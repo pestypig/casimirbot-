@@ -242,6 +242,7 @@ import {
   type HelixAskSessionMemory,
 } from "../services/helix-ask/session-memory";
 import {
+  type CapsuleConstraintBundle,
   buildContextCapsuleFromTrace,
   buildSessionMemoryPatchFromCapsules,
   resolveContextCapsuleIds,
@@ -3845,6 +3846,8 @@ const HELIX_ASK_FILE_HINT =
   /(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yml|yaml|mjs|cjs|py|rs|go|java|kt|swift|cpp|c|h)/i;
 const HELIX_ASK_ANSWER_START = "ANSWER_START";
 const HELIX_ASK_ANSWER_END = "ANSWER_END";
+const HELIX_ASK_DIALOGUE_PROFILE_VALUES = ["dot_min_steps_v1"] as const;
+type HelixAskDialogueProfile = (typeof HELIX_ASK_DIALOGUE_PROFILE_VALUES)[number];
 const HELIX_ASK_ANSWER_BOUNDARY_PREFIX_RE = /^\s*ANSWER_(?:START|END)\b\s*/i;
 const HELIX_ASK_ANSWER_MARKER_SPLIT_RE = /\b(?:ANSWER_START|ANSWER_END)\b/gi;
 const HELIX_ASK_PROGRESS_TOOL = "helix.ask.progress";
@@ -3896,6 +3899,30 @@ function ensureFinalMarker(value: string): string {
   if (!value.trim()) return `${HELIX_ASK_ANSWER_START}\n${HELIX_ASK_ANSWER_END}`;
   if (value.includes(HELIX_ASK_ANSWER_START) || value.includes("FINAL:")) return value;
   return `${value.trimEnd()}\n\n${HELIX_ASK_ANSWER_START}\n${HELIX_ASK_ANSWER_END}`;
+}
+
+function applyDialogueProfilePrompt(
+  prompt: string,
+  profile: HelixAskDialogueProfile | undefined,
+  question: string,
+): string {
+  if (profile !== "dot_min_steps_v1") return prompt;
+  if (prompt.includes("Dialogue profile: dot_min_steps_v1")) return prompt;
+  const directives = [
+    "Dialogue profile: dot_min_steps_v1",
+    "Cadence: mirror -> decisive next step -> bounded why -> optional evidence anchor.",
+    "If uncertainty blocks action, ask exactly one clarifying question before prescribing steps.",
+    "When evidence is sufficient, cap actionable guidance to 1-3 steps.",
+    "Do not inflate certainty; preserve certainty/evidence parity with deterministic suppression reasons.",
+    `Question focus: ${question.trim() || "conversation lane"}`,
+  ].join("\n");
+  const markerIndex = prompt.lastIndexOf(HELIX_ASK_ANSWER_START);
+  if (markerIndex >= 0) {
+    const head = prompt.slice(0, markerIndex).trimEnd();
+    const tail = prompt.slice(markerIndex);
+    return `${head}\n\n${directives}\n\n${tail}`;
+  }
+  return `${prompt.trimEnd()}\n\n${directives}`;
 }
 
 function cleanPromptLine(value: string): string {
@@ -4943,6 +4970,15 @@ function stripRepoCitationsForOpenWorldBypass(value: string): string {
     .trim();
 }
 
+const shouldAppendOpenWorldSourcesMarker = (args: {
+  answerText: string;
+  treeWalkBlock?: string | null;
+}): boolean => {
+  if (hasSourcesLine(args.answerText)) return false;
+  const treeWalkCitations = extractFilePathsFromText(args.treeWalkBlock ?? "").filter(Boolean);
+  return treeWalkCitations.length === 0;
+};
+
 function ensureOpenWorldBypassUncertainty(value: string): string {
   const body = value.trim();
   const prefix =
@@ -5797,6 +5833,127 @@ function mergeHelixAskQueries(base: string[], hints: string[], limit: number): s
   hints.forEach(push);
   return merged.slice(0, Math.max(1, limit));
 }
+
+type CapsuleGuardResult = "pass" | "retry" | "clarify";
+
+const CAPSULE_TOPIC_SHIFT_RE =
+  /\b(?:new topic|switch(?:ing)?(?:\s+topics?)?|change(?:\s+the)?\s+subject|moving on|instead|actually[, ]+let'?s|now[, ]+let'?s\s+talk about)\b/i;
+const CAPSULE_AMBIGUOUS_PROMPT_RE =
+  /^(?:where|why|how|what|and|so|then|that|this|it)\b(?:\s+[a-z0-9'_-]+){0,6}\??$/i;
+
+const normalizeCapsulePathKey = (value: string): string =>
+  (normalizeEvidenceRef(value) ?? value).replace(/\\/g, "/").toLowerCase();
+
+const detectCapsuleTopicShift = (question: string): boolean => CAPSULE_TOPIC_SHIFT_RE.test(question);
+
+const resolveCapsuleMustKeepTerms = (
+  bundle: CapsuleConstraintBundle | null | undefined,
+  latestTopicShift: boolean,
+): string[] => {
+  const terms = Array.isArray(bundle?.mustKeepTerms) ? bundle.mustKeepTerms : [];
+  return dedupeTokens(terms.map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length >= 3)).slice(
+    0,
+    latestTopicShift ? 4 : 12,
+  );
+};
+
+const resolveCapsulePreferredEvidencePaths = (
+  bundle: CapsuleConstraintBundle | null | undefined,
+  latestTopicShift: boolean,
+): string[] => {
+  const paths = Array.isArray(bundle?.preferredEvidencePaths) ? bundle.preferredEvidencePaths : [];
+  return normalizeCitations(paths).slice(0, latestTopicShift ? 3 : 12);
+};
+
+const answerContainsCapsuleFocusTerm = (text: string, terms: string[]): boolean => {
+  if (!terms.length) return true;
+  const normalized = text.toLowerCase();
+  return terms.some((term) => normalized.includes(term));
+};
+
+const answerHasCapsulePreferredAnchor = (text: string, preferredPaths: string[]): boolean => {
+  if (!preferredPaths.length) return true;
+  const citedPathKeys = new Set(
+    extractFilePathsFromText(text)
+      .map((entry) => normalizeCapsulePathKey(entry))
+      .filter(Boolean),
+  );
+  if (citedPathKeys.size > 0) {
+    for (const preferred of preferredPaths) {
+      const preferredKey = normalizeCapsulePathKey(preferred);
+      if (!preferredKey) continue;
+      if (citedPathKeys.has(preferredKey)) return true;
+      const preferredBase = path.posix.basename(preferredKey);
+      for (const cited of citedPathKeys) {
+        if (preferredBase && cited.endsWith(`/${preferredBase}`)) return true;
+      }
+    }
+  }
+  return false;
+};
+
+const isCapsuleIntentAmbiguous = (question: string): boolean => {
+  const normalized = question.trim().toLowerCase();
+  if (!normalized) return true;
+  if (normalized.length <= 12) return true;
+  if (CAPSULE_AMBIGUOUS_PROMPT_RE.test(normalized)) return true;
+  const tokenCount = tokenizeAskQuery(normalized).length;
+  return tokenCount <= 3;
+};
+
+const buildCapsuleTargetedClarifier = (question: string, mustKeepTerms: string[]): string => {
+  const seed = mustKeepTerms[0] ?? tokenizeAskQuery(question).slice(0, 2).join(" ");
+  if (seed) {
+    return `Quick check: should I keep this anchored to "${seed}" or switch to a different focus?`;
+  }
+  return "Quick check: what exact concept should I anchor this follow-up to?";
+};
+
+const rewriteAnswerWithCapsuleConstraints = (args: {
+  answer: string;
+  mustKeepTerms: string[];
+  preferredEvidencePaths: string[];
+  requireAnchor: boolean;
+}): string => {
+  let next = args.answer.trim();
+  if (!next) return next;
+  const focusOk = answerContainsCapsuleFocusTerm(next, args.mustKeepTerms);
+  if (!focusOk && args.mustKeepTerms.length > 0) {
+    const focusLine = ensureSentence(
+      `Focus anchor: ${args.mustKeepTerms.slice(0, 3).join(", ")}.`,
+    );
+    if (focusLine) {
+      next = `${focusLine}\n\n${next}`.trim();
+    }
+  }
+  if (args.requireAnchor && args.preferredEvidencePaths.length > 0) {
+    const anchorOk = answerHasCapsulePreferredAnchor(next, args.preferredEvidencePaths);
+    if (!anchorOk) {
+      const anchorLine = `Sources: ${args.preferredEvidencePaths.slice(0, 4).join(", ")}`;
+      if (!hasSourcesLine(next)) {
+        next = `${next}\n\n${anchorLine}`.trim();
+      } else if (!next.toLowerCase().includes(anchorLine.toLowerCase())) {
+        next = `${next}\n${anchorLine}`.trim();
+      }
+    }
+  }
+  return next;
+};
+
+const isCapsuleRetrievalDriftDetected = (args: {
+  contextText: string;
+  contextFiles: string[];
+  mustKeepTerms: string[];
+  preferredEvidencePaths: string[];
+}): boolean => {
+  if (args.mustKeepTerms.length === 0 && args.preferredEvidencePaths.length === 0) return false;
+  const focusHit = answerContainsCapsuleFocusTerm(args.contextText, args.mustKeepTerms);
+  const contextPathKeys = new Set(args.contextFiles.map((entry) => normalizeCapsulePathKey(entry)));
+  const anchorHit =
+    args.preferredEvidencePaths.length === 0 ||
+    args.preferredEvidencePaths.some((entry) => contextPathKeys.has(normalizeCapsulePathKey(entry)));
+  return !focusHit || !anchorHit;
+};
 
 function normalizeAskSearchSeed(value: string): string {
   return value.replace(/^\s*question:\s*/i, "").trim();
@@ -13463,6 +13620,7 @@ const HELIX_ASK_ADAPTIVE_RESCUE_REASONS = new Set<string>([
   "generic_grounding_scaffold",
   "metadata_noise",
   "code_noise",
+  "path_index_body",
   "citation_missing",
   "text_too_short",
   "semantic_density_low",
@@ -13479,6 +13637,35 @@ const hasModelPlaceholderOrStub = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
   return RELATION_MODEL_PLACEHOLDER_RE.test(normalized) || STUB_TEXT_RE.test(normalized) || GENERIC_GROUNDED_RE.test(normalized);
+};
+
+const HELIX_ASK_LABELED_PATH_INDEX_ENTRY_RE =
+  /(?:^|[\n;]\s*|\s)(?:[A-Za-z][A-Za-z0-9 _-]{2,84})\s*:\s*(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.(?:md|json|ts|tsx|js|jsx|py|yml|yaml)\b/gi;
+
+const isPathIndexStyleAnswer = (value: string): boolean => {
+  const text = value.trim();
+  if (!text) return false;
+  const pathMatches = extractFilePathsFromText(text);
+  if (pathMatches.length < 2) return false;
+  const labeledEntries = text.match(HELIX_ASK_LABELED_PATH_INDEX_ENTRY_RE) ?? [];
+  const proseSentences = splitGroundedSentences(text).filter((sentence) => {
+    if (!sentence.trim()) return false;
+    if (extractFilePathsFromText(sentence).length > 0) return false;
+    return /[A-Za-z]{3,}/.test(sentence);
+  });
+  const claimCount = extractClaimCandidates(text, 6).length;
+  const textWithoutIndexLabels = text.replace(HELIX_ASK_LABELED_PATH_INDEX_ENTRY_RE, " ");
+  const hasMechanismSignal =
+    /\b(is|are|means|refers?|because|therefore|comes from|derived from|involves|related to|difference|through)\b/i.test(
+      textWithoutIndexLabels,
+    );
+  if (labeledEntries.length >= 2 && proseSentences.length === 0) {
+    return true;
+  }
+  if (pathMatches.length >= 3 && proseSentences.length <= 1 && claimCount <= 1 && !hasMechanismSignal) {
+    return true;
+  }
+  return false;
 };
 
 const detectRelationDeterministicFallbackReasons = (value: string): string[] => {
@@ -13537,6 +13724,9 @@ const detectRepoAnswerQualityFloorReasons = (args: {
   }
   if (isDeterministicMetadataNoise(normalized)) {
     reasons.add("metadata_noise");
+  }
+  if (isPathIndexStyleAnswer(args.text)) {
+    reasons.add("path_index_body");
   }
   if (RELATION_CODE_NOISE_RE.test(normalized)) {
     reasons.add("code_noise");
@@ -14768,10 +14958,11 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
     sessionId: z.string().min(1).max(128).optional(),
     traceId: z.string().min(1).max(128).optional(),
-    capsuleIds: z.array(z.string().min(1).max(24)).max(3).optional(),
+    capsuleIds: z.array(z.string().min(1).max(24)).max(12).optional(),
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
     mode: z.enum(["read", "observe", "act", "verify"]).optional(),
+    dialogue_profile: z.enum(HELIX_ASK_DIALOGUE_PROFILE_VALUES).optional(),
     allowTools: z.array(z.string().min(1)).max(24).optional(),
     requiredEvidence: z.array(z.string().min(1)).max(24).optional(),
     strictProvenance: z.boolean().optional(),
@@ -14810,6 +15001,57 @@ const MoodHintPayloadSchema = z.object({
   mood: LumaMoodSchema.nullable().optional(),
   confidence: z.number().min(0).max(1).optional(),
   reason: z.string().min(1).optional(),
+});
+
+const HELIX_CONVERSATION_MODE_VALUES = ["observe", "act", "verify", "clarify"] as const;
+type HelixConversationMode = (typeof HELIX_CONVERSATION_MODE_VALUES)[number];
+type HelixConversationRouteReasonCode =
+  | "dispatch:observe_explore"
+  | "dispatch:observe"
+  | "dispatch:act"
+  | "dispatch:verify"
+  | "suppressed:filler"
+  | "suppressed:clarify_after_attempt1"
+  | "suppressed:low_salience";
+
+type HelixConversationExplorationPacket = {
+  topic: string;
+  goal: string;
+  knowns: string[];
+  unknowns: string[];
+  evidence_needed: string[];
+  next_probe: string;
+};
+
+type HelixConversationRouteDecision = {
+  classification: z.infer<typeof HelixConversationClassifierSchema>;
+  routeReasonCode: HelixConversationRouteReasonCode;
+  explorationTurn: boolean;
+  clarifierPolicy: "after_first_attempt";
+  explorationPacket: HelixConversationExplorationPacket;
+};
+
+const HelixConversationClassifierSchema = z.object({
+  mode: z.enum(HELIX_CONVERSATION_MODE_VALUES),
+  confidence: z.number().min(0).max(1),
+  dispatch_hint: z.boolean(),
+  clarify_needed: z.boolean(),
+  reason: z.string().min(1).max(240),
+});
+
+const HelixConversationBriefSchema = z.object({
+  text: z.string().min(1).max(1200),
+});
+
+const HelixConversationTurnRequest = z.object({
+  transcript: z.string().min(1).max(4000),
+  sessionId: z.string().min(1).max(128).optional(),
+  traceId: z.string().min(1).max(128).optional(),
+  missionId: z.string().min(1).max(200).optional(),
+  personaId: z.string().min(1).optional(),
+  sourceLanguage: z.string().min(1).max(32).optional(),
+  translated: z.boolean().optional(),
+  recentTurns: z.array(z.string().min(1).max(480)).max(8).optional(),
 });
 
 const HELIX_MOOD_HINT_MAX_CHARS = clampNumber(
@@ -14915,6 +15157,375 @@ function parseMoodHintResult(raw: string): {
   };
 }
 
+const HELIX_CONVERSATION_CLASSIFIER_MAX_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_CONVERSATION_CLASSIFIER_MAX_TOKENS, 160),
+  64,
+  512,
+);
+const HELIX_CONVERSATION_BRIEF_MAX_TOKENS = clampNumber(
+  readNumber(process.env.HELIX_CONVERSATION_BRIEF_MAX_TOKENS, 220),
+  96,
+  640,
+);
+const HELIX_CONVERSATION_MODEL = () =>
+  process.env.LLM_HTTP_MODEL?.trim() ||
+  process.env.LLM_LOCAL_MODEL?.trim() ||
+  "gpt-4o-mini";
+
+const clipConversationText = (value: string, maxChars = 320): string => {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+};
+
+const HELIX_CONVERSATION_FILLER_RE =
+  /^(ok|okay|yeah|yep|nope|thanks|thank you|cool|nice|right|got it|sounds good|testing|test)\b/i;
+const HELIX_CONVERSATION_VERIFY_RE =
+  /\b(verify|verification|prove|proof|validate|validation|integrity|certificate|pass\/fail|pass fail|audit|check)\b/i;
+const HELIX_CONVERSATION_ACT_RE =
+  /\b(implement|fix|change|update|remove|add|create|run|patch|deploy|execute|do this|take action)\b/i;
+const HELIX_CONVERSATION_OBSERVE_RE =
+  /\b(observe|monitor|watch|track|status|state|what changed|what is happening|inspect|summarize)\b/i;
+const HELIX_CONVERSATION_EXPLORATORY_RE =
+  /\b(how|why|what|walk me through|full solve|explain|overview|tell me about|break down|understand|explore)\b/i;
+
+const HELIX_CONVERSATION_STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "what",
+  "when",
+  "where",
+  "which",
+  "would",
+  "could",
+  "should",
+  "about",
+  "there",
+  "their",
+  "them",
+  "your",
+  "into",
+  "while",
+  "have",
+  "need",
+  "then",
+  "just",
+  "like",
+  "done",
+  "does",
+  "is",
+  "are",
+  "was",
+  "were",
+]);
+
+const isConversationFillerTurn = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return true;
+  if (normalized.length <= 6) return true;
+  return normalized.length <= 28 && HELIX_CONVERSATION_FILLER_RE.test(normalized);
+};
+
+const isConversationExploratoryTurn = (transcript: string): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  if (HELIX_CONVERSATION_VERIFY_RE.test(normalized) || HELIX_CONVERSATION_ACT_RE.test(normalized)) {
+    return false;
+  }
+  if (HELIX_CONVERSATION_OBSERVE_RE.test(normalized)) return true;
+  if (HELIX_CONVERSATION_EXPLORATORY_RE.test(normalized)) return true;
+  if (normalized.includes("?") && normalized.length >= 12) return true;
+  if (normalized.length >= 20) return true;
+  return false;
+};
+
+const extractConversationKnowns = (transcript: string): string[] => {
+  const tokens = transcript.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? [];
+  const knowns: string[] = [];
+  for (const token of tokens) {
+    if (HELIX_CONVERSATION_STOP_WORDS.has(token)) continue;
+    if (knowns.includes(token)) continue;
+    knowns.push(token);
+    if (knowns.length >= 6) break;
+  }
+  return knowns;
+};
+
+const buildConversationExplorationPacket = (args: {
+  transcript: string;
+  mode: HelixConversationMode;
+  routeReasonCode: HelixConversationRouteReasonCode;
+}): HelixConversationExplorationPacket => {
+  const topic = clipConversationText(args.transcript, 120);
+  const knowns = extractConversationKnowns(args.transcript);
+  const baseGoal =
+    args.mode === "verify"
+      ? "Validate the claim with explicit pass/fail evidence."
+      : args.mode === "act"
+        ? "Plan and execute the requested change with deterministic safety checks."
+        : args.mode === "clarify"
+          ? "Collect one concrete detail needed to continue."
+          : "Explore the topic and assemble a grounded explanation.";
+  const unknowns =
+    args.mode === "verify"
+      ? ["claim boundaries", "required evidence", "pass/fail threshold"]
+      : args.mode === "act"
+        ? ["target change scope", "safety constraints", "execution order"]
+        : args.mode === "clarify"
+          ? ["missing context detail", "user-specific constraint", "next concrete objective"]
+          : ["mechanism details", "evidence anchors", "best next probe"];
+  const evidenceNeeded =
+    args.mode === "act"
+      ? ["preflight checks", "affected files/modules", "post-change verification"]
+      : ["citations or grounded references", "deterministic fail reasons", "next testable probe"];
+  const nextProbe =
+    args.mode === "verify"
+      ? `Check whether "${topic}" is supported by explicit evidence and return pass/fail.`
+      : args.mode === "act"
+        ? `Convert "${topic}" into concrete execution steps and expected receipts.`
+        : args.routeReasonCode === "suppressed:clarify_after_attempt1"
+          ? `Ask one focused clarifier to unlock "${topic}".`
+          : `Run observe-first reasoning for "${topic}" and surface the highest-signal next step.`;
+  return {
+    topic,
+    goal: baseGoal,
+    knowns,
+    unknowns,
+    evidence_needed: evidenceNeeded,
+    next_probe: nextProbe,
+  };
+};
+
+const normalizeConversationRouteDecision = (args: {
+  transcript: string;
+  classification: z.infer<typeof HelixConversationClassifierSchema>;
+}): HelixConversationRouteDecision => {
+  const normalized = args.transcript.trim().toLowerCase();
+  const explicitVerify = HELIX_CONVERSATION_VERIFY_RE.test(normalized);
+  const explicitAct = HELIX_CONVERSATION_ACT_RE.test(normalized);
+  const filler = isConversationFillerTurn(normalized);
+  const exploratory = isConversationExploratoryTurn(normalized);
+  const next = { ...args.classification };
+
+  let routeReasonCode: HelixConversationRouteReasonCode = "suppressed:low_salience";
+  let explorationTurn = false;
+
+  if (filler) {
+    next.mode = "clarify";
+    next.dispatch_hint = false;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.72);
+    next.reason = "Low-information filler/ack turn.";
+    routeReasonCode = "suppressed:filler";
+  } else if (explicitVerify) {
+    next.mode = "verify";
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.82);
+    routeReasonCode = "dispatch:verify";
+  } else if (explicitAct) {
+    next.mode = "act";
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.82);
+    routeReasonCode = "dispatch:act";
+  } else if (exploratory) {
+    next.mode = "observe";
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.72);
+    routeReasonCode = "dispatch:observe_explore";
+    explorationTurn = true;
+  } else if (next.mode === "clarify") {
+    next.mode = "observe";
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.58);
+    next.reason = "Clarifier deferred until after first exploration attempt.";
+    routeReasonCode = "dispatch:observe_explore";
+    explorationTurn = true;
+  } else if (next.mode === "verify") {
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    routeReasonCode = "dispatch:verify";
+  } else if (next.mode === "act") {
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    routeReasonCode = "dispatch:act";
+  } else if (next.mode === "observe" && next.dispatch_hint) {
+    routeReasonCode = "dispatch:observe";
+  } else if (next.mode === "observe") {
+    next.dispatch_hint = exploratory || normalized.length >= 18;
+    next.clarify_needed = false;
+    routeReasonCode = next.dispatch_hint ? "dispatch:observe_explore" : "suppressed:low_salience";
+    explorationTurn = next.dispatch_hint;
+  } else {
+    next.dispatch_hint = false;
+    next.clarify_needed = false;
+    routeReasonCode = "suppressed:low_salience";
+  }
+
+  const explorationPacket = buildConversationExplorationPacket({
+    transcript: args.transcript,
+    mode: next.mode,
+    routeReasonCode,
+  });
+  return {
+    classification: next,
+    routeReasonCode,
+    explorationTurn,
+    clarifierPolicy: "after_first_attempt",
+    explorationPacket,
+  };
+};
+
+const inferConversationModeHeuristic = (transcript: string): HelixConversationMode => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return "clarify";
+  if (HELIX_CONVERSATION_VERIFY_RE.test(normalized)) {
+    return "verify";
+  }
+  if (HELIX_CONVERSATION_ACT_RE.test(normalized)) {
+    return "act";
+  }
+  if (HELIX_CONVERSATION_OBSERVE_RE.test(normalized)) {
+    return "observe";
+  }
+  if (isConversationFillerTurn(normalized)) {
+    return "clarify";
+  }
+  return "observe";
+};
+
+const inferConversationDispatchHintHeuristic = (transcript: string, mode: HelixConversationMode): boolean => {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  if (mode === "act" || mode === "verify") return true;
+  if (mode === "clarify") return false;
+  if (isConversationFillerTurn(normalized)) return false;
+  if (isConversationExploratoryTurn(normalized)) return true;
+  if (normalized.length < 14) return false;
+  return /\b(risk|decision|claim|status|monitor|check|evidence|why|how|full solve|explain)\b/.test(normalized);
+};
+
+const buildConversationFallbackBrief = (args: {
+  transcript: string;
+  mode: HelixConversationMode;
+  dispatchHint: boolean;
+}): string => {
+  const clipped = clipConversationText(args.transcript, 160);
+  const laneText =
+    args.mode === "verify"
+      ? "verification"
+      : args.mode === "act"
+        ? "action"
+        : args.mode === "observe"
+          ? "observe"
+          : "clarify";
+  if (args.mode === "clarify") {
+    return `I heard: "${clipped}". Share one specific goal or constraint and I will guide the next step while keeping this conversational for now.`;
+  }
+  if (args.dispatchHint) {
+    return `Got it. I will run a short ${laneText} reasoning pass in the background so we can keep talking while it loads.`;
+  }
+  return `I heard: "${clipped}". I will keep this conversational for now and queue deeper reasoning when the turn needs it.`;
+};
+
+const parseConversationClassifierResult = (
+  raw: string,
+): z.infer<typeof HelixConversationClassifierSchema> | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const jsonCandidate = extractJsonObject(trimmed) ?? trimmed;
+  try {
+    const parsed = HelixConversationClassifierSchema.safeParse(JSON.parse(jsonCandidate));
+    if (parsed.success) {
+      return parsed.data;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+const parseConversationBriefResult = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const jsonCandidate = extractJsonObject(trimmed);
+  if (jsonCandidate) {
+    try {
+      const parsed = HelixConversationBriefSchema.safeParse(JSON.parse(jsonCandidate));
+      if (parsed.success) {
+        return parsed.data.text.trim();
+      }
+    } catch {
+      // Fall through to plain-text mode.
+    }
+  }
+  return clipConversationText(trimmed, 520);
+};
+
+const buildConversationClassifierPrompt = (args: {
+  transcript: string;
+  recentTurns: string[];
+}): string => {
+  const lines: string[] = [];
+  lines.push("You are the Helix conversation governor classifier.");
+  lines.push("Classify the user turn for routing into observe, act, verify, or clarify.");
+  lines.push("Return strict JSON only with fields:");
+  lines.push(
+    "{\"mode\":\"observe|act|verify|clarify\",\"confidence\":0..1,\"dispatch_hint\":boolean,\"clarify_needed\":boolean,\"reason\":\"<=160 chars\"}",
+  );
+  lines.push("Dispatch hint policy:");
+  lines.push("- true for substantive claim/check/decision/risk/action turns.");
+  lines.push("- true for broad exploratory prompts (explanations, walkthroughs, full-solve questions).");
+  lines.push("- false for fillers, acknowledgments, or low-information chatter.");
+  lines.push("Reserve mode=clarify for filler/ack/very-short turns; do not overuse clarify on broad topics.");
+  lines.push("");
+  lines.push("Recent turns:");
+  lines.push(args.recentTurns.length > 0 ? args.recentTurns.map((turn) => `- ${turn}`).join("\n") : "- none");
+  lines.push("");
+  lines.push("Current transcript:");
+  lines.push(args.transcript);
+  return lines.join("\n");
+};
+
+const buildConversationBriefPrompt = (args: {
+  transcript: string;
+  classification: z.infer<typeof HelixConversationClassifierSchema>;
+  routeReasonCode: HelixConversationRouteReasonCode;
+  recentTurns: string[];
+}): string => {
+  const lines: string[] = [];
+  lines.push("Dialogue profile: dot_min_steps_v1");
+  lines.push("Generate one concise conversational brief.");
+  lines.push("Cadence: mirror -> decisive next step -> bounded why -> optional evidence anchor.");
+  lines.push("Include decision awareness in plain human wording.");
+  lines.push("- If dispatch_hint=true, say you are queuing reasoning in the background.");
+  lines.push("- If dispatch_hint=false, say you are keeping this conversational for now.");
+  lines.push("Do not output raw route/status codes.");
+  lines.push("For exploratory turns, do not ask a clarifier yet; launch observe-first reasoning.");
+  lines.push("Ask exactly one clarifier only when the first reasoning attempt cannot progress.");
+  lines.push("Keep to 1-3 short sentences. Do not overstate certainty.");
+  lines.push("Return strict JSON only: {\"text\":\"...\"}");
+  lines.push("");
+  lines.push(`Classification mode: ${args.classification.mode}`);
+  lines.push(`Dispatch hint: ${args.classification.dispatch_hint ? "true" : "false"}`);
+  lines.push(`Reason: ${args.classification.reason}`);
+  lines.push(`Route reason: ${args.routeReasonCode}`);
+  lines.push("Recent turns:");
+  lines.push(args.recentTurns.length > 0 ? args.recentTurns.map((turn) => `- ${turn}`).join("\n") : "- none");
+  lines.push("");
+  lines.push("Current transcript:");
+  lines.push(args.transcript);
+  return lines.join("\n");
+};
+
 type LocalAskResult = {
   text?: string;
   provenance_class?: "measured" | "proxy" | "inferred" | "simulation";
@@ -15009,6 +15620,8 @@ type HelixAskOverflowOptions = {
   allowContextDrop?: boolean;
   fallbackMaxTokens?: number;
   label?: string;
+  dialogueProfile?: HelixAskDialogueProfile;
+  dialogueQuestion?: string;
 };
 
 type HelixAskLlmCallMeta = {
@@ -15178,6 +15791,7 @@ const runHelixAskLocalWithOverflowRetry = async (
     temperature?: number;
     seed?: number;
     stop?: string | string[];
+    model?: string;
   },
   ctx: {
     personaId: string;
@@ -15189,7 +15803,11 @@ const runHelixAskLocalWithOverflowRetry = async (
 ): Promise<{ result: LocalAskResult; overflow?: HelixAskOverflowMeta; llm?: HelixAskLlmCallMeta }> => {
   const steps = parseOverflowPolicy(HELIX_ASK_OVERFLOW_RETRY_POLICY);
   const fallbackMaxTokens = Math.max(1, Math.floor(options.fallbackMaxTokens ?? 256));
-  let prompt = input.prompt;
+  let prompt = applyDialogueProfilePrompt(
+    input.prompt,
+    options.dialogueProfile,
+    options.dialogueQuestion ?? "",
+  );
   let maxTokens = input.max_tokens;
   const appliedSteps: string[] = [];
   let attempts = 0;
@@ -15227,6 +15845,7 @@ const runHelixAskLocalWithOverflowRetry = async (
           temperature: input.temperature,
           seed: input.seed,
           stop: input.stop,
+          model: input.model,
         },
         ctx,
       )) as LocalAskResult;
@@ -18388,6 +19007,18 @@ export const __testHelixAskReliabilityGuards = {
   applyHelixAskClaimGroundingGate,
 };
 
+export const __testCapsuleGrounding = {
+  detectCapsuleTopicShift,
+  resolveCapsuleMustKeepTerms,
+  resolveCapsulePreferredEvidencePaths,
+  answerContainsCapsuleFocusTerm,
+  answerHasCapsulePreferredAnchor,
+  isCapsuleIntentAmbiguous,
+  rewriteAnswerWithCapsuleConstraints,
+  isCapsuleRetrievalDriftDetected,
+  shouldAppendOpenWorldSourcesMarker,
+};
+
 type HelixAskExecutionArgs = {
   request: z.infer<typeof LocalAskRequest>;
   personaId: string;
@@ -18530,11 +19161,22 @@ const executeHelixAsk = async ({
   const askRequestStartedAt = Date.now();
   const askSessionId = parsed.data.sessionId;
   const askTraceId = (parsed.data.traceId?.trim() || `ask:${crypto.randomUUID()}`).slice(0, 128);
+  const dialogueProfile = parsed.data.dialogue_profile;
   const requestedContextCapsuleIds = resolveContextCapsuleIds({
     explicit: parsed.data.capsuleIds,
     prompt: parsed.data.prompt,
     question: parsed.data.question,
   });
+  let capsuleConstraintBundle: CapsuleConstraintBundle = {
+    mustKeepTerms: [],
+    preferredEvidencePaths: [],
+  };
+  let capsuleMustKeepTerms: string[] = [];
+  let capsulePreferredEvidencePaths: string[] = [];
+  let capsuleLatestTopicShift = false;
+  let capsuleRetryApplied = false;
+  let focusGuardResult: CapsuleGuardResult = "pass";
+  let anchorGuardResult: CapsuleGuardResult = "pass";
   let contextCapsuleMemoryPatchSummary: ReturnType<
     typeof buildSessionMemoryPatchFromCapsules
   > | null = null;
@@ -18751,6 +19393,7 @@ const executeHelixAsk = async ({
         tenantId: tenantId ?? null,
         sessionId: askSessionId,
       });
+      capsuleConstraintBundle = contextCapsuleMemoryPatchSummary.constraintBundle;
       if (contextCapsuleMemoryPatchSummary.appliedCapsuleIds.length > 0) {
         recordHelixAskSessionMemory({
           sessionId: askSessionId,
@@ -19340,6 +19983,7 @@ const executeHelixAsk = async ({
       micro_pass_enabled?: boolean;
       micro_pass_auto?: boolean;
       micro_pass_reason?: string;
+      dialogue_profile?: HelixAskDialogueProfile;
       scaffold?: string;
       evidence_cards?: string;
       query_hints?: string[];
@@ -19670,6 +20314,16 @@ const executeHelixAsk = async ({
         aliases?: string[];
       }>;
       session_memory_last_clarify?: string[];
+      capsule_dialogue_applied_count?: number;
+      capsule_evidence_applied_count?: number;
+      capsule_retry_applied?: boolean;
+      capsule_retry_triggered?: boolean;
+      capsule_retry_reason?: string;
+      capsule_latest_topic_shift?: boolean;
+      capsule_must_keep_terms?: string[];
+      capsule_preferred_paths?: string[];
+      focus_guard_result?: CapsuleGuardResult;
+      anchor_guard_result?: CapsuleGuardResult;
       graph_pack_lock?: {
         requested?: string[];
         applied?: string[];
@@ -20119,6 +20773,7 @@ const executeHelixAsk = async ({
       debugPayload.llm_skip_reason = "not_attempted";
       debugPayload.llm_force_probe_requested = forceLlmProbeRequested;
       debugPayload.llm_force_probe_enabled = forceLlmProbe;
+      debugPayload.dialogue_profile = dialogueProfile;
     }
     attachContextCapsuleToResult = (
       target: LocalAskResult,
@@ -20126,6 +20781,13 @@ const executeHelixAsk = async ({
     ): void => {
       const finalText = (coerceString(finalTextRaw ?? target.text ?? "") ?? "").trim();
       if (!finalText) return;
+      if (isPathIndexStyleAnswer(finalText)) {
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).context_capsule_skipped = true;
+          (debugPayload as Record<string, unknown>).context_capsule_skip_reason = "path_index_body";
+        }
+        return;
+      }
       try {
         const proofRecord =
           target.proof && typeof target.proof === "object"
@@ -20161,6 +20823,8 @@ const executeHelixAsk = async ({
             (debugPayload as Record<string, unknown>).context_capsule_memory = {
               requested: contextCapsuleMemoryPatchSummary.requestedCapsuleIds,
               applied: contextCapsuleMemoryPatchSummary.appliedCapsuleIds,
+              dialogue_applied: contextCapsuleMemoryPatchSummary.dialogueAppliedCapsuleIds,
+              evidence_applied: contextCapsuleMemoryPatchSummary.evidenceAppliedCapsuleIds,
               inactive: contextCapsuleMemoryPatchSummary.inactiveCapsuleIds,
               missing: contextCapsuleMemoryPatchSummary.missingCapsuleIds,
             };
@@ -20429,6 +21093,15 @@ const executeHelixAsk = async ({
       }
     }
     const baseQuestion = (questionValue ?? question ?? "").trim();
+    capsuleLatestTopicShift = detectCapsuleTopicShift(baseQuestion);
+    capsuleMustKeepTerms = resolveCapsuleMustKeepTerms(
+      capsuleConstraintBundle,
+      capsuleLatestTopicShift,
+    );
+    capsulePreferredEvidencePaths = resolveCapsulePreferredEvidencePaths(
+      capsuleConstraintBundle,
+      capsuleLatestTopicShift,
+    );
     const definitionFocus = isDefinitionQuestion(baseQuestion);
     if (definitionFocus) {
       evidenceTokens = clampNumber(
@@ -20441,6 +21114,16 @@ const executeHelixAsk = async ({
       debugPayload.single_llm = HELIX_ASK_SINGLE_LLM;
       debugPayload.definition_focus = definitionFocus;
       debugPayload.evidence_tokens = evidenceTokens;
+      debugPayload.capsule_dialogue_applied_count =
+        contextCapsuleMemoryPatchSummary?.dialogueAppliedCapsuleIds.length ?? 0;
+      debugPayload.capsule_evidence_applied_count =
+        contextCapsuleMemoryPatchSummary?.evidenceAppliedCapsuleIds.length ?? 0;
+      debugPayload.capsule_retry_applied = false;
+      debugPayload.focus_guard_result = "pass";
+      debugPayload.anchor_guard_result = "pass";
+      debugPayload.capsule_latest_topic_shift = capsuleLatestTopicShift;
+      debugPayload.capsule_must_keep_terms = capsuleMustKeepTerms.slice(0, 8);
+      debugPayload.capsule_preferred_paths = capsulePreferredEvidencePaths.slice(0, 8);
     }
     const rawQuestion = (request.question ?? request.prompt ?? "").trim();
     const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
@@ -24328,10 +25011,21 @@ const executeHelixAsk = async ({
         if (!blockScoped && conceptMatch?.card.sourcePath) {
           baseQueries.push(conceptMatch.card.sourcePath);
         }
+        const capsuleHintTerms = capsuleMustKeepTerms.slice(0, 8);
+        const capsuleEvidenceHints = capsulePreferredEvidencePaths.slice(0, 8);
         const blockQueryHints = blockScoped && HELIX_ASK_QUERY_HINTS_BLOCKS ? queryHints : [];
         const mergeHints = blockScoped
-          ? [...blockQueryHints, ...graphHintTerms, ...slotAliases, ...slotEvidenceHints]
+          ? [
+              ...capsuleHintTerms,
+              ...capsuleEvidenceHints,
+              ...blockQueryHints,
+              ...graphHintTerms,
+              ...slotAliases,
+              ...slotEvidenceHints,
+            ]
           : [
+              ...capsuleHintTerms,
+              ...capsuleEvidenceHints,
               ...queryHints,
               ...graphHintTerms,
               ...slotAliases,
@@ -26053,6 +26747,112 @@ const executeHelixAsk = async ({
               : coverageSlotSummary?.missingSlots ?? [];
           return { applied: true, observedDelta, missingSlots };
         };
+        const capsuleContextFocusHit = answerContainsCapsuleFocusTerm(
+          contextText,
+          capsuleMustKeepTerms,
+        );
+        const capsuleContextAnchorHit =
+          capsulePreferredEvidencePaths.length === 0 ||
+          capsulePreferredEvidencePaths.some((entry) =>
+            contextFiles.some(
+              (filePath) => normalizeCapsulePathKey(filePath) === normalizeCapsulePathKey(entry),
+            ),
+          );
+        const capsuleRetrievalDrift = isCapsuleRetrievalDriftDetected({
+          contextText,
+          contextFiles,
+          mustKeepTerms: capsuleMustKeepTerms,
+          preferredEvidencePaths: capsulePreferredEvidencePaths,
+        });
+        const capsuleRetryEligible =
+          HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
+          !promptIngested &&
+          openWorldBypassMode !== "active" &&
+          !capsuleRetryApplied &&
+          (capsuleMustKeepTerms.length > 0 || capsulePreferredEvidencePaths.length > 0) &&
+          capsuleRetrievalDrift &&
+          canAgentAct();
+        if (debugPayload) {
+          debugPayload.capsule_retry_triggered = capsuleRetryEligible;
+          debugPayload.capsule_retry_reason = capsuleRetrievalDrift
+            ? [
+                capsuleContextFocusHit ? "" : "focus_miss",
+                capsuleContextAnchorHit ? "" : "anchor_miss",
+              ]
+                .filter(Boolean)
+                .join("|") || "constraint_drift"
+            : "not_needed";
+        }
+        if (capsuleRetryEligible) {
+          const capsuleRetryHints = [
+            ...capsulePreferredEvidencePaths,
+            ...capsuleMustKeepTerms,
+          ];
+          const capsuleRetryQueries = mergeHelixAskQueries(
+            baseQueries,
+            capsuleRetryHints,
+            HELIX_ASK_QUERY_MERGE_MAX + 4,
+          );
+          const capsuleRetryTopK = Math.min(
+            HELIX_ASK_CONTEXT_FILES,
+            (parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES) + 1,
+          );
+          const capsuleRetryStart = logStepStart(
+            "Retrieval capsule-retry",
+            `queries=${capsuleRetryQueries.length}`,
+            {
+              queryCount: capsuleRetryQueries.length,
+              topK: capsuleRetryTopK,
+              fn: "buildAskContextFromQueries",
+              phase: "capsuleRetry",
+            },
+          );
+          const capsuleRetryResult = await buildAskContextFromQueries(
+            baseQuestion,
+            capsuleRetryQueries,
+            capsuleRetryTopK,
+            topicProfile,
+            planScope ?? undefined,
+          );
+          const capsuleRetryOutcome = applyContextAttempt(
+            "capsule-retry",
+            capsuleRetryResult,
+            capsuleRetryStart,
+            capsuleRetryQueries,
+            planScope ?? undefined,
+          );
+          capsuleRetryApplied = capsuleRetryOutcome.applied;
+          if (debugPayload) {
+            debugPayload.capsule_retry_applied = capsuleRetryApplied;
+            debugPayload.capsule_retry_reason = capsuleRetryOutcome.applied
+              ? "constraint_drift_recovered"
+              : (debugPayload.capsule_retry_reason ?? "constraint_drift_no_context");
+          }
+          if (capsuleRetryOutcome.applied) {
+            answerPath.push("retrieval:capsule_retry");
+            logStepEnd(
+              "Retrieval capsule-retry",
+              `files=${capsuleRetryResult.files.length}`,
+              capsuleRetryStart,
+              true,
+              {
+                files: capsuleRetryResult.files.length,
+                fn: "buildAskContextFromQueries",
+                missingSlots: capsuleRetryOutcome.missingSlots,
+              },
+            );
+          } else {
+            logStepEnd(
+              "Retrieval capsule-retry",
+              "no_context",
+              capsuleRetryStart,
+              false,
+              {
+                fn: "buildAskContextFromQueries",
+              },
+            );
+          }
+        }
         const arbiterHybridThreshold = Math.min(arbiterRepoRatio, arbiterHybridRatio);
         const coverageSlotsMissing = Boolean(
           coverageSlotSummary && coverageSlotSummary.missingSlots.length > 0,
@@ -29461,6 +30261,11 @@ const executeHelixAsk = async ({
         maxTokens: answerMaxTokens,
         temperature: parsed.data.temperature ?? null,
       });
+      const dialogueProfileModel =
+        dialogueProfile === "dot_min_steps_v1"
+          ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+          : undefined;
+      const answerPrompt = applyDialogueProfilePrompt(prompt, dialogueProfile, baseQuestion);
       const answerFallbackTokens = answerMaxTokens;
       const answerHelperBudget = canStartFastHelper(
         "answer",
@@ -29526,11 +30331,12 @@ const executeHelixAsk = async ({
         const { result: answerResult, overflow: answerOverflow, llm: answerLlm } =
           await runHelixAskLocalWithOverflowRetry(
             {
-              prompt,
+              prompt: answerPrompt,
               max_tokens: answerMaxTokens,
               temperature: parsed.data.temperature,
               seed: parsed.data.seed,
               stop: parsed.data.stop,
+              model: dialogueProfileModel,
             },
             {
               personaId,
@@ -29542,6 +30348,8 @@ const executeHelixAsk = async ({
               fallbackMaxTokens: answerFallbackTokens,
               allowContextDrop: true,
               label: "answer",
+              dialogueProfile,
+              dialogueQuestion: baseQuestion,
             },
           );
         recordOverflow("answer", answerOverflow);
@@ -29554,7 +30362,7 @@ const executeHelixAsk = async ({
           HELIX_ASK_SHORT_ANSWER_RETRY_MAX > 0 &&
           answerMeta.short &&
           !answerBudget.override &&
-          Boolean(prompt);
+          Boolean(answerPrompt);
         if (retryEligible) {
           const answerRetryHelperBudget = canStartFastHelper(
             "answer_retry",
@@ -29589,11 +30397,12 @@ const executeHelixAsk = async ({
               const { result: retryResult, overflow: retryOverflow, llm: retryLlm } =
                 await runHelixAskLocalWithOverflowRetry(
                   {
-                    prompt,
+                    prompt: answerPrompt,
                     max_tokens: retryBudget,
                     temperature: parsed.data.temperature,
                     seed: parsed.data.seed,
                     stop: parsed.data.stop,
+                    model: dialogueProfileModel,
                   },
                   {
                     personaId,
@@ -29605,6 +30414,8 @@ const executeHelixAsk = async ({
                     fallbackMaxTokens: retryBudget,
                     allowContextDrop: true,
                     label: "answer_retry",
+                    dialogueProfile,
+                    dialogueQuestion: baseQuestion,
                   },
                 );
               recordOverflow("answer_retry", retryOverflow);
@@ -31918,7 +32729,9 @@ const executeHelixAsk = async ({
         !debugPayload?.llm_error_code;
       const hasConcreteAnswerText = typeof cleaned === "string" && cleaned.trim().length > 0;
       const answerLooksPlaceholder =
-        hasModelPlaceholderOrStub(cleaned) || isUnverifiedScaffoldScientificReport(cleaned.trim());
+        hasModelPlaceholderOrStub(cleaned) ||
+        isUnverifiedScaffoldScientificReport(cleaned.trim()) ||
+        isPathIndexStyleAnswer(cleaned);
       const providerDeliveredUsableAnswer =
         providerHttpSuccess && hasConcreteAnswerText && !answerLooksPlaceholder;
       const rescueAllowRepoHints =
@@ -32122,7 +32935,8 @@ const executeHelixAsk = async ({
               const rescueUsable =
                 rescueText.length > 0 &&
                 !hasModelPlaceholderOrStub(rescueText) &&
-                !isUnverifiedScaffoldScientificReport(rescueText);
+                !isUnverifiedScaffoldScientificReport(rescueText) &&
+                !isPathIndexStyleAnswer(rescueText);
               logStepEnd(
                 "LLM answer rescue",
                 rescueUsable ? "applied" : "rejected",
@@ -32630,7 +33444,9 @@ const executeHelixAsk = async ({
         };
       }
       const genericScaffoldDetected =
-        hasModelPlaceholderOrStub(cleaned) || isUnverifiedScaffoldScientificReport(cleaned.trim());
+        hasModelPlaceholderOrStub(cleaned) ||
+        isUnverifiedScaffoldScientificReport(cleaned.trim()) ||
+        isPathIndexStyleAnswer(cleaned);
       if (genericScaffoldDetected && !runtimeFallbackPinned) {
         const emergencyFallback = RenderPlatonicFallback({
           prompt: baseQuestion,
@@ -32689,9 +33505,16 @@ const executeHelixAsk = async ({
       if (suppressGeneralCitations) {
         cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
         answerPath.push("citationScrub:general_sources_suppressed");
-        if (!hasSourcesLine(cleaned)) {
+        if (
+          shouldAppendOpenWorldSourcesMarker({
+            answerText: cleaned,
+            treeWalkBlock,
+          })
+        ) {
           cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
           answerPath.push("citationScrub:open_world_sources_marker");
+        } else {
+          answerPath.push("citationScrub:open_world_sources_marker_skipped_tree_walk_citations");
         }
       }
       const frontierContractIntent =
@@ -32823,6 +33646,73 @@ const executeHelixAsk = async ({
           cleaned = guarded;
           answerPath.push("openWorldBypass:final_uncertainty_guard");
         }
+      }
+      const capsuleAnchorRequired =
+        (intentDomain === "repo" || intentDomain === "hybrid") &&
+        capsulePreferredEvidencePaths.length > 0;
+      const capsuleGuardApplicable =
+        capsuleMustKeepTerms.length > 0 || capsuleAnchorRequired;
+      if (capsuleGuardApplicable) {
+        let focusGuardPass = answerContainsCapsuleFocusTerm(cleaned, capsuleMustKeepTerms);
+        let anchorGuardPass = answerHasCapsulePreferredAnchor(
+          cleaned,
+          capsuleAnchorRequired ? capsulePreferredEvidencePaths : [],
+        );
+        if (!focusGuardPass || !anchorGuardPass) {
+          if (isCapsuleIntentAmbiguous(baseQuestion)) {
+            const clarifier = buildCapsuleTargetedClarifier(baseQuestion, capsuleMustKeepTerms);
+            cleaned = clarifier;
+            focusGuardResult = focusGuardPass ? "pass" : "clarify";
+            anchorGuardResult = anchorGuardPass ? "pass" : "clarify";
+            answerPath.push("capsuleGuard:clarify");
+            logEvent(
+              "Capsule guard",
+              "clarify",
+              [
+                focusGuardPass ? "focus=pass" : "focus=miss",
+                anchorGuardPass ? "anchor=pass" : "anchor=miss",
+              ].join(" | "),
+              answerStart,
+            );
+          } else {
+            const rewritten = rewriteAnswerWithCapsuleConstraints({
+              answer: cleaned,
+              mustKeepTerms: capsuleMustKeepTerms,
+              preferredEvidencePaths: capsulePreferredEvidencePaths,
+              requireAnchor: capsuleAnchorRequired,
+            });
+            if (rewritten !== cleaned) {
+              cleaned = rewritten;
+              answerPath.push("capsuleGuard:retry_rewrite");
+            }
+            focusGuardPass = answerContainsCapsuleFocusTerm(cleaned, capsuleMustKeepTerms);
+            anchorGuardPass = answerHasCapsulePreferredAnchor(
+              cleaned,
+              capsuleAnchorRequired ? capsulePreferredEvidencePaths : [],
+            );
+            focusGuardResult = focusGuardPass ? "pass" : "retry";
+            anchorGuardResult = anchorGuardPass ? "pass" : "retry";
+            logEvent(
+              "Capsule guard",
+              "retry",
+              [
+                focusGuardPass ? "focus=pass" : "focus=retry",
+                anchorGuardPass ? "anchor=pass" : "anchor=retry",
+              ].join(" | "),
+              answerStart,
+            );
+          }
+        } else {
+          focusGuardResult = "pass";
+          anchorGuardResult = "pass";
+        }
+      } else {
+        focusGuardResult = "pass";
+        anchorGuardResult = "pass";
+      }
+      if (debugPayload) {
+        debugPayload.focus_guard_result = focusGuardResult;
+        debugPayload.anchor_guard_result = anchorGuardResult;
       }
       if (debugPayload && !reportDecision.enabled && intentStrategy !== "constraint_report") {
         debugPayload.report_mode_mismatch = finalNonReportGuard.mismatch;
@@ -33177,6 +34067,246 @@ const executeHelixAsk = async ({
   }
 };
 
+planRouter.post("/ask/conversation-turn", async (req, res) => {
+  const parsed = HelixConversationTurnRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "bad_request", details: parsed.error.issues });
+  }
+
+  let personaId = parsed.data.personaId ?? "default";
+  if (personaPolicy.shouldRestrictRequest(req.auth) && (!personaId || personaId === "default") && req.auth?.sub) {
+    personaId = req.auth.sub;
+  }
+  if (!personaPolicy.canAccess(req.auth, personaId, "plan")) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+
+  const tenantId =
+    req.tenantId ??
+    req.get("x-tenant-id") ??
+    req.get("x-customer-id") ??
+    req.get("x-org-id") ??
+    null;
+  const sessionId = parsed.data.sessionId?.trim() || undefined;
+  const traceId = (parsed.data.traceId?.trim() || `conversation:${crypto.randomUUID()}`).slice(0, 128);
+  const transcript = parsed.data.transcript.trim();
+  const recentTurns = (parsed.data.recentTurns ?? []).map((entry) => entry.trim()).filter(Boolean).slice(-6);
+  const model = HELIX_CONVERSATION_MODEL();
+  const requestStartedAt = Date.now();
+
+  const appendConversationLog = (args: {
+    tool: "conversation.classified" | "conversation.brief_ready" | "conversation.dispatch_hint";
+    detail: string;
+    message: string;
+    ok: boolean;
+    meta?: Record<string, unknown>;
+    startedAtMs?: number;
+    error?: string;
+  }): void => {
+    const now = Date.now();
+    const payloadHash = sha256Hex(
+      stableJsonStringify({
+        transcript,
+        detail: args.detail,
+        message: args.message,
+        meta: args.meta ?? {},
+      }),
+    );
+    appendToolLog({
+      tool: args.tool,
+      version: "v1",
+      paramsHash: payloadHash,
+      durationMs: Math.max(0, now - (args.startedAtMs ?? requestStartedAt)),
+      tenantId: tenantId ?? undefined,
+      sessionId,
+      traceId,
+      stage: "conversation_turn",
+      detail: args.detail,
+      message: args.message,
+      meta: args.meta,
+      ok: args.ok,
+      error: args.error,
+    });
+  };
+
+  let classifierSource: "llm" | "fallback" = "llm";
+  let classifierFailReason: string | null = null;
+  let classification: z.infer<typeof HelixConversationClassifierSchema>;
+  const classifyStartedAt = Date.now();
+  const classifierPrompt = buildConversationClassifierPrompt({ transcript, recentTurns });
+  try {
+    const classifierResult = await llmLocalHandler(
+      {
+        prompt: classifierPrompt,
+        max_tokens: HELIX_CONVERSATION_CLASSIFIER_MAX_TOKENS,
+        temperature: 0.1,
+        stop: ["\n\n"],
+        model,
+        metadata: { kind: "helix.conversation.classifier" },
+      },
+      {
+        sessionId,
+        traceId: `${traceId}:classify`,
+        personaId,
+        tenantId: tenantId ?? undefined,
+      },
+    );
+    const rawClassifier = String((classifierResult as { text?: unknown })?.text ?? "");
+    const parsedClassifier = parseConversationClassifierResult(rawClassifier);
+    if (parsedClassifier) {
+      classification = parsedClassifier;
+    } else {
+      classifierSource = "fallback";
+      classifierFailReason = "conversation_classifier_parse_fallback";
+      const fallbackMode = inferConversationModeHeuristic(transcript);
+      const fallbackDispatch = inferConversationDispatchHintHeuristic(transcript, fallbackMode);
+      classification = {
+        mode: fallbackMode,
+        confidence: fallbackMode === "clarify" ? 0.28 : 0.46,
+        dispatch_hint: fallbackDispatch,
+        clarify_needed: fallbackMode === "clarify",
+        reason: "Deterministic fallback classifier.",
+      };
+    }
+  } catch (error) {
+    classifierSource = "fallback";
+    classifierFailReason = "conversation_classifier_model_fallback";
+    const fallbackMode = inferConversationModeHeuristic(transcript);
+    const fallbackDispatch = inferConversationDispatchHintHeuristic(transcript, fallbackMode);
+    classification = {
+      mode: fallbackMode,
+      confidence: fallbackMode === "clarify" ? 0.24 : 0.42,
+      dispatch_hint: fallbackDispatch,
+      clarify_needed: fallbackMode === "clarify",
+      reason: "Classifier unavailable, deterministic fallback applied.",
+    };
+  }
+  const routeDecision = normalizeConversationRouteDecision({ transcript, classification });
+  classification = routeDecision.classification;
+
+  appendConversationLog({
+    tool: "conversation.classified",
+    detail: classification.mode,
+    message: classification.reason,
+    ok: classifierSource === "llm",
+    startedAtMs: classifyStartedAt,
+    error: classifierFailReason ?? undefined,
+    meta: {
+      confidence: classification.confidence,
+      dispatch_hint: classification.dispatch_hint,
+      clarify_needed: classification.clarify_needed,
+      source: classifierSource,
+      route_reason_code: routeDecision.routeReasonCode,
+      exploration_turn: routeDecision.explorationTurn,
+    },
+  });
+
+  let briefSource: "llm" | "fallback" = "llm";
+  let briefFailReason: string | null = null;
+  let briefText = "";
+  const briefStartedAt = Date.now();
+  const briefPrompt = buildConversationBriefPrompt({
+    transcript,
+    classification,
+    routeReasonCode: routeDecision.routeReasonCode,
+    recentTurns,
+  });
+  try {
+    const briefResult = await llmLocalHandler(
+      {
+        prompt: briefPrompt,
+        max_tokens: HELIX_CONVERSATION_BRIEF_MAX_TOKENS,
+        temperature: 0.35,
+        model,
+        metadata: { kind: "helix.conversation.brief" },
+      },
+      {
+        sessionId,
+        traceId: `${traceId}:brief`,
+        personaId,
+        tenantId: tenantId ?? undefined,
+      },
+    );
+    const rawBrief = String((briefResult as { text?: unknown })?.text ?? "");
+    const parsedBrief = parseConversationBriefResult(rawBrief);
+    if (parsedBrief && parsedBrief.trim()) {
+      briefText = parsedBrief.trim();
+    } else {
+      briefSource = "fallback";
+      briefFailReason = "conversation_brief_parse_fallback";
+      briefText = buildConversationFallbackBrief({
+        transcript,
+        mode: classification.mode,
+        dispatchHint: classification.dispatch_hint,
+      });
+    }
+  } catch (error) {
+    briefSource = "fallback";
+    briefFailReason = "conversation_brief_model_fallback";
+    briefText = buildConversationFallbackBrief({
+      transcript,
+      mode: classification.mode,
+      dispatchHint: classification.dispatch_hint,
+    });
+  }
+  appendConversationLog({
+    tool: "conversation.brief_ready",
+    detail: classification.mode,
+    message: clipConversationText(briefText, 220),
+    ok: briefSource === "llm",
+    startedAtMs: briefStartedAt,
+    error: briefFailReason ?? undefined,
+    meta: {
+      source: briefSource,
+      text_length: briefText.length,
+    },
+  });
+
+  const dispatchHint = Boolean(classification.dispatch_hint);
+  const dispatchReason = routeDecision.routeReasonCode;
+  appendConversationLog({
+    tool: "conversation.dispatch_hint",
+    detail: dispatchHint ? "dispatch" : "suppress",
+    message: dispatchReason,
+    ok: true,
+    meta: {
+      mode: classification.mode,
+      dispatch_hint: dispatchHint,
+      source: classifierSource,
+      route_reason_code: routeDecision.routeReasonCode,
+      exploration_turn: routeDecision.explorationTurn,
+    },
+  });
+
+  const failReason = classifierFailReason ?? briefFailReason;
+  return res.json({
+    ok: true,
+    traceId,
+    sessionId: sessionId ?? null,
+    transcript,
+    source_language: parsed.data.sourceLanguage ?? null,
+    translated: parsed.data.translated ?? false,
+    classification: {
+      ...classification,
+      source: classifierSource,
+    },
+    brief: {
+      text: briefText,
+      source: briefSource,
+    },
+    dispatch: {
+      dispatch_hint: dispatchHint,
+      reason: dispatchReason,
+    },
+    route_reason_code: routeDecision.routeReasonCode,
+    exploration_turn: routeDecision.explorationTurn,
+    clarifier_policy: routeDecision.clarifierPolicy,
+    exploration_packet: routeDecision.explorationPacket,
+    fail_reason: failReason,
+    durationMs: Math.max(0, Date.now() - requestStartedAt),
+  });
+});
+
 planRouter.post("/ask", async (req, res) => {
   const parsed = LocalAskRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -33289,6 +34419,10 @@ const describeHelixAskJobError = (payload: unknown, status: number): string => {
     return payload.trim();
   }
   if (payload && typeof payload === "object") {
+    const failReason = (payload as { fail_reason?: string }).fail_reason;
+    if (typeof failReason === "string" && failReason.trim()) {
+      return failReason.trim();
+    }
     const message = (payload as { message?: string }).message;
     if (typeof message === "string" && message.trim()) {
       return message.trim();
@@ -33296,6 +34430,10 @@ const describeHelixAskJobError = (payload: unknown, status: number): string => {
     const error = (payload as { error?: string }).error;
     if (typeof error === "string" && error.trim()) {
       return error.trim();
+    }
+    const text = (payload as { text?: string }).text;
+    if (typeof text === "string" && text.trim()) {
+      return text.trim().slice(0, 240);
     }
   }
   return `helix_ask_failed_${status}`;

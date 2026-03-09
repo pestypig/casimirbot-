@@ -130,6 +130,11 @@ Reportable unlock replay (when paired-run evidence is available):
 npm run warp:shadow:build-se-packs -- --paired-evidence docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json
 ```
 
+Paired evidence can be generated from raw CSV runs with:
+```bash
+npm run warp:shadow:se-paired-evidence:ingest -- --sem artifacts/research/full-solve/se-paired-runs/<date>/sem-measurements.csv --ellips artifacts/research/full-solve/se-paired-runs/<date>/ellips-measurements.csv --manifest artifacts/research/full-solve/se-paired-runs/<date>/pairing-manifest.json --covariance artifacts/research/full-solve/se-paired-runs/<date>/covariance-budget.json
+```
+
 Then run:
 ```bash
 npm run warp:shadow:inject -- --scenarios configs/warp-shadow-injection-scenarios.generated.v1.json

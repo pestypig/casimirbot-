@@ -1,0 +1,170 @@
+import express from "express";
+import request from "supertest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { llmLocalHandlerMock } = vi.hoisted(() => ({
+  llmLocalHandlerMock: vi.fn(),
+}));
+
+vi.mock("../server/skills/llm.local", async () => {
+  const actual = await vi.importActual<typeof import("../server/skills/llm.local")>(
+    "../server/skills/llm.local",
+  );
+  return {
+    ...actual,
+    llmLocalHandler: llmLocalHandlerMock,
+  };
+});
+
+const buildApp = async () => {
+  const { planRouter } = await import("../server/routes/agi.plan");
+  const app = express();
+  app.use(express.json({ limit: "2mb" }));
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+describe("conversation-turn route", () => {
+  beforeEach(() => {
+    process.env.ENABLE_AGI = "1";
+    llmLocalHandlerMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns classifier + brief schema for representative verify prompts", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "verify",
+          confidence: 0.91,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Verification intent detected.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          brief:
+            "I heard your verification request. Next step: run the verify lane and report pass/fail evidence.",
+        }),
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "Please verify this claim and give me pass/fail evidence.",
+      traceId: "trace-conversation-verify",
+      recentTurns: ["user: previous context", "dottie: previous brief"],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.classification).toMatchObject({
+      mode: "verify",
+      dispatch_hint: true,
+      clarify_needed: false,
+    });
+    expect(typeof res.body.classification.reason).toBe("string");
+    expect(typeof res.body.brief.text).toBe("string");
+    expect(res.body.dispatch).toMatchObject({
+      dispatch_hint: true,
+    });
+    expect(llmLocalHandlerMock).toHaveBeenCalledTimes(2);
+    const briefPrompt = String(llmLocalHandlerMock.mock.calls[1]?.[0]?.prompt ?? "");
+    expect(briefPrompt).toContain("Route reason: dispatch:verify");
+    expect(briefPrompt).toContain("Do not output raw route/status codes.");
+  }, 20000);
+
+  it("falls back deterministically when model/parse paths fail", async () => {
+    llmLocalHandlerMock
+      .mockRejectedValueOnce(new Error("model unavailable"))
+      .mockResolvedValueOnce({ text: "" });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "Implement this patch and run the action flow now.",
+      traceId: "trace-conversation-fallback",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.classification?.source).toBe("fallback");
+    expect(res.body.classification?.mode).toBe("act");
+    expect(["llm", "fallback"]).toContain(res.body.brief?.source);
+    expect(typeof res.body.brief?.text).toBe("string");
+    expect(["conversation_classifier_model_fallback", "conversation_classifier_parse_fallback"]).toContain(
+      res.body.fail_reason,
+    );
+    expect(res.body.dispatch?.dispatch_hint).toBe(true);
+    expect(String(res.body.brief?.text ?? "").toLowerCase()).toContain("background");
+    expect(llmLocalHandlerMock).toHaveBeenCalledTimes(2);
+  }, 20000);
+
+  it("routes exploratory broad prompts to observe with dispatch enabled", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "clarify",
+          confidence: 0.51,
+          dispatch_hint: false,
+          clarify_needed: true,
+          reason: "Needs more detail.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          text: "I’ll run an observe-first pass and report the concrete path next.",
+        }),
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "How is a full solve done?",
+      traceId: "trace-conversation-explore",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.classification).toMatchObject({
+      mode: "observe",
+      dispatch_hint: true,
+      clarify_needed: false,
+    });
+    expect(res.body.route_reason_code).toBe("dispatch:observe_explore");
+    expect(res.body.exploration_turn).toBe(true);
+    expect(res.body.clarifier_policy).toBe("after_first_attempt");
+    expect(res.body.exploration_packet?.topic).toContain("How is a full solve done");
+    expect(Array.isArray(res.body.exploration_packet?.unknowns)).toBe(true);
+  }, 20000);
+
+  it("suppresses filler turns with deterministic reason code", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.84,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Observe",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          text: "Acknowledged.",
+        }),
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "ok thanks",
+      traceId: "trace-conversation-filler",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.classification?.mode).toBe("clarify");
+    expect(res.body.dispatch?.dispatch_hint).toBe(false);
+    expect(res.body.route_reason_code).toBe("suppressed:filler");
+    expect(res.body.exploration_turn).toBe(false);
+  }, 20000);
+});

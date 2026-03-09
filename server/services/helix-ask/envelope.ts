@@ -45,6 +45,7 @@ const splitParagraphs = (value: string): string[] =>
 
 const TREE_WALK_HEADER = /^Tree Walk:/i;
 const TREE_WALK_LINE = /^\s*\d+\.\s+/;
+const PRACTICAL_PREFIX = /^in\s+practic(?:e|al\s+terms)\b/i;
 
 const extractTreeWalkBlock = (
   value: string,
@@ -113,6 +114,38 @@ const splitAnswerForEnvelope = (
   return rest ? { summary, details: rest } : { summary };
 };
 
+const promotePracticalParagraph = (input: {
+  summary: string;
+  details?: string;
+}): { summary: string; details?: string } => {
+  const summary = input.summary.trim();
+  const details = input.details?.trim();
+  if (!details) return { summary };
+  const detailParagraphs = splitParagraphs(details);
+  const practicalIndex = detailParagraphs.findIndex((entry) => PRACTICAL_PREFIX.test(entry.trim()));
+  if (practicalIndex < 0) {
+    return { summary, details };
+  }
+  const practicalParagraph = detailParagraphs[practicalIndex]?.trim();
+  if (!practicalParagraph) {
+    return { summary, details };
+  }
+  const summaryAlreadyPractical = splitParagraphs(summary).some((entry) =>
+    PRACTICAL_PREFIX.test(entry.trim()),
+  );
+  const nextSummary = summaryAlreadyPractical
+    ? summary
+    : [summary, practicalParagraph].filter(Boolean).join("\n\n").trim();
+  const remainingDetails = detailParagraphs
+    .filter((_, index) => index !== practicalIndex)
+    .join("\n\n")
+    .trim();
+  return {
+    summary: nextSummary,
+    details: remainingDetails || undefined,
+  };
+};
+
 const parseGateEvidence = (evidenceText: string): HelixAskProofEnvelope["gate"] | undefined => {
   if (!evidenceText.trim()) return undefined;
   const gate: HelixAskProofEnvelope["gate"] = {};
@@ -158,7 +191,7 @@ const buildDetailSections = (
   for (let index = 0; index < paragraphs.length; index += 1) {
     const body = paragraphs[index];
     let title = "Details";
-    if (/^in practice\b/i.test(body)) {
+    if (PRACTICAL_PREFIX.test(body)) {
       title = "In practice";
     } else if (tier === "F3" && index === 0) {
       title = "Data flow";
@@ -258,9 +291,18 @@ export const buildHelixAskEnvelope = (
   const treeWalkExtract = extractTreeWalkBlock(input.answer);
   const treeWalkBlock = input.treeWalk?.trim() || treeWalkExtract.block;
   const answerText = treeWalkExtract.stripped || input.answer;
-  const summarySplit = splitAnswerForEnvelope(answerText, input.format);
-  const summary = summarySplit.summary.trim();
-  const details = summarySplit.details?.trim();
+  // When tree-walk evidence is present, keep the full non-tree-walk narrative in
+  // the main answer card and reserve drawer/details for the tree-walk block.
+  const preserveFullNarrative = Boolean(treeWalkBlock?.trim());
+  const summarySplit = preserveFullNarrative
+    ? { summary: answerText, details: undefined }
+    : splitAnswerForEnvelope(answerText, input.format);
+  const promotedPractical = promotePracticalParagraph({
+    summary: summarySplit.summary,
+    details: summarySplit.details,
+  });
+  const summary = promotedPractical.summary.trim();
+  const details = promotedPractical.details?.trim();
   const sections: HelixAskEnvelopeSection[] = [];
   const treeWalkSection = buildTreeWalkSection(treeWalkBlock, input.mode);
   if (treeWalkSection) sections.push(treeWalkSection);

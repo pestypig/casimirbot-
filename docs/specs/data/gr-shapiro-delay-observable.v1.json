@@ -1,0 +1,29 @@
+{
+  "artifact_type": "external_gr_observable_snapshot/v1",
+  "work_id": "EXT-GR-SHAP-001",
+  "title": "Shapiro delay observable replay (historical proposal + Cassini test)",
+  "source_refs": [
+    "SRC-083",
+    "SRC-084"
+  ],
+  "chain_ids": [
+    "CH-GR-004"
+  ],
+  "equation_anchors": [
+    "Delta_t_shapiro = (1+gamma)*(2*G*M_sun/c^3)*ln((r_E+r_R+R)/(r_E+r_R-R))",
+    "gamma_estimated = 1 + (gamma_minus_one)"
+  ],
+  "assumption_domain": {
+    "class": "solar_system_weak_field_ppn",
+    "comparability": "direct",
+    "notes": "Shapiro-delay parity checks are evaluated as reference-only observable anchors."
+  },
+  "observed": {
+    "gamma_minus_one": 2.1e-5,
+    "gamma_minus_one_uncertainty": 2.3e-5
+  },
+  "acceptance": {
+    "max_abs_gamma_minus_one": 7e-5
+  },
+  "status": "extracted"
+}

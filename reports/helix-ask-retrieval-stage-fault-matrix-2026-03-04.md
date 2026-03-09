@@ -1,6 +1,6 @@
 # Helix Ask Retrieval Stage-Fault Matrix (2026-03-04)
 
-Run: retrieval-ablation-1772730019929
+Run: retrieval-ablation-1772828749960
 Fault owner: retrieval
 
 | Stage | Fault score |

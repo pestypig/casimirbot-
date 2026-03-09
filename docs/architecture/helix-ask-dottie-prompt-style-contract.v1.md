@@ -160,6 +160,13 @@ This contract is additive and does not replace existing endpoint contracts:
 
 Where fields are absent in legacy payloads, adapters must default deterministically and never upgrade certainty by default.
 
+## Conversation Governor v1 addendum
+
+- Mic capture in Helix Ask is panel-scoped and explicitly user-toggled (`on|off`), with no hidden capture when `off`.
+- Runtime should expose transient mic states only (`listening|transcribing|cooldown|error`) and keep operator voice-policy controls internal.
+- Conversation-lane auto-dispatch may set `dialogue_profile=dot_min_steps_v1` for minimum-step guidance while preserving certainty/evidence parity.
+- Reasoning attempts triggered by conversation should remain observable as a timeline keyed by `traceId` with deterministic status transitions.
+
 ## Test requirements (minimum)
 
 1. Certainty parity tests for text vs voice outputs.

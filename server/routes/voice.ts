@@ -1,16 +1,25 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import multer from "multer";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";
 import { evaluateCalloutEligibility as evaluateSharedEligibility } from "../../shared/callout-eligibility";
 import {
   OPERATOR_CALLOUT_V1_KIND,
   validateOperatorCalloutV1,
 } from "../services/helix-ask/operator-contract-v1";
+import { sttHttpHandler } from "../skills/stt.whisper.http";
+import { sttWhisperHandler } from "../skills/stt.whisper";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
 const voiceRouter = Router();
+const OPENAI_AUDIO_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
+const voiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES },
+});
 
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(600),
@@ -31,6 +40,11 @@ const requestSchema = z.object({
   contextTier: z.enum(["tier0", "tier1"]).optional(),
   sessionState: z.enum(["idle", "requesting", "active", "stopping", "error"]).optional(),
   voiceMode: z.enum(["off", "critical_only", "normal", "dnd"]).optional(),
+  utteranceId: z.string().trim().max(200).optional(),
+  chunkIndex: z.number().int().nonnegative().max(4096).optional(),
+  chunkCount: z.number().int().positive().max(4096).optional(),
+  chunkKind: z.enum(["brief", "final"]).optional(),
+  turnKey: z.string().trim().max(200).optional(),
   textCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
   voiceCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
   deterministic: z.boolean().optional(),
@@ -43,6 +57,24 @@ const requestSchema = z.object({
 
 type VoiceRequest = z.infer<typeof requestSchema>;
 
+const transcribeRequestSchema = z.object({
+  language: z.string().trim().min(1).max(32).optional(),
+  traceId: z.string().trim().max(200).optional(),
+  missionId: z.string().trim().max(200).optional(),
+  durationMs: z.preprocess((value) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return Math.max(0, Math.round(value));
+    }
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : undefined;
+    }
+    return undefined;
+  }, z.number().int().nonnegative().max(600_000).optional()),
+});
+
+type VoiceTranscribeRequest = z.infer<typeof transcribeRequestSchema>;
+
 
 type VoiceProviderMode = "local_only" | "allow_remote";
 
@@ -54,12 +86,164 @@ type ProviderGovernance = {
   localOnlyMissionMode: boolean;
 };
 
+type ElevenLabsConfig = {
+  apiKey: string;
+  voiceId: string;
+  modelId: string;
+  outputFormat: string;
+  baseUrl: string;
+};
+
 const parseBooleanFlag = (value: string | undefined, defaultValue: boolean): boolean => {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return defaultValue;
   if (normalized === "1" || normalized === "true") return true;
   if (normalized === "0" || normalized === "false") return false;
   return defaultValue;
+};
+
+const voiceTranscriptionEnabled = (): boolean =>
+  parseBooleanFlag(process.env.ENABLE_VOICE_TRANSCRIBE, true);
+
+type SttPolicyMode = "openai_first" | "local_first" | "local_only" | "http_only";
+type SttOutputMode = "original" | "english" | "dual";
+type TranscriptionEngine = "openai_transcribe" | "faster_whisper_local" | "whisper_http";
+type SttBackendKind = "openai" | "whisper_http" | "local";
+type SttBackendMode = "openai" | "generic";
+
+type ResolvedSttBackend = {
+  kind: SttBackendKind;
+  mode: SttBackendMode;
+  url?: string;
+  apiKey?: string;
+  model?: string;
+};
+
+const normalizeSttPolicyMode = (value: string | undefined): SttPolicyMode => {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "local_first") return "local_first";
+  if (normalized === "local_only") return "local_only";
+  if (normalized === "http_only") return "http_only";
+  return "openai_first";
+};
+
+const normalizeSttOutputMode = (value: string | undefined): SttOutputMode => {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "original") return "original";
+  if (normalized === "dual") return "dual";
+  return "english";
+};
+
+const resolveSttPolicyMode = (): SttPolicyMode => normalizeSttPolicyMode(process.env.STT_POLICY_MODE);
+
+const resolveSttOutputMode = (): SttOutputMode => normalizeSttOutputMode(process.env.STT_OUTPUT_MODE);
+
+const resolveWhisperHttpModel = (): string =>
+  (process.env.WHISPER_HTTP_MODEL ?? "gpt-4o-mini-transcribe").trim() || "gpt-4o-mini-transcribe";
+
+const resolveSttAuthKey = (): string | undefined =>
+  process.env.WHISPER_HTTP_API_KEY?.trim() ||
+  process.env.OPENAI_API_KEY?.trim() ||
+  process.env.LLM_HTTP_API_KEY?.trim() ||
+  undefined;
+
+const resolveOpenAiSttAuthKey = (): string | undefined =>
+  process.env.OPENAI_API_KEY?.trim() ||
+  process.env.WHISPER_HTTP_API_KEY?.trim() ||
+  process.env.LLM_HTTP_API_KEY?.trim() ||
+  undefined;
+
+const resolveOpenAiSttBaseUrl = (): string => {
+  const explicit = process.env.OPENAI_API_BASE?.trim();
+  if (explicit) {
+    return explicit;
+  }
+  const llmBase = process.env.LLM_HTTP_BASE?.trim();
+  if (llmBase && /api\.openai\.com/i.test(llmBase)) {
+    return llmBase;
+  }
+  return "https://api.openai.com";
+};
+
+const resolveOpenAiSttBackend = (): ResolvedSttBackend | null => {
+  const apiKey = resolveOpenAiSttAuthKey();
+  if (!apiKey) {
+    return null;
+  }
+  const url = resolveOpenAiSttBaseUrl().trim();
+  if (!url) {
+    return null;
+  }
+  return {
+    kind: "openai",
+    mode: "openai",
+    url,
+    apiKey,
+    model: resolveWhisperHttpModel(),
+  };
+};
+
+const resolveWhisperHttpBackend = (): ResolvedSttBackend | null => {
+  const url = process.env.WHISPER_HTTP_URL?.trim();
+  if (!url) {
+    return null;
+  }
+  return {
+    kind: "whisper_http",
+    mode: (process.env.WHISPER_HTTP_MODE ?? "openai").trim().toLowerCase() === "generic" ? "generic" : "openai",
+    url,
+    apiKey: resolveSttAuthKey(),
+    model: resolveWhisperHttpModel(),
+  };
+};
+
+const resolveLocalSttBackend = (): ResolvedSttBackend | null => {
+  const localUrl = process.env.STT_LOCAL_URL?.trim();
+  if (localUrl) {
+    return {
+      kind: "local",
+      mode: (process.env.STT_LOCAL_MODE ?? "openai").trim().toLowerCase() === "generic" ? "generic" : "openai",
+      url: localUrl,
+      apiKey: process.env.STT_LOCAL_API_KEY?.trim(),
+      model: (process.env.STT_LOCAL_MODEL ?? "whisper-1").trim() || "whisper-1",
+    };
+  }
+  if (parseBooleanFlag(process.env.STT_LOCAL_EMBEDDED_ENABLED, false)) {
+    return {
+      kind: "local",
+      mode: "generic",
+    };
+  }
+  return null;
+};
+
+const resolveSttBackendOrder = (policyMode: SttPolicyMode): ResolvedSttBackend[] => {
+  const openAi = resolveOpenAiSttBackend();
+  const local = resolveLocalSttBackend();
+  const whisperHttp = resolveWhisperHttpBackend();
+  if (policyMode === "local_only") {
+    return local ? [local] : [];
+  }
+  if (policyMode === "local_first") {
+    return [local, openAi, whisperHttp].filter((entry): entry is ResolvedSttBackend => Boolean(entry));
+  }
+  if (policyMode === "http_only") {
+    return [whisperHttp ?? openAi].filter((entry): entry is ResolvedSttBackend => Boolean(entry));
+  }
+  return [openAi, local, whisperHttp].filter((entry): entry is ResolvedSttBackend => Boolean(entry));
+};
+
+const isEnglishLikeLanguage = (value: string | undefined): boolean => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized === "en" || normalized.startsWith("en-");
+};
+
+const normalizeRequestedLanguage = (value: string | undefined): string | undefined => {
+  const normalized = (value ?? "").trim();
+  if (!normalized || /^auto$/i.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
 };
 
 const resolvePolicyNowMs = (payload: VoiceRequest): number => {
@@ -85,6 +269,71 @@ const resolveProviderGovernance = (): ProviderGovernance => {
 
 const isLocalProvider = (provider: string): boolean => provider.toLowerCase().startsWith("local");
 
+const isElevenLabsProvider = (provider: string): boolean => {
+  const normalized = provider.trim().toLowerCase();
+  return normalized === "elevenlabs" || normalized.startsWith("elevenlabs:");
+};
+
+const resolveRequestedVoiceProfile = (payload: VoiceRequest): string | undefined => {
+  const direct = payload.voiceProfile?.trim();
+  if (direct) return direct;
+  const legacy = payload.voice_profile_id?.trim();
+  if (legacy) return legacy;
+  return undefined;
+};
+
+const resolveElevenLabsConfig = (voiceProfileId?: string): ElevenLabsConfig | null => {
+  const apiKey = process.env.ELEVENLABS_API_KEY?.trim() || process.env.VOICE_ELEVENLABS_API_KEY?.trim();
+  if (!apiKey) return null;
+  const voiceId = voiceProfileId?.trim() || process.env.ELEVENLABS_VOICE_ID?.trim();
+  if (!voiceId) return null;
+  const modelId = (process.env.ELEVENLABS_MODEL_ID ?? "eleven_multilingual_v2").trim() || "eleven_multilingual_v2";
+  const outputFormat = (process.env.ELEVENLABS_OUTPUT_FORMAT ?? "mp3_44100_128").trim() || "mp3_44100_128";
+  const baseUrl = (process.env.ELEVENLABS_API_BASE ?? "https://api.elevenlabs.io").trim().replace(/\/+$/, "");
+  return {
+    apiKey,
+    voiceId,
+    modelId,
+    outputFormat,
+    baseUrl: baseUrl || "https://api.elevenlabs.io",
+  };
+};
+
+const clipBackendErrorDetail = (value: string, limit = 400): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit - 3)}...`;
+};
+
+const isRetryableVoiceStatus = (status: number): boolean =>
+  status === 408 || status === 429 || status >= 500;
+
+const waitWithJitter = async (attempt: number): Promise<void> => {
+  const baseMs = 80 + attempt * 70;
+  const jitterMs = Math.floor(Math.random() * 90);
+  const waitMs = baseMs + jitterMs;
+  await new Promise<void>((resolve) => {
+    setTimeout(() => resolve(), waitMs);
+  });
+};
+
+type VoiceSynthFetchSuccess = {
+  contentType: string;
+  durationHeader: string;
+  providerHeader: string;
+  profileHeader: string;
+  buffer: Buffer;
+};
+
+type VoiceSynthFetchFailure = {
+  status: number;
+  provider: "elevenlabs" | "proxy";
+  message: string;
+  body: string;
+  retryable: boolean;
+};
+
 const COOLDOWN_SECONDS: Record<VoicePriority, number> = {
   info: 60,
   warn: 30,
@@ -104,6 +353,63 @@ const missionWindow = new Map<string, number[]>();
 
 const missionBudgetWindow = new Map<string, number[]>();
 const tenantBudgetDaily = new Map<string, { day: string; count: number }>();
+
+type VoiceSpeakCacheEntry = {
+  expiresAtMs: number;
+  contentType: string;
+  providerHeader: string;
+  profileHeader: string;
+  durationHeader: string;
+  buffer: Buffer;
+};
+
+const voiceSpeakChunkCache = new Map<string, VoiceSpeakCacheEntry>();
+
+const resolveVoiceChunkCacheTtlMs = (): number => {
+  const parsed = Number.parseInt((process.env.VOICE_CHUNK_CACHE_TTL_MS ?? "30000").trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30_000;
+  return Math.max(1_000, parsed);
+};
+
+const createVoiceSpeakCacheKey = (payload: VoiceRequest, provider: string, voiceProfile: string): string => {
+  const hash = createHash("sha256");
+  hash.update(provider);
+  hash.update("|");
+  hash.update(voiceProfile);
+  hash.update("|");
+  hash.update(payload.format ?? "wav");
+  hash.update("|");
+  hash.update(payload.mode ?? "callout");
+  hash.update("|");
+  hash.update(payload.text);
+  return hash.digest("hex");
+};
+
+const readVoiceSpeakChunkCache = (cacheKey: string, nowMs: number): VoiceSpeakCacheEntry | null => {
+  const cached = voiceSpeakChunkCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAtMs <= nowMs) {
+    voiceSpeakChunkCache.delete(cacheKey);
+    return null;
+  }
+  return cached;
+};
+
+const writeVoiceSpeakChunkCache = (cacheKey: string, nowMs: number, entry: Omit<VoiceSpeakCacheEntry, "expiresAtMs">): void => {
+  const ttlMs = resolveVoiceChunkCacheTtlMs();
+  voiceSpeakChunkCache.set(cacheKey, {
+    ...entry,
+    expiresAtMs: nowMs + ttlMs,
+  });
+};
+
+const cleanupVoiceSpeakChunkCache = (nowMs: number): void => {
+  for (const [key, entry] of voiceSpeakChunkCache.entries()) {
+    if (entry.expiresAtMs <= nowMs) {
+      voiceSpeakChunkCache.delete(key);
+    }
+  }
+};
 
 const parseIntEnv = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt((value ?? "").trim(), 10);
@@ -259,9 +565,377 @@ const suppressionEnvelope = (reason: string) => ({
   suppression_reason: reason,
 });
 
+const buildInlineAudioDataUri = (file: Express.Multer.File): string => {
+  const mimeType = file.mimetype?.trim() || "audio/webm";
+  return `data:${mimeType};base64,${file.buffer.toString("base64")}`;
+};
+
+type VoiceTranscriptionHandlerResult = {
+  text?: string;
+  language?: string;
+  duration_ms?: number;
+  segments?: unknown[];
+  essence_id?: string;
+  model?: string;
+  mode?: string;
+  task?: string;
+  backend_url?: string;
+};
+
+type VoiceTranscriptionResult = {
+  text?: string;
+  language?: string;
+  duration_ms?: number;
+  segments?: unknown[];
+  essence_id?: string;
+  source_text?: string;
+  source_language?: string;
+  translated?: boolean;
+  engine: TranscriptionEngine;
+};
+
+type SttFailure = {
+  backend: SttBackendKind;
+  engine: TranscriptionEngine;
+  message: string;
+  status?: number;
+  retryable: boolean;
+};
+
+const backendEngine = (backend: ResolvedSttBackend): TranscriptionEngine => {
+  if (backend.kind === "openai") return "openai_transcribe";
+  if (backend.kind === "local") return "faster_whisper_local";
+  return "whisper_http";
+};
+
+const inferStatusCode = (message: string): number | undefined => {
+  const match = message.match(/STT HTTP (\d{3})/i);
+  if (match) {
+    const parsed = Number.parseInt(match[1], 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+const classifySttFailure = (backend: ResolvedSttBackend, error: unknown): SttFailure => {
+  const message = error instanceof Error ? error.message : String(error);
+  const status = inferStatusCode(message);
+  const retryable =
+    (typeof status === "number" && (status >= 500 || status === 429 || status === 408)) ||
+    /tim(e)?out|temporar|unavailable|network|fetch|ECONN|ENOTFOUND|EAI_AGAIN|WHISPER_HTTP_URL not set/i.test(message);
+  return {
+    backend: backend.kind,
+    engine: backendEngine(backend),
+    message,
+    status,
+    retryable,
+  };
+};
+
+const runHttpTask = async (args: {
+  backend: ResolvedSttBackend;
+  task: "transcribe" | "translate";
+  file: Express.Multer.File;
+  payload: VoiceTranscribeRequest;
+  requestedLanguage?: string;
+}): Promise<VoiceTranscriptionHandlerResult> => {
+  const personaId = args.payload.missionId?.trim() || args.payload.traceId?.trim() || "voice.transcribe";
+  const response = (await sttHttpHandler(
+    {
+      audio_url: buildInlineAudioDataUri(args.file),
+      language: args.requestedLanguage,
+      duration_ms: args.payload.durationMs,
+      audio_mime: args.file.mimetype || undefined,
+      audio_filename: args.file.originalname || undefined,
+      backend_mode: args.backend.mode,
+      backend_url: args.backend.url,
+      api_key: args.backend.apiKey,
+      model: args.task === "translate" ? "whisper-1" : args.backend.model,
+      task: args.task,
+    },
+    { personaId },
+  )) as VoiceTranscriptionHandlerResult;
+  return response;
+};
+
+const runEmbeddedLocalTranscribe = async (args: {
+  file: Express.Multer.File;
+  payload: VoiceTranscribeRequest;
+  requestedLanguage?: string;
+}): Promise<VoiceTranscriptionHandlerResult> => {
+  const personaId = args.payload.missionId?.trim() || args.payload.traceId?.trim() || "voice.transcribe";
+  const result = (await sttWhisperHandler(
+    {
+      audio_base64: args.file.buffer.toString("base64"),
+      language: args.requestedLanguage ?? "en",
+      duration_ms: args.payload.durationMs,
+    },
+    { personaId },
+  )) as VoiceTranscriptionHandlerResult;
+  return result;
+};
+
+const runBackendTranscribe = async (args: {
+  backend: ResolvedSttBackend;
+  file: Express.Multer.File;
+  payload: VoiceTranscribeRequest;
+  requestedLanguage?: string;
+}): Promise<VoiceTranscriptionResult> => {
+  const result =
+    args.backend.kind === "local" && !args.backend.url
+      ? await runEmbeddedLocalTranscribe({
+          file: args.file,
+          payload: args.payload,
+          requestedLanguage: args.requestedLanguage,
+        })
+      : await runHttpTask({
+          backend: args.backend,
+          task: "transcribe",
+          file: args.file,
+          payload: args.payload,
+          requestedLanguage: args.requestedLanguage,
+        });
+  return {
+    text: typeof result.text === "string" ? result.text : "",
+    language: typeof result.language === "string" ? result.language : args.requestedLanguage,
+    duration_ms:
+      typeof result.duration_ms === "number" ? result.duration_ms : args.payload.durationMs,
+    segments: Array.isArray(result.segments) ? result.segments : [],
+    essence_id: typeof result.essence_id === "string" ? result.essence_id : undefined,
+    engine: backendEngine(args.backend),
+    translated: false,
+  };
+};
+
+const translateToEnglish = async (args: {
+  backend: ResolvedSttBackend;
+  file: Express.Multer.File;
+  payload: VoiceTranscribeRequest;
+}): Promise<VoiceTranscriptionHandlerResult> => {
+  if (args.backend.kind === "local" && !args.backend.url) {
+    throw new Error("local_embedded_translation_unsupported");
+  }
+  return runHttpTask({
+    backend: args.backend,
+    task: "translate",
+    file: args.file,
+    payload: args.payload,
+  });
+};
+
+const runVoiceTranscription = async (args: {
+  file: Express.Multer.File;
+  payload: VoiceTranscribeRequest;
+  policyMode: SttPolicyMode;
+  outputMode: SttOutputMode;
+}): Promise<{ result?: VoiceTranscriptionResult; failures: SttFailure[] }> => {
+  const backends = resolveSttBackendOrder(args.policyMode);
+  const failures: SttFailure[] = [];
+  const requestedLanguage = normalizeRequestedLanguage(args.payload.language);
+  let selectedBackend: ResolvedSttBackend | null = null;
+  let baseResult: VoiceTranscriptionResult | undefined;
+
+  for (const backend of backends) {
+    try {
+      const next = await runBackendTranscribe({
+        backend,
+        file: args.file,
+        payload: args.payload,
+        requestedLanguage,
+      });
+      baseResult = next;
+      selectedBackend = backend;
+      break;
+    } catch (error) {
+      const failure = classifySttFailure(backend, error);
+      failures.push(failure);
+      if (!failure.retryable) {
+        break;
+      }
+    }
+  }
+
+  if (!baseResult || !selectedBackend) {
+    return { failures };
+  }
+
+  const sourceText = baseResult.text ?? "";
+  const sourceLanguage =
+    (baseResult.language ?? requestedLanguage ?? "unknown").trim().toLowerCase() || "unknown";
+  const wantsEnglish = args.outputMode === "english" || args.outputMode === "dual";
+  if (wantsEnglish && sourceText && !isEnglishLikeLanguage(sourceLanguage)) {
+    try {
+      const translated = await translateToEnglish({
+        backend: selectedBackend,
+        file: args.file,
+        payload: args.payload,
+      });
+      const translatedText = typeof translated.text === "string" ? translated.text.trim() : "";
+      if (translatedText) {
+        baseResult = {
+          ...baseResult,
+          text: translatedText,
+          language: "en",
+          source_text: sourceText,
+          source_language: sourceLanguage,
+          translated: true,
+        };
+      } else if (args.outputMode === "dual") {
+        baseResult = {
+          ...baseResult,
+          source_text: sourceText,
+          source_language: sourceLanguage,
+          translated: false,
+        };
+      }
+    } catch (error) {
+      failures.push(classifySttFailure(selectedBackend, error));
+      baseResult = {
+        ...baseResult,
+        source_text: sourceText,
+        source_language: sourceLanguage,
+        translated: false,
+      };
+    }
+  } else if (args.outputMode === "dual") {
+    baseResult = {
+      ...baseResult,
+      source_text: sourceText,
+      source_language: sourceLanguage,
+      translated: false,
+    };
+  }
+
+  return { result: baseResult, failures };
+};
+
 voiceRouter.options("/speak", (_req, res) => {
   setCors(res);
   res.status(200).end();
+});
+
+voiceRouter.options("/transcribe", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+voiceRouter.post("/transcribe", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  voiceUpload.single("audio")(req, res, async (uploadError?: unknown) => {
+    const rawTraceId = typeof req.body?.traceId === "string" ? req.body.traceId.trim() : undefined;
+    const traceId = rawTraceId || undefined;
+    if (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : "Audio upload failed.";
+      return errorEnvelope(
+        res,
+        400,
+        "voice_invalid_request",
+        "Invalid voice transcription upload.",
+        { message },
+        traceId,
+      );
+    }
+
+    if (!voiceTranscriptionEnabled()) {
+      return errorEnvelope(
+        res,
+        503,
+        "voice_unavailable",
+        "Voice transcription is disabled.",
+        { transcriptionEnabled: false },
+        traceId,
+      );
+    }
+
+    const parsed = transcribeRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return errorEnvelope(
+        res,
+        400,
+        "voice_invalid_request",
+        "Invalid voice transcription payload.",
+        { issues: parsed.error.flatten() },
+        traceId,
+      );
+    }
+
+    const file = (req as Request & { file?: Express.Multer.File }).file;
+    if (!file?.buffer || file.buffer.length === 0) {
+      return errorEnvelope(
+        res,
+        400,
+        "voice_invalid_request",
+        "Audio upload is required.",
+        { field: "audio" },
+        parsed.data.traceId,
+      );
+    }
+
+    const policyMode = resolveSttPolicyMode();
+    const outputMode = resolveSttOutputMode();
+    const configuredBackends = resolveSttBackendOrder(policyMode);
+    if (configuredBackends.length === 0) {
+      return errorEnvelope(
+        res,
+        503,
+        "voice_unavailable",
+        "Voice transcription backend is not configured.",
+        {
+          policyMode,
+          outputMode,
+          backendConfigured: false,
+          requiredEnv: ["WHISPER_HTTP_API_KEY|OPENAI_API_KEY|LLM_HTTP_API_KEY", "STT_LOCAL_URL"],
+        },
+        parsed.data.traceId,
+      );
+    }
+
+    const { result, failures } = await runVoiceTranscription({
+      file,
+      payload: parsed.data,
+      policyMode,
+      outputMode,
+    });
+    if (!result) {
+      return errorEnvelope(
+        res,
+        502,
+        "voice_backend_error",
+        "Voice transcription failed.",
+        {
+          policyMode,
+          outputMode,
+          attempts: failures.map((entry) => ({
+            backend: entry.backend,
+            engine: entry.engine,
+            status: entry.status ?? null,
+            retryable: entry.retryable,
+            message: entry.message,
+          })),
+        },
+        parsed.data.traceId,
+      );
+    }
+
+    return res.status(200).json({
+      ok: true,
+      text: result.text ?? "",
+      language: result.language ?? parsed.data.language ?? "en",
+      duration_ms:
+        typeof result.duration_ms === "number"
+          ? result.duration_ms
+          : parsed.data.durationMs ?? 0,
+      segments: Array.isArray(result.segments) ? result.segments : [],
+      source_text: result.source_text ?? null,
+      source_language: result.source_language ?? null,
+      translated: result.translated ?? false,
+      traceId: parsed.data.traceId ?? null,
+      missionId: parsed.data.missionId ?? null,
+      engine: result.engine,
+      essence_id: result.essence_id ?? null,
+    });
+  });
 });
 
 voiceRouter.post("/speak", async (req: Request, res: Response) => {
@@ -281,16 +955,18 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const payload = parsed.data;
   const policyNowMs = resolvePolicyNowMs(payload);
-  const contextEligibility = evaluateSharedEligibility({
-    contextTier: payload.contextTier,
-    sessionState: payload.sessionState,
-    voiceMode: payload.voiceMode,
-    classification: payload.priority,
-  });
-  if (!contextEligibility.emitVoice) {
-    return res
-      .status(200)
-      .json({ ok: true, suppressed: true, ...suppressionEnvelope("voice_context_ineligible"), traceId: payload.traceId ?? null });
+  if (payload.mode === "callout") {
+    const contextEligibility = evaluateSharedEligibility({
+      contextTier: payload.contextTier,
+      sessionState: payload.sessionState,
+      voiceMode: payload.voiceMode,
+      classification: payload.priority,
+    });
+    if (!contextEligibility.emitVoice) {
+      return res
+        .status(200)
+        .json({ ok: true, suppressed: true, ...suppressionEnvelope("voice_context_ineligible"), traceId: payload.traceId ?? null });
+    }
   }
   const repoAttributedEffective = payload.repoAttributed ?? Boolean(payload.missionId && payload.mode === "callout");
   const textCertainty = payload.textCertainty ?? PRIORITY_TO_CERTAINTY[payload.priority];
@@ -411,7 +1087,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  if (!missionRateAllowed(payload.missionId, policyNowMs)) {
+  if (payload.mode === "callout" && !missionRateAllowed(payload.missionId, policyNowMs)) {
     return errorEnvelope(
       res,
       429,
@@ -422,7 +1098,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  if (dedupeSuppressed(payload, policyNowMs)) {
+  if (payload.mode === "callout" && dedupeSuppressed(payload, policyNowMs)) {
     return res.status(200).json({
       ok: true,
       suppressed: true,
@@ -435,13 +1111,16 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const dryRun = String(process.env.VOICE_PROXY_DRY_RUN ?? "0").trim() === "1";
   const baseUrl = process.env.TTS_BASE_URL?.trim();
+  const requestedVoiceProfile = resolveRequestedVoiceProfile(payload);
+  const elevenLabsRequested = isElevenLabsProvider(provider);
+  const elevenLabsConfig = elevenLabsRequested ? resolveElevenLabsConfig(requestedVoiceProfile) : null;
 
   if (dryRun) {
     return res.status(200).json({
       ok: true,
       dryRun: true,
       provider: "dry-run",
-      voiceProfile: payload.voiceProfile ?? payload.voice_profile_id ?? "default",
+      voiceProfile: requestedVoiceProfile ?? "default",
       metering: {
         ...metering,
         durationMs: payload.durationMs ?? Math.max(250, payload.text.length * 45),
@@ -450,13 +1129,28 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     });
   }
 
-  if (!baseUrl) {
+  if (elevenLabsRequested && !elevenLabsConfig) {
+    return errorEnvelope(
+      res,
+      503,
+      "voice_unavailable",
+      "ElevenLabs voice service is not configured.",
+      {
+        providerConfigured: false,
+        provider,
+        requiredEnv: ["ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID|voice_profile_id"],
+      },
+      traceId,
+    );
+  }
+
+  if (!elevenLabsRequested && !baseUrl) {
     return errorEnvelope(
       res,
       503,
       "voice_unavailable",
       "Voice service is not configured.",
-      { providerConfigured: false },
+      { providerConfigured: false, provider },
       traceId,
     );
   }
@@ -477,60 +1171,178 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   const timeoutMs = 15_000;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const upstream = await fetch(`${baseUrl.replace(/\/+$/, "")}/speak`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...payload, provider, ...(payload.voice_profile_id ? { voiceProfile: payload.voiceProfile ?? payload.voice_profile_id } : {}) }),
-      signal: controller.signal,
-    });
-
-    if (!upstream.ok) {
-      recordBackendFailure(policyNowMs);
-      const responseText = await upstream.text().catch(() => "");
-      return errorEnvelope(
-        res,
-        upstream.status >= 500 ? 502 : upstream.status,
-        "voice_backend_error",
-        "Voice backend returned an error response.",
-        { status: upstream.status, body: responseText.slice(0, 400) },
-        traceId,
-      );
-    }
-
-    const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    recordBackendSuccess();
-    res.setHeader("content-type", contentType);
-    res.setHeader("x-voice-provider", "proxy");
-    res.setHeader("x-voice-profile", payload.voiceProfile ?? payload.voice_profile_id ?? "default");
+  const maxAttempts = 2;
+  const resolvedProfileHeader = requestedVoiceProfile ?? "default";
+  cleanupVoiceSpeakChunkCache(policyNowMs);
+  const cacheKey = createVoiceSpeakCacheKey(payload, provider, resolvedProfileHeader);
+  const cached = readVoiceSpeakChunkCache(cacheKey, policyNowMs);
+  if (cached) {
+    res.setHeader("content-type", cached.contentType);
+    res.setHeader("x-voice-provider", cached.providerHeader);
+    res.setHeader("x-voice-profile", cached.profileHeader);
+    res.setHeader("x-voice-cache", "hit");
     if (payload.watermark_mode) {
       res.setHeader("x-watermark-mode", payload.watermark_mode);
     }
-    const durationHeader = upstream.headers.get("x-audio-duration-ms") ?? (payload.durationMs ? String(payload.durationMs) : "");
     res.setHeader("x-voice-meter-request-count", String(metering.requestCount));
     res.setHeader("x-voice-meter-char-count", String(metering.charCount));
-    if (durationHeader) {
-      res.setHeader("x-voice-meter-duration-ms", durationHeader);
+    if (cached.durationHeader) {
+      res.setHeader("x-voice-meter-duration-ms", cached.durationHeader);
     }
-    return res.status(200).send(buffer);
-  } catch (error) {
+    return res.status(200).send(cached.buffer);
+  }
+
+  const attempts: VoiceSynthFetchFailure[] = [];
+  let success: VoiceSynthFetchSuccess | null = null;
+
+  for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      if (elevenLabsRequested) {
+        const config = elevenLabsConfig as ElevenLabsConfig;
+        const response = await fetch(`${config.baseUrl}/v1/text-to-speech/${encodeURIComponent(config.voiceId)}`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            accept: "audio/mpeg",
+            "xi-api-key": config.apiKey,
+          },
+          body: JSON.stringify({
+            text: payload.text,
+            model_id: config.modelId,
+            output_format: config.outputFormat,
+          }),
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const responseText = await response.text().catch(() => "");
+          const retryable = isRetryableVoiceStatus(response.status);
+          attempts.push({
+            status: response.status >= 500 ? 502 : response.status,
+            provider: "elevenlabs",
+            message: "Voice backend returned an error response.",
+            body: clipBackendErrorDetail(responseText),
+            retryable,
+          });
+          if (retryable && attemptIndex < maxAttempts - 1) {
+            await waitWithJitter(attemptIndex);
+            continue;
+          }
+          break;
+        }
+        const contentType = response.headers.get("content-type") ?? "audio/mpeg";
+        const durationHeader = response.headers.get("x-audio-duration-ms") ?? (payload.durationMs ? String(payload.durationMs) : "");
+        success = {
+          contentType,
+          durationHeader,
+          providerHeader: "elevenlabs",
+          profileHeader: config.voiceId,
+          buffer: Buffer.from(await response.arrayBuffer()),
+        };
+        break;
+      }
+
+      const upstream = await fetch(`${(baseUrl as string).replace(/\/+$/, "")}/speak`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          provider,
+          ...(requestedVoiceProfile ? { voiceProfile: requestedVoiceProfile } : {}),
+        }),
+        signal: controller.signal,
+      });
+
+      if (!upstream.ok) {
+        const responseText = await upstream.text().catch(() => "");
+        const retryable = isRetryableVoiceStatus(upstream.status);
+        attempts.push({
+          status: upstream.status >= 500 ? 502 : upstream.status,
+          provider: "proxy",
+          message: "Voice backend returned an error response.",
+          body: clipBackendErrorDetail(responseText),
+          retryable,
+        });
+        if (retryable && attemptIndex < maxAttempts - 1) {
+          await waitWithJitter(attemptIndex);
+          continue;
+        }
+        break;
+      }
+
+      const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
+      const durationHeader = upstream.headers.get("x-audio-duration-ms") ?? (payload.durationMs ? String(payload.durationMs) : "");
+      success = {
+        contentType,
+        durationHeader,
+        providerHeader: "proxy",
+        profileHeader: resolvedProfileHeader,
+        buffer: Buffer.from(await upstream.arrayBuffer()),
+      };
+      break;
+    } catch (error) {
+      const aborted = error instanceof Error && error.name === "AbortError";
+      attempts.push({
+        status: aborted ? 504 : 502,
+        provider: elevenLabsRequested ? "elevenlabs" : "proxy",
+        message: aborted ? "Voice backend timed out." : "Voice backend request failed.",
+        body: clipBackendErrorDetail(error instanceof Error ? error.message : String(error)),
+        retryable: true,
+      });
+      if (attemptIndex < maxAttempts - 1) {
+        await waitWithJitter(attemptIndex);
+        continue;
+      }
+      break;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  if (!success) {
     recordBackendFailure(policyNowMs);
-    const aborted = error instanceof Error && error.name === "AbortError";
+    const finalAttempt = attempts[attempts.length - 1];
     return errorEnvelope(
       res,
-      aborted ? 504 : 502,
-      aborted ? "voice_backend_timeout" : "voice_backend_error",
-      aborted ? "Voice backend timed out." : "Voice backend request failed.",
-      { timeoutMs },
+      finalAttempt?.status ?? 502,
+      finalAttempt?.status === 504 ? "voice_backend_timeout" : "voice_backend_error",
+      finalAttempt?.message ?? "Voice backend request failed.",
+      {
+        timeoutMs,
+        attempts: attempts.map((entry, index) => ({
+          attempt: index + 1,
+          provider: entry.provider,
+          status: entry.status,
+          retryable: entry.retryable,
+          body: entry.body,
+        })),
+      },
       traceId,
     );
-  } finally {
-    clearTimeout(timeout);
   }
+
+  writeVoiceSpeakChunkCache(cacheKey, policyNowMs, {
+    contentType: success.contentType,
+    providerHeader: success.providerHeader,
+    profileHeader: success.profileHeader,
+    durationHeader: success.durationHeader,
+    buffer: success.buffer,
+  });
+  recordBackendSuccess();
+  res.setHeader("content-type", success.contentType);
+  res.setHeader("x-voice-provider", success.providerHeader);
+  res.setHeader("x-voice-profile", success.profileHeader);
+  res.setHeader("x-voice-cache", "miss");
+  if (payload.watermark_mode) {
+    res.setHeader("x-watermark-mode", payload.watermark_mode);
+  }
+  res.setHeader("x-voice-meter-request-count", String(metering.requestCount));
+  res.setHeader("x-voice-meter-char-count", String(metering.charCount));
+  if (success.durationHeader) {
+    res.setHeader("x-voice-meter-duration-ms", success.durationHeader);
+  }
+  return res.status(200).send(success.buffer);
 });
 
 const resetVoiceRouteState = () => {
@@ -538,6 +1350,7 @@ const resetVoiceRouteState = () => {
   missionWindow.clear();
   missionBudgetWindow.clear();
   tenantBudgetDaily.clear();
+  voiceSpeakChunkCache.clear();
   circuitBreaker.openedUntil = 0;
   circuitBreaker.recentFailures = [];
 };

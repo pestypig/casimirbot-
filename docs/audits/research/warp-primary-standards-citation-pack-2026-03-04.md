@@ -50,6 +50,31 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 | SRC-034 | User-supplied vendor overview of IEEE 1588/WR | M | white-rabbit.tech overview page | https://www.white-rabbit.tech/ieee1588-standard/ | rolling | secondary | low | supporting |
 | SRC-067 | White Rabbit conference baseline with multi-switch skew/jitter measurements | M | Serrano et al., ICALEPCS2009 TUC004 | https://accelconf.web.cern.ch/icalepcs2009/papers/tuc004.pdf | 2009 | primary | medium | normative |
 | SRC-068 | White Rabbit clock-characteristics paper with DDMTD/SoftPLL precision metrics | M | Rizzi et al., ISPCS 2016 | https://doi.org/10.1109/ISPCS.2016.7579446 | 2016 | primary | medium | normative |
+| SRC-069 | QCD hadronization evidence lane: measured Lambda-Lambda_bar spin correlation in p+p collisions | M | STAR Collaboration, Nature 2026 (`10.1038/s41586-025-09920-0`) | https://doi.org/10.1038/s41586-025-09920-0 | 2026-01-29 | primary | high | exploratory |
+| SRC-070 | QCD hadronization dataset anchor for STAR Nature 2026 result | M | HEPData record 159491 | https://doi.org/10.17182/hepdata.159491 | 2026-02-08 | primary | medium | exploratory |
+| SRC-071 | Core-4 warp-family anchor: ADM shift-only warp metric baseline and wall-localized stress profile | M | Alcubierre, Class. Quant. Grav. 11 L73-L77 | https://doi.org/10.1088/0264-9381/11/5/001 | 1994 | primary | high | normative |
+| SRC-072 | Core-4 warp-family anchor: zero-expansion warp metric construction with `div X = 0` control lane | M | Natario, Class. Quant. Grav. 19, 1157-1166 | https://doi.org/10.1088/0264-9381/19/6/308 | 2002 | primary | high | normative |
+| SRC-073 | Core-4 warp-family anchor: pocket-compressed warp geometry with conditional Alcubierre reduction (`B=1` region) | M | Van Den Broeck, Class. Quant. Grav. 16, 3973-3979 | https://doi.org/10.1088/0264-9381/16/12/314 | 1999 | primary | high | normative |
+| SRC-074 | Core-4 warp-family anchor: hyper-fast positive-energy soliton model in Einstein-Maxwell-plasma theory | M | Lentz, Class. Quantum Grav. 38, 075015 | https://doi.org/10.1088/1361-6382/abe692 | 2021 | primary | medium | normative |
+| SRC-075 | Observable GR anchor: Mercury perihelion precession explained by Einstein field equations | M | Einstein, "Erklarung der Perihelbewegung des Merkur aus der allgemeinen Relativitatstheorie" (archival record) | https://cds.cern.ch/record/632319 | 1915 | primary | medium | normative |
+| SRC-076 | Observable GR benchmark formula and modern test context for perihelion advance | M | Will, Living Reviews in Relativity 17:4 | https://doi.org/10.12942/lrr-2014-4 | 2014 | primary | high | normative |
+| SRC-077 | Historical GR field-equation anchor for light-deflection derivation | M | Einstein, "Die Grundlage der allgemeinen Relativitatstheorie", Annalen der Physik 354(7) | https://doi.org/10.1002/andp.19163540702 | 1916 | primary | high | normative |
+| SRC-078 | Historical eclipse reduction anchor for starlight deflection near the solar limb | M | Dyson, Eddington, Davidson, Philosophical Transactions A 220 | https://doi.org/10.1098/rsta.1920.0009 | 1920 | primary | medium | normative |
+| SRC-079 | Modern light-deflection precision anchor (Jupiter deflection / PPN gamma) | M | Shapiro et al., Phys. Rev. Lett. 92, 121101 | https://doi.org/10.1103/PhysRevLett.92.121101 | 2004 | primary | high | normative |
+| SRC-080 | Frame-dragging measurement anchor from LAGEOS satellites | M | Ciufolini and Pavlis, Nature 431, 958-960 | https://doi.org/10.1038/nature03007 | 2004 | primary | high | normative |
+| SRC-081 | Frame-dragging measurement anchor from Gravity Probe B final results | M | Everitt et al., Phys. Rev. Lett. 106, 221101 | https://doi.org/10.1103/PhysRevLett.106.221101 | 2011 | primary | high | normative |
+| SRC-082 | Frame-dragging confirmation/accuracy anchor from LARES mission analysis | M | Iorio et al., Eur. Phys. J. C 79, 872 | https://doi.org/10.1140/epjc/s10052-018-6451-1 | 2019 | primary | medium | normative |
+| SRC-083 | Historical Shapiro-delay proposal anchor | M | Shapiro, Phys. Rev. Lett. 13, 789-791 | https://doi.org/10.1103/PhysRevLett.13.789 | 1964 | primary | high | normative |
+| SRC-084 | Modern Cassini Shapiro-delay precision anchor (PPN gamma) | M | Bertotti, Iess, Tortora, Nature 425, 374-376 | https://doi.org/10.1038/nature01997 | 2003 | primary | high | normative |
+| SRC-085 | NIST preparation/certification protocol for SRM-2530 ellipsometric parameters | M,N | NIST SP 260-109 | https://www.nist.gov/publications/standard-reference-materials-preparation-and-certificaiton-srm-2530-ellipsometric | 1988-10-01 | standard | high | normative |
+| SRC-086 | SRM-2530-x certificate archive anchor (Si/SiO2 ellipsometric SRM family) | M,N | NIST SRM archive certificate (2530-3) | https://tsapps.nist.gov/srmext/certificates/archives/2530-3.pdf | archive | primary | medium | normative |
+| SRC-087 | SRM 2531 certificate anchor (nominal 50 nm SiO2 on Si) | M,N | NIST certificate 2531 | https://tsapps.nist.gov/srmext/certificates/archives/2531.pdf | 2006 certificate archive | primary | medium | normative |
+| SRC-088 | SRM 2532 certificate anchor (nominal 100 nm SiO2 on Si) | M,N | NIST certificate 2532 | https://tsapps.nist.gov/srmext/certificates/archives/2532.pdf | archive | primary | medium | normative |
+| SRC-089 | SRM 2533 certificate anchor (nominal 200 nm SiO2 on Si) | M,N | NIST certificate 2533 | https://tsapps.nist.gov/srmext/certificates/archives/2533.pdf | archive | primary | medium | normative |
+| SRC-090 | SRM 2534 certificate anchor (nominal 25 nm SiO2 on Si) | M,N | NIST certificate 2534 | https://tsapps.nist.gov/srmext/certificates/archives/2534.pdf | archive | primary | medium | normative |
+| SRC-091 | SRM 2535 certificate anchor (nominal 14 nm SiO2 on Si) | M,N | NIST certificate 2535 | https://tsapps.nist.gov/srmext/certificates/archives/2535.pdf | archive | primary | medium | normative |
+| SRC-092 | SRM 2536 certificate anchor (nominal 10 nm SiO2 on Si) | M,N | NIST certificate 2536 | https://tsapps.nist.gov/srmext/certificates/archives/2536.pdf | archive | primary | medium | normative |
+| SRC-093 | NIST SRM archive listing for 2530/2531-2536 family | M,N | NIST archived certificates catalog | https://shop.nist.gov/ccrz__CCPage?cclcl=en_US&pageKey=SRMArchive | archive listing | standard | medium | supporting |
 | SRC-035 | CD-AFM standards comparison and uncertainty discussion (NIST publication) | M,N | NIST CD-AFM uncertainty publication | https://www.nist.gov/publications/comparison-and-uncertainties-standards-cd-afm-microscope-tip-width-calibration | 2004 | standard | high | normative |
 | SRC-036 | Blind tip reconstruction methodology foundation (Villarrubia) | M | Villarrubia, J. Res. NIST 102(4):425-454 | https://doi.org/10.6028/jres.102.030 | 1997 | primary | high | normative |
 | SRC-037 | End-to-end differentiable BTR under noisy AFM conditions | M | PMC9813222 | https://pmc.ncbi.nlm.nih.gov/articles/PMC9813222/ | 2023 | primary | medium | normative |
@@ -98,6 +123,18 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 - `SRC-025`, `SRC-026`, and `SRC-027` are non-admissible for normative claims and should only be used as intake leads.
 - `SRC-029`, `SRC-030`, and `SRC-031` are preferred anchors for timing-acceptance normative claims.
 - `SRC-067` and `SRC-068` are admissible primary timing anchors for WR topology/jitter architecture and clock-subsystem precision metrics.
+- `SRC-069` and `SRC-070` are admissible as exploratory QCD-analog intake anchors only (`reference_only`); they do not upgrade physical-feasibility posture or canonical lane outcomes.
+- `SRC-075` and `SRC-076` are admissible for reference-only GR observable replay (`CH-GR-001`); they provide an external solar-system anchor for framework sanity checks and do not alter canonical warp-lane admissibility policy.
+- `SRC-077`, `SRC-078`, and `SRC-079` are admissible for the historical+modern lensing observable replay chain (`CH-GR-002`) in `reference_only` mode.
+- `SRC-080`, `SRC-081`, and `SRC-082` are admissible for frame-dragging observable replay (`CH-GR-003`) with explicit uncertainty and assumption-domain reporting.
+- `SRC-083` and `SRC-084` are admissible for Shapiro-delay observable replay (`CH-GR-004`) using the same non-blocking parity policy as other GR observable anchors.
+- `SRC-085` and `SRC-086` are preferred standards/primary anchors for SRM-2530 ellipsometry pipeline calibration (`Psi/Delta`, wavelength anchor, and model-selection uncertainty context).
+- `SRC-087..SRC-092` are admissible primary certificate anchors for thickness-transfer calibration in the SEM+ellipsometry lane (`CH-SE-001`), with numeric per-certificate uncertainties required for reportable closure when extracted.
+- `SRC-093` is a catalog/supporting anchor for SRM family enumeration and cannot replace certificate-level numeric uncertainty extraction.
+- Direct PDF/OCR extraction in this wave confirms archive surfaces expose nominal classes and addendum/process anchors, but do not expose populated serial-specific certificate tables for `SRC-087..SRC-092`; those values remain `UNKNOWN` until serial-resolved certificate surfaces are available.
+- `SRC-071`, `SRC-072`, and `SRC-073` are admissible primary anchors for Core-4 warp-family geometry comparison under geometry-first scope.
+- `SRC-074` is admissible for Core-4 intake but remains domain-conditional in geometry-first comparison because its Einstein-Maxwell-plasma assumptions are not equivalent to the canonical vacuum/ADM baseline used by current local geometry conformance checks.
+- `SRC-071..SRC-074` are also admissible for Core-4 energetics/QEI reference-only comparison (`CH-WARP-002`) when outputs explicitly retain comparability blockers and do not override canonical reduced-order policy.
 - `SRC-032` is exploratory long-haul evidence until matched topology replication exists.
 - `SRC-033` is non-admissible for normative claims and should be treated as intake context only.
 - `SRC-034` is supporting context and cannot be sole basis for a hard recommendation.
@@ -128,6 +165,6 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 - It closes the prior ellipsometry numeric blocker for `CH-SE-001` at reference-procedure level via `SRC-050`; dual-instrument raw datasets are still required for replay-grade closure.
 
 ## Commit Traceability
-- `commit_pin`: `e240431948598a964a9042ed929a076f609b90d6`
+- `commit_pin`: `latest`
 - `owner`: `research-governance`
 - `generated_on`: `2026-03-04`

@@ -1,0 +1,4 @@
+sample_id,d_sem_raw_nm,scale_factor_sem,b_sem_nm,u_scale_sem,u_edge_sem_nm,u_drift_sem_nm,u_repeat_sem_nm,u_temp_sem_nm
+S001,100.12,1.0,0.0,0.20,0.30,0.15,0.25,0.10
+S002,99.84,1.0,0.0,0.20,0.30,0.15,0.25,0.10
+S003,25.03,1.0,0.0,0.10,0.20,0.10,0.20,0.08

@@ -1,0 +1,110 @@
+{
+  "ok": true,
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "generatedOn": "2026-03-08T09:51:57.811Z",
+  "inputs": {
+    "semPath": "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv",
+    "ellipsPath": "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv",
+    "manifestPath": "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json",
+    "covariancePath": "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json"
+  },
+  "pairedRunId": "se_pair_run_2026_03_08_template",
+  "sourceClass": "primary",
+  "sourceRefs": [
+    "EXP-SE-003",
+    "EXP-SE-009",
+    "EXP-SE-016",
+    "EXP-SE-017",
+    "EXP-SE-021",
+    "EXP-SE-022",
+    "EXP-SE-025",
+    "EXP-SE-026",
+    "EXP-SE-027",
+    "EXP-SE-028",
+    "EXP-SE-029",
+    "EXP-SE-030"
+  ],
+  "provenance": {
+    "data_origin": "template_placeholder",
+    "instrument_run_ids": [],
+    "raw_artifact_refs": [
+      "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv",
+      "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv",
+      "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json",
+      "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json"
+    ],
+    "raw_artifact_sha256": {
+      "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv": "5c35c938340a77b441dd1ceafce30740007c7873d6060f09972d017574d2d997",
+      "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv": "10860ba2ff3c58c153624d6c3a5964cd498c0201f4cc1e6f8750739689e80217",
+      "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json": "98610b9e687b109c31400e869dc3d8d96e88c84eb17e047f9478c9f9ff5e8dff",
+      "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json": "18477fafadd3bc48f6434e7b9dd929b98d10baba2e372d1c525c9f66c2dcb5ef"
+    },
+    "operator_id": null,
+    "acquisition_date_utc": null
+  },
+  "uncertaintyMethod": "paired_dual_instrument_covariance_measured",
+  "k": 2,
+  "dataOrigin": "template_placeholder",
+  "instrumentRunIds": [],
+  "rawArtifactRefs": [
+    "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv",
+    "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv",
+    "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json",
+    "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json"
+  ],
+  "rawArtifactHashCount": 4,
+  "rhoSemEllip": 0.35,
+  "covarianceSemEllipNm2": 0.012,
+  "reportableReadyCandidate": false,
+  "summary": {
+    "nPairs": 3,
+    "meanDeltaSeNm": 0.003333,
+    "meanAbsDeltaSeNm": 0.076667,
+    "stdDeltaSeNm": 0.098658,
+    "uSemNmRms": 16.395254,
+    "uEllipNmRms": 0.25632,
+    "uFusedNmMean": 0.273375,
+    "UFusedNmMean": 0.54675,
+    "seStd2PassCount": 3,
+    "seAdv1PassCount": 3
+  },
+  "issues": [
+    "measurement_provenance_not_instrument_export",
+    "missing_measurement_provenance_run_ids"
+  ],
+  "pairs": [
+    {
+      "sampleId": "S001",
+      "dSemCorrNm": 100.12,
+      "uSemNm": 20.028619,
+      "dEllipNm": 100.05,
+      "uEllipNm": 0.277308,
+      "deltaSeNm": 0.07,
+      "dFusedNm": 100.050013,
+      "uFusedNm": 0.294771,
+      "UFusedNm": 0.589542
+    },
+    {
+      "sampleId": "S002",
+      "dSemCorrNm": 99.84,
+      "uSemNm": 19.972632,
+      "dEllipNm": 99.95,
+      "uEllipNm": 0.277308,
+      "deltaSeNm": -0.11,
+      "dFusedNm": 99.949979,
+      "uFusedNm": 0.294771,
+      "UFusedNm": 0.589542
+    },
+    {
+      "sampleId": "S003",
+      "dSemCorrNm": 25.03,
+      "uSemNm": 2.522183,
+      "dEllipNm": 24.98,
+      "uEllipNm": 0.208087,
+      "deltaSeNm": 0.05,
+      "dFusedNm": 24.980338,
+      "uFusedNm": 0.230583,
+      "UFusedNm": 0.461166
+    }
+  ]
+}

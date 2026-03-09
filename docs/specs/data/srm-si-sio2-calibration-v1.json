@@ -1,0 +1,311 @@
+{
+  "artifact_type": "srm_si_sio2_calibration/v1",
+  "generated_on": "2026-03-08",
+  "boundary_statement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "policy_posture": {
+    "reference_only": true,
+    "canonical_blocking": false
+  },
+  "sources": [
+    "SRC-085",
+    "SRC-086",
+    "SRC-087",
+    "SRC-088",
+    "SRC-089",
+    "SRC-090",
+    "SRC-091",
+    "SRC-092",
+    "SRC-093"
+  ],
+  "shared_anchors": {
+    "wavelength_nm": [
+      632.8,
+      633.0
+    ],
+    "supplemental_incidence_angles_deg": [
+      50,
+      55,
+      60,
+      65,
+      70,
+      75
+    ],
+    "center_certification_area_mm_diameter": 5.0,
+    "dual_orientation_rejection_threshold_nm": 0.10,
+    "interlayer_sensitive_relation": "t0 = tf + ti/2 +/- sqrt(sigma_f^2 + sigma_i^2/4 + delta_i^2)",
+    "cross_instrument_examples": {
+      "tem_thickness_nm": 102.8,
+      "corresponding_certified_value_nm": 103.7,
+      "corresponding_certified_uncertainty_nm": 1.2,
+      "profilometer_uncertainty_nm": 3.8,
+      "profilometer_vs_ellipsometry_agreement_nm": 3.0
+    },
+    "notes": [
+      "Direct archive surfaces for SRM 2530-series include addendum/process anchors and class metadata.",
+      "Archive scans do not expose populated serial-specific certificate table values for each SRM unit."
+    ]
+  },
+  "entries": [
+    {
+      "srm_id": "2530-1",
+      "source_id": "SRC-086",
+      "nominal_class_nm": 50,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "two-layer with interlayer; one-layer oxide thickness also reported",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2530-1 archive certificate",
+        "page_refs": [
+          "p1",
+          "p2"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2530-2",
+      "source_id": "SRC-086",
+      "nominal_class_nm": 100,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "two-layer with interlayer; one-layer oxide thickness also reported",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2530-2 archive certificate",
+        "page_refs": [
+          "p1",
+          "p2"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2530-3",
+      "source_id": "SRC-086",
+      "nominal_class_nm": 200,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "two-layer with interlayer; one-layer oxide thickness also reported",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2530-3 archive certificate",
+        "page_refs": [
+          "p1",
+          "p2"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2531",
+      "source_id": "SRC-087",
+      "nominal_class_nm": 50,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "certificate references two-layer/one-layer treatment from SP 260-109",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2531 archive certificate",
+        "page_refs": [
+          "p1",
+          "p3"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2532",
+      "source_id": "SRC-088",
+      "nominal_class_nm": 100,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "certificate references two-layer/one-layer treatment from SP 260-109",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2532 archive certificate",
+        "page_refs": [
+          "p1",
+          "p3"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2533",
+      "source_id": "SRC-089",
+      "nominal_class_nm": 200,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "certificate references two-layer/one-layer treatment from SP 260-109",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2533 archive certificate",
+        "page_refs": [
+          "p1",
+          "p3"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2534",
+      "source_id": "SRC-090",
+      "nominal_class_nm": 25,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "certificate references two-layer/one-layer treatment from SP 260-109",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2534 archive certificate",
+        "page_refs": [
+          "p1",
+          "p3"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2535",
+      "source_id": "SRC-091",
+      "nominal_class_nm": 14,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "certificate references two-layer/one-layer treatment from SP 260-109",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2535 archive certificate",
+        "page_refs": [
+          "p1",
+          "p3"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    },
+    {
+      "srm_id": "2536",
+      "source_id": "SRC-092",
+      "nominal_class_nm": 10,
+      "certified_thickness_nm": null,
+      "expanded_uncertainty_nm": null,
+      "coverage_factor_k": null,
+      "measurands": [
+        "Delta",
+        "Psi",
+        "derived_thickness",
+        "refractive_index"
+      ],
+      "model_context": "certificate references two-layer/one-layer treatment from SP 260-109",
+      "serial_specific_required": true,
+      "provenance": {
+        "doc_ref": "SRM 2536 archive certificate",
+        "page_refs": [
+          "p1"
+        ]
+      },
+      "extraction_status": "partial",
+      "blocked_reason": "serial_specific_table_not_populated_in_accessible_scan"
+    }
+  ],
+  "traceability": {
+    "registry_rows": [
+      "EXP-SE-021",
+      "EXP-SE-022",
+      "EXP-SE-023",
+      "EXP-SE-024",
+      "EXP-SE-025",
+      "EXP-SE-026",
+      "EXP-SE-027",
+      "EXP-SE-028",
+      "EXP-SE-029",
+      "EXP-SE-030",
+      "EXP-SE-031",
+      "EXP-SE-032",
+      "EXP-SE-033",
+      "EXP-SE-034",
+      "EXP-SE-035",
+      "EXP-SE-036",
+      "EXP-SE-037",
+      "EXP-SE-038",
+      "EXP-SE-039",
+      "EXP-SE-040",
+      "EXP-SE-041"
+    ],
+    "equation_trace_rows": [
+      "EQT-085-01",
+      "EQT-086-01",
+      "EQT-087-01",
+      "EQT-088-01",
+      "EQT-089-01",
+      "EQT-090-01",
+      "EQT-091-01",
+      "EQT-092-01",
+      "EQT-093-01"
+    ],
+    "chain_id": "CH-SE-001"
+  }
+}

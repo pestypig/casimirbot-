@@ -9,16 +9,32 @@
   "covarianceAnchorPresent": false,
   "pairedRunId": "unpaired_anchor_only_2026-03-06",
   "sourceClass": "primary",
+  "provenance": {
+    "data_origin": "template_placeholder",
+    "instrument_run_ids": [],
+    "raw_artifact_refs": [],
+    "raw_artifact_sha256": {},
+    "operator_id": null,
+    "acquisition_date_utc": null
+  },
   "sourceRefs": [
     "EXP-SE-003",
     "EXP-SE-009",
     "EXP-SE-016",
     "EXP-SE-017",
     "EXP-SE-012",
-    "EXP-SE-013"
+    "EXP-SE-013",
+    "EXP-SE-021",
+    "EXP-SE-022",
+    "EXP-SE-025",
+    "EXP-SE-026",
+    "EXP-SE-027",
+    "EXP-SE-028",
+    "EXP-SE-029",
+    "EXP-SE-030"
   ],
   "uncertainty": {
-    "method": "strict_anchor_partial_no_paired_covariance",
+    "method": "strict_anchor_partial_no_paired_covariance_nist_srm_enabled",
     "u_sem_nm": 100,
     "u_ellip_nm": 0.5,
     "rho_sem_ellip": null,
@@ -27,8 +43,9 @@
   },
   "notes": [
     "u_sem_nm is provisionally anchored to EXP-SE-017 (0.1 um 3sigma SEM-vs-line-scale difference -> 100 nm).",
-    "u_ellip_nm is anchored to EXP-SE-013 (0.5 nm expanded uncertainty, k=2).",
+    "u_ellip_nm is anchored to EXP-SE-013 (0.5 nm expanded uncertainty, k=2), with SRM-family transfer anchors EXP-SE-021..EXP-SE-031 recorded for certificate-linked updates.",
     "Set pairedRunPresent=true only when matched SEM+ellips sample IDs are commit-tracked.",
-    "Set covarianceAnchorPresent=true only when numeric rho or covariance term is present."
+    "Set covarianceAnchorPresent=true only when numeric rho or covariance term is present.",
+    "Replace provenance.* placeholder values with instrument-exported run IDs and raw artifact references before using for reportable unlock."
   ]
 }

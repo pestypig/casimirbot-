@@ -1,4 +1,4 @@
-import {
+import React, {
   Component,
   useCallback,
   useEffect,
@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { BrainCircuit, Search, Square } from "lucide-react";
+import { BrainCircuit, Mic, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   askLocal,
@@ -17,10 +17,14 @@ import {
   getContextCapsule,
   getReasoningTheaterConfig,
   getPendingHelixAskJob,
+  runConversationTurn,
   resumeHelixAskJob,
   speakVoice,
   subscribeToolLogs,
+  transcribeVoice,
   type AtomicViewerLaunch,
+  type ConversationClarifierPolicy,
+  type ConversationExplorationPacket,
   type PendingHelixAskJob,
   type ToolLogEvent,
 } from "@/lib/agi/api";
@@ -31,21 +35,18 @@ import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moo
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
 import { reportClientError } from "@/lib/observability/client-error";
 import {
-  canStartContextSession,
   readMissionContextControls,
-  startDesktopTier1ScreenSession,
   stopDesktopTier1ScreenSession,
   writeMissionContextControls,
   type ContextLifecycleEvent,
   type MissionContextControls,
-  type MissionContextTier,
-  type MissionVoiceMode,
 } from "@/lib/mission-overwatch";
 import {
   getDefaultReasoningTheaterConfig,
   type ReasoningTheaterConfigResponse,
   type ReasoningTheaterFrontierAction,
 } from "@/lib/helix/reasoning-theater-config";
+import { publishVoiceCaptureDiagnosticsSnapshot } from "@/lib/helix/voice-capture-diagnostics";
 import {
   advanceReasoningTheaterFrontierTracker,
   clampFrontierMeterPct,
@@ -62,9 +63,20 @@ import {
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
 import {
+  applyLatestWinsVoiceQueue,
+  createVoicePlaybackUtterance,
+  trimVoicePlaybackQueue,
+  type VoicePlaybackCancelReason,
+  type VoicePlaybackChunk,
+  type VoicePlaybackMetrics,
+  type VoicePlaybackUtterance,
+  type VoicePlaybackUtteranceKind,
+} from "@/lib/helix/voice-playback";
+import {
   createContextCapsuleAutomaton,
   extractContextCapsuleIdsFromText,
   injectContextCapsuleCommit,
+  normalizeContextCapsuleId,
   renderContextCapsuleStampLines,
   stepContextCapsuleAutomaton,
   type ContextCapsuleAutomaton,
@@ -90,9 +102,43 @@ export function transitionReadAloudState(
 }
 
 const SPEAK_TEXT_MAX_CHARS = 600;
+const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
+const FILE_PATH_CITATION_SEGMENT =
+  "(?:[A-Za-z]:[\\\\/]|(?:docs|client|server|shared|scripts|tests|configs|reports|artifacts|packages|sdk|cli)/)";
+const FILE_PATH_CITATION_PATTERN = new RegExp(`${FILE_PATH_CITATION_SEGMENT}[^\\s)\\]]+`, "gi");
+const SOURCE_TRAILER_PATTERN = new RegExp(`(?:;|,)?\\s*source:\\s*${FILE_PATH_CITATION_SEGMENT}[^)\\s]+`, "gi");
+const SOURCE_PAREN_PATTERN = new RegExp(`\\(\\s*source:\\s*${FILE_PATH_CITATION_SEGMENT}[^)]*\\)`, "gi");
+const FILE_PATH_PAREN_PATTERN = new RegExp(`\\(\\s*${FILE_PATH_CITATION_SEGMENT}[^)]*\\)`, "gi");
+const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
+const URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
+
+export function stripVoiceCitationArtifacts(source: string): string {
+  if (!source) return "";
+  const normalized = source
+    .replace(/\r\n/g, "\n")
+    .replace(MARKDOWN_LINK_PATTERN, "$1")
+    .replace(URL_PATTERN, "");
+  const strippedLines = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) =>
+      line
+        .replace(SOURCE_TRAILER_PATTERN, "")
+        .replace(SOURCE_PAREN_PATTERN, "")
+        .replace(FILE_PATH_PAREN_PATTERN, "")
+        .replace(FILE_PATH_CITATION_PATTERN, "")
+        .replace(/\s{2,}/g, " ")
+        .trim(),
+    )
+    .filter((line) => line.length > 0 && !/^sources?\s*:/i.test(line))
+    .filter((line) => !/^[(){}\[\],.;:!?-]+$/.test(line));
+
+  return strippedLines.join("\n").trim();
+}
 
 export function buildSpeakText(source: string, maxChars = SPEAK_TEXT_MAX_CHARS): string {
-  const text = source.trim();
+  const text = stripVoiceCitationArtifacts(source).trim();
   if (!text || maxChars <= 0) return "";
   if (text.length <= maxChars) return text;
 
@@ -111,8 +157,1073 @@ export function buildSpeakText(source: string, maxChars = SPEAK_TEXT_MAX_CHARS):
   return `${fallback.slice(0, maxChars - 1).trimEnd()}...`;
 }
 
+function hashVoiceUtteranceKey(source: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < source.length; i += 1) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function buildVoiceAutoSpeakUtteranceId(parts: Array<string | undefined | null>): string {
+  const normalized = parts
+    .map((part) => (part ?? "").trim())
+    .filter(Boolean)
+    .join(":");
+  if (!normalized) {
+    return `utt:${crypto.randomUUID()}`;
+  }
+  if (normalized.length <= VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS) {
+    return normalized;
+  }
+  const digest = hashVoiceUtteranceKey(normalized);
+  const headMax = Math.max(24, VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS - digest.length - 1);
+  return `${normalized.slice(0, headMax)}:${digest}`;
+}
+
 export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
   return audio === active;
+}
+
+export type MicArmState = "off" | "on";
+export type MicRuntimeState = "listening" | "transcribing" | "cooldown" | "error";
+export type FloorOwner = "none" | "user" | "bot";
+export type TurnState =
+  | "user_speaking"
+  | "soft_pause"
+  | "hard_pause"
+  | "bot_brief"
+  | "bot_full"
+  | "interrupted";
+
+export type CompletionRoute = "ask_more" | "mirror_clarify" | "answer";
+
+export type CompletionScore = {
+  score: number;
+  route: CompletionRoute;
+};
+
+export type NarrativeSpine = {
+  objective: string | null;
+  phase: "observe" | "plan" | "retrieve" | "gate" | "synthesize" | "verify" | "execute" | "debrief";
+  user_terms: string[];
+  candidate_answer: string | null;
+  open_question: string | null;
+  evidence_anchor: string | null;
+  next_action: string | null;
+};
+
+export type ConversationGovernorState = {
+  floor_owner: FloorOwner;
+  turn_state: TurnState;
+  cooling_down: boolean;
+  completion_score: CompletionScore;
+  narrative_spine: NarrativeSpine;
+};
+
+export type ReasoningAttemptStatus =
+  | "queued"
+  | "running"
+  | "streaming"
+  | "done"
+  | "failed"
+  | "cancelled"
+  | "suppressed";
+
+export type ReasoningAttemptSource = "voice_auto" | "manual";
+export type VoiceDecisionLifecycle =
+  | "queued"
+  | "running"
+  | "suppressed"
+  | "escalated"
+  | "done"
+  | "failed";
+
+export type ReasoningAttempt = {
+  id: string;
+  traceId: string;
+  turnId?: string;
+  prompt: string;
+  dispatchPrompt?: string;
+  recordedText?: string | null;
+  contextCapsuleIds?: string[];
+  contextCapsuleCount?: number;
+  contextCapsulePinnedCount?: number;
+  source: ReasoningAttemptSource;
+  profile?: "dot_min_steps_v1";
+  status: ReasoningAttemptStatus;
+  mode?: "observe" | "act" | "verify";
+  suppression_reason?: string;
+  routeReasonCode?: string;
+  explorationTurn?: boolean;
+  clarifierPolicy?: ConversationClarifierPolicy;
+  explorationPacket?: ConversationExplorationPacket | null;
+  explorationTopicKey?: string | null;
+  explorationAttemptCount?: number;
+  floorOwner?: FloorOwner;
+  completionScore?: number;
+  sttEngine?: string;
+  sourceLanguage?: string | null;
+  translated?: boolean;
+  certaintyClass?: "confirmed" | "reasoned" | "hypothesis" | "unknown";
+  evidenceRefs?: string[];
+  conversationBriefBase?: string;
+  partial: string;
+  finalAnswer?: string;
+  events: AskLiveEventEntry[];
+  createdAtMs: number;
+  updatedAtMs: number;
+  completedAtMs?: number;
+};
+
+export type HelixTimelineEntryType =
+  | "conversation_recorded"
+  | "conversation_brief"
+  | "reasoning_attempt"
+  | "reasoning_stream"
+  | "reasoning_final"
+  | "action_receipt"
+  | "suppressed";
+
+export type HelixTimelineEntry = {
+  id: string;
+  type: HelixTimelineEntryType;
+  source: ReasoningAttemptSource;
+  status: "queued" | "running" | "streaming" | "done" | "failed" | "suppressed";
+  text: string;
+  detail?: string | null;
+  mode?: "read" | "observe" | "act" | "verify" | "clarify";
+  traceId?: string;
+  attemptId?: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+  meta?: Record<string, unknown>;
+};
+
+export type VoiceCaptureWarningCode = "loopback_source" | "flat_signal" | "recorder_stalled";
+
+export type VoiceCaptureCheckpointKey =
+  | "track_live"
+  | "signal_detected"
+  | "segment_cut"
+  | "stt_request_started"
+  | "stt_response_ok"
+  | "stt_response_error"
+  | "translated"
+  | "draft_appended"
+  | "dispatch_queued"
+  | "dispatch_suppressed"
+  | "dispatch_completed";
+
+export type VoiceCaptureCheckpointStatus = "idle" | "ok" | "warn" | "error";
+
+export type VoiceCaptureCheckpoint = {
+  key: VoiceCaptureCheckpointKey;
+  status: VoiceCaptureCheckpointStatus;
+  message: string | null;
+  lastAtMs: number | null;
+  latencyMs: number | null;
+};
+
+export type VoiceCaptureHealthSnapshot = {
+  rmsRaw: number;
+  rmsDb: number;
+  peak: number;
+  noiseFloor: number;
+  displayLevel: number;
+  mediaChunkCount: number;
+  mediaBytes: number;
+  chunksPerSecond: number;
+  lastChunkAgeMs: number | null;
+  warnings: VoiceCaptureWarningCode[];
+  pipelineStatus: "idle" | "active" | "attention";
+  lastRoundtripMs: number | null;
+};
+
+type VoiceMeterStats = {
+  rmsRaw: number;
+  rmsDb: number;
+  peak: number;
+  noiseFloor: number;
+  displayLevel: number;
+};
+
+type VoiceRecorderStats = {
+  mediaChunkCount: number;
+  mediaBytes: number;
+  lastChunkAtMs: number | null;
+  chunksPerSecond: number;
+};
+
+type VoiceSegmentAttempt = {
+  id: string;
+  cutAtMs: number;
+  durationMs: number;
+  status: "segment_cut" | "transcribing" | "stt_ok" | "stt_error";
+  sttLatencyMs: number | null;
+  transcriptPreview: string | null;
+  translated: boolean;
+  dispatch: "none" | "queued" | "suppressed" | "completed";
+  engine: string | null;
+  error: string | null;
+};
+
+type VoiceAutoSpeakTask = {
+  key: string;
+  kind: VoicePlaybackUtteranceKind;
+  turnKey: string;
+  text: string;
+  traceId?: string;
+  eventId: string;
+};
+
+type ExplorationRuntimeState = {
+  attemptCount: number;
+  clarifierAsked: boolean;
+  packet: ConversationExplorationPacket | null;
+  lastRouteReasonCode: string | null;
+  updatedAtMs: number;
+};
+
+const VOICE_CAPTURE_CHECKPOINT_ORDER: VoiceCaptureCheckpointKey[] = [
+  "track_live",
+  "signal_detected",
+  "segment_cut",
+  "stt_request_started",
+  "stt_response_ok",
+  "stt_response_error",
+  "translated",
+  "draft_appended",
+  "dispatch_queued",
+  "dispatch_suppressed",
+  "dispatch_completed",
+];
+
+const VOICE_CAPTURE_CHECKPOINT_LABEL: Record<VoiceCaptureCheckpointKey, string> = {
+  track_live: "track live",
+  signal_detected: "signal",
+  segment_cut: "segment",
+  stt_request_started: "stt request",
+  stt_response_ok: "stt ok",
+  stt_response_error: "stt error",
+  translated: "translated",
+  draft_appended: "draft append",
+  dispatch_queued: "dispatch queued",
+  dispatch_suppressed: "dispatch suppressed",
+  dispatch_completed: "dispatch completed",
+};
+
+const VOICE_LEVEL_ATTACK_ALPHA = 0.55;
+const VOICE_LEVEL_RELEASE_ALPHA = 0.18;
+const VOICE_FLAT_SIGNAL_WINDOW_MS = 3000;
+const VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD = 0.0016;
+const VOICE_RECORDER_STALL_MS = 1200;
+
+const MIC_PERSIST_KEY = "helix.ask.micCaptureEnabled.v1";
+const MIC_SPEECH_START_MS = 120;
+const MIC_SOFT_PAUSE_MS = 450;
+const MIC_END_TURN_MS = 1200;
+const MIC_MAX_SEGMENT_MS = 12_000;
+const MIC_POST_TRANSCRIBE_COOLDOWN_MS = 600;
+const MIC_RING_BUFFER_MS = 45_000;
+const MIC_ANALYSIS_INTERVAL_MS = 60;
+const MIC_LEVEL_UI_UPDATE_MS = 120;
+const MIC_LEVEL_THRESHOLD = 0.03;
+const MIC_LEVEL_MIN_THRESHOLD = 0.008;
+const MIC_LEVEL_FLOOR_ALPHA = 0.92;
+const MIC_LEVEL_FLOOR_MULTIPLIER = 2.4;
+const VOICE_CONTINUATION_MERGE_WINDOW_MS = 9000;
+const VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS = 18_000;
+const VOICE_CONTINUATION_SHORT_WORD_LIMIT = 14;
+const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
+const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_VOICE = HELIX_CONTEXT_CAPSULE_MAX_IDS;
+const HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_MANUAL = HELIX_CONTEXT_CAPSULE_MAX_IDS;
+const HELIX_VOICE_AUTO_SPEAK_DEFAULT_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
+const HELIX_VOICE_AUTO_SPEAK_PROVIDER = "elevenlabs";
+const HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX = 8;
+const HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS = 2400;
+const HELIX_TIMELINE_TYPE_LABEL: Record<HelixTimelineEntryType, string> = {
+  conversation_recorded: "recorded",
+  conversation_brief: "brief",
+  reasoning_attempt: "reasoning",
+  reasoning_stream: "stream",
+  reasoning_final: "final",
+  action_receipt: "action",
+  suppressed: "suppressed",
+};
+
+const SESSION_CAPSULE_CONFIDENCE_LABEL: Record<SessionCapsuleConfidenceBand, string> = {
+  reinforcing: "reinforcing",
+  building: "building",
+  uncertain: "uncertain",
+};
+
+function createVoiceCaptureCheckpointMap(): Record<VoiceCaptureCheckpointKey, VoiceCaptureCheckpoint> {
+  return VOICE_CAPTURE_CHECKPOINT_ORDER.reduce(
+    (acc, key) => {
+      acc[key] = {
+        key,
+        status: "idle",
+        message: null,
+        lastAtMs: null,
+        latencyMs: null,
+      };
+      return acc;
+    },
+    {} as Record<VoiceCaptureCheckpointKey, VoiceCaptureCheckpoint>,
+  );
+}
+
+const CONTEXT_CAPSULE_PROOF_POSTURE_SCORE: Record<ContextCapsuleConvergence["proofPosture"], number> = {
+  confirmed: 5,
+  reasoned: 4,
+  hypothesis: 3,
+  unknown: 2,
+  fail_closed: 1,
+};
+
+const CONTEXT_CAPSULE_MATURITY_SCORE: Record<ContextCapsuleConvergence["maturity"], number> = {
+  certified: 4,
+  diagnostic: 3,
+  reduced_order: 2,
+  exploratory: 1,
+};
+
+const CONTEXT_CAPSULE_PROOF_VERDICT_SCORE: Record<ContextCapsuleSummary["commit"]["proof_verdict"], number> = {
+  PASS: 3,
+  UNKNOWN: 2,
+  FAIL: 1,
+};
+
+function resolveSessionCapsuleConfidenceBand(
+  summary: ContextCapsuleSummary,
+): SessionCapsuleConfidenceBand {
+  if (
+    summary.convergence.proofPosture === "fail_closed" ||
+    summary.commit.proof_verdict === "FAIL" ||
+    summary.commit.certificate_integrity_ok === false
+  ) {
+    return "uncertain";
+  }
+  if (summary.convergence.proofPosture === "confirmed") {
+    return "reinforcing";
+  }
+  if (
+    summary.convergence.proofPosture === "reasoned" &&
+    (summary.commit.proof_verdict === "PASS" || summary.convergence.maturity === "certified")
+  ) {
+    return "reinforcing";
+  }
+  if (
+    summary.convergence.proofPosture === "reasoned" ||
+    summary.convergence.proofPosture === "hypothesis" ||
+    summary.convergence.maturity === "diagnostic" ||
+    summary.convergence.maturity === "certified"
+  ) {
+    return "building";
+  }
+  return "uncertain";
+}
+
+export function deriveSessionCapsuleState(
+  entries: ContextCapsuleLedgerEntry[],
+): SessionCapsuleState | null {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  const latest = [...entries].sort((a, b) => {
+    const touchedDelta = b.touchedAtMs - a.touchedAtMs;
+    if (touchedDelta !== 0) return touchedDelta;
+    const createdDelta = b.summary.createdAtTsMs - a.summary.createdAtTsMs;
+    if (createdDelta !== 0) return createdDelta;
+    return a.id.localeCompare(b.id);
+  })[0];
+  return {
+    id: latest.id,
+    summary: latest.summary,
+    confidenceBand: resolveSessionCapsuleConfidenceBand(latest.summary),
+  };
+}
+
+function resolveContextCapsuleLedgerId(
+  summary: Pick<ContextCapsuleSummary, "fingerprint" | "capsuleId">,
+): string | null {
+  return (
+    normalizeContextCapsuleId(summary.fingerprint) ??
+    normalizeContextCapsuleId(summary.capsuleId)
+  );
+}
+
+export function compareContextCapsuleSummariesByRank(
+  a: ContextCapsuleSummary,
+  b: ContextCapsuleSummary,
+): number {
+  const proofPostureDelta =
+    CONTEXT_CAPSULE_PROOF_POSTURE_SCORE[b.convergence.proofPosture] -
+    CONTEXT_CAPSULE_PROOF_POSTURE_SCORE[a.convergence.proofPosture];
+  if (proofPostureDelta !== 0) return proofPostureDelta;
+
+  const maturityDelta =
+    CONTEXT_CAPSULE_MATURITY_SCORE[b.convergence.maturity] -
+    CONTEXT_CAPSULE_MATURITY_SCORE[a.convergence.maturity];
+  if (maturityDelta !== 0) return maturityDelta;
+
+  const proofVerdictDelta =
+    CONTEXT_CAPSULE_PROOF_VERDICT_SCORE[b.commit.proof_verdict] -
+    CONTEXT_CAPSULE_PROOF_VERDICT_SCORE[a.commit.proof_verdict];
+  if (proofVerdictDelta !== 0) return proofVerdictDelta;
+
+  const integrityScoreA =
+    a.commit.certificate_integrity_ok === true ? 2 : a.commit.certificate_integrity_ok === false ? 0 : 1;
+  const integrityScoreB =
+    b.commit.certificate_integrity_ok === true ? 2 : b.commit.certificate_integrity_ok === false ? 0 : 1;
+  const integrityDelta = integrityScoreB - integrityScoreA;
+  if (integrityDelta !== 0) return integrityDelta;
+
+  const createdAtDelta = b.createdAtTsMs - a.createdAtTsMs;
+  if (createdAtDelta !== 0) return createdAtDelta;
+
+  return a.fingerprint.localeCompare(b.fingerprint);
+}
+
+function compareContextCapsuleLedgerEntriesByRank(
+  a: ContextCapsuleLedgerEntry,
+  b: ContextCapsuleLedgerEntry,
+): number {
+  if (a.pinned !== b.pinned) {
+    return a.pinned ? -1 : 1;
+  }
+  return compareContextCapsuleSummariesByRank(a.summary, b.summary);
+}
+
+function compareContextCapsuleLedgerEntriesForSelection(
+  a: ContextCapsuleLedgerEntry,
+  b: ContextCapsuleLedgerEntry,
+): number {
+  if (a.pinned !== b.pinned) {
+    return a.pinned ? -1 : 1;
+  }
+  const touchedDelta = b.touchedAtMs - a.touchedAtMs;
+  if (touchedDelta !== 0) return touchedDelta;
+  if (a.pinnedAtMs !== b.pinnedAtMs) {
+    return (b.pinnedAtMs ?? 0) - (a.pinnedAtMs ?? 0);
+  }
+  return compareContextCapsuleSummariesByRank(a.summary, b.summary);
+}
+
+export function upsertContextCapsuleLedger(args: {
+  entries: ContextCapsuleLedgerEntry[];
+  summary: ContextCapsuleSummary;
+  pin?: boolean;
+  maxEntries?: number;
+  nowMs?: number;
+}): ContextCapsuleLedgerEntry[] {
+  const maxEntries = Math.max(
+    1,
+    Math.min(args.maxEntries ?? HELIX_CONTEXT_CAPSULE_MAX_IDS, HELIX_CONTEXT_CAPSULE_MAX_IDS),
+  );
+  const nowMs = args.nowMs ?? Date.now();
+  const capsuleId = resolveContextCapsuleLedgerId(args.summary);
+  if (!capsuleId) {
+    return [...args.entries].sort(compareContextCapsuleLedgerEntriesByRank).slice(0, maxEntries);
+  }
+
+  const existingIndex = args.entries.findIndex((entry) => entry.id === capsuleId);
+  const pin = args.pin === true;
+  const nextEntries = [...args.entries];
+  if (existingIndex >= 0) {
+    const existing = nextEntries[existingIndex];
+    nextEntries[existingIndex] = {
+      ...existing,
+      summary: args.summary,
+      pinned: existing.pinned || pin,
+      pinnedAtMs: existing.pinnedAtMs ?? (pin ? nowMs : null),
+      touchedAtMs: nowMs,
+    };
+  } else {
+    nextEntries.push({
+      id: capsuleId,
+      summary: args.summary,
+      pinned: pin,
+      pinnedAtMs: pin ? nowMs : null,
+      touchedAtMs: nowMs,
+    });
+  }
+
+  while (nextEntries.length > maxEntries) {
+    const evictionPool = nextEntries.some((entry) => !entry.pinned)
+      ? nextEntries.filter((entry) => !entry.pinned)
+      : nextEntries;
+    const lowest = [...evictionPool]
+      .sort((a, b) => compareContextCapsuleSummariesByRank(a.summary, b.summary))
+      .at(-1);
+    if (!lowest) break;
+    const dropIndex = nextEntries.findIndex((entry) => entry.id === lowest.id);
+    if (dropIndex < 0) break;
+    nextEntries.splice(dropIndex, 1);
+  }
+
+  return nextEntries.sort(compareContextCapsuleLedgerEntriesByRank).slice(0, maxEntries);
+}
+
+export function buildSelectedContextCapsuleIds(args: {
+  ledgerEntries: ContextCapsuleLedgerEntry[];
+  prompt?: string;
+  inlineCapsuleIds?: string[];
+  maxIds?: number;
+}): string[] {
+  const maxIds = Math.max(
+    1,
+    Math.min(args.maxIds ?? HELIX_CONTEXT_CAPSULE_MAX_IDS, HELIX_CONTEXT_CAPSULE_MAX_IDS),
+  );
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (value: string | null | undefined) => {
+    const normalized = normalizeContextCapsuleId(value ?? null);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  };
+
+  const inlineIds = args.inlineCapsuleIds ?? extractContextCapsuleIdsFromText(args.prompt ?? "");
+  for (const inlineId of inlineIds) {
+    push(inlineId);
+    if (out.length >= maxIds) return out;
+  }
+
+  const orderedLedger = [...args.ledgerEntries].sort(compareContextCapsuleLedgerEntriesForSelection);
+  for (const entry of orderedLedger) {
+    push(entry.id);
+    if (out.length >= maxIds) return out;
+  }
+
+  return out;
+}
+
+export function smoothVoiceLevel(
+  previous: number,
+  nextRaw: number,
+  attack = VOICE_LEVEL_ATTACK_ALPHA,
+  release = VOICE_LEVEL_RELEASE_ALPHA,
+): number {
+  const prev = clamp01(previous);
+  const next = clamp01(nextRaw);
+  const alpha = clampNumber(next >= prev ? attack : release, 0, 1);
+  return clamp01(prev + (next - prev) * alpha);
+}
+
+export function isFlatVoiceSignal(
+  variance: number,
+  elapsedMs: number,
+  threshold = VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD,
+  windowMs = VOICE_FLAT_SIGNAL_WINDOW_MS,
+): boolean {
+  return variance <= threshold && elapsedMs >= windowMs;
+}
+
+export function isRecorderStalled(params: {
+  recorderActive: boolean;
+  nowMs: number;
+  recorderStartedAtMs: number | null;
+  lastChunkAtMs: number | null;
+  stallMs?: number;
+}): boolean {
+  const stallMs = params.stallMs ?? VOICE_RECORDER_STALL_MS;
+  if (!params.recorderActive) return false;
+  const referenceMs = params.lastChunkAtMs ?? params.recorderStartedAtMs;
+  if (referenceMs === null) return false;
+  return params.nowMs - referenceMs >= stallMs;
+}
+
+export function isLikelyLoopbackDeviceLabel(label: string): boolean {
+  return /\b(output|loopback|stereo mix|vb-audio|voicemeeter|what u hear)\b/i.test(label.trim());
+}
+
+export function shouldPrimeSegmentWithContainerHeader(params: {
+  segmentStartIndex: number;
+  mimeType?: string | null;
+  hasHeaderChunk: boolean;
+}): boolean {
+  if (!params.hasHeaderChunk) return false;
+  if (params.segmentStartIndex <= 0) return false;
+  const normalized = (params.mimeType ?? "").trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized.includes("webm") ||
+    normalized.includes("ogg") ||
+    normalized.includes("mp4") ||
+    normalized.includes("mpeg") ||
+    normalized.includes("mp3") ||
+    normalized.includes("wav")
+  );
+}
+
+function pickMicRecorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+    return undefined;
+  }
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+  for (const mimeType of candidates) {
+    try {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        return mimeType;
+      }
+    } catch {
+      // continue checking the next mime type
+    }
+  }
+  return undefined;
+}
+
+export function inferAskMode(question: string): "observe" | "act" | "verify" | undefined {
+  const normalized = question.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  if (
+    /\b(verify|verification|prove|proof|validate|validation|integrity|certificate|pass\/fail|pass fail|audit|check)\b/.test(
+      normalized,
+    )
+  ) {
+    return "verify";
+  }
+
+  if (
+    /^(please\s+)?(implement|fix|change|update|remove|add|create|open|start|stop|run|patch|rewrite)\b/.test(
+      normalized,
+    ) ||
+    /\b(next action|take action|fix this|implement this|make this|change this|update this)\b/.test(
+      normalized,
+    )
+  ) {
+    return "act";
+  }
+
+  if (
+    /\b(observe|monitor|watch|track|status|state|what changed|what is happening|inspect|summarize the current)\b/.test(
+      normalized,
+    )
+  ) {
+    return "observe";
+  }
+
+  return undefined;
+}
+
+export function mergeVoiceTranscriptDraft(currentDraft: string, transcript: string): string {
+  const normalizedSegment = transcript
+    .trim()
+    .replace(/^\.\.\.\s*/, "")
+    .replace(/\s*\.\.\.$/, "");
+  if (!normalizedSegment) return currentDraft;
+  const normalizedDraft = currentDraft.trimEnd().replace(/\s*\.\.\.$/, "");
+  const joiner = normalizedDraft && !/\s$/.test(normalizedDraft) ? " " : "";
+  return `${normalizedDraft}${joiner}${normalizedSegment}`;
+}
+
+export function shouldMergeVoiceContinuationTurn(args: {
+  previousPrompt: string;
+  nextTranscript: string;
+  gapMs: number;
+  windowMs?: number;
+}): boolean {
+  const windowMs = args.windowMs ?? VOICE_CONTINUATION_MERGE_WINDOW_MS;
+  if (args.gapMs < 0 || args.gapMs > windowMs) return false;
+  const previous = args.previousPrompt.trim();
+  const next = args.nextTranscript.trim();
+  if (!previous || !next) return false;
+  const nextWords = next.split(/\s+/).filter(Boolean);
+  const nextStartsContinuation =
+    /^[a-z]/.test(next) ||
+    /^(and|but|so|then|because|which|that|who|where|when|while|if|with|for|to|used|using)\b/i.test(
+      next,
+    );
+  if (nextStartsContinuation) return true;
+  const previousLooksIncomplete = !/[.!?]["')\]]?\s*$/.test(previous);
+  return previousLooksIncomplete && nextWords.length <= VOICE_CONTINUATION_SHORT_WORD_LIMIT;
+}
+
+export function shouldMergeVoiceContinuationInFlight(args: {
+  gapMs: number;
+  lexicalContinuation: boolean;
+  activeWindowMs?: number;
+}): boolean {
+  const activeWindowMs = args.activeWindowMs ?? VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS;
+  if (args.gapMs < 0) return false;
+  if (args.gapMs <= activeWindowMs) return true;
+  return args.lexicalContinuation;
+}
+
+export function scoreConversationCompletion(input: {
+  transcript: string;
+  pauseMs: number;
+  stability: number;
+}): CompletionScore {
+  const text = input.transcript.trim();
+  const stability = Math.max(0, Math.min(1, input.stability));
+  let score = 0.2 + stability * 0.45;
+  if (/[.!?]$/.test(text)) score += 0.18;
+  if (/\b(and|but|or|because|so)\s*$/i.test(text)) score -= 0.16;
+  if (/\b(this|that|it|they|those|these)\b/i.test(text) && !/\b(is|are|means|does)\b/i.test(text)) {
+    score -= 0.08;
+  }
+  if (input.pauseMs >= MIC_SOFT_PAUSE_MS) score += 0.06;
+  if (input.pauseMs >= MIC_END_TURN_MS) score += 0.12;
+  score = Math.max(0, Math.min(1, score));
+  if (score < 0.45) return { score, route: "ask_more" };
+  if (score < 0.75) return { score, route: "mirror_clarify" };
+  return { score, route: "answer" };
+}
+
+export function shouldDispatchReasoningAttempt(transcript: string): boolean {
+  const text = transcript.trim().toLowerCase();
+  if (!text) return false;
+  if (text.length < 14) return false;
+  if (/^(ok|okay|yeah|yep|nope|thanks|thank you|cool|nice|right)\b/.test(text)) return false;
+  if (/\b(verify|prove|check|pass fail|certificate|integrity|evidence|risk|decision)\b/.test(text)) {
+    return true;
+  }
+  if (/\b(implement|fix|change|update|remove|add|create|run|patch|deploy|execute)\b/.test(text)) {
+    return true;
+  }
+  if (/\b(what changed|status|monitor|state|watch)\b/.test(text)) {
+    return true;
+  }
+  if (/\b(how|why|explain|walk me through|full solve|tell me about|break down|understand)\b/.test(text)) {
+    return true;
+  }
+  if (text.includes("?") && text.length >= 16) {
+    return true;
+  }
+  return false;
+}
+
+export function isLikelyContextDependentTurn(transcript: string): boolean {
+  const normalized = transcript.trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized.length > 220) return false;
+  if (
+    /^(where|why|how|what)\s+(is|are|was|were|does|did)\s+(that|this|it|they|those|these)\b/.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+  if (/^(and|so|then|also)\b/.test(normalized)) return true;
+  if (/\b(that|this|it|they|those|these)\b/.test(normalized) && normalized.length <= 72) {
+    return true;
+  }
+  return false;
+}
+
+function extractPriorUserContext(recentTurns: string[], currentTranscript?: string): string | null {
+  const currentNormalized = currentTranscript?.trim().toLowerCase() || null;
+  for (let index = recentTurns.length - 1; index >= 0; index -= 1) {
+    const line = recentTurns[index]?.trim() ?? "";
+    if (!line) continue;
+    if (!/^user:/i.test(line)) continue;
+    const text = line.replace(/^user:\s*/i, "").trim();
+    if (!text) continue;
+    if (currentNormalized && text.toLowerCase() === currentNormalized) continue;
+    return text;
+  }
+  return null;
+}
+
+export function buildVoiceReasoningDispatchPrompt(args: {
+  transcript: string;
+  recentTurns: string[];
+  explorationPacket?: ConversationExplorationPacket | null;
+}): string {
+  const transcript = args.transcript.trim();
+  if (!transcript) return "";
+  const priorUser = extractPriorUserContext(args.recentTurns, transcript);
+  const topicHint = args.explorationPacket?.topic?.trim() || priorUser || transcript;
+  if (!isLikelyContextDependentTurn(transcript)) {
+    return transcript;
+  }
+  const recentWindow = args.recentTurns.slice(-4).map((entry) => clipText(entry, 220));
+  return [
+    `Follow-up turn: ${transcript}`,
+    `Topic anchor: ${topicHint}`,
+    "Use conversation continuity from recent turns before answering.",
+    recentWindow.length > 0 ? "Recent turns:" : "",
+    ...recentWindow,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function normalizeConversationModeForDispatch(
+  mode: "observe" | "act" | "verify" | "clarify" | undefined,
+): "observe" | "act" | "verify" | undefined {
+  if (!mode || mode === "clarify") return undefined;
+  return mode;
+}
+
+type ExplorationLadderAction =
+  | "finalize"
+  | "clarify_after_attempt1"
+  | "escalate_verify"
+  | "escalate_act";
+
+type ExplorationLadderDecision = {
+  action: ExplorationLadderAction;
+  reasonCode: string;
+};
+
+function inferExplorationTopicKey(packet: ConversationExplorationPacket | null | undefined, prompt: string): string {
+  const raw = (packet?.topic?.trim() || prompt.trim() || "unknown").toLowerCase();
+  const normalized = raw.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  return normalized || "unknown";
+}
+
+function buildExplorationEscalationPrompt(args: {
+  mode: "verify" | "act";
+  prompt: string;
+  previousOutput: string;
+  packet?: ConversationExplorationPacket | null;
+}): string {
+  const topic = clipText(args.packet?.topic?.trim() || args.prompt.trim(), 140);
+  const previous = clipText(args.previousOutput.trim(), 700);
+  if (args.mode === "verify") {
+    return [
+      `Topic: ${topic}`,
+      "Run verify mode on this exploration thread.",
+      "Return pass/fail with grounded evidence anchors and deterministic fail reason if blocked.",
+      "",
+      "Original user turn:",
+      args.prompt.trim(),
+      "",
+      "Observe attempt output:",
+      previous,
+    ].join("\n");
+  }
+  return [
+    `Topic: ${topic}`,
+    "Run act mode on this exploration thread.",
+    "Return concrete execution steps and expected receipts, bounded by existing safety gates.",
+    "",
+    "Original user turn:",
+    args.prompt.trim(),
+    "",
+    "Observe attempt output:",
+    previous,
+  ].join("\n");
+}
+
+export function decideExplorationLadderAction(args: {
+  explorationAttemptCount: number;
+  outputText: string;
+  failReason?: string | null;
+  mode?: "observe" | "act" | "verify";
+  debug?:
+    | {
+        arbiter_mode?: "repo_grounded" | "hybrid" | "general" | "clarify";
+        coverage_gate_reason?: string;
+        evidence_gate_ok?: boolean;
+        verification_anchor_required?: boolean;
+      }
+    | null
+    | undefined;
+}): ExplorationLadderDecision {
+  const trimmedText = args.outputText.trim();
+  const normalizedText = trimmedText.toLowerCase();
+  const normalizedFail = (args.failReason ?? "").trim().toLowerCase();
+  const normalizedCoverage = (args.debug?.coverage_gate_reason ?? "").trim().toLowerCase();
+  const firstAttempt = args.explorationAttemptCount <= 1;
+  const explicitClarifierQuestion =
+    /\?$/.test(trimmedText) &&
+    /\b(could you|can you|would you|please clarify|which|what specific|what context|provide)\b/.test(
+      normalizedText,
+    );
+  const substantiveAnswer =
+    normalizedText.length >= 180 ||
+    /[.!]\s+/.test(normalizedText) ||
+    /\b(warp bubble|general relativity|metric|space-time|mechanism|because|therefore)\b/.test(normalizedText);
+  const missingContextSignal =
+    explicitClarifierQuestion ||
+    /\b(please clarify|missing context|need more context|one more detail|specific problem|which context)\b/.test(
+      normalizedText,
+    ) ||
+    /\bclarify\b/.test(normalizedFail) ||
+    /\bmissing\b/.test(normalizedCoverage) ||
+    (args.debug?.arbiter_mode === "clarify" && !substantiveAnswer);
+  if (firstAttempt && missingContextSignal) {
+    return { action: "clarify_after_attempt1", reasonCode: "suppressed:clarify_after_attempt1" };
+  }
+
+  const verifySignal =
+    args.mode === "verify" ||
+    args.debug?.verification_anchor_required === true ||
+    /\b(pass\/?fail|verification|verify|proof|integrity|certificate)\b/.test(normalizedText);
+  if (verifySignal) {
+    return { action: "escalate_verify", reasonCode: "dispatch:verify" };
+  }
+
+  const actSignal =
+    args.mode === "act" ||
+    /\b(action required|execute change|apply patch|run tool|implement change|edit files)\b/.test(
+      normalizedText,
+    );
+  if (actSignal) {
+    return { action: "escalate_act", reasonCode: "dispatch:act" };
+  }
+
+  return { action: "finalize", reasonCode: "dispatch:observe_finalize" };
+}
+
+function buildConversationFallbackBrief(args: {
+  transcript: string;
+  mode?: "observe" | "act" | "verify" | "clarify";
+  clarifyNeeded: boolean;
+}): string {
+  const snippet = clipText(args.transcript.trim(), 180);
+  if (args.clarifyNeeded || args.mode === "clarify") {
+    return `I heard: "${snippet}". Give me one more concrete detail so I can route this precisely.`;
+  }
+  if (args.mode === "verify") {
+    return `I heard: "${snippet}". I'll verify the claim path and report evidence-backed pass/fail.`;
+  }
+  if (args.mode === "act") {
+    return `I heard: "${snippet}". I'll queue an action-oriented reasoning run and return the next concrete step.`;
+  }
+  if (args.mode === "observe") {
+    return `I heard: "${snippet}". I'll inspect the current state and summarize what changed and what matters now.`;
+  }
+  return `I heard: "${snippet}". I can continue with one precise next step, or ask a clarifier if context is still missing.`;
+}
+
+function laneLabelForConversationMode(mode?: "observe" | "act" | "verify" | "clarify"): string {
+  if (mode === "verify") return "verification";
+  if (mode === "act") return "action";
+  if (mode === "observe") return "observe";
+  if (mode === "clarify") return "clarify";
+  return "reasoning";
+}
+
+function normalizeConversationRouteReasonCode(reasonCode?: string | null): string | null {
+  const trimmed = reasonCode?.trim().toLowerCase();
+  return trimmed ? trimmed : null;
+}
+
+export function formatVoiceDecisionSentence(args: {
+  lifecycle: VoiceDecisionLifecycle;
+  mode?: "observe" | "act" | "verify" | "clarify";
+  routeReasonCode?: string | null;
+  escalatedMode?: "verify" | "act";
+}): string {
+  const reasonCode = normalizeConversationRouteReasonCode(args.routeReasonCode);
+  if (args.lifecycle === "queued") {
+    if (reasonCode === "dispatch:verify") return "Reasoning is queued in verification mode.";
+    if (reasonCode === "dispatch:act") return "Reasoning is queued in action mode.";
+    if (reasonCode === "dispatch:observe_explore") return "Reasoning is queued in explore mode.";
+    if (reasonCode === "dispatch:observe") return "Reasoning is queued in observe mode.";
+    return `Reasoning is queued in ${laneLabelForConversationMode(args.mode)} mode.`;
+  }
+  if (args.lifecycle === "running") {
+    return `Reasoning is running in ${laneLabelForConversationMode(args.mode)} mode.`;
+  }
+  if (args.lifecycle === "suppressed") {
+    if (reasonCode === "suppressed:filler") {
+      return "Reasoning is suppressed for this filler turn.";
+    }
+    if (reasonCode === "suppressed:clarify_after_attempt1") {
+      return "Reasoning is paused until you share one concrete detail.";
+    }
+    if (reasonCode === "suppressed:low_salience") {
+      return "Reasoning is suppressed for now while we keep this conversational.";
+    }
+    return "Reasoning is suppressed for this turn.";
+  }
+  if (args.lifecycle === "escalated") {
+    if (args.escalatedMode === "verify") return "Reasoning is escalated to verification mode.";
+    if (args.escalatedMode === "act") return "Reasoning is escalated to action mode.";
+    return "Reasoning is escalated to a deeper lane.";
+  }
+  if (args.lifecycle === "done") {
+    if (args.mode === "act") return "Action reasoning is complete; see the receipt below.";
+    return "Reasoning is complete; see the answer below.";
+  }
+  return "Reasoning failed for this turn; I can retry on your next prompt.";
+}
+
+export function shouldAutoSpeakVoiceDecisionLifecycle(
+  lifecycle: VoiceDecisionLifecycle | undefined,
+): boolean {
+  return (
+    lifecycle === "queued" ||
+    lifecycle === "suppressed" ||
+    lifecycle === "escalated" ||
+    lifecycle === "failed"
+  );
+}
+
+export function shouldInterruptForSupersededReason(
+  reason: VoicePlaybackCancelReason | null,
+  hasActiveAudio: boolean,
+): boolean {
+  if (!reason) return false;
+  if (reason === "preempted_by_final" && !hasActiveAudio) {
+    return false;
+  }
+  return true;
+}
+
+export function composeVoiceBriefWithDecision(baseBrief: string, decisionSentence: string): string {
+  const brief = baseBrief.trim();
+  const decision = decisionSentence.trim();
+  if (!brief) return clipText(decision, 640);
+  if (!decision) return clipText(brief, 640);
+  const separator = /[.!?]["')\]]?$/.test(brief) ? " " : ". ";
+  return clipText(`${brief}${separator}${decision}`, 640);
+}
+
+export function buildVoiceInputStatusLabel(
+  micArmState: MicArmState,
+  state: MicRuntimeState,
+  error: string | null,
+): string | null {
+  if (micArmState === "off") return null;
+  if (state === "listening") return "Listening";
+  if (state === "transcribing") return "Transcribing";
+  if (state === "cooldown") return "Cooldown";
+  if (state === "error") return error ?? "Voice input unavailable.";
+  return null;
+}
+
+function describeVoiceInputError(error: unknown): string {
+  if (error instanceof Error) {
+    const msg = error.message.trim();
+    if (/STT HTTP 401/i.test(msg)) {
+      return "OpenAI STT unauthorized (401). Check OPENAI_API_KEY on server :5050.";
+    }
+    if (/STT HTTP 403/i.test(msg)) {
+      return "OpenAI STT forbidden (403). Check key permissions and organization/project access.";
+    }
+    if (/STT HTTP 429/i.test(msg)) {
+      return "OpenAI STT rate-limited (429). Retry shortly or adjust limits.";
+    }
+    if (/HULL|not allowed|ENOTFOUND|EAI_AGAIN|ECONN|network|fetch/i.test(msg)) {
+      return "STT network/allowlist failure. Verify outbound host allowlist includes api.openai.com.";
+    }
+    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+      return "Microphone permission denied.";
+    }
+    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+      return "No microphone available.";
+    }
+    if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+      return "Microphone is busy.";
+    }
+    if (msg) {
+      return msg;
+    }
+  }
+  return "Voice input unavailable.";
 }
 
 type HelixAskReply = {
@@ -156,6 +1267,7 @@ type HelixAskReply = {
     intent_secondary_tier?: string;
     intent_strategy?: string;
     intent_reason?: string;
+    client_inferred_mode?: "observe" | "act" | "verify";
     claim_tier?: "exploratory" | "diagnostic" | "reduced_order" | "reduced-order" | "certified";
     provenance_class?: "measured" | "proxy" | "inferred" | "simulation";
     certifying?: boolean;
@@ -237,6 +1349,16 @@ type HelixAskReply = {
     variant_selection_reason?: string;
     variant_selection_label?: string;
     variant_selection_candidate_count?: number;
+    capsule_dialogue_applied_count?: number;
+    capsule_evidence_applied_count?: number;
+    capsule_retry_applied?: boolean;
+    capsule_retry_triggered?: boolean;
+    capsule_retry_reason?: string;
+    capsule_latest_topic_shift?: boolean;
+    capsule_must_keep_terms?: string[];
+    capsule_preferred_paths?: string[];
+    focus_guard_result?: "pass" | "retry" | "clarify";
+    anchor_guard_result?: "pass" | "retry" | "clarify";
     gates?: {
       evidence?: {
         ok?: boolean;
@@ -362,6 +1484,22 @@ type ContextCapsulePreview = {
   error?: string;
   summary?: ContextCapsuleSummary;
   convergence?: ContextCapsuleConvergence;
+};
+
+export type ContextCapsuleLedgerEntry = {
+  id: string;
+  summary: ContextCapsuleSummary;
+  pinned: boolean;
+  pinnedAtMs: number | null;
+  touchedAtMs: number;
+};
+
+export type SessionCapsuleConfidenceBand = "reinforcing" | "building" | "uncertain";
+
+export type SessionCapsuleState = {
+  id: string;
+  summary: ContextCapsuleSummary;
+  confidenceBand: SessionCapsuleConfidenceBand;
 };
 
 type HelixAskPillProps = {
@@ -1999,7 +3137,8 @@ export function HelixAskPill({
   const [askQueue, setAskQueue] = useState<string[]>([]);
   const [contextCapsulePreview, setContextCapsulePreview] = useState<ContextCapsulePreview | null>(null);
   const [contextCapsuleDetectedId, setContextCapsuleDetectedId] = useState<string | null>(null);
-  const [contextCapsuleAppliedId, setContextCapsuleAppliedId] = useState<string | null>(null);
+  const [contextCapsuleSessionLedger, setContextCapsuleSessionLedger] = useState<ContextCapsuleLedgerEntry[]>([]);
+  const contextCapsuleSessionLedgerRef = useRef<ContextCapsuleLedgerEntry[]>([]);
   const contextCapsuleLookupSeqRef = useRef(0);
   const [askActiveQuestion, setAskActiveQuestion] = useState<string | null>(null);
   const [askMood, setAskMood] = useState<LumaMood>("question");
@@ -2020,7 +3159,68 @@ export function HelixAskPill({
   const askRunIdRef = useRef(0);
   const moodHintSessionId = useMemo(() => `helix:mood:${contextId}`, [contextId]);
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
-  const [askMode, setAskMode] = useState<"read" | "observe" | "act" | "verify">("read");
+  const [micArmState, setMicArmState] = useState<MicArmState>(() => {
+    if (typeof window === "undefined") return "off";
+    try {
+      const persisted = window.localStorage.getItem(MIC_PERSIST_KEY);
+      return persisted === "on" ? "on" : "off";
+    } catch {
+      return "off";
+    }
+  });
+  const micArmStateRef = useRef<MicArmState>(micArmState);
+  const [voiceInputState, setVoiceInputState] = useState<MicRuntimeState>("listening");
+  const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
+  const [voiceMonitorMaxHeightPx, setVoiceMonitorMaxHeightPx] = useState(320);
+  const [voiceMonitorLevel, setVoiceMonitorLevel] = useState(0);
+  const [voiceMonitorThreshold, setVoiceMonitorThreshold] = useState(MIC_LEVEL_MIN_THRESHOLD);
+  const [voiceSignalState, setVoiceSignalState] = useState<"waiting" | "low" | "speech">("waiting");
+  const [voiceMeterStats, setVoiceMeterStats] = useState<VoiceMeterStats>({
+    rmsRaw: 0,
+    rmsDb: -120,
+    peak: 0,
+    noiseFloor: 0.006,
+    displayLevel: 0,
+  });
+  const [voiceRecorderStats, setVoiceRecorderStats] = useState<VoiceRecorderStats>({
+    mediaChunkCount: 0,
+    mediaBytes: 0,
+    lastChunkAtMs: null,
+    chunksPerSecond: 0,
+  });
+  const [voiceCaptureCheckpoints, setVoiceCaptureCheckpoints] = useState<
+    Record<VoiceCaptureCheckpointKey, VoiceCaptureCheckpoint>
+  >(() => createVoiceCaptureCheckpointMap());
+  const [voiceCaptureWarnings, setVoiceCaptureWarnings] = useState<VoiceCaptureWarningCode[]>([]);
+  const [voiceSegmentAttempts, setVoiceSegmentAttempts] = useState<VoiceSegmentAttempt[]>([]);
+  const [voiceLastRoundtripMs, setVoiceLastRoundtripMs] = useState<number | null>(null);
+  const [voiceRecorderMimeType, setVoiceRecorderMimeType] = useState<string | null>(null);
+  const [voiceInputDeviceLabel, setVoiceInputDeviceLabel] = useState<string | null>(null);
+  const [voiceTrackMuted, setVoiceTrackMuted] = useState(false);
+  const [conversationGovernor, setConversationGovernor] = useState<ConversationGovernorState>({
+    floor_owner: "none",
+    turn_state: "hard_pause",
+    cooling_down: false,
+    completion_score: { score: 0, route: "ask_more" },
+    narrative_spine: {
+      objective: null,
+      phase: "observe",
+      user_terms: [],
+      candidate_answer: null,
+      open_question: null,
+      evidence_anchor: null,
+      next_action: null,
+    },
+  });
+  const [reasoningAttempts, setReasoningAttempts] = useState<ReasoningAttempt[]>([]);
+  const [helixTimeline, setHelixTimeline] = useState<HelixTimelineEntry[]>([]);
+  const reasoningAttemptQueueRef = useRef<string[]>([]);
+  const reasoningAttemptRunnerRef = useRef(false);
+  const reasoningAttemptCurrentIdRef = useRef<string | null>(null);
+  const reasoningAttemptAbortControllerRef = useRef<AbortController | null>(null);
+  const reasoningAttemptAbortAttemptIdRef = useRef<string | null>(null);
+  const reasoningAttemptRestartRequestedRef = useRef(new Set<string>());
+  const reasoningAttemptManualIdRef = useRef<string | null>(null);
   const [missionContextControls, setMissionContextControls] = useState<MissionContextControls>(() =>
     readMissionContextControls(),
   );
@@ -2031,8 +3231,52 @@ export function HelixAskPill({
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
+  const voiceAutoSpeakQueueRef = useRef<VoicePlaybackUtterance[]>([]);
+  const voiceAutoSpeakRunningRef = useRef(false);
+  const voiceAutoSpeakActiveUtteranceRef = useRef<VoicePlaybackUtterance | null>(null);
+  const voiceAutoSpeakAbortControllerRef = useRef<AbortController | null>(null);
+  const voiceAutoSpeakPendingPlaybackResolverRef = useRef<(() => void) | null>(null);
+  const voiceAutoSpeakCancelReasonRef = useRef<VoicePlaybackCancelReason | null>(null);
+  const voiceAutoSpeakLastMetricsRef = useRef<VoicePlaybackMetrics | null>(null);
+  const voiceBargeHoldActiveRef = useRef(false);
+  const voiceBargeHoldTurnKeyRef = useRef<string | null>(null);
+  const voiceSuppressedFinalTurnKeysRef = useRef<Set<string>>(new Set());
+  const voiceBriefSpokenLifecycleByTurnRef = useRef<Map<string, VoiceDecisionLifecycle>>(new Map());
+  const [voiceAutoSpeakLastMetrics, setVoiceAutoSpeakLastMetrics] = useState<VoicePlaybackMetrics | null>(null);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
+  const voiceChunksRef = useRef<Array<{ chunk: Blob; atMs: number }>>([]);
+  const voiceAudioContextRef = useRef<AudioContext | null>(null);
+  const voiceAnalyserRef = useRef<AnalyserNode | null>(null);
+  const voiceSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const voiceSilenceGainNodeRef = useRef<GainNode | null>(null);
+  const voiceMonitorTimerRef = useRef<number | null>(null);
+  const voiceCooldownTimerRef = useRef<number | null>(null);
+  const voiceSpeechCandidateStartMsRef = useRef<number | null>(null);
+  const voiceSpeechActiveRef = useRef(false);
+  const voiceLastSpeechMsRef = useRef<number | null>(null);
+  const voiceNoiseFloorRef = useRef(0.006);
+  const voiceDisplayLevelRef = useRef(0);
+  const voicePeakLevelRef = useRef(0);
+  const voiceLevelUiLastMsRef = useRef(0);
+  const voiceFlatWindowStartMsRef = useRef<number | null>(null);
+  const voiceFlatMinRmsRef = useRef(Number.POSITIVE_INFINITY);
+  const voiceFlatMaxRmsRef = useRef(0);
+  const voiceRecorderStartedAtMsRef = useRef<number | null>(null);
+  const voiceLastChunkAtMsRef = useRef<number | null>(null);
+  const voiceChunkCountRef = useRef(0);
+  const voiceChunkBytesRef = useRef(0);
+  const voiceReasoningAttemptSegmentByIdRef = useRef<Record<string, string>>({});
+  const voiceTrackMutedRef = useRef(false);
+  const voiceSegmentStartMsRef = useRef<number | null>(null);
+  const voiceSegmentStartIndexRef = useRef(0);
+  const voiceTranscribeQueueRef = useRef<
+    Array<{ id: string; blob: Blob; durationMs: number; cutAtMs: number }>
+  >([]);
+  const voiceTranscribeBusyRef = useRef(false);
+  const voiceSegmentFlushTimerRef = useRef<number | null>(null);
+  const voiceMonitorAnchorRef = useRef<HTMLDivElement | null>(null);
   const contextSessionStreamRef = useRef<MediaStream | null>(null);
-  const contextSessionStartInFlightRef = useRef(false);
   const reasoningTheaterPrevRef = useRef<ReasoningTheaterState | null>(null);
   const reasoningTheaterClockRafRef = useRef<number | null>(null);
   const reasoningTheaterClockLastMsRef = useRef<number | null>(null);
@@ -2121,6 +3365,19 @@ export function HelixAskPill({
   const contextCapsulePrevCellsRef = useRef<Uint8Array | null>(null);
   const contextCapsuleLastStepMsRef = useRef(0);
   const contextCapsuleLastCommitTokenRef = useRef<string | null>(null);
+  const reasoningAttemptsRef = useRef<ReasoningAttempt[]>([]);
+  const conversationRecentTurnsRef = useRef<string[]>([]);
+  const explorationRuntimeByTopicRef = useRef<Record<string, ExplorationRuntimeState>>({});
+  const reasoningTimelineEntryByAttemptIdRef = useRef<Record<string, string>>({});
+  const reasoningStreamEntryByAttemptIdRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    reasoningAttemptsRef.current = reasoningAttempts;
+  }, [reasoningAttempts]);
+
+  useEffect(() => {
+    micArmStateRef.current = micArmState;
+  }, [micArmState]);
 
   const getHelixAskSessionId = useCallback(() => {
     if (helixAskSessionRef.current) return helixAskSessionRef.current;
@@ -2128,6 +3385,62 @@ export function HelixAskPill({
     helixAskSessionRef.current = sessionId || null;
     return helixAskSessionRef.current;
   }, [contextId, ensureContextSession]);
+
+  const upsertContextCapsuleSessionLedger = useCallback(
+    (summary: ContextCapsuleSummary, pin = false) => {
+      setContextCapsuleSessionLedger((prev) => {
+        const next = upsertContextCapsuleLedger({
+          entries: prev,
+          summary,
+          pin,
+          maxEntries: HELIX_CONTEXT_CAPSULE_MAX_IDS,
+        });
+        contextCapsuleSessionLedgerRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const resolveSelectedContextCapsuleIds = useCallback(
+    (
+      prompt: string,
+      inlineCapsuleIds?: string[],
+      options?: {
+        source?: ReasoningAttemptSource;
+      },
+    ) => {
+      const inlineIds = inlineCapsuleIds ?? extractContextCapsuleIdsFromText(prompt);
+      const autoLimit =
+        options?.source === "voice_auto"
+          ? HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_VOICE
+          : HELIX_CONTEXT_CAPSULE_AUTO_APPLY_IDS_MANUAL;
+      return buildSelectedContextCapsuleIds({
+        ledgerEntries: contextCapsuleSessionLedgerRef.current,
+        prompt,
+        inlineCapsuleIds: inlineIds,
+        maxIds: inlineIds.length > 0 ? HELIX_CONTEXT_CAPSULE_MAX_IDS : autoLimit,
+      });
+    },
+    [],
+  );
+
+  const getPinnedContextCapsuleCount = useCallback(
+    () => contextCapsuleSessionLedgerRef.current.filter((entry) => entry.pinned).length,
+    [],
+  );
+
+  useEffect(() => {
+    contextCapsuleSessionLedgerRef.current = contextCapsuleSessionLedger;
+  }, [contextCapsuleSessionLedger]);
+
+  useEffect(() => {
+    helixAskSessionRef.current = null;
+    contextCapsuleSessionLedgerRef.current = [];
+    setContextCapsuleSessionLedger([]);
+    setContextCapsuleDetectedId(null);
+    setContextCapsulePreview(null);
+  }, [contextId]);
 
   useEffect(() => {
     setAskMoodBroken(false);
@@ -2147,10 +3460,16 @@ export function HelixAskPill({
 
   useEffect(() => {
     if (!contextCapsuleDetectedId) {
-      if (contextCapsuleAppliedId) {
-        // Keep an explicitly applied capsule visible while the user types.
-        return;
-      }
+      const previewId = normalizeContextCapsuleId(
+        contextCapsulePreview?.summary?.fingerprint ??
+          contextCapsulePreview?.summary?.capsuleId ??
+          contextCapsulePreview?.id ??
+          null,
+      );
+      const keepVisible =
+        previewId !== null &&
+        contextCapsuleSessionLedgerRef.current.some((entry) => entry.id === previewId && entry.pinned);
+      if (keepVisible) return;
       setContextCapsulePreview(null);
       return;
     }
@@ -2172,7 +3491,6 @@ export function HelixAskPill({
           summary: payload.capsule,
           convergence: payload.convergence,
         });
-        setContextCapsuleAppliedId(contextCapsuleDetectedId);
       })
       .catch((error) => {
         if (controller.signal.aborted || sequence !== contextCapsuleLookupSeqRef.current) return;
@@ -2182,12 +3500,11 @@ export function HelixAskPill({
           loading: false,
           error: message,
         });
-        setContextCapsuleAppliedId(null);
       });
     return () => {
       controller.abort();
     };
-  }, [contextCapsuleDetectedId, contextCapsuleAppliedId, getHelixAskSessionId]);
+  }, [contextCapsuleDetectedId, getHelixAskSessionId]);
 
   useEffect(() => {
     broadcastLumaMood(askMood);
@@ -2828,8 +4145,14 @@ export function HelixAskPill({
       reasoningTheaterFrontierTrackerRef.current = createReasoningTheaterFrontierTrackerState("steady");
       const steadyDebug = { action: "steady" as const, deltaPct: 0 };
       reasoningTheaterFrontierDebugRef.current = steadyDebug;
-      setReasoningTheaterFrontierDebug(steadyDebug);
-      setReasoningTheaterFrontierIconBrokenByPath({});
+      setReasoningTheaterFrontierDebug((prev) =>
+        prev.action === steadyDebug.action && Math.abs(prev.deltaPct - steadyDebug.deltaPct) < 0.01
+          ? prev
+          : steadyDebug,
+      );
+      setReasoningTheaterFrontierIconBrokenByPath((prev) =>
+        Object.keys(prev).length === 0 ? prev : {},
+      );
       reasoningTheaterFrontierDebugUpdateAtRef.current = 0;
       setConvergenceStripDisplayState(null);
       setConvergenceStripCollapseState(null);
@@ -3330,7 +4653,101 @@ export function HelixAskPill({
     [],
   );
 
-  const stopReadAloud = useCallback(() => {
+  const updateVoiceAutoSpeakMetrics = useCallback((metrics: VoicePlaybackMetrics) => {
+    voiceAutoSpeakLastMetricsRef.current = metrics;
+    setVoiceAutoSpeakLastMetrics(metrics);
+  }, []);
+
+  const playVoiceAudioBlob = useCallback(
+    async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
+      const replyId = input.replyId ?? null;
+      const audio = new Audio();
+      const url = URL.createObjectURL(input.blob);
+      playbackUrlRef.current = url;
+      playbackReplyIdRef.current = replyId;
+      audio.src = url;
+      playbackAudioRef.current = audio;
+      if (replyId) {
+        setReadAloudByReply((prev) => ({
+          ...prev,
+          [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "audio"),
+        }));
+      }
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finalize = (event: "ended" | "error" | "stopped") => {
+          if (settled) return;
+          settled = true;
+          if (voiceAutoSpeakPendingPlaybackResolverRef.current === resolver) {
+            voiceAutoSpeakPendingPlaybackResolverRef.current = null;
+          }
+          if (replyId) {
+            setReadAloudByReply((prev) => ({
+              ...prev,
+              [replyId]: transitionReadAloudState(
+                prev[replyId] ?? "idle",
+                event === "ended" ? "ended" : event === "stopped" ? "stop" : "error",
+              ),
+            }));
+          }
+          if (playbackUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            playbackUrlRef.current = null;
+          }
+          if (playbackAudioRef.current === audio) {
+            playbackAudioRef.current = null;
+          }
+          if (playbackReplyIdRef.current === replyId) {
+            playbackReplyIdRef.current = null;
+          }
+          if (event === "error") {
+            reject(new Error("voice_audio_playback_error"));
+            return;
+          }
+          resolve();
+        };
+        const resolver = () => finalize("stopped");
+        voiceAutoSpeakPendingPlaybackResolverRef.current = resolver;
+        audio.onended = () => finalize("ended");
+        audio.onerror = () => finalize("error");
+        const playPromise = audio.play();
+        if (input.awaitPlayback === false) {
+          void playPromise
+            .then(() => resolve())
+            .catch(() => finalize("error"));
+          return;
+        }
+        void playPromise.catch(() => finalize("error"));
+      });
+    },
+    [],
+  );
+
+  const stopReadAloud = useCallback((reason: VoicePlaybackCancelReason = "manual_stop") => {
+    voiceBargeHoldActiveRef.current = false;
+    voiceBargeHoldTurnKeyRef.current = null;
+    if (reason === "barge_in") {
+      // Drop pending chunks so speech does not resume over the active speaker.
+      voiceAutoSpeakQueueRef.current = [];
+    }
+    if (voiceAutoSpeakAbortControllerRef.current) {
+      voiceAutoSpeakAbortControllerRef.current.abort();
+      voiceAutoSpeakAbortControllerRef.current = null;
+    }
+    const activeUtterance = voiceAutoSpeakActiveUtteranceRef.current;
+    if (activeUtterance) {
+      voiceAutoSpeakCancelReasonRef.current = reason;
+      const previousMetrics = voiceAutoSpeakLastMetricsRef.current;
+      if (previousMetrics && previousMetrics.utteranceId === activeUtterance.utteranceId) {
+        updateVoiceAutoSpeakMetrics({
+          ...previousMetrics,
+          cancelReason: reason,
+          totalPlaybackMs:
+            previousMetrics.totalPlaybackMs ??
+            Math.max(0, Date.now() - activeUtterance.enqueuedAtMs),
+        });
+      }
+    }
     const currentAudio = playbackAudioRef.current;
     if (currentAudio) {
       currentAudio.pause();
@@ -3346,68 +4763,492 @@ export function HelixAskPill({
       setReadAloudByReply((prev) => ({ ...prev, [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "stop") }));
       playbackReplyIdRef.current = null;
     }
-  }, []);
+    const pendingResolver = voiceAutoSpeakPendingPlaybackResolverRef.current;
+    voiceAutoSpeakPendingPlaybackResolverRef.current = null;
+    if (pendingResolver) {
+      pendingResolver();
+    }
+  }, [updateVoiceAutoSpeakMetrics]);
 
-  const handleReadAloud = useCallback(async (reply: HelixAskReply) => {
-    const text = buildSpeakText(buildCopyText(reply));
-    if (!text) return;
-    stopReadAloud();
-    setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "request") }));
-    try {
-      const response = await speakVoice({
-        text,
-        mode: "briefing",
-        priority: "info",
-        traceId: askLiveTraceId ?? `ask:${crypto.randomUUID()}`,
-        missionId: contextId,
-        eventId: reply.id,
-        contextTier: missionContextControls.tier,
-        sessionState: contextSessionState,
-        voiceMode: missionContextControls.voiceMode,
-      });
-      if (response.kind === "json") {
-        const statusEvent = response.status >= 400 ? "error" : "dry-run";
-        setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", statusEvent) }));
-        return;
+  const requestVoicePlayback = useCallback(
+    async (input: {
+      text: string;
+      eventId: string;
+      traceId?: string;
+      provider?: string;
+      voiceProfileId?: string;
+      markReplyId?: string;
+      awaitPlayback?: boolean;
+    }): Promise<"audio" | "json"> => {
+      const text = buildSpeakText(input.text);
+      if (!text) return "json";
+      stopReadAloud();
+      const replyId = input.markReplyId ?? null;
+      if (replyId) {
+        setReadAloudByReply((prev) => ({
+          ...prev,
+          [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "request"),
+        }));
       }
-      const audio = new Audio();
-      const url = URL.createObjectURL(response.blob);
-      playbackUrlRef.current = url;
-      playbackReplyIdRef.current = reply.id;
-      audio.src = url;
-      audio.onended = () => {
-        if (!isActivePlayback(playbackAudioRef.current, audio)) {
-          return;
+      try {
+        const response = await speakVoice({
+          text,
+          mode: "briefing",
+          priority: "info",
+          provider: input.provider,
+          voice_profile_id: input.voiceProfileId,
+          traceId: input.traceId ?? askLiveTraceId ?? `ask:${crypto.randomUUID()}`,
+          missionId: contextId,
+          eventId: input.eventId,
+          contextTier: missionContextControls.tier,
+          sessionState: contextSessionState,
+          voiceMode: missionContextControls.voiceMode,
+        });
+        if (response.kind === "json") {
+          if (replyId) {
+            const statusEvent = response.status >= 400 ? "error" : "dry-run";
+            setReadAloudByReply((prev) => ({
+              ...prev,
+              [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", statusEvent),
+            }));
+          }
+          return "json";
         }
-        setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "ended") }));
-        if (playbackUrlRef.current === url) {
-          URL.revokeObjectURL(url);
+        await playVoiceAudioBlob({
+          blob: response.blob,
+          replyId,
+          awaitPlayback: input.awaitPlayback,
+        });
+        return "audio";
+      } catch {
+        if (playbackAudioRef.current) {
+          playbackAudioRef.current.pause();
+          playbackAudioRef.current.src = "";
+          playbackAudioRef.current = null;
+        }
+        if (playbackUrlRef.current) {
+          URL.revokeObjectURL(playbackUrlRef.current);
           playbackUrlRef.current = null;
         }
-        playbackAudioRef.current = null;
         playbackReplyIdRef.current = null;
-      };
-      playbackAudioRef.current = audio;
-      setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "audio") }));
-      await audio.play();
-    } catch {
-      if (playbackAudioRef.current) {
-        playbackAudioRef.current.pause();
-        playbackAudioRef.current.src = "";
-        playbackAudioRef.current = null;
+        if (replyId) {
+          setReadAloudByReply((prev) => ({
+            ...prev,
+            [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "error"),
+          }));
+        }
+        throw new Error("voice_playback_failed");
       }
-      if (playbackUrlRef.current) {
-        URL.revokeObjectURL(playbackUrlRef.current);
-        playbackUrlRef.current = null;
-      }
-      playbackReplyIdRef.current = null;
-      setReadAloudByReply((prev) => ({ ...prev, [reply.id]: transitionReadAloudState(prev[reply.id] ?? "idle", "error") }));
-    }
-  }, [askLiveTraceId, buildCopyText, contextId, contextSessionState, missionContextControls.tier, missionContextControls.voiceMode, stopReadAloud]);
+    },
+    [
+      askLiveTraceId,
+      contextId,
+      contextSessionState,
+      missionContextControls.tier,
+      missionContextControls.voiceMode,
+      playVoiceAudioBlob,
+      stopReadAloud,
+    ],
+  );
 
-  useEffect(() => () => {
-    stopReadAloud();
-  }, [stopReadAloud]);
+  const synthesizeVoiceChunk = useCallback(
+    async (input: {
+      utterance: VoicePlaybackUtterance;
+      chunk: VoicePlaybackChunk;
+      signal: AbortSignal;
+    }): Promise<{
+      blob: Blob;
+      synthMs: number;
+      headers: {
+        provider: string | null;
+        profile: string | null;
+        cache: "hit" | "miss" | null;
+      };
+    }> => {
+      const startedAtMs = Date.now();
+      const response = await speakVoice(
+        {
+          text: input.chunk.text,
+          mode: "briefing",
+          priority: "info",
+          provider: HELIX_VOICE_AUTO_SPEAK_PROVIDER,
+          voice_profile_id: HELIX_VOICE_AUTO_SPEAK_DEFAULT_PROFILE_ID,
+          traceId: input.utterance.traceId ?? askLiveTraceId ?? `ask:${crypto.randomUUID()}`,
+          // Brief/final auto-speak is chunked; omit missionId to avoid callout rate rails.
+          missionId: undefined,
+          eventId: input.utterance.eventId,
+          contextTier: missionContextControls.tier,
+          sessionState: contextSessionState,
+          voiceMode: missionContextControls.voiceMode,
+          utteranceId: input.utterance.utteranceId,
+          chunkIndex: input.chunk.chunkIndex,
+          chunkCount: input.chunk.chunkCount,
+          chunkKind: input.chunk.kind,
+          turnKey: input.chunk.turnKey,
+        },
+        { signal: input.signal },
+      );
+      const synthMs = Math.max(0, Date.now() - startedAtMs);
+      if (response.kind === "json") {
+        const suppressionReason =
+          (response.payload as { suppression_reason?: string | null }).suppression_reason ??
+          response.payload?.reason ??
+          response.payload?.error ??
+          response.payload?.message ??
+          "voice_auto_speak_json_response";
+        if (response.payload?.suppressed === true || response.status < 400) {
+          throw new Error(`voice_auto_speak_suppressed:${suppressionReason}`);
+        }
+        throw new Error(
+          suppressionReason,
+        );
+      }
+      return {
+        blob: response.blob,
+        synthMs,
+        headers: response.headers,
+      };
+    },
+    [
+      askLiveTraceId,
+      contextId,
+      contextSessionState,
+      missionContextControls.tier,
+      missionContextControls.voiceMode,
+    ],
+  );
+
+  const runVoiceAutoSpeakQueue = useCallback(async () => {
+    if (voiceAutoSpeakRunningRef.current) return;
+    voiceAutoSpeakRunningRef.current = true;
+    try {
+      while (voiceAutoSpeakQueueRef.current.length > 0) {
+        if (micArmStateRef.current !== "on") break;
+        const utterance = voiceAutoSpeakQueueRef.current.shift();
+        if (!utterance || utterance.chunks.length === 0) continue;
+        voiceAutoSpeakActiveUtteranceRef.current = utterance;
+        voiceAutoSpeakCancelReasonRef.current = null;
+        const metrics: VoicePlaybackMetrics = {
+          utteranceId: utterance.utteranceId,
+          turnKey: utterance.turnKey,
+          kind: utterance.kind,
+          chunkCount: utterance.chunks.length,
+          enqueueToFirstAudioMs: null,
+          synthDurationsMs: [],
+          chunkGapMs: [],
+          totalPlaybackMs: null,
+          cancelReason: null,
+          cacheHitCount: 0,
+          cacheMissCount: 0,
+        };
+        updateVoiceAutoSpeakMetrics(metrics);
+        const utteranceStartedAtMs = Date.now();
+        let lastChunkEndedAtMs: number | null = null;
+        for (let chunkIndex = 0; chunkIndex < utterance.chunks.length; chunkIndex += 1) {
+          if (micArmStateRef.current !== "on") {
+            metrics.cancelReason = "mic_off";
+            break;
+          }
+          if (voiceAutoSpeakActiveUtteranceRef.current?.utteranceId !== utterance.utteranceId) {
+            metrics.cancelReason = voiceAutoSpeakCancelReasonRef.current ?? "superseded_same_turn";
+            break;
+          }
+          const chunk: VoicePlaybackChunk = {
+            utteranceId: utterance.utteranceId,
+            turnKey: utterance.turnKey,
+            kind: utterance.kind,
+            chunkIndex,
+            chunkCount: utterance.chunks.length,
+            text: utterance.chunks[chunkIndex] ?? "",
+          };
+          if (!chunk.text) continue;
+          const currentController = new AbortController();
+          voiceAutoSpeakAbortControllerRef.current = currentController;
+          const nextChunk = utterance.chunks[chunkIndex + 1]
+            ? {
+                utteranceId: utterance.utteranceId,
+                turnKey: utterance.turnKey,
+                kind: utterance.kind,
+                chunkIndex: chunkIndex + 1,
+                chunkCount: utterance.chunks.length,
+                text: utterance.chunks[chunkIndex + 1] ?? "",
+              }
+            : null;
+          let nextController: AbortController | null = null;
+          let nextFetch:
+            | Promise<{
+                ok: true;
+                value: {
+                  blob: Blob;
+                  synthMs: number;
+                  headers: {
+                    provider: string | null;
+                    profile: string | null;
+                    cache: "hit" | "miss" | null;
+                  };
+                };
+              } | {
+                ok: false;
+                error: unknown;
+              }>
+            | null = null;
+          try {
+            const currentResult = await synthesizeVoiceChunk({
+              utterance,
+              chunk,
+              signal: currentController.signal,
+            });
+            if (voiceAutoSpeakAbortControllerRef.current === currentController) {
+              voiceAutoSpeakAbortControllerRef.current = null;
+            }
+            metrics.synthDurationsMs.push(currentResult.synthMs);
+            if (currentResult.headers.cache === "hit") metrics.cacheHitCount += 1;
+            if (currentResult.headers.cache === "miss") metrics.cacheMissCount += 1;
+            metrics.providerHeader = currentResult.headers.provider ?? undefined;
+            metrics.profileHeader = currentResult.headers.profile ?? undefined;
+            if (metrics.enqueueToFirstAudioMs === null) {
+              metrics.enqueueToFirstAudioMs = Math.max(0, Date.now() - utterance.enqueuedAtMs);
+            }
+            if (nextChunk && nextChunk.text) {
+              nextController = new AbortController();
+              voiceAutoSpeakAbortControllerRef.current = nextController;
+              nextFetch = synthesizeVoiceChunk({
+                utterance,
+                chunk: nextChunk,
+                signal: nextController.signal,
+              })
+                .then((value) => ({
+                  ok: true as const,
+                  value,
+                }))
+                .catch((error: unknown) => ({
+                  ok: false as const,
+                  error,
+                }));
+            }
+            const playStartedAtMs = Date.now();
+            if (lastChunkEndedAtMs !== null) {
+              metrics.chunkGapMs.push(Math.max(0, playStartedAtMs - lastChunkEndedAtMs));
+            }
+            await playVoiceAudioBlob({ blob: currentResult.blob, awaitPlayback: true });
+            lastChunkEndedAtMs = Date.now();
+            if (nextFetch && nextController) {
+              const prefetchedSettled = await nextFetch;
+              if (voiceAutoSpeakAbortControllerRef.current === nextController) {
+                voiceAutoSpeakAbortControllerRef.current = null;
+              }
+              if (!prefetchedSettled.ok) {
+                throw prefetchedSettled.error;
+              }
+              const prefetched = prefetchedSettled.value;
+              metrics.synthDurationsMs.push(prefetched.synthMs);
+              if (prefetched.headers.cache === "hit") metrics.cacheHitCount += 1;
+              if (prefetched.headers.cache === "miss") metrics.cacheMissCount += 1;
+              metrics.providerHeader = prefetched.headers.provider ?? metrics.providerHeader;
+              metrics.profileHeader = prefetched.headers.profile ?? metrics.profileHeader;
+              if (metrics.enqueueToFirstAudioMs === null) {
+                metrics.enqueueToFirstAudioMs = Math.max(0, Date.now() - utterance.enqueuedAtMs);
+              }
+              const prefetchedPlayStartMs = Date.now();
+              if (lastChunkEndedAtMs !== null) {
+                metrics.chunkGapMs.push(Math.max(0, prefetchedPlayStartMs - lastChunkEndedAtMs));
+              }
+              await playVoiceAudioBlob({ blob: prefetched.blob, awaitPlayback: true });
+              lastChunkEndedAtMs = Date.now();
+              chunkIndex += 1;
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (/abort/i.test(message)) {
+              metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current ?? "barge_in";
+            } else if (/^voice_auto_speak_suppressed:/i.test(message)) {
+              metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current;
+            } else {
+              metrics.cancelReason = metrics.cancelReason ?? "error";
+            }
+            break;
+          }
+        }
+        metrics.totalPlaybackMs = Math.max(0, Date.now() - utteranceStartedAtMs);
+        updateVoiceAutoSpeakMetrics(metrics);
+        voiceAutoSpeakActiveUtteranceRef.current = null;
+        voiceAutoSpeakCancelReasonRef.current = null;
+      }
+    } finally {
+      voiceAutoSpeakRunningRef.current = false;
+      voiceAutoSpeakAbortControllerRef.current = null;
+      voiceAutoSpeakActiveUtteranceRef.current = null;
+      voiceAutoSpeakCancelReasonRef.current = null;
+    }
+  }, [playVoiceAudioBlob, synthesizeVoiceChunk, updateVoiceAutoSpeakMetrics]);
+
+  const enqueueVoiceAutoSpeakTask = useCallback(
+    (task: VoiceAutoSpeakTask) => {
+      if (micArmStateRef.current !== "on") return;
+      if (task.kind === "final" && voiceSuppressedFinalTurnKeysRef.current.has(task.turnKey)) {
+        return;
+      }
+      const text = buildSpeakText(task.text, HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS);
+      if (!text) return;
+      const nextUtterance = createVoicePlaybackUtterance({
+        utteranceId: task.key,
+        turnKey: task.turnKey,
+        kind: task.kind,
+        text,
+        traceId: task.traceId,
+        eventId: task.eventId,
+      });
+      if (nextUtterance.chunks.length === 0) {
+        return;
+      }
+      const duplicateQueued = voiceAutoSpeakQueueRef.current.some(
+        (entry) =>
+          entry.turnKey === nextUtterance.turnKey &&
+          entry.kind === nextUtterance.kind &&
+          entry.text === nextUtterance.text,
+      );
+      const duplicateActive =
+        voiceAutoSpeakActiveUtteranceRef.current &&
+        voiceAutoSpeakActiveUtteranceRef.current.turnKey === nextUtterance.turnKey &&
+        voiceAutoSpeakActiveUtteranceRef.current.kind === nextUtterance.kind &&
+        voiceAutoSpeakActiveUtteranceRef.current.text === nextUtterance.text;
+      if (duplicateQueued || duplicateActive) {
+        return;
+      }
+      const nextQueue = applyLatestWinsVoiceQueue({
+        queue: voiceAutoSpeakQueueRef.current,
+        incoming: nextUtterance,
+        active: voiceAutoSpeakActiveUtteranceRef.current,
+      });
+      voiceAutoSpeakQueueRef.current = trimVoicePlaybackQueue(nextQueue.queue, HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX).queue;
+      if (
+        shouldInterruptForSupersededReason(
+          nextQueue.supersededActiveReason,
+          Boolean(playbackAudioRef.current),
+        )
+      ) {
+        stopReadAloud(nextQueue.supersededActiveReason);
+      }
+      void runVoiceAutoSpeakQueue();
+    },
+    [runVoiceAutoSpeakQueue, stopReadAloud],
+  );
+
+  const scheduleVoiceAutoSpeakBrief = useCallback(
+    (entry: HelixTimelineEntry) => {
+      if (entry.source !== "voice_auto" || micArmStateRef.current !== "on") return;
+      const lifecycle =
+        typeof entry.meta?.decisionLifecycle === "string"
+          ? (entry.meta.decisionLifecycle as VoiceDecisionLifecycle)
+          : undefined;
+      const turnKey = entry.traceId ?? entry.attemptId ?? entry.id;
+      const priorLifecycle = voiceBriefSpokenLifecycleByTurnRef.current.get(turnKey);
+      const shouldSpeakLifecycle =
+        shouldAutoSpeakVoiceDecisionLifecycle(lifecycle) ||
+        (lifecycle === "running" && priorLifecycle === undefined);
+      if (!shouldSpeakLifecycle) return;
+      if (lifecycle) {
+        const map = voiceBriefSpokenLifecycleByTurnRef.current;
+        map.set(turnKey, lifecycle);
+        if (map.size > 256) {
+          const oldestKey = map.keys().next().value;
+          if (typeof oldestKey === "string" && oldestKey) {
+            map.delete(oldestKey);
+          }
+        }
+      }
+      const task: VoiceAutoSpeakTask = {
+        key: buildVoiceAutoSpeakUtteranceId([
+          "brief",
+          entry.traceId ?? entry.attemptId ?? entry.id,
+          lifecycle,
+          entry.id,
+        ]),
+        kind: "brief",
+        turnKey,
+        text: entry.text,
+        traceId: entry.traceId,
+        eventId: entry.id,
+      };
+      enqueueVoiceAutoSpeakTask(task);
+    },
+    [enqueueVoiceAutoSpeakTask],
+  );
+
+  const pausePlaybackForPotentialBargeIn = useCallback((): boolean => {
+    voiceBargeHoldTurnKeyRef.current = voiceAutoSpeakActiveUtteranceRef.current?.turnKey ?? null;
+    const currentAudio = playbackAudioRef.current;
+    if (!currentAudio || currentAudio.paused) return false;
+    try {
+      currentAudio.pause();
+      voiceBargeHoldActiveRef.current = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const resolveBargeInFromTranscription = useCallback(
+    (resolved: boolean) => {
+      if (!voiceBargeHoldActiveRef.current) return;
+      voiceBargeHoldActiveRef.current = false;
+      const heldTurnKey = voiceBargeHoldTurnKeyRef.current;
+      voiceBargeHoldTurnKeyRef.current = null;
+      if (resolved) {
+        if (heldTurnKey) {
+          const suppressed = voiceSuppressedFinalTurnKeysRef.current;
+          suppressed.add(heldTurnKey);
+          if (suppressed.size > 64) {
+            const oldest = suppressed.values().next().value;
+            if (typeof oldest === "string" && oldest) {
+              suppressed.delete(oldest);
+            }
+          }
+        }
+        stopReadAloud("barge_in");
+        return;
+      }
+      const currentAudio = playbackAudioRef.current;
+      if (currentAudio && currentAudio.paused && micArmStateRef.current === "on") {
+        void currentAudio.play().catch(() => {
+          // Ignore resume failures; queue may still continue on subsequent turns.
+        });
+        return;
+      }
+      if (voiceAutoSpeakQueueRef.current.length > 0 && micArmStateRef.current === "on") {
+        void runVoiceAutoSpeakQueue();
+      }
+    },
+    [runVoiceAutoSpeakQueue, stopReadAloud],
+  );
+
+  const handleReadAloud = useCallback(
+    async (reply: HelixAskReply) => {
+      const text = buildCopyText(reply);
+      if (!text) return;
+      try {
+        await requestVoicePlayback({
+          text,
+          eventId: reply.id,
+          markReplyId: reply.id,
+        });
+      } catch {
+        // requestVoicePlayback handles state cleanup for manual read aloud.
+      }
+    },
+    [buildCopyText, requestVoicePlayback],
+  );
+
+  useEffect(() => {
+    if (micArmState !== "off") return;
+    voiceAutoSpeakQueueRef.current = [];
+    voiceAutoSpeakActiveUtteranceRef.current = null;
+    voiceAutoSpeakCancelReasonRef.current = "mic_off";
+    voiceSuppressedFinalTurnKeysRef.current.clear();
+    voiceBriefSpokenLifecycleByTurnRef.current.clear();
+    voiceBargeHoldTurnKeyRef.current = null;
+    stopReadAloud("mic_off");
+  }, [micArmState, stopReadAloud]);
 
   const handleOpenConversationPanel = useCallback(() => {
     const sessionId = getHelixAskSessionId();
@@ -3434,27 +5275,2101 @@ export function HelixAskPill({
     resizeTextarea();
   }, [resizeTextarea]);
 
-  const handleUseContextCapsuleFromReply = useCallback(
-    (reply: HelixAskReply) => {
-      const capsule = reply.contextCapsule;
-      if (!capsule) return;
-      const capsuleToken = capsule.fingerprint.trim().toUpperCase();
-      if (!capsuleToken) return;
+  const syncAskDraftValue = useCallback(
+    (
+      nextValue: string,
+      options?: {
+        target?: HTMLTextAreaElement | null;
+        focus?: boolean;
+        forceMoodHint?: boolean;
+      },
+    ) => {
+      const input = options?.target ?? askInputRef.current;
+      if (input) {
+        input.value = nextValue;
+        if (options?.focus) {
+          input.focus();
+          const cursor = input.value.length;
+          input.setSelectionRange(cursor, cursor);
+        }
+        resizeTextarea(input);
+        input.scrollTop = input.scrollHeight;
+      }
+      askDraftRef.current = nextValue;
+      const contextCapsuleIds = extractContextCapsuleIdsFromText(nextValue);
+      setContextCapsuleDetectedId(contextCapsuleIds[0] ?? null);
+      if (voiceInputError) {
+        setVoiceInputError(null);
+        if (voiceInputState === "error") {
+          setVoiceInputState("listening");
+        }
+      }
+      if (askBusy) return;
+      clearMoodTimer();
+      const trimmed = nextValue.trim();
+      if (!trimmed) return;
+      if (options?.forceMoodHint) {
+        updateMoodFromText(trimmed);
+        requestMoodHint(trimmed, { force: true });
+        return;
+      }
+      askMoodTimerRef.current = window.setTimeout(() => {
+        askMoodTimerRef.current = null;
+        const latest = askDraftRef.current.trim();
+        if (!latest) return;
+        updateMoodFromText(latest);
+        requestMoodHint(latest);
+      }, 900);
+    },
+    [
+      askBusy,
+      clearMoodTimer,
+      requestMoodHint,
+      resizeTextarea,
+      updateMoodFromText,
+      voiceInputError,
+      voiceInputState,
+    ],
+  );
 
-      const input = askInputRef.current;
-      input?.focus();
+  const setVoiceWarning = useCallback((code: VoiceCaptureWarningCode, active: boolean) => {
+    setVoiceCaptureWarnings((prev) => {
+      const hasCode = prev.includes(code);
+      if (active) {
+        return hasCode ? prev : [...prev, code];
+      }
+      if (!hasCode) return prev;
+      return prev.filter((entry) => entry !== code);
+    });
+  }, []);
 
-      setContextCapsuleDetectedId(capsuleToken);
-      setContextCapsuleAppliedId(capsuleToken);
-      setContextCapsulePreview({
-        id: capsuleToken,
-        loading: false,
-        summary: capsule,
-        convergence: capsule.convergence,
+  const markVoiceCheckpoint = useCallback(
+    (
+      key: VoiceCaptureCheckpointKey,
+      status: VoiceCaptureCheckpointStatus,
+      message?: string,
+      latencyMs?: number | null,
+    ) => {
+      setVoiceCaptureCheckpoints((prev) => {
+        const existing = prev[key];
+        const nextMessage = message ?? existing.message;
+        const nextLatencyMs = latencyMs ?? existing.latencyMs;
+        return {
+          ...prev,
+          [key]: {
+            ...existing,
+            status,
+            message: nextMessage ?? null,
+            latencyMs: nextLatencyMs ?? null,
+            lastAtMs: Date.now(),
+          },
+        };
       });
     },
     [],
   );
+
+  const addVoiceSegmentAttempt = useCallback((segment: VoiceSegmentAttempt) => {
+    setVoiceSegmentAttempts((prev) => [segment, ...prev].slice(0, 5));
+  }, []);
+
+  const patchVoiceSegmentAttempt = useCallback(
+    (segmentId: string, patch: Partial<VoiceSegmentAttempt>) => {
+      setVoiceSegmentAttempts((prev) =>
+        prev.map((segment) => (segment.id === segmentId ? { ...segment, ...patch } : segment)),
+      );
+    },
+    [],
+  );
+
+  const rememberConversationTurn = useCallback((entry: string) => {
+    const trimmed = entry.trim();
+    if (!trimmed) return;
+    conversationRecentTurnsRef.current = [...conversationRecentTurnsRef.current, trimmed].slice(-8);
+  }, []);
+
+  const addHelixTimelineEntry = useCallback(
+    (input: Omit<HelixTimelineEntry, "id" | "createdAtMs" | "updatedAtMs">): HelixTimelineEntry => {
+      const now = Date.now();
+      const entry: HelixTimelineEntry = {
+        ...input,
+        id: `timeline:${crypto.randomUUID()}`,
+        createdAtMs: now,
+        updatedAtMs: now,
+      };
+      setHelixTimeline((prev) => [entry, ...prev].slice(0, 120));
+      return entry;
+    },
+    [],
+  );
+
+  const replaceVoiceConversationTimelineEntry = useCallback(
+    (
+      input: Omit<HelixTimelineEntry, "id" | "createdAtMs" | "updatedAtMs"> & {
+        type: "conversation_recorded" | "conversation_brief";
+        source: "voice_auto";
+      },
+    ): HelixTimelineEntry => {
+      const now = Date.now();
+      const entry: HelixTimelineEntry = {
+        ...input,
+        id: `timeline:${crypto.randomUUID()}`,
+        createdAtMs: now,
+        updatedAtMs: now,
+      };
+      setHelixTimeline((prev) => {
+        const filtered = prev.filter(
+          (existing) => !(existing.source === "voice_auto" && existing.type === input.type),
+        );
+        return [entry, ...filtered].slice(0, 120);
+      });
+      return entry;
+    },
+    [],
+  );
+
+  const updateVoiceDecisionBrief = useCallback(
+    (input: {
+      baseBrief: string;
+      lifecycle: VoiceDecisionLifecycle;
+      mode?: "observe" | "act" | "verify" | "clarify";
+      routeReasonCode?: string | null;
+      traceId?: string;
+      escalatedMode?: "verify" | "act";
+      status?: HelixTimelineEntry["status"];
+      meta?: Record<string, unknown>;
+    }): HelixTimelineEntry => {
+      const decisionSentence = formatVoiceDecisionSentence({
+        lifecycle: input.lifecycle,
+        mode: input.mode,
+        routeReasonCode: input.routeReasonCode,
+        escalatedMode: input.escalatedMode,
+      });
+      const composedBrief = composeVoiceBriefWithDecision(input.baseBrief, decisionSentence);
+      const status: HelixTimelineEntry["status"] =
+        input.status ??
+        (input.lifecycle === "queued"
+          ? "queued"
+          : input.lifecycle === "running" || input.lifecycle === "escalated"
+            ? "running"
+            : input.lifecycle === "suppressed"
+              ? "suppressed"
+              : input.lifecycle === "failed"
+                ? "failed"
+                : "done");
+      const timelineEntry = replaceVoiceConversationTimelineEntry({
+        type: "conversation_brief",
+        source: "voice_auto",
+        status,
+        text: clipText(composedBrief, 560),
+        detail: decisionSentence,
+        mode: input.mode,
+        traceId: input.traceId,
+        meta: {
+          ...(input.meta ?? {}),
+          decisionLifecycle: input.lifecycle,
+          decisionSentence,
+          routeReasonCode: input.routeReasonCode ?? null,
+          escalatedMode: input.escalatedMode ?? null,
+        },
+      });
+      scheduleVoiceAutoSpeakBrief(timelineEntry);
+      return timelineEntry;
+    },
+    [replaceVoiceConversationTimelineEntry, scheduleVoiceAutoSpeakBrief],
+  );
+
+  const patchHelixTimelineEntry = useCallback((entryId: string, patch: Partial<HelixTimelineEntry>) => {
+    setHelixTimeline((prev) =>
+      prev.map((entry) =>
+        entry.id === entryId
+          ? {
+              ...entry,
+              ...patch,
+              updatedAtMs: Date.now(),
+            }
+          : entry,
+      ),
+    );
+  }, []);
+
+  const formatReasoningAttemptDetail = useCallback(
+    (attempt: Pick<ReasoningAttempt, "mode">, fallback: string | null): string | null => {
+      const parts: string[] = [];
+      if (attempt.mode) {
+        parts.push(`mode:${attempt.mode}`);
+      }
+      if (parts.length > 0) return parts.join(" | ");
+      return fallback;
+    },
+    [],
+  );
+
+  const ensureReasoningTimelineEntry = useCallback(
+    (attempt: ReasoningAttempt, status?: HelixTimelineEntry["status"]) => {
+      const existingId = reasoningTimelineEntryByAttemptIdRef.current[attempt.id];
+      if (existingId) {
+        if (status) {
+          patchHelixTimelineEntry(existingId, { status });
+        }
+        return existingId;
+      }
+      const timelineEntry = addHelixTimelineEntry({
+        type: "reasoning_attempt",
+        source: attempt.source,
+        status: status ?? (attempt.status === "suppressed" ? "suppressed" : "queued"),
+        text: clipText(attempt.prompt, 300),
+        detail: formatReasoningAttemptDetail(attempt, null),
+        mode: attempt.mode,
+        traceId: attempt.traceId,
+        attemptId: attempt.id,
+        meta: {
+          profile: attempt.profile ?? null,
+          completionScore: attempt.completionScore ?? null,
+          floorOwner: attempt.floorOwner ?? null,
+          contextCapsuleCount: attempt.contextCapsuleCount ?? null,
+          contextCapsulePinnedCount: attempt.contextCapsulePinnedCount ?? null,
+          contextCapsuleIds: attempt.contextCapsuleIds ?? [],
+          routeReasonCode: attempt.routeReasonCode ?? null,
+          explorationTurn: attempt.explorationTurn ?? false,
+          explorationAttemptCount: attempt.explorationAttemptCount ?? null,
+        },
+      });
+      reasoningTimelineEntryByAttemptIdRef.current[attempt.id] = timelineEntry.id;
+      return timelineEntry.id;
+    },
+    [addHelixTimelineEntry, formatReasoningAttemptDetail, patchHelixTimelineEntry],
+  );
+
+  const updateReasoningAttempt = useCallback(
+    (attemptId: string, updater: (attempt: ReasoningAttempt) => ReasoningAttempt) => {
+      setReasoningAttempts((prev) =>
+        prev.map((attempt) =>
+          attempt.id === attemptId ? { ...updater(attempt), updatedAtMs: Date.now() } : attempt,
+        ),
+      );
+    },
+    [],
+  );
+
+  const enqueueReasoningAttempt = useCallback((attemptId: string) => {
+    reasoningAttemptQueueRef.current.push(attemptId);
+  }, []);
+
+  const createReasoningAttempt = useCallback(
+    (input: {
+      prompt: string;
+      dispatchPrompt?: string;
+      recordedText?: string | null;
+      contextCapsuleIds?: string[];
+      contextCapsuleCount?: number;
+      contextCapsulePinnedCount?: number;
+      source: ReasoningAttemptSource;
+      mode?: "observe" | "act" | "verify";
+      profile?: "dot_min_steps_v1";
+      status?: ReasoningAttemptStatus;
+      traceId?: string;
+      conversationBriefBase?: string;
+      completionScore?: number;
+      floorOwner?: FloorOwner;
+      suppression_reason?: string;
+      routeReasonCode?: string;
+      explorationTurn?: boolean;
+      clarifierPolicy?: ConversationClarifierPolicy;
+      explorationPacket?: ConversationExplorationPacket | null;
+      explorationTopicKey?: string | null;
+      explorationAttemptCount?: number;
+      sttEngine?: string;
+      sourceLanguage?: string | null;
+      translated?: boolean;
+    }): ReasoningAttempt => {
+      const now = Date.now();
+      const attempt: ReasoningAttempt = {
+        id: crypto.randomUUID(),
+        traceId: input.traceId ?? `ask:${crypto.randomUUID()}`,
+        prompt: input.prompt.trim(),
+        dispatchPrompt: input.dispatchPrompt?.trim() || undefined,
+        recordedText: input.recordedText ?? null,
+        contextCapsuleIds: input.contextCapsuleIds?.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS),
+        contextCapsuleCount: input.contextCapsuleCount,
+        contextCapsulePinnedCount: input.contextCapsulePinnedCount,
+        source: input.source,
+        status: input.status ?? "queued",
+        profile: input.profile,
+        mode: input.mode,
+        completionScore: input.completionScore,
+        floorOwner: input.floorOwner,
+        suppression_reason: input.suppression_reason,
+        routeReasonCode: input.routeReasonCode,
+        explorationTurn: input.explorationTurn,
+        clarifierPolicy: input.clarifierPolicy,
+        explorationPacket: input.explorationPacket ?? null,
+        explorationTopicKey: input.explorationTopicKey ?? null,
+        explorationAttemptCount: input.explorationAttemptCount,
+        sttEngine: input.sttEngine,
+        sourceLanguage: input.sourceLanguage,
+        translated: input.translated,
+        conversationBriefBase: input.conversationBriefBase,
+        partial: "",
+        events: [],
+        createdAtMs: now,
+        updatedAtMs: now,
+      };
+      const nextAttempts = [attempt, ...reasoningAttemptsRef.current].slice(0, 24);
+      reasoningAttemptsRef.current = nextAttempts;
+      setReasoningAttempts(nextAttempts);
+      return attempt;
+    },
+    [],
+  );
+
+  const runReasoningAttemptQueue = useCallback(async () => {
+    if (reasoningAttemptRunnerRef.current) return;
+    reasoningAttemptRunnerRef.current = true;
+    try {
+      while (reasoningAttemptQueueRef.current.length > 0) {
+        const nextAttemptId = reasoningAttemptQueueRef.current.shift();
+        if (!nextAttemptId) continue;
+        if (askBusy && reasoningAttemptCurrentIdRef.current === null) {
+          reasoningAttemptQueueRef.current.unshift(nextAttemptId);
+          break;
+        }
+        const attempt = reasoningAttemptsRef.current.find((entry) => entry.id === nextAttemptId);
+        if (!attempt || attempt.status === "cancelled" || attempt.status === "suppressed") {
+          continue;
+        }
+        const sessionId = getHelixAskSessionId() ?? undefined;
+        setAskBusy(true);
+        setAskStatus("Generating answer...");
+        setAskError(null);
+        setAskLiveEvents([]);
+        askLiveEventsRef.current = [];
+        resetReasoningTheaterEventClock();
+        setAskLiveDraft("");
+        askLiveDraftRef.current = "";
+        askLiveDraftBufferRef.current = "";
+        clearLiveDraftFlush();
+        askStartRef.current = Date.now();
+        setAskElapsedMs(0);
+        setAskActiveQuestion(attempt.prompt);
+        setAskLiveSessionId(sessionId ?? null);
+        setAskLiveTraceId(attempt.traceId);
+        if (sessionId) {
+          setActive(sessionId);
+        }
+        reasoningAttemptCurrentIdRef.current = attempt.id;
+        const primaryTimelineEntryId = ensureReasoningTimelineEntry(attempt, "running");
+        updateReasoningAttempt(attempt.id, (current) => ({ ...current, status: "running" }));
+        patchHelixTimelineEntry(primaryTimelineEntryId, {
+          status: "running",
+          detail: formatReasoningAttemptDetail(attempt, "running"),
+        });
+        if (attempt.source === "voice_auto") {
+          const voiceBriefBase =
+            attempt.conversationBriefBase?.trim() ||
+            buildConversationFallbackBrief({
+              transcript: attempt.recordedText ?? attempt.prompt,
+              mode: attempt.mode,
+              clarifyNeeded: false,
+            });
+          updateVoiceDecisionBrief({
+            baseBrief: voiceBriefBase,
+            lifecycle: "running",
+            mode: attempt.mode,
+            routeReasonCode: attempt.routeReasonCode,
+            traceId: attempt.traceId,
+            meta: {
+              attemptId: attempt.id,
+              explorationAttemptCount: attempt.explorationAttemptCount ?? null,
+            },
+          });
+        }
+        const unsubscribe = subscribeToolLogs(
+          (event) => {
+            if (!event || event.traceId !== attempt.traceId) return;
+            const toolName = (event.tool ?? "").trim();
+            if (toolName === "helix.ask.stream") {
+              const chunk = String(event.text ?? "");
+              if (!chunk) return;
+              const currentAttempt = reasoningAttemptsRef.current.find((entry) => entry.id === attempt.id);
+              const nextPartial = `${currentAttempt?.partial ?? ""}${chunk}`.slice(-4000);
+              updateReasoningAttempt(attempt.id, (current) => ({
+                ...current,
+                status: "streaming",
+                partial: nextPartial,
+              }));
+              patchHelixTimelineEntry(primaryTimelineEntryId, {
+                status: "streaming",
+                detail: "streaming",
+              });
+              const streamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+              if (streamEntryId) {
+                patchHelixTimelineEntry(streamEntryId, {
+                  status: "streaming",
+                  text: clipText(nextPartial, 420),
+                });
+              } else {
+                const streamEntry = addHelixTimelineEntry({
+                  type: "reasoning_stream",
+                  source: attempt.source,
+                  status: "streaming",
+                  text: clipText(nextPartial, 420),
+                  detail: "live partial",
+                  traceId: attempt.traceId,
+                  attemptId: attempt.id,
+                  mode: attempt.mode,
+                });
+                reasoningStreamEntryByAttemptIdRef.current[attempt.id] = streamEntry.id;
+              }
+              return;
+            }
+            let text = String(event.message ?? event.text ?? "").trim();
+            if (!text && event.stage) {
+              text = event.detail ? `${event.stage}: ${event.detail}` : event.stage;
+            }
+            if (!text) return;
+            const eventTs = parseTimestampMs(event.ts);
+            const nextEvent: AskLiveEventEntry = {
+              id: event.id ?? String(event.seq ?? Date.now()),
+              text: clipText(text, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
+              tool: toolName || undefined,
+              ts: event.ts,
+              tsMs: eventTs ?? undefined,
+              seq:
+                typeof event.seq === "number" && Number.isFinite(event.seq)
+                  ? event.seq
+                  : undefined,
+              durationMs:
+                typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
+                  ? event.durationMs
+                  : undefined,
+              meta:
+                event.meta && typeof event.meta === "object" && !Array.isArray(event.meta)
+                  ? (event.meta as Record<string, unknown>)
+                  : undefined,
+            };
+            updateReasoningAttempt(attempt.id, (current) => ({
+              ...current,
+              events: [...current.events, nextEvent].slice(-HELIX_ASK_LIVE_EVENT_LIMIT),
+            }));
+            patchHelixTimelineEntry(primaryTimelineEntryId, {
+              detail: clipText(nextEvent.text, 120),
+            });
+          },
+          {
+            sessionId,
+            traceId: attempt.traceId,
+            limit: 120,
+          },
+        );
+        const askController = new AbortController();
+        reasoningAttemptAbortControllerRef.current = askController;
+        reasoningAttemptAbortAttemptIdRef.current = attempt.id;
+        try {
+          const askModeForRequest = attempt.mode === "observe" ? undefined : attempt.mode;
+          const askPromptForRequest = attempt.dispatchPrompt ?? attempt.prompt;
+          const selectedCapsuleIds =
+            Array.isArray(attempt.contextCapsuleIds) && attempt.contextCapsuleIds.length > 0
+              ? attempt.contextCapsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
+              : resolveSelectedContextCapsuleIds(attempt.prompt, undefined, { source: attempt.source });
+          const response = await askLocal(undefined, {
+            sessionId,
+            traceId: attempt.traceId,
+            maxTokens: HELIX_ASK_OUTPUT_TOKENS,
+            question: askPromptForRequest,
+            debug: userSettings.showHelixAskDebug,
+            mode: askModeForRequest,
+            capsuleIds: selectedCapsuleIds,
+            dialogue_profile: attempt.profile,
+            signal: askController.signal,
+          });
+          const finalText = (response.envelope?.answer?.trim() ||
+            stripPromptEcho(response.text ?? "", askPromptForRequest) ||
+            "").trim();
+          const outputText = finalText || "No final answer returned.";
+          const responseDebugWithClientMode =
+            response.debug || attempt.mode
+              ? {
+                  ...response.debug,
+                  ...(attempt.mode ? { client_inferred_mode: attempt.mode } : {}),
+                }
+              : undefined;
+          const evidenceRefs = response.debug?.context_files ?? response.debug?.prompt_context_files ?? [];
+          const certaintyClass =
+            ((response.envelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
+              ?.certainty_class) ??
+            (response.debug?.evidence_gate_ok ? "reasoned" : "unknown");
+          const ladderDecision =
+            attempt.source === "voice_auto" && attempt.explorationTurn
+              ? decideExplorationLadderAction({
+                  explorationAttemptCount: attempt.explorationAttemptCount ?? 1,
+                  outputText,
+                  failReason:
+                    (
+                      response.debug as
+                        | { fail_reason?: string; helix_ask_fail_reason?: string }
+                        | undefined
+                    )?.helix_ask_fail_reason ??
+                    (response.debug as { fail_reason?: string } | undefined)?.fail_reason,
+                  mode: attempt.mode,
+                  debug: response.debug,
+                })
+              : { action: "finalize" as const, reasonCode: attempt.routeReasonCode ?? "dispatch:finalize" };
+          const streamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+          if (streamEntryId) {
+            patchHelixTimelineEntry(streamEntryId, {
+              status: "done",
+              detail: "stream complete",
+            });
+            delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+          }
+          if (ladderDecision.action === "clarify_after_attempt1") {
+            updateReasoningAttempt(attempt.id, (current) => ({
+              ...current,
+              status: "suppressed",
+              suppression_reason: ladderDecision.reasonCode,
+              partial: current.partial || outputText,
+              finalAnswer: outputText,
+              certaintyClass,
+              evidenceRefs,
+              completedAtMs: Date.now(),
+            }));
+            patchHelixTimelineEntry(primaryTimelineEntryId, {
+              status: "suppressed",
+              detail: ladderDecision.reasonCode,
+            });
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: attempt.source,
+              status: "suppressed",
+              text: clipText(ladderDecision.reasonCode, 280),
+              detail: "clarifier requested after attempt 1",
+              mode: "clarify",
+              traceId: attempt.traceId,
+              attemptId: attempt.id,
+            });
+            updateVoiceDecisionBrief({
+              baseBrief: outputText,
+              lifecycle: "suppressed",
+              mode: "clarify",
+              routeReasonCode: ladderDecision.reasonCode,
+              traceId: attempt.traceId,
+              meta: {
+                attemptId: attempt.id,
+                explorationAttemptCount: attempt.explorationAttemptCount ?? 1,
+              },
+            });
+            rememberConversationTurn(`dottie: ${outputText}`);
+            if (attempt.explorationTopicKey) {
+              const existing = explorationRuntimeByTopicRef.current[attempt.explorationTopicKey];
+              explorationRuntimeByTopicRef.current[attempt.explorationTopicKey] = {
+                attemptCount: attempt.explorationAttemptCount ?? existing?.attemptCount ?? 1,
+                clarifierAsked: true,
+                packet: attempt.explorationPacket ?? existing?.packet ?? null,
+                lastRouteReasonCode: ladderDecision.reasonCode,
+                updatedAtMs: Date.now(),
+              };
+            }
+            if (attempt.source === "voice_auto") {
+              markVoiceCheckpoint("dispatch_suppressed", "ok", "Clarifier requested after attempt 1.");
+              const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              if (segmentId) {
+                patchVoiceSegmentAttempt(segmentId, { dispatch: "suppressed" });
+                delete voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              }
+            }
+          } else if (ladderDecision.action === "escalate_verify" || ladderDecision.action === "escalate_act") {
+            const escalatedMode: "verify" | "act" =
+              ladderDecision.action === "escalate_verify" ? "verify" : "act";
+            const nextAttemptCount = (attempt.explorationAttemptCount ?? 1) + 1;
+            updateReasoningAttempt(attempt.id, (current) => ({
+              ...current,
+              status: "suppressed",
+              suppression_reason: ladderDecision.reasonCode,
+              partial: current.partial || outputText,
+              finalAnswer: outputText,
+              certaintyClass,
+              evidenceRefs,
+              completedAtMs: Date.now(),
+            }));
+            patchHelixTimelineEntry(primaryTimelineEntryId, {
+              status: "suppressed",
+              detail: `escalated -> ${escalatedMode}`,
+            });
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: attempt.source,
+              status: "suppressed",
+              text: clipText(ladderDecision.reasonCode, 280),
+              detail: `escalating to ${escalatedMode}`,
+              mode: escalatedMode,
+              traceId: attempt.traceId,
+              attemptId: attempt.id,
+            });
+            const escalatedBriefBase = attempt.conversationBriefBase?.trim() || outputText;
+            updateVoiceDecisionBrief({
+              baseBrief: escalatedBriefBase,
+              lifecycle: "escalated",
+              mode: attempt.mode,
+              escalatedMode,
+              routeReasonCode: ladderDecision.reasonCode,
+              traceId: attempt.traceId,
+              meta: {
+                attemptId: attempt.id,
+                explorationAttemptCount: attempt.explorationAttemptCount ?? 1,
+              },
+            });
+            const followUpAttempt = createReasoningAttempt({
+              prompt: buildExplorationEscalationPrompt({
+                mode: escalatedMode,
+                prompt: attempt.prompt,
+                previousOutput: outputText,
+                packet: attempt.explorationPacket,
+              }),
+              recordedText: attempt.recordedText ?? attempt.prompt,
+              contextCapsuleIds: attempt.contextCapsuleIds,
+              contextCapsuleCount: attempt.contextCapsuleCount,
+              contextCapsulePinnedCount: attempt.contextCapsulePinnedCount,
+              source: attempt.source,
+              profile: attempt.profile,
+              mode: escalatedMode,
+              status: "queued",
+              routeReasonCode: ladderDecision.reasonCode,
+              explorationTurn: false,
+              clarifierPolicy: attempt.clarifierPolicy,
+              explorationPacket: attempt.explorationPacket,
+              explorationTopicKey: attempt.explorationTopicKey,
+              explorationAttemptCount: nextAttemptCount,
+              completionScore: attempt.completionScore,
+              floorOwner: attempt.floorOwner,
+              sttEngine: attempt.sttEngine,
+              sourceLanguage: attempt.sourceLanguage,
+              translated: attempt.translated,
+              conversationBriefBase: escalatedBriefBase,
+            });
+            ensureReasoningTimelineEntry(followUpAttempt, "queued");
+            enqueueReasoningAttempt(followUpAttempt.id);
+            if (attempt.explorationTopicKey) {
+              const existing = explorationRuntimeByTopicRef.current[attempt.explorationTopicKey];
+              explorationRuntimeByTopicRef.current[attempt.explorationTopicKey] = {
+                attemptCount: nextAttemptCount,
+                clarifierAsked: existing?.clarifierAsked ?? false,
+                packet: attempt.explorationPacket ?? existing?.packet ?? null,
+                lastRouteReasonCode: ladderDecision.reasonCode,
+                updatedAtMs: Date.now(),
+              };
+            }
+            if (attempt.source === "voice_auto") {
+              markVoiceCheckpoint("dispatch_queued", "ok", `Escalated to ${escalatedMode} lane.`);
+              updateVoiceDecisionBrief({
+                baseBrief: escalatedBriefBase,
+                lifecycle: "queued",
+                mode: escalatedMode,
+                routeReasonCode: ladderDecision.reasonCode,
+                traceId: followUpAttempt.traceId,
+                meta: {
+                  attemptId: followUpAttempt.id,
+                  explorationAttemptCount: nextAttemptCount,
+                },
+              });
+              const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              if (segmentId) {
+                voiceReasoningAttemptSegmentByIdRef.current[followUpAttempt.id] = segmentId;
+                delete voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              }
+            }
+          } else {
+            if (response.context_capsule) {
+              upsertContextCapsuleSessionLedger(response.context_capsule);
+            }
+            updateReasoningAttempt(attempt.id, (current) => ({
+              ...current,
+              status: "done",
+              partial: current.partial || outputText,
+              finalAnswer: outputText,
+              certaintyClass,
+              evidenceRefs,
+              completedAtMs: Date.now(),
+            }));
+            patchHelixTimelineEntry(primaryTimelineEntryId, {
+              status: "done",
+              detail: formatReasoningAttemptDetail(attempt, "done"),
+            });
+            const finalTimelineEntry = addHelixTimelineEntry({
+              type: attempt.mode === "act" ? "action_receipt" : "reasoning_final",
+              source: attempt.source,
+              status: "done",
+              text: clipText(outputText, 500),
+              detail: formatReasoningAttemptDetail(attempt, "reasoning complete"),
+              mode: attempt.mode,
+              traceId: attempt.traceId,
+              attemptId: attempt.id,
+              meta: {
+                certaintyClass,
+                evidenceRefs,
+              },
+            });
+            if (attempt.source === "voice_auto" && finalTimelineEntry.type === "reasoning_final") {
+              enqueueVoiceAutoSpeakTask({
+                key: `final:${attempt.id}:${finalTimelineEntry.id}`,
+                kind: "final",
+                turnKey: attempt.traceId ?? attempt.id,
+                text: outputText,
+                traceId: attempt.traceId,
+                eventId: finalTimelineEntry.id,
+              });
+            }
+            const liveEventsSnapshot = [...askLiveEventsRef.current];
+            const convergenceSnapshot = deriveConvergenceStripState({
+              events: liveEventsSnapshot,
+              frontierAction: reasoningTheaterFrontierDebugRef.current.action,
+              frontierDeltaPct: reasoningTheaterFrontierDebugRef.current.deltaPct,
+              proof: response.proof
+                ? {
+                    verdict: response.proof.verdict,
+                    certificate: {
+                      certificateHash: response.proof.certificate?.certificateHash ?? null,
+                      integrityOk: response.proof.certificate?.integrityOk ?? null,
+                    },
+                  }
+                : undefined,
+              debug: buildConvergenceDebugSnapshot(responseDebugWithClientMode),
+              fallbackPhase: "debrief",
+            });
+            const replyId = crypto.randomUUID();
+            setAskReplies((prev) =>
+              [
+                {
+                  id: replyId,
+                  content: outputText,
+                  question: attempt.recordedText ?? attempt.prompt,
+                  debug: responseDebugWithClientMode,
+                  promptIngested: response.prompt_ingested,
+                  envelope: response.envelope,
+                  mode: response.mode,
+                  proof: response.proof,
+                  contextCapsule: response.context_capsule,
+                  sources:
+                    responseDebugWithClientMode?.context_files ??
+                    responseDebugWithClientMode?.prompt_context_files ??
+                    [],
+                  liveEvents: liveEventsSnapshot,
+                  convergenceSnapshot,
+                },
+                ...prev,
+              ].slice(0, 3),
+            );
+            if (sessionId) {
+              addMessage(sessionId, { role: "assistant", content: outputText });
+            }
+            if (attempt.explorationTopicKey) {
+              const existing = explorationRuntimeByTopicRef.current[attempt.explorationTopicKey];
+              explorationRuntimeByTopicRef.current[attempt.explorationTopicKey] = {
+                attemptCount: attempt.explorationAttemptCount ?? existing?.attemptCount ?? 1,
+                clarifierAsked: existing?.clarifierAsked ?? false,
+                packet: attempt.explorationPacket ?? existing?.packet ?? null,
+                lastRouteReasonCode: ladderDecision.reasonCode,
+                updatedAtMs: Date.now(),
+              };
+            }
+            if (attempt.source === "voice_auto") {
+              markVoiceCheckpoint("dispatch_completed", "ok", "Reasoning dispatch completed.");
+              const doneBriefBase =
+                attempt.conversationBriefBase?.trim() ||
+                buildConversationFallbackBrief({
+                  transcript: attempt.recordedText ?? attempt.prompt,
+                  mode: attempt.mode,
+                  clarifyNeeded: false,
+                });
+              updateVoiceDecisionBrief({
+                baseBrief: doneBriefBase,
+                lifecycle: "done",
+                mode: attempt.mode,
+                routeReasonCode: attempt.routeReasonCode,
+                traceId: attempt.traceId,
+                meta: {
+                  attemptId: attempt.id,
+                  certaintyClass,
+                  evidenceRefs,
+                },
+              });
+              const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              if (segmentId) {
+                patchVoiceSegmentAttempt(segmentId, { dispatch: "completed" });
+                delete voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+              }
+            }
+          }
+        } catch (error) {
+          const isAbortError =
+            (typeof DOMException !== "undefined" &&
+              error instanceof DOMException &&
+              error.name === "AbortError") ||
+            (error instanceof Error && /abort/i.test(error.message));
+          if (isAbortError && reasoningAttemptRestartRequestedRef.current.has(attempt.id)) {
+            reasoningAttemptRestartRequestedRef.current.delete(attempt.id);
+            patchHelixTimelineEntry(primaryTimelineEntryId, {
+              status: "queued",
+              detail: "continuation merged; restarting",
+            });
+            continue;
+          }
+          const message = error instanceof Error ? error.message : String(error);
+          updateReasoningAttempt(attempt.id, (current) => ({
+            ...current,
+            status: "failed",
+            suppression_reason: message || "reasoning_failed",
+            completedAtMs: Date.now(),
+          }));
+          patchHelixTimelineEntry(primaryTimelineEntryId, {
+            status: "failed",
+            detail: clipText(message || "reasoning_failed", 160),
+          });
+          const streamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+          if (streamEntryId) {
+            patchHelixTimelineEntry(streamEntryId, {
+              status: "failed",
+              detail: "stream failed",
+            });
+            delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+          }
+          addHelixTimelineEntry({
+            type: "suppressed",
+            source: attempt.source,
+            status: "suppressed",
+            text: clipText(message || "reasoning_failed", 280),
+            detail: "reasoning attempt failed",
+            mode: attempt.mode,
+            traceId: attempt.traceId,
+            attemptId: attempt.id,
+          });
+          if (attempt.source === "voice_auto") {
+            const failedBriefBase =
+              attempt.conversationBriefBase?.trim() ||
+              buildConversationFallbackBrief({
+                transcript: attempt.recordedText ?? attempt.prompt,
+                mode: attempt.mode,
+                clarifyNeeded: false,
+              });
+            updateVoiceDecisionBrief({
+              baseBrief: failedBriefBase,
+              lifecycle: "failed",
+              mode: attempt.mode,
+              routeReasonCode: attempt.routeReasonCode,
+              traceId: attempt.traceId,
+              meta: {
+                attemptId: attempt.id,
+                errorMessage: message,
+              },
+            });
+            const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+            if (segmentId) {
+              patchVoiceSegmentAttempt(segmentId, { dispatch: "suppressed" });
+              delete voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+            }
+          }
+        } finally {
+          unsubscribe();
+          if (reasoningAttemptAbortAttemptIdRef.current === attempt.id) {
+            reasoningAttemptAbortAttemptIdRef.current = null;
+            reasoningAttemptAbortControllerRef.current = null;
+          }
+          reasoningAttemptCurrentIdRef.current = null;
+          setAskBusy(false);
+          setAskStatus(null);
+          setAskLiveSessionId(null);
+          setAskLiveTraceId(null);
+          setAskLiveDraft("");
+          askLiveDraftRef.current = "";
+          askLiveDraftBufferRef.current = "";
+          clearLiveDraftFlush();
+          setAskActiveQuestion(null);
+        }
+      }
+    } finally {
+      reasoningAttemptRunnerRef.current = false;
+    }
+  }, [
+    addMessage,
+    addHelixTimelineEntry,
+    askBusy,
+    clearLiveDraftFlush,
+    createReasoningAttempt,
+    enqueueReasoningAttempt,
+    enqueueVoiceAutoSpeakTask,
+    ensureReasoningTimelineEntry,
+    formatReasoningAttemptDetail,
+    getHelixAskSessionId,
+    markVoiceCheckpoint,
+    patchHelixTimelineEntry,
+    patchVoiceSegmentAttempt,
+    rememberConversationTurn,
+    resetReasoningTheaterEventClock,
+    resolveSelectedContextCapsuleIds,
+    setActive,
+    upsertContextCapsuleSessionLedger,
+    updateVoiceDecisionBrief,
+    updateReasoningAttempt,
+    userSettings.showHelixAskDebug,
+  ]);
+
+  useEffect(() => {
+    if (askBusy) return;
+    if (reasoningAttemptRunnerRef.current) return;
+    if (reasoningAttemptQueueRef.current.length === 0) return;
+    void runReasoningAttemptQueue();
+  }, [askBusy, runReasoningAttemptQueue]);
+
+  const stopVoiceCapture = useCallback(
+    (options?: { preserveChunks?: boolean }) => {
+      if (voiceMonitorTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearInterval(voiceMonitorTimerRef.current);
+        voiceMonitorTimerRef.current = null;
+      }
+      if (voiceCooldownTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(voiceCooldownTimerRef.current);
+        voiceCooldownTimerRef.current = null;
+      }
+      if (voiceSegmentFlushTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(voiceSegmentFlushTimerRef.current);
+        voiceSegmentFlushTimerRef.current = null;
+      }
+      const recorder = voiceRecorderRef.current;
+      if (recorder) {
+        recorder.ondataavailable = null;
+        recorder.onerror = null;
+        recorder.onstop = null;
+        if (recorder.state !== "inactive") {
+          try {
+            recorder.stop();
+          } catch {
+            // no-op
+          }
+        }
+      }
+      voiceRecorderRef.current = null;
+      const stream = voiceStreamRef.current;
+      if (stream) {
+        const track = stream.getAudioTracks()[0];
+        if (track) {
+          track.onmute = null;
+          track.onunmute = null;
+          track.onended = null;
+        }
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+      }
+      voiceStreamRef.current = null;
+      voiceSourceNodeRef.current?.disconnect();
+      voiceSourceNodeRef.current = null;
+      voiceSilenceGainNodeRef.current?.disconnect();
+      voiceSilenceGainNodeRef.current = null;
+      voiceAnalyserRef.current = null;
+      if (voiceAudioContextRef.current) {
+        void voiceAudioContextRef.current.close().catch(() => undefined);
+        voiceAudioContextRef.current = null;
+      }
+      voiceSpeechCandidateStartMsRef.current = null;
+      voiceSpeechActiveRef.current = false;
+      voiceLastSpeechMsRef.current = null;
+      voiceNoiseFloorRef.current = 0.006;
+      voiceDisplayLevelRef.current = 0;
+      voicePeakLevelRef.current = 0;
+      voiceLevelUiLastMsRef.current = 0;
+      voiceFlatWindowStartMsRef.current = null;
+      voiceFlatMinRmsRef.current = Number.POSITIVE_INFINITY;
+      voiceFlatMaxRmsRef.current = 0;
+      voiceRecorderStartedAtMsRef.current = null;
+      voiceLastChunkAtMsRef.current = null;
+      voiceChunkCountRef.current = 0;
+      voiceChunkBytesRef.current = 0;
+      voiceReasoningAttemptSegmentByIdRef.current = {};
+      voiceSegmentStartMsRef.current = null;
+      voiceSegmentStartIndexRef.current = 0;
+      voiceTranscribeQueueRef.current = [];
+      voiceTranscribeBusyRef.current = false;
+      setVoiceMonitorLevel(0);
+      setVoiceMonitorThreshold(MIC_LEVEL_MIN_THRESHOLD);
+      setVoiceSignalState("waiting");
+      setVoiceMeterStats({
+        rmsRaw: 0,
+        rmsDb: -120,
+        peak: 0,
+        noiseFloor: 0.006,
+        displayLevel: 0,
+      });
+      setVoiceRecorderStats({
+        mediaChunkCount: 0,
+        mediaBytes: 0,
+        lastChunkAtMs: null,
+        chunksPerSecond: 0,
+      });
+      setVoiceCaptureCheckpoints(createVoiceCaptureCheckpointMap());
+      setVoiceCaptureWarnings([]);
+      setVoiceSegmentAttempts([]);
+      setVoiceLastRoundtripMs(null);
+      setVoiceRecorderMimeType(null);
+      setVoiceInputDeviceLabel(null);
+      setVoiceTrackMuted(false);
+      voiceTrackMutedRef.current = false;
+      setConversationGovernor((prev) => ({
+        ...prev,
+        floor_owner: "none",
+        turn_state: "hard_pause",
+        cooling_down: false,
+      }));
+      if (!options?.preserveChunks) {
+        voiceChunksRef.current = [];
+      }
+    },
+    [],
+  );
+
+  const processTranscriptionQueue = useCallback(async () => {
+    if (voiceTranscribeBusyRef.current) return;
+    voiceTranscribeBusyRef.current = true;
+    try {
+      while (voiceTranscribeQueueRef.current.length > 0 && micArmState === "on") {
+        const nextSegment = voiceTranscribeQueueRef.current.shift();
+        if (!nextSegment) continue;
+        setVoiceInputState("transcribing");
+        markVoiceCheckpoint("stt_request_started", "ok", "Submitting segment to STT.");
+        markVoiceCheckpoint("stt_response_error", "idle", "No STT error.");
+        patchVoiceSegmentAttempt(nextSegment.id, { status: "transcribing" });
+        const traceId = `voice:${crypto.randomUUID()}`;
+        const sttStartedAt = Date.now();
+        try {
+          const result = await transcribeVoice({
+            audio: nextSegment.blob,
+            traceId,
+            missionId: contextId,
+            durationMs: nextSegment.durationMs,
+          });
+          const sttLatencyMs = Date.now() - sttStartedAt;
+          const transcript = result.text?.trim() ?? "";
+          if (!transcript) {
+            resolveBargeInFromTranscription(false);
+            markVoiceCheckpoint(
+              "stt_response_error",
+              "warn",
+              "No transcript detected; continuing playback.",
+            );
+            patchVoiceSegmentAttempt(nextSegment.id, {
+              status: "stt_error",
+              sttLatencyMs,
+              transcriptPreview: null,
+              translated: false,
+              engine: result.engine ?? null,
+              error: "no_transcript",
+              dispatch: "none",
+            });
+            setVoiceInputError(null);
+            setVoiceInputState("listening");
+            setConversationGovernor((prev) => ({
+              ...prev,
+              floor_owner: "none",
+              turn_state: "hard_pause",
+              cooling_down: false,
+            }));
+            continue;
+          }
+          resolveBargeInFromTranscription(true);
+          markVoiceCheckpoint(
+            "stt_response_ok",
+            "ok",
+            `STT returned ${transcript.length} chars.`,
+            sttLatencyMs,
+          );
+          markVoiceCheckpoint("stt_response_error", "idle", "No STT error.");
+          if (result.translated) {
+            markVoiceCheckpoint(
+              "translated",
+              "ok",
+              `Translated ${result.source_language ?? "source"} -> ${result.language ?? "en"}.`,
+            );
+          } else {
+            markVoiceCheckpoint("translated", "idle", "No translation needed.");
+          }
+          const nextDraft = mergeVoiceTranscriptDraft(askDraftRef.current, transcript);
+          syncAskDraftValue(nextDraft, {
+            focus: true,
+            forceMoodHint: true,
+          });
+          const roundtripMs = Math.max(0, Date.now() - nextSegment.cutAtMs);
+          setVoiceLastRoundtripMs(roundtripMs);
+          markVoiceCheckpoint(
+            "draft_appended",
+            "ok",
+            `Draft updated from captured segment.`,
+            roundtripMs,
+          );
+          patchVoiceSegmentAttempt(nextSegment.id, {
+            status: "stt_ok",
+            sttLatencyMs,
+            transcriptPreview: clipText(transcript, 180),
+            translated: Boolean(result.translated),
+            engine: result.engine ?? null,
+            error: null,
+          });
+          const completion = scoreConversationCompletion({
+            transcript,
+            pauseMs: MIC_END_TURN_MS,
+            stability: 1,
+          });
+          setConversationGovernor((prev) => ({
+            ...prev,
+            floor_owner: "none",
+            turn_state: completion.route === "answer" ? "hard_pause" : "soft_pause",
+            cooling_down: true,
+            completion_score: completion,
+            narrative_spine: {
+              ...prev.narrative_spine,
+              user_terms: transcript
+                .toLowerCase()
+                .split(/[^a-z0-9]+/)
+                .filter((token) => token.length >= 4)
+                .slice(0, 12),
+              open_question: completion.route === "ask_more" ? transcript : null,
+            },
+          }));
+          const recordedText = result.source_text?.trim() || transcript;
+          replaceVoiceConversationTimelineEntry({
+            type: "conversation_recorded",
+            source: "voice_auto",
+            status: "done",
+            text: clipText(recordedText, 360),
+            detail: result.translated
+              ? `translated from ${result.source_language ?? result.language ?? "unknown"}`
+              : "captured",
+            traceId,
+            meta: {
+              engine: result.engine ?? null,
+              sourceLanguage: result.source_language ?? result.language ?? null,
+              translated: Boolean(result.translated),
+            },
+          });
+          const recentTurnsForTurn = conversationRecentTurnsRef.current.slice(-6);
+          rememberConversationTurn(`user: ${recordedText}`);
+
+          const sessionId = getHelixAskSessionId() ?? undefined;
+          let conversationMode: "observe" | "act" | "verify" | "clarify" | undefined;
+          let classifierConfidence: number | null = null;
+          let classifierReason = "conversation_turn_fallback";
+          let classifierSource: "llm" | "fallback" = "fallback";
+          let dispatchHint = shouldDispatchReasoningAttempt(transcript);
+          let dispatchReason = dispatchHint ? "dispatch:heuristic" : "suppressed:heuristic_low_salience";
+          let routeReasonCode = dispatchReason;
+          let explorationTurn = false;
+          let clarifierPolicy: ConversationClarifierPolicy = "after_first_attempt";
+          let explorationPacket: ConversationExplorationPacket | null = null;
+          let failReason: string | null = null;
+          let briefText = buildConversationFallbackBrief({
+            transcript,
+            mode: completion.route === "ask_more" ? "clarify" : undefined,
+            clarifyNeeded: completion.route === "ask_more",
+          });
+
+          try {
+            const conversation = await runConversationTurn({
+              transcript,
+              sessionId,
+              traceId,
+              missionId: contextId,
+              sourceLanguage: result.source_language ?? result.language ?? undefined,
+              translated: Boolean(result.translated),
+              recentTurns: recentTurnsForTurn,
+            });
+            conversationMode = conversation.classification?.mode;
+            classifierConfidence = conversation.classification?.confidence ?? null;
+            classifierReason = conversation.classification?.reason?.trim() || classifierReason;
+            classifierSource = conversation.classification?.source ?? classifierSource;
+            routeReasonCode =
+              conversation.route_reason_code?.trim() ||
+              conversation.dispatch?.reason?.trim() ||
+              routeReasonCode;
+            explorationTurn = conversation.exploration_turn === true;
+            clarifierPolicy = conversation.clarifier_policy ?? "after_first_attempt";
+            explorationPacket = conversation.exploration_packet ?? null;
+            dispatchHint =
+              conversation.dispatch?.dispatch_hint ??
+              conversation.classification?.dispatch_hint ??
+              dispatchHint;
+            dispatchReason =
+              routeReasonCode ||
+              (dispatchHint ? `dispatch:${conversationMode ?? "unknown"}` : "suppressed:low_salience");
+            if (explorationTurn && conversationMode !== "act" && conversationMode !== "verify") {
+              conversationMode = "observe";
+            }
+            failReason = conversation.fail_reason ?? null;
+            const briefCandidate = conversation.brief?.text?.trim() ?? "";
+            if (briefCandidate) {
+              briefText = briefCandidate;
+            } else {
+              briefText = buildConversationFallbackBrief({
+                transcript,
+                mode: conversationMode,
+                clarifyNeeded: conversation.classification?.clarify_needed === true,
+              });
+            }
+          } catch (conversationError) {
+            const message =
+              conversationError instanceof Error ? conversationError.message : String(conversationError);
+            failReason = "conversation_turn_client_fallback";
+            classifierReason = clipText(message || classifierReason, 160);
+            classifierSource = "fallback";
+            const inferredMode = normalizeConversationModeForDispatch(inferAskMode(transcript));
+            conversationMode = inferredMode ?? (completion.route === "ask_more" ? "clarify" : "observe");
+            dispatchHint = shouldDispatchReasoningAttempt(transcript);
+            dispatchReason = dispatchHint ? `dispatch:${conversationMode}` : "suppressed:heuristic_low_salience";
+            routeReasonCode = dispatchReason;
+            briefText = buildConversationFallbackBrief({
+              transcript,
+              mode: conversationMode,
+              clarifyNeeded: conversationMode === "clarify",
+            });
+          }
+
+          updateVoiceDecisionBrief({
+            baseBrief: briefText,
+            lifecycle: dispatchHint ? "queued" : "suppressed",
+            mode: conversationMode,
+            routeReasonCode,
+            traceId,
+            meta: {
+              dispatchHint,
+              classifierSource,
+              classifierConfidence,
+              classifierReason,
+              routeReasonCode,
+              explorationTurn,
+              clarifierPolicy,
+              failReason,
+            },
+          });
+          rememberConversationTurn(`dottie: ${briefText}`);
+
+          if (dispatchHint) {
+            const inferredDispatchMode =
+              normalizeConversationModeForDispatch(conversationMode) ??
+              normalizeConversationModeForDispatch(inferAskMode(transcript));
+            const dispatchMode =
+              explorationTurn && inferredDispatchMode !== "act" && inferredDispatchMode !== "verify"
+                ? "observe"
+                : inferredDispatchMode;
+            const selectedCapsuleIds = resolveSelectedContextCapsuleIds(transcript, undefined, {
+              source: "voice_auto",
+            });
+            const pinnedCapsuleCount = getPinnedContextCapsuleCount();
+            let explorationTopicKey: string | null = null;
+            let explorationAttemptCount: number | undefined;
+            if (explorationTurn) {
+              explorationTopicKey = inferExplorationTopicKey(explorationPacket, transcript);
+              const previousRuntime = explorationRuntimeByTopicRef.current[explorationTopicKey];
+              explorationAttemptCount = Math.max(0, previousRuntime?.attemptCount ?? 0) + 1;
+              explorationRuntimeByTopicRef.current[explorationTopicKey] = {
+                attemptCount: explorationAttemptCount,
+                clarifierAsked: previousRuntime?.clarifierAsked ?? false,
+                packet: explorationPacket ?? previousRuntime?.packet ?? null,
+                lastRouteReasonCode: routeReasonCode,
+                updatedAtMs: Date.now(),
+              };
+            }
+            markVoiceCheckpoint("dispatch_queued", "ok", "Reasoning dispatch queued.");
+            const dispatchPrompt = buildVoiceReasoningDispatchPrompt({
+              transcript,
+              recentTurns: recentTurnsForTurn,
+              explorationPacket,
+            });
+            const continuityCandidate = reasoningAttemptsRef.current.find(
+              (entry) =>
+                entry.source === "voice_auto" &&
+                (entry.status === "queued" || entry.status === "running" || entry.status === "streaming"),
+            );
+            const continuityGapMs = continuityCandidate
+              ? Math.max(0, Date.now() - continuityCandidate.updatedAtMs)
+              : Number.POSITIVE_INFINITY;
+            const lexicalContinuation = continuityCandidate
+              ? shouldMergeVoiceContinuationTurn({
+                  previousPrompt: continuityCandidate.prompt,
+                  nextTranscript: transcript,
+                  gapMs: continuityGapMs,
+                })
+              : false;
+            const canMergeContinuation =
+              continuityCandidate !== undefined &&
+              shouldMergeVoiceContinuationInFlight({
+                gapMs: continuityGapMs,
+                lexicalContinuation,
+                activeWindowMs: VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS,
+              });
+            if (continuityCandidate && canMergeContinuation) {
+              const mergedPrompt = mergeVoiceTranscriptDraft(continuityCandidate.prompt, transcript);
+              const mergedRecordedText = mergeVoiceTranscriptDraft(
+                continuityCandidate.recordedText ?? continuityCandidate.prompt,
+                recordedText,
+              );
+              const mergedCapsuleIds = resolveSelectedContextCapsuleIds(mergedPrompt, undefined, {
+                source: "voice_auto",
+              });
+              const mergedDispatchPrompt = buildVoiceReasoningDispatchPrompt({
+                transcript: mergedPrompt,
+                recentTurns: recentTurnsForTurn,
+                explorationPacket: continuityCandidate.explorationPacket ?? explorationPacket,
+              });
+              const continuityStatus =
+                continuityCandidate.status === "running" || continuityCandidate.status === "streaming"
+                  ? "running"
+                  : "queued";
+              const continuityEntrySnapshot = {
+                ...continuityCandidate,
+                prompt: mergedPrompt,
+                contextCapsuleCount: mergedCapsuleIds.length,
+              };
+              const continuityTimelineEntryId = ensureReasoningTimelineEntry(
+                continuityEntrySnapshot,
+                continuityStatus,
+              );
+              updateReasoningAttempt(continuityCandidate.id, (current) => ({
+                ...current,
+                prompt: mergedPrompt,
+                dispatchPrompt: mergedDispatchPrompt,
+                recordedText: mergedRecordedText,
+                contextCapsuleIds: mergedCapsuleIds,
+                contextCapsuleCount: mergedCapsuleIds.length,
+                contextCapsulePinnedCount: pinnedCapsuleCount,
+                routeReasonCode,
+                conversationBriefBase: briefText,
+                sttEngine: result.engine,
+                sourceLanguage: result.source_language ?? result.language ?? current.sourceLanguage ?? null,
+                translated: Boolean(result.translated) || current.translated,
+                ...(continuityStatus === "running"
+                  ? {
+                      status: "queued" as const,
+                      partial: "",
+                      finalAnswer: undefined,
+                      events: [],
+                      suppression_reason: "voice_turn_continuation_merged",
+                    }
+                  : {}),
+              }));
+              patchHelixTimelineEntry(continuityTimelineEntryId, {
+                status: continuityStatus === "running" ? "queued" : continuityStatus,
+                text: clipText(mergedPrompt, 300),
+                detail: `${dispatchReason} | continuation merged`,
+                mode: conversationMode ?? continuityCandidate.mode ?? dispatchMode,
+                meta: {
+                  dispatchReason,
+                  routeReasonCode,
+                  continuityMerged: true,
+                  contextCapsuleCount: mergedCapsuleIds.length,
+                  contextCapsulePinnedCount: pinnedCapsuleCount,
+                  contextCapsuleIds: mergedCapsuleIds,
+                  sttEngine: result.engine ?? null,
+                },
+              });
+              const existingStreamEntryId = reasoningStreamEntryByAttemptIdRef.current[continuityCandidate.id];
+              if (existingStreamEntryId) {
+                patchHelixTimelineEntry(existingStreamEntryId, {
+                  status: "suppressed",
+                  detail: "continuation merged; restarting",
+                });
+                delete reasoningStreamEntryByAttemptIdRef.current[continuityCandidate.id];
+              }
+              voiceReasoningAttemptSegmentByIdRef.current[continuityCandidate.id] = nextSegment.id;
+              patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "queued" });
+              updateVoiceDecisionBrief({
+                baseBrief: briefText,
+                lifecycle: continuityStatus === "running" ? "running" : "queued",
+                mode: conversationMode ?? continuityCandidate.mode,
+                routeReasonCode,
+                traceId: continuityCandidate.traceId,
+                meta: {
+                  attemptId: continuityCandidate.id,
+                  continuityMerged: true,
+                  mergedPromptLength: mergedPrompt.length,
+                },
+              });
+              if (continuityStatus === "running") {
+                reasoningAttemptRestartRequestedRef.current.add(continuityCandidate.id);
+                reasoningAttemptQueueRef.current = [
+                  continuityCandidate.id,
+                  ...reasoningAttemptQueueRef.current.filter((id) => id !== continuityCandidate.id),
+                ];
+                if (reasoningAttemptAbortAttemptIdRef.current === continuityCandidate.id) {
+                  reasoningAttemptAbortControllerRef.current?.abort();
+                }
+                markVoiceCheckpoint("dispatch_queued", "ok", "Merged continuation and restarted reasoning.");
+              } else {
+                reasoningAttemptQueueRef.current = [
+                  continuityCandidate.id,
+                  ...reasoningAttemptQueueRef.current.filter((id) => id !== continuityCandidate.id),
+                ];
+                markVoiceCheckpoint("dispatch_queued", "ok", "Merged continuation into queued reasoning.");
+              }
+              void runReasoningAttemptQueue();
+              continue;
+            }
+            const queuedAttempt = createReasoningAttempt({
+              prompt: transcript,
+              dispatchPrompt,
+              recordedText,
+              contextCapsuleIds: selectedCapsuleIds,
+              contextCapsuleCount: selectedCapsuleIds.length,
+              contextCapsulePinnedCount: pinnedCapsuleCount,
+              source: "voice_auto",
+              profile: "dot_min_steps_v1",
+              mode: dispatchMode,
+              status: "queued",
+              routeReasonCode,
+              explorationTurn,
+              clarifierPolicy,
+              explorationPacket,
+              explorationTopicKey,
+              explorationAttemptCount,
+              completionScore: completion.score,
+              floorOwner: "none",
+              sttEngine: result.engine,
+              sourceLanguage: result.source_language ?? result.language ?? null,
+              translated: Boolean(result.translated),
+              conversationBriefBase: briefText,
+            });
+            const timelineEntryId = ensureReasoningTimelineEntry(queuedAttempt, "queued");
+            patchHelixTimelineEntry(timelineEntryId, {
+              detail: dispatchReason,
+              mode: conversationMode ?? dispatchMode,
+              meta: {
+                dispatchReason,
+                routeReasonCode,
+                continuityContextApplied: dispatchPrompt !== transcript,
+                explorationTurn,
+                clarifierPolicy,
+                explorationAttemptCount: explorationAttemptCount ?? null,
+                completionScore: completion.score,
+                contextCapsuleCount: selectedCapsuleIds.length,
+                contextCapsulePinnedCount: pinnedCapsuleCount,
+                contextCapsuleIds: selectedCapsuleIds,
+                sttEngine: result.engine ?? null,
+              },
+            });
+            voiceReasoningAttemptSegmentByIdRef.current[queuedAttempt.id] = nextSegment.id;
+            patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "queued" });
+            enqueueReasoningAttempt(queuedAttempt.id);
+            void runReasoningAttemptQueue();
+          } else {
+            markVoiceCheckpoint("dispatch_suppressed", "ok", "Dispatch suppressed for this turn.");
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: "voice_auto",
+              status: "suppressed",
+              text: clipText(dispatchReason, 280),
+              detail: "reasoning dispatch suppressed",
+              mode: conversationMode,
+              traceId,
+              meta: {
+                completionScore: completion.score,
+                classifierReason,
+                routeReasonCode,
+              },
+            });
+            patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "suppressed" });
+          }
+          setVoiceInputError(null);
+          setVoiceInputState("cooldown");
+          if (voiceCooldownTimerRef.current !== null && typeof window !== "undefined") {
+            window.clearTimeout(voiceCooldownTimerRef.current);
+          }
+          if (typeof window !== "undefined") {
+            voiceCooldownTimerRef.current = window.setTimeout(() => {
+              voiceCooldownTimerRef.current = null;
+              if (micArmState === "on") {
+                setVoiceInputState("listening");
+                setConversationGovernor((prev) => ({ ...prev, cooling_down: false }));
+              }
+            }, MIC_POST_TRANSCRIBE_COOLDOWN_MS);
+          }
+        } catch (error) {
+          resolveBargeInFromTranscription(true);
+          const message = describeVoiceInputError(error);
+          setVoiceInputError(message);
+          markVoiceCheckpoint("stt_response_error", "error", message);
+          patchVoiceSegmentAttempt(nextSegment.id, {
+            status: "stt_error",
+            sttLatencyMs: Math.max(0, Date.now() - sttStartedAt),
+            error: message,
+            dispatch: "suppressed",
+          });
+          setVoiceInputState("error");
+          setConversationGovernor((prev) => ({
+            ...prev,
+            floor_owner: "none",
+            turn_state: "hard_pause",
+            cooling_down: false,
+          }));
+        }
+      }
+    } finally {
+      voiceTranscribeBusyRef.current = false;
+    }
+  }, [
+    addHelixTimelineEntry,
+    contextId,
+    createReasoningAttempt,
+    enqueueReasoningAttempt,
+    ensureReasoningTimelineEntry,
+    getHelixAskSessionId,
+    getPinnedContextCapsuleCount,
+    markVoiceCheckpoint,
+    micArmState,
+    patchHelixTimelineEntry,
+    patchVoiceSegmentAttempt,
+    replaceVoiceConversationTimelineEntry,
+    resolveSelectedContextCapsuleIds,
+    resolveBargeInFromTranscription,
+    rememberConversationTurn,
+    runReasoningAttemptQueue,
+    syncAskDraftValue,
+    updateVoiceDecisionBrief,
+  ]);
+
+  const queueSegmentForTranscription = useCallback(
+    (blob: Blob, durationMs: number, segmentId: string, cutAtMs: number) => {
+      if (blob.size <= 0) return;
+      voiceTranscribeQueueRef.current.push({ id: segmentId, blob, durationMs, cutAtMs });
+      void processTranscriptionQueue();
+    },
+    [processTranscriptionQueue],
+  );
+
+  const finalizeVoiceSegment = useCallback(
+    (reason: "silence" | "max_segment") => {
+      if (!voiceSpeechActiveRef.current) return;
+      voiceSpeechActiveRef.current = false;
+      voiceSpeechCandidateStartMsRef.current = null;
+      const segmentStartMs = voiceSegmentStartMsRef.current ?? Date.now();
+      const segmentStartIndex = voiceSegmentStartIndexRef.current;
+      const recorder = voiceRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.requestData();
+        } catch {
+          // no-op
+        }
+      }
+      if (voiceSegmentFlushTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(voiceSegmentFlushTimerRef.current);
+        voiceSegmentFlushTimerRef.current = null;
+      }
+      if (typeof window !== "undefined") {
+        voiceSegmentFlushTimerRef.current = window.setTimeout(() => {
+          voiceSegmentFlushTimerRef.current = null;
+          const bufferedChunks = voiceChunksRef.current;
+          const headerChunk = bufferedChunks[0]?.chunk;
+          const segmentChunks = bufferedChunks.slice(segmentStartIndex);
+          voiceSegmentStartIndexRef.current = voiceChunksRef.current.length;
+          const audioChunks = segmentChunks.map((entry) => entry.chunk).filter((chunk) => chunk.size > 0);
+          if (!audioChunks.length) return;
+          const mimeType =
+            recorder?.mimeType || audioChunks[0]?.type || "audio/webm";
+          const shouldPrimeWithHeader = shouldPrimeSegmentWithContainerHeader({
+            segmentStartIndex,
+            mimeType,
+            hasHeaderChunk: Boolean(headerChunk && headerChunk.size > 0),
+          });
+          const uploadChunks =
+            shouldPrimeWithHeader && headerChunk && !audioChunks.includes(headerChunk)
+              ? [headerChunk, ...audioChunks]
+              : audioChunks;
+          const durationMs = Math.max(0, Date.now() - segmentStartMs);
+          const segmentId = `segment:${crypto.randomUUID()}`;
+          const cutAtMs = Date.now();
+          addVoiceSegmentAttempt({
+            id: segmentId,
+            cutAtMs,
+            durationMs,
+            status: "segment_cut",
+            sttLatencyMs: null,
+            transcriptPreview: null,
+            translated: false,
+            dispatch: "none",
+            engine: null,
+            error: null,
+          });
+          markVoiceCheckpoint(
+            "segment_cut",
+            "ok",
+            shouldPrimeWithHeader
+              ? `Segment captured (${Math.round(durationMs)}ms, container primed).`
+              : `Segment captured (${Math.round(durationMs)}ms).`,
+            durationMs,
+          );
+          queueSegmentForTranscription(new Blob(uploadChunks, { type: mimeType }), durationMs, segmentId, cutAtMs);
+        }, 90);
+      }
+      setConversationGovernor((prev) => ({
+        ...prev,
+        floor_owner: "none",
+        turn_state: reason === "silence" ? "hard_pause" : "soft_pause",
+        cooling_down: true,
+      }));
+      voiceLastSpeechMsRef.current = null;
+      voiceSegmentStartMsRef.current = null;
+    },
+    [addVoiceSegmentAttempt, markVoiceCheckpoint, queueSegmentForTranscription],
+  );
+
+  const evaluateMicLevel = useCallback(() => {
+    const analyser = voiceAnalyserRef.current;
+    if (!analyser || micArmState !== "on") return;
+    const frame = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(frame);
+    let sum = 0;
+    for (let i = 0; i < frame.length; i += 1) {
+      const normalized = (frame[i]! - 128) / 128;
+      sum += normalized * normalized;
+    }
+    const rms = Math.sqrt(sum / frame.length);
+    const baseline = Math.max(0.001, voiceNoiseFloorRef.current || 0.006);
+    const dynamicThreshold = Math.max(
+      MIC_LEVEL_MIN_THRESHOLD,
+      Math.min(MIC_LEVEL_THRESHOLD, baseline * MIC_LEVEL_FLOOR_MULTIPLIER),
+    );
+    const rmsDb = 20 * Math.log10(Math.max(rms, 0.000001));
+    voicePeakLevelRef.current = Math.max(rms, voicePeakLevelRef.current * 0.94);
+    const scaledRaw = Math.max(
+      0,
+      Math.min(1, rms / Math.max(dynamicThreshold * 2.2, MIC_LEVEL_MIN_THRESHOLD * 2.2)),
+    );
+    const smoothedLevel = smoothVoiceLevel(voiceDisplayLevelRef.current, scaledRaw);
+    voiceDisplayLevelRef.current = smoothedLevel;
+    const speakingNow = rms >= dynamicThreshold;
+    const now = Date.now();
+
+    const trackMuted = voiceTrackMutedRef.current;
+    if (voiceFlatWindowStartMsRef.current === null) {
+      voiceFlatWindowStartMsRef.current = now;
+      voiceFlatMinRmsRef.current = rms;
+      voiceFlatMaxRmsRef.current = rms;
+    } else {
+      voiceFlatMinRmsRef.current = Math.min(voiceFlatMinRmsRef.current, rms);
+      voiceFlatMaxRmsRef.current = Math.max(voiceFlatMaxRmsRef.current, rms);
+      const flatElapsedMs = now - voiceFlatWindowStartMsRef.current;
+      const flatVariance = Math.max(0, voiceFlatMaxRmsRef.current - voiceFlatMinRmsRef.current);
+      const isFlat = isFlatVoiceSignal(flatVariance, flatElapsedMs);
+      if (!trackMuted && isFlat && !speakingNow) {
+        setVoiceWarning("flat_signal", true);
+      } else if (speakingNow || flatVariance > VOICE_FLAT_SIGNAL_VARIANCE_THRESHOLD * 1.25) {
+        setVoiceWarning("flat_signal", false);
+      }
+      if (flatElapsedMs >= VOICE_FLAT_SIGNAL_WINDOW_MS) {
+        voiceFlatWindowStartMsRef.current = now;
+        voiceFlatMinRmsRef.current = rms;
+        voiceFlatMaxRmsRef.current = rms;
+      }
+    }
+
+    const recorder = voiceRecorderRef.current;
+    const recorderActive = Boolean(recorder && recorder.state !== "inactive");
+    setVoiceWarning(
+      "recorder_stalled",
+      isRecorderStalled({
+        recorderActive,
+        nowMs: now,
+        recorderStartedAtMs: voiceRecorderStartedAtMsRef.current,
+        lastChunkAtMs: voiceLastChunkAtMsRef.current,
+      }),
+    );
+
+    if (now - voiceLevelUiLastMsRef.current >= MIC_LEVEL_UI_UPDATE_MS) {
+      voiceLevelUiLastMsRef.current = now;
+      setVoiceMonitorLevel(smoothedLevel);
+      setVoiceMonitorThreshold(dynamicThreshold);
+      const nextSignalState =
+        rms >= dynamicThreshold
+          ? "speech"
+          : rms >= Math.max(baseline * 1.1, MIC_LEVEL_MIN_THRESHOLD * 0.8)
+            ? "low"
+            : "waiting";
+      setVoiceSignalState((prev) => (prev === nextSignalState ? prev : nextSignalState));
+      setVoiceMeterStats({
+        rmsRaw: rms,
+        rmsDb,
+        peak: voicePeakLevelRef.current,
+        noiseFloor: baseline,
+        displayLevel: smoothedLevel,
+      });
+      setVoiceRecorderStats((prev) => {
+        const lastChunkAtMs = voiceLastChunkAtMsRef.current;
+        const mediaChunkCount = voiceChunkCountRef.current;
+        const mediaBytes = voiceChunkBytesRef.current;
+        const recorderStartedAtMs = voiceRecorderStartedAtMsRef.current;
+        const elapsedMs =
+          recorderStartedAtMs !== null ? Math.max(1, now - recorderStartedAtMs) : 1;
+        const chunksPerSecond = mediaChunkCount / (elapsedMs / 1000);
+        if (
+          prev.mediaChunkCount === mediaChunkCount &&
+          prev.mediaBytes === mediaBytes &&
+          prev.lastChunkAtMs === lastChunkAtMs &&
+          Math.abs(prev.chunksPerSecond - chunksPerSecond) < 0.01
+        ) {
+          return prev;
+        }
+        return {
+          mediaChunkCount,
+          mediaBytes,
+          lastChunkAtMs,
+          chunksPerSecond,
+        };
+      });
+    }
+    if (speakingNow) {
+      if (voiceSpeechCandidateStartMsRef.current === null) {
+        voiceSpeechCandidateStartMsRef.current = now;
+      }
+      const candidateDuration = now - (voiceSpeechCandidateStartMsRef.current ?? now);
+      if (!voiceSpeechActiveRef.current && candidateDuration >= MIC_SPEECH_START_MS) {
+        voiceSpeechActiveRef.current = true;
+        voiceLastSpeechMsRef.current = now;
+        voiceSegmentStartMsRef.current = now;
+        markVoiceCheckpoint(
+          "signal_detected",
+          "ok",
+          `Signal detected (rms ${rms.toFixed(4)}, gate ${dynamicThreshold.toFixed(4)}).`,
+        );
+        setVoiceWarning("flat_signal", false);
+        const prerollWindowStart = now - 240;
+        const firstPrerollIndex = voiceChunksRef.current.findIndex(
+          (entry) => entry.atMs >= prerollWindowStart,
+        );
+        voiceSegmentStartIndexRef.current =
+          firstPrerollIndex >= 0
+            ? firstPrerollIndex
+            : Math.max(0, voiceChunksRef.current.length - 2);
+        const voiceOutputActive =
+          Boolean(playbackAudioRef.current) ||
+          Boolean(voiceAutoSpeakActiveUtteranceRef.current) ||
+          voiceAutoSpeakRunningRef.current ||
+          voiceAutoSpeakQueueRef.current.length > 0;
+        if (voiceOutputActive) {
+          const paused = pausePlaybackForPotentialBargeIn();
+          if (!paused && voiceAutoSpeakActiveUtteranceRef.current) {
+            // Fallback for non-audible active synthesis: interrupt immediately.
+            stopReadAloud("barge_in");
+          }
+          setConversationGovernor((prev) => ({
+            ...prev,
+            floor_owner: "user",
+            turn_state: "interrupted",
+            cooling_down: false,
+          }));
+        } else {
+          setConversationGovernor((prev) => ({
+            ...prev,
+            floor_owner: "user",
+            turn_state: "user_speaking",
+            cooling_down: false,
+          }));
+        }
+      } else if (voiceSpeechActiveRef.current) {
+        if (voiceBargeHoldActiveRef.current) {
+          const currentAudio = playbackAudioRef.current;
+          if (currentAudio && !currentAudio.paused) {
+            currentAudio.pause();
+          }
+        }
+        voiceLastSpeechMsRef.current = now;
+        setConversationGovernor((prev) => ({
+          ...prev,
+          floor_owner: "user",
+          turn_state: "user_speaking",
+          cooling_down: false,
+        }));
+      }
+      if (
+        voiceSpeechActiveRef.current &&
+        voiceSegmentStartMsRef.current !== null &&
+        now - voiceSegmentStartMsRef.current >= MIC_MAX_SEGMENT_MS
+      ) {
+        finalizeVoiceSegment("max_segment");
+      }
+      return;
+    }
+    if (!voiceSpeechActiveRef.current) {
+      voiceNoiseFloorRef.current =
+        baseline * MIC_LEVEL_FLOOR_ALPHA + rms * (1 - MIC_LEVEL_FLOOR_ALPHA);
+    }
+    voiceSpeechCandidateStartMsRef.current = null;
+    if (!voiceSpeechActiveRef.current) {
+      setConversationGovernor((prev) =>
+        prev.turn_state === "hard_pause"
+          ? prev
+          : { ...prev, floor_owner: "none", turn_state: "hard_pause" },
+      );
+      return;
+    }
+    const sinceLastSpeech = now - (voiceLastSpeechMsRef.current ?? now);
+    if (sinceLastSpeech >= MIC_SOFT_PAUSE_MS && sinceLastSpeech < MIC_END_TURN_MS) {
+      setConversationGovernor((prev) => ({
+        ...prev,
+        floor_owner: "none",
+        turn_state: "soft_pause",
+        cooling_down: false,
+      }));
+      return;
+    }
+    if (sinceLastSpeech >= MIC_END_TURN_MS) {
+      finalizeVoiceSegment("silence");
+    }
+  }, [
+    finalizeVoiceSegment,
+    markVoiceCheckpoint,
+    micArmState,
+    pausePlaybackForPotentialBargeIn,
+    setVoiceWarning,
+    stopReadAloud,
+  ]);
+
+  const startVoiceCaptureLoop = useCallback(async () => {
+    if (micArmState !== "on") return;
+    if (voiceRecorderRef.current || voiceStreamRef.current) return;
+    setVoiceInputError(null);
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setVoiceInputError("Microphone capture unavailable.");
+      setVoiceInputState("error");
+      markVoiceCheckpoint("track_live", "error", "Microphone capture unavailable.");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined" || typeof window === "undefined") {
+      setVoiceInputError("Browser recording unsupported.");
+      setVoiceInputState("error");
+      markVoiceCheckpoint("track_live", "error", "Browser recording unsupported.");
+      return;
+    }
+    try {
+      const micConstraints: MediaTrackConstraints = {
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl: { ideal: true },
+        channelCount: { ideal: 1 },
+      };
+      let stream = await navigator.mediaDevices.getUserMedia({
+        audio: micConstraints,
+      });
+      let audioTrack = stream.getAudioTracks()[0];
+      let trackLabel = audioTrack?.label?.trim() || "default microphone";
+      if (
+        audioTrack &&
+        isLikelyLoopbackDeviceLabel(trackLabel) &&
+        typeof navigator.mediaDevices.enumerateDevices === "function"
+      ) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const currentDeviceId =
+            (audioTrack.getSettings?.().deviceId as string | undefined) ?? undefined;
+          const fallbackInput = devices.find(
+            (device) =>
+              device.kind === "audioinput" &&
+              !!device.deviceId &&
+              device.deviceId !== currentDeviceId &&
+              !isLikelyLoopbackDeviceLabel(device.label ?? ""),
+          );
+          if (fallbackInput?.deviceId) {
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                ...micConstraints,
+                deviceId: { exact: fallbackInput.deviceId },
+              },
+            });
+            for (const track of stream.getTracks()) {
+              track.stop();
+            }
+            stream = fallbackStream;
+            audioTrack = stream.getAudioTracks()[0];
+            trackLabel = audioTrack?.label?.trim() || fallbackInput.label?.trim() || "default microphone";
+            markVoiceCheckpoint(
+              "track_live",
+              "warn",
+              `Auto-switched from loopback to ${clipText(trackLabel, 32)}.`,
+            );
+          }
+        } catch {
+          // keep original stream; warning surface will guide operator
+        }
+      }
+      voiceStreamRef.current = stream;
+      if (audioTrack) {
+        const mutedNow = audioTrack.muted === true;
+        setVoiceInputDeviceLabel(trackLabel);
+        setVoiceTrackMuted(mutedNow);
+        voiceTrackMutedRef.current = mutedNow;
+        markVoiceCheckpoint(
+          "track_live",
+          mutedNow ? "warn" : "ok",
+          mutedNow ? "Track is live but muted." : "Track is live.",
+        );
+        setVoiceWarning("loopback_source", isLikelyLoopbackDeviceLabel(trackLabel));
+        audioTrack.onmute = () => {
+          voiceTrackMutedRef.current = true;
+          setVoiceTrackMuted(true);
+          markVoiceCheckpoint("track_live", "warn", "Track muted by browser or device.");
+        };
+        audioTrack.onunmute = () => {
+          voiceTrackMutedRef.current = false;
+          setVoiceTrackMuted(false);
+          markVoiceCheckpoint("track_live", "ok", "Track resumed.");
+        };
+        audioTrack.onended = () => {
+          setVoiceInputError("Microphone track ended.");
+          setVoiceInputState("error");
+          markVoiceCheckpoint("track_live", "error", "Track ended unexpectedly.");
+          stopVoiceCapture();
+        };
+      }
+      const preferredMimeType = pickMicRecorderMimeType();
+      let recorder: MediaRecorder;
+      try {
+        recorder = preferredMimeType
+          ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+          : new MediaRecorder(stream);
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
+      voiceRecorderRef.current = recorder;
+      voiceRecorderStartedAtMsRef.current = Date.now();
+      voiceLastChunkAtMsRef.current = null;
+      voiceChunkCountRef.current = 0;
+      voiceChunkBytesRef.current = 0;
+      setVoiceRecorderMimeType(recorder.mimeType?.trim() || preferredMimeType || "default");
+      voiceChunksRef.current = [];
+      voiceSegmentStartIndexRef.current = 0;
+      recorder.ondataavailable = (event) => {
+        if (!event.data || event.data.size <= 0) return;
+        const now = Date.now();
+        voiceLastChunkAtMsRef.current = now;
+        voiceChunkCountRef.current += 1;
+        voiceChunkBytesRef.current += event.data.size;
+        setVoiceWarning("recorder_stalled", false);
+        const beforeLength = voiceChunksRef.current.length;
+        voiceChunksRef.current.push({ chunk: event.data, atMs: now });
+        const cutoff = now - MIC_RING_BUFFER_MS;
+        voiceChunksRef.current = voiceChunksRef.current.filter(
+          (entry, index) => index === 0 || entry.atMs >= cutoff,
+        );
+        const dropped = beforeLength + 1 - voiceChunksRef.current.length;
+        if (dropped > 0) {
+          voiceSegmentStartIndexRef.current = Math.max(0, voiceSegmentStartIndexRef.current - dropped);
+        }
+      };
+      recorder.onerror = (event) => {
+        const recorderError = (event as unknown as { error?: Error }).error;
+        setVoiceInputError(describeVoiceInputError(recorderError));
+        setVoiceInputState("error");
+        markVoiceCheckpoint("track_live", "error", "Recorder error.");
+        stopVoiceCapture();
+      };
+      recorder.start(250);
+      const AudioCtx = (window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
+        | typeof AudioContext
+        | undefined;
+      if (!AudioCtx) {
+        setVoiceInputError("Audio analysis unavailable.");
+        setVoiceInputState("error");
+        markVoiceCheckpoint("track_live", "error", "Audio analysis unavailable.");
+        stopVoiceCapture();
+        return;
+      }
+      const audioContext = new AudioCtx();
+      if (audioContext.state === "suspended") {
+        try {
+          await audioContext.resume();
+        } catch {
+          // continue; analyser may still become available on next interaction
+        }
+      }
+      voiceAudioContextRef.current = audioContext;
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      voiceSourceNodeRef.current = sourceNode;
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.88;
+      sourceNode.connect(analyser);
+      const silenceGain = audioContext.createGain();
+      silenceGain.gain.value = 0;
+      analyser.connect(silenceGain);
+      silenceGain.connect(audioContext.destination);
+      voiceSilenceGainNodeRef.current = silenceGain;
+      voiceAnalyserRef.current = analyser;
+      voiceMonitorTimerRef.current = window.setInterval(
+        evaluateMicLevel,
+        MIC_ANALYSIS_INTERVAL_MS,
+      );
+      setVoiceInputState("listening");
+      markVoiceCheckpoint("track_live", "ok", "Capture loop armed.");
+      setConversationGovernor((prev) => ({
+        ...prev,
+        floor_owner: "none",
+        turn_state: "hard_pause",
+        cooling_down: false,
+      }));
+    } catch (error) {
+      stopVoiceCapture();
+      const message = describeVoiceInputError(error);
+      setVoiceInputError(message);
+      setVoiceInputState("error");
+      markVoiceCheckpoint("track_live", "error", message);
+    }
+  }, [evaluateMicLevel, markVoiceCheckpoint, micArmState, setVoiceWarning, stopVoiceCapture]);
+
+  const handleVoiceInputToggle = useCallback(() => {
+    if (micArmState === "on") {
+      setMicArmState("off");
+      setVoiceInputError(null);
+      stopVoiceCapture();
+      return;
+    }
+    setMicArmState("on");
+    setVoiceInputState("listening");
+    setVoiceInputError(null);
+  }, [micArmState, stopVoiceCapture]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(MIC_PERSIST_KEY, micArmState);
+    } catch {
+      // no-op
+    }
+  }, [micArmState]);
+
+  useEffect(() => {
+    if (micArmState === "on") {
+      void startVoiceCaptureLoop();
+      return;
+    }
+    stopVoiceCapture();
+  }, [micArmState, startVoiceCaptureLoop, stopVoiceCapture]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopVoiceCapture();
+        return;
+      }
+      if (micArmState === "on") {
+        void startVoiceCaptureLoop();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [micArmState, startVoiceCaptureLoop, stopVoiceCapture]);
+
+  useEffect(() => () => {
+    stopReadAloud();
+    stopVoiceCapture();
+    contextCapsuleSessionLedgerRef.current = [];
+  }, [stopReadAloud, stopVoiceCapture]);
 
   useEffect(() => {
     if (!askBusy) {
@@ -3502,6 +7417,14 @@ export function HelixAskPill({
         }
         askLiveDraftRef.current = askLiveDraftBufferRef.current;
         scheduleLiveDraftFlush();
+        const manualAttemptId = reasoningAttemptManualIdRef.current;
+        if (manualAttemptId) {
+          updateReasoningAttempt(manualAttemptId, (current) => ({
+            ...current,
+            status: "streaming",
+            partial: askLiveDraftBufferRef.current,
+          }));
+        }
         return;
       }
       let text = (event.message ?? event.text ?? "").toString().trim();
@@ -3542,6 +7465,16 @@ export function HelixAskPill({
         ];
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
         askLiveEventsRef.current = clipped;
+        const manualAttemptId = reasoningAttemptManualIdRef.current;
+        if (manualAttemptId) {
+          const appendedEvent = clipped[clipped.length - 1];
+          if (appendedEvent) {
+            updateReasoningAttempt(manualAttemptId, (current) => ({
+              ...current,
+              events: [...current.events, appendedEvent].slice(-HELIX_ASK_LIVE_EVENT_LIMIT),
+            }));
+          }
+        }
         return clipped;
       });
     };
@@ -3555,6 +7488,7 @@ export function HelixAskPill({
     askBusy,
     askLiveSessionId,
     askLiveTraceId,
+    updateReasoningAttempt,
     scheduleLiveDraftFlush,
     updateReasoningTheaterEventClock,
   ]);
@@ -3759,6 +7693,9 @@ export function HelixAskPill({
           if (!responseText) {
             responseText = "No response returned.";
           }
+          if (responseContextCapsule) {
+            upsertContextCapsuleSessionLedger(responseContextCapsule);
+          }
           launchAtomicViewer(responseViewerLaunch);
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
@@ -3820,6 +7757,7 @@ export function HelixAskPill({
       resetReasoningTheaterEventClock,
       requestMoodHint,
       setActive,
+      upsertContextCapsuleSessionLedger,
       updateMoodFromText,
     ],
   );
@@ -3837,6 +7775,12 @@ export function HelixAskPill({
     async (question: string, capsuleIds?: string[]) => {
       const trimmed = question.trim();
       if (!trimmed) return;
+      const selectedCapsuleIds =
+        Array.isArray(capsuleIds) && capsuleIds.length > 0
+          ? capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
+          : resolveSelectedContextCapsuleIds(trimmed, undefined, { source: "manual" });
+      const pinnedCapsuleCount = getPinnedContextCapsuleCount();
+      const inferredMode = inferAskMode(trimmed);
       setAskBusy(true);
       setAskStatus("Interpreting prompt...");
       setAskError(null);
@@ -3856,13 +7800,26 @@ export function HelixAskPill({
       }
       askDraftRef.current = "";
       setContextCapsuleDetectedId(null);
-      setContextCapsuleAppliedId(null);
       clearMoodTimer();
       cancelMoodHint();
       updateMoodFromText(trimmed);
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
       const traceId = `ask:${crypto.randomUUID()}`;
+      const manualAttempt = createReasoningAttempt({
+        prompt: trimmed,
+        contextCapsuleIds: selectedCapsuleIds,
+        contextCapsuleCount: selectedCapsuleIds.length,
+        contextCapsulePinnedCount: pinnedCapsuleCount,
+        source: "manual",
+        mode: inferredMode,
+        status: "running",
+        traceId,
+        completionScore: conversationGovernor.completion_score.score,
+        floorOwner: conversationGovernor.floor_owner,
+      });
+      const manualTimelineEntryId = ensureReasoningTimelineEntry(manualAttempt, "running");
+      reasoningAttemptManualIdRef.current = manualAttempt.id;
       setAskLiveSessionId(sessionId ?? null);
       setAskLiveTraceId(traceId);
       if (sessionId) {
@@ -3884,8 +7841,10 @@ export function HelixAskPill({
         let responseMode: "read" | "observe" | "act" | "verify" | undefined;
         let responseProof: HelixAskReply["proof"];
         let responseContextCapsule: ContextCapsuleSummary | undefined;
+        let responseDebugWithClientMode: HelixAskReply["debug"] | undefined;
         setAskStatus("Generating answer...");
         try {
+          const askModeForRequest = inferredMode === "observe" ? undefined : inferredMode;
           const localResponse = await askLocal(undefined, {
             sessionId: sessionId ?? undefined,
             traceId,
@@ -3893,8 +7852,8 @@ export function HelixAskPill({
             question: trimmed,
             debug: userSettings.showHelixAskDebug,
             signal: controller.signal,
-            mode: askMode,
-            capsuleIds,
+            mode: askModeForRequest,
+            capsuleIds: selectedCapsuleIds,
           });
           responseEnvelope = localResponse.envelope;
           const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
@@ -3902,6 +7861,13 @@ export function HelixAskPill({
             ? envelopeAnswer
             : stripPromptEcho(localResponse.text ?? "", trimmed);
           responseDebug = localResponse.debug;
+          responseDebugWithClientMode =
+            localResponse.debug || inferredMode
+              ? {
+                  ...localResponse.debug,
+                  ...(inferredMode ? { client_inferred_mode: inferredMode } : {}),
+                }
+              : undefined;
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
           responseMode = localResponse.mode;
@@ -3913,15 +7879,57 @@ export function HelixAskPill({
           if (aborted) {
             skipReply = true;
             setAskStatus("Generation stopped.");
+            updateReasoningAttempt(manualAttempt.id, (current) => ({
+              ...current,
+              status: "cancelled",
+              completedAtMs: Date.now(),
+            }));
+            patchHelixTimelineEntry(manualTimelineEntryId, {
+              status: "suppressed",
+              detail: "cancelled",
+            });
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: "manual",
+              status: "suppressed",
+              text: "Manual reasoning cancelled by user.",
+              detail: "cancelled",
+              mode: inferredMode,
+              traceId,
+              attemptId: manualAttempt.id,
+            });
           } else {
             const message = error instanceof Error ? error.message : String(error);
             const streamedFallback = askLiveDraftRef.current.trim();
             responseText = streamedFallback || message || "Request failed.";
+            updateReasoningAttempt(manualAttempt.id, (current) => ({
+              ...current,
+              status: "failed",
+              suppression_reason: message || "reasoning_failed",
+              completedAtMs: Date.now(),
+            }));
+            patchHelixTimelineEntry(manualTimelineEntryId, {
+              status: "failed",
+              detail: clipText(message || "reasoning_failed", 180),
+            });
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: "manual",
+              status: "suppressed",
+              text: clipText(message || "reasoning_failed", 280),
+              detail: "manual reasoning failed",
+              mode: inferredMode,
+              traceId,
+              attemptId: manualAttempt.id,
+            });
           }
         }
         if (!skipReply) {
           if (!responseText) {
             responseText = "No response returned.";
+          }
+          if (responseContextCapsule) {
+            upsertContextCapsuleSessionLedger(responseContextCapsule);
           }
           launchAtomicViewer(responseViewerLaunch);
           updateMoodFromText(responseText);
@@ -3939,13 +7947,16 @@ export function HelixAskPill({
                 id: replyId,
                 content: responseText,
                 question: trimmed,
-                debug: responseDebug,
+                debug: responseDebugWithClientMode ?? responseDebug,
                 promptIngested: responsePromptIngested,
                 envelope: responseEnvelope,
                 mode: responseMode,
                 proof: responseProof,
                 contextCapsule: responseContextCapsule,
-                sources: responseDebug?.context_files ?? responseDebug?.prompt_context_files ?? [],
+                sources:
+                  (responseDebugWithClientMode ?? responseDebug)?.context_files ??
+                  (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
+                  [],
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
               },
@@ -3955,6 +7966,60 @@ export function HelixAskPill({
           if (sessionId) {
             addMessage(sessionId, { role: "assistant", content: responseText });
           }
+          const detailMode =
+            responseMode === "observe" || responseMode === "act" || responseMode === "verify"
+              ? responseMode
+              : inferredMode;
+          updateReasoningAttempt(manualAttempt.id, (current) => ({
+            ...current,
+            status: "done",
+            partial: askLiveDraftRef.current || responseText,
+            finalAnswer: responseText,
+            certaintyClass:
+              ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
+                ?.certainty_class) ??
+              ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
+            evidenceRefs:
+              (responseDebugWithClientMode ?? responseDebug)?.context_files ??
+              (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
+              [],
+            completedAtMs: Date.now(),
+          }));
+          patchHelixTimelineEntry(manualTimelineEntryId, {
+            status: "done",
+            detail: formatReasoningAttemptDetail(
+              {
+                mode: detailMode,
+              },
+              "done",
+            ),
+            mode: responseMode ?? inferredMode,
+          });
+          addHelixTimelineEntry({
+            type: responseMode === "act" ? "action_receipt" : "reasoning_final",
+            source: "manual",
+            status: "done",
+            text: clipText(responseText, 520),
+            detail: formatReasoningAttemptDetail(
+              {
+                mode: detailMode,
+              },
+              "manual complete",
+            ),
+            mode: responseMode ?? inferredMode,
+            traceId,
+            attemptId: manualAttempt.id,
+            meta: {
+              certaintyClass:
+                ((responseEnvelope as { certainty_class?: "confirmed" | "reasoned" | "hypothesis" | "unknown" } | undefined)
+                  ?.certainty_class) ??
+                ((responseDebugWithClientMode ?? responseDebug)?.evidence_gate_ok ? "reasoned" : "unknown"),
+              contextFiles:
+                (responseDebugWithClientMode ?? responseDebug)?.context_files ??
+                (responseDebugWithClientMode ?? responseDebug)?.prompt_context_files ??
+                [],
+            },
+          });
         }
       } finally {
         if (askRunIdRef.current === runId) {
@@ -3971,21 +8036,35 @@ export function HelixAskPill({
         if (askAbortRef.current === controller) {
           askAbortRef.current = null;
         }
+        if (reasoningAttemptManualIdRef.current === manualAttempt.id) {
+          reasoningAttemptManualIdRef.current = null;
+        }
       }
     },
     [
+      addHelixTimelineEntry,
       addMessage,
       askBusy,
+      conversationGovernor.completion_score.score,
+      conversationGovernor.floor_owner,
+      createReasoningAttempt,
       buildConvergenceSnapshot,
       cancelMoodHint,
       clearLiveDraftFlush,
       clearMoodTimer,
+      ensureReasoningTimelineEntry,
+      formatReasoningAttemptDetail,
       getHelixAskSessionId,
+      getPinnedContextCapsuleCount,
       launchAtomicViewer,
+      patchHelixTimelineEntry,
       resetReasoningTheaterEventClock,
+      resolveSelectedContextCapsuleIds,
       requestMoodHint,
       resizeTextarea,
       setActive,
+      upsertContextCapsuleSessionLedger,
+      updateReasoningAttempt,
       updateMoodFromText,
       userSettings.showHelixAskDebug,
     ],
@@ -4005,38 +8084,6 @@ export function HelixAskPill({
     setAskStatus("Stopping...");
   }, []);
 
-  const handleApplyContextCapsuleChip = useCallback(() => {
-    if (!contextCapsulePreview?.summary) return;
-    setContextCapsuleAppliedId(contextCapsulePreview.summary.fingerprint);
-  }, [contextCapsulePreview]);
-
-  const handleRemoveContextCapsuleChip = useCallback(() => {
-    const capsuleId =
-      contextCapsulePreview?.summary?.fingerprint ??
-      contextCapsulePreview?.summary?.capsuleId ??
-      contextCapsulePreview?.id;
-    if (!capsuleId) {
-      setContextCapsuleDetectedId(null);
-      setContextCapsuleAppliedId(null);
-      setContextCapsulePreview(null);
-      return;
-    }
-    const input = askInputRef.current;
-    if (input) {
-      const escaped = capsuleId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const nextValue = input.value
-        .replace(new RegExp(`\\b${escaped}\\b`, "gi"), " ")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-      input.value = nextValue;
-      askDraftRef.current = nextValue;
-      resizeTextarea(input);
-    }
-    setContextCapsuleDetectedId(null);
-    setContextCapsuleAppliedId(null);
-    setContextCapsulePreview(null);
-  }, [contextCapsulePreview, resizeTextarea]);
-
   const handleAskSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -4044,10 +8091,9 @@ export function HelixAskPill({
       const entries = parseQueuedQuestions(rawInput);
       if (entries.length === 0) return;
       const inlineCapsuleIds = extractContextCapsuleIdsFromText(rawInput);
-      const selectedCapsuleIds =
-        contextCapsuleAppliedId !== null
-          ? [contextCapsuleAppliedId]
-          : inlineCapsuleIds.slice(0, 1);
+      const selectedCapsuleIds = resolveSelectedContextCapsuleIds(rawInput, inlineCapsuleIds, {
+        source: "manual",
+      });
       const normalizedEntries = entries.map((entry) => {
         const stripped = stripContextCapsuleTokensFromText(entry);
         return stripped || entry.trim();
@@ -4062,7 +8108,6 @@ export function HelixAskPill({
         }
         askDraftRef.current = "";
         setContextCapsuleDetectedId(null);
-        setContextCapsuleAppliedId(null);
         clearMoodTimer();
         cancelMoodHint();
         updateMoodFromText(normalizedEntries[0] ?? entries[0] ?? "");
@@ -4099,7 +8144,6 @@ export function HelixAskPill({
       }
       askDraftRef.current = "";
       setContextCapsuleDetectedId(null);
-      setContextCapsuleAppliedId(null);
       if (askBusy) {
         setAskQueue((prev) => {
           const combined = [...prev, ...normalizedEntries];
@@ -4121,11 +8165,11 @@ export function HelixAskPill({
     [
       addMessage,
       cancelMoodHint,
-      contextCapsuleAppliedId,
       clearMoodTimer,
       getHelixAskSessionId,
       openPanelById,
       parseQueuedQuestions,
+      resolveSelectedContextCapsuleIds,
       requestMoodHint,
       resizeTextarea,
       setActive,
@@ -4138,42 +8182,62 @@ export function HelixAskPill({
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
+  const voiceInputStatusLabel = buildVoiceInputStatusLabel(
+    micArmState,
+    voiceInputState,
+    voiceInputError,
+  );
+  const showTopInputLevelMonitor = micArmState === "on";
+  const formMaxWidthStyle =
+    maxWidthClassName !== undefined
+      ? undefined
+      : ({
+          maxWidth: showTopInputLevelMonitor ? "72rem" : "64rem",
+        } as const);
+
+  const refreshVoiceMonitorBounds = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const anchor = voiceMonitorAnchorRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const viewportTop = window.visualViewport?.offsetTop ?? 0;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    // Use the anchored bottom edge (stable at the pill top) so expansion
+    // doesn't recursively shrink available space as the monitor grows.
+    const availableAbove = Math.max(0, Math.floor(rect.bottom - viewportTop - 8));
+    const viewportCap = Math.max(48, Math.floor(Math.min(560, viewportHeight - 64)));
+    const nextMaxHeight = Math.min(availableAbove, viewportCap);
+    setVoiceMonitorMaxHeightPx((prev) => (Math.abs(prev - nextMaxHeight) <= 1 ? prev : nextMaxHeight));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !showTopInputLevelMonitor) return;
+    const updateBounds = () => {
+      refreshVoiceMonitorBounds();
+    };
+    updateBounds();
+    window.addEventListener("resize", updateBounds);
+    window.addEventListener("scroll", updateBounds, true);
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener("resize", updateBounds);
+    visualViewport?.addEventListener("scroll", updateBounds);
+    return () => {
+      window.removeEventListener("resize", updateBounds);
+      window.removeEventListener("scroll", updateBounds, true);
+      visualViewport?.removeEventListener("resize", updateBounds);
+      visualViewport?.removeEventListener("scroll", updateBounds);
+    };
+  }, [refreshVoiceMonitorBounds, showTopInputLevelMonitor]);
 
   const emitContextLifecycle = useCallback((event: ContextLifecycleEvent) => {
     setContextSessionState(event.sessionState);
   }, []);
-
-  const startContextSession = useCallback(async () => {
-    if (contextSessionStartInFlightRef.current) return;
-    if (!canStartContextSession({ tier: missionContextControls.tier, sessionState: contextSessionState })) return;
-    contextSessionStartInFlightRef.current = true;
-    const stream = await startDesktopTier1ScreenSession(emitContextLifecycle);
-    contextSessionStartInFlightRef.current = false;
-    if (!stream) {
-      contextSessionStreamRef.current = null;
-      return;
-    }
-    contextSessionStreamRef.current = stream;
-    for (const track of stream.getTracks()) {
-      track.addEventListener(
-        "ended",
-        () => {
-          if (contextSessionStreamRef.current === stream) {
-            contextSessionStreamRef.current = null;
-            setContextSessionState("idle");
-          }
-        },
-        { once: true },
-      );
-    }
-  }, [contextSessionState, emitContextLifecycle, missionContextControls.tier]);
 
   const stopContextSession = useCallback(() => {
     const stream = contextSessionStreamRef.current;
     if (!stream && contextSessionState === "idle") return;
     stopDesktopTier1ScreenSession(stream, emitContextLifecycle);
     contextSessionStreamRef.current = null;
-    contextSessionStartInFlightRef.current = false;
   }, [contextSessionState, emitContextLifecycle]);
 
   useEffect(() => {
@@ -4193,20 +8257,8 @@ export function HelixAskPill({
       for (const track of stream?.getTracks?.() ?? []) {
         track.stop();
       }
-      contextSessionStartInFlightRef.current = false;
     };
   }, []);
-
-  const contextSessionBadge =
-    contextSessionState === "active"
-      ? "LIVE"
-      : contextSessionState === "requesting"
-        ? "REQUESTING"
-        : contextSessionState === "stopping"
-          ? "STOPPING"
-          : contextSessionState === "error"
-            ? "ERROR"
-            : "IDLE";
 
   const queuePreview = useMemo(() => {
     const preview = askQueue.slice(0, 3).map((entry) => clipText(entry, 80));
@@ -4214,19 +8266,179 @@ export function HelixAskPill({
     return { preview, remainder };
   }, [askQueue]);
 
+  const helixTimelineFeed = useMemo(() => {
+    return [...helixTimeline].sort((a, b) => {
+      const aActive = a.status === "queued" || a.status === "running" || a.status === "streaming";
+      const bActive = b.status === "queued" || b.status === "running" || b.status === "streaming";
+      if (aActive !== bActive) return aActive ? -1 : 1;
+      return b.createdAtMs - a.createdAtMs;
+    });
+  }, [helixTimeline]);
+
+  const latestConversationBrief = useMemo(
+    () => helixTimelineFeed.find((entry) => entry.type === "conversation_brief") ?? null,
+    [helixTimelineFeed],
+  );
+
+  const latestTimelineEvent = useMemo(
+    () => helixTimelineFeed.find((entry) => entry.type !== "conversation_brief") ?? null,
+    [helixTimelineFeed],
+  );
+
+  const sessionCapsuleState = useMemo(
+    () => deriveSessionCapsuleState(contextCapsuleSessionLedger),
+    [contextCapsuleSessionLedger],
+  );
+
+  const activeContextCapsulePreview = useMemo<ContextCapsulePreview | null>(() => {
+    if (sessionCapsuleState) {
+      return {
+        id: sessionCapsuleState.id,
+        loading: false,
+        summary: sessionCapsuleState.summary,
+        convergence: sessionCapsuleState.summary.convergence,
+      };
+    }
+    return contextCapsulePreview;
+  }, [contextCapsulePreview, sessionCapsuleState]);
+
+  const contextMemoryStatusText = useMemo(() => {
+    if (!sessionCapsuleState) return null;
+    return `Context memory active - ${SESSION_CAPSULE_CONFIDENCE_LABEL[sessionCapsuleState.confidenceBand]}`;
+  }, [sessionCapsuleState]);
+
+  const voiceCaptureCheckpointList = useMemo(
+    () => VOICE_CAPTURE_CHECKPOINT_ORDER.map((key) => voiceCaptureCheckpoints[key]),
+    [voiceCaptureCheckpoints],
+  );
+
+  const voiceCaptureHealth = useMemo<VoiceCaptureHealthSnapshot>(() => {
+    const nowMs = Date.now();
+    const lastChunkAgeMs =
+      voiceRecorderStats.lastChunkAtMs !== null ? Math.max(0, nowMs - voiceRecorderStats.lastChunkAtMs) : null;
+    const hasWarningCheckpoint = voiceCaptureCheckpointList.some(
+      (checkpoint) => checkpoint.status === "warn" || checkpoint.status === "error",
+    );
+    const pipelineStatus =
+      micArmState === "off"
+        ? "idle"
+        : voiceCaptureWarnings.length > 0 || hasWarningCheckpoint
+          ? "attention"
+          : "active";
+    return {
+      rmsRaw: voiceMeterStats.rmsRaw,
+      rmsDb: voiceMeterStats.rmsDb,
+      peak: voiceMeterStats.peak,
+      noiseFloor: voiceMeterStats.noiseFloor,
+      displayLevel: voiceMeterStats.displayLevel,
+      mediaChunkCount: voiceRecorderStats.mediaChunkCount,
+      mediaBytes: voiceRecorderStats.mediaBytes,
+      chunksPerSecond: voiceRecorderStats.chunksPerSecond,
+      lastChunkAgeMs,
+      warnings: voiceCaptureWarnings,
+      pipelineStatus,
+      lastRoundtripMs: voiceLastRoundtripMs,
+    };
+  }, [
+    micArmState,
+    voiceCaptureCheckpointList,
+    voiceCaptureWarnings,
+    voiceLastRoundtripMs,
+    voiceMeterStats,
+    voiceRecorderStats,
+  ]);
+
+  useEffect(() => {
+    publishVoiceCaptureDiagnosticsSnapshot({
+      updatedAtMs: Date.now(),
+      micArmState,
+      voiceInputState,
+      voiceSignalState,
+      voiceMonitorLevel,
+      voiceMonitorThreshold,
+      voiceRecorderMimeType,
+      voiceInputDeviceLabel,
+      voiceTrackMuted,
+      rmsRaw: voiceCaptureHealth.rmsRaw,
+      rmsDb: voiceCaptureHealth.rmsDb,
+      peak: voiceCaptureHealth.peak,
+      noiseFloor: voiceCaptureHealth.noiseFloor,
+      chunksPerSecond: voiceCaptureHealth.chunksPerSecond,
+      mediaChunkCount: voiceCaptureHealth.mediaChunkCount,
+      mediaBytes: voiceCaptureHealth.mediaBytes,
+      lastChunkAgeMs: voiceCaptureHealth.lastChunkAgeMs,
+      lastRoundtripMs: voiceCaptureHealth.lastRoundtripMs,
+      warnings: [...voiceCaptureWarnings],
+      checkpoints: voiceCaptureCheckpointList.map((checkpoint) => ({
+        key: checkpoint.key,
+        label: VOICE_CAPTURE_CHECKPOINT_LABEL[checkpoint.key],
+        status: checkpoint.status,
+        message: checkpoint.message,
+        lastAtMs: checkpoint.lastAtMs,
+      })),
+      segments: voiceSegmentAttempts.map((segment) => ({
+        id: segment.id,
+        cutAtMs: segment.cutAtMs,
+        durationMs: segment.durationMs,
+        status: segment.status,
+        sttLatencyMs: segment.sttLatencyMs,
+        transcriptPreview: segment.transcriptPreview,
+        translated: segment.translated,
+        dispatch: segment.dispatch,
+        engine: segment.engine,
+        error: segment.error,
+      })),
+      playback: voiceAutoSpeakLastMetrics
+        ? {
+            utteranceId: voiceAutoSpeakLastMetrics.utteranceId,
+            turnKey: voiceAutoSpeakLastMetrics.turnKey,
+            kind: voiceAutoSpeakLastMetrics.kind,
+            chunkCount: voiceAutoSpeakLastMetrics.chunkCount,
+            enqueueToFirstAudioMs: voiceAutoSpeakLastMetrics.enqueueToFirstAudioMs,
+            synthDurationsMs: [...voiceAutoSpeakLastMetrics.synthDurationsMs],
+            chunkGapMs: [...voiceAutoSpeakLastMetrics.chunkGapMs],
+            totalPlaybackMs: voiceAutoSpeakLastMetrics.totalPlaybackMs,
+            cancelReason: voiceAutoSpeakLastMetrics.cancelReason,
+            providerHeader: voiceAutoSpeakLastMetrics.providerHeader,
+            profileHeader: voiceAutoSpeakLastMetrics.profileHeader,
+            cacheHitCount: voiceAutoSpeakLastMetrics.cacheHitCount,
+            cacheMissCount: voiceAutoSpeakLastMetrics.cacheMissCount,
+          }
+        : null,
+    });
+  }, [
+    micArmState,
+    voiceCaptureCheckpointList,
+    voiceCaptureHealth,
+    voiceCaptureWarnings,
+    voiceInputDeviceLabel,
+    voiceInputState,
+    voiceMonitorLevel,
+    voiceMonitorThreshold,
+    voiceRecorderMimeType,
+    voiceSegmentAttempts,
+    voiceAutoSpeakLastMetrics,
+    voiceSignalState,
+    voiceTrackMuted,
+  ]);
+
   return (
     <HelixAskErrorBoundary>
       <div className={className}>
-        <form className={`w-full ${maxWidthClass}`} onSubmit={handleAskSubmit}>
+        <form
+          className={`w-full ${maxWidthClass} transition-[max-width] duration-300 ease-out`}
+          style={formMaxWidthStyle}
+          onSubmit={handleAskSubmit}
+        >
         <div
-          className={`relative overflow-hidden rounded-3xl border bg-slate-950/80 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur ${moodPalette.surfaceBorder}`}
+          className={`relative overflow-visible rounded-3xl border bg-slate-950/80 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur ${moodPalette.surfaceBorder}`}
         >
           <div
-            className={`pointer-events-none absolute inset-0 ${moodPalette.surfaceTint}`}
+            className={`pointer-events-none absolute inset-0 rounded-3xl ${moodPalette.surfaceTint}`}
             aria-hidden
           />
           <div
-            className={`pointer-events-none absolute inset-0 ${moodPalette.surfaceHalo}`}
+            className={`pointer-events-none absolute inset-0 rounded-3xl ${moodPalette.surfaceHalo}`}
             aria-hidden
           />
           <div className="relative">
@@ -4235,6 +8447,59 @@ export function HelixAskPill({
                 Offline - reconnecting
               </div>
             ) : null}
+            <div
+              ref={voiceMonitorAnchorRef}
+              aria-hidden={!showTopInputLevelMonitor}
+              className={`absolute inset-x-4 bottom-full z-20 overflow-hidden transition-all duration-300 ease-out ${
+                showTopInputLevelMonitor
+                  ? "mb-2 translate-y-0 opacity-100"
+                  : "pointer-events-none mb-0 max-h-0 translate-y-1 opacity-0"
+              }`}
+              style={
+                showTopInputLevelMonitor ? { maxHeight: `${Math.max(0, voiceMonitorMaxHeightPx)}px` } : undefined
+              }
+            >
+              <div className="rounded-xl border border-white/10 bg-black/35 px-2.5 py-2">
+                <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                  <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em] text-slate-500">
+                    <span>Input level</span>
+                    <span>
+                      {voiceSignalState === "speech"
+                        ? "speech-level signal"
+                        : voiceSignalState === "low"
+                          ? "low-level signal"
+                          : "waiting for device audio"}
+                    </span>
+                  </div>
+                  <div
+                    className="mt-1 grid grid-cols-12 gap-0.5 rounded border border-white/10 bg-slate-900/70 p-1"
+                    aria-label="Voice input level meter"
+                  >
+                    {Array.from({ length: 12 }).map((_, index) => {
+                      const threshold = (index + 1) / 12;
+                      const active = voiceMonitorLevel >= threshold;
+                      return (
+                        <span
+                          key={`voice-level-${index}`}
+                          className={`h-2 rounded-[2px] ${
+                            active
+                              ? voiceMonitorLevel >= 0.75
+                                ? "bg-emerald-300"
+                                : voiceMonitorLevel >= 0.45
+                                  ? "bg-cyan-300"
+                                  : "bg-sky-300"
+                              : "bg-slate-700/80"
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                  {voiceSegmentAttempts.length === 0 ? (
+                    <p className="mt-1 text-[11px] text-slate-500">Listening for first segment...</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
             <div className="flex items-center gap-3 px-4 py-3">
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-full border ${moodPalette.aura}`}
@@ -4259,17 +8524,25 @@ export function HelixAskPill({
                   )}
                 </div>
               </div>
-            <select
-              value={askMode}
-              onChange={(event) => setAskMode(event.target.value as "read" | "observe" | "act" | "verify")}
-              className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-slate-200"
-              aria-label="Ask mode"
+            <button
+              type="button"
+              aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
+              aria-pressed={micArmState === "on"}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                micArmState === "on"
+                  ? voiceInputState === "transcribing"
+                    ? "border-cyan-300/45 bg-cyan-400/12 text-cyan-100"
+                    : "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
+                  : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+              }`}
+              onClick={handleVoiceInputToggle}
             >
-              <option value="read">read</option>
-              <option value="observe">observe</option>
-              <option value="act">act</option>
-              <option value="verify">verify</option>
-            </select>
+              <Mic
+                className={`h-4 w-4 ${
+                  micArmState === "on" || voiceInputState === "transcribing" ? "animate-pulse" : ""
+                }`}
+              />
+            </button>
             <textarea
               aria-label="Ask Helix"
               aria-disabled={askBusy}
@@ -4277,22 +8550,11 @@ export function HelixAskPill({
               ref={askInputRef}
               placeholder={currentPlaceholder}
               rows={1}
-              onInput={(event) => {
-                resizeTextarea(event.currentTarget);
-                askDraftRef.current = event.currentTarget.value;
-                const contextCapsuleIds = extractContextCapsuleIdsFromText(event.currentTarget.value);
-                setContextCapsuleDetectedId(contextCapsuleIds[0] ?? null);
-                if (askBusy) return;
-                clearMoodTimer();
-                askMoodTimerRef.current = window.setTimeout(() => {
-                  askMoodTimerRef.current = null;
-                  const trimmed = askDraftRef.current.trim();
-                  if (trimmed) {
-                    updateMoodFromText(trimmed);
-                    requestMoodHint(trimmed);
-                  }
-                }, 900);
-              }}
+              onInput={(event) =>
+                syncAskDraftValue(event.currentTarget.value, {
+                  target: event.currentTarget,
+                })
+              }
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -4309,13 +8571,13 @@ export function HelixAskPill({
               {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
             </button>
           </div>
-            {contextCapsulePreview ? (
+            {activeContextCapsulePreview ? (
               <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
                 <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-950/20 px-2 py-1">
                   <span className="uppercase tracking-[0.18em] text-cyan-200/90">capsule</span>
-                  {contextCapsulePreview.summary ? (
+                  {activeContextCapsulePreview.summary ? (
                     <img
-                      src={buildContextCapsuleStampDataUri(contextCapsulePreview.summary.stamp)}
+                      src={buildContextCapsuleStampDataUri(activeContextCapsulePreview.summary.stamp)}
                       alt="Context capsule fingerprint"
                       className="h-7 w-32 rounded border border-cyan-300/40 bg-cyan-950/30 object-fill"
                       style={{ imageRendering: "pixelated" }}
@@ -4326,115 +8588,66 @@ export function HelixAskPill({
                       visual key detected
                     </span>
                   )}
-                  {contextCapsulePreview.loading ? (
+                  {activeContextCapsulePreview.loading ? (
                     <span className="text-cyan-100/80">loading...</span>
-                  ) : contextCapsulePreview.error ? (
+                  ) : activeContextCapsulePreview.error ? (
                     <span className="text-rose-200/90">unavailable</span>
-                  ) : contextCapsulePreview.convergence ? (
+                  ) : activeContextCapsulePreview.convergence ? (
                     <span className="text-cyan-100/85">
-                      {CONVERGENCE_SOURCE_LABEL[contextCapsulePreview.convergence.source]} /{" "}
-                      {CONVERGENCE_PROOF_LABEL[contextCapsulePreview.convergence.proofPosture]} /{" "}
-                      {CONVERGENCE_MATURITY_LABEL[contextCapsulePreview.convergence.maturity]}
+                      {CONVERGENCE_SOURCE_LABEL[activeContextCapsulePreview.convergence.source]} /{" "}
+                      {CONVERGENCE_PROOF_LABEL[activeContextCapsulePreview.convergence.proofPosture]} /{" "}
+                      {CONVERGENCE_MATURITY_LABEL[activeContextCapsulePreview.convergence.maturity]}
                     </span>
                   ) : null}
-                  {contextCapsuleAppliedId ? (
+                  {sessionCapsuleState ? (
                     <span className="rounded border border-emerald-300/45 bg-emerald-400/12 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-emerald-100">
-                      apply on send
+                      auto-applied
                     </span>
                   ) : null}
-                  <div className="ml-auto flex items-center gap-1.5">
-                    {!contextCapsuleAppliedId && contextCapsulePreview.summary && !contextCapsulePreview.error ? (
-                      <button
-                        type="button"
-                        className="rounded border border-white/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-100 hover:bg-white/10"
-                        onClick={handleApplyContextCapsuleChip}
-                      >
-                        apply
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="rounded border border-white/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-100 hover:bg-white/10"
-                      onClick={handleRemoveContextCapsuleChip}
-                    >
-                      remove
-                    </button>
-                  </div>
                 </div>
               </div>
             ) : null}
-            <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="uppercase tracking-[0.2em] text-slate-500">Dot context</span>
-                <span className="rounded-full border border-white/10 px-2 py-0.5">
-                  {missionContextControls.tier === "tier1" ? "Tier 1" : "Tier 0"}
-                </span>
-                <span className="rounded-full border border-white/10 px-2 py-0.5">
-                  {contextSessionBadge}
-                </span>
-                {missionContextControls.tier === "tier1" ? (
-                  <span className="rounded-full border border-cyan-300/30 px-2 py-0.5 text-cyan-200">screen</span>
-                ) : null}
-                <label className="ml-auto flex items-center gap-1">
-                  <span className="text-slate-400">tier</span>
-                  <select
-                    value={missionContextControls.tier}
-                    onChange={(event) =>
-                      setMissionContextControls((prev) => ({
-                        ...prev,
-                        tier: event.target.value as MissionContextTier,
-                      }))
-                    }
-                    className="rounded border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-slate-200"
-                  >
-                    <option value="tier0">tier0</option>
-                    <option value="tier1">tier1</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-1">
-                  <span className="text-slate-400">voice</span>
-                  <select
-                    value={missionContextControls.voiceMode}
-                    onChange={(event) =>
-                      setMissionContextControls((prev) => ({
-                        ...prev,
-                        voiceMode: event.target.value as MissionVoiceMode,
-                      }))
-                    }
-                    className="rounded border border-white/10 bg-black/30 px-1 py-0.5 text-[10px] text-slate-200"
-                  >
-                    <option value="off">off</option>
-                    <option value="critical_only">critical_only</option>
-                    <option value="normal">normal</option>
-                    <option value="dnd">dnd</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-1 text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={missionContextControls.muteWhileTyping}
-                    onChange={(event) =>
-                      setMissionContextControls((prev) => ({ ...prev, muteWhileTyping: event.target.checked }))
-                    }
-                  />
-                  mute while typing
-                </label>
-                <button
-                  type="button"
-                  className="rounded border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-300"
-                  onClick={() => {
-                    if (contextSessionState === "active" || contextSessionState === "requesting") {
-                      stopContextSession();
-                      return;
-                    }
-                    void startContextSession();
-                  }}
-                  disabled={missionContextControls.tier !== "tier1" || contextSessionState === "stopping"}
+            {voiceInputStatusLabel ? (
+              <div className="-mt-1 px-4 pb-2 text-[10px]">
+                <div
+                  className={`inline-flex items-center rounded-full border px-2.5 py-1 uppercase tracking-[0.18em] ${
+                    voiceInputState === "listening"
+                      ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-100"
+                      : voiceInputState === "transcribing"
+                        ? "border-cyan-300/35 bg-cyan-400/10 text-cyan-100"
+                        : voiceInputState === "cooldown"
+                          ? "border-indigo-300/35 bg-indigo-400/10 text-indigo-100"
+                          : "border-amber-300/35 bg-amber-400/10 text-amber-100"
+                  }`}
                 >
-                  {contextSessionState === "active" || contextSessionState === "requesting" ? "stop" : "start"}
-                </button>
+                  {voiceInputStatusLabel}
+                </div>
               </div>
-            </div>
+            ) : null}
+            {latestConversationBrief ? (
+              <div className="-mt-1 px-4 pb-2 text-[11px]">
+                <p className="text-[9px] uppercase tracking-[0.14em] text-cyan-300/80">brief</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-cyan-100/90">{latestConversationBrief.text}</p>
+              </div>
+            ) : null}
+            {contextMemoryStatusText ? (
+              <div className="-mt-1 px-4 pb-2 text-[9px] uppercase tracking-[0.14em] text-emerald-200/85">
+                {contextMemoryStatusText}
+              </div>
+            ) : null}
+            {latestTimelineEvent ? (
+              <div className="-mt-1 px-4 pb-2 text-[9px] uppercase tracking-[0.14em] text-slate-500">
+                <div className="flex items-center gap-1 overflow-hidden">
+                  <span className="shrink-0">{HELIX_TIMELINE_TYPE_LABEL[latestTimelineEvent.type]}</span>
+                  {latestTimelineEvent.status !== "done" ? (
+                    <span className="shrink-0 text-[8px] text-slate-400">{latestTimelineEvent.status}</span>
+                  ) : null}
+                  <span className="truncate normal-case tracking-normal text-[10px] text-slate-400/90">
+                    {clipText(latestTimelineEvent.text, 140)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
           {askBusy ? (
             <div
               className={`relative overflow-hidden border-t px-4 py-2 text-[11px] text-slate-300 ${moodPalette.liveBorder}`}
@@ -4797,12 +9010,7 @@ export function HelixAskPill({
                   />
                   <div className="relative">
                 {reply.contextCapsule ? (
-                  <button
-                    type="button"
-                    onClick={() => handleUseContextCapsuleFromReply(reply)}
-                    className="mb-2 w-full rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-left text-xs text-cyan-100 transition hover:border-cyan-300/45 hover:bg-cyan-900/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
-                    aria-label={`Use context capsule ${reply.contextCapsule.fingerprint}`}
-                  >
+                  <div className="mb-2 w-full rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-left text-xs text-cyan-100">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Context capsule</p>
@@ -4815,10 +9023,10 @@ export function HelixAskPill({
                         />
                       </div>
                       <span className="shrink-0 rounded border border-cyan-300/35 bg-cyan-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
-                        use
+                        auto
                       </span>
                     </div>
-                  </button>
+                  </div>
                 ) : null}
                 {reply.question ? (
                   <p className="mb-2 text-xs text-slate-300">
@@ -4882,6 +9090,38 @@ export function HelixAskPill({
                       </p>
                     ) : null}
                   </div>
+              ) : null}
+              {userSettings.showHelixAskDebug && reply.debug?.client_inferred_mode ? (
+                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                    Client inference
+                  </p>
+                  <p className="mt-1">Mode: {reply.debug.client_inferred_mode}</p>
+                </div>
+              ) : null}
+              {userSettings.showHelixAskDebug &&
+              (reply.debug?.capsule_dialogue_applied_count !== undefined ||
+                reply.debug?.capsule_evidence_applied_count !== undefined ||
+                reply.debug?.focus_guard_result ||
+                reply.debug?.anchor_guard_result ||
+                reply.debug?.capsule_retry_applied !== undefined) ? (
+                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                    Capsule guards
+                  </p>
+                  <p className="mt-1">
+                    Dialogue: {reply.debug?.capsule_dialogue_applied_count ?? 0} | Evidence:{" "}
+                    {reply.debug?.capsule_evidence_applied_count ?? 0}
+                  </p>
+                  <p className="mt-1">
+                    Focus: {reply.debug?.focus_guard_result ?? "pass"} | Anchor:{" "}
+                    {reply.debug?.anchor_guard_result ?? "pass"}
+                  </p>
+                  <p className="mt-1">
+                    Retry: {reply.debug?.capsule_retry_applied ? "applied" : "not applied"}
+                    {reply.debug?.capsule_retry_reason ? ` (${reply.debug.capsule_retry_reason})` : ""}
+                  </p>
+                </div>
               ) : null}
               {userSettings.showHelixAskDebug &&
               (reply.sources?.length || reply.debug?.context_files?.length || reply.debug?.prompt_context_files?.length) ? (

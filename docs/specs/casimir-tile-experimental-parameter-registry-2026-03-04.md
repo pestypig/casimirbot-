@@ -3,7 +3,7 @@
 "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
 
 ## Purpose
-Strict extraction registry for linked timing, nanogap, Casimir sign-control, and Q-spoiling papers.
+Strict extraction registry for linked timing, nanogap, Casimir sign-control, Q-spoiling, worldline-QEI, provenance, exploratory QCD-analog papers, and Core-4 warp-family geometry comparison anchors.
 
 Extraction policy:
 - Only values directly read from paper/standard text surfaces.
@@ -41,6 +41,13 @@ Per-paper equation trace:
 | `EXP-CS-*` | `CH-CS-001` | partial | sign-transition derivation is defined; several rows still abstract-level in this pass |
 | `EXP-SE-*` | `CH-SE-001` | partial | sem/ellipsometry equations are defined; full dual-instrument datasets are pending |
 | `EXP-QEI-*` | `CH-QEI-001` | partial | worldline-QEI equation forms and sampler checks are defined; implementation-level sweep traces are pending |
+| `EXP-QCD-*` | `CH-QCD-001` | partial | QCD analog extraction and multi-table replay (`t3+t4+t5`) are captured (`qcd-analog-replay-2026-03-07`); full event-level reconstruction remains out of scope in this wave |
+| `EXP-GR-001..EXP-GR-005` | `CH-GR-001` | partial | Mercury perihelion observable replay is extracted and deterministic at equation level; remains reference-only and non-blocking for warp canonical policy |
+| `EXP-GR-006..EXP-GR-010` | `CH-GR-002` | partial | Lensing deflection observable anchors are extracted for historical+modern replay; strict-source covariance is still partial |
+| `EXP-GR-011..EXP-GR-015` | `CH-GR-003` | partial | Frame-dragging observable anchors are extracted from LAGEOS/GP-B/LARES sources; replay remains reference-only |
+| `EXP-GR-016..EXP-GR-019` | `CH-GR-004` | partial | Shapiro-delay observable anchors are extracted from proposal + Cassini precision test; replay is deterministic and non-blocking |
+| `EXP-WARP-001..EXP-WARP-012` | `CH-WARP-001` | partial | Core-4 warp-family geometry-first comparison anchors are extracted; conditional/non-comparable domains remain explicitly blocked in this wave |
+| `EXP-WARP-013..EXP-WARP-020` | `CH-WARP-002` | partial | Core-4 energetics/QEI comparison anchors are extracted for reference-only method replay; explicit worldline-QEI and assumption-domain blockers remain non-promotable in this wave |
 
 ## Timing Extraction
 
@@ -139,6 +146,27 @@ Per-paper equation trace:
 | EXP-SE-018 | SRC-041 | Maximum observed SEM vs line-scale difference (issue 484f) | 46 | nm | UNKNOWN | Maximum reported difference for 10 um spacing (`0.046 um` converted to `46 nm`) | J. Res. NIST 99(2), Sec. 5 systematic-difference discussion | full_text | primary | `delta_se_nm` | extracted |
 | EXP-SE-019 | SRC-041 | SRM+measurement-system relative uncertainty anchor (small spacing) | 5 | % | approximate | Reported uncertainty at `0.5 um` spacing in conclusion | J. Res. NIST 99(2), conclusion uncertainty statement | full_text | primary | SEM scale-governance anchor | extracted |
 | EXP-SE-020 | SRC-041 | SRM+measurement-system relative uncertainty anchor (large spacing) | 1 | % | approximate | Reported uncertainty at `50 um` spacing in conclusion | J. Res. NIST 99(2), conclusion uncertainty statement | full_text | primary | SEM scale-governance anchor | extracted |
+| EXP-SE-021 | SRC-085 | SRM-2530 certified ellipsometric measurands | Psi and Delta | symbolic | model/instrument/fit contributions included per certification procedure | Si/SiO2 ellipsometric SRM certification workflow | NIST SP 260-109, certification methodology | full_text | standard | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | extracted |
+| EXP-SE-022 | SRC-086 | SRM-2530 ellipsometric wavelength anchor | 632.8 | nm | equivalent vacuum wavelength reported as ~633.0 nm in certificate context | He-Ne ellipsometer wavelength anchor for certificate transfer checks | SRM-2530 certificate archive surface | full_text | primary | `d_ellip_nm`,`u_ellip_nm` | extracted |
+| EXP-SE-023 | SRC-086 | SRM-2530 thickness-class family anchor | 50, 100, 200 | nm | serial-specific certified tables are not populated in accessible archive surfaces; nominal class only | 2530 family includes multiple nominal oxide classes | SRM-2530-x certificate archive surface, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm` | partial |
+| EXP-SE-024 | SRC-085 | SRM-2530 model-selection uncertainty anchor | one-layer and two-layer interface models documented | categorical | model choice contributes to derived thickness/index uncertainty | one-layer vs two-layer interface treatment in certification method | NIST SP 260-109 model discussion | full_text | standard | `U_fused_nm` | extracted |
+| EXP-SE-025 | SRC-087 | SRM 2531 nominal oxide thickness anchor | 50 | nm | serial-specific certified thickness and uncertainty are not populated on accessible archive surfaces | Si/SiO2 thickness-transfer calibration coupon | NIST certificate 2531 archive, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | partial |
+| EXP-SE-026 | SRC-088 | SRM 2532 nominal oxide thickness anchor | 100 | nm | serial-specific certified thickness and uncertainty are not populated on accessible archive surfaces | Si/SiO2 thickness-transfer calibration coupon | NIST certificate 2532 archive, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | partial |
+| EXP-SE-027 | SRC-089 | SRM 2533 nominal oxide thickness anchor | 200 | nm | serial-specific certified thickness and uncertainty are not populated on accessible archive surfaces | Si/SiO2 thickness-transfer calibration coupon | NIST certificate 2533 archive, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | partial |
+| EXP-SE-028 | SRC-090 | SRM 2534 nominal oxide thickness anchor | 25 | nm | serial-specific certified thickness and uncertainty are not populated on accessible archive surfaces | Si/SiO2 thickness-transfer calibration coupon | NIST certificate 2534 archive, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | partial |
+| EXP-SE-029 | SRC-091 | SRM 2535 nominal oxide thickness anchor | 14 | nm | serial-specific certified thickness and uncertainty are not populated on accessible archive surfaces | Si/SiO2 thickness-transfer calibration coupon | NIST certificate 2535 archive, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | partial |
+| EXP-SE-030 | SRC-092 | SRM 2536 nominal oxide thickness anchor | 10 | nm | serial-specific certified thickness and uncertainty are not populated on accessible archive surfaces | Si/SiO2 thickness-transfer calibration coupon | NIST certificate 2536 archive, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | partial |
+| EXP-SE-031 | SRC-093 | SRM archive family enumeration anchor | 10, 14, 25, 50, 100, 200 | nm | UNKNOWN | NIST archive listing for 2531-2536 transfer standards | NIST SRM archive listing | metadata | standard | SE profile planning and calibration coverage checks | extracted |
+| EXP-SE-032 | SRC-086 | SRM-2530 certified wavelength anchor | 632.8 | nm | UNKNOWN | 2530-x certificate reports ellipsometric certification wavelength at 632.8 nm | SRM 2530-1 archive certificate, p.1 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm` | extracted |
+| EXP-SE-033 | SRC-086 | SRM-2530 uncertainty convention for plus/minus values | one-standard-deviation limits | categorical | k=1 statement in source surface; not expanded k=2 | Plus/minus values in 2530-x are stated as random+systematic one-sigma limits | SRM 2530-1 archive certificate, p.2 | full_text_ocr | primary | `u_ellip_nm`,`U_fused_nm` | extracted |
+| EXP-SE-034 | SRC-086 | SRM-2530 supplementary incidence-angle set | 50, 55, 60, 65, 70, 75 | deg | UNKNOWN | Supplemental Δ/Ψ values are listed across fixed incidence-angle set | SRM 2531/2532/2535 archive certificates, p.1 | full_text_ocr | primary | ellipsometry-measurement-congruence | extracted |
+| EXP-SE-035 | SRC-086 | SRM-2530 addendum center certification area | 5 | mm diameter | UNKNOWN | Certified thickness is mean of two center measurements over 5-mm-diameter center region | SRM 2531 addendum, p.3 | full_text_ocr | primary | measurement-congruence and transfer conditions | extracted |
+| EXP-SE-036 | SRC-086 | SRM-2530 addendum dual-orientation rejection threshold | 0.10 | nm | UNKNOWN | Wafer rejected if two orientation measurements differ by more than threshold | SRM 2531 addendum, p.3 | full_text_ocr | primary | repeatability gate and measurement-congruence | extracted |
+| EXP-SE-037 | SRC-086 | SRM-2530 interlayer-aware oxide-thickness relation | `t0 = tf + ti/2 ± sqrt(sigma_f^2 + sigma_i^2/4 + delta_i^2)` | symbolic | UNKNOWN | Relation provided for applications not sensitive to interlayer in same way as ellipsometry | SRM 2531 addendum, p.3 | full_text_ocr | primary | `d_ellip_nm`,`U_fused_nm` | extracted |
+| EXP-SE-038 | SRC-086 | SRM-2530 addendum TEM thickness cross-check | 102.8 | nm | UNKNOWN | TEM-measured oxide-thickness cross-check on specimen SRM | SRM 2531 addendum, p.3 | full_text_ocr | primary | cross-instrument congruence | extracted |
+| EXP-SE-039 | SRC-086 | SRM-2530 addendum corresponding certified thickness example | 103.7 | nm | ±1.2 nm (same expression style as certificate) | Certified value corresponding to EXP-SE-038 comparison example | SRM 2531 addendum, p.3 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`delta_se_nm` | extracted |
+| EXP-SE-040 | SRC-086 | SRM-2530 addendum profilometer uncertainty anchor | 3.8 | nm | ±3.8 nm stated as estimated uncertainty | NIST Precision Engineering Division unpublished-data uncertainty cited in addendum | SRM 2533/2535 addendum page, p.3/4 | full_text_ocr | primary | cross-instrument uncertainty anchor | extracted |
+| EXP-SE-041 | SRC-086 | SRM-2530 addendum profilometer-vs-ellipsometry agreement | <=3 | nm | UNKNOWN | Agreement reported for nominal 50-nm specimen SRMs | SRM 2533/2535 addendum page, p.3/4 | full_text_ocr | primary | `delta_se_nm` congruence anchor | extracted |
 
 ## Q-Factor + Spoiling Extraction
 
@@ -218,6 +246,94 @@ Per-paper equation trace:
 | EXP-QEI-016 | SRC-052 | FE derivation convention bridge between weighting and helper function | `g(omega)=fhat^(1/2)(omega)/sqrt(2*pi)` with `g * g = fhat` | symbolic | UNKNOWN | Establishes explicit `f`-weight vs helper-`g` mapping in FE derivation | arXiv:gr-qc/9805024, Eq. (3.1)/(3.2), p.5 | full_text | primary | `samplingKernelConvention`,`samplingKernelNormalization` | extracted |
 | EXP-QEI-017 | SRC-065 | Adaptive Gauss-Kronrod integrator contract for normalization checks | `dqag` uses globally adaptive Gauss-Kronrod with target `abs(I-result) <= max(epsabs, epsrel*abs(I))`; selectable 15/21/31/41/51/61-point pairs | symbolic | UNKNOWN | Numerical integration implementation for 1D oscillatory/non-oscillatory integrands | QUADPACK `dqag.f` prologue + `dqk15..dqk61` headers | full_text | standard | `normalize_ok`,`u_rho_bar`,`integrationErrorEstimate` | extracted |
 
+## QCD Analog Extraction
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-QCD-001 | SRC-069 | Collision centre-of-mass energy | 200 | GeV | UNKNOWN | Proton-proton collisions at STAR/RHIC | Nature 650 (2026), Experiment section | full_text | primary | `qcd_collision_energy_gev`,`qcd_relative_polarization` | extracted |
+| EXP-QCD-002 | SRC-069 | Selected minimum-bias event count | ~600000000 | events | UNKNOWN | Primary vertex within 60 cm from detector center along beam axis | Nature 650 (2026), Data analysis section | full_text | primary | `qcd_event_count` | extracted |
+| EXP-QCD-003 | SRC-069 | Beam speed context for vacuum-excitation step | 99.996 | % c | UNKNOWN | Method step describing proton acceleration before collision | Nature 650 (2026), Analysis method step 1 | full_text | primary | `qcd_collision_kinematics` | extracted |
+| EXP-QCD-004 | SRC-069 | Relative polarization signal (short-range Lambda-Lambda_bar pairs) | 0.181 | dimensionless | +/-0.035 (stat), +/-0.022 (syst) | Relative polarization reported by STAR from Lambda-Lambda_bar pair analysis | Nature 650 (2026), Results/main text and abstract summary | full_text | primary | `qcd_relative_polarization` | extracted |
+| EXP-QCD-005 | SRC-069 | Relative polarization significance | 4.4 | sigma | UNKNOWN | Significance of non-zero relative polarization signal | Nature 650 (2026), Results/main text summary | full_text | primary | `qcd_significance_sigma` | extracted |
+| EXP-QCD-006 | SRC-069 | Dataset collection year | 2012 | year | UNKNOWN | STAR detector data-taking context for the p+p run | Nature 650 (2026), Experiment section | full_text | primary | `qcd_run_context_year` | extracted |
+| EXP-QCD-007 | SRC-070 | HEPData collection DOI anchor | `10.17182/hepdata.159491` | DOI | UNKNOWN | STAR HEPData collection linked to the Nature publication | HEPData record 159491, citation panel | full_text | primary | `qcd_dataset_anchor` | extracted |
+| EXP-QCD-008 | SRC-070 | HEPData versioned DOI anchor | `10.17182/hepdata.159491.v1` | DOI | UNKNOWN | Versioned collection DOI for reproducible table references | HEPData record 159491, citation panel | full_text | primary | `qcd_dataset_anchor` | extracted |
+| EXP-QCD-009 | SRC-070 | HEPData table count for released dataset bundle | 6 | tables | UNKNOWN | Figure datasets `t1..t6` published for the analysis | HEPData record 159491, Data tables section | full_text | primary | `qcd_dataset_tables` | extracted |
+| EXP-QCD-010 | SRC-070 | Long-range relative polarization signal (Lambda-Lambda_bar pairs) | 0.020 | dimensionless | +/-0.023 (stat), +/-0.022 (syst) | Long-range pair species row (`x=1`) from Fig. 3b table | HEPData table `10.17182/hepdata.159491.v1/t4`, Data from Figure 3 b) | full_text | primary | `qcd_relative_polarization_long`,`qcd_decoherence_contrast` | extracted |
+| EXP-QCD-011 | SRC-070 | Short-vs-long polarization contrast magnitude | 0.161 | dimensionless | derived from table rows | `|P_short|-|P_long|` using short-range `t3/x=1` and long-range `t4/x=1` rows | HEPData tables `t3` and `t4`, replay derivation | full_text | primary | `qcd_decoherence_contrast` | extracted |
+| EXP-QCD-012 | SRC-070 | Delta-R near-window mean absolute polarization (`DeltaR<=1.0`) | 0.1405 | dimensionless | table-level mean, no covariance published | Mean of absolute `P` over bins `[0,0.5]` and `[0.5,1.0]` | HEPData table `10.17182/hepdata.159491.v1/t5`, Data from Figure 4 | full_text | primary | `qcd_decoherence_vs_separation` | extracted |
+| EXP-QCD-013 | SRC-070 | Delta-R far-window mean absolute polarization (`DeltaR>=1.5`) | 0.0045 | dimensionless | table-level mean, no covariance published | Mean of absolute `P` over bins `[1.5,2.0]` and `[2.0,3.0]` | HEPData table `10.17182/hepdata.159491.v1/t5`, Data from Figure 4 | full_text | primary | `qcd_decoherence_vs_separation` | extracted |
+| EXP-QCD-014 | SRC-070 | Delta-R near/far polarization ratio | 31.222222 | ratio | derived from EXP-QCD-012/013 | `mean_abs_near/mean_abs_far` for decoherence-trend bookkeeping | HEPData table `t5`, replay derivation | full_text | primary | `qcd_decoherence_vs_separation` | extracted |
+
+## GR Observable Extraction (Mercury Perihelion)
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-GR-001 | SRC-075 | Einstein Mercury anomalous perihelion advance benchmark | 43 | arcsec/century | UNKNOWN | Residual perihelion advance beyond Newtonian perturbation model in the 1915 GR explanation context | Einstein (1915) archival record (`Erklarung der Perihelbewegung des Merkur ...`) | full_text | primary | `gr_observables.mercury_perihelion.observed_arcsec_per_century` | extracted |
+| EXP-GR-002 | SRC-076 | Weak-field GR perihelion advance per-orbit expression | `Delta_varpi_per_orbit = 6*pi*G*M_sun/(a*(1-e^2)*c^2)` | symbolic | UNKNOWN | Schwarzschild weak-field solar-system approximation for Mercury perihelion advance | Will (2014), perihelion-advance test context | full_text | primary | `gr_observables.mercury_perihelion.formula`, `gr_observables.mercury_perihelion.predicted_arcsec_per_century` | extracted |
+| EXP-GR-003 | SRC-076 | Orbit-to-century conversion expression for perihelion advance | `arcsec_per_century = Delta_varpi_per_orbit * arcsec_per_rad * (36525/orbital_period_days)` | symbolic | UNKNOWN | Conversion from per-orbit radians to arcseconds per Julian century | Will (2014), observational-test conversion context | full_text | primary | `gr_observables.mercury_perihelion.predicted_arcsec_per_century` | extracted |
+| EXP-GR-004 | SRC-076 | Mercury perihelion test role in post-Newtonian validation program | CLASSIC_SOLAR_SYSTEM_TEST | categorical | UNKNOWN | Source classifies perihelion advance as a canonical GR weak-field test observable | Will (2014), Living Reviews test-summary scope | full_text | primary | `gr_observables.mercury_perihelion.status`, `comparison_result.status` | extracted |
+| EXP-GR-005 | SRC-076 | Source-surface explicit uncertainty anchor for observed perihelion benchmark | UNKNOWN | arcsec/century | UNKNOWN | No explicit uncertainty value extracted in this pass from the source text surface; replay keeps tolerance in snapshot acceptance block | Will (2014), test-summary scope | full_text | primary | `gr_observables.mercury_perihelion.observed_uncertainty_arcsec_per_century` | partial |
+
+## GR Observable Extraction (Lensing Deflection)
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-GR-006 | SRC-077 | Einstein weak-field light-deflection formula at impact parameter `b` | `alpha_limb_rad = 4*G*M_sun/(c^2*b)` | symbolic | UNKNOWN | Solar-limb deflection in weak-field GR | Einstein 1916 field-equation paper, weak-field light-path derivation context | full_text | primary | `gr_observables.lensing_deflection.formula` | extracted |
+| EXP-GR-007 | SRC-077 | Einstein solar-limb deflection benchmark | 1.75 | arcsec | UNKNOWN | Predicted deflection for ray grazing the solar limb | Einstein 1916, solar-limb estimate context | full_text | primary | `gr_observables.lensing_deflection.predicted_limb_arcsec` | extracted |
+| EXP-GR-008 | SRC-078 | Eclipse reduction starlight deflection estimate (solar-limb class) | 1.98 | arcsec | +/-0.16 | Historical eclipse reduction aggregate used as observational anchor | Dyson/Eddington/Davidson 1920 eclipse reductions | full_text | primary | `gr_observables.lensing_deflection.historical_observed_arcsec`,`gr_observables.lensing_deflection.historical_uncertainty_arcsec` | extracted |
+| EXP-GR-009 | SRC-079 | Modern deflection PPN gamma estimate | 0.9998 | dimensionless | +/-0.0003 | VLBI/planetary deflection precision test context | Shapiro et al. PRL 2004 deflection test | full_text | primary | `gr_observables.lensing_deflection.modern_gamma_measured`,`gr_observables.lensing_deflection.modern_gamma_uncertainty` | extracted |
+| EXP-GR-010 | SRC-079 | Modern gamma residual definition | `gamma_residual = gamma_measured - 1` | symbolic | UNKNOWN | PPN residual lane used for replay tolerance checks | Shapiro et al. PRL 2004, PPN comparison context | full_text | primary | `gr_observables.lensing_deflection.modern_gamma_residual` | extracted |
+
+## GR Observable Extraction (Frame Dragging)
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-GR-011 | SRC-081 | GP-B GR frame-dragging prediction | 39.2 | mas/year | UNKNOWN | Earth-orbit frame-dragging channel for gyro precession | Everitt et al. PRL 2011 final results | full_text | primary | `gr_observables.frame_dragging.gpb_predicted_mas_per_year` | extracted |
+| EXP-GR-012 | SRC-081 | GP-B measured frame-dragging precession | 37.2 | mas/year | +/-7.2 | Same channel and analysis as EXP-GR-011 | Everitt et al. PRL 2011 final results | full_text | primary | `gr_observables.frame_dragging.gpb_observed_mas_per_year`,`gr_observables.frame_dragging.gpb_uncertainty_mas_per_year` | extracted |
+| EXP-GR-013 | SRC-080 | LAGEOS frame-dragging measurement ratio | 0.99 | ratio | +/-0.10 | Ratio form relative to GR prediction in Ciufolini-Pavlis analysis | Ciufolini & Pavlis Nature 2004 | full_text | primary | `gr_observables.frame_dragging.lageos_observed_ratio`,`gr_observables.frame_dragging.lageos_uncertainty` | extracted |
+| EXP-GR-014 | SRC-080 | LAGEOS expected GR ratio baseline | 1.00 | ratio | UNKNOWN | Baseline expected ratio lane used for residual comparison | Ciufolini & Pavlis Nature 2004 | full_text | primary | `gr_observables.frame_dragging.lageos_expected_ratio` | extracted |
+| EXP-GR-015 | SRC-082 | LARES frame-dragging accuracy context | 0.6 | % | UNKNOWN | LARES confirmation context used as supplementary accuracy anchor | LARES confirmation analysis (`EPJ C 2019`) | full_text | primary | `gr_observables.frame_dragging.lares_accuracy_percent_reported` | extracted |
+
+## GR Observable Extraction (Shapiro Delay)
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-GR-016 | SRC-083 | Shapiro delay formula anchor | `Delta_t_shapiro = (1+gamma)*(2*G*M_sun/c^3)*ln((r_E+r_R+R)/(r_E+r_R-R))` | symbolic | UNKNOWN | Radar echo-time delay in weak-field solar-system geometry | Shapiro 1964 PRL proposal | full_text | primary | `gr_observables.shapiro_delay.formula` | extracted |
+| EXP-GR-017 | SRC-084 | Cassini PPN gamma-minus-one estimate | 2.1e-5 | dimensionless | +/-2.3e-5 | Cassini radio-science delay test | Bertotti et al. Nature 2003 | full_text | primary | `gr_observables.shapiro_delay.gamma_minus_one_measured`,`gr_observables.shapiro_delay.gamma_minus_one_uncertainty` | extracted |
+| EXP-GR-018 | SRC-084 | Gamma reconstruction from gamma-minus-one | `gamma_estimated = 1 + (gamma_minus_one)` | symbolic | UNKNOWN | Deterministic replay mapping from measured `gamma-1` | Bertotti et al. Nature 2003, PPN gamma lane | full_text | primary | `gr_observables.shapiro_delay.gamma_estimated` | extracted |
+| EXP-GR-019 | SRC-084 | Three-sigma absolute gamma-minus-one envelope (derived) | 6.9e-5 | dimensionless | derived (`3*2.3e-5`) | Conservative replay tolerance anchor when strict-source covariance is unavailable | Derived from Bertotti et al. 2003 reported uncertainty | full_text | primary | `gr_observables.shapiro_delay.max_abs_gamma_minus_one` | extracted |
+
+## Warp-Family Geometry Extraction (Core-4)
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-WARP-001 | SRC-071 | Alcubierre ADM shift-only line element | `ds^2 = -dt^2 + (dx - v_s f(r_s) dt)^2 + dy^2 + dz^2` | symbolic | UNKNOWN | Standard Alcubierre chart with `alpha=1`, `gamma_ij=delta_ij` | Alcubierre 1994, Eq. (1)/(5) form in CQG paper | full_text | primary | `warp_metric_form`, `metric_form_alignment` | extracted |
+| EXP-WARP-002 | SRC-071 | Alcubierre shift mapping anchor | `beta^x = -v_s f(r_s), beta^y=beta^z=0` | symbolic | UNKNOWN | Same chart as EXP-WARP-001 | Alcubierre 1994, shift definition lane | full_text | primary | `warp_shift_mapping`, `shift_mapping` | extracted |
+| EXP-WARP-003 | SRC-071 | Alcubierre expansion/sign parity anchor | `theta_beta = D_i beta^i = -theta_Alc` | symbolic | UNKNOWN | Sign convention depends on `theta` definition (`div(beta)` vs `-TrK`) | Alcubierre 1994 + ADM convention mapping | full_text | primary | `warp_york_time_sign_parity`, `york_time_sign_parity` | extracted |
+| EXP-WARP-004 | SRC-071 | Alcubierre wall-localized Eulerian energy density anchor | `rho_E <= 0` in wall region where `f'(r_s) != 0` | categorical | UNKNOWN | Flat-slice Alcubierre wall terms | Alcubierre 1994 stress-energy discussion | full_text | primary | `warp_metric_derived_t00_path`, `metric_derived_t00_path` | extracted |
+| EXP-WARP-005 | SRC-072 | Natario metric definition anchor | `ds^2 = -dt^2 + sum_i (dx^i - X^i dt)^2` | symbolic | UNKNOWN | Def. 1.1 chart with spatial vector field `X` | Natario 2002, Def. 1.1 | full_text | primary | `warp_metric_form`, `metric_form_alignment` | extracted |
+| EXP-WARP-006 | SRC-072 | Natario zero-expansion control condition | `div X = 0` | symbolic | UNKNOWN | Warp class constrained to zero expansion lane | Natario 2002, Cor. 1.5 | full_text | primary | `warp_natario_control_behavior`, `natario_control_behavior` | extracted |
+| EXP-WARP-007 | SRC-072 | Natario geometry-derived stress identity anchor | `rho_E` tied to geometric terms (`TrK`, `K_ij K^ij`, spatial curvature) | symbolic | UNKNOWN | Geometry-first stress mapping, not free `T00` injection | Natario 2002, Thm. 1.7 | full_text | primary | `warp_metric_derived_t00_path`, `metric_derived_t00_path` | extracted |
+| EXP-WARP-008 | SRC-073 | Van den Broeck conformal spatial metric anchor | `gamma_ij = B(r)^2 delta_ij` | symbolic | UNKNOWN | Pocket-compression geometry modifies spatial metric | Van Den Broeck 1999, geometry construction | full_text | primary | `warp_metric_form`, `metric_form_alignment` | extracted |
+| EXP-WARP-009 | SRC-073 | Van den Broeck conditional Alcubierre reduction region | `B(r)=1` exterior region admits Alcubierre-like reduction | categorical | UNKNOWN | Conditional equivalence only in declared region | Van Den Broeck 1999, region construction | full_text | primary | `warp_conditional_comparability`, `metric_form_alignment` | extracted |
+| EXP-WARP-010 | SRC-073 | Van den Broeck derivative-support requirement | `B'(r), B''(r)` required for full stress/curvature closure | symbolic | UNKNOWN | Region-II derivative support required for geometry-derived closure | Van Den Broeck 1999, pocket-support analysis | full_text | primary | `warp_metric_derived_t00_path`, `metric_derived_t00_path` | extracted |
+| EXP-WARP-011 | SRC-074 | Lentz model-domain anchor | EINSTEIN_MAXWELL_PLASMA | categorical | UNKNOWN | Model assumptions differ from vacuum/ADM-only baseline | Lentz 2021, model statement | full_text | primary | `warp_assumption_domain` | extracted |
+| EXP-WARP-012 | SRC-074 | Lentz geometry-first direct comparability status | NON_COMPARABLE_IN_CORE4_GEOMETRY_WAVE | categorical | UNKNOWN | Marked non-comparable for this geometry-first Core-4 wave without full EM-plasma closure mapping | Lentz 2021, scope mapping to local baseline | full_text | primary | `warp_comparison_blocker` | extracted |
+
+## Warp-Family Energetics/QEI Extraction (Core-4)
+
+| entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
+|---|---|---|---:|---|---|---|---|---|---|---|---|
+| EXP-WARP-013 | SRC-071 | Alcubierre wall-energy sign anchor | `rho_E <= 0` in wall support | categorical | UNKNOWN | Wall region where shaping-function gradients are non-zero | Alcubierre 1994 stress-energy discussion | full_text | primary | `warp_negative_energy_branch_policy` | extracted |
+| EXP-WARP-014 | SRC-071 | Alcubierre explicit worldline-QEI anchor availability | WORLDLINE_QEI_NOT_EXPLICIT_IN_SOURCE | categorical | UNKNOWN | Source does not provide Fewster/Ford-Roman style sampler inequality derivation | Alcubierre 1994 full text scope | full_text | primary | `warp_qei_worldline_requirement` | extracted |
+| EXP-WARP-015 | SRC-072 | Natario stress-source contract anchor | GEOMETRY_DERIVED_STRESS_IDENTITY_PRESENT | categorical | UNKNOWN | Stress lane tied to geometric identities in theorem context | Natario 2002, Thm. 1.7 | full_text | primary | `warp_stress_source_contract` | extracted |
+| EXP-WARP-016 | SRC-072 | Natario explicit worldline-QEI anchor availability | WORLDLINE_QEI_NOT_EXPLICIT_IN_SOURCE | categorical | UNKNOWN | Source does not provide explicit worldline-QEI sampler inequality derivation | Natario 2002 full text scope | full_text | primary | `warp_qei_worldline_requirement` | extracted |
+| EXP-WARP-017 | SRC-073 | Van den Broeck stress closure dependency anchor | REGION_II_DERIVATIVE_CLOSURE_REQUIRED | categorical | UNKNOWN | Full energetic closure requires derivative support (`B'`,`B''`) beyond conditional `B=1` domain | Van Den Broeck 1999, pocket-support analysis | full_text | primary | `warp_stress_source_contract`, `warp_conditional_comparability` | extracted |
+| EXP-WARP-018 | SRC-073 | Van den Broeck explicit worldline-QEI anchor availability | WORLDLINE_QEI_NOT_EXPLICIT_IN_SOURCE | categorical | UNKNOWN | Source does not provide explicit worldline-QEI sampler inequality derivation | Van Den Broeck 1999 full text scope | full_text | primary | `warp_qei_worldline_requirement` | extracted |
+| EXP-WARP-019 | SRC-074 | Lentz stress/energy domain anchor | POSITIVE_ENERGY_CLAIM_IN_EINSTEIN_MAXWELL_PLASMA_DOMAIN | categorical | UNKNOWN | Positive-energy claim occurs under model-specific EM-plasma assumptions | Lentz 2021 model statement | full_text | primary | `warp_negative_energy_branch_policy`, `warp_assumption_domain` | extracted |
+| EXP-WARP-020 | SRC-074 | Lentz direct comparability to current local energetics/QEI baseline | NON_COMPARABLE_IN_CORE4_ENERGETICS_WAVE | categorical | UNKNOWN | Current local baseline is reduced-order ADM/vacuum lane with worldline-QEI guardrails; direct equivalence not asserted | Lentz 2021 scope mapping to local baseline | full_text | primary | `warp_comparison_blocker` | extracted |
+
 ## Provenance / Attestation Extraction
 
 | entry_id | source_id | parameter | value | unit | uncertainty | conditions | paper_ref | extraction_method | source_class | maps_to_spec | status |
@@ -234,27 +350,40 @@ Per-paper equation trace:
 |---|---:|---:|---:|---:|
 | timing | 7 | 29 | 2 | 0 |
 | nanogap | 6 | 32 | 0 | 0 |
-| sem_ellipsometry | 5 | 14 | 1 | 0 |
+| sem_ellipsometry | 14 | 33 | 8 | 0 |
 | q_spoiling | 6 | 20 | 2 | 0 |
 | casimir_sign_control | 4 | 21 | 2 | 0 |
 | worldline_qei | 9 | 18 | 0 | 0 |
+| qcd_analog | 2 | 14 | 0 | 0 |
 | provenance_attestation | 3 | 5 | 0 | 0 |
+| gr_observable_mercury | 2 | 4 | 1 | 0 |
+| gr_observable_lensing | 3 | 5 | 0 | 0 |
+| gr_observable_frame_dragging | 3 | 5 | 0 | 0 |
+| gr_observable_shapiro | 2 | 4 | 0 | 0 |
+| warp_family_geometry | 4 | 12 | 0 | 0 |
+| warp_family_energetics_qei | 3 | 8 | 0 | 0 |
 
 ## Extraction Gaps (explicit)
 1. Full IEEE 1588 and ISPCS 2009 numeric profiles are not extracted due access limits on full standard/proceedings text.
 2. `SRC-016`, `SRC-018`, and `SRC-063` provide equation-level and quantitative anchors, but complete raw force-vs-gap traces with full covariance are still not extracted into this registry.
 3. `SRC-025` remains non-admissible for normative claims and is retained only as intake context.
 4. `CH-CS-001` is only partially populated with uncertainty-resolved numeric rows and remains non-promotable for hard-claim use.
-5. `CH-SE-001` now has quantitative AFM uncertainty-model equations (`SRC-042`) plus ellipsometry reference anchors (`SRC-050`), but still needs in-house dual-instrument raw datasets to promote from `partial` to `pass`.
+5. `CH-SE-001` now has quantitative AFM uncertainty-model equations (`SRC-042`), ellipsometry reference anchors (`SRC-050`), and expanded NIST SRM Si/SiO2 transfer/addendum anchors (`SRC-085..SRC-093`) from direct PDF OCR; archive certificates still do not expose populated serial-specific certified-thickness tables in accessible surfaces, and in-house paired SEM+ellipsometry raw datasets plus numeric covariance anchors are still required to promote from `partial` to `pass`.
 6. `CH-QEI-001` now has direct-source equation anchors for Ford-Roman, Fewster-Eveson, Flanagan normalization/optimal 2D bounds, Hadamard renormalization, and QUADPACK numerical-integration contracts, but still requires implementation-level sampler sweep artifacts to close `scaling_ok` and uncertainty propagation.
 7. Provenance/attestation extraction is source-complete at schema level, but CI-integrated verification artifacts are still pending for promotion use.
 8. `SRC-062` and `SRC-063` are preprint extraction lanes; journal-linked primary counterparts remain canonical for normative claim phrasing.
 9. `SRC-065` is a numerical-methods implementation anchor and must be paired with theorem-level QEI sources when defining hard gate policy semantics.
 10. `EXP-Q-020..EXP-Q-022` replace the prior policy-only uncertainty anchor with mechanism-specific measured-spread anchors and are tagged as reportable uncertainty anchors for the q-spoiling lane.
+11. `CH-QCD-001` is exploratory and reference-only in this wave; multi-table replay now reproduces short-range significance (`t3`), long-range near-zero consistency (`t4`), and separation-trend decoherence metrics (`t5`) from HEPData (`artifacts/research/full-solve/qcd-analog-replay-2026-03-07.json`), while full event-level reconstruction remains pending.
+12. `CH-WARP-001` is geometry-first and reference-only in this wave; Core-4 anchors are extracted, but conditional and non-comparable domains (notably VdB region support and Lentz EM-plasma assumptions) remain explicit blockers for strong cross-family equivalence claims.
+13. `CH-WARP-002` is energetics/QEI reference-only in this wave; extracted anchors are categorical and assumption-domain scoped, while explicit in-paper worldline-QEI derivations remain missing and therefore non-promotable for hard equivalence claims.
+14. `CH-GR-001` is reference-only in this wave; equation-level replay is deterministic, but explicit observed-uncertainty extraction from strict source text remains partial and is represented as `UNKNOWN` in the registry.
+15. `CH-GR-002` and `CH-GR-003` are reference-only in this wave; observable anchors are extractable and deterministic, but full covariance/cross-instrument covariance models remain outside this replay scope.
+16. `CH-GR-004` is reference-only in this wave; `gamma-1` replay is deterministic from source anchors, while acceptance tolerance remains a conservative replay band.
 
 ## Traceability
 - `registry_id`: `casimir-tile-experimental-parameter-registry-2026-03-04`
-- `commit_pin`: `f6d6146d26885aae34ebd8785950df07d6af9731`
+- `commit_pin`: `latest`
 - `owner`: `research-governance`
-- `status`: `draft_v5`
-- `extraction_mode`: `text-surface only (abstract/full-text), no figure OCR`
+- `status`: `draft_v8`
+- `extraction_mode`: `text-surface + PDF OCR (for scanned certificate pages)`

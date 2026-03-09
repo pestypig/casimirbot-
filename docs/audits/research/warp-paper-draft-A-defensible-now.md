@@ -8,6 +8,48 @@
 - Snapshot companion: `docs/audits/research/warp-evidence-snapshot-2026-03-02.md`
 - Claim-governance contract: `docs/audits/research/warp-paper-authoring-contract-2026-03-02.md`
 
+## Default Integrity Parity Anchor
+- Machine-readable anchor: `artifacts/research/full-solve/integrity-parity-suite-latest.json`
+- Human-readable anchor: `docs/audits/research/warp-integrity-parity-suite-latest.md`
+- Regeneration command: `npm run warp:integrity:check`
+
+Derived capsule anchors (for deep drill-down):
+- `artifacts/research/full-solve/full-solve-reference-capsule-latest.json`
+- `docs/audits/research/warp-full-solve-reference-capsule-latest.md`
+- Validation command: `npm run warp:full-solve:reference:validate -- --capsule artifacts/research/full-solve/full-solve-reference-capsule-latest.json`
+
+Policy note:
+- Capsule artifacts are reporting/traceability only.
+- Canonical decision authority remains: canonical report -> decision ledger -> governance matrix -> summaries -> exploratory overlays.
+
+## Default External-Work Comparison Anchor
+- Master matrix (machine-readable): `artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json`
+- Master matrix (human-readable): `docs/audits/research/warp-external-work-comparison-matrix-latest.md`
+- Per-work run artifacts: `artifacts/research/full-solve/external-work/external-work-run-<work_id>-latest.json`
+- Per-work compare artifacts: `artifacts/research/full-solve/external-work/external-work-compare-<work_id>-latest.json`
+- Refresh command: `npm run warp:external:refresh`
+- Manuscript-stable blocker buckets: `reduced_reason_counts` in `external-work-comparison-matrix-latest.json` and capsule `external_work_comparison.reduced_reason_counts`
+
+Interpretation rule:
+- External-work comparison artifacts are non-blocking overlays and do not override canonical full-solve decisions.
+
+## Default Promotion-Readiness Bridge Anchor
+- Machine-readable anchor: `artifacts/research/full-solve/promotion-readiness-suite-latest.json`
+- Human-readable anchor: `docs/audits/research/warp-promotion-readiness-suite-latest.md`
+- Regeneration command: `npm run warp:promotion:readiness:check`
+
+State-of-record rule:
+- “Reportable vs exploratory” manuscript language must be sourced from `integrity-parity-suite-latest` + `external-work-comparison-matrix-latest` + `promotion-readiness-suite-latest` only.
+
+## Reportable vs Exploratory (Latest Anchors)
+
+| lane | reportable status source | expected status interpretation |
+|---|---|---|
+| `q_spoiling` | `promotion-readiness-suite-latest.json` -> `lane_reportable_coverage.lanes[q_spoiling]` | reportable when `reportableReady=true` and `blockedReasons=[]` |
+| `timing` | `promotion-readiness-suite-latest.json` -> `lane_reportable_coverage.lanes[timing]` | reportable when strict uncertainty/topology gates stay closed and `reportableReady=true` |
+| `sem_ellipsometry` | `promotion-readiness-suite-latest.json` -> `lane_reportable_coverage.lanes[sem_ellipsometry]` | exploratory/blocked until paired-run + covariance blocked reasons are cleared |
+| external GR/warp overlays | `external-work-comparison-matrix-latest.json` | reference-only overlay; never canonical override |
+
 ## Abstract
 This draft reports the current reduced-order campaign state using commit-tracked repository evidence at one pin. Canonical adjudication is `REDUCED_ORDER_ADMISSIBLE` with gate counts `PASS=8`, `FAIL=0`, `UNKNOWN=0`, `NOT_READY=0`, `NOT_APPLICABLE=1`. The work is scientifically useful as a reproducible reduced-order closure with explicit falsifiers and a standards-aligned upgrade path; it is not, by itself, a full-system physical feasibility claim.
 
@@ -185,12 +227,14 @@ Strict primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.se-prim
 - reportable run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
 - reportable-reference run summary: `scenarioCount=2`, `compatible=2`, `partial=0`, `incompatible=0`, `error=0`
 - frozen reportable prereg profile records `reportableReady=false` with blocked reasons `missing_paired_dual_instrument_run` and `missing_covariance_uncertainty_anchor`.
+- when paired-evidence payloads are provided, reportable unlock additionally requires measurement provenance anchors (`data_origin=instrument_export`, non-empty instrument run IDs, and non-empty raw artifact refs); placeholder/template bundles remain fail-closed.
 
 Lane-specific evidence congruence checks:
 - typed check (`artifacts/research/full-solve/se-compat-check-2026-03-06.json`): `congruent=8`, `incongruent=0`, `unknown=10`
 - reportable check (`artifacts/research/full-solve/se-compat-check-reportable-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=18`
 - reportable-reference check (`artifacts/research/full-solve/se-compat-check-reportable-reference-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=2`
 - dominant deterministic reason code on typed envelope: `edge_uncertainty_overlap`.
+- strict-source extraction was refreshed with numeric anchors from full text (`EXP-SE-016..EXP-SE-020` from `SRC-041`; updated `EXP-SE-012/013` from `SRC-050`), improving `u_sem_nm`/`u_ellip_nm` bookkeeping while keeping reportable fail-closed.
 
 Repeat-run determinism (`artifacts/research/full-solve/se-repeat-determinism-2026-03-06.json`) reports `status=PASS` across pass-1/pass-2/reportable/reportable-reference runs and typed/reportable/reportable-reference checker summaries.
 
@@ -199,6 +243,115 @@ Interpretation rule:
 - reportable outputs remain fail-closed by design until paired dual-instrument covariance-aware uncertainty anchors are present;
 - paired-run closure path is now commit-tracked via `docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md` and `docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json`;
 - no promotion/canonical override is implied by this envelope mapping alone.
+
+## Exploratory QCD Analog Citation Block (Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Manuscript-stable citation targets for QCD analog bookkeeping:
+- primary publication anchor: `SRC-069` (`10.1038/s41586-025-09920-0`)
+- primary dataset anchor: `SRC-070` (`10.17182/hepdata.159491`)
+- deterministic replay artifacts:
+  - `artifacts/research/full-solve/qcd-analog-replay-2026-03-07.json`
+  - `docs/audits/research/warp-qcd-analog-replay-2026-03-07.md`
+
+Replay scope and result (table-level only):
+- HEPData `t3` short-range replay: `z=4.37832`, parity to published `4.4 sigma` within tolerance (`|Delta z|=0.02168`)
+- HEPData `t4` long-range replay: `z=0.62838` (consistent with near-zero long-range correlation)
+- HEPData `t5` separation replay: near/far mean-absolute polarization ratio `31.22222`
+
+Interpretation rule:
+- this is an exploratory analog lane for evidence organization and method traceability;
+- full event-level QCD reconstruction is not complete in this wave;
+- no promotion/canonical override is implied by this citation block.
+
+## GR Observable Parity Anchors (Mercury + Lensing + Frame Dragging + Shapiro, Non-Blocking)
+This comparison block is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Method-track profiles:
+- `EXT-GR-MERC-001` (Mercury perihelion)
+- `EXT-GR-LENS-001` (lensing deflection, historical + modern)
+- `EXT-GR-FD-001` (frame dragging: GP-B + LAGEOS with LARES context)
+- `EXT-GR-SHAP-001` (Shapiro delay: proposal + Cassini precision)
+
+Source/snapshot anchors:
+- sources: `SRC-075..SRC-084` (primary-only set for this wave)
+- snapshots:
+  - `docs/specs/data/gr-mercury-perihelion-einstein-1915.v1.json`
+  - `docs/specs/data/gr-lensing-deflection-observable.v1.json`
+  - `docs/specs/data/gr-frame-dragging-observable.v1.json`
+  - `docs/specs/data/gr-shapiro-delay-observable.v1.json`
+- replay scripts:
+  - `scripts/warp-shadow-gr-mercury-precession-replay.ts`
+  - `scripts/warp-shadow-gr-lensing-deflection-replay.ts`
+  - `scripts/warp-shadow-gr-frame-dragging-replay.ts`
+  - `scripts/warp-shadow-gr-shapiro-delay-replay.ts`
+
+Observable mapping chains:
+- `CH-GR-001`: Mercury perihelion (`gr_observables.mercury_perihelion.*`)
+- `CH-GR-002`: Lensing deflection (`gr_observables.lensing_deflection.*`)
+- `CH-GR-003`: Frame dragging (`gr_observables.frame_dragging.*`)
+- `CH-GR-004`: Shapiro delay (`gr_observables.shapiro_delay.*`)
+
+Interpretation rule:
+- these lanes are observational parity anchors for framework integrity and replay determinism;
+- they do not serve as canonical warp-lane promotion inputs in this wave;
+- unresolved strict-source covariance details remain explicit and are not collapsed into PASS semantics.
+
+## Core-4 Geometry Comparison Envelope (Non-Blocking)
+This comparison block is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Core-4 cohort profiles are method-track and snapshot-first:
+- `EXT-WARP-ALC-001` (Alcubierre 1994)
+- `EXT-WARP-NAT-001` (Natario 2002)
+- `EXT-WARP-VDB-001` (Van den Broeck 1999)
+- `EXT-WARP-LEN-001` (Lentz 2021)
+
+Current comparison outputs against local geometry-conformance baseline keys
+(`metric_form_alignment`, `shift_mapping`, `york_time_sign_parity`,
+`natario_control_behavior`, `metric_derived_t00_path`) are:
+- Natario: `compatible` (`5/5` key parity)
+- Alcubierre: `partial` (`4 pass`, `1 inconclusive` due Natario-specific control key non-comparability)
+- Van den Broeck: `inconclusive` (conditional geometry domain blockers)
+- Lentz: `inconclusive` (non-comparable assumption domain blockers)
+
+Artifact anchors:
+- per-work run: `artifacts/research/full-solve/external-work/external-work-run-ext-warp-*-latest.json`
+- per-work compare: `artifacts/research/full-solve/external-work/external-work-compare-ext-warp-*-latest.json`
+- matrix: `artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json`
+
+Interpretation rule:
+- this wave is geometry-first only and does not claim energetic/QEI equivalence;
+- unresolved comparability is preserved as explicit blocker reason codes, not coerced to pass/fail;
+- reduced blocker taxonomy currently collapses these unresolved comparability reasons under `non_comparable_or_unknown` for stable manuscript tables;
+- no promotion/canonical override is implied by these external comparisons.
+
+## Core-4 Energetics/QEI Comparison Envelope (Non-Blocking)
+This comparison block is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Core-4 energetics/QEI cohort profiles are method-track and snapshot-first:
+- `EXT-WARP-ALC-E001` (Alcubierre 1994 energetics)
+- `EXT-WARP-NAT-E001` (Natario 2002 energetics)
+- `EXT-WARP-VDB-E001` (Van den Broeck 1999 energetics)
+- `EXT-WARP-LEN-E001` (Lentz 2021 energetics)
+
+Comparison baseline keys are local policy/conformance signatures in the reference capsule:
+- `negative_energy_branch_policy`
+- `qei_worldline_requirement`
+- `stress_source_contract`
+- `assumption_domain_disclosure`
+- `physical_feasibility_boundary`
+
+Current comparison outputs are:
+- `EXT-WARP-ALC-E001`: `partial` (`3 pass`, `0 fail`, `2 inconclusive`)
+- `EXT-WARP-NAT-E001`: `partial` (`2 pass`, `0 fail`, `3 inconclusive`)
+- `EXT-WARP-VDB-E001`: `partial` (`1 pass`, `0 fail`, `4 inconclusive`)
+- `EXT-WARP-LEN-E001`: `partial` (`1 pass`, `0 fail`, `4 inconclusive`)
+
+Interpretation rule:
+- this wave tests energetic/QEI comparability semantics only; it is not a viability or promotion lane;
+- missing in-paper worldline-QEI derivations and non-comparable assumption domains remain explicit blockers;
+- reduced blocker taxonomy currently collapses dominant blockers under `non_comparable_or_unknown` for stable manuscript tables;
+- inconclusive outputs are retained as blockers, not converted into pass/fail claims.
 
 ## What This Research Improves Now
 1. Adds standards-oriented governance language without changing reduced-order gate semantics.

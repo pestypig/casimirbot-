@@ -1,0 +1,47 @@
+{
+  "artifact_type": "external_warp_geometry_snapshot/v1",
+  "work_id": "EXT-WARP-LEN-001",
+  "title": "Lentz 2021 hyper-fast positive-energy soliton model",
+  "source_refs": [
+    "SRC-074"
+  ],
+  "chain_ids": [
+    "CH-WARP-001"
+  ],
+  "equation_anchors": [
+    "Model domain statement: Einstein-Maxwell-plasma",
+    "Hyperbolic PDE soliton construction assumptions",
+    "Positive-energy stress claim under model-specific matter sector"
+  ],
+  "assumption_domain": {
+    "class": "einstein_maxwell_plasma",
+    "comparability": "non_comparable",
+    "notes": "Non-comparable to this geometry-first ADM/vacuum baseline without full EM-plasma closure mapping."
+  },
+  "geometry_signature": {
+    "metric_form_alignment": {
+      "status": "unknown",
+      "reason_code": "non_comparable_assumption_domain"
+    },
+    "shift_mapping": {
+      "status": "unknown",
+      "reason_code": "non_comparable_assumption_domain"
+    },
+    "york_time_sign_parity": {
+      "status": "unknown",
+      "reason_code": "non_comparable_assumption_domain"
+    },
+    "natario_control_behavior": {
+      "status": "unknown",
+      "reason_code": "non_comparable_assumption_domain"
+    },
+    "metric_derived_t00_path": {
+      "status": "unknown",
+      "reason_code": "non_comparable_assumption_domain"
+    }
+  },
+  "blockers": [
+    "non_comparable_assumption_domain"
+  ],
+  "status": "extracted"
+}

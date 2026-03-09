@@ -1,6 +1,6 @@
 {
   "runId": "g4-recovery-search-20260227-2026-02-27",
-  "generatedAt": "2026-03-02T23:11:20.375Z",
+  "generatedAt": "2026-03-07T20:49:24.028Z",
   "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "deterministicSearch": {
     "seed": 20260227,
@@ -10,14 +10,14 @@
     "attemptedCaseUniverse": 16174080,
     "executedCaseCount": 160,
     "evaluatedCaseCount": 160,
-    "elapsedMs": 2428,
+    "elapsedMs": 3078,
     "deterministicWalk": {
       "start": 4086147,
       "step": 9997831
     },
     "stagedCounts": {
       "tauPriorityRows": 13,
-      "influenceRows": 45,
+      "influenceRows": 47,
       "stagedRows": 160
     },
     "seedStrategy": {
@@ -28,7 +28,7 @@
         "warpFieldType",
         "shipRadius_m",
         "qCavity",
-        "sectorCount"
+        "gammaGeo"
       ],
       "stepBSeedUsed": true,
       "couplingLocalizationSeedUsed": true,
@@ -142,10 +142,10 @@
   "stepCSummaryPath": "artifacts/research/full-solve/g4-stepC-summary.json",
   "couplingLocalizationPath": "artifacts/research/full-solve/g4-coupling-localization-2026-02-27.json",
   "provenance": {
-    "commitHash": "36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e",
+    "commitHash": "6450f41e802e97c5fed02ba097723c00cf49152e",
     "freshnessSource": "git.head",
-    "stepBSeedCommitHash": "36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e",
-    "couplingLocalizationSeedCommitHash": "36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e"
+    "stepBSeedCommitHash": "6450f41e802e97c5fed02ba097723c00cf49152e",
+    "couplingLocalizationSeedCommitHash": "6450f41e802e97c5fed02ba097723c00cf49152e"
   },
   "topRankedApplicabilityPassCases": [
     {
@@ -564,7 +564,339 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0133",
+      "id": "case_0021",
+      "params": {
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 4,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 0.02,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
+      },
+      "lhs_Jm3": -3.093763128722717,
+      "boundComputed_Jm3": -24.00000000002375,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18.000000000018126,
+      "boundFloor_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -24.00000000002375,
+      "boundFloorApplied": false,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
+      "tau_s": 0.00002,
+      "tauConfigured_s": 0.00002,
+      "tauWindow_s": 0.001,
+      "tauPulse_s": 6.717980877290783e-8,
+      "tauLC_s": 0.000003358990438645391,
+      "tauSelected_s": 0.00002,
+      "tauSelectedSource": "configured",
+      "tauSelectorPolicy": "configured",
+      "tauSelectorFallbackApplied": false,
+      "tauProvenanceReady": true,
+      "tauProvenanceMissing": "",
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": true,
+      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": true,
+      "quantitySemanticBridgeMissing": "",
+      "qeiStateClass": "hadamard",
+      "qeiRenormalizationScheme": "point_splitting",
+      "qeiSamplingNormalization": "unit_integral",
+      "qeiOperatorMapping": "t_munu_uu_ren",
+      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
+      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
+      "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
+      "metricT00Si_Jm3": -89888730.09553961,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
+      "metricStressRhoSiMean_Jm3": -89888730.09553961,
+      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
+      "metricStressKTraceMean": 2.474459600646483e-18,
+      "metricStressKSquaredMean": 8.104627668767766e-35,
+      "metricStressStep_m": 3.5828324597676766,
+      "metricStressScale_m": 179.14162298838383,
+      "metricStressSampleCount": 9,
+      "classificationTag": "candidate_pass_found",
+      "comparabilityClass": "comparable_canonical"
+    },
+    {
+      "id": "case_0022",
+      "params": {
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 12,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 0.02,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
+      },
+      "lhs_Jm3": -3.093763128722717,
+      "boundComputed_Jm3": -24.00000000002375,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18.000000000018126,
+      "boundFloor_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -24.00000000002375,
+      "boundFloorApplied": false,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
+      "tau_s": 0.00002,
+      "tauConfigured_s": 0.00002,
+      "tauWindow_s": 0.001,
+      "tauPulse_s": 6.717980877290783e-8,
+      "tauLC_s": 0.000003358990438645391,
+      "tauSelected_s": 0.00002,
+      "tauSelectedSource": "configured",
+      "tauSelectorPolicy": "configured",
+      "tauSelectorFallbackApplied": false,
+      "tauProvenanceReady": true,
+      "tauProvenanceMissing": "",
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": true,
+      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": true,
+      "quantitySemanticBridgeMissing": "",
+      "qeiStateClass": "hadamard",
+      "qeiRenormalizationScheme": "point_splitting",
+      "qeiSamplingNormalization": "unit_integral",
+      "qeiOperatorMapping": "t_munu_uu_ren",
+      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
+      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
+      "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
+      "metricT00Si_Jm3": -89888730.09553961,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
+      "metricStressRhoSiMean_Jm3": -89888730.09553961,
+      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
+      "metricStressKTraceMean": 2.474459600646483e-18,
+      "metricStressKSquaredMean": 8.104627668767766e-35,
+      "metricStressStep_m": 3.5828324597676766,
+      "metricStressScale_m": 179.14162298838383,
+      "metricStressSampleCount": 9,
+      "classificationTag": "candidate_pass_found",
+      "comparabilityClass": "comparable_canonical"
+    },
+    {
+      "id": "case_0023",
+      "params": {
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 48,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 0.02,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
+      },
+      "lhs_Jm3": -3.093763128722717,
+      "boundComputed_Jm3": -24.00000000002375,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18.000000000018126,
+      "boundFloor_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -24.00000000002375,
+      "boundFloorApplied": false,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
+      "tau_s": 0.00002,
+      "tauConfigured_s": 0.00002,
+      "tauWindow_s": 0.001,
+      "tauPulse_s": 6.717980877290783e-8,
+      "tauLC_s": 0.000003358990438645391,
+      "tauSelected_s": 0.00002,
+      "tauSelectedSource": "configured",
+      "tauSelectorPolicy": "configured",
+      "tauSelectorFallbackApplied": false,
+      "tauProvenanceReady": true,
+      "tauProvenanceMissing": "",
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": true,
+      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": true,
+      "quantitySemanticBridgeMissing": "",
+      "qeiStateClass": "hadamard",
+      "qeiRenormalizationScheme": "point_splitting",
+      "qeiSamplingNormalization": "unit_integral",
+      "qeiOperatorMapping": "t_munu_uu_ren",
+      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
+      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
+      "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
+      "metricT00Si_Jm3": -89888730.09553961,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
+      "metricStressRhoSiMean_Jm3": -89888730.09553961,
+      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
+      "metricStressKTraceMean": 2.474459600646483e-18,
+      "metricStressKSquaredMean": 8.104627668767766e-35,
+      "metricStressStep_m": 3.5828324597676766,
+      "metricStressScale_m": 179.14162298838383,
+      "metricStressSampleCount": 9,
+      "classificationTag": "candidate_pass_found",
+      "comparabilityClass": "comparable_canonical"
+    },
+    {
+      "id": "case_0024",
+      "params": {
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 120,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 0.02,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
+      },
+      "lhs_Jm3": -3.093763128722717,
+      "boundComputed_Jm3": -24.00000000002375,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18.000000000018126,
+      "boundFloor_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -24.00000000002375,
+      "boundFloorApplied": false,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
+      "tau_s": 0.00002,
+      "tauConfigured_s": 0.00002,
+      "tauWindow_s": 0.001,
+      "tauPulse_s": 6.717980877290783e-8,
+      "tauLC_s": 0.000003358990438645391,
+      "tauSelected_s": 0.00002,
+      "tauSelectedSource": "configured",
+      "tauSelectorPolicy": "configured",
+      "tauSelectorFallbackApplied": false,
+      "tauProvenanceReady": true,
+      "tauProvenanceMissing": "",
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -89888730.09553961,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
+      "couplingComparable": true,
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": true,
+      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": true,
+      "quantitySemanticBridgeMissing": "",
+      "qeiStateClass": "hadamard",
+      "qeiRenormalizationScheme": "point_splitting",
+      "qeiSamplingNormalization": "unit_integral",
+      "qeiOperatorMapping": "t_munu_uu_ren",
+      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
+      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
+      "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
+      "metricT00Si_Jm3": -89888730.09553961,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
+      "metricStressRhoSiMean_Jm3": -89888730.09553961,
+      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
+      "metricStressKTraceMean": 2.474459600646483e-18,
+      "metricStressKSquaredMean": 8.104627668767766e-35,
+      "metricStressStep_m": 3.5828324597676766,
+      "metricStressScale_m": 179.14162298838383,
+      "metricStressSampleCount": 9,
+      "classificationTag": "candidate_pass_found",
+      "comparabilityClass": "comparable_canonical"
+    },
+    {
+      "id": "case_0135",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 48,
@@ -647,90 +979,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0021",
-      "params": {
-        "warpFieldType": "natario_sdf",
-        "gammaGeo": 1,
-        "dutyCycle": 0.12,
-        "sectorCount": 200,
-        "concurrentSectors": 2,
-        "gammaVanDenBroeck": 500,
-        "sampler": "hann",
-        "fieldType": "em",
-        "qCavity": 100000,
-        "qSpoilingFactor": 3,
-        "tau_s_ms": 0.02,
-        "gap_nm": 8,
-        "shipRadius_m": 2,
-        "dutyShip": 0.12,
-        "dutyEffective_FR": 0.12
-      },
-      "lhs_Jm3": -12.46432816687411,
-      "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -12.46432816687411,
-      "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -18.000000000018126,
-      "boundUsed_Jm3": -24.00000000002375,
-      "boundFloorApplied": false,
-      "marginRatioRaw": 0.519347006952574,
-      "marginRatioRawComputed": 0.519347006952574,
-      "sumWindowDt": 0.9999999999999998,
-      "tau_s": 0.00002,
-      "tauConfigured_s": 0.00002,
-      "tauWindow_s": 0.001,
-      "tauPulse_s": 6.717980877290783e-8,
-      "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.00002,
-      "tauSelectedSource": "configured",
-      "tauSelectorPolicy": "configured",
-      "tauSelectorFallbackApplied": false,
-      "tauProvenanceReady": true,
-      "tauProvenanceMissing": "",
-      "K": 3.8e-30,
-      "safetySigma_Jm3": 24,
-      "applicabilityStatus": "PASS",
-      "reasonCode": [],
-      "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "couplingMode": "shadow",
-      "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -89888730.09553961,
-      "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -44944366.32338355,
-      "couplingResidualRel": 0.9999999716179383,
-      "couplingComparable": true,
-      "quantitySemanticType": "ren_expectation_timelike_energy_density",
-      "quantitySemanticBaseType": "classical_proxy_from_curvature",
-      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
-      "quantityWorldlineClass": "timelike",
-      "quantitySemanticComparable": true,
-      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
-      "quantitySemanticBridgeMode": "strict_evidence_gated",
-      "quantitySemanticBridgeReady": true,
-      "quantitySemanticBridgeMissing": "",
-      "qeiStateClass": "hadamard",
-      "qeiRenormalizationScheme": "point_splitting",
-      "qeiSamplingNormalization": "unit_integral",
-      "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
-      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
-      "metricT00ContractStatus": "ok",
-      "metricT00Geom": null,
-      "metricT00Si_Jm3": -89888730.09553961,
-      "metricT00SiFromGeom": null,
-      "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -89888730.09553961,
-      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
-      "metricStressKTraceMean": 2.474459600646483e-18,
-      "metricStressKSquaredMean": 8.104627668767766e-35,
-      "metricStressStep_m": 3.5828324597676766,
-      "metricStressScale_m": 179.14162298838383,
-      "metricStressSampleCount": 9,
-      "classificationTag": "candidate_pass_found",
-      "comparabilityClass": "comparable_canonical"
-    },
-    {
-      "id": "case_0136",
+      "id": "case_0138",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
@@ -813,90 +1062,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0022",
-      "params": {
-        "warpFieldType": "natario_sdf",
-        "gammaGeo": 1,
-        "dutyCycle": 0.12,
-        "sectorCount": 400,
-        "concurrentSectors": 2,
-        "gammaVanDenBroeck": 500,
-        "sampler": "hann",
-        "fieldType": "em",
-        "qCavity": 100000,
-        "qSpoilingFactor": 3,
-        "tau_s_ms": 0.02,
-        "gap_nm": 8,
-        "shipRadius_m": 2,
-        "dutyShip": 0.12,
-        "dutyEffective_FR": 0.12
-      },
-      "lhs_Jm3": -18.27938347831543,
-      "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -18.27938347831543,
-      "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -18.27938347831543,
-      "boundUsed_Jm3": -24.00000000002375,
-      "boundFloorApplied": false,
-      "marginRatioRaw": 0.7616409782623893,
-      "marginRatioRawComputed": 0.7616409782623893,
-      "sumWindowDt": 0.9999999999999998,
-      "tau_s": 0.00002,
-      "tauConfigured_s": 0.00002,
-      "tauWindow_s": 0.001,
-      "tauPulse_s": 6.717980877290783e-8,
-      "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.00002,
-      "tauSelectedSource": "configured",
-      "tauSelectorPolicy": "configured",
-      "tauSelectorFallbackApplied": false,
-      "tauProvenanceReady": true,
-      "tauProvenanceMissing": "",
-      "K": 3.8e-30,
-      "safetySigma_Jm3": 24,
-      "applicabilityStatus": "PASS",
-      "reasonCode": [],
-      "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "couplingMode": "shadow",
-      "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -89888730.09553961,
-      "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -44944366.32338355,
-      "couplingResidualRel": 0.9999999716179383,
-      "couplingComparable": true,
-      "quantitySemanticType": "ren_expectation_timelike_energy_density",
-      "quantitySemanticBaseType": "classical_proxy_from_curvature",
-      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
-      "quantityWorldlineClass": "timelike",
-      "quantitySemanticComparable": true,
-      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
-      "quantitySemanticBridgeMode": "strict_evidence_gated",
-      "quantitySemanticBridgeReady": true,
-      "quantitySemanticBridgeMissing": "",
-      "qeiStateClass": "hadamard",
-      "qeiRenormalizationScheme": "point_splitting",
-      "qeiSamplingNormalization": "unit_integral",
-      "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
-      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
-      "metricT00ContractStatus": "ok",
-      "metricT00Geom": null,
-      "metricT00Si_Jm3": -89888730.09553961,
-      "metricT00SiFromGeom": null,
-      "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -89888730.09553961,
-      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
-      "metricStressKTraceMean": 2.474459600646483e-18,
-      "metricStressKSquaredMean": 8.104627668767766e-35,
-      "metricStressStep_m": 3.5828324597676766,
-      "metricStressScale_m": 179.14162298838383,
-      "metricStressSampleCount": 9,
-      "classificationTag": "candidate_pass_found",
-      "comparabilityClass": "comparable_canonical"
-    },
-    {
-      "id": "case_0086",
+      "id": "case_0088",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -938,176 +1104,6 @@
       "tauProvenanceMissing": "",
       "K": 2e-30,
       "safetySigma_Jm3": 12,
-      "applicabilityStatus": "PASS",
-      "reasonCode": [
-        "G4_QI_MARGIN_EXCEEDED"
-      ],
-      "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "couplingMode": "shadow",
-      "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -89888730.09553961,
-      "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -44944366.32338355,
-      "couplingResidualRel": 0.9999999716179383,
-      "couplingComparable": true,
-      "quantitySemanticType": "ren_expectation_timelike_energy_density",
-      "quantitySemanticBaseType": "classical_proxy_from_curvature",
-      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
-      "quantityWorldlineClass": "timelike",
-      "quantitySemanticComparable": true,
-      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
-      "quantitySemanticBridgeMode": "strict_evidence_gated",
-      "quantitySemanticBridgeReady": true,
-      "quantitySemanticBridgeMissing": "",
-      "qeiStateClass": "hadamard",
-      "qeiRenormalizationScheme": "point_splitting",
-      "qeiSamplingNormalization": "unit_integral",
-      "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
-      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
-      "metricT00ContractStatus": "ok",
-      "metricT00Geom": null,
-      "metricT00Si_Jm3": -89888730.09553961,
-      "metricT00SiFromGeom": null,
-      "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -89888730.09553961,
-      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
-      "metricStressKTraceMean": 2.474459600646483e-18,
-      "metricStressKSquaredMean": 8.104627668767766e-35,
-      "metricStressStep_m": 3.5828324597676766,
-      "metricStressScale_m": 179.14162298838383,
-      "metricStressSampleCount": 9,
-      "classificationTag": "margin_limited",
-      "comparabilityClass": "comparable_canonical"
-    },
-    {
-      "id": "case_0002",
-      "params": {
-        "warpFieldType": "natario_sdf",
-        "gammaGeo": 1,
-        "dutyCycle": 0.12,
-        "sectorCount": 80,
-        "concurrentSectors": 2,
-        "gammaVanDenBroeck": 500,
-        "sampler": "hann",
-        "fieldType": "em",
-        "qCavity": 100000,
-        "qSpoilingFactor": 3,
-        "tau_s_ms": 0.05,
-        "gap_nm": 8,
-        "shipRadius_m": 2,
-        "dutyShip": 0.12,
-        "dutyEffective_FR": 0.12
-      },
-      "lhs_Jm3": -1488833.624597767,
-      "boundComputed_Jm3": -24.000000000000608,
-      "boundPolicyFloor_Jm3": -1488833.624597767,
-      "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -1488833.624597767,
-      "boundUsed_Jm3": -1488833.624597767,
-      "boundFloorApplied": true,
-      "marginRatioRaw": 1,
-      "marginRatioRawComputed": 62034.73435823872,
-      "sumWindowDt": 0.9999999999999997,
-      "tau_s": 0.00005,
-      "tauConfigured_s": 0.00005,
-      "tauWindow_s": 0.001,
-      "tauPulse_s": 6.717980877290783e-8,
-      "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.00005,
-      "tauSelectedSource": "configured",
-      "tauSelectorPolicy": "configured",
-      "tauSelectorFallbackApplied": false,
-      "tauProvenanceReady": true,
-      "tauProvenanceMissing": "",
-      "K": 3.8e-30,
-      "safetySigma_Jm3": 24,
-      "applicabilityStatus": "PASS",
-      "reasonCode": [
-        "G4_QI_MARGIN_EXCEEDED"
-      ],
-      "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "couplingMode": "shadow",
-      "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -89888730.09553961,
-      "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -44944366.32338355,
-      "couplingResidualRel": 0.9999999716179383,
-      "couplingComparable": true,
-      "quantitySemanticType": "ren_expectation_timelike_energy_density",
-      "quantitySemanticBaseType": "classical_proxy_from_curvature",
-      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
-      "quantityWorldlineClass": "timelike",
-      "quantitySemanticComparable": true,
-      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
-      "quantitySemanticBridgeMode": "strict_evidence_gated",
-      "quantitySemanticBridgeReady": true,
-      "quantitySemanticBridgeMissing": "",
-      "qeiStateClass": "hadamard",
-      "qeiRenormalizationScheme": "point_splitting",
-      "qeiSamplingNormalization": "unit_integral",
-      "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
-      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
-      "metricT00ContractStatus": "ok",
-      "metricT00Geom": null,
-      "metricT00Si_Jm3": -89888730.09553961,
-      "metricT00SiFromGeom": null,
-      "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -89888730.09553961,
-      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
-      "metricStressKTraceMean": 2.474459600646483e-18,
-      "metricStressKSquaredMean": 8.104627668767766e-35,
-      "metricStressStep_m": 3.5828324597676766,
-      "metricStressScale_m": 179.14162298838383,
-      "metricStressSampleCount": 9,
-      "classificationTag": "margin_limited",
-      "comparabilityClass": "comparable_canonical"
-    },
-    {
-      "id": "case_0065",
-      "params": {
-        "warpFieldType": "natario_sdf",
-        "gammaGeo": 12,
-        "dutyCycle": 0.12,
-        "sectorCount": 80,
-        "concurrentSectors": 2,
-        "gammaVanDenBroeck": 500,
-        "sampler": "boxcar",
-        "fieldType": "scalar",
-        "qCavity": 1000000000,
-        "qSpoilingFactor": 1,
-        "tau_s_ms": 0.05,
-        "gap_nm": 8,
-        "shipRadius_m": 2,
-        "dutyShip": 0.12,
-        "dutyEffective_FR": 0.12
-      },
-      "lhs_Jm3": -1488833.624597767,
-      "boundComputed_Jm3": -14.000000000000384,
-      "boundPolicyFloor_Jm3": -1488833.624597767,
-      "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -1488833.624597767,
-      "boundUsed_Jm3": -1488833.624597767,
-      "boundFloorApplied": true,
-      "marginRatioRaw": 1,
-      "marginRatioRawComputed": 106345.25889983757,
-      "sumWindowDt": 0.9999999999999997,
-      "tau_s": 0.00005,
-      "tauConfigured_s": 0.00005,
-      "tauWindow_s": 0.001,
-      "tauPulse_s": 6.717980877290783e-8,
-      "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.00005,
-      "tauSelectedSource": "configured",
-      "tauSelectorPolicy": "configured",
-      "tauSelectorFallbackApplied": false,
-      "tauProvenanceReady": true,
-      "tauProvenanceMissing": "",
-      "K": 2.4e-30,
-      "safetySigma_Jm3": 14,
       "applicabilityStatus": "PASS",
       "reasonCode": [
         "G4_QI_MARGIN_EXCEEDED"
@@ -2846,9 +2842,9 @@
       "id": "case_0021",
       "params": {
         "warpFieldType": "natario_sdf",
-        "gammaGeo": 1,
+        "gammaGeo": 4,
         "dutyCycle": 0.12,
-        "sectorCount": 200,
+        "sectorCount": 80,
         "concurrentSectors": 2,
         "gammaVanDenBroeck": 500,
         "sampler": "hann",
@@ -2861,17 +2857,17 @@
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -12.46432816687411,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -12.46432816687411,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
       "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.519347006952574,
-      "marginRatioRawComputed": 0.519347006952574,
-      "sumWindowDt": 0.9999999999999998,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
       "tau_s": 0.00002,
       "tauConfigured_s": 0.00002,
       "tauWindow_s": 0.001,
@@ -2929,9 +2925,9 @@
       "id": "case_0022",
       "params": {
         "warpFieldType": "natario_sdf",
-        "gammaGeo": 1,
+        "gammaGeo": 12,
         "dutyCycle": 0.12,
-        "sectorCount": 400,
+        "sectorCount": 80,
         "concurrentSectors": 2,
         "gammaVanDenBroeck": 500,
         "sampler": "hann",
@@ -2944,17 +2940,17 @@
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -18.27938347831543,
+      "lhs_Jm3": -3.093763128722717,
       "boundComputed_Jm3": -24.00000000002375,
-      "boundPolicyFloor_Jm3": -18.27938347831543,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -18.27938347831543,
+      "boundFloor_Jm3": -18.000000000018126,
       "boundUsed_Jm3": -24.00000000002375,
       "boundFloorApplied": false,
-      "marginRatioRaw": 0.7616409782623893,
-      "marginRatioRawComputed": 0.7616409782623893,
-      "sumWindowDt": 0.9999999999999998,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
       "tau_s": 0.00002,
       "tauConfigured_s": 0.00002,
       "tauWindow_s": 0.001,
@@ -3011,8 +3007,8 @@
     {
       "id": "case_0023",
       "params": {
-        "warpFieldType": "natario",
-        "gammaGeo": 1,
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 48,
         "dutyCycle": 0.12,
         "sectorCount": 80,
         "concurrentSectors": 2,
@@ -3021,29 +3017,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.05,
+        "tau_s_ms": 0.02,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -3105018642199739.5,
-      "boundComputed_Jm3": -24.000000000000608,
-      "boundPolicyFloor_Jm3": -3105018642199739.5,
+      "lhs_Jm3": -3.093763128722717,
+      "boundComputed_Jm3": -24.00000000002375,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -3105018642199739.5,
-      "boundUsed_Jm3": -3105018642199739.5,
-      "boundFloorApplied": true,
-      "marginRatioRaw": 1,
-      "marginRatioRawComputed": 129375776758319.2,
-      "sumWindowDt": 0.9999999999999997,
-      "tau_s": 0.00005,
-      "tauConfigured_s": 0.00005,
+      "boundFloor_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -24.00000000002375,
+      "boundFloorApplied": false,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
+      "tau_s": 0.00002,
+      "tauConfigured_s": 0.00002,
       "tauWindow_s": 0.001,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.00005,
+      "tauSelected_s": 0.00002,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3052,16 +3048,14 @@
       "K": 3.8e-30,
       "safetySigma_Jm3": 24,
       "applicabilityStatus": "PASS",
-      "reasonCode": [
-        "G4_QI_MARGIN_EXCEEDED"
-      ],
-      "rhoSource": "warp.metric.T00.natario.shift",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "couplingMode": "shadow",
       "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -187466334759679000,
+      "rhoMetric_Jm3": -89888730.09553961,
       "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -93733167379839500,
-      "couplingResidualRel": 1,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
       "couplingComparable": true,
       "quantitySemanticType": "ren_expectation_timelike_energy_density",
       "quantitySemanticBaseType": "classical_proxy_from_curvature",
@@ -3076,28 +3070,28 @@
       "qeiRenormalizationScheme": "point_splitting",
       "qeiSamplingNormalization": "unit_integral",
       "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario.shift",
+      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
       "metricT00Derivation": "forward_shift_to_K_to_rho_E",
       "metricT00ContractStatus": "ok",
       "metricT00Geom": null,
-      "metricT00Si_Jm3": -187466334759679000,
+      "metricT00Si_Jm3": -89888730.09553961,
       "metricT00SiFromGeom": null,
       "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -187466334759679000,
-      "metricStressRhoGeomMean_Geom": -1.5489813910683371e-27,
-      "metricStressKTraceMean": 6.972059287573196e-14,
-      "metricStressKSquaredMean": 8.27212640845792e-26,
+      "metricStressRhoSiMean_Jm3": -89888730.09553961,
+      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
+      "metricStressKTraceMean": 2.474459600646483e-18,
+      "metricStressKSquaredMean": 8.104627668767766e-35,
       "metricStressStep_m": 3.5828324597676766,
       "metricStressScale_m": 179.14162298838383,
       "metricStressSampleCount": 9,
-      "classificationTag": "margin_limited",
+      "classificationTag": "candidate_pass_found",
       "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0024",
       "params": {
-        "warpFieldType": "lentz",
-        "gammaGeo": 1,
+        "warpFieldType": "natario_sdf",
+        "gammaGeo": 120,
         "dutyCycle": 0.12,
         "sectorCount": 80,
         "concurrentSectors": 2,
@@ -3106,29 +3100,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.05,
+        "tau_s_ms": 0.02,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -3105018642199739.5,
-      "boundComputed_Jm3": -24.000000000000608,
-      "boundPolicyFloor_Jm3": -3105018642199739.5,
+      "lhs_Jm3": -3.093763128722717,
+      "boundComputed_Jm3": -24.00000000002375,
+      "boundPolicyFloor_Jm3": -3.093763128722717,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -3105018642199739.5,
-      "boundUsed_Jm3": -3105018642199739.5,
-      "boundFloorApplied": true,
-      "marginRatioRaw": 1,
-      "marginRatioRawComputed": 129375776758319.2,
-      "sumWindowDt": 0.9999999999999997,
-      "tau_s": 0.00005,
-      "tauConfigured_s": 0.00005,
+      "boundFloor_Jm3": -18.000000000018126,
+      "boundUsed_Jm3": -24.00000000002375,
+      "boundFloorApplied": false,
+      "marginRatioRaw": 0.12890679702998564,
+      "marginRatioRawComputed": 0.12890679702998564,
+      "sumWindowDt": 1.0000000000000004,
+      "tau_s": 0.00002,
+      "tauConfigured_s": 0.00002,
       "tauWindow_s": 0.001,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.00005,
+      "tauSelected_s": 0.00002,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3137,16 +3131,14 @@
       "K": 3.8e-30,
       "safetySigma_Jm3": 24,
       "applicabilityStatus": "PASS",
-      "reasonCode": [
-        "G4_QI_MARGIN_EXCEEDED"
-      ],
-      "rhoSource": "warp.metric.T00.natario.shift",
+      "reasonCode": [],
+      "rhoSource": "warp.metric.T00.natario_sdf.shift",
       "couplingMode": "shadow",
       "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -187466334759679000,
+      "rhoMetric_Jm3": -89888730.09553961,
       "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -93733167379839500,
-      "couplingResidualRel": 1,
+      "rhoCoupledShadow_Jm3": -44944366.32338355,
+      "couplingResidualRel": 0.9999999716179383,
       "couplingComparable": true,
       "quantitySemanticType": "ren_expectation_timelike_energy_density",
       "quantitySemanticBaseType": "classical_proxy_from_curvature",
@@ -3161,27 +3153,27 @@
       "qeiRenormalizationScheme": "point_splitting",
       "qeiSamplingNormalization": "unit_integral",
       "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario.shift",
+      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
       "metricT00Derivation": "forward_shift_to_K_to_rho_E",
       "metricT00ContractStatus": "ok",
       "metricT00Geom": null,
-      "metricT00Si_Jm3": -187466334759679000,
+      "metricT00Si_Jm3": -89888730.09553961,
       "metricT00SiFromGeom": null,
       "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -187466334759679000,
-      "metricStressRhoGeomMean_Geom": -1.5489813910683371e-27,
-      "metricStressKTraceMean": 6.972059287573196e-14,
-      "metricStressKSquaredMean": 8.27212640845792e-26,
+      "metricStressRhoSiMean_Jm3": -89888730.09553961,
+      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
+      "metricStressKTraceMean": 2.474459600646483e-18,
+      "metricStressKSquaredMean": 8.104627668767766e-35,
       "metricStressStep_m": 3.5828324597676766,
       "metricStressScale_m": 179.14162298838383,
       "metricStressSampleCount": 9,
-      "classificationTag": "margin_limited",
+      "classificationTag": "candidate_pass_found",
       "comparabilityClass": "comparable_canonical"
     },
     {
       "id": "case_0025",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3266,7 +3258,7 @@
     {
       "id": "case_0026",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3276,29 +3268,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.1,
+        "tau_s_ms": 0.05,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -26966506572958708,
-      "boundComputed_Jm3": -24.00000000000004,
-      "boundPolicyFloor_Jm3": -26966506572958708,
+      "lhs_Jm3": -3105018642199739.5,
+      "boundComputed_Jm3": -24.000000000000608,
+      "boundPolicyFloor_Jm3": -3105018642199739.5,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -26966506572958708,
-      "boundUsed_Jm3": -26966506572958708,
+      "boundFloor_Jm3": -3105018642199739.5,
+      "boundUsed_Jm3": -3105018642199739.5,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 1123604440539944.4,
-      "sumWindowDt": 1.0000000000000002,
-      "tau_s": 0.0001,
-      "tauConfigured_s": 0.0001,
+      "marginRatioRawComputed": 129375776758319.2,
+      "sumWindowDt": 0.9999999999999997,
+      "tau_s": 0.00005,
+      "tauConfigured_s": 0.00005,
       "tauWindow_s": 0.001,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0001,
+      "tauSelected_s": 0.00005,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3351,7 +3343,7 @@
     {
       "id": "case_0027",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3361,29 +3353,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.1,
+        "tau_s_ms": 0.05,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -26966506572958708,
-      "boundComputed_Jm3": -24.00000000000004,
-      "boundPolicyFloor_Jm3": -26966506572958708,
+      "lhs_Jm3": -3105018642199739.5,
+      "boundComputed_Jm3": -24.000000000000608,
+      "boundPolicyFloor_Jm3": -3105018642199739.5,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -26966506572958708,
-      "boundUsed_Jm3": -26966506572958708,
+      "boundFloor_Jm3": -3105018642199739.5,
+      "boundUsed_Jm3": -3105018642199739.5,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 1123604440539944.4,
-      "sumWindowDt": 1.0000000000000002,
-      "tau_s": 0.0001,
-      "tauConfigured_s": 0.0001,
+      "marginRatioRawComputed": 129375776758319.2,
+      "sumWindowDt": 0.9999999999999997,
+      "tau_s": 0.00005,
+      "tauConfigured_s": 0.00005,
       "tauWindow_s": 0.001,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0001,
+      "tauSelected_s": 0.00005,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3436,7 +3428,7 @@
     {
       "id": "case_0028",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3521,7 +3513,7 @@
     {
       "id": "case_0029",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3531,29 +3523,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.2,
+        "tau_s_ms": 0.1,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -91710446459758530,
-      "boundComputed_Jm3": -24.000000000000004,
-      "boundPolicyFloor_Jm3": -91710446459758530,
+      "lhs_Jm3": -26966506572958708,
+      "boundComputed_Jm3": -24.00000000000004,
+      "boundPolicyFloor_Jm3": -26966506572958708,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -91710446459758530,
-      "boundUsed_Jm3": -91710446459758530,
+      "boundFloor_Jm3": -26966506572958708,
+      "boundUsed_Jm3": -26966506572958708,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3821268602489938,
-      "sumWindowDt": 1.0000000000000007,
-      "tau_s": 0.0002,
-      "tauConfigured_s": 0.0002,
-      "tauWindow_s": 0.002,
+      "marginRatioRawComputed": 1123604440539944.4,
+      "sumWindowDt": 1.0000000000000002,
+      "tau_s": 0.0001,
+      "tauConfigured_s": 0.0001,
+      "tauWindow_s": 0.001,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0002,
+      "tauSelected_s": 0.0001,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3606,7 +3598,7 @@
     {
       "id": "case_0030",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3616,29 +3608,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.2,
+        "tau_s_ms": 0.1,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -91710446459758530,
-      "boundComputed_Jm3": -24.000000000000004,
-      "boundPolicyFloor_Jm3": -91710446459758530,
+      "lhs_Jm3": -26966506572958708,
+      "boundComputed_Jm3": -24.00000000000004,
+      "boundPolicyFloor_Jm3": -26966506572958708,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -91710446459758530,
-      "boundUsed_Jm3": -91710446459758530,
+      "boundFloor_Jm3": -26966506572958708,
+      "boundUsed_Jm3": -26966506572958708,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3821268602489938,
-      "sumWindowDt": 1.0000000000000007,
-      "tau_s": 0.0002,
-      "tauConfigured_s": 0.0002,
-      "tauWindow_s": 0.002,
+      "marginRatioRawComputed": 1123604440539944.4,
+      "sumWindowDt": 1.0000000000000002,
+      "tau_s": 0.0001,
+      "tauConfigured_s": 0.0001,
+      "tauWindow_s": 0.001,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0002,
+      "tauSelected_s": 0.0001,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3691,7 +3683,7 @@
     {
       "id": "case_0031",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3776,7 +3768,7 @@
     {
       "id": "case_0032",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3786,29 +3778,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.5,
+        "tau_s_ms": 0.2,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -75267799924777260,
-      "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -75267799924777260,
+      "lhs_Jm3": -91710446459758530,
+      "boundComputed_Jm3": -24.000000000000004,
+      "boundPolicyFloor_Jm3": -91710446459758530,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -75267799924777260,
-      "boundUsed_Jm3": -75267799924777260,
+      "boundFloor_Jm3": -91710446459758530,
+      "boundUsed_Jm3": -91710446459758530,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3136158330199052.5,
-      "sumWindowDt": 0.9999999999999998,
-      "tau_s": 0.0005,
-      "tauConfigured_s": 0.0005,
-      "tauWindow_s": 0.004,
+      "marginRatioRawComputed": 3821268602489938,
+      "sumWindowDt": 1.0000000000000007,
+      "tau_s": 0.0002,
+      "tauConfigured_s": 0.0002,
+      "tauWindow_s": 0.002,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0005,
+      "tauSelected_s": 0.0002,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3861,7 +3853,7 @@
     {
       "id": "case_0033",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -3871,29 +3863,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 0.5,
+        "tau_s_ms": 0.2,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -75267799924777260,
-      "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -75267799924777260,
+      "lhs_Jm3": -91710446459758530,
+      "boundComputed_Jm3": -24.000000000000004,
+      "boundPolicyFloor_Jm3": -91710446459758530,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -75267799924777260,
-      "boundUsed_Jm3": -75267799924777260,
+      "boundFloor_Jm3": -91710446459758530,
+      "boundUsed_Jm3": -91710446459758530,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3136158330199052.5,
-      "sumWindowDt": 0.9999999999999998,
-      "tau_s": 0.0005,
-      "tauConfigured_s": 0.0005,
-      "tauWindow_s": 0.004,
+      "marginRatioRawComputed": 3821268602489938,
+      "sumWindowDt": 1.0000000000000007,
+      "tau_s": 0.0002,
+      "tauConfigured_s": 0.0002,
+      "tauWindow_s": 0.002,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0005,
+      "tauSelected_s": 0.0002,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -3946,7 +3938,7 @@
     {
       "id": "case_0034",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4031,7 +4023,7 @@
     {
       "id": "case_0035",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4041,29 +4033,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 1,
+        "tau_s_ms": 0.5,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74985850399724020,
+      "lhs_Jm3": -75267799924777260,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74985850399724020,
+      "boundPolicyFloor_Jm3": -75267799924777260,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74985850399724020,
-      "boundUsed_Jm3": -74985850399724020,
+      "boundFloor_Jm3": -75267799924777260,
+      "boundUsed_Jm3": -75267799924777260,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124410433321834,
-      "sumWindowDt": 0.9999999999999992,
-      "tau_s": 0.001,
-      "tauConfigured_s": 0.001,
-      "tauWindow_s": 0.008,
+      "marginRatioRawComputed": 3136158330199052.5,
+      "sumWindowDt": 0.9999999999999998,
+      "tau_s": 0.0005,
+      "tauConfigured_s": 0.0005,
+      "tauWindow_s": 0.004,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.001,
+      "tauSelected_s": 0.0005,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4116,7 +4108,7 @@
     {
       "id": "case_0036",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4126,29 +4118,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 1,
+        "tau_s_ms": 0.5,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74985850399724020,
+      "lhs_Jm3": -75267799924777260,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74985850399724020,
+      "boundPolicyFloor_Jm3": -75267799924777260,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74985850399724020,
-      "boundUsed_Jm3": -74985850399724020,
+      "boundFloor_Jm3": -75267799924777260,
+      "boundUsed_Jm3": -75267799924777260,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124410433321834,
-      "sumWindowDt": 0.9999999999999992,
-      "tau_s": 0.001,
-      "tauConfigured_s": 0.001,
-      "tauWindow_s": 0.008,
+      "marginRatioRawComputed": 3136158330199052.5,
+      "sumWindowDt": 0.9999999999999998,
+      "tau_s": 0.0005,
+      "tauConfigured_s": 0.0005,
+      "tauWindow_s": 0.004,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.001,
+      "tauSelected_s": 0.0005,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4201,7 +4193,7 @@
     {
       "id": "case_0037",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4286,7 +4278,7 @@
     {
       "id": "case_0038",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4296,29 +4288,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 2,
+        "tau_s_ms": 1,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74986315532420880,
+      "lhs_Jm3": -74985850399724020,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74986315532420880,
+      "boundPolicyFloor_Jm3": -74985850399724020,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986315532420880,
-      "boundUsed_Jm3": -74986315532420880,
+      "boundFloor_Jm3": -74985850399724020,
+      "boundUsed_Jm3": -74985850399724020,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124429813850870,
-      "sumWindowDt": 0.9999999999999987,
-      "tau_s": 0.002,
-      "tauConfigured_s": 0.002,
-      "tauWindow_s": 0.016,
+      "marginRatioRawComputed": 3124410433321834,
+      "sumWindowDt": 0.9999999999999992,
+      "tau_s": 0.001,
+      "tauConfigured_s": 0.001,
+      "tauWindow_s": 0.008,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.002,
+      "tauSelected_s": 0.001,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4371,7 +4363,7 @@
     {
       "id": "case_0039",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4381,29 +4373,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 2,
+        "tau_s_ms": 1,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74986315532420880,
+      "lhs_Jm3": -74985850399724020,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74986315532420880,
+      "boundPolicyFloor_Jm3": -74985850399724020,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986315532420880,
-      "boundUsed_Jm3": -74986315532420880,
+      "boundFloor_Jm3": -74985850399724020,
+      "boundUsed_Jm3": -74985850399724020,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124429813850870,
-      "sumWindowDt": 0.9999999999999987,
-      "tau_s": 0.002,
-      "tauConfigured_s": 0.002,
-      "tauWindow_s": 0.016,
+      "marginRatioRawComputed": 3124410433321834,
+      "sumWindowDt": 0.9999999999999992,
+      "tau_s": 0.001,
+      "tauConfigured_s": 0.001,
+      "tauWindow_s": 0.008,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.002,
+      "tauSelected_s": 0.001,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4456,7 +4448,7 @@
     {
       "id": "case_0040",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4541,7 +4533,7 @@
     {
       "id": "case_0041",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4551,29 +4543,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 5,
+        "tau_s_ms": 2,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74986496303036860,
+      "lhs_Jm3": -74986315532420880,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74986496303036860,
+      "boundPolicyFloor_Jm3": -74986315532420880,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986496303036860,
-      "boundUsed_Jm3": -74986496303036860,
+      "boundFloor_Jm3": -74986315532420880,
+      "boundUsed_Jm3": -74986315532420880,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124437345959869.5,
-      "sumWindowDt": 1.0000000000000029,
-      "tau_s": 0.005,
-      "tauConfigured_s": 0.005,
-      "tauWindow_s": 0.04,
+      "marginRatioRawComputed": 3124429813850870,
+      "sumWindowDt": 0.9999999999999987,
+      "tau_s": 0.002,
+      "tauConfigured_s": 0.002,
+      "tauWindow_s": 0.016,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.005,
+      "tauSelected_s": 0.002,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4626,7 +4618,7 @@
     {
       "id": "case_0042",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4636,29 +4628,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 5,
+        "tau_s_ms": 2,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74986496303036860,
+      "lhs_Jm3": -74986315532420880,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74986496303036860,
+      "boundPolicyFloor_Jm3": -74986315532420880,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986496303036860,
-      "boundUsed_Jm3": -74986496303036860,
+      "boundFloor_Jm3": -74986315532420880,
+      "boundUsed_Jm3": -74986315532420880,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124437345959869.5,
-      "sumWindowDt": 1.0000000000000029,
-      "tau_s": 0.005,
-      "tauConfigured_s": 0.005,
-      "tauWindow_s": 0.04,
+      "marginRatioRawComputed": 3124429813850870,
+      "sumWindowDt": 0.9999999999999987,
+      "tau_s": 0.002,
+      "tauConfigured_s": 0.002,
+      "tauWindow_s": 0.016,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.005,
+      "tauSelected_s": 0.002,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4711,7 +4703,7 @@
     {
       "id": "case_0043",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4796,7 +4788,7 @@
     {
       "id": "case_0044",
       "params": {
-        "warpFieldType": "natario",
+        "warpFieldType": "lentz",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4806,29 +4798,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 8,
+        "tau_s_ms": 5,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74986519088820720,
+      "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74986519088820720,
+      "boundPolicyFloor_Jm3": -74986496303036860,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986519088820720,
-      "boundUsed_Jm3": -74986519088820720,
+      "boundFloor_Jm3": -74986496303036860,
+      "boundUsed_Jm3": -74986496303036860,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124438295367530,
-      "sumWindowDt": 1.0000000000000033,
-      "tau_s": 0.008,
-      "tauConfigured_s": 0.008,
-      "tauWindow_s": 0.064,
+      "marginRatioRawComputed": 3124437345959869.5,
+      "sumWindowDt": 1.0000000000000029,
+      "tau_s": 0.005,
+      "tauConfigured_s": 0.005,
+      "tauWindow_s": 0.04,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.008,
+      "tauSelected_s": 0.005,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4881,7 +4873,7 @@
     {
       "id": "case_0045",
       "params": {
-        "warpFieldType": "lentz",
+        "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -4891,29 +4883,29 @@
         "fieldType": "em",
         "qCavity": 100000,
         "qSpoilingFactor": 3,
-        "tau_s_ms": 8,
+        "tau_s_ms": 5,
         "gap_nm": 8,
         "shipRadius_m": 2,
         "dutyShip": 0.12,
         "dutyEffective_FR": 0.12
       },
-      "lhs_Jm3": -74986519088820720,
+      "lhs_Jm3": -74986496303036860,
       "boundComputed_Jm3": -24,
-      "boundPolicyFloor_Jm3": -74986519088820720,
+      "boundPolicyFloor_Jm3": -74986496303036860,
       "boundEnvFloor_Jm3": null,
       "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986519088820720,
-      "boundUsed_Jm3": -74986519088820720,
+      "boundFloor_Jm3": -74986496303036860,
+      "boundUsed_Jm3": -74986496303036860,
       "boundFloorApplied": true,
       "marginRatioRaw": 1,
-      "marginRatioRawComputed": 3124438295367530,
-      "sumWindowDt": 1.0000000000000033,
-      "tau_s": 0.008,
-      "tauConfigured_s": 0.008,
-      "tauWindow_s": 0.064,
+      "marginRatioRawComputed": 3124437345959869.5,
+      "sumWindowDt": 1.0000000000000029,
+      "tau_s": 0.005,
+      "tauConfigured_s": 0.005,
+      "tauWindow_s": 0.04,
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.008,
+      "tauSelected_s": 0.005,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,
@@ -4966,7 +4958,7 @@
     {
       "id": "case_0046",
       "params": {
-        "warpFieldType": "bobrick_martire",
+        "warpFieldType": "natario",
         "gammaGeo": 1,
         "dutyCycle": 0.12,
         "sectorCount": 80,
@@ -5051,6 +5043,176 @@
     {
       "id": "case_0047",
       "params": {
+        "warpFieldType": "lentz",
+        "gammaGeo": 1,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 8,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
+      },
+      "lhs_Jm3": -74986519088820720,
+      "boundComputed_Jm3": -24,
+      "boundPolicyFloor_Jm3": -74986519088820720,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18.000000000018126,
+      "boundFloor_Jm3": -74986519088820720,
+      "boundUsed_Jm3": -74986519088820720,
+      "boundFloorApplied": true,
+      "marginRatioRaw": 1,
+      "marginRatioRawComputed": 3124438295367530,
+      "sumWindowDt": 1.0000000000000033,
+      "tau_s": 0.008,
+      "tauConfigured_s": 0.008,
+      "tauWindow_s": 0.064,
+      "tauPulse_s": 6.717980877290783e-8,
+      "tauLC_s": 0.000003358990438645391,
+      "tauSelected_s": 0.008,
+      "tauSelectedSource": "configured",
+      "tauSelectorPolicy": "configured",
+      "tauSelectorFallbackApplied": false,
+      "tauProvenanceReady": true,
+      "tauProvenanceMissing": "",
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [
+        "G4_QI_MARGIN_EXCEEDED"
+      ],
+      "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": true,
+      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": true,
+      "quantitySemanticBridgeMissing": "",
+      "qeiStateClass": "hadamard",
+      "qeiRenormalizationScheme": "point_splitting",
+      "qeiSamplingNormalization": "unit_integral",
+      "qeiOperatorMapping": "t_munu_uu_ren",
+      "metricT00Ref": "warp.metric.T00.natario.shift",
+      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
+      "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
+      "metricT00Si_Jm3": -187466334759679000,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
+      "metricStressRhoSiMean_Jm3": -187466334759679000,
+      "metricStressRhoGeomMean_Geom": -1.5489813910683371e-27,
+      "metricStressKTraceMean": 6.972059287573196e-14,
+      "metricStressKSquaredMean": 8.27212640845792e-26,
+      "metricStressStep_m": 3.5828324597676766,
+      "metricStressScale_m": 179.14162298838383,
+      "metricStressSampleCount": 9,
+      "classificationTag": "margin_limited",
+      "comparabilityClass": "comparable_canonical"
+    },
+    {
+      "id": "case_0048",
+      "params": {
+        "warpFieldType": "bobrick_martire",
+        "gammaGeo": 1,
+        "dutyCycle": 0.12,
+        "sectorCount": 80,
+        "concurrentSectors": 2,
+        "gammaVanDenBroeck": 500,
+        "sampler": "hann",
+        "fieldType": "em",
+        "qCavity": 100000,
+        "qSpoilingFactor": 3,
+        "tau_s_ms": 8,
+        "gap_nm": 8,
+        "shipRadius_m": 2,
+        "dutyShip": 0.12,
+        "dutyEffective_FR": 0.12
+      },
+      "lhs_Jm3": -74986519088820720,
+      "boundComputed_Jm3": -24,
+      "boundPolicyFloor_Jm3": -74986519088820720,
+      "boundEnvFloor_Jm3": null,
+      "boundDefaultFloor_Jm3": -18.000000000018126,
+      "boundFloor_Jm3": -74986519088820720,
+      "boundUsed_Jm3": -74986519088820720,
+      "boundFloorApplied": true,
+      "marginRatioRaw": 1,
+      "marginRatioRawComputed": 3124438295367530,
+      "sumWindowDt": 1.0000000000000033,
+      "tau_s": 0.008,
+      "tauConfigured_s": 0.008,
+      "tauWindow_s": 0.064,
+      "tauPulse_s": 6.717980877290783e-8,
+      "tauLC_s": 0.000003358990438645391,
+      "tauSelected_s": 0.008,
+      "tauSelectedSource": "configured",
+      "tauSelectorPolicy": "configured",
+      "tauSelectorFallbackApplied": false,
+      "tauProvenanceReady": true,
+      "tauProvenanceMissing": "",
+      "K": 3.8e-30,
+      "safetySigma_Jm3": 24,
+      "applicabilityStatus": "PASS",
+      "reasonCode": [
+        "G4_QI_MARGIN_EXCEEDED"
+      ],
+      "rhoSource": "warp.metric.T00.natario.shift",
+      "couplingMode": "shadow",
+      "couplingAlpha": 0.5,
+      "rhoMetric_Jm3": -187466334759679000,
+      "rhoProxy_Jm3": -2.5512274856810015,
+      "rhoCoupledShadow_Jm3": -93733167379839500,
+      "couplingResidualRel": 1,
+      "couplingComparable": true,
+      "quantitySemanticType": "ren_expectation_timelike_energy_density",
+      "quantitySemanticBaseType": "classical_proxy_from_curvature",
+      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
+      "quantityWorldlineClass": "timelike",
+      "quantitySemanticComparable": true,
+      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
+      "quantitySemanticBridgeMode": "strict_evidence_gated",
+      "quantitySemanticBridgeReady": true,
+      "quantitySemanticBridgeMissing": "",
+      "qeiStateClass": "hadamard",
+      "qeiRenormalizationScheme": "point_splitting",
+      "qeiSamplingNormalization": "unit_integral",
+      "qeiOperatorMapping": "t_munu_uu_ren",
+      "metricT00Ref": "warp.metric.T00.natario.shift",
+      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
+      "metricT00ContractStatus": "ok",
+      "metricT00Geom": null,
+      "metricT00Si_Jm3": -187466334759679000,
+      "metricT00SiFromGeom": null,
+      "metricT00SiRelError": null,
+      "metricStressRhoSiMean_Jm3": -187466334759679000,
+      "metricStressRhoGeomMean_Geom": -1.5489813910683371e-27,
+      "metricStressKTraceMean": 6.972059287573196e-14,
+      "metricStressKSquaredMean": 8.27212640845792e-26,
+      "metricStressStep_m": 3.5828324597676766,
+      "metricStressScale_m": 179.14162298838383,
+      "metricStressSampleCount": 9,
+      "classificationTag": "margin_limited",
+      "comparabilityClass": "comparable_canonical"
+    },
+    {
+      "id": "case_0049",
+      "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
         "dutyCycle": 0.02,
@@ -5134,7 +5296,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0048",
+      "id": "case_0050",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 12,
@@ -5219,7 +5381,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0049",
+      "id": "case_0051",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 120,
@@ -5304,7 +5466,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0050",
+      "id": "case_0052",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 12,
@@ -5389,7 +5551,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0051",
+      "id": "case_0053",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 120,
@@ -5474,7 +5636,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0052",
+      "id": "case_0054",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 4,
@@ -5559,7 +5721,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0053",
+      "id": "case_0055",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 120,
@@ -5644,7 +5806,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0054",
+      "id": "case_0056",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 4,
@@ -5729,7 +5891,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0055",
+      "id": "case_0057",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 48,
@@ -5814,7 +5976,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0056",
+      "id": "case_0058",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 4,
@@ -5899,7 +6061,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0057",
+      "id": "case_0059",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 48,
@@ -5984,7 +6146,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0058",
+      "id": "case_0060",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 4,
@@ -6069,7 +6231,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0059",
+      "id": "case_0061",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 48,
@@ -6154,7 +6316,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0060",
+      "id": "case_0062",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
@@ -6239,7 +6401,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0061",
+      "id": "case_0063",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 48,
@@ -6324,7 +6486,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0062",
+      "id": "case_0064",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 1,
@@ -6409,7 +6571,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0063",
+      "id": "case_0065",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 12,
@@ -6494,7 +6656,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0064",
+      "id": "case_0066",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
@@ -6579,7 +6741,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0065",
+      "id": "case_0067",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -6664,7 +6826,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0066",
+      "id": "case_0068",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 120,
@@ -6749,7 +6911,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0067",
+      "id": "case_0069",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 12,
@@ -6834,7 +6996,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0068",
+      "id": "case_0070",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 120,
@@ -6919,7 +7081,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0069",
+      "id": "case_0071",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 12,
@@ -7004,7 +7166,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0070",
+      "id": "case_0072",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 120,
@@ -7089,7 +7251,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0071",
+      "id": "case_0073",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 4,
@@ -7174,7 +7336,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0072",
+      "id": "case_0074",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 120,
@@ -7259,7 +7421,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0073",
+      "id": "case_0075",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 4,
@@ -7344,7 +7506,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0074",
+      "id": "case_0076",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 48,
@@ -7429,7 +7591,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0075",
+      "id": "case_0077",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 4,
@@ -7514,7 +7676,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0076",
+      "id": "case_0078",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 48,
@@ -7599,7 +7761,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0077",
+      "id": "case_0079",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
@@ -7684,7 +7846,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0078",
+      "id": "case_0080",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 48,
@@ -7769,7 +7931,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0079",
+      "id": "case_0081",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 1,
@@ -7854,7 +8016,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0080",
+      "id": "case_0082",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 48,
@@ -7939,7 +8101,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0081",
+      "id": "case_0083",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
@@ -8024,7 +8186,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0082",
+      "id": "case_0084",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 12,
@@ -8109,7 +8271,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0083",
+      "id": "case_0085",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 1,
@@ -8194,7 +8356,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0084",
+      "id": "case_0086",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 12,
@@ -8279,7 +8441,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0085",
+      "id": "case_0087",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 120,
@@ -8364,7 +8526,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0086",
+      "id": "case_0088",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -8449,7 +8611,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0087",
+      "id": "case_0089",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 120,
@@ -8534,7 +8696,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0088",
+      "id": "case_0090",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 4,
@@ -8619,7 +8781,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0089",
+      "id": "case_0091",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 120,
@@ -8704,7 +8866,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0090",
+      "id": "case_0092",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 4,
@@ -8789,7 +8951,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0091",
+      "id": "case_0093",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 120,
@@ -8874,7 +9036,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0092",
+      "id": "case_0094",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 4,
@@ -8959,7 +9121,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0093",
+      "id": "case_0095",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 48,
@@ -9044,7 +9206,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0094",
+      "id": "case_0096",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 4,
@@ -9129,7 +9291,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0095",
+      "id": "case_0097",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 48,
@@ -9214,7 +9376,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0096",
+      "id": "case_0098",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 1,
@@ -9299,7 +9461,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0097",
+      "id": "case_0099",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 48,
@@ -9384,7 +9546,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0098",
+      "id": "case_0100",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
@@ -9469,7 +9631,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0099",
+      "id": "case_0101",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -9554,7 +9716,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0100",
+      "id": "case_0102",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 1,
@@ -9639,7 +9801,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0101",
+      "id": "case_0103",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 12,
@@ -9724,7 +9886,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0102",
+      "id": "case_0104",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
@@ -9809,7 +9971,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0103",
+      "id": "case_0105",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 12,
@@ -9894,7 +10056,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0104",
+      "id": "case_0106",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 120,
@@ -9979,7 +10141,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0105",
+      "id": "case_0107",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 12,
@@ -10064,7 +10226,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0106",
+      "id": "case_0108",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 120,
@@ -10149,7 +10311,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0107",
+      "id": "case_0109",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 4,
@@ -10234,7 +10396,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0108",
+      "id": "case_0110",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 120,
@@ -10319,7 +10481,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0109",
+      "id": "case_0111",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 4,
@@ -10404,7 +10566,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0110",
+      "id": "case_0112",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 48,
@@ -10489,7 +10651,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0111",
+      "id": "case_0113",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 4,
@@ -10574,7 +10736,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0112",
+      "id": "case_0114",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 48,
@@ -10659,7 +10821,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0113",
+      "id": "case_0115",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 1,
@@ -10744,7 +10906,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0114",
+      "id": "case_0116",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 48,
@@ -10829,7 +10991,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0115",
+      "id": "case_0117",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
@@ -10914,7 +11076,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0116",
+      "id": "case_0118",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 48,
@@ -10999,7 +11161,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0117",
+      "id": "case_0119",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 1,
@@ -11084,7 +11246,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0118",
+      "id": "case_0120",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 12,
@@ -11169,7 +11331,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0119",
+      "id": "case_0121",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
@@ -11254,7 +11416,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0120",
+      "id": "case_0122",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -11339,7 +11501,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0121",
+      "id": "case_0123",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 120,
@@ -11424,7 +11586,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0122",
+      "id": "case_0124",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 12,
@@ -11509,7 +11671,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0123",
+      "id": "case_0125",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 120,
@@ -11594,7 +11756,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0124",
+      "id": "case_0126",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 4,
@@ -11679,7 +11841,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0125",
+      "id": "case_0127",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 120,
@@ -11764,7 +11926,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0126",
+      "id": "case_0128",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 4,
@@ -11849,7 +12011,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0127",
+      "id": "case_0129",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 120,
@@ -11934,7 +12096,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0128",
+      "id": "case_0130",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 4,
@@ -12019,7 +12181,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0129",
+      "id": "case_0131",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 48,
@@ -12104,7 +12266,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0130",
+      "id": "case_0132",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 4,
@@ -12189,7 +12351,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0131",
+      "id": "case_0133",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 48,
@@ -12274,7 +12436,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0132",
+      "id": "case_0134",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
@@ -12359,7 +12521,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0133",
+      "id": "case_0135",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 48,
@@ -12442,7 +12604,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0134",
+      "id": "case_0136",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 1,
@@ -12527,7 +12689,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0135",
+      "id": "case_0137",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 12,
@@ -12612,7 +12774,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0136",
+      "id": "case_0138",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 1,
@@ -12695,7 +12857,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0137",
+      "id": "case_0139",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 12,
@@ -12780,7 +12942,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0138",
+      "id": "case_0140",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 1,
@@ -12865,7 +13027,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0139",
+      "id": "case_0141",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 12,
@@ -12950,7 +13112,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0140",
+      "id": "case_0142",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 120,
@@ -13035,7 +13197,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0141",
+      "id": "case_0143",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -13120,7 +13282,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0142",
+      "id": "case_0144",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 120,
@@ -13205,7 +13367,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0143",
+      "id": "case_0145",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 4,
@@ -13290,7 +13452,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0144",
+      "id": "case_0146",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 120,
@@ -13375,7 +13537,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0145",
+      "id": "case_0147",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 4,
@@ -13460,7 +13622,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0146",
+      "id": "case_0148",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 48,
@@ -13545,7 +13707,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0147",
+      "id": "case_0149",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 4,
@@ -13630,7 +13792,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0148",
+      "id": "case_0150",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 48,
@@ -13715,7 +13877,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0149",
+      "id": "case_0151",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 4,
@@ -13800,7 +13962,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0150",
+      "id": "case_0152",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 48,
@@ -13885,7 +14047,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0151",
+      "id": "case_0153",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 1,
@@ -13970,7 +14132,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0152",
+      "id": "case_0154",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 48,
@@ -14055,7 +14217,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0153",
+      "id": "case_0155",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 1,
@@ -14140,7 +14302,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0154",
+      "id": "case_0156",
       "params": {
         "warpFieldType": "natario_sdf",
         "gammaGeo": 12,
@@ -14225,7 +14387,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0155",
+      "id": "case_0157",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 1,
@@ -14310,7 +14472,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0156",
+      "id": "case_0158",
       "params": {
         "warpFieldType": "lentz",
         "gammaGeo": 12,
@@ -14395,7 +14557,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0157",
+      "id": "case_0159",
       "params": {
         "warpFieldType": "natario",
         "gammaGeo": 120,
@@ -14480,7 +14642,7 @@
       "comparabilityClass": "comparable_canonical"
     },
     {
-      "id": "case_0158",
+      "id": "case_0160",
       "params": {
         "warpFieldType": "bobrick_martire",
         "gammaGeo": 12,
@@ -14515,176 +14677,6 @@
       "tauPulse_s": 6.717980877290783e-8,
       "tauLC_s": 0.000003358990438645391,
       "tauSelected_s": 0.005,
-      "tauSelectedSource": "configured",
-      "tauSelectorPolicy": "configured",
-      "tauSelectorFallbackApplied": false,
-      "tauProvenanceReady": true,
-      "tauProvenanceMissing": "",
-      "K": 2.4e-30,
-      "safetySigma_Jm3": 14,
-      "applicabilityStatus": "PASS",
-      "reasonCode": [
-        "G4_QI_MARGIN_EXCEEDED"
-      ],
-      "rhoSource": "warp.metric.T00.natario.shift",
-      "couplingMode": "shadow",
-      "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -187466334759679000,
-      "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -93733167379839500,
-      "couplingResidualRel": 1,
-      "couplingComparable": true,
-      "quantitySemanticType": "ren_expectation_timelike_energy_density",
-      "quantitySemanticBaseType": "classical_proxy_from_curvature",
-      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
-      "quantityWorldlineClass": "timelike",
-      "quantitySemanticComparable": true,
-      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
-      "quantitySemanticBridgeMode": "strict_evidence_gated",
-      "quantitySemanticBridgeReady": true,
-      "quantitySemanticBridgeMissing": "",
-      "qeiStateClass": "hadamard",
-      "qeiRenormalizationScheme": "point_splitting",
-      "qeiSamplingNormalization": "unit_integral",
-      "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario.shift",
-      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
-      "metricT00ContractStatus": "ok",
-      "metricT00Geom": null,
-      "metricT00Si_Jm3": -187466334759679000,
-      "metricT00SiFromGeom": null,
-      "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -187466334759679000,
-      "metricStressRhoGeomMean_Geom": -1.5489813910683371e-27,
-      "metricStressKTraceMean": 6.972059287573196e-14,
-      "metricStressKSquaredMean": 8.27212640845792e-26,
-      "metricStressStep_m": 3.5828324597676766,
-      "metricStressScale_m": 179.14162298838383,
-      "metricStressSampleCount": 9,
-      "classificationTag": "margin_limited",
-      "comparabilityClass": "comparable_canonical"
-    },
-    {
-      "id": "case_0159",
-      "params": {
-        "warpFieldType": "natario_sdf",
-        "gammaGeo": 120,
-        "dutyCycle": 0.12,
-        "sectorCount": 400,
-        "concurrentSectors": 1,
-        "gammaVanDenBroeck": 1.5,
-        "sampler": "boxcar",
-        "fieldType": "em",
-        "qCavity": 100000,
-        "qSpoilingFactor": 1.5,
-        "tau_s_ms": 0.1,
-        "gap_nm": 5,
-        "shipRadius_m": 10,
-        "dutyShip": 0.12,
-        "dutyEffective_FR": 0.12
-      },
-      "lhs_Jm3": -13990555.544232972,
-      "boundComputed_Jm3": -24.00000000000004,
-      "boundPolicyFloor_Jm3": -13990555.544232972,
-      "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -13990555.544232972,
-      "boundUsed_Jm3": -13990555.544232972,
-      "boundFloorApplied": true,
-      "marginRatioRaw": 1,
-      "marginRatioRawComputed": 582939.8143430395,
-      "sumWindowDt": 1.0000000000000016,
-      "tau_s": 0.0001,
-      "tauConfigured_s": 0.0001,
-      "tauWindow_s": 0.001,
-      "tauPulse_s": 6.717980877290783e-8,
-      "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.0001,
-      "tauSelectedSource": "configured",
-      "tauSelectorPolicy": "configured",
-      "tauSelectorFallbackApplied": false,
-      "tauProvenanceReady": true,
-      "tauProvenanceMissing": "",
-      "K": 3.8e-30,
-      "safetySigma_Jm3": 24,
-      "applicabilityStatus": "PASS",
-      "reasonCode": [
-        "G4_QI_MARGIN_EXCEEDED"
-      ],
-      "rhoSource": "warp.metric.T00.natario_sdf.shift",
-      "couplingMode": "shadow",
-      "couplingAlpha": 0.5,
-      "rhoMetric_Jm3": -89888730.09553961,
-      "rhoProxy_Jm3": -2.5512274856810015,
-      "rhoCoupledShadow_Jm3": -44944366.32338355,
-      "couplingResidualRel": 0.9999999716179383,
-      "couplingComparable": true,
-      "quantitySemanticType": "ren_expectation_timelike_energy_density",
-      "quantitySemanticBaseType": "classical_proxy_from_curvature",
-      "quantitySemanticTargetType": "ren_expectation_timelike_energy_density",
-      "quantityWorldlineClass": "timelike",
-      "quantitySemanticComparable": true,
-      "quantitySemanticReason": "semantic_parity_qei_timelike_ren",
-      "quantitySemanticBridgeMode": "strict_evidence_gated",
-      "quantitySemanticBridgeReady": true,
-      "quantitySemanticBridgeMissing": "",
-      "qeiStateClass": "hadamard",
-      "qeiRenormalizationScheme": "point_splitting",
-      "qeiSamplingNormalization": "unit_integral",
-      "qeiOperatorMapping": "t_munu_uu_ren",
-      "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
-      "metricT00Derivation": "forward_shift_to_K_to_rho_E",
-      "metricT00ContractStatus": "ok",
-      "metricT00Geom": null,
-      "metricT00Si_Jm3": -89888730.09553961,
-      "metricT00SiFromGeom": null,
-      "metricT00SiRelError": null,
-      "metricStressRhoSiMean_Jm3": -89888730.09553961,
-      "metricStressRhoGeomMean_Geom": -7.42725195770471e-37,
-      "metricStressKTraceMean": 2.474459600646483e-18,
-      "metricStressKSquaredMean": 8.104627668767766e-35,
-      "metricStressStep_m": 3.5828324597676766,
-      "metricStressScale_m": 179.14162298838383,
-      "metricStressSampleCount": 9,
-      "classificationTag": "margin_limited",
-      "comparabilityClass": "comparable_canonical"
-    },
-    {
-      "id": "case_0160",
-      "params": {
-        "warpFieldType": "natario",
-        "gammaGeo": 12,
-        "dutyCycle": 0.02,
-        "sectorCount": 80,
-        "concurrentSectors": 2,
-        "gammaVanDenBroeck": 0.8,
-        "sampler": "hann",
-        "fieldType": "scalar",
-        "qCavity": 100000,
-        "qSpoilingFactor": 1,
-        "tau_s_ms": 35,
-        "gap_nm": 0.4,
-        "shipRadius_m": 40,
-        "dutyShip": 0.02,
-        "dutyEffective_FR": 0.02
-      },
-      "lhs_Jm3": -74986533125787380,
-      "boundComputed_Jm3": -14,
-      "boundPolicyFloor_Jm3": -74986533125787380,
-      "boundEnvFloor_Jm3": null,
-      "boundDefaultFloor_Jm3": -18.000000000018126,
-      "boundFloor_Jm3": -74986533125787380,
-      "boundUsed_Jm3": -74986533125787380,
-      "boundFloorApplied": true,
-      "marginRatioRaw": 1,
-      "marginRatioRawComputed": 5356180937556241,
-      "sumWindowDt": 1.0000000000000073,
-      "tau_s": 0.035,
-      "tauConfigured_s": 0.035,
-      "tauWindow_s": 0.28,
-      "tauPulse_s": 6.717980877290783e-8,
-      "tauLC_s": 0.000003358990438645391,
-      "tauSelected_s": 0.035,
       "tauSelectedSource": "configured",
       "tauSelectorPolicy": "configured",
       "tauSelectorFallbackApplied": false,

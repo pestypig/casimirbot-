@@ -1,0 +1,7 @@
+{
+  "method": "paired_dual_instrument_covariance_measured",
+  "k": 2,
+  "u_common_nm": 0.10,
+  "rho_sem_ellip": 0.35,
+  "covariance_sem_ellip_nm2": 0.012
+}

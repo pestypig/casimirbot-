@@ -5,6 +5,11 @@ server/public
 vite.config.ts.*
 *.tar.gz
 data/
+!docs/specs/data/
+!docs/specs/data/qcd-hepdata-record-159491.v1.json
+!docs/specs/data/qcd-hepdata-table-159491-t3.v1.json
+!docs/specs/data/qcd-hepdata-table-159491-t4.v1.json
+!docs/specs/data/qcd-hepdata-table-159491-t5.v1.json
 !external/audiocraft/audiocraft/data/
 !external/audiocraft/audiocraft/data/**
 !data/noisegen/

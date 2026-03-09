@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e",
-  "headCommitHash": "36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e",
+  "commitHash": "6450f41e802e97c5fed02ba097723c00cf49152e",
+  "headCommitHash": "6450f41e802e97c5fed02ba097723c00cf49152e",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -67,7 +67,7 @@
   },
   "recoverySearch": {
     "artifactPath": "artifacts/research/full-solve/g4-recovery-search-2026-02-27.json",
-    "artifactDate": "2026-03-02",
+    "artifactDate": "2026-03-07",
     "caseCount": 160,
     "candidatePassFound": true,
     "candidatePassFoundCanonical": true,
@@ -167,7 +167,7 @@
   },
   "couplingAblation": {
     "artifactPath": "artifacts/research/full-solve/g4-coupling-ablation-2026-02-27.json",
-    "artifactDate": "2026-03-02",
+    "artifactDate": "2026-03-07",
     "analysisMode": "canonical_comparable",
     "baselineCaseId": "case_0001",
     "baselineMarginRatioRawComputed": 0.12890679702998564,
@@ -177,28 +177,28 @@
       {
         "field": "metricStressRhoSiMean_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.018512698345788215,
+        "slopeToMarginRatioRawComputed": -0.018422079157393162,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "metricT00Si_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.018512698345788215,
+        "slopeToMarginRatioRawComputed": -0.018422079157393162,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "rhoCoupledShadow_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.03702539669157643,
+        "slopeToMarginRatioRawComputed": -0.036844158314786324,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "rhoMetric_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.018512698345788215,
+        "slopeToMarginRatioRawComputed": -0.018422079157393162,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },

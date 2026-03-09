@@ -53,6 +53,14 @@ type SemEllipsPairedEvidence = {
   covarianceAnchorPresent?: boolean;
   pairedRunId?: string;
   sourceClass?: string;
+  provenance?: {
+    data_origin?: string | null;
+    instrument_run_ids?: string[] | null;
+    raw_artifact_refs?: string[] | null;
+    raw_artifact_sha256?: Record<string, string> | null;
+    operator_id?: string | null;
+    acquisition_date_utc?: string | null;
+  };
   uncertainty?: {
     method?: string;
     u_sem_nm?: number;
@@ -94,6 +102,8 @@ const finiteOrNull = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+const isSha256Hex = (value: string): boolean => /^[a-f0-9]{64}$/i.test(value);
+
 const unique = <T>(values: T[]): T[] => [...new Set(values)];
 
 const resolveReportableUnlock = (
@@ -103,6 +113,10 @@ const resolveReportableUnlock = (
   blockedReasons: string[];
   method: string;
   pairedRunId: string | null;
+  dataOrigin: string | null;
+  instrumentRunIds: string[];
+  rawArtifactRefs: string[];
+  rawArtifactSha256: Record<string, string>;
   uSemNm: number | null;
   uEllipNm: number | null;
   rhoSemEllip: number | null;
@@ -115,6 +129,10 @@ const resolveReportableUnlock = (
       blockedReasons: REPORTABLE_BLOCKED_REASONS,
       method: 'profile_envelope_from_primary_standard_anchors',
       pairedRunId: null,
+      dataOrigin: null,
+      instrumentRunIds: [],
+      rawArtifactRefs: [],
+      rawArtifactSha256: {},
       uSemNm: null,
       uEllipNm: null,
       rhoSemEllip: null,
@@ -130,6 +148,40 @@ const resolveReportableUnlock = (
   if (payload.covarianceAnchorPresent !== true) errors.push('missing_covariance_uncertainty_anchor');
   if (payload.sourceClass && !['primary', 'standard'].includes(payload.sourceClass.toLowerCase())) {
     errors.push('paired_evidence_source_not_admissible');
+  }
+  const dataOrigin = String(payload.provenance?.data_origin ?? '').trim().toLowerCase();
+  const instrumentRunIds = (payload.provenance?.instrument_run_ids ?? [])
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
+  const rawArtifactRefs = (payload.provenance?.raw_artifact_refs ?? [])
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
+  const rawArtifactSha256Entries = Object.entries(payload.provenance?.raw_artifact_sha256 ?? {}).map(([ref, hash]) => [
+    String(ref).trim(),
+    String(hash).trim().toLowerCase(),
+  ] as const);
+  const rawArtifactSha256 = Object.fromEntries(rawArtifactSha256Entries.filter(([ref]) => ref.length > 0));
+  if (dataOrigin !== 'instrument_export') {
+    errors.push('measurement_provenance_not_instrument_export');
+  }
+  if (instrumentRunIds.length === 0) {
+    errors.push('missing_measurement_provenance_run_ids');
+  }
+  if (rawArtifactRefs.length === 0) {
+    errors.push('missing_measurement_provenance_raw_refs');
+  }
+  if (Object.keys(rawArtifactSha256).length === 0) {
+    errors.push('missing_measurement_provenance_raw_hashes');
+  }
+  for (const ref of rawArtifactRefs) {
+    const hash = rawArtifactSha256[ref];
+    if (!hash) {
+      errors.push('missing_measurement_provenance_raw_hash_for_ref');
+      continue;
+    }
+    if (!isSha256Hex(hash)) {
+      errors.push('invalid_measurement_provenance_raw_hash_format');
+    }
   }
 
   const uSemNm = finiteOrNull(payload.uncertainty?.u_sem_nm);
@@ -158,6 +210,10 @@ const resolveReportableUnlock = (
         ? 'paired_dual_instrument_covariance_numeric'
         : 'profile_envelope_from_primary_standard_anchors'),
     pairedRunId: payload.pairedRunId?.trim() || null,
+    dataOrigin: dataOrigin || null,
+    instrumentRunIds,
+    rawArtifactRefs,
+    rawArtifactSha256,
     uSemNm,
     uEllipNm,
     rhoSemEllip,
@@ -184,6 +240,10 @@ const deriveTypedContext = (
     blockedReasons: string[];
     method: string;
     pairedRunId: string | null;
+    dataOrigin: string | null;
+    instrumentRunIds: string[];
+    rawArtifactRefs: string[];
+    rawArtifactSha256: Record<string, string>;
     uSemNm: number | null;
     uEllipNm: number | null;
     rhoSemEllip: number | null;
@@ -209,6 +269,10 @@ const deriveTypedContext = (
     u_fused_nm: uFusedStdNm,
     U_fused_nm: Number(input.uFusedNm.toFixed(6)),
     paired_run_id: reportable.pairedRunId,
+    data_origin: reportable.dataOrigin,
+    instrument_run_ids: reportable.instrumentRunIds,
+    raw_artifact_refs: reportable.rawArtifactRefs,
+    raw_artifact_sha256: reportable.rawArtifactSha256,
     rho_sem_ellip: reportable.rhoSemEllip,
     covariance_sem_ellip_nm2: reportable.covarianceSemEllipNm2,
     sourceRefs: input.refs,
@@ -314,6 +378,10 @@ export const buildSemEllipsScenarioPacks = (options: {
         blockedReasons: REPORTABLE_BLOCKED_REASONS,
         method: 'profile_envelope_from_primary_standard_anchors',
         pairedRunId: null,
+        dataOrigin: null,
+        instrumentRunIds: [],
+        rawArtifactRefs: [],
+        rawArtifactSha256: {},
         uSemNm: null,
         uEllipNm: null,
         rhoSemEllip: null,
@@ -372,7 +440,7 @@ export const buildSemEllipsScenarioPacks = (options: {
       'Primary/standard SEM+ellipsometry evidence only.',
       'Non-blocking compatibility envelope mapping lane.',
       'No canonical override or promotion implied.',
-      'Reportable profile is fail-closed blocked until paired-run and covariance uncertainty anchors are present.',
+      'Reportable profile is fail-closed blocked until paired-run, covariance uncertainty, and measurement provenance anchors are present.',
     ],
     profileThresholds: {
       'SE-STD-2': {

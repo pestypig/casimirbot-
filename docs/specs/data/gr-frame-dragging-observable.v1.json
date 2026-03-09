@@ -1,0 +1,38 @@
+{
+  "artifact_type": "external_gr_observable_snapshot/v1",
+  "work_id": "EXT-GR-FD-001",
+  "title": "Frame-dragging observable replay (LAGEOS + Gravity Probe B)",
+  "source_refs": [
+    "SRC-080",
+    "SRC-081",
+    "SRC-082"
+  ],
+  "chain_ids": [
+    "CH-GR-003"
+  ],
+  "equation_anchors": [
+    "delta_gpb = omega_gpb_measured_mas_per_year - omega_gpb_gr_predicted_mas_per_year",
+    "delta_lageos_ratio = ratio_lageos_measured - ratio_lageos_expected"
+  ],
+  "assumption_domain": {
+    "class": "weak_field_lense_thirring_earth_orbit",
+    "comparability": "direct",
+    "notes": "Replay compares published frame-dragging observational anchors against GR-predicted reference values."
+  },
+  "constants": {
+    "gpb_gr_predicted_mas_per_year": 39.2,
+    "lageos_ratio_expected": 1.0
+  },
+  "observed": {
+    "gpb_measured_mas_per_year": 37.2,
+    "gpb_uncertainty_mas_per_year": 7.2,
+    "lageos_ratio_measured": 0.99,
+    "lageos_ratio_uncertainty": 0.1,
+    "lares_accuracy_percent_reported": 0.6
+  },
+  "acceptance": {
+    "max_abs_gpb_residual_mas_per_year": 14.4,
+    "max_abs_lageos_ratio_residual": 0.2
+  },
+  "status": "extracted"
+}

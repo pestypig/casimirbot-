@@ -81,3 +81,129 @@ Any code/config patch must finish with:
 1. Required test evidence for touched surfaces.
 2. Casimir verification gate PASS (`POST /api/agi/adapter/run` via `npm run casimir:verify`).
 3. Report verdict, first failing hard constraint (if any), certificate hash, and certificate integrity status.
+
+## 7) Full-solve reference capsule workflow
+
+For manuscript/governance runs, regenerate and validate the commit-pinned full-solve capsule:
+
+```bash
+npm run warp:full-solve:reference:refresh
+```
+
+Outputs:
+- `artifacts/research/full-solve/full-solve-reference-capsule-YYYY-MM-DD.json`
+- `docs/audits/research/warp-full-solve-reference-capsule-YYYY-MM-DD.md`
+- Stable aliases:
+  - `artifacts/research/full-solve/full-solve-reference-capsule-latest.json`
+  - `docs/audits/research/warp-full-solve-reference-capsule-latest.md`
+
+Validation-only run:
+
+```bash
+npm run warp:full-solve:reference:validate -- --capsule artifacts/research/full-solve/full-solve-reference-capsule-latest.json
+```
+
+Use the `latest` capsule paths as default citation anchors in paper-generation prompts.
+
+## 8) Integrity parity suite workflow (default pre-paper/pre-claim)
+
+Run the integrity parity suite before drafting or updating claim language:
+
+```bash
+npm run warp:integrity:check
+```
+
+This executes, in order:
+1. canonical bundle + reconciliation,
+2. geometry conformance,
+3. external-work refresh/matrix,
+4. Mercury observable replay/compare (`EXT-GR-MERC-001`),
+5. reference capsule generation + validation,
+6. Casimir verify + trace export.
+
+Outputs:
+- `artifacts/research/full-solve/integrity-parity-suite-YYYY-MM-DD.json`
+- `docs/audits/research/warp-integrity-parity-suite-YYYY-MM-DD.md`
+- Stable aliases:
+  - `artifacts/research/full-solve/integrity-parity-suite-latest.json`
+  - `docs/audits/research/warp-integrity-parity-suite-latest.md`
+
+Policy:
+- parity suite is `reference_only` and non-blocking for canonical policy changes,
+- external non-comparable works remain `inconclusive` with explicit reason codes.
+
+## 9) External-work comparison workflow
+
+For external paper/model comparison against local full-solve reference, run:
+
+```bash
+npm run warp:external:refresh
+```
+
+This executes, in order:
+1. external profile contract validation,
+2. per-work dual-track runs (mirror + method where available),
+3. per-work local-reference comparisons,
+4. master external comparison matrix generation,
+5. capsule regeneration + capsule validation.
+
+Operator add/update flow:
+1. Add or edit one profile in `configs/warp-external-work-profiles.v1.json` with:
+   - `work_id`, `source_refs`, `chain_ids`, `comparison_keys`,
+   - mirror/method track contract fields,
+   - `posture.reference_only=true`, `posture.canonical_blocking=false`.
+2. Ensure snapshot-first inputs exist for that profile:
+   - scenario packs and checker scripts for mirror track,
+   - replay script + input snapshots for method track.
+3. Validate profile contract:
+
+```bash
+npm run warp:external:profiles:validate
+```
+
+4. Run profile-only refresh (optional during iteration):
+
+```bash
+npm run warp:external:run -- --work-id <WORK_ID>
+npm run warp:external:compare -- --work-id <WORK_ID>
+npm run warp:external:matrix
+```
+
+5. Run full refresh + capsule inclusion check:
+
+```bash
+npm run warp:external:refresh
+```
+
+6. Confirm `external_work_comparison` block is present and valid in:
+   - `artifacts/research/full-solve/full-solve-reference-capsule-latest.json`
+   - `docs/audits/research/warp-full-solve-reference-capsule-latest.md`
+
+Target artifacts:
+- `artifacts/research/full-solve/external-work/external-work-run-<work_id>-latest.json`
+- `artifacts/research/full-solve/external-work/external-work-compare-<work_id>-latest.json`
+- `artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json`
+
+Policy:
+- external-work outputs remain `reference_only` overlays,
+- canonical decisions are not overridden.
+
+## 10) Promotion-readiness bridge workflow
+
+Before upgrading manuscript language from integrity parity to stronger readiness framing, run:
+
+```bash
+npm run warp:promotion:readiness:check
+```
+
+Outputs:
+- `artifacts/research/full-solve/promotion-readiness-suite-YYYY-MM-DD.json`
+- `docs/audits/research/warp-promotion-readiness-suite-YYYY-MM-DD.md`
+- Stable aliases:
+  - `artifacts/research/full-solve/promotion-readiness-suite-latest.json`
+  - `docs/audits/research/warp-promotion-readiness-suite-latest.md`
+
+Policy:
+- readiness suite is `reference_only` and non-blocking for canonical decisions,
+- measured uncertainty anchors are required for reportable lane readiness,
+- blocked lanes remain explicit with deterministic blocker codes.

@@ -3,15 +3,21 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AgiKnowledgePanel } from "@/components/AgiKnowledgePanel";
 import CoreKnowledgePanel from "@/components/CoreKnowledgePanel";
 import type { SettingsTab, StartSettings } from "@/hooks/useHelixStartSettings";
 import { isFlagEnabled } from "@/lib/envFlags";
+import {
+  getVoiceCaptureDiagnosticsSnapshot,
+  subscribeVoiceCaptureDiagnostics,
+  type VoiceCaptureCheckpointStatus,
+  type VoiceCaptureDiagnosticsSnapshot,
+  type VoiceCaptureWarningCode,
+} from "@/lib/helix/voice-capture-diagnostics";
 
 type Props = {
   settingsTab: SettingsTab;
@@ -22,73 +28,69 @@ type Props = {
   onClose: () => void;
 };
 
+const VOICE_WARNING_LABEL: Record<VoiceCaptureWarningCode, string> = {
+  loopback_source: "Input appears to be loopback/output source.",
+  flat_signal: "Signal looks flat for the active track.",
+  recorder_stalled: "Recorder heartbeat stalled (no chunks recently).",
+};
+
+const VOICE_CHECKPOINT_STATUS_CLASS: Record<VoiceCaptureCheckpointStatus, string> = {
+  idle: "border-slate-300/25 bg-slate-400/10 text-slate-200",
+  ok: "border-emerald-300/40 bg-emerald-500/12 text-emerald-100",
+  warn: "border-amber-300/40 bg-amber-500/12 text-amber-100",
+  error: "border-rose-300/45 bg-rose-500/15 text-rose-100",
+};
+
 export function HelixSettingsDialogContent({
   settingsTab,
   onSettingsTabChange,
   userSettings,
   updateSettings,
   onClearSavedChoice,
-  onClose
+  onClose,
 }: Props) {
   const knowledgeEnabled = isFlagEnabled("ENABLE_KNOWLEDGE_PROJECTS", true);
-  const activeTab = knowledgeEnabled ? settingsTab : "preferences";
+  const activeSection = knowledgeEnabled ? settingsTab : "preferences";
+  const [knowledgeSource, setKnowledgeSource] = React.useState<"my" | "core">("my");
+  const [voiceDiagnostics, setVoiceDiagnostics] = React.useState<VoiceCaptureDiagnosticsSnapshot | null>(() =>
+    getVoiceCaptureDiagnosticsSnapshot(),
+  );
+
+  React.useEffect(() => {
+    setVoiceDiagnostics(getVoiceCaptureDiagnosticsSnapshot());
+    return subscribeVoiceCaptureDiagnostics((snapshot) => {
+      setVoiceDiagnostics(snapshot);
+    });
+  }, []);
 
   return (
-    <DialogContent
-      className="mood-transition-scope relative max-h-[min(88vh,calc(100vh-2.5rem),1060px)] w-full max-w-[calc(100vw-2.5rem)] overflow-y-auto border border-primary/45 bg-card/98 text-foreground shadow-[0_48px_140px_hsl(var(--primary)/0.38)] sm:max-w-[min(64rem,calc(100vw-3.5rem))] sm:rounded-2xl"
-    >
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(140%_190%_at_6%_10%,hsl(var(--primary)/0.34)_0%,transparent_70%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(150%_210%_at_96%_8%,hsl(var(--primary)/0.24)_0%,transparent_74%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-70 bg-[linear-gradient(120deg,hsl(var(--primary)/0.12)_0%,transparent_46%,hsl(var(--ring)/0.12)_100%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-75 bg-[radial-gradient(160%_200%_at_50%_92%,hsl(var(--primary)/0.22)_0%,transparent_72%)]"
-        aria-hidden
-      />
-      <div className="relative">
+    <DialogContent className="max-h-[88vh] w-full max-w-[min(44rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 p-0 text-slate-100 shadow-xl">
+      <div className="sticky top-0 z-10 border-b border-slate-700 bg-slate-950 px-4 py-3">
         <DialogHeader>
-          <DialogTitle>Helix Start Settings</DialogTitle>
-          <DialogDescription>
-            Tune how this intro behaves on this device.
+          <DialogTitle className="text-slate-100">Helix Start Settings</DialogTitle>
+          <DialogDescription className="text-slate-300">
+            Tune this device behavior with simple controls.
           </DialogDescription>
         </DialogHeader>
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => {
-            if (!knowledgeEnabled && value === "knowledge") return;
-            onSettingsTabChange(value as SettingsTab);
-          }}
-          className="mt-4"
-        >
-          <TabsList
-            className={`grid ${
-              knowledgeEnabled ? "grid-cols-2" : "grid-cols-1"
-            } rounded-xl border border-primary/35 bg-background/70 p-1 text-muted-foreground shadow-[inset_0_0_36px_hsl(var(--primary)/0.12)]`}
+        <div className="mt-3 flex items-center gap-2">
+          <label htmlFor="helix-settings-section" className="text-xs font-medium text-slate-300">
+            Section
+          </label>
+          <select
+            id="helix-settings-section"
+            value={activeSection}
+            onChange={(event) => onSettingsTabChange(event.target.value as SettingsTab)}
+            className="h-9 min-w-[220px] rounded-md border border-slate-600 bg-slate-900 px-2 text-sm text-slate-100"
           >
-            <TabsTrigger
-              value="preferences"
-              className="rounded-lg px-2 py-1 text-sm data-[state=active]:bg-primary/28 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_26px_hsl(var(--primary)/0.36)]"
-            >
-              Preferences
-            </TabsTrigger>
-            {knowledgeEnabled && (
-              <TabsTrigger
-                value="knowledge"
-                className="rounded-lg px-2 py-1 text-sm data-[state=active]:bg-primary/28 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_26px_hsl(var(--primary)/0.36)]"
-              >
-                AGI Knowledge
-              </TabsTrigger>
-            )}
-          </TabsList>
-          <TabsContent value="preferences" className="mt-4 space-y-3">
+            <option value="preferences">Preferences</option>
+            {knowledgeEnabled ? <option value="knowledge">AGI Knowledge</option> : null}
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-3 px-4 py-4">
+        {activeSection === "preferences" ? (
+          <>
             <PreferenceToggleRow
               id="remember-choice"
               label="Remember my mission view"
@@ -99,47 +101,57 @@ export function HelixSettingsDialogContent({
             <PreferenceToggleRow
               id="prefer-desktop"
               label="Prefer Desktop launch"
-              description="Use the Desktop as the primary action button."
+              description="Use Desktop as the primary action button."
               checked={userSettings.preferDesktop}
               onChange={(value) => updateSettings({ preferDesktop: value })}
             />
             <PreferenceToggleRow
               id="show-zen"
               label="Show mission mantra"
-              description="Keep the profile's guiding quote visible."
+              description="Keep the profile quote visible."
               checked={userSettings.showZen}
               onChange={(value) => updateSettings({ showZen: value })}
             />
             <PreferenceToggleRow
               id="splash-cursor"
               label="Splash cursor trail"
-              description="Paint a fluid ribbon that follows your cursor."
+              description="Show a cursor ribbon effect."
               checked={userSettings.enableSplashCursor}
               onChange={(value) => updateSettings({ enableSplashCursor: value })}
             />
             <PreferenceToggleRow
               id="helix-ask-debug"
               label="Helix Ask debug context"
-              description="Show which repo files were used to answer."
+              description="Show repo file debug context."
               checked={userSettings.showHelixAskDebug}
               onChange={(value) => updateSettings({ showHelixAskDebug: value })}
             />
             <PreferenceToggleRow
+              id="helix-voice-diagnostics"
+              label="Voice capture diagnostics panel"
+              description="Show live mic diagnostics in this settings dialog."
+              checked={userSettings.showHelixVoiceCaptureDiagnostics}
+              onChange={(value) => updateSettings({ showHelixVoiceCaptureDiagnostics: value })}
+            />
+            {userSettings.showHelixVoiceCaptureDiagnostics ? (
+              <VoiceCaptureDiagnosticsPanel snapshot={voiceDiagnostics} />
+            ) : null}
+            <PreferenceToggleRow
               id="powershell-debug"
               label="Developer terminal (PowerShell)"
-              description="Use a local scratchpad for commands."
+              description="Show local scratchpad command panel."
               checked={userSettings.showPowerShellDebug}
               onChange={(value) => updateSettings({ showPowerShellDebug: value })}
             />
-            {userSettings.showPowerShellDebug && (
+            {userSettings.showPowerShellDebug ? (
               <PowerShellTerminalPad
                 value={userSettings.powerShellScratch}
                 onChange={(value) => updateSettings({ powerShellScratch: value })}
               />
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <button
-                className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                className="rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 hover:bg-slate-800"
                 onClick={() => {
                   onClearSavedChoice?.();
                 }}
@@ -147,48 +159,50 @@ export function HelixSettingsDialogContent({
                 Clear saved choice
               </button>
               <button
-                className="rounded-lg border border-primary/40 bg-primary/92 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_32px_hsl(var(--primary)/0.4)] hover:bg-primary"
+                className="rounded-md border border-cyan-300 bg-cyan-300 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-200"
                 onClick={onClose}
               >
                 Close
               </button>
             </div>
-          </TabsContent>
-          {knowledgeEnabled && (
-            <TabsContent value="knowledge" className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
-              <Tabs defaultValue="my">
-                <TabsList className="mb-3 grid grid-cols-2 rounded-xl border border-primary/35 bg-background/70 p-1 text-muted-foreground shadow-[inset_0_0_34px_hsl(var(--primary)/0.12)]">
-                  <TabsTrigger
-                    value="my"
-                    className="rounded-lg px-2 py-1 text-sm data-[state=active]:bg-primary/28 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_26px_hsl(var(--primary)/0.36)]"
+          </>
+        ) : null}
+
+        {activeSection === "knowledge" ? (
+          <>
+            {knowledgeEnabled ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="helix-settings-knowledge-source" className="text-xs font-medium text-slate-300">
+                    Knowledge source
+                  </label>
+                  <select
+                    id="helix-settings-knowledge-source"
+                    value={knowledgeSource}
+                    onChange={(event) => setKnowledgeSource(event.target.value as "my" | "core")}
+                    className="h-9 min-w-[220px] rounded-md border border-slate-600 bg-slate-900 px-2 text-sm text-slate-100"
                   >
-                    My Knowledge
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="core"
-                    className="rounded-lg px-2 py-1 text-sm data-[state=active]:bg-primary/28 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_26px_hsl(var(--primary)/0.36)]"
-                  >
-                    Core Knowledge (read-only)
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="my" className="mt-0">
-                  <AgiKnowledgePanel />
-                </TabsContent>
-                <TabsContent value="core" className="mt-0">
-                  <CoreKnowledgePanel />
-                </TabsContent>
-              </Tabs>
-              <div className="mt-4 flex justify-end">
-                <button
-                  className="rounded-lg border border-primary/40 bg-primary/92 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_0_32px_hsl(var(--primary)/0.4)] hover:bg-primary"
-                  onClick={onClose}
-                >
-                  Close
-                </button>
-              </div>
-            </TabsContent>
-          )}
-        </Tabs>
+                    <option value="my">My Knowledge</option>
+                    <option value="core">Core Knowledge (read-only)</option>
+                  </select>
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-2">
+                  {knowledgeSource === "my" ? <AgiKnowledgePanel /> : <CoreKnowledgePanel />}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-300">AGI Knowledge is disabled by feature flag.</p>
+            )}
+            <div className="flex justify-end pt-1">
+              <button
+                className="rounded-md border border-cyan-300 bg-cyan-300 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-200"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            </div>
+          </>
+        ) : null}
       </div>
     </DialogContent>
   );
@@ -199,7 +213,7 @@ function PreferenceToggleRow({
   label,
   description,
   checked,
-  onChange
+  onChange,
 }: {
   id: string;
   label: string;
@@ -208,34 +222,184 @@ function PreferenceToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-primary/35 bg-background/72 px-4 py-3 shadow-[inset_0_0_34px_hsl(var(--primary)/0.12),0_18px_40px_hsl(var(--primary)/0.12)]">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(170%_230%_at_6%_10%,hsl(var(--primary)/0.22)_0%,transparent_74%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-70 bg-[linear-gradient(120deg,hsl(var(--primary)/0.1)_0%,transparent_55%,hsl(var(--ring)/0.12)_100%)]"
-        aria-hidden
-      />
-      <div className="relative flex items-center justify-between gap-4">
-        <div className="space-y-0.5">
-          <p className="text-sm font-semibold text-foreground">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        <Switch
-          id={id}
-          checked={checked}
-          onCheckedChange={(value) => onChange(value === true)}
-          className="shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.12)] data-[state=unchecked]:bg-foreground/10"
-        />
+    <div className="flex items-center justify-between gap-4 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium text-slate-100">{label}</p>
+        <p className="text-xs text-slate-300">{description}</p>
       </div>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={(value) => onChange(value === true)}
+      />
     </div>
   );
 }
 
+function VoiceCaptureDiagnosticsPanel({
+  snapshot,
+}: {
+  snapshot: VoiceCaptureDiagnosticsSnapshot | null;
+}) {
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const formatCaptureTimestamp = React.useCallback(
+    (value: number | null): string => {
+      if (value === null) return "never";
+      const elapsedMs = Math.max(0, nowMs - value);
+      if (elapsedMs < 1000) return "just now";
+      if (elapsedMs < 60_000) return `${Math.round(elapsedMs / 1000)}s ago`;
+      return `${Math.round(elapsedMs / 60_000)}m ago`;
+    },
+    [nowMs],
+  );
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Capture diagnostics</p>
+      {!snapshot ? (
+        <p className="text-xs text-slate-300">
+          No active voice capture yet. Enable the mic in Helix Ask to stream diagnostics here.
+        </p>
+      ) : (
+        <div className="max-h-[44vh] space-y-2 overflow-y-auto pr-1 text-[10px] text-foreground/90">
+          <p className="uppercase tracking-[0.14em] text-slate-400">
+            Input level{" "}
+            {snapshot.voiceSignalState === "speech"
+              ? "(speech-level signal)"
+              : snapshot.voiceSignalState === "low"
+                ? "(low-level signal)"
+                : "(waiting for device audio)"}
+          </p>
+          <div className="grid grid-cols-12 gap-0.5 rounded border border-white/10 bg-slate-900/70 p-1">
+            {Array.from({ length: 12 }).map((_, index) => {
+              const threshold = (index + 1) / 12;
+              const active = snapshot.voiceMonitorLevel >= threshold;
+              return (
+                <span
+                  key={`settings-voice-level-${index}`}
+                  className={`h-2 rounded-[2px] ${
+                    active
+                      ? snapshot.voiceMonitorLevel >= 0.75
+                        ? "bg-emerald-300"
+                        : snapshot.voiceMonitorLevel >= 0.45
+                          ? "bg-cyan-300"
+                          : "bg-sky-300"
+                      : "bg-slate-700/80"
+                  }`}
+                />
+              );
+            })}
+          </div>
+          {snapshot.warnings.length > 0 ? (
+            <div className="space-y-1">
+              {snapshot.warnings.map((warning) => (
+                <p
+                  key={`settings-voice-warning-${warning}`}
+                  className="rounded border border-amber-300/35 bg-amber-500/12 px-2 py-1 text-[9px] uppercase tracking-[0.14em] text-amber-100"
+                >
+                  {VOICE_WARNING_LABEL[warning]}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          <p className="uppercase tracking-[0.14em] text-slate-500">
+            rms {snapshot.rmsRaw.toFixed(4)} | db {snapshot.rmsDb.toFixed(1)} | peak {snapshot.peak.toFixed(4)} |
+            floor {snapshot.noiseFloor.toFixed(4)}
+          </p>
+          <p className="uppercase tracking-[0.14em] text-slate-500">
+            roundtrip {snapshot.lastRoundtripMs ?? "--"}ms | adaptive gate{" "}
+            {Math.round(snapshot.voiceMonitorThreshold * 1000) / 1000}
+          </p>
+          {snapshot.playback ? (
+            <>
+              <p className="uppercase tracking-[0.14em] text-slate-500">
+                playback {snapshot.playback.kind} | chunks {snapshot.playback.chunkCount} | first audio{" "}
+                {snapshot.playback.enqueueToFirstAudioMs ?? "--"}ms
+              </p>
+              <p className="uppercase tracking-[0.14em] text-slate-500">
+                total {snapshot.playback.totalPlaybackMs ?? "--"}ms | cache h/m{" "}
+                {snapshot.playback.cacheHitCount}/{snapshot.playback.cacheMissCount}
+                {snapshot.playback.cancelReason ? ` | cancel ${snapshot.playback.cancelReason}` : ""}
+              </p>
+            </>
+          ) : null}
+          <p className="uppercase tracking-[0.14em] text-slate-500">
+            recorder {snapshot.voiceRecorderMimeType ?? "unknown"} | track {snapshot.voiceTrackMuted ? "muted" : "live"}
+            {snapshot.voiceInputDeviceLabel ? ` | ${clipDiagnosticsText(snapshot.voiceInputDeviceLabel, 56)}` : ""}
+          </p>
+          <p className="uppercase tracking-[0.14em] text-slate-500">
+            chunk cadence {snapshot.chunksPerSecond.toFixed(2)} /s | chunks {snapshot.mediaChunkCount} | bytes{" "}
+            {snapshot.mediaBytes}
+          </p>
+          <p className="uppercase tracking-[0.14em] text-slate-500">
+            last chunk age{" "}
+            {snapshot.lastChunkAgeMs === null ? "--" : `${Math.round(Math.max(0, snapshot.lastChunkAgeMs))}ms`}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {snapshot.checkpoints.map((checkpoint) => (
+              <span
+                key={`settings-checkpoint-${checkpoint.key}`}
+                className={`inline-flex rounded border px-1.5 py-0.5 uppercase tracking-[0.14em] ${VOICE_CHECKPOINT_STATUS_CLASS[checkpoint.status]}`}
+                title={checkpoint.message ?? undefined}
+              >
+                {checkpoint.label}
+                {checkpoint.lastAtMs !== null ? ` (${formatCaptureTimestamp(checkpoint.lastAtMs)})` : ""}
+              </span>
+            ))}
+          </div>
+          {snapshot.segments.length > 0 ? (
+            <div className="space-y-1">
+              <p className="uppercase tracking-[0.18em] text-slate-400">Last 5 segments</p>
+              {snapshot.segments.map((segment) => (
+                <div
+                  key={`settings-segment-attempt-${segment.id}`}
+                  className="rounded border border-white/10 bg-white/5 px-1.5 py-1"
+                >
+                  <p className="uppercase tracking-[0.14em] text-slate-500">
+                    {segment.status} | dispatch {segment.dispatch} | {Math.round(segment.durationMs)}ms
+                  </p>
+                  <p className="uppercase tracking-[0.14em] text-slate-500">
+                    captured {formatCaptureTimestamp(segment.cutAtMs)}
+                    {segment.sttLatencyMs !== null ? ` | stt ${Math.round(segment.sttLatencyMs)}ms` : ""}
+                    {segment.engine ? ` | ${segment.engine}` : ""}
+                  </p>
+                  {segment.transcriptPreview ? (
+                    <p className="mt-1 text-[10px] text-slate-200">
+                      {clipDiagnosticsText(segment.transcriptPreview, 220)}
+                    </p>
+                  ) : null}
+                  {segment.error ? <p className="mt-1 text-[10px] text-rose-200">{segment.error}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-300">Listening for first segment...</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function clipDiagnosticsText(source: string, maxChars: number): string {
+  const text = source.trim();
+  if (!text) return "";
+  if (maxChars <= 0) return "";
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars - 1).trimEnd()}...`;
+}
+
 function PowerShellTerminalPad({
   value,
-  onChange
+  onChange,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -247,6 +411,7 @@ function PowerShellTerminalPad({
   const [truncated, setTruncated] = React.useState(false);
   const canCopy = value.trim().length > 0;
   const canRun = value.trim().length > 0 && status !== "running";
+
   const handleCopy = async () => {
     if (!navigator?.clipboard?.writeText || !canCopy) return;
     try {
@@ -257,7 +422,9 @@ function PowerShellTerminalPad({
       // ignore clipboard failures
     }
   };
+
   const handleClear = () => onChange("");
+
   const handleRun = async () => {
     if (!canRun) return;
     setStatus("running");
@@ -272,17 +439,12 @@ function PowerShellTerminalPad({
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const message =
-          payload?.message ||
-          payload?.error ||
-          `Command failed (${response.status})`;
+        const message = payload?.message || payload?.error || `Command failed (${response.status})`;
         throw new Error(message);
       }
       const stdout = typeof payload.stdout === "string" ? payload.stdout : "";
       const stderr = typeof payload.stderr === "string" ? payload.stderr : "";
-      const combined = [stdout.trimEnd(), stderr.trimEnd()]
-        .filter(Boolean)
-        .join("\n");
+      const combined = [stdout.trimEnd(), stderr.trimEnd()].filter(Boolean).join("\n");
       const decorated = appendTerminalHints(combined);
       setOutput(decorated || "Command completed with no output.");
       setExitCode(typeof payload.code === "number" ? payload.code : null);
@@ -293,67 +455,54 @@ function PowerShellTerminalPad({
       setStatus("error");
     }
   };
+
   return (
-    <div className="relative space-y-3 overflow-hidden rounded-xl border border-primary/45 bg-background/78 px-4 py-3 shadow-[inset_0_0_32px_hsl(var(--primary)/0.1),0_16px_36px_hsl(var(--primary)/0.12)]">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-75 bg-[radial-gradient(170%_230%_at_8%_12%,hsl(var(--primary)/0.2)_0%,transparent_74%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-65 bg-[linear-gradient(120deg,hsl(var(--primary)/0.08)_0%,transparent_58%,hsl(var(--ring)/0.1)_100%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(160%_200%_at_50%_94%,hsl(var(--primary)/0.24)_0%,transparent_74%)]"
-        aria-hidden
-      />
-      <div className="relative space-y-3">
-        <div className="space-y-0.5">
-          <p className="text-sm font-semibold text-foreground">Developer terminal</p>
-          <p className="text-xs text-muted-foreground">
-            Scratchpad only. Use Copy to send the command to your local terminal.
-          </p>
-        </div>
-        <Textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Type PowerShell commands here..."
-          className="min-h-[140px] border-primary/40 bg-card/70 font-mono text-xs text-foreground placeholder:text-muted-foreground shadow-[inset_0_0_24px_hsl(var(--primary)/0.08)]"
-        />
-        <div className="flex items-center gap-2">
-          <button
-            className="rounded-md border border-primary/55 bg-primary/10 px-2 py-1 text-[11px] text-foreground transition-colors hover:border-primary/85 hover:bg-primary/20 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleRun}
-            disabled={!canRun}
-          >
-            {status === "running" ? "Running" : "Run"}
-          </button>
-          <button
-            className="rounded-md border border-primary/50 bg-primary/8 px-2 py-1 text-[11px] text-foreground transition-colors hover:border-primary/80 hover:bg-primary/18 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleCopy}
-            disabled={!canCopy}
-          >
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <button
-            className="rounded-md border border-primary/50 bg-primary/8 px-2 py-1 text-[11px] text-foreground transition-colors hover:border-primary/80 hover:bg-primary/18 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleClear}
-            disabled={!value}
-          >
-            Clear
-          </button>
-        </div>
-        {status !== "idle" && (
-          <div className="rounded-md border border-primary/36 bg-background/62 px-3 py-2 text-xs text-foreground shadow-[inset_0_0_26px_hsl(var(--primary)/0.1)]">
-            <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-              {status === "running" ? "Running" : status === "error" ? "Error" : "Output"}
-              {exitCode != null ? ` (exit ${exitCode})` : ""}
-              {truncated ? " (truncated)" : ""}
-            </div>
-            <pre className="whitespace-pre-wrap">{output || "..."}</pre>
-          </div>
-        )}
+    <div className="space-y-3 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium text-slate-100">Developer terminal</p>
+        <p className="text-xs text-slate-300">
+          Scratchpad only. Use Copy to send the command to your local terminal.
+        </p>
       </div>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Type PowerShell commands here..."
+        className="min-h-[140px] border-slate-600 bg-slate-950 font-mono text-xs text-slate-100 placeholder:text-slate-500"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleRun}
+          disabled={!canRun}
+        >
+          {status === "running" ? "Running" : "Run"}
+        </button>
+        <button
+          className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleCopy}
+          disabled={!canCopy}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <button
+          className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-[11px] text-slate-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleClear}
+          disabled={!value}
+        >
+          Clear
+        </button>
+      </div>
+      {status !== "idle" ? (
+        <div className="rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100">
+          <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-400">
+            {status === "running" ? "Running" : status === "error" ? "Error" : "Output"}
+            {exitCode != null ? ` (exit ${exitCode})` : ""}
+            {truncated ? " (truncated)" : ""}
+          </div>
+          <pre className="whitespace-pre-wrap">{output || "..."}</pre>
+        </div>
+      ) : null}
     </div>
   );
 }

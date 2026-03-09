@@ -57,15 +57,25 @@ type ContextCapsuleMergeArgs = {
   sessionId?: string | null;
 };
 
-type ContextCapsuleMergeSummary = {
+export type CapsuleConstraintBundle = {
+  mustKeepTerms: string[];
+  preferredEvidencePaths: string[];
+};
+
+export type CapsuleMergeTier = "dialogue" | "evidence";
+
+export type ContextCapsuleMergeSummary = {
   requestedCapsuleIds: string[];
   appliedCapsuleIds: string[];
   inactiveCapsuleIds: string[];
   missingCapsuleIds: string[];
+  dialogueAppliedCapsuleIds: string[];
+  evidenceAppliedCapsuleIds: string[];
   pinnedFiles: string[];
   resolvedConcepts: Array<{ id: string; label: string; evidence: string[] }>;
   recentTopics: string[];
   openSlots: string[];
+  constraintBundle: CapsuleConstraintBundle;
 };
 
 const readNumber = (value: string | undefined, fallback: number): number => {
@@ -90,9 +100,9 @@ const CONTEXT_CAPSULE_MAX_STORE = clamp(
 );
 
 const CONTEXT_CAPSULE_MAX_APPLY = clamp(
-  readNumber(process.env.HELIX_CONTEXT_CAPSULE_MAX_APPLY, 3),
+  readNumber(process.env.HELIX_CONTEXT_CAPSULE_MAX_APPLY, 12),
   1,
-  6,
+  12,
 );
 
 const store = new Map<string, ContextCapsuleStoredRecord>();
@@ -175,6 +185,186 @@ const tokenizeTerms = (value: string): string[] => {
     if (out.length >= 8) break;
   }
   return out;
+};
+
+const CONTEXT_CAPSULE_PROOF_POSTURE_SCORE: Record<ContextCapsuleConvergence["proofPosture"], number> = {
+  confirmed: 5,
+  reasoned: 4,
+  hypothesis: 3,
+  unknown: 2,
+  fail_closed: 1,
+};
+
+const CONTEXT_CAPSULE_MATURITY_SCORE: Record<ContextCapsuleConvergence["maturity"], number> = {
+  certified: 4,
+  diagnostic: 3,
+  reduced_order: 2,
+  exploratory: 1,
+};
+
+const CONTEXT_CAPSULE_PROOF_VERDICT_SCORE: Record<ContextCapsuleV1["commit"]["proof_verdict"], number> = {
+  PASS: 3,
+  UNKNOWN: 2,
+  FAIL: 1,
+};
+
+type RankedContextCapsule = {
+  requestedId: string;
+  capsule: ContextCapsuleV1;
+  proofScore: number;
+  maturityScore: number;
+  verdictScore: number;
+  integrityScore: number;
+  exactPathSignal: number;
+};
+
+const dedupeStrings = (values: string[], limit: number): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+    if (out.length >= limit) break;
+  }
+  return out;
+};
+
+const dedupeDocs = (
+  values: Array<{ uri: string; title?: string; hash?: string }>,
+  limit: number,
+): Array<{ uri: string; title?: string; hash?: string }> => {
+  const out: Array<{ uri: string; title?: string; hash?: string }> = [];
+  const seen = new Set<string>();
+  for (const entry of values) {
+    const uri = entry?.uri?.trim();
+    if (!uri) continue;
+    const key = uri.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      uri,
+      title: entry.title?.trim() || undefined,
+      hash: entry.hash?.trim() || undefined,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+};
+
+const resolveDialogueBundle = (capsule: ContextCapsuleV1): ContextCapsuleReplayBundle => ({
+  pinned_files: dedupeStrings(
+    [...capsule.replay_active.pinned_files, ...capsule.replay_inactive.pinned_files],
+    16,
+  ),
+  exact_paths: dedupeStrings(
+    [...capsule.replay_active.exact_paths, ...capsule.replay_inactive.exact_paths],
+    16,
+  ),
+  docs: dedupeDocs([...capsule.replay_active.docs, ...capsule.replay_inactive.docs], 16),
+  resolved_concepts: [...capsule.replay_active.resolved_concepts, ...capsule.replay_inactive.resolved_concepts]
+    .slice(0, 16),
+  recent_topics: dedupeStrings(
+    [...capsule.replay_active.recent_topics, ...capsule.replay_inactive.recent_topics],
+    16,
+  ),
+  open_slots: dedupeStrings(
+    [...capsule.replay_active.open_slots, ...capsule.replay_inactive.open_slots],
+    16,
+  ),
+});
+
+const resolveEvidenceBundle = (capsule: ContextCapsuleV1): ContextCapsuleReplayBundle => ({
+  pinned_files: dedupeStrings(
+    [...capsule.replay_active.pinned_files, ...capsule.replay_inactive.pinned_files],
+    16,
+  ),
+  exact_paths: dedupeStrings(
+    [
+      ...capsule.replay_active.exact_paths,
+      ...capsule.replay_inactive.exact_paths,
+      ...capsule.provenance.exact_paths,
+    ],
+    16,
+  ),
+  docs: dedupeDocs([...capsule.replay_active.docs, ...capsule.replay_inactive.docs], 16),
+  resolved_concepts: [...capsule.replay_active.resolved_concepts, ...capsule.replay_inactive.resolved_concepts]
+    .slice(0, 16),
+  recent_topics: dedupeStrings(
+    [...capsule.replay_active.recent_topics, ...capsule.replay_inactive.recent_topics],
+    16,
+  ),
+  open_slots: dedupeStrings(
+    [...capsule.replay_active.open_slots, ...capsule.replay_inactive.open_slots],
+    16,
+  ),
+});
+
+const resolveEvidenceLaneEligible = (capsule: ContextCapsuleV1): boolean => {
+  if (capsule.safety.fail_closed || capsule.commit.proof_verdict === "FAIL") return false;
+  const exactPaths = dedupeStrings(
+    [
+      ...capsule.replay_active.exact_paths,
+      ...capsule.replay_inactive.exact_paths,
+      ...capsule.provenance.exact_paths,
+    ],
+    32,
+  );
+  if (exactPaths.length === 0) return false;
+  if (capsule.safety.replay_active) return true;
+  if (capsule.convergence.source === "open_world") return false;
+  if (
+    capsule.convergence.proofPosture === "confirmed" ||
+    capsule.convergence.proofPosture === "reasoned"
+  ) {
+    return true;
+  }
+  return capsule.commit.proof_verdict === "PASS" && capsule.commit.certificate_integrity_ok !== false;
+};
+
+const scoreRankedCapsule = (requestedId: string, capsule: ContextCapsuleV1): RankedContextCapsule => {
+  const exactPathSignal = dedupeStrings(
+    [
+      ...capsule.replay_active.exact_paths,
+      ...capsule.replay_inactive.exact_paths,
+      ...capsule.provenance.exact_paths,
+    ],
+    32,
+  ).length;
+  const integrityScore =
+    capsule.commit.certificate_integrity_ok === true
+      ? 2
+      : capsule.commit.certificate_integrity_ok === false
+        ? 0
+        : 1;
+  return {
+    requestedId,
+    capsule,
+    proofScore: CONTEXT_CAPSULE_PROOF_POSTURE_SCORE[capsule.convergence.proofPosture],
+    maturityScore: CONTEXT_CAPSULE_MATURITY_SCORE[capsule.convergence.maturity],
+    verdictScore: CONTEXT_CAPSULE_PROOF_VERDICT_SCORE[capsule.commit.proof_verdict],
+    integrityScore,
+    exactPathSignal,
+  };
+};
+
+const compareRankedCapsules = (a: RankedContextCapsule, b: RankedContextCapsule): number => {
+  const proofDelta = b.proofScore - a.proofScore;
+  if (proofDelta !== 0) return proofDelta;
+  const maturityDelta = b.maturityScore - a.maturityScore;
+  if (maturityDelta !== 0) return maturityDelta;
+  const verdictDelta = b.verdictScore - a.verdictScore;
+  if (verdictDelta !== 0) return verdictDelta;
+  const integrityDelta = b.integrityScore - a.integrityScore;
+  if (integrityDelta !== 0) return integrityDelta;
+  const exactDelta = b.exactPathSignal - a.exactPathSignal;
+  if (exactDelta !== 0) return exactDelta;
+  const createdDelta = b.capsule.createdAtTsMs - a.capsule.createdAtTsMs;
+  if (createdDelta !== 0) return createdDelta;
+  return a.requestedId.localeCompare(b.requestedId);
 };
 
 const pruneStore = (): void => {
@@ -655,12 +845,17 @@ export function buildSessionMemoryPatchFromCapsules(
     new Set(args.capsuleIds.map((entry) => normalizeContextCapsuleId(entry)).filter(Boolean) as string[]),
   ).slice(0, CONTEXT_CAPSULE_MAX_APPLY);
   const appliedCapsuleIds: string[] = [];
+  const dialogueAppliedCapsuleIds: string[] = [];
+  const evidenceAppliedCapsuleIds: string[] = [];
   const inactiveCapsuleIds: string[] = [];
   const missingCapsuleIds: string[] = [];
   const pinnedFiles = new Set<string>();
   const recentTopics = new Set<string>();
   const openSlots = new Set<string>();
+  const mustKeepTerms = new Set<string>();
+  const preferredEvidencePaths = new Set<string>();
   const resolvedConceptMap = new Map<string, { id: string; label: string; evidence: string[] }>();
+  const rankedCapsules: RankedContextCapsule[] = [];
   for (const capsuleId of requestedCapsuleIds) {
     const capsule = getContextCapsule({
       capsuleId,
@@ -671,28 +866,61 @@ export function buildSessionMemoryPatchFromCapsules(
       missingCapsuleIds.push(capsuleId);
       continue;
     }
-    if (!capsule.safety.replay_active) {
+    rankedCapsules.push(scoreRankedCapsule(capsuleId, capsule));
+  }
+
+  for (const ranked of rankedCapsules.sort(compareRankedCapsules)) {
+    const capsuleId = ranked.requestedId;
+    const capsule = ranked.capsule;
+    const dialogueBundle = resolveDialogueBundle(capsule);
+    appliedCapsuleIds.push(capsuleId);
+    dialogueAppliedCapsuleIds.push(capsuleId);
+
+    for (const topic of dialogueBundle.recent_topics) {
+      const trimmed = topic.trim();
+      if (trimmed) {
+        recentTopics.add(trimmed);
+        tokenizeTerms(trimmed).forEach((token) => mustKeepTerms.add(token));
+      }
+    }
+    for (const slot of dialogueBundle.open_slots) {
+      const trimmed = slot.trim();
+      if (trimmed) {
+        openSlots.add(trimmed);
+        tokenizeTerms(trimmed).forEach((token) => mustKeepTerms.add(token));
+      }
+    }
+    for (const term of capsule.intent.key_terms ?? []) {
+      const trimmed = term.trim().toLowerCase();
+      if (trimmed) mustKeepTerms.add(trimmed);
+    }
+    const topicSeed = `${capsule.intent.intent_id} ${capsule.intent.intent_domain}`
+      .replace(/[_-]+/g, " ")
+      .trim();
+    tokenizeTerms(topicSeed).forEach((token) => mustKeepTerms.add(token));
+
+    const evidenceEligible = resolveEvidenceLaneEligible(capsule);
+    if (!evidenceEligible) {
       inactiveCapsuleIds.push(capsuleId);
       continue;
     }
-    appliedCapsuleIds.push(capsuleId);
-    for (const path of capsule.replay_active.pinned_files) {
+    evidenceAppliedCapsuleIds.push(capsuleId);
+    const evidenceBundle = resolveEvidenceBundle(capsule);
+    for (const path of evidenceBundle.pinned_files) {
       const trimmed = path.trim();
-      if (trimmed) pinnedFiles.add(trimmed);
+      if (trimmed) {
+        pinnedFiles.add(trimmed);
+        preferredEvidencePaths.add(trimmed);
+      }
     }
-    for (const path of capsule.replay_active.exact_paths) {
+    for (const path of evidenceBundle.exact_paths) {
       const trimmed = path.trim();
-      if (trimmed) pinnedFiles.add(trimmed);
+      if (trimmed) {
+        pinnedFiles.add(trimmed);
+        preferredEvidencePaths.add(trimmed);
+      }
     }
-    for (const topic of capsule.replay_active.recent_topics) {
-      const trimmed = topic.trim();
-      if (trimmed) recentTopics.add(trimmed);
-    }
-    for (const slot of capsule.replay_active.open_slots) {
-      const trimmed = slot.trim();
-      if (trimmed) openSlots.add(trimmed);
-    }
-    for (const concept of capsule.replay_active.resolved_concepts) {
+    for (const concept of evidenceBundle.resolved_concepts) {
       const id = concept.id.trim();
       if (!id) continue;
       const existing = resolvedConceptMap.get(id);
@@ -713,16 +941,29 @@ export function buildSessionMemoryPatchFromCapsules(
         evidence: mergedEvidence,
       });
     }
+    for (const path of capsule.provenance.exact_paths ?? []) {
+      const trimmed = path.trim();
+      if (!trimmed) continue;
+      preferredEvidencePaths.add(trimmed);
+      pinnedFiles.add(trimmed);
+    }
   }
+
   return {
     requestedCapsuleIds,
     appliedCapsuleIds,
+    dialogueAppliedCapsuleIds,
+    evidenceAppliedCapsuleIds,
     inactiveCapsuleIds,
     missingCapsuleIds,
     pinnedFiles: Array.from(pinnedFiles).slice(0, 12),
     resolvedConcepts: Array.from(resolvedConceptMap.values()).slice(0, 8),
     recentTopics: Array.from(recentTopics).slice(0, 8),
     openSlots: Array.from(openSlots).slice(0, 8),
+    constraintBundle: {
+      mustKeepTerms: Array.from(mustKeepTerms).slice(0, 12),
+      preferredEvidencePaths: Array.from(preferredEvidencePaths).slice(0, 12),
+    },
   };
 }
 

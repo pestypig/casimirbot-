@@ -32,6 +32,14 @@ type PairedEvidence = {
   pairedRunId?: string;
   sourceClass?: string;
   sourceRefs?: string[];
+  provenance?: {
+    data_origin?: string | null;
+    instrument_run_ids?: string[] | null;
+    raw_artifact_refs?: string[] | null;
+    raw_artifact_sha256?: Record<string, string> | null;
+    operator_id?: string | null;
+    acquisition_date_utc?: string | null;
+  };
   uncertainty?: {
     method?: string;
     u_sem_nm?: number | null;
@@ -60,6 +68,8 @@ const finiteOrNull = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const isSha256Hex = (value: string): boolean => /^[a-f0-9]{64}$/i.test(value);
+
 const renderMarkdown = (payload: {
   evidencePath: string;
   reportableReadyCandidate: boolean;
@@ -69,6 +79,10 @@ const renderMarkdown = (payload: {
     covarianceAnchorPresent: boolean | null;
     sourceClass: string | null;
     pairedRunId: string | null;
+    dataOrigin: string | null;
+    instrumentRunIdCount: number;
+    rawArtifactRefCount: number;
+    rawArtifactHashCount: number;
     uSemNm: number | null;
     uEllipNm: number | null;
     rhoSemEllip: number | null;
@@ -95,6 +109,10 @@ const renderMarkdown = (payload: {
 - covarianceAnchorPresent: \`${payload.summary.covarianceAnchorPresent}\`
 - sourceClass: \`${payload.summary.sourceClass}\`
 - pairedRunId: \`${payload.summary.pairedRunId}\`
+- dataOrigin: \`${payload.summary.dataOrigin}\`
+- instrumentRunIdCount: \`${payload.summary.instrumentRunIdCount}\`
+- rawArtifactRefCount: \`${payload.summary.rawArtifactRefCount}\`
+- rawArtifactHashCount: \`${payload.summary.rawArtifactHashCount}\`
 - u_sem_nm: \`${payload.summary.uSemNm}\`
 - u_ellip_nm: \`${payload.summary.uEllipNm}\`
 - rho_sem_ellip: \`${payload.summary.rhoSemEllip}\`
@@ -125,6 +143,20 @@ export const validateSemEllipsPairedEvidence = (options: {
     typeof payload.covarianceAnchorPresent === 'boolean' ? payload.covarianceAnchorPresent : null;
   const sourceClass = payload.sourceClass?.trim().toLowerCase() || null;
   const pairedRunId = payload.pairedRunId?.trim() || null;
+  const dataOrigin = payload.provenance?.data_origin?.trim().toLowerCase() || null;
+  const instrumentRunIds = (payload.provenance?.instrument_run_ids ?? [])
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
+  const rawArtifactRefs = (payload.provenance?.raw_artifact_refs ?? [])
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
+  const rawArtifactSha256Entries = Object.entries(payload.provenance?.raw_artifact_sha256 ?? {}).map(([ref, hash]) => [
+    String(ref).trim(),
+    String(hash).trim().toLowerCase(),
+  ] as const);
+  const rawArtifactSha256 = Object.fromEntries(
+    rawArtifactSha256Entries.filter(([ref]) => ref.length > 0),
+  );
   const uSemNm = finiteOrNull(payload.uncertainty?.u_sem_nm);
   const uEllipNm = finiteOrNull(payload.uncertainty?.u_ellip_nm);
   const rhoSemEllip = finiteOrNull(payload.uncertainty?.rho_sem_ellip);
@@ -168,6 +200,55 @@ export const validateSemEllipsPairedEvidence = (options: {
       severity: 'error',
       detail: 'pairedRunId is required.',
     });
+  }
+
+  if (dataOrigin !== 'instrument_export') {
+    issues.push({
+      code: 'measurement_provenance_not_instrument_export',
+      severity: 'error',
+      detail: 'provenance.data_origin must be instrument_export for reportable readiness.',
+    });
+  }
+
+  if (instrumentRunIds.length === 0) {
+    issues.push({
+      code: 'missing_measurement_provenance_run_ids',
+      severity: 'error',
+      detail: 'provenance.instrument_run_ids must include at least one instrument run id.',
+    });
+  }
+
+  if (rawArtifactRefs.length === 0) {
+    issues.push({
+      code: 'missing_measurement_provenance_raw_refs',
+      severity: 'error',
+      detail: 'provenance.raw_artifact_refs must include at least one raw artifact reference.',
+    });
+  }
+  if (Object.keys(rawArtifactSha256).length === 0) {
+    issues.push({
+      code: 'missing_measurement_provenance_raw_hashes',
+      severity: 'error',
+      detail: 'provenance.raw_artifact_sha256 must include SHA-256 hashes for raw artifact refs.',
+    });
+  }
+  for (const ref of rawArtifactRefs) {
+    const hash = rawArtifactSha256[ref];
+    if (!hash) {
+      issues.push({
+        code: 'missing_measurement_provenance_raw_hash_for_ref',
+        severity: 'error',
+        detail: `Missing SHA-256 for raw artifact ref: ${ref}`,
+      });
+      continue;
+    }
+    if (!isSha256Hex(hash)) {
+      issues.push({
+        code: 'invalid_measurement_provenance_raw_hash_format',
+        severity: 'error',
+        detail: `Invalid SHA-256 hash format for raw artifact ref: ${ref}`,
+      });
+    }
   }
 
   if (uSemNm == null || uSemNm <= 0) {
@@ -224,6 +305,10 @@ export const validateSemEllipsPairedEvidence = (options: {
       covarianceAnchorPresent,
       sourceClass,
       pairedRunId,
+      dataOrigin,
+      instrumentRunIdCount: instrumentRunIds.length,
+      rawArtifactRefCount: rawArtifactRefs.length,
+      rawArtifactHashCount: Object.keys(rawArtifactSha256).length,
       uSemNm,
       uEllipNm,
       rhoSemEllip,

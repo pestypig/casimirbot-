@@ -1,0 +1,45 @@
+{
+  "artifact_type": "external_warp_geometry_snapshot/v1",
+  "work_id": "EXT-WARP-NAT-001",
+  "title": "Natario 2002 zero-expansion warp metric",
+  "source_refs": [
+    "SRC-072"
+  ],
+  "chain_ids": [
+    "CH-WARP-001"
+  ],
+  "equation_anchors": [
+    "Definition 1.1 metric form",
+    "Corollary 1.5 div X = 0 control lane",
+    "Theorem 1.7 geometry-derived stress identity"
+  ],
+  "assumption_domain": {
+    "class": "adm_shift_lapse_metric",
+    "comparability": "direct",
+    "notes": "Directly comparable to local Natario-family geometry checks."
+  },
+  "geometry_signature": {
+    "metric_form_alignment": {
+      "status": "pass",
+      "reason_code": "natario_metric_definition_present"
+    },
+    "shift_mapping": {
+      "status": "pass",
+      "reason_code": "shift_vector_mapping_present"
+    },
+    "york_time_sign_parity": {
+      "status": "pass",
+      "reason_code": "expansion_trace_sign_mapping_present"
+    },
+    "natario_control_behavior": {
+      "status": "pass",
+      "reason_code": "zero_expansion_control_anchor_present"
+    },
+    "metric_derived_t00_path": {
+      "status": "pass",
+      "reason_code": "geometry_tied_stress_identity_present"
+    }
+  },
+  "blockers": [],
+  "status": "extracted"
+}

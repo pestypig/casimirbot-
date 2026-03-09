@@ -20,9 +20,9 @@ Define strict, reproducible rules for building and evaluating the `sem_ellipsome
 
 Signal interpretation:
 1. `sem_calibration_anchor`: SEM calibration evidence (must include `EXP-SE-003` class anchors).
-2. `ellipsometry_anchor`: ellipsometry thickness/uncertainty anchors (must include `EXP-SE-012` and/or `EXP-SE-013` class anchors).
+2. `ellipsometry_anchor`: ellipsometry thickness/uncertainty anchors (must include `EXP-SE-012` and/or `EXP-SE-013`, and should include NIST SRM transfer anchors `EXP-SE-021..EXP-SE-031` when available).
 3. `uncertainty_reporting_anchor`: explicit uncertainty reporting contract anchors (must include `EXP-SE-009` and/or `EXP-SE-013` class anchors).
-4. `traceability_anchor`: standards traceability anchors (must include `EXP-SE-001` and `EXP-SE-002` class anchors).
+4. `traceability_anchor`: standards traceability anchors (must include `EXP-SE-001` and `EXP-SE-002`; NIST SRM certification anchors `EXP-SE-021..EXP-SE-024` are preferred for reportable closure).
 
 ## Source Policy
 1. Pass-1, pass-2, and reportable packs are filtered to `source_class in {primary,standard}`.
@@ -44,7 +44,13 @@ Lane sweep is fixed to:
    - `blockedReasons` must include:
      - `missing_paired_dual_instrument_run`
      - `missing_covariance_uncertainty_anchor`
-3. Reportable readiness can only move to true when paired SEM+ellipsometry run evidence and covariance uncertainty anchors are present under strict source policy.
+     - `measurement_provenance_not_instrument_export`
+     - `missing_measurement_provenance_run_ids`
+     - `missing_measurement_provenance_raw_refs`
+     - `missing_measurement_provenance_raw_hashes`
+     - `missing_measurement_provenance_raw_hash_for_ref`
+     - `invalid_measurement_provenance_raw_hash_format`
+3. Reportable readiness can only move to true when paired SEM+ellipsometry run evidence, covariance uncertainty anchors, and measurement provenance anchors are present under strict source policy.
 4. Artifact-set contract for unlock is defined in:
    - `docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md`
    - `docs/specs/casimir-tile-sem-ellipsometry-covariance-budget-template-v1.md`
@@ -54,6 +60,10 @@ Lane sweep is fixed to:
 When paired-run evidence is available, rebuild reportable packs with:
 ```bash
 npm run warp:shadow:build-se-packs -- --paired-evidence docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json
+```
+Or use the starter bundle path:
+```bash
+npm run warp:shadow:build-se-packs -- --paired-evidence docs/specs/data/se-paired-runs-template-2026-03-08/se-paired-run-evidence.v1.json
 ```
 Builder behavior:
 1. Default (no `--paired-evidence`): reportable remains fail-closed blocked.
@@ -82,7 +92,9 @@ Each `sem_ellipsometry` scenario should include:
 ## Congruence Contract
 Per scenario, checker output must emit:
 1. `evidenceCongruence` in `{congruent,incongruent,unknown}`
-2. deterministic reason codes, including:
+2. `reportableReady` and `blockedReasons[]`
+3. `reducedReasonCodes[]` per scenario and `summary.reducedReasonCounts`
+4. deterministic reason codes, including:
    - `missing_sem_calibration_anchor`
    - `missing_ellipsometry_anchor`
    - `missing_uncertainty_reporting_anchor`
@@ -92,8 +104,15 @@ Per scenario, checker output must emit:
    - `U_fused_exceeds_profile:<profile>`
    - `edge_uncertainty_overlap`
    - `reportable_not_ready`
+   - `missing_reportable_blocked_reasons`
    - `missing_paired_dual_instrument_run`
    - `missing_covariance_uncertainty_anchor`
+   - `measurement_provenance_not_instrument_export`
+   - `missing_measurement_provenance_run_ids`
+   - `missing_measurement_provenance_raw_refs`
+   - `missing_measurement_provenance_raw_hashes`
+   - `missing_measurement_provenance_raw_hash_for_ref`
+   - `invalid_measurement_provenance_raw_hash_format`
 
 Edge policy:
 1. Boundary-overlap cases classify as `unknown`.

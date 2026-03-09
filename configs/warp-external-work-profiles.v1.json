@@ -1,0 +1,1032 @@
+{
+  "schema_version": "external_work_profile/v1",
+  "boundary_statement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "defaults": {
+    "data_policy": "snapshot_first",
+    "comparison_depth": "dual_track",
+    "reference_only": true,
+    "canonical_blocking": false
+  },
+  "profiles": [
+    {
+      "work_id": "EXT-TI-001",
+      "title": "White Rabbit sub-ns synchronization baseline replay",
+      "source_refs": [
+        "SRC-031",
+        "SRC-067",
+        "SRC-068"
+      ],
+      "chain_ids": [
+        "CH-T-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": true,
+        "lane": "timing",
+        "scenario_pack": "configs/warp-shadow-injection-scenarios.ti-primary-typed.v1.json",
+        "checker_script": "scripts/warp-shadow-timing-compat-check.ts",
+        "required_anchors": [
+          "EXP-T-001",
+          "EXP-T-003",
+          "EXP-T-029"
+        ]
+      },
+      "track_method": {
+        "enabled": false,
+        "reason": "no method-faithful replay plugin declared for this work profile"
+      },
+      "comparison_keys": [
+        {
+          "id": "timing_typed_congruent",
+          "local_reference_path": "evidence_lanes.timing.typed.summary.congruent",
+          "external_path": "mirror_track.compat.summary.congruent",
+          "mode": "delta",
+          "tolerance": 0
+        },
+        {
+          "id": "timing_typed_unknown",
+          "local_reference_path": "evidence_lanes.timing.typed.summary.unknown",
+          "external_path": "mirror_track.compat.summary.unknown",
+          "mode": "delta",
+          "tolerance": 0
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-QCD-001",
+      "title": "STAR Nature 2026 hadronization analog replay",
+      "source_refs": [
+        "SRC-069",
+        "SRC-070"
+      ],
+      "chain_ids": [
+        "CH-QCD-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "no direct mirror lane mapping for this analog profile"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-qcd-analog-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/qcd-hepdata-record-159491.v1.json",
+          "docs/specs/data/qcd-hepdata-table-159491-t3.v1.json",
+          "docs/specs/data/qcd-hepdata-table-159491-t4.v1.json",
+          "docs/specs/data/qcd-hepdata-table-159491-t5.v1.json"
+        ],
+        "args": {
+          "record": "docs/specs/data/qcd-hepdata-record-159491.v1.json",
+          "table-short": "docs/specs/data/qcd-hepdata-table-159491-t3.v1.json",
+          "table-long": "docs/specs/data/qcd-hepdata-table-159491-t4.v1.json",
+          "table-dr": "docs/specs/data/qcd-hepdata-table-159491-t5.v1.json",
+          "registry": "docs/specs/casimir-tile-experimental-parameter-registry-2026-03-04.md"
+        },
+        "expected_output_keys": [
+          "replay.derived.shortZScore",
+          "replay.derived.longZScore",
+          "replay.derived.drNearFarRatio",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "qcd_short_z_parity",
+          "local_reference_path": "evidence_lanes.qcd_analog.replay.z_score_short",
+          "external_path": "method_track.extracted.replay.derived.shortZScore",
+          "mode": "delta",
+          "tolerance": 0.000001
+        },
+        {
+          "id": "qcd_long_z_parity",
+          "local_reference_path": "evidence_lanes.qcd_analog.replay.z_score_long",
+          "external_path": "method_track.extracted.replay.derived.longZScore",
+          "mode": "delta",
+          "tolerance": 0.000001
+        },
+        {
+          "id": "qcd_dr_ratio_parity",
+          "local_reference_path": "evidence_lanes.qcd_analog.replay.dr_near_far_ratio",
+          "external_path": "method_track.extracted.replay.derived.drNearFarRatio",
+          "mode": "delta",
+          "tolerance": 0.000001
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-GR-MERC-001",
+      "title": "Einstein (1915) Mercury perihelion precession observable replay",
+      "source_refs": [
+        "SRC-075",
+        "SRC-076"
+      ],
+      "chain_ids": [
+        "CH-GR-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "observable anchor is method-track only in this wave"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-gr-mercury-precession-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/gr-mercury-perihelion-einstein-1915.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/gr-mercury-perihelion-einstein-1915.v1.json",
+          "work-id": "EXT-GR-MERC-001"
+        },
+        "expected_output_keys": [
+          "gr_observable_signature.mercury_perihelion_precession.status",
+          "gr_observable_signature.mercury_perihelion_precession.predicted_arcsec_per_century",
+          "gr_observable_signature.mercury_perihelion_precession.observed_arcsec_per_century",
+          "gr_observable_signature.mercury_perihelion_precession.residual_arcsec_per_century",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "grm_mercury_status",
+          "local_reference_path": "gr_observables.mercury_perihelion.status",
+          "external_path": "method_track.extracted.gr_observable_signature.mercury_perihelion_precession.status",
+          "mode": "equals"
+        },
+        {
+          "id": "grm_mercury_predicted_arcsec_century",
+          "local_reference_path": "gr_observables.mercury_perihelion.predicted_arcsec_per_century",
+          "external_path": "method_track.extracted.gr_observable_signature.mercury_perihelion_precession.predicted_arcsec_per_century",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grm_mercury_observed_arcsec_century",
+          "local_reference_path": "gr_observables.mercury_perihelion.observed_arcsec_per_century",
+          "external_path": "method_track.extracted.gr_observable_signature.mercury_perihelion_precession.observed_arcsec_per_century",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grm_mercury_residual_arcsec_century",
+          "local_reference_path": "gr_observables.mercury_perihelion.residual_arcsec_per_century",
+          "external_path": "method_track.extracted.gr_observable_signature.mercury_perihelion_precession.residual_arcsec_per_century",
+          "mode": "delta",
+          "tolerance": 1e-9
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-GR-LENS-001",
+      "title": "GR light-deflection observable replay (historical + modern)",
+      "source_refs": [
+        "SRC-077",
+        "SRC-078",
+        "SRC-079"
+      ],
+      "chain_ids": [
+        "CH-GR-002"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "observable anchor is method-track only in this wave"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-gr-lensing-deflection-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/gr-lensing-deflection-observable.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/gr-lensing-deflection-observable.v1.json",
+          "work-id": "EXT-GR-LENS-001"
+        },
+        "expected_output_keys": [
+          "gr_observable_signature.lensing_deflection.status",
+          "gr_observable_signature.lensing_deflection.predicted_limb_arcsec",
+          "gr_observable_signature.lensing_deflection.historical_observed_arcsec",
+          "gr_observable_signature.lensing_deflection.historical_residual_arcsec",
+          "gr_observable_signature.lensing_deflection.modern_gamma_measured",
+          "gr_observable_signature.lensing_deflection.modern_gamma_residual",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "grl_lensing_status",
+          "local_reference_path": "gr_observables.lensing_deflection.status",
+          "external_path": "method_track.extracted.gr_observable_signature.lensing_deflection.status",
+          "mode": "equals"
+        },
+        {
+          "id": "grl_lensing_predicted_arcsec",
+          "local_reference_path": "gr_observables.lensing_deflection.predicted_limb_arcsec",
+          "external_path": "method_track.extracted.gr_observable_signature.lensing_deflection.predicted_limb_arcsec",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grl_lensing_observed_arcsec",
+          "local_reference_path": "gr_observables.lensing_deflection.historical_observed_arcsec",
+          "external_path": "method_track.extracted.gr_observable_signature.lensing_deflection.historical_observed_arcsec",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grl_lensing_residual_arcsec",
+          "local_reference_path": "gr_observables.lensing_deflection.historical_residual_arcsec",
+          "external_path": "method_track.extracted.gr_observable_signature.lensing_deflection.historical_residual_arcsec",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grl_lensing_gamma_measured",
+          "local_reference_path": "gr_observables.lensing_deflection.modern_gamma_measured",
+          "external_path": "method_track.extracted.gr_observable_signature.lensing_deflection.modern_gamma_measured",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grl_lensing_gamma_residual",
+          "local_reference_path": "gr_observables.lensing_deflection.modern_gamma_residual",
+          "external_path": "method_track.extracted.gr_observable_signature.lensing_deflection.modern_gamma_residual",
+          "mode": "delta",
+          "tolerance": 1e-9
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-GR-FD-001",
+      "title": "GR frame-dragging observable replay (LAGEOS + GP-B + LARES context)",
+      "source_refs": [
+        "SRC-080",
+        "SRC-081",
+        "SRC-082"
+      ],
+      "chain_ids": [
+        "CH-GR-003"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "observable anchor is method-track only in this wave"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-gr-frame-dragging-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/gr-frame-dragging-observable.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/gr-frame-dragging-observable.v1.json",
+          "work-id": "EXT-GR-FD-001"
+        },
+        "expected_output_keys": [
+          "gr_observable_signature.frame_dragging.status",
+          "gr_observable_signature.frame_dragging.gpb_predicted_mas_per_year",
+          "gr_observable_signature.frame_dragging.gpb_observed_mas_per_year",
+          "gr_observable_signature.frame_dragging.gpb_residual_mas_per_year",
+          "gr_observable_signature.frame_dragging.lageos_observed_ratio",
+          "gr_observable_signature.frame_dragging.lageos_residual_ratio",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "grf_frame_dragging_status",
+          "local_reference_path": "gr_observables.frame_dragging.status",
+          "external_path": "method_track.extracted.gr_observable_signature.frame_dragging.status",
+          "mode": "equals"
+        },
+        {
+          "id": "grf_gpb_predicted",
+          "local_reference_path": "gr_observables.frame_dragging.gpb_predicted_mas_per_year",
+          "external_path": "method_track.extracted.gr_observable_signature.frame_dragging.gpb_predicted_mas_per_year",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grf_gpb_observed",
+          "local_reference_path": "gr_observables.frame_dragging.gpb_observed_mas_per_year",
+          "external_path": "method_track.extracted.gr_observable_signature.frame_dragging.gpb_observed_mas_per_year",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grf_gpb_residual",
+          "local_reference_path": "gr_observables.frame_dragging.gpb_residual_mas_per_year",
+          "external_path": "method_track.extracted.gr_observable_signature.frame_dragging.gpb_residual_mas_per_year",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grf_lageos_observed",
+          "local_reference_path": "gr_observables.frame_dragging.lageos_observed_ratio",
+          "external_path": "method_track.extracted.gr_observable_signature.frame_dragging.lageos_observed_ratio",
+          "mode": "delta",
+          "tolerance": 1e-9
+        },
+        {
+          "id": "grf_lageos_residual",
+          "local_reference_path": "gr_observables.frame_dragging.lageos_residual_ratio",
+          "external_path": "method_track.extracted.gr_observable_signature.frame_dragging.lageos_residual_ratio",
+          "mode": "delta",
+          "tolerance": 1e-9
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-GR-SHAP-001",
+      "title": "GR Shapiro-delay observable replay (proposal + Cassini precision test)",
+      "source_refs": [
+        "SRC-083",
+        "SRC-084"
+      ],
+      "chain_ids": [
+        "CH-GR-004"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "observable anchor is method-track only in this wave"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-gr-shapiro-delay-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/gr-shapiro-delay-observable.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/gr-shapiro-delay-observable.v1.json",
+          "work-id": "EXT-GR-SHAP-001"
+        },
+        "expected_output_keys": [
+          "gr_observable_signature.shapiro_delay.status",
+          "gr_observable_signature.shapiro_delay.gamma_minus_one_measured",
+          "gr_observable_signature.shapiro_delay.gamma_estimated",
+          "gr_observable_signature.shapiro_delay.gamma_residual",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "grs_shapiro_status",
+          "local_reference_path": "gr_observables.shapiro_delay.status",
+          "external_path": "method_track.extracted.gr_observable_signature.shapiro_delay.status",
+          "mode": "equals"
+        },
+        {
+          "id": "grs_shapiro_gamma_minus_one",
+          "local_reference_path": "gr_observables.shapiro_delay.gamma_minus_one_measured",
+          "external_path": "method_track.extracted.gr_observable_signature.shapiro_delay.gamma_minus_one_measured",
+          "mode": "delta",
+          "tolerance": 1e-12
+        },
+        {
+          "id": "grs_shapiro_gamma_estimated",
+          "local_reference_path": "gr_observables.shapiro_delay.gamma_estimated",
+          "external_path": "method_track.extracted.gr_observable_signature.shapiro_delay.gamma_estimated",
+          "mode": "delta",
+          "tolerance": 1e-12
+        },
+        {
+          "id": "grs_shapiro_gamma_residual",
+          "local_reference_path": "gr_observables.shapiro_delay.gamma_residual",
+          "external_path": "method_track.extracted.gr_observable_signature.shapiro_delay.gamma_residual",
+          "mode": "delta",
+          "tolerance": 1e-12
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-ALC-001",
+      "title": "Alcubierre (1994) geometry-first replay",
+      "source_refs": [
+        "SRC-071"
+      ],
+      "chain_ids": [
+        "CH-WARP-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "geometry-first Core-4 wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-geometry-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-alcubierre-1994.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-alcubierre-1994.v1.json",
+          "work-id": "EXT-WARP-ALC-001"
+        },
+        "expected_output_keys": [
+          "geometry_signature.metric_form_alignment.status",
+          "geometry_signature.shift_mapping.status",
+          "geometry_signature.york_time_sign_parity.status",
+          "geometry_signature.natario_control_behavior.status",
+          "geometry_signature.metric_derived_t00_path.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "alc_metric_form_alignment",
+          "local_reference_path": "geometry_conformance.signature.metric_form_alignment.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_form_alignment.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alc_shift_mapping",
+          "local_reference_path": "geometry_conformance.signature.shift_mapping.status",
+          "external_path": "method_track.extracted.geometry_signature.shift_mapping.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alc_york_time_sign_parity",
+          "local_reference_path": "geometry_conformance.signature.york_time_sign_parity.status",
+          "external_path": "method_track.extracted.geometry_signature.york_time_sign_parity.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alc_natario_control_behavior",
+          "local_reference_path": "geometry_conformance.signature.natario_control_behavior.status",
+          "external_path": "method_track.extracted.geometry_signature.natario_control_behavior.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alc_metric_derived_t00_path",
+          "local_reference_path": "geometry_conformance.signature.metric_derived_t00_path.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_derived_t00_path.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-NAT-001",
+      "title": "Natario (2002) geometry-first replay",
+      "source_refs": [
+        "SRC-072"
+      ],
+      "chain_ids": [
+        "CH-WARP-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "geometry-first Core-4 wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-geometry-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-natario-2002.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-natario-2002.v1.json",
+          "work-id": "EXT-WARP-NAT-001"
+        },
+        "expected_output_keys": [
+          "geometry_signature.metric_form_alignment.status",
+          "geometry_signature.shift_mapping.status",
+          "geometry_signature.york_time_sign_parity.status",
+          "geometry_signature.natario_control_behavior.status",
+          "geometry_signature.metric_derived_t00_path.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "nat_metric_form_alignment",
+          "local_reference_path": "geometry_conformance.signature.metric_form_alignment.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_form_alignment.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nat_shift_mapping",
+          "local_reference_path": "geometry_conformance.signature.shift_mapping.status",
+          "external_path": "method_track.extracted.geometry_signature.shift_mapping.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nat_york_time_sign_parity",
+          "local_reference_path": "geometry_conformance.signature.york_time_sign_parity.status",
+          "external_path": "method_track.extracted.geometry_signature.york_time_sign_parity.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nat_natario_control_behavior",
+          "local_reference_path": "geometry_conformance.signature.natario_control_behavior.status",
+          "external_path": "method_track.extracted.geometry_signature.natario_control_behavior.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nat_metric_derived_t00_path",
+          "local_reference_path": "geometry_conformance.signature.metric_derived_t00_path.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_derived_t00_path.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-VDB-001",
+      "title": "Van den Broeck (1999) geometry-first replay",
+      "source_refs": [
+        "SRC-073"
+      ],
+      "chain_ids": [
+        "CH-WARP-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "geometry-first Core-4 wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-geometry-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-vandenbroeck-1999.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-vandenbroeck-1999.v1.json",
+          "work-id": "EXT-WARP-VDB-001"
+        },
+        "expected_output_keys": [
+          "geometry_signature.metric_form_alignment.status",
+          "geometry_signature.shift_mapping.status",
+          "geometry_signature.york_time_sign_parity.status",
+          "geometry_signature.natario_control_behavior.status",
+          "geometry_signature.metric_derived_t00_path.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "vdb_metric_form_alignment",
+          "local_reference_path": "geometry_conformance.signature.metric_form_alignment.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_form_alignment.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdb_shift_mapping",
+          "local_reference_path": "geometry_conformance.signature.shift_mapping.status",
+          "external_path": "method_track.extracted.geometry_signature.shift_mapping.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdb_york_time_sign_parity",
+          "local_reference_path": "geometry_conformance.signature.york_time_sign_parity.status",
+          "external_path": "method_track.extracted.geometry_signature.york_time_sign_parity.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdb_natario_control_behavior",
+          "local_reference_path": "geometry_conformance.signature.natario_control_behavior.status",
+          "external_path": "method_track.extracted.geometry_signature.natario_control_behavior.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdb_metric_derived_t00_path",
+          "local_reference_path": "geometry_conformance.signature.metric_derived_t00_path.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_derived_t00_path.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-LEN-001",
+      "title": "Lentz (2021) geometry-first replay",
+      "source_refs": [
+        "SRC-074"
+      ],
+      "chain_ids": [
+        "CH-WARP-001"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "geometry-first Core-4 wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-geometry-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-lentz-2021.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-lentz-2021.v1.json",
+          "work-id": "EXT-WARP-LEN-001"
+        },
+        "expected_output_keys": [
+          "geometry_signature.metric_form_alignment.status",
+          "geometry_signature.shift_mapping.status",
+          "geometry_signature.york_time_sign_parity.status",
+          "geometry_signature.natario_control_behavior.status",
+          "geometry_signature.metric_derived_t00_path.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "len_metric_form_alignment",
+          "local_reference_path": "geometry_conformance.signature.metric_form_alignment.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_form_alignment.status",
+          "mode": "equals"
+        },
+        {
+          "id": "len_shift_mapping",
+          "local_reference_path": "geometry_conformance.signature.shift_mapping.status",
+          "external_path": "method_track.extracted.geometry_signature.shift_mapping.status",
+          "mode": "equals"
+        },
+        {
+          "id": "len_york_time_sign_parity",
+          "local_reference_path": "geometry_conformance.signature.york_time_sign_parity.status",
+          "external_path": "method_track.extracted.geometry_signature.york_time_sign_parity.status",
+          "mode": "equals"
+        },
+        {
+          "id": "len_natario_control_behavior",
+          "local_reference_path": "geometry_conformance.signature.natario_control_behavior.status",
+          "external_path": "method_track.extracted.geometry_signature.natario_control_behavior.status",
+          "mode": "equals"
+        },
+        {
+          "id": "len_metric_derived_t00_path",
+          "local_reference_path": "geometry_conformance.signature.metric_derived_t00_path.status",
+          "external_path": "method_track.extracted.geometry_signature.metric_derived_t00_path.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-ALC-E001",
+      "title": "Alcubierre (1994) energetics/QEI reference replay",
+      "source_refs": [
+        "SRC-071",
+        "SRC-051",
+        "SRC-052"
+      ],
+      "chain_ids": [
+        "CH-WARP-002"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "Core-4 energetics/QEI wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-energetics-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-alcubierre-1994-energetics.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-alcubierre-1994-energetics.v1.json",
+          "work-id": "EXT-WARP-ALC-E001"
+        },
+        "expected_output_keys": [
+          "energetics_signature.negative_energy_branch_policy.status",
+          "energetics_signature.qei_worldline_requirement.status",
+          "energetics_signature.stress_source_contract.status",
+          "energetics_signature.assumption_domain_disclosure.status",
+          "energetics_signature.physical_feasibility_boundary.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "alce_negative_energy_branch_policy",
+          "local_reference_path": "energetics_qei_conformance.signature.negative_energy_branch_policy.status",
+          "external_path": "method_track.extracted.energetics_signature.negative_energy_branch_policy.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alce_qei_worldline_requirement",
+          "local_reference_path": "energetics_qei_conformance.signature.qei_worldline_requirement.status",
+          "external_path": "method_track.extracted.energetics_signature.qei_worldline_requirement.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alce_stress_source_contract",
+          "local_reference_path": "energetics_qei_conformance.signature.stress_source_contract.status",
+          "external_path": "method_track.extracted.energetics_signature.stress_source_contract.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alce_assumption_domain_disclosure",
+          "local_reference_path": "energetics_qei_conformance.signature.assumption_domain_disclosure.status",
+          "external_path": "method_track.extracted.energetics_signature.assumption_domain_disclosure.status",
+          "mode": "equals"
+        },
+        {
+          "id": "alce_physical_feasibility_boundary",
+          "local_reference_path": "energetics_qei_conformance.signature.physical_feasibility_boundary.status",
+          "external_path": "method_track.extracted.energetics_signature.physical_feasibility_boundary.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-NAT-E001",
+      "title": "Natario (2002) energetics/QEI reference replay",
+      "source_refs": [
+        "SRC-072",
+        "SRC-051",
+        "SRC-052"
+      ],
+      "chain_ids": [
+        "CH-WARP-002"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "Core-4 energetics/QEI wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-energetics-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-natario-2002-energetics.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-natario-2002-energetics.v1.json",
+          "work-id": "EXT-WARP-NAT-E001"
+        },
+        "expected_output_keys": [
+          "energetics_signature.negative_energy_branch_policy.status",
+          "energetics_signature.qei_worldline_requirement.status",
+          "energetics_signature.stress_source_contract.status",
+          "energetics_signature.assumption_domain_disclosure.status",
+          "energetics_signature.physical_feasibility_boundary.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "nate_negative_energy_branch_policy",
+          "local_reference_path": "energetics_qei_conformance.signature.negative_energy_branch_policy.status",
+          "external_path": "method_track.extracted.energetics_signature.negative_energy_branch_policy.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nate_qei_worldline_requirement",
+          "local_reference_path": "energetics_qei_conformance.signature.qei_worldline_requirement.status",
+          "external_path": "method_track.extracted.energetics_signature.qei_worldline_requirement.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nate_stress_source_contract",
+          "local_reference_path": "energetics_qei_conformance.signature.stress_source_contract.status",
+          "external_path": "method_track.extracted.energetics_signature.stress_source_contract.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nate_assumption_domain_disclosure",
+          "local_reference_path": "energetics_qei_conformance.signature.assumption_domain_disclosure.status",
+          "external_path": "method_track.extracted.energetics_signature.assumption_domain_disclosure.status",
+          "mode": "equals"
+        },
+        {
+          "id": "nate_physical_feasibility_boundary",
+          "local_reference_path": "energetics_qei_conformance.signature.physical_feasibility_boundary.status",
+          "external_path": "method_track.extracted.energetics_signature.physical_feasibility_boundary.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-VDB-E001",
+      "title": "Van den Broeck (1999) energetics/QEI reference replay",
+      "source_refs": [
+        "SRC-073",
+        "SRC-051",
+        "SRC-052"
+      ],
+      "chain_ids": [
+        "CH-WARP-002"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "Core-4 energetics/QEI wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-energetics-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-vandenbroeck-1999-energetics.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-vandenbroeck-1999-energetics.v1.json",
+          "work-id": "EXT-WARP-VDB-E001"
+        },
+        "expected_output_keys": [
+          "energetics_signature.negative_energy_branch_policy.status",
+          "energetics_signature.qei_worldline_requirement.status",
+          "energetics_signature.stress_source_contract.status",
+          "energetics_signature.assumption_domain_disclosure.status",
+          "energetics_signature.physical_feasibility_boundary.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "vdbe_negative_energy_branch_policy",
+          "local_reference_path": "energetics_qei_conformance.signature.negative_energy_branch_policy.status",
+          "external_path": "method_track.extracted.energetics_signature.negative_energy_branch_policy.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdbe_qei_worldline_requirement",
+          "local_reference_path": "energetics_qei_conformance.signature.qei_worldline_requirement.status",
+          "external_path": "method_track.extracted.energetics_signature.qei_worldline_requirement.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdbe_stress_source_contract",
+          "local_reference_path": "energetics_qei_conformance.signature.stress_source_contract.status",
+          "external_path": "method_track.extracted.energetics_signature.stress_source_contract.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdbe_assumption_domain_disclosure",
+          "local_reference_path": "energetics_qei_conformance.signature.assumption_domain_disclosure.status",
+          "external_path": "method_track.extracted.energetics_signature.assumption_domain_disclosure.status",
+          "mode": "equals"
+        },
+        {
+          "id": "vdbe_physical_feasibility_boundary",
+          "local_reference_path": "energetics_qei_conformance.signature.physical_feasibility_boundary.status",
+          "external_path": "method_track.extracted.energetics_signature.physical_feasibility_boundary.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    },
+    {
+      "work_id": "EXT-WARP-LEN-E001",
+      "title": "Lentz (2021) energetics/QEI reference replay",
+      "source_refs": [
+        "SRC-074",
+        "SRC-051",
+        "SRC-052"
+      ],
+      "chain_ids": [
+        "CH-WARP-002"
+      ],
+      "commit_pin": "latest",
+      "track_mirror": {
+        "enabled": false,
+        "reason": "Core-4 energetics/QEI wave is method-track only"
+      },
+      "track_method": {
+        "enabled": true,
+        "script": "scripts/warp-shadow-warp-energetics-replay.ts",
+        "input_snapshots": [
+          "docs/specs/data/warp-core4-lentz-2021-energetics.v1.json"
+        ],
+        "args": {
+          "snapshot": "docs/specs/data/warp-core4-lentz-2021-energetics.v1.json",
+          "work-id": "EXT-WARP-LEN-E001"
+        },
+        "expected_output_keys": [
+          "energetics_signature.negative_energy_branch_policy.status",
+          "energetics_signature.qei_worldline_requirement.status",
+          "energetics_signature.stress_source_contract.status",
+          "energetics_signature.assumption_domain_disclosure.status",
+          "energetics_signature.physical_feasibility_boundary.status",
+          "comparison_result.status",
+          "reason_codes",
+          "recompute_ready",
+          "replay.status"
+        ]
+      },
+      "comparison_keys": [
+        {
+          "id": "lene_negative_energy_branch_policy",
+          "local_reference_path": "energetics_qei_conformance.signature.negative_energy_branch_policy.status",
+          "external_path": "method_track.extracted.energetics_signature.negative_energy_branch_policy.status",
+          "mode": "equals"
+        },
+        {
+          "id": "lene_qei_worldline_requirement",
+          "local_reference_path": "energetics_qei_conformance.signature.qei_worldline_requirement.status",
+          "external_path": "method_track.extracted.energetics_signature.qei_worldline_requirement.status",
+          "mode": "equals"
+        },
+        {
+          "id": "lene_stress_source_contract",
+          "local_reference_path": "energetics_qei_conformance.signature.stress_source_contract.status",
+          "external_path": "method_track.extracted.energetics_signature.stress_source_contract.status",
+          "mode": "equals"
+        },
+        {
+          "id": "lene_assumption_domain_disclosure",
+          "local_reference_path": "energetics_qei_conformance.signature.assumption_domain_disclosure.status",
+          "external_path": "method_track.extracted.energetics_signature.assumption_domain_disclosure.status",
+          "mode": "equals"
+        },
+        {
+          "id": "lene_physical_feasibility_boundary",
+          "local_reference_path": "energetics_qei_conformance.signature.physical_feasibility_boundary.status",
+          "external_path": "method_track.extracted.energetics_signature.physical_feasibility_boundary.status",
+          "mode": "equals"
+        }
+      ],
+      "posture": {
+        "reference_only": true,
+        "canonical_blocking": false
+      }
+    }
+  ]
+}

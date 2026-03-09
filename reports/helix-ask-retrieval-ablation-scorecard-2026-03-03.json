@@ -1,6 +1,6 @@
 {
-  "runId": "retrieval-ablation-1772730019929",
-  "generatedAt": "2026-03-05T17:00:19.930Z",
+  "runId": "retrieval-ablation-1772828749960",
+  "generatedAt": "2026-03-06T20:25:49.961Z",
   "seeds": [
     7,
     11,
@@ -42,21 +42,21 @@
             "gold_file_recall_at_5": 0.95,
             "gold_file_recall_at_10": 0.95,
             "consequential_file_retention_rate": 0.95,
-            "rerank_mrr10": 0.83125,
-            "graph_edge_hit_rate": 0.975,
-            "retrieval_confidence_mean": 0.8245714775516564,
-            "retrieval_doc_share_mean": 0.2766535007247082,
-            "unmatched_expected_file_rate": 0.025
+            "rerank_mrr10": 0.85,
+            "graph_edge_hit_rate": 0.95,
+            "retrieval_confidence_mean": 0.8173381012790589,
+            "retrieval_doc_share_mean": 0.29937017407483435,
+            "unmatched_expected_file_rate": 0.05
           },
           "canonicalized_metrics": {
-            "gold_file_recall_at_5": 0.975,
-            "gold_file_recall_at_10": 0.975,
-            "consequential_file_retention_rate": 0.975,
-            "rerank_mrr10": 0.8375,
-            "graph_edge_hit_rate": 0.975,
-            "retrieval_confidence_mean": 0.8245714775516564,
-            "retrieval_doc_share_mean": 0.2766535007247082,
-            "unmatched_expected_file_rate": 0.025
+            "gold_file_recall_at_5": 0.95,
+            "gold_file_recall_at_10": 0.95,
+            "consequential_file_retention_rate": 0.95,
+            "rerank_mrr10": 0.85,
+            "graph_edge_hit_rate": 0.95,
+            "retrieval_confidence_mean": 0.8173381012790589,
+            "retrieval_doc_share_mean": 0.29937017407483435,
+            "unmatched_expected_file_rate": 0.05
           },
           "task_results": [
             {
@@ -64,54 +64,30 @@
               "expected_files": [
                 "server/horizons-proxy.ts"
               ],
-              "top5": [
-                "server/config/knowledge.ts",
-                "client/src/data/hr-presets.ts",
-                "server/services/knowledge/corpus.ts",
-                "server/utils/horizons-proxy.ts",
-                "server/services/knowledge/citations.ts"
-              ],
-              "top10": [
-                "server/config/knowledge.ts",
-                "client/src/data/hr-presets.ts",
-                "server/services/knowledge/corpus.ts",
-                "server/utils/horizons-proxy.ts",
-                "server/services/knowledge/citations.ts",
-                "server/services/knowledge/validation.ts",
-                "server/services/knowledge/merge.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "shared/essence-themes.ts",
-                "tests/theory-checks.spec.ts"
-              ],
+              "top5": [],
+              "top10": [],
               "rawHits5": 0,
               "rawHits10": 0,
-              "canonHits5": 1,
-              "canonHits10": 1,
+              "canonHits5": 0,
+              "canonHits10": 0,
               "rawRR": 0,
-              "canonRR": 0.25,
-              "mode": "alias",
-              "mismatchReasons": [],
-              "mismatchTaxonomy": [],
+              "canonRR": 0,
+              "mode": "none",
+              "mismatchReasons": [
+                "server/horizons-proxy.ts:retrieval_miss"
+              ],
+              "mismatchTaxonomy": [
+                "retrieval_miss"
+              ],
               "expectedNormalized": [
                 "server/horizons-proxy.ts"
               ],
-              "retrievedNormalizedTop10": [
-                "server/config/knowledge.ts",
-                "client/src/data/hr-presets.ts",
-                "server/services/knowledge/corpus.ts",
-                "server/utils/horizons-proxy.ts",
-                "server/services/knowledge/citations.ts",
-                "server/services/knowledge/validation.ts",
-                "server/services/knowledge/merge.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "shared/essence-themes.ts",
-                "tests/theory-checks.spec.ts"
-              ],
-              "contextSource": "retrieval_context_files",
-              "top10Fingerprint": "server/config/knowledge.ts|client/src/data/hr-presets.ts|server/services/knowledge/corpus.ts|server/utils/horizons-proxy.ts|server/services/knowledge/citations.ts|server/services/knowledge/validation.ts|server/services/knowledge/merge.ts|modules/dynamic/dynamic-casimir.ts|shared/essence-themes.ts|tests/theory-checks.spec.ts",
-              "graphEdgeHit": true,
-              "confidence": 0.8761904761904764,
-              "docShare": 0.047619047619047616,
+              "retrievedNormalizedTop10": [],
+              "contextSource": "none",
+              "top10Fingerprint": "<empty>",
+              "graphEdgeHit": false,
+              "confidence": null,
+              "docShare": null,
               "atlasGraphSelectedCount": 0,
               "atlasGraphRuntimeLinkCount": 0,
               "atlasGraphEdgeTypeCounts": {}
@@ -121,54 +97,30 @@
               "expected_files": [
                 "server/utils/horizons-proxy.ts"
               ],
-              "top5": [
-                "server/config/knowledge.ts",
-                "client/src/data/hr-presets.ts",
-                "server/services/knowledge/corpus.ts",
-                "server/utils/horizons-proxy.ts",
-                "server/services/knowledge/citations.ts"
+              "top5": [],
+              "top10": [],
+              "rawHits5": 0,
+              "rawHits10": 0,
+              "canonHits5": 0,
+              "canonHits10": 0,
+              "rawRR": 0,
+              "canonRR": 0,
+              "mode": "none",
+              "mismatchReasons": [
+                "server/utils/horizons-proxy.ts:retrieval_miss"
               ],
-              "top10": [
-                "server/config/knowledge.ts",
-                "client/src/data/hr-presets.ts",
-                "server/services/knowledge/corpus.ts",
-                "server/utils/horizons-proxy.ts",
-                "server/services/knowledge/citations.ts",
-                "server/services/knowledge/validation.ts",
-                "server/services/knowledge/merge.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "shared/essence-themes.ts",
-                "tests/theory-checks.spec.ts"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "rawHits5": 1,
-              "rawHits10": 1,
-              "canonHits5": 1,
-              "canonHits10": 1,
-              "rawRR": 0.25,
-              "canonRR": 0.25,
-              "mode": "exact",
-              "mismatchReasons": [],
-              "mismatchTaxonomy": [],
               "expectedNormalized": [
                 "server/utils/horizons-proxy.ts"
               ],
-              "retrievedNormalizedTop10": [
-                "server/config/knowledge.ts",
-                "client/src/data/hr-presets.ts",
-                "server/services/knowledge/corpus.ts",
-                "server/utils/horizons-proxy.ts",
-                "server/services/knowledge/citations.ts",
-                "server/services/knowledge/validation.ts",
-                "server/services/knowledge/merge.ts",
-                "modules/dynamic/dynamic-casimir.ts",
-                "shared/essence-themes.ts",
-                "tests/theory-checks.spec.ts"
-              ],
-              "contextSource": "retrieval_context_files",
-              "top10Fingerprint": "server/config/knowledge.ts|client/src/data/hr-presets.ts|server/services/knowledge/corpus.ts|server/utils/horizons-proxy.ts|server/services/knowledge/citations.ts|server/services/knowledge/validation.ts|server/services/knowledge/merge.ts|modules/dynamic/dynamic-casimir.ts|shared/essence-themes.ts|tests/theory-checks.spec.ts",
-              "graphEdgeHit": true,
-              "confidence": 0.8761904761904764,
-              "docShare": 0.047619047619047616,
+              "retrievedNormalizedTop10": [],
+              "contextSource": "none",
+              "top10Fingerprint": "<empty>",
+              "graphEdgeHit": false,
+              "confidence": null,
+              "docShare": null,
               "atlasGraphSelectedCount": 0,
               "atlasGraphRuntimeLinkCount": 0,
               "atlasGraphEdgeTypeCounts": {}
@@ -577,30 +529,54 @@
               "expected_files": [
                 "server/gr/gr-os-payload.ts"
               ],
-              "top5": [],
-              "top10": [],
-              "rawHits5": 0,
-              "rawHits10": 0,
-              "canonHits5": 0,
-              "canonHits10": 0,
-              "rawRR": 0,
-              "canonRR": 0,
-              "mode": "none",
-              "mismatchReasons": [
-                "server/gr/gr-os-payload.ts:retrieval_miss"
+              "top5": [
+                "server/gr/gr-os-payload.ts",
+                "../../shared/information-boundary.js",
+                "../../shared/schema.js",
+                "../energy-pipeline.js",
+                "client/src/components/ElectronOrbitalPanel.tsx"
               ],
-              "mismatchTaxonomy": [
-                "retrieval_miss"
+              "top10": [
+                "server/gr/gr-os-payload.ts",
+                "../../shared/information-boundary.js",
+                "../../shared/schema.js",
+                "../energy-pipeline.js",
+                "client/src/components/ElectronOrbitalPanel.tsx",
+                "client/src/hooks/useElectronOrbitSim.ts",
+                "docs/BUSINESS_MODEL.md",
+                "docs/knowledge/physics/math-tree.json",
+                "docs/helix-ask-flow.md",
+                "docs/stellar-consciousness-orch-or-review.md"
               ],
+              "rawHits5": 1,
+              "rawHits10": 1,
+              "canonHits5": 1,
+              "canonHits10": 1,
+              "rawRR": 1,
+              "canonRR": 1,
+              "mode": "exact",
+              "mismatchReasons": [],
+              "mismatchTaxonomy": [],
               "expectedNormalized": [
                 "server/gr/gr-os-payload.ts"
               ],
-              "retrievedNormalizedTop10": [],
-              "contextSource": "none",
-              "top10Fingerprint": "<empty>",
-              "graphEdgeHit": false,
-              "confidence": null,
-              "docShare": null,
+              "retrievedNormalizedTop10": [
+                "server/gr/gr-os-payload.ts",
+                "../../shared/information-boundary.js",
+                "../../shared/schema.js",
+                "../energy-pipeline.js",
+                "client/src/components/electronorbitalpanel.tsx",
+                "client/src/hooks/useelectronorbitsim.ts",
+                "docs/business_model.md",
+                "docs/knowledge/physics/math-tree.json",
+                "docs/helix-ask-flow.md",
+                "docs/stellar-consciousness-orch-or-review.md"
+              ],
+              "contextSource": "retrieval_context_files",
+              "top10Fingerprint": "server/gr/gr-os-payload.ts|../../shared/information-boundary.js|../../shared/schema.js|../energy-pipeline.js|client/src/components/electronorbitalpanel.tsx|client/src/hooks/useelectronorbitsim.ts|docs/business_model.md|docs/knowledge/physics/math-tree.json|docs/helix-ask-flow.md|docs/stellar-consciousness-orch-or-review.md",
+              "graphEdgeHit": true,
+              "confidence": 0.6529411764705884,
+              "docShare": 0.6818181818181818,
               "atlasGraphSelectedCount": 0,
               "atlasGraphRuntimeLinkCount": 0,
               "atlasGraphEdgeTypeCounts": {}
@@ -6848,99 +6824,99 @@
       ],
       "aggregate": {
         "gold_file_recall_at_5": {
-          "point_estimate": 0.9833333333333334,
+          "point_estimate": 0.975,
           "ci95": {
-            "low": 0.975,
+            "low": 0.9499999999999998,
             "high": 0.9918749999999998
           }
         },
         "gold_file_recall_at_10": {
-          "point_estimate": 0.9833333333333334,
+          "point_estimate": 0.975,
           "ci95": {
-            "low": 0.975,
+            "low": 0.9499999999999998,
             "high": 1
           }
         },
         "consequential_file_retention_rate": {
-          "point_estimate": 0.9833333333333334,
+          "point_estimate": 0.975,
           "ci95": {
-            "low": 0.975,
+            "low": 0.9499999999999998,
             "high": 1
           }
         },
         "rerank_mrr10": {
-          "point_estimate": 0.8520833333333334,
+          "point_estimate": 0.8562499999999998,
           "ci95": {
-            "low": 0.8375,
+            "low": 0.85,
             "high": 0.8625000000000002
           }
         },
         "graph_edge_hit_rate": {
-          "point_estimate": 0.9833333333333334,
+          "point_estimate": 0.975,
           "ci95": {
-            "low": 0.975,
+            "low": 0.9499999999999998,
             "high": 0.9916666666666667
           }
         },
         "retrieval_confidence_mean": {
-          "point_estimate": 0.8212432863800031,
+          "point_estimate": 0.8188321609558039,
           "ci95": {
-            "low": 0.8193453477173586,
-            "high": 0.8245714775516563
+            "low": 0.8173381012790589,
+            "high": 0.8202807200246299
           }
         },
         "retrieval_doc_share_mean": {
-          "point_estimate": 0.27964137267865335,
+          "point_estimate": 0.2872135971286955,
           "ci95": {
-            "low": 0.2758764999477074,
-            "high": 0.286782617752045
+            "low": 0.279252872290153,
+            "high": 0.29937017407483435
           }
         },
         "unmatched_expected_file_rate": {
-          "point_estimate": 0.016666666666666666,
+          "point_estimate": 0.025000000000000005,
           "ci95": {
             "low": 0.008125000000000012,
-            "high": 0.025000000000000005
+            "high": 0.05000000000000001
           }
         }
       },
       "diagnostics": {
-        "unmatched_expected_file_rate": 0.016666666666666666,
+        "unmatched_expected_file_rate": 0.025000000000000005,
         "expected_file_match_mode": {
           "exact": 115,
           "normalized": 0,
-          "alias": 3,
-          "none": 2
+          "alias": 2,
+          "none": 3
         },
         "mismatch_taxonomy_counts": {
           "path_form_mismatch": 0,
           "alias_unmapped": 0,
-          "retrieval_miss": 2,
+          "retrieval_miss": 3,
           "context_shape_mismatch": 0
         },
         "context_file_source_counts": {
-          "retrieval_context_files": 118,
+          "retrieval_context_files": 117,
           "context_files": 0,
-          "none": 2
+          "none": 3
         },
         "top10_fingerprint_unique_count": 40,
         "top10_fingerprint_total_count": 120,
         "top10_fingerprint_unique_rate": 0.333333,
-        "top10_fingerprint_dominant_count": 6,
-        "top10_fingerprint_dominant_share": 0.05,
+        "top10_fingerprint_dominant_count": 4,
+        "top10_fingerprint_dominant_share": 0.033333,
         "top10_fingerprint_dominant_sample": "server/config/knowledge.ts|client/src/data/hr-presets.ts|server/services/knowledge/corpus.ts",
         "top10_fingerprint_collapse_flag": false,
         "miss_bucket_counts": {
           "scripts": 1,
           "docs": 0,
-          "server": 1,
+          "server": 2,
           "client": 0,
           "other": 0
         },
         "miss_bucket_rates": {
-          "scripts": 0.5,
+          "scripts": 0.333333,
           "docs": 0,
-          "server": 0.5,
+          "server": 0.666667,
           "client": 0,
           "other": 0
         },
@@ -6953,17 +6929,39 @@
           {
             "seed": 7,
             "temperature": 0.2,
-            "taskId": "atlas_task_010",
+            "taskId": "atlas_task_001",
             "expectedRoot": "server",
             "mode": "none",
             "mismatchReasons": [
-              "server/gr/gr-os-payload.ts:retrieval_miss"
+              "server/horizons-proxy.ts:retrieval_miss"
             ],
             "mismatchTaxonomy": [
               "retrieval_miss"
             ],
             "expectedNormalized": [
-              "server/gr/gr-os-payload.ts"
+              "server/horizons-proxy.ts"
+            ],
+            "retrievedNormalizedTop10": [],
+            "contextSource": "none",
+            "top10Fingerprint": "<empty>",
+            "atlasGraphSelectedCount": 0,
+            "atlasGraphRuntimeLinkCount": 0,
+            "atlasGraphEdgeTypeCounts": {}
+          },
+          {
+            "seed": 7,
+            "temperature": 0.2,
+            "taskId": "atlas_task_002",
+            "expectedRoot": "server",
+            "mode": "none",
+            "mismatchReasons": [
+              "server/utils/horizons-proxy.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/utils/horizons-proxy.ts"
             ],
             "retrievedNormalizedTop10": [],
             "contextSource": "none",
@@ -14203,24 +14201,24 @@
           "seed": 7,
           "temperature": 0.2,
           "raw_metrics": {
+            "gold_file_recall_at_5": 0.95,
+            "gold_file_recall_at_10": 0.95,
+            "consequential_file_retention_rate": 0.95,
+            "rerank_mrr10": 0.84375,
+            "graph_edge_hit_rate": 0.975,
+            "retrieval_confidence_mean": 0.8068588546213499,
+            "retrieval_doc_share_mean": 0.2834923519848501,
+            "unmatched_expected_file_rate": 0.025
+          },
+          "canonicalized_metrics": {
             "gold_file_recall_at_5": 0.975,
             "gold_file_recall_at_10": 0.975,
             "consequential_file_retention_rate": 0.975,
-            "rerank_mrr10": 0.86875,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.8030109126675808,
-            "retrieval_doc_share_mean": 0.2904675431852288,
-            "unmatched_expected_file_rate": 0
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 1,
-            "gold_file_recall_at_10": 1,
-            "consequential_file_retention_rate": 1,
-            "rerank_mrr10": 0.875,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.8030109126675808,
-            "retrieval_doc_share_mean": 0.2904675431852288,
-            "unmatched_expected_file_rate": 0
+            "rerank_mrr10": 0.85,
+            "graph_edge_hit_rate": 0.975,
+            "retrieval_confidence_mean": 0.8068588546213499,
+            "retrieval_doc_share_mean": 0.2834923519848501,
+            "unmatched_expected_file_rate": 0.025
           },
           "task_results": [
             {
@@ -14741,54 +14739,30 @@
               "expected_files": [
                 "server/gr/gr-os-payload.ts"
               ],
-              "top5": [
-                "server/gr/gr-os-payload.ts",
-                "../../shared/information-boundary.js",
-                "../../shared/schema.js",
-                "../energy-pipeline.js",
-                "client/src/components/ElectronOrbitalPanel.tsx"
+              "top5": [],
+              "top10": [],
+              "rawHits5": 0,
+              "rawHits10": 0,
+              "canonHits5": 0,
+              "canonHits10": 0,
+              "rawRR": 0,
+              "canonRR": 0,
+              "mode": "none",
+              "mismatchReasons": [
+                "server/gr/gr-os-payload.ts:retrieval_miss"
               ],
-              "top10": [
-                "server/gr/gr-os-payload.ts",
-                "../../shared/information-boundary.js",
-                "../../shared/schema.js",
-                "../energy-pipeline.js",
-                "client/src/components/ElectronOrbitalPanel.tsx",
-                "client/src/hooks/useElectronOrbitSim.ts",
-                "docs/BUSINESS_MODEL.md",
-                "docs/knowledge/physics/math-tree.json",
-                "docs/helix-ask-flow.md",
-                "docs/stellar-consciousness-orch-or-review.md"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "rawHits5": 1,
-              "rawHits10": 1,
-              "canonHits5": 1,
-              "canonHits10": 1,
-              "rawRR": 1,
-              "canonRR": 1,
-              "mode": "exact",
-              "mismatchReasons": [],
-              "mismatchTaxonomy": [],
               "expectedNormalized": [
                 "server/gr/gr-os-payload.ts"
               ],
-              "retrievedNormalizedTop10": [
-                "server/gr/gr-os-payload.ts",
-                "../../shared/information-boundary.js",
-                "../../shared/schema.js",
-                "../energy-pipeline.js",
-                "client/src/components/electronorbitalpanel.tsx",
-                "client/src/hooks/useelectronorbitsim.ts",
-                "docs/business_model.md",
-                "docs/knowledge/physics/math-tree.json",
-                "docs/helix-ask-flow.md",
-                "docs/stellar-consciousness-orch-or-review.md"
-              ],
-              "contextSource": "retrieval_context_files",
-              "top10Fingerprint": "server/gr/gr-os-payload.ts|../../shared/information-boundary.js|../../shared/schema.js|../energy-pipeline.js|client/src/components/electronorbitalpanel.tsx|client/src/hooks/useelectronorbitsim.ts|docs/business_model.md|docs/knowledge/physics/math-tree.json|docs/helix-ask-flow.md|docs/stellar-consciousness-orch-or-review.md",
-              "graphEdgeHit": true,
-              "confidence": 0.6529411764705884,
-              "docShare": 0.5625,
+              "retrievedNormalizedTop10": [],
+              "contextSource": "none",
+              "top10Fingerprint": "<empty>",
+              "graphEdgeHit": false,
+              "confidence": null,
+              "docShare": null,
               "atlasGraphSelectedCount": 0,
               "atlasGraphRuntimeLinkCount": 0,
               "atlasGraphEdgeTypeCounts": {}
@@ -18775,24 +18749,24 @@
           "seed": 13,
           "temperature": 0.2,
           "raw_metrics": {
+            "gold_file_recall_at_5": 0.95,
+            "gold_file_recall_at_10": 0.95,
+            "consequential_file_retention_rate": 0.95,
+            "rerank_mrr10": 0.84375,
+            "graph_edge_hit_rate": 0.975,
+            "retrieval_confidence_mean": 0.8059371184054961,
+            "retrieval_doc_share_mean": 0.27868465967715783,
+            "unmatched_expected_file_rate": 0.025
+          },
+          "canonicalized_metrics": {
             "gold_file_recall_at_5": 0.975,
             "gold_file_recall_at_10": 0.975,
             "consequential_file_retention_rate": 0.975,
-            "rerank_mrr10": 0.86875,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.8030109126675808,
-            "retrieval_doc_share_mean": 0.2904675431852288,
-            "unmatched_expected_file_rate": 0
-          },
-          "canonicalized_metrics": {
-            "gold_file_recall_at_5": 1,
-            "gold_file_recall_at_10": 1,
-            "consequential_file_retention_rate": 1,
-            "rerank_mrr10": 0.875,
-            "graph_edge_hit_rate": 1,
-            "retrieval_confidence_mean": 0.8030109126675808,
-            "retrieval_doc_share_mean": 0.2904675431852288,
-            "unmatched_expected_file_rate": 0
+            "rerank_mrr10": 0.85,
+            "graph_edge_hit_rate": 0.975,
+            "retrieval_confidence_mean": 0.8059371184054961,
+            "retrieval_doc_share_mean": 0.27868465967715783,
+            "unmatched_expected_file_rate": 0.025
           },
           "task_results": [
             {
@@ -20054,50 +20028,30 @@
               "expected_files": [
                 "scripts/validate-ideology-verifiers.ts"
               ],
-              "top5": [
-                "scripts/validate-ideology-verifiers.ts",
-                "server/routes/ethos.ts",
-                "docs/BUSINESS_MODEL.md",
-                "docs/ethos/ideology.json",
-                "docs/knowledge/knowledge-ingestion-tree.json"
+              "top5": [],
+              "top10": [],
+              "rawHits5": 0,
+              "rawHits10": 0,
+              "canonHits5": 0,
+              "canonHits10": 0,
+              "rawRR": 0,
+              "canonRR": 0,
+              "mode": "none",
+              "mismatchReasons": [
+                "scripts/validate-ideology-verifiers.ts:retrieval_miss"
               ],
-              "top10": [
-                "scripts/validate-ideology-verifiers.ts",
-                "server/routes/ethos.ts",
-                "docs/BUSINESS_MODEL.md",
-                "docs/ethos/ideology.json",
-                "docs/knowledge/knowledge-ingestion-tree.json",
-                "docs/helix-ask-flow.md",
-                "docs/knowledge/zen-society-tree.json",
-                "docs/knowledge/ethos/ethos-knowledge-tree.json"
+              "mismatchTaxonomy": [
+                "retrieval_miss"
               ],
-              "rawHits5": 1,
-              "rawHits10": 1,
-              "canonHits5": 1,
-              "canonHits10": 1,
-              "rawRR": 1,
-              "canonRR": 1,
-              "mode": "exact",
-              "mismatchReasons": [],
-              "mismatchTaxonomy": [],
               "expectedNormalized": [
                 "scripts/validate-ideology-verifiers.ts"
               ],
-              "retrievedNormalizedTop10": [
-                "scripts/validate-ideology-verifiers.ts",
-                "server/routes/ethos.ts",
-                "docs/business_model.md",
-                "docs/ethos/ideology.json",
-                "docs/knowledge/knowledge-ingestion-tree.json",
-                "docs/helix-ask-flow.md",
-                "docs/knowledge/zen-society-tree.json",
-                "docs/knowledge/ethos/ethos-knowledge-tree.json"
-              ],
-              "contextSource": "retrieval_context_files",
-              "top10Fingerprint": "scripts/validate-ideology-verifiers.ts|server/routes/ethos.ts|docs/business_model.md|docs/ethos/ideology.json|docs/knowledge/knowledge-ingestion-tree.json|docs/helix-ask-flow.md|docs/knowledge/zen-society-tree.json|docs/knowledge/ethos/ethos-knowledge-tree.json",
-              "graphEdgeHit": true,
-              "confidence": 0.688888888888889,
-              "docShare": 0.75,
+              "retrievedNormalizedTop10": [],
+              "contextSource": "none",
+              "top10Fingerprint": "<empty>",
+              "graphEdgeHit": false,
+              "confidence": null,
+              "docShare": null,
               "atlasGraphSelectedCount": 0,
               "atlasGraphRuntimeLinkCount": 0,
               "atlasGraphEdgeTypeCounts": {}
@@ -21060,99 +21014,99 @@
       ],
       "aggregate": {
         "gold_file_recall_at_5": {
-          "point_estimate": 1,
+          "point_estimate": 0.9833333333333334,
           "ci95": {
-            "low": 1,
+            "low": 0.975,
             "high": 1
           }
         },
         "gold_file_recall_at_10": {
-          "point_estimate": 1,
+          "point_estimate": 0.9833333333333334,
           "ci95": {
-            "low": 1,
+            "low": 0.975,
             "high": 1
           }
         },
         "consequential_file_retention_rate": {
-          "point_estimate": 1,
+          "point_estimate": 0.9833333333333334,
           "ci95": {
-            "low": 1,
+            "low": 0.975,
             "high": 1
           }
         },
         "rerank_mrr10": {
-          "point_estimate": 0.875,
+          "point_estimate": 0.8583333333333334,
           "ci95": {
-            "low": 0.875,
+            "low": 0.85,
             "high": 0.875
           }
         },
         "graph_edge_hit_rate": {
-          "point_estimate": 1,
+          "point_estimate": 0.9833333333333334,
           "ci95": {
-            "low": 1,
+            "low": 0.975,
             "high": 1
           }
         },
         "retrieval_confidence_mean": {
-          "point_estimate": 0.8030109126675807,
+          "point_estimate": 0.8052689618981423,
           "ci95": {
             "low": 0.8030109126675807,
-            "high": 0.8030109126675807
+            "high": 0.8068588546213499
           }
         },
         "retrieval_doc_share_mean": {
-          "point_estimate": 0.2904675431852288,
+          "point_estimate": 0.2842148516157456,
           "ci95": {
-            "low": 0.2904675431852288,
+            "low": 0.27868465967715783,
             "high": 0.2904675431852288
           }
         },
         "unmatched_expected_file_rate": {
-          "point_estimate": 0,
+          "point_estimate": 0.016666666666666666,
           "ci95": {
-            "low": 0,
-            "high": 0
+            "low": 0.008333333333333333,
+            "high": 0.025000000000000005
           }
         }
       },
       "diagnostics": {
-        "unmatched_expected_file_rate": 0,
+        "unmatched_expected_file_rate": 0.016666666666666666,
         "expected_file_match_mode": {
-          "exact": 117,
+          "exact": 115,
           "normalized": 0,
           "alias": 3,
-          "none": 0
+          "none": 2
         },
         "mismatch_taxonomy_counts": {
           "path_form_mismatch": 0,
           "alias_unmapped": 0,
-          "retrieval_miss": 0,
+          "retrieval_miss": 2,
           "context_shape_mismatch": 0
         },
         "context_file_source_counts": {
-          "retrieval_context_files": 120,
+          "retrieval_context_files": 118,
           "context_files": 0,
-          "none": 0
+          "none": 2
         },
-        "top10_fingerprint_unique_count": 39,
+        "top10_fingerprint_unique_count": 40,
         "top10_fingerprint_total_count": 120,
-        "top10_fingerprint_unique_rate": 0.325,
+        "top10_fingerprint_unique_rate": 0.333333,
         "top10_fingerprint_dominant_count": 6,
         "top10_fingerprint_dominant_share": 0.05,
         "top10_fingerprint_dominant_sample": "server/config/knowledge.ts|client/src/data/hr-presets.ts|server/services/knowledge/corpus.ts",
         "top10_fingerprint_collapse_flag": false,
         "miss_bucket_counts": {
-          "scripts": 0,
+          "scripts": 1,
           "docs": 0,
-          "server": 0,
+          "server": 1,
           "client": 0,
           "other": 0
         },
         "miss_bucket_rates": {
-          "scripts": 0,
+          "scripts": 0.5,
           "docs": 0,
-          "server": 0,
+          "server": 0.5,
           "client": 0,
           "other": 0
         },
@@ -21161,10 +21115,55 @@
         "graph_selected_task_count": 30,
         "graph_runtime_link_task_count": 12,
         "graph_edge_type_counts": {},
-        "mismatch_reasons": []
+        "mismatch_reasons": [
+          {
+            "seed": 7,
+            "temperature": 0.2,
+            "taskId": "atlas_task_010",
+            "expectedRoot": "server",
+            "mode": "none",
+            "mismatchReasons": [
+              "server/gr/gr-os-payload.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "server/gr/gr-os-payload.ts"
+            ],
+            "retrievedNormalizedTop10": [],
+            "contextSource": "none",
+            "top10Fingerprint": "<empty>",
+            "atlasGraphSelectedCount": 0,
+            "atlasGraphRuntimeLinkCount": 0,
+            "atlasGraphEdgeTypeCounts": {}
+          },
+          {
+            "seed": 13,
+            "temperature": 0.2,
+            "taskId": "atlas_task_023",
+            "expectedRoot": "scripts",
+            "mode": "none",
+            "mismatchReasons": [
+              "scripts/validate-ideology-verifiers.ts:retrieval_miss"
+            ],
+            "mismatchTaxonomy": [
+              "retrieval_miss"
+            ],
+            "expectedNormalized": [
+              "scripts/validate-ideology-verifiers.ts"
+            ],
+            "retrievedNormalizedTop10": [],
+            "contextSource": "none",
+            "top10Fingerprint": "<empty>",
+            "atlasGraphSelectedCount": 0,
+            "atlasGraphRuntimeLinkCount": 0,
+            "atlasGraphEdgeTypeCounts": {}
+          }
+        ]
       },
       "stage_fault_matrix": {
-        "retrieval": 0,
+        "retrieval": 1,
         "candidate_filtering": 0,
         "rerank": 0,
         "synthesis_packing": 0,
@@ -28337,26 +28336,26 @@
   },
   "completedScenarioCount": 12,
   "driver_verdict": {
-    "retrieval_lift_proven": "yes",
+    "retrieval_lift_proven": "no",
     "dominant_channel": "atlas",
     "contributions": {
-      "atlas": 0.03333333333333355,
-      "git_tracked": -0.016666666666666607
+      "atlas": 0.025000000000000133,
+      "git_tracked": -0.008333333333333415
     },
     "contribution_ci95": {
       "atlas": {
-        "low": 0.025000000000000133,
+        "low": 0,
         "high": 0.050000000000000155
       },
       "git_tracked": {
-        "low": -0.025000000000000022,
-        "high": 0
+        "low": -0.050000000000000155,
+        "high": 0.025000000000000022
       }
     },
-    "bounded_confidence": true,
+    "bounded_confidence": false,
     "strict_gate": {
       "positive_lane_ablation_delta": true,
-      "bounded_confidence": true,
+      "bounded_confidence": false,
       "fault_owner_points_to_retrieval": true,
       "quality_floor_passed": true,
       "eval_fidelity_passed": true
@@ -28368,9 +28367,9 @@
         "min_consequential_file_retention_rate": 0.2
       },
       "observed": {
-        "unmatched_expected_file_rate": 0.016666666666666666,
-        "gold_file_recall_at_10": 0.9833333333333334,
-        "consequential_file_retention_rate": 0.9833333333333334
+        "unmatched_expected_file_rate": 0.025000000000000005,
+        "gold_file_recall_at_10": 0.975,
+        "consequential_file_retention_rate": 0.975
       },
       "checks": {
         "unmatched_expected_file_rate_ok": true,

@@ -7,6 +7,7 @@ export type StartSettings = {
   showZen: boolean;
   enableSplashCursor: boolean;
   showHelixAskDebug: boolean;
+  showHelixVoiceCaptureDiagnostics: boolean;
   showPowerShellDebug: boolean;
   powerShellScratch: string;
 };
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   showZen: true,
   enableSplashCursor: false,
   showHelixAskDebug: true,
+  showHelixVoiceCaptureDiagnostics: false,
   showPowerShellDebug: false,
   powerShellScratch: ""
 };
@@ -40,6 +42,7 @@ export function useHelixStartSettings() {
       if (parsed.settingsVersion !== DEFAULT_SETTINGS.settingsVersion) {
         merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
         merged.showHelixAskDebug = DEFAULT_SETTINGS.showHelixAskDebug;
+        merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
       }
       setUserSettings(merged);
     } catch {

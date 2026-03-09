@@ -25,6 +25,8 @@ import type { LumaMood } from "@/lib/luma-moods";
 import type { CollapseDecision, CollapseStrategyName } from "./orchestrator";
 import type { LocalCallSpec } from "@shared/local-call-spec";
 
+const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
+
 export type PlanResponse = {
   traceId: string;
   plan: unknown;
@@ -305,6 +307,16 @@ export type LocalAskResponse = {
     variant_selection_reason?: string;
     variant_selection_label?: string;
     variant_selection_candidate_count?: number;
+    capsule_dialogue_applied_count?: number;
+    capsule_evidence_applied_count?: number;
+    capsule_retry_applied?: boolean;
+    capsule_retry_triggered?: boolean;
+    capsule_retry_reason?: string;
+    capsule_latest_topic_shift?: boolean;
+    capsule_must_keep_terms?: string[];
+    capsule_preferred_paths?: string[];
+    focus_guard_result?: "pass" | "retry" | "clarify";
+    anchor_guard_result?: "pass" | "retry" | "clarify";
   };
 };
 
@@ -695,6 +707,8 @@ export type VoiceSpeakPayload = {
   text: string;
   mode?: "callout" | "briefing" | "debrief";
   priority?: "info" | "warn" | "critical" | "action";
+  provider?: string;
+  voiceProfile?: string;
   voice_profile_id?: string;
   traceId?: string;
   missionId?: string;
@@ -702,6 +716,12 @@ export type VoiceSpeakPayload = {
   contextTier?: "tier0" | "tier1";
   sessionState?: "idle" | "requesting" | "active" | "stopping" | "error";
   voiceMode?: "off" | "critical_only" | "normal" | "dnd";
+  utteranceId?: string;
+  chunkIndex?: number;
+  chunkCount?: number;
+  chunkKind?: "brief" | "final";
+  turnKey?: string;
+  dedupe_key?: string;
 };
 
 export type VoiceSpeakJsonResponse = {
@@ -719,13 +739,119 @@ export type VoiceSpeakResponse =
       kind: "json";
       status: number;
       payload: VoiceSpeakJsonResponse;
+      headers: {
+        provider: string | null;
+        profile: string | null;
+        cache: "hit" | "miss" | null;
+      };
     }
   | {
       kind: "audio";
       status: number;
       mimeType: string;
       blob: Blob;
+      headers: {
+        provider: string | null;
+        profile: string | null;
+        cache: "hit" | "miss" | null;
+      };
     };
+
+export type VoiceTranscribeSegment = {
+  text: string;
+  start_ms?: number;
+  end_ms?: number;
+  confidence?: number;
+};
+
+export type VoiceTranscribePayload = {
+  audio: Blob;
+  filename?: string;
+  language?: string;
+  traceId?: string;
+  missionId?: string;
+  durationMs?: number;
+};
+
+export type VoiceTranscribeResponse = {
+  ok?: boolean;
+  text?: string;
+  language?: string;
+  duration_ms?: number;
+  segments?: VoiceTranscribeSegment[];
+  source_text?: string | null;
+  source_language?: string | null;
+  translated?: boolean;
+  traceId?: string | null;
+  missionId?: string | null;
+  engine?: string;
+  essence_id?: string | null;
+  error?: string;
+  message?: string;
+  details?: Record<string, unknown>;
+};
+
+export type ConversationTurnClassification = {
+  mode: "observe" | "act" | "verify" | "clarify";
+  confidence: number;
+  dispatch_hint: boolean;
+  clarify_needed: boolean;
+  reason: string;
+  source?: "llm" | "fallback";
+};
+
+export type ConversationBrief = {
+  text: string;
+  source?: "llm" | "fallback";
+};
+
+export type ConversationDispatchDecision = {
+  dispatch_hint: boolean;
+  reason: string;
+};
+
+export type ConversationClarifierPolicy = "after_first_attempt";
+
+export type ConversationExplorationPacket = {
+  topic: string;
+  goal: string;
+  knowns: string[];
+  unknowns: string[];
+  evidence_needed: string[];
+  next_probe: string;
+};
+
+export type ConversationTurnPayload = {
+  transcript: string;
+  sessionId?: string;
+  traceId?: string;
+  missionId?: string;
+  personaId?: string;
+  sourceLanguage?: string;
+  translated?: boolean;
+  recentTurns?: string[];
+};
+
+export type ConversationTurnResponse = {
+  ok?: boolean;
+  traceId?: string | null;
+  sessionId?: string | null;
+  transcript?: string;
+  source_language?: string | null;
+  translated?: boolean;
+  classification?: ConversationTurnClassification;
+  brief?: ConversationBrief;
+  dispatch?: ConversationDispatchDecision;
+  route_reason_code?: string;
+  exploration_turn?: boolean;
+  clarifier_policy?: ConversationClarifierPolicy;
+  exploration_packet?: ConversationExplorationPacket;
+  fail_reason?: string | null;
+  durationMs?: number;
+  error?: string;
+  message?: string;
+  details?: Record<string, unknown>;
+};
 
 async function asJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
@@ -766,10 +892,27 @@ async function asJson<T>(response: Response): Promise<T> {
         }
       }
     }
-    const message =
+    const baseMessage =
       (typeof (payload as any)?.message === "string" && (payload as any).message) ||
       (typeof (payload as any)?.error === "string" && (payload as any).error) ||
       `${response.status} ${response.statusText}`;
+    let message = baseMessage;
+    if ((payload as any)?.error === "voice_backend_error") {
+      const firstAttempt = Array.isArray((payload as any)?.details?.attempts)
+        ? (payload as any).details.attempts[0]
+        : undefined;
+      const attemptEngine =
+        typeof firstAttempt?.engine === "string" && firstAttempt.engine.trim()
+          ? firstAttempt.engine.trim()
+          : "stt";
+      const attemptMessage =
+        typeof firstAttempt?.message === "string" && firstAttempt.message.trim()
+          ? firstAttempt.message.trim()
+          : "";
+      if (attemptMessage) {
+        message = `${baseMessage} (${attemptEngine}: ${attemptMessage})`;
+      }
+    }
     const error = new Error(message);
     (error as { status?: number }).status = response.status;
     const payloadRetry =
@@ -786,7 +929,10 @@ async function asJson<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-export async function speakVoice(payload: VoiceSpeakPayload): Promise<VoiceSpeakResponse> {
+export async function speakVoice(
+  payload: VoiceSpeakPayload,
+  options?: { signal?: AbortSignal },
+): Promise<VoiceSpeakResponse> {
   const response = await fetch("/api/voice/speak", {
     method: "POST",
     headers: {
@@ -794,7 +940,13 @@ export async function speakVoice(payload: VoiceSpeakPayload): Promise<VoiceSpeak
       Accept: "application/json, audio/wav, audio/mpeg",
     },
     body: JSON.stringify(payload),
+    signal: options?.signal,
   });
+  const headerSnapshot = {
+    provider: response.headers.get("x-voice-provider"),
+    profile: response.headers.get("x-voice-profile"),
+    cache: (response.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
+  };
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   if (contentType.includes("application/json")) {
     const json = (await response.json().catch(() => ({}))) as VoiceSpeakJsonResponse;
@@ -802,6 +954,7 @@ export async function speakVoice(payload: VoiceSpeakPayload): Promise<VoiceSpeak
       kind: "json",
       status: response.status,
       payload: json,
+      headers: headerSnapshot,
     };
   }
   const blob = await response.blob();
@@ -813,7 +966,76 @@ export async function speakVoice(payload: VoiceSpeakPayload): Promise<VoiceSpeak
     status: response.status,
     mimeType: contentType || blob.type || "application/octet-stream",
     blob,
+    headers: headerSnapshot,
   };
+}
+
+const extensionForAudioMime = (mimeType: string): string => {
+  const normalized = mimeType.trim().toLowerCase();
+  if (normalized.includes("webm")) return "webm";
+  if (normalized.includes("ogg")) return "ogg";
+  if (normalized.includes("mpeg")) return "mp3";
+  if (normalized.includes("mp4")) return "mp4";
+  if (normalized.includes("wav") || normalized.includes("wave")) return "wav";
+  return "webm";
+};
+
+export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<VoiceTranscribeResponse> {
+  const form = new FormData();
+  const audioMimeType = payload.audio.type?.trim() || "audio/webm";
+  const filename = payload.filename?.trim() || `helix-voice-input.${extensionForAudioMime(audioMimeType)}`;
+  form.set("audio", payload.audio, filename);
+  if (payload.language?.trim()) {
+    form.set("language", payload.language.trim());
+  }
+  if (payload.traceId?.trim()) {
+    form.set("traceId", payload.traceId.trim());
+  }
+  if (payload.missionId?.trim()) {
+    form.set("missionId", payload.missionId.trim());
+  }
+  if (typeof payload.durationMs === "number" && Number.isFinite(payload.durationMs)) {
+    form.set("durationMs", String(Math.max(0, Math.round(payload.durationMs))));
+  }
+
+  const response = await fetch("/api/voice/transcribe", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+    },
+    body: form,
+  });
+
+  return asJson<VoiceTranscribeResponse>(response);
+}
+
+export async function runConversationTurn(
+  payload: ConversationTurnPayload,
+): Promise<ConversationTurnResponse> {
+  const body: Record<string, unknown> = {
+    transcript: payload.transcript,
+  };
+  if (payload.sessionId?.trim()) body.sessionId = payload.sessionId.trim();
+  if (payload.traceId?.trim()) body.traceId = payload.traceId.trim();
+  if (payload.missionId?.trim()) body.missionId = payload.missionId.trim();
+  if (payload.personaId?.trim()) body.personaId = payload.personaId.trim();
+  if (payload.sourceLanguage?.trim()) body.sourceLanguage = payload.sourceLanguage.trim();
+  if (typeof payload.translated === "boolean") body.translated = payload.translated;
+  if (Array.isArray(payload.recentTurns) && payload.recentTurns.length > 0) {
+    body.recentTurns = payload.recentTurns
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .slice(-8);
+  }
+  const response = await fetch("/api/agi/ask/conversation-turn", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  return asJson<ConversationTurnResponse>(response);
 }
 
 export type PlanRequestOptions = {
@@ -1227,6 +1449,7 @@ export async function askLocal(
     compare?: { place?: HaloBankPlace; timestamp?: string | number; durationMs?: number };
     model?: { includeEnvelope?: boolean; includeCausal?: boolean };
     capsuleIds?: string[];
+    dialogue_profile?: "dot_min_steps_v1";
   },
 ): Promise<LocalAskResponse> {
   const body: Record<string, unknown> = {};
@@ -1267,7 +1490,10 @@ export async function askLocal(
   if (options?.compare) body.compare = options.compare;
   if (options?.model) body.model = options.model;
   if (Array.isArray(options?.capsuleIds) && options.capsuleIds.length > 0) {
-    body.capsuleIds = options.capsuleIds.slice(0, 3);
+    body.capsuleIds = options.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
+  }
+  if (options?.dialogue_profile) {
+    body.dialogue_profile = options.dialogue_profile;
   }
   const signal = options?.signal;
   if (isNavigatorOffline()) {

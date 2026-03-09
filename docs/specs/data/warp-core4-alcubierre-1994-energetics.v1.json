@@ -1,0 +1,46 @@
+{
+  "artifact_type": "external_warp_energetics_snapshot/v1",
+  "work_id": "EXT-WARP-ALC-E001",
+  "title": "Alcubierre 1994 energetics/QEI parity snapshot",
+  "source_refs": [
+    "SRC-071",
+    "SRC-051",
+    "SRC-052"
+  ],
+  "chain_ids": [
+    "CH-WARP-002"
+  ],
+  "equation_anchors": [
+    "Eulerian energy density is negative in the wall support region",
+    "ADM shift-only metric source terms define stress-energy lane"
+  ],
+  "assumption_domain": {
+    "class": "adm_shift_lapse_metric",
+    "comparability": "direct",
+    "notes": "Directly comparable for baseline energetics semantics; explicit worldline-QEI derivation is not supplied in-paper."
+  },
+  "energetics_signature": {
+    "negative_energy_branch_policy": {
+      "status": "pass",
+      "reason_code": "negative_wall_energy_anchor_present"
+    },
+    "qei_worldline_requirement": {
+      "status": "unknown",
+      "reason_code": "worldline_qei_not_explicit_in_source"
+    },
+    "stress_source_contract": {
+      "status": "pass",
+      "reason_code": "metric_derived_stress_lane_present"
+    },
+    "assumption_domain_disclosure": {
+      "status": "pass",
+      "reason_code": "adm_domain_disclosed"
+    },
+    "physical_feasibility_boundary": {
+      "status": "unknown",
+      "reason_code": "feasibility_boundary_not_explicit_in_source"
+    }
+  },
+  "blockers": [],
+  "status": "extracted"
+}

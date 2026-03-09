@@ -79,6 +79,14 @@ type RunPayload = {
 };
 
 type Congruence = 'congruent' | 'incongruent' | 'unknown';
+type ReducedReasonCategory =
+  | 'missing_anchor_or_context'
+  | 'missing_uncertainty_anchor'
+  | 'threshold_violation'
+  | 'uncertainty_edge_overlap'
+  | 'source_admissibility'
+  | 'reportable_contract'
+  | 'other';
 
 const readArgValue = (name: string, argv = process.argv.slice(2)): string | undefined => {
   const index = argv.findIndex((value) => value === name || value.startsWith(`${name}=`));
@@ -91,6 +99,31 @@ const parseNumberCandidates = (raw: string): number[] => {
   const matches = String(raw).match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi);
   if (!matches) return [];
   return matches.map((token) => Number(token)).filter((value) => Number.isFinite(value));
+};
+
+const reduceReasonCode = (reasonCode: string): ReducedReasonCategory => {
+  const code = String(reasonCode ?? '').trim().toLowerCase();
+  if (!code) return 'other';
+  if (code.includes('missing_numeric_uncertainty_anchor') || code.startsWith('missing_u_')) {
+    return 'missing_uncertainty_anchor';
+  }
+  if (code.startsWith('missing_')) return 'missing_anchor_or_context';
+  if (
+    code.includes('below_floor') ||
+    code.includes('above_ceiling') ||
+    code.includes('exceeds_profile') ||
+    code.includes('outside')
+  ) {
+    return 'threshold_violation';
+  }
+  if (code.includes('edge_uncertainty_overlap')) return 'uncertainty_edge_overlap';
+  if (code.includes('source_class_not_allowed') || code.includes('strict_scope_ref_not_admissible')) {
+    return 'source_admissibility';
+  }
+  if (code.includes('reportable_not_ready') || code.includes('reportable_ready_with_blocked_reasons')) {
+    return 'reportable_contract';
+  }
+  return 'other';
 };
 
 const finiteOrNull = (value: unknown): number | null => {
@@ -352,6 +385,15 @@ export const runQSpoilingCompatCheck = (options: {
   const runById = new Map((runPayload.results ?? []).map((row) => [row.id, row]));
 
   const reasonCounts: Record<string, number> = {};
+  const reducedReasonCounts: Record<ReducedReasonCategory, number> = {
+    missing_anchor_or_context: 0,
+    missing_uncertainty_anchor: 0,
+    threshold_violation: 0,
+    uncertainty_edge_overlap: 0,
+    source_admissibility: 0,
+    reportable_contract: 0,
+    other: 0,
+  };
   const byMechanism: Record<string, { congruent: number; incongruent: number; unknown: number }> = {};
 
   const scenarioChecks = scenarioPack.scenarios.map((scenario) => {
@@ -379,7 +421,11 @@ export const runQSpoilingCompatCheck = (options: {
       thresholds,
     });
 
-    for (const reason of evaluation.reasonCodes) reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+    for (const reason of evaluation.reasonCodes) {
+      reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+      const reduced = reduceReasonCode(reason);
+      reducedReasonCounts[reduced] = (reducedReasonCounts[reduced] ?? 0) + 1;
+    }
 
     const mechanismKey = mechanismLane ?? 'unknown';
     if (!byMechanism[mechanismKey]) byMechanism[mechanismKey] = { congruent: 0, incongruent: 0, unknown: 0 };
@@ -403,9 +449,11 @@ export const runQSpoilingCompatCheck = (options: {
       u_f_rel: Number(uFRel.toFixed(6)),
       uncertaintyMethod: qContext?.uncertainty?.method ?? 'conservative_fallback_missing_numeric',
       reportableReady: qContext?.uncertainty?.reportableReady ?? false,
+      blockedReasons: qContext?.uncertainty?.blockedReasons ?? [],
       registryRefs: refs,
       evidenceCongruence: evaluation.evidenceCongruence,
       reasonCodes: evaluation.reasonCodes,
+      reducedReasonCodes: [...new Set(evaluation.reasonCodes.map((reason) => reduceReasonCode(reason)))].sort(),
       runClassification: runResult?.classification ?? null,
       runCongruentSolvePass: runResult?.guard?.congruentSolvePass === true,
     };
@@ -418,6 +466,7 @@ export const runQSpoilingCompatCheck = (options: {
     unknown: scenarioChecks.filter((row) => row.evidenceCongruence === 'unknown').length,
     byMechanism,
     reasonCounts,
+    reducedReasonCounts,
   };
 
   const payload = {

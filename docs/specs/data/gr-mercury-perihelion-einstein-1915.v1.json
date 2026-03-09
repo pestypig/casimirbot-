@@ -1,0 +1,36 @@
+{
+  "artifact_type": "external_gr_observable_snapshot/v1",
+  "work_id": "EXT-GR-MERC-001",
+  "title": "Einstein (1915) Mercury perihelion precession observable replay",
+  "source_refs": [
+    "SRC-075",
+    "SRC-076"
+  ],
+  "chain_ids": [
+    "CH-GR-001"
+  ],
+  "equation_anchors": [
+    "Delta_varpi_per_orbit = 6*pi*G*M_sun / (a*(1-e^2)*c^2)",
+    "arcsec_per_century = Delta_varpi_per_orbit * arcsec_per_rad * (36525/orbital_period_days)"
+  ],
+  "assumption_domain": {
+    "class": "solar_system_weak_field_schwarzschild_approximation",
+    "comparability": "direct",
+    "notes": "Observable replay uses the standard weak-field perihelion-advance expression and is reference-only."
+  },
+  "constants": {
+    "gm_sun_m3_s2": 1.32712440018e20,
+    "c_m_s": 299792458,
+    "a_m": 57909050000,
+    "e": 0.205630,
+    "orbital_period_days": 87.9691
+  },
+  "observed": {
+    "anomalous_arcsec_per_century": 43.0,
+    "uncertainty_arcsec_per_century": 0.5
+  },
+  "acceptance": {
+    "max_abs_residual_arcsec_per_century": 1.0
+  },
+  "status": "extracted"
+}

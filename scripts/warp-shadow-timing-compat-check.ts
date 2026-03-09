@@ -22,6 +22,14 @@ const BOUNDARY_STATEMENT =
 
 type ProfileId = 'WR-SHORT-PS' | 'WR-LONGHAUL-EXP';
 type Congruence = 'congruent' | 'incongruent' | 'unknown';
+type ReducedReasonCategory =
+  | 'missing_anchor_or_context'
+  | 'missing_uncertainty_anchor'
+  | 'threshold_violation'
+  | 'uncertainty_edge_overlap'
+  | 'source_admissibility'
+  | 'reportable_contract'
+  | 'other';
 type TimingProfileThreshold = {
   sigma_t_ps_max: number | null;
   tie_pp_ps_max: number | null;
@@ -94,6 +102,31 @@ const readArgValue = (name: string, argv = process.argv.slice(2)): string | unde
 const finiteOrNull = (value: unknown): number | null => {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+};
+
+const reduceReasonCode = (reasonCode: string): ReducedReasonCategory => {
+  const code = String(reasonCode ?? '').trim().toLowerCase();
+  if (!code) return 'other';
+  if (code.includes('missing_numeric_uncertainty_anchor') || code.startsWith('missing_u_')) {
+    return 'missing_uncertainty_anchor';
+  }
+  if (code.startsWith('missing_')) return 'missing_anchor_or_context';
+  if (
+    code.includes('exceeds_profile') ||
+    code.includes('outside') ||
+    code.includes('not_hardware') ||
+    code.includes('not_enabled')
+  ) {
+    return 'threshold_violation';
+  }
+  if (code.includes('edge_uncertainty_overlap')) return 'uncertainty_edge_overlap';
+  if (code.includes('strict_scope_ref_not_admissible') || code.includes('not_admissible_in_strict_scope')) {
+    return 'source_admissibility';
+  }
+  if (code.includes('reportable_not_ready') || code.includes('reportable_ready_with_blocked_reasons')) {
+    return 'reportable_contract';
+  }
+  return 'other';
 };
 
 const parseRegistryRows = (markdown: string): RegistryRow[] => {
@@ -276,6 +309,15 @@ export const runTimingCompatCheck = (options: {
   };
 
   const reasonCounts: Record<string, number> = {};
+  const reducedReasonCounts: Record<ReducedReasonCategory, number> = {
+    missing_anchor_or_context: 0,
+    missing_uncertainty_anchor: 0,
+    threshold_violation: 0,
+    uncertainty_edge_overlap: 0,
+    source_admissibility: 0,
+    reportable_contract: 0,
+    other: 0,
+  };
   const byProfile: Record<string, { congruent: number; incongruent: number; unknown: number }> = {};
 
   const scenarioChecks = scenarioPack.scenarios.map((scenario) => {
@@ -293,6 +335,7 @@ export const runTimingCompatCheck = (options: {
     const topologyClass = String(timing?.topology_class ?? '').trim() || null;
     const reportableReady =
       typeof timing?.uncertainty?.reportableReady === 'boolean' ? timing.uncertainty.reportableReady : null;
+    const blockedReasons = timing?.uncertainty?.blockedReasons ?? [];
 
     const uncertaintyAnchorOk = refs.some((ref) => {
       const row = rowsById.get(ref);
@@ -338,6 +381,8 @@ export const runTimingCompatCheck = (options: {
 
     for (const reason of reasonCodes) {
       reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+      const reduced = reduceReasonCode(reason);
+      reducedReasonCounts[reduced] = (reducedReasonCounts[reduced] ?? 0) + 1;
     }
 
     return {
@@ -351,8 +396,10 @@ export const runTimingCompatCheck = (options: {
       synce_enabled: synceEnabled,
       topology_class: topologyClass,
       reportableReady,
+      blockedReasons,
       evidenceCongruence,
       reasonCodes,
+      reducedReasonCodes: [...new Set(reasonCodes.map((reason) => reduceReasonCode(reason)))].sort(),
       runClassification: runById.get(scenario.id)?.classification ?? null,
     };
   });
@@ -364,6 +411,7 @@ export const runTimingCompatCheck = (options: {
     unknown: scenarioChecks.filter((row) => row.evidenceCongruence === 'unknown').length,
     byProfile,
     reasonCounts,
+    reducedReasonCounts,
   };
 
   const payload = {

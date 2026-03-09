@@ -5,7 +5,7 @@
   "recovery_goal": "sem_ellipsometry_compatibility_recovery",
   "success_bar": "map_only",
   "baseline_reference": {
-    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-06.json",
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-08.json",
     "keys": [
       "marginRatioRaw",
       "marginRatioRawComputed",
@@ -21,7 +21,7 @@
     "Primary/standard SEM+ellipsometry evidence only.",
     "Non-blocking compatibility envelope mapping lane.",
     "No canonical override or promotion implied.",
-    "Reportable profile is fail-closed blocked until paired-run and covariance uncertainty anchors are present."
+    "Reportable profile is fail-closed blocked until paired-run, covariance uncertainty, and measurement provenance anchors are present."
   ],
   "profileThresholds": {
     "SE-STD-2": {

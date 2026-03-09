@@ -75,7 +75,9 @@ Each `q_spoiling` scenario should include:
 ## Congruence Contract
 Per scenario, checker output must emit:
 1. `evidenceCongruence` in `{congruent,incongruent,unknown}`
-2. deterministic reason codes, including:
+2. `reportableReady` and `blockedReasons[]`
+3. `reducedReasonCodes[]` per scenario and `summary.reducedReasonCounts`
+4. deterministic reason codes, including:
    - `missing_q0_baseline_anchor`
    - `missing_q_spoil_anchor`
    - `missing_q_spoil_ratio_anchor`

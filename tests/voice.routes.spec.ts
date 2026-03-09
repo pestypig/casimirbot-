@@ -26,6 +26,13 @@ const ORIGINAL_ENV = {
   VOICE_BUDGET_MISSION_MAX_REQUESTS: process.env.VOICE_BUDGET_MISSION_MAX_REQUESTS,
   VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS: process.env.VOICE_BUDGET_TENANT_DAILY_MAX_REQUESTS,
   VOICE_REPLAY_CLOCK_TRUSTED: process.env.VOICE_REPLAY_CLOCK_TRUSTED,
+  ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
+  VOICE_ELEVENLABS_API_KEY: process.env.VOICE_ELEVENLABS_API_KEY,
+  ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID,
+  ELEVENLABS_API_BASE: process.env.ELEVENLABS_API_BASE,
+  ELEVENLABS_MODEL_ID: process.env.ELEVENLABS_MODEL_ID,
+  ELEVENLABS_OUTPUT_FORMAT: process.env.ELEVENLABS_OUTPUT_FORMAT,
+  VOICE_CHUNK_CACHE_TTL_MS: process.env.VOICE_CHUNK_CACHE_TTL_MS,
 };
 
 describe("voice routes", () => {
@@ -86,6 +93,41 @@ describe("voice routes", () => {
     } else {
       process.env.VOICE_REPLAY_CLOCK_TRUSTED = ORIGINAL_ENV.VOICE_REPLAY_CLOCK_TRUSTED;
     }
+    if (ORIGINAL_ENV.ELEVENLABS_API_KEY === undefined) {
+      delete process.env.ELEVENLABS_API_KEY;
+    } else {
+      process.env.ELEVENLABS_API_KEY = ORIGINAL_ENV.ELEVENLABS_API_KEY;
+    }
+    if (ORIGINAL_ENV.VOICE_ELEVENLABS_API_KEY === undefined) {
+      delete process.env.VOICE_ELEVENLABS_API_KEY;
+    } else {
+      process.env.VOICE_ELEVENLABS_API_KEY = ORIGINAL_ENV.VOICE_ELEVENLABS_API_KEY;
+    }
+    if (ORIGINAL_ENV.ELEVENLABS_VOICE_ID === undefined) {
+      delete process.env.ELEVENLABS_VOICE_ID;
+    } else {
+      process.env.ELEVENLABS_VOICE_ID = ORIGINAL_ENV.ELEVENLABS_VOICE_ID;
+    }
+    if (ORIGINAL_ENV.ELEVENLABS_API_BASE === undefined) {
+      delete process.env.ELEVENLABS_API_BASE;
+    } else {
+      process.env.ELEVENLABS_API_BASE = ORIGINAL_ENV.ELEVENLABS_API_BASE;
+    }
+    if (ORIGINAL_ENV.ELEVENLABS_MODEL_ID === undefined) {
+      delete process.env.ELEVENLABS_MODEL_ID;
+    } else {
+      process.env.ELEVENLABS_MODEL_ID = ORIGINAL_ENV.ELEVENLABS_MODEL_ID;
+    }
+    if (ORIGINAL_ENV.ELEVENLABS_OUTPUT_FORMAT === undefined) {
+      delete process.env.ELEVENLABS_OUTPUT_FORMAT;
+    } else {
+      process.env.ELEVENLABS_OUTPUT_FORMAT = ORIGINAL_ENV.ELEVENLABS_OUTPUT_FORMAT;
+    }
+    if (ORIGINAL_ENV.VOICE_CHUNK_CACHE_TTL_MS === undefined) {
+      delete process.env.VOICE_CHUNK_CACHE_TTL_MS;
+    } else {
+      process.env.VOICE_CHUNK_CACHE_TTL_MS = ORIGINAL_ENV.VOICE_CHUNK_CACHE_TTL_MS;
+    }
   });
 
   it("rejects invalid payloads with deterministic envelope", async () => {
@@ -134,6 +176,25 @@ describe("voice routes", () => {
     expect(res.body.error).toBe("voice_unavailable");
     expect(res.body.traceId).toBe("trace-unconfigured");
     expect(res.body.details?.providerConfigured).toBe(false);
+  });
+
+  it("returns voice_unavailable when elevenlabs is selected without credentials", async () => {
+    delete process.env.VOICE_PROXY_DRY_RUN;
+    delete process.env.ELEVENLABS_API_KEY;
+    delete process.env.VOICE_ELEVENLABS_API_KEY;
+    delete process.env.ELEVENLABS_VOICE_ID;
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Speak with ElevenLabs.",
+      provider: "elevenlabs",
+      voice_profile_id: "voice-custom",
+      traceId: "trace-elevenlabs-unconfigured",
+    });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("voice_unavailable");
+    expect(res.body.traceId).toBe("trace-elevenlabs-unconfigured");
   });
 
   it("enforces local-only provider mode", async () => {
@@ -245,6 +306,31 @@ describe("voice routes", () => {
     expect(second.status).toBe(200);
     expect(second.body.suppressed).toBe(true);
     expect(second.body.reason).toBe("dedupe_cooldown");
+  });
+
+  it("does not suppress dedupe duplicates for briefing mode", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    delete process.env.TTS_BASE_URL;
+    const app = buildApp();
+    const dedupeKey = uniqueId("brief-dedupe");
+
+    const payload = {
+      text: "Briefing chunk.",
+      mode: "briefing",
+      priority: "info",
+      eventId: dedupeKey,
+      dedupe_key: dedupeKey,
+      traceId: "trace-brief-dedupe",
+    } as const;
+
+    const first = await request(app).post("/api/voice/speak").send(payload);
+    const second = await request(app).post("/api/voice/speak").send(payload);
+
+    expect(first.status).toBe(200);
+    expect(first.body.ok).toBe(true);
+    expect(second.status).toBe(200);
+    expect(second.body.suppressed ?? false).toBe(false);
+    expect(second.body.reason).toBeUndefined();
   });
 
   it("returns normalized metering in dry-run mode", async () => {
@@ -402,6 +488,31 @@ describe("voice routes", () => {
     expect(third.body.error).toBe("voice_rate_limited");
   });
 
+  it("does not apply mission-level callout rate cap to briefing mode", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    delete process.env.TTS_BASE_URL;
+    const app = buildApp();
+    const missionId = uniqueId("mission-briefing-rate");
+
+    const send = (eventId: string) =>
+      request(app).post("/api/voice/speak").send({
+        text: "Briefing update.",
+        mode: "briefing",
+        priority: "info",
+        missionId,
+        eventId,
+        dedupe_key: eventId,
+      });
+
+    const first = await send(uniqueId("evt"));
+    const second = await send(uniqueId("evt"));
+    const third = await send(uniqueId("evt"));
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(third.status).toBe(200);
+  });
+
 
 
   it("passes voice_profile_id through to proxy contract without breaking legacy shape", async () => {
@@ -409,8 +520,12 @@ describe("voice routes", () => {
     const upstreamApp = express();
     upstreamApp.use(express.json());
     let seenProfile: string | null = null;
+    let seenUtteranceId: string | null = null;
+    let seenChunkKind: string | null = null;
     upstreamApp.post("/speak", (req, res) => {
       seenProfile = req.body.voice_profile_id ?? req.body.voiceProfile ?? null;
+      seenUtteranceId = req.body.utteranceId ?? null;
+      seenChunkKind = req.body.chunkKind ?? null;
       res.setHeader("content-type", "audio/wav");
       res.send(Buffer.from("ok"));
     });
@@ -426,10 +541,17 @@ describe("voice routes", () => {
       const res = await request(app).post("/api/voice/speak").send({
         text: "profile passthrough",
         voice_profile_id: "dottie_governed",
+        utteranceId: "utt-meta-1",
+        chunkIndex: 0,
+        chunkCount: 1,
+        chunkKind: "brief",
+        turnKey: "turn-meta-1",
       });
 
       expect(res.status).toBe(200);
       expect(seenProfile).toBe("dottie_governed");
+      expect(seenUtteranceId).toBe("utt-meta-1");
+      expect(seenChunkKind).toBe("brief");
       expect(res.headers["x-voice-profile"]).toBe("dottie_governed");
     } finally {
       await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
@@ -572,6 +694,150 @@ describe("voice routes", () => {
     }
   });
 
+  it("calls elevenlabs provider when configured", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "0";
+    process.env.ELEVENLABS_API_KEY = "test-elevenlabs-key";
+    process.env.ELEVENLABS_VOICE_ID = "voice-default";
+    process.env.ELEVENLABS_MODEL_ID = "eleven_multilingual_v2";
+    process.env.ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_128";
+    const upstreamApp = express();
+    upstreamApp.use(express.json());
+    upstreamApp.post("/v1/text-to-speech/:voiceId", (req, res) => {
+      expect(req.headers["xi-api-key"]).toBe("test-elevenlabs-key");
+      expect(req.params.voiceId).toBe("voice-custom");
+      res.setHeader("content-type", "audio/mpeg");
+      res.status(200).send(Buffer.from("ID3TESTAUDIO", "utf8"));
+    });
+    const upstreamServer = await new Promise<Server>((resolve) => {
+      const server = upstreamApp.listen(0, () => resolve(server));
+    });
+
+    try {
+      const address = upstreamServer.address();
+      if (!address || typeof address !== "object") {
+        throw new Error("Failed to resolve upstream listen port");
+      }
+      process.env.ELEVENLABS_API_BASE = `http://127.0.0.1:${address.port}`;
+      const app = buildApp();
+
+      const res = await request(app)
+        .post("/api/voice/speak")
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(chunk));
+          response.on("end", () => callback(null, Buffer.concat(chunks)));
+        })
+        .send({
+          text: "Read this with ElevenLabs.",
+          provider: "elevenlabs",
+          voice_profile_id: "voice-custom",
+          mode: "briefing",
+          priority: "info",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.headers["x-voice-provider"]).toBe("elevenlabs");
+      expect(res.headers["x-voice-profile"]).toBe("voice-custom");
+      expect(res.headers["content-type"]).toContain("audio/mpeg");
+      expect(Buffer.isBuffer(res.body)).toBe(true);
+      expect((res.body as Buffer).length).toBeGreaterThan(0);
+    } finally {
+      await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+    }
+  });
+
+  it("serves repeated chunked speak payloads from short-lived cache", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "0";
+    process.env.VOICE_CHUNK_CACHE_TTL_MS = "30000";
+    let callCount = 0;
+    const upstreamApp = express();
+    upstreamApp.use(express.json());
+    upstreamApp.post("/speak", (_req, res) => {
+      callCount += 1;
+      res.setHeader("content-type", "audio/wav");
+      res.status(200).send(Buffer.from("CACHEAUDIO", "utf8"));
+    });
+    const upstreamServer = await new Promise<Server>((resolve) => {
+      const server = upstreamApp.listen(0, () => resolve(server));
+    });
+
+    try {
+      const address = upstreamServer.address();
+      if (!address || typeof address !== "object") {
+        throw new Error("Failed to resolve upstream listen port");
+      }
+      process.env.TTS_BASE_URL = `http://127.0.0.1:${address.port}`;
+      const app = buildApp();
+      const payload = {
+        text: "Chunked brief one.",
+        mode: "briefing",
+        utteranceId: "utt-cache-1",
+        chunkIndex: 0,
+        chunkCount: 1,
+        chunkKind: "brief",
+        turnKey: "turn-cache-1",
+      };
+
+      const first = await request(app).post("/api/voice/speak").send(payload);
+      const second = await request(app).post("/api/voice/speak").send(payload);
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(first.headers["x-voice-cache"]).toBe("miss");
+      expect(second.headers["x-voice-cache"]).toBe("hit");
+      expect(callCount).toBe(1);
+    } finally {
+      await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+    }
+  });
+
+  it("retries transient backend failures once before succeeding", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "0";
+    let callCount = 0;
+    const upstreamApp = express();
+    upstreamApp.use(express.json());
+    upstreamApp.post("/speak", (_req, res) => {
+      callCount += 1;
+      if (callCount === 1) {
+        res.status(500).json({ error: "transient_failure" });
+        return;
+      }
+      res.setHeader("content-type", "audio/wav");
+      res.status(200).send(Buffer.from("RETRYOK", "utf8"));
+    });
+    const upstreamServer = await new Promise<Server>((resolve) => {
+      const server = upstreamApp.listen(0, () => resolve(server));
+    });
+
+    try {
+      const address = upstreamServer.address();
+      if (!address || typeof address !== "object") {
+        throw new Error("Failed to resolve upstream listen port");
+      }
+      process.env.TTS_BASE_URL = `http://127.0.0.1:${address.port}`;
+      const app = buildApp();
+
+      const res = await request(app)
+        .post("/api/voice/speak")
+        .send({
+          text: "Retry this chunk.",
+          mode: "briefing",
+          utteranceId: "utt-retry-1",
+          chunkIndex: 0,
+          chunkCount: 1,
+          chunkKind: "brief",
+          turnKey: "turn-retry-1",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.headers["x-voice-cache"]).toBe("miss");
+      expect(callCount).toBe(2);
+    } finally {
+      await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
+    }
+  });
+
   it("suppresses non-eligible context callouts", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     const app = buildApp();
@@ -589,6 +855,26 @@ describe("voice routes", () => {
     expect(res.body.suppressed).toBe(true);
     expect(res.body.reason).toBe("voice_context_ineligible");
     expect(res.body.traceId).toBe("trace-context-suppress");
+  });
+
+  it("allows briefing mode even when context callout gate is ineligible", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "Briefing voice lane update",
+      mode: "briefing",
+      priority: "info",
+      contextTier: "tier0",
+      sessionState: "idle",
+      voiceMode: "off",
+      traceId: "trace-briefing-context-bypass",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.suppressed ?? false).toBe(false);
+    expect(res.body.traceId).toBe("trace-briefing-context-bypass");
   });
 
 

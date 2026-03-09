@@ -36,6 +36,10 @@ awareness loop.
    - Persist a structured event trail (timestamp, stage, callout class,
      evidence refs, chosen action) for replay/audit.
 
+Conversation governor overlay:
+- Mic dictation can run as panel-scoped continuous listening with explicit ON/OFF control.
+- Conversation-triggered reasoning attempts are tracked in a live timeline keyed by `traceId` (queued/running/streaming/done/failed/suppressed).
+
 ## Go Board construction loop
 The Mission Go Board is built from event-time updates, not only final answers.
 

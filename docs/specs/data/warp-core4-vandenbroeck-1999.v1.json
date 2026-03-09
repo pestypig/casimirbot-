@@ -1,0 +1,48 @@
+{
+  "artifact_type": "external_warp_geometry_snapshot/v1",
+  "work_id": "EXT-WARP-VDB-001",
+  "title": "Van den Broeck 1999 pocket-compressed warp geometry",
+  "source_refs": [
+    "SRC-073"
+  ],
+  "chain_ids": [
+    "CH-WARP-001"
+  ],
+  "equation_anchors": [
+    "Conformal spatial metric gamma_ij = B(r)^2 delta_ij",
+    "Conditional Alcubierre-like reduction in region where B(r)=1",
+    "Derivative support requirement B'(r), B''(r) for full closure"
+  ],
+  "assumption_domain": {
+    "class": "adm_conformal_pocket_metric",
+    "comparability": "conditional",
+    "notes": "Geometry is conditionally comparable in B=1 exterior region; full closure needs region-II derivative support."
+  },
+  "geometry_signature": {
+    "metric_form_alignment": {
+      "status": "unknown",
+      "reason_code": "conditional_b_equals_1_only"
+    },
+    "shift_mapping": {
+      "status": "unknown",
+      "reason_code": "conditional_b_equals_1_only"
+    },
+    "york_time_sign_parity": {
+      "status": "unknown",
+      "reason_code": "conditional_sign_parity_domain_limited"
+    },
+    "natario_control_behavior": {
+      "status": "unknown",
+      "reason_code": "natario_specific_control_not_declared"
+    },
+    "metric_derived_t00_path": {
+      "status": "unknown",
+      "reason_code": "requires_region_ii_derivative_closure"
+    }
+  },
+  "blockers": [
+    "conditional_b_equals_1_only",
+    "requires_region_ii_derivative_closure"
+  ],
+  "status": "extracted"
+}

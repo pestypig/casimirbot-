@@ -1,0 +1,4 @@
+sample_id,d_ellip_nm,u_fit_ellip_nm,u_model_ellip_nm,u_refindex_ellip_nm,u_repeat_ellip_nm,u_temp_ellip_nm
+S001,100.05,0.12,0.20,0.10,0.10,0.05
+S002,99.95,0.12,0.20,0.10,0.10,0.05
+S003,24.98,0.08,0.15,0.08,0.08,0.04

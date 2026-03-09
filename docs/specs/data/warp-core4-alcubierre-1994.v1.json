@@ -1,0 +1,46 @@
+{
+  "artifact_type": "external_warp_geometry_snapshot/v1",
+  "work_id": "EXT-WARP-ALC-001",
+  "title": "Alcubierre 1994 warp metric baseline",
+  "source_refs": [
+    "SRC-071"
+  ],
+  "chain_ids": [
+    "CH-WARP-001"
+  ],
+  "equation_anchors": [
+    "Eq. (1)/(5) shift-only line element",
+    "Shift lane beta^x=-v_s f(r_s)",
+    "Expansion-sign relation theta_beta=-theta_Alc",
+    "Wall-localized rho_E sign lane"
+  ],
+  "assumption_domain": {
+    "class": "adm_shift_lapse_metric",
+    "comparability": "direct",
+    "notes": "Directly comparable to local geometry-conformance checks under ADM shift/lapse framing."
+  },
+  "geometry_signature": {
+    "metric_form_alignment": {
+      "status": "pass",
+      "reason_code": "direct_adm_metric_form"
+    },
+    "shift_mapping": {
+      "status": "pass",
+      "reason_code": "direct_shift_mapping"
+    },
+    "york_time_sign_parity": {
+      "status": "pass",
+      "reason_code": "sign_convention_explicit"
+    },
+    "natario_control_behavior": {
+      "status": "unknown",
+      "reason_code": "natario_specific_control_not_declared"
+    },
+    "metric_derived_t00_path": {
+      "status": "pass",
+      "reason_code": "wall_energy_density_anchor_present"
+    }
+  },
+  "blockers": [],
+  "status": "extracted"
+}

@@ -47,6 +47,8 @@ This runner is not for:
 - Nanogap checker (execution): `scripts/warp-shadow-nanogap-compat-check.ts`
 - Timing checker (execution): `scripts/warp-shadow-timing-compat-check.ts`
 - SEM+ellipsometry checker (execution): `scripts/warp-shadow-sem-ellips-compat-check.ts`
+- SEM+ellipsometry paired evidence ingest (execution): `scripts/warp-shadow-sem-ellips-paired-run-ingest.ts`
+- SEM+ellipsometry paired evidence validator (execution): `scripts/warp-shadow-sem-ellips-paired-evidence-validate.ts`
 - JSON output (default): `artifacts/research/full-solve/shadow-injection-run-YYYY-MM-DD.json`
 - Markdown output (default): `docs/audits/research/warp-shadow-injection-run-YYYY-MM-DD.md`
 
@@ -183,6 +185,16 @@ npm run warp:shadow:ti-compat-check -- --scenarios configs/warp-shadow-injection
 SEM+ellipsometry evidence congruence check:
 ```bash
 npm run warp:shadow:se-compat-check -- --scenarios configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json --run artifacts/research/full-solve/shadow-injection-run-se-primary-typed-YYYY-MM-DD.json --out artifacts/research/full-solve/se-compat-check-YYYY-MM-DD.json --out-md docs/audits/research/warp-se-compat-check-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry paired evidence ingest:
+```bash
+npm run warp:shadow:se-paired-evidence:ingest -- --sem artifacts/research/full-solve/se-paired-runs/<date>/sem-measurements.csv --ellips artifacts/research/full-solve/se-paired-runs/<date>/ellips-measurements.csv --manifest artifacts/research/full-solve/se-paired-runs/<date>/pairing-manifest.json --covariance artifacts/research/full-solve/se-paired-runs/<date>/covariance-budget.json
+```
+
+SEM+ellipsometry paired evidence validate:
+```bash
+npm run warp:shadow:se-paired-evidence:validate -- --evidence artifacts/research/full-solve/se-paired-runs/<date>/se-paired-run-evidence.v1.json
 ```
 
 Casimir sign evidence congruence check:

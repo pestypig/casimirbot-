@@ -1,0 +1,38 @@
+{
+  "pairedRunId": "se_pair_run_2026_03_08_template",
+  "sourceClass": "primary",
+  "provenance": {
+    "data_origin": "template_placeholder",
+    "instrument_run_ids": [],
+    "raw_artifact_refs": [],
+    "raw_artifact_sha256": {},
+    "operator_id": null,
+    "acquisition_date_utc": null
+  },
+  "sourceRefs": [
+    "EXP-SE-003",
+    "EXP-SE-009",
+    "EXP-SE-016",
+    "EXP-SE-017",
+    "EXP-SE-021",
+    "EXP-SE-022",
+    "EXP-SE-025",
+    "EXP-SE-026",
+    "EXP-SE-027",
+    "EXP-SE-028",
+    "EXP-SE-029",
+    "EXP-SE-030"
+  ],
+  "semDefaults": {
+    "scale_factor_sem": 1.0,
+    "b_sem_nm": 0.0,
+    "u_scale_sem": 0.20
+  },
+  "uncertainty": {
+    "method": "paired_dual_instrument_covariance_measured",
+    "k": 2,
+    "u_common_nm": 0.10,
+    "rho_sem_ellip": 0.35,
+    "covariance_sem_ellip_nm2": 0.012
+  }
+}

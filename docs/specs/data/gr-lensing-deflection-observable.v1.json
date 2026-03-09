@@ -1,0 +1,39 @@
+{
+  "artifact_type": "external_gr_observable_snapshot/v1",
+  "work_id": "EXT-GR-LENS-001",
+  "title": "Historical+modern GR light-deflection observable replay",
+  "source_refs": [
+    "SRC-077",
+    "SRC-078",
+    "SRC-079"
+  ],
+  "chain_ids": [
+    "CH-GR-002"
+  ],
+  "equation_anchors": [
+    "alpha_limb_rad = 4*G*M_sun/(c^2*b)",
+    "alpha_limb_arcsec = alpha_limb_rad * arcsec_per_rad",
+    "gamma_residual = gamma_measured - 1"
+  ],
+  "assumption_domain": {
+    "class": "solar_system_weak_field_ppn",
+    "comparability": "direct",
+    "notes": "Historical+modern light-deflection anchors are replayed as reference-only observational parity checks."
+  },
+  "constants": {
+    "gm_sun_m3_s2": 1.32712440018e20,
+    "c_m_s": 299792458,
+    "solar_limb_impact_parameter_m": 696340000
+  },
+  "observed": {
+    "historical_deflection_arcsec": 1.98,
+    "historical_uncertainty_arcsec": 0.16,
+    "modern_gamma": 0.9998,
+    "modern_gamma_uncertainty": 0.0003
+  },
+  "acceptance": {
+    "max_abs_historical_residual_arcsec": 0.5,
+    "max_abs_gamma_residual": 0.001
+  },
+  "status": "extracted"
+}

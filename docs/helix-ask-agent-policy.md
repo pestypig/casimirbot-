@@ -94,6 +94,10 @@ without changing policy semantics.
 - Voice callouts may consume context events only while session state is `active`.
 - If session state is `idle|requesting|stopping|error`, non-critical context callouts are suppressed.
 
+Panel-scoped mic governance:
+- Helix Ask microphone capture is armed/disarmed by an explicit UI toggle and must be visibly indicated while armed.
+- When disarmed, stream/recorder/transcription/background voice dispatch are stopped deterministically.
+
 
 ### Consent boundaries and usage constraints
 - Consent is required before using reference audio or identity-specific voice profile cloning flows.

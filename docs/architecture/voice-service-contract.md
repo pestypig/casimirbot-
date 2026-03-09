@@ -14,6 +14,19 @@ keeping TTS engine implementation replaceable.
 ## Endpoint
 `POST /api/voice/speak`
 
+Additional endpoint:
+- `POST /api/voice/transcribe` (multipart `audio` + optional `language`, `traceId`, `missionId`, `durationMs`)
+- Response shape for UI dictation:
+  - `ok`, `text`, `language`, `duration_ms`, `segments`, `traceId`, `missionId`, `engine`
+  - optional multilingual metadata: `source_text`, `source_language`, `translated`
+  - `engine` values: `openai_transcribe | faster_whisper_local | whisper_http`
+
+STT runtime policy controls:
+- `STT_POLICY_MODE`: `openai_first | local_first | local_only | http_only` (default: `openai_first`)
+- `STT_OUTPUT_MODE`: `original | english | dual` (default: `english`)
+- `WHISPER_HTTP_MODEL`: default `gpt-4o-mini-transcribe`
+- STT auth key precedence: `WHISPER_HTTP_API_KEY -> OPENAI_API_KEY -> LLM_HTTP_API_KEY`
+
 ## Request body
 ```json
 {
@@ -35,6 +48,8 @@ keeping TTS engine implementation replaceable.
 - `text` required, trimmed, max length enforced.
 - `mode` enum: `callout|briefing|debrief`.
 - `priority` enum: `info|warn|critical|action`.
+- Optional chunk metadata for low-latency playback orchestration:
+  - `utteranceId`, `turnKey`, `chunkKind` (`brief|final`), `chunkIndex`, `chunkCount`
 - `consent_asserted` required for any reference-audio or custom profile route.
 - `traceId` recommended for replay/audit linkage.
 - `missionId` and `eventId` optional but recommended for Go Board linkage.
@@ -44,6 +59,7 @@ Headers:
 - `content-type: audio/wav` (or requested format)
 - `x-voice-provider`
 - `x-voice-profile`
+- `x-voice-cache` (`hit|miss`, optional)
 - `x-watermark-mode`
 
 Body:

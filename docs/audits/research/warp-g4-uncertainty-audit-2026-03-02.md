@@ -18,7 +18,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - max uncertaintySigmaBridge_Jm3: 3.093763040915341
 - max uncertaintySigmaTau_Jm3: 0
 - dominant component counts: bridge:4
-- provenance commit: 36c4bfecf3235c68cd8caa9a6262b69beaa2cb1e
+- provenance commit: 6450f41e802e97c5fed02ba097723c00cf49152e
 - provenance freshness vs HEAD: fresh
 - canonical-authoritative statement: canonical campaign decision remains authoritative; uncertainty evidence is fail-closed.
 

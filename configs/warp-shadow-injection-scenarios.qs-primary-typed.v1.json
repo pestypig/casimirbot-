@@ -5,7 +5,7 @@
   "recovery_goal": "q_spoiling_recovery",
   "success_bar": "map_only",
   "baseline_reference": {
-    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-06.json",
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-08.json",
     "keys": [
       "marginRatioRaw",
       "marginRatioRawComputed",
@@ -90,11 +90,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -119,11 +114,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -159,11 +149,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -188,11 +173,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -228,11 +208,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -257,11 +232,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -297,11 +267,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -326,11 +291,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -366,11 +326,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -395,11 +350,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -435,11 +385,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -464,11 +409,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -504,11 +444,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -533,11 +468,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -573,11 +503,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -602,11 +527,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -642,11 +562,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -671,11 +586,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -711,11 +621,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -740,11 +645,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -780,11 +680,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -809,11 +704,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -849,11 +739,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -878,11 +763,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -918,11 +798,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -947,11 +822,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -987,11 +857,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1016,11 +881,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1056,11 +916,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1085,11 +940,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1125,11 +975,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1154,11 +999,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1194,11 +1034,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1223,11 +1058,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1263,11 +1093,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1292,11 +1117,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1335,8 +1155,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1364,8 +1182,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1405,8 +1221,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1434,8 +1248,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1475,8 +1287,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1504,8 +1314,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1545,8 +1353,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1574,8 +1380,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1615,8 +1419,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1644,8 +1446,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1685,8 +1485,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1714,8 +1512,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1755,8 +1551,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1784,8 +1578,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1825,8 +1617,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1854,8 +1644,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1895,8 +1683,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1924,8 +1710,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -1965,8 +1749,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -1994,8 +1776,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2035,8 +1815,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2064,8 +1842,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2105,8 +1881,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2134,8 +1908,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2175,8 +1947,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2204,8 +1974,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2245,8 +2013,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2274,8 +2040,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2315,8 +2079,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2344,8 +2106,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2385,8 +2145,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2414,8 +2172,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2455,8 +2211,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2484,8 +2238,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2525,8 +2277,6 @@
         "EXP-Q-003",
         "EXP-Q-004",
         "EXP-Q-005",
-        "EXP-Q-014",
-        "EXP-Q-015",
         "EXP-Q-020",
         "EXP-Q-021",
         "EXP-Q-022"
@@ -2554,8 +2304,6 @@
             "EXP-Q-003",
             "EXP-Q-004",
             "EXP-Q-005",
-            "EXP-Q-014",
-            "EXP-Q-015",
             "EXP-Q-020",
             "EXP-Q-021",
             "EXP-Q-022"
@@ -2592,9 +2340,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -2621,9 +2366,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -2662,9 +2404,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -2691,9 +2430,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -2732,9 +2468,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -2761,9 +2494,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -2802,9 +2532,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -2831,9 +2558,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -2872,9 +2596,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -2901,9 +2622,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -2942,9 +2660,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -2971,9 +2686,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3012,9 +2724,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3041,9 +2750,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3082,9 +2788,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3111,9 +2814,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3152,9 +2852,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3181,9 +2878,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3222,9 +2916,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3251,9 +2942,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3292,9 +2980,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3321,9 +3006,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3362,9 +3044,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3391,9 +3070,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3432,9 +3108,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3461,9 +3134,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3502,9 +3172,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3531,9 +3198,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3572,9 +3236,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3601,9 +3262,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3642,9 +3300,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3671,9 +3326,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3712,9 +3364,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3741,9 +3390,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
@@ -3782,9 +3428,6 @@
       "registryRefs": [
         "EXP-Q-001",
         "EXP-Q-002",
-        "EXP-Q-003",
-        "EXP-Q-004",
-        "EXP-Q-005",
         "EXP-Q-014",
         "EXP-Q-015",
         "EXP-Q-020",
@@ -3811,9 +3454,6 @@
           "sourceRefs": [
             "EXP-Q-001",
             "EXP-Q-002",
-            "EXP-Q-003",
-            "EXP-Q-004",
-            "EXP-Q-005",
             "EXP-Q-014",
             "EXP-Q-015",
             "EXP-Q-020",
