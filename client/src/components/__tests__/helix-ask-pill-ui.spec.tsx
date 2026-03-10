@@ -23,6 +23,8 @@ let deriveTranscriptConfidence: typeof import("@/components/helix/HelixAskPill")
 let shouldRequireTranscriptConfirmation: typeof import("@/components/helix/HelixAskPill").shouldRequireTranscriptConfirmation;
 let scoreVoiceTurnComplete: typeof import("@/components/helix/HelixAskPill").scoreVoiceTurnComplete;
 let scoreIntentShift: typeof import("@/components/helix/HelixAskPill").scoreIntentShift;
+let evaluateVoiceReasoningResponseAuthority: typeof import("@/components/helix/HelixAskPill").evaluateVoiceReasoningResponseAuthority;
+let resolveVoicePlaybackGain: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackGain;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -48,6 +50,8 @@ beforeAll(async () => {
     shouldRequireTranscriptConfirmation,
     scoreVoiceTurnComplete,
     scoreIntentShift,
+    evaluateVoiceReasoningResponseAuthority,
+    resolveVoicePlaybackGain,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -96,6 +100,23 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(buildVoiceInputStatusLabel("on", "error", "Microphone permission denied.")).toBe(
       "Microphone permission denied.",
     );
+  });
+
+  it("uses a stronger playback gain profile for mobile audio devices", () => {
+    const desktopGain = resolveVoicePlaybackGain(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+    );
+    const androidGain = resolveVoicePlaybackGain(
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/122 Mobile Safari/537.36",
+    );
+    const iosGain = resolveVoicePlaybackGain(
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
+    );
+    expect(desktopGain).toBe(1.15);
+    expect(androidGain).toBe(1.8);
+    expect(iosGain).toBe(2.1);
+    expect(androidGain).toBeGreaterThan(desktopGain);
+    expect(iosGain).toBeGreaterThan(androidGain);
   });
 
   it("routes completion scores by threshold", () => {
@@ -188,6 +209,85 @@ describe("HelixAskPill mic helper behavior", () => {
         lexicalContinuation: true,
       }),
     ).toBe(true);
+  });
+
+  it("suppresses stale voice responses when turn revision drifts", () => {
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "Follow-up turn: Where does that come from?",
+        askPromptForRequest: "Follow-up turn: Where does that come from?",
+        requestIntentRevision: 3,
+        latestIntentRevision: 4,
+        latestAttemptIntentRevision: 4,
+        requestDispatchPromptHash: "hash-3",
+        latestDispatchPromptHash: "hash-4",
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "stale_revision",
+      restart: true,
+    });
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "What is negative energy density?",
+        askPromptForRequest: "What is negative energy density?",
+        requestIntentRevision: 5,
+        latestIntentRevision: 5,
+        latestAttemptIntentRevision: 5,
+        requestDispatchPromptHash: "hash-a",
+        latestDispatchPromptHash: "hash-b",
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "stale_dispatch_hash",
+      restart: true,
+    });
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "What is negative energy density?",
+        askPromptForRequest: "What is negative energy density?",
+        latestAttemptStatus: "suppressed",
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "inactive_attempt",
+      restart: false,
+    });
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: true,
+        latestAskPromptForAttempt: "A",
+        askPromptForRequest: "A",
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "continuation_merged",
+      restart: true,
+    });
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "What is negative energy density?",
+        askPromptForRequest: "What is negative energy density?",
+        requestIntentRevision: 4,
+        latestIntentRevision: 4,
+        latestAttemptIntentRevision: 4,
+        requestDispatchPromptHash: "hash-a",
+        latestDispatchPromptHash: "hash-a",
+      }),
+    ).toEqual({
+      suppress: false,
+      reason: "ok",
+      restart: false,
+    });
   });
 
   it("builds a context-anchored dispatch prompt for follow-up turns", () => {

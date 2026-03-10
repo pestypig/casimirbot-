@@ -3733,6 +3733,18 @@ const HELIX_ASK_VERIFICATION_ANCHOR_FILES = [
   "server/services/agi/refinery-trajectory.ts",
   "server/routes/training-trace.ts",
 ];
+
+const shouldApplyWarpDelegationGuard = (args: {
+  warpDelegationRequested: boolean;
+  intentStrategy: string;
+  intentId: string;
+}): boolean => {
+  if (!args.warpDelegationRequested) return false;
+  return (
+    args.intentStrategy === "constraint_report" ||
+    args.intentId === "falsifiable.constraints.gr_viability_certificate"
+  );
+};
 const HELIX_ASK_COMPOSITE_HINT =
   /\b(synthesize|fit together|bring together|tie together|map (?:it|them)? together|relate (?:these|those|them|it)|connect (?:these|those|them|it)|connect .* to|how do .* fit together|how do .* relate|how does .* connect)\b/i;
 const HELIX_ASK_COMPOSITE_MIN_TOPICS = 2;
@@ -19164,6 +19176,10 @@ export const __testHelixAskDialogueFormatting = {
   rewriteConversationScientificVoice,
 };
 
+export const __testWarpDelegationGuard = {
+  shouldApplyWarpDelegationGuard,
+};
+
 type HelixAskExecutionArgs = {
   request: z.infer<typeof LocalAskRequest>;
   personaId: string;
@@ -24215,12 +24231,17 @@ const executeHelixAsk = async ({
     let constraintEvidenceRefs: string[] = [];
     const mathSolverOk = mathSolveResult?.ok === true;
     const warpDelegationRequested = mathSolveResult?.reason === "warp_delegation_required";
-    if (mathSolveResult && (mathSolveResult.ok || warpDelegationRequested)) {
+    const warpDelegationGuardAllowed = shouldApplyWarpDelegationGuard({
+      warpDelegationRequested,
+      intentStrategy,
+      intentId: intentProfile.id,
+    });
+    if (mathSolveResult && (mathSolveResult.ok || warpDelegationGuardAllowed)) {
       forcedAnswer = buildHelixAskMathAnswer(mathSolveResult);
       // Keep hard short-circuit only for explicit constraint-report math flows.
       forcedAnswerIsHard =
-        mathSolveResult.ok || (warpDelegationRequested && intentStrategy === "constraint_report");
-      answerPath.push(warpDelegationRequested ? "forcedAnswer:math_solver_warp_guard" : "forcedAnswer:math_solver");
+        mathSolveResult.ok || (warpDelegationGuardAllowed && intentStrategy === "constraint_report");
+      answerPath.push(warpDelegationGuardAllowed ? "forcedAnswer:math_solver_warp_guard" : "forcedAnswer:math_solver");
     }
     if (conceptFastPath && conceptMatch && !forcedAnswer) {
       const conceptDraft = isIdeologyReferenceIntent
@@ -33774,11 +33795,14 @@ const executeHelixAsk = async ({
       }
       cleaned = finalNonReportGuard.text;
       const forcedWarpGuardActive = answerPath.includes("forcedAnswer:math_solver_warp_guard");
+      const warpDelegationPreserveAllowed = shouldApplyWarpDelegationGuard({
+        warpDelegationRequested: mathSolveResult?.reason === "warp_delegation_required",
+        intentStrategy,
+        intentId: intentProfile.id,
+      });
       const preserveWarpGuardAsFinal =
         forcedWarpGuardActive &&
-        (intentStrategy === "constraint_report" ||
-          intentProfile.id === "falsifiable.constraints.gr_viability_certificate" ||
-          mathSolveResult?.reason === "warp_delegation_required");
+        warpDelegationPreserveAllowed;
       if (preserveWarpGuardAsFinal) {
         cleaned = buildHelixAskMathAnswer({
           ok: false,

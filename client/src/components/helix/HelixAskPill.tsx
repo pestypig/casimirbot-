@@ -46,7 +46,10 @@ import {
   type ReasoningTheaterConfigResponse,
   type ReasoningTheaterFrontierAction,
 } from "@/lib/helix/reasoning-theater-config";
-import { publishVoiceCaptureDiagnosticsSnapshot } from "@/lib/helix/voice-capture-diagnostics";
+import {
+  publishVoiceCaptureDiagnosticsSnapshot,
+  type VoiceLaneTimelineDebugEvent,
+} from "@/lib/helix/voice-capture-diagnostics";
 import {
   advanceReasoningTheaterFrontierTracker,
   clampFrontierMeterPct,
@@ -114,6 +117,20 @@ const SOURCE_PAREN_PATTERN = new RegExp(`\\(\\s*source:\\s*${FILE_PATH_CITATION_
 const FILE_PATH_PAREN_PATTERN = new RegExp(`\\(\\s*${FILE_PATH_CITATION_SEGMENT}[^)]*\\)`, "gi");
 const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
 const URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
+const MOBILE_AUDIO_USER_AGENT_PATTERN =
+  /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
+const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
+const HELIX_VOICE_PLAYBACK_GAIN_DESKTOP = 1.15;
+const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 1.8;
+const HELIX_VOICE_PLAYBACK_GAIN_IOS = 2.1;
+
+export function resolveVoicePlaybackGain(userAgent?: string): number {
+  const ua = (userAgent ?? "").trim();
+  if (!ua) return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
+  if (IOS_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
+  if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_MOBILE;
+  return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
+}
 
 export function stripVoiceCitationArtifacts(source: string): string {
   if (!source) return "";
@@ -183,6 +200,13 @@ function buildVoiceAutoSpeakUtteranceId(parts: Array<string | undefined | null>)
   const digest = hashVoiceUtteranceKey(normalized);
   const headMax = Math.max(24, VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS - digest.length - 1);
   return `${normalized.slice(0, headMax)}:${digest}`;
+}
+
+function summarizeVoiceDebugText(source: string, maxChars = 220): string {
+  const normalized = source.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, Math.max(1, maxChars - 1)).trimEnd()}...`;
 }
 
 export function isActivePlayback(audio: HTMLAudioElement | null, active: HTMLAudioElement): boolean {
@@ -557,6 +581,7 @@ const HELIX_VOICE_AUTO_SPEAK_DEFAULT_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
 const HELIX_VOICE_AUTO_SPEAK_PROVIDER = "elevenlabs";
 const HELIX_VOICE_AUTO_SPEAK_QUEUE_MAX = 8;
 const HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS = 2400;
+const HELIX_VOICE_DEBUG_TIMELINE_LIMIT = 280;
 const HELIX_TIMELINE_TYPE_LABEL: Record<HelixTimelineEntryType, string> = {
   conversation_recorded: "recorded",
   conversation_brief: "brief",
@@ -1146,6 +1171,95 @@ export function scoreIntentShift(args: {
     return { score, band: "shift", reason: explicitShift ? "explicit_topic_shift" : "semantic_shift" };
   }
   return { score, band: "continuation", reason: "semantic_continuation" };
+}
+
+export type VoiceReasoningResponseAuthorityDecision = {
+  suppress: boolean;
+  reason:
+    | "ok"
+    | "continuation_merged"
+    | "stale_prompt"
+    | "stale_revision"
+    | "stale_dispatch_hash"
+    | "inactive_attempt";
+  restart: boolean;
+};
+
+export function evaluateVoiceReasoningResponseAuthority(args: {
+  source: ReasoningAttemptSource;
+  continuationRestartRequested: boolean;
+  latestAskPromptForAttempt: string;
+  askPromptForRequest: string;
+  latestAttemptStatus?: ReasoningAttemptStatus;
+  requestIntentRevision?: number;
+  latestIntentRevision?: number;
+  latestAttemptIntentRevision?: number;
+  requestDispatchPromptHash?: string | null;
+  latestDispatchPromptHash?: string | null;
+}): VoiceReasoningResponseAuthorityDecision {
+  if (args.continuationRestartRequested) {
+    return { suppress: true, reason: "continuation_merged", restart: true };
+  }
+  if (
+    args.latestAttemptStatus === "suppressed" ||
+    args.latestAttemptStatus === "cancelled" ||
+    args.latestAttemptStatus === "failed"
+  ) {
+    return { suppress: true, reason: "inactive_attempt", restart: false };
+  }
+  if (
+    args.latestAskPromptForAttempt.length > 0 &&
+    args.latestAskPromptForAttempt !== args.askPromptForRequest.trim()
+  ) {
+    return { suppress: true, reason: "stale_prompt", restart: true };
+  }
+  if (args.source !== "voice_auto") {
+    return { suppress: false, reason: "ok", restart: false };
+  }
+  const requestIntentRevision =
+    typeof args.requestIntentRevision === "number" && Number.isFinite(args.requestIntentRevision)
+      ? args.requestIntentRevision
+      : null;
+  const latestIntentRevision =
+    typeof args.latestIntentRevision === "number" && Number.isFinite(args.latestIntentRevision)
+      ? args.latestIntentRevision
+      : null;
+  const latestAttemptIntentRevision =
+    typeof args.latestAttemptIntentRevision === "number" &&
+    Number.isFinite(args.latestAttemptIntentRevision)
+      ? args.latestAttemptIntentRevision
+      : null;
+  if (
+    requestIntentRevision !== null &&
+    latestAttemptIntentRevision !== null &&
+    requestIntentRevision !== latestAttemptIntentRevision
+  ) {
+    return { suppress: true, reason: "stale_revision", restart: true };
+  }
+  if (
+    requestIntentRevision !== null &&
+    latestIntentRevision !== null &&
+    requestIntentRevision < latestIntentRevision
+  ) {
+    return { suppress: true, reason: "stale_revision", restart: true };
+  }
+  if (
+    latestAttemptIntentRevision !== null &&
+    latestIntentRevision !== null &&
+    latestAttemptIntentRevision < latestIntentRevision
+  ) {
+    return { suppress: true, reason: "stale_revision", restart: true };
+  }
+  const requestDispatchPromptHash = args.requestDispatchPromptHash?.trim() || null;
+  const latestDispatchPromptHash = args.latestDispatchPromptHash?.trim() || null;
+  if (
+    requestDispatchPromptHash !== null &&
+    latestDispatchPromptHash !== null &&
+    requestDispatchPromptHash !== latestDispatchPromptHash
+  ) {
+    return { suppress: true, reason: "stale_dispatch_hash", restart: true };
+  }
+  return { suppress: false, reason: "ok", restart: false };
 }
 
 export function shouldDispatchReasoningAttempt(transcript: string): boolean {
@@ -3657,6 +3771,11 @@ export function HelixAskPill({
   const [readAloudByReply, setReadAloudByReply] = useState<Record<string, ReadAloudPlaybackState>>({});
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackElementRef = useRef<HTMLAudioElement | null>(null);
+  const voicePlaybackAudioContextRef = useRef<AudioContext | null>(null);
+  const voicePlaybackSourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const voicePlaybackCompressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
+  const voicePlaybackGainNodeRef = useRef<GainNode | null>(null);
+  const voicePlaybackGraphElementRef = useRef<HTMLAudioElement | null>(null);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
   const voiceAudioUnlockedRef = useRef(false);
@@ -3676,6 +3795,8 @@ export function HelixAskPill({
   const voiceQueuedSpeechLatchByTurnRef = useRef<Map<string, number>>(new Map());
   const voiceTurnRevisionStateRef = useRef<Record<string, VoiceTurnRevisionState>>({});
   const voiceDivergenceEventsRef = useRef<VoiceDivergenceEvent[]>([]);
+  const voiceChunkTimelineEventsRef = useRef<VoiceLaneTimelineDebugEvent[]>([]);
+  const [voiceTimelineDebugVersion, setVoiceTimelineDebugVersion] = useState(0);
   const voicePendingPreemptRef = useRef<{
     turnKey: string;
     utteranceId: string;
@@ -5232,6 +5353,36 @@ export function HelixAskPill({
     [updateVoiceTurnRevisionState],
   );
 
+  const pushVoiceChunkTimelineEvent = useCallback(
+    (
+      input: Omit<VoiceLaneTimelineDebugEvent, "id" | "atMs" | "source"> & {
+        atMs?: number;
+      },
+    ) => {
+      const event: VoiceLaneTimelineDebugEvent = {
+        id: `voice-chunk:${crypto.randomUUID()}`,
+        atMs: input.atMs ?? Date.now(),
+        source: "chunk_playback",
+        kind: input.kind,
+        status: input.status ?? null,
+        traceId: input.traceId ?? null,
+        turnKey: input.turnKey ?? null,
+        attemptId: input.attemptId ?? null,
+        utteranceId: input.utteranceId ?? null,
+        chunkIndex: typeof input.chunkIndex === "number" ? input.chunkIndex : null,
+        chunkCount: typeof input.chunkCount === "number" ? input.chunkCount : null,
+        text: input.text ? summarizeVoiceDebugText(input.text, 240) : null,
+        detail: input.detail ? summarizeVoiceDebugText(input.detail, 220) : null,
+      };
+      const nextEvents = [...voiceChunkTimelineEventsRef.current, event].slice(
+        -HELIX_VOICE_DEBUG_TIMELINE_LIMIT,
+      );
+      voiceChunkTimelineEventsRef.current = nextEvents;
+      setVoiceTimelineDebugVersion((value) => (value + 1) % 1_000_000);
+    },
+    [],
+  );
+
   const isVoiceUtteranceRevisionStale = useCallback((revision: VoiceUtteranceRevision): boolean => {
     const state = voiceTurnRevisionStateRef.current[revision.turnKey];
     if (!state) return false;
@@ -5243,6 +5394,7 @@ export function HelixAskPill({
     if (existing) return existing;
     const audio = new Audio();
     audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
     audio.playsInline = true;
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
@@ -5251,11 +5403,82 @@ export function HelixAskPill({
     return audio;
   }, []);
 
+  const ensureVoicePlaybackAudioGraph = useCallback(
+    async (audio: HTMLAudioElement): Promise<boolean> => {
+      if (typeof window === "undefined") return false;
+      const AudioCtx = (window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
+        | typeof AudioContext
+        | undefined;
+      if (!AudioCtx) return false;
+      let playbackContext = voicePlaybackAudioContextRef.current;
+      if (!playbackContext) {
+        playbackContext = new AudioCtx();
+        voicePlaybackAudioContextRef.current = playbackContext;
+      }
+      if (playbackContext.state === "suspended") {
+        try {
+          await playbackContext.resume();
+        } catch {
+          // fallback to plain element playback if context resume is blocked
+          return false;
+        }
+      }
+
+      let sourceNode = voicePlaybackSourceNodeRef.current;
+      if (!sourceNode || voicePlaybackGraphElementRef.current !== audio) {
+        sourceNode = playbackContext.createMediaElementSource(audio);
+        voicePlaybackSourceNodeRef.current = sourceNode;
+        voicePlaybackGraphElementRef.current = audio;
+      }
+      let compressorNode = voicePlaybackCompressorNodeRef.current;
+      if (!compressorNode) {
+        compressorNode = playbackContext.createDynamicsCompressor();
+        compressorNode.threshold.value = -21;
+        compressorNode.knee.value = 18;
+        compressorNode.ratio.value = 3.4;
+        compressorNode.attack.value = 0.004;
+        compressorNode.release.value = 0.22;
+        voicePlaybackCompressorNodeRef.current = compressorNode;
+      }
+      let gainNode = voicePlaybackGainNodeRef.current;
+      if (!gainNode) {
+        gainNode = playbackContext.createGain();
+        voicePlaybackGainNodeRef.current = gainNode;
+      }
+
+      const targetGain = resolveVoicePlaybackGain(window.navigator?.userAgent);
+      gainNode.gain.cancelScheduledValues(playbackContext.currentTime);
+      gainNode.gain.setTargetAtTime(targetGain, playbackContext.currentTime, 0.02);
+      try {
+        sourceNode.disconnect();
+      } catch {
+        // no-op
+      }
+      try {
+        compressorNode.disconnect();
+      } catch {
+        // no-op
+      }
+      try {
+        gainNode.disconnect();
+      } catch {
+        // no-op
+      }
+      sourceNode.connect(compressorNode);
+      compressorNode.connect(gainNode);
+      gainNode.connect(playbackContext.destination);
+      return true;
+    },
+    [],
+  );
+
   const primeVoiceAudioPlayback = useCallback(async (): Promise<boolean> => {
     if (voiceAudioUnlockedRef.current) return true;
     if (typeof window === "undefined") return false;
     try {
       const primer = getOrCreateVoicePlaybackElement();
+      await ensureVoicePlaybackAudioGraph(primer).catch(() => false);
       primer.muted = true;
       primer.src = MOBILE_AUDIO_UNLOCK_DATA_URI;
       const playPromise = primer.play();
@@ -5272,12 +5495,13 @@ export function HelixAskPill({
     } catch {
       return false;
     }
-  }, [getOrCreateVoicePlaybackElement]);
+  }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement]);
 
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
       const audio = getOrCreateVoicePlaybackElement();
+      await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
       const url = URL.createObjectURL(input.blob);
       audio.muted = false;
       audio.volume = 1;
@@ -5363,7 +5587,7 @@ export function HelixAskPill({
         });
       });
     },
-    [getOrCreateVoicePlaybackElement, primeVoiceAudioPlayback],
+    [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, primeVoiceAudioPlayback],
   );
 
   const clearVoicePendingPreempt = useCallback(() => {
@@ -5727,6 +5951,16 @@ export function HelixAskPill({
             text: utterance.chunks[chunkIndex] ?? "",
           };
           if (!chunk.text) continue;
+          pushVoiceChunkTimelineEvent({
+            kind: "chunk_synth_start",
+            status: "running",
+            traceId: utterance.traceId ?? null,
+            turnKey: utterance.turnKey,
+            utteranceId: utterance.utteranceId,
+            chunkIndex: chunk.chunkIndex,
+            chunkCount: chunk.chunkCount,
+            text: chunk.text,
+          });
           const currentController = new AbortController();
           voiceAutoSpeakAbortControllerRef.current = currentController;
           const nextChunk = utterance.chunks[chunkIndex + 1]
@@ -5770,6 +6004,16 @@ export function HelixAskPill({
             metrics.synthDurationsMs.push(currentResult.synthMs);
             if (currentResult.headers.cache === "hit") metrics.cacheHitCount += 1;
             if (currentResult.headers.cache === "miss") metrics.cacheMissCount += 1;
+            pushVoiceChunkTimelineEvent({
+              kind: "chunk_synth_ok",
+              status: "done",
+              traceId: utterance.traceId ?? null,
+              turnKey: utterance.turnKey,
+              utteranceId: utterance.utteranceId,
+              chunkIndex: chunk.chunkIndex,
+              chunkCount: chunk.chunkCount,
+              detail: `synth ${currentResult.synthMs}ms | cache ${currentResult.headers.cache ?? "n/a"}`,
+            });
             metrics.providerHeader = currentResult.headers.provider ?? undefined;
             metrics.profileHeader = currentResult.headers.profile ?? undefined;
             if (metrics.enqueueToFirstAudioMs === null) {
@@ -5800,8 +6044,27 @@ export function HelixAskPill({
             if (lastChunkEndedAtMs !== null) {
               metrics.chunkGapMs.push(Math.max(0, playStartedAtMs - lastChunkEndedAtMs));
             }
+            pushVoiceChunkTimelineEvent({
+              kind: "chunk_play_start",
+              status: "running",
+              traceId: utterance.traceId ?? null,
+              turnKey: utterance.turnKey,
+              utteranceId: utterance.utteranceId,
+              chunkIndex: chunk.chunkIndex,
+              chunkCount: chunk.chunkCount,
+            });
             await playVoiceAudioBlob({ blob: currentResult.blob, awaitPlayback: true });
             lastChunkEndedAtMs = Date.now();
+            pushVoiceChunkTimelineEvent({
+              kind: "chunk_play_end",
+              status: "done",
+              atMs: lastChunkEndedAtMs,
+              traceId: utterance.traceId ?? null,
+              turnKey: utterance.turnKey,
+              utteranceId: utterance.utteranceId,
+              chunkIndex: chunk.chunkIndex,
+              chunkCount: chunk.chunkCount,
+            });
             const pendingAfterChunk = voicePendingPreemptRef.current;
             if (
               pendingAfterChunk &&
@@ -5847,6 +6110,16 @@ export function HelixAskPill({
               metrics.synthDurationsMs.push(prefetched.synthMs);
               if (prefetched.headers.cache === "hit") metrics.cacheHitCount += 1;
               if (prefetched.headers.cache === "miss") metrics.cacheMissCount += 1;
+              pushVoiceChunkTimelineEvent({
+                kind: "chunk_synth_ok",
+                status: "done",
+                traceId: utterance.traceId ?? null,
+                turnKey: utterance.turnKey,
+                utteranceId: utterance.utteranceId,
+                chunkIndex: nextChunk.chunkIndex,
+                chunkCount: nextChunk.chunkCount,
+                detail: `prefetch synth ${prefetched.synthMs}ms | cache ${prefetched.headers.cache ?? "n/a"}`,
+              });
               metrics.providerHeader = prefetched.headers.provider ?? metrics.providerHeader;
               metrics.profileHeader = prefetched.headers.profile ?? metrics.profileHeader;
               if (metrics.enqueueToFirstAudioMs === null) {
@@ -5856,8 +6129,29 @@ export function HelixAskPill({
               if (lastChunkEndedAtMs !== null) {
                 metrics.chunkGapMs.push(Math.max(0, prefetchedPlayStartMs - lastChunkEndedAtMs));
               }
+              pushVoiceChunkTimelineEvent({
+                kind: "chunk_play_start",
+                status: "running",
+                traceId: utterance.traceId ?? null,
+                turnKey: utterance.turnKey,
+                utteranceId: utterance.utteranceId,
+                chunkIndex: nextChunk.chunkIndex,
+                chunkCount: nextChunk.chunkCount,
+                detail: "prefetched",
+              });
               await playVoiceAudioBlob({ blob: prefetched.blob, awaitPlayback: true });
               lastChunkEndedAtMs = Date.now();
+              pushVoiceChunkTimelineEvent({
+                kind: "chunk_play_end",
+                status: "done",
+                atMs: lastChunkEndedAtMs,
+                traceId: utterance.traceId ?? null,
+                turnKey: utterance.turnKey,
+                utteranceId: utterance.utteranceId,
+                chunkIndex: nextChunk.chunkIndex,
+                chunkCount: nextChunk.chunkCount,
+                detail: "prefetched",
+              });
               const pendingAfterPrefetchChunk = voicePendingPreemptRef.current;
               if (
                 pendingAfterPrefetchChunk &&
@@ -5895,6 +6189,16 @@ export function HelixAskPill({
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
+            pushVoiceChunkTimelineEvent({
+              kind: "chunk_synth_error",
+              status: "failed",
+              traceId: utterance.traceId ?? null,
+              turnKey: utterance.turnKey,
+              utteranceId: utterance.utteranceId,
+              chunkIndex: chunk.chunkIndex,
+              chunkCount: chunk.chunkCount,
+              detail: message,
+            });
             if (/abort/i.test(message)) {
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current ?? "barge_in";
             } else if (/^voice_auto_speak_suppressed:/i.test(message)) {
@@ -5925,6 +6229,7 @@ export function HelixAskPill({
     clearVoicePendingPreempt,
     isVoiceUtteranceRevisionStale,
     playVoiceAudioBlob,
+    pushVoiceChunkTimelineEvent,
     recordVoiceDivergenceEvent,
     synthesizeVoiceChunk,
     updateVoiceAutoSpeakMetrics,
@@ -6011,12 +6316,32 @@ export function HelixAskPill({
         return !stale;
       });
       voiceAutoSpeakQueueRef.current = filteredQueue;
+      pushVoiceChunkTimelineEvent({
+        kind: "chunk_enqueue",
+        status: "queued",
+        traceId: task.traceId ?? null,
+        turnKey: nextUtterance.turnKey,
+        utteranceId: nextUtterance.utteranceId,
+        chunkCount: nextUtterance.chunks.length,
+        text: nextUtterance.text,
+        detail: `${nextUtterance.kind}@r${nextUtterance.revision}`,
+      });
       const droppedIds = [...nextQueue.droppedUtteranceIds, ...trimmedQueue.droppedUtteranceIds, ...staleDropped];
       if (droppedIds.length > 0) {
+        const droppedId = droppedIds[droppedIds.length - 1] ?? null;
+        pushVoiceChunkTimelineEvent({
+          kind: "chunk_drop",
+          status: "suppressed",
+          traceId: task.traceId ?? null,
+          turnKey: task.turnKey,
+          utteranceId: droppedId,
+          chunkCount: droppedIds.length,
+          detail: `${droppedIds.length} queued utterance(s) dropped`,
+        });
         recordVoiceDivergenceEvent({
           code: "stale_revision_dropped",
           turnKey: task.turnKey,
-          utteranceId: droppedIds[droppedIds.length - 1] ?? null,
+          utteranceId: droppedId,
           revision: task.revision,
           detail: `${droppedIds.length} queued utterance(s) dropped`,
           uiVoiceRevisionMatch: false,
@@ -6048,6 +6373,7 @@ export function HelixAskPill({
       runVoiceAutoSpeakQueue,
       setVoicePendingPreempt,
       stopReadAloud,
+      pushVoiceChunkTimelineEvent,
       updateVoiceTurnRevisionState,
     ],
   );
@@ -6758,6 +7084,16 @@ export function HelixAskPill({
         try {
           const askModeForRequest = attempt.mode === "observe" ? undefined : attempt.mode;
           const askPromptForRequest = attempt.dispatchPrompt ?? attempt.prompt;
+          const requestIntentRevision =
+            attempt.source === "voice_auto" &&
+            typeof attempt.intentRevision === "number" &&
+            Number.isFinite(attempt.intentRevision)
+              ? attempt.intentRevision
+              : undefined;
+          const requestDispatchPromptHash =
+            attempt.source === "voice_auto"
+              ? hashVoiceUtteranceKey(askPromptForRequest)
+              : null;
           const selectedCapsuleIds =
             Array.isArray(attempt.contextCapsuleIds) && attempt.contextCapsuleIds.length > 0
               ? attempt.contextCapsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
@@ -6794,21 +7130,42 @@ export function HelixAskPill({
             latestAttemptSnapshot?.dispatchPrompt ?? latestAttemptSnapshot?.prompt ?? askPromptForRequest
           ).trim();
           const continuationRestartRequested = reasoningAttemptRestartRequestedRef.current.has(attempt.id);
-          const stalePromptResponse =
-            latestAskPromptForAttempt.length > 0 &&
-            latestAskPromptForAttempt !== askPromptForRequest.trim();
-          const latestIntentRevision =
+          const latestIntentState =
             attempt.source === "voice_auto" && attempt.traceId
-              ? intentRevisionByTurnKeyRef.current[attempt.traceId]?.revision
+              ? intentRevisionByTurnKeyRef.current[attempt.traceId]
               : undefined;
+          const latestIntentRevision = latestIntentState?.revision;
           const attemptIntentRevision =
             typeof latestAttemptSnapshot?.intentRevision === "number"
               ? latestAttemptSnapshot.intentRevision
               : typeof attempt.intentRevision === "number"
                 ? attempt.intentRevision
                 : undefined;
-          if (continuationRestartRequested || stalePromptResponse) {
+          const authority = evaluateVoiceReasoningResponseAuthority({
+            source: attempt.source,
+            continuationRestartRequested,
+            latestAskPromptForAttempt,
+            askPromptForRequest,
+            latestAttemptStatus: latestAttemptSnapshot?.status,
+            requestIntentRevision,
+            latestIntentRevision,
+            latestAttemptIntentRevision: attemptIntentRevision,
+            requestDispatchPromptHash,
+            latestDispatchPromptHash: latestIntentState?.dispatchPromptHash,
+          });
+          if (authority.suppress) {
             reasoningAttemptRestartRequestedRef.current.delete(attempt.id);
+            if (!authority.restart) {
+              continue;
+            }
+            const staleRestartDetail =
+              authority.reason === "continuation_merged"
+                ? "continuation merged; restarting"
+                : authority.reason === "stale_revision"
+                  ? "stale revision dropped; restarting"
+                  : authority.reason === "stale_dispatch_hash"
+                    ? "stale dispatch dropped; restarting"
+                    : "stale prompt dropped; restarting";
             reasoningAttemptQueueRef.current = [
               attempt.id,
               ...reasoningAttemptQueueRef.current.filter((id) => id !== attempt.id),
@@ -6816,20 +7173,23 @@ export function HelixAskPill({
             updateReasoningAttempt(attempt.id, (current) => ({
               ...current,
               status: "queued",
-              suppression_reason: "voice_turn_continuation_merged",
+              suppression_reason:
+                authority.reason === "continuation_merged"
+                  ? "voice_turn_continuation_merged"
+                  : "voice_turn_response_stale",
               partial: "",
               finalAnswer: undefined,
               events: [],
             }));
             patchHelixTimelineEntry(primaryTimelineEntryId, {
               status: "queued",
-              detail: "continuation merged; restarting",
+              detail: staleRestartDetail,
             });
             const staleStreamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
             if (staleStreamEntryId) {
               patchHelixTimelineEntry(staleStreamEntryId, {
                 status: "suppressed",
-                detail: "continuation merged; restarting",
+                detail: staleRestartDetail,
               });
               delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
             }
@@ -9110,6 +9470,17 @@ export function HelixAskPill({
   useEffect(() => () => {
     stopReadAloud();
     stopVoiceCapture();
+    voicePlaybackSourceNodeRef.current?.disconnect();
+    voicePlaybackSourceNodeRef.current = null;
+    voicePlaybackCompressorNodeRef.current?.disconnect();
+    voicePlaybackCompressorNodeRef.current = null;
+    voicePlaybackGainNodeRef.current?.disconnect();
+    voicePlaybackGainNodeRef.current = null;
+    voicePlaybackGraphElementRef.current = null;
+    if (voicePlaybackAudioContextRef.current) {
+      void voicePlaybackAudioContextRef.current.close().catch(() => undefined);
+      voicePlaybackAudioContextRef.current = null;
+    }
     const playbackElement = playbackElementRef.current;
     if (playbackElement) {
       playbackElement.pause();
@@ -9117,6 +9488,7 @@ export function HelixAskPill({
       playbackElement.load();
     }
     playbackElementRef.current = null;
+    voiceChunkTimelineEventsRef.current = [];
     contextCapsuleSessionLedgerRef.current = [];
   }, [stopReadAloud, stopVoiceCapture]);
 
@@ -10111,6 +10483,73 @@ export function HelixAskPill({
     voiceRecorderStats,
   ]);
 
+  const voiceLaneTimelineEvents = useMemo<VoiceLaneTimelineDebugEvent[]>(() => {
+    const conversationAndReasoningEvents = [...helixTimeline]
+      .sort((a, b) => a.createdAtMs - b.createdAtMs)
+      .map((entry): VoiceLaneTimelineDebugEvent => {
+        const source =
+          entry.type === "conversation_recorded" || entry.type === "conversation_brief"
+            ? "conversation"
+            : "reasoning";
+        const kind: VoiceLaneTimelineDebugEvent["kind"] =
+          entry.type === "conversation_recorded"
+            ? "prompt_recorded"
+            : entry.type === "conversation_brief"
+              ? "brief"
+              : entry.type === "reasoning_attempt"
+                ? "reasoning_attempt"
+                : entry.type === "reasoning_stream"
+                  ? "reasoning_stream"
+                  : entry.type === "reasoning_final"
+                    ? "reasoning_final"
+                    : entry.type === "action_receipt"
+                      ? "action_receipt"
+                      : "suppressed";
+        return {
+          id: `timeline:${entry.id}`,
+          atMs: entry.updatedAtMs || entry.createdAtMs,
+          source,
+          kind,
+          status: entry.status,
+          traceId: entry.traceId ?? null,
+          turnKey: entry.traceId ?? null,
+          attemptId: entry.attemptId ?? null,
+          text: entry.text ? summarizeVoiceDebugText(entry.text, 300) : null,
+          detail: entry.detail ? summarizeVoiceDebugText(entry.detail, 220) : null,
+        };
+      });
+    const segmentEvents = [...voiceSegmentAttempts]
+      .sort((a, b) => a.cutAtMs - b.cutAtMs)
+      .map((segment): VoiceLaneTimelineDebugEvent => ({
+        id: `segment:${segment.id}`,
+        atMs: segment.cutAtMs,
+        source: "voice_capture",
+        kind: "segment",
+        status: segment.status,
+        traceId: null,
+        turnKey: null,
+        attemptId: null,
+        text: segment.transcriptPreview
+          ? summarizeVoiceDebugText(segment.transcriptPreview, 260)
+          : null,
+        detail: summarizeVoiceDebugText(
+          [
+            `dispatch:${segment.dispatch}`,
+            segment.engine ? `engine:${segment.engine}` : null,
+            segment.error ? `error:${segment.error}` : null,
+            segment.sttLatencyMs !== null ? `stt:${Math.round(segment.sttLatencyMs)}ms` : null,
+          ]
+            .filter(Boolean)
+            .join(" | "),
+          220,
+        ),
+      }));
+    const chunkEvents = [...voiceChunkTimelineEventsRef.current];
+    return [...conversationAndReasoningEvents, ...segmentEvents, ...chunkEvents]
+      .sort((a, b) => a.atMs - b.atMs)
+      .slice(-HELIX_VOICE_DEBUG_TIMELINE_LIMIT);
+  }, [helixTimeline, voiceSegmentAttempts, voiceTimelineDebugVersion]);
+
   useEffect(() => {
     publishVoiceCaptureDiagnosticsSnapshot({
       updatedAtMs: Date.now(),
@@ -10196,8 +10635,10 @@ export function HelixAskPill({
             },
           }
         : null,
+      timelineEvents: voiceLaneTimelineEvents,
     });
   }, [
+    helixTimeline,
     micArmState,
     voiceCaptureCheckpointList,
     voiceCaptureHealth,
@@ -10209,7 +10650,9 @@ export function HelixAskPill({
     voiceRecorderMimeType,
     voiceSegmentAttempts,
     voiceAutoSpeakLastMetrics,
+    voiceLaneTimelineEvents,
     voiceSignalState,
+    voiceTimelineDebugVersion,
     voiceTrackMuted,
   ]);
 

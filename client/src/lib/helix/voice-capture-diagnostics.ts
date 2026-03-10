@@ -77,6 +77,45 @@ export type VoicePlaybackDiagnosticsSnapshot = {
   };
 };
 
+export type VoiceLaneTimelineDebugSource =
+  | "voice_capture"
+  | "conversation"
+  | "reasoning"
+  | "chunk_playback";
+
+export type VoiceLaneTimelineDebugKind =
+  | "prompt_recorded"
+  | "brief"
+  | "reasoning_attempt"
+  | "reasoning_stream"
+  | "reasoning_final"
+  | "action_receipt"
+  | "suppressed"
+  | "segment"
+  | "chunk_enqueue"
+  | "chunk_synth_start"
+  | "chunk_synth_ok"
+  | "chunk_synth_error"
+  | "chunk_play_start"
+  | "chunk_play_end"
+  | "chunk_drop";
+
+export type VoiceLaneTimelineDebugEvent = {
+  id: string;
+  atMs: number;
+  source: VoiceLaneTimelineDebugSource;
+  kind: VoiceLaneTimelineDebugKind;
+  status?: string | null;
+  traceId?: string | null;
+  turnKey?: string | null;
+  attemptId?: string | null;
+  utteranceId?: string | null;
+  chunkIndex?: number | null;
+  chunkCount?: number | null;
+  text?: string | null;
+  detail?: string | null;
+};
+
 export type VoiceCaptureDiagnosticsSnapshot = {
   updatedAtMs: number;
   micArmState: "off" | "on";
@@ -100,6 +139,7 @@ export type VoiceCaptureDiagnosticsSnapshot = {
   checkpoints: VoiceCaptureCheckpointSnapshot[];
   segments: VoiceCaptureSegmentSnapshot[];
   playback?: VoicePlaybackDiagnosticsSnapshot | null;
+  timelineEvents?: VoiceLaneTimelineDebugEvent[];
 };
 
 export const HELIX_VOICE_CAPTURE_DIAGNOSTICS_EVENT = "helix:voice-capture-diagnostics";

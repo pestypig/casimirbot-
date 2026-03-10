@@ -16,6 +16,7 @@ import {
   subscribeVoiceCaptureDiagnostics,
   type VoiceCaptureCheckpointStatus,
   type VoiceCaptureDiagnosticsSnapshot,
+  type VoiceLaneTimelineDebugEvent,
   type VoiceCaptureWarningCode,
 } from "@/lib/helix/voice-capture-diagnostics";
 
@@ -135,6 +136,16 @@ export function HelixSettingsDialogContent({
             />
             {userSettings.showHelixVoiceCaptureDiagnostics ? (
               <VoiceCaptureDiagnosticsPanel snapshot={voiceDiagnostics} />
+            ) : null}
+            <PreferenceToggleRow
+              id="helix-voice-event-timeline-debug"
+              label="Voice lane event timeline debug"
+              description="Show prompt, brief, final, and chunk traffic events with copy export."
+              checked={userSettings.showHelixVoiceEventTimelineDebug}
+              onChange={(value) => updateSettings({ showHelixVoiceEventTimelineDebug: value })}
+            />
+            {userSettings.showHelixVoiceEventTimelineDebug ? (
+              <VoiceEventTimelineDebugPanel snapshot={voiceDiagnostics} />
             ) : null}
             <PreferenceToggleRow
               id="powershell-debug"
@@ -387,6 +398,97 @@ function VoiceCaptureDiagnosticsPanel({
       )}
     </div>
   );
+}
+
+function VoiceEventTimelineDebugPanel({
+  snapshot,
+}: {
+  snapshot: VoiceCaptureDiagnosticsSnapshot | null;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const timelineEvents = React.useMemo(
+    () =>
+      [...(snapshot?.timelineEvents ?? [])]
+        .sort((a, b) => a.atMs - b.atMs)
+        .slice(-220),
+    [snapshot?.timelineEvents],
+  );
+  const exportPayload = React.useMemo(() => {
+    if (timelineEvents.length === 0) return "";
+    return timelineEvents.map((event) => JSON.stringify(event)).join("\n");
+  }, [timelineEvents]);
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">
+          Voice lane event timeline
+        </p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!exportPayload}
+          className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+            exportPayload
+              ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+              : "border-slate-600 text-slate-500"
+          }`}
+        >
+          {copied ? "copied" : "copy logs"}
+        </button>
+      </div>
+      {timelineEvents.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No voice lane events yet. Start a mic turn and reasoning run to capture timeline continuity.
+        </p>
+      ) : (
+        <>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+            {timelineEvents.length} events
+          </p>
+          <div className="max-h-[44vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {timelineEvents.map((event) => (
+              <p key={event.id} className="whitespace-pre-wrap break-words">
+                {formatVoiceTimelineDebugEvent(event)}
+              </p>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatVoiceTimelineDebugEvent(event: VoiceLaneTimelineDebugEvent): string {
+  const timestamp = Number.isFinite(event.atMs)
+    ? new Date(event.atMs).toISOString().split("T")[1]?.replace("Z", "") ?? "time"
+    : "time";
+  const fields = [
+    `source=${event.source}`,
+    `kind=${event.kind}`,
+    event.status ? `status=${event.status}` : null,
+    event.turnKey ? `turn=${clipDiagnosticsText(event.turnKey, 28)}` : null,
+    event.traceId ? `trace=${clipDiagnosticsText(event.traceId, 26)}` : null,
+    event.attemptId ? `attempt=${clipDiagnosticsText(event.attemptId, 18)}` : null,
+    event.utteranceId ? `utt=${clipDiagnosticsText(event.utteranceId, 18)}` : null,
+    typeof event.chunkIndex === "number" ? `chunk=${event.chunkIndex + 1}/${event.chunkCount ?? "?"}` : null,
+    event.detail ? `detail=${clipDiagnosticsText(event.detail, 96)}` : null,
+    event.text ? `text=${clipDiagnosticsText(event.text, 150)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  return `[${timestamp}] ${fields}`;
 }
 
 function clipDiagnosticsText(source: string, maxChars: number): string {
