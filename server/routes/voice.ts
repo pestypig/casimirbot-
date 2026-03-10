@@ -11,6 +11,10 @@ import {
 } from "../services/helix-ask/operator-contract-v1";
 import { sttHttpHandler } from "../skills/stt.whisper.http";
 import { sttWhisperHandler } from "../skills/stt.whisper";
+import {
+  normalizeVoicePcm16WavBuffer,
+  type VoiceWavNormalizationOptions,
+} from "../services/audio/voice-normalization";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -427,6 +431,8 @@ type VoiceSpeakCacheEntry = {
   providerHeader: string;
   profileHeader: string;
   durationHeader: string;
+  normalizationHeader: string;
+  normalizationGainDbHeader: string;
   buffer: Buffer;
 };
 
@@ -482,6 +488,20 @@ const parseIntEnv = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt((value ?? "").trim(), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
+
+const parseFloatEnv = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseFloat((value ?? "").trim());
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const resolveVoiceWavNormalizationOptions = (): VoiceWavNormalizationOptions => ({
+  enabled: parseBooleanFlag(process.env.VOICE_SPEAK_NORMALIZE_ENABLED, true),
+  targetPeakDbfs: parseFloatEnv(process.env.VOICE_SPEAK_TARGET_PEAK_DBFS, -2),
+  targetRmsDbfs: parseFloatEnv(process.env.VOICE_SPEAK_TARGET_RMS_DBFS, -19),
+  maxGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MAX_GAIN_DB, 12),
+  minGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_GAIN_DB, -12),
+  minDeltaDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_DELTA_DB, 0.6),
+});
 
 const resolveBudgetConfig = () => ({
   missionWindowMs: parseIntEnv(process.env.VOICE_BUDGET_MISSION_WINDOW_MS, 60_000),
@@ -1331,6 +1351,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     res.setHeader("x-voice-provider", cached.providerHeader);
     res.setHeader("x-voice-profile", cached.profileHeader);
     res.setHeader("x-voice-cache", "hit");
+    if (cached.normalizationHeader) {
+      res.setHeader("x-voice-normalization", cached.normalizationHeader);
+    }
+    if (cached.normalizationGainDbHeader) {
+      res.setHeader("x-voice-normalization-gain-db", cached.normalizationGainDbHeader);
+    }
     if (payload.watermark_mode) {
       res.setHeader("x-watermark-mode", payload.watermark_mode);
     }
@@ -1472,18 +1498,35 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
+  const normalization = normalizeVoicePcm16WavBuffer({
+    buffer: success.buffer,
+    options: resolveVoiceWavNormalizationOptions(),
+  });
+  const normalizationHeader =
+    normalization.reason === "applied"
+      ? "pcm16_wav_applied"
+      : `skipped:${normalization.reason}`;
+  const normalizationGainDbHeader =
+    normalization.reason === "applied" ? normalization.gainDb.toFixed(2) : "";
+
   writeVoiceSpeakChunkCache(cacheKey, policyNowMs, {
     contentType: success.contentType,
     providerHeader: success.providerHeader,
     profileHeader: success.profileHeader,
     durationHeader: success.durationHeader,
-    buffer: success.buffer,
+    normalizationHeader,
+    normalizationGainDbHeader,
+    buffer: normalization.buffer,
   });
   recordBackendSuccess();
   res.setHeader("content-type", success.contentType);
   res.setHeader("x-voice-provider", success.providerHeader);
   res.setHeader("x-voice-profile", success.profileHeader);
   res.setHeader("x-voice-cache", "miss");
+  res.setHeader("x-voice-normalization", normalizationHeader);
+  if (normalizationGainDbHeader) {
+    res.setHeader("x-voice-normalization-gain-db", normalizationGainDbHeader);
+  }
   if (payload.watermark_mode) {
     res.setHeader("x-watermark-mode", payload.watermark_mode);
   }
@@ -1492,7 +1535,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   if (success.durationHeader) {
     res.setHeader("x-voice-meter-duration-ms", success.durationHeader);
   }
-  return res.status(200).send(success.buffer);
+  return res.status(200).send(normalization.buffer);
 });
 
 const resetVoiceRouteState = () => {

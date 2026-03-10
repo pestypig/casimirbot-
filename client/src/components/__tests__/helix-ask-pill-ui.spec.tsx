@@ -26,6 +26,7 @@ let scoreIntentShift: typeof import("@/components/helix/HelixAskPill").scoreInte
 let evaluateVoiceReasoningResponseAuthority: typeof import("@/components/helix/HelixAskPill").evaluateVoiceReasoningResponseAuthority;
 let evaluateVoiceTurnSealGate: typeof import("@/components/helix/HelixAskPill").evaluateVoiceTurnSealGate;
 let resolveVoicePlaybackGain: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackGain;
+let shouldUseVoicePlaybackAudioGraph: typeof import("@/components/helix/HelixAskPill").shouldUseVoicePlaybackAudioGraph;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -54,6 +55,7 @@ beforeAll(async () => {
     evaluateVoiceReasoningResponseAuthority,
     evaluateVoiceTurnSealGate,
     resolveVoicePlaybackGain,
+    shouldUseVoicePlaybackAudioGraph,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -126,6 +128,24 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(iosGain).toBe(2.1);
     expect(androidGain).toBeGreaterThan(desktopGain);
     expect(iosGain).toBeGreaterThan(androidGain);
+  });
+
+  it("disables WebAudio media-element routing on mobile user agents", () => {
+    expect(
+      shouldUseVoicePlaybackAudioGraph(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+      ),
+    ).toBe(true);
+    expect(
+      shouldUseVoicePlaybackAudioGraph(
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/122 Mobile Safari/537.36",
+      ),
+    ).toBe(false);
+    expect(
+      shouldUseVoicePlaybackAudioGraph(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
+      ),
+    ).toBe(false);
   });
 
   it("routes completion scores by threshold", () => {

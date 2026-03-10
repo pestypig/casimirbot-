@@ -134,6 +134,13 @@ export function resolveVoicePlaybackGain(userAgent?: string): number {
   return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
 }
 
+export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
+  const ua = (userAgent ?? "").trim();
+  if (!ua) return true;
+  // Mobile Safari/Chrome WebAudio media-element routing is less reliable than direct element playback.
+  return !MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua);
+}
+
 export function stripVoiceCitationArtifacts(source: string): string {
   if (!source) return "";
   const normalized = source
@@ -6381,6 +6388,9 @@ export function HelixAskPill({
   const ensureVoicePlaybackAudioGraph = useCallback(
     async (audio: HTMLAudioElement): Promise<boolean> => {
       if (typeof window === "undefined") return false;
+      if (!shouldUseVoicePlaybackAudioGraph(window.navigator?.userAgent)) {
+        return false;
+      }
       const AudioCtx = (window.AudioContext ||
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
         | typeof AudioContext
