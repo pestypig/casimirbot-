@@ -7170,6 +7170,7 @@ export function HelixAskPill({
         typeof entry.meta?.decisionLifecycle === "string"
           ? (entry.meta.decisionLifecycle as VoiceDecisionLifecycle)
           : undefined;
+      const artifactGuardRestart = entry.meta?.artifactGuardRestart === true;
       const turnKey = entry.traceId ?? entry.attemptId ?? entry.id;
       const decisionSentence =
         typeof entry.meta?.decisionSentence === "string" ? String(entry.meta.decisionSentence).trim() : "";
@@ -7182,6 +7183,9 @@ export function HelixAskPill({
         failReasonRaw,
       });
       if (!shouldSpeakLifecycle) return;
+      if (lifecycle === "queued" && artifactGuardRestart) {
+        return;
+      }
       if (lifecycle) {
         const map = voiceBriefSpokenLifecycleByTurnRef.current;
         map.set(turnKey, lifecycle);
@@ -7789,6 +7793,59 @@ export function HelixAskPill({
   const enqueueReasoningAttempt = useCallback((attemptId: string) => {
     reasoningAttemptQueueRef.current.push(attemptId);
   }, []);
+
+  const suppressSupersededVoiceAttemptsForNewTurn = useCallback(
+    (newTraceId: string | null | undefined) => {
+      if (!newTraceId) return;
+      const supersededAttempts = reasoningAttemptsRef.current.filter(
+        (attempt) =>
+          attempt.source === "voice_auto" &&
+          attempt.traceId &&
+          attempt.traceId !== newTraceId &&
+          (attempt.status === "queued" || attempt.status === "running" || attempt.status === "streaming"),
+      );
+      if (supersededAttempts.length === 0) return;
+      const supersededIds = new Set(supersededAttempts.map((attempt) => attempt.id));
+      reasoningAttemptQueueRef.current = reasoningAttemptQueueRef.current.filter((id) => !supersededIds.has(id));
+      for (const attempt of supersededAttempts) {
+        updateReasoningAttempt(attempt.id, (current) => ({
+          ...current,
+          status: "suppressed",
+          suppression_reason: "voice_turn_superseded_by_newer_turn",
+          completedAtMs: Date.now(),
+        }));
+        const entryId = ensureReasoningTimelineEntry(attempt, "suppressed");
+        patchHelixTimelineEntry(entryId, {
+          status: "suppressed",
+          detail: "superseded by newer voice turn",
+        });
+        const streamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+        if (streamEntryId) {
+          patchHelixTimelineEntry(streamEntryId, {
+            status: "suppressed",
+            detail: "superseded by newer voice turn",
+          });
+          delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+        }
+        if (reasoningAttemptAbortAttemptIdRef.current === attempt.id) {
+          reasoningAttemptAbortControllerRef.current?.abort();
+        }
+        suppressVoiceFinalForTurn(attempt.traceId);
+        const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+        if (segmentId) {
+          patchVoiceSegmentAttempt(segmentId, { dispatch: "suppressed" });
+          delete voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+        }
+      }
+    },
+    [
+      ensureReasoningTimelineEntry,
+      patchHelixTimelineEntry,
+      patchVoiceSegmentAttempt,
+      suppressVoiceFinalForTurn,
+      updateReasoningAttempt,
+    ],
+  );
 
   const createReasoningAttempt = useCallback(
     (input: {
@@ -9076,6 +9133,7 @@ export function HelixAskPill({
       const dispatchMode =
         normalizeConversationModeForDispatch(conversationMode) ??
         normalizeConversationModeForDispatch(inferAskMode(transcript));
+      suppressSupersededVoiceAttemptsForNewTurn(input.traceId);
       const selectedCapsuleIds = resolveSelectedContextCapsuleIds(transcript, undefined, {
         source: "voice_auto",
       });
@@ -9166,6 +9224,7 @@ export function HelixAskPill({
       resolveSelectedContextCapsuleIds,
       runReasoningAttemptQueue,
       setIntentRevisionState,
+      suppressSupersededVoiceAttemptsForNewTurn,
       updateReasoningAttempt,
       updateVoiceDecisionBrief,
     ],
@@ -10055,6 +10114,7 @@ export function HelixAskPill({
               source: "voice_auto",
               preferLatestWins: intentShiftScore.band === "shift" && !shortContinuationAddendum,
             });
+            suppressSupersededVoiceAttemptsForNewTurn(traceId);
             const queuedAttempt = createReasoningAttempt({
               prompt: mergedTranscript,
               dispatchPrompt,
@@ -10235,6 +10295,7 @@ export function HelixAskPill({
     runReasoningAttemptQueue,
     setIntentRevisionState,
     stopReadAloud,
+    suppressSupersededVoiceAttemptsForNewTurn,
     syncAskDraftValue,
     updateVoiceDecisionBrief,
     updateReasoningAttempt,
