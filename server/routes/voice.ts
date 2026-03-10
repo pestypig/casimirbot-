@@ -12,7 +12,8 @@ import {
 import { sttHttpHandler } from "../skills/stt.whisper.http";
 import { sttWhisperHandler } from "../skills/stt.whisper";
 import {
-  normalizeVoicePcm16WavBuffer,
+  normalizeVoiceBuffer,
+  type VoiceMp3NormalizationOptions,
   type VoiceWavNormalizationOptions,
 } from "../services/audio/voice-normalization";
 
@@ -501,6 +502,12 @@ const resolveVoiceWavNormalizationOptions = (): VoiceWavNormalizationOptions => 
   maxGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MAX_GAIN_DB, 12),
   minGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_GAIN_DB, -12),
   minDeltaDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_DELTA_DB, 0.6),
+});
+
+const resolveVoiceMp3NormalizationOptions = (): VoiceMp3NormalizationOptions => ({
+  enabled: parseBooleanFlag(process.env.VOICE_SPEAK_MP3_NORMALIZE_ENABLED, true),
+  ffmpegPath: process.env.VOICE_SPEAK_MP3_FFMPEG_PATH?.trim() || undefined,
+  bitrateKbps: parseIntEnv(process.env.VOICE_SPEAK_MP3_BITRATE_KBPS, 128),
 });
 
 const resolveBudgetConfig = () => ({
@@ -1498,16 +1505,18 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     );
   }
 
-  const normalization = normalizeVoicePcm16WavBuffer({
+  const normalization = await normalizeVoiceBuffer({
     buffer: success.buffer,
-    options: resolveVoiceWavNormalizationOptions(),
+    contentType: success.contentType,
+    wavOptions: resolveVoiceWavNormalizationOptions(),
+    mp3Options: resolveVoiceMp3NormalizationOptions(),
   });
   const normalizationHeader =
-    normalization.reason === "applied"
-      ? "pcm16_wav_applied"
+    normalization.applied
+      ? `${normalization.codec}_applied`
       : `skipped:${normalization.reason}`;
   const normalizationGainDbHeader =
-    normalization.reason === "applied" ? normalization.gainDb.toFixed(2) : "";
+    normalization.applied ? normalization.gainDb.toFixed(2) : "";
 
   writeVoiceSpeakChunkCache(cacheKey, policyNowMs, {
     contentType: success.contentType,

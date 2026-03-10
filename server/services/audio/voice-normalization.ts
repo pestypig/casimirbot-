@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+
 type WavFormat = {
   audioFormat: number;
   channels: number;
@@ -57,6 +59,43 @@ export type VoiceWavNormalizationResult = {
   buffer: Buffer;
   applied: boolean;
   reason: VoiceWavNormalizationReason;
+  gainLinear: number;
+  gainDb: number;
+  peakBefore: number;
+  rmsBefore: number;
+  peakAfter: number;
+  rmsAfter: number;
+};
+
+export type VoiceMp3NormalizationReason =
+  | VoiceWavNormalizationReason
+  | "ffmpeg_unavailable"
+  | "ffmpeg_decode_failed"
+  | "ffmpeg_encode_failed";
+
+export type VoiceMp3NormalizationOptions = {
+  enabled?: boolean;
+  ffmpegPath?: string;
+  bitrateKbps?: number;
+};
+
+export type VoiceMp3NormalizationResult = {
+  buffer: Buffer;
+  applied: boolean;
+  reason: VoiceMp3NormalizationReason;
+  gainLinear: number;
+  gainDb: number;
+  peakBefore: number;
+  rmsBefore: number;
+  peakAfter: number;
+  rmsAfter: number;
+};
+
+export type VoiceBufferNormalizationResult = {
+  buffer: Buffer;
+  applied: boolean;
+  reason: VoiceMp3NormalizationReason | "unsupported_content_type";
+  codec: "pcm16_wav" | "mp3_ffmpeg" | "none";
   gainLinear: number;
   gainDb: number;
   peakBefore: number;
@@ -296,5 +335,218 @@ export const normalizeVoicePcm16WavBuffer = (params: {
     rmsBefore: before.rms,
     peakAfter: after.peak,
     rmsAfter: after.rms,
+  };
+};
+
+const MP3_DEFAULT_OPTIONS = {
+  enabled: true,
+  bitrateKbps: 128,
+} as const;
+
+const runFfmpeg = async (params: {
+  args: string[];
+  input: Buffer;
+  ffmpegPath: string;
+}): Promise<{ ok: true; output: Buffer } | { ok: false; reason: "unavailable" | "failed" }> =>
+  await new Promise((resolve) => {
+    let childExited = false;
+    let unavailable = false;
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    const child = spawn(params.ffmpegPath, params.args, { stdio: ["pipe", "pipe", "pipe"] });
+
+    child.stdout.on("data", (chunk: Buffer | string) => {
+      stdoutChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    child.stderr.on("data", (chunk: Buffer | string) => {
+      stderrChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    child.on("error", (error: NodeJS.ErrnoException) => {
+      if (childExited) return;
+      childExited = true;
+      if (error.code === "ENOENT") {
+        unavailable = true;
+      }
+      resolve({ ok: false, reason: unavailable ? "unavailable" : "failed" });
+    });
+
+    child.on("close", (code) => {
+      if (childExited) return;
+      childExited = true;
+      if (code === 0) {
+        const output = Buffer.concat(stdoutChunks);
+        if (output.byteLength > 0) {
+          resolve({ ok: true, output });
+          return;
+        }
+      }
+      // Preserve stderr capture for local diagnostics via debugger, but expose deterministic reason.
+      const _stderr = Buffer.concat(stderrChunks).toString("utf8").trim();
+      void _stderr;
+      resolve({ ok: false, reason: "failed" });
+    });
+
+    child.stdin.on("error", () => {
+      // no-op: close handler emits deterministic failure
+    });
+    child.stdin.end(params.input);
+  });
+
+const resolveMp3Options = (options?: VoiceMp3NormalizationOptions): Required<VoiceMp3NormalizationOptions> => {
+  const bitrateRaw = Number.parseInt(String(options?.bitrateKbps ?? ""), 10);
+  const bitrateKbps = clamp(
+    Number.isFinite(bitrateRaw) ? bitrateRaw : MP3_DEFAULT_OPTIONS.bitrateKbps,
+    48,
+    320,
+  );
+  return {
+    enabled: options?.enabled ?? MP3_DEFAULT_OPTIONS.enabled,
+    ffmpegPath: (options?.ffmpegPath ?? "ffmpeg").trim() || "ffmpeg",
+    bitrateKbps,
+  };
+};
+
+const skippedMp3Result = (
+  reason: VoiceMp3NormalizationReason,
+  buffer: Buffer,
+  peakBefore = 0,
+  rmsBefore = 0,
+): VoiceMp3NormalizationResult => ({
+  buffer,
+  applied: false,
+  reason,
+  gainLinear: 1,
+  gainDb: 0,
+  peakBefore,
+  rmsBefore,
+  peakAfter: peakBefore,
+  rmsAfter: rmsBefore,
+});
+
+const mapWavResultToMp3 = (result: VoiceWavNormalizationResult, encodedBuffer: Buffer): VoiceMp3NormalizationResult => ({
+  buffer: encodedBuffer,
+  applied: result.applied,
+  reason: result.reason,
+  gainLinear: result.gainLinear,
+  gainDb: result.gainDb,
+  peakBefore: result.peakBefore,
+  rmsBefore: result.rmsBefore,
+  peakAfter: result.peakAfter,
+  rmsAfter: result.rmsAfter,
+});
+
+export const normalizeVoiceMp3Buffer = async (params: {
+  buffer: Buffer;
+  wavOptions?: VoiceWavNormalizationOptions;
+  mp3Options?: VoiceMp3NormalizationOptions;
+}): Promise<VoiceMp3NormalizationResult> => {
+  const mp3Options = resolveMp3Options(params.mp3Options);
+  if (!mp3Options.enabled) {
+    return skippedMp3Result("disabled", params.buffer);
+  }
+  if (params.wavOptions?.enabled === false) {
+    return skippedMp3Result("disabled", params.buffer);
+  }
+
+  const decoded = await runFfmpeg({
+    ffmpegPath: mp3Options.ffmpegPath,
+    args: ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-f", "wav", "-acodec", "pcm_s16le", "pipe:1"],
+    input: params.buffer,
+  });
+  if (!decoded.ok) {
+    return skippedMp3Result(
+      decoded.reason === "unavailable" ? "ffmpeg_unavailable" : "ffmpeg_decode_failed",
+      params.buffer,
+    );
+  }
+
+  const normalizedWav = normalizeVoicePcm16WavBuffer({
+    buffer: decoded.output,
+    options: params.wavOptions,
+  });
+  if (!normalizedWav.applied) {
+    return skippedMp3Result(
+      normalizedWav.reason,
+      params.buffer,
+      normalizedWav.peakBefore,
+      normalizedWav.rmsBefore,
+    );
+  }
+
+  const encoded = await runFfmpeg({
+    ffmpegPath: mp3Options.ffmpegPath,
+    args: [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      "pipe:0",
+      "-f",
+      "mp3",
+      "-codec:a",
+      "libmp3lame",
+      "-b:a",
+      `${mp3Options.bitrateKbps}k`,
+      "pipe:1",
+    ],
+    input: normalizedWav.buffer,
+  });
+  if (!encoded.ok) {
+    return skippedMp3Result(
+      encoded.reason === "unavailable" ? "ffmpeg_unavailable" : "ffmpeg_encode_failed",
+      params.buffer,
+      normalizedWav.peakBefore,
+      normalizedWav.rmsBefore,
+    );
+  }
+
+  return mapWavResultToMp3(normalizedWav, encoded.output);
+};
+
+const isWavContentType = (contentType: string): boolean => /^audio\/(x-)?wav\b/i.test(contentType);
+
+const isMp3ContentType = (contentType: string): boolean =>
+  /^audio\/(mpeg|mp3|x-mp3)\b/i.test(contentType);
+
+export const normalizeVoiceBuffer = async (params: {
+  buffer: Buffer;
+  contentType: string;
+  wavOptions?: VoiceWavNormalizationOptions;
+  mp3Options?: VoiceMp3NormalizationOptions;
+}): Promise<VoiceBufferNormalizationResult> => {
+  const contentType = params.contentType.trim().toLowerCase();
+  if (isWavContentType(contentType)) {
+    const wav = normalizeVoicePcm16WavBuffer({
+      buffer: params.buffer,
+      options: params.wavOptions,
+    });
+    return {
+      ...wav,
+      codec: wav.applied ? "pcm16_wav" : "none",
+    };
+  }
+  if (isMp3ContentType(contentType)) {
+    const mp3 = await normalizeVoiceMp3Buffer({
+      buffer: params.buffer,
+      wavOptions: params.wavOptions,
+      mp3Options: params.mp3Options,
+    });
+    return {
+      ...mp3,
+      codec: mp3.applied ? "mp3_ffmpeg" : "none",
+    };
+  }
+  return {
+    buffer: params.buffer,
+    applied: false,
+    reason: "unsupported_content_type",
+    codec: "none",
+    gainLinear: 1,
+    gainDb: 0,
+    peakBefore: 0,
+    rmsBefore: 0,
+    peakAfter: 0,
+    rmsAfter: 0,
   };
 };

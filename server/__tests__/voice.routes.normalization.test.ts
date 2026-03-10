@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import request from "supertest";
+import { spawnSync } from "node:child_process";
 
 const parseBinary = (
   res: NodeJS.ReadableStream & { setEncoding(encoding: BufferEncoding): void },
@@ -55,6 +56,9 @@ const buildApp = async () => {
 };
 
 describe("voice routes normalization", () => {
+  const hasFfmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
+  const itIfFfmpeg = hasFfmpeg ? it : it.skip;
+
   beforeEach(() => {
     process.env.TTS_BASE_URL = "http://voice.local";
     process.env.VOICE_PROXY_DRY_RUN = "0";
@@ -63,6 +67,8 @@ describe("voice routes normalization", () => {
     process.env.VOICE_SPEAK_TARGET_RMS_DBFS = "-16";
     process.env.VOICE_SPEAK_MAX_GAIN_DB = "18";
     process.env.VOICE_SPEAK_MIN_DELTA_DB = "0.1";
+    process.env.VOICE_SPEAK_MP3_NORMALIZE_ENABLED = "1";
+    process.env.VOICE_SPEAK_MP3_BITRATE_KBPS = "128";
   });
 
   afterEach(() => {
@@ -73,6 +79,8 @@ describe("voice routes normalization", () => {
     delete process.env.VOICE_SPEAK_TARGET_RMS_DBFS;
     delete process.env.VOICE_SPEAK_MAX_GAIN_DB;
     delete process.env.VOICE_SPEAK_MIN_DELTA_DB;
+    delete process.env.VOICE_SPEAK_MP3_NORMALIZE_ENABLED;
+    delete process.env.VOICE_SPEAK_MP3_BITRATE_KBPS;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -106,5 +114,58 @@ describe("voice routes normalization", () => {
     expect(Buffer.isBuffer(response.body)).toBe(true);
     expect(Buffer.compare(response.body as Buffer, source)).not.toBe(0);
   });
-});
 
+  itIfFfmpeg("normalizes mpeg responses through ffmpeg path before returning audio", async () => {
+    const sourceWav = buildSineWav(0.08);
+    const encoded = spawnSync(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "wav",
+        "-i",
+        "pipe:0",
+        "-f",
+        "mp3",
+        "-codec:a",
+        "libmp3lame",
+        "-b:a",
+        "128k",
+        "pipe:1",
+      ],
+      { input: sourceWav },
+    );
+    expect(encoded.status).toBe(0);
+    const sourceMp3 = Buffer.from(encoded.stdout);
+    expect(sourceMp3.byteLength).toBeGreaterThan(0);
+
+    const fetchMock = vi.fn(async () => {
+      return new Response(sourceMp3, {
+        status: 200,
+        headers: { "content-type": "audio/mpeg" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const app = await buildApp();
+    const response = await request(app)
+      .post("/api/voice/speak")
+      .send({
+        text: "test output",
+        mode: "briefing",
+        priority: "info",
+        format: "mp3",
+      })
+      .buffer(true)
+      .parse(parseBinary)
+      .expect(200);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(response.headers["x-voice-normalization"]).toBe("mp3_ffmpeg_applied");
+    expect(Number(response.headers["x-voice-normalization-gain-db"])).toBeGreaterThan(0);
+    expect(response.headers["content-type"]).toContain("audio/mpeg");
+    expect(Buffer.compare(response.body as Buffer, sourceMp3)).not.toBe(0);
+  });
+});

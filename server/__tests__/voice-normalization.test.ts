@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { normalizeVoicePcm16WavBuffer } from "../services/audio/voice-normalization";
+import { spawnSync } from "node:child_process";
+import { normalizeVoiceBuffer, normalizeVoicePcm16WavBuffer } from "../services/audio/voice-normalization";
 
 const buildSineWav = (params: {
   amplitude: number;
@@ -39,6 +40,9 @@ const buildSineWav = (params: {
 };
 
 describe("voice wav normalization", () => {
+  const hasFfmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
+  const itIfFfmpeg = hasFfmpeg ? it : it.skip;
+
   it("boosts quiet PCM16 wav clips toward target loudness", () => {
     const quiet = buildSineWav({ amplitude: 0.08 });
     const result = normalizeVoicePcm16WavBuffer({
@@ -110,5 +114,64 @@ describe("voice wav normalization", () => {
 
     expect(result.applied).toBe(false);
     expect(result.reason).toBe("delta_below_threshold");
+  });
+
+  itIfFfmpeg("normalizes quiet mp3 clips through ffmpeg path", async () => {
+    const quietWav = buildSineWav({ amplitude: 0.08, durationSeconds: 0.6 });
+    const encoded = spawnSync(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "wav",
+        "-i",
+        "pipe:0",
+        "-f",
+        "mp3",
+        "-codec:a",
+        "libmp3lame",
+        "-b:a",
+        "128k",
+        "pipe:1",
+      ],
+      { input: quietWav },
+    );
+    expect(encoded.status).toBe(0);
+    const mp3 = Buffer.from(encoded.stdout);
+    expect(mp3.byteLength).toBeGreaterThan(0);
+
+    const result = await normalizeVoiceBuffer({
+      buffer: mp3,
+      contentType: "audio/mpeg",
+      wavOptions: {
+        targetPeakDbfs: -2,
+        targetRmsDbfs: -16,
+        maxGainDb: 18,
+        minDeltaDb: 0.1,
+      },
+      mp3Options: {
+        enabled: true,
+        bitrateKbps: 128,
+      },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.codec).toBe("mp3_ffmpeg");
+    expect(result.reason).toBe("applied");
+    expect(result.gainDb).toBeGreaterThan(0);
+    expect(Buffer.compare(result.buffer, mp3)).not.toBe(0);
+  });
+
+  it("reports unsupported content types deterministically", async () => {
+    const result = await normalizeVoiceBuffer({
+      buffer: Buffer.from("raw-bytes", "utf8"),
+      contentType: "application/octet-stream",
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.reason).toBe("unsupported_content_type");
+    expect(result.codec).toBe("none");
   });
 });
