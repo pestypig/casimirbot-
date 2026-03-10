@@ -1,4 +1,13 @@
+# ElevenLabs routing for /api/voice/speak (provider=elevenlabs)
+VOICE_PROXY_DRY_RUN=0
+VOICE_PROVIDER_MODE=allow_remote
+VOICE_MANAGED_PROVIDERS_ENABLED=1
+
 ELEVENLABS_API_BASE=https://api.elevenlabs.io
 ELEVENLABS_VOICE_ID=vU0dJF9WOwsWEUfX1Aqw
 ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 ELEVENLABS_OUTPUT_FORMAT=mp3_44100_128
+
+# Set either key (server accepts both)
+ELEVENLABS_API_KEY=
+# VOICE_ELEVENLABS_API_KEY=
