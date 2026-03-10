@@ -7183,10 +7183,10 @@ export function HelixAskPill({
   ]);
 
   const enqueueVoiceAutoSpeakTask = useCallback(
-    (task: VoiceAutoSpeakTask) => {
-      if (micArmStateRef.current !== "on") return;
+    (task: VoiceAutoSpeakTask): boolean => {
+      if (micArmStateRef.current !== "on") return false;
       if (task.kind === "final" && voiceSuppressedFinalTurnKeysRef.current.has(task.turnKey)) {
-        return;
+        return false;
       }
       updateVoiceTurnRevisionState(task.turnKey, (current) => ({
         ...current,
@@ -7213,10 +7213,10 @@ export function HelixAskPill({
           detail: `${task.kind} dropped before enqueue`,
           uiVoiceRevisionMatch: false,
         });
-        return;
+        return false;
       }
       const text = buildSpeakText(task.text, HELIX_VOICE_AUTO_SPEAK_TEXT_MAX_CHARS);
-      if (!text) return;
+      if (!text) return false;
       const nextUtterance = createVoicePlaybackUtterance({
         utteranceId: task.key,
         turnKey: task.turnKey,
@@ -7227,7 +7227,7 @@ export function HelixAskPill({
         eventId: task.eventId,
       });
       if (nextUtterance.chunks.length === 0) {
-        return;
+        return false;
       }
       const duplicateQueued = voiceAutoSpeakQueueRef.current.some(
         (entry) =>
@@ -7243,7 +7243,7 @@ export function HelixAskPill({
         voiceAutoSpeakActiveUtteranceRef.current.revision === nextUtterance.revision &&
         voiceAutoSpeakActiveUtteranceRef.current.text === nextUtterance.text;
       if (duplicateQueued || duplicateActive) {
-        return;
+        return false;
       }
       const nextQueue = applyLatestWinsVoiceQueue({
         queue: voiceAutoSpeakQueueRef.current,
@@ -7262,6 +7262,10 @@ export function HelixAskPill({
         return !stale;
       });
       voiceAutoSpeakQueueRef.current = filteredQueue;
+      const accepted = filteredQueue.some((entry) => entry.utteranceId === nextUtterance.utteranceId);
+      if (!accepted) {
+        return false;
+      }
       pushVoiceChunkTimelineEvent({
         kind: "chunk_enqueue",
         status: "queued",
@@ -7312,6 +7316,7 @@ export function HelixAskPill({
         stopReadAloud(nextQueue.supersededActiveReason ?? undefined);
       }
       void runVoiceAutoSpeakQueue();
+      return true;
     },
     [
       isVoiceUtteranceRevisionStale,
@@ -7375,12 +7380,6 @@ export function HelixAskPill({
         if (transcriptRevision > 0 && spokenRevision === transcriptRevision) {
           return;
         }
-        if (transcriptRevision > 0) {
-          updateVoiceTurnAssemblerState(turnKey, (current) => ({
-            ...current,
-            briefSpokenRevision: transcriptRevision,
-          }));
-        }
       }
       const textForSpeech =
         lifecycle === "queued"
@@ -7422,7 +7421,13 @@ export function HelixAskPill({
         traceId: entry.traceId,
         eventId: entry.id,
       };
-      enqueueVoiceAutoSpeakTask(task);
+      const accepted = enqueueVoiceAutoSpeakTask(task);
+      if (accepted && (lifecycle === "queued" || lifecycle === "running") && transcriptRevision > 0) {
+        updateVoiceTurnAssemblerState(turnKey, (current) => ({
+          ...current,
+          briefSpokenRevision: transcriptRevision,
+        }));
+      }
     },
     [
       bumpVoiceTurnRevision,
