@@ -143,19 +143,25 @@ function isLikelyIOSDesktopModeUserAgent(userAgent?: string): boolean {
   return touchPoints > 1;
 }
 
+function isLikelyMobileAudioUserAgent(userAgent?: string): boolean {
+  const ua = (userAgent ?? "").trim();
+  if (!ua) return false;
+  return MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua) || isLikelyIOSDesktopModeUserAgent(ua);
+}
+
 export function resolveVoicePlaybackGain(userAgent?: string): number {
   const ua = (userAgent ?? "").trim();
   if (!ua) return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
   if (isLikelyIOSDesktopModeUserAgent(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
   if (IOS_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
-  if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_MOBILE;
+  if (isLikelyMobileAudioUserAgent(ua)) return HELIX_VOICE_PLAYBACK_GAIN_MOBILE;
   return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
 }
 
 export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
   const ua = (userAgent ?? "").trim();
   if (!ua) return true;
-  if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua) || isLikelyIOSDesktopModeUserAgent(ua)) {
+  if (isLikelyMobileAudioUserAgent(ua)) {
     // Mobile graph is now enabled by default for louder device-side playback.
     // Set VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE=1 to opt back into direct element playback.
     return !HELIX_VOICE_FORCE_DIRECT_MOBILE;
@@ -743,6 +749,8 @@ const MIC_POST_TRANSCRIBE_COOLDOWN_MS = 600;
 const VOICE_BARGE_RESUME_GRACE_MS = 2800;
 const VOICE_BARGE_HARD_CUT_PERSIST_MS = 700;
 const VOICE_BARGE_TRAFFIC_BUFFER_MS = 2600;
+const MIC_PLAYBACK_BARGE_THRESHOLD_MULTIPLIER_MOBILE = 1.5;
+const MIC_PLAYBACK_BARGE_START_MS_MOBILE = 320;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
 const VOICE_TURN_CLOSE_SILENCE_MS = 3200;
 const VOICE_TURN_HASH_STABLE_DWELL_MS = 900;
@@ -11327,6 +11335,21 @@ export function HelixAskPill({
       MIC_LEVEL_MIN_THRESHOLD,
       Math.min(MIC_LEVEL_THRESHOLD, baseline * MIC_LEVEL_FLOOR_MULTIPLIER),
     );
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const mobileAudioUserAgent = isLikelyMobileAudioUserAgent(ua);
+    const voiceOutputActive =
+      Boolean(playbackAudioRef.current && !playbackAudioRef.current.paused) ||
+      Boolean(voiceAutoSpeakActiveUtteranceRef.current) ||
+      voiceAutoSpeakRunningRef.current ||
+      voiceAutoSpeakQueueRef.current.length > 0;
+    const speechTriggerThreshold =
+      mobileAudioUserAgent && voiceOutputActive
+        ? dynamicThreshold * MIC_PLAYBACK_BARGE_THRESHOLD_MULTIPLIER_MOBILE
+        : dynamicThreshold;
+    const speechStartMs =
+      mobileAudioUserAgent && voiceOutputActive
+        ? MIC_PLAYBACK_BARGE_START_MS_MOBILE
+        : MIC_SPEECH_START_MS;
     const rmsDb = 20 * Math.log10(Math.max(rms, 0.000001));
     voicePeakLevelRef.current = Math.max(rms, voicePeakLevelRef.current * 0.94);
     const scaledRaw = Math.max(
@@ -11335,7 +11358,7 @@ export function HelixAskPill({
     );
     const smoothedLevel = smoothVoiceLevel(voiceDisplayLevelRef.current, scaledRaw);
     voiceDisplayLevelRef.current = smoothedLevel;
-    const speakingNow = rms >= dynamicThreshold;
+    const speakingNow = rms >= speechTriggerThreshold;
     const now = Date.now();
 
     const trackMuted = voiceTrackMutedRef.current;
@@ -11425,7 +11448,7 @@ export function HelixAskPill({
         voiceSpeechCandidateStartMsRef.current = now;
       }
       const candidateDuration = now - (voiceSpeechCandidateStartMsRef.current ?? now);
-      if (!voiceSpeechActiveRef.current && candidateDuration >= MIC_SPEECH_START_MS) {
+      if (!voiceSpeechActiveRef.current && candidateDuration >= speechStartMs) {
         voiceSpeechActiveRef.current = true;
         voiceLastSpeechMsRef.current = now;
         voiceSegmentStartMsRef.current = now;
@@ -11443,11 +11466,6 @@ export function HelixAskPill({
           firstPrerollIndex >= 0
             ? firstPrerollIndex
             : Math.max(0, voiceChunksRef.current.length - 2);
-        const voiceOutputActive =
-          Boolean(playbackAudioRef.current) ||
-          Boolean(voiceAutoSpeakActiveUtteranceRef.current) ||
-          voiceAutoSpeakRunningRef.current ||
-          voiceAutoSpeakQueueRef.current.length > 0;
         if (voiceOutputActive) {
           pausePlaybackForPotentialBargeIn();
           if (playbackAudioRef.current && !playbackAudioRef.current.paused) {
