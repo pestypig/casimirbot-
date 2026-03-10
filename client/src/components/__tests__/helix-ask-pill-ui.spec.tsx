@@ -18,6 +18,10 @@ let isLikelyLoopbackDeviceLabel: typeof import("@/components/helix/HelixAskPill"
 let shouldPrimeSegmentWithContainerHeader: typeof import("@/components/helix/HelixAskPill").shouldPrimeSegmentWithContainerHeader;
 let formatVoiceDecisionSentence: typeof import("@/components/helix/HelixAskPill").formatVoiceDecisionSentence;
 let composeVoiceBriefWithDecision: typeof import("@/components/helix/HelixAskPill").composeVoiceBriefWithDecision;
+let deriveTranscriptConfidence: typeof import("@/components/helix/HelixAskPill").deriveTranscriptConfidence;
+let shouldRequireTranscriptConfirmation: typeof import("@/components/helix/HelixAskPill").shouldRequireTranscriptConfirmation;
+let scoreVoiceTurnComplete: typeof import("@/components/helix/HelixAskPill").scoreVoiceTurnComplete;
+let scoreIntentShift: typeof import("@/components/helix/HelixAskPill").scoreIntentShift;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -38,6 +42,10 @@ beforeAll(async () => {
     shouldPrimeSegmentWithContainerHeader,
     formatVoiceDecisionSentence,
     composeVoiceBriefWithDecision,
+    deriveTranscriptConfidence,
+    shouldRequireTranscriptConfirmation,
+    scoreVoiceTurnComplete,
+    scoreIntentShift,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -72,7 +80,7 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("interrupts read-aloud playback when speech is detected", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const evaluateBlock = /const evaluateMicLevel = useCallback\(\(\) => \{[\s\S]+?\n  \}, \[/.exec(source);
-    expect(evaluateBlock?.[0]).toContain("stopReadAloud();");
+    expect(evaluateBlock?.[0]).toContain('stopReadAloud("barge_in");');
     expect(evaluateBlock?.[0]).toContain("turn_state: \"interrupted\"");
   });
 });
@@ -299,7 +307,7 @@ describe("HelixAskPill mic helper behavior", () => {
         mode: "observe",
         routeReasonCode: "dispatch:observe_explore",
       }),
-    ).toBe("Reasoning is queued in explore mode.");
+    ).toBe("I am thinking through this in the background.");
     expect(
       formatVoiceDecisionSentence({
         lifecycle: "running",
@@ -328,6 +336,12 @@ describe("HelixAskPill mic helper behavior", () => {
       lifecycle: "failed",
     });
     expect(failedSentence).not.toMatch(/dispatch:|suppressed:/i);
+    const failedScopedSentence = formatVoiceDecisionSentence({
+      lifecycle: "failed",
+      failureReasonRaw: "DESKTOP_JOINT_SCOPE_REQUIRED",
+    });
+    expect(failedScopedSentence).toContain("desktop joint scope");
+    expect(failedScopedSentence).not.toContain("DESKTOP_JOINT_SCOPE_REQUIRED");
   });
 
   it("composes base brief plus decision sentence as one updated brief", () => {
@@ -340,5 +354,65 @@ describe("HelixAskPill mic helper behavior", () => {
       'I heard: "How is a full solve done?" Reasoning is queued in explore mode.',
     );
     expect(composeVoiceBriefWithDecision("Short brief.", "")).toBe("Short brief.");
+  });
+
+  it("gates transcript confirmation only for uncertain STT inputs", () => {
+    const confident = deriveTranscriptConfidence({
+      transcript: "Explain the Casimir effect in one sentence.",
+      providerConfidence: 0.91,
+      segments: [],
+    });
+    expect(
+      shouldRequireTranscriptConfirmation({
+        confidence: confident.confidence,
+        translationUncertain: false,
+      }),
+    ).toBe(false);
+
+    const uncertain = deriveTranscriptConfidence({
+      transcript: "x y z ???",
+      providerConfidence: 0.34,
+      segments: [],
+    });
+    expect(
+      shouldRequireTranscriptConfirmation({
+        confidence: uncertain.confidence,
+        translationUncertain: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRequireTranscriptConfirmation({
+        confidence: 0.92,
+        translationUncertain: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("scores turn completion with semantic guard bands", () => {
+    const low = scoreVoiceTurnComplete({
+      transcript: "and then because",
+      pauseMs: 300,
+      stability: 0.45,
+    });
+    const high = scoreVoiceTurnComplete({
+      transcript: "Negative energy density is bounded by quantum inequalities.",
+      pauseMs: 1600,
+      stability: 1,
+    });
+    expect(low.band).toBe("low");
+    expect(high.band).toBe("high");
+  });
+
+  it("detects continuation vs topic shift for latest-wins routing", () => {
+    const continuation = scoreIntentShift({
+      activePrompt: "How can we improve answer quality in this conversation lane?",
+      nextTranscript: "Can we improve answer quality with better context continuity in this lane?",
+    });
+    const shifted = scoreIntentShift({
+      activePrompt: "How can we improve answer quality in this conversation lane?",
+      nextTranscript: "Switch topics and explain how to grow tomatoes indoors.",
+    });
+    expect(continuation.band).toBe("continuation");
+    expect(shifted.band).toBe("shift");
   });
 });

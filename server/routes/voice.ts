@@ -246,6 +246,73 @@ const normalizeRequestedLanguage = (value: string | undefined): string | undefin
   return normalized;
 };
 
+const STT_CONFIRM_CONFIDENCE_THRESHOLD = 0.58;
+const STT_TRANSLATION_CONFIRM_THRESHOLD = 0.68;
+
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const normalizeConfidenceValue = (value: unknown): number | undefined => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return clamp01(value);
+};
+
+const collectSegmentConfidence = (segments: unknown[] | undefined): number[] => {
+  if (!Array.isArray(segments)) return [];
+  const values: number[] = [];
+  for (const segment of segments) {
+    if (!segment || typeof segment !== "object") continue;
+    const confidence = normalizeConfidenceValue((segment as { confidence?: unknown }).confidence);
+    if (typeof confidence === "number") values.push(confidence);
+  }
+  return values;
+};
+
+const averageConfidence = (values: number[]): number | undefined => {
+  if (values.length === 0) return undefined;
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return clamp01(total / values.length);
+};
+
+const estimateTextConfidence = (text: string, language: string | undefined): number => {
+  const normalized = text.trim();
+  if (!normalized) return 0;
+  let score = 0.48;
+  if (normalized.length >= 18) score += 0.12;
+  if (normalized.length >= 64) score += 0.12;
+  if (/[.!?]["')\]]?$/.test(normalized)) score += 0.08;
+  if (/\b(and|but|or|because|so)\s*$/i.test(normalized)) score -= 0.08;
+  if (/[�]/.test(normalized)) score -= 0.25;
+  if (/[\u0000-\u001F]/.test(normalized)) score -= 0.2;
+  const alnumChars = (normalized.match(/[A-Za-z0-9]/g) ?? []).length;
+  const printableChars = (normalized.match(/[^\s]/g) ?? []).length || 1;
+  const alnumRatio = alnumChars / printableChars;
+  if (alnumRatio < 0.45) score -= 0.14;
+  if (alnumRatio > 0.82) score += 0.06;
+  const normalizedLanguage = (language ?? "").trim().toLowerCase();
+  if (!normalizedLanguage || normalizedLanguage === "unknown") score -= 0.06;
+  return clamp01(score);
+};
+
+const deriveTranscriptionConfidence = (args: {
+  text: string;
+  language: string | undefined;
+  segments: unknown[] | undefined;
+  providerConfidence?: unknown;
+}): { confidence: number; reason: string } => {
+  const provider = normalizeConfidenceValue(args.providerConfidence);
+  if (typeof provider === "number") {
+    return { confidence: provider, reason: "provider_reported" };
+  }
+  const segmentAverage = averageConfidence(collectSegmentConfidence(args.segments));
+  if (typeof segmentAverage === "number") {
+    return { confidence: segmentAverage, reason: "segment_average" };
+  }
+  return {
+    confidence: estimateTextConfidence(args.text, args.language),
+    reason: "heuristic_text_quality",
+  };
+};
+
 const resolvePolicyNowMs = (payload: VoiceRequest): number => {
   const serverNowMs = Date.now();
   const replayClockTrusted = parseBooleanFlag(process.env.VOICE_REPLAY_CLOCK_TRUSTED, false);
@@ -575,6 +642,10 @@ type VoiceTranscriptionHandlerResult = {
   language?: string;
   duration_ms?: number;
   segments?: unknown[];
+  confidence?: number;
+  confidence_reason?: string;
+  needs_confirmation?: boolean;
+  translation_uncertain?: boolean;
   essence_id?: string;
   model?: string;
   mode?: string;
@@ -587,6 +658,10 @@ type VoiceTranscriptionResult = {
   language?: string;
   duration_ms?: number;
   segments?: unknown[];
+  confidence?: number;
+  confidence_reason?: string;
+  needs_confirmation?: boolean;
+  translation_uncertain?: boolean;
   essence_id?: string;
   source_text?: string;
   source_language?: string;
@@ -695,12 +770,30 @@ const runBackendTranscribe = async (args: {
           payload: args.payload,
           requestedLanguage: args.requestedLanguage,
         });
+  const text = typeof result.text === "string" ? result.text : "";
+  const language = typeof result.language === "string" ? result.language : args.requestedLanguage;
+  const segments = Array.isArray(result.segments) ? result.segments : [];
+  const confidenceMeta = deriveTranscriptionConfidence({
+    text,
+    language,
+    segments,
+    providerConfidence: result.confidence,
+  });
   return {
-    text: typeof result.text === "string" ? result.text : "",
-    language: typeof result.language === "string" ? result.language : args.requestedLanguage,
+    text,
+    language,
     duration_ms:
       typeof result.duration_ms === "number" ? result.duration_ms : args.payload.durationMs,
-    segments: Array.isArray(result.segments) ? result.segments : [],
+    segments,
+    confidence: confidenceMeta.confidence,
+    confidence_reason:
+      typeof result.confidence_reason === "string" && result.confidence_reason.trim().length > 0
+        ? result.confidence_reason.trim()
+        : confidenceMeta.reason,
+    needs_confirmation:
+      typeof result.needs_confirmation === "boolean" ? result.needs_confirmation : undefined,
+    translation_uncertain:
+      typeof result.translation_uncertain === "boolean" ? result.translation_uncertain : undefined,
     essence_id: typeof result.essence_id === "string" ? result.essence_id : undefined,
     engine: backendEngine(args.backend),
     translated: false,
@@ -763,6 +856,7 @@ const runVoiceTranscription = async (args: {
   const sourceLanguage =
     (baseResult.language ?? requestedLanguage ?? "unknown").trim().toLowerCase() || "unknown";
   const wantsEnglish = args.outputMode === "english" || args.outputMode === "dual";
+  let translationUncertain = baseResult.translation_uncertain === true;
   if (wantsEnglish && sourceText && !isEnglishLikeLanguage(sourceLanguage)) {
     try {
       const translated = await translateToEnglish({
@@ -772,14 +866,41 @@ const runVoiceTranscription = async (args: {
       });
       const translatedText = typeof translated.text === "string" ? translated.text.trim() : "";
       if (translatedText) {
+        const translatedSegments = Array.isArray(translated.segments) ? translated.segments : [];
+        const translatedConfidenceMeta = deriveTranscriptionConfidence({
+          text: translatedText,
+          language: "en",
+          segments: translatedSegments,
+          providerConfidence: translated.confidence,
+        });
         baseResult = {
           ...baseResult,
           text: translatedText,
           language: "en",
+          segments: translatedSegments.length > 0 ? translatedSegments : baseResult.segments,
+          confidence:
+            typeof baseResult.confidence === "number"
+              ? Math.min(baseResult.confidence, translatedConfidenceMeta.confidence)
+              : translatedConfidenceMeta.confidence,
+          confidence_reason:
+            typeof translated.confidence_reason === "string" && translated.confidence_reason.trim().length > 0
+              ? translated.confidence_reason.trim()
+              : translatedConfidenceMeta.reason,
+          needs_confirmation:
+            typeof translated.needs_confirmation === "boolean"
+              ? translated.needs_confirmation
+              : baseResult.needs_confirmation,
+          translation_uncertain:
+            typeof translated.translation_uncertain === "boolean"
+              ? translated.translation_uncertain
+              : translatedConfidenceMeta.confidence < STT_TRANSLATION_CONFIRM_THRESHOLD,
           source_text: sourceText,
           source_language: sourceLanguage,
           translated: true,
         };
+        translationUncertain =
+          baseResult.translation_uncertain === true ||
+          translatedConfidenceMeta.confidence < STT_TRANSLATION_CONFIRM_THRESHOLD;
       } else if (args.outputMode === "dual") {
         baseResult = {
           ...baseResult,
@@ -787,6 +908,7 @@ const runVoiceTranscription = async (args: {
           source_language: sourceLanguage,
           translated: false,
         };
+        translationUncertain = true;
       }
     } catch (error) {
       failures.push(classifySttFailure(selectedBackend, error));
@@ -796,6 +918,7 @@ const runVoiceTranscription = async (args: {
         source_language: sourceLanguage,
         translated: false,
       };
+      translationUncertain = true;
     }
   } else if (args.outputMode === "dual") {
     baseResult = {
@@ -805,6 +928,29 @@ const runVoiceTranscription = async (args: {
       translated: false,
     };
   }
+
+  const confidenceMeta = deriveTranscriptionConfidence({
+    text: baseResult.text ?? "",
+    language: baseResult.language,
+    segments: Array.isArray(baseResult.segments) ? baseResult.segments : [],
+    providerConfidence: baseResult.confidence,
+  });
+  const normalizedConfidence = confidenceMeta.confidence;
+  const confidenceReason =
+    typeof baseResult.confidence_reason === "string" && baseResult.confidence_reason.trim().length > 0
+      ? baseResult.confidence_reason.trim()
+      : confidenceMeta.reason;
+  const needsConfirmation =
+    (typeof baseResult.needs_confirmation === "boolean" ? baseResult.needs_confirmation : false) ||
+    normalizedConfidence < STT_CONFIRM_CONFIDENCE_THRESHOLD ||
+    translationUncertain;
+  baseResult = {
+    ...baseResult,
+    confidence: normalizedConfidence,
+    confidence_reason: confidenceReason,
+    needs_confirmation: needsConfirmation,
+    translation_uncertain: translationUncertain,
+  };
 
   return { result: baseResult, failures };
 };
@@ -930,6 +1076,10 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       source_text: result.source_text ?? null,
       source_language: result.source_language ?? null,
       translated: result.translated ?? false,
+      confidence: typeof result.confidence === "number" ? result.confidence : null,
+      confidence_reason: result.confidence_reason ?? null,
+      needs_confirmation: result.needs_confirmation ?? false,
+      translation_uncertain: result.translation_uncertain ?? false,
       traceId: parsed.data.traceId ?? null,
       missionId: parsed.data.missionId ?? null,
       engine: result.engine,

@@ -71,10 +71,10 @@ describe("isActivePlayback", () => {
 });
 
 describe("shouldAutoSpeakVoiceDecisionLifecycle", () => {
-  it("speaks only transparency-critical lifecycle states", () => {
+  it("speaks queued plus suppression/failure lifecycle updates", () => {
     expect(shouldAutoSpeakVoiceDecisionLifecycle("queued")).toBe(true);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("suppressed")).toBe(true);
-    expect(shouldAutoSpeakVoiceDecisionLifecycle("escalated")).toBe(true);
+    expect(shouldAutoSpeakVoiceDecisionLifecycle("escalated")).toBe(false);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("failed")).toBe(true);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("running")).toBe(false);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("done")).toBe(false);

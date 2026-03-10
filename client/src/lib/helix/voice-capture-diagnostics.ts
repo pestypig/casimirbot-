@@ -37,6 +37,44 @@ export type VoicePlaybackDiagnosticsSnapshot = {
   profileHeader?: string;
   cacheHitCount: number;
   cacheMissCount: number;
+  divergence?: {
+    activeUtteranceId: string | null;
+    activeTurnKey: string | null;
+    activeRevision: number | null;
+    pendingPreemptPolicy: "none" | "pending_final" | "pending_regen";
+    pendingTurnKey: string | null;
+    pendingUtteranceId: string | null;
+    pendingDeadlineMs: number | null;
+    turnStates: Array<{
+      turnKey: string;
+      latestTranscriptRevision: number;
+      latestBriefRevision: number;
+      latestFinalRevision: number;
+      latestRevision: number;
+      activeUtteranceRevision: number | null;
+      pendingPreemptPolicy: "none" | "pending_final" | "pending_regen";
+      pendingSwitchReason: "none" | "pending_preempt_by_final" | "pending_preempt_by_regen";
+      pendingSinceMs: number | null;
+      pendingDeadlineMs: number | null;
+      uiVoiceRevisionMatch: boolean | null;
+      lastEventCode: string | null;
+      updatedAtMs: number;
+    }>;
+    recentEvents: Array<{
+      code:
+        | "divergence_detected"
+        | "stale_revision_dropped"
+        | "preempt_pending"
+        | "preempt_applied"
+        | "preempt_timeout_forced"
+        | "ui_voice_revision_match";
+      turnKey: string;
+      utteranceId: string | null;
+      revision: number | null;
+      detail: string | null;
+      atMs: number;
+    }>;
+  };
 };
 
 export type VoiceCaptureDiagnosticsSnapshot = {

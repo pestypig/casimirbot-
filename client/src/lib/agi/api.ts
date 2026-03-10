@@ -782,6 +782,10 @@ export type VoiceTranscribeResponse = {
   source_text?: string | null;
   source_language?: string | null;
   translated?: boolean;
+  confidence?: number | null;
+  confidence_reason?: string | null;
+  needs_confirmation?: boolean;
+  translation_uncertain?: boolean;
   traceId?: string | null;
   missionId?: string | null;
   engine?: string;

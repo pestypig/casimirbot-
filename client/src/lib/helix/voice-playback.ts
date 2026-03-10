@@ -17,10 +17,13 @@ export type VoicePlaybackCancelReason =
   | "preempted_by_final"
   | "error";
 
+export type VoicePreemptPolicy = "none" | "pending_final" | "pending_regen";
+
 export type VoicePlaybackChunk = {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  revision: number;
   chunkIndex: number;
   chunkCount: number;
   text: string;
@@ -30,6 +33,7 @@ export type VoicePlaybackUtterance = {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  revision: number;
   text: string;
   chunks: string[];
   playState: VoicePlaybackPlayState;
@@ -64,6 +68,7 @@ export type VoicePlaybackQueueTransition = {
   queue: VoicePlaybackUtterance[];
   droppedUtteranceIds: string[];
   supersededActiveReason: VoicePlaybackCancelReason | null;
+  pendingPreemptPolicy: VoicePreemptPolicy;
 };
 
 const DEFAULT_TARGET_MIN_CHARS = 90;
@@ -190,6 +195,7 @@ export function createVoicePlaybackUtterance(input: {
   utteranceId: string;
   turnKey: string;
   kind: VoicePlaybackUtteranceKind;
+  revision: number;
   text: string;
   traceId?: string;
   eventId: string;
@@ -201,6 +207,7 @@ export function createVoicePlaybackUtterance(input: {
     utteranceId: input.utteranceId,
     turnKey: input.turnKey,
     kind: input.kind,
+    revision: Math.max(1, Math.floor(input.revision)),
     text: normalizeWhitespace(input.text),
     chunks,
     playState: "queued",
@@ -219,6 +226,7 @@ export function applyLatestWinsVoiceQueue(input: {
   const incomingTurnKey = input.incoming.turnKey;
   let queue = [...input.queue];
   let supersededActiveReason: VoicePlaybackCancelReason | null = null;
+  let pendingPreemptPolicy: VoicePreemptPolicy = "none";
 
   if (input.incoming.kind === "brief") {
     queue = queue.filter((entry) => {
@@ -230,23 +238,44 @@ export function applyLatestWinsVoiceQueue(input: {
       dropped.add(entry.utteranceId);
       return false;
     });
-    if (input.active && input.active.kind === "brief" && input.active.turnKey === incomingTurnKey) {
-      supersededActiveReason = "superseded_same_turn";
+    if (
+      input.active &&
+      input.active.kind === "brief" &&
+      input.active.turnKey === incomingTurnKey &&
+      input.incoming.revision > input.active.revision
+    ) {
+      pendingPreemptPolicy = "pending_regen";
     }
   } else {
-    // Keep queued same-turn brief so users still hear the conversational handoff.
-    // Final only preempts an actively playing same-turn brief.
-    if (input.active && input.active.kind === "brief" && input.active.turnKey === incomingTurnKey) {
-      supersededActiveReason = "preempted_by_final";
+    queue = queue.filter((entry) => {
+      if (entry.turnKey !== incomingTurnKey) return true;
+      if (entry.kind === "brief") {
+        dropped.add(entry.utteranceId);
+        return false;
+      }
+      if (entry.kind === "final" && entry.revision <= input.incoming.revision) {
+        dropped.add(entry.utteranceId);
+        return false;
+      }
+      return true;
+    });
+    if (input.active && input.active.turnKey === incomingTurnKey) {
+      if (
+        input.active.kind === "brief" &&
+        input.incoming.revision >= input.active.revision
+      ) {
+        pendingPreemptPolicy = "pending_final";
+      } else if (
+        input.active.kind === "final" &&
+        input.incoming.revision > input.active.revision
+      ) {
+        pendingPreemptPolicy = "pending_regen";
+      }
     }
   }
 
-  if (
-    input.active &&
-    input.active.turnKey !== incomingTurnKey &&
-    input.incoming.kind === "brief"
-  ) {
-    supersededActiveReason = supersededActiveReason ?? "superseded_new_turn";
+  if (input.active && input.active.turnKey !== incomingTurnKey) {
+    pendingPreemptPolicy = pendingPreemptPolicy === "none" ? "pending_regen" : pendingPreemptPolicy;
   }
 
   if (input.incoming.kind === "brief") {
@@ -263,6 +292,7 @@ export function applyLatestWinsVoiceQueue(input: {
     queue,
     droppedUtteranceIds: [...dropped],
     supersededActiveReason,
+    pendingPreemptPolicy,
   };
 }
 

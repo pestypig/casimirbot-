@@ -15178,6 +15178,15 @@ const clipConversationText = (value: string, maxChars = 320): string => {
   return `${trimmed.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
 };
 
+const sanitizeConversationBriefText = (value: string, maxChars = 520): string => {
+  const normalized = value
+    .replace(/\?/g, ".")
+    .replace(/\s+/g, " ")
+    .replace(/\.\.+/g, ".")
+    .trim();
+  return clipConversationText(normalized, maxChars);
+};
+
 const HELIX_CONVERSATION_FILLER_RE =
   /^(ok|okay|yeah|yep|nope|thanks|thank you|cool|nice|right|got it|sounds good|testing|test)\b/i;
 const HELIX_CONVERSATION_VERIFY_RE =
@@ -15428,12 +15437,18 @@ const buildConversationFallbackBrief = (args: {
           ? "observe"
           : "clarify";
   if (args.mode === "clarify") {
-    return `I heard: "${clipped}". Share one specific goal or constraint and I will guide the next step while keeping this conversational for now.`;
+    return sanitizeConversationBriefText(
+      `I heard: "${clipped}". Share one specific goal or constraint. I will guide the next step while keeping this conversational for now.`,
+    );
   }
   if (args.dispatchHint) {
-    return `Got it. I will run a short ${laneText} reasoning pass in the background so we can keep talking while it loads.`;
+    return sanitizeConversationBriefText(
+      `Got it. I will run a short ${laneText} reasoning pass in the background so we can keep talking while it loads.`,
+    );
   }
-  return `I heard: "${clipped}". I will keep this conversational for now and queue deeper reasoning when the turn needs it.`;
+  return sanitizeConversationBriefText(
+    `I heard: "${clipped}". I will keep this conversational for now and queue deeper reasoning when the turn needs it.`,
+  );
 };
 
 const parseConversationClassifierResult = (
@@ -15504,10 +15519,10 @@ const buildConversationBriefPrompt = (args: {
   const lines: string[] = [];
   lines.push("Dialogue profile: dot_min_steps_v1");
   lines.push("Generate one concise conversational brief.");
-  lines.push("Cadence: mirror -> decisive next step -> bounded why -> optional evidence anchor.");
-  lines.push("Include decision awareness in plain human wording.");
-  lines.push("- If dispatch_hint=true, say you are queuing reasoning in the background.");
-  lines.push("- If dispatch_hint=false, say you are keeping this conversational for now.");
+  lines.push("Cadence: acknowledge -> decisive next step -> bounded why.");
+  lines.push("Use statement-only wording with no direct question to the user.");
+  lines.push("Do not include question marks.");
+  lines.push("Do not include lifecycle/status text; the client renders status separately.");
   lines.push("Do not output raw route/status codes.");
   lines.push("For exploratory turns, do not ask a clarifier yet; launch observe-first reasoning.");
   lines.push("Ask exactly one clarifier only when the first reasoning attempt cannot progress.");
@@ -34230,7 +34245,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     const rawBrief = String((briefResult as { text?: unknown })?.text ?? "");
     const parsedBrief = parseConversationBriefResult(rawBrief);
     if (parsedBrief && parsedBrief.trim()) {
-      briefText = parsedBrief.trim();
+      briefText = sanitizeConversationBriefText(parsedBrief);
     } else {
       briefSource = "fallback";
       briefFailReason = "conversation_brief_parse_fallback";
@@ -34249,6 +34264,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       dispatchHint: classification.dispatch_hint,
     });
   }
+  briefText = sanitizeConversationBriefText(briefText);
   appendConversationLog({
     tool: "conversation.brief_ready",
     detail: classification.mode,

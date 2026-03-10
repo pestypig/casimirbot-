@@ -41,12 +41,14 @@ describe("applyLatestWinsVoiceQueue", () => {
     utteranceId: string,
     turnKey: string,
     kind: "brief" | "final",
+    revision = 1,
     text = "test",
   ) =>
     createVoicePlaybackUtterance({
       utteranceId,
       turnKey,
       kind,
+      revision,
       text,
       eventId: utteranceId,
       enqueuedAtMs: 1,
@@ -58,7 +60,7 @@ describe("applyLatestWinsVoiceQueue", () => {
       make("brief-old-turn-b", "turn-b", "brief"),
       make("final-turn-z", "turn-z", "final"),
     ];
-    const incoming = make("brief-new-turn-b", "turn-b", "brief");
+    const incoming = make("brief-new-turn-b", "turn-b", "brief", 2);
     const next = applyLatestWinsVoiceQueue({
       queue,
       incoming,
@@ -73,31 +75,29 @@ describe("applyLatestWinsVoiceQueue", () => {
       "brief-old-turn-a",
       "brief-old-turn-b",
     ]);
-    expect(next.supersededActiveReason).toBe("superseded_same_turn");
+    expect(next.supersededActiveReason).toBe(null);
+    expect(next.pendingPreemptPolicy).toBe("pending_regen");
   });
 
-  it("keeps queued same-turn brief but preempts active same-turn brief when final arrives", () => {
+  it("queues same-turn final and marks active same-turn brief for sentence-boundary handoff", () => {
     const queue = [
-      make("brief-turn-c", "turn-c", "brief"),
-      make("final-turn-a", "turn-a", "final"),
+      make("brief-turn-c", "turn-c", "brief", 1),
+      make("final-turn-a", "turn-a", "final", 1),
     ];
-    const incoming = make("final-turn-c", "turn-c", "final");
+    const incoming = make("final-turn-c", "turn-c", "final", 2);
     const next = applyLatestWinsVoiceQueue({
       queue,
       incoming,
-      active: make("brief-active-turn-c", "turn-c", "brief"),
+      active: make("brief-active-turn-c", "turn-c", "brief", 1),
     });
 
-    expect(next.queue.map((entry) => entry.utteranceId)).toEqual([
-      "brief-turn-c",
-      "final-turn-a",
-      "final-turn-c",
-    ]);
-    expect(next.droppedUtteranceIds).toEqual([]);
-    expect(next.supersededActiveReason).toBe("preempted_by_final");
+    expect(next.queue.map((entry) => entry.utteranceId)).toEqual(["final-turn-a", "final-turn-c"]);
+    expect(next.droppedUtteranceIds).toEqual(["brief-turn-c"]);
+    expect(next.pendingPreemptPolicy).toBe("pending_final");
+    expect(next.supersededActiveReason).toBe(null);
   });
 
-  it("preempts active prior-turn final when a new brief arrives", () => {
+  it("marks active prior-turn playback for boundary cancel when new-turn brief arrives", () => {
     const queue = [make("final-queued-turn-z", "turn-z", "final")];
     const incoming = make("brief-new-turn-b", "turn-b", "brief");
     const next = applyLatestWinsVoiceQueue({
@@ -110,7 +110,28 @@ describe("applyLatestWinsVoiceQueue", () => {
       "brief-new-turn-b",
       "final-queued-turn-z",
     ]);
-    expect(next.supersededActiveReason).toBe("superseded_new_turn");
+    expect(next.pendingPreemptPolicy).toBe("pending_regen");
+    expect(next.supersededActiveReason).toBe(null);
+  });
+
+  it("drops stale queued same-turn finals when a newer final revision arrives", () => {
+    const queue = [
+      make("final-turn-c-r1", "turn-c", "final", 1),
+      make("final-turn-c-r2", "turn-c", "final", 2),
+      make("final-turn-z-r1", "turn-z", "final", 1),
+    ];
+    const incoming = make("final-turn-c-r3", "turn-c", "final", 3);
+    const next = applyLatestWinsVoiceQueue({
+      queue,
+      incoming,
+      active: null,
+    });
+
+    expect(next.queue.map((entry) => entry.utteranceId)).toEqual([
+      "final-turn-z-r1",
+      "final-turn-c-r3",
+    ]);
+    expect(next.droppedUtteranceIds.sort()).toEqual(["final-turn-c-r1", "final-turn-c-r2"]);
   });
 });
 
@@ -121,6 +142,7 @@ describe("trimVoicePlaybackQueue", () => {
         utteranceId: id,
         turnKey: `turn-${index}`,
         kind: "brief",
+        revision: 1,
         text: id,
         eventId: id,
         enqueuedAtMs: index,
