@@ -20796,6 +20796,17 @@ const executeHelixAsk = async ({
     ): void => {
       const finalText = (coerceString(finalTextRaw ?? target.text ?? "") ?? "").trim();
       if (!finalText) return;
+      const fallbackTag = typeof target.fallback === "string" ? target.fallback.trim() : "";
+      const runtimeFallbackPayload =
+        HELIX_ASK_RUNTIME_FALLBACK_PREFIX_TEST_RE.test(finalText) ||
+        /^(?:runtime_deterministic|fast_mode_runtime_missing|helper_runtime_missing)$/i.test(fallbackTag);
+      if (runtimeFallbackPayload) {
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).context_capsule_skipped = true;
+          (debugPayload as Record<string, unknown>).context_capsule_skip_reason = "runtime_fallback";
+        }
+        return;
+      }
       if (isPathIndexStyleAnswer(finalText)) {
         if (debugPayload) {
           (debugPayload as Record<string, unknown>).context_capsule_skipped = true;
@@ -21141,6 +21152,22 @@ const executeHelixAsk = async ({
       debugPayload.capsule_preferred_paths = capsulePreferredEvidencePaths.slice(0, 8);
     }
     const rawQuestion = (request.question ?? request.prompt ?? "").trim();
+    const requestContextText = (() => {
+      const inlineContext = parsed.data.context?.trim() ?? "";
+      if (inlineContext) return inlineContext;
+      if (prompt) return extractContextFromPrompt(prompt);
+      return "";
+    })();
+    const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
+      ? (parsed.data as any).contextFiles
+      : [];
+    const requestContextFiles = (() => {
+      const normalized = providedContextFiles
+        .map((entry: string) => (entry ? entry.replace(/\\/g, "/") : ""))
+        .filter(Boolean);
+      const merged = new Set<string>([...extractFilePathsFromText(requestContextText), ...normalized]);
+      return Array.from(merged);
+    })();
     const requestCoverageSlots = Array.isArray(parsed.data.coverageSlots)
       ? parsed.data.coverageSlots.map(normalizeSlotId)
       : [];
@@ -21939,7 +21966,7 @@ const executeHelixAsk = async ({
         let reportCitationTokens = normalizeCitations([
           ...blockResults.flatMap((block) => block.citations ?? []),
           ...reportBlockDetails.flatMap((detail) => detail.context_files ?? []),
-          ...contextFiles,
+          ...requestContextFiles,
         ]);
         if (reportCitationTokens.length === 0) {
           reportCitationTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
@@ -23000,30 +23027,15 @@ const executeHelixAsk = async ({
     if (compositeApplied) {
       answerPath.push("composite:enabled");
     }
-    let contextText = parsed.data.context?.trim() ?? "";
-    if (!contextText && prompt) {
-      contextText = extractContextFromPrompt(prompt);
-    }
-      let contextFiles = extractFilePathsFromText(contextText);
-      let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
-      let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
-      let docSlotTargets: string[] = [];
-      let docBlocks: Array<{ path: string; block: string }> = [];
-      let definitionRegistryBlocks: Array<{ path: string; block: string }> = [];
-      let graphEvidenceItems: HelixAskGraphEvidence[] = [];
-      let minDocEvidenceCards = 0;
-      const providedContextFiles = Array.isArray((parsed.data as any).contextFiles)
-        ? (parsed.data as any).contextFiles
-        : [];
-    if (providedContextFiles.length > 0) {
-      const normalized = providedContextFiles
-        .map((entry: string) => (entry ? entry.replace(/\\/g, "/") : ""))
-        .filter(Boolean);
-      if (normalized.length > 0) {
-        const merged = new Set([...contextFiles, ...normalized]);
-        contextFiles = Array.from(merged);
-      }
-    }
+    let contextText = requestContextText;
+    let contextFiles = requestContextFiles.slice();
+    let coverageSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+    let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
+    let docSlotTargets: string[] = [];
+    let docBlocks: Array<{ path: string; block: string }> = [];
+    let definitionRegistryBlocks: Array<{ path: string; block: string }> = [];
+    let graphEvidenceItems: HelixAskGraphEvidence[] = [];
+    let minDocEvidenceCards = 0;
     const hasRepoCodeEvidencePaths = (paths: string[]): boolean =>
       paths.some((entry) => {
         const normalized = String(entry ?? "")
