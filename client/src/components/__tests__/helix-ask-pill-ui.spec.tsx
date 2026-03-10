@@ -18,6 +18,7 @@ let isLikelyLoopbackDeviceLabel: typeof import("@/components/helix/HelixAskPill"
 let shouldPrimeSegmentWithContainerHeader: typeof import("@/components/helix/HelixAskPill").shouldPrimeSegmentWithContainerHeader;
 let formatVoiceDecisionSentence: typeof import("@/components/helix/HelixAskPill").formatVoiceDecisionSentence;
 let composeVoiceBriefWithDecision: typeof import("@/components/helix/HelixAskPill").composeVoiceBriefWithDecision;
+let isAgibotPreflightScopeError: typeof import("@/components/helix/HelixAskPill").isAgibotPreflightScopeError;
 let deriveTranscriptConfidence: typeof import("@/components/helix/HelixAskPill").deriveTranscriptConfidence;
 let shouldRequireTranscriptConfirmation: typeof import("@/components/helix/HelixAskPill").shouldRequireTranscriptConfirmation;
 let scoreVoiceTurnComplete: typeof import("@/components/helix/HelixAskPill").scoreVoiceTurnComplete;
@@ -42,6 +43,7 @@ beforeAll(async () => {
     shouldPrimeSegmentWithContainerHeader,
     formatVoiceDecisionSentence,
     composeVoiceBriefWithDecision,
+    isAgibotPreflightScopeError,
     deriveTranscriptConfidence,
     shouldRequireTranscriptConfirmation,
     scoreVoiceTurnComplete,
@@ -354,6 +356,14 @@ describe("HelixAskPill mic helper behavior", () => {
       'I heard: "How is a full solve done?" Reasoning is queued in explore mode.',
     );
     expect(composeVoiceBriefWithDecision("Short brief.", "")).toBe("Short brief.");
+  });
+
+  it("detects mission preflight scope failures for safe fallback retry", () => {
+    expect(isAgibotPreflightScopeError(new Error("DESKTOP_JOINT_SCOPE_REQUIRED"))).toBe(true);
+    expect(
+      isAgibotPreflightScopeError("Mission interface blocked by bring-up preflight gate."),
+    ).toBe(true);
+    expect(isAgibotPreflightScopeError(new Error("network timeout"))).toBe(false);
   });
 
   it("gates transcript confirmation only for uncertain STT inputs", () => {

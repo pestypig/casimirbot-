@@ -1442,6 +1442,59 @@ function normalizeVoiceFailureReasonText(reason?: string | null): string | null 
   return null;
 }
 
+type AskLocalOptions = Parameters<typeof askLocal>[1];
+type AskLocalMode = NonNullable<AskLocalOptions>["mode"];
+type AskLocalResult = Awaited<ReturnType<typeof askLocal>>;
+
+const AGIBOT_PREFLIGHT_SCOPE_ERROR_RE =
+  /\bDESKTOP_JOINT_SCOPE_REQUIRED\b|desktop joint scope is required|mission interface blocked by bring-up preflight gate|preflight_gate/i;
+
+export function isAgibotPreflightScopeError(error: unknown): boolean {
+  if (!error) return false;
+  const rawMessage =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : typeof (error as { message?: unknown }).message === "string"
+          ? String((error as { message?: unknown }).message)
+          : "";
+  if (!rawMessage) return false;
+  return AGIBOT_PREFLIGHT_SCOPE_ERROR_RE.test(rawMessage);
+}
+
+type AskLocalWithFallbackResult = {
+  response: AskLocalResult;
+  downgradedFromMode?: AskLocalMode;
+};
+
+export async function askLocalWithPreflightScopeFallback(
+  prompt: string | undefined,
+  options?: AskLocalOptions,
+): Promise<AskLocalWithFallbackResult> {
+  try {
+    const response = await askLocal(prompt, options);
+    return { response };
+  } catch (error) {
+    if (!options?.mode || !isAgibotPreflightScopeError(error)) {
+      throw error;
+    }
+    const retryOptions: AskLocalOptions = { ...options };
+    delete retryOptions.mode;
+    delete retryOptions.allowTools;
+    delete retryOptions.requiredEvidence;
+    delete retryOptions.verify;
+    const response = await askLocal(prompt, retryOptions);
+    if (!response.mode) {
+      response.mode = "read";
+    }
+    return {
+      response,
+      downgradedFromMode: options.mode,
+    };
+  }
+}
+
 export function formatVoiceDecisionSentence(args: {
   lifecycle: VoiceDecisionLifecycle;
   mode?: "observe" | "act" | "verify" | "clarify";
@@ -6609,7 +6662,7 @@ export function HelixAskPill({
             Array.isArray(attempt.contextCapsuleIds) && attempt.contextCapsuleIds.length > 0
               ? attempt.contextCapsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
               : resolveSelectedContextCapsuleIds(attempt.prompt, undefined, { source: attempt.source });
-          const response = await askLocal(undefined, {
+          const askResult = await askLocalWithPreflightScopeFallback(undefined, {
             sessionId,
             traceId: attempt.traceId,
             maxTokens: HELIX_ASK_OUTPUT_TOKENS,
@@ -6620,6 +6673,22 @@ export function HelixAskPill({
             dialogue_profile: attempt.profile,
             signal: askController.signal,
           });
+          const response = askResult.response;
+          const responseMode =
+            response.mode === "read" ||
+            response.mode === "observe" ||
+            response.mode === "act" ||
+            response.mode === "verify"
+              ? response.mode
+              : undefined;
+          const modeForTimeline: HelixTimelineEntry["mode"] =
+            responseMode ?? (attempt.mode ?? "observe");
+          const modeForAttempt: ReasoningAttempt["mode"] =
+            responseMode === "observe" || responseMode === "act" || responseMode === "verify"
+              ? responseMode
+              : responseMode === "read"
+                ? "observe"
+                : attempt.mode;
           const latestAttemptSnapshot = reasoningAttemptsRef.current.find((entry) => entry.id === attempt.id);
           const latestAskPromptForAttempt = (
             latestAttemptSnapshot?.dispatchPrompt ?? latestAttemptSnapshot?.prompt ?? askPromptForRequest
@@ -6753,10 +6822,19 @@ export function HelixAskPill({
             "").trim();
           const outputText = finalText || "No final answer returned.";
           const responseDebugWithClientMode =
-            response.debug || attempt.mode
+            response.debug || modeForAttempt
               ? {
                   ...response.debug,
-                  ...(attempt.mode ? { client_inferred_mode: attempt.mode } : {}),
+                  ...(modeForAttempt ? { client_inferred_mode: modeForAttempt } : {}),
+                  ...(askResult.downgradedFromMode
+                    ? {
+                        client_mode_fallback: {
+                          from: askResult.downgradedFromMode,
+                          to: responseMode ?? "read",
+                          reason: "preflight_scope_required",
+                        },
+                      }
+                    : {}),
                 }
               : undefined;
           const evidenceRefs = response.debug?.context_files ?? response.debug?.prompt_context_files ?? [];
@@ -6776,7 +6854,7 @@ export function HelixAskPill({
                         | undefined
                     )?.helix_ask_fail_reason ??
                     (response.debug as { fail_reason?: string } | undefined)?.fail_reason,
-                  mode: attempt.mode,
+                  mode: modeForAttempt,
                   debug: response.debug,
                 })
               : { action: "finalize" as const, reasonCode: attempt.routeReasonCode ?? "dispatch:finalize" };
@@ -6792,6 +6870,7 @@ export function HelixAskPill({
             updateReasoningAttempt(attempt.id, (current) => ({
               ...current,
               status: "suppressed",
+              mode: modeForAttempt,
               suppression_reason: ladderDecision.reasonCode,
               partial: current.partial || outputText,
               finalAnswer: outputText,
@@ -6864,6 +6943,7 @@ export function HelixAskPill({
             updateReasoningAttempt(attempt.id, (current) => ({
               ...current,
               status: "suppressed",
+              mode: modeForAttempt,
               suppression_reason: ladderDecision.reasonCode,
               partial: current.partial || outputText,
               finalAnswer: outputText,
@@ -6882,7 +6962,7 @@ export function HelixAskPill({
               text: clipText(
                 formatVoiceDecisionSentence({
                   lifecycle: "escalated",
-                  mode: attempt.mode,
+                  mode: modeForAttempt,
                   escalatedMode,
                   routeReasonCode: ladderDecision.reasonCode,
                 }),
@@ -6897,7 +6977,7 @@ export function HelixAskPill({
             updateVoiceDecisionBrief({
               baseBrief: escalatedBriefBase,
               lifecycle: "escalated",
-              mode: attempt.mode,
+              mode: modeForAttempt,
               escalatedMode,
               routeReasonCode: ladderDecision.reasonCode,
               traceId: attempt.traceId,
@@ -6972,6 +7052,7 @@ export function HelixAskPill({
             updateReasoningAttempt(attempt.id, (current) => ({
               ...current,
               status: "done",
+              mode: modeForAttempt,
               partial: current.partial || outputText,
               finalAnswer: outputText,
               certaintyClass,
@@ -6980,15 +7061,16 @@ export function HelixAskPill({
             }));
             patchHelixTimelineEntry(primaryTimelineEntryId, {
               status: "done",
-              detail: formatReasoningAttemptDetail(attempt, "done"),
+              detail: formatReasoningAttemptDetail({ mode: modeForAttempt }, "done"),
+              mode: modeForTimeline,
             });
             const finalTimelineEntry = addHelixTimelineEntry({
-              type: attempt.mode === "act" ? "action_receipt" : "reasoning_final",
+              type: modeForAttempt === "act" ? "action_receipt" : "reasoning_final",
               source: attempt.source,
               status: "done",
               text: clipText(outputText, 500),
-              detail: formatReasoningAttemptDetail(attempt, "reasoning complete"),
-              mode: attempt.mode,
+              detail: formatReasoningAttemptDetail({ mode: modeForAttempt }, "reasoning complete"),
+              mode: modeForTimeline,
               traceId: attempt.traceId,
               attemptId: attempt.id,
               meta: {
@@ -7035,7 +7117,7 @@ export function HelixAskPill({
                   debug: responseDebugWithClientMode,
                   promptIngested: response.prompt_ingested,
                   envelope: response.envelope,
-                  mode: response.mode,
+                  mode: modeForTimeline,
                   proof: response.proof,
                   contextCapsule: response.context_capsule,
                   sources:
@@ -7067,13 +7149,13 @@ export function HelixAskPill({
                 attempt.conversationBriefBase?.trim() ||
                 buildConversationFallbackBrief({
                   transcript: attempt.recordedText ?? attempt.prompt,
-                  mode: attempt.mode,
+                  mode: modeForAttempt,
                   clarifyNeeded: false,
                 });
               updateVoiceDecisionBrief({
                 baseBrief: doneBriefBase,
                 lifecycle: "done",
-                mode: attempt.mode,
+                mode: modeForAttempt,
                 routeReasonCode: attempt.routeReasonCode,
                 traceId: attempt.traceId,
                 meta: {
@@ -9403,7 +9485,7 @@ export function HelixAskPill({
         setAskStatus("Generating answer...");
         try {
           const askModeForRequest = inferredMode === "observe" ? undefined : inferredMode;
-          const localResponse = await askLocal(undefined, {
+          const askResult = await askLocalWithPreflightScopeFallback(undefined, {
             sessionId: sessionId ?? undefined,
             traceId,
             maxTokens: HELIX_ASK_OUTPUT_TOKENS,
@@ -9413,6 +9495,7 @@ export function HelixAskPill({
             mode: askModeForRequest,
             capsuleIds: selectedCapsuleIds,
           });
+          const localResponse = askResult.response;
           responseEnvelope = localResponse.envelope;
           const envelopeAnswer = responseEnvelope?.answer?.trim() ?? "";
           responseText = envelopeAnswer
@@ -9424,6 +9507,15 @@ export function HelixAskPill({
               ? {
                   ...localResponse.debug,
                   ...(inferredMode ? { client_inferred_mode: inferredMode } : {}),
+                  ...(askResult.downgradedFromMode
+                    ? {
+                        client_mode_fallback: {
+                          from: askResult.downgradedFromMode,
+                          to: localResponse.mode ?? "read",
+                          reason: "preflight_scope_required",
+                        },
+                      }
+                    : {}),
                 }
               : undefined;
           responsePromptIngested = localResponse.prompt_ingested;
@@ -9527,7 +9619,9 @@ export function HelixAskPill({
           const detailMode =
             responseMode === "observe" || responseMode === "act" || responseMode === "verify"
               ? responseMode
-              : inferredMode;
+              : responseMode === "read"
+                ? "observe"
+                : inferredMode;
           updateReasoningAttempt(manualAttempt.id, (current) => ({
             ...current,
             status: "done",
