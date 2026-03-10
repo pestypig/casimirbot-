@@ -7344,7 +7344,20 @@ export function HelixAskPill({
         failReasonRaw,
       });
       if (!shouldSpeakLifecycle) return;
-      if (lifecycle === "queued" && artifactGuardRestart) {
+      const assemblerSnapshot = getVoiceTurnAssemblerState(turnKey);
+      const transcriptRevision =
+        typeof entry.meta?.transcriptRevision === "number" && Number.isFinite(entry.meta.transcriptRevision)
+          ? Math.max(0, Math.floor(entry.meta.transcriptRevision))
+          : assemblerSnapshot?.transcriptRevision ??
+            voiceTurnRevisionStateRef.current[turnKey]?.latestTranscriptRevision ??
+            0;
+      const spokenRevision = assemblerSnapshot?.briefSpokenRevision ?? 0;
+      if (
+        lifecycle === "queued" &&
+        artifactGuardRestart &&
+        transcriptRevision > 0 &&
+        spokenRevision === transcriptRevision
+      ) {
         return;
       }
       if (lifecycle) {
@@ -7357,16 +7370,8 @@ export function HelixAskPill({
           }
         }
       }
-      const assemblerSnapshot = getVoiceTurnAssemblerState(turnKey);
-      const transcriptRevision =
-        typeof entry.meta?.transcriptRevision === "number" && Number.isFinite(entry.meta.transcriptRevision)
-          ? Math.max(0, Math.floor(entry.meta.transcriptRevision))
-          : assemblerSnapshot?.transcriptRevision ??
-            voiceTurnRevisionStateRef.current[turnKey]?.latestTranscriptRevision ??
-            0;
       const continuityMerged = entry.meta?.continuityMerged === true;
       if (lifecycle === "queued" || lifecycle === "running") {
-        const spokenRevision = assemblerSnapshot?.briefSpokenRevision ?? 0;
         if (transcriptRevision > 0 && spokenRevision === transcriptRevision) {
           return;
         }
@@ -7675,7 +7680,8 @@ export function HelixAskPill({
         voiceBargeResumeNotBeforeMsRef.current = null;
         return;
       }
-      const suppressFinals = reason !== "stt_queue";
+      const suppressFinals =
+        reason === "stt_queue" || reason === "stt_busy" || reason === "pending_confirmation";
       if (suppressFinals) {
         suppressVoiceFinalsForActiveTurns(heldTurnKey);
       }
