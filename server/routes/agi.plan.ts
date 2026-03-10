@@ -11545,6 +11545,44 @@ const hasWeakScientificSections = (text: string): boolean => {
   return false;
 };
 
+const rewriteConversationScientificVoice = (text: string): string => {
+  if (!isScientificMicroReport(text)) return text;
+  const confirmedBullets = extractSectionBullets(extractScientificPrimaryBody(text)).filter(
+    (entry) => !isLowSignalScientificBullet(entry),
+  );
+  const reasonedBullets = extractSectionBullets(
+    extractScientificSectionBody(text, "Reasoned connections (bounded):"),
+  ).filter((entry) => !isLowSignalScientificBullet(entry));
+  const nextEvidenceBullets = extractSectionBullets(
+    extractScientificSectionBody(text, "Next evidence:"),
+  ).filter(
+    (entry) =>
+      !/^(Searched terms|Checked files|Clarify:|Search )/i.test(entry) &&
+      !isLowSignalScientificBullet(entry),
+  );
+
+  const primaryLine = confirmedBullets[0] ?? reasonedBullets[0] ?? "";
+  const reasonedLine = reasonedBullets[0] ?? "";
+  const nextStepLine = nextEvidenceBullets[0] ?? "";
+
+  const lines: string[] = [];
+  if (primaryLine) {
+    lines.push(ensureSentence(primaryLine));
+  }
+  if (
+    reasonedLine &&
+    (!primaryLine || !primaryLine.toLowerCase().includes(reasonedLine.toLowerCase()))
+  ) {
+    lines.push(ensureSentence(`In practical terms, ${reasonedLine}`));
+  }
+  if (nextStepLine) {
+    lines.push(ensureSentence(`Next step: ${nextStepLine}`));
+  }
+  const sourcesLine = text.match(/^Sources?:.*$/im)?.[0]?.trim();
+  if (sourcesLine) lines.push(sourcesLine);
+  return lines.length > 0 ? lines.join("\n\n").trim() : text;
+};
+
 
 const rewriteIdeologyScientificVoice = (text: string, question: string): string => {
   if (!isScientificMicroReport(text)) return text;
@@ -19032,6 +19070,10 @@ export const __testCapsuleGrounding = {
   rewriteAnswerWithCapsuleConstraints,
   isCapsuleRetrievalDriftDetected,
   shouldAppendOpenWorldSourcesMarker,
+};
+
+export const __testHelixAskDialogueFormatting = {
+  rewriteConversationScientificVoice,
 };
 
 type HelixAskExecutionArgs = {
@@ -32436,6 +32478,9 @@ const executeHelixAsk = async ({
         }
         cleaned = stripTrivialOrdinalBullets(cleaned);
         cleaned = dedupeReportParagraphs(cleaned).text;
+      }
+      if (dialogueProfile === "dot_min_steps_v1" && !isIdeologyReferenceIntent) {
+        cleaned = rewriteConversationScientificVoice(cleaned);
       }
       const scientificFallbackReason =
         !answerContractApplied && hasWeakScientificSections(cleaned)
