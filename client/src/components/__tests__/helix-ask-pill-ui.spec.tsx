@@ -24,6 +24,7 @@ let shouldRequireTranscriptConfirmation: typeof import("@/components/helix/Helix
 let scoreVoiceTurnComplete: typeof import("@/components/helix/HelixAskPill").scoreVoiceTurnComplete;
 let scoreIntentShift: typeof import("@/components/helix/HelixAskPill").scoreIntentShift;
 let evaluateVoiceReasoningResponseAuthority: typeof import("@/components/helix/HelixAskPill").evaluateVoiceReasoningResponseAuthority;
+let evaluateVoiceTurnSealGate: typeof import("@/components/helix/HelixAskPill").evaluateVoiceTurnSealGate;
 let resolveVoicePlaybackGain: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackGain;
 
 beforeAll(async () => {
@@ -51,6 +52,7 @@ beforeAll(async () => {
     scoreVoiceTurnComplete,
     scoreIntentShift,
     evaluateVoiceReasoningResponseAuthority,
+    evaluateVoiceTurnSealGate,
     resolveVoicePlaybackGain,
   } = await import("@/components/helix/HelixAskPill"));
 });
@@ -282,6 +284,131 @@ describe("HelixAskPill mic helper behavior", () => {
         latestAttemptIntentRevision: 4,
         requestDispatchPromptHash: "hash-a",
         latestDispatchPromptHash: "hash-a",
+      }),
+    ).toEqual({
+      suppress: false,
+      reason: "ok",
+      restart: false,
+    });
+  });
+
+  it("enforces deterministic seal gate conditions before dispatch", () => {
+    expect(
+      evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs: 4000,
+        sttQueueDepth: 0,
+        sttInFlight: false,
+        heldPending: false,
+        hashStableDwellMs: 1200,
+      }),
+    ).toBe(true);
+    expect(
+      evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs: 3000,
+        sttQueueDepth: 0,
+        sttInFlight: false,
+        heldPending: false,
+        hashStableDwellMs: 1200,
+      }),
+    ).toBe(false);
+    expect(
+      evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs: 4000,
+        sttQueueDepth: 1,
+        sttInFlight: false,
+        heldPending: false,
+        hashStableDwellMs: 1200,
+      }),
+    ).toBe(false);
+    expect(
+      evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs: 4000,
+        sttQueueDepth: 0,
+        sttInFlight: true,
+        heldPending: false,
+        hashStableDwellMs: 1200,
+      }),
+    ).toBe(false);
+    expect(
+      evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs: 4000,
+        sttQueueDepth: 0,
+        sttInFlight: false,
+        heldPending: true,
+        hashStableDwellMs: 1200,
+      }),
+    ).toBe(false);
+    expect(
+      evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs: 4000,
+        sttQueueDepth: 0,
+        sttInFlight: false,
+        heldPending: false,
+        hashStableDwellMs: 400,
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects responses that violate sealed revision authority", () => {
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "A",
+        askPromptForRequest: "A",
+        assemblerPhase: "draft",
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "inactive_attempt",
+      restart: false,
+    });
+
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "A",
+        askPromptForRequest: "A",
+        assemblerPhase: "sealed",
+        attemptTranscriptRevision: 2,
+        latestSealedTranscriptRevision: 3,
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "stale_revision",
+      restart: false,
+    });
+
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "A",
+        askPromptForRequest: "A",
+        assemblerPhase: "sealed",
+        attemptTranscriptRevision: 3,
+        latestSealedTranscriptRevision: 3,
+        attemptSealToken: "seal-old",
+        latestSealToken: "seal-new",
+      }),
+    ).toEqual({
+      suppress: true,
+      reason: "stale_revision",
+      restart: false,
+    });
+
+    expect(
+      evaluateVoiceReasoningResponseAuthority({
+        source: "voice_auto",
+        continuationRestartRequested: false,
+        latestAskPromptForAttempt: "A",
+        askPromptForRequest: "A",
+        assemblerPhase: "sealed",
+        attemptTranscriptRevision: 3,
+        latestSealedTranscriptRevision: 3,
+        attemptSealToken: "seal-new",
+        latestSealToken: "seal-new",
       }),
     ).toEqual({
       suppress: false,

@@ -396,6 +396,9 @@ export type ReasoningAttempt = {
   explorationTopicKey?: string | null;
   explorationAttemptCount?: number;
   intentRevision?: number;
+  transcriptRevision?: number;
+  sealToken?: string | null;
+  sealedAtMs?: number | null;
   intentShiftScore?: number;
   turnCompleteScore?: number;
   floorOwner?: FloorOwner;
@@ -557,6 +560,36 @@ type VoiceTurnRevisionState = {
   updatedAtMs: number;
 };
 
+type VoiceTurnAssemblerPhase = "draft" | "sealed";
+
+type VoiceTurnAssemblerState = {
+  turnKey: string;
+  phase: VoiceTurnAssemblerPhase;
+  transcriptRevision: number;
+  sealedRevision: number;
+  sealToken: string | null;
+  sealedAtMs: number | null;
+  draftTranscript: string;
+  draftRecordedText: string;
+  lastSpeechAtMs: number;
+  hashStableSinceMs: number;
+  currentTranscriptHash: string;
+  sttQueueDepth: number;
+  sttInFlight: boolean;
+  heldPending: boolean;
+  briefSpokenRevision: number;
+  artifactRetryCountByRevision: Record<number, number>;
+  sourceLanguage: string | null;
+  translated: boolean;
+  sttEngine: string | null;
+  confidence: number;
+  confidenceReason: string | null;
+  completion: CompletionScore;
+  turnComplete: TurnCompleteScore;
+  segmentId: string | null;
+  updatedAtMs: number;
+};
+
 type VoiceUtteranceRevision = {
   turnKey: string;
   revision: number;
@@ -669,6 +702,8 @@ const VOICE_BARGE_HARD_CUT_PERSIST_MS = 700;
 const VOICE_BARGE_TRAFFIC_BUFFER_MS = 2600;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
 const VOICE_TURN_CLOSE_SILENCE_MS = 3200;
+const VOICE_TURN_HASH_STABLE_DWELL_MS = 900;
+const VOICE_TURN_SEAL_POLL_MS = 140;
 const VOICE_TURN_GAMEPLAY_LOOP_MAX_MS = 30_000;
 const VOICE_PLAYBACK_TRANSCRIBE_WAIT_POLL_MS = 120;
 const VOICE_PLAYBACK_TRANSCRIBE_WAIT_MAX_MS = 4200;
@@ -1355,6 +1390,26 @@ export function shouldFlushHeldTranscriptFromWatchdog(args: {
   });
 }
 
+export function evaluateVoiceTurnSealGate(args: {
+  sinceLastSpeechMs: number;
+  sttQueueDepth: number;
+  sttInFlight: boolean;
+  heldPending: boolean;
+  hashStableDwellMs: number;
+  closeSilenceMs?: number;
+  hashStableMs?: number;
+}): boolean {
+  const closeSilenceMs = args.closeSilenceMs ?? VOICE_TURN_CLOSE_SILENCE_MS;
+  const hashStableMs = args.hashStableMs ?? VOICE_TURN_HASH_STABLE_DWELL_MS;
+  return (
+    args.sinceLastSpeechMs >= closeSilenceMs &&
+    args.sttQueueDepth <= 0 &&
+    !args.sttInFlight &&
+    !args.heldPending &&
+    args.hashStableDwellMs >= hashStableMs
+  );
+}
+
 export function scoreConversationCompletion(input: {
   transcript: string;
   pauseMs: number;
@@ -1518,6 +1573,11 @@ export function evaluateVoiceReasoningResponseAuthority(args: {
   latestAttemptIntentRevision?: number;
   requestDispatchPromptHash?: string | null;
   latestDispatchPromptHash?: string | null;
+  attemptTranscriptRevision?: number | null;
+  latestSealedTranscriptRevision?: number | null;
+  attemptSealToken?: string | null;
+  latestSealToken?: string | null;
+  assemblerPhase?: VoiceTurnAssemblerPhase | null;
 }): VoiceReasoningResponseAuthorityDecision {
   if (args.continuationRestartRequested) {
     return { suppress: true, reason: "continuation_merged", restart: true };
@@ -1537,6 +1597,30 @@ export function evaluateVoiceReasoningResponseAuthority(args: {
   }
   if (args.source !== "voice_auto") {
     return { suppress: false, reason: "ok", restart: false };
+  }
+  if (args.assemblerPhase && args.assemblerPhase !== "sealed") {
+    return { suppress: true, reason: "inactive_attempt", restart: false };
+  }
+  const attemptTranscriptRevision =
+    typeof args.attemptTranscriptRevision === "number" && Number.isFinite(args.attemptTranscriptRevision)
+      ? Math.max(0, Math.floor(args.attemptTranscriptRevision))
+      : null;
+  const latestSealedTranscriptRevision =
+    typeof args.latestSealedTranscriptRevision === "number" &&
+    Number.isFinite(args.latestSealedTranscriptRevision)
+      ? Math.max(0, Math.floor(args.latestSealedTranscriptRevision))
+      : null;
+  if (
+    attemptTranscriptRevision !== null &&
+    latestSealedTranscriptRevision !== null &&
+    attemptTranscriptRevision !== latestSealedTranscriptRevision
+  ) {
+    return { suppress: true, reason: "stale_revision", restart: false };
+  }
+  const attemptSealToken = args.attemptSealToken?.trim() || null;
+  const latestSealToken = args.latestSealToken?.trim() || null;
+  if (attemptSealToken && latestSealToken && attemptSealToken !== latestSealToken) {
+    return { suppress: true, reason: "stale_revision", restart: false };
   }
   const requestIntentRevision =
     typeof args.requestIntentRevision === "number" && Number.isFinite(args.requestIntentRevision)
@@ -4452,11 +4536,12 @@ export function HelixAskPill({
   const voiceSegmentStartMsRef = useRef<number | null>(null);
   const voiceSegmentStartIndexRef = useRef(0);
   const voiceTranscribeQueueRef = useRef<
-    Array<{ id: string; blob: Blob; durationMs: number; cutAtMs: number }>
+    Array<{ id: string; blob: Blob; durationMs: number; cutAtMs: number; turnKey: string }>
   >([]);
   const voiceConfirmedTurnQueueRef = useRef<VoiceConfirmedTurn[]>([]);
   const transcriptConfirmStateRef = useRef<TranscriptConfirmState | null>(null);
   const voiceTranscribeBusyRef = useRef(false);
+  const voiceSealPollTimerRef = useRef<number | null>(null);
   const voiceSegmentFlushTimerRef = useRef<number | null>(null);
   const voiceMonitorAnchorRef = useRef<HTMLDivElement | null>(null);
   const contextSessionStreamRef = useRef<MediaStream | null>(null);
@@ -4551,6 +4636,8 @@ export function HelixAskPill({
   const reasoningAttemptsRef = useRef<ReasoningAttempt[]>([]);
   const conversationRecentTurnsRef = useRef<string[]>([]);
   const intentRevisionByTurnKeyRef = useRef<Record<string, IntentRevisionState>>({});
+  const voiceTurnAssemblerByTurnKeyRef = useRef<Record<string, VoiceTurnAssemblerState>>({});
+  const voiceActiveAssemblerTurnKeyRef = useRef<string | null>(null);
   const voiceHeldTranscriptPrefixRef = useRef<string>("");
   const voiceHeldTranscriptStateRef = useRef<HeldTranscriptState | null>(null);
   const voiceHeldTranscriptFlushTimerRef = useRef<number | null>(null);
@@ -5869,6 +5956,81 @@ export function HelixAskPill({
     setVoiceAutoSpeakLastMetrics(metrics);
   }, []);
 
+  const buildInitialVoiceTurnAssemblerState = useCallback(
+    (turnKey: string): VoiceTurnAssemblerState => {
+      const now = Date.now();
+      return {
+        turnKey,
+        phase: "draft",
+        transcriptRevision: 0,
+        sealedRevision: 0,
+        sealToken: null,
+        sealedAtMs: null,
+        draftTranscript: "",
+        draftRecordedText: "",
+        lastSpeechAtMs: now,
+        hashStableSinceMs: now,
+        currentTranscriptHash: "",
+        sttQueueDepth: 0,
+        sttInFlight: false,
+        heldPending: false,
+        briefSpokenRevision: 0,
+        artifactRetryCountByRevision: {},
+        sourceLanguage: null,
+        translated: false,
+        sttEngine: null,
+        confidence: 0,
+        confidenceReason: null,
+        completion: { score: 0, route: "ask_more" },
+        turnComplete: { score: 0, band: "low", reason: "insufficient_pause" },
+        segmentId: null,
+        updatedAtMs: now,
+      };
+    },
+    [],
+  );
+
+  const updateVoiceTurnAssemblerState = useCallback(
+    (
+      turnKey: string,
+      updater: (current: VoiceTurnAssemblerState) => VoiceTurnAssemblerState,
+    ): VoiceTurnAssemblerState => {
+      const map = voiceTurnAssemblerByTurnKeyRef.current;
+      const current = map[turnKey] ?? buildInitialVoiceTurnAssemblerState(turnKey);
+      const next = {
+        ...updater(current),
+        turnKey,
+        updatedAtMs: Date.now(),
+      };
+      map[turnKey] = next;
+      const keys = Object.keys(map);
+      if (keys.length > 64) {
+        const dropKeys = keys
+          .sort((a, b) => (map[a]?.updatedAtMs ?? 0) - (map[b]?.updatedAtMs ?? 0))
+          .slice(0, keys.length - 64);
+        for (const dropKey of dropKeys) {
+          delete map[dropKey];
+        }
+      }
+      return next;
+    },
+    [buildInitialVoiceTurnAssemblerState],
+  );
+
+  const getVoiceTurnAssemblerState = useCallback((turnKey: string | null | undefined) => {
+    if (!turnKey) return null;
+    return voiceTurnAssemblerByTurnKeyRef.current[turnKey] ?? null;
+  }, []);
+
+  const clearVoiceSealPollTimer = useCallback(() => {
+    if (voiceSealPollTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(voiceSealPollTimerRef.current);
+      voiceSealPollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearVoiceSealPollTimer(), [clearVoiceSealPollTimer]);
+
   const updateVoiceTurnRevisionState = useCallback(
     (
       turnKey: string,
@@ -6031,7 +6193,6 @@ export function HelixAskPill({
     const audio = new Audio();
     audio.preload = "auto";
     audio.crossOrigin = "anonymous";
-    audio.playsInline = true;
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
     audio.volume = 1;
@@ -6849,7 +7010,7 @@ export function HelixAskPill({
               });
               break;
             }
-            if (nextFetch && nextController) {
+            if (nextFetch && nextController && nextChunk) {
               const prefetchedSettled = await nextFetch;
               if (voiceAutoSpeakAbortControllerRef.current === nextController) {
                 voiceAutoSpeakAbortControllerRef.current = null;
@@ -7196,35 +7357,24 @@ export function HelixAskPill({
           }
         }
       }
+      const assemblerSnapshot = getVoiceTurnAssemblerState(turnKey);
       const transcriptRevision =
         typeof entry.meta?.transcriptRevision === "number" && Number.isFinite(entry.meta.transcriptRevision)
           ? Math.max(0, Math.floor(entry.meta.transcriptRevision))
-          : voiceTurnRevisionStateRef.current[turnKey]?.latestTranscriptRevision ?? 0;
+          : assemblerSnapshot?.transcriptRevision ??
+            voiceTurnRevisionStateRef.current[turnKey]?.latestTranscriptRevision ??
+            0;
       const continuityMerged = entry.meta?.continuityMerged === true;
-      if (lifecycle === "queued") {
-        const latch = voiceQueuedSpeechLatchByTurnRef.current;
-        if (latch.get(turnKey) === transcriptRevision) {
+      if (lifecycle === "queued" || lifecycle === "running") {
+        const spokenRevision = assemblerSnapshot?.briefSpokenRevision ?? 0;
+        if (transcriptRevision > 0 && spokenRevision === transcriptRevision) {
           return;
         }
-        latch.set(turnKey, transcriptRevision);
-        if (latch.size > 256) {
-          const oldestKey = latch.keys().next().value;
-          if (typeof oldestKey === "string" && oldestKey) {
-            latch.delete(oldestKey);
-          }
-        }
-      }
-      if (lifecycle === "running") {
-        const latch = voiceRunningSpeechLatchByTurnRef.current;
-        if (latch.get(turnKey) === transcriptRevision) {
-          return;
-        }
-        latch.set(turnKey, transcriptRevision);
-        if (latch.size > 256) {
-          const oldestKey = latch.keys().next().value;
-          if (typeof oldestKey === "string" && oldestKey) {
-            latch.delete(oldestKey);
-          }
+        if (transcriptRevision > 0) {
+          updateVoiceTurnAssemblerState(turnKey, (current) => ({
+            ...current,
+            briefSpokenRevision: transcriptRevision,
+          }));
         }
       }
       const textForSpeech =
@@ -7269,7 +7419,12 @@ export function HelixAskPill({
       };
       enqueueVoiceAutoSpeakTask(task);
     },
-    [bumpVoiceTurnRevision, enqueueVoiceAutoSpeakTask],
+    [
+      bumpVoiceTurnRevision,
+      enqueueVoiceAutoSpeakTask,
+      getVoiceTurnAssemblerState,
+      updateVoiceTurnAssemblerState,
+    ],
   );
 
   const suppressVoiceFinalForTurn = useCallback((turnKey: string | null | undefined): void => {
@@ -7376,6 +7531,9 @@ export function HelixAskPill({
     voiceRunningSpeechLatchByTurnRef.current.clear();
     voiceTurnRevisionStateRef.current = {};
     intentRevisionByTurnKeyRef.current = {};
+    voiceTurnAssemblerByTurnKeyRef.current = {};
+    voiceActiveAssemblerTurnKeyRef.current = null;
+    clearVoiceSealPollTimer();
     clearHeldTranscriptState();
     setTranscriptConfirmState(null);
     voiceDivergenceEventsRef.current = [];
@@ -7384,7 +7542,7 @@ export function HelixAskPill({
     voiceBargeHoldTurnKeyRef.current = null;
     voiceBargeHoldStartedAtMsRef.current = null;
     stopReadAloud("mic_off");
-  }, [clearHeldTranscriptState, micArmState, stopReadAloud]);
+  }, [clearHeldTranscriptState, clearVoiceSealPollTimer, micArmState, stopReadAloud]);
 
   const handleOpenConversationPanel = useCallback(() => {
     const sessionId = getHelixAskSessionId();
@@ -7650,12 +7808,8 @@ export function HelixAskPill({
           transcriptHint ? buildPredictiveBriefFromTranscript(transcriptHint) : "";
         const deterministicBrief =
           transcriptHint ? buildDeterministicQueuedBriefFromTranscript(transcriptHint) : "";
-        if (
-          transcriptHint &&
-          (isGenericQueuedVoiceAcknowledgement(resolvedBaseBrief) ||
-            isBriefEchoingTranscript(resolvedBaseBrief, transcriptHint))
-        ) {
-          resolvedBaseBrief = predictiveBrief || deterministicBrief;
+        if (transcriptHint) {
+          resolvedBaseBrief = predictiveBrief || deterministicBrief || resolvedBaseBrief;
         }
       }
       if (
@@ -7767,6 +7921,8 @@ export function HelixAskPill({
           explorationTurn: attempt.explorationTurn ?? false,
           explorationAttemptCount: attempt.explorationAttemptCount ?? null,
           intentRevision: attempt.intentRevision ?? null,
+          transcriptRevision: attempt.transcriptRevision ?? null,
+          sealToken: attempt.sealToken ?? null,
           intentShiftScore: attempt.intentShiftScore ?? null,
           turnCompleteScore: attempt.turnCompleteScore ?? null,
         },
@@ -7847,6 +8003,61 @@ export function HelixAskPill({
     ],
   );
 
+  const suppressActiveVoiceAttemptsForTurn = useCallback(
+    (input: {
+      turnKey: string;
+      reason: string;
+      detail: string;
+      patchSegmentDispatch?: "suppressed" | "queued" | "completed" | "none";
+    }) => {
+      const activeAttempts = reasoningAttemptsRef.current.filter(
+        (attempt) =>
+          attempt.source === "voice_auto" &&
+          attempt.traceId === input.turnKey &&
+          (attempt.status === "queued" || attempt.status === "running" || attempt.status === "streaming"),
+      );
+      if (activeAttempts.length === 0) return;
+      const activeIds = new Set(activeAttempts.map((attempt) => attempt.id));
+      reasoningAttemptQueueRef.current = reasoningAttemptQueueRef.current.filter((id) => !activeIds.has(id));
+      for (const attempt of activeAttempts) {
+        updateReasoningAttempt(attempt.id, (current) => ({
+          ...current,
+          status: "suppressed",
+          suppression_reason: input.reason,
+          completedAtMs: Date.now(),
+        }));
+        const entryId = ensureReasoningTimelineEntry(attempt, "suppressed");
+        patchHelixTimelineEntry(entryId, {
+          status: "suppressed",
+          detail: input.detail,
+        });
+        const streamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+        if (streamEntryId) {
+          patchHelixTimelineEntry(streamEntryId, {
+            status: "suppressed",
+            detail: input.detail,
+          });
+          delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+        }
+        if (reasoningAttemptAbortAttemptIdRef.current === attempt.id) {
+          reasoningAttemptAbortControllerRef.current?.abort();
+        }
+        const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
+        if (segmentId && input.patchSegmentDispatch) {
+          patchVoiceSegmentAttempt(segmentId, { dispatch: input.patchSegmentDispatch });
+        }
+      }
+      suppressVoiceFinalForTurn(input.turnKey);
+    },
+    [
+      ensureReasoningTimelineEntry,
+      patchHelixTimelineEntry,
+      patchVoiceSegmentAttempt,
+      suppressVoiceFinalForTurn,
+      updateReasoningAttempt,
+    ],
+  );
+
   const createReasoningAttempt = useCallback(
     (input: {
       prompt: string;
@@ -7871,6 +8082,9 @@ export function HelixAskPill({
       explorationTopicKey?: string | null;
       explorationAttemptCount?: number;
       intentRevision?: number;
+      transcriptRevision?: number;
+      sealToken?: string | null;
+      sealedAtMs?: number | null;
       intentShiftScore?: number;
       turnCompleteScore?: number;
       sttEngine?: string;
@@ -7901,6 +8115,9 @@ export function HelixAskPill({
         explorationTopicKey: input.explorationTopicKey ?? null,
         explorationAttemptCount: input.explorationAttemptCount,
         intentRevision: input.intentRevision,
+        transcriptRevision: input.transcriptRevision,
+        sealToken: input.sealToken ?? null,
+        sealedAtMs: input.sealedAtMs ?? null,
         intentShiftScore: input.intentShiftScore,
         turnCompleteScore: input.turnCompleteScore,
         sttEngine: input.sttEngine,
@@ -7934,6 +8151,48 @@ export function HelixAskPill({
         const attempt = reasoningAttemptsRef.current.find((entry) => entry.id === nextAttemptId);
         if (!attempt || attempt.status === "cancelled" || attempt.status === "suppressed") {
           continue;
+        }
+        if (attempt.source === "voice_auto") {
+          const assemblerState = getVoiceTurnAssemblerState(attempt.traceId);
+          const preflightAuthority = evaluateVoiceReasoningResponseAuthority({
+            source: attempt.source,
+            continuationRestartRequested: false,
+            latestAskPromptForAttempt: attempt.dispatchPrompt ?? attempt.prompt,
+            askPromptForRequest: attempt.dispatchPrompt ?? attempt.prompt,
+            latestAttemptStatus: attempt.status,
+            requestIntentRevision: attempt.intentRevision,
+            latestIntentRevision: assemblerState?.sealedRevision ?? undefined,
+            latestAttemptIntentRevision: attempt.intentRevision,
+            requestDispatchPromptHash: hashVoiceUtteranceKey(attempt.dispatchPrompt ?? attempt.prompt),
+            latestDispatchPromptHash: hashVoiceUtteranceKey(attempt.dispatchPrompt ?? attempt.prompt),
+            attemptTranscriptRevision: attempt.transcriptRevision ?? null,
+            latestSealedTranscriptRevision: assemblerState?.sealedRevision ?? null,
+            attemptSealToken: attempt.sealToken ?? null,
+            latestSealToken: assemblerState?.sealToken ?? null,
+            assemblerPhase: assemblerState?.phase ?? null,
+          });
+          if (preflightAuthority.suppress) {
+            updateReasoningAttempt(attempt.id, (current) => ({
+              ...current,
+              status: "suppressed",
+              suppression_reason: "voice_turn_response_stale_seal_authority",
+              completedAtMs: Date.now(),
+            }));
+            const suppressedEntryId = ensureReasoningTimelineEntry(attempt, "suppressed");
+            patchHelixTimelineEntry(suppressedEntryId, {
+              status: "suppressed",
+              detail: "stale seal authority",
+            });
+            const staleStreamEntryId = reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+            if (staleStreamEntryId) {
+              patchHelixTimelineEntry(staleStreamEntryId, {
+                status: "suppressed",
+                detail: "stale seal authority",
+              });
+              delete reasoningStreamEntryByAttemptIdRef.current[attempt.id];
+            }
+            continue;
+          }
         }
         const sessionId = getHelixAskSessionId() ?? undefined;
         setAskBusy(true);
@@ -7982,12 +8241,23 @@ export function HelixAskPill({
               attemptId: attempt.id,
               explorationAttemptCount: attempt.explorationAttemptCount ?? null,
               transcript: attempt.recordedText ?? attempt.prompt,
+              transcriptRevision: attempt.transcriptRevision ?? null,
             },
           });
         }
         const unsubscribe = subscribeToolLogs(
           (event) => {
             if (!event || event.traceId !== attempt.traceId) return;
+            if (attempt.source === "voice_auto") {
+              const assemblerState = getVoiceTurnAssemblerState(attempt.traceId);
+              const authoritative =
+                assemblerState?.phase === "sealed" &&
+                assemblerState.sealedRevision === (attempt.transcriptRevision ?? -1) &&
+                assemblerState.sealToken === (attempt.sealToken ?? null);
+              if (!authoritative) {
+                return;
+              }
+            }
             const toolName = (event.tool ?? "").trim();
             if (toolName === "helix.ask.stream") {
               const chunk = String(event.text ?? "");
@@ -8071,9 +8341,9 @@ export function HelixAskPill({
           const askPromptForRequest = attempt.dispatchPrompt ?? attempt.prompt;
           const requestIntentRevision =
             attempt.source === "voice_auto" &&
-            typeof attempt.intentRevision === "number" &&
-            Number.isFinite(attempt.intentRevision)
-              ? attempt.intentRevision
+            typeof (attempt.transcriptRevision ?? attempt.intentRevision) === "number" &&
+            Number.isFinite(attempt.transcriptRevision ?? attempt.intentRevision)
+              ? (attempt.transcriptRevision ?? attempt.intentRevision)
               : undefined;
           const requestDispatchPromptHash =
             attempt.source === "voice_auto"
@@ -8119,12 +8389,18 @@ export function HelixAskPill({
             attempt.source === "voice_auto" && attempt.traceId
               ? intentRevisionByTurnKeyRef.current[attempt.traceId]
               : undefined;
-          const latestIntentRevision = latestIntentState?.revision;
+          const latestAssemblerState =
+            attempt.source === "voice_auto" ? getVoiceTurnAssemblerState(attempt.traceId) : null;
+          const latestIntentRevision = latestAssemblerState?.sealedRevision ?? latestIntentState?.revision;
           const attemptIntentRevision =
-            typeof latestAttemptSnapshot?.intentRevision === "number"
-              ? latestAttemptSnapshot.intentRevision
-              : typeof attempt.intentRevision === "number"
-                ? attempt.intentRevision
+            typeof latestAttemptSnapshot?.transcriptRevision === "number"
+              ? latestAttemptSnapshot.transcriptRevision
+              : typeof latestAttemptSnapshot?.intentRevision === "number"
+                ? latestAttemptSnapshot.intentRevision
+                : typeof attempt.transcriptRevision === "number"
+                  ? attempt.transcriptRevision
+                  : typeof attempt.intentRevision === "number"
+                    ? attempt.intentRevision
                 : undefined;
           const authority = evaluateVoiceReasoningResponseAuthority({
             source: attempt.source,
@@ -8137,6 +8413,11 @@ export function HelixAskPill({
             latestAttemptIntentRevision: attemptIntentRevision,
             requestDispatchPromptHash,
             latestDispatchPromptHash: latestIntentState?.dispatchPromptHash,
+            attemptTranscriptRevision: attempt.transcriptRevision ?? null,
+            latestSealedTranscriptRevision: latestAssemblerState?.sealedRevision ?? null,
+            attemptSealToken: attempt.sealToken ?? null,
+            latestSealToken: latestAssemblerState?.sealToken ?? null,
+            assemblerPhase: latestAssemblerState?.phase ?? null,
           });
           if (authority.suppress) {
             reasoningAttemptRestartRequestedRef.current.delete(attempt.id);
@@ -8321,6 +8602,20 @@ export function HelixAskPill({
           }
           if (ladderDecision.action === "restart_after_artifact") {
             const nextAttemptCount = (attempt.explorationAttemptCount ?? 1) + 1;
+            if (
+              attempt.source === "voice_auto" &&
+              typeof attempt.transcriptRevision === "number" &&
+              Number.isFinite(attempt.transcriptRevision)
+            ) {
+              const revision = Math.max(0, Math.floor(attempt.transcriptRevision));
+              updateVoiceTurnAssemblerState(attempt.traceId, (current) => ({
+                ...current,
+                artifactRetryCountByRevision: {
+                  ...current.artifactRetryCountByRevision,
+                  [revision]: (current.artifactRetryCountByRevision[revision] ?? 0) + 1,
+                },
+              }));
+            }
             updateReasoningAttempt(attempt.id, (current) => ({
               ...current,
               status: "suppressed",
@@ -8366,6 +8661,7 @@ export function HelixAskPill({
                 previousOutput: outputText,
                 packet: attempt.explorationPacket,
               }),
+              traceId: attempt.traceId,
               recordedText: attempt.recordedText ?? attempt.prompt,
               contextCapsuleIds: attempt.contextCapsuleIds,
               contextCapsuleCount: attempt.contextCapsuleCount,
@@ -8380,6 +8676,9 @@ export function HelixAskPill({
               explorationPacket: attempt.explorationPacket,
               explorationTopicKey: attempt.explorationTopicKey,
               explorationAttemptCount: nextAttemptCount,
+              transcriptRevision: attempt.transcriptRevision,
+              sealToken: attempt.sealToken,
+              sealedAtMs: attempt.sealedAtMs,
               completionScore: attempt.completionScore,
               floorOwner: attempt.floorOwner,
               sttEngine: attempt.sttEngine,
@@ -8416,6 +8715,7 @@ export function HelixAskPill({
                   transcript: followUpAttempt.recordedText ?? followUpAttempt.prompt,
                   explorationAttemptCount: nextAttemptCount,
                   artifactGuardRestart: true,
+                  transcriptRevision: followUpAttempt.transcriptRevision ?? null,
                 },
               });
               const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
@@ -8556,6 +8856,7 @@ export function HelixAskPill({
                 previousOutput: outputText,
                 packet: attempt.explorationPacket,
               }),
+              traceId: attempt.traceId,
               recordedText: attempt.recordedText ?? attempt.prompt,
               contextCapsuleIds: attempt.contextCapsuleIds,
               contextCapsuleCount: attempt.contextCapsuleCount,
@@ -8570,6 +8871,9 @@ export function HelixAskPill({
               explorationPacket: attempt.explorationPacket,
               explorationTopicKey: attempt.explorationTopicKey,
               explorationAttemptCount: nextAttemptCount,
+              transcriptRevision: attempt.transcriptRevision,
+              sealToken: attempt.sealToken,
+              sealedAtMs: attempt.sealedAtMs,
               completionScore: attempt.completionScore,
               floorOwner: attempt.floorOwner,
               sttEngine: attempt.sttEngine,
@@ -8601,6 +8905,7 @@ export function HelixAskPill({
                   attemptId: followUpAttempt.id,
                   transcript: followUpAttempt.recordedText ?? followUpAttempt.prompt,
                   explorationAttemptCount: nextAttemptCount,
+                  transcriptRevision: followUpAttempt.transcriptRevision ?? null,
                 },
               });
               const segmentId = voiceReasoningAttemptSegmentByIdRef.current[attempt.id];
@@ -8872,6 +9177,7 @@ export function HelixAskPill({
     ensureReasoningTimelineEntry,
     formatReasoningAttemptDetail,
     getHelixAskSessionId,
+    getVoiceTurnAssemblerState,
     markVoiceCheckpoint,
     patchHelixTimelineEntry,
     patchVoiceSegmentAttempt,
@@ -8961,6 +9267,9 @@ export function HelixAskPill({
       voiceSegmentStartIndexRef.current = 0;
       voiceTranscribeQueueRef.current = [];
       voiceTranscribeBusyRef.current = false;
+      clearVoiceSealPollTimer();
+      voiceTurnAssemblerByTurnKeyRef.current = {};
+      voiceActiveAssemblerTurnKeyRef.current = null;
       clearHeldTranscriptState();
       voiceTurnGameplayLoopStartedAtMsRef.current = null;
       setVoiceMonitorLevel(0);
@@ -8999,11 +9308,18 @@ export function HelixAskPill({
       }
       voiceBargeResumeNotBeforeMsRef.current = null;
     },
-    [clearHeldTranscriptState],
+    [clearHeldTranscriptState, clearVoiceSealPollTimer],
   );
 
   const dispatchConfirmedVoiceTranscript = useCallback(
-    async (input: VoiceConfirmedTurn) => {
+    async (
+      input: VoiceConfirmedTurn,
+      authority?: {
+        transcriptRevision: number;
+        sealToken: string;
+        sealedAtMs: number;
+      },
+    ) => {
       const transcript = input.transcript.trim();
       if (!transcript) return;
       const recordedText = input.recordedText?.trim() || transcript;
@@ -9165,11 +9481,24 @@ export function HelixAskPill({
         translated: input.translated,
         conversationBriefBase: briefText,
         traceId: input.traceId,
+        transcriptRevision:
+          typeof authority?.transcriptRevision === "number" &&
+          Number.isFinite(authority.transcriptRevision)
+            ? Math.max(0, Math.floor(authority.transcriptRevision))
+            : undefined,
+        sealToken: authority?.sealToken ?? null,
+        sealedAtMs:
+          typeof authority?.sealedAtMs === "number" && Number.isFinite(authority.sealedAtMs)
+            ? Math.max(0, Math.floor(authority.sealedAtMs))
+            : null,
       });
-      const transcriptRevision = bumpVoiceTurnRevision(queuedAttempt.traceId, "transcript");
+      const transcriptRevision =
+        typeof authority?.transcriptRevision === "number" && Number.isFinite(authority.transcriptRevision)
+          ? Math.max(0, Math.floor(authority.transcriptRevision))
+          : bumpVoiceTurnRevision(queuedAttempt.traceId, "transcript").revision;
       setIntentRevisionState({
         turnKey: queuedAttempt.traceId,
-        revision: transcriptRevision.revision,
+        revision: transcriptRevision,
         topicTerms: extractIntentTerms(transcript, 12),
         mode: conversationMode ?? dispatchMode ?? null,
         dispatchPromptHash: hashVoiceUtteranceKey(queuedAttempt.dispatchPrompt ?? queuedAttempt.prompt),
@@ -9177,7 +9506,13 @@ export function HelixAskPill({
       });
       updateReasoningAttempt(queuedAttempt.id, (current) => ({
         ...current,
-        intentRevision: transcriptRevision.revision,
+        intentRevision: transcriptRevision,
+        transcriptRevision,
+        sealToken: authority?.sealToken ?? current.sealToken ?? null,
+        sealedAtMs:
+          typeof authority?.sealedAtMs === "number" && Number.isFinite(authority.sealedAtMs)
+            ? Math.max(0, Math.floor(authority.sealedAtMs))
+            : current.sealedAtMs ?? null,
       }));
       ensureReasoningTimelineEntry(queuedAttempt, "queued");
       markVoiceCheckpoint("dispatch_queued", "ok", "Reasoning dispatch queued.");
@@ -9198,11 +9533,11 @@ export function HelixAskPill({
           routeReasonCode,
           explorationTurn,
           clarifierPolicy,
-          failReason,
-          transcriptRevision: transcriptRevision.revision,
-          confidence: input.confidence,
-          confidenceReason: input.confidenceReason,
-          confirmed: true,
+            failReason,
+            transcriptRevision,
+            confidence: input.confidence,
+            confidenceReason: input.confidenceReason,
+            confirmed: true,
         },
       });
       enqueueReasoningAttempt(queuedAttempt.id);
@@ -9227,6 +9562,270 @@ export function HelixAskPill({
       suppressSupersededVoiceAttemptsForNewTurn,
       updateReasoningAttempt,
       updateVoiceDecisionBrief,
+    ],
+  );
+
+  const hasActiveVoiceAttemptForTurn = useCallback((turnKey: string): boolean => {
+    return reasoningAttemptsRef.current.some(
+      (attempt) =>
+        attempt.source === "voice_auto" &&
+        attempt.traceId === turnKey &&
+        (attempt.status === "queued" || attempt.status === "running" || attempt.status === "streaming"),
+    );
+  }, []);
+
+  const evaluateAndDispatchVoiceSeal = useCallback(
+    (turnKey: string) => {
+      const state = getVoiceTurnAssemblerState(turnKey);
+      if (!state) return;
+      const now = Date.now();
+      const queueDepth = voiceTranscribeQueueRef.current.length;
+      const inFlight = voiceTranscribeBusyRef.current;
+      const heldPending =
+        transcriptConfirmStateRef.current !== null ||
+        voiceHeldTranscriptStateRef.current !== null ||
+        voiceHeldTranscriptPrefixRef.current.trim().length > 0;
+      const sinceLastSpeechMs =
+        voiceLastSpeechMsRef.current !== null
+          ? Math.max(0, now - voiceLastSpeechMsRef.current)
+          : Number.POSITIVE_INFINITY;
+      const hashStableDwellMs = Math.max(0, now - state.hashStableSinceMs);
+      const gateOpen = evaluateVoiceTurnSealGate({
+        sinceLastSpeechMs,
+        sttQueueDepth: queueDepth,
+        sttInFlight: inFlight,
+        heldPending,
+        hashStableDwellMs,
+      });
+      updateVoiceTurnAssemblerState(turnKey, (current) => ({
+        ...current,
+        sttQueueDepth: queueDepth,
+        sttInFlight: inFlight,
+        heldPending,
+        lastSpeechAtMs: voiceLastSpeechMsRef.current ?? current.lastSpeechAtMs,
+      }));
+      if (state.phase !== "draft" || !gateOpen) {
+        clearVoiceSealPollTimer();
+        if (
+          state.phase === "draft" &&
+          micArmStateRef.current === "on" &&
+          voiceActiveAssemblerTurnKeyRef.current === turnKey &&
+          typeof window !== "undefined"
+        ) {
+          voiceSealPollTimerRef.current = window.setTimeout(() => {
+            voiceSealPollTimerRef.current = null;
+            evaluateAndDispatchVoiceSeal(turnKey);
+          }, VOICE_TURN_SEAL_POLL_MS);
+        }
+        return;
+      }
+      const sealedRevision = state.transcriptRevision;
+      if (sealedRevision <= 0 || !state.draftTranscript.trim()) {
+        return;
+      }
+      const sealToken = crypto.randomUUID();
+      updateVoiceTurnAssemblerState(turnKey, (current) => ({
+        ...current,
+        phase: "sealed",
+        sealedRevision,
+        sealToken,
+        sealedAtMs: now,
+        sttQueueDepth: queueDepth,
+        sttInFlight: inFlight,
+        heldPending,
+      }));
+      const sealedTurn: VoiceConfirmedTurn = {
+        id: `confirm:${turnKey}:sealed:${sealedRevision}`,
+        traceId: turnKey,
+        segmentId: state.segmentId ?? `segment:${crypto.randomUUID()}`,
+        transcript: state.draftTranscript,
+        recordedText: state.draftRecordedText || state.draftTranscript,
+        completion: state.completion,
+        turnComplete: state.turnComplete,
+        sttEngine: state.sttEngine,
+        sourceLanguage: state.sourceLanguage,
+        translated: state.translated,
+        confidence: state.confidence,
+        confidenceReason: state.confidenceReason,
+        needsConfirmation: false,
+        translationUncertain: false,
+      };
+      void dispatchConfirmedVoiceTranscript(sealedTurn, {
+        transcriptRevision: sealedRevision,
+        sealToken,
+        sealedAtMs: now,
+      });
+    },
+    [
+      clearVoiceSealPollTimer,
+      dispatchConfirmedVoiceTranscript,
+      getVoiceTurnAssemblerState,
+      updateVoiceTurnAssemblerState,
+    ],
+  );
+
+  const scheduleVoiceSealEvaluation = useCallback(
+    (turnKey: string, delayMs = VOICE_TURN_SEAL_POLL_MS) => {
+      clearVoiceSealPollTimer();
+      if (micArmStateRef.current !== "on" || typeof window === "undefined") return;
+      voiceSealPollTimerRef.current = window.setTimeout(() => {
+        voiceSealPollTimerRef.current = null;
+        evaluateAndDispatchVoiceSeal(turnKey);
+      }, Math.max(0, delayMs));
+    },
+    [clearVoiceSealPollTimer, evaluateAndDispatchVoiceSeal],
+  );
+
+  const reopenVoiceAssemblerDraft = useCallback(
+    (turnKey: string, reason: string) => {
+      suppressActiveVoiceAttemptsForTurn({
+        turnKey,
+        reason,
+        detail: "awaiting reseal after interruption",
+        patchSegmentDispatch: "suppressed",
+      });
+      updateVoiceTurnAssemblerState(turnKey, (current) => ({
+        ...current,
+        phase: "draft",
+        sealToken: null,
+        sealedAtMs: null,
+      }));
+      clearVoiceSealPollTimer();
+      scheduleVoiceSealEvaluation(turnKey);
+    },
+    [
+      clearVoiceSealPollTimer,
+      scheduleVoiceSealEvaluation,
+      suppressActiveVoiceAttemptsForTurn,
+      updateVoiceTurnAssemblerState,
+    ],
+  );
+
+  const resolveVoiceAssemblerTurnKeyForIncomingSegment = useCallback((): string => {
+    const currentTurnKey = voiceActiveAssemblerTurnKeyRef.current;
+    if (!currentTurnKey) {
+      const nextTurnKey = `voice:${crypto.randomUUID()}`;
+      voiceActiveAssemblerTurnKeyRef.current = nextTurnKey;
+      updateVoiceTurnAssemblerState(nextTurnKey, (current) => ({
+        ...current,
+        phase: "draft",
+        lastSpeechAtMs: Date.now(),
+      }));
+      suppressSupersededVoiceAttemptsForNewTurn(nextTurnKey);
+      return nextTurnKey;
+    }
+    const currentState = getVoiceTurnAssemblerState(currentTurnKey);
+    const activeAttempt = hasActiveVoiceAttemptForTurn(currentTurnKey);
+    if (!currentState || (currentState.phase === "sealed" && !activeAttempt)) {
+      const nextTurnKey = `voice:${crypto.randomUUID()}`;
+      voiceActiveAssemblerTurnKeyRef.current = nextTurnKey;
+      updateVoiceTurnAssemblerState(nextTurnKey, (current) => ({
+        ...current,
+        phase: "draft",
+        lastSpeechAtMs: Date.now(),
+      }));
+      suppressSupersededVoiceAttemptsForNewTurn(nextTurnKey);
+      return nextTurnKey;
+    }
+    return currentTurnKey;
+  }, [
+    getVoiceTurnAssemblerState,
+    hasActiveVoiceAttemptForTurn,
+    suppressSupersededVoiceAttemptsForNewTurn,
+    updateVoiceTurnAssemblerState,
+  ]);
+
+  const ingestVoiceDraftSegment = useCallback(
+    (input: {
+      turnKey: string;
+      segmentId: string;
+      transcript: string;
+      recordedText: string;
+      sourceLanguage: string | null;
+      translated: boolean;
+      sttEngine: string | null;
+      confidence: number;
+      confidenceReason: string | null;
+      completion: CompletionScore;
+      turnComplete: TurnCompleteScore;
+    }) => {
+      const transcript = input.transcript.trim();
+      if (!transcript) return null;
+      const now = Date.now();
+      const assembler = updateVoiceTurnAssemblerState(input.turnKey, (current) => {
+        const mergedTranscript = mergeVoiceTranscriptDraft(current.draftTranscript, transcript);
+        const mergedRecordedText = mergeVoiceTranscriptDraft(
+          current.draftRecordedText || current.draftTranscript,
+          input.recordedText || transcript,
+        );
+        const nextHash = hashVoiceUtteranceKey(mergedTranscript);
+        const hashStableSinceMs =
+          nextHash === current.currentTranscriptHash ? current.hashStableSinceMs : now;
+        return {
+          ...current,
+          phase: "draft",
+          transcriptRevision: current.transcriptRevision + 1,
+          sealToken: null,
+          sealedAtMs: null,
+          draftTranscript: mergedTranscript,
+          draftRecordedText: mergedRecordedText,
+          lastSpeechAtMs: voiceLastSpeechMsRef.current ?? now,
+          hashStableSinceMs,
+          currentTranscriptHash: nextHash,
+          sttQueueDepth: voiceTranscribeQueueRef.current.length,
+          sttInFlight: voiceTranscribeBusyRef.current,
+          heldPending:
+            transcriptConfirmStateRef.current !== null ||
+            voiceHeldTranscriptStateRef.current !== null ||
+            voiceHeldTranscriptPrefixRef.current.trim().length > 0,
+          sourceLanguage: input.sourceLanguage,
+          translated: input.translated,
+          sttEngine: input.sttEngine,
+          confidence: input.confidence,
+          confidenceReason: input.confidenceReason,
+          completion: input.completion,
+          turnComplete: input.turnComplete,
+          segmentId: input.segmentId,
+        };
+      });
+      voiceActiveAssemblerTurnKeyRef.current = input.turnKey;
+      replaceVoiceConversationTimelineEntry({
+        type: "conversation_recorded",
+        source: "voice_auto",
+        status: "done",
+        text: clipText(assembler.draftRecordedText || assembler.draftTranscript, 360),
+        detail: input.translated
+          ? `translated from ${input.sourceLanguage ?? "unknown"}`
+          : "captured",
+        traceId: input.turnKey,
+        meta: {
+          engine: input.sttEngine,
+          sourceLanguage: input.sourceLanguage,
+          translated: input.translated,
+          confidence: input.confidence,
+          confidenceReason: input.confidenceReason,
+          transcriptRevision: assembler.transcriptRevision,
+        },
+      });
+      suppressActiveVoiceAttemptsForTurn({
+        turnKey: input.turnKey,
+        reason: "voice_turn_reopened_pending_seal",
+        detail: "draft revision advanced; awaiting reseal",
+      });
+      const nextDraft = mergeVoiceTranscriptDraft(askDraftRef.current, transcript);
+      syncAskDraftValue(nextDraft, {
+        focus: true,
+        forceMoodHint: true,
+      });
+      scheduleVoiceSealEvaluation(input.turnKey);
+      return assembler;
+    },
+    [
+      replaceVoiceConversationTimelineEntry,
+      scheduleVoiceSealEvaluation,
+      suppressActiveVoiceAttemptsForTurn,
+      syncAskDraftValue,
+      updateVoiceTurnAssemblerState,
     ],
   );
 
@@ -9316,7 +9915,19 @@ export function HelixAskPill({
         if (confirmedTurn) {
           clearHeldTranscriptState();
           setVoiceInputState("transcribing");
-          await dispatchConfirmedVoiceTranscript(confirmedTurn);
+          ingestVoiceDraftSegment({
+            turnKey: confirmedTurn.traceId,
+            segmentId: confirmedTurn.segmentId,
+            transcript: confirmedTurn.transcript,
+            recordedText: confirmedTurn.recordedText,
+            sourceLanguage: confirmedTurn.sourceLanguage,
+            translated: confirmedTurn.translated,
+            sttEngine: confirmedTurn.sttEngine,
+            confidence: confirmedTurn.confidence,
+            confidenceReason: confirmedTurn.confidenceReason,
+            completion: confirmedTurn.completion,
+            turnComplete: confirmedTurn.turnComplete,
+          });
           setVoiceInputError(null);
           setVoiceInputState("cooldown");
           if (voiceCooldownTimerRef.current !== null && typeof window !== "undefined") {
@@ -9339,7 +9950,7 @@ export function HelixAskPill({
         markVoiceCheckpoint("stt_request_started", "ok", "Submitting segment to STT.");
         markVoiceCheckpoint("stt_response_error", "idle", "No STT error.");
         patchVoiceSegmentAttempt(nextSegment.id, { status: "transcribing" });
-        const traceId = `voice:${crypto.randomUUID()}`;
+        const traceId = nextSegment.turnKey;
         const sttStartedAt = Date.now();
         try {
           const result = await transcribeVoice({
@@ -9702,537 +10313,29 @@ export function HelixAskPill({
             },
           }));
           const recordedText = result.source_text?.trim() || mergedTranscript;
-          replaceVoiceConversationTimelineEntry({
-            type: "conversation_recorded",
-            source: "voice_auto",
-            status: "done",
-            text: clipText(recordedText, 360),
-            detail: result.translated
-              ? `translated from ${result.source_language ?? result.language ?? "unknown"}`
-              : "captured",
-            traceId,
-            meta: {
-              engine: result.engine ?? null,
-              sourceLanguage: result.source_language ?? result.language ?? null,
-              translated: Boolean(result.translated),
-            },
-          });
-          const recentTurnsForTurn = conversationRecentTurnsRef.current.slice(-6);
           rememberConversationTurn(`user: ${recordedText}`);
-
-          const sessionId = getHelixAskSessionId() ?? undefined;
-          let conversationMode: "observe" | "act" | "verify" | "clarify" | undefined;
-          let classifierConfidence: number | null = null;
-          let classifierReason = "conversation_turn_fallback";
-          let classifierSource: "llm" | "fallback" = "fallback";
-          let dispatchHint = shouldDispatchReasoningAttempt(mergedTranscript);
-          let dispatchReason = dispatchHint ? "dispatch:heuristic" : "suppressed:heuristic_low_salience";
-          let routeReasonCode = dispatchReason;
-          let explorationTurn = false;
-          let clarifierPolicy: ConversationClarifierPolicy = "after_first_attempt";
-          let explorationPacket: ConversationExplorationPacket | null = null;
-          let failReason: string | null = null;
-          let briefText = buildConversationFallbackBrief({
+          const assembled = ingestVoiceDraftSegment({
+            turnKey: traceId,
+            segmentId: nextSegment.id,
             transcript: mergedTranscript,
-            mode: completion.route === "ask_more" ? "clarify" : undefined,
-            clarifyNeeded: completion.route === "ask_more",
+            recordedText,
+            sourceLanguage: result.source_language ?? result.language ?? null,
+            translated: Boolean(result.translated),
+            sttEngine: result.engine ?? null,
+            confidence: confidenceMeta.confidence,
+            confidenceReason: result.confidence_reason ?? confidenceMeta.reason,
+            completion,
+            turnComplete,
           });
-
-          try {
-            const conversation = await runConversationTurn({
-              transcript: mergedTranscript,
-              sessionId,
-              traceId,
-              missionId: contextId,
-              sourceLanguage: result.source_language ?? result.language ?? undefined,
-              translated: Boolean(result.translated),
-              recentTurns: recentTurnsForTurn,
-            });
-            conversationMode = conversation.classification?.mode;
-            classifierConfidence = conversation.classification?.confidence ?? null;
-            classifierReason = conversation.classification?.reason?.trim() || classifierReason;
-            classifierSource = conversation.classification?.source ?? classifierSource;
-            routeReasonCode =
-              conversation.route_reason_code?.trim() ||
-              conversation.dispatch?.reason?.trim() ||
-              routeReasonCode;
-            explorationTurn = conversation.exploration_turn === true;
-            clarifierPolicy = conversation.clarifier_policy ?? "after_first_attempt";
-            explorationPacket = conversation.exploration_packet ?? null;
-            dispatchHint =
-              conversation.dispatch?.dispatch_hint ??
-              conversation.classification?.dispatch_hint ??
-              dispatchHint;
-            dispatchReason =
-              routeReasonCode ||
-              (dispatchHint ? `dispatch:${conversationMode ?? "unknown"}` : "suppressed:low_salience");
-            if (explorationTurn && conversationMode !== "act" && conversationMode !== "verify") {
-              conversationMode = "observe";
-            }
-            failReason = conversation.fail_reason ?? null;
-            const briefCandidate = conversation.brief?.text?.trim() ?? "";
-            if (briefCandidate) {
-              briefText = briefCandidate;
-            } else {
-              briefText = buildConversationFallbackBrief({
-                transcript: mergedTranscript,
-                mode: conversationMode,
-                clarifyNeeded: conversation.classification?.clarify_needed === true,
-              });
-            }
-          } catch (conversationError) {
-            const message =
-              conversationError instanceof Error ? conversationError.message : String(conversationError);
-            failReason = "conversation_turn_client_fallback";
-            classifierReason = clipText(message || classifierReason, 160);
-            classifierSource = "fallback";
-            const inferredMode = normalizeConversationModeForDispatch(inferAskMode(mergedTranscript));
-            conversationMode = inferredMode ?? (completion.route === "ask_more" ? "clarify" : "observe");
-            dispatchHint = shouldDispatchReasoningAttempt(mergedTranscript);
-            dispatchReason = dispatchHint ? `dispatch:${conversationMode}` : "suppressed:heuristic_low_salience";
-            routeReasonCode = dispatchReason;
-            briefText = buildConversationFallbackBrief({
-              transcript: mergedTranscript,
-              mode: conversationMode,
-              clarifyNeeded: conversationMode === "clarify",
-            });
-          }
-
-          if (
-            shouldForceObserveDispatchFromSuppression({
-              dispatchHint,
-              routeReasonCode,
-              transcript: mergedTranscript,
-            })
-          ) {
-            dispatchHint = true;
-            conversationMode = conversationMode === "act" || conversationMode === "verify" ? conversationMode : "observe";
-            routeReasonCode = "dispatch:observe_explore_forced";
-            dispatchReason = routeReasonCode;
-          }
-
-          const predictiveBrief = buildPredictiveBriefFromTranscript(mergedTranscript);
-          if (
-            isGenericQueuedVoiceAcknowledgement(briefText) ||
-            isBriefEchoingTranscript(briefText, mergedTranscript)
-          ) {
-            briefText =
-              predictiveBrief ||
-              buildDeterministicQueuedBriefFromTranscript(mergedTranscript);
-          }
-          briefText = sanitizeConversationBriefTextForVoice(briefText, 520);
-          if (!dispatchHint) {
-            updateVoiceDecisionBrief({
-              baseBrief: briefText,
-              lifecycle: "suppressed",
-              mode: conversationMode,
-              routeReasonCode,
-              failReasonRaw: failReason,
-              traceId,
-              meta: {
-                dispatchHint,
-                classifierSource,
-                classifierConfidence,
-                classifierReason,
-                routeReasonCode,
-                explorationTurn,
-                clarifierPolicy,
-                failReason,
-                confidence: confidenceMeta.confidence,
-                confidenceReason: result.confidence_reason ?? confidenceMeta.reason,
-                turnCompleteScore: turnComplete.score,
-                translationUncertain,
-              },
-            });
-          }
-          rememberConversationTurn(`dottie: ${briefText}`);
-
-          if (dispatchHint) {
-            const inferredDispatchMode =
-              normalizeConversationModeForDispatch(conversationMode) ??
-              normalizeConversationModeForDispatch(inferAskMode(mergedTranscript));
-            const dispatchMode =
-              explorationTurn && inferredDispatchMode !== "act" && inferredDispatchMode !== "verify"
-                ? "observe"
-                : inferredDispatchMode;
-            const pinnedCapsuleCount = getPinnedContextCapsuleCount();
-            let explorationTopicKey: string | null = null;
-            let explorationAttemptCount: number | undefined;
-            markVoiceCheckpoint("dispatch_queued", "ok", "Reasoning dispatch queued.");
-            const dispatchPrompt = buildVoiceReasoningDispatchPrompt({
-              transcript: mergedTranscript,
-              recentTurns: recentTurnsForTurn,
-              explorationPacket,
-            });
-            const continuityCandidate = [...reasoningAttemptsRef.current]
-              .filter(
-                (entry) =>
-                  entry.source === "voice_auto" &&
-                  (entry.status === "queued" || entry.status === "running" || entry.status === "streaming"),
-              )
-              .sort((a, b) => b.updatedAtMs - a.updatedAtMs)[0];
-            const continuityGapMs = continuityCandidate
-              ? Math.max(0, Date.now() - continuityCandidate.updatedAtMs)
-              : Number.POSITIVE_INFINITY;
-            const lexicalContinuation = continuityCandidate
-              ? shouldMergeVoiceContinuationTurn({
-                  previousPrompt: continuityCandidate.prompt,
-                  nextTranscript: mergedTranscript,
-                  gapMs: continuityGapMs,
-                })
-              : false;
-            const canMergeContinuation =
-              continuityCandidate !== undefined &&
-              shouldMergeVoiceContinuationInFlight({
-                gapMs: continuityGapMs,
-                lexicalContinuation,
-                activeWindowMs: VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS,
-              });
-            const intentShiftScore = continuityCandidate
-              ? scoreIntentShift({
-                  activePrompt: continuityCandidate.prompt,
-                  nextTranscript: mergedTranscript,
-                })
-              : { score: 0, band: "continuation" as IntentShiftBand, reason: "no_continuity_candidate" };
-            const forceTailContinuationMerge =
-              continuityCandidate !== undefined &&
-              isLowInformationTailTranscript(mergedTranscript) &&
-              hasDanglingTurnTail(continuityCandidate.prompt);
-            const shortContinuationAddendum =
-              continuityCandidate !== undefined &&
-              continuityGapMs <= VOICE_CONTINUATION_ACTIVE_CHAIN_WINDOW_MS &&
-              (isLikelyContinuationAddendum(mergedTranscript) ||
-                isLikelyContinuationTailFragment(mergedTranscript));
-            const restartExplorationLadder =
-              continuityCandidate !== undefined &&
-              shouldRestartExplorationLadderOnSupersede({
-                hasContinuityCandidate: true,
-                forceTailContinuationMerge,
-                shortContinuationAddendum,
-                canMergeContinuation,
-                intentShiftBand: intentShiftScore.band,
-              });
-            if (
-              continuityCandidate &&
-              (forceTailContinuationMerge ||
-                shortContinuationAddendum ||
-                (canMergeContinuation && intentShiftScore.band === "continuation"))
-            ) {
-              const latestFocusPrompt = extractLatestContinuationQuestionFocus(mergedTranscript);
-              const mergedPrompt =
-                latestFocusPrompt ?? mergeVoiceTranscriptDraft(continuityCandidate.prompt, mergedTranscript);
-              const mergedRecordedText = mergeVoiceTranscriptDraft(
-                continuityCandidate.recordedText ?? continuityCandidate.prompt,
-                recordedText,
-              );
-              const mergedBriefText = buildConversationFallbackBrief({
-                transcript: mergedPrompt,
-                mode: conversationMode ?? continuityCandidate.mode,
-                clarifyNeeded: false,
-              });
-              const mergedCapsuleIds = resolveSelectedContextCapsuleIds(mergedPrompt, undefined, {
-                source: "voice_auto",
-              });
-              const mergedDispatchPrompt = buildVoiceReasoningDispatchPrompt({
-                transcript: mergedPrompt,
-                recentTurns: recentTurnsForTurn,
-                explorationPacket: continuityCandidate.explorationPacket ?? explorationPacket,
-              });
-              const continuityStatus =
-                continuityCandidate.status === "running" || continuityCandidate.status === "streaming"
-                  ? "running"
-                  : "queued";
-              const continuityEntrySnapshot = {
-                ...continuityCandidate,
-                prompt: mergedPrompt,
-                contextCapsuleCount: mergedCapsuleIds.length,
-              };
-              const continuityTimelineEntryId = ensureReasoningTimelineEntry(
-                continuityEntrySnapshot,
-                continuityStatus,
-              );
-              updateReasoningAttempt(continuityCandidate.id, (current) => ({
-                ...current,
-                prompt: mergedPrompt,
-                dispatchPrompt: mergedDispatchPrompt,
-                recordedText: mergedRecordedText,
-                contextCapsuleIds: mergedCapsuleIds,
-                contextCapsuleCount: mergedCapsuleIds.length,
-                contextCapsulePinnedCount: pinnedCapsuleCount,
-                routeReasonCode,
-                conversationBriefBase: mergedBriefText,
-                sttEngine: result.engine,
-                sourceLanguage: result.source_language ?? result.language ?? current.sourceLanguage ?? null,
-                translated: Boolean(result.translated) || current.translated,
-                ...(continuityStatus === "running"
-                  ? {
-                      status: "queued" as const,
-                      partial: "",
-                      finalAnswer: undefined,
-                      events: [],
-                      suppression_reason: "voice_turn_continuation_merged",
-                    }
-                  : {}),
-              }));
-              patchHelixTimelineEntry(continuityTimelineEntryId, {
-                status: continuityStatus === "running" ? "queued" : continuityStatus,
-                text: clipText(mergedPrompt, 300),
-                detail: `${dispatchReason} | continuation merged${forceTailContinuationMerge ? " | tail guard" : shortContinuationAddendum ? " | addendum guard" : ""}`,
-                mode: conversationMode ?? continuityCandidate.mode ?? dispatchMode,
-                meta: {
-                  dispatchReason,
-                  routeReasonCode,
-                  continuityMerged: true,
-                  tailGuardMerged: forceTailContinuationMerge,
-                  addendumGuardMerged: shortContinuationAddendum,
-                  contextCapsuleCount: mergedCapsuleIds.length,
-                  contextCapsulePinnedCount: pinnedCapsuleCount,
-                  contextCapsuleIds: mergedCapsuleIds,
-                  sttEngine: result.engine ?? null,
-                },
-              });
-              const existingStreamEntryId = reasoningStreamEntryByAttemptIdRef.current[continuityCandidate.id];
-              if (existingStreamEntryId) {
-                patchHelixTimelineEntry(existingStreamEntryId, {
-                  status: "suppressed",
-                  detail: "continuation merged; restarting",
-                });
-                delete reasoningStreamEntryByAttemptIdRef.current[continuityCandidate.id];
-              }
-              voiceReasoningAttemptSegmentByIdRef.current[continuityCandidate.id] = nextSegment.id;
-              patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "queued" });
-              const mergedTranscriptRevision = bumpVoiceTurnRevision(continuityCandidate.traceId, "transcript");
-              setIntentRevisionState({
-                turnKey: continuityCandidate.traceId,
-                revision: mergedTranscriptRevision.revision,
-                topicTerms: extractIntentTerms(mergedPrompt, 12),
-                mode: conversationMode ?? continuityCandidate.mode ?? dispatchMode ?? null,
-                dispatchPromptHash: hashVoiceUtteranceKey(mergedDispatchPrompt || mergedPrompt),
-                updatedAtMs: Date.now(),
-              });
-              if (continuityCandidate.traceId) {
-                voiceSuppressedFinalTurnKeysRef.current.delete(continuityCandidate.traceId);
-              }
-              updateReasoningAttempt(continuityCandidate.id, (current) => ({
-                ...current,
-                intentRevision: mergedTranscriptRevision.revision,
-                intentShiftScore: intentShiftScore.score,
-                turnCompleteScore: turnComplete.score,
-              }));
-              updateVoiceDecisionBrief({
-                baseBrief: mergedBriefText,
-                lifecycle: continuityStatus === "running" ? "running" : "queued",
-                mode: conversationMode ?? continuityCandidate.mode,
-                routeReasonCode,
-                traceId: continuityCandidate.traceId,
-                meta: {
-                  attemptId: continuityCandidate.id,
-                  transcript: mergedPrompt,
-                  continuityMerged: true,
-                  tailGuardMerged: forceTailContinuationMerge,
-                  addendumGuardMerged: shortContinuationAddendum,
-                  mergedPromptLength: mergedPrompt.length,
-                  transcriptRevision: mergedTranscriptRevision.revision,
-                  briefRegeneratedFromMergedPrompt: true,
-                  intentShiftScore: intentShiftScore.score,
-                },
-              });
-              if (continuityStatus === "running") {
-                reasoningAttemptRestartRequestedRef.current.add(continuityCandidate.id);
-                reasoningAttemptQueueRef.current = [
-                  continuityCandidate.id,
-                  ...reasoningAttemptQueueRef.current.filter((id) => id !== continuityCandidate.id),
-                ];
-                if (reasoningAttemptAbortAttemptIdRef.current === continuityCandidate.id) {
-                  reasoningAttemptAbortControllerRef.current?.abort();
-                }
-                markVoiceCheckpoint("dispatch_queued", "ok", "Merged continuation and restarted reasoning.");
-              } else {
-                reasoningAttemptQueueRef.current = [
-                  continuityCandidate.id,
-                  ...reasoningAttemptQueueRef.current.filter((id) => id !== continuityCandidate.id),
-                ];
-                markVoiceCheckpoint("dispatch_queued", "ok", "Merged continuation into queued reasoning.");
-              }
-              void runReasoningAttemptQueue();
-              continue;
-            }
-            if (
-              continuityCandidate &&
-              !forceTailContinuationMerge &&
-              !shortContinuationAddendum &&
-              intentShiftScore.band === "shift" &&
-              (continuityCandidate.status === "queued" ||
-                continuityCandidate.status === "running" ||
-                continuityCandidate.status === "streaming")
-            ) {
-              updateReasoningAttempt(continuityCandidate.id, (current) => ({
-                ...current,
-                status: "suppressed",
-                suppression_reason: "voice_turn_superseded_by_topic_shift",
-                completedAtMs: Date.now(),
-              }));
-              const continuityTimelineEntryId = ensureReasoningTimelineEntry(continuityCandidate, "suppressed");
-              patchHelixTimelineEntry(continuityTimelineEntryId, {
-                status: "suppressed",
-                detail: "superseded by strong topic shift",
-              });
-              const staleStreamEntryId = reasoningStreamEntryByAttemptIdRef.current[continuityCandidate.id];
-              if (staleStreamEntryId) {
-                patchHelixTimelineEntry(staleStreamEntryId, {
-                  status: "suppressed",
-                  detail: "superseded by strong topic shift",
-                });
-                delete reasoningStreamEntryByAttemptIdRef.current[continuityCandidate.id];
-              }
-              if (reasoningAttemptAbortAttemptIdRef.current === continuityCandidate.id) {
-                reasoningAttemptAbortControllerRef.current?.abort();
-              }
-              const continuitySegmentId = voiceReasoningAttemptSegmentByIdRef.current[continuityCandidate.id];
-              if (continuitySegmentId) {
-                patchVoiceSegmentAttempt(continuitySegmentId, { dispatch: "suppressed" });
-                delete voiceReasoningAttemptSegmentByIdRef.current[continuityCandidate.id];
-              }
-            }
-            if (explorationTurn) {
-              explorationTopicKey = inferExplorationTopicKey(explorationPacket, mergedTranscript);
-              if (restartExplorationLadder && explorationTopicKey) {
-                delete explorationRuntimeByTopicRef.current[explorationTopicKey];
-              }
-              const previousRuntime = explorationRuntimeByTopicRef.current[explorationTopicKey];
-              // New user turns always re-enter exploration at rung 1.
-              explorationAttemptCount = 1;
-              explorationRuntimeByTopicRef.current[explorationTopicKey] = {
-                attemptCount: explorationAttemptCount,
-                clarifierAsked: previousRuntime?.clarifierAsked ?? false,
-                packet: explorationPacket ?? previousRuntime?.packet ?? null,
-                lastRouteReasonCode: routeReasonCode,
-                updatedAtMs: Date.now(),
-              };
-            }
-            const selectedCapsuleIds = resolveSelectedContextCapsuleIds(mergedTranscript, undefined, {
-              source: "voice_auto",
-              preferLatestWins: intentShiftScore.band === "shift" && !shortContinuationAddendum,
-            });
-            suppressSupersededVoiceAttemptsForNewTurn(traceId);
-            const queuedAttempt = createReasoningAttempt({
-              prompt: mergedTranscript,
-              dispatchPrompt,
-              recordedText,
-              contextCapsuleIds: selectedCapsuleIds,
-              contextCapsuleCount: selectedCapsuleIds.length,
-              contextCapsulePinnedCount: pinnedCapsuleCount,
-              source: "voice_auto",
-              profile: "dot_min_steps_v1",
-              mode: dispatchMode,
-              status: "queued",
-              routeReasonCode,
-              explorationTurn,
-              clarifierPolicy,
-              explorationPacket,
-              explorationTopicKey,
-              explorationAttemptCount,
-              completionScore: completion.score,
-              turnCompleteScore: turnComplete.score,
-              floorOwner: "none",
-              sttEngine: result.engine,
-              sourceLanguage: result.source_language ?? result.language ?? null,
-              translated: Boolean(result.translated),
-              conversationBriefBase: briefText,
-              intentShiftScore: intentShiftScore.score,
-            });
-            const timelineEntryId = ensureReasoningTimelineEntry(queuedAttempt, "queued");
-            patchHelixTimelineEntry(timelineEntryId, {
-              detail: dispatchReason,
-              mode: conversationMode ?? dispatchMode,
-              meta: {
-                dispatchReason,
-                routeReasonCode,
-                continuityContextApplied: dispatchPrompt !== mergedTranscript,
-                explorationTurn,
-                clarifierPolicy,
-                explorationAttemptCount: explorationAttemptCount ?? null,
-                completionScore: completion.score,
-                contextCapsuleCount: selectedCapsuleIds.length,
-                contextCapsulePinnedCount: pinnedCapsuleCount,
-                contextCapsuleIds: selectedCapsuleIds,
-                sttEngine: result.engine ?? null,
-              },
-            });
-            voiceReasoningAttemptSegmentByIdRef.current[queuedAttempt.id] = nextSegment.id;
+          if (assembled) {
+            markVoiceCheckpoint(
+              "dispatch_queued",
+              "ok",
+              `Draft revision ${assembled.transcriptRevision} updated; waiting for seal gate.`,
+            );
             patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "queued" });
-            const transcriptRevision = bumpVoiceTurnRevision(queuedAttempt.traceId, "transcript");
-            setIntentRevisionState({
-              turnKey: queuedAttempt.traceId,
-              revision: transcriptRevision.revision,
-              topicTerms: extractIntentTerms(mergedTranscript, 12),
-              mode: conversationMode ?? dispatchMode ?? null,
-              dispatchPromptHash: hashVoiceUtteranceKey(dispatchPrompt || mergedTranscript),
-              updatedAtMs: Date.now(),
-            });
-            updateReasoningAttempt(queuedAttempt.id, (current) => ({
-              ...current,
-              intentRevision: transcriptRevision.revision,
-              turnCompleteScore: turnComplete.score,
-            }));
-            if (queuedAttempt.traceId) {
-              voiceSuppressedFinalTurnKeysRef.current.delete(queuedAttempt.traceId);
-            }
-            updateVoiceDecisionBrief({
-              baseBrief: briefText,
-              lifecycle: "queued",
-              mode: conversationMode ?? dispatchMode,
-              routeReasonCode,
-              traceId: queuedAttempt.traceId,
-              meta: {
-                attemptId: queuedAttempt.id,
-                transcript: mergedTranscript,
-                dispatchHint,
-                classifierSource,
-                classifierConfidence,
-                classifierReason,
-                routeReasonCode,
-                explorationTurn,
-                clarifierPolicy,
-                failReason,
-                transcriptRevision: transcriptRevision.revision,
-                confidence: confidenceMeta.confidence,
-                confidenceReason: result.confidence_reason ?? confidenceMeta.reason,
-                turnCompleteScore: turnComplete.score,
-                translationUncertain,
-              },
-            });
-            enqueueReasoningAttempt(queuedAttempt.id);
-            void runReasoningAttemptQueue();
           } else {
-            markVoiceCheckpoint("dispatch_suppressed", "ok", "Dispatch suppressed for this turn.");
-            addHelixTimelineEntry({
-              type: "suppressed",
-              source: "voice_auto",
-              status: "suppressed",
-              text: clipText(
-                formatVoiceDecisionSentence({
-                  lifecycle: "suppressed",
-                  mode: conversationMode,
-                  routeReasonCode,
-                  failureReasonRaw: failReason,
-                }),
-                280,
-              ),
-              detail: "reasoning dispatch suppressed",
-              mode: conversationMode,
-              traceId,
-              meta: {
-                completionScore: completion.score,
-                classifierReason,
-                routeReasonCode,
-                failReasonRaw: failReason,
-                confidence: confidenceMeta.confidence,
-                confidenceReason: result.confidence_reason ?? confidenceMeta.reason,
-                turnCompleteScore: turnComplete.score,
-                translationUncertain,
-              },
-            });
+            markVoiceCheckpoint("dispatch_suppressed", "ok", "Draft transcript was empty.");
             patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "suppressed" });
           }
           setVoiceInputError(null);
@@ -10273,32 +10376,16 @@ export function HelixAskPill({
       voiceTranscribeBusyRef.current = false;
     }
   }, [
-    addHelixTimelineEntry,
-    bumpVoiceTurnRevision,
     clearHeldTranscriptFlushTimer,
     clearHeldTranscriptState,
     contextId,
-    createReasoningAttempt,
-    dispatchConfirmedVoiceTranscript,
-    enqueueReasoningAttempt,
-    ensureReasoningTimelineEntry,
-    getHelixAskSessionId,
-    getPinnedContextCapsuleCount,
+    ingestVoiceDraftSegment,
     markVoiceCheckpoint,
     micArmState,
-    patchHelixTimelineEntry,
     patchVoiceSegmentAttempt,
-    replaceVoiceConversationTimelineEntry,
-    resolveSelectedContextCapsuleIds,
     resolveBargeInFromTranscription,
     rememberConversationTurn,
-    runReasoningAttemptQueue,
-    setIntentRevisionState,
     stopReadAloud,
-    suppressSupersededVoiceAttemptsForNewTurn,
-    syncAskDraftValue,
-    updateVoiceDecisionBrief,
-    updateReasoningAttempt,
   ]);
 
   const handleTranscriptConfirmationAccept = useCallback(() => {
@@ -10379,7 +10466,20 @@ export function HelixAskPill({
       // If a voice segment was captured, pause any active playback while STT resolves.
       // This prevents stale finals from continuing to speak over the user's in-flight thought.
       pausePlaybackForPotentialBargeIn();
-      voiceTranscribeQueueRef.current.push({ id: segmentId, blob, durationMs, cutAtMs });
+      const turnKey = resolveVoiceAssemblerTurnKeyForIncomingSegment();
+      const assemblerState = getVoiceTurnAssemblerState(turnKey);
+      if (assemblerState?.phase === "sealed") {
+        reopenVoiceAssemblerDraft(turnKey, "voice_turn_interrupted_pending_reseal");
+      } else {
+        updateVoiceTurnAssemblerState(turnKey, (current) => ({
+          ...current,
+          phase: "draft",
+          sealToken: null,
+          sealedAtMs: null,
+          lastSpeechAtMs: Date.now(),
+        }));
+      }
+      voiceTranscribeQueueRef.current.push({ id: segmentId, blob, durationMs, cutAtMs, turnKey });
       const hardCutReason = resolveVoiceBargeHardCutReason({
         holdActive: voiceBargeHoldActiveRef.current,
         holdStartedAtMs: voiceBargeHoldStartedAtMsRef.current,
@@ -10394,7 +10494,15 @@ export function HelixAskPill({
       }
       void processTranscriptionQueue();
     },
-    [hardCutVoicePlaybackForBargeIn, pausePlaybackForPotentialBargeIn, processTranscriptionQueue],
+    [
+      getVoiceTurnAssemblerState,
+      hardCutVoicePlaybackForBargeIn,
+      pausePlaybackForPotentialBargeIn,
+      processTranscriptionQueue,
+      reopenVoiceAssemblerDraft,
+      resolveVoiceAssemblerTurnKeyForIncomingSegment,
+      updateVoiceTurnAssemblerState,
+    ],
   );
 
   const finalizeVoiceSegment = useCallback(

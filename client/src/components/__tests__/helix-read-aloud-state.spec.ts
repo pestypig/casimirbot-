@@ -336,7 +336,7 @@ describe("artifact-dominated output guards", () => {
 });
 
 describe("exploration escalation guard", () => {
-  it("restarts observe ladder on first artifact-heavy output, then clarifies on repeat", () => {
+  it("retries artifact-heavy observe output up to cap, then clarifies", () => {
     const decision = decideExplorationLadderAction({
       explorationAttemptCount: 1,
       promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
@@ -354,7 +354,16 @@ describe("exploration escalation guard", () => {
       mode: "observe",
       debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
     });
-    expect(secondAttempt.action).toBe("clarify_after_attempt1");
+    expect(secondAttempt.action).toBe("restart_after_artifact");
+    const thirdAttempt = decideExplorationLadderAction({
+      explorationAttemptCount: 3,
+      promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
+      outputText:
+        "What is warp bubble: docs/casimir-tile-mechanism.md What is mission ethos: docs/BUSINESS_MODEL.md",
+      mode: "observe",
+      debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
+    });
+    expect(thirdAttempt.action).toBe("clarify_after_attempt1");
   });
 
   it("uses raw output artifact guard when sanitized output looks benign", () => {
