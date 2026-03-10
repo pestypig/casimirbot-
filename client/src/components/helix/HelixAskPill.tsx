@@ -6400,21 +6400,6 @@ export function HelixAskPill({
     return state.latestRevision > revision.revision;
   }, []);
 
-  const hintVoicePlaybackAudioSession = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const nav = window.navigator as Navigator & {
-      audioSession?: {
-        type?: string;
-      };
-    };
-    if (!nav.audioSession || typeof nav.audioSession !== "object") return;
-    try {
-      nav.audioSession.type = "playback";
-    } catch {
-      // Best-effort hint only; unsupported browsers can ignore.
-    }
-  }, []);
-
   const getOrCreateVoicePlaybackElement = useCallback((): HTMLAudioElement => {
     const existing = playbackElementRef.current;
     if (existing) return existing;
@@ -6435,7 +6420,6 @@ export function HelixAskPill({
       if (!shouldUseVoicePlaybackAudioGraph(window.navigator?.userAgent)) {
         return false;
       }
-      hintVoicePlaybackAudioSession();
       const AudioCtx = (window.AudioContext ||
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
         | typeof AudioContext
@@ -6501,14 +6485,13 @@ export function HelixAskPill({
       compressorNode.connect(playbackContext.destination);
       return true;
     },
-    [hintVoicePlaybackAudioSession],
+    [],
   );
 
   const primeVoiceAudioPlayback = useCallback(async (): Promise<boolean> => {
     if (voiceAudioUnlockedRef.current) return true;
     if (typeof window === "undefined") return false;
     try {
-      hintVoicePlaybackAudioSession();
       const primer = getOrCreateVoicePlaybackElement();
       // Do not mute the unlock primer; muted autoplay can pass without unlocking
       // subsequent audible playback on mobile browsers.
@@ -6530,12 +6513,11 @@ export function HelixAskPill({
     } catch {
       return false;
     }
-  }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, hintVoicePlaybackAudioSession]);
+  }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement]);
 
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
-      hintVoicePlaybackAudioSession();
       const audio = getOrCreateVoicePlaybackElement();
       await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
       const url = URL.createObjectURL(input.blob);
@@ -6623,7 +6605,7 @@ export function HelixAskPill({
         });
       });
     },
-    [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, hintVoicePlaybackAudioSession, primeVoiceAudioPlayback],
+    [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, primeVoiceAudioPlayback],
   );
 
   const clearVoicePendingPreempt = useCallback(() => {
