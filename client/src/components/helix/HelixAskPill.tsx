@@ -122,6 +122,7 @@ const URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
 const MOBILE_AUDIO_USER_AGENT_PATTERN =
   /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
 const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
+const DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN = /macintosh/i;
 const HELIX_VOICE_PLAYBACK_GAIN_DESKTOP = 1.15;
 const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 3.6;
 const HELIX_VOICE_PLAYBACK_GAIN_IOS = 4.2;
@@ -133,9 +134,19 @@ const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
 const HELIX_VOICE_FORCE_DIRECT_MOBILE =
   String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 
+function isLikelyIOSDesktopModeUserAgent(userAgent?: string): boolean {
+  const ua = (userAgent ?? "").trim();
+  if (!ua) return false;
+  if (!DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN.test(ua)) return false;
+  if (typeof navigator === "undefined") return false;
+  const touchPoints = typeof navigator.maxTouchPoints === "number" ? navigator.maxTouchPoints : 0;
+  return touchPoints > 1;
+}
+
 export function resolveVoicePlaybackGain(userAgent?: string): number {
   const ua = (userAgent ?? "").trim();
   if (!ua) return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
+  if (isLikelyIOSDesktopModeUserAgent(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
   if (IOS_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_IOS;
   if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua)) return HELIX_VOICE_PLAYBACK_GAIN_MOBILE;
   return HELIX_VOICE_PLAYBACK_GAIN_DESKTOP;
@@ -144,7 +155,7 @@ export function resolveVoicePlaybackGain(userAgent?: string): number {
 export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
   const ua = (userAgent ?? "").trim();
   if (!ua) return true;
-  if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua)) {
+  if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua) || isLikelyIOSDesktopModeUserAgent(ua)) {
     // Mobile graph is now enabled by default for louder device-side playback.
     // Set VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE=1 to opt back into direct element playback.
     return !HELIX_VOICE_FORCE_DIRECT_MOBILE;
@@ -4591,6 +4602,7 @@ export function HelixAskPill({
   const voicePlaybackCompressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const voicePlaybackGainNodeRef = useRef<GainNode | null>(null);
   const voicePlaybackGraphElementRef = useRef<HTMLAudioElement | null>(null);
+  const voicePlaybackForceDirectRef = useRef(false);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
   const voiceAudioUnlockedRef = useRef(false);
@@ -6414,9 +6426,32 @@ export function HelixAskPill({
     return audio;
   }, []);
 
+  const teardownVoicePlaybackAudioGraph = useCallback(() => {
+    try {
+      voicePlaybackSourceNodeRef.current?.disconnect();
+    } catch {
+      // no-op
+    }
+    try {
+      voicePlaybackCompressorNodeRef.current?.disconnect();
+    } catch {
+      // no-op
+    }
+    try {
+      voicePlaybackGainNodeRef.current?.disconnect();
+    } catch {
+      // no-op
+    }
+    voicePlaybackSourceNodeRef.current = null;
+    voicePlaybackCompressorNodeRef.current = null;
+    voicePlaybackGainNodeRef.current = null;
+    voicePlaybackGraphElementRef.current = null;
+  }, []);
+
   const ensureVoicePlaybackAudioGraph = useCallback(
     async (audio: HTMLAudioElement): Promise<boolean> => {
       if (typeof window === "undefined") return false;
+      if (voicePlaybackForceDirectRef.current) return false;
       if (!shouldUseVoicePlaybackAudioGraph(window.navigator?.userAgent)) {
         return false;
       }
@@ -6518,94 +6553,129 @@ export function HelixAskPill({
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
-      const audio = getOrCreateVoicePlaybackElement();
-      await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
-      const url = URL.createObjectURL(input.blob);
-      audio.muted = false;
-      audio.volume = 1;
-      playbackUrlRef.current = url;
-      playbackReplyIdRef.current = replyId;
-      audio.src = url;
-      audio.load();
-      playbackAudioRef.current = audio;
-      if (replyId) {
-        setReadAloudByReply((prev) => ({
-          ...prev,
-          [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "audio"),
-        }));
-      }
-      await new Promise<void>((resolve, reject) => {
-        let settled = false;
-        const finalize = (event: "ended" | "error" | "stopped") => {
-          if (settled) return;
-          settled = true;
-          if (voiceAutoSpeakPendingPlaybackResolverRef.current === resolver) {
-            voiceAutoSpeakPendingPlaybackResolverRef.current = null;
-          }
-          if (replyId) {
-            setReadAloudByReply((prev) => ({
-              ...prev,
-              [replyId]: transitionReadAloudState(
-                prev[replyId] ?? "idle",
-                event === "ended" ? "ended" : event === "stopped" ? "stop" : "error",
-              ),
-            }));
-          }
-          if (playbackUrlRef.current === url) {
-            URL.revokeObjectURL(url);
-            playbackUrlRef.current = null;
-          }
-          if (playbackAudioRef.current === audio) {
-            playbackAudioRef.current = null;
-          }
-          if (playbackReplyIdRef.current === replyId) {
-            playbackReplyIdRef.current = null;
-          }
-          if (event === "error") {
-            reject(new Error("voice_audio_playback_error"));
-            return;
-          }
-          resolve();
-        };
-        const resolver = () => finalize("stopped");
-        voiceAutoSpeakPendingPlaybackResolverRef.current = resolver;
-        audio.onended = () => finalize("ended");
-        audio.onerror = () => finalize("error");
-        const attemptPlay = async () => {
-          try {
-            await audio.play();
-          } catch (error) {
-            if (
-              error instanceof DOMException &&
-              (error.name === "NotAllowedError" || error.name === "AbortError")
-            ) {
-              const unlocked = await primeVoiceAudioPlayback();
-              if (unlocked) {
-                await audio.play();
+      let attemptedDirectFallback = false;
+      while (true) {
+        const audio = getOrCreateVoicePlaybackElement();
+        const graphAttached = await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
+        const url = URL.createObjectURL(input.blob);
+        audio.muted = false;
+        audio.volume = 1;
+        playbackUrlRef.current = url;
+        playbackReplyIdRef.current = replyId;
+        audio.src = url;
+        audio.load();
+        playbackAudioRef.current = audio;
+        if (replyId) {
+          setReadAloudByReply((prev) => ({
+            ...prev,
+            [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "audio"),
+          }));
+        }
+        try {
+          await new Promise<void>((resolve, reject) => {
+            let settled = false;
+            const finalize = (event: "ended" | "error" | "stopped") => {
+              if (settled) return;
+              settled = true;
+              audio.onended = null;
+              audio.onerror = null;
+              if (voiceAutoSpeakPendingPlaybackResolverRef.current === resolver) {
+                voiceAutoSpeakPendingPlaybackResolverRef.current = null;
+              }
+              if (replyId) {
+                setReadAloudByReply((prev) => ({
+                  ...prev,
+                  [replyId]: transitionReadAloudState(
+                    prev[replyId] ?? "idle",
+                    event === "ended" ? "ended" : event === "stopped" ? "stop" : "error",
+                  ),
+                }));
+              }
+              if (playbackUrlRef.current === url) {
+                URL.revokeObjectURL(url);
+                playbackUrlRef.current = null;
+              }
+              if (playbackAudioRef.current === audio) {
+                playbackAudioRef.current = null;
+              }
+              if (playbackReplyIdRef.current === replyId) {
+                playbackReplyIdRef.current = null;
+              }
+              if (event === "error") {
+                reject(new Error("voice_audio_playback_error"));
                 return;
               }
+              resolve();
+            };
+            const resolver = () => finalize("stopped");
+            voiceAutoSpeakPendingPlaybackResolverRef.current = resolver;
+            audio.onended = () => finalize("ended");
+            audio.onerror = () => finalize("error");
+            const attemptPlay = async () => {
+              try {
+                await audio.play();
+              } catch (error) {
+                if (
+                  error instanceof DOMException &&
+                  (error.name === "NotAllowedError" || error.name === "AbortError")
+                ) {
+                  const unlocked = await primeVoiceAudioPlayback();
+                  if (unlocked) {
+                    await audio.play();
+                    return;
+                  }
+                }
+                throw error;
+              }
+            };
+            if (input.awaitPlayback === false) {
+              void attemptPlay()
+                .then(() => resolve())
+                .catch(() => finalize("error"));
+              return;
             }
-            throw error;
-          }
-        };
-        if (input.awaitPlayback === false) {
-          void attemptPlay()
-            .then(() => resolve())
-            .catch(() => finalize("error"));
+            void attemptPlay().catch((error) => {
+              if (
+                error instanceof DOMException &&
+                (error.name === "NotAllowedError" || error.name === "AbortError")
+              ) {
+                setVoiceInputError("Audio blocked on this device. Tap mic to enable playback.");
+              }
+              finalize("error");
+            });
+          });
           return;
-        }
-        void attemptPlay().catch((error) => {
-          if (
-            error instanceof DOMException &&
-            (error.name === "NotAllowedError" || error.name === "AbortError")
-          ) {
-            setVoiceInputError("Audio blocked on this device. Tap mic to enable playback.");
+        } catch (error) {
+          // Mobile Safari can intermittently fail MediaElementSource playback; retry once
+          // with direct element output by discarding the graph-bound element.
+          if (!attemptedDirectFallback && graphAttached) {
+            attemptedDirectFallback = true;
+            voicePlaybackForceDirectRef.current = true;
+            teardownVoicePlaybackAudioGraph();
+            try {
+              audio.pause();
+            } catch {
+              // no-op
+            }
+            audio.onended = null;
+            audio.onerror = null;
+            audio.src = "";
+            audio.load();
+            if (playbackElementRef.current === audio) {
+              playbackElementRef.current = null;
+            }
+            continue;
           }
-          finalize("error");
-        });
-      });
+          throw error;
+        }
+      }
     },
-    [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, primeVoiceAudioPlayback],
+    [
+      ensureVoicePlaybackAudioGraph,
+      getOrCreateVoicePlaybackElement,
+      primeVoiceAudioPlayback,
+      teardownVoicePlaybackAudioGraph,
+    ],
   );
 
   const clearVoicePendingPreempt = useCallback(() => {
@@ -6653,10 +6723,17 @@ export function HelixAskPill({
       }
     }
     const currentAudio = playbackAudioRef.current;
+    const pendingResolver = voiceAutoSpeakPendingPlaybackResolverRef.current;
+    voiceAutoSpeakPendingPlaybackResolverRef.current = null;
+    if (pendingResolver) {
+      pendingResolver();
+    }
     if (currentAudio) {
       currentAudio.pause();
       currentAudio.src = "";
-      playbackAudioRef.current = null;
+      if (playbackAudioRef.current === currentAudio) {
+        playbackAudioRef.current = null;
+      }
     }
     if (playbackUrlRef.current) {
       URL.revokeObjectURL(playbackUrlRef.current);
@@ -6666,11 +6743,6 @@ export function HelixAskPill({
       const replyId = playbackReplyIdRef.current;
       setReadAloudByReply((prev) => ({ ...prev, [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "stop") }));
       playbackReplyIdRef.current = null;
-    }
-    const pendingResolver = voiceAutoSpeakPendingPlaybackResolverRef.current;
-    voiceAutoSpeakPendingPlaybackResolverRef.current = null;
-    if (pendingResolver) {
-      pendingResolver();
     }
   }, [clearVoicePendingPreempt, updateVoiceAutoSpeakMetrics]);
 
@@ -11753,13 +11825,7 @@ export function HelixAskPill({
   useEffect(() => () => {
     stopReadAloud();
     stopVoiceCapture();
-    voicePlaybackSourceNodeRef.current?.disconnect();
-    voicePlaybackSourceNodeRef.current = null;
-    voicePlaybackCompressorNodeRef.current?.disconnect();
-    voicePlaybackCompressorNodeRef.current = null;
-    voicePlaybackGainNodeRef.current?.disconnect();
-    voicePlaybackGainNodeRef.current = null;
-    voicePlaybackGraphElementRef.current = null;
+    teardownVoicePlaybackAudioGraph();
     if (voicePlaybackAudioContextRef.current) {
       void voicePlaybackAudioContextRef.current.close().catch(() => undefined);
       voicePlaybackAudioContextRef.current = null;
@@ -11771,9 +11837,10 @@ export function HelixAskPill({
       playbackElement.load();
     }
     playbackElementRef.current = null;
+    voicePlaybackForceDirectRef.current = false;
     voiceChunkTimelineEventsRef.current = [];
     contextCapsuleSessionLedgerRef.current = [];
-  }, [stopReadAloud, stopVoiceCapture]);
+  }, [stopReadAloud, stopVoiceCapture, teardownVoicePlaybackAudioGraph]);
 
   useEffect(() => {
     if (!askBusy) {
@@ -13054,7 +13121,10 @@ export function HelixAskPill({
           userAgent: ua,
           audioSessionType:
             nav && nav.audioSession && typeof nav.audioSession.type === "string" ? nav.audioSession.type : null,
-          expectedPath: shouldUseVoicePlaybackAudioGraph(ua ?? undefined) ? "audio_graph" : "direct_element",
+          expectedPath:
+            voicePlaybackForceDirectRef.current || !shouldUseVoicePlaybackAudioGraph(ua ?? undefined)
+              ? "direct_element"
+              : "audio_graph",
           forcedDirectMobile: HELIX_VOICE_FORCE_DIRECT_MOBILE,
           gainTarget: resolveVoicePlaybackGain(ua ?? undefined),
           audioUnlocked: voiceAudioUnlockedRef.current,

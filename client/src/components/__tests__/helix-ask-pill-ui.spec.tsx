@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 let mergeVoiceTranscriptDraft: typeof import("@/components/helix/HelixAskPill").mergeVoiceTranscriptDraft;
 let buildVoiceInputStatusLabel: typeof import("@/components/helix/HelixAskPill").buildVoiceInputStatusLabel;
@@ -128,6 +128,25 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(iosGain).toBe(4.2);
     expect(androidGain).toBeGreaterThan(desktopGain);
     expect(iosGain).toBeGreaterThan(androidGain);
+  });
+
+  it("treats desktop-style iOS Safari user agents as mobile when touch is available", () => {
+    const originalNavigator = globalThis.navigator;
+    vi.stubGlobal("navigator", {
+      maxTouchPoints: 5,
+    } as Navigator);
+    try {
+      const iosDesktopUa =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15";
+      expect(resolveVoicePlaybackGain(iosDesktopUa)).toBe(4.2);
+      expect(shouldUseVoicePlaybackAudioGraph(iosDesktopUa)).toBe(true);
+    } finally {
+      if (originalNavigator) {
+        vi.stubGlobal("navigator", originalNavigator);
+      } else {
+        vi.unstubAllGlobals();
+      }
+    }
   });
 
   it("enables WebAudio media-element routing on mobile user agents by default", () => {
