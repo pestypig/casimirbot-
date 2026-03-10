@@ -301,9 +301,10 @@ describe("HelixAskPill mic helper behavior", () => {
       explorationPacket: null,
     });
     expect(prompt).toContain("Follow-up turn: Where is that coming from?");
-    expect(prompt).toContain("Topic anchor: what is negative energy");
-    expect(prompt).toContain("Recent turns:");
-    expect(prompt).not.toContain("Topic anchor: Where is that coming from?");
+    expect(prompt).toContain("Immediate anchor: what is negative energy");
+    expect(prompt).toContain("Prior user turn: what is negative energy");
+    expect(prompt).not.toContain("Recent turns:");
+    expect(prompt).not.toContain("Immediate anchor: Where is that coming from?");
   });
 
   it("routes exploration ladder outcomes after attempt one", () => {

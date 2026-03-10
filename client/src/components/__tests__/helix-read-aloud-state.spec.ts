@@ -5,6 +5,7 @@ let buildSpeakText: typeof import("@/components/helix/HelixAskPill").buildSpeakT
 let isActivePlayback: typeof import("@/components/helix/HelixAskPill").isActivePlayback;
 let shouldAutoSpeakVoiceDecisionLifecycle: typeof import("@/components/helix/HelixAskPill").shouldAutoSpeakVoiceDecisionLifecycle;
 let shouldInterruptForSupersededReason: typeof import("@/components/helix/HelixAskPill").shouldInterruptForSupersededReason;
+let isRetryableVoiceChunkSynthesisError: typeof import("@/components/helix/HelixAskPill").isRetryableVoiceChunkSynthesisError;
 let stripVoiceCitationArtifacts: typeof import("@/components/helix/HelixAskPill").stripVoiceCitationArtifacts;
 let shouldDispatchReasoningAttempt: typeof import("@/components/helix/HelixAskPill").shouldDispatchReasoningAttempt;
 let shouldForceObserveDispatchFromSuppression: typeof import("@/components/helix/HelixAskPill").shouldForceObserveDispatchFromSuppression;
@@ -12,7 +13,18 @@ let isArtifactDominatedReasoningText: typeof import("@/components/helix/HelixAsk
 let sanitizeReasoningOutputText: typeof import("@/components/helix/HelixAskPill").sanitizeReasoningOutputText;
 let hasDanglingTurnTail: typeof import("@/components/helix/HelixAskPill").hasDanglingTurnTail;
 let isLowInformationTailTranscript: typeof import("@/components/helix/HelixAskPill").isLowInformationTailTranscript;
+let isLikelyContinuationAddendum: typeof import("@/components/helix/HelixAskPill").isLikelyContinuationAddendum;
+let shouldRestartExplorationLadderOnSupersede: typeof import("@/components/helix/HelixAskPill").shouldRestartExplorationLadderOnSupersede;
+let shouldRecoverHeldTranscriptAfterNoTranscript: typeof import("@/components/helix/HelixAskPill").shouldRecoverHeldTranscriptAfterNoTranscript;
+let shouldFlushHeldTranscriptFromWatchdog: typeof import("@/components/helix/HelixAskPill").shouldFlushHeldTranscriptFromWatchdog;
 let decideExplorationLadderAction: typeof import("@/components/helix/HelixAskPill").decideExplorationLadderAction;
+let resolveVoiceBargeHardCutReason: typeof import("@/components/helix/HelixAskPill").resolveVoiceBargeHardCutReason;
+let shouldResumeBargeHeldPlayback: typeof import("@/components/helix/HelixAskPill").shouldResumeBargeHeldPlayback;
+let isLikelyContinuationTailFragment: typeof import("@/components/helix/HelixAskPill").isLikelyContinuationTailFragment;
+let isGenericQueuedVoiceAcknowledgement: typeof import("@/components/helix/HelixAskPill").isGenericQueuedVoiceAcknowledgement;
+let extractLatestContinuationQuestionFocus: typeof import("@/components/helix/HelixAskPill").extractLatestContinuationQuestionFocus;
+let buildVoiceReasoningDispatchPrompt: typeof import("@/components/helix/HelixAskPill").buildVoiceReasoningDispatchPrompt;
+let isLikelyNearTurnContinuation: typeof import("@/components/helix/HelixAskPill").isLikelyNearTurnContinuation;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -22,6 +34,7 @@ beforeAll(async () => {
     isActivePlayback,
     shouldAutoSpeakVoiceDecisionLifecycle,
     shouldInterruptForSupersededReason,
+    isRetryableVoiceChunkSynthesisError,
     stripVoiceCitationArtifacts,
     shouldDispatchReasoningAttempt,
     shouldForceObserveDispatchFromSuppression,
@@ -29,7 +42,18 @@ beforeAll(async () => {
     sanitizeReasoningOutputText,
     hasDanglingTurnTail,
     isLowInformationTailTranscript,
+    isLikelyContinuationAddendum,
+    shouldRestartExplorationLadderOnSupersede,
+    shouldRecoverHeldTranscriptAfterNoTranscript,
+    shouldFlushHeldTranscriptFromWatchdog,
     decideExplorationLadderAction,
+    resolveVoiceBargeHardCutReason,
+    shouldResumeBargeHeldPlayback,
+    isLikelyContinuationTailFragment,
+    isGenericQueuedVoiceAcknowledgement,
+    extractLatestContinuationQuestionFocus,
+    buildVoiceReasoningDispatchPrompt,
+    isLikelyNearTurnContinuation,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -85,12 +109,12 @@ describe("isActivePlayback", () => {
 });
 
 describe("shouldAutoSpeakVoiceDecisionLifecycle", () => {
-  it("speaks queued plus suppression/failure lifecycle updates", () => {
+  it("speaks queued and running lifecycle updates", () => {
     expect(shouldAutoSpeakVoiceDecisionLifecycle("queued")).toBe(true);
-    expect(shouldAutoSpeakVoiceDecisionLifecycle("suppressed")).toBe(true);
+    expect(shouldAutoSpeakVoiceDecisionLifecycle("running")).toBe(true);
+    expect(shouldAutoSpeakVoiceDecisionLifecycle("suppressed")).toBe(false);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("escalated")).toBe(false);
-    expect(shouldAutoSpeakVoiceDecisionLifecycle("failed")).toBe(true);
-    expect(shouldAutoSpeakVoiceDecisionLifecycle("running")).toBe(false);
+    expect(shouldAutoSpeakVoiceDecisionLifecycle("failed")).toBe(false);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("done")).toBe(false);
   });
 
@@ -114,6 +138,121 @@ describe("shouldInterruptForSupersededReason", () => {
     expect(shouldInterruptForSupersededReason("preempted_by_final", true)).toBe(true);
     expect(shouldInterruptForSupersededReason("superseded_new_turn", false)).toBe(true);
     expect(shouldInterruptForSupersededReason(null, true)).toBe(false);
+  });
+});
+
+describe("hybrid barge-in hard cut policy", () => {
+  it("hard-cuts when STT queue starts during active hold", () => {
+    expect(
+      resolveVoiceBargeHardCutReason({
+        holdActive: true,
+        holdStartedAtMs: Date.now() - 120,
+        nowMs: Date.now(),
+        transcribeQueueLength: 1,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        speechActive: true,
+      }),
+    ).toBe("stt_queue");
+  });
+
+  it("does not hard-cut for stt queue rollover when speech is no longer active", () => {
+    expect(
+      resolveVoiceBargeHardCutReason({
+        holdActive: true,
+        holdStartedAtMs: Date.now() - 120,
+        nowMs: Date.now(),
+        transcribeQueueLength: 1,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        speechActive: false,
+      }),
+    ).toBeNull();
+  });
+
+  it("hard-cuts when speech persists beyond hold threshold", () => {
+    const nowMs = Date.now();
+    expect(
+      resolveVoiceBargeHardCutReason({
+        holdActive: true,
+        holdStartedAtMs: nowMs - 900,
+        nowMs,
+        transcribeQueueLength: 0,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        speechActive: true,
+      }),
+    ).toBe("speech_persisted");
+  });
+});
+
+describe("barge-in resume guard", () => {
+  it("blocks resume while the chunk-traffic quiet window is active", () => {
+    const now = Date.now();
+    expect(
+      shouldResumeBargeHeldPlayback({
+        holdActive: true,
+        resumeNotBeforeMs: now - 1,
+        nowMs: now,
+        transcribeQueueLength: 0,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        speechActive: false,
+        micArmed: true,
+        segmentFlushPending: false,
+        trafficQuietUntilMs: now + 800,
+      }),
+    ).toBe(false);
+  });
+
+  it("allows resume once hold, stt, and traffic guards are clear", () => {
+    const now = Date.now();
+    expect(
+      shouldResumeBargeHeldPlayback({
+        holdActive: true,
+        resumeNotBeforeMs: now - 1,
+        nowMs: now,
+        transcribeQueueLength: 0,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        speechActive: false,
+        micArmed: true,
+        segmentFlushPending: false,
+        trafficQuietUntilMs: now - 1,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("isRetryableVoiceChunkSynthesisError", () => {
+  it("marks transient network and retryable status errors as retryable", () => {
+    expect(isRetryableVoiceChunkSynthesisError(new Error("Failed to fetch"))).toBe(true);
+    expect(
+      isRetryableVoiceChunkSynthesisError({
+        status: 503,
+        message: "service unavailable",
+      }),
+    ).toBe(true);
+    expect(
+      isRetryableVoiceChunkSynthesisError({
+        status: 429,
+        message: "rate limited",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not retry suppressed or abort errors", () => {
+    expect(
+      isRetryableVoiceChunkSynthesisError(
+        new Error("voice_auto_speak_suppressed:dedupe_cooldown"),
+      ),
+    ).toBe(false);
+    expect(
+      isRetryableVoiceChunkSynthesisError({
+        name: "AbortError",
+        message: "The operation was aborted.",
+      }),
+    ).toBe(false);
   });
 });
 
@@ -180,6 +319,12 @@ describe("artifact-dominated output guards", () => {
     expect(isArtifactDominatedReasoningText(noisy)).toBe(true);
   });
 
+  it("detects underscore template spill with focus anchors", () => {
+    const noisy =
+      "Focus anchor: system, interdependent, components. what_is_warp_bubble: export default function ElectronOrbitalPanel() const state, actions = useElectronOrbitSim(); what_is_mission_ethos: Mission ethos constrains capability claims.";
+    expect(isArtifactDominatedReasoningText(noisy)).toBe(true);
+  });
+
   it("sanitizes citation/path fragments for display", () => {
     const noisy =
       "ts, server/services/planner/grounding.ts. Evidence: docs/helix-ask-flow.md. In practice, the system explains tradeoffs.";
@@ -191,7 +336,7 @@ describe("artifact-dominated output guards", () => {
 });
 
 describe("exploration escalation guard", () => {
-  it("does not auto-escalate verify from artifact-heavy observe output", () => {
+  it("restarts observe ladder on first artifact-heavy output, then clarifies on repeat", () => {
     const decision = decideExplorationLadderAction({
       explorationAttemptCount: 1,
       promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
@@ -200,7 +345,29 @@ describe("exploration escalation guard", () => {
       mode: "observe",
       debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
     });
-    expect(decision.action).toBe("finalize");
+    expect(decision.action).toBe("restart_after_artifact");
+    const secondAttempt = decideExplorationLadderAction({
+      explorationAttemptCount: 2,
+      promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
+      outputText:
+        "What is warp bubble: docs/casimir-tile-mechanism.md What is mission ethos: docs/BUSINESS_MODEL.md",
+      mode: "observe",
+      debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
+    });
+    expect(secondAttempt.action).toBe("clarify_after_attempt1");
+  });
+
+  it("uses raw output artifact guard when sanitized output looks benign", () => {
+    const decision = decideExplorationLadderAction({
+      explorationAttemptCount: 1,
+      promptText: "Relate interdependent components to curvature.",
+      outputText: "Interdependent components can shape a system objective.",
+      rawOutputText:
+        "Focus anchor: system, interdependent, components. what_is_warp_bubble: export default function ElectronOrbitalPanel()",
+      mode: "observe",
+      debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
+    });
+    expect(decision.action).toBe("restart_after_artifact");
   });
 });
 
@@ -214,5 +381,222 @@ describe("late-tail continuation guards", () => {
   it("marks short orphan fragments as low-information tails", () => {
     expect(isLowInformationTailTranscript("Friends.")).toBe(true);
     expect(isLowInformationTailTranscript("Define quantum system")).toBe(false);
+  });
+
+  it("detects short discourse addenda for continuation merges", () => {
+    expect(isLikelyContinuationAddendum("So gravity is like where this converges.")).toBe(true);
+    expect(isLikelyContinuationAddendum("And move faster than light in this frame.")).toBe(true);
+    expect(isLikelyContinuationAddendum("Define a system from scratch with examples.")).toBe(false);
+  });
+
+  it("detects lowercase continuation tail fragments", () => {
+    expect(isLikelyContinuationTailFragment("probability that happens in the Casimir effect.")).toBe(true);
+    expect(isLikelyContinuationTailFragment("the effect of this in bounded modes")).toBe(true);
+    expect(isLikelyContinuationTailFragment("What is the Casimir effect?")).toBe(false);
+  });
+
+  it("extracts latest continuation question focus from merged prompts", () => {
+    expect(
+      extractLatestContinuationQuestionFocus("Okay, define a system. So, what about a statistical quantum system?"),
+    ).toBe("So, what about a statistical quantum system?");
+    expect(
+      extractLatestContinuationQuestionFocus(
+        "So in biological cohesive systems, can you explain this relation to objective reduction to the wave function.",
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("generic queued brief detection", () => {
+  it("identifies boilerplate queued acknowledgements", () => {
+    expect(isGenericQueuedVoiceAcknowledgement("Got it. I am thinking through this in the background.")).toBe(
+      true,
+    );
+    expect(isGenericQueuedVoiceAcknowledgement("Got it. Thinking in the background.")).toBe(true);
+    expect(
+      isGenericQueuedVoiceAcknowledgement(
+        "Got it. I will run a short observe reasoning pass in the background so we can keep talking while it loads.",
+      ),
+    ).toBe(true);
+    expect(
+      isGenericQueuedVoiceAcknowledgement(
+        "A system is a set of interconnected components that work together to achieve a specific purpose.",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("context-scoped dispatch prompts", () => {
+  it("injects only immediate anchor for likely continuation turns", () => {
+    const prompt = buildVoiceReasoningDispatchPrompt({
+      transcript: "Where is that coming from?",
+      recentTurns: [
+        "user: what is negative energy",
+        "dottie: Negative energy can refer to effective energy-density terms in GR.",
+        "user: where is that coming from?",
+      ],
+      explorationPacket: null,
+    });
+    expect(prompt).toContain("Follow-up turn: Where is that coming from?");
+    expect(prompt).toContain("Immediate anchor: what is negative energy");
+    expect(prompt).toContain("Prior user turn: what is negative energy");
+    expect(prompt).not.toContain("Recent turns:");
+  });
+
+  it("drops stale context injection on topic-shift turns", () => {
+    const prompt = buildVoiceReasoningDispatchPrompt({
+      transcript: "Now explain electron spin statistics from scratch.",
+      recentTurns: [
+        "user: where is that coming from?",
+        "dottie: It came from Casimir field constraints.",
+      ],
+      explorationPacket: null,
+    });
+    expect(prompt).toBe("Now explain electron spin statistics from scratch.");
+    expect(
+      isLikelyNearTurnContinuation({
+        transcript: "Now explain electron spin statistics from scratch.",
+        priorUserTurn: "where is that coming from?",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("exploration ladder restart policy", () => {
+  it("restarts ladder when superseding an active turn outside merge guards", () => {
+    expect(
+      shouldRestartExplorationLadderOnSupersede({
+        hasContinuityCandidate: true,
+        forceTailContinuationMerge: false,
+        shortContinuationAddendum: false,
+        canMergeContinuation: false,
+        intentShiftBand: "shift",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not restart ladder for continuation merges", () => {
+    expect(
+      shouldRestartExplorationLadderOnSupersede({
+        hasContinuityCandidate: true,
+        forceTailContinuationMerge: true,
+        shortContinuationAddendum: false,
+        canMergeContinuation: true,
+        intentShiftBand: "continuation",
+      }),
+    ).toBe(false);
+    expect(
+      shouldRestartExplorationLadderOnSupersede({
+        hasContinuityCandidate: true,
+        forceTailContinuationMerge: false,
+        shortContinuationAddendum: true,
+        canMergeContinuation: false,
+        intentShiftBand: "shift",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("held transcript recovery", () => {
+  it("recovers held transcript when follow-up STT is empty and turn is complete enough", () => {
+    expect(
+      shouldRecoverHeldTranscriptAfterNoTranscript({
+        heldTranscript: "Virtual particles aren't directly observable, but they result in the Casimir effect, so can you relate that?",
+        turnCompleteBand: "high",
+        transcribeQueueLength: 0,
+        speechActive: false,
+        sinceLastSpeechMs: 3600,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not recover before turn-close silence guard is satisfied", () => {
+    expect(
+      shouldRecoverHeldTranscriptAfterNoTranscript({
+        heldTranscript: "Virtual particles aren't directly observable, but they result in the Casimir effect.",
+        turnCompleteBand: "high",
+        transcribeQueueLength: 0,
+        speechActive: false,
+        sinceLastSpeechMs: 1800,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not recover while active speech or queued segments remain", () => {
+    expect(
+      shouldRecoverHeldTranscriptAfterNoTranscript({
+        heldTranscript: "how does",
+        turnCompleteBand: "medium",
+        transcribeQueueLength: 1,
+        speechActive: false,
+        sinceLastSpeechMs: 1800,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRecoverHeldTranscriptAfterNoTranscript({
+        heldTranscript: "A continuation is still happening",
+        turnCompleteBand: "high",
+        transcribeQueueLength: 0,
+        speechActive: true,
+        sinceLastSpeechMs: 400,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not recover low-information orphan tails", () => {
+    expect(
+      shouldRecoverHeldTranscriptAfterNoTranscript({
+        heldTranscript: "Friends.",
+        turnCompleteBand: "high",
+        transcribeQueueLength: 0,
+        speechActive: false,
+        sinceLastSpeechMs: 1800,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("held transcript watchdog flush", () => {
+  it("flushes continuation holds after guard window when channel is quiet", () => {
+    expect(
+      shouldFlushHeldTranscriptFromWatchdog({
+        heldTranscript:
+          "Classical mechanics and quantum mechanics can meet at Penrose objective reduction. Can you get into how our curvature unit does that?",
+        holdReason: "continuation_hold",
+        transcribeQueueLength: 0,
+        speechActive: false,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        sinceLastSpeechMs: 3600,
+        ageMs: 2400,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not flush low-information tails or active continuation channels", () => {
+    expect(
+      shouldFlushHeldTranscriptFromWatchdog({
+        heldTranscript: "Friends.",
+        holdReason: "low_info_tail",
+        transcribeQueueLength: 0,
+        speechActive: false,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        sinceLastSpeechMs: 2200,
+        ageMs: 2400,
+      }),
+    ).toBe(false);
+    expect(
+      shouldFlushHeldTranscriptFromWatchdog({
+        heldTranscript: "Can you relate that to Casimir vacuum effects?",
+        holdReason: "continuation_hold",
+        transcribeQueueLength: 1,
+        speechActive: false,
+        transcribeBusy: false,
+        pendingConfirmation: false,
+        sinceLastSpeechMs: 2200,
+        ageMs: 2400,
+      }),
+    ).toBe(false);
   });
 });

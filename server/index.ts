@@ -543,9 +543,29 @@ const renderRootRedirectHtml = (target: string) => `<!doctype html>
     <meta charset="utf-8">
     <meta http-equiv="refresh" content="0; url=${target}">
     <title>CasimirBot</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background:
+        radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
+        radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
+        #040915; color: #e2e8f0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .card { width: min(90vw, 480px); border-radius: 18px; border: 1px solid rgba(56, 189, 248, 0.28); background: rgba(15, 23, 42, 0.86); padding: 20px 22px; text-align: center; box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16); }
+      .icon-wrap { width: 58px; height: 58px; border-radius: 14px; margin: 0 auto 12px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.14); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25); }
+      .icon { width: 42px; height: 42px; animation: spin 1.5s linear infinite; }
+      h1 { margin: 0 0 8px; font-size: 18px; }
+      p { margin: 0; font-size: 13px; color: #94a3b8; }
+      a { color: #7dd3fc; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <p>Redirecting to <a href="${target}">${target}</a>...</p>
+    <div class="card" role="status" aria-live="polite">
+      <div class="icon-wrap">
+        <img class="icon" src="/icons/helix-arrow.svg" alt="">
+      </div>
+      <h1>Opening workspace...</h1>
+      <p>Redirecting to <a href="${target}">${target}</a>.</p>
+    </div>
     <script>
       window.location.replace(${JSON.stringify(target)});
     </script>
@@ -574,19 +594,29 @@ const renderStartupRetryHtml = (target: string) => `<!doctype html>
     <meta charset="utf-8">
     <meta http-equiv="refresh" content="8">
     <meta name="robots" content="noindex,nofollow">
-    <title>Starting up…</title>
+    <title>Starting up...</title>
     <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #0b1020; color: #e2e8f0; display: flex; min-height: 100vh; margin: 0; }
-      .card { max-width: 520px; margin: auto; padding: 28px 32px; border-radius: 16px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); }
-      h1 { font-size: 18px; margin: 0 0 8px; }
+      :root { color-scheme: dark; }
+      body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background:
+        radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
+        radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
+        #040915; color: #e2e8f0; display: flex; min-height: 100vh; margin: 0; }
+      .card { max-width: 520px; margin: auto; padding: 28px 32px; border-radius: 18px; background: rgba(15, 23, 42, 0.86); border: 1px solid rgba(56, 189, 248, 0.28); box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16); }
+      .icon-wrap { width: 62px; height: 62px; border-radius: 14px; margin: 0 auto 14px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.14); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25); }
+      .icon { width: 46px; height: 46px; animation: spin 1.5s linear infinite; }
+      h1 { font-size: 18px; margin: 0 0 8px; text-align: center; }
       p { font-size: 14px; line-height: 1.5; margin: 0 0 10px; }
       code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
       .muted { color: #94a3b8; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>Starting up…</h1>
+      <div class="icon-wrap">
+        <img class="icon" src="/icons/helix-arrow.svg" alt="">
+      </div>
+      <h1>Starting up...</h1>
       <p>The server is still warming up. This page will auto-refresh when it is ready.</p>
       <p class="muted">Target: <code>${target}</code></p>
       <p class="muted" id="boot-error" style="display:none;"></p>
@@ -628,10 +658,31 @@ const renderRootBootHtml = (target: string) => `<!doctype html>
     <meta http-equiv="refresh" content="5">
     <meta name="robots" content="noindex">
     <title>CasimirBot</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background:
+        radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
+        radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
+        #040915; color: #e2e8f0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+      .card { width: min(90vw, 520px); border-radius: 18px; border: 1px solid rgba(56, 189, 248, 0.28); background: rgba(15, 23, 42, 0.86); padding: 24px 24px 20px; text-align: center; box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16); }
+      .icon-wrap { width: 62px; height: 62px; border-radius: 14px; margin: 0 auto 14px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.14); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25); }
+      .icon { width: 46px; height: 46px; animation: spin 1.5s linear infinite; }
+      h1 { margin: 0 0 8px; font-size: 18px; }
+      p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: #94a3b8; }
+      a { color: #7dd3fc; }
+      #boot-error { display: none; font-size: 12px; color: #fca5a5; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <p>Starting up... Redirecting to <a href="${target}">${target}</a> once ready.</p>
-    <p id="boot-error" style="font-family: sans-serif; font-size: 12px; color: #666; display:none;"></p>
+    <div class="card" role="status" aria-live="polite">
+      <div class="icon-wrap">
+        <img class="icon" src="/icons/helix-arrow.svg" alt="">
+      </div>
+      <h1>Starting up...</h1>
+      <p>Redirecting to <a href="${target}">${target}</a> once ready.</p>
+      <p id="boot-error"></p>
+    </div>
     <script>
       (function() {
         var target = ${JSON.stringify(target)};

@@ -77,6 +77,72 @@ describe("conversation-turn route", () => {
     expect(briefPrompt).toContain("Do not output raw route/status codes.");
   }, 20000);
 
+  it("falls back deterministically when brief payload is non-JSON or policy-violating", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.78,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Substantive exploratory turn detected.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: "Acknowledging the request. I am thinking through this in the background.",
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "Explain how quantum structures map to system behavior.",
+      traceId: "trace-conversation-brief-fallback",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.classification).toMatchObject({
+      mode: "observe",
+      dispatch_hint: true,
+    });
+    expect(res.body.route_reason_code).toMatch(/^dispatch:/);
+    expect(res.body.dispatch?.dispatch_hint).toBe(true);
+    expect(res.body.brief?.source).toBe("fallback");
+    expect(String(res.body.fail_reason ?? "")).toContain("conversation_brief_parse_fallback");
+    expect(String(res.body.brief?.text ?? "").toLowerCase()).toContain("background");
+  }, 20000);
+
+  it("rejects clarifier-style brief text for observe turns even when JSON is valid", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.79,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Exploratory question detected.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          text: 'I heard: "Okay, what is a system.". Share one specific goal or constraint.',
+        }),
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "Okay, what is a system?",
+      traceId: "trace-observe-brief-policy-fallback",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.classification?.mode).toBe("observe");
+    expect(res.body.dispatch?.dispatch_hint).toBe(true);
+    expect(res.body.brief?.source).toBe("fallback");
+    expect(String(res.body.fail_reason ?? "")).toContain("conversation_brief_policy_fallback");
+    expect(String(res.body.brief?.text ?? "").toLowerCase()).not.toContain("share one specific goal or constraint");
+  }, 20000);
+
   it("falls back deterministically when model/parse paths fail", async () => {
     llmLocalHandlerMock
       .mockRejectedValueOnce(new Error("model unavailable"))
@@ -166,5 +232,28 @@ describe("conversation-turn route", () => {
     expect(res.body.dispatch?.dispatch_hint).toBe(false);
     expect(res.body.route_reason_code).toBe("suppressed:filler");
     expect(res.body.exploration_turn).toBe(false);
+  }, 20000);
+
+  it("does not down-rank substantive turns that start with 'okay'", async () => {
+    llmLocalHandlerMock
+      .mockRejectedValueOnce(new Error("classifier unavailable"))
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          text: "Okay, what is a system? I will run a short observe pass and return a direct answer.",
+        }),
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "Okay, what is a system?",
+      traceId: "trace-leading-ok-substantive",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.classification?.source).toBe("fallback");
+    expect(res.body.classification?.mode).toBe("observe");
+    expect(res.body.dispatch?.dispatch_hint).toBe(true);
+    expect(String(res.body.route_reason_code ?? "")).toMatch(/^dispatch:/);
+    expect(String(res.body.brief?.text ?? "").toLowerCase()).not.toContain("share one specific goal or constraint");
   }, 20000);
 });

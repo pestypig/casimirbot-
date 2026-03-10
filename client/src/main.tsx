@@ -3,6 +3,17 @@ import App from "./App";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import "./index.css";
 
+const markBootShellMounted = () => {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  document.body.classList.add("app-mounted");
+  window.setTimeout(() => {
+    const shell = document.getElementById("boot-shell");
+    if (shell?.parentElement) {
+      shell.parentElement.removeChild(shell);
+    }
+  }, 420);
+};
+
 const buildStamp = import.meta.env.DEV
   ? `dev-${Date.now().toString()}`
   : typeof __APP_BUILD__ === "string"
@@ -106,6 +117,12 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </AppErrorBoundary>,
 );
+
+if (typeof window !== "undefined") {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(markBootShellMounted);
+  });
+}
 
 if (typeof window !== "undefined" && Boolean(import.meta.env?.DEV)) {
   // Ensure dev doesn't get stuck on a stale service worker or cached shell.

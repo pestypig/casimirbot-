@@ -31,6 +31,7 @@ import { useQiStream } from "@/hooks/useQiStream";
 import { LumaWhispersProvider } from "@/lib/luma-whispers";
 import MobileStartPage from "@/pages/mobile-start";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
+import RouteBootSplash from "@/components/RouteBootSplash";
 
 const hasDesktopOverride = () => {
   if (typeof window === "undefined") return false;
@@ -79,7 +80,12 @@ function DesktopRedirect() {
     setLocation("/desktop", { replace: true });
   }, [desktopOverride, isMobile, isReady, mobileOverride, setLocation]);
 
-  return null;
+  return (
+    <RouteBootSplash
+      message="Preparing your Helix workspace..."
+      detail="Selecting desktop or mobile mode"
+    />
+  );
 }
 
 function StartRoute() {
@@ -103,7 +109,12 @@ function StartRoute() {
   }, [desktopOverride, isMobile, isReady, mobileOverride, setLocation]);
 
   if (mobileOverride || (!desktopOverride && (!isReady || isMobile))) {
-    return null;
+    return (
+      <RouteBootSplash
+        message="Preparing your Helix workspace..."
+        detail="Routing to mobile start"
+      />
+    );
   }
 
   return <StartPortal />;
@@ -118,7 +129,12 @@ function HelixCoreRoute() {
     setLocation(`/desktop${search}${hash}`, { replace: true });
   }, [setLocation]);
 
-  return null;
+  return (
+    <RouteBootSplash
+      message="Opening desktop..."
+      detail="Applying Helix route handoff"
+    />
+  );
 }
 
 function DesktopRoute() {

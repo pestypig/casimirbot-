@@ -5,9 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#38bdf8" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/svg+xml" href="/icons/helix-icon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/icons/helix-arrow.svg" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        background: #040915;
+      }
+      body {
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        color: #e2e8f0;
+      }
+      #root {
+        min-height: 100vh;
+      }
+      #boot-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(120% 180% at 10% 10%, rgba(56, 189, 248, 0.18) 0%, transparent 62%),
+          radial-gradient(140% 200% at 90% 8%, rgba(30, 58, 138, 0.2) 0%, transparent 70%),
+          #040915;
+        transition: opacity 280ms ease, visibility 280ms ease;
+      }
+      #boot-shell .boot-shell__card {
+        display: flex;
+        width: min(88vw, 360px);
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(56, 189, 248, 0.28);
+        border-radius: 18px;
+        padding: 20px 18px;
+        text-align: center;
+        background: rgba(15, 23, 42, 0.84);
+        box-shadow: 0 30px 90px rgba(56, 189, 248, 0.16);
+      }
+      #boot-shell .boot-shell__icon-wrap {
+        display: grid;
+        place-items: center;
+        width: 62px;
+        height: 62px;
+        border-radius: 14px;
+        background: rgba(56, 189, 248, 0.14);
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25);
+      }
+      #boot-shell .boot-shell__icon {
+        width: 46px;
+        height: 46px;
+        animation: boot-spin 1.5s linear infinite;
+      }
+      #boot-shell .boot-shell__title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      #boot-shell .boot-shell__detail {
+        margin: 0;
+        color: rgba(148, 163, 184, 0.92);
+        font-size: 12px;
+      }
+      body.app-mounted #boot-shell {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      @keyframes boot-spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-shell" aria-live="polite">
+      <div class="boot-shell__card" role="status" aria-label="Loading">
+        <div class="boot-shell__icon-wrap">
+          <img class="boot-shell__icon" src="/icons/helix-arrow.svg" alt="" />
+        </div>
+        <p class="boot-shell__title">Starting Helix...</p>
+        <p class="boot-shell__detail">Preparing desktop and mobile workspace</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script src="/warp-engine.js" defer></script>
     <script type="module" src="/src/main.tsx"></script>

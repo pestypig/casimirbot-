@@ -1,4 +1,4 @@
-const CACHE_VERSION = new URL(self.location.href).searchParams.get("v") || "v2";
+const CACHE_VERSION = new URL(self.location.href).searchParams.get("v") || "v3";
 const CACHE_PREFIX = "helix-mobile-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_ASSETS = [
@@ -6,9 +6,7 @@ const OFFLINE_ASSETS = [
   "/mobile",
   "/index.html",
   "/manifest.webmanifest",
-  "/icons/helix-icon-192.png",
-  "/icons/helix-icon-512.png",
-  "/icons/helix-icon.svg",
+  "/icons/helix-arrow.svg",
 ];
 const NETWORK_FIRST_DESTINATIONS = new Set(["script", "style", "font"]);
 

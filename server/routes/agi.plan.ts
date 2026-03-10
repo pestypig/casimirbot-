@@ -15326,6 +15326,8 @@ const sanitizeConversationBriefText = (value: string, maxChars = 520): string =>
 
 const HELIX_CONVERSATION_FILLER_RE =
   /^(ok|okay|yeah|yep|nope|thanks|thank you|cool|nice|right|got it|sounds good|testing|test)\b/i;
+const HELIX_CONVERSATION_LEADING_FILLER_RE =
+  /^(ok|okay|yeah|yep|right|cool|nice|thanks|thank you|got it|sounds good)\b[\s,.-]*/i;
 const HELIX_CONVERSATION_VERIFY_RE =
   /\b(verify|verification|prove|proof|validate|validation|integrity|certificate|pass\/fail|pass fail|audit|check)\b/i;
 const HELIX_CONVERSATION_ACT_RE =
@@ -15334,6 +15336,8 @@ const HELIX_CONVERSATION_OBSERVE_RE =
   /\b(observe|monitor|watch|track|status|state|what changed|what is happening|inspect|summarize)\b/i;
 const HELIX_CONVERSATION_EXPLORATORY_RE =
   /\b(how|why|what|walk me through|full solve|explain|overview|tell me about|break down|understand|explore)\b/i;
+const HELIX_CONVERSATION_DIRECT_QUESTION_RE =
+  /^(?:(?:ok|okay|yeah|yep|right|cool|nice)\b[\s,.-]*)?(?:what|how|why|when|where|who|can you|could you|would you|explain|define|tell me|walk me through)\b/i;
 
 const HELIX_CONVERSATION_STOP_WORDS = new Set([
   "the",
@@ -15374,7 +15378,19 @@ const isConversationFillerTurn = (transcript: string): boolean => {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return true;
   if (normalized.length <= 6) return true;
-  return normalized.length <= 28 && HELIX_CONVERSATION_FILLER_RE.test(normalized);
+  const strippedLead = normalized.replace(HELIX_CONVERSATION_LEADING_FILLER_RE, "").trim();
+  if (!strippedLead) return true;
+  if (
+    strippedLead.length >= 8 &&
+    (HELIX_CONVERSATION_EXPLORATORY_RE.test(strippedLead) ||
+      HELIX_CONVERSATION_OBSERVE_RE.test(strippedLead) ||
+      HELIX_CONVERSATION_VERIFY_RE.test(strippedLead) ||
+      HELIX_CONVERSATION_ACT_RE.test(strippedLead) ||
+      strippedLead.includes("?"))
+  ) {
+    return false;
+  }
+  return normalized.length <= 28 && HELIX_CONVERSATION_FILLER_RE.test(normalized) && strippedLead.length <= 6;
 };
 
 const isConversationExploratoryTurn = (transcript: string): boolean => {
@@ -15454,6 +15470,7 @@ const normalizeConversationRouteDecision = (args: {
   const normalized = args.transcript.trim().toLowerCase();
   const explicitVerify = HELIX_CONVERSATION_VERIFY_RE.test(normalized);
   const explicitAct = HELIX_CONVERSATION_ACT_RE.test(normalized);
+  const directQuestion = HELIX_CONVERSATION_DIRECT_QUESTION_RE.test(normalized);
   const filler = isConversationFillerTurn(normalized);
   const exploratory = isConversationExploratoryTurn(normalized);
   const next = { ...args.classification };
@@ -15461,14 +15478,7 @@ const normalizeConversationRouteDecision = (args: {
   let routeReasonCode: HelixConversationRouteReasonCode = "suppressed:low_salience";
   let explorationTurn = false;
 
-  if (filler) {
-    next.mode = "clarify";
-    next.dispatch_hint = false;
-    next.clarify_needed = false;
-    next.confidence = Math.max(next.confidence, 0.72);
-    next.reason = "Low-information filler/ack turn.";
-    routeReasonCode = "suppressed:filler";
-  } else if (explicitVerify) {
+  if (explicitVerify) {
     next.mode = "verify";
     next.dispatch_hint = true;
     next.clarify_needed = false;
@@ -15480,6 +15490,21 @@ const normalizeConversationRouteDecision = (args: {
     next.clarify_needed = false;
     next.confidence = Math.max(next.confidence, 0.82);
     routeReasonCode = "dispatch:act";
+  } else if (directQuestion) {
+    next.mode = "observe";
+    next.dispatch_hint = true;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.78);
+    next.reason = "Direct question routed to observe lane.";
+    routeReasonCode = "dispatch:observe_explore";
+    explorationTurn = true;
+  } else if (filler) {
+    next.mode = "clarify";
+    next.dispatch_hint = false;
+    next.clarify_needed = false;
+    next.confidence = Math.max(next.confidence, 0.72);
+    next.reason = "Low-information filler/ack turn.";
+    routeReasonCode = "suppressed:filler";
   } else if (exploratory) {
     next.mode = "observe";
     next.dispatch_hint = true;
@@ -15539,6 +15564,9 @@ const inferConversationModeHeuristic = (transcript: string): HelixConversationMo
   if (HELIX_CONVERSATION_ACT_RE.test(normalized)) {
     return "act";
   }
+  if (HELIX_CONVERSATION_DIRECT_QUESTION_RE.test(normalized)) {
+    return "observe";
+  }
   if (HELIX_CONVERSATION_OBSERVE_RE.test(normalized)) {
     return "observe";
   }
@@ -15553,6 +15581,7 @@ const inferConversationDispatchHintHeuristic = (transcript: string, mode: HelixC
   if (!normalized) return false;
   if (mode === "act" || mode === "verify") return true;
   if (mode === "clarify") return false;
+  if (HELIX_CONVERSATION_DIRECT_QUESTION_RE.test(normalized)) return true;
   if (isConversationFillerTurn(normalized)) return false;
   if (isConversationExploratoryTurn(normalized)) return true;
   if (normalized.length < 14) return false;
@@ -15609,17 +15638,35 @@ const parseConversationBriefResult = (raw: string): string | null => {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const jsonCandidate = extractJsonObject(trimmed);
-  if (jsonCandidate) {
-    try {
-      const parsed = HelixConversationBriefSchema.safeParse(JSON.parse(jsonCandidate));
-      if (parsed.success) {
-        return parsed.data.text.trim();
-      }
-    } catch {
-      // Fall through to plain-text mode.
+  if (!jsonCandidate) return null;
+  try {
+    const parsed = HelixConversationBriefSchema.safeParse(JSON.parse(jsonCandidate));
+    if (parsed.success) {
+      return parsed.data.text.trim();
     }
+  } catch {
+    return null;
   }
-  return clipConversationText(trimmed, 520);
+  return null;
+};
+
+const CONVERSATION_BRIEF_POLICY_FORBIDDEN_RE =
+  /dispatch:|suppressed:|reasoning is complete|reasoning is running|reasoning is escalated|i am thinking through this in the background|switched to your newer request|reasoning failed/i;
+const CONVERSATION_BRIEF_CLARIFIER_RE =
+  /\b(share one specific goal or constraint|share one concrete detail|one concrete detail will help|please clarify)\b/i;
+
+const isConversationBriefPolicyCompliant = (
+  text: string,
+  mode?: z.infer<typeof HelixConversationClassifierSchema>["mode"],
+): boolean => {
+  const normalized = sanitizeConversationBriefText(text).trim();
+  if (!normalized) return false;
+  if (/^acknowledg(?:e|ing)\b/i.test(normalized)) return false;
+  if (mode && mode !== "clarify") {
+    if (/^i heard:/i.test(normalized)) return false;
+    if (CONVERSATION_BRIEF_CLARIFIER_RE.test(normalized)) return false;
+  }
+  return !CONVERSATION_BRIEF_POLICY_FORBIDDEN_RE.test(normalized);
 };
 
 const buildConversationClassifierPrompt = (args: {
@@ -34447,7 +34494,18 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     const rawBrief = String((briefResult as { text?: unknown })?.text ?? "");
     const parsedBrief = parseConversationBriefResult(rawBrief);
     if (parsedBrief && parsedBrief.trim()) {
-      briefText = sanitizeConversationBriefText(parsedBrief);
+      const sanitizedBrief = sanitizeConversationBriefText(parsedBrief);
+      if (isConversationBriefPolicyCompliant(sanitizedBrief, classification.mode)) {
+        briefText = sanitizedBrief;
+      } else {
+        briefSource = "fallback";
+        briefFailReason = "conversation_brief_policy_fallback";
+        briefText = buildConversationFallbackBrief({
+          transcript,
+          mode: classification.mode,
+          dispatchHint: classification.dispatch_hint,
+        });
+      }
     } else {
       briefSource = "fallback";
       briefFailReason = "conversation_brief_parse_fallback";
