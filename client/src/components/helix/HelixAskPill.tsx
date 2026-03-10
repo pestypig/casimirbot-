@@ -2027,28 +2027,29 @@ function buildPredictiveBriefFromTranscript(transcript: string): string {
   const candidate = focusSource || source;
   if (!candidate) return "";
   const normalized = candidate.toLowerCase();
-  if (/\b(what is|define|explain)\b/.test(normalized) && /\bsystem\b/.test(normalized)) {
-    return "A system is a set of interacting components organized to achieve a purpose.";
-  }
+  const fullNormalized = source.toLowerCase();
   if (
-    /\b(quantum statistical|statistical quantum)\b/.test(normalized) &&
-    /\bclassical\b/.test(normalized)
-  ) {
-    return "Quantum statistical systems model ensemble behavior under quantum uncertainty, while classical systems model deterministic macroscopic dynamics.";
-  }
-  if (/\b(casimir|objective reduction|penrose|wave function|gravitational curvature)\b/.test(normalized)) {
-    return "I can map the quantum claim to the physical mechanism and separate established results from speculative links.";
-  }
-  if (
-    /\b(warp|quantum inequality|ford[-\s]?roman|energy conditions?)\b/.test(normalized) &&
-    /\b(uncertainty|bound|limit|inequality|constraint)\b/.test(normalized)
+    /\b(warp|quantum inequality|ford[-\s]?roman|energy conditions?)\b/.test(fullNormalized) &&
+    /\b(uncertainty|bound|limit|inequality|constraint)\b/.test(fullNormalized)
   ) {
     return "I can map the quantum-inequality bounds to what the warp model can and cannot claim.";
   }
+  if (/\b(casimir|objective reduction|penrose|wave function|gravitational curvature)\b/.test(fullNormalized)) {
+    return "I can map the quantum claim to the physical mechanism and separate established results from speculative links.";
+  }
   if (
-    /\b(classical|quantum|wave function|collapse|superposition|measurement)\b/.test(normalized)
+    /\b(quantum statistical|statistical quantum)\b/.test(fullNormalized) &&
+    /\bclassical\b/.test(fullNormalized)
+  ) {
+    return "Quantum statistical systems model ensemble behavior under quantum uncertainty, while classical systems model deterministic macroscopic dynamics.";
+  }
+  if (
+    /\b(classical|quantum|wave function|collapse|superposition|measurement)\b/.test(fullNormalized)
   ) {
     return "I can relate the classical limit, quantum superposition, and measurement collapse in one clean chain.";
+  }
+  if (/\b(what is|define|explain)\b/.test(normalized) && /\bsystem\b/.test(normalized)) {
+    return "A system is a set of interacting components organized to achieve a purpose.";
   }
   if (/[?]$/.test(candidate.trim()) || /\b(how|why|what|when|where|which|can you|could you)\b/.test(normalized)) {
     return "I will answer directly first, then contrast assumptions and limits.";
@@ -2063,14 +2064,21 @@ function buildDeterministicQueuedBriefFromTranscript(transcript: string): string
   const candidate = focusSource || source;
   if (!candidate) return "";
   const normalized = candidate.toLowerCase();
-  if (/\b(system|components?|interactions?|purpose)\b/.test(normalized)) {
-    return "I can define the system first, then map components, interactions, and purpose.";
+  const fullNormalized = source.toLowerCase();
+  if (
+    /\b(warp|quantum inequality|ford[-\s]?roman|energy conditions?)\b/.test(fullNormalized) &&
+    /\b(uncertainty|bound|limit|inequality|constraint)\b/.test(fullNormalized)
+  ) {
+    return "I can map the quantum-inequality bounds to what the warp model can and cannot claim.";
   }
-  if (/\b(quantum|classical|wave function|collapse|superposition)\b/.test(normalized)) {
+  if (/\b(quantum|classical|wave function|collapse|superposition)\b/.test(fullNormalized)) {
     return "I can answer this in steps and keep the mechanism and uncertainty explicit.";
   }
-  if (/\b(warp|casimir|curvature|inequality)\b/.test(normalized)) {
+  if (/\b(warp|casimir|curvature|inequality)\b/.test(fullNormalized)) {
     return "I can map the mechanism, constraints, and uncertainty bounds before drawing conclusions.";
+  }
+  if (/\b(system|components?|interactions?|purpose)\b/.test(normalized)) {
+    return "I can define the system first, then map components, interactions, and purpose.";
   }
   return "I can answer directly, then separate mechanism, constraints, and uncertainty.";
 }
@@ -4498,7 +4506,15 @@ export function HelixAskPill({
   const voiceBargeTrafficQuietUntilMsRef = useRef<number | null>(null);
   const voiceSuppressedFinalTurnKeysRef = useRef<Set<string>>(new Set());
   const voiceBriefSpokenLifecycleByTurnRef = useRef<Map<string, VoiceDecisionLifecycle>>(new Map());
-  const voicePinnedBriefByTurnRef = useRef<Map<string, string>>(new Map());
+  const voicePinnedBriefByTurnRef = useRef<
+    Map<
+      string,
+      {
+        text: string;
+        transcriptRevision: number | null;
+      }
+    >
+  >(new Map());
   const voiceQueuedSpeechLatchByTurnRef = useRef<Map<string, number>>(new Map());
   const voiceRunningSpeechLatchByTurnRef = useRef<Map<string, number>>(new Map());
   const voiceTurnRevisionStateRef = useRef<Record<string, VoiceTurnRevisionState>>({});
@@ -7795,18 +7811,37 @@ export function HelixAskPill({
         typeof input.meta?.transcript === "string"
           ? sanitizeConversationBriefTextForVoice(String(input.meta.transcript), 220)
           : "";
+      const transcriptRevision =
+        typeof input.meta?.transcriptRevision === "number" &&
+        Number.isFinite(input.meta.transcriptRevision)
+          ? Math.max(0, Math.floor(input.meta.transcriptRevision))
+          : null;
       if (turnKey && (input.lifecycle === "queued" || input.lifecycle === "running")) {
         const pinnedBriefs = voicePinnedBriefByTurnRef.current;
         const pinned = pinnedBriefs.get(turnKey);
-        if (pinned) {
-          if (isPinnedVoiceBriefCandidate(sanitizedBaseBrief) && !isPinnedVoiceBriefCandidate(pinned)) {
-            pinnedBriefs.set(turnKey, sanitizedBaseBrief);
+        const pinnedMatchesRevision =
+          Boolean(pinned) &&
+          (transcriptRevision === null ||
+            pinned?.transcriptRevision === null ||
+            pinned?.transcriptRevision === transcriptRevision);
+        if (pinned && pinnedMatchesRevision) {
+          if (isPinnedVoiceBriefCandidate(sanitizedBaseBrief) && !isPinnedVoiceBriefCandidate(pinned.text)) {
+            pinnedBriefs.set(turnKey, {
+              text: sanitizedBaseBrief,
+              transcriptRevision,
+            });
             resolvedBaseBrief = sanitizedBaseBrief;
           } else {
-            resolvedBaseBrief = pinned;
+            resolvedBaseBrief = pinned.text;
           }
+        } else if (pinned && !pinnedMatchesRevision) {
+          // New transcript revision for the same turn; never reuse an older pinned brief.
+          pinnedBriefs.delete(turnKey);
         } else if (isPinnedVoiceBriefCandidate(sanitizedBaseBrief)) {
-          pinnedBriefs.set(turnKey, sanitizedBaseBrief);
+          pinnedBriefs.set(turnKey, {
+            text: sanitizedBaseBrief,
+            transcriptRevision,
+          });
         }
         if (pinnedBriefs.size > 256) {
           const oldestKey = pinnedBriefs.keys().next().value;
@@ -7827,6 +7862,12 @@ export function HelixAskPill({
           transcriptHint ? buildDeterministicQueuedBriefFromTranscript(transcriptHint) : "";
         if (transcriptHint) {
           resolvedBaseBrief = predictiveBrief || deterministicBrief || resolvedBaseBrief;
+        }
+        if (turnKey && resolvedBaseBrief) {
+          voicePinnedBriefByTurnRef.current.set(turnKey, {
+            text: resolvedBaseBrief,
+            transcriptRevision,
+          });
         }
       }
       if (
