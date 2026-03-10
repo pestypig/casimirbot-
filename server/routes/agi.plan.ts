@@ -21226,6 +21226,19 @@ const executeHelixAsk = async ({
       HELIX_ASK_FILE_HINT.test(initialReportQuestion) ||
       /helix(?:[-\s]+)ask|\/api\/agi\/ask|codebase|repository|repo|arbiter|evidence gate|constraint|live events?|routing/i.test(initialReportQuestion);
     let reportDecision = resolveReportModeDecision(initialReportQuestion);
+    const dialogueProfileNonReportMode = dialogueProfile === "dot_min_steps_v1";
+    if (
+      dialogueProfileNonReportMode &&
+      reportDecision.enabled &&
+      reportDecision.reason !== "explicit_report_request"
+    ) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "dialogue_profile_non_report_guard",
+        blockCount: 1,
+      };
+    }
     const ideologyConversationalSeed = shouldUseIdeologyConversationalMode(
       initialReportQuestion,
       reportDecision.tokenCount,
@@ -21274,6 +21287,7 @@ const executeHelixAsk = async ({
       !isIdeologyNarrativeQuery &&
       !warpEthosRelationReportQuery &&
       !initialRepoCueDetected &&
+      !dialogueProfileNonReportMode &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -21365,6 +21379,7 @@ const executeHelixAsk = async ({
       !isIdeologyNarrativeQuery &&
       !warpEthosRelationReportQuery &&
       !initialRepoCueDetected &&
+      !dialogueProfileNonReportMode &&
       !reportDecision.enabled &&
       slotPreview.coverageSlots.length >= 2
     ) {
@@ -21387,6 +21402,9 @@ const executeHelixAsk = async ({
       debugPayload.report_mode_reason = reportDecision.reason;
       debugPayload.report_blocks_count = reportDecision.blockCount;
       debugPayload.slot_plan_pass_used = slotPlanPassSlots.length > 0;
+      if (dialogueProfileNonReportMode) {
+        (debugPayload as Record<string, unknown>).report_mode_dialogue_guard = true;
+      }
       if (slotPlanPass) {
         debugPayload.slot_plan_pass = {
           slots: slotPlanPass.slots.map((slot) => ({
@@ -22822,6 +22840,19 @@ const executeHelixAsk = async ({
         enabled: false,
         reason: "ideology_chat_mode",
       };
+    }
+    if (
+      dialogueProfileNonReportMode &&
+      reportDecision.enabled &&
+      reportDecision.reason !== "explicit_report_request"
+    ) {
+      reportDecision = {
+        ...reportDecision,
+        enabled: false,
+        reason: "dialogue_profile_non_report_guard",
+        blockCount: 1,
+      };
+      answerPath.push("policy:report_mode_dialogue_profile_guard");
     }
     if (
       requiresRepoEvidence &&
