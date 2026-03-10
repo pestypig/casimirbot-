@@ -2021,9 +2021,12 @@ function isBriefEchoingTranscript(briefText: string, transcript: string): boolea
 }
 
 function buildPredictiveBriefFromTranscript(transcript: string): string {
+  const latestFocus = extractLatestContinuationQuestionFocus(transcript);
+  const focusSource = sanitizeConversationBriefTextForVoice(latestFocus ?? "", 220);
   const source = sanitizeConversationBriefTextForVoice(transcript, 220);
-  if (!source) return "";
-  const normalized = source.toLowerCase();
+  const candidate = focusSource || source;
+  if (!candidate) return "";
+  const normalized = candidate.toLowerCase();
   if (/\b(what is|define|explain)\b/.test(normalized) && /\bsystem\b/.test(normalized)) {
     return "A system is a set of interacting components organized to achieve a purpose.";
   }
@@ -2047,16 +2050,19 @@ function buildPredictiveBriefFromTranscript(transcript: string): string {
   ) {
     return "I can relate the classical limit, quantum superposition, and measurement collapse in one clean chain.";
   }
-  if (/[?]$/.test(transcript.trim()) || /\b(how|why|what|when|where|which|can you|could you)\b/.test(normalized)) {
+  if (/[?]$/.test(candidate.trim()) || /\b(how|why|what|when|where|which|can you|could you)\b/.test(normalized)) {
     return "I will answer directly first, then contrast assumptions and limits.";
   }
   return "";
 }
 
 function buildDeterministicQueuedBriefFromTranscript(transcript: string): string {
+  const latestFocus = extractLatestContinuationQuestionFocus(transcript);
+  const focusSource = sanitizeConversationBriefTextForVoice(latestFocus ?? "", 220);
   const source = sanitizeConversationBriefTextForVoice(transcript, 220);
-  if (!source) return "";
-  const normalized = source.toLowerCase();
+  const candidate = focusSource || source;
+  if (!candidate) return "";
+  const normalized = candidate.toLowerCase();
   if (/\b(system|components?|interactions?|purpose)\b/.test(normalized)) {
     return "I can define the system first, then map components, interactions, and purpose.";
   }
