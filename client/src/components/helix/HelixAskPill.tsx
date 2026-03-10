@@ -123,8 +123,10 @@ const MOBILE_AUDIO_USER_AGENT_PATTERN =
   /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
 const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
 const HELIX_VOICE_PLAYBACK_GAIN_DESKTOP = 1.15;
-const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 1.8;
-const HELIX_VOICE_PLAYBACK_GAIN_IOS = 2.1;
+const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 2.4;
+const HELIX_VOICE_PLAYBACK_GAIN_IOS = 2.8;
+const HELIX_VOICE_FORCE_DIRECT_MOBILE =
+  String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 
 export function resolveVoicePlaybackGain(userAgent?: string): number {
   const ua = (userAgent ?? "").trim();
@@ -137,8 +139,12 @@ export function resolveVoicePlaybackGain(userAgent?: string): number {
 export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
   const ua = (userAgent ?? "").trim();
   if (!ua) return true;
-  // Mobile Safari/Chrome WebAudio media-element routing is less reliable than direct element playback.
-  return !MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua);
+  if (MOBILE_AUDIO_USER_AGENT_PATTERN.test(ua)) {
+    // Mobile graph is now enabled by default for louder device-side playback.
+    // Set VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE=1 to opt back into direct element playback.
+    return !HELIX_VOICE_FORCE_DIRECT_MOBILE;
+  }
+  return true;
 }
 
 export function stripVoiceCitationArtifacts(source: string): string {

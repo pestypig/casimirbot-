@@ -124,13 +124,13 @@ describe("HelixAskPill mic helper behavior", () => {
       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
     );
     expect(desktopGain).toBe(1.15);
-    expect(androidGain).toBe(1.8);
-    expect(iosGain).toBe(2.1);
+    expect(androidGain).toBe(2.4);
+    expect(iosGain).toBe(2.8);
     expect(androidGain).toBeGreaterThan(desktopGain);
     expect(iosGain).toBeGreaterThan(androidGain);
   });
 
-  it("disables WebAudio media-element routing on mobile user agents", () => {
+  it("enables WebAudio media-element routing on mobile user agents by default", () => {
     expect(
       shouldUseVoicePlaybackAudioGraph(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
@@ -140,12 +140,12 @@ describe("HelixAskPill mic helper behavior", () => {
       shouldUseVoicePlaybackAudioGraph(
         "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/122 Mobile Safari/537.36",
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldUseVoicePlaybackAudioGraph(
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("routes completion scores by threshold", () => {
