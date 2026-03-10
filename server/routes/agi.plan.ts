@@ -5840,29 +5840,116 @@ const CAPSULE_TOPIC_SHIFT_RE =
   /\b(?:new topic|switch(?:ing)?(?:\s+topics?)?|change(?:\s+the)?\s+subject|moving on|instead|actually[, ]+let'?s|now[, ]+let'?s\s+talk about)\b/i;
 const CAPSULE_AMBIGUOUS_PROMPT_RE =
   /^(?:where|why|how|what|and|so|then|that|this|it)\b(?:\s+[a-z0-9'_-]+){0,6}\??$/i;
+const HELIX_ASK_MISSION_SOFT_SIGNAL_RE =
+  /\b(?:mission[-\s]?overwatch|dottie|go board|voice callout|mission callout|mission ethos|situational awareness|callout policy)\b/i;
 
 const normalizeCapsulePathKey = (value: string): string =>
   (normalizeEvidenceRef(value) ?? value).replace(/\\/g, "/").toLowerCase();
 
 const detectCapsuleTopicShift = (question: string): boolean => CAPSULE_TOPIC_SHIFT_RE.test(question);
 
+const tokenizeCapsuleConstraint = (value: string): string[] =>
+  filterCriticTokens(tokenizeAskQuery(String(value || "").replace(/[\\/._-]+/g, " ")))
+    .map((token) => token.trim().toLowerCase())
+    .filter((token) => token.length >= 3);
+
+const scoreCapsuleConstraintRelevance = (
+  candidate: string,
+  questionTokens: Set<string>,
+): number => {
+  if (questionTokens.size === 0) return 0;
+  const tokens = dedupeTokens(tokenizeCapsuleConstraint(candidate));
+  if (tokens.length === 0) return 0;
+  let matchCount = 0;
+  for (const token of tokens) {
+    if (questionTokens.has(token)) matchCount += 1;
+  }
+  if (matchCount === 0) return 0;
+  return matchCount / tokens.length;
+};
+
+const selectRelevantCapsuleConstraintEntries = (
+  entries: string[],
+  question: string,
+  latestTopicShift: boolean,
+  limits: {
+    aligned: number;
+    ambiguousFallback: number;
+  },
+): string[] => {
+  const uniqueEntries: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueEntries.push(trimmed);
+  }
+  if (uniqueEntries.length === 0) return [];
+  const questionTokens = new Set(tokenizeCapsuleConstraint(question));
+  const scored = uniqueEntries
+    .map((entry, index) => ({
+      entry,
+      index,
+      score: scoreCapsuleConstraintRelevance(entry, questionTokens),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+  const aligned = scored.filter((item) => item.score > 0).map((item) => item.entry);
+  if (aligned.length > 0) {
+    return aligned.slice(0, Math.max(1, limits.aligned));
+  }
+  if (latestTopicShift) return [];
+  if (isCapsuleIntentAmbiguous(question)) {
+    return scored.slice(0, Math.max(0, limits.ambiguousFallback)).map((item) => item.entry);
+  }
+  return [];
+};
+
 const resolveCapsuleMustKeepTerms = (
   bundle: CapsuleConstraintBundle | null | undefined,
   latestTopicShift: boolean,
+  question: string,
 ): string[] => {
   const terms = Array.isArray(bundle?.mustKeepTerms) ? bundle.mustKeepTerms : [];
-  return dedupeTokens(terms.map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length >= 3)).slice(
-    0,
-    latestTopicShift ? 4 : 12,
+  return selectRelevantCapsuleConstraintEntries(
+    terms
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length >= 3),
+    question,
+    latestTopicShift,
+    {
+      aligned: latestTopicShift ? 4 : 8,
+      ambiguousFallback: latestTopicShift ? 0 : 6,
+    },
   );
 };
 
 const resolveCapsulePreferredEvidencePaths = (
   bundle: CapsuleConstraintBundle | null | undefined,
   latestTopicShift: boolean,
+  question: string,
 ): string[] => {
   const paths = Array.isArray(bundle?.preferredEvidencePaths) ? bundle.preferredEvidencePaths : [];
-  return normalizeCitations(paths).slice(0, latestTopicShift ? 3 : 12);
+  return selectRelevantCapsuleConstraintEntries(
+    normalizeCitations(paths),
+    question,
+    latestTopicShift,
+    {
+      aligned: latestTopicShift ? 3 : 6,
+      ambiguousFallback: latestTopicShift ? 0 : 4,
+    },
+  );
+};
+
+const shouldInjectMissionSoftSignal = (
+  normalizedQuestion: string,
+  topicTags: HelixAskTopicTag[],
+): boolean => {
+  if (!HELIX_ASK_DOTTIE_SOFT_SIGNAL) return false;
+  if (HELIX_ASK_MISSION_SOFT_SIGNAL_RE.test(normalizedQuestion)) return true;
+  return topicTags.includes("helix_ask") && (topicTags.includes("telemetry") || topicTags.includes("trace"));
 };
 
 const answerContainsCapsuleFocusTerm = (text: string, terms: string[]): boolean => {
@@ -5977,7 +6064,7 @@ function buildHelixAskSearchQueries(
     seen.add(key);
     queries.push(trimmed);
   };
-  if (HELIX_ASK_DOTTIE_SOFT_SIGNAL) {
+  if (shouldInjectMissionSoftSignal(normalized, topicTags)) {
     push("mission overwatch intent context");
     push("docs/BUSINESS_MODEL.md");
     push("docs/helix-ask-flow.md");
@@ -19064,6 +19151,7 @@ export const __testCapsuleGrounding = {
   detectCapsuleTopicShift,
   resolveCapsuleMustKeepTerms,
   resolveCapsulePreferredEvidencePaths,
+  buildHelixAskSearchQueries,
   answerContainsCapsuleFocusTerm,
   answerHasCapsulePreferredAnchor,
   isCapsuleIntentAmbiguous,
@@ -21165,10 +21253,12 @@ const executeHelixAsk = async ({
     capsuleMustKeepTerms = resolveCapsuleMustKeepTerms(
       capsuleConstraintBundle,
       capsuleLatestTopicShift,
+      baseQuestion,
     );
     capsulePreferredEvidencePaths = resolveCapsulePreferredEvidencePaths(
       capsuleConstraintBundle,
       capsuleLatestTopicShift,
+      baseQuestion,
     );
     const definitionFocus = isDefinitionQuestion(baseQuestion);
     if (definitionFocus) {

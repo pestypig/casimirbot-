@@ -3656,6 +3656,7 @@ export function HelixAskPill({
   >("idle");
   const [readAloudByReply, setReadAloudByReply] = useState<Record<string, ReadAloudPlaybackState>>({});
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackElementRef = useRef<HTMLAudioElement | null>(null);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
   const voiceAudioUnlockedRef = useRef(false);
@@ -5237,15 +5238,24 @@ export function HelixAskPill({
     return state.latestRevision > revision.revision;
   }, []);
 
+  const getOrCreateVoicePlaybackElement = useCallback((): HTMLAudioElement => {
+    const existing = playbackElementRef.current;
+    if (existing) return existing;
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.playsInline = true;
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
+    audio.volume = 1;
+    playbackElementRef.current = audio;
+    return audio;
+  }, []);
+
   const primeVoiceAudioPlayback = useCallback(async (): Promise<boolean> => {
     if (voiceAudioUnlockedRef.current) return true;
     if (typeof window === "undefined") return false;
     try {
-      const primer = new Audio();
-      primer.preload = "auto";
-      primer.playsInline = true;
-      primer.setAttribute("playsinline", "true");
-      primer.setAttribute("webkit-playsinline", "true");
+      const primer = getOrCreateVoicePlaybackElement();
       primer.muted = true;
       primer.src = MOBILE_AUDIO_UNLOCK_DATA_URI;
       const playPromise = primer.play();
@@ -5255,25 +5265,26 @@ export function HelixAskPill({
       primer.pause();
       primer.currentTime = 0;
       primer.src = "";
+      primer.load();
+      primer.muted = false;
       voiceAudioUnlockedRef.current = true;
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [getOrCreateVoicePlaybackElement]);
 
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
-      const audio = new Audio();
+      const audio = getOrCreateVoicePlaybackElement();
       const url = URL.createObjectURL(input.blob);
-      audio.preload = "auto";
-      audio.playsInline = true;
-      audio.setAttribute("playsinline", "true");
-      audio.setAttribute("webkit-playsinline", "true");
+      audio.muted = false;
+      audio.volume = 1;
       playbackUrlRef.current = url;
       playbackReplyIdRef.current = replyId;
       audio.src = url;
+      audio.load();
       playbackAudioRef.current = audio;
       if (replyId) {
         setReadAloudByReply((prev) => ({
@@ -5318,14 +5329,30 @@ export function HelixAskPill({
         voiceAutoSpeakPendingPlaybackResolverRef.current = resolver;
         audio.onended = () => finalize("ended");
         audio.onerror = () => finalize("error");
-        const playPromise = audio.play();
+        const attemptPlay = async () => {
+          try {
+            await audio.play();
+          } catch (error) {
+            if (
+              error instanceof DOMException &&
+              (error.name === "NotAllowedError" || error.name === "AbortError")
+            ) {
+              const unlocked = await primeVoiceAudioPlayback();
+              if (unlocked) {
+                await audio.play();
+                return;
+              }
+            }
+            throw error;
+          }
+        };
         if (input.awaitPlayback === false) {
-          void playPromise
+          void attemptPlay()
             .then(() => resolve())
             .catch(() => finalize("error"));
           return;
         }
-        void playPromise.catch((error) => {
+        void attemptPlay().catch((error) => {
           if (
             error instanceof DOMException &&
             (error.name === "NotAllowedError" || error.name === "AbortError")
@@ -5336,7 +5363,7 @@ export function HelixAskPill({
         });
       });
     },
-    [],
+    [getOrCreateVoicePlaybackElement, primeVoiceAudioPlayback],
   );
 
   const clearVoicePendingPreempt = useCallback(() => {
@@ -9083,6 +9110,13 @@ export function HelixAskPill({
   useEffect(() => () => {
     stopReadAloud();
     stopVoiceCapture();
+    const playbackElement = playbackElementRef.current;
+    if (playbackElement) {
+      playbackElement.pause();
+      playbackElement.src = "";
+      playbackElement.load();
+    }
+    playbackElementRef.current = null;
     contextCapsuleSessionLedgerRef.current = [];
   }, [stopReadAloud, stopVoiceCapture]);
 
@@ -10187,6 +10221,12 @@ export function HelixAskPill({
           style={formMaxWidthStyle}
           onSubmit={handleAskSubmit}
           onPointerDownCapture={() => {
+            void primeVoiceAudioPlayback();
+          }}
+          onTouchStartCapture={() => {
+            void primeVoiceAudioPlayback();
+          }}
+          onClickCapture={() => {
             void primeVoiceAudioPlayback();
           }}
         >
