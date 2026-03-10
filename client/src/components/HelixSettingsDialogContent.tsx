@@ -253,6 +253,11 @@ function VoiceCaptureDiagnosticsPanel({
   snapshot: VoiceCaptureDiagnosticsSnapshot | null;
 }) {
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [copied, setCopied] = React.useState(false);
+  const exportPayload = React.useMemo(
+    () => (snapshot ? buildVoiceAudioDebugCopyPayload(snapshot) : ""),
+    [snapshot],
+  );
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -272,9 +277,34 @@ function VoiceCaptureDiagnosticsPanel({
     [nowMs],
   );
 
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   return (
     <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Capture diagnostics</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Capture diagnostics</p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!exportPayload}
+          className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+            exportPayload
+              ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+              : "border-slate-600 text-slate-500"
+          }`}
+        >
+          {copied ? "copied" : "copy audio debug"}
+        </button>
+      </div>
       {!snapshot ? (
         <p className="text-xs text-slate-300">
           No active voice capture yet. Enable the mic in Helix Ask to stream diagnostics here.
@@ -339,6 +369,44 @@ function VoiceCaptureDiagnosticsPanel({
                 total {snapshot.playback.totalPlaybackMs ?? "--"}ms | cache h/m{" "}
                 {snapshot.playback.cacheHitCount}/{snapshot.playback.cacheMissCount}
                 {snapshot.playback.cancelReason ? ` | cancel ${snapshot.playback.cancelReason}` : ""}
+              </p>
+              <p className="uppercase tracking-[0.14em] text-slate-500">
+                provider {snapshot.playback.providerHeader ?? "n/a"} | profile {snapshot.playback.profileHeader ?? "n/a"}
+                {snapshot.playback.normalizationBenchmarkHeader
+                  ? ` | norm ${clipDiagnosticsText(snapshot.playback.normalizationBenchmarkHeader, 84)}`
+                  : ""}
+                {snapshot.playback.normalizationSkipReasonHeader
+                  ? ` | skip ${clipDiagnosticsText(snapshot.playback.normalizationSkipReasonHeader, 84)}`
+                  : ""}
+              </p>
+            </>
+          ) : null}
+          {snapshot.playbackOutput ? (
+            <>
+              <p className="uppercase tracking-[0.14em] text-slate-500">
+                output {snapshot.playbackOutput.expectedPath} | gain target{" "}
+                {snapshot.playbackOutput.gainTarget.toFixed(2)} | unlocked{" "}
+                {snapshot.playbackOutput.audioUnlocked ? "yes" : "no"}
+                {snapshot.playbackOutput.audioSessionType
+                  ? ` | session ${snapshot.playbackOutput.audioSessionType}`
+                  : ""}
+                {snapshot.playbackOutput.forcedDirectMobile ? " | forced-direct-mobile" : ""}
+              </p>
+              <p className="uppercase tracking-[0.14em] text-slate-500">
+                element{" "}
+                {snapshot.playbackOutput.audioElementReady
+                  ? `${snapshot.playbackOutput.audioElementMuted ? "muted" : "live"} @ ${
+                      snapshot.playbackOutput.audioElementVolume ?? "--"
+                    }`
+                  : "none"}{" "}
+                | graph {snapshot.playbackOutput.audioGraphAttached ? "attached" : "detached"} | ctx{" "}
+                {snapshot.playbackOutput.audioContextState ?? "n/a"}
+                {typeof snapshot.playbackOutput.audioContextSampleRate === "number"
+                  ? ` ${Math.round(snapshot.playbackOutput.audioContextSampleRate)}hz`
+                  : ""}
+                {typeof snapshot.playbackOutput.gainNodeValue === "number"
+                  ? ` | gain ${snapshot.playbackOutput.gainNodeValue.toFixed(2)}`
+                  : ""}
               </p>
             </>
           ) : null}
@@ -468,6 +536,48 @@ function VoiceEventTimelineDebugPanel({
       )}
     </div>
   );
+}
+
+function buildVoiceAudioDebugCopyPayload(snapshot: VoiceCaptureDiagnosticsSnapshot): string {
+  const timelineTail = [...(snapshot.timelineEvents ?? [])]
+    .sort((a, b) => a.atMs - b.atMs)
+    .slice(-60);
+  const payload = {
+    capturedAt: new Date(snapshot.updatedAtMs).toISOString(),
+    micArmState: snapshot.micArmState,
+    voiceInputState: snapshot.voiceInputState,
+    voiceSignalState: snapshot.voiceSignalState,
+    voiceInputDeviceLabel: snapshot.voiceInputDeviceLabel,
+    voiceTrackMuted: snapshot.voiceTrackMuted,
+    voiceRecorderMimeType: snapshot.voiceRecorderMimeType,
+    audioLevels: {
+      rmsRaw: snapshot.rmsRaw,
+      rmsDb: snapshot.rmsDb,
+      peak: snapshot.peak,
+      noiseFloor: snapshot.noiseFloor,
+      monitorLevel: snapshot.voiceMonitorLevel,
+      monitorThreshold: snapshot.voiceMonitorThreshold,
+    },
+    captureCadence: {
+      chunksPerSecond: snapshot.chunksPerSecond,
+      mediaChunkCount: snapshot.mediaChunkCount,
+      mediaBytes: snapshot.mediaBytes,
+      lastChunkAgeMs: snapshot.lastChunkAgeMs,
+      lastRoundtripMs: snapshot.lastRoundtripMs,
+      warnings: snapshot.warnings,
+    },
+    playback: snapshot.playback ?? null,
+    playbackOutput: snapshot.playbackOutput ?? null,
+    checkpoints: snapshot.checkpoints.map((checkpoint) => ({
+      key: checkpoint.key,
+      status: checkpoint.status,
+      message: checkpoint.message,
+      lastAtMs: checkpoint.lastAtMs,
+    })),
+    recentSegments: snapshot.segments.slice(-5),
+    timelineTail,
+  };
+  return JSON.stringify(payload, null, 2);
 }
 
 function formatVoiceTimelineDebugEvent(event: VoiceLaneTimelineDebugEvent): string {

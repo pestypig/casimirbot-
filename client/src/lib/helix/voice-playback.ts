@@ -54,6 +54,8 @@ export type VoicePlaybackMetrics = {
   cancelReason: VoicePlaybackCancelReason | null;
   providerHeader?: string;
   profileHeader?: string;
+  normalizationBenchmarkHeader?: string;
+  normalizationSkipReasonHeader?: string;
   cacheHitCount: number;
   cacheMissCount: number;
 };

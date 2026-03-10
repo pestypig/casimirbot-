@@ -123,8 +123,13 @@ const MOBILE_AUDIO_USER_AGENT_PATTERN =
   /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
 const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
 const HELIX_VOICE_PLAYBACK_GAIN_DESKTOP = 1.15;
-const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 2.4;
-const HELIX_VOICE_PLAYBACK_GAIN_IOS = 2.8;
+const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 3.6;
+const HELIX_VOICE_PLAYBACK_GAIN_IOS = 4.2;
+const HELIX_VOICE_LIMITER_THRESHOLD_DB = -2.5;
+const HELIX_VOICE_LIMITER_KNEE_DB = 1;
+const HELIX_VOICE_LIMITER_RATIO = 20;
+const HELIX_VOICE_LIMITER_ATTACK_S = 0.001;
+const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
 const HELIX_VOICE_FORCE_DIRECT_MOBILE =
   String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 
@@ -6395,6 +6400,21 @@ export function HelixAskPill({
     return state.latestRevision > revision.revision;
   }, []);
 
+  const hintVoicePlaybackAudioSession = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const nav = window.navigator as Navigator & {
+      audioSession?: {
+        type?: string;
+      };
+    };
+    if (!nav.audioSession || typeof nav.audioSession !== "object") return;
+    try {
+      nav.audioSession.type = "playback";
+    } catch {
+      // Best-effort hint only; unsupported browsers can ignore.
+    }
+  }, []);
+
   const getOrCreateVoicePlaybackElement = useCallback((): HTMLAudioElement => {
     const existing = playbackElementRef.current;
     if (existing) return existing;
@@ -6415,6 +6435,7 @@ export function HelixAskPill({
       if (!shouldUseVoicePlaybackAudioGraph(window.navigator?.userAgent)) {
         return false;
       }
+      hintVoicePlaybackAudioSession();
       const AudioCtx = (window.AudioContext ||
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as
         | typeof AudioContext
@@ -6443,11 +6464,11 @@ export function HelixAskPill({
       let compressorNode = voicePlaybackCompressorNodeRef.current;
       if (!compressorNode) {
         compressorNode = playbackContext.createDynamicsCompressor();
-        compressorNode.threshold.value = -21;
-        compressorNode.knee.value = 18;
-        compressorNode.ratio.value = 3.4;
-        compressorNode.attack.value = 0.004;
-        compressorNode.release.value = 0.22;
+        compressorNode.threshold.value = HELIX_VOICE_LIMITER_THRESHOLD_DB;
+        compressorNode.knee.value = HELIX_VOICE_LIMITER_KNEE_DB;
+        compressorNode.ratio.value = HELIX_VOICE_LIMITER_RATIO;
+        compressorNode.attack.value = HELIX_VOICE_LIMITER_ATTACK_S;
+        compressorNode.release.value = HELIX_VOICE_LIMITER_RELEASE_S;
         voicePlaybackCompressorNodeRef.current = compressorNode;
       }
       let gainNode = voicePlaybackGainNodeRef.current;
@@ -6474,18 +6495,20 @@ export function HelixAskPill({
       } catch {
         // no-op
       }
-      sourceNode.connect(compressorNode);
-      compressorNode.connect(gainNode);
-      gainNode.connect(playbackContext.destination);
+      // Boost first, then apply limiting so mobile playback can run hotter without clipping.
+      sourceNode.connect(gainNode);
+      gainNode.connect(compressorNode);
+      compressorNode.connect(playbackContext.destination);
       return true;
     },
-    [],
+    [hintVoicePlaybackAudioSession],
   );
 
   const primeVoiceAudioPlayback = useCallback(async (): Promise<boolean> => {
     if (voiceAudioUnlockedRef.current) return true;
     if (typeof window === "undefined") return false;
     try {
+      hintVoicePlaybackAudioSession();
       const primer = getOrCreateVoicePlaybackElement();
       // Do not mute the unlock primer; muted autoplay can pass without unlocking
       // subsequent audible playback on mobile browsers.
@@ -6507,11 +6530,12 @@ export function HelixAskPill({
     } catch {
       return false;
     }
-  }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement]);
+  }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, hintVoicePlaybackAudioSession]);
 
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
+      hintVoicePlaybackAudioSession();
       const audio = getOrCreateVoicePlaybackElement();
       await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
       const url = URL.createObjectURL(input.blob);
@@ -6599,7 +6623,7 @@ export function HelixAskPill({
         });
       });
     },
-    [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, primeVoiceAudioPlayback],
+    [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement, hintVoicePlaybackAudioSession, primeVoiceAudioPlayback],
   );
 
   const clearVoicePendingPreempt = useCallback(() => {
@@ -6833,6 +6857,8 @@ export function HelixAskPill({
         provider: string | null;
         profile: string | null;
         cache: "hit" | "miss" | null;
+        normalizationBenchmark: string | null;
+        normalizationSkipReason: string | null;
       };
     }> => {
       const startedAtMs = Date.now();
@@ -7132,6 +7158,8 @@ export function HelixAskPill({
                     provider: string | null;
                     profile: string | null;
                     cache: "hit" | "miss" | null;
+                    normalizationBenchmark: string | null;
+                    normalizationSkipReason: string | null;
                   };
                 };
               } | {
@@ -7163,6 +7191,8 @@ export function HelixAskPill({
             });
             metrics.providerHeader = currentResult.headers.provider ?? undefined;
             metrics.profileHeader = currentResult.headers.profile ?? undefined;
+            metrics.normalizationBenchmarkHeader = currentResult.headers.normalizationBenchmark ?? undefined;
+            metrics.normalizationSkipReasonHeader = currentResult.headers.normalizationSkipReason ?? undefined;
             if (metrics.enqueueToFirstAudioMs === null) {
               metrics.enqueueToFirstAudioMs = Math.max(0, Date.now() - utterance.enqueuedAtMs);
             }
@@ -7277,6 +7307,10 @@ export function HelixAskPill({
               });
               metrics.providerHeader = prefetched.headers.provider ?? metrics.providerHeader;
               metrics.profileHeader = prefetched.headers.profile ?? metrics.profileHeader;
+              metrics.normalizationBenchmarkHeader =
+                prefetched.headers.normalizationBenchmark ?? metrics.normalizationBenchmarkHeader;
+              metrics.normalizationSkipReasonHeader =
+                prefetched.headers.normalizationSkipReason ?? metrics.normalizationSkipReasonHeader;
               if (metrics.enqueueToFirstAudioMs === null) {
                 metrics.enqueueToFirstAudioMs = Math.max(0, Date.now() - utterance.enqueuedAtMs);
               }
@@ -12993,6 +13027,8 @@ export function HelixAskPill({
             cancelReason: voiceAutoSpeakLastMetrics.cancelReason,
             providerHeader: voiceAutoSpeakLastMetrics.providerHeader,
             profileHeader: voiceAutoSpeakLastMetrics.profileHeader,
+            normalizationBenchmarkHeader: voiceAutoSpeakLastMetrics.normalizationBenchmarkHeader,
+            normalizationSkipReasonHeader: voiceAutoSpeakLastMetrics.normalizationSkipReasonHeader,
             cacheHitCount: voiceAutoSpeakLastMetrics.cacheHitCount,
             cacheMissCount: voiceAutoSpeakLastMetrics.cacheMissCount,
             divergence: {
@@ -13025,6 +13061,40 @@ export function HelixAskPill({
             },
           }
         : null,
+      playbackOutput: (() => {
+        const ua = typeof window !== "undefined" ? window.navigator?.userAgent ?? null : null;
+        const nav = typeof window !== "undefined" ? (window.navigator as Navigator & { audioSession?: { type?: string } }) : null;
+        const playbackAudio = playbackElementRef.current ?? playbackAudioRef.current;
+        const playbackContext = voicePlaybackAudioContextRef.current;
+        const gainNode = voicePlaybackGainNodeRef.current;
+        const compressor = voicePlaybackCompressorNodeRef.current;
+        return {
+          userAgent: ua,
+          audioSessionType:
+            nav && nav.audioSession && typeof nav.audioSession.type === "string" ? nav.audioSession.type : null,
+          expectedPath: shouldUseVoicePlaybackAudioGraph(ua ?? undefined) ? "audio_graph" : "direct_element",
+          forcedDirectMobile: HELIX_VOICE_FORCE_DIRECT_MOBILE,
+          gainTarget: resolveVoicePlaybackGain(ua ?? undefined),
+          audioUnlocked: voiceAudioUnlockedRef.current,
+          audioElementReady: playbackAudio !== null,
+          audioElementMuted: playbackAudio?.muted ?? null,
+          audioElementVolume: typeof playbackAudio?.volume === "number" ? playbackAudio.volume : null,
+          audioGraphAttached:
+            !!voicePlaybackSourceNodeRef.current &&
+            !!voicePlaybackGainNodeRef.current &&
+            voicePlaybackGraphElementRef.current !== null,
+          audioContextState: playbackContext?.state ?? null,
+          audioContextSampleRate:
+            typeof playbackContext?.sampleRate === "number" ? playbackContext.sampleRate : null,
+          gainNodeValue: typeof gainNode?.gain?.value === "number" ? gainNode.gain.value : null,
+          compressorThreshold:
+            typeof compressor?.threshold?.value === "number" ? compressor.threshold.value : null,
+          compressorKnee: typeof compressor?.knee?.value === "number" ? compressor.knee.value : null,
+          compressorRatio: typeof compressor?.ratio?.value === "number" ? compressor.ratio.value : null,
+          compressorAttack: typeof compressor?.attack?.value === "number" ? compressor.attack.value : null,
+          compressorRelease: typeof compressor?.release?.value === "number" ? compressor.release.value : null,
+        };
+      })(),
       timelineEvents: voiceLaneTimelineEvents,
     });
   }, [

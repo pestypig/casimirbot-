@@ -35,6 +35,8 @@ export type VoicePlaybackDiagnosticsSnapshot = {
   cancelReason: string | null;
   providerHeader?: string;
   profileHeader?: string;
+  normalizationBenchmarkHeader?: string;
+  normalizationSkipReasonHeader?: string;
   cacheHitCount: number;
   cacheMissCount: number;
   divergence?: {
@@ -75,6 +77,27 @@ export type VoicePlaybackDiagnosticsSnapshot = {
       atMs: number;
     }>;
   };
+};
+
+export type VoicePlaybackOutputDiagnosticsSnapshot = {
+  userAgent: string | null;
+  audioSessionType: string | null;
+  expectedPath: "audio_graph" | "direct_element";
+  forcedDirectMobile: boolean;
+  gainTarget: number;
+  audioUnlocked: boolean;
+  audioElementReady: boolean;
+  audioElementMuted: boolean | null;
+  audioElementVolume: number | null;
+  audioGraphAttached: boolean;
+  audioContextState: string | null;
+  audioContextSampleRate: number | null;
+  gainNodeValue: number | null;
+  compressorThreshold: number | null;
+  compressorKnee: number | null;
+  compressorRatio: number | null;
+  compressorAttack: number | null;
+  compressorRelease: number | null;
 };
 
 export type VoiceLaneTimelineDebugSource =
@@ -150,6 +173,7 @@ export type VoiceCaptureDiagnosticsSnapshot = {
   checkpoints: VoiceCaptureCheckpointSnapshot[];
   segments: VoiceCaptureSegmentSnapshot[];
   playback?: VoicePlaybackDiagnosticsSnapshot | null;
+  playbackOutput?: VoicePlaybackOutputDiagnosticsSnapshot | null;
   timelineEvents?: VoiceLaneTimelineDebugEvent[];
 };
 

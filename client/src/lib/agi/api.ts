@@ -743,6 +743,8 @@ export type VoiceSpeakResponse =
         provider: string | null;
         profile: string | null;
         cache: "hit" | "miss" | null;
+        normalizationBenchmark: string | null;
+        normalizationSkipReason: string | null;
       };
     }
   | {
@@ -754,6 +756,8 @@ export type VoiceSpeakResponse =
         provider: string | null;
         profile: string | null;
         cache: "hit" | "miss" | null;
+        normalizationBenchmark: string | null;
+        normalizationSkipReason: string | null;
       };
     };
 
@@ -950,6 +954,8 @@ export async function speakVoice(
     provider: response.headers.get("x-voice-provider"),
     profile: response.headers.get("x-voice-profile"),
     cache: (response.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
+    normalizationBenchmark: response.headers.get("x-voice-normalization-benchmark"),
+    normalizationSkipReason: response.headers.get("x-voice-normalization-skip-reason"),
   };
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   if (contentType.includes("application/json")) {

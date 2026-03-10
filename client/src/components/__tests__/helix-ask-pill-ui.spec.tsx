@@ -124,8 +124,8 @@ describe("HelixAskPill mic helper behavior", () => {
       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
     );
     expect(desktopGain).toBe(1.15);
-    expect(androidGain).toBe(2.4);
-    expect(iosGain).toBe(2.8);
+    expect(androidGain).toBe(3.6);
+    expect(iosGain).toBe(4.2);
     expect(androidGain).toBeGreaterThan(desktopGain);
     expect(iosGain).toBeGreaterThan(androidGain);
   });
