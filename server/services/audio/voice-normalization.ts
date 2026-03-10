@@ -21,11 +21,13 @@ const WAVE_FORMAT_IEEE_FLOAT = 3;
 
 const DEFAULT_OPTIONS = {
   enabled: true,
-  targetPeakDbfs: -2,
-  targetRmsDbfs: -19,
-  maxGainDb: 12,
-  minGainDb: -12,
-  minDeltaDb: 0.6,
+  // Mobile-loudness benchmark:
+  // near-maximum speech loudness with headroom against codec/device distortion.
+  targetPeakDbfs: -1,
+  targetRmsDbfs: -14,
+  maxGainDb: 20,
+  minGainDb: -14,
+  minDeltaDb: 0.3,
 } as const;
 
 export type VoiceWavNormalizationReason =
@@ -340,7 +342,8 @@ export const normalizeVoicePcm16WavBuffer = (params: {
 
 const MP3_DEFAULT_OPTIONS = {
   enabled: true,
-  bitrateKbps: 128,
+  // Higher bitrate helps preserve quality after loudness normalization.
+  bitrateKbps: 192,
 } as const;
 
 const runFfmpeg = async (params: {

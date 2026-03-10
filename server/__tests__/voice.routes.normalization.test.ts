@@ -111,6 +111,9 @@ describe("voice routes normalization", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(response.headers["x-voice-normalization"]).toBe("pcm16_wav_applied");
     expect(Number(response.headers["x-voice-normalization-gain-db"])).toBeGreaterThan(0);
+    expect(String(response.headers["x-voice-normalization-benchmark"] ?? "")).toContain(
+      "mobile_voice_v1",
+    );
     expect(Buffer.isBuffer(response.body)).toBe(true);
     expect(Buffer.compare(response.body as Buffer, source)).not.toBe(0);
   });
@@ -165,6 +168,9 @@ describe("voice routes normalization", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(response.headers["x-voice-normalization"]).toBe("mp3_ffmpeg_applied");
     expect(Number(response.headers["x-voice-normalization-gain-db"])).toBeGreaterThan(0);
+    expect(String(response.headers["x-voice-normalization-benchmark"] ?? "")).toContain(
+      "mobile_voice_v1",
+    );
     expect(response.headers["content-type"]).toContain("audio/mpeg");
     expect(Buffer.compare(response.body as Buffer, sourceMp3)).not.toBe(0);
   });

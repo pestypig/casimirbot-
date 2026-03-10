@@ -434,6 +434,7 @@ type VoiceSpeakCacheEntry = {
   durationHeader: string;
   normalizationHeader: string;
   normalizationGainDbHeader: string;
+  normalizationBenchmarkHeader: string;
   buffer: Buffer;
 };
 
@@ -497,18 +498,55 @@ const parseFloatEnv = (value: string | undefined, fallback: number): number => {
 
 const resolveVoiceWavNormalizationOptions = (): VoiceWavNormalizationOptions => ({
   enabled: parseBooleanFlag(process.env.VOICE_SPEAK_NORMALIZE_ENABLED, true),
-  targetPeakDbfs: parseFloatEnv(process.env.VOICE_SPEAK_TARGET_PEAK_DBFS, -2),
-  targetRmsDbfs: parseFloatEnv(process.env.VOICE_SPEAK_TARGET_RMS_DBFS, -19),
-  maxGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MAX_GAIN_DB, 12),
-  minGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_GAIN_DB, -12),
-  minDeltaDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_DELTA_DB, 0.6),
+  targetPeakDbfs: parseFloatEnv(process.env.VOICE_SPEAK_TARGET_PEAK_DBFS, -1),
+  targetRmsDbfs: parseFloatEnv(process.env.VOICE_SPEAK_TARGET_RMS_DBFS, -14),
+  maxGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MAX_GAIN_DB, 20),
+  minGainDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_GAIN_DB, -14),
+  minDeltaDb: parseFloatEnv(process.env.VOICE_SPEAK_MIN_DELTA_DB, 0.3),
 });
 
 const resolveVoiceMp3NormalizationOptions = (): VoiceMp3NormalizationOptions => ({
   enabled: parseBooleanFlag(process.env.VOICE_SPEAK_MP3_NORMALIZE_ENABLED, true),
   ffmpegPath: process.env.VOICE_SPEAK_MP3_FFMPEG_PATH?.trim() || undefined,
-  bitrateKbps: parseIntEnv(process.env.VOICE_SPEAK_MP3_BITRATE_KBPS, 128),
+  bitrateKbps: parseIntEnv(process.env.VOICE_SPEAK_MP3_BITRATE_KBPS, 192),
 });
+
+const formatVoiceNormalizationBenchmarkHeader = (
+  wavOptions: VoiceWavNormalizationOptions,
+  mp3Options: VoiceMp3NormalizationOptions,
+): string => {
+  const enabled = wavOptions.enabled !== false;
+  const mp3Enabled = mp3Options.enabled !== false;
+  const peak = Number.isFinite(wavOptions.targetPeakDbfs as number)
+    ? Number(wavOptions.targetPeakDbfs)
+    : -1;
+  const rms = Number.isFinite(wavOptions.targetRmsDbfs as number)
+    ? Number(wavOptions.targetRmsDbfs)
+    : -14;
+  const maxGain = Number.isFinite(wavOptions.maxGainDb as number)
+    ? Number(wavOptions.maxGainDb)
+    : 20;
+  const minGain = Number.isFinite(wavOptions.minGainDb as number)
+    ? Number(wavOptions.minGainDb)
+    : -14;
+  const minDelta = Number.isFinite(wavOptions.minDeltaDb as number)
+    ? Number(wavOptions.minDeltaDb)
+    : 0.3;
+  const bitrate = Number.isFinite(mp3Options.bitrateKbps as number)
+    ? Number(mp3Options.bitrateKbps)
+    : 192;
+  return [
+    "mobile_voice_v1",
+    `enabled=${enabled ? 1 : 0}`,
+    `peak=${peak.toFixed(1)}`,
+    `rms=${rms.toFixed(1)}`,
+    `maxGain=${maxGain.toFixed(1)}`,
+    `minGain=${minGain.toFixed(1)}`,
+    `minDelta=${minDelta.toFixed(1)}`,
+    `mp3=${mp3Enabled ? 1 : 0}`,
+    `kbps=${Math.max(0, Math.round(bitrate))}`,
+  ].join(";");
+};
 
 const resolveBudgetConfig = () => ({
   missionWindowMs: parseIntEnv(process.env.VOICE_BUDGET_MISSION_WINDOW_MS, 60_000),
@@ -1350,6 +1388,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const timeoutMs = 15_000;
   const maxAttempts = 2;
   const resolvedProfileHeader = requestedVoiceProfile ?? "default";
+  const wavNormalizationOptions = resolveVoiceWavNormalizationOptions();
+  const mp3NormalizationOptions = resolveVoiceMp3NormalizationOptions();
+  const normalizationBenchmarkHeader = formatVoiceNormalizationBenchmarkHeader(
+    wavNormalizationOptions,
+    mp3NormalizationOptions,
+  );
   cleanupVoiceSpeakChunkCache(policyNowMs);
   const cacheKey = createVoiceSpeakCacheKey(payload, provider, resolvedProfileHeader);
   const cached = readVoiceSpeakChunkCache(cacheKey, policyNowMs);
@@ -1363,6 +1407,9 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     }
     if (cached.normalizationGainDbHeader) {
       res.setHeader("x-voice-normalization-gain-db", cached.normalizationGainDbHeader);
+    }
+    if (cached.normalizationBenchmarkHeader) {
+      res.setHeader("x-voice-normalization-benchmark", cached.normalizationBenchmarkHeader);
     }
     if (payload.watermark_mode) {
       res.setHeader("x-watermark-mode", payload.watermark_mode);
@@ -1508,8 +1555,8 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const normalization = await normalizeVoiceBuffer({
     buffer: success.buffer,
     contentType: success.contentType,
-    wavOptions: resolveVoiceWavNormalizationOptions(),
-    mp3Options: resolveVoiceMp3NormalizationOptions(),
+    wavOptions: wavNormalizationOptions,
+    mp3Options: mp3NormalizationOptions,
   });
   const normalizationHeader =
     normalization.applied
@@ -1525,6 +1572,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     durationHeader: success.durationHeader,
     normalizationHeader,
     normalizationGainDbHeader,
+    normalizationBenchmarkHeader,
     buffer: normalization.buffer,
   });
   recordBackendSuccess();
@@ -1536,6 +1584,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   if (normalizationGainDbHeader) {
     res.setHeader("x-voice-normalization-gain-db", normalizationGainDbHeader);
   }
+  res.setHeader("x-voice-normalization-benchmark", normalizationBenchmarkHeader);
   if (payload.watermark_mode) {
     res.setHeader("x-watermark-mode", payload.watermark_mode);
   }
