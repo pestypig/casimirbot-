@@ -104,6 +104,8 @@ export function transitionReadAloudState(
 
 const SPEAK_TEXT_MAX_CHARS = 600;
 const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
+const MOBILE_AUDIO_UNLOCK_DATA_URI =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
 const FILE_PATH_CITATION_SEGMENT =
   "(?:[A-Za-z]:[\\\\/]|(?:docs|client|server|shared|scripts|tests|configs|reports|artifacts|packages|sdk|cli)/)";
 const FILE_PATH_CITATION_PATTERN = new RegExp(`${FILE_PATH_CITATION_SEGMENT}[^\\s)\\]]+`, "gi");
@@ -3656,6 +3658,7 @@ export function HelixAskPill({
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
+  const voiceAudioUnlockedRef = useRef(false);
   const voiceAutoSpeakQueueRef = useRef<VoicePlaybackUtterance[]>([]);
   const voiceAutoSpeakRunningRef = useRef(false);
   const voiceAutoSpeakActiveUtteranceRef = useRef<VoicePlaybackUtterance | null>(null);
@@ -5234,11 +5237,40 @@ export function HelixAskPill({
     return state.latestRevision > revision.revision;
   }, []);
 
+  const primeVoiceAudioPlayback = useCallback(async (): Promise<boolean> => {
+    if (voiceAudioUnlockedRef.current) return true;
+    if (typeof window === "undefined") return false;
+    try {
+      const primer = new Audio();
+      primer.preload = "auto";
+      primer.playsInline = true;
+      primer.setAttribute("playsinline", "true");
+      primer.setAttribute("webkit-playsinline", "true");
+      primer.muted = true;
+      primer.src = MOBILE_AUDIO_UNLOCK_DATA_URI;
+      const playPromise = primer.play();
+      if (playPromise && typeof playPromise.then === "function") {
+        await playPromise;
+      }
+      primer.pause();
+      primer.currentTime = 0;
+      primer.src = "";
+      voiceAudioUnlockedRef.current = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
       const audio = new Audio();
       const url = URL.createObjectURL(input.blob);
+      audio.preload = "auto";
+      audio.playsInline = true;
+      audio.setAttribute("playsinline", "true");
+      audio.setAttribute("webkit-playsinline", "true");
       playbackUrlRef.current = url;
       playbackReplyIdRef.current = replyId;
       audio.src = url;
@@ -5293,7 +5325,15 @@ export function HelixAskPill({
             .catch(() => finalize("error"));
           return;
         }
-        void playPromise.catch(() => finalize("error"));
+        void playPromise.catch((error) => {
+          if (
+            error instanceof DOMException &&
+            (error.name === "NotAllowedError" || error.name === "AbortError")
+          ) {
+            setVoiceInputError("Audio blocked on this device. Tap mic to enable playback.");
+          }
+          finalize("error");
+        });
       });
     },
     [],
@@ -6126,6 +6166,7 @@ export function HelixAskPill({
       const text = buildCopyText(reply);
       if (!text) return;
       try {
+        await primeVoiceAudioPlayback();
         await requestVoicePlayback({
           text,
           eventId: reply.id,
@@ -6135,7 +6176,7 @@ export function HelixAskPill({
         // requestVoicePlayback handles state cleanup for manual read aloud.
       }
     },
-    [buildCopyText, requestVoicePlayback],
+    [buildCopyText, primeVoiceAudioPlayback, requestVoicePlayback],
   );
 
   useEffect(() => {
@@ -8995,6 +9036,7 @@ export function HelixAskPill({
   }, [evaluateMicLevel, markVoiceCheckpoint, micArmState, setVoiceWarning, stopVoiceCapture]);
 
   const handleVoiceInputToggle = useCallback(() => {
+    void primeVoiceAudioPlayback();
     if (micArmState === "on") {
       setMicArmState("off");
       setVoiceInputError(null);
@@ -9004,7 +9046,7 @@ export function HelixAskPill({
     setMicArmState("on");
     setVoiceInputState("listening");
     setVoiceInputError(null);
-  }, [micArmState, stopVoiceCapture]);
+  }, [micArmState, primeVoiceAudioPlayback, stopVoiceCapture]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -9772,6 +9814,7 @@ export function HelixAskPill({
   const handleAskSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      void primeVoiceAudioPlayback();
       const rawInput = askInputRef.current?.value ?? "";
       const entries = parseQueuedQuestions(rawInput);
       if (entries.length === 0) return;
@@ -9854,6 +9897,7 @@ export function HelixAskPill({
       getHelixAskSessionId,
       openPanelById,
       parseQueuedQuestions,
+      primeVoiceAudioPlayback,
       resolveSelectedContextCapsuleIds,
       requestMoodHint,
       resizeTextarea,
@@ -10142,6 +10186,9 @@ export function HelixAskPill({
           className={`w-full ${maxWidthClass} transition-[max-width] duration-300 ease-out`}
           style={formMaxWidthStyle}
           onSubmit={handleAskSubmit}
+          onPointerDownCapture={() => {
+            void primeVoiceAudioPlayback();
+          }}
         >
         <div
           className={`relative overflow-visible rounded-3xl border bg-slate-950/80 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur ${moodPalette.surfaceBorder}`}
