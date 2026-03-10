@@ -317,12 +317,14 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(
       decideExplorationLadderAction({
         explorationAttemptCount: 1,
+        promptText: "Please verify this with pass/fail and evidence anchors.",
         outputText: "Next step: run pass/fail verification with evidence anchors.",
       }).action,
     ).toBe("escalate_verify");
     expect(
       decideExplorationLadderAction({
         explorationAttemptCount: 1,
+        promptText: "Implement the change and run the tool.",
         outputText: "Action required: apply patch and run tool execution.",
       }).action,
     ).toBe("escalate_act");
@@ -504,12 +506,18 @@ describe("HelixAskPill mic helper behavior", () => {
       pauseMs: 300,
       stability: 0.45,
     });
+    const danglingTail = scoreVoiceTurnComplete({
+      transcript: "it's not like a classical system that you can",
+      pauseMs: 1600,
+      stability: 1,
+    });
     const high = scoreVoiceTurnComplete({
       transcript: "Negative energy density is bounded by quantum inequalities.",
       pauseMs: 1600,
       stability: 1,
     });
     expect(low.band).toBe("low");
+    expect(danglingTail.band).not.toBe("high");
     expect(high.band).toBe("high");
   });
 

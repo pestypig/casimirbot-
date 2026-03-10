@@ -6,6 +6,13 @@ let isActivePlayback: typeof import("@/components/helix/HelixAskPill").isActiveP
 let shouldAutoSpeakVoiceDecisionLifecycle: typeof import("@/components/helix/HelixAskPill").shouldAutoSpeakVoiceDecisionLifecycle;
 let shouldInterruptForSupersededReason: typeof import("@/components/helix/HelixAskPill").shouldInterruptForSupersededReason;
 let stripVoiceCitationArtifacts: typeof import("@/components/helix/HelixAskPill").stripVoiceCitationArtifacts;
+let shouldDispatchReasoningAttempt: typeof import("@/components/helix/HelixAskPill").shouldDispatchReasoningAttempt;
+let shouldForceObserveDispatchFromSuppression: typeof import("@/components/helix/HelixAskPill").shouldForceObserveDispatchFromSuppression;
+let isArtifactDominatedReasoningText: typeof import("@/components/helix/HelixAskPill").isArtifactDominatedReasoningText;
+let sanitizeReasoningOutputText: typeof import("@/components/helix/HelixAskPill").sanitizeReasoningOutputText;
+let hasDanglingTurnTail: typeof import("@/components/helix/HelixAskPill").hasDanglingTurnTail;
+let isLowInformationTailTranscript: typeof import("@/components/helix/HelixAskPill").isLowInformationTailTranscript;
+let decideExplorationLadderAction: typeof import("@/components/helix/HelixAskPill").decideExplorationLadderAction;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -16,6 +23,13 @@ beforeAll(async () => {
     shouldAutoSpeakVoiceDecisionLifecycle,
     shouldInterruptForSupersededReason,
     stripVoiceCitationArtifacts,
+    shouldDispatchReasoningAttempt,
+    shouldForceObserveDispatchFromSuppression,
+    isArtifactDominatedReasoningText,
+    sanitizeReasoningOutputText,
+    hasDanglingTurnTail,
+    isLowInformationTailTranscript,
+    decideExplorationLadderAction,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -79,6 +93,19 @@ describe("shouldAutoSpeakVoiceDecisionLifecycle", () => {
     expect(shouldAutoSpeakVoiceDecisionLifecycle("running")).toBe(false);
     expect(shouldAutoSpeakVoiceDecisionLifecycle("done")).toBe(false);
   });
+
+  it("stays quiet for superseded interruption lifecycle updates", () => {
+    expect(
+      shouldAutoSpeakVoiceDecisionLifecycle("failed", {
+        failReasonRaw: "the run was interrupted by a newer turn",
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoSpeakVoiceDecisionLifecycle("suppressed", {
+        routeReasonCode: "voice_turn_superseded_by_newer_attempt",
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("shouldInterruptForSupersededReason", () => {
@@ -96,5 +123,96 @@ describe("stripVoiceCitationArtifacts", () => {
       "Tree Walk: Warp Mechanics (tree-derived; source: docs/knowledge/warp/warp-mechanics-tree.json)",
     );
     expect(cleaned).toBe("Tree Walk: Warp Mechanics (tree-derived)");
+  });
+
+  it("strips bare file basenames and extension residue tokens", () => {
+    const cleaned = stripVoiceCitationArtifacts(
+      "ts, server/services/planner/grounding.ts. Constraint: plan.ts, docs/helix-ask-flow.md",
+    );
+    expect(cleaned).not.toContain("grounding.ts");
+    expect(cleaned).not.toContain("plan.ts");
+    expect(cleaned).not.toContain("docs/helix-ask-flow.md");
+  });
+});
+
+describe("shouldDispatchReasoningAttempt", () => {
+  it("dispatches reasoning for directive prompts with leading discourse markers", () => {
+    expect(shouldDispatchReasoningAttempt("Okay, define quantum system.")).toBe(true);
+  });
+
+  it("suppresses pure acknowledgments", () => {
+    expect(shouldDispatchReasoningAttempt("okay")).toBe(false);
+  });
+});
+
+describe("suppression override guard", () => {
+  it("forces observe dispatch for real prompts suppressed as filler/low-salience", () => {
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:filler",
+        transcript: "Okay, define a quantum system in simple terms.",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not force dispatch for low-information tails", () => {
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:low_salience",
+        transcript: "Friends.",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("artifact-dominated output guards", () => {
+  it("detects artifact-heavy final text", () => {
+    const noisy =
+      "ts, server/services/planner/grounding.ts. Evidence: docs/helix-ask-flow.md. Constraint: plan.ts.";
+    expect(isArtifactDominatedReasoningText(noisy)).toBe(true);
+  });
+
+  it("detects mission/warp artifact template spill", () => {
+    const noisy =
+      "What is warp bubble: docs/casimir-tile-mechanism.md What is mission ethos: docs/BUSINESS_MODEL.md How they connect: Verification hooks translate design ambition.";
+    expect(isArtifactDominatedReasoningText(noisy)).toBe(true);
+  });
+
+  it("sanitizes citation/path fragments for display", () => {
+    const noisy =
+      "ts, server/services/planner/grounding.ts. Evidence: docs/helix-ask-flow.md. In practice, the system explains tradeoffs.";
+    const cleaned = sanitizeReasoningOutputText(noisy);
+    expect(cleaned).toContain("In practice, the system explains tradeoffs.");
+    expect(cleaned).not.toContain("grounding.ts");
+    expect(cleaned).not.toContain("docs/helix-ask-flow.md");
+  });
+});
+
+describe("exploration escalation guard", () => {
+  it("does not auto-escalate verify from artifact-heavy observe output", () => {
+    const decision = decideExplorationLadderAction({
+      explorationAttemptCount: 1,
+      promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
+      outputText:
+        "What is warp bubble: docs/casimir-tile-mechanism.md What is mission ethos: docs/BUSINESS_MODEL.md",
+      mode: "observe",
+      debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
+    });
+    expect(decision.action).toBe("finalize");
+  });
+});
+
+describe("late-tail continuation guards", () => {
+  it("detects dangling connector endings", () => {
+    expect(hasDanglingTurnTail("the virtual particles of the energy density is the")).toBe(true);
+    expect(hasDanglingTurnTail("it's not like a classical system that you can")).toBe(true);
+    expect(hasDanglingTurnTail("quantum systems exhibit superposition.")).toBe(false);
+  });
+
+  it("marks short orphan fragments as low-information tails", () => {
+    expect(isLowInformationTailTranscript("Friends.")).toBe(true);
+    expect(isLowInformationTailTranscript("Define quantum system")).toBe(false);
   });
 });
