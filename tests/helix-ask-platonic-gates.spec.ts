@@ -82,6 +82,39 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).toMatch(/morphospace|attractors/i);
   });
 
+  it("keeps hybrid conceptual answers when repo evidence is not required", () => {
+    const answer =
+      "Kinematics describes motion without modeling the forces, and it provides the baseline language for classical system behavior.";
+    const result = applyHelixAskPlatonicGates({
+      question: "What is the function of a classical physical system like kinematics?",
+      answer,
+      domain: "hybrid",
+      tier: "F1",
+      intentId: "hybrid.concept_plus_system_mapping",
+      format: "brief",
+      evidenceGateOk: false,
+      evidenceText: "helix ask pipeline intent routing evidence gates and capsules.",
+    });
+    expect(result.coverageGateApplied).toBe(false);
+    expect(result.answer).toBe(answer);
+  });
+
+  it("still fail-closes hybrid coverage when repo evidence is explicitly required", () => {
+    const result = applyHelixAskPlatonicGates({
+      question: "How does this system use morphospace attractors?",
+      answer: "It routes evidence and builds an answer.",
+      domain: "hybrid",
+      tier: "F1",
+      intentId: "hybrid.concept_plus_system_mapping",
+      format: "brief",
+      evidenceGateOk: false,
+      requiresRepoEvidence: true,
+      evidenceText: "helix ask pipeline intent routing evidence gates and capsules.",
+    });
+    expect(result.coverageGateApplied).toBe(true);
+    expect(result.answer).toMatch(/Repo evidence did not cover key terms/i);
+  });
+
   it("uses explicit coverage slots when provided", () => {
     const result = applyHelixAskPlatonicGates({
       question:

@@ -169,6 +169,10 @@ const IDEOLOGY_INTENT_ID = "repo.ideology_reference";
 
 const SYSTEM_TERMS =
   /\b(helix ask|this system|repo|repository|codebase|server\/|client\/|api\/|endpoint|constraint gate|certificate|admissible|verified|integrity_ok)\b/i;
+const OPEN_WORLD_CONCEPTUAL_RE =
+  /\b(what is|what's|define|definition|meaning|describe)\b/i;
+const REPO_REQUEST_CUE_RE =
+  /\b(this system|in this system|repo|repository|codebase|file paths?|which files?|which file|where in the code|path\b|module|component|endpoint|route|handler|api|server\/|client\/|docs\/|according to the (?:repo|codebase|code)|from the (?:repo|codebase|code)|cite files?)\b/i;
 
 const SENTENCE_SPLIT = /(?<=[.!?])\s+/;
 const LIST_STRUCTURE_RE = /^\s*(?:[-*]|\d+\.)\s+/m;
@@ -1331,6 +1335,14 @@ function applyCoverageGate(
   if (input.domain !== "repo" && input.domain !== "hybrid" && input.domain !== "falsifiable") {
     return { answer: input.answer, applied: false };
   }
+  if (input.domain !== "repo" && isOpenWorldConceptualQuestion(input.question)) {
+    return { answer: input.answer, applied: false, reason: "open_world_conceptual" };
+  }
+  // Hybrid/falsifiable turns are often open-world conceptual prompts. Do not
+  // force repo-key coverage unless repo evidence is explicitly required.
+  if (input.domain !== "repo" && input.requiresRepoEvidence !== true) {
+    return { answer: input.answer, applied: false, reason: "non_repo_no_obligation" };
+  }
   if (!input.evidenceText || input.evidenceText.trim().length === 0) {
     return { answer: input.answer, applied: false };
   }
@@ -1352,7 +1364,11 @@ function applyCoverageGate(
     return { answer: input.answer, applied: false, reason: "missing_slots_filtered" };
   }
   const guarded = `Repo evidence did not cover key terms from the question (${missingList}). Please point to the relevant files or narrow the request.`;
-  if (input.evidenceGateOk !== true && input.intentId !== "repo.ideology_reference") {
+  if (
+    input.evidenceGateOk !== true &&
+    input.intentId !== "repo.ideology_reference" &&
+    input.requiresRepoEvidence === true
+  ) {
     return { answer: guarded, applied: true, reason: "missing_slots" };
   }
   const clarifyLine = missingList
@@ -1452,6 +1468,12 @@ const CONSTRAINT_LINE_RE =
   /^(gate:|status:|residuals:|constraints:|violations:|certificate:|integrity_ok:|source:)/i;
 
 const ensureUnique = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
+
+const isOpenWorldConceptualQuestion = (question: string): boolean => {
+  const normalized = String(question || "").trim().toLowerCase();
+  if (!normalized) return false;
+  return OPEN_WORLD_CONCEPTUAL_RE.test(normalized) && !REPO_REQUEST_CUE_RE.test(normalized);
+};
 
 function buildBeliefGraphSummary(
   input: HelixAskPlatonicInput,
@@ -1600,6 +1622,12 @@ function applyBeliefGate(
   }
   if (input.domain === "general") {
     return { answer: input.answer, applied: false };
+  }
+  if (input.domain !== "repo" && isOpenWorldConceptualQuestion(input.question)) {
+    return { answer: input.answer, applied: false, reason: "open_world_conceptual" };
+  }
+  if (input.domain !== "repo" && input.requiresRepoEvidence !== true) {
+    return { answer: input.answer, applied: false, reason: "non_repo_no_obligation" };
   }
   if (!input.evidenceText || input.evidenceText.trim().length === 0) {
     return { answer: input.answer, applied: false };

@@ -806,7 +806,7 @@ export type ConversationTurnClassification = {
 
 export type ConversationBrief = {
   text: string;
-  source?: "llm" | "fallback";
+  source?: "llm" | "fallback" | "none";
 };
 
 export type ConversationDispatchDecision = {

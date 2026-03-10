@@ -15638,16 +15638,43 @@ const parseConversationBriefResult = (raw: string): string | null => {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const jsonCandidate = extractJsonObject(trimmed);
-  if (!jsonCandidate) return null;
-  try {
-    const parsed = HelixConversationBriefSchema.safeParse(JSON.parse(jsonCandidate));
-    if (parsed.success) {
-      return parsed.data.text.trim();
+  if (jsonCandidate) {
+    try {
+      const json = JSON.parse(jsonCandidate) as unknown;
+      const parsed = HelixConversationBriefSchema.safeParse(json);
+      if (parsed.success) {
+        return parsed.data.text.trim();
+      }
+      if (json && typeof json === "object") {
+        const obj = json as Record<string, unknown>;
+        const aliasCandidates: unknown[] = [
+          obj.text,
+          obj.brief,
+          obj.message,
+          obj.content,
+          obj.summary,
+          obj.preview,
+          obj.response,
+          (obj.data as Record<string, unknown> | undefined)?.text,
+          (obj.data as Record<string, unknown> | undefined)?.brief,
+          (obj.result as Record<string, unknown> | undefined)?.text,
+          (obj.result as Record<string, unknown> | undefined)?.brief,
+        ];
+        for (const candidate of aliasCandidates) {
+          if (typeof candidate === "string" && candidate.trim()) {
+            return candidate.trim();
+          }
+        }
+      }
+    } catch {
+      // Fall through to plain-text parsing.
     }
-  } catch {
-    return null;
   }
-  return null;
+  const plain = trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  return plain || null;
 };
 
 const CONVERSATION_BRIEF_POLICY_FORBIDDEN_RE =
@@ -15707,6 +15734,9 @@ const buildConversationBriefPrompt = (args: {
   lines.push("Use statement-only wording with no direct question to the user.");
   lines.push("Do not include question marks.");
   lines.push("Do not include lifecycle/status text; the client renders status separately.");
+  lines.push('Never write: "Reasoning is running in observe mode."');
+  lines.push('Never write: "I am thinking through this in the background."');
+  lines.push('Never write: "Reasoning is complete; see the answer below."');
   lines.push("Do not output raw route/status codes.");
   lines.push("For exploratory turns, do not ask a clarifier yet; launch observe-first reasoning.");
   lines.push("Ask exactly one clarifier only when the first reasoning attempt cannot progress.");
@@ -15722,6 +15752,40 @@ const buildConversationBriefPrompt = (args: {
   lines.push("");
   lines.push("Current transcript:");
   lines.push(args.transcript);
+  return lines.join("\n");
+};
+
+const buildConversationBriefRepairPrompt = (args: {
+  transcript: string;
+  classification: z.infer<typeof HelixConversationClassifierSchema>;
+  routeReasonCode: HelixConversationRouteReasonCode;
+  recentTurns: string[];
+  priorRawBrief: string;
+  failureReason: string | null;
+}): string => {
+  const lines: string[] = [];
+  lines.push("Repair the brief output to satisfy the Helix conversation brief contract.");
+  lines.push('Return strict JSON only: {"text":"..."}');
+  lines.push("The text must be conversational and content-bearing, not status boilerplate.");
+  lines.push("Do not include lifecycle/status text.");
+  lines.push('Never write: "Reasoning is running in observe mode."');
+  lines.push('Never write: "I am thinking through this in the background."');
+  lines.push('Never write: "Reasoning is complete; see the answer below."');
+  lines.push("Do not output raw route/status codes.");
+  lines.push("Keep to 1-3 short sentences with no question marks.");
+  lines.push("");
+  lines.push(`Classification mode: ${args.classification.mode}`);
+  lines.push(`Dispatch hint: ${args.classification.dispatch_hint ? "true" : "false"}`);
+  lines.push(`Route reason: ${args.routeReasonCode}`);
+  lines.push(`Previous failure reason: ${args.failureReason ?? "unknown"}`);
+  lines.push("Recent turns:");
+  lines.push(args.recentTurns.length > 0 ? args.recentTurns.map((turn) => `- ${turn}`).join("\n") : "- none");
+  lines.push("");
+  lines.push("Current transcript:");
+  lines.push(args.transcript);
+  lines.push("");
+  lines.push("Previous invalid brief output:");
+  lines.push(args.priorRawBrief.trim() || "(empty)");
   return lines.join("\n");
 };
 
@@ -31937,6 +32001,9 @@ const executeHelixAsk = async ({
       );
       const templateLockedPlatonicAnswer =
         Boolean(forcedAnswer && forcedAnswerIsHard && intentProfile.id === "repo.ideology_reference");
+      const preserveReasoningOnlyAnswer =
+        /^voice:/i.test(askTraceId) || parsed.data.mode === "observe";
+      let ungatedReasoningAnswer = cleaned;
       let platonicResult = applyHelixAskPlatonicGates({
         question: baseQuestion,
         answer: cleaned,
@@ -32113,7 +32180,8 @@ const executeHelixAsk = async ({
                 candidate.beliefSummary.unsupportedRate <= platonicResult.beliefSummary.unsupportedRate)
             ) {
               platonicResult = candidate;
-              cleaned = candidate.answer;
+              cleaned = preserveReasoningOnlyAnswer ? repairText : candidate.answer;
+              ungatedReasoningAnswer = cleaned;
               driftRepairImproved = true;
             }
             driftRepairApplied = true;
@@ -32145,6 +32213,7 @@ const executeHelixAsk = async ({
       HELIX_ASK_SCIENTIFIC_CLARIFY &&
       !isIdeologyReferenceIntent &&
       !lockedByIdeologyTemplate &&
+      !preserveReasoningOnlyAnswer &&
       !isScientificMicroReport(cleaned) &&
       (platonicDomain === "repo" || platonicDomain === "hybrid" || platonicDomain === "falsifiable") &&
       (platonicResult.coverageGateApplied ||
@@ -32291,11 +32360,19 @@ const executeHelixAsk = async ({
             },
             notes: notes.length ? notes : undefined,
           });
-        } catch (error) {
-          console.warn("[helix-ask] training trace emit failed", error);
-        }
+      } catch (error) {
+        console.warn("[helix-ask] training trace emit failed", error);
       }
-      cleaned = platonicResult.answer;
+    }
+      if (preserveReasoningOnlyAnswer) {
+        if (platonicResult.answer.trim() !== ungatedReasoningAnswer.trim()) {
+          answerPath.push("policy:voice_reasoning_preserve");
+          logEvent("Platonic gates", "diagnostic_only", "voice_or_observe_preserve_reasoning");
+        }
+        cleaned = ungatedReasoningAnswer;
+      } else {
+        cleaned = platonicResult.answer;
+      }
       const ideologyDeterministicFirstPassFromPath = answerPath.includes(
         "forcedAnswer:ideology_social_deterministic",
       );
@@ -32313,7 +32390,7 @@ const executeHelixAsk = async ({
         cleaned = endpointGuardMessage;
         answerPath.push("endpointGuard:applied");
       }
-      if (allowHybridFallback && intentStrategy === "hybrid_explain" && repoScaffold.trim()) {
+      if (!preserveReasoningOnlyAnswer && allowHybridFallback && intentStrategy === "hybrid_explain" && repoScaffold.trim()) {
         const guarded =
           /please point to the relevant files|available evidence was weakly reflected|repo evidence did not cover/i.test(
             cleaned,
@@ -34465,9 +34542,12 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     },
   });
 
-  let briefSource: "llm" | "fallback" = "llm";
+  let briefSource: "llm" | "none" = "none";
   let briefFailReason: string | null = null;
   let briefText = "";
+  let briefRepairAttempted = false;
+  let briefRepairSucceeded = false;
+  let rawBrief = "";
   const briefStartedAt = Date.now();
   const briefPrompt = buildConversationBriefPrompt({
     transcript,
@@ -34491,40 +34571,70 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
         tenantId: tenantId ?? undefined,
       },
     );
-    const rawBrief = String((briefResult as { text?: unknown })?.text ?? "");
+    rawBrief = String((briefResult as { text?: unknown })?.text ?? "");
     const parsedBrief = parseConversationBriefResult(rawBrief);
     if (parsedBrief && parsedBrief.trim()) {
       const sanitizedBrief = sanitizeConversationBriefText(parsedBrief);
       if (isConversationBriefPolicyCompliant(sanitizedBrief, classification.mode)) {
         briefText = sanitizedBrief;
+        briefSource = "llm";
       } else {
-        briefSource = "fallback";
-        briefFailReason = "conversation_brief_policy_fallback";
-        briefText = buildConversationFallbackBrief({
-          transcript,
-          mode: classification.mode,
-          dispatchHint: classification.dispatch_hint,
-        });
+        briefFailReason = "conversation_brief_policy_none";
       }
     } else {
-      briefSource = "fallback";
-      briefFailReason = "conversation_brief_parse_fallback";
-      briefText = buildConversationFallbackBrief({
-        transcript,
-        mode: classification.mode,
-        dispatchHint: classification.dispatch_hint,
-      });
+      briefFailReason = "conversation_brief_parse_none";
     }
   } catch (error) {
-    briefSource = "fallback";
-    briefFailReason = "conversation_brief_model_fallback";
-    briefText = buildConversationFallbackBrief({
+    briefFailReason = "conversation_brief_model_none";
+  }
+  if (
+    briefSource !== "llm" &&
+    classifierSource === "llm"
+  ) {
+    briefRepairAttempted = true;
+    const briefRepairPrompt = buildConversationBriefRepairPrompt({
       transcript,
-      mode: classification.mode,
-      dispatchHint: classification.dispatch_hint,
+      classification,
+      routeReasonCode: routeDecision.routeReasonCode,
+      recentTurns,
+      priorRawBrief: rawBrief,
+      failureReason: briefFailReason,
     });
+    try {
+      const repairResult = await llmLocalHandler(
+        {
+          prompt: briefRepairPrompt,
+          max_tokens: HELIX_CONVERSATION_BRIEF_MAX_TOKENS,
+          temperature: 0.15,
+          model,
+          metadata: { kind: "helix.conversation.brief.repair" },
+        },
+        {
+          sessionId,
+          traceId: `${traceId}:brief:repair`,
+          personaId,
+          tenantId: tenantId ?? undefined,
+        },
+      );
+      const repairRaw = String((repairResult as { text?: unknown })?.text ?? "");
+      const repairParsed = parseConversationBriefResult(repairRaw);
+      if (repairParsed && repairParsed.trim()) {
+        const sanitizedRepair = sanitizeConversationBriefText(repairParsed);
+        if (isConversationBriefPolicyCompliant(sanitizedRepair, classification.mode)) {
+          briefText = sanitizedRepair;
+          briefSource = "llm";
+          briefFailReason = null;
+          briefRepairSucceeded = true;
+        }
+      }
+    } catch {
+      // Keep original fail reason and return none when repair is unavailable.
+    }
   }
   briefText = sanitizeConversationBriefText(briefText);
+  if (!briefText) {
+    briefSource = "none";
+  }
   appendConversationLog({
     tool: "conversation.brief_ready",
     detail: classification.mode,
@@ -34535,6 +34645,8 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     meta: {
       source: briefSource,
       text_length: briefText.length,
+      repair_attempted: briefRepairAttempted,
+      repair_succeeded: briefRepairSucceeded,
     },
   });
 

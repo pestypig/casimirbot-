@@ -81,9 +81,11 @@ export type VoiceLaneTimelineDebugSource =
   | "voice_capture"
   | "conversation"
   | "reasoning"
-  | "chunk_playback";
+  | "chunk_playback"
+  | "system";
 
 export type VoiceLaneTimelineDebugKind =
+  | "build_info"
   | "prompt_recorded"
   | "brief"
   | "reasoning_attempt"
@@ -114,6 +116,15 @@ export type VoiceLaneTimelineDebugEvent = {
   chunkCount?: number | null;
   text?: string | null;
   detail?: string | null;
+  hlcMs?: number | null;
+  seq?: number | null;
+  revision?: number | null;
+  sealToken?: string | null;
+  briefSource?: "llm" | "none" | null;
+  suppressionCause?: string | null;
+  authorityRejectStage?: "preflight" | "stream" | "final" | null;
+  finalSource?: "normal_reasoning" | "strict_gate_override" | null;
+  causalRefId?: string | null;
 };
 
 export type VoiceCaptureDiagnosticsSnapshot = {

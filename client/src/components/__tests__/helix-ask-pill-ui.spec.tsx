@@ -91,6 +91,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(evaluateBlock?.[0]).toContain('stopReadAloud("barge_in");');
     expect(evaluateBlock?.[0]).toContain("turn_state: \"interrupted\"");
   });
+
+  it("includes build provenance as a system timeline event", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('fetch("/version"');
+    expect(source).toContain('source: "system"');
+    expect(source).toContain('kind: "build_info"');
+  });
 });
 
 describe("HelixAskPill mic helper behavior", () => {
@@ -228,7 +235,7 @@ describe("HelixAskPill mic helper behavior", () => {
       }),
     ).toEqual({
       suppress: true,
-      reason: "stale_revision",
+      reason: "sealed_revision_mismatch",
       restart: true,
     });
     expect(
@@ -245,7 +252,7 @@ describe("HelixAskPill mic helper behavior", () => {
       }),
     ).toEqual({
       suppress: true,
-      reason: "stale_dispatch_hash",
+      reason: "dispatch_hash_mismatch",
       restart: true,
     });
     expect(
@@ -360,7 +367,7 @@ describe("HelixAskPill mic helper behavior", () => {
       }),
     ).toEqual({
       suppress: true,
-      reason: "inactive_attempt",
+      reason: "phase_not_sealed",
       restart: false,
     });
 
@@ -376,7 +383,7 @@ describe("HelixAskPill mic helper behavior", () => {
       }),
     ).toEqual({
       suppress: true,
-      reason: "stale_revision",
+      reason: "sealed_revision_mismatch",
       restart: false,
     });
 
@@ -394,7 +401,7 @@ describe("HelixAskPill mic helper behavior", () => {
       }),
     ).toEqual({
       suppress: true,
-      reason: "stale_revision",
+      reason: "seal_token_mismatch",
       restart: false,
     });
 
@@ -464,6 +471,23 @@ describe("HelixAskPill mic helper behavior", () => {
     ).toBe("finalize");
   });
 
+  it("finalizes substantive artifact-noisy observe output instead of looping restarts", () => {
+    const artifactNoisyButSubstantive = [
+      "A system is a set of interacting components with boundaries and feedback loops.[docs/knowledge/a.md]",
+      "In this codebase, the sun consciousness topic appears in retrieval and reasoning orchestration paths.[docs/knowledge/b.md]",
+      "A practical next step is to inspect those paths and map where context is injected before final response assembly.[docs/knowledge/c.md]",
+      "That gives a grounded baseline before deeper verification or action steps.[docs/knowledge/d.md]",
+      "The overlap between question intent and retrieved context remains the main alignment check.[docs/knowledge/e.md]",
+    ].join(" ");
+    expect(
+      decideExplorationLadderAction({
+        explorationAttemptCount: 2,
+        promptText: "Can you see what the codebase has for the sun consciousness system?",
+        outputText: artifactNoisyButSubstantive,
+      }).action,
+    ).toBe("finalize");
+  });
+
   it("appends transcript text without losing existing draft formatting", () => {
     expect(mergeVoiceTranscriptDraft("Check", "captured transcript")).toBe("Check captured transcript");
     expect(mergeVoiceTranscriptDraft("Check ", "captured transcript")).toBe("Check captured transcript");
@@ -471,6 +495,18 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(mergeVoiceTranscriptDraft("What is negative energy...", "...where does it come from")).toBe(
       "What is negative energy where does it come from",
     );
+    expect(
+      mergeVoiceTranscriptDraft(
+        "First sentence.",
+        "First sentence. Second sentence with a new direction?",
+      ),
+    ).toBe("First sentence. Second sentence with a new direction?");
+    expect(
+      mergeVoiceTranscriptDraft(
+        "First sentence. Transition phrase",
+        "Transition phrase with additional detail.",
+      ),
+    ).toBe("First sentence. Transition phrase with additional detail.");
   });
 
   it("smooths the level meter with attack/release behavior", () => {

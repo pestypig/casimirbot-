@@ -77,7 +77,7 @@ describe("conversation-turn route", () => {
     expect(briefPrompt).toContain("Do not output raw route/status codes.");
   }, 20000);
 
-  it("falls back deterministically when brief payload is non-JSON or policy-violating", async () => {
+  it("keeps brief empty when LLM brief payload is invalid", async () => {
     llmLocalHandlerMock
       .mockResolvedValueOnce({
         text: JSON.stringify({
@@ -106,9 +106,9 @@ describe("conversation-turn route", () => {
     });
     expect(res.body.route_reason_code).toMatch(/^dispatch:/);
     expect(res.body.dispatch?.dispatch_hint).toBe(true);
-    expect(res.body.brief?.source).toBe("fallback");
-    expect(String(res.body.fail_reason ?? "")).toContain("conversation_brief_parse_fallback");
-    expect(String(res.body.brief?.text ?? "").toLowerCase()).toContain("background");
+    expect(res.body.brief?.source).toBe("none");
+    expect(String(res.body.fail_reason ?? "")).toMatch(/conversation_brief_(parse|policy)_none/);
+    expect(String(res.body.brief?.text ?? "")).toBe("");
   }, 20000);
 
   it("rejects clarifier-style brief text for observe turns even when JSON is valid", async () => {
@@ -138,9 +138,9 @@ describe("conversation-turn route", () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.classification?.mode).toBe("observe");
     expect(res.body.dispatch?.dispatch_hint).toBe(true);
-    expect(res.body.brief?.source).toBe("fallback");
-    expect(String(res.body.fail_reason ?? "")).toContain("conversation_brief_policy_fallback");
-    expect(String(res.body.brief?.text ?? "").toLowerCase()).not.toContain("share one specific goal or constraint");
+    expect(res.body.brief?.source).toBe("none");
+    expect(String(res.body.fail_reason ?? "")).toContain("conversation_brief_policy_none");
+    expect(String(res.body.brief?.text ?? "")).toBe("");
   }, 20000);
 
   it("falls back deterministically when model/parse paths fail", async () => {
@@ -158,13 +158,13 @@ describe("conversation-turn route", () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.classification?.source).toBe("fallback");
     expect(res.body.classification?.mode).toBe("act");
-    expect(["llm", "fallback"]).toContain(res.body.brief?.source);
+    expect(["llm", "none"]).toContain(res.body.brief?.source);
     expect(typeof res.body.brief?.text).toBe("string");
     expect(["conversation_classifier_model_fallback", "conversation_classifier_parse_fallback"]).toContain(
       res.body.fail_reason,
     );
     expect(res.body.dispatch?.dispatch_hint).toBe(true);
-    expect(String(res.body.brief?.text ?? "").toLowerCase()).toContain("background");
+    expect(String(res.body.brief?.text ?? "")).toBe("");
     expect(llmLocalHandlerMock).toHaveBeenCalledTimes(2);
   }, 20000);
 
