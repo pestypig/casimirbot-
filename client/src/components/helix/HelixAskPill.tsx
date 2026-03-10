@@ -2241,6 +2241,10 @@ function normalizeVoiceFailureReasonText(reason?: string | null): string | null 
       pattern: /\bHELIX_ASK_FAILED_403\b/,
       text: "access policy blocked this run",
     },
+    {
+      pattern: /\bREASONING_TIMEOUT\b|\bHELIX_ASK_TIMEOUT\b|\bREQUEST TIMED OUT\b/,
+      text: "the run timed out before completion",
+    },
   ];
   for (const entry of messageMap) {
     if (entry.pattern.test(normalized)) {
@@ -2251,6 +2255,14 @@ function normalizeVoiceFailureReasonText(reason?: string | null): string | null 
     return "the run was interrupted by a newer turn";
   }
   return null;
+}
+
+function isReasoningTimeoutReason(reason?: string | null): boolean {
+  const trimmed = reason?.trim();
+  if (!trimmed) return false;
+  return /\breasoning_timeout\b|\bhelix_ask_timeout\b|\brequest timed out\b|\btimed out\b/i.test(
+    trimmed,
+  );
 }
 
 function isVoiceTurnSupersededReason(reason?: string | null): boolean {
@@ -3089,6 +3101,11 @@ const HELIX_MOOD_HINT_MAX_TEXT_CHARS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_MOOD_HINT_MAX_TEXT_CHARS, 720),
   160,
   2400,
+);
+const HELIX_REASONING_ATTEMPT_TIMEOUT_MS = clampNumber(
+  readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_ATTEMPT_TIMEOUT_MS, 90_000),
+  15_000,
+  10 * 60_000,
 );
 type LumaMoodPalette = {
   ring: string;
@@ -6380,6 +6397,7 @@ export function HelixAskPill({
     audio.crossOrigin = "anonymous";
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
+    audio.setAttribute("autoplay", "true");
     audio.volume = 1;
     playbackElementRef.current = audio;
     return audio;
@@ -6463,8 +6481,10 @@ export function HelixAskPill({
     if (typeof window === "undefined") return false;
     try {
       const primer = getOrCreateVoicePlaybackElement();
-      await ensureVoicePlaybackAudioGraph(primer).catch(() => false);
-      primer.muted = true;
+      // Do not mute the unlock primer; muted autoplay can pass without unlocking
+      // subsequent audible playback on mobile browsers.
+      primer.muted = false;
+      primer.volume = 0.01;
       primer.src = MOBILE_AUDIO_UNLOCK_DATA_URI;
       const playPromise = primer.play();
       if (playPromise && typeof playPromise.then === "function") {
@@ -6474,7 +6494,8 @@ export function HelixAskPill({
       primer.currentTime = 0;
       primer.src = "";
       primer.load();
-      primer.muted = false;
+      primer.volume = 1;
+      await ensureVoicePlaybackAudioGraph(primer).catch(() => false);
       voiceAudioUnlockedRef.current = true;
       return true;
     } catch {
@@ -8812,6 +8833,14 @@ export function HelixAskPill({
         reasoningAttemptAbortControllerRef.current = askController;
         reasoningAttemptAbortAttemptIdRef.current = attempt.id;
         try {
+          let timedOut = false;
+          let reasoningTimeoutId: ReturnType<typeof setTimeout> | null = null;
+          if (HELIX_REASONING_ATTEMPT_TIMEOUT_MS > 0) {
+            reasoningTimeoutId = setTimeout(() => {
+              timedOut = true;
+              askController.abort();
+            }, HELIX_REASONING_ATTEMPT_TIMEOUT_MS);
+          }
           const askModeForRequest = attempt.mode === "observe" ? undefined : attempt.mode;
           const askPromptForRequest = attempt.dispatchPrompt ?? attempt.prompt;
           const requestIntentRevision =
@@ -8828,17 +8857,34 @@ export function HelixAskPill({
             Array.isArray(attempt.contextCapsuleIds) && attempt.contextCapsuleIds.length > 0
               ? attempt.contextCapsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS)
               : resolveSelectedContextCapsuleIds(attempt.prompt, undefined, { source: attempt.source });
-          const askResult = await askLocalWithPreflightScopeFallback(undefined, {
-            sessionId,
-            traceId: attempt.traceId,
-            maxTokens: HELIX_ASK_OUTPUT_TOKENS,
-            question: askPromptForRequest,
-            debug: userSettings.showHelixAskDebug,
-            mode: askModeForRequest,
-            capsuleIds: selectedCapsuleIds,
-            dialogue_profile: attempt.profile,
-            signal: askController.signal,
-          });
+          const askResult = await (async () => {
+            try {
+              return await askLocalWithPreflightScopeFallback(undefined, {
+                sessionId,
+                traceId: attempt.traceId,
+                maxTokens: HELIX_ASK_OUTPUT_TOKENS,
+                question: askPromptForRequest,
+                debug: userSettings.showHelixAskDebug,
+                mode: askModeForRequest,
+                capsuleIds: selectedCapsuleIds,
+                dialogue_profile: attempt.profile,
+                signal: askController.signal,
+              });
+            } catch (error) {
+              if (timedOut) {
+                const timeoutError = new Error(
+                  `reasoning_timeout:${HELIX_REASONING_ATTEMPT_TIMEOUT_MS}`,
+                );
+                (timeoutError as { code?: string }).code = "reasoning_timeout";
+                throw timeoutError;
+              }
+              throw error;
+            } finally {
+              if (reasoningTimeoutId !== null) {
+                clearTimeout(reasoningTimeoutId);
+              }
+            }
+          })();
           const response = askResult.response;
           const responseMode =
             response.mode === "read" ||
@@ -9634,8 +9680,14 @@ export function HelixAskPill({
           const message = error instanceof Error ? error.message : String(error);
           const supersededByNewerTurn =
             attempt.source === "voice_auto" && isVoiceTurnSupersededReason(message);
+          const timedOut = !supersededByNewerTurn && isReasoningTimeoutReason(message);
           const failureLifecycle: VoiceDecisionLifecycle = supersededByNewerTurn ? "suppressed" : "failed";
           const failureStatus: ReasoningAttempt["status"] = supersededByNewerTurn ? "suppressed" : "failed";
+          const failureSuppressionCause = supersededByNewerTurn
+            ? "inactive_attempt"
+            : timedOut
+              ? "reasoning_timeout"
+              : "reasoning_failed";
           updateReasoningAttempt(attempt.id, (current) => ({
             ...current,
             status: failureStatus,
@@ -9654,7 +9706,7 @@ export function HelixAskPill({
               160,
             ),
             meta: buildReasoningTimelineMeta(attempt, {
-              suppressionCause: supersededByNewerTurn ? "inactive_attempt" : "reasoning_failed",
+              suppressionCause: failureSuppressionCause,
               authorityRejectStage: "final",
               failReasonRaw: message || null,
               causalRefId: primaryTimelineEntryId,
@@ -9664,9 +9716,13 @@ export function HelixAskPill({
           if (streamEntryId) {
             patchHelixTimelineEntry(streamEntryId, {
               status: supersededByNewerTurn ? "suppressed" : "failed",
-              detail: supersededByNewerTurn ? "superseded by newer turn" : "stream failed",
+              detail: supersededByNewerTurn
+                ? "superseded by newer turn"
+                : timedOut
+                  ? "reasoning attempt timed out"
+                  : "stream failed",
               meta: buildReasoningTimelineMeta(attempt, {
-                suppressionCause: supersededByNewerTurn ? "inactive_attempt" : "reasoning_failed",
+                suppressionCause: failureSuppressionCause,
                 authorityRejectStage: "stream",
                 failReasonRaw: message || null,
                 causalRefId: primaryTimelineEntryId,
@@ -9687,13 +9743,17 @@ export function HelixAskPill({
               }),
               280,
             ),
-            detail: supersededByNewerTurn ? "superseded by newer turn" : "reasoning attempt failed",
+            detail: supersededByNewerTurn
+              ? "superseded by newer turn"
+              : timedOut
+                ? "reasoning attempt timed out"
+                : "reasoning attempt failed",
             mode: attempt.mode,
             traceId: attempt.traceId,
             attemptId: attempt.id,
             meta: buildReasoningTimelineMeta(attempt, {
               failReasonRaw: message || null,
-              suppressionCause: supersededByNewerTurn ? "inactive_attempt" : "reasoning_failed",
+              suppressionCause: failureSuppressionCause,
               authorityRejectStage: "final",
               causalRefId: primaryTimelineEntryId,
             }),
@@ -11619,6 +11679,22 @@ export function HelixAskPill({
     setVoiceInputState("listening");
     setVoiceInputError(null);
   }, [micArmState, primeVoiceAudioPlayback, stopVoiceCapture]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const unlockOnGesture = () => {
+      if (voiceAudioUnlockedRef.current) return;
+      void primeVoiceAudioPlayback();
+    };
+    window.addEventListener("pointerdown", unlockOnGesture, { passive: true });
+    window.addEventListener("touchend", unlockOnGesture, { passive: true });
+    window.addEventListener("click", unlockOnGesture, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlockOnGesture);
+      window.removeEventListener("touchend", unlockOnGesture);
+      window.removeEventListener("click", unlockOnGesture);
+    };
+  }, [primeVoiceAudioPlayback]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

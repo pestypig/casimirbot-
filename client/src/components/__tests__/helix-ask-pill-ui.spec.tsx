@@ -630,6 +630,12 @@ describe("HelixAskPill mic helper behavior", () => {
     });
     expect(failedScopedSentence).toContain("desktop joint scope");
     expect(failedScopedSentence).not.toContain("DESKTOP_JOINT_SCOPE_REQUIRED");
+    const timedOutSentence = formatVoiceDecisionSentence({
+      lifecycle: "failed",
+      failureReasonRaw: "reasoning_timeout:90000",
+    });
+    expect(timedOutSentence).toContain("timed out");
+    expect(timedOutSentence).not.toContain("reasoning_timeout");
   });
 
   it("composes base brief plus decision sentence as one updated brief", () => {
