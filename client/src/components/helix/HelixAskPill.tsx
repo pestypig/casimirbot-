@@ -529,6 +529,8 @@ const MIC_SOFT_PAUSE_MS = 450;
 const MIC_END_TURN_MS = 1200;
 const MIC_MAX_SEGMENT_MS = 12_000;
 const MIC_POST_TRANSCRIBE_COOLDOWN_MS = 600;
+const VOICE_BARGE_RESUME_GRACE_MS = 2800;
+const VOICE_BARGE_FORCE_COMMIT_MS = 1800;
 const MIC_RING_BUFFER_MS = 45_000;
 const MIC_ANALYSIS_INTERVAL_MS = 60;
 const MIC_LEVEL_UI_UPDATE_MS = 120;
@@ -3663,6 +3665,7 @@ export function HelixAskPill({
   const voiceAutoSpeakLastMetricsRef = useRef<VoicePlaybackMetrics | null>(null);
   const voiceBargeHoldActiveRef = useRef(false);
   const voiceBargeHoldTurnKeyRef = useRef<string | null>(null);
+  const voiceBargeHoldStartedAtMsRef = useRef<number | null>(null);
   const voiceBargeResumeNotBeforeMsRef = useRef<number | null>(null);
   const voiceSuppressedFinalTurnKeysRef = useRef<Set<string>>(new Set());
   const voiceBriefSpokenLifecycleByTurnRef = useRef<Map<string, VoiceDecisionLifecycle>>(new Map());
@@ -5316,6 +5319,7 @@ export function HelixAskPill({
     clearVoicePendingPreempt();
     voiceBargeHoldActiveRef.current = false;
     voiceBargeHoldTurnKeyRef.current = null;
+    voiceBargeHoldStartedAtMsRef.current = null;
     voiceBargeResumeNotBeforeMsRef.current = null;
     if (reason === "barge_in") {
       // Drop pending chunks so speech does not resume over the active speaker.
@@ -6057,6 +6061,7 @@ export function HelixAskPill({
     try {
       currentAudio.pause();
       voiceBargeHoldActiveRef.current = true;
+      voiceBargeHoldStartedAtMsRef.current = Date.now();
       voiceBargeResumeNotBeforeMsRef.current = null;
       return true;
     } catch {
@@ -6068,24 +6073,50 @@ export function HelixAskPill({
     (resolved: boolean) => {
       if (!voiceBargeHoldActiveRef.current) return;
       const heldTurnKey = voiceBargeHoldTurnKeyRef.current;
+      const suppressTurnFinal = (turnKey: string | null | undefined) => {
+        if (!turnKey) return;
+        const suppressed = voiceSuppressedFinalTurnKeysRef.current;
+        suppressed.add(turnKey);
+        if (suppressed.size > 64) {
+          const oldest = suppressed.values().next().value;
+          if (typeof oldest === "string" && oldest) {
+            suppressed.delete(oldest);
+          }
+        }
+      };
       if (resolved) {
         voiceBargeHoldActiveRef.current = false;
         voiceBargeHoldTurnKeyRef.current = null;
+        voiceBargeHoldStartedAtMsRef.current = null;
         voiceBargeResumeNotBeforeMsRef.current = null;
-        if (heldTurnKey) {
-          const suppressed = voiceSuppressedFinalTurnKeysRef.current;
-          suppressed.add(heldTurnKey);
-          if (suppressed.size > 64) {
-            const oldest = suppressed.values().next().value;
-            if (typeof oldest === "string" && oldest) {
-              suppressed.delete(oldest);
-            }
+        suppressTurnFinal(heldTurnKey);
+        for (const attempt of reasoningAttemptsRef.current) {
+          if (attempt.source !== "voice_auto") continue;
+          if (!attempt.traceId || attempt.traceId === heldTurnKey) continue;
+          if (
+            attempt.status === "queued" ||
+            attempt.status === "running" ||
+            attempt.status === "streaming"
+          ) {
+            suppressTurnFinal(attempt.traceId);
           }
         }
         stopReadAloud("barge_in");
         return;
       }
-      voiceBargeResumeNotBeforeMsRef.current = Date.now() + MIC_END_TURN_MS;
+      const holdStartedAtMs = voiceBargeHoldStartedAtMsRef.current;
+      const holdDurationMs =
+        holdStartedAtMs !== null ? Math.max(0, Date.now() - holdStartedAtMs) : 0;
+      if (holdDurationMs >= VOICE_BARGE_FORCE_COMMIT_MS) {
+        voiceBargeHoldActiveRef.current = false;
+        voiceBargeHoldTurnKeyRef.current = null;
+        voiceBargeHoldStartedAtMsRef.current = null;
+        voiceBargeResumeNotBeforeMsRef.current = null;
+        suppressTurnFinal(heldTurnKey);
+        stopReadAloud("barge_in");
+        return;
+      }
+      voiceBargeResumeNotBeforeMsRef.current = Date.now() + VOICE_BARGE_RESUME_GRACE_MS;
     },
     [stopReadAloud],
   );
@@ -6122,6 +6153,7 @@ export function HelixAskPill({
     voiceDivergenceEventsRef.current = [];
     voiceBargeResumeNotBeforeMsRef.current = null;
     voiceBargeHoldTurnKeyRef.current = null;
+    voiceBargeHoldStartedAtMsRef.current = null;
     stopReadAloud("mic_off");
   }, [micArmState, stopReadAloud]);
 
@@ -8729,6 +8761,7 @@ export function HelixAskPill({
       ) {
         voiceBargeHoldActiveRef.current = false;
         voiceBargeHoldTurnKeyRef.current = null;
+        voiceBargeHoldStartedAtMsRef.current = null;
         voiceBargeResumeNotBeforeMsRef.current = null;
         const currentAudio = playbackAudioRef.current;
         if (currentAudio && currentAudio.paused) {
