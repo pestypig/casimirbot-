@@ -152,6 +152,8 @@ export function stripVoiceCitationArtifacts(source: string): string {
         .replace(FILE_PATH_CITATION_PATTERN, "")
         .replace(FILE_BASENAME_PATTERN, "")
         .replace(RESIDUAL_EXTENSION_TOKEN_PATTERN, "")
+        .replace(/\[\s*\]/g, " ")
+        .replace(/\bsources?\s*:\s*$/i, "")
         .replace(/\s{2,}/g, " ")
         .replace(/\s+([,.;:!?])/g, "$1")
         .trim(),
@@ -200,12 +202,15 @@ export function isArtifactDominatedReasoningText(source: string): boolean {
     ) ?? []
   ).length;
   const citationBracketHits = (text.match(/\[[^\]]+\]/g) ?? []).length;
+  const emptyBracketHits = (text.match(/\[\s*\]/g) ?? []).length;
   const sentenceHits = (text.match(/[.!?](?:\s|$)/g) ?? []).length;
   if (fileRefHits >= 3 && semanticHits <= 2) return true;
   if (fileRefHits >= 4 && labelHits >= 1) return true;
   if (labelHits >= 2 && fileRefHits >= 2 && semanticHits <= 2) return true;
   if (citationBracketHits >= 4 && fileRefHits >= 1 && semanticHits <= 12) return true;
   if (citationBracketHits >= 6 && semanticHits <= 5) return true;
+  if (emptyBracketHits >= 2 && semanticHits <= 18) return true;
+  if (/\bsources?\s*:\s*$/i.test(text) && (fileRefHits >= 1 || citationBracketHits >= 1)) return true;
   if (sentenceHits === 0 && fileRefHits >= 3) return true;
   return false;
 }
@@ -215,6 +220,32 @@ export function sanitizeReasoningOutputText(source: string): string {
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
     .trim();
+}
+
+function isLikelyIdeologyDomainLeak(args: {
+  promptText?: string;
+  outputText: string;
+}): boolean {
+  const prompt = (args.promptText ?? "").trim();
+  const output = args.outputText.trim();
+  if (!prompt || !output) return false;
+  if (
+    !/\b(?:mission ethos|ideology scope|warp vessel|radiance to the sun|stewardship policy)\b/i.test(output)
+  ) {
+    return false;
+  }
+  if (/\b(?:mission ethos|ideology|ethos|warp bubble|warp drive|alcubierre|natario)\b/i.test(prompt)) {
+    return false;
+  }
+  const promptTerms = new Set(extractIntentTerms(prompt, 18));
+  if (promptTerms.size === 0) return true;
+  let overlap = 0;
+  for (const term of extractIntentTerms(output, 24)) {
+    if (!promptTerms.has(term)) continue;
+    overlap += 1;
+    if (overlap >= 2) return false;
+  }
+  return true;
 }
 
 export function buildSpeakText(source: string, maxChars = SPEAK_TEXT_MAX_CHARS): string {
@@ -1761,6 +1792,7 @@ function buildExplorationArtifactRetryPrompt(args: {
     `Topic: ${topic}`,
     "Restart observe mode from the top of the reasoning chain.",
     "Do not emit repository file lists, mission/ethos scaffolds, or artifact-only templates.",
+    "If the output drifts into mission/ethos ideology content without explicit user request, ask one focused clarifier instead of finalizing.",
     "Return a plain, grounded explanation aligned to the user turn. If still blocked, ask one focused clarifier.",
     "",
     "Original user turn:",
@@ -1795,9 +1827,14 @@ export function decideExplorationLadderAction(args: {
   const normalizedCoverage = (args.debug?.coverage_gate_reason ?? "").trim().toLowerCase();
   const normalizedPrompt = (args.promptText ?? "").trim().toLowerCase();
   const firstAttempt = args.explorationAttemptCount <= 1;
+  const ideologyDomainLeak = isLikelyIdeologyDomainLeak({
+    promptText: args.promptText,
+    outputText: rawText || trimmedText,
+  });
   const artifactDominated =
     isArtifactDominatedReasoningText(trimmedText) ||
-    (rawText !== trimmedText && isArtifactDominatedReasoningText(rawText));
+    (rawText !== trimmedText && isArtifactDominatedReasoningText(rawText)) ||
+    ideologyDomainLeak;
   const explicitClarifierQuestion =
     /\?$/.test(trimmedText) &&
     /\b(could you|can you|would you|please clarify|which|what specific|what context|provide)\b/.test(
@@ -8175,7 +8212,7 @@ export function HelixAskPill({
                   explorationAttemptCount: attempt.explorationAttemptCount ?? 1,
                   outputText,
                   rawOutputText,
-                  promptText: attempt.prompt,
+                  promptText: attempt.recordedText ?? attempt.prompt,
                   failReason:
                     (
                       response.debug as
