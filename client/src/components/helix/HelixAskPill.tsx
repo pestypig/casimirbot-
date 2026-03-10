@@ -676,6 +676,7 @@ const VOICE_CHUNK_SYNTH_MAX_ATTEMPTS = 2;
 const VOICE_CHUNK_SYNTH_RETRY_BASE_MS = 220;
 const VOICE_CHUNK_SYNTH_RETRY_JITTER_MS = 180;
 const VOICE_CHUNK_SYNTH_RETRY_MAX_MS = 4000;
+const VOICE_ARTIFACT_RESTART_MAX_ATTEMPTS = 3;
 const MIC_RING_BUFFER_MS = 45_000;
 const MIC_ANALYSIS_INTERVAL_MS = 60;
 const MIC_LEVEL_UI_UPDATE_MS = 120;
@@ -1856,12 +1857,12 @@ export function decideExplorationLadderAction(args: {
     return { action: "clarify_after_attempt1", reasonCode: "suppressed:clarify_after_attempt1" };
   }
 
-  // Restart once when observe output collapses into artifact/control text.
+  // Restart observe lane from rung 1 for artifact output, bounded by retry cap.
   if (artifactDominated && args.mode !== "verify" && args.mode !== "act") {
-    if (firstAttempt) {
+    if (args.explorationAttemptCount < VOICE_ARTIFACT_RESTART_MAX_ATTEMPTS) {
       return { action: "restart_after_artifact", reasonCode: "dispatch:observe_restart_artifact_guard" };
     }
-    return { action: "clarify_after_attempt1", reasonCode: "suppressed:clarify_after_artifact_retry" };
+    return { action: "clarify_after_attempt1", reasonCode: "suppressed:clarify_after_artifact_retry_exhausted" };
   }
 
   const explicitVerifyIntent = /\b(verify|verification|prove|proof|validate|integrity|certificate|pass\/?fail|audit)\b/.test(
@@ -1951,10 +1952,37 @@ function buildPredictiveBriefFromTranscript(transcript: string): string {
   if (/\b(casimir|objective reduction|penrose|wave function|gravitational curvature)\b/.test(normalized)) {
     return "I can map the quantum claim to the physical mechanism and separate established results from speculative links.";
   }
-  if (/[?]$/.test(transcript.trim())) {
+  if (
+    /\b(warp|quantum inequality|ford[-\s]?roman|energy conditions?)\b/.test(normalized) &&
+    /\b(uncertainty|bound|limit|inequality|constraint)\b/.test(normalized)
+  ) {
+    return "I can map the quantum-inequality bounds to what the warp model can and cannot claim.";
+  }
+  if (
+    /\b(classical|quantum|wave function|collapse|superposition|measurement)\b/.test(normalized)
+  ) {
+    return "I can relate the classical limit, quantum superposition, and measurement collapse in one clean chain.";
+  }
+  if (/[?]$/.test(transcript.trim()) || /\b(how|why|what|when|where|which|can you|could you)\b/.test(normalized)) {
     return "I will answer directly first, then contrast assumptions and limits.";
   }
   return "";
+}
+
+function buildDeterministicQueuedBriefFromTranscript(transcript: string): string {
+  const source = sanitizeConversationBriefTextForVoice(transcript, 220);
+  if (!source) return "";
+  const normalized = source.toLowerCase();
+  if (/\b(system|components?|interactions?|purpose)\b/.test(normalized)) {
+    return "I can define the system first, then map components, interactions, and purpose.";
+  }
+  if (/\b(quantum|classical|wave function|collapse|superposition)\b/.test(normalized)) {
+    return "I can answer this in steps and keep the mechanism and uncertainty explicit.";
+  }
+  if (/\b(warp|casimir|curvature|inequality)\b/.test(normalized)) {
+    return "I can map the mechanism, constraints, and uncertainty bounds before drawing conclusions.";
+  }
+  return "I can answer directly, then separate mechanism, constraints, and uncertainty.";
 }
 
 function laneLabelForConversationMode(mode?: "observe" | "act" | "verify" | "clarify"): string {
@@ -7609,19 +7637,21 @@ export function HelixAskPill({
         }
       }
       if ((input.lifecycle === "queued" || input.lifecycle === "running") && isGenericQueuedVoiceAcknowledgement(resolvedBaseBrief)) {
-        resolvedBaseBrief = transcriptHint || "";
+        resolvedBaseBrief = transcriptHint ? buildDeterministicQueuedBriefFromTranscript(transcriptHint) : "";
       }
       if (
         input.lifecycle === "queued" || input.lifecycle === "running"
       ) {
         const predictiveBrief =
           transcriptHint ? buildPredictiveBriefFromTranscript(transcriptHint) : "";
+        const deterministicBrief =
+          transcriptHint ? buildDeterministicQueuedBriefFromTranscript(transcriptHint) : "";
         if (
           transcriptHint &&
           (isGenericQueuedVoiceAcknowledgement(resolvedBaseBrief) ||
             isBriefEchoingTranscript(resolvedBaseBrief, transcriptHint))
         ) {
-          resolvedBaseBrief = predictiveBrief || transcriptHint;
+          resolvedBaseBrief = predictiveBrief || deterministicBrief;
         }
       }
       if (
@@ -9015,7 +9045,7 @@ export function HelixAskPill({
         isGenericQueuedVoiceAcknowledgement(briefText) ||
         isBriefEchoingTranscript(briefText, transcript)
       ) {
-        briefText = predictiveBrief || clipText(sanitizeConversationBriefTextForVoice(transcript, 220), 220);
+        briefText = predictiveBrief || buildDeterministicQueuedBriefFromTranscript(transcript);
       }
       briefText = sanitizeConversationBriefTextForVoice(briefText, 520);
       if (!dispatchHint) {
@@ -9729,7 +9759,7 @@ export function HelixAskPill({
           ) {
             briefText =
               predictiveBrief ||
-              clipText(sanitizeConversationBriefTextForVoice(mergedTranscript, 220), 220);
+              buildDeterministicQueuedBriefFromTranscript(mergedTranscript);
           }
           briefText = sanitizeConversationBriefTextForVoice(briefText, 520);
           if (!dispatchHint) {
@@ -10011,7 +10041,8 @@ export function HelixAskPill({
                 delete explorationRuntimeByTopicRef.current[explorationTopicKey];
               }
               const previousRuntime = explorationRuntimeByTopicRef.current[explorationTopicKey];
-              explorationAttemptCount = Math.max(0, previousRuntime?.attemptCount ?? 0) + 1;
+              // New user turns always re-enter exploration at rung 1.
+              explorationAttemptCount = 1;
               explorationRuntimeByTopicRef.current[explorationTopicKey] = {
                 attemptCount: explorationAttemptCount,
                 clarifierAsked: previousRuntime?.clarifierAsked ?? false,
