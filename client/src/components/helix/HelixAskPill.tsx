@@ -109,7 +109,7 @@ export function transitionReadAloudState(
 const SPEAK_TEXT_MAX_CHARS = 600;
 const VOICE_AUTO_SPEAK_UTTERANCE_ID_MAX_CHARS = 180;
 const MOBILE_AUDIO_UNLOCK_DATA_URI =
-  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
+  "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const FILE_PATH_CITATION_SEGMENT =
   "(?:[A-Za-z]:[\\\\/]|(?:docs|client|server|shared|scripts|tests|configs|reports|artifacts|packages|sdk|cli)/)";
 const FILE_PATH_CITATION_PATTERN = new RegExp(`${FILE_PATH_CITATION_SEGMENT}[^\\s)\\]]+`, "gi");
@@ -4730,6 +4730,7 @@ export function HelixAskPill({
   const voicePlaybackCurrentPathRef = useRef<"audio_graph" | "direct_element" | "direct_fallback" | null>(null);
   const voicePlaybackGraphFailureStreakRef = useRef(0);
   const voicePlaybackGraphBypassUntilMsRef = useRef<number | null>(null);
+  const voicePlaybackLastUnlockFailureRef = useRef<{ reason: string; atMs: number } | null>(null);
   const voiceUiModalOpenRef = useRef(false);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
@@ -6678,8 +6679,13 @@ export function HelixAskPill({
       primer.volume = 1;
       await ensureVoicePlaybackAudioGraph(primer).catch(() => false);
       voiceAudioUnlockedRef.current = true;
+      voicePlaybackLastUnlockFailureRef.current = null;
       return true;
-    } catch {
+    } catch (error) {
+      voicePlaybackLastUnlockFailureRef.current = {
+        reason: error instanceof Error ? error.message : String(error),
+        atMs: Date.now(),
+      };
       return false;
     }
   }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement]);
@@ -6687,11 +6693,17 @@ export function HelixAskPill({
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
+      if (!voiceAudioUnlockedRef.current) {
+        await primeVoiceAudioPlayback().catch(() => false);
+      }
       let directFallbackAttempted = false;
       let directRetryCount = 0;
       while (true) {
-        const audio = createVoicePlaybackElement();
-        playbackElementRef.current = audio;
+        const reusePrimaryElement = !directFallbackAttempted && directRetryCount === 0;
+        const audio = reusePrimaryElement ? getOrCreateVoicePlaybackElement() : createVoicePlaybackElement();
+        if (!reusePrimaryElement) {
+          playbackElementRef.current = audio;
+        }
         const bypassGraph = !directFallbackAttempted
           ? shouldBypassVoicePlaybackGraph({
               bypassUntilMs: voicePlaybackGraphBypassUntilMsRef.current,
@@ -6887,8 +6899,10 @@ export function HelixAskPill({
       }
     },
     [
+      primeVoiceAudioPlayback,
       ensureVoicePlaybackAudioGraph,
       createVoicePlaybackElement,
+      getOrCreateVoicePlaybackElement,
       teardownVoicePlaybackAudioGraph,
     ],
   );
@@ -12085,6 +12099,7 @@ export function HelixAskPill({
     voicePlaybackCurrentPathRef.current = null;
     voicePlaybackGraphFailureStreakRef.current = 0;
     voicePlaybackGraphBypassUntilMsRef.current = null;
+    voicePlaybackLastUnlockFailureRef.current = null;
     voiceChunkTimelineEventsRef.current = [];
     contextCapsuleSessionLedgerRef.current = [];
   }, [stopReadAloud, stopVoiceCapture, teardownVoicePlaybackAudioGraph]);
@@ -13371,6 +13386,7 @@ export function HelixAskPill({
           nowMs: Date.now(),
         });
         const lastFallback = voicePlaybackLastFallbackRef.current;
+        const lastUnlockFailure = voicePlaybackLastUnlockFailureRef.current;
         return {
           userAgent: ua,
           audioSessionType:
@@ -13386,6 +13402,8 @@ export function HelixAskPill({
           fallbackCount: voicePlaybackFallbackCountRef.current,
           lastFallbackReason: lastFallback?.reason ?? null,
           lastFallbackAtMs: lastFallback?.atMs ?? null,
+          unlockLastFailureReason: lastUnlockFailure?.reason ?? null,
+          unlockLastFailureAtMs: lastUnlockFailure?.atMs ?? null,
           forcedDirectMobile: HELIX_VOICE_FORCE_DIRECT_MOBILE,
           gainTarget: resolveVoicePlaybackGain(ua ?? undefined),
           audioUnlocked: voiceAudioUnlockedRef.current,

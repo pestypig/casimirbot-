@@ -398,6 +398,9 @@ function VoiceCaptureDiagnosticsPanel({
                   ? ` | fallbacks ${snapshot.playbackOutput.fallbackCount}`
                   : ""}
                 {snapshot.playbackOutput.graphBypassActive ? " | graph bypass active" : ""}
+                {snapshot.playbackOutput.unlockLastFailureReason
+                  ? ` | unlock fail ${clipDiagnosticsText(snapshot.playbackOutput.unlockLastFailureReason, 64)}`
+                  : ""}
               </p>
               <p className="uppercase tracking-[0.14em] text-slate-500">
                 element{" "}

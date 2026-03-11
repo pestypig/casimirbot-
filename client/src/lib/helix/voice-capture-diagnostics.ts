@@ -93,6 +93,8 @@ export type VoicePlaybackOutputDiagnosticsSnapshot = {
   fallbackCount?: number;
   lastFallbackReason?: string | null;
   lastFallbackAtMs?: number | null;
+  unlockLastFailureReason?: string | null;
+  unlockLastFailureAtMs?: number | null;
   forcedDirectMobile: boolean;
   gainTarget: number;
   audioUnlocked: boolean;
