@@ -33,6 +33,7 @@ let shouldRetryVoicePlaybackWithDirectFallback: typeof import("@/components/heli
 let shouldRetryVoicePlaybackDirectAttempt: typeof import("@/components/helix/HelixAskPill").shouldRetryVoicePlaybackDirectAttempt;
 let shouldTreatVoicePlaybackErrorAsEnded: typeof import("@/components/helix/HelixAskPill").shouldTreatVoicePlaybackErrorAsEnded;
 let resolveVoicePlaybackAttemptPath: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackAttemptPath;
+let shouldBypassVoicePlaybackGraph: typeof import("@/components/helix/HelixAskPill").shouldBypassVoicePlaybackGraph;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -68,6 +69,7 @@ beforeAll(async () => {
     shouldRetryVoicePlaybackDirectAttempt,
     shouldTreatVoicePlaybackErrorAsEnded,
     resolveVoicePlaybackAttemptPath,
+    shouldBypassVoicePlaybackGraph,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -274,6 +276,28 @@ describe("HelixAskPill mic helper behavior", () => {
         stability: 1,
       }).route,
     ).toBe("answer");
+  });
+
+  it("activates graph bypass only while the bypass window is still open", () => {
+    const nowMs = Date.now();
+    expect(
+      shouldBypassVoicePlaybackGraph({
+        bypassUntilMs: nowMs + 5000,
+        nowMs,
+      }),
+    ).toBe(true);
+    expect(
+      shouldBypassVoicePlaybackGraph({
+        bypassUntilMs: nowMs - 1,
+        nowMs,
+      }),
+    ).toBe(false);
+    expect(
+      shouldBypassVoicePlaybackGraph({
+        bypassUntilMs: null,
+        nowMs,
+      }),
+    ).toBe(false);
   });
 
   it("dispatches background reasoning only for reasoning-heavy turns", () => {

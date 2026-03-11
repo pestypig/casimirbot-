@@ -391,6 +391,13 @@ function VoiceCaptureDiagnosticsPanel({
                   ? ` | session ${snapshot.playbackOutput.audioSessionType}`
                   : ""}
                 {snapshot.playbackOutput.forcedDirectMobile ? " | forced-direct-mobile" : ""}
+                {typeof snapshot.playbackOutput.graphAttemptCount === "number"
+                  ? ` | graph attempts ${snapshot.playbackOutput.graphAttemptCount}`
+                  : ""}
+                {typeof snapshot.playbackOutput.fallbackCount === "number"
+                  ? ` | fallbacks ${snapshot.playbackOutput.fallbackCount}`
+                  : ""}
+                {snapshot.playbackOutput.graphBypassActive ? " | graph bypass active" : ""}
               </p>
               <p className="uppercase tracking-[0.14em] text-slate-500">
                 element{" "}

@@ -83,6 +83,16 @@ export type VoicePlaybackOutputDiagnosticsSnapshot = {
   userAgent: string | null;
   audioSessionType: string | null;
   expectedPath: "audio_graph" | "direct_element";
+  currentUtterancePath?: "audio_graph" | "direct_element" | "direct_fallback" | null;
+  currentUtteranceDirectFallback?: boolean;
+  graphEligible?: boolean;
+  graphBypassActive?: boolean;
+  graphBypassUntilMs?: number | null;
+  graphFailureStreak?: number;
+  graphAttemptCount?: number;
+  fallbackCount?: number;
+  lastFallbackReason?: string | null;
+  lastFallbackAtMs?: number | null;
   forcedDirectMobile: boolean;
   gainTarget: number;
   audioUnlocked: boolean;

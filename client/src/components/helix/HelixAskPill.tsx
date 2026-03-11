@@ -133,10 +133,13 @@ const HELIX_VOICE_LIMITER_RATIO = 20;
 const HELIX_VOICE_LIMITER_ATTACK_S = 0.001;
 const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
 const VOICE_PLAYBACK_DIRECT_RETRY_MAX = 1;
+const VOICE_PLAYBACK_DIRECT_RETRY_DELAY_MS = 120;
 const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS = 0.65;
 const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION = 1.2;
 const VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO = 0.35;
 const VOICE_PLAYBACK_ERROR_RECOVER_DIRECT_FALLBACK_MIN_SECONDS = 0.3;
+const VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS = 2;
+const VOICE_PLAYBACK_GRAPH_BYPASS_MS = 90_000;
 const HELIX_VOICE_FORCE_DIRECT_MOBILE =
   String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 
@@ -225,6 +228,29 @@ export function resolveVoicePlaybackAttemptPath(params: {
 }): "audio_graph" | "direct_fallback" | "direct_element" {
   if (params.graphAttached) return "audio_graph";
   return params.directFallbackAttempted ? "direct_fallback" : "direct_element";
+}
+
+export function shouldBypassVoicePlaybackGraph(params: {
+  bypassUntilMs: number | null;
+  nowMs: number;
+}): boolean {
+  if (params.bypassUntilMs === null) return false;
+  return params.nowMs < params.bypassUntilMs;
+}
+
+function describeMediaErrorCode(code: number | null): string {
+  switch (code) {
+    case 1:
+      return "media_err_aborted";
+    case 2:
+      return "media_err_network";
+    case 3:
+      return "media_err_decode";
+    case 4:
+      return "media_err_src_not_supported";
+    default:
+      return "media_err_unknown";
+  }
 }
 
 export function stripVoiceCitationArtifacts(source: string): string {
@@ -4702,6 +4728,8 @@ export function HelixAskPill({
   const voicePlaybackFallbackCountRef = useRef(0);
   const voicePlaybackLastFallbackRef = useRef<{ reason: string; atMs: number } | null>(null);
   const voicePlaybackCurrentPathRef = useRef<"audio_graph" | "direct_element" | "direct_fallback" | null>(null);
+  const voicePlaybackGraphFailureStreakRef = useRef(0);
+  const voicePlaybackGraphBypassUntilMsRef = useRef<number | null>(null);
   const voiceUiModalOpenRef = useRef(false);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
@@ -6512,19 +6540,26 @@ export function HelixAskPill({
     return state.latestRevision > revision.revision;
   }, []);
 
-  const getOrCreateVoicePlaybackElement = useCallback((): HTMLAudioElement => {
-    const existing = playbackElementRef.current;
-    if (existing) return existing;
+  const createVoicePlaybackElement = useCallback((): HTMLAudioElement => {
     const audio = new Audio();
     audio.preload = "auto";
     audio.crossOrigin = "anonymous";
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
     audio.setAttribute("autoplay", "true");
+    audio.playsInline = true;
+    audio.autoplay = true;
     audio.volume = 1;
-    playbackElementRef.current = audio;
     return audio;
   }, []);
+
+  const getOrCreateVoicePlaybackElement = useCallback((): HTMLAudioElement => {
+    const existing = playbackElementRef.current;
+    if (existing) return existing;
+    const audio = createVoicePlaybackElement();
+    playbackElementRef.current = audio;
+    return audio;
+  }, [createVoicePlaybackElement]);
 
   const teardownVoicePlaybackAudioGraph = useCallback(() => {
     try {
@@ -6655,12 +6690,22 @@ export function HelixAskPill({
       let directFallbackAttempted = false;
       let directRetryCount = 0;
       while (true) {
-        const audio = getOrCreateVoicePlaybackElement();
-        const graphAttached = directFallbackAttempted
-          ? false
-          : await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
+        const audio = createVoicePlaybackElement();
+        playbackElementRef.current = audio;
+        const bypassGraph = !directFallbackAttempted
+          ? shouldBypassVoicePlaybackGraph({
+              bypassUntilMs: voicePlaybackGraphBypassUntilMsRef.current,
+              nowMs: Date.now(),
+            })
+          : false;
+        const graphAttached =
+          directFallbackAttempted || bypassGraph
+            ? false
+            : await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
         if (!directFallbackAttempted && graphAttached) {
           voicePlaybackGraphAttemptCountRef.current += 1;
+          voicePlaybackGraphFailureStreakRef.current = 0;
+          voicePlaybackGraphBypassUntilMsRef.current = null;
         }
         voicePlaybackCurrentPathRef.current = resolveVoicePlaybackAttemptPath({
           graphAttached,
@@ -6715,6 +6760,7 @@ export function HelixAskPill({
                 const playedSeconds = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
                 const durationSeconds =
                   Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
+                const mediaErrorCode = audio.error?.code ?? null;
                 if (
                   shouldTreatVoicePlaybackErrorAsEnded({
                     playedSeconds,
@@ -6725,7 +6771,8 @@ export function HelixAskPill({
                   resolve();
                   return;
                 }
-                reject(new Error("voice_audio_playback_error"));
+                const mediaErrorDetail = describeMediaErrorCode(mediaErrorCode);
+                reject(new Error(`voice_audio_playback_error:${mediaErrorDetail}`));
                 return;
               }
               resolve();
@@ -6777,6 +6824,11 @@ export function HelixAskPill({
               directFallbackAttempted,
             })
           ) {
+            const nextFailureStreak = voicePlaybackGraphFailureStreakRef.current + 1;
+            voicePlaybackGraphFailureStreakRef.current = nextFailureStreak;
+            if (nextFailureStreak >= VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS) {
+              voicePlaybackGraphBypassUntilMsRef.current = Date.now() + VOICE_PLAYBACK_GRAPH_BYPASS_MS;
+            }
             directFallbackAttempted = true;
             voicePlaybackFallbackCountRef.current += 1;
             voicePlaybackLastFallbackRef.current = {
@@ -6813,6 +6865,9 @@ export function HelixAskPill({
               atMs: Date.now(),
             };
             voicePlaybackCurrentPathRef.current = "direct_fallback";
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, VOICE_PLAYBACK_DIRECT_RETRY_DELAY_MS);
+            });
             try {
               audio.pause();
             } catch {
@@ -6833,8 +6888,7 @@ export function HelixAskPill({
     },
     [
       ensureVoicePlaybackAudioGraph,
-      getOrCreateVoicePlaybackElement,
-      primeVoiceAudioPlayback,
+      createVoicePlaybackElement,
       teardownVoicePlaybackAudioGraph,
     ],
   );
@@ -12029,6 +12083,8 @@ export function HelixAskPill({
     voicePlaybackFallbackCountRef.current = 0;
     voicePlaybackLastFallbackRef.current = null;
     voicePlaybackCurrentPathRef.current = null;
+    voicePlaybackGraphFailureStreakRef.current = 0;
+    voicePlaybackGraphBypassUntilMsRef.current = null;
     voiceChunkTimelineEventsRef.current = [];
     contextCapsuleSessionLedgerRef.current = [];
   }, [stopReadAloud, stopVoiceCapture, teardownVoicePlaybackAudioGraph]);
@@ -13309,6 +13365,11 @@ export function HelixAskPill({
         const gainNode = voicePlaybackGainNodeRef.current;
         const compressor = voicePlaybackCompressorNodeRef.current;
         const graphEligible = shouldUseVoicePlaybackAudioGraph(ua ?? undefined);
+        const graphBypassUntilMs = voicePlaybackGraphBypassUntilMsRef.current;
+        const graphBypassActive = shouldBypassVoicePlaybackGraph({
+          bypassUntilMs: graphBypassUntilMs,
+          nowMs: Date.now(),
+        });
         const lastFallback = voicePlaybackLastFallbackRef.current;
         return {
           userAgent: ua,
@@ -13318,6 +13379,9 @@ export function HelixAskPill({
           currentUtterancePath: voicePlaybackCurrentPathRef.current,
           currentUtteranceDirectFallback: voicePlaybackCurrentPathRef.current === "direct_fallback",
           graphEligible,
+          graphBypassActive,
+          graphBypassUntilMs,
+          graphFailureStreak: voicePlaybackGraphFailureStreakRef.current,
           graphAttemptCount: voicePlaybackGraphAttemptCountRef.current,
           fallbackCount: voicePlaybackFallbackCountRef.current,
           lastFallbackReason: lastFallback?.reason ?? null,
