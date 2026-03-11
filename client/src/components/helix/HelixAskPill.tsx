@@ -120,6 +120,9 @@ const FILE_BASENAME_PATTERN = /\b[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yaml|
 const RESIDUAL_EXTENSION_TOKEN_PATTERN = /\b(?:ts|tsx|js|jsx|md|json|yaml|yml)\b(?=[,;:])/gi;
 const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
 const URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
+const RUNTIME_FALLBACK_FETCH_FAILED_RE = /\bruntime fallback:\s*fetch failed\.?/gi;
+const RUNTIME_FALLBACK_FETCH_FAILED_TEST_RE = /\bruntime fallback:\s*fetch failed\.?/i;
+const HELPER_TIMEOUT_FALLBACK_RE = /\bhelper[_\s-]?timeout[_\s-]?fallback\b/i;
 const MOBILE_AUDIO_USER_AGENT_PATTERN =
   /(iphone|ipad|ipod|android|mobile|silk|kindle|fennec|iemobile|opera mini)/i;
 const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
@@ -283,9 +286,19 @@ export function stripVoiceCitationArtifacts(source: string): string {
   return strippedLines.join("\n").trim();
 }
 
+function hasRuntimeFallbackArtifactSpill(source: string): boolean {
+  const text = source.trim();
+  if (!text) return false;
+  const fetchFailedMentions = (text.match(RUNTIME_FALLBACK_FETCH_FAILED_RE) ?? []).length;
+  if (fetchFailedMentions >= 2) return true;
+  if (!RUNTIME_FALLBACK_FETCH_FAILED_TEST_RE.test(text)) return false;
+  return HELPER_TIMEOUT_FALLBACK_RE.test(text);
+}
+
 export function isArtifactDominatedReasoningText(source: string): boolean {
   const text = source.trim();
   if (!text) return true;
+  if (hasRuntimeFallbackArtifactSpill(text)) return true;
   if (/\bwhat[\s_]?is[\s_](warp[\s_]?bubble|mission[\s_]?ethos)\s*:/i.test(text)) return true;
   if (/\bhow[\s_]?they[\s_]?connect\s*:/i.test(text)) return true;
   if (/\bconstraints?_and_falsifiability\s*:/i.test(text)) return true;
@@ -335,7 +348,10 @@ export function isArtifactDominatedReasoningText(source: string): boolean {
 }
 
 export function sanitizeReasoningOutputText(source: string): string {
-  return stripVoiceCitationArtifacts(source)
+  const text = hasRuntimeFallbackArtifactSpill(source)
+    ? source.replace(RUNTIME_FALLBACK_FETCH_FAILED_RE, " ").replace(HELPER_TIMEOUT_FALLBACK_RE, " ")
+    : source;
+  return stripVoiceCitationArtifacts(text)
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
     .trim();
@@ -2220,7 +2236,8 @@ export function decideExplorationLadderAction(args: {
     ) ||
     /\bwhat[\s_]?is[\s_](?:warp[\s_]?bubble|mission[\s_]?ethos)\s*:/i.test(rawText || trimmedText) ||
     /\bhow[\s_]?they[\s_]?connect\s*:/i.test(rawText || trimmedText) ||
-    /\bconstraints?_and_falsifiability\s*:/i.test(rawText || trimmedText)
+    /\bconstraints?_and_falsifiability\s*:/i.test(rawText || trimmedText) ||
+    hasRuntimeFallbackArtifactSpill(rawText || trimmedText)
   );
   const missingContextSignal =
     explicitClarifierQuestion ||

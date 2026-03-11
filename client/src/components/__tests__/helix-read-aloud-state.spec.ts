@@ -325,6 +325,12 @@ describe("artifact-dominated output guards", () => {
     expect(isArtifactDominatedReasoningText(noisy)).toBe(true);
   });
 
+  it("detects repeated runtime fallback boilerplate spill", () => {
+    const noisy =
+      "Runtime fallback: fetch failed Runtime fallback: fetch failed. Mechanism: Runtime fallback: fetch failed.";
+    expect(isArtifactDominatedReasoningText(noisy)).toBe(true);
+  });
+
   it("sanitizes citation/path fragments for display", () => {
     const noisy =
       "ts, server/services/planner/grounding.ts. Evidence: docs/helix-ask-flow.md. In practice, the system explains tradeoffs.";
@@ -332,6 +338,14 @@ describe("artifact-dominated output guards", () => {
     expect(cleaned).toContain("In practice, the system explains tradeoffs.");
     expect(cleaned).not.toContain("grounding.ts");
     expect(cleaned).not.toContain("docs/helix-ask-flow.md");
+  });
+
+  it("sanitizes repeated runtime fallback boilerplate for display", () => {
+    const noisy =
+      "Runtime fallback: fetch failed Runtime fallback: fetch failed. In practice, retry with narrower scope.";
+    const cleaned = sanitizeReasoningOutputText(noisy);
+    expect(cleaned).toContain("In practice, retry with narrower scope.");
+    expect(cleaned.toLowerCase()).not.toContain("runtime fallback: fetch failed");
   });
 });
 
@@ -373,6 +387,18 @@ describe("exploration escalation guard", () => {
       outputText: "Interdependent components can shape a system objective.",
       rawOutputText:
         "Focus anchor: system, interdependent, components. what_is_warp_bubble: export default function ElectronOrbitalPanel()",
+      mode: "observe",
+      debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
+    });
+    expect(decision.action).toBe("restart_after_artifact");
+  });
+
+  it("restarts observe lane when runtime fallback spill dominates", () => {
+    const decision = decideExplorationLadderAction({
+      explorationAttemptCount: 1,
+      promptText: "How does intention relate to action?",
+      outputText:
+        "Runtime fallback: fetch failed Runtime fallback: fetch failed. Mechanism: Runtime fallback: fetch failed.",
       mode: "observe",
       debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
     });
