@@ -33843,14 +33843,16 @@ const executeHelixAsk = async ({
       if (suppressGeneralCitations) {
         cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
         answerPath.push("citationScrub:general_sources_suppressed");
-        if (
-          shouldAppendOpenWorldSourcesMarker({
-            answerText: cleaned,
-            treeWalkBlock,
-          })
-        ) {
+        const shouldAppendMarker = shouldAppendOpenWorldSourcesMarker({
+          answerText: cleaned,
+          treeWalkBlock,
+        });
+        if (shouldAppendMarker || !hasSourcesLine(cleaned)) {
           cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
           answerPath.push("citationScrub:open_world_sources_marker");
+          if (!shouldAppendMarker) {
+            answerPath.push("citationScrub:open_world_sources_marker_forced");
+          }
         } else {
           answerPath.push("citationScrub:open_world_sources_marker_skipped_tree_walk_citations");
         }
