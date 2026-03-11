@@ -16,6 +16,10 @@ import {
   type VoiceMp3NormalizationOptions,
   type VoiceWavNormalizationOptions,
 } from "../services/audio/voice-normalization";
+import {
+  isSttInvalidFormatMessage,
+  recoverSttInvalidFormatToPcmWav,
+} from "../services/audio/stt-format-recovery";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -740,6 +744,7 @@ type SttFailure = {
   message: string;
   status?: number;
   retryable: boolean;
+  stage?: "primary" | "format_recovery" | "format_recovery_retry";
 };
 
 const backendEngine = (backend: ResolvedSttBackend): TranscriptionEngine => {
@@ -757,7 +762,11 @@ const inferStatusCode = (message: string): number | undefined => {
   return undefined;
 };
 
-const classifySttFailure = (backend: ResolvedSttBackend, error: unknown): SttFailure => {
+const classifySttFailure = (
+  backend: ResolvedSttBackend,
+  error: unknown,
+  stage: SttFailure["stage"] = "primary",
+): SttFailure => {
   const message = error instanceof Error ? error.message : String(error);
   const status = inferStatusCode(message);
   const retryable =
@@ -769,8 +778,12 @@ const classifySttFailure = (backend: ResolvedSttBackend, error: unknown): SttFai
     message,
     status,
     retryable,
+    stage,
   };
 };
+
+const isInvalidFormatSttFailure = (failure: SttFailure): boolean =>
+  failure.status === 400 && isSttInvalidFormatMessage(failure.message);
 
 const runHttpTask = async (args: {
   backend: ResolvedSttBackend;
@@ -886,12 +899,31 @@ const runVoiceTranscription = async (args: {
   payload: VoiceTranscribeRequest;
   policyMode: SttPolicyMode;
   outputMode: SttOutputMode;
-}): Promise<{ result?: VoiceTranscriptionResult; failures: SttFailure[] }> => {
+}): Promise<{
+  result?: VoiceTranscriptionResult;
+  failures: SttFailure[];
+  formatRecovery: {
+    attempted: boolean;
+    succeeded: boolean;
+    reason: string | null;
+    backend: SttBackendKind | null;
+    ffmpegPath: string | null;
+  };
+}> => {
   const backends = resolveSttBackendOrder(args.policyMode);
   const failures: SttFailure[] = [];
+  const formatRecovery = {
+    attempted: false,
+    succeeded: false,
+    reason: null as string | null,
+    backend: null as SttBackendKind | null,
+    ffmpegPath: null as string | null,
+  };
   const requestedLanguage = normalizeRequestedLanguage(args.payload.language);
   let selectedBackend: ResolvedSttBackend | null = null;
   let baseResult: VoiceTranscriptionResult | undefined;
+  let transcriptionFile: Express.Multer.File = args.file;
+  let hardFailure = false;
 
   for (const backend of backends) {
     try {
@@ -903,18 +935,79 @@ const runVoiceTranscription = async (args: {
       });
       baseResult = next;
       selectedBackend = backend;
+      transcriptionFile = args.file;
       break;
     } catch (error) {
-      const failure = classifySttFailure(backend, error);
+      const failure = classifySttFailure(backend, error, "primary");
       failures.push(failure);
+      if (isInvalidFormatSttFailure(failure)) {
+        const recovery = await recoverSttInvalidFormatToPcmWav({
+          buffer: args.file.buffer,
+          originalName: args.file.originalname,
+          ffmpegPath: process.env.STT_TRANSCRIBE_FFMPEG_PATH?.trim() || undefined,
+          sampleRateHz: 16_000,
+        });
+        formatRecovery.attempted = true;
+        formatRecovery.backend = backend.kind;
+        formatRecovery.ffmpegPath = recovery.ffmpegPath;
+        if (!recovery.ok) {
+          formatRecovery.succeeded = false;
+          formatRecovery.reason = recovery.reason;
+          failures.push({
+            backend: backend.kind,
+            engine: backendEngine(backend),
+            message: `stt_invalid_format_recovery_${recovery.reason}`,
+            retryable: false,
+            stage: "format_recovery",
+          });
+          hardFailure = true;
+          break;
+        }
+        formatRecovery.succeeded = true;
+        formatRecovery.reason = "recovered";
+        const recoveredFile: Express.Multer.File = {
+          ...args.file,
+          buffer: recovery.buffer,
+          size: recovery.buffer.byteLength,
+          mimetype: recovery.mimeType,
+          originalname: recovery.fileName,
+        };
+        try {
+          const recoveredResult = await runBackendTranscribe({
+            backend,
+            file: recoveredFile,
+            payload: args.payload,
+            requestedLanguage,
+          });
+          baseResult = recoveredResult;
+          selectedBackend = backend;
+          transcriptionFile = recoveredFile;
+          break;
+        } catch (retryError) {
+          const retryFailure = classifySttFailure(backend, retryError, "format_recovery_retry");
+          failures.push(retryFailure);
+          if (!retryFailure.retryable) {
+            hardFailure = true;
+          }
+          if (isInvalidFormatSttFailure(retryFailure)) {
+            hardFailure = true;
+          }
+          if (hardFailure) {
+            break;
+          }
+          continue;
+        }
+      }
       if (!failure.retryable) {
+        hardFailure = true;
         break;
       }
     }
+    if (hardFailure) break;
   }
 
   if (!baseResult || !selectedBackend) {
-    return { failures };
+    return { failures, formatRecovery };
   }
 
   const sourceText = baseResult.text ?? "";
@@ -926,7 +1019,7 @@ const runVoiceTranscription = async (args: {
     try {
       const translated = await translateToEnglish({
         backend: selectedBackend,
-        file: args.file,
+        file: transcriptionFile,
         payload: args.payload,
       });
       const translatedText = typeof translated.text === "string" ? translated.text.trim() : "";
@@ -976,7 +1069,7 @@ const runVoiceTranscription = async (args: {
         translationUncertain = true;
       }
     } catch (error) {
-      failures.push(classifySttFailure(selectedBackend, error));
+      failures.push(classifySttFailure(selectedBackend, error, "primary"));
       baseResult = {
         ...baseResult,
         source_text: sourceText,
@@ -1017,7 +1110,7 @@ const runVoiceTranscription = async (args: {
     translation_uncertain: translationUncertain,
   };
 
-  return { result: baseResult, failures };
+  return { result: baseResult, failures, formatRecovery };
 };
 
 voiceRouter.options("/speak", (_req, res) => {
@@ -1102,7 +1195,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       );
     }
 
-    const { result, failures } = await runVoiceTranscription({
+    const { result, failures, formatRecovery } = await runVoiceTranscription({
       file,
       payload: parsed.data,
       policyMode,
@@ -1120,10 +1213,12 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
           attempts: failures.map((entry) => ({
             backend: entry.backend,
             engine: entry.engine,
+            stage: entry.stage ?? "primary",
             status: entry.status ?? null,
             retryable: entry.retryable,
             message: entry.message,
           })),
+          formatRecovery,
         },
         parsed.data.traceId,
       );

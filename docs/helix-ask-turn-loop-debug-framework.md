@@ -2,6 +2,9 @@
 
 Status: active debug guide.
 
+## Latest Stable Checkpoint
+- `docs/helix-ask-turn-loop-checkpoint-2026-03-10.md`
+
 ## Turn-By-Turn Loop
 1. User speaks in natural chunks.
 2. Segments merge into one draft turn while the assembler phase is `draft`.

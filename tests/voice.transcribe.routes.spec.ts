@@ -6,6 +6,9 @@ const { sttHttpHandlerMock, sttWhisperHandlerMock } = vi.hoisted(() => ({
   sttHttpHandlerMock: vi.fn(),
   sttWhisperHandlerMock: vi.fn(),
 }));
+const { recoverSttInvalidFormatToPcmWavMock } = vi.hoisted(() => ({
+  recoverSttInvalidFormatToPcmWavMock: vi.fn(),
+}));
 
 vi.mock("../server/skills/stt.whisper.http", () => ({
   sttHttpHandler: sttHttpHandlerMock,
@@ -13,6 +16,11 @@ vi.mock("../server/skills/stt.whisper.http", () => ({
 
 vi.mock("../server/skills/stt.whisper", () => ({
   sttWhisperHandler: sttWhisperHandlerMock,
+}));
+
+vi.mock("../server/services/audio/stt-format-recovery", () => ({
+  isSttInvalidFormatMessage: (message: string) => message.toLowerCase().includes("invalid file format"),
+  recoverSttInvalidFormatToPcmWav: recoverSttInvalidFormatToPcmWavMock,
 }));
 
 import { resetVoiceRouteState, voiceRouter } from "../server/routes/voice";
@@ -45,6 +53,7 @@ describe("voice transcribe route", () => {
     resetVoiceRouteState();
     sttHttpHandlerMock.mockReset();
     sttWhisperHandlerMock.mockReset();
+    recoverSttInvalidFormatToPcmWavMock.mockReset();
     delete process.env.ENABLE_VOICE_TRANSCRIBE;
     delete process.env.OPENAI_API_KEY;
     delete process.env.LLM_HTTP_API_KEY;
@@ -377,5 +386,86 @@ describe("voice transcribe route", () => {
     expect(Array.isArray(res.body.details.attempts)).toBe(true);
     expect(res.body.details.attempts[0].engine).toBe("openai_transcribe");
     expect(sttHttpHandlerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers invalid-format uploads with one ffmpeg wav retry", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    sttHttpHandlerMock
+      .mockRejectedValueOnce(
+        new Error(
+          "STT HTTP 400: invalid file format. Supported formats: ['flac','m4a','mp3','mp4','mpeg','mpga','oga','ogg','wav','webm']",
+        ),
+      )
+      .mockResolvedValueOnce({
+        text: "Recovered transcript",
+        language: "en",
+        duration_ms: 700,
+        segments: [],
+      });
+    recoverSttInvalidFormatToPcmWavMock.mockResolvedValue({
+      ok: true,
+      buffer: Buffer.from("RIFF....WAVE"),
+      mimeType: "audio/wav",
+      fileName: "input.wav",
+      ffmpegPath: "ffmpeg",
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-recover")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.text).toBe("Recovered transcript");
+    expect(res.body.engine).toBe("openai_transcribe");
+    expect(sttHttpHandlerMock).toHaveBeenCalledTimes(2);
+    expect(sttHttpHandlerMock.mock.calls[1][0]).toMatchObject({
+      audio_url: expect.stringContaining("data:audio/wav;base64,"),
+      task: "transcribe",
+    });
+    expect(recoverSttInvalidFormatToPcmWavMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails deterministically when invalid-format recovery cannot run", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    sttHttpHandlerMock.mockRejectedValue(
+      new Error(
+        "STT HTTP 400: invalid file format. Supported formats: ['flac','m4a','mp3','mp4','mpeg','mpga','oga','ogg','wav','webm']",
+      ),
+    );
+    recoverSttInvalidFormatToPcmWavMock.mockResolvedValue({
+      ok: false,
+      reason: "ffmpeg_unavailable",
+      ffmpegPath: "ffmpeg",
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-recover-fail")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("voice_backend_error");
+    expect(res.body.message).toBe("Voice transcription failed.");
+    expect(res.body.traceId).toBe("trace-recover-fail");
+    expect(Array.isArray(res.body.details.attempts)).toBe(true);
+    expect(
+      res.body.details.attempts.some(
+        (attempt: { stage?: string; message?: string }) =>
+          attempt.stage === "format_recovery" &&
+          String(attempt.message ?? "").includes("ffmpeg_unavailable"),
+      ),
+    ).toBe(true);
+    expect(res.body.details.formatRecovery).toMatchObject({
+      attempted: true,
+      succeeded: false,
+      reason: "ffmpeg_unavailable",
+    });
   });
 });

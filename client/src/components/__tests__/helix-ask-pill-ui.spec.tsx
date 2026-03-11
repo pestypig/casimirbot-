@@ -16,6 +16,8 @@ let isFlatVoiceSignal: typeof import("@/components/helix/HelixAskPill").isFlatVo
 let isRecorderStalled: typeof import("@/components/helix/HelixAskPill").isRecorderStalled;
 let isLikelyLoopbackDeviceLabel: typeof import("@/components/helix/HelixAskPill").isLikelyLoopbackDeviceLabel;
 let shouldPrimeSegmentWithContainerHeader: typeof import("@/components/helix/HelixAskPill").shouldPrimeSegmentWithContainerHeader;
+let getMicRecorderMimeCandidates: typeof import("@/components/helix/HelixAskPill").getMicRecorderMimeCandidates;
+let pickSupportedMicRecorderMimeType: typeof import("@/components/helix/HelixAskPill").pickSupportedMicRecorderMimeType;
 let formatVoiceDecisionSentence: typeof import("@/components/helix/HelixAskPill").formatVoiceDecisionSentence;
 let composeVoiceBriefWithDecision: typeof import("@/components/helix/HelixAskPill").composeVoiceBriefWithDecision;
 let isAgibotPreflightScopeError: typeof import("@/components/helix/HelixAskPill").isAgibotPreflightScopeError;
@@ -27,6 +29,8 @@ let evaluateVoiceReasoningResponseAuthority: typeof import("@/components/helix/H
 let evaluateVoiceTurnSealGate: typeof import("@/components/helix/HelixAskPill").evaluateVoiceTurnSealGate;
 let resolveVoicePlaybackGain: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackGain;
 let shouldUseVoicePlaybackAudioGraph: typeof import("@/components/helix/HelixAskPill").shouldUseVoicePlaybackAudioGraph;
+let shouldRetryVoicePlaybackWithDirectFallback: typeof import("@/components/helix/HelixAskPill").shouldRetryVoicePlaybackWithDirectFallback;
+let resolveVoicePlaybackAttemptPath: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackAttemptPath;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -45,6 +49,8 @@ beforeAll(async () => {
     isRecorderStalled,
     isLikelyLoopbackDeviceLabel,
     shouldPrimeSegmentWithContainerHeader,
+    getMicRecorderMimeCandidates,
+    pickSupportedMicRecorderMimeType,
     formatVoiceDecisionSentence,
     composeVoiceBriefWithDecision,
     isAgibotPreflightScopeError,
@@ -56,6 +62,8 @@ beforeAll(async () => {
     evaluateVoiceTurnSealGate,
     resolveVoicePlaybackGain,
     shouldUseVoicePlaybackAudioGraph,
+    shouldRetryVoicePlaybackWithDirectFallback,
+    resolveVoicePlaybackAttemptPath,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -165,6 +173,27 @@ describe("HelixAskPill mic helper behavior", () => {
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1",
       ),
     ).toBe(true);
+  });
+
+  it("retries playback fallback only for the current utterance", () => {
+    expect(
+      shouldRetryVoicePlaybackWithDirectFallback({
+        graphAttached: true,
+        directFallbackAttempted: false,
+      }),
+    ).toBe(true);
+    expect(
+      resolveVoicePlaybackAttemptPath({
+        graphAttached: false,
+        directFallbackAttempted: true,
+      }),
+    ).toBe("direct_fallback");
+    expect(
+      resolveVoicePlaybackAttemptPath({
+        graphAttached: true,
+        directFallbackAttempted: false,
+      }),
+    ).toBe("audio_graph");
   });
 
   it("routes completion scores by threshold", () => {
@@ -601,10 +630,39 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(
       shouldPrimeSegmentWithContainerHeader({
         segmentStartIndex: 4,
+        mimeType: "audio/mp4",
+        hasHeaderChunk: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPrimeSegmentWithContainerHeader({
+        segmentStartIndex: 4,
         mimeType: "audio/wav",
         hasHeaderChunk: false,
       }),
     ).toBe(false);
+  });
+
+  it("orders recorder MIME candidates by runtime capabilities", () => {
+    const iosUa =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1";
+    const desktopUa =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36";
+    expect(getMicRecorderMimeCandidates(iosUa)[0]).toContain("audio/mp4");
+    expect(getMicRecorderMimeCandidates(desktopUa)[0]).toContain("audio/webm");
+    const supported = new Set<string>(["audio/mp4", "audio/webm;codecs=opus"]);
+    expect(
+      pickSupportedMicRecorderMimeType({
+        userAgent: iosUa,
+        isTypeSupported: (mimeType) => supported.has(mimeType),
+      }),
+    ).toBe("audio/mp4");
+    expect(
+      pickSupportedMicRecorderMimeType({
+        userAgent: desktopUa,
+        isTypeSupported: (mimeType) => supported.has(mimeType),
+      }),
+    ).toBe("audio/webm;codecs=opus");
   });
 
   it("formats lifecycle decision sentences in human wording only", () => {

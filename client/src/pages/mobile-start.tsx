@@ -5,6 +5,7 @@ import {
   MessageCircle,
   PanelsTopLeft,
   Pin,
+  Settings,
   X,
   XCircle,
 } from "lucide-react";
@@ -17,6 +18,11 @@ import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
+import { Dialog } from "@/components/ui/dialog";
+import { HelixSettingsDialogContent } from "@/components/HelixSettingsDialogContent";
+import { PROFILE_STORAGE_KEY, useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
+import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
@@ -24,6 +30,14 @@ const MAX_WARN_STACK = 4;
 export default function MobileStartPage() {
   const [, setLocation] = useLocation();
   const { stack, activeId, open, activate, close, closeAll, goHome } = useMobileAppStore();
+  const { userSettings, updateSettings } = useHelixStartSettings();
+  const {
+    settingsOpen,
+    settingsTab,
+    setSettingsTab,
+    openSettings,
+    handleSettingsOpenChange,
+  } = useHelixSettingsDialog("preferences");
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [appViewerOpen, setAppViewerOpen] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -170,32 +184,42 @@ export default function MobileStartPage() {
     setShowSwitcher(false);
   }, [goHome]);
 
+  const clearSavedChoice = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(PROFILE_STORAGE_KEY);
+    }
+  }, []);
+
   return (
-    <div
-      className="mood-transition-scope relative min-h-screen bg-background text-foreground"
-      style={{ minHeight: "max(100dvh, 100vh)" }}
+    <Dialog
+      open={settingsOpen}
+      onOpenChange={handleSettingsOpenChange}
     >
-      <SurfaceStack recipe={wallpaperRecipe} />
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ backgroundColor: "var(--surface-laminate)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(140%_200%_at_8%_12%,hsl(var(--primary)/0.24)_0%,transparent_70%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(150%_210%_at_96%_10%,hsl(var(--primary)/0.18)_0%,transparent_72%)]"
-      />
-      {appViewerOpen ? (
+        className="mood-transition-scope relative min-h-screen bg-background text-foreground"
+        style={{ minHeight: "max(100dvh, 100vh)" }}
+      >
+        <SurfaceStack recipe={wallpaperRecipe} />
         <div
-          className="relative z-10 mx-auto flex min-h-screen max-w-screen-lg flex-col"
-          style={{
-            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)"
-          }}
-        >
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundColor: "var(--surface-laminate)" }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(140%_200%_at_8%_12%,hsl(var(--primary)/0.24)_0%,transparent_70%)]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(150%_210%_at_96%_10%,hsl(var(--primary)/0.18)_0%,transparent_72%)]"
+        />
+        {appViewerOpen ? (
+          <div
+            className="relative z-10 mx-auto flex min-h-screen max-w-screen-lg flex-col"
+            style={{
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)"
+            }}
+          >
           <header
             className="sticky top-0 z-20 flex items-center justify-between border-b border-primary/25 bg-background/85 px-4 pb-3 backdrop-blur sm:px-5 sm:pb-4"
             style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
@@ -215,13 +239,23 @@ export default function MobileStartPage() {
               <Home className="h-4 w-4" />
               Home
             </button>
-            <button
-              className={`inline-flex ${navPrimaryButtonClass}`}
-              onClick={closeAppViewer}
-            >
-              <MessageCircle className="h-4 w-4" />
-              Ask
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={`inline-flex ${navButtonClass}`}
+                onClick={() => openSettings("preferences")}
+              >
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+              <button
+                className={`inline-flex ${navPrimaryButtonClass}`}
+                onClick={closeAppViewer}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Ask
+              </button>
+            </div>
           </header>
 
           <main className="relative flex-1 overflow-hidden">
@@ -366,36 +400,45 @@ export default function MobileStartPage() {
           )}
         </main>
         </div>
-      ) : (
-        <div
-          className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6"
-          style={{
-            paddingTop: "env(safe-area-inset-top, 0px)",
-            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
-          }}
-        >
-          <HelixAskPill
-            className="w-full max-w-md"
-            contextId="helix-ask-mobile"
-            maxWidthClassName="max-w-md"
-            onOpenPanel={handleOpenPanel}
-            onOpenConversation={handleOpenConversation}
-          />
-        </div>
-      )}
+        ) : (
+          <div
+            className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6"
+            style={{
+              paddingTop: "env(safe-area-inset-top, 0px)",
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
+            }}
+          >
+            <HelixAskPill
+              className="w-full max-w-md"
+              contextId={HELIX_ASK_CONTEXT_ID.mobile}
+              maxWidthClassName="max-w-md"
+              onOpenPanel={handleOpenPanel}
+              onOpenConversation={handleOpenConversation}
+            />
+          </div>
+        )}
 
-      {!appViewerOpen && (
         <button
-          className="pointer-events-auto fixed bottom-6 left-5 z-20 flex min-h-[48px] items-center gap-2 rounded-full border border-primary/45 bg-primary/18 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary shadow-[0_0_26px_hsl(var(--primary)/0.32)] transition hover:bg-primary/26 active:scale-[0.99] active:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          onClick={openAppViewer}
           type="button"
+          className="pointer-events-auto fixed right-5 top-4 z-30 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-primary/45 bg-card/74 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-foreground transition hover:border-primary/60 hover:bg-card/86 hover:text-primary active:scale-[0.99] active:border-primary/65 active:bg-primary/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          onClick={() => openSettings("preferences")}
         >
-          <PanelsTopLeft className="h-4 w-4" />
-          Start
+          <Settings className="h-4 w-4" />
+          Settings
         </button>
-      )}
 
-      {appViewerOpen && showSwitcher && (
+        {!appViewerOpen && (
+          <button
+            className="pointer-events-auto fixed bottom-6 left-5 z-20 flex min-h-[48px] items-center gap-2 rounded-full border border-primary/45 bg-primary/18 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary shadow-[0_0_26px_hsl(var(--primary)/0.32)] transition hover:bg-primary/26 active:scale-[0.99] active:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/75 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            onClick={openAppViewer}
+            type="button"
+          >
+            <PanelsTopLeft className="h-4 w-4" />
+            Start
+          </button>
+        )}
+
+        {appViewerOpen && showSwitcher && (
         <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm">
           <div
             className="mx-auto mt-12 w-full max-w-screen-md px-5"
@@ -492,7 +535,17 @@ export default function MobileStartPage() {
             )}
           </div>
         </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      <HelixSettingsDialogContent
+        settingsTab={settingsTab}
+        onSettingsTabChange={setSettingsTab}
+        userSettings={userSettings}
+        updateSettings={updateSettings}
+        onClearSavedChoice={clearSavedChoice}
+        onClose={() => handleSettingsOpenChange(false)}
+      />
+    </Dialog>
   );
 }

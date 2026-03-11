@@ -169,6 +169,21 @@ export function shouldUseVoicePlaybackAudioGraph(userAgent?: string): boolean {
   return true;
 }
 
+export function shouldRetryVoicePlaybackWithDirectFallback(params: {
+  graphAttached: boolean;
+  directFallbackAttempted: boolean;
+}): boolean {
+  return params.graphAttached && !params.directFallbackAttempted;
+}
+
+export function resolveVoicePlaybackAttemptPath(params: {
+  graphAttached: boolean;
+  directFallbackAttempted: boolean;
+}): "audio_graph" | "direct_fallback" | "direct_element" {
+  if (params.graphAttached) return "audio_graph";
+  return params.directFallbackAttempted ? "direct_fallback" : "direct_element";
+}
+
 export function stripVoiceCitationArtifacts(source: string): string {
   if (!source) return "";
   const normalized = source
@@ -1134,30 +1149,41 @@ export function shouldPrimeSegmentWithContainerHeader(params: {
   if (!params.hasHeaderChunk) return false;
   if (params.segmentStartIndex <= 0) return false;
   const normalized = (params.mimeType ?? "").trim().toLowerCase();
-  if (!normalized) return true;
-  return (
-    normalized.includes("webm") ||
-    normalized.includes("ogg") ||
-    normalized.includes("mp4") ||
-    normalized.includes("mpeg") ||
-    normalized.includes("mp3") ||
-    normalized.includes("wav")
-  );
+  if (!normalized) return false;
+  return normalized.includes("webm") || normalized.includes("ogg");
 }
 
-function pickMicRecorderMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
-    return undefined;
-  }
-  const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-    "audio/ogg;codecs=opus",
-  ];
+export function getMicRecorderMimeCandidates(userAgent?: string): string[] {
+  const ua =
+    (userAgent ?? (typeof navigator !== "undefined" ? navigator.userAgent : ""))
+      .trim()
+      .toLowerCase();
+  const iosLike = IOS_AUDIO_USER_AGENT_PATTERN.test(ua) || isLikelyIOSDesktopModeUserAgent(ua);
+  const ordered = iosLike
+    ? [
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+      ]
+    : [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+      ];
+  return [...new Set(ordered)];
+}
+
+export function pickSupportedMicRecorderMimeType(params: {
+  userAgent?: string;
+  isTypeSupported: (mimeType: string) => boolean;
+}): string | undefined {
+  const candidates = getMicRecorderMimeCandidates(params.userAgent);
   for (const mimeType of candidates) {
     try {
-      if (MediaRecorder.isTypeSupported(mimeType)) {
+      if (params.isTypeSupported(mimeType)) {
         return mimeType;
       }
     } catch {
@@ -1165,6 +1191,17 @@ function pickMicRecorderMimeType(): string | undefined {
     }
   }
   return undefined;
+}
+
+function pickMicRecorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+    return undefined;
+  }
+  const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : undefined;
+  return pickSupportedMicRecorderMimeType({
+    userAgent,
+    isTypeSupported: MediaRecorder.isTypeSupported.bind(MediaRecorder),
+  });
 }
 
 export function inferAskMode(question: string): "observe" | "act" | "verify" | undefined {
@@ -4610,7 +4647,10 @@ export function HelixAskPill({
   const voicePlaybackCompressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const voicePlaybackGainNodeRef = useRef<GainNode | null>(null);
   const voicePlaybackGraphElementRef = useRef<HTMLAudioElement | null>(null);
-  const voicePlaybackForceDirectRef = useRef(false);
+  const voicePlaybackGraphAttemptCountRef = useRef(0);
+  const voicePlaybackFallbackCountRef = useRef(0);
+  const voicePlaybackLastFallbackRef = useRef<{ reason: string; atMs: number } | null>(null);
+  const voicePlaybackCurrentPathRef = useRef<"audio_graph" | "direct_element" | "direct_fallback" | null>(null);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
   const voiceAudioUnlockedRef = useRef(false);
@@ -6459,7 +6499,6 @@ export function HelixAskPill({
   const ensureVoicePlaybackAudioGraph = useCallback(
     async (audio: HTMLAudioElement): Promise<boolean> => {
       if (typeof window === "undefined") return false;
-      if (voicePlaybackForceDirectRef.current) return false;
       if (!shouldUseVoicePlaybackAudioGraph(window.navigator?.userAgent)) {
         return false;
       }
@@ -6561,10 +6600,19 @@ export function HelixAskPill({
   const playVoiceAudioBlob = useCallback(
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
-      let attemptedDirectFallback = false;
+      let directFallbackAttempted = false;
       while (true) {
         const audio = getOrCreateVoicePlaybackElement();
-        const graphAttached = await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
+        const graphAttached = directFallbackAttempted
+          ? false
+          : await ensureVoicePlaybackAudioGraph(audio).catch(() => false);
+        if (!directFallbackAttempted && graphAttached) {
+          voicePlaybackGraphAttemptCountRef.current += 1;
+        }
+        voicePlaybackCurrentPathRef.current = resolveVoicePlaybackAttemptPath({
+          graphAttached,
+          directFallbackAttempted,
+        });
         const url = URL.createObjectURL(input.blob);
         audio.muted = false;
         audio.volume = 1;
@@ -6605,6 +6653,7 @@ export function HelixAskPill({
               }
               if (playbackAudioRef.current === audio) {
                 playbackAudioRef.current = null;
+                voicePlaybackCurrentPathRef.current = null;
               }
               if (playbackReplyIdRef.current === replyId) {
                 playbackReplyIdRef.current = null;
@@ -6656,9 +6705,19 @@ export function HelixAskPill({
         } catch (error) {
           // Mobile Safari can intermittently fail MediaElementSource playback; retry once
           // with direct element output by discarding the graph-bound element.
-          if (!attemptedDirectFallback && graphAttached) {
-            attemptedDirectFallback = true;
-            voicePlaybackForceDirectRef.current = true;
+          if (
+            shouldRetryVoicePlaybackWithDirectFallback({
+              graphAttached,
+              directFallbackAttempted,
+            })
+          ) {
+            directFallbackAttempted = true;
+            voicePlaybackFallbackCountRef.current += 1;
+            voicePlaybackLastFallbackRef.current = {
+              reason: error instanceof Error ? error.message : String(error),
+              atMs: Date.now(),
+            };
+            voicePlaybackCurrentPathRef.current = "direct_fallback";
             teardownVoicePlaybackAudioGraph();
             try {
               audio.pause();
@@ -6741,6 +6800,7 @@ export function HelixAskPill({
       currentAudio.src = "";
       if (playbackAudioRef.current === currentAudio) {
         playbackAudioRef.current = null;
+        voicePlaybackCurrentPathRef.current = null;
       }
     }
     if (playbackUrlRef.current) {
@@ -11855,7 +11915,10 @@ export function HelixAskPill({
       playbackElement.load();
     }
     playbackElementRef.current = null;
-    voicePlaybackForceDirectRef.current = false;
+    voicePlaybackGraphAttemptCountRef.current = 0;
+    voicePlaybackFallbackCountRef.current = 0;
+    voicePlaybackLastFallbackRef.current = null;
+    voicePlaybackCurrentPathRef.current = null;
     voiceChunkTimelineEventsRef.current = [];
     contextCapsuleSessionLedgerRef.current = [];
   }, [stopReadAloud, stopVoiceCapture, teardownVoicePlaybackAudioGraph]);
@@ -13135,14 +13198,20 @@ export function HelixAskPill({
         const playbackContext = voicePlaybackAudioContextRef.current;
         const gainNode = voicePlaybackGainNodeRef.current;
         const compressor = voicePlaybackCompressorNodeRef.current;
+        const graphEligible = shouldUseVoicePlaybackAudioGraph(ua ?? undefined);
+        const lastFallback = voicePlaybackLastFallbackRef.current;
         return {
           userAgent: ua,
           audioSessionType:
             nav && nav.audioSession && typeof nav.audioSession.type === "string" ? nav.audioSession.type : null,
-          expectedPath:
-            voicePlaybackForceDirectRef.current || !shouldUseVoicePlaybackAudioGraph(ua ?? undefined)
-              ? "direct_element"
-              : "audio_graph",
+          expectedPath: graphEligible ? "audio_graph" : "direct_element",
+          currentUtterancePath: voicePlaybackCurrentPathRef.current,
+          currentUtteranceDirectFallback: voicePlaybackCurrentPathRef.current === "direct_fallback",
+          graphEligible,
+          graphAttemptCount: voicePlaybackGraphAttemptCountRef.current,
+          fallbackCount: voicePlaybackFallbackCountRef.current,
+          lastFallbackReason: lastFallback?.reason ?? null,
+          lastFallbackAtMs: lastFallback?.atMs ?? null,
           forcedDirectMobile: HELIX_VOICE_FORCE_DIRECT_MOBILE,
           gainTarget: resolveVoicePlaybackGain(ua ?? undefined),
           audioUnlocked: voiceAudioUnlockedRef.current,

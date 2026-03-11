@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Settings } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import { useDesktopStore } from "@/store/useDesktopStore";
@@ -11,13 +11,14 @@ import { HelixAskPill } from "@/components/helix/HelixAskPill";
 import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,
-  type SettingsTab
 } from "@/hooks/useHelixStartSettings";
+import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
 import { decodeLayout, resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
 import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
+import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -25,7 +26,6 @@ const PENDING_PANEL_KEY = "helix:pending-panel";
 const NOISE_GENS_PANEL_ID = "helix-noise-gens";
 const ESSENCE_CONSOLE_PANEL_ID = "agi-essence-console";
 const NOISE_GENS_AUTO_OPEN_SUPPRESS = new Set([ESSENCE_CONSOLE_PANEL_ID]);
-const HELIX_ASK_CONTEXT_ID = "helix-ask-desktop";
 function collectPanelIdsFromStructure(
   input: unknown,
   target: Set<string>,
@@ -79,8 +79,13 @@ function collectPanelIdsFromStructure(
 export default function DesktopPage() {
   const { windows, registerFromManifest, open } = useDesktopStore();
   const { userSettings, updateSettings } = useHelixStartSettings();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>("preferences");
+  const {
+    settingsOpen,
+    settingsTab,
+    setSettingsTab,
+    openSettings,
+    handleSettingsOpenChange,
+  } = useHelixSettingsDialog("preferences");
   const { refresh: refreshProjects, selectProjects, projects } = useKnowledgeProjectsStore((state) => ({
     projects: state.projects,
     refresh: state.refresh,
@@ -147,26 +152,13 @@ export default function DesktopPage() {
       if (projectId) {
         selectProjects([projectId]);
       }
-      setSettingsTab("knowledge");
-      setSettingsOpen(true);
+      openSettings("knowledge");
     };
     window.addEventListener("open-knowledge-project", handleKnowledgeOpen as EventListener);
     return () => {
       window.removeEventListener("open-knowledge-project", handleKnowledgeOpen as EventListener);
     };
-  }, [selectProjects]);
-
-  useEffect(() => {
-    const handleSettingsOpen = (event: Event) => {
-      const custom = event as CustomEvent<{ tab?: SettingsTab }>;
-      setSettingsTab(custom?.detail?.tab ?? "preferences");
-      setSettingsOpen(true);
-    };
-    window.addEventListener("open-desktop-settings", handleSettingsOpen as EventListener);
-    return () => {
-      window.removeEventListener("open-desktop-settings", handleSettingsOpen as EventListener);
-    };
-  }, []);
+  }, [openSettings, selectProjects]);
 
   const applyLayout = useCallback(
     (layout: DesktopLayoutHash) => {
@@ -294,10 +286,7 @@ export default function DesktopPage() {
   return (
     <Dialog
       open={settingsOpen}
-      onOpenChange={(next) => {
-        setSettingsOpen(next);
-        if (!next) setSettingsTab("preferences");
-      }}
+      onOpenChange={handleSettingsOpenChange}
     >
       {userSettings.enableSplashCursor && <SplashCursor />}
       <div
@@ -322,7 +311,7 @@ export default function DesktopPage() {
         <div className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex flex-col items-center px-6">
           <HelixAskPill
             className="pointer-events-auto w-full"
-            contextId={HELIX_ASK_CONTEXT_ID}
+            contextId={HELIX_ASK_CONTEXT_ID.desktop}
             maxWidthClassName="max-w-4xl mx-auto"
             onOpenPanel={openPanelById}
             onOpenConversation={() => {
@@ -355,9 +344,10 @@ export default function DesktopPage() {
         userSettings={userSettings}
         updateSettings={updateSettings}
         onClearSavedChoice={clearSavedChoice}
-        onClose={() => setSettingsOpen(false)}
+        onClose={() => handleSettingsOpenChange(false)}
       />
     </Dialog>
   );
 }
+
 
