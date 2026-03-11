@@ -131,6 +131,10 @@ const HELIX_VOICE_LIMITER_KNEE_DB = 1;
 const HELIX_VOICE_LIMITER_RATIO = 20;
 const HELIX_VOICE_LIMITER_ATTACK_S = 0.001;
 const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
+const VOICE_PLAYBACK_DIRECT_RETRY_MAX = 1;
+const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS = 0.9;
+const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION = 1.8;
+const VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO = 0.82;
 const HELIX_VOICE_FORCE_DIRECT_MOBILE =
   String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 
@@ -174,6 +178,36 @@ export function shouldRetryVoicePlaybackWithDirectFallback(params: {
   directFallbackAttempted: boolean;
 }): boolean {
   return params.graphAttached && !params.directFallbackAttempted;
+}
+
+export function shouldRetryVoicePlaybackDirectAttempt(params: {
+  graphAttached: boolean;
+  directFallbackAttempted: boolean;
+  directRetryCount: number;
+}): boolean {
+  return (
+    !params.graphAttached &&
+    params.directFallbackAttempted &&
+    params.directRetryCount < VOICE_PLAYBACK_DIRECT_RETRY_MAX
+  );
+}
+
+export function shouldTreatVoicePlaybackErrorAsEnded(params: {
+  playedSeconds: number;
+  durationSeconds: number | null;
+}): boolean {
+  if (!Number.isFinite(params.playedSeconds)) return false;
+  const playedSeconds = Math.max(0, params.playedSeconds);
+  if (playedSeconds < VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS) return false;
+  const durationSeconds =
+    typeof params.durationSeconds === "number" && Number.isFinite(params.durationSeconds)
+      ? params.durationSeconds
+      : null;
+  if (!durationSeconds || durationSeconds <= 0) {
+    return playedSeconds >= VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION;
+  }
+  const ratio = playedSeconds / Math.max(durationSeconds, 1e-6);
+  return ratio >= VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO;
 }
 
 export function resolveVoicePlaybackAttemptPath(params: {
@@ -6601,6 +6635,7 @@ export function HelixAskPill({
     async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
       const replyId = input.replyId ?? null;
       let directFallbackAttempted = false;
+      let directRetryCount = 0;
       while (true) {
         const audio = getOrCreateVoicePlaybackElement();
         const graphAttached = directFallbackAttempted
@@ -6659,6 +6694,18 @@ export function HelixAskPill({
                 playbackReplyIdRef.current = null;
               }
               if (event === "error") {
+                const playedSeconds = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+                const durationSeconds =
+                  Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
+                if (
+                  shouldTreatVoicePlaybackErrorAsEnded({
+                    playedSeconds,
+                    durationSeconds,
+                  })
+                ) {
+                  resolve();
+                  return;
+                }
                 reject(new Error("voice_audio_playback_error"));
                 return;
               }
@@ -6719,6 +6766,34 @@ export function HelixAskPill({
             };
             voicePlaybackCurrentPathRef.current = "direct_fallback";
             teardownVoicePlaybackAudioGraph();
+            try {
+              audio.pause();
+            } catch {
+              // no-op
+            }
+            audio.onended = null;
+            audio.onerror = null;
+            audio.src = "";
+            audio.load();
+            if (playbackElementRef.current === audio) {
+              playbackElementRef.current = null;
+            }
+            continue;
+          }
+          if (
+            shouldRetryVoicePlaybackDirectAttempt({
+              graphAttached,
+              directFallbackAttempted,
+              directRetryCount,
+            })
+          ) {
+            directRetryCount += 1;
+            voicePlaybackFallbackCountRef.current += 1;
+            voicePlaybackLastFallbackRef.current = {
+              reason: `direct_retry:${error instanceof Error ? error.message : String(error)}`,
+              atMs: Date.now(),
+            };
+            voicePlaybackCurrentPathRef.current = "direct_fallback";
             try {
               audio.pause();
             } catch {

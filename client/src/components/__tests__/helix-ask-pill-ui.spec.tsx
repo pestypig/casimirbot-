@@ -30,6 +30,8 @@ let evaluateVoiceTurnSealGate: typeof import("@/components/helix/HelixAskPill").
 let resolveVoicePlaybackGain: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackGain;
 let shouldUseVoicePlaybackAudioGraph: typeof import("@/components/helix/HelixAskPill").shouldUseVoicePlaybackAudioGraph;
 let shouldRetryVoicePlaybackWithDirectFallback: typeof import("@/components/helix/HelixAskPill").shouldRetryVoicePlaybackWithDirectFallback;
+let shouldRetryVoicePlaybackDirectAttempt: typeof import("@/components/helix/HelixAskPill").shouldRetryVoicePlaybackDirectAttempt;
+let shouldTreatVoicePlaybackErrorAsEnded: typeof import("@/components/helix/HelixAskPill").shouldTreatVoicePlaybackErrorAsEnded;
 let resolveVoicePlaybackAttemptPath: typeof import("@/components/helix/HelixAskPill").resolveVoicePlaybackAttemptPath;
 
 beforeAll(async () => {
@@ -63,6 +65,8 @@ beforeAll(async () => {
     resolveVoicePlaybackGain,
     shouldUseVoicePlaybackAudioGraph,
     shouldRetryVoicePlaybackWithDirectFallback,
+    shouldRetryVoicePlaybackDirectAttempt,
+    shouldTreatVoicePlaybackErrorAsEnded,
     resolveVoicePlaybackAttemptPath,
   } = await import("@/components/helix/HelixAskPill"));
 });
@@ -194,6 +198,51 @@ describe("HelixAskPill mic helper behavior", () => {
         directFallbackAttempted: false,
       }),
     ).toBe("audio_graph");
+  });
+
+  it("allows one clean direct retry after fallback if direct playback throws", () => {
+    expect(
+      shouldRetryVoicePlaybackDirectAttempt({
+        graphAttached: false,
+        directFallbackAttempted: true,
+        directRetryCount: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetryVoicePlaybackDirectAttempt({
+        graphAttached: false,
+        directFallbackAttempted: true,
+        directRetryCount: 1,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRetryVoicePlaybackDirectAttempt({
+        graphAttached: true,
+        directFallbackAttempted: false,
+        directRetryCount: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("treats late media errors as ended to avoid iOS tail-drop stalls", () => {
+    expect(
+      shouldTreatVoicePlaybackErrorAsEnded({
+        playedSeconds: 9.1,
+        durationSeconds: 10,
+      }),
+    ).toBe(true);
+    expect(
+      shouldTreatVoicePlaybackErrorAsEnded({
+        playedSeconds: 0.2,
+        durationSeconds: 10,
+      }),
+    ).toBe(false);
+    expect(
+      shouldTreatVoicePlaybackErrorAsEnded({
+        playedSeconds: 2.1,
+        durationSeconds: null,
+      }),
+    ).toBe(true);
   });
 
   it("routes completion scores by threshold", () => {
