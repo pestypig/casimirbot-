@@ -30,6 +30,7 @@ import {
 } from "@/lib/agi/api";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog";
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
 import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moods";
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
@@ -125,16 +126,17 @@ const IOS_AUDIO_USER_AGENT_PATTERN = /(iphone|ipad|ipod)/i;
 const DESKTOP_STYLE_APPLE_AUDIO_USER_AGENT_PATTERN = /macintosh/i;
 const HELIX_VOICE_PLAYBACK_GAIN_DESKTOP = 1.15;
 const HELIX_VOICE_PLAYBACK_GAIN_MOBILE = 3.6;
-const HELIX_VOICE_PLAYBACK_GAIN_IOS = 4.2;
+const HELIX_VOICE_PLAYBACK_GAIN_IOS = 5.0;
 const HELIX_VOICE_LIMITER_THRESHOLD_DB = -2.5;
 const HELIX_VOICE_LIMITER_KNEE_DB = 1;
 const HELIX_VOICE_LIMITER_RATIO = 20;
 const HELIX_VOICE_LIMITER_ATTACK_S = 0.001;
 const HELIX_VOICE_LIMITER_RELEASE_S = 0.08;
 const VOICE_PLAYBACK_DIRECT_RETRY_MAX = 1;
-const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS = 0.9;
-const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION = 1.8;
-const VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO = 0.82;
+const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS = 0.65;
+const VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS_NO_DURATION = 1.2;
+const VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO = 0.35;
+const VOICE_PLAYBACK_ERROR_RECOVER_DIRECT_FALLBACK_MIN_SECONDS = 0.3;
 const HELIX_VOICE_FORCE_DIRECT_MOBILE =
   String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 
@@ -195,9 +197,16 @@ export function shouldRetryVoicePlaybackDirectAttempt(params: {
 export function shouldTreatVoicePlaybackErrorAsEnded(params: {
   playedSeconds: number;
   durationSeconds: number | null;
+  directFallbackAttempted?: boolean;
 }): boolean {
   if (!Number.isFinite(params.playedSeconds)) return false;
   const playedSeconds = Math.max(0, params.playedSeconds);
+  if (
+    params.directFallbackAttempted &&
+    playedSeconds >= VOICE_PLAYBACK_ERROR_RECOVER_DIRECT_FALLBACK_MIN_SECONDS
+  ) {
+    return true;
+  }
   if (playedSeconds < VOICE_PLAYBACK_ERROR_RECOVER_MIN_SECONDS) return false;
   const durationSeconds =
     typeof params.durationSeconds === "number" && Number.isFinite(params.durationSeconds)
@@ -1184,7 +1193,15 @@ export function shouldPrimeSegmentWithContainerHeader(params: {
   if (params.segmentStartIndex <= 0) return false;
   const normalized = (params.mimeType ?? "").trim().toLowerCase();
   if (!normalized) return false;
-  return normalized.includes("webm") || normalized.includes("ogg");
+  // Sliced chunks often need container initialization data prepended to remain decodable.
+  // Keep this enabled for streaming containers used by mobile MediaRecorder runtimes.
+  return (
+    normalized.includes("webm") ||
+    normalized.includes("ogg") ||
+    normalized.includes("mp4") ||
+    normalized.includes("m4a") ||
+    normalized.includes("quicktime")
+  );
 }
 
 export function getMicRecorderMimeCandidates(userAgent?: string): string[] {
@@ -4685,6 +4702,7 @@ export function HelixAskPill({
   const voicePlaybackFallbackCountRef = useRef(0);
   const voicePlaybackLastFallbackRef = useRef<{ reason: string; atMs: number } | null>(null);
   const voicePlaybackCurrentPathRef = useRef<"audio_graph" | "direct_element" | "direct_fallback" | null>(null);
+  const voiceUiModalOpenRef = useRef(false);
   const playbackUrlRef = useRef<string | null>(null);
   const playbackReplyIdRef = useRef<string | null>(null);
   const voiceAudioUnlockedRef = useRef(false);
@@ -6701,6 +6719,7 @@ export function HelixAskPill({
                   shouldTreatVoicePlaybackErrorAsEnded({
                     playedSeconds,
                     durationSeconds,
+                    directFallbackAttempted,
                   })
                 ) {
                   resolve();
@@ -6888,6 +6907,22 @@ export function HelixAskPill({
       playbackReplyIdRef.current = null;
     }
   }, [clearVoicePendingPreempt, updateVoiceAutoSpeakMetrics]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleSettingsState = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>)?.detail;
+      voiceUiModalOpenRef.current = detail?.open === true;
+    };
+    window.addEventListener(HELIX_SETTINGS_OPEN_STATE_EVENT, handleSettingsState as EventListener);
+    return () => {
+      window.removeEventListener(
+        HELIX_SETTINGS_OPEN_STATE_EVENT,
+        handleSettingsState as EventListener,
+      );
+      voiceUiModalOpenRef.current = false;
+    };
+  }, []);
 
   const setVoicePendingPreempt = useCallback(
     (input: {
@@ -11601,7 +11636,7 @@ export function HelixAskPill({
           firstPrerollIndex >= 0
             ? firstPrerollIndex
             : Math.max(0, voiceChunksRef.current.length - 2);
-        if (voiceOutputActive) {
+        if (voiceOutputActive && !voiceUiModalOpenRef.current) {
           pausePlaybackForPotentialBargeIn();
           if (playbackAudioRef.current && !playbackAudioRef.current.paused) {
             stopReadAloud("barge_in");

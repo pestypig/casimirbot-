@@ -5,11 +5,17 @@ type OpenSettingsDetail = {
   tab?: SettingsTab;
 };
 
+type HelixSettingsOpenStateDetail = {
+  open: boolean;
+};
+
 const OPEN_EVENTS = [
   "open-helix-settings",
   "open-desktop-settings",
   "open-mobile-settings",
 ] as const;
+
+export const HELIX_SETTINGS_OPEN_STATE_EVENT = "helix-settings-open-state";
 
 export function useHelixSettingsDialog(defaultTab: SettingsTab = "preferences") {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
@@ -38,6 +44,13 @@ export function useHelixSettingsDialog(defaultTab: SettingsTab = "preferences") 
 
   const handleSettingsOpenChange = React.useCallback((next: boolean) => {
     setSettingsOpen(next);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent<HelixSettingsOpenStateDetail>(HELIX_SETTINGS_OPEN_STATE_EVENT, {
+          detail: { open: next },
+        }),
+      );
+    }
     if (!next) {
       setSettingsTab(defaultTab);
     }

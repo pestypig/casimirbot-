@@ -19,7 +19,10 @@ vi.mock("../server/skills/stt.whisper", () => ({
 }));
 
 vi.mock("../server/services/audio/stt-format-recovery", () => ({
-  isSttInvalidFormatMessage: (message: string) => message.toLowerCase().includes("invalid file format"),
+  isSttInvalidFormatMessage: (message: string) =>
+    /(invalid file format|format is not supported|could not be decoded|unsupported format)/i.test(
+      message,
+    ),
   recoverSttInvalidFormatToPcmWav: recoverSttInvalidFormatToPcmWavMock,
 }));
 
@@ -393,7 +396,7 @@ describe("voice transcribe route", () => {
     sttHttpHandlerMock
       .mockRejectedValueOnce(
         new Error(
-          "STT HTTP 400: invalid file format. Supported formats: ['flac','m4a','mp3','mp4','mpeg','mpga','oga','ogg','wav','webm']",
+          "STT HTTP 400: The audio file could not be decoded or its format is not supported.",
         ),
       )
       .mockResolvedValueOnce({
@@ -433,7 +436,7 @@ describe("voice transcribe route", () => {
     process.env.OPENAI_API_KEY = "openai-key";
     sttHttpHandlerMock.mockRejectedValue(
       new Error(
-        "STT HTTP 400: invalid file format. Supported formats: ['flac','m4a','mp3','mp4','mpeg','mpga','oga','ogg','wav','webm']",
+        "STT HTTP 400: The audio file could not be decoded or its format is not supported.",
       ),
     );
     recoverSttInvalidFormatToPcmWavMock.mockResolvedValue({

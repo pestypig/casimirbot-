@@ -137,7 +137,7 @@ describe("HelixAskPill mic helper behavior", () => {
     );
     expect(desktopGain).toBe(1.15);
     expect(androidGain).toBe(3.6);
-    expect(iosGain).toBe(4.2);
+    expect(iosGain).toBe(5.0);
     expect(androidGain).toBeGreaterThan(desktopGain);
     expect(iosGain).toBeGreaterThan(androidGain);
   });
@@ -150,7 +150,7 @@ describe("HelixAskPill mic helper behavior", () => {
     try {
       const iosDesktopUa =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15";
-      expect(resolveVoicePlaybackGain(iosDesktopUa)).toBe(4.2);
+      expect(resolveVoicePlaybackGain(iosDesktopUa)).toBe(5.0);
       expect(shouldUseVoicePlaybackAudioGraph(iosDesktopUa)).toBe(true);
     } finally {
       if (originalNavigator) {
@@ -241,6 +241,13 @@ describe("HelixAskPill mic helper behavior", () => {
       shouldTreatVoicePlaybackErrorAsEnded({
         playedSeconds: 2.1,
         durationSeconds: null,
+      }),
+    ).toBe(true);
+    expect(
+      shouldTreatVoicePlaybackErrorAsEnded({
+        playedSeconds: 0.35,
+        durationSeconds: 6,
+        directFallbackAttempted: true,
       }),
     ).toBe(true);
   });
@@ -682,7 +689,7 @@ describe("HelixAskPill mic helper behavior", () => {
         mimeType: "audio/mp4",
         hasHeaderChunk: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldPrimeSegmentWithContainerHeader({
         segmentStartIndex: 4,

@@ -33,6 +33,9 @@ export const isSttInvalidFormatMessage = (message: string): boolean => {
   return (
     normalized.includes("invalid file format") ||
     normalized.includes("unsupported format") ||
+    normalized.includes("format is not supported") ||
+    normalized.includes("could not be decoded") ||
+    normalized.includes("could not decode") ||
     normalized.includes("supported formats")
   );
 };
