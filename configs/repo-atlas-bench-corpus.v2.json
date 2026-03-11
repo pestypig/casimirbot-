@@ -523,6 +523,58 @@
                                         }
                   },
                   {
+                      "id":  "atlas_task_040a",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, locate the script invoked by the verify:ideology-verifiers npm command that validates ideology verifier contracts (validate-ideology-verifiers.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/validate-ideology-verifiers.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_040b",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, identify the script that compiles panel trees consumed by Helix Ask concept routing (build-panel-tree.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/build-panel-tree.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_040c",
+                      "domain":  "scripts",
+                      "prompt":  "For retrieval attribution benchmarking, identify the Helix Ask retrieval utility ablation runner script (helix-ask-utility-ab.ts). Return the exact repository path.",
+                      "expected_files":  [
+                                             "scripts/helix-ask-utility-ab.ts"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
+                      "id":  "atlas_task_040d",
+                      "domain":  "docs",
+                      "prompt":  "For retrieval attribution benchmarking, identify the Casimir tile roadmap document referenced for milestone planning (casimir-tile-roadmap.md). Return the exact repository path.",
+                      "expected_files":  [
+                                             "docs/casimir-tile-roadmap.md"
+                                         ],
+                      "success_check":  {
+                                            "file_hit":  true,
+                                            "command":  null,
+                                            "hard_gate":  false
+                                        }
+                  },
+                  {
                       "id":  "atlas_task_041",
                       "domain":  "docs",
                       "prompt":  "For retrieval attribution benchmarking, locate the docs file implementing helix ask quake balancing primitives (helix-ask-quake-balancing-primitives.md). Return the exact repository path.",

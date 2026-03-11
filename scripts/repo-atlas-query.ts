@@ -202,6 +202,7 @@ const summarizePathDiagnostics = (atlas: RepoAtlas, paths: string[][], direction
   const edgeLookup = buildDirectedEdgeLookup(atlas, direction);
   const edgeTypeCounts: Record<string, number> = {};
   const sourceSystemCounts: Record<string, number> = {};
+  const pathHopDepthCounts: Record<string, number> = {};
   const pathHopDiagnostics = paths.slice(0, 16).map((pathIds) => {
     const hops: Array<{ from: string; to: string; kind: string; sourceSystem: string }> = [];
     for (let i = 0; i + 1 < pathIds.length; i += 1) {
@@ -218,15 +219,19 @@ const summarizePathDiagnostics = (atlas: RepoAtlas, paths: string[][], direction
         sourceSystem: metadata.sourceSystem,
       });
     }
+    const hopCount = Math.max(0, pathIds.length - 1);
+    pathHopDepthCounts[String(hopCount)] = (pathHopDepthCounts[String(hopCount)] ?? 0) + 1;
     return {
       nodes: pathIds,
-      hop_count: Math.max(0, pathIds.length - 1),
+      hop_count: hopCount,
       hops: hops.slice(0, 12),
     };
   });
   return {
+    path_count: paths.length,
     edge_type_counts: edgeTypeCounts,
     source_system_counts: sourceSystemCounts,
+    path_hop_depth_counts: pathHopDepthCounts,
     path_hop_diagnostics: pathHopDiagnostics,
   };
 };
@@ -242,11 +247,15 @@ export const whyIdentifier = (atlas: RepoAtlas, identifier: string) => {
     node,
     producers,
     consumers,
+    producer_path_count: producerDiagnostics.path_count,
     producer_edge_type_counts: producerDiagnostics.edge_type_counts,
     producer_source_system_counts: producerDiagnostics.source_system_counts,
+    producer_path_hop_depth_counts: producerDiagnostics.path_hop_depth_counts,
     producer_path_hop_diagnostics: producerDiagnostics.path_hop_diagnostics,
+    consumer_path_count: consumerDiagnostics.path_count,
     consumer_edge_type_counts: consumerDiagnostics.edge_type_counts,
     consumer_source_system_counts: consumerDiagnostics.source_system_counts,
+    consumer_path_hop_depth_counts: consumerDiagnostics.path_hop_depth_counts,
     consumer_path_hop_diagnostics: consumerDiagnostics.path_hop_diagnostics,
   };
 };
@@ -260,8 +269,10 @@ export const traceIdentifier = (atlas: RepoAtlas, identifier: string, direction:
     node,
     direction,
     paths,
+    path_count: diagnostics.path_count,
     edge_type_counts: diagnostics.edge_type_counts,
     source_system_counts: diagnostics.source_system_counts,
+    path_hop_depth_counts: diagnostics.path_hop_depth_counts,
     path_hop_diagnostics: diagnostics.path_hop_diagnostics,
   };
 };

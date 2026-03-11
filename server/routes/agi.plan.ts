@@ -193,6 +193,7 @@ import {
   runGitTrackedRepoSearch,
   runRepoSearch,
   type RepoSearchResult,
+  type RepoSearchStage0Telemetry,
 } from "../services/helix-ask/repo-search";
 import {
   buildHelixAskMathAnswer,
@@ -6522,6 +6523,11 @@ type AskCandidate = {
     atlasSource?: "corpus" | "graph";
     atlasGraphRuntimeLink?: boolean;
     atlasGraphEdgeTypes?: string[];
+    atlasGraphQueryOverlap?: number;
+    atlasGraphSymbolTokenHits?: number;
+    atlasGraphSnippetTokenHits?: number;
+    atlasGraphCorpusMember?: boolean;
+    atlasGraphScriptDocBoostApplied?: boolean;
   };
 };
 
@@ -8619,6 +8625,30 @@ function parseAtlasGraphEdgeTypes(snippet: string): string[] {
   return Array.from(hits).sort((a, b) => a.localeCompare(b));
 }
 
+function hasAtlasRuntimeQueryCue(queryTokens: Set<string>): boolean {
+  return Array.from(queryTokens).some((token) => HELIX_ASK_ATLAS_RUNTIME_QUERY_TOKENS.has(token));
+}
+
+function countAtlasQueryTokenOverlap(text: string, queryTokens: Set<string>, maxHits = 6): number {
+  if (!text.trim()) return 0;
+  const tokens = text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+  if (!tokens.length) return 0;
+  const seen = new Set<string>();
+  let hits = 0;
+  for (const token of tokens) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (!queryTokens.has(token)) continue;
+    hits += 1;
+    if (hits >= maxHits) break;
+  }
+  return hits;
+}
+
 function hasAtlasGraphRuntimeLink(args: {
   filePath: string;
   queryTokens: Set<string>;
@@ -8628,9 +8658,7 @@ function hasAtlasGraphRuntimeLink(args: {
 }): boolean {
   if (!isAtlasScriptOrDocPath(args.filePath)) return false;
   const normalizedSymbol = args.symbolName.toLowerCase();
-  const queryHasRuntimeCue = Array.from(args.queryTokens).some((token) =>
-    HELIX_ASK_ATLAS_RUNTIME_QUERY_TOKENS.has(token),
-  );
+  const queryHasRuntimeCue = hasAtlasRuntimeQueryCue(args.queryTokens);
   const symbolOverlap = normalizedSymbol
     ? Array.from(args.queryTokens).some((token) => token.length >= 3 && normalizedSymbol.includes(token))
     : false;
@@ -8738,6 +8766,7 @@ async function collectAtlasCandidatesForQuery(
   const queryText = `${query} ${question}`.trim();
   const queryTokens = buildAtlasQueryTokenSet(queryText);
   const normalizedQuery = queryText.toLowerCase();
+  const queryHasRuntimeCue = hasAtlasRuntimeQueryCue(queryTokens);
   const isValidRepoFilePath = buildAtlasRepoFilePathValidator();
   const byPath = new Map<string, AskCandidate>();
   const upsert = (candidate: AskCandidate) => {
@@ -8792,13 +8821,17 @@ async function collectAtlasCandidatesForQuery(
         }
         const exactFilenameMention = hasAtlasExactFilenameMention(filePath, normalizedQuery);
         const filenameBoost = scoreAtlasFilenameIntent(filePath, normalizedQuery, queryTokens);
-        const atlasMembershipBoost = atlasCorpusSet.has(filePath.toLowerCase()) ? 4 : 0;
-        if (atlasMembershipBoost <= 0 && tokenHits <= 0 && filenameBoost <= 0) continue;
         const graphScore = Number.isFinite(hit.score) ? hit.score : 0;
         if (graphScore <= 0) continue;
         const symbolName = String((hit as { symbol_name?: unknown }).symbol_name ?? "").trim();
         const snippet = String((hit as { snippet?: unknown }).snippet ?? "");
         const edgeTypes = parseAtlasGraphEdgeTypes(snippet);
+        const symbolTokenHits = countAtlasQueryTokenOverlap(symbolName, queryTokens, 4);
+        const snippetTokenHits = countAtlasQueryTokenOverlap(snippet, queryTokens, 6);
+        const queryOverlapHits = tokenHits + symbolTokenHits + snippetTokenHits;
+        const atlasCorpusMember = atlasCorpusSet.has(filePath.toLowerCase());
+        if (!atlasCorpusMember && queryOverlapHits <= 0 && filenameBoost <= 0) continue;
+        const atlasMembershipBoost = atlasCorpusMember ? 4 : 0;
         const runtimeLink = hasAtlasGraphRuntimeLink({
           filePath,
           queryTokens,
@@ -8807,10 +8840,22 @@ async function collectAtlasCandidatesForQuery(
           edgeTypes,
         });
         const runtimeBoost = runtimeLink ? HELIX_ASK_ATLAS_GRAPH_RUNTIME_LINK_BOOST : 0;
+        const scriptDocRuntimeBoost =
+          isAtlasScriptOrDocPath(filePath) && queryHasRuntimeCue && (runtimeLink || symbolTokenHits > 0)
+            ? 1.5 + Math.min(1.5, symbolTokenHits * 0.75)
+            : 0;
         const edgeTypeBoost = Math.min(1.5, edgeTypes.length * 0.3);
         const exactFilenameBoost = exactFilenameMention ? HELIX_ASK_ATLAS_FILENAME_MATCH_BASE_SCORE * 0.5 : 0;
         const score = applyAskNodeBoosts(
-          4 + graphScore * 4 + tokenHits + atlasMembershipBoost + runtimeBoost + edgeTypeBoost + filenameBoost + exactFilenameBoost,
+          4 +
+            graphScore * 4 +
+            queryOverlapHits +
+            atlasMembershipBoost +
+            runtimeBoost +
+            scriptDocRuntimeBoost +
+            edgeTypeBoost +
+            filenameBoost +
+            exactFilenameBoost,
           filePath,
           question,
           options?.topicProfile,
@@ -8824,6 +8869,11 @@ async function collectAtlasCandidatesForQuery(
             atlasSource: "graph",
             atlasGraphRuntimeLink: runtimeLink,
             atlasGraphEdgeTypes: edgeTypes,
+            atlasGraphQueryOverlap: queryOverlapHits,
+            atlasGraphSymbolTokenHits: symbolTokenHits,
+            atlasGraphSnippetTokenHits: snippetTokenHits,
+            atlasGraphCorpusMember: atlasCorpusMember,
+            atlasGraphScriptDocBoostApplied: scriptDocRuntimeBoost > 0,
           },
         });
       }
@@ -9053,6 +9103,58 @@ function formatAskChannelTopScores(channelTopScores: AskCandidateChannelStats): 
   ).join(",");
 }
 
+function applyStage0DebugFields(
+  debugPayload: Record<string, unknown> | null | undefined,
+  stage0: RepoSearchStage0Telemetry | undefined,
+  prefix?: string,
+): void {
+  if (!debugPayload || !stage0) return;
+  const readNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+  const writeScoped = (suffix: string, value: unknown): void => {
+    if (!prefix) return;
+    debugPayload[`${prefix}_stage0_${suffix}`] = value;
+  };
+
+  const prevUsed = Boolean(debugPayload.stage0_used);
+  debugPayload.stage0_used = prevUsed || stage0.used;
+  const prevShadow = typeof debugPayload.stage0_shadow_only === "boolean"
+    ? Boolean(debugPayload.stage0_shadow_only)
+    : stage0.shadow_only;
+  debugPayload.stage0_shadow_only = Boolean(debugPayload.stage0_used)
+    ? false
+    : prevShadow && stage0.shadow_only;
+  const prevCount = readNumber(debugPayload.stage0_candidate_count) ?? 0;
+  debugPayload.stage0_candidate_count = Math.max(prevCount, stage0.candidate_count);
+  const prevHitRate = readNumber(debugPayload.stage0_hit_rate) ?? 0;
+  debugPayload.stage0_hit_rate = Number(Math.max(prevHitRate, stage0.hit_rate).toFixed(4));
+  if (stage0.fallback_reason) {
+    debugPayload.stage0_fallback_reason = stage0.fallback_reason;
+  } else if (debugPayload.stage0_fallback_reason === undefined) {
+    debugPayload.stage0_fallback_reason = null;
+  }
+  const prevBuildAge = readNumber(debugPayload.stage0_build_age_ms);
+  if (typeof stage0.build_age_ms === "number" && Number.isFinite(stage0.build_age_ms)) {
+    debugPayload.stage0_build_age_ms =
+      prevBuildAge == null ? stage0.build_age_ms : Math.min(prevBuildAge, stage0.build_age_ms);
+  } else if (debugPayload.stage0_build_age_ms === undefined) {
+    debugPayload.stage0_build_age_ms = null;
+  }
+  if (stage0.commit) {
+    debugPayload.stage0_commit = stage0.commit;
+  } else if (debugPayload.stage0_commit === undefined) {
+    debugPayload.stage0_commit = null;
+  }
+
+  writeScoped("used", stage0.used);
+  writeScoped("shadow_only", stage0.shadow_only);
+  writeScoped("candidate_count", stage0.candidate_count);
+  writeScoped("hit_rate", stage0.hit_rate);
+  writeScoped("fallback_reason", stage0.fallback_reason ?? null);
+  writeScoped("build_age_ms", stage0.build_age_ms ?? null);
+  writeScoped("commit", stage0.commit ?? null);
+}
+
 function pathSimilarity(a: string, b: string): number {
   const aParts = a.toLowerCase().split(/[\\/]+/).filter(Boolean);
   const bParts = b.toLowerCase().split(/[\\/]+/).filter(Boolean);
@@ -9179,12 +9281,21 @@ function summarizeAtlasGraphSelection(selected: AskCandidate[]): {
   atlasGraphSelectedCount: number;
   atlasGraphRuntimeLinkCount: number;
   atlasGraphEdgeTypeCounts: Record<string, number>;
+  atlasGraphQueryOverlapCount: number;
+  atlasGraphCorpusMemberCount: number;
+  atlasGraphScriptDocBoostCount: number;
 } {
   const graphCandidates = selected.filter((entry) => entry.meta?.atlasSource === "graph");
   const edgeTypeCounts: Record<string, number> = {};
   let runtimeLinkCount = 0;
+  let queryOverlapCount = 0;
+  let corpusMemberCount = 0;
+  let scriptDocBoostCount = 0;
   for (const entry of graphCandidates) {
     if (entry.meta?.atlasGraphRuntimeLink) runtimeLinkCount += 1;
+    if ((entry.meta?.atlasGraphQueryOverlap ?? 0) > 0) queryOverlapCount += 1;
+    if (entry.meta?.atlasGraphCorpusMember) corpusMemberCount += 1;
+    if (entry.meta?.atlasGraphScriptDocBoostApplied) scriptDocBoostCount += 1;
     for (const edgeType of entry.meta?.atlasGraphEdgeTypes ?? []) {
       edgeTypeCounts[edgeType] = (edgeTypeCounts[edgeType] ?? 0) + 1;
     }
@@ -9193,6 +9304,9 @@ function summarizeAtlasGraphSelection(selected: AskCandidate[]): {
     atlasGraphSelectedCount: graphCandidates.length,
     atlasGraphRuntimeLinkCount: runtimeLinkCount,
     atlasGraphEdgeTypeCounts: edgeTypeCounts,
+    atlasGraphQueryOverlapCount: queryOverlapCount,
+    atlasGraphCorpusMemberCount: corpusMemberCount,
+    atlasGraphScriptDocBoostCount: scriptDocBoostCount,
   };
 }
 
@@ -9290,6 +9404,9 @@ async function buildAskContextFromQueries(
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  atlasGraphQueryOverlapCount?: number;
+  atlasGraphCorpusMemberCount?: number;
+  atlasGraphScriptDocBoostCount?: number;
   footprintExactPaths?: string[];
   footprintPathCount?: number;
   footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -9326,6 +9443,9 @@ async function buildAskContextFromQueries(
   let atlasGraphSelectedCount = 0;
   let atlasGraphRuntimeLinkCount = 0;
   let atlasGraphEdgeTypeCounts: Record<string, number> = {};
+  let atlasGraphQueryOverlapCount = 0;
+  let atlasGraphCorpusMemberCount = 0;
+  let atlasGraphScriptDocBoostCount = 0;
 
   for (let tierIndex = 0; tierIndex < allowlistTiers.length; tierIndex += 1) {
     const allowlist = allowlistTiers[tierIndex] ?? [];
@@ -9399,6 +9519,9 @@ async function buildAskContextFromQueries(
     atlasGraphSelectedCount = graphSummary.atlasGraphSelectedCount;
     atlasGraphRuntimeLinkCount = graphSummary.atlasGraphRuntimeLinkCount;
     atlasGraphEdgeTypeCounts = graphSummary.atlasGraphEdgeTypeCounts;
+    atlasGraphQueryOverlapCount = graphSummary.atlasGraphQueryOverlapCount;
+    atlasGraphCorpusMemberCount = graphSummary.atlasGraphCorpusMemberCount;
+    atlasGraphScriptDocBoostCount = graphSummary.atlasGraphScriptDocBoostCount;
     channelWeights = channelWeightsForTier;
     topicTier = tierIndex + 1;
     topicMustIncludeOk = mustIncludeOk;
@@ -9422,6 +9545,9 @@ async function buildAskContextFromQueries(
     atlasGraphSelectedCount,
     atlasGraphRuntimeLinkCount,
     atlasGraphEdgeTypeCounts,
+    atlasGraphQueryOverlapCount,
+    atlasGraphCorpusMemberCount,
+    atlasGraphScriptDocBoostCount,
   });
 }
 
@@ -9438,6 +9564,9 @@ function buildAskContextFromCandidates(args: {
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  atlasGraphQueryOverlapCount?: number;
+  atlasGraphCorpusMemberCount?: number;
+  atlasGraphScriptDocBoostCount?: number;
   footprintExactPaths?: string[];
   footprintPathCount?: number;
   footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -9457,6 +9586,9 @@ function buildAskContextFromCandidates(args: {
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  atlasGraphQueryOverlapCount?: number;
+  atlasGraphCorpusMemberCount?: number;
+  atlasGraphScriptDocBoostCount?: number;
   footprintExactPaths?: string[];
   footprintPathCount?: number;
   footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -10075,6 +10207,9 @@ function finalizeAskContext({
   atlasGraphSelectedCount,
   atlasGraphRuntimeLinkCount,
   atlasGraphEdgeTypeCounts,
+  atlasGraphQueryOverlapCount,
+  atlasGraphCorpusMemberCount,
+  atlasGraphScriptDocBoostCount,
 }: {
   selected: AskCandidate[];
   topicTier?: number;
@@ -10088,6 +10223,9 @@ function finalizeAskContext({
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  atlasGraphQueryOverlapCount?: number;
+  atlasGraphCorpusMemberCount?: number;
+  atlasGraphScriptDocBoostCount?: number;
 }): {
   context: string;
   files: string[];
@@ -10103,6 +10241,9 @@ function finalizeAskContext({
   atlasGraphSelectedCount?: number;
   atlasGraphRuntimeLinkCount?: number;
   atlasGraphEdgeTypeCounts?: Record<string, number>;
+  atlasGraphQueryOverlapCount?: number;
+  atlasGraphCorpusMemberCount?: number;
+  atlasGraphScriptDocBoostCount?: number;
   footprintExactPaths?: string[];
   footprintPathCount?: number;
   footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -10141,6 +10282,9 @@ function finalizeAskContext({
     atlasGraphSelectedCount,
     atlasGraphRuntimeLinkCount,
     atlasGraphEdgeTypeCounts,
+    atlasGraphQueryOverlapCount,
+    atlasGraphCorpusMemberCount,
+    atlasGraphScriptDocBoostCount,
     footprintExactPaths: footprint.exact_paths,
     footprintPathCount: footprint.path_count,
     footprintZoneHint: footprint.zone_hint,
@@ -20762,6 +20906,9 @@ const executeHelixAsk = async ({
       retrieval_atlas_graph_selected_count?: number;
       retrieval_atlas_graph_runtime_link_count?: number;
       retrieval_atlas_graph_edge_type_counts?: Record<string, number>;
+      retrieval_atlas_graph_query_overlap_count?: number;
+      retrieval_atlas_graph_corpus_member_count?: number;
+      retrieval_atlas_graph_script_doc_boost_count?: number;
       retrieval_channel_hits?: AskCandidateChannelStats;
       retrieval_channel_top_scores?: AskCandidateChannelStats;
       retrieval_channel_weights?: AskCandidateChannelStats;
@@ -24060,6 +24207,9 @@ const executeHelixAsk = async ({
               atlasGraphSelectedCount?: number;
               atlasGraphRuntimeLinkCount?: number;
               atlasGraphEdgeTypeCounts?: Record<string, number>;
+              atlasGraphQueryOverlapCount?: number;
+              atlasGraphCorpusMemberCount?: number;
+              atlasGraphScriptDocBoostCount?: number;
               footprintExactPaths?: string[];
               footprintPathCount?: number;
               footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -24223,6 +24373,11 @@ const executeHelixAsk = async ({
                 if (repoSearchResult.error) {
                   debugPayload.preflight_repo_search_error = repoSearchResult.error;
                 }
+                applyStage0DebugFields(
+                  debugPayload as Record<string, unknown>,
+                  repoSearchResult.stage0,
+                  "preflight",
+                );
               }
             }
           }
@@ -25477,6 +25632,9 @@ const executeHelixAsk = async ({
           atlasGraphSelectedCount?: number;
           atlasGraphRuntimeLinkCount?: number;
           atlasGraphEdgeTypeCounts?: Record<string, number>;
+          atlasGraphQueryOverlapCount?: number;
+          atlasGraphCorpusMemberCount?: number;
+          atlasGraphScriptDocBoostCount?: number;
           footprintExactPaths?: string[];
           footprintPathCount?: number;
           footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -25496,6 +25654,9 @@ const executeHelixAsk = async ({
               atlasGraphSelectedCount: preflightMeta.atlasGraphSelectedCount,
               atlasGraphRuntimeLinkCount: preflightMeta.atlasGraphRuntimeLinkCount,
               atlasGraphEdgeTypeCounts: preflightMeta.atlasGraphEdgeTypeCounts,
+              atlasGraphQueryOverlapCount: preflightMeta.atlasGraphQueryOverlapCount,
+              atlasGraphCorpusMemberCount: preflightMeta.atlasGraphCorpusMemberCount,
+              atlasGraphScriptDocBoostCount: preflightMeta.atlasGraphScriptDocBoostCount,
               footprintExactPaths: preflightMeta.footprintExactPaths,
               footprintPathCount: preflightMeta.footprintPathCount,
               footprintZoneHint: preflightMeta.footprintZoneHint,
@@ -25548,6 +25709,9 @@ const executeHelixAsk = async ({
                 atlasGraphSelectedCount?: number;
                 atlasGraphRuntimeLinkCount?: number;
                 atlasGraphEdgeTypeCounts?: Record<string, number>;
+                atlasGraphQueryOverlapCount?: number;
+                atlasGraphCorpusMemberCount?: number;
+                atlasGraphScriptDocBoostCount?: number;
                 footprintExactPaths?: string[];
                 footprintPathCount?: number;
                 footprintZoneHint?: ReasoningTheaterFootprintZone;
@@ -26297,6 +26461,11 @@ const executeHelixAsk = async ({
             if (repoSearchResult.error) {
               debugPayload.repo_search_error = repoSearchResult.error;
             }
+            applyStage0DebugFields(
+              debugPayload as Record<string, unknown>,
+              repoSearchResult.stage0,
+              "fallback",
+            );
           }
         }
         if (coverageSlotSummary) {
@@ -26470,6 +26639,12 @@ const executeHelixAsk = async ({
           debugPayload.retrieval_atlas_graph_selected_count = contextMeta.atlasGraphSelectedCount ?? 0;
           debugPayload.retrieval_atlas_graph_runtime_link_count = contextMeta.atlasGraphRuntimeLinkCount ?? 0;
           debugPayload.retrieval_atlas_graph_edge_type_counts = contextMeta.atlasGraphEdgeTypeCounts ?? {};
+          debugPayload.retrieval_atlas_graph_query_overlap_count =
+            contextMeta.atlasGraphQueryOverlapCount ?? 0;
+          debugPayload.retrieval_atlas_graph_corpus_member_count =
+            contextMeta.atlasGraphCorpusMemberCount ?? 0;
+          debugPayload.retrieval_atlas_graph_script_doc_boost_count =
+            contextMeta.atlasGraphScriptDocBoostCount ?? 0;
           (debugPayload as Record<string, unknown>).retrieval_footprint_exact_paths =
             (contextMeta.footprintExactPaths ?? []).slice(0, REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT);
           (debugPayload as Record<string, unknown>).retrieval_footprint_path_count =
@@ -26911,6 +27086,12 @@ const executeHelixAsk = async ({
             debugPayload.retrieval_atlas_graph_selected_count = result.atlasGraphSelectedCount ?? 0;
             debugPayload.retrieval_atlas_graph_runtime_link_count = result.atlasGraphRuntimeLinkCount ?? 0;
             debugPayload.retrieval_atlas_graph_edge_type_counts = result.atlasGraphEdgeTypeCounts ?? {};
+            debugPayload.retrieval_atlas_graph_query_overlap_count =
+              result.atlasGraphQueryOverlapCount ?? 0;
+            debugPayload.retrieval_atlas_graph_corpus_member_count =
+              result.atlasGraphCorpusMemberCount ?? 0;
+            debugPayload.retrieval_atlas_graph_script_doc_boost_count =
+              result.atlasGraphScriptDocBoostCount ?? 0;
             (debugPayload as Record<string, unknown>).retrieval_footprint_exact_paths =
               (result.footprintExactPaths ?? []).slice(0, REASONING_THEATER_MAX_EXACT_PATHS_PER_EVENT);
             (debugPayload as Record<string, unknown>).retrieval_footprint_path_count =

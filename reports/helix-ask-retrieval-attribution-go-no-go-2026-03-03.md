@@ -1,13 +1,13 @@
 # Helix Ask Retrieval Attribution Go/No-Go (2026-03-03)
 
-Run: retrieval-ablation-1772828749960
+Run: retrieval-ablation-1773217849613
 
 retrieval_lift_proven=no
-dominant_channel=atlas
+dominant_channel=none
 fault_owner=retrieval
 
 Strict retrieval-lift claim gate:
-- positive lane-ablation delta: true
+- positive lane-ablation delta: false
 - bounded confidence: false
 - stage-fault owner points to retrieval: true
 - absolute quality floor passed: true

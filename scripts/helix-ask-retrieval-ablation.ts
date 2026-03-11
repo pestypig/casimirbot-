@@ -44,6 +44,9 @@ type TaskResult = {
   atlasGraphSelectedCount: number;
   atlasGraphRuntimeLinkCount: number;
   atlasGraphEdgeTypeCounts: Record<string, number>;
+  atlasGraphQueryOverlapCount: number;
+  atlasGraphCorpusMemberCount: number;
+  atlasGraphScriptDocBoostCount: number;
 };
 
 const CORPUS_PATH = process.env.HELIX_ASK_RETRIEVAL_CORPUS ?? "configs/repo-atlas-bench-corpus.v2.json";
@@ -367,6 +370,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       retrieval_atlas_graph_selected_count?: unknown;
       retrieval_atlas_graph_runtime_link_count?: unknown;
       retrieval_atlas_graph_edge_type_counts?: unknown;
+      retrieval_atlas_graph_query_overlap_count?: unknown;
+      retrieval_atlas_graph_corpus_member_count?: unknown;
+      retrieval_atlas_graph_script_doc_boost_count?: unknown;
     };
   } | null = null;
   for (let attempt=0; attempt<ASK_RETRY_ATTEMPTS; attempt+=1) {
@@ -385,6 +391,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
           retrieval_atlas_graph_selected_count?: unknown;
           retrieval_atlas_graph_runtime_link_count?: unknown;
           retrieval_atlas_graph_edge_type_counts?: unknown;
+          retrieval_atlas_graph_query_overlap_count?: unknown;
+          retrieval_atlas_graph_corpus_member_count?: unknown;
+          retrieval_atlas_graph_script_doc_boost_count?: unknown;
         };
       };
       break;
@@ -417,6 +426,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
       atlasGraphSelectedCount: 0,
       atlasGraphRuntimeLinkCount: 0,
       atlasGraphEdgeTypeCounts: {},
+      atlasGraphQueryOverlapCount: 0,
+      atlasGraphCorpusMemberCount: 0,
+      atlasGraphScriptDocBoostCount: 0,
     };
   }
   const selectedContext = selectDebugContextFiles((payload.debug ?? null) as Record<string, unknown> | null);
@@ -471,6 +483,18 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     numberOrNull(payload.debug?.retrieval_atlas_graph_runtime_link_count) ?? 0,
   );
   const atlasGraphEdgeTypeCounts = numberRecordOrEmpty(payload.debug?.retrieval_atlas_graph_edge_type_counts);
+  const atlasGraphQueryOverlapCount = Math.max(
+    0,
+    numberOrNull(payload.debug?.retrieval_atlas_graph_query_overlap_count) ?? 0,
+  );
+  const atlasGraphCorpusMemberCount = Math.max(
+    0,
+    numberOrNull(payload.debug?.retrieval_atlas_graph_corpus_member_count) ?? 0,
+  );
+  const atlasGraphScriptDocBoostCount = Math.max(
+    0,
+    numberOrNull(payload.debug?.retrieval_atlas_graph_script_doc_boost_count) ?? 0,
+  );
   return {
     taskId: task.id,
     expected_files: task.expected_files,
@@ -495,6 +519,9 @@ const runTask = async (askUrl: string, task: CorpusTask, seed: number, temperatu
     atlasGraphSelectedCount,
     atlasGraphRuntimeLinkCount,
     atlasGraphEdgeTypeCounts,
+    atlasGraphQueryOverlapCount,
+    atlasGraphCorpusMemberCount,
+    atlasGraphScriptDocBoostCount,
   };
 };
 
@@ -700,6 +727,9 @@ const main = async () => {
           atlasGraphSelectedCount: taskResult.atlasGraphSelectedCount,
           atlasGraphRuntimeLinkCount: taskResult.atlasGraphRuntimeLinkCount,
           atlasGraphEdgeTypeCounts: taskResult.atlasGraphEdgeTypeCounts,
+          atlasGraphQueryOverlapCount: taskResult.atlasGraphQueryOverlapCount,
+          atlasGraphCorpusMemberCount: taskResult.atlasGraphCorpusMemberCount,
+          atlasGraphScriptDocBoostCount: taskResult.atlasGraphScriptDocBoostCount,
         })),
       );
       const mismatchCounts = flattenedTaskResults.reduce(
@@ -792,6 +822,15 @@ const main = async () => {
       const graphRuntimeLinkTaskCount = flattenedTaskResults.filter(
         (task) => task.atlasGraphRuntimeLinkCount > 0,
       ).length;
+      const graphQueryOverlapTaskCount = flattenedTaskResults.filter(
+        (task) => task.atlasGraphQueryOverlapCount > 0,
+      ).length;
+      const graphCorpusMemberTaskCount = flattenedTaskResults.filter(
+        (task) => task.atlasGraphCorpusMemberCount > 0,
+      ).length;
+      const graphScriptDocBoostTaskCount = flattenedTaskResults.filter(
+        (task) => task.atlasGraphScriptDocBoostCount > 0,
+      ).length;
       const graphEdgeTypeCounts = flattenedTaskResults.reduce((counts: Record<string, number>, task) => {
         for (const [edgeType, count] of Object.entries(task.atlasGraphEdgeTypeCounts ?? {})) {
           const numeric = Number(count);
@@ -804,6 +843,12 @@ const main = async () => {
         flattenedTaskResults.length > 0 ? graphSelectedTaskCount / flattenedTaskResults.length : 0;
       const graphRuntimeLinkRate =
         flattenedTaskResults.length > 0 ? graphRuntimeLinkTaskCount / flattenedTaskResults.length : 0;
+      const graphQueryOverlapRate =
+        flattenedTaskResults.length > 0 ? graphQueryOverlapTaskCount / flattenedTaskResults.length : 0;
+      const graphCorpusMemberRate =
+        flattenedTaskResults.length > 0 ? graphCorpusMemberTaskCount / flattenedTaskResults.length : 0;
+      const graphScriptDocBoostRate =
+        flattenedTaskResults.length > 0 ? graphScriptDocBoostTaskCount / flattenedTaskResults.length : 0;
       const diagnostics = {
         unmatched_expected_file_rate: avg(scenarios.map((s)=>s.raw_metrics.unmatched_expected_file_rate)),
         expected_file_match_mode: {
@@ -831,8 +876,14 @@ const main = async () => {
         },
         graph_expansion_contribution_rate: Number(graphExpansionContributionRate.toFixed(6)),
         graph_runtime_link_rate: Number(graphRuntimeLinkRate.toFixed(6)),
+        graph_query_overlap_rate: Number(graphQueryOverlapRate.toFixed(6)),
+        graph_corpus_member_rate: Number(graphCorpusMemberRate.toFixed(6)),
+        graph_script_doc_boost_rate: Number(graphScriptDocBoostRate.toFixed(6)),
         graph_selected_task_count: graphSelectedTaskCount,
         graph_runtime_link_task_count: graphRuntimeLinkTaskCount,
+        graph_query_overlap_task_count: graphQueryOverlapTaskCount,
+        graph_corpus_member_task_count: graphCorpusMemberTaskCount,
+        graph_script_doc_boost_task_count: graphScriptDocBoostTaskCount,
         graph_edge_type_counts: graphEdgeTypeCounts,
         mismatch_reasons: flattenedTaskResults.filter((task) => task.mismatchReasons.length > 0),
       };
@@ -1085,6 +1136,7 @@ const main = async () => {
       `Top10 collapse (baseline): dominant_share=${(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_dominant_share ?? 0).toFixed(6)}, unique_rate=${(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_unique_rate ?? 0).toFixed(6)}, collapse_flag=${Boolean(score.variants.baseline_atlas_git_on?.diagnostics?.top10_fingerprint_collapse_flag)}.`,
       `Context source counts (baseline): retrieval_context_files=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.retrieval_context_files ?? 0}, context_files=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.context_files ?? 0}, none=${score.variants.baseline_atlas_git_on?.diagnostics?.context_file_source_counts?.none ?? 0}.`,
       `Graph expansion contribution (baseline): selected_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_expansion_contribution_rate ?? 0).toFixed(6)}, runtime_link_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_runtime_link_rate ?? 0).toFixed(6)}, selected_tasks=${score.variants.baseline_atlas_git_on?.diagnostics?.graph_selected_task_count ?? 0}.`,
+      `Graph expansion attribution (baseline): query_overlap_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_query_overlap_rate ?? 0).toFixed(6)}, corpus_member_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_corpus_member_rate ?? 0).toFixed(6)}, script_doc_boost_rate=${Number(score.variants.baseline_atlas_git_on?.diagnostics?.graph_script_doc_boost_rate ?? 0).toFixed(6)}.`,
       `Miss buckets (baseline): scripts=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.scripts ?? 0}, docs=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.docs ?? 0}, server=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.server ?? 0}, client=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.client ?? 0}, other=${score.variants.baseline_atlas_git_on?.diagnostics?.miss_bucket_counts?.other ?? 0}.`,
       "",
     ].join("\n");

@@ -74,6 +74,13 @@ const PATH_REF_EXTENSIONS = [
   ".md",
   ".mdx",
 ] as const;
+const SOURCE_SCAN_ALLOWED_EXTENSIONS = new Set<string>([
+  ...PATH_REF_EXTENSIONS,
+  ".sh",
+  ".ps1",
+  ".yaml",
+  ".yml",
+]);
 const IMPORT_REF_REGEX =
   /(?:import\s+[^'"\n]*from\s*|import\s*|require\(\s*|from\s+|export\s+[^'"\n]*from\s*)(['"])([^'"\n]+)\1/gm;
 const COMMAND_TARGET_REGEX = /(?:^|\s)(?:tsx|node|python|bash)\s+([./A-Za-z0-9_\-\\/]+(?:\.[A-Za-z0-9]+)?)/gim;
@@ -218,6 +225,67 @@ const isScriptOrDocSourcePath = (value: string): boolean => {
   return SOURCE_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 };
 
+const classifyAtlasPathKind = (value: string): "scripts" | "docs" | "runtime" | "configs" | "other" => {
+  const normalized = normalizeRepoPath(value).toLowerCase();
+  if (normalized.startsWith("scripts/")) return "scripts";
+  if (normalized.startsWith("docs/")) return "docs";
+  if (
+    normalized.startsWith("server/") ||
+    normalized.startsWith("modules/") ||
+    normalized.startsWith("client/") ||
+    normalized.startsWith("shared/")
+  ) {
+    return "runtime";
+  }
+  if (normalized.startsWith("configs/")) return "configs";
+  return "other";
+};
+
+const collectWorkspaceSourcePaths = (prefixes: readonly string[]): string[] => {
+  const out = new Set<string>();
+  const stack: string[] = [];
+  for (const prefix of prefixes) {
+    const normalizedPrefix = normalizeRepoPath(prefix);
+    if (!normalizedPrefix) continue;
+    const absolute = path.resolve(process.cwd(), normalizedPrefix);
+    if (!fsSync.existsSync(absolute)) continue;
+    stack.push(absolute);
+  }
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    let stat: fsSync.Stats;
+    try {
+      stat = fsSync.statSync(current);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
+      let entries: string[] = [];
+      try {
+        entries = fsSync.readdirSync(current);
+      } catch {
+        continue;
+      }
+      entries.sort((a, b) => a.localeCompare(b));
+      for (let i = entries.length - 1; i >= 0; i -= 1) {
+        const entry = entries[i];
+        if (!entry) continue;
+        if (entry.startsWith(".") && entry !== ".github") continue;
+        stack.push(path.join(current, entry));
+      }
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    const relativePath = normalizeRepoPath(path.relative(process.cwd(), current));
+    if (!relativePath || !isScriptOrDocSourcePath(relativePath)) continue;
+    const extension = path.extname(relativePath).toLowerCase();
+    if (extension && !SOURCE_SCAN_ALLOWED_EXTENSIONS.has(extension)) continue;
+    out.add(relativePath);
+  }
+  return stableSort([...out], (entry) => entry);
+};
+
 const sanitizeReferenceValue = (raw: string): string => {
   const trimmed = raw.trim();
   if (!trimmed) return "";
@@ -324,6 +392,9 @@ const collectScriptDocReferenceEdges = (sources: AtlasSources): AtlasEdge[] => {
       knownPaths.add(normalizeRepoPath(node.filePath));
     }
   }
+  for (const sourcePath of collectWorkspaceSourcePaths(SOURCE_PATH_PREFIXES)) {
+    knownPaths.add(sourcePath);
+  }
 
   const knownByNormalizedPath = new Map<string, string>();
   const knownByBaseName = new Map<string, string[]>();
@@ -364,7 +435,8 @@ const collectScriptDocReferenceEdges = (sources: AtlasSources): AtlasEdge[] => {
         sourceSystem: SCRIPT_DOC_REF_SOURCE_SYSTEM,
         meta: {
           reference: reference.slice(0, 200),
-          sourceKind: sourcePath.startsWith("docs/") ? "docs" : "scripts",
+          sourceKind: classifyAtlasPathKind(sourcePath),
+          targetKind: classifyAtlasPathKind(targetPath),
         },
       });
     };
