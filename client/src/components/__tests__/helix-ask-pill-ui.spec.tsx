@@ -6,10 +6,14 @@ let mergeVoiceTranscriptDraft: typeof import("@/components/helix/HelixAskPill").
 let buildVoiceInputStatusLabel: typeof import("@/components/helix/HelixAskPill").buildVoiceInputStatusLabel;
 let scoreConversationCompletion: typeof import("@/components/helix/HelixAskPill").scoreConversationCompletion;
 let shouldDispatchReasoningAttempt: typeof import("@/components/helix/HelixAskPill").shouldDispatchReasoningAttempt;
+let shouldForceObserveDispatchFromSuppression: typeof import("@/components/helix/HelixAskPill").shouldForceObserveDispatchFromSuppression;
+let inferSuppressionCauseFromRouteReason: typeof import("@/components/helix/HelixAskPill").inferSuppressionCauseFromRouteReason;
+let resolveSuppressedDispatchRescueTranscript: typeof import("@/components/helix/HelixAskPill").resolveSuppressedDispatchRescueTranscript;
 let isLikelyContextDependentTurn: typeof import("@/components/helix/HelixAskPill").isLikelyContextDependentTurn;
 let buildVoiceReasoningDispatchPrompt: typeof import("@/components/helix/HelixAskPill").buildVoiceReasoningDispatchPrompt;
 let shouldMergeVoiceContinuationTurn: typeof import("@/components/helix/HelixAskPill").shouldMergeVoiceContinuationTurn;
 let shouldMergeVoiceContinuationInFlight: typeof import("@/components/helix/HelixAskPill").shouldMergeVoiceContinuationInFlight;
+let shouldMergePendingConfirmationTranscript: typeof import("@/components/helix/HelixAskPill").shouldMergePendingConfirmationTranscript;
 let decideExplorationLadderAction: typeof import("@/components/helix/HelixAskPill").decideExplorationLadderAction;
 let smoothVoiceLevel: typeof import("@/components/helix/HelixAskPill").smoothVoiceLevel;
 let isFlatVoiceSignal: typeof import("@/components/helix/HelixAskPill").isFlatVoiceSignal;
@@ -23,6 +27,10 @@ let composeVoiceBriefWithDecision: typeof import("@/components/helix/HelixAskPil
 let isAgibotPreflightScopeError: typeof import("@/components/helix/HelixAskPill").isAgibotPreflightScopeError;
 let deriveTranscriptConfidence: typeof import("@/components/helix/HelixAskPill").deriveTranscriptConfidence;
 let shouldRequireTranscriptConfirmation: typeof import("@/components/helix/HelixAskPill").shouldRequireTranscriptConfirmation;
+let shouldAutoConfirmTranscriptPrompt: typeof import("@/components/helix/HelixAskPill").shouldAutoConfirmTranscriptPrompt;
+let resolveTranscriptConfirmPolicy: typeof import("@/components/helix/HelixAskPill").resolveTranscriptConfirmPolicy;
+let parseTranscriptConfirmationVoiceCommand: typeof import("@/components/helix/HelixAskPill").parseTranscriptConfirmationVoiceCommand;
+let shouldInterruptForSupersededReason: typeof import("@/components/helix/HelixAskPill").shouldInterruptForSupersededReason;
 let scoreVoiceTurnComplete: typeof import("@/components/helix/HelixAskPill").scoreVoiceTurnComplete;
 let scoreIntentShift: typeof import("@/components/helix/HelixAskPill").scoreIntentShift;
 let evaluateVoiceReasoningResponseAuthority: typeof import("@/components/helix/HelixAskPill").evaluateVoiceReasoningResponseAuthority;
@@ -42,10 +50,14 @@ beforeAll(async () => {
     buildVoiceInputStatusLabel,
     scoreConversationCompletion,
     shouldDispatchReasoningAttempt,
+    shouldForceObserveDispatchFromSuppression,
+    inferSuppressionCauseFromRouteReason,
+    resolveSuppressedDispatchRescueTranscript,
     isLikelyContextDependentTurn,
     buildVoiceReasoningDispatchPrompt,
     shouldMergeVoiceContinuationTurn,
     shouldMergeVoiceContinuationInFlight,
+    shouldMergePendingConfirmationTranscript,
     decideExplorationLadderAction,
     smoothVoiceLevel,
     isFlatVoiceSignal,
@@ -59,6 +71,10 @@ beforeAll(async () => {
     isAgibotPreflightScopeError,
     deriveTranscriptConfidence,
     shouldRequireTranscriptConfirmation,
+    shouldAutoConfirmTranscriptPrompt,
+    resolveTranscriptConfirmPolicy,
+    parseTranscriptConfirmationVoiceCommand,
+    shouldInterruptForSupersededReason,
     scoreVoiceTurnComplete,
     scoreIntentShift,
     evaluateVoiceReasoningResponseAuthority,
@@ -106,6 +122,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     const evaluateBlock = /const evaluateMicLevel = useCallback\(\(\) => \{[\s\S]+?\n  \}, \[/.exec(source);
     expect(evaluateBlock?.[0]).toContain('stopReadAloud("barge_in");');
     expect(evaluateBlock?.[0]).toContain("turn_state: \"interrupted\"");
+  });
+
+  it("retries turn-close deferred finals without waiting for a new enqueue event", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toMatch(
+      /if \(yieldedForTurnClose\) \{[\s\S]+setTimeout\(resolve, turnCloseYieldDelayMs\);[\s\S]+continue;/,
+    );
   });
 
   it("includes build provenance as a system timeline event", () => {
@@ -304,8 +327,56 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(shouldDispatchReasoningAttempt("Verify this claim and provide evidence.")).toBe(true);
     expect(shouldDispatchReasoningAttempt("Implement the patch now.")).toBe(true);
     expect(shouldDispatchReasoningAttempt("How is a full solve done?")).toBe(true);
+    expect(shouldDispatchReasoningAttempt("and what a warp bubble is the congruence of the code base")).toBe(
+      true,
+    );
     expect(shouldDispatchReasoningAttempt("ok")).toBe(false);
     expect(shouldDispatchReasoningAttempt("thanks")).toBe(false);
+  });
+
+  it("forces observe dispatch for suppressed noisy codebase questions", () => {
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:clarify_after_attempt1",
+        transcript: "What is a warp bubble false off in this codebase?",
+      }),
+    ).toBe(true);
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:multilang_dispatch_blocked",
+        transcript: "What is a warp bubble in this codebase?",
+      }),
+    ).toBe(false);
+  });
+
+  it("maps suppressed route reasons to stable suppression causes", () => {
+    expect(inferSuppressionCauseFromRouteReason("suppressed:heuristic_low_salience")).toBe("low_salience");
+    expect(inferSuppressionCauseFromRouteReason("suppressed:clarify_after_attempt1")).toBe(
+      "clarifier_requested",
+    );
+    expect(inferSuppressionCauseFromRouteReason("dispatch:observe")).toBeNull();
+  });
+
+  it("rescues suppressed low-info transcript fragments from richer draft context", () => {
+    expect(
+      resolveSuppressedDispatchRescueTranscript({
+        dispatchHint: false,
+        routeReasonCode: "dispatch:heuristic",
+        transcript: "a notario solve.",
+        draftText: "Okay, define what a warp solve is for. a notario solve.",
+      }),
+    ).toContain("warp solve");
+
+    expect(
+      resolveSuppressedDispatchRescueTranscript({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:multilang_dispatch_blocked",
+        transcript: "a notario solve.",
+        draftText: "Okay, define what a warp solve is for. a notario solve.",
+      }),
+    ).toBeNull();
   });
 
   it("marks short follow-up turns as context-dependent", () => {
@@ -366,6 +437,23 @@ describe("HelixAskPill mic helper behavior", () => {
         lexicalContinuation: true,
       }),
     ).toBe(true);
+  });
+
+  it("merges pending confirm transcripts for low-salience follow-up fragments", () => {
+    expect(
+      shouldMergePendingConfirmationTranscript({
+        pendingTranscript: "How does the immersion of fantasy reflect the",
+        nextTranscript: "Human qualities in storytelling.",
+        pendingAgeMs: 1800,
+      }),
+    ).toBe(true);
+    expect(
+      shouldMergePendingConfirmationTranscript({
+        pendingTranscript: "What is a warp bubble in this codebase?",
+        nextTranscript: "Actually switch topics and explain tomato soil acidity.",
+        pendingAgeMs: 1500,
+      }),
+    ).toBe(false);
   });
 
   it("suppresses stale voice responses when turn revision drifts", () => {
@@ -636,6 +724,21 @@ describe("HelixAskPill mic helper behavior", () => {
     ).toBe("finalize");
   });
 
+  it("does not artifact-restart when file-location prompts return grounded path-based answers", () => {
+    const pathAnchoredAnswer = [
+      "Helix Ask retrieval logic is routed through server/services/helix-ask/repo-search.ts.",
+      "Intent and ask orchestration are coordinated in server/routes/agi.plan.ts.",
+      "The voice turn enters through server/routes/voice.ts before dispatch.",
+    ].join(" ");
+    expect(
+      decideExplorationLadderAction({
+        explorationAttemptCount: 1,
+        promptText: "What files does Helix Ask retrieval use in the codebase?",
+        outputText: pathAnchoredAnswer,
+      }).action,
+    ).toBe("finalize");
+  });
+
   it("appends transcript text without losing existing draft formatting", () => {
     expect(mergeVoiceTranscriptDraft("Check", "captured transcript")).toBe("Check captured transcript");
     expect(mergeVoiceTranscriptDraft("Check ", "captured transcript")).toBe("Check captured transcript");
@@ -692,7 +795,7 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(isLikelyLoopbackDeviceLabel("USB Microphone")).toBe(false);
   });
 
-  it("primes sliced container segments with a header chunk", () => {
+  it("primes sliced webm/ogg segments with a header chunk", () => {
     expect(
       shouldPrimeSegmentWithContainerHeader({
         segmentStartIndex: 4,
@@ -713,7 +816,7 @@ describe("HelixAskPill mic helper behavior", () => {
         mimeType: "audio/mp4",
         hasHeaderChunk: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldPrimeSegmentWithContainerHeader({
         segmentStartIndex: 4,
@@ -845,6 +948,240 @@ describe("HelixAskPill mic helper behavior", () => {
         translationUncertain: true,
       }),
     ).toBe(true);
+  });
+
+  it("auto-confirms only safe confirm-state transcript prompts", () => {
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "confirm",
+        confidence: 0.76,
+        languageConfidence: 0.82,
+        pivotConfidence: 0.79,
+        translationUncertain: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "blocked",
+        confidence: 0.92,
+        languageConfidence: 0.9,
+        pivotConfidence: 0.9,
+        translationUncertain: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "confirm",
+        confidence: 0,
+        languageConfidence: 0.9,
+        pivotConfidence: 0.9,
+        translationUncertain: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "confirm",
+        confidence: 0.88,
+        languageConfidence: 0.62,
+        pivotConfidence: 0.9,
+        translationUncertain: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        languageConfidence: 0.9,
+        pivotConfidence: null,
+        translationUncertain: true,
+        sourceLanguage: "zh-hans",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        languageConfidence: 0.9,
+        pivotConfidence: null,
+        translationUncertain: true,
+        sourceLanguage: "unknown",
+        sourceText: "Define what a warp bubble is in this codebase.",
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldAutoConfirmTranscriptPrompt({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        languageConfidence: 0.9,
+        pivotConfidence: 0.4,
+        translationUncertain: true,
+        sourceLanguage: "unknown",
+        sourceText: "Define what a warp bubble is in this codebase.",
+      }),
+    ).toBe(true);
+  });
+
+  it("resolves confirm policy with deterministic blocked/manual/auto reasons", () => {
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "blocked",
+        confidence: 0.9,
+        pivotConfidence: 0.9,
+        translationUncertain: false,
+      }),
+    ).toMatchObject({
+      action: "blocked",
+      reason: "dispatch_blocked",
+      confirmAutoEligible: false,
+      confirmBlockReason: "dispatch_blocked",
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: 0.4,
+        translationUncertain: false,
+      }),
+    ).toMatchObject({
+      action: "auto_confirm",
+      reason: "eligible",
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: 0.92,
+        translationUncertain: false,
+        lowAudioQuality: true,
+      }),
+    ).toMatchObject({
+      action: "auto_confirm",
+      reason: "eligible",
+      confirmAutoEligible: true,
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.62,
+        pivotConfidence: 0.92,
+        translationUncertain: false,
+        lowAudioQuality: true,
+      }),
+    ).toMatchObject({
+      action: "manual_confirm",
+      reason: "low_audio_quality",
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: 0.92,
+        translationUncertain: false,
+        speechActive: true,
+      }),
+    ).toMatchObject({
+      action: "manual_confirm",
+      reason: "live_activity",
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: 0.4,
+        translationUncertain: true,
+        sourceLanguage: "zh-hans",
+      }),
+    ).toMatchObject({
+      action: "blocked",
+      reason: "pivot_low_confidence",
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: null,
+        translationUncertain: true,
+        sourceLanguage: "zh-hans",
+      }),
+    ).toMatchObject({
+      action: "blocked",
+      reason: "translation_uncertain_without_pivot",
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: null,
+        translationUncertain: true,
+        sourceLanguage: "unknown",
+        sourceText: "Define what a warp bubble is in this codebase.",
+      }),
+    ).toMatchObject({
+      action: "auto_confirm",
+      reason: "eligible",
+      confirmAutoEligible: true,
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: 0.4,
+        translationUncertain: true,
+        sourceLanguage: "unknown",
+        sourceText: "Define what a warp bubble is in this codebase.",
+      }),
+    ).toMatchObject({
+      action: "auto_confirm",
+      reason: "eligible",
+      confirmAutoEligible: true,
+    });
+
+    expect(
+      resolveTranscriptConfirmPolicy({
+        dispatchState: "confirm",
+        confidence: 0.9,
+        pivotConfidence: 0.92,
+        translationUncertain: false,
+      }),
+    ).toMatchObject({
+      action: "auto_confirm",
+      reason: "eligible",
+      confirmAutoEligible: true,
+    });
+  });
+
+  it("parses transcript confirmation voice commands conservatively", () => {
+    expect(parseTranscriptConfirmationVoiceCommand("confirm")).toBe("confirm");
+    expect(parseTranscriptConfirmationVoiceCommand("yes")).toBe("confirm");
+    expect(parseTranscriptConfirmationVoiceCommand("retry")).toBe("retry");
+    expect(parseTranscriptConfirmationVoiceCommand("no")).toBe("retry");
+    expect(parseTranscriptConfirmationVoiceCommand("cancel")).toBe("cancel");
+    expect(parseTranscriptConfirmationVoiceCommand("dismiss")).toBe("cancel");
+    expect(
+      parseTranscriptConfirmationVoiceCommand(
+        "we define what is truth from the helix standpoint",
+      ),
+    ).toBeNull();
+  });
+
+  it("avoids hard-cut interruption for same-turn supersede handoff", () => {
+    expect(shouldInterruptForSupersededReason("superseded_same_turn", true)).toBe(false);
+    expect(shouldInterruptForSupersededReason("preempted_by_final", false)).toBe(false);
+    expect(shouldInterruptForSupersededReason("preempted_by_final", true)).toBe(true);
   });
 
   it("scores turn completion with semantic guard bands", () => {

@@ -116,6 +116,28 @@ Record:
 4. plan context hash (`sha256`) from the active plan file
 5. artifact directory under `artifacts/experiments/helix-ask-patch-probe/*`
 
+## Loop B4: Multilingual Golden-Set Gate (zh + zh+en mixed)
+
+Run the fixed multilingual gate before promoting multilingual rollout from
+partial to full:
+
+```powershell
+$env:HELIX_ASK_BASE_URL="http://localhost:5050"
+npm run helix:ask:multilang:golden-gate
+```
+
+Required pass bars:
+
+1. `zh route/intention accuracy >= 0.92`
+2. `zh+en mixed route/intention accuracy >= 0.90`
+3. `canonical term preservation >= 99.5%`
+4. `response-language correctness >= 99.0%`
+5. `low-confidence dispatch violations = 0`
+
+Primary artifact:
+
+1. `artifacts/experiments/helix-ask-multilang-golden/helix-ask-multilang-golden-gate.<timestamp>.json`
+
 ## Loop C: Casimir Gate (Required)
 
 Run for every patch:
@@ -166,6 +188,14 @@ System readiness target:
 
 If hard gate passes but system readiness target fails, classify as:
 `PARTIAL_READY`.
+
+Pre-promote sequence for multilingual activation:
+
+1. contract battery
+2. variety battery
+3. per-patch probe
+4. multilingual golden-set gate
+5. Casimir verify PASS with certificate hash + integrity OK
 
 ## Debug Hotspot Triage
 

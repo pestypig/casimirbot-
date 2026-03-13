@@ -39,6 +39,20 @@ describe("helix ask novelty phrasing", () => {
     expect(a).toBe(b);
   });
 
+  it("localizes generic mechanism fallback for CJK prompts", () => {
+    const sentence = buildHelixAskMechanismSentence({
+      claimA: "输入约束已建立",
+      claimB: "输出保持有界",
+      evidenceTarget: "server/routes/agi.plan.ts",
+      context: {
+        family: "other",
+        prompt: "什么是阿尔库别雷曲速泡？",
+      },
+    });
+    expect(sentence).toContain("机制：");
+    expect(sentence).not.toMatch(/\bMechanism:\b/);
+  });
+
   it("returns valid alternative variants when key anchors change", () => {
     const base = buildHelixAskMechanismSentence({
       claimA: "Route invokes gate",

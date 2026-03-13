@@ -64,6 +64,11 @@ type HelixAskDebug = {
   stage_tags?: boolean;
   context_files?: string[];
   context_files_count?: number;
+  stage0_used?: boolean;
+  stage0_canary_hit?: boolean;
+  stage0_policy_decision?: string | null;
+  stage0_fail_open_reason?: string | null;
+  stage0_fallback_reason?: string | null;
   open_world_bypass_mode?: "off" | "active";
   alignment_gate_decision?: "PASS" | "BORDERLINE" | "FAIL";
   alignment_gate_metrics?: {
@@ -110,6 +115,13 @@ type CaseResult = {
   answer_length: number;
   quality_score: number;
   quality_signals: CaseQuality;
+  citation_missing: boolean;
+  runtime_fallback_answer: boolean;
+  stage0_eligible: boolean;
+  stage0_used_active: boolean;
+  stage0_fail_open_reason: string | null;
+  stage0_policy_decision: string | null;
+  stage0_technical_fail_open: boolean;
   debug?: HelixAskDebug;
 };
 
@@ -126,6 +138,27 @@ type SweepSummary = {
   p95_duration_ms?: number;
   avg_quality_score: number;
   quality_rate: number;
+};
+
+export type Stage0SweepGateMetrics = {
+  citation_missing: number;
+  runtime_fallback_answer: number;
+  eligible_turn_count: number;
+  stage0_active_used_count: number;
+  stage0_active_usage_rate: number;
+  stage0_technical_fail_open_count: number;
+  stage0_technical_fail_open_rate: number;
+  fail_open_reason_histogram: Record<string, number>;
+  policy_decision_histogram: Record<string, number>;
+};
+
+export type Stage0SweepPromotionGate = {
+  baseline_config: string;
+  candidate_config: string;
+  baseline: Stage0SweepGateMetrics;
+  candidate: Stage0SweepGateMetrics;
+  verdict: "pass" | "fail";
+  failing_rules: string[];
 };
 
 type QualityBaselineThresholds = {
@@ -163,6 +196,11 @@ const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_SWEEP_TIMEOUT_MS ?? 1200
 const PACK_PATH = process.env.HELIX_ASK_SWEEP_PACK ?? "scripts/helix-ask-sweep-pack.json";
 const MATRIX_PATH = process.env.HELIX_ASK_SWEEP_MATRIX;
 const OUTPUT_DIR = process.env.HELIX_ASK_SWEEP_OUT_DIR ?? "artifacts";
+const STAGE0_GATE_ENABLED = String(process.env.HELIX_ASK_SWEEP_STAGE0_GATE ?? "0").trim() !== "0";
+const STAGE0_GATE_BASELINE_CONFIG = process.env.HELIX_ASK_SWEEP_GATE_BASELINE_CONFIG?.trim() || null;
+const STAGE0_GATE_CANDIDATE_CONFIG = process.env.HELIX_ASK_SWEEP_GATE_CANDIDATE_CONFIG?.trim() || null;
+const STAGE0_GATE_BASELINE_ARTIFACT = process.env.HELIX_ASK_SWEEP_GATE_BASELINE_ARTIFACT?.trim() || null;
+const STAGE0_ROLLOUT_ACTION_OUT_PATH = process.env.HELIX_ASK_SWEEP_ROLLOUT_ACTION_PATH?.trim() || null;
 const QUALITY_BASELINE_OUT_PATH =
   process.env.HELIX_ASK_QUALITY_BASELINE_OUT_PATH ??
   path.join("docs", "audits", "helix-ask-quality", "baseline-contract.json");
@@ -192,6 +230,22 @@ const PROMPT_LEAK_PATTERNS: RegExp[] = [
   /\bcontext sources\b/i,
   /\bevidence (?:bullets|steps)\b/i,
   /\brespond with only the answer\b/i,
+];
+const SOURCES_RE = /\bSources?:\s+/i;
+const RUNTIME_FALLBACK_RE = /\bruntime fallback\b/i;
+const STAGE0_HARD_BYPASS_REASONS = new Set(["explicit_repo_query", "explicit_path_query"]);
+const STAGE0_TECH_FAIL_OPEN_TOKENS = [
+  "index_stale",
+  "index_commit_mismatch",
+  "index_unavailable",
+  "index_version_mismatch",
+  "index_build",
+  "index_refresh",
+  "git_tracked_scan_",
+  "rg_failed",
+  "rg_not_found",
+  "runtime_",
+  "scan_",
 ];
 
 const clamp01 = (value: number | undefined, fallback = 0): number => {
@@ -237,6 +291,41 @@ const extractFilePaths = (text: string): string[] => {
 
 const hasPromptLeak = (text: string): boolean =>
   PROMPT_LEAK_PATTERNS.some((pattern) => pattern.test(text));
+
+const hasCitationSignal = (text: string, citedPaths: string[]): boolean =>
+  citedPaths.length > 0 || SOURCES_RE.test(text) || /docs\//i.test(text) || /server\//i.test(text);
+
+const toHistogramKey = (value: string | null | undefined): string =>
+  value && value.trim().length > 0 ? value.trim() : "none";
+
+const incrementHistogram = (histogram: Record<string, number>, value: string | null | undefined): void => {
+  const key = toHistogramKey(value);
+  histogram[key] = (histogram[key] ?? 0) + 1;
+};
+
+const isStage0TechnicalFailOpenReason = (reason: string | null | undefined): boolean => {
+  const normalized = String(reason ?? "")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return false;
+  return STAGE0_TECH_FAIL_OPEN_TOKENS.some((token) => normalized.includes(token));
+};
+
+const isStage0EligibleTurn = (debug: HelixAskDebug | undefined): boolean => {
+  const domain = String(debug?.intent_domain ?? "")
+    .trim()
+    .toLowerCase();
+  if (domain !== "repo" && domain !== "hybrid") return false;
+  if (debug?.stage0_canary_hit !== true) return false;
+  const policy = String(debug?.stage0_policy_decision ?? "")
+    .trim()
+    .toLowerCase();
+  const failOpen = String(debug?.stage0_fail_open_reason ?? debug?.stage0_fallback_reason ?? "")
+    .trim()
+    .toLowerCase();
+  if (STAGE0_HARD_BYPASS_REASONS.has(policy) || STAGE0_HARD_BYPASS_REASONS.has(failOpen)) return false;
+  return true;
+};
 
 const readJsonFile = async <T>(filePath: string): Promise<T> => {
   const content = await fs.readFile(filePath, "utf8");
@@ -366,12 +455,19 @@ const evaluateCase = (
   const answerText = payload.text ?? "";
   const debug = payload.debug;
   const citedPaths = extractFilePaths(answerText);
+  const hasCitation = hasCitationSignal(answerText, citedPaths);
   const contextPaths = debug?.context_files ?? [];
   const contextSet = new Set(contextPaths);
   const decorative = citedPaths.filter((path) => !contextSet.has(path));
   const clarify =
     debug?.arbiter_mode === "clarify" ||
     /please point to the relevant files|narrow the request/i.test(answerText);
+  const runtimeFallbackAnswer = RUNTIME_FALLBACK_RE.test(answerText);
+  const stage0Eligible = isStage0EligibleTurn(debug);
+  const stage0UsedActive = stage0Eligible && debug?.stage0_used === true;
+  const stage0FailOpenReason = (debug?.stage0_fail_open_reason ?? debug?.stage0_fallback_reason ?? null) || null;
+  const stage0PolicyDecision = (debug?.stage0_policy_decision ?? null) || null;
+  const stage0TechnicalFailOpen = stage0Eligible && isStage0TechnicalFailOpenReason(stage0FailOpenReason);
 
   const hardFailures: string[] = [];
   const expect = entry.expect ?? {};
@@ -406,10 +502,11 @@ const evaluateCase = (
   }
 
   const citationsPolicy = expect.citations ?? "optional";
+  const citationMissing = citationsPolicy === "require" && !hasCitation;
   if (citationsPolicy === "require") {
-    checkExpectation(citedPaths.length > 0, "missing citations");
+    checkExpectation(hasCitation, "missing citations");
   } else if (citationsPolicy === "forbid") {
-    checkExpectation(citedPaths.length === 0, "unexpected citations");
+    checkExpectation(!hasCitation, "unexpected citations");
   }
 
   if (expect.must_include?.length) {
@@ -446,6 +543,13 @@ const evaluateCase = (
     answer_length: answerText.length,
     quality_score: qualityScore,
     quality_signals: qualitySignals,
+    citation_missing: citationMissing,
+    runtime_fallback_answer: runtimeFallbackAnswer,
+    stage0_eligible: stage0Eligible,
+    stage0_used_active: stage0UsedActive,
+    stage0_fail_open_reason: stage0FailOpenReason,
+    stage0_policy_decision: stage0PolicyDecision,
+    stage0_technical_fail_open: stage0TechnicalFailOpen,
     debug,
   };
 };
@@ -486,6 +590,144 @@ const summarize = (configName: string, results: CaseResult[]): SweepSummary => {
   };
 };
 
+const buildStage0SweepGateMetrics = (results: CaseResult[]): Stage0SweepGateMetrics => {
+  const failOpenReasonHistogram: Record<string, number> = {};
+  const policyDecisionHistogram: Record<string, number> = {};
+  let citationMissing = 0;
+  let runtimeFallback = 0;
+  let eligibleTurns = 0;
+  let activeUsedTurns = 0;
+  let technicalFailOpenTurns = 0;
+
+  for (const result of results) {
+    if (result.citation_missing) citationMissing += 1;
+    if (result.runtime_fallback_answer) runtimeFallback += 1;
+    incrementHistogram(failOpenReasonHistogram, result.stage0_fail_open_reason);
+    incrementHistogram(policyDecisionHistogram, result.stage0_policy_decision);
+    if (!result.stage0_eligible) continue;
+    eligibleTurns += 1;
+    if (result.stage0_used_active) activeUsedTurns += 1;
+    if (result.stage0_technical_fail_open) technicalFailOpenTurns += 1;
+  }
+
+  return {
+    citation_missing: citationMissing,
+    runtime_fallback_answer: runtimeFallback,
+    eligible_turn_count: eligibleTurns,
+    stage0_active_used_count: activeUsedTurns,
+    stage0_active_usage_rate:
+      eligibleTurns > 0 ? Number((activeUsedTurns / eligibleTurns).toFixed(4)) : 0,
+    stage0_technical_fail_open_count: technicalFailOpenTurns,
+    stage0_technical_fail_open_rate:
+      eligibleTurns > 0 ? Number((technicalFailOpenTurns / eligibleTurns).toFixed(4)) : 0,
+    fail_open_reason_histogram: failOpenReasonHistogram,
+    policy_decision_histogram: policyDecisionHistogram,
+  };
+};
+
+const evaluateStage0PromotionGate = (
+  baselineConfig: string,
+  baseline: Stage0SweepGateMetrics,
+  candidateConfig: string,
+  candidate: Stage0SweepGateMetrics,
+): Stage0SweepPromotionGate => {
+  const failingRules: string[] = [];
+  if (candidate.citation_missing > baseline.citation_missing) {
+    failingRules.push(
+      `citation_missing increased baseline=${baseline.citation_missing} candidate=${candidate.citation_missing}`,
+    );
+  }
+  if (candidate.runtime_fallback_answer > baseline.runtime_fallback_answer) {
+    failingRules.push(
+      `runtime_fallback_answer increased baseline=${baseline.runtime_fallback_answer} candidate=${candidate.runtime_fallback_answer}`,
+    );
+  }
+  if (candidate.eligible_turn_count <= 0) {
+    failingRules.push("stage0_active_usage_rate unavailable (eligible_turn_count=0)");
+  } else if (candidate.stage0_active_usage_rate < 0.99) {
+    failingRules.push(
+      `stage0_active_usage_rate below threshold candidate=${candidate.stage0_active_usage_rate} threshold=0.99`,
+    );
+  }
+  if (candidate.stage0_technical_fail_open_rate >= 0.01) {
+    failingRules.push(
+      `stage0_technical_fail_open_rate above threshold candidate=${candidate.stage0_technical_fail_open_rate} threshold=0.01`,
+    );
+  }
+
+  return {
+    baseline_config: baselineConfig,
+    candidate_config: candidateConfig,
+    baseline,
+    candidate,
+    verdict: failingRules.length === 0 ? "pass" : "fail",
+    failing_rules: failingRules,
+  };
+};
+
+type Stage0RolloutActionArtifact = {
+  schema_version: "helix_ask_stage0_rollout_action/1";
+  generated_at: string;
+  verdict: "pass" | "fail";
+  recommendation: {
+    mode: "shadow" | "full";
+    canary_pct: number;
+  };
+  gate: Stage0SweepPromotionGate;
+};
+
+const buildStage0RolloutActionArtifact = (
+  gate: Stage0SweepPromotionGate,
+): Stage0RolloutActionArtifact => ({
+  schema_version: "helix_ask_stage0_rollout_action/1",
+  generated_at: new Date().toISOString(),
+  verdict: gate.verdict,
+  recommendation:
+    gate.verdict === "fail"
+      ? { mode: "shadow", canary_pct: 0 }
+      : { mode: "full", canary_pct: 100 },
+  gate,
+});
+
+const resolveGateEntry = async (
+  runResults: Array<{ config: SweepConfig; results: CaseResult[]; gate_metrics: Stage0SweepGateMetrics }>,
+  configName: string | null,
+  artifactPath: string | null,
+): Promise<{ config: string; metrics: Stage0SweepGateMetrics } | null> => {
+  if (artifactPath) {
+    const artifact = await readJsonFile<
+      Array<{ config: SweepConfig; gate_metrics?: Stage0SweepGateMetrics }>
+    >(path.resolve(artifactPath));
+    const configuredName = configName?.trim();
+    const foundFromArtifact =
+      (configuredName
+        ? artifact.find((entry) => entry.config?.name === configuredName)
+        : artifact[0]) ?? null;
+    if (foundFromArtifact?.gate_metrics) {
+      return {
+        config: foundFromArtifact.config.name,
+        metrics: foundFromArtifact.gate_metrics,
+      };
+    }
+    return null;
+  }
+  const configuredName = configName?.trim();
+  const found =
+    (configuredName
+      ? runResults.find((entry) => entry.config.name === configuredName)
+      : runResults[0]) ?? null;
+  if (!found) return null;
+  return {
+    config: found.config.name,
+    metrics: found.gate_metrics,
+  };
+};
+
+export const __testOnlyBuildStage0SweepGateMetrics = buildStage0SweepGateMetrics;
+export const __testOnlyEvaluateStage0PromotionGate = evaluateStage0PromotionGate;
+export const __testOnlyIsStage0TechnicalFailOpenReason = isStage0TechnicalFailOpenReason;
+export const __testOnlyBuildStage0RolloutActionArtifact = buildStage0RolloutActionArtifact;
+
 export const buildQualityBaselineContract = (
   summary: SweepSummary,
   sourceReport: string,
@@ -523,7 +765,7 @@ export const buildQualityBaselineContract = (
 };
 
 const writeQualityBaselineContract = async (
-  runResults: Array<{ config: SweepConfig; summary: SweepSummary }>,
+  runResults: Array<{ config: SweepConfig; summary: SweepSummary; gate_metrics: Stage0SweepGateMetrics }>,
   sourceReport: string,
 ) => {
   const baseline = runResults.find((entry) => entry.config.name === "baseline") ?? runResults[0];
@@ -541,7 +783,9 @@ const toPercentDelta = (a: number, b: number): string => {
   return `${(((b - a) / a) * 100).toFixed(1)}%`;
 };
 
-const printPairwiseStudySummary = (results: Array<{ config: SweepConfig; summary: SweepSummary }>) => {
+const printPairwiseStudySummary = (
+  results: Array<{ config: SweepConfig; summary: SweepSummary; gate_metrics: Stage0SweepGateMetrics }>,
+) => {
   if (results.length < 2) return;
   const base = results[0];
   const candidate = results[results.length - 1];
@@ -578,7 +822,12 @@ async function main(): Promise<void> {
   }
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
   const sessionId = `helix-ask-sweep:${Date.now()}`;
-  const runResults: Array<{ config: SweepConfig; results: CaseResult[]; summary: SweepSummary }> = [];
+  const runResults: Array<{
+    config: SweepConfig;
+    results: CaseResult[];
+    summary: SweepSummary;
+    gate_metrics: Stage0SweepGateMetrics;
+  }> = [];
 
   for (const config of matrix) {
     const results: CaseResult[] = [];
@@ -605,10 +854,13 @@ async function main(): Promise<void> {
       results.push(evaluateCase(entry, response.payload, response.duration_ms));
     }
     const summary = summarize(config.name, results);
-    runResults.push({ config, results, summary });
+    const gateMetrics = buildStage0SweepGateMetrics(results);
+    runResults.push({ config, results, summary, gate_metrics: gateMetrics });
     console.log(
       `Summary [${config.name}] ok=${summary.ok}/${summary.total} clarifyRate=${summary.clarify_rate} ` +
-        `quality=${summary.avg_quality_score} latencyP50=${summary.p50_duration_ms ?? "n/a"}ms latencyP95=${summary.p95_duration_ms ?? "n/a"}ms`,
+        `quality=${summary.avg_quality_score} latencyP50=${summary.p50_duration_ms ?? "n/a"}ms latencyP95=${summary.p95_duration_ms ?? "n/a"}ms ` +
+        `citationMissing=${gateMetrics.citation_missing} runtimeFallback=${gateMetrics.runtime_fallback_answer} ` +
+        `stage0Usage=${gateMetrics.stage0_active_usage_rate} stage0TechFailOpen=${gateMetrics.stage0_technical_fail_open_rate}`,
     );
   }
 
@@ -619,6 +871,37 @@ async function main(): Promise<void> {
   await fs.writeFile(outPath, JSON.stringify(runResults, null, 2), "utf8");
   console.log(`Saved sweep report: ${outPath}`);
   await writeQualityBaselineContract(runResults, outPath);
+
+  if (STAGE0_GATE_ENABLED) {
+    const baselineEntry = await resolveGateEntry(
+      runResults,
+      STAGE0_GATE_BASELINE_CONFIG,
+      STAGE0_GATE_BASELINE_ARTIFACT,
+    );
+    const candidateEntry = await resolveGateEntry(runResults, STAGE0_GATE_CANDIDATE_CONFIG, null);
+    if (!baselineEntry || !candidateEntry) {
+      throw new Error("stage0 gate enabled but baseline/candidate entries could not be resolved");
+    }
+    const gate = evaluateStage0PromotionGate(
+      baselineEntry.config,
+      baselineEntry.metrics,
+      candidateEntry.config,
+      candidateEntry.metrics,
+    );
+    const action = buildStage0RolloutActionArtifact(gate);
+    const actionOutPath =
+      STAGE0_ROLLOUT_ACTION_OUT_PATH ??
+      path.join(OUTPUT_DIR, `helix-ask-stage0-rollout-action.${stamp}.json`);
+    const actionPath = path.resolve(actionOutPath);
+    await fs.mkdir(path.dirname(actionPath), { recursive: true });
+    await fs.writeFile(actionPath, JSON.stringify(action, null, 2), "utf8");
+    console.log(`Saved stage0 rollout action: ${actionPath}`);
+    console.log(`Stage0 promotion gate verdict: ${gate.verdict.toUpperCase()}`);
+    if (gate.verdict === "fail") {
+      console.error(`Stage0 promotion gate failures: ${gate.failing_rules.join(" | ")}`);
+      process.exit(1);
+    }
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

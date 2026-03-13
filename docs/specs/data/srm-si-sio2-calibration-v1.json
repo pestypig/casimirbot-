@@ -1,6 +1,6 @@
 {
   "artifact_type": "srm_si_sio2_calibration/v1",
-  "generated_on": "2026-03-08",
+  "generated_on": "2026-03-11",
   "boundary_statement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
   "policy_posture": {
     "reference_only": true,
@@ -44,6 +44,23 @@
       "Direct archive surfaces for SRM 2530-series include addendum/process anchors and class metadata.",
       "Archive scans do not expose populated serial-specific certificate table values for each SRM unit."
     ]
+  },
+  "revalidation_log": {
+    "date_utc": "2026-03-11",
+    "method": "direct_pdf_page_review",
+    "coverage": [
+      "2530-1",
+      "2530-2",
+      "2530-3",
+      "2531",
+      "2532",
+      "2533",
+      "2534",
+      "2535",
+      "2536"
+    ],
+    "result": "serial_specific_tables_not_visible_in_accessible_archive_scans",
+    "note": "Nominal class and addendum/process anchors are visible; populated serial-specific certified-thickness table values remain absent."
   },
   "entries": [
     {
@@ -293,7 +310,8 @@
       "EXP-SE-038",
       "EXP-SE-039",
       "EXP-SE-040",
-      "EXP-SE-041"
+      "EXP-SE-041",
+      "EXP-SE-042"
     ],
     "equation_trace_rows": [
       "EQT-085-01",

@@ -36,7 +36,11 @@ const attachLlmBridgeMeta = (
 export const resolveLlmLocalBackend = (): LocalLlmBackend => {
   const runtime = (process.env.LLM_RUNTIME ?? "").trim().toLowerCase();
   const policy = (process.env.LLM_POLICY ?? "").trim().toLowerCase();
-  const hasHttp = Boolean(process.env.LLM_HTTP_BASE?.trim());
+  const allowDefaultOpenAiBase =
+    String(process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE ?? "1").trim() !== "0";
+  const hasHttpBase = Boolean(process.env.LLM_HTTP_BASE?.trim());
+  const hasHttpKey = Boolean(process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
+  const hasHttp = hasHttpBase || (allowDefaultOpenAiBase && hasHttpKey);
   const useSpawn =
     process.env.ENABLE_LLM_LOCAL_SPAWN === "1" ||
     isLocalRuntime() ||

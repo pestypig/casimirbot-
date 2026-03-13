@@ -1,0 +1,245 @@
+{
+  "schema_version": "helix_ask_multilang_golden_pack/2",
+  "cases": [
+    {
+      "id": "zh_general_quantum",
+      "group": "zh",
+      "source_question": "\u4ec0\u4e48\u662f\u91cf\u5b50\u7269\u7406\u5b66\uff1f",
+      "pivot_question": "What is quantum physics?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.93,
+      "pivot_confidence": 0.92,
+      "code_mixed": false,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": false,
+      "expect_prior_impact": "neutral"
+    },
+    {
+      "id": "zh_general_warp_bubble",
+      "group": "zh",
+      "source_question": "\u4ec0\u4e48\u662f\u66f2\u901f\u6ce1\uff1f",
+      "pivot_question": "What is a warp bubble?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.94,
+      "pivot_confidence": 0.91,
+      "code_mixed": false,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "zh_general_alcubierre",
+      "group": "zh",
+      "source_question": "\u4ec0\u4e48\u662f\u963f\u5e93\u6bd4\u57c3\u96f7\u66f2\u901f\u6ce1\uff1f",
+      "pivot_question": "What is an Alcubierre warp bubble?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.92,
+      "pivot_confidence": 0.9,
+      "code_mixed": false,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "zh_general_casimir",
+      "group": "zh",
+      "source_question": "\u4ec0\u4e48\u662fCasimir\u6548\u5e94\uff1f",
+      "pivot_question": "What is the Casimir effect?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.95,
+      "pivot_confidence": 0.93,
+      "code_mixed": false,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "zh_general_natario",
+      "group": "zh",
+      "source_question": "\u8bf7\u89e3\u91caNatario\u5ea6\u89c4\u548c\u66f2\u901f\u6ce1\u7684\u5173\u7cfb\u3002",
+      "pivot_question": "Explain the relation between the Natario metric and warp bubble.",
+      "source_language": "zh-hans",
+      "language_confidence": 0.92,
+      "pivot_confidence": 0.9,
+      "code_mixed": false,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "zh_repo_counter_helix_pipeline",
+      "group": "zh",
+      "source_question": "\u8bf7\u5206\u6790\u8fd9\u4e2arepo\u91ccHelix Ask pipeline\u5728\u54ea\u4e2a\u6a21\u5757\u3002",
+      "pivot_question": "In this repo, which module contains the Helix Ask pipeline?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.93,
+      "pivot_confidence": 0.91,
+      "code_mixed": false,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "repo"
+      },
+      "expect_term_prior_applied": false,
+      "expect_prior_impact": "neutral"
+    },
+    {
+      "id": "mixed_alcubierre_relation",
+      "group": "zh_en_mixed",
+      "source_question": "Alcubierre drive\u548cwarp bubble\u6709\u4ec0\u4e48\u5173\u7cfb\uff1f",
+      "pivot_question": "How is the Alcubierre drive related to a warp bubble?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.91,
+      "pivot_confidence": 0.9,
+      "code_mixed": true,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "mixed_casimir_concept",
+      "group": "zh_en_mixed",
+      "source_question": "\u8bf7\u89e3\u91caCasimir effect\u7684\u6982\u5ff5\u548c\u610f\u4e49\u3002",
+      "pivot_question": "Explain the concept and meaning of the Casimir effect.",
+      "source_language": "zh-hans",
+      "language_confidence": 0.92,
+      "pivot_confidence": 0.9,
+      "code_mixed": true,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "mixed_repo_counter_module_path",
+      "group": "zh_en_mixed",
+      "source_question": "\u8fd9\u4e2acodebase\u91ccHelix Ask routing\u7684module path\u5728\u54ea\uff1f",
+      "pivot_question": "In this codebase, what is the module path for Helix Ask routing?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.9,
+      "pivot_confidence": 0.89,
+      "code_mixed": true,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "repo"
+      },
+      "expect_term_prior_applied": false,
+      "expect_prior_impact": "neutral"
+    },
+    {
+      "id": "mixed_ford_roman_concept",
+      "group": "zh_en_mixed",
+      "source_question": "Ford-Roman quantum inequality\u662f\u4ec0\u4e48\uff1f",
+      "pivot_question": "What is the Ford-Roman quantum inequality?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.9,
+      "pivot_confidence": 0.9,
+      "code_mixed": true,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": true,
+      "expect_prior_impact": "helped"
+    },
+    {
+      "id": "mixed_polysemy_ambiguous",
+      "group": "zh_en_mixed",
+      "source_question": "Ford motor\u548cFord-Roman\u662f\u540c\u4e00\u4e2aFord\u5417\uff1f",
+      "pivot_question": "Are Ford motor and Ford-Roman the same Ford?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.9,
+      "pivot_confidence": 0.9,
+      "code_mixed": true,
+      "response_language": "zh-hans",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": false,
+      "expect_prior_impact": "neutral"
+    },
+    {
+      "id": "ja_general_warp_bubble",
+      "group": "ja",
+      "source_question": "\u30ef\u30fc\u30d7\u30d0\u30d6\u30eb\u3068\u306f\u4f55\u3067\u3059\u304b\uff1f",
+      "pivot_question": "What is a warp bubble?",
+      "source_language": "ja",
+      "language_confidence": 0.93,
+      "pivot_confidence": 0.9,
+      "code_mixed": false,
+      "response_language": "ja",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "expect_term_prior_applied": false,
+      "expect_prior_impact": "neutral"
+    },
+    {
+      "id": "ja_repo_counter_module_path",
+      "group": "ja",
+      "source_question": "\u3053\u306erepo\u3067Helix Ask routing\u306e\u30e2\u30b8\u30e5\u30fc\u30eb\u30d1\u30b9\u306f\u3069\u3053\u3067\u3059\u304b\uff1f",
+      "pivot_question": "In this repo, what is the module path for Helix Ask routing?",
+      "source_language": "ja",
+      "language_confidence": 0.92,
+      "pivot_confidence": 0.9,
+      "code_mixed": true,
+      "response_language": "ja",
+      "expect": {
+        "intent_domain": "repo"
+      },
+      "expect_term_prior_applied": false,
+      "expect_prior_impact": "neutral"
+    }
+  ],
+  "low_confidence_cases": [
+    {
+      "id": "low_conf_zh_block",
+      "source_question": "\u4ec0\u4e48\u662f\u963f\u5e93\u6bd4\u57c3\u96f7\u66f2\u901f\u6ce1\uff1f",
+      "pivot_question": "What is an Alcubierre warp bubble?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.88,
+      "pivot_confidence": 0.64,
+      "code_mixed": false,
+      "response_language": "zh-hans"
+    },
+    {
+      "id": "low_conf_mixed_block",
+      "source_question": "warp bubble\u548cCasimir\u6709\u4ec0\u4e48\u5173\u7cfb\uff1f",
+      "pivot_question": "How are warp bubble and Casimir related?",
+      "source_language": "zh-hans",
+      "language_confidence": 0.87,
+      "pivot_confidence": 0.66,
+      "code_mixed": true,
+      "response_language": "zh-hans"
+    },
+    {
+      "id": "low_conf_ja_block",
+      "source_question": "\u30ef\u30fc\u30d7\u30d0\u30d6\u30eb\u3068\u306f\u4f55\u3067\u3059\u304b\uff1f",
+      "pivot_question": "What is a warp bubble?",
+      "source_language": "ja",
+      "language_confidence": 0.88,
+      "pivot_confidence": 0.63,
+      "code_mixed": false,
+      "response_language": "ja"
+    }
+  ]
+}

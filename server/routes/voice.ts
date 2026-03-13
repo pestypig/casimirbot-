@@ -20,6 +20,20 @@ import {
   isSttInvalidFormatMessage,
   recoverSttInvalidFormatToPcmWav,
 } from "../services/audio/stt-format-recovery";
+import {
+  HELIX_LANG_SCHEMA_VERSION,
+  canonicalTermPreservationRatio,
+  enforceCanonicalTermPreservation,
+  normalizeLanguageTag,
+} from "../services/helix-ask/multilang";
+import {
+  HELIX_INTERPRETER_SCHEMA_VERSION,
+  readHelixAskInterpreterConfigFromEnv,
+  runHelixAskInterpreter,
+  shouldRunHelixAskInterpreter,
+  type HelixAskInterpreterArtifact,
+  type HelixAskInterpreterStatus,
+} from "../services/helix-ask/interpreter";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -70,6 +84,42 @@ const transcribeRequestSchema = z.object({
   language: z.string().trim().min(1).max(32).optional(),
   traceId: z.string().trim().max(200).optional(),
   missionId: z.string().trim().max(200).optional(),
+  speaker_id: z.string().trim().min(1).max(64).optional(),
+  speaker_confidence: z.preprocess((value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }, z.number().min(0).max(1).optional()),
+  speech_probability: z.preprocess((value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }, z.number().min(0).max(1).optional()),
+  snr_db: z.preprocess((value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }, z.number().min(-80).max(80).optional()),
+  confirm_auto_eligible: z.preprocess((value) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value > 0;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "1" || normalized === "true") return true;
+      if (normalized === "0" || normalized === "false") return false;
+    }
+    return undefined;
+  }, z.boolean().optional()),
+  confirm_block_reason: z.string().trim().max(120).optional(),
   durationMs: z.preprocess((value) => {
     if (typeof value === "number" && Number.isFinite(value)) {
       return Math.max(0, Math.round(value));
@@ -259,6 +309,221 @@ const STT_CONFIRM_CONFIDENCE_THRESHOLD = 0.58;
 const STT_TRANSLATION_CONFIRM_THRESHOLD = 0.68;
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const readConfidenceThreshold = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return clamp01(fallback);
+  return clamp01(parsed);
+};
+
+const HELIX_ASK_LANG_CONF_AUTO_MIN = readConfidenceThreshold(
+  process.env.HELIX_ASK_LANG_CONF_AUTO_MIN,
+  0.85,
+);
+const HELIX_ASK_LANG_CONF_MIN = readConfidenceThreshold(
+  process.env.HELIX_ASK_LANG_CONF_MIN,
+  0.7,
+);
+const HELIX_ASK_PIVOT_CONF_AUTO_MIN = readConfidenceThreshold(
+  process.env.HELIX_ASK_PIVOT_CONF_AUTO_MIN,
+  0.82,
+);
+const HELIX_ASK_PIVOT_CONF_BLOCK_MIN = readConfidenceThreshold(
+  process.env.HELIX_ASK_PIVOT_CONF_BLOCK_MIN,
+  0.68,
+);
+const HELIX_ASK_CODEMIX_PRIMARY_SHARE_MAX = readConfidenceThreshold(
+  process.env.HELIX_ASK_CODEMIX_PRIMARY_SHARE_MAX,
+  0.8,
+);
+const HELIX_ASK_CODEMIX_SECONDARY_SHARE_MIN = readConfidenceThreshold(
+  process.env.HELIX_ASK_CODEMIX_SECONDARY_SHARE_MIN,
+  0.2,
+);
+const HELIX_ASK_INTERPRETER_CONFIG = readHelixAskInterpreterConfigFromEnv();
+const HELIX_ASK_INTERPRETER_EVALUATE =
+  HELIX_ASK_INTERPRETER_CONFIG.enabled || HELIX_ASK_INTERPRETER_CONFIG.logOnly;
+const HELIX_ASK_INTERPRETER_ACTIVE =
+  HELIX_ASK_INTERPRETER_CONFIG.enabled && !HELIX_ASK_INTERPRETER_CONFIG.logOnly;
+const INTERPRETER_FAIL_CLOSED_STATUSES = new Set<HelixAskInterpreterStatus>([
+  "timeout",
+  "parse_error",
+  "provider_error",
+]);
+
+const shouldForceInterpreterFailClosed = (args: {
+  artifact: HelixAskInterpreterArtifact | null;
+  status: HelixAskInterpreterStatus | null;
+  error: string | null;
+  sourceLanguage: string | null;
+  codeMixed: boolean;
+}): boolean => {
+  if (!HELIX_ASK_INTERPRETER_ACTIVE) return false;
+  if (args.artifact) return false;
+  if (
+    !shouldRunHelixAskInterpreter({
+      sourceLanguage: args.sourceLanguage,
+      codeMixed: args.codeMixed,
+    })
+  ) {
+    return false;
+  }
+  if (args.status && INTERPRETER_FAIL_CLOSED_STATUSES.has(args.status)) {
+    return true;
+  }
+  return Boolean(args.error && args.error.trim());
+};
+
+type ScriptFamily = "latin" | "cjk" | "arabic" | "cyrillic" | "other";
+
+const expectedScriptFamily = (language: string | undefined): ScriptFamily => {
+  const normalized = normalizeLanguageTag(language);
+  if (!normalized) return "other";
+  if (normalized === "zh" || normalized.startsWith("zh-") || normalized === "ja" || normalized.startsWith("ja-") || normalized === "ko" || normalized.startsWith("ko-")) {
+    return "cjk";
+  }
+  if (normalized === "ar" || normalized.startsWith("ar-")) return "arabic";
+  if (
+    normalized === "ru" ||
+    normalized.startsWith("ru-") ||
+    normalized === "uk" ||
+    normalized.startsWith("uk-") ||
+    normalized === "bg" ||
+    normalized.startsWith("bg-")
+  ) {
+    return "cyrillic";
+  }
+  if (normalized === "unknown") return "other";
+  return "latin";
+};
+
+const scriptForChar = (char: string): ScriptFamily => {
+  if (/[A-Za-z]/.test(char)) return "latin";
+  if (/[\u4E00-\u9FFF\u3400-\u4DBF\u3040-\u30FF\uAC00-\uD7AF]/u.test(char)) return "cjk";
+  if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/u.test(char)) return "arabic";
+  if (/[\u0400-\u04FF]/u.test(char)) return "cyrillic";
+  return "other";
+};
+
+type ScriptStats = {
+  totalLetters: number;
+  shares: Record<ScriptFamily, number>;
+  primary: ScriptFamily;
+  secondary: ScriptFamily;
+  primaryShare: number;
+  secondaryShare: number;
+};
+
+const analyzeScriptStats = (text: string): ScriptStats => {
+  const counts: Record<ScriptFamily, number> = {
+    latin: 0,
+    cjk: 0,
+    arabic: 0,
+    cyrillic: 0,
+    other: 0,
+  };
+  for (const char of text) {
+    if (!/\S/u.test(char)) continue;
+    counts[scriptForChar(char)] += 1;
+  }
+  const totalLetters = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  const shares: Record<ScriptFamily, number> = {
+    latin: totalLetters > 0 ? counts.latin / totalLetters : 0,
+    cjk: totalLetters > 0 ? counts.cjk / totalLetters : 0,
+    arabic: totalLetters > 0 ? counts.arabic / totalLetters : 0,
+    cyrillic: totalLetters > 0 ? counts.cyrillic / totalLetters : 0,
+    other: totalLetters > 0 ? counts.other / totalLetters : 0,
+  };
+  const ranked = (Object.keys(shares) as ScriptFamily[]).sort((a, b) => shares[b] - shares[a]);
+  const primary = ranked[0] ?? "other";
+  const secondary = ranked[1] ?? "other";
+  return {
+    totalLetters,
+    shares,
+    primary,
+    secondary,
+    primaryShare: shares[primary] ?? 0,
+    secondaryShare: shares[secondary] ?? 0,
+  };
+};
+
+const estimateLidModelConfidence = (text: string, language: string | undefined): number => {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  let score = 0.56;
+  if (trimmed.length >= 16) score += 0.08;
+  if (trimmed.length >= 40) score += 0.08;
+  if (trimmed.length >= 80) score += 0.04;
+  if (/[.!?。！？]$/.test(trimmed)) score += 0.05;
+  if (!normalizeLanguageTag(language)) score -= 0.12;
+  return clamp01(score);
+};
+
+const estimateScriptSanityConfidence = (text: string, language: string | undefined): number => {
+  const stats = analyzeScriptStats(text);
+  if (stats.totalLetters <= 0) return 0.5;
+  const expected = expectedScriptFamily(language);
+  if (expected === "other") return 0.6;
+  const expectedShare = stats.shares[expected] ?? 0;
+  const primaryShare = stats.primaryShare;
+  if (expectedShare >= 0.6) return clamp01(0.7 + 0.3 * expectedShare);
+  if (expected === stats.primary) return clamp01(0.6 + 0.25 * primaryShare);
+  return clamp01(0.35 + 0.3 * expectedShare);
+};
+
+const deriveLanguageConfidence = (args: {
+  text: string;
+  language: string | undefined;
+  providerConfidence?: unknown;
+}): number => {
+  const provider = normalizeConfidenceValue(args.providerConfidence) ?? estimateTextConfidence(args.text, args.language);
+  const lidModel = estimateLidModelConfidence(args.text, args.language);
+  const scriptSanity = estimateScriptSanityConfidence(args.text, args.language);
+  return clamp01(0.6 * provider + 0.25 * lidModel + 0.15 * scriptSanity);
+};
+
+const isCodeMixedTranscript = (text: string): boolean => {
+  const stats = analyzeScriptStats(text);
+  if (stats.totalLetters <= 0) return false;
+  return (
+    stats.primaryShare <= HELIX_ASK_CODEMIX_PRIMARY_SHARE_MAX &&
+    stats.secondaryShare >= HELIX_ASK_CODEMIX_SECONDARY_SHARE_MIN
+  );
+};
+
+const estimateBacktranslationSimilarity = (sourceText: string, translatedText: string): number => {
+  const source = sourceText.trim();
+  const target = translatedText.trim();
+  if (!source || !target) return 0;
+  const sourceLen = source.length;
+  const targetLen = target.length;
+  const lengthScore = Math.min(sourceLen, targetLen) / Math.max(sourceLen, targetLen, 1);
+  const sourceSentenceCount = Math.max(1, source.split(/[.!?。！？]+/).filter(Boolean).length);
+  const targetSentenceCount = Math.max(1, target.split(/[.!?。！？]+/).filter(Boolean).length);
+  const sentenceScore =
+    1 - Math.min(1, Math.abs(sourceSentenceCount - targetSentenceCount) / Math.max(sourceSentenceCount, targetSentenceCount, 1));
+  const sourcePunctuation = (source.match(/[,:;.!?。！？]/g) ?? []).length;
+  const targetPunctuation = (target.match(/[,:;.!?。！？]/g) ?? []).length;
+  const punctuationScore =
+    sourcePunctuation === 0 && targetPunctuation === 0
+      ? 1
+      : Math.min(sourcePunctuation, targetPunctuation) / Math.max(sourcePunctuation, targetPunctuation, 1);
+  return clamp01(0.45 * lengthScore + 0.35 * sentenceScore + 0.2 * punctuationScore);
+};
+
+const derivePivotConfidence = (args: {
+  translatorConfidence: number;
+  sourceText: string;
+  translatedText: string;
+}): number => {
+  const backtranslationSimilarity = estimateBacktranslationSimilarity(args.sourceText, args.translatedText);
+  const canonicalPreservation = canonicalTermPreservationRatio(args.sourceText, args.translatedText);
+  return clamp01(
+    0.5 * clamp01(args.translatorConfidence) +
+      0.3 * backtranslationSimilarity +
+      0.2 * canonicalPreservation,
+  );
+};
 
 const normalizeConfidenceValue = (value: unknown): number | undefined => {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
@@ -709,32 +974,72 @@ const buildInlineAudioDataUri = (file: Express.Multer.File): string => {
 type VoiceTranscriptionHandlerResult = {
   text?: string;
   language?: string;
+  language_detected?: string;
+  language_confidence?: number;
+  code_mixed?: boolean;
   duration_ms?: number;
   segments?: unknown[];
   confidence?: number;
   confidence_reason?: string;
+  pivot_confidence?: number;
+  dispatch_state?: "auto" | "confirm" | "blocked";
   needs_confirmation?: boolean;
   translation_uncertain?: boolean;
+  speaker_id?: string;
+  speaker_confidence?: number;
+  speech_probability?: number;
+  snr_db?: number;
+  confirm_auto_eligible?: boolean;
+  confirm_block_reason?: string;
+  lang_schema_version?: string;
   essence_id?: string;
   model?: string;
   mode?: string;
   task?: string;
   backend_url?: string;
+  interpreter?: HelixAskInterpreterArtifact;
+  interpreter_schema_version?: string;
+  interpreter_status?: HelixAskInterpreterStatus;
+  interpreter_confidence?: number;
+  interpreter_dispatch_state?: "auto" | "confirm" | "blocked";
+  interpreter_confirm_prompt?: string | null;
+  interpreter_term_ids?: string[];
+  interpreter_concept_ids?: string[];
 };
 
 type VoiceTranscriptionResult = {
   text?: string;
   language?: string;
+  language_detected?: string;
+  language_confidence?: number;
+  code_mixed?: boolean;
   duration_ms?: number;
   segments?: unknown[];
   confidence?: number;
   confidence_reason?: string;
+  pivot_confidence?: number;
+  dispatch_state?: "auto" | "confirm" | "blocked";
   needs_confirmation?: boolean;
   translation_uncertain?: boolean;
+  speaker_id?: string;
+  speaker_confidence?: number;
+  speech_probability?: number;
+  snr_db?: number;
+  confirm_auto_eligible?: boolean;
+  confirm_block_reason?: string;
+  lang_schema_version?: string;
   essence_id?: string;
   source_text?: string;
   source_language?: string;
   translated?: boolean;
+  interpreter?: HelixAskInterpreterArtifact;
+  interpreter_schema_version?: string;
+  interpreter_status?: HelixAskInterpreterStatus;
+  interpreter_confidence?: number;
+  interpreter_dispatch_state?: "auto" | "confirm" | "blocked";
+  interpreter_confirm_prompt?: string | null;
+  interpreter_term_ids?: string[];
+  interpreter_concept_ids?: string[];
   engine: TranscriptionEngine;
 };
 
@@ -820,7 +1125,7 @@ const runEmbeddedLocalTranscribe = async (args: {
   const result = (await sttWhisperHandler(
     {
       audio_base64: args.file.buffer.toString("base64"),
-      language: args.requestedLanguage ?? "en",
+      language: args.requestedLanguage,
       duration_ms: args.payload.durationMs,
     },
     { personaId },
@@ -849,7 +1154,12 @@ const runBackendTranscribe = async (args: {
           requestedLanguage: args.requestedLanguage,
         });
   const text = typeof result.text === "string" ? result.text : "";
-  const language = typeof result.language === "string" ? result.language : args.requestedLanguage;
+  const language = normalizeLanguageTag(
+    typeof result.language === "string" ? result.language : args.requestedLanguage ?? "unknown",
+  ) ?? "unknown";
+  const languageDetected = normalizeLanguageTag(
+    typeof result.language_detected === "string" ? result.language_detected : language,
+  ) ?? language;
   const segments = Array.isArray(result.segments) ? result.segments : [];
   const confidenceMeta = deriveTranscriptionConfidence({
     text,
@@ -857,9 +1167,19 @@ const runBackendTranscribe = async (args: {
     segments,
     providerConfidence: result.confidence,
   });
+  const languageConfidence = deriveLanguageConfidence({
+    text,
+    language: languageDetected,
+    providerConfidence:
+      typeof result.language_confidence === "number" ? result.language_confidence : confidenceMeta.confidence,
+  });
+  const codeMixed = typeof result.code_mixed === "boolean" ? result.code_mixed : isCodeMixedTranscript(text);
   return {
     text,
     language,
+    language_detected: languageDetected,
+    language_confidence: languageConfidence,
+    code_mixed: codeMixed,
     duration_ms:
       typeof result.duration_ms === "number" ? result.duration_ms : args.payload.durationMs,
     segments,
@@ -872,6 +1192,13 @@ const runBackendTranscribe = async (args: {
       typeof result.needs_confirmation === "boolean" ? result.needs_confirmation : undefined,
     translation_uncertain:
       typeof result.translation_uncertain === "boolean" ? result.translation_uncertain : undefined,
+    pivot_confidence:
+      typeof result.pivot_confidence === "number" ? clamp01(result.pivot_confidence) : undefined,
+    dispatch_state:
+      result.dispatch_state === "blocked" || result.dispatch_state === "confirm" || result.dispatch_state === "auto"
+        ? result.dispatch_state
+        : undefined,
+    lang_schema_version: typeof result.lang_schema_version === "string" ? result.lang_schema_version : HELIX_LANG_SCHEMA_VERSION,
     essence_id: typeof result.essence_id === "string" ? result.essence_id : undefined,
     engine: backendEngine(args.backend),
     translated: false,
@@ -1011,10 +1338,17 @@ const runVoiceTranscription = async (args: {
   }
 
   const sourceText = baseResult.text ?? "";
-  const sourceLanguage =
-    (baseResult.language ?? requestedLanguage ?? "unknown").trim().toLowerCase() || "unknown";
+  const sourceLanguage = normalizeLanguageTag(
+    baseResult.language ?? requestedLanguage ?? "unknown",
+  ) ?? "unknown";
   const wantsEnglish = args.outputMode === "english" || args.outputMode === "dual";
   let translationUncertain = baseResult.translation_uncertain === true;
+  let pivotConfidence =
+    typeof baseResult.pivot_confidence === "number"
+      ? clamp01(baseResult.pivot_confidence)
+      : isEnglishLikeLanguage(sourceLanguage)
+        ? 1
+        : 0.5;
   if (wantsEnglish && sourceText && !isEnglishLikeLanguage(sourceLanguage)) {
     try {
       const translated = await translateToEnglish({
@@ -1024,16 +1358,22 @@ const runVoiceTranscription = async (args: {
       });
       const translatedText = typeof translated.text === "string" ? translated.text.trim() : "";
       if (translatedText) {
+        const translatedTextWithCanonicalTerms = enforceCanonicalTermPreservation(sourceText, translatedText);
         const translatedSegments = Array.isArray(translated.segments) ? translated.segments : [];
         const translatedConfidenceMeta = deriveTranscriptionConfidence({
-          text: translatedText,
+          text: translatedTextWithCanonicalTerms,
           language: "en",
           segments: translatedSegments,
           providerConfidence: translated.confidence,
         });
+        pivotConfidence = derivePivotConfidence({
+          translatorConfidence: translatedConfidenceMeta.confidence,
+          sourceText,
+          translatedText: translatedTextWithCanonicalTerms,
+        });
         baseResult = {
           ...baseResult,
-          text: translatedText,
+          text: translatedTextWithCanonicalTerms,
           language: "en",
           segments: translatedSegments.length > 0 ? translatedSegments : baseResult.segments,
           confidence:
@@ -1051,22 +1391,28 @@ const runVoiceTranscription = async (args: {
           translation_uncertain:
             typeof translated.translation_uncertain === "boolean"
               ? translated.translation_uncertain
-              : translatedConfidenceMeta.confidence < STT_TRANSLATION_CONFIRM_THRESHOLD,
+              : pivotConfidence < HELIX_ASK_PIVOT_CONF_AUTO_MIN,
+          pivot_confidence: pivotConfidence,
           source_text: sourceText,
           source_language: sourceLanguage,
           translated: true,
+          lang_schema_version: HELIX_LANG_SCHEMA_VERSION,
         };
         translationUncertain =
           baseResult.translation_uncertain === true ||
+          pivotConfidence < HELIX_ASK_PIVOT_CONF_AUTO_MIN ||
           translatedConfidenceMeta.confidence < STT_TRANSLATION_CONFIRM_THRESHOLD;
-      } else if (args.outputMode === "dual") {
+      } else {
         baseResult = {
           ...baseResult,
           source_text: sourceText,
           source_language: sourceLanguage,
           translated: false,
+          pivot_confidence: 0,
+          lang_schema_version: HELIX_LANG_SCHEMA_VERSION,
         };
         translationUncertain = true;
+        pivotConfidence = 0;
       }
     } catch (error) {
       failures.push(classifySttFailure(selectedBackend, error, "primary"));
@@ -1075,8 +1421,11 @@ const runVoiceTranscription = async (args: {
         source_text: sourceText,
         source_language: sourceLanguage,
         translated: false,
+        pivot_confidence: 0,
+        lang_schema_version: HELIX_LANG_SCHEMA_VERSION,
       };
       translationUncertain = true;
+      pivotConfidence = 0;
     }
   } else if (args.outputMode === "dual") {
     baseResult = {
@@ -1084,6 +1433,7 @@ const runVoiceTranscription = async (args: {
       source_text: sourceText,
       source_language: sourceLanguage,
       translated: false,
+      lang_schema_version: HELIX_LANG_SCHEMA_VERSION,
     };
   }
 
@@ -1098,16 +1448,149 @@ const runVoiceTranscription = async (args: {
     typeof baseResult.confidence_reason === "string" && baseResult.confidence_reason.trim().length > 0
       ? baseResult.confidence_reason.trim()
       : confidenceMeta.reason;
+  const languageDetected = normalizeLanguageTag(
+    baseResult.language_detected ?? baseResult.source_language ?? sourceLanguage,
+  ) ?? sourceLanguage;
+  const languageConfidence =
+    typeof baseResult.language_confidence === "number"
+      ? clamp01(baseResult.language_confidence)
+      : deriveLanguageConfidence({
+          text: sourceText || baseResult.text || "",
+          language: languageDetected,
+          providerConfidence: baseResult.confidence,
+        });
+  const codeMixed =
+    typeof baseResult.code_mixed === "boolean"
+      ? baseResult.code_mixed
+      : isCodeMixedTranscript(sourceText || baseResult.text || "");
+  let interpreterArtifact: HelixAskInterpreterArtifact | null = null;
+  let interpreterStatus: HelixAskInterpreterStatus | null = null;
+  let interpreterError: string | null = null;
+  let interpreterDispatchTrusted = false;
+  if (
+    HELIX_ASK_INTERPRETER_EVALUATE &&
+    shouldRunHelixAskInterpreter({
+      sourceLanguage,
+      codeMixed,
+    })
+  ) {
+    const interpreterResult = await runHelixAskInterpreter({
+      sourceText: sourceText || baseResult.source_text || baseResult.text || "",
+      sourceLanguage,
+      codeMixed,
+      pivotText: baseResult.text ?? null,
+      responseLanguage: args.payload.language ?? sourceLanguage,
+      config: HELIX_ASK_INTERPRETER_CONFIG,
+    });
+    interpreterStatus = interpreterResult.status;
+    interpreterArtifact = interpreterResult.artifact;
+    interpreterError = interpreterResult.error;
+    interpreterDispatchTrusted =
+      HELIX_ASK_INTERPRETER_ACTIVE &&
+      interpreterStatus === "ok" &&
+      Boolean(interpreterArtifact);
+    if (interpreterArtifact) {
+      const interpreterPivotText = interpreterArtifact.selected_pivot.text.trim();
+      const interpreterPivotConfidence = clamp01(interpreterArtifact.selected_pivot.confidence);
+      if (interpreterDispatchTrusted && interpreterPivotText) {
+        baseResult = {
+          ...baseResult,
+          text: interpreterPivotText,
+          language: "en",
+          pivot_confidence: interpreterPivotConfidence,
+        };
+      }
+      baseResult = {
+        ...baseResult,
+        interpreter: interpreterArtifact,
+        interpreter_schema_version: HELIX_INTERPRETER_SCHEMA_VERSION,
+        interpreter_status: interpreterStatus,
+        interpreter_confidence: interpreterPivotConfidence,
+        interpreter_dispatch_state: interpreterDispatchTrusted ? interpreterArtifact.dispatch_state : null,
+        interpreter_confirm_prompt: interpreterArtifact.confirm_prompt,
+        interpreter_term_ids: interpreterArtifact.term_ids,
+        interpreter_concept_ids: interpreterArtifact.concept_ids,
+      };
+      if (interpreterDispatchTrusted && interpreterArtifact.dispatch_state !== "auto") {
+        translationUncertain = true;
+      }
+    } else {
+      baseResult = {
+        ...baseResult,
+        interpreter_status: interpreterStatus,
+      };
+      if (HELIX_ASK_INTERPRETER_ACTIVE) {
+        translationUncertain = true;
+      }
+    }
+    if (interpreterError && HELIX_ASK_INTERPRETER_ACTIVE) {
+      translationUncertain = true;
+    }
+  }
+  pivotConfidence =
+    typeof baseResult.pivot_confidence === "number"
+      ? clamp01(baseResult.pivot_confidence)
+      : isEnglishLikeLanguage(sourceLanguage)
+        ? 1
+        : pivotConfidence;
+  const interpreterStatusForceBlock = shouldForceInterpreterFailClosed({
+    artifact: interpreterArtifact,
+    status: interpreterStatus,
+    error: interpreterError,
+    sourceLanguage,
+    codeMixed,
+  });
+  let dispatchState: "auto" | "confirm" | "blocked" = "auto";
+  if (interpreterStatusForceBlock) {
+    dispatchState = "blocked";
+  } else if (interpreterDispatchTrusted && interpreterArtifact) {
+    dispatchState = interpreterArtifact.dispatch_state;
+    pivotConfidence = clamp01(interpreterArtifact.selected_pivot.confidence);
+  } else {
+    if (pivotConfidence < HELIX_ASK_PIVOT_CONF_BLOCK_MIN) {
+      dispatchState = "blocked";
+    } else if (
+      pivotConfidence < HELIX_ASK_PIVOT_CONF_AUTO_MIN ||
+      languageConfidence < HELIX_ASK_LANG_CONF_MIN
+    ) {
+      dispatchState = "confirm";
+    }
+  }
   const needsConfirmation =
     (typeof baseResult.needs_confirmation === "boolean" ? baseResult.needs_confirmation : false) ||
     normalizedConfidence < STT_CONFIRM_CONFIDENCE_THRESHOLD ||
-    translationUncertain;
+    translationUncertain ||
+    languageConfidence < HELIX_ASK_LANG_CONF_MIN ||
+    dispatchState !== "auto";
   baseResult = {
     ...baseResult,
+    language_detected: languageDetected,
+    language_confidence: languageConfidence,
+    code_mixed: codeMixed,
     confidence: normalizedConfidence,
     confidence_reason: confidenceReason,
+    pivot_confidence: pivotConfidence,
+    dispatch_state: dispatchState,
     needs_confirmation: needsConfirmation,
     translation_uncertain: translationUncertain,
+    lang_schema_version: HELIX_LANG_SCHEMA_VERSION,
+    interpreter: interpreterArtifact ?? baseResult.interpreter,
+    interpreter_schema_version:
+      baseResult.interpreter_schema_version ?? (interpreterArtifact ? HELIX_INTERPRETER_SCHEMA_VERSION : undefined),
+    interpreter_status: interpreterStatus ?? baseResult.interpreter_status,
+    interpreter_confidence:
+      typeof baseResult.interpreter_confidence === "number"
+        ? clamp01(baseResult.interpreter_confidence)
+        : interpreterArtifact
+          ? clamp01(interpreterArtifact.selected_pivot.confidence)
+          : undefined,
+    interpreter_dispatch_state:
+      interpreterDispatchTrusted && interpreterArtifact
+        ? interpreterArtifact.dispatch_state
+        : (baseResult.interpreter_dispatch_state ?? null),
+    interpreter_confirm_prompt: interpreterArtifact?.confirm_prompt ?? baseResult.interpreter_confirm_prompt ?? null,
+    interpreter_term_ids: interpreterArtifact?.term_ids ?? baseResult.interpreter_term_ids ?? [],
+    interpreter_concept_ids: interpreterArtifact?.concept_ids ?? baseResult.interpreter_concept_ids ?? [],
   };
 
   return { result: baseResult, failures, formatRecovery };
@@ -1228,6 +1711,10 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       ok: true,
       text: result.text ?? "",
       language: result.language ?? parsed.data.language ?? "en",
+      language_detected: result.language_detected ?? result.source_language ?? result.language ?? null,
+      language_confidence:
+        typeof result.language_confidence === "number" ? result.language_confidence : null,
+      code_mixed: result.code_mixed ?? false,
       duration_ms:
         typeof result.duration_ms === "number"
           ? result.duration_ms
@@ -1238,12 +1725,50 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       translated: result.translated ?? false,
       confidence: typeof result.confidence === "number" ? result.confidence : null,
       confidence_reason: result.confidence_reason ?? null,
+      pivot_confidence: typeof result.pivot_confidence === "number" ? result.pivot_confidence : null,
+      dispatch_state: result.dispatch_state ?? "auto",
       needs_confirmation: result.needs_confirmation ?? false,
       translation_uncertain: result.translation_uncertain ?? false,
+      speaker_id: result.speaker_id ?? parsed.data.speaker_id ?? null,
+      speaker_confidence:
+        typeof result.speaker_confidence === "number"
+          ? result.speaker_confidence
+          : typeof parsed.data.speaker_confidence === "number"
+            ? parsed.data.speaker_confidence
+            : null,
+      speech_probability:
+        typeof result.speech_probability === "number"
+          ? result.speech_probability
+          : typeof parsed.data.speech_probability === "number"
+            ? parsed.data.speech_probability
+            : null,
+      snr_db:
+        typeof result.snr_db === "number"
+          ? result.snr_db
+          : typeof parsed.data.snr_db === "number"
+            ? parsed.data.snr_db
+            : null,
+      confirm_auto_eligible:
+        typeof result.confirm_auto_eligible === "boolean"
+          ? result.confirm_auto_eligible
+          : typeof parsed.data.confirm_auto_eligible === "boolean"
+            ? parsed.data.confirm_auto_eligible
+            : null,
+      confirm_block_reason: result.confirm_block_reason ?? parsed.data.confirm_block_reason ?? null,
+      lang_schema_version: result.lang_schema_version ?? HELIX_LANG_SCHEMA_VERSION,
       traceId: parsed.data.traceId ?? null,
       missionId: parsed.data.missionId ?? null,
       engine: result.engine,
       essence_id: result.essence_id ?? null,
+      interpreter: result.interpreter ?? null,
+      interpreter_schema_version: result.interpreter_schema_version ?? null,
+      interpreter_status: result.interpreter_status ?? null,
+      interpreter_confidence:
+        typeof result.interpreter_confidence === "number" ? result.interpreter_confidence : null,
+      interpreter_dispatch_state: result.interpreter_dispatch_state ?? null,
+      interpreter_confirm_prompt: result.interpreter_confirm_prompt ?? null,
+      interpreter_term_ids: Array.isArray(result.interpreter_term_ids) ? result.interpreter_term_ids : [],
+      interpreter_concept_ids: Array.isArray(result.interpreter_concept_ids) ? result.interpreter_concept_ids : [],
     });
   });
 });

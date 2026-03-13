@@ -123,10 +123,23 @@ export function HelixSettingsDialogContent({
             <PreferenceToggleRow
               id="helix-ask-debug"
               label="Helix Ask debug context"
-              description="Show repo file debug context."
+              description="Show repo debug context with turn filter + copy export."
               checked={userSettings.showHelixAskDebug}
               onChange={(value) => updateSettings({ showHelixAskDebug: value })}
             />
+            {userSettings.showHelixAskDebug ? (
+              <HelixAskDebugContextPanel snapshot={voiceDiagnostics} />
+            ) : null}
+            <PreferenceToggleRow
+              id="helix-ask-reasoning-event-log"
+              label="Helix Ask reasoning event log"
+              description="Show chronological turn steps for Helix Ask with turn filter + copy export."
+              checked={userSettings.showHelixAskReasoningEventLog}
+              onChange={(value) => updateSettings({ showHelixAskReasoningEventLog: value })}
+            />
+            {userSettings.showHelixAskReasoningEventLog ? (
+              <HelixAskReasoningEventLogPanel snapshot={voiceDiagnostics} />
+            ) : null}
             <PreferenceToggleRow
               id="helix-voice-diagnostics"
               label="Voice capture diagnostics panel"
@@ -478,6 +491,289 @@ function VoiceCaptureDiagnosticsPanel({
   );
 }
 
+function HelixAskDebugContextPanel({
+  snapshot,
+}: {
+  snapshot: VoiceCaptureDiagnosticsSnapshot | null;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const [selectedTurnKey, setSelectedTurnKey] = React.useState<string>("latest");
+  const turnSelectId = React.useId();
+  const debugEvents = React.useMemo(
+    () =>
+      [...(snapshot?.timelineEvents ?? [])]
+        .sort((a, b) => a.atMs - b.atMs)
+        .map((event) => {
+          const context = readHelixAskDebugContextRecord(event.debugContext);
+          if (!context) return null;
+          return { event, context };
+        })
+        .filter((entry): entry is { event: VoiceLaneTimelineDebugEvent; context: Record<string, unknown> } => Boolean(entry))
+        .slice(-220),
+    [snapshot?.timelineEvents],
+  );
+  const turnOptions = React.useMemo(() => {
+    const grouped = new Map<string, { count: number; lastAtMs: number }>();
+    debugEvents.forEach(({ event }) => {
+      const key = getReasoningTimelineTurnKey(event);
+      const current = grouped.get(key);
+      if (current) {
+        current.count += 1;
+        current.lastAtMs = Math.max(current.lastAtMs, event.atMs);
+        return;
+      }
+      grouped.set(key, { count: 1, lastAtMs: event.atMs });
+    });
+    return [...grouped.entries()]
+      .map(([key, meta]) => ({ key, ...meta }))
+      .sort((a, b) => b.lastAtMs - a.lastAtMs);
+  }, [debugEvents]);
+  const latestTurnKey = turnOptions[0]?.key ?? null;
+  const latestTurnCount = turnOptions[0]?.count ?? 0;
+
+  React.useEffect(() => {
+    if (selectedTurnKey === "all" || selectedTurnKey === "latest") return;
+    const selectedStillExists = turnOptions.some((option) => option.key === selectedTurnKey);
+    if (!selectedStillExists) {
+      setSelectedTurnKey("latest");
+    }
+  }, [selectedTurnKey, turnOptions]);
+
+  const selectedEntries = React.useMemo(() => {
+    if (debugEvents.length === 0) return [];
+    if (selectedTurnKey === "all") return debugEvents;
+    const targetKey = selectedTurnKey === "latest" ? latestTurnKey : selectedTurnKey;
+    if (!targetKey) return [];
+    return debugEvents.filter(({ event }) => getReasoningTimelineTurnKey(event) === targetKey);
+  }, [debugEvents, latestTurnKey, selectedTurnKey]);
+  const exportPayload = React.useMemo(() => {
+    if (selectedEntries.length === 0) return "";
+    return selectedEntries
+      .map(({ event, context }) =>
+        JSON.stringify({
+          id: event.id,
+          atMs: event.atMs,
+          source: event.source,
+          kind: event.kind,
+          traceId: event.traceId ?? null,
+          turnKey: event.turnKey ?? null,
+          attemptId: event.attemptId ?? null,
+          debugContext: context,
+        }),
+      )
+      .join("\n");
+  }, [selectedEntries]);
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">
+          Helix Ask debug context
+        </p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!exportPayload}
+          className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+            exportPayload
+              ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+              : "border-slate-600 text-slate-500"
+          }`}
+        >
+          {copied ? "copied" : "copy logs"}
+        </button>
+      </div>
+      {debugEvents.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No Helix Ask debug payloads captured yet. Complete a reply with debug enabled to populate this panel.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={turnSelectId} className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              Turn
+            </label>
+            <select
+              id={turnSelectId}
+              value={selectedTurnKey}
+              onChange={(event) => setSelectedTurnKey(event.target.value)}
+              className="h-7 min-w-[240px] rounded-md border border-slate-600 bg-slate-900 px-2 text-[11px] text-slate-100"
+            >
+              <option value="latest">Latest turn ({latestTurnCount})</option>
+              <option value="all">All turns ({debugEvents.length})</option>
+              {turnOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {clipDiagnosticsText(option.key, 64)} ({option.count})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              {selectedEntries.length} entries shown
+            </p>
+          </div>
+          <div className="max-h-[44vh] space-y-2 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {selectedEntries.map(({ event, context }) => {
+              const contextFiles = readHelixAskDebugStringArray(context.contextFiles);
+              return (
+                <div key={`${event.id}-helix-debug`} className="rounded border border-white/10 bg-white/5 p-1.5">
+                  <p className="whitespace-pre-wrap break-words">{formatVoiceTimelineDebugEvent(event)}</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-cyan-100">
+                    {formatHelixAskDebugContextSummary(context)}
+                  </p>
+                  {contextFiles.length > 0 ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-slate-300">
+                      files:
+                      {"\n"}
+                      {contextFiles.slice(0, 10).join("\n")}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function HelixAskReasoningEventLogPanel({
+  snapshot,
+}: {
+  snapshot: VoiceCaptureDiagnosticsSnapshot | null;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const [selectedTurnKey, setSelectedTurnKey] = React.useState<string>("latest");
+  const turnSelectId = React.useId();
+  const reasoningEvents = React.useMemo(
+    () =>
+      [...(snapshot?.timelineEvents ?? [])]
+        .filter((event) => isHelixAskReasoningStepEvent(event))
+        .sort((a, b) => a.atMs - b.atMs)
+        .slice(-420),
+    [snapshot?.timelineEvents],
+  );
+  const turnOptions = React.useMemo(() => {
+    const grouped = new Map<string, { count: number; lastAtMs: number }>();
+    reasoningEvents.forEach((event) => {
+      const key = getReasoningTimelineTurnKey(event);
+      const current = grouped.get(key);
+      if (current) {
+        current.count += 1;
+        current.lastAtMs = Math.max(current.lastAtMs, event.atMs);
+        return;
+      }
+      grouped.set(key, { count: 1, lastAtMs: event.atMs });
+    });
+    return [...grouped.entries()]
+      .map(([key, meta]) => ({ key, ...meta }))
+      .sort((a, b) => b.lastAtMs - a.lastAtMs);
+  }, [reasoningEvents]);
+  const latestTurnKey = turnOptions[0]?.key ?? null;
+  const latestTurnCount = turnOptions[0]?.count ?? 0;
+
+  React.useEffect(() => {
+    if (selectedTurnKey === "all" || selectedTurnKey === "latest") return;
+    const selectedStillExists = turnOptions.some((option) => option.key === selectedTurnKey);
+    if (!selectedStillExists) {
+      setSelectedTurnKey("latest");
+    }
+  }, [selectedTurnKey, turnOptions]);
+
+  const selectedEvents = React.useMemo(() => {
+    if (reasoningEvents.length === 0) return [];
+    if (selectedTurnKey === "all") return reasoningEvents;
+    const targetKey = selectedTurnKey === "latest" ? latestTurnKey : selectedTurnKey;
+    if (!targetKey) return [];
+    return reasoningEvents.filter((event) => getReasoningTimelineTurnKey(event) === targetKey);
+  }, [latestTurnKey, reasoningEvents, selectedTurnKey]);
+  const exportPayload = React.useMemo(() => {
+    if (selectedEvents.length === 0) return "";
+    return selectedEvents.map((event) => JSON.stringify(event)).join("\n");
+  }, [selectedEvents]);
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">
+          Helix Ask reasoning event log
+        </p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!exportPayload}
+          className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+            exportPayload
+              ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+              : "border-slate-600 text-slate-500"
+          }`}
+        >
+          {copied ? "copied" : "copy logs"}
+        </button>
+      </div>
+      {reasoningEvents.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No Helix Ask reasoning events yet. Start a turn to capture chronological reasoning logs.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={turnSelectId} className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              Turn
+            </label>
+            <select
+              id={turnSelectId}
+              value={selectedTurnKey}
+              onChange={(event) => setSelectedTurnKey(event.target.value)}
+              className="h-7 min-w-[240px] rounded-md border border-slate-600 bg-slate-900 px-2 text-[11px] text-slate-100"
+            >
+              <option value="latest">Latest turn ({latestTurnCount})</option>
+              <option value="all">All turns ({reasoningEvents.length})</option>
+              {turnOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {clipDiagnosticsText(option.key, 64)} ({option.count})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              {selectedEvents.length} events shown
+            </p>
+          </div>
+          <div className="max-h-[44vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {selectedEvents.map((event) => (
+              <p key={event.id} className="whitespace-pre-wrap break-words">
+                {formatVoiceTimelineDebugEvent(event)}
+              </p>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VoiceEventTimelineDebugPanel({
   snapshot,
 }: {
@@ -588,6 +884,130 @@ function buildVoiceAudioDebugCopyPayload(snapshot: VoiceCaptureDiagnosticsSnapsh
     timelineTail,
   };
   return JSON.stringify(payload, null, 2);
+}
+
+function isHelixAskReasoningStepEvent(event: VoiceLaneTimelineDebugEvent): boolean {
+  if (event.source === "system" && event.kind === "build_info") return false;
+  return true;
+}
+
+function getReasoningTimelineTurnKey(event: VoiceLaneTimelineDebugEvent): string {
+  const turn = event.turnKey?.trim();
+  if (turn) return turn;
+  const trace = event.traceId?.trim();
+  if (trace) return `trace:${trace}`;
+  return "unkeyed";
+}
+
+function readHelixAskDebugContextRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function readHelixAskDebugStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry) => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function formatHelixAskDebugContextSummary(context: Record<string, unknown>): string {
+  const contextFileCount =
+    typeof context.contextFileCount === "number" && Number.isFinite(context.contextFileCount)
+      ? Math.max(0, Math.floor(context.contextFileCount))
+      : readHelixAskDebugStringArray(context.contextFiles).length;
+  const stage05KindCountsRaw =
+    context.stage05KindCounts && typeof context.stage05KindCounts === "object"
+      ? (context.stage05KindCounts as Record<string, unknown>)
+      : null;
+  const stage05KindCounts =
+    stage05KindCountsRaw
+      ? ["code", "doc", "config", "data", "binary"]
+          .map((kind) => {
+            const value = stage05KindCountsRaw[kind];
+            const count = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+            return `${kind}:${count}`;
+          })
+          .join(",")
+      : null;
+  const fields = [
+    typeof context.intentDomain === "string" ? `domain=${context.intentDomain}` : null,
+    typeof context.intentId === "string" ? `intent=${context.intentId}` : null,
+    typeof context.helixAskFailClass === "string" ? `fail_class=${context.helixAskFailClass}` : null,
+    typeof context.helixAskFailReason === "string" ? `fail_reason=${context.helixAskFailReason}` : null,
+    typeof context.retrievalChannelHits === "string" ? `channels=${context.retrievalChannelHits}` : null,
+    typeof context.stage0RolloutMode === "string" ? `stage0_mode=${context.stage0RolloutMode}` : null,
+    typeof context.stage0Used === "boolean" ? `stage0_used=${context.stage0Used ? "true" : "false"}` : null,
+    typeof context.stage0ShadowOnly === "boolean"
+      ? `stage0_shadow_only=${context.stage0ShadowOnly ? "true" : "false"}`
+      : null,
+    typeof context.stage0CandidateCount === "number" && Number.isFinite(context.stage0CandidateCount)
+      ? `stage0_candidates=${Math.max(0, Math.floor(context.stage0CandidateCount))}`
+      : null,
+    typeof context.stage0HitRate === "number" && Number.isFinite(context.stage0HitRate)
+      ? `stage0_hit_rate=${context.stage0HitRate.toFixed(4)}`
+      : null,
+    typeof context.stage0SoftMustIncludeApplied === "boolean"
+      ? `stage0_soft_must_include=${context.stage0SoftMustIncludeApplied ? "true" : "false"}`
+      : null,
+    typeof context.stage0PolicyDecision === "string" ? `stage0_policy=${context.stage0PolicyDecision}` : null,
+    typeof context.stage0FailOpenReason === "string" ? `stage0_fail_open=${context.stage0FailOpenReason}` : null,
+    typeof context.stage0FallbackReason === "string" ? `stage0_fallback=${context.stage0FallbackReason}` : null,
+    typeof context.stage0CodeFloorPass === "boolean"
+      ? `code_floor_pass=${context.stage0CodeFloorPass ? "true" : "false"}`
+      : null,
+    typeof context.stage0CodePathCount === "number" && Number.isFinite(context.stage0CodePathCount)
+      ? `code_paths=${Math.max(0, Math.floor(context.stage0CodePathCount))}`
+      : null,
+    typeof context.stage0DocPathCount === "number" && Number.isFinite(context.stage0DocPathCount)
+      ? `doc_paths=${Math.max(0, Math.floor(context.stage0DocPathCount))}`
+      : null,
+    typeof context.stage05Used === "boolean" ? `stage05_used=${context.stage05Used ? "true" : "false"}` : null,
+    typeof context.stage05FileCount === "number" && Number.isFinite(context.stage05FileCount)
+      ? `stage05_files=${Math.max(0, Math.floor(context.stage05FileCount))}`
+      : null,
+    typeof context.stage05CardCount === "number" && Number.isFinite(context.stage05CardCount)
+      ? `stage05_cards=${Math.max(0, Math.floor(context.stage05CardCount))}`
+      : null,
+    stage05KindCounts ? `stage05_kinds=${stage05KindCounts}` : null,
+    typeof context.stage05LlmUsed === "boolean" ? `stage05_llm=${context.stage05LlmUsed ? "true" : "false"}` : null,
+    typeof context.stage05FallbackReason === "string" ? `stage05_fallback=${context.stage05FallbackReason}` : null,
+    typeof context.stage05ExtractMs === "number" && Number.isFinite(context.stage05ExtractMs)
+      ? `stage05_extract_ms=${Math.max(0, Math.floor(context.stage05ExtractMs))}`
+      : null,
+    typeof context.stage05TotalMs === "number" && Number.isFinite(context.stage05TotalMs)
+      ? `stage05_total_ms=${Math.max(0, Math.floor(context.stage05TotalMs))}`
+      : null,
+    typeof context.stage05BudgetCapped === "boolean"
+      ? `stage05_budget_capped=${context.stage05BudgetCapped ? "true" : "false"}`
+      : null,
+    typeof context.stage05SummaryRequired === "boolean"
+      ? `stage05_summary_required=${context.stage05SummaryRequired ? "true" : "false"}`
+      : null,
+    typeof context.stage05SummaryHardFail === "boolean"
+      ? `stage05_summary_hard_fail=${context.stage05SummaryHardFail ? "true" : "false"}`
+      : null,
+    typeof context.stage05SummaryFailReason === "string"
+      ? `stage05_summary_fail=${context.stage05SummaryFailReason}`
+      : null,
+    typeof context.stage05FullfileMode === "boolean"
+      ? `stage05_fullfile=${context.stage05FullfileMode ? "true" : "false"}`
+      : null,
+    typeof context.stage05TwoPassUsed === "boolean"
+      ? `stage05_two_pass=${context.stage05TwoPassUsed ? "true" : "false"}`
+      : null,
+    typeof context.stage05TwoPassBatches === "number" && Number.isFinite(context.stage05TwoPassBatches)
+      ? `stage05_two_pass_batches=${Math.max(0, Math.floor(context.stage05TwoPassBatches))}`
+      : null,
+    typeof context.stage05OverflowPolicy === "string"
+      ? `stage05_overflow=${context.stage05OverflowPolicy}`
+      : null,
+    `context_files=${contextFileCount}`,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  return fields || "no debug summary fields";
 }
 
 function formatVoiceTimelineDebugEvent(event: VoiceLaneTimelineDebugEvent): string {

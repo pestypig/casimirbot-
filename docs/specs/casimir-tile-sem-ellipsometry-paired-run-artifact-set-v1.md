@@ -42,6 +42,12 @@ npm run warp:shadow:se-paired-evidence:validate -- --evidence artifacts/research
 npm run warp:shadow:build-se-packs -- --paired-evidence artifacts/research/full-solve/se-paired-runs/<date>/se-paired-run-evidence.v1.json
 ```
 
+### Single-command attempt (recommended)
+Run the full deterministic chain (prepare -> ingest -> validate -> build -> inject -> compat-check -> summary):
+```bash
+npm run warp:shadow:se-reportable:attempt -- --bundle-dir artifacts/research/full-solve/se-paired-runs/<date> --run-ids <sem_run_id,ellips_run_id> --raw-refs <raw/sem-export.csv,raw/ellips-export.csv,raw/metadata.json>
+```
+
 ## Minimum Required Fields
 `se-paired-run-evidence.v1.json` must include:
 1. `pairedRunPresent=true`
@@ -86,6 +92,20 @@ npm run warp:shadow:build-se-packs -- --paired-evidence artifacts/research/full-
    - `missing_measurement_provenance_raw_refs`
    - `missing_measurement_provenance_raw_hashes`
    - `missing_measurement_provenance_raw_hash_for_ref`
+
+### Reportable Attempt Decision Path
+`npm run warp:shadow:se-reportable:attempt` evaluates readiness against the frozen reportable-reference profile, not the full envelope pack.
+
+Decision inputs:
+1. `reportableReadyCandidate` from paired-evidence validation.
+2. `reportableReferencePackReady` from `configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`.
+3. `reportableReferenceCompatSummary` must satisfy:
+   - `incongruent=0`
+   - `unknown=0`
+
+Mapping-only telemetry:
+1. `reportableMappingPackReady` and `mappingCompatSummary` from the full reportable envelope are emitted for envelope diagnostics.
+2. Envelope edge points may remain `unknown` (for example, uncertainty-overlap regions) without blocking reportable-reference readiness decisions.
 
 ## Deterministic Falsifiers
 1. Missing paired sample IDs across SEM and ellipsometry runs.

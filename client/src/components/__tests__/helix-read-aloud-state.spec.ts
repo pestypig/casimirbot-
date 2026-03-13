@@ -20,6 +20,7 @@ let shouldFlushHeldTranscriptFromWatchdog: typeof import("@/components/helix/Hel
 let decideExplorationLadderAction: typeof import("@/components/helix/HelixAskPill").decideExplorationLadderAction;
 let resolveVoiceBargeHardCutReason: typeof import("@/components/helix/HelixAskPill").resolveVoiceBargeHardCutReason;
 let shouldResumeBargeHeldPlayback: typeof import("@/components/helix/HelixAskPill").shouldResumeBargeHeldPlayback;
+let shouldTreatMicSignalAsSpeech: typeof import("@/components/helix/HelixAskPill").shouldTreatMicSignalAsSpeech;
 let isLikelyContinuationTailFragment: typeof import("@/components/helix/HelixAskPill").isLikelyContinuationTailFragment;
 let isGenericQueuedVoiceAcknowledgement: typeof import("@/components/helix/HelixAskPill").isGenericQueuedVoiceAcknowledgement;
 let extractLatestContinuationQuestionFocus: typeof import("@/components/helix/HelixAskPill").extractLatestContinuationQuestionFocus;
@@ -49,6 +50,7 @@ beforeAll(async () => {
     decideExplorationLadderAction,
     resolveVoiceBargeHardCutReason,
     shouldResumeBargeHeldPlayback,
+    shouldTreatMicSignalAsSpeech,
     isLikelyContinuationTailFragment,
     isGenericQueuedVoiceAcknowledgement,
     extractLatestContinuationQuestionFocus,
@@ -129,6 +131,19 @@ describe("shouldAutoSpeakVoiceDecisionLifecycle", () => {
         routeReasonCode: "voice_turn_superseded_by_newer_attempt",
       }),
     ).toBe(false);
+  });
+
+  it("speaks suppressed clarifier lifecycle updates", () => {
+    expect(
+      shouldAutoSpeakVoiceDecisionLifecycle("suppressed", {
+        routeReasonCode: "suppressed:clarify_after_attempt1",
+      }),
+    ).toBe(true);
+    expect(
+      shouldAutoSpeakVoiceDecisionLifecycle("suppressed", {
+        routeReasonCode: "suppressed:clarify_after_artifact_retry_exhausted",
+      }),
+    ).toBe(true);
   });
 });
 
@@ -224,6 +239,61 @@ describe("barge-in resume guard", () => {
   });
 });
 
+describe("barge-in speech qualification", () => {
+  it("ignores ambient playback noise unless speech evidence is strong", () => {
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: true,
+        speechProbability: 0.34,
+        snrDb: 3.2,
+        rms: 0.022,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps legacy behavior when playback is inactive or gating is disabled", () => {
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: false,
+        localAudioGateActive: true,
+        speechProbability: 0.25,
+        snrDb: 2.8,
+        rms: 0.02,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(true);
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: false,
+        speechProbability: 0.25,
+        snrDb: 2.8,
+        rms: 0.02,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(true);
+  });
+
+  it("qualifies near-field speech while playback is active", () => {
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: true,
+        speechProbability: 0.72,
+        snrDb: 9.1,
+        rms: 0.03,
+        speechTriggerThreshold: 0.018,
+      }),
+    ).toBe(true);
+  });
+});
+
 describe("isRetryableVoiceChunkSynthesisError", () => {
   it("marks transient network and retryable status errors as retryable", () => {
     expect(isRetryableVoiceChunkSynthesisError(new Error("Failed to fetch"))).toBe(true);
@@ -295,6 +365,23 @@ describe("suppression override guard", () => {
     ).toBe(true);
   });
 
+  it("forces observe dispatch when dispatcher reason is inconsistent but prompt is clearly intentful", () => {
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "dispatch:heuristic",
+        transcript: "Okay, okay, explain what a warp bubble full solve means in this code base.",
+      }),
+    ).toBe(true);
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:low_salience",
+        transcript: "You found what a warp bubble is the congruence of for the codebase.",
+      }),
+    ).toBe(true);
+  });
+
   it("does not force dispatch for low-information tails", () => {
     expect(
       shouldForceObserveDispatchFromSuppression({
@@ -303,6 +390,16 @@ describe("suppression override guard", () => {
         transcript: "Friends.",
       }),
     ).toBe(false);
+  });
+
+  it("forces observe dispatch for substantive prompts suppressed by multilang confidence gate", () => {
+    expect(
+      shouldForceObserveDispatchFromSuppression({
+        dispatchHint: false,
+        routeReasonCode: "suppressed:multilang_confirmation_required",
+        transcript: "What is quantum physics and why does it matter?",
+      }),
+    ).toBe(true);
   });
 });
 
@@ -350,7 +447,7 @@ describe("artifact-dominated output guards", () => {
 });
 
 describe("exploration escalation guard", () => {
-  it("retries artifact-heavy observe output up to cap, then clarifies", () => {
+  it("retries artifact-heavy observe output once, then clarifies", () => {
     const decision = decideExplorationLadderAction({
       explorationAttemptCount: 1,
       promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
@@ -368,16 +465,7 @@ describe("exploration escalation guard", () => {
       mode: "observe",
       debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
     });
-    expect(secondAttempt.action).toBe("restart_after_artifact");
-    const thirdAttempt = decideExplorationLadderAction({
-      explorationAttemptCount: 3,
-      promptText: "So how does the Planck scale relate to virtual particles in Casimir effect?",
-      outputText:
-        "What is warp bubble: docs/casimir-tile-mechanism.md What is mission ethos: docs/BUSINESS_MODEL.md",
-      mode: "observe",
-      debug: { arbiter_mode: "hybrid", verification_anchor_required: false },
-    });
-    expect(thirdAttempt.action).toBe("clarify_after_attempt1");
+    expect(secondAttempt.action).toBe("clarify_after_attempt1");
   });
 
   it("uses raw output artifact guard when sanitized output looks benign", () => {

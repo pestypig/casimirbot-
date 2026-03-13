@@ -290,7 +290,8 @@ async function callOpenAiLike(
   const language =
     args.task === "translate"
       ? "en"
-      : payload?.language ?? (typeof args.language === "string" && args.language.trim() ? args.language.trim() : "en");
+      : payload?.language ??
+        (typeof args.language === "string" && args.language.trim() ? args.language.trim() : "unknown");
   return {
     text: payload?.text ?? "",
     language,
@@ -326,7 +327,7 @@ async function callGeneric(args: {
     throw new Error(detail ? `STT HTTP ${response.status}: ${detail}` : `STT HTTP ${response.status}`);
   }
   const payload = (await response.json()) as any;
-  const language = args.task === "translate" ? "en" : payload?.language ?? args.language ?? "en";
+  const language = args.task === "translate" ? "en" : payload?.language ?? args.language ?? "unknown";
   return {
     text: payload?.text ?? "",
     language,
@@ -373,7 +374,7 @@ export const sttHttpHandler: ToolHandler = async (input: any, ctx: any) => {
         task,
       });
   const text = String(request.text ?? "");
-  const resolvedLanguage = request.language ?? language ?? "en";
+  const resolvedLanguage = request.language ?? language ?? "unknown";
   const durationMs = request.duration_ms ?? input?.duration_ms ?? 0;
   const segments = Array.isArray(request.segments) ? request.segments : [];
   const now = new Date().toISOString();

@@ -125,6 +125,10 @@ const HELIX_ASK_META_TOKENS = new Set([
   "two",
 ]);
 
+const CJK_TOKEN_RE = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/u;
+
+const minSignalTokenLength = (token: string): number => (CJK_TOKEN_RE.test(token) ? 2 : 3);
+
 const NON_EVIDENCE_LINE_RE = /navigation hint only;\s*no doc span bound\./i;
 
 const stripNonEvidenceLines = (value: string): string => {
@@ -138,13 +142,13 @@ const stripNonEvidenceLines = (value: string): string => {
 export function tokenizeAskQuery(input: string): string[] {
   return input
     .toLowerCase()
-    .split(/[^a-z0-9_/.:-]+/g)
+    .split(/[^\p{L}\p{N}_/.:-]+/gu)
     .map((token) => token.trim())
     .filter((token) => token.length >= 2);
 }
 
 export const filterSignalTokens = (tokens: string[]): string[] =>
-  tokens.filter((token) => token.length >= 3 && !HELIX_ASK_STOP_TOKENS.has(token));
+  tokens.filter((token) => token.length >= minSignalTokenLength(token) && !HELIX_ASK_STOP_TOKENS.has(token));
 
 export const filterCriticTokens = (tokens: string[]): string[] =>
   filterSignalTokens(tokens).filter((token) => !HELIX_ASK_META_TOKENS.has(token));

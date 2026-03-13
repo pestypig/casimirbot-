@@ -36,7 +36,7 @@ const SttRequest = z
     sample_rate: z.number().int().min(8_000).max(48_000).default(16_000),
     channels: z.number().int().min(1).max(2).default(1),
     duration_ms: z.number().int().positive().optional(),
-    language: z.string().default("en"),
+    language: z.string().default("unknown"),
     prompt: z.string().optional(),
     tag: z.string().optional(),
   })

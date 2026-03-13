@@ -153,6 +153,35 @@ describe("helix ask reliability guards", () => {
     expect(fallback).toMatch(/docs\/knowledge\/warp\/warp-bubble\.md/i);
   });
 
+  it("filters stage0 score/symbol/file metadata noise from deterministic fallback output", () => {
+    const fallback =
+      __testHelixAskReliabilityGuards.buildDeterministicRepoRuntimeFallback({
+        question: "Define warp solve in full congruence.",
+        format: "brief",
+        definitionFocus: true,
+        docBlocks: [
+          {
+            path: "docs/warp-geometry-congruence-report.md",
+            block:
+              "docs/warp-geometry-congruence-report.md\nDefinition: Warp solve in this repo is a constrained metric + guardrail solve pipeline.",
+          },
+        ],
+        codeAlignment: null,
+        evidenceText: [
+          "Stage-0 candidate: docs/warp-canonical-runtime-overview.md",
+          "score=30.000 | symbol=stage0 | file=docs/warp-canonical-runtime-overview.md",
+          "Definition: Warp solve in this repo is a constrained metric + guardrail solve pipeline.",
+          "Sources: docs/warp-geometry-congruence-report.md",
+        ].join("\n"),
+        anchorFiles: ["docs/warp-geometry-congruence-report.md"],
+      }) ?? "";
+
+    expect(fallback).toBeTruthy();
+    expect(fallback).not.toMatch(/score=\d/i);
+    expect(fallback).not.toMatch(/\bsymbol=/i);
+    expect(fallback).not.toMatch(/\bfile=/i);
+  });
+
   it("builds evidence packet v2 with canonical retrieval and coverage snapshot", () => {
     const packet = __testHelixAskReliabilityGuards.buildHelixAskEvidencePacketV2({
       route: "repo",
@@ -200,6 +229,35 @@ describe("helix ask reliability guards", () => {
     expect(packet.sources).toContain("docs/knowledge/warp/warp-bubble.md");
     expect(packet.coverage.slotMissing).toEqual(["warp_equation_anchor"]);
     expect(packet.retrieval.confidence).toBeGreaterThan(0.8);
+  });
+
+  it("does not require equation-quote contract for broad congruence definitions", () => {
+    const question = "Okay, define what a warp solve is in full congruence.";
+    const contract = __testHelixAskReliabilityGuards.evaluateEquationQuoteContract({
+      question,
+      answer:
+        "A warp solve is the repo's constrained solve flow for metric + guardrail checks. [docs/warp-geometry-congruence-report.md]",
+      allowedCitations: ["docs/warp-geometry-congruence-report.md"],
+    });
+
+    expect(__testHelixAskReliabilityGuards.isWarpMathBroadPrompt(question)).toBe(true);
+    expect(__testHelixAskReliabilityGuards.isEquationQuotePrompt(question)).toBe(false);
+    expect(contract.required).toBe(false);
+    expect(contract.ok).toBe(true);
+    expect(contract.reason).toBe("not_required");
+  });
+
+  it("requires equation-quote contract for explicit equation requests", () => {
+    const contract = __testHelixAskReliabilityGuards.evaluateEquationQuoteContract({
+      question: "Show one warp congruence equation from docs and explain it.",
+      answer: "Warp congruence is discussed in the report. [docs/warp-geometry-congruence-report.md]",
+      allowedCitations: ["docs/warp-geometry-congruence-report.md"],
+    });
+
+    expect(__testHelixAskReliabilityGuards.isEquationQuotePrompt("show one equation from docs")).toBe(true);
+    expect(contract.required).toBe(true);
+    expect(contract.ok).toBe(false);
+    expect(contract.reason === "equation_missing" || contract.reason === "equation_and_citation_missing").toBe(true);
   });
 
   it("scores evidence mass higher when source diversity and coverage are strong", () => {

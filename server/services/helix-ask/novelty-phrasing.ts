@@ -14,6 +14,8 @@ export type HelixAskNoveltyContext = {
   relationPacketSignal?: string | null;
 };
 
+const CJK_PROMPT_RE = /[\u2e80-\u2eff\u2f00-\u2fdf\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
+
 const pickDeterministic = (count: number, ctx: HelixAskNoveltyContext, slot: string): number => {
   if (count <= 1) return 0;
   const targetedFamily = ctx.family === "relation" || ctx.family === "repo_technical";
@@ -79,6 +81,9 @@ export const buildHelixAskMechanismSentence = (args: {
       `Mechanism: ${args.claimA} -> deterministic adapter + validator sequencing controls what leaves the route -> ${args.claimB}, because citation-gated branches in ${args.evidenceTarget} narrow admissible render outputs.`,
       `Mechanism: ${args.claimA} -> answer-contract assembly stitches repo evidence into stable section slots -> ${args.claimB}, because synthesis formatting in ${args.evidenceTarget} enforces grounded, replay-safe responses.`,
     ], args.context, "repo_mechanism");
+  }
+  if (CJK_PROMPT_RE.test(args.context.prompt)) {
+    return `机制：${args.claimA} -> 受约束的交互动力学 -> ${args.claimB}，因为相互关联的约束会随时间放大或抑制结果。`;
   }
   return `Mechanism: ${args.claimA} -> constrained interaction dynamics -> ${args.claimB}, because linked constraints amplify or dampen outcomes over time.`;
 };

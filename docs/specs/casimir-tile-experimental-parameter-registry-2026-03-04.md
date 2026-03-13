@@ -7,8 +7,8 @@ Strict extraction registry for linked timing, nanogap, Casimir sign-control, Q-s
 
 Extraction policy:
 - Only values directly read from paper/standard text surfaces.
-- No image OCR extraction used in this pass.
-- If value not directly extractable from accessible text, mark `UNKNOWN`.
+- Image OCR extraction is allowed only for scanned SRM archive certificate pages in the SEM+ellipsometry lane (`SRC-085..SRC-093`); all other lanes use text-surface extraction.
+- If value not directly extractable from accessible text/surfaces, mark `UNKNOWN`.
 - `source_class` follows `primary|standard|preprint|secondary` from the citation pack.
 
 ## Columns
@@ -167,6 +167,7 @@ Per-paper equation trace:
 | EXP-SE-039 | SRC-086 | SRM-2530 addendum corresponding certified thickness example | 103.7 | nm | ±1.2 nm (same expression style as certificate) | Certified value corresponding to EXP-SE-038 comparison example | SRM 2531 addendum, p.3 | full_text_ocr | primary | `d_ellip_nm`,`u_ellip_nm`,`delta_se_nm` | extracted |
 | EXP-SE-040 | SRC-086 | SRM-2530 addendum profilometer uncertainty anchor | 3.8 | nm | ±3.8 nm stated as estimated uncertainty | NIST Precision Engineering Division unpublished-data uncertainty cited in addendum | SRM 2533/2535 addendum page, p.3/4 | full_text_ocr | primary | cross-instrument uncertainty anchor | extracted |
 | EXP-SE-041 | SRC-086 | SRM-2530 addendum profilometer-vs-ellipsometry agreement | <=3 | nm | UNKNOWN | Agreement reported for nominal 50-nm specimen SRMs | SRM 2533/2535 addendum page, p.3/4 | full_text_ocr | primary | `delta_se_nm` congruence anchor | extracted |
+| EXP-SE-042 | SRC-086 | Direct-PDF serial-table availability recheck across NIST SRM archive set (`2530-1/2/3`, `2531..2536`) | no populated serial-specific certified-thickness table values visible in accessible archive scans | categorical | UNKNOWN | Recheck pass opened each archive PDF page directly on 2026-03-11; method/addendum and nominal-class anchors are visible, but serial-value tables remain absent | NIST archive PDF pages for SRM 2530-1/2/3 and 2531..2536, page-set review | full_text_ocr | primary | serial-specific fail-closed posture for `d_ellip_nm`,`u_ellip_nm`,`U_fused_nm` | extracted |
 
 ## Q-Factor + Spoiling Extraction
 
@@ -350,7 +351,7 @@ Per-paper equation trace:
 |---|---:|---:|---:|---:|
 | timing | 7 | 29 | 2 | 0 |
 | nanogap | 6 | 32 | 0 | 0 |
-| sem_ellipsometry | 14 | 33 | 8 | 0 |
+| sem_ellipsometry | 14 | 34 | 8 | 0 |
 | q_spoiling | 6 | 20 | 2 | 0 |
 | casimir_sign_control | 4 | 21 | 2 | 0 |
 | worldline_qei | 9 | 18 | 0 | 0 |
@@ -368,7 +369,7 @@ Per-paper equation trace:
 2. `SRC-016`, `SRC-018`, and `SRC-063` provide equation-level and quantitative anchors, but complete raw force-vs-gap traces with full covariance are still not extracted into this registry.
 3. `SRC-025` remains non-admissible for normative claims and is retained only as intake context.
 4. `CH-CS-001` is only partially populated with uncertainty-resolved numeric rows and remains non-promotable for hard-claim use.
-5. `CH-SE-001` now has quantitative AFM uncertainty-model equations (`SRC-042`), ellipsometry reference anchors (`SRC-050`), and expanded NIST SRM Si/SiO2 transfer/addendum anchors (`SRC-085..SRC-093`) from direct PDF OCR; archive certificates still do not expose populated serial-specific certified-thickness tables in accessible surfaces, and in-house paired SEM+ellipsometry raw datasets plus numeric covariance anchors are still required to promote from `partial` to `pass`.
+5. `CH-SE-001` now has quantitative AFM uncertainty-model equations (`SRC-042`), ellipsometry reference anchors (`SRC-050`), and expanded NIST SRM Si/SiO2 transfer/addendum anchors (`SRC-085..SRC-093`) from direct PDF OCR; direct recheck on 2026-03-11 still found no populated serial-specific certified-thickness tables in accessible archive surfaces (`EXP-SE-042`), and in-house paired SEM+ellipsometry raw datasets plus numeric covariance anchors are still required to promote from `partial` to `pass`.
 6. `CH-QEI-001` now has direct-source equation anchors for Ford-Roman, Fewster-Eveson, Flanagan normalization/optimal 2D bounds, Hadamard renormalization, and QUADPACK numerical-integration contracts, but still requires implementation-level sampler sweep artifacts to close `scaling_ok` and uncertainty propagation.
 7. Provenance/attestation extraction is source-complete at schema level, but CI-integrated verification artifacts are still pending for promotion use.
 8. `SRC-062` and `SRC-063` are preprint extraction lanes; journal-linked primary counterparts remain canonical for normative claim phrasing.

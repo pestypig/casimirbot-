@@ -175,6 +175,13 @@ export type HaloBankActionOutput = {
 
 export type LocalAskResponse = {
   text: string;
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  needs_confirmation?: boolean;
+  interpreter_confirm_prompt?: string | null;
+  fail_reason?: string | null;
+  fail_class?: string | null;
   context_capsule?: ContextCapsuleSummary;
   mode?: "read" | "observe" | "act" | "verify";
   action?: { tool?: string; output?: unknown | HaloBankActionOutput };
@@ -317,6 +324,59 @@ export type LocalAskResponse = {
     capsule_preferred_paths?: string[];
     focus_guard_result?: "pass" | "retry" | "clarify";
     anchor_guard_result?: "pass" | "retry" | "clarify";
+    retrieval_channel_hits?: string;
+    stage0_used?: boolean;
+    stage0_shadow_only?: boolean;
+    stage0_candidate_count?: number;
+    stage0_hit_rate?: number;
+    stage0_fallback_reason?: string | null;
+    stage0_build_age_ms?: number | null;
+    stage0_commit?: string | null;
+    stage0_rollout_mode?: "off" | "shadow" | "partial" | "full" | null;
+    stage0_canary_hit?: boolean;
+    stage0_soft_must_include_applied?: boolean;
+    stage0_policy_decision?: string | null;
+    stage0_fail_open_reason?: string | null;
+    stage0_code_floor_pass?: boolean;
+    stage0_code_path_count?: number;
+    stage0_doc_path_count?: number;
+    stage05_used?: boolean;
+    stage05_file_count?: number;
+    stage05_card_count?: number;
+    stage05_kind_counts?: {
+      code?: number;
+      doc?: number;
+      config?: number;
+      data?: number;
+      binary?: number;
+    } | null;
+    stage05_llm_used?: boolean;
+    stage05_fallback_reason?: string | null;
+    stage05_extract_ms?: number;
+    stage05_total_ms?: number;
+    stage05_budget_capped?: boolean;
+    stage05_summary_required?: boolean;
+    stage05_summary_hard_fail?: boolean;
+    stage05_summary_fail_reason?: string | null;
+    stage05_slot_plan?: {
+      mode?: "dynamic" | "static";
+      slots?: string[];
+      required?: string[];
+    } | null;
+    stage05_slot_coverage?: {
+      required?: string[];
+      present?: string[];
+      missing?: string[];
+      ratio?: number;
+    } | null;
+    stage05_fullfile_mode?: boolean;
+    stage05_two_pass_used?: boolean;
+    stage05_two_pass_batches?: number;
+    stage05_overflow_policy?: "single_pass" | "two_pass" | null;
+    fail_reason?: string | null;
+    fail_class?: string | null;
+    helix_ask_fail_reason?: string | null;
+    helix_ask_fail_class?: string | null;
   };
 };
 
@@ -768,6 +828,42 @@ export type VoiceTranscribeSegment = {
   confidence?: number;
 };
 
+export type HelixInterpreterDispatchState = "auto" | "confirm" | "blocked";
+
+export type HelixInterpreterPivotCandidate = {
+  text: string;
+  confidence: number;
+};
+
+export type HelixInterpreterConceptCandidate = {
+  concept_id: string;
+  concept_label?: string;
+  confidence: number;
+  source: "concept_card" | "term_directory";
+};
+
+export type HelixInterpreterArtifact = {
+  schema_version: "helix.interpreter.v1" | string;
+  source_text: string;
+  source_language: string;
+  code_mixed: boolean;
+  pivot_candidates: HelixInterpreterPivotCandidate[];
+  selected_pivot: HelixInterpreterPivotCandidate;
+  concept_candidates: HelixInterpreterConceptCandidate[];
+  term_preservation: {
+    ratio: number;
+    missing_terms: string[];
+  };
+  ambiguity: {
+    top2_gap: number;
+    ambiguous: boolean;
+  };
+  term_ids: string[];
+  concept_ids: string[];
+  confirm_prompt: string | null;
+  dispatch_state: HelixInterpreterDispatchState;
+};
+
 export type VoiceTranscribePayload = {
   audio: Blob;
   filename?: string;
@@ -775,12 +871,21 @@ export type VoiceTranscribePayload = {
   traceId?: string;
   missionId?: string;
   durationMs?: number;
+  speaker_id?: string;
+  speaker_confidence?: number;
+  speech_probability?: number;
+  snr_db?: number;
+  confirm_auto_eligible?: boolean;
+  confirm_block_reason?: string;
 };
 
 export type VoiceTranscribeResponse = {
   ok?: boolean;
   text?: string;
   language?: string;
+  language_detected?: string | null;
+  language_confidence?: number | null;
+  code_mixed?: boolean;
   duration_ms?: number;
   segments?: VoiceTranscribeSegment[];
   source_text?: string | null;
@@ -788,12 +893,36 @@ export type VoiceTranscribeResponse = {
   translated?: boolean;
   confidence?: number | null;
   confidence_reason?: string | null;
+  pivot_confidence?: number | null;
+  dispatch_state?: "auto" | "confirm" | "blocked";
   needs_confirmation?: boolean;
   translation_uncertain?: boolean;
+  speaker_id?: string | null;
+  speaker_confidence?: number | null;
+  speech_probability?: number | null;
+  snr_db?: number | null;
+  confirm_auto_eligible?: boolean | null;
+  confirm_block_reason?: string | null;
+  lang_schema_version?: "helix.lang.v1" | string;
   traceId?: string | null;
   missionId?: string | null;
   engine?: string;
   essence_id?: string | null;
+  interpreter?: HelixInterpreterArtifact | null;
+  interpreter_schema_version?: "helix.interpreter.v1" | string | null;
+  interpreter_status?:
+    | "ok"
+    | "timeout"
+    | "parse_error"
+    | "provider_error"
+    | "disabled"
+    | "skipped"
+    | null;
+  interpreter_confidence?: number | null;
+  interpreter_dispatch_state?: HelixInterpreterDispatchState | null;
+  interpreter_confirm_prompt?: string | null;
+  interpreter_term_ids?: string[];
+  interpreter_concept_ids?: string[];
   error?: string;
   message?: string;
   details?: Record<string, unknown>;
@@ -836,6 +965,16 @@ export type ConversationTurnPayload = {
   missionId?: string;
   personaId?: string;
   sourceLanguage?: string;
+  languageDetected?: string;
+  languageConfidence?: number;
+  codeMixed?: boolean;
+  pivotConfidence?: number;
+  responseLanguage?: string;
+  preferredResponseLanguage?: string;
+  interpreter?: HelixInterpreterArtifact;
+  interpreter_schema_version?: "helix.interpreter.v1" | string;
+  multilangConfirm?: boolean;
+  lang_schema_version?: "helix.lang.v1" | string;
   translated?: boolean;
   recentTurns?: string[];
 };
@@ -846,6 +985,29 @@ export type ConversationTurnResponse = {
   sessionId?: string | null;
   transcript?: string;
   source_language?: string | null;
+  language_detected?: string | null;
+  language_confidence?: number | null;
+  code_mixed?: boolean;
+  pivot_confidence?: number | null;
+  response_language?: string | null;
+  dispatch_state?: "auto" | "confirm" | "blocked";
+  needs_confirmation?: boolean;
+  interpreter_schema_version?: "helix.interpreter.v1" | string | null;
+  interpreter_status?:
+    | "ok"
+    | "timeout"
+    | "parse_error"
+    | "provider_error"
+    | "disabled"
+    | "skipped"
+    | null;
+  interpreter_confidence?: number | null;
+  interpreter_dispatch_state?: HelixInterpreterDispatchState | null;
+  interpreter_confirm_prompt?: string | null;
+  interpreter_term_ids?: string[];
+  interpreter_concept_ids?: string[];
+  interpreter_error?: string | null;
+  lang_schema_version?: "helix.lang.v1" | string | null;
   translated?: boolean;
   classification?: ConversationTurnClassification;
   brief?: ConversationBrief;
@@ -1007,6 +1169,24 @@ export async function transcribeVoice(payload: VoiceTranscribePayload): Promise<
   if (typeof payload.durationMs === "number" && Number.isFinite(payload.durationMs)) {
     form.set("durationMs", String(Math.max(0, Math.round(payload.durationMs))));
   }
+  if (payload.speaker_id?.trim()) {
+    form.set("speaker_id", payload.speaker_id.trim());
+  }
+  if (typeof payload.speaker_confidence === "number" && Number.isFinite(payload.speaker_confidence)) {
+    form.set("speaker_confidence", String(payload.speaker_confidence));
+  }
+  if (typeof payload.speech_probability === "number" && Number.isFinite(payload.speech_probability)) {
+    form.set("speech_probability", String(payload.speech_probability));
+  }
+  if (typeof payload.snr_db === "number" && Number.isFinite(payload.snr_db)) {
+    form.set("snr_db", String(payload.snr_db));
+  }
+  if (typeof payload.confirm_auto_eligible === "boolean") {
+    form.set("confirm_auto_eligible", payload.confirm_auto_eligible ? "1" : "0");
+  }
+  if (payload.confirm_block_reason?.trim()) {
+    form.set("confirm_block_reason", payload.confirm_block_reason.trim());
+  }
 
   const response = await fetch("/api/voice/transcribe", {
     method: "POST",
@@ -1030,6 +1210,26 @@ export async function runConversationTurn(
   if (payload.missionId?.trim()) body.missionId = payload.missionId.trim();
   if (payload.personaId?.trim()) body.personaId = payload.personaId.trim();
   if (payload.sourceLanguage?.trim()) body.sourceLanguage = payload.sourceLanguage.trim();
+  if (payload.languageDetected?.trim()) body.languageDetected = payload.languageDetected.trim();
+  if (typeof payload.languageConfidence === "number" && Number.isFinite(payload.languageConfidence)) {
+    body.languageConfidence = payload.languageConfidence;
+  }
+  if (typeof payload.codeMixed === "boolean") body.codeMixed = payload.codeMixed;
+  if (typeof payload.pivotConfidence === "number" && Number.isFinite(payload.pivotConfidence)) {
+    body.pivotConfidence = payload.pivotConfidence;
+  }
+  if (payload.responseLanguage?.trim()) body.responseLanguage = payload.responseLanguage.trim();
+  if (payload.preferredResponseLanguage?.trim()) {
+    body.preferredResponseLanguage = payload.preferredResponseLanguage.trim();
+  }
+  if (payload.interpreter) body.interpreter = payload.interpreter;
+  if (payload.interpreter_schema_version?.trim()) {
+    body.interpreter_schema_version = payload.interpreter_schema_version.trim();
+  }
+  if (typeof payload.multilangConfirm === "boolean") {
+    body.multilangConfirm = payload.multilangConfirm;
+  }
+  if (payload.lang_schema_version?.trim()) body.lang_schema_version = payload.lang_schema_version.trim();
   if (typeof payload.translated === "boolean") body.translated = payload.translated;
   if (Array.isArray(payload.recentTurns) && payload.recentTurns.length > 0) {
     body.recentTurns = payload.recentTurns
@@ -1213,6 +1413,7 @@ const isJobMissingError = (error: unknown): boolean => {
 };
 
 const HELIX_ASK_PENDING_JOB_KEY = "helixAsk.pendingJob.v1";
+const HELIX_ASK_JOB_INTERRUPTED_FALLBACK_TEXT = "request interrupted. please try again.";
 
 const readPendingHelixAskJob = (): PendingHelixAskJob | null => {
   if (typeof sessionStorage === "undefined") return null;
@@ -1252,6 +1453,48 @@ const clearPendingHelixAskJob = (jobId?: string): void => {
 
 const isNavigatorOffline = (): boolean =>
   typeof navigator !== "undefined" && navigator.onLine === false;
+
+const isInterruptedJobFallbackResponse = (response: LocalAskResponse | null | undefined): boolean => {
+  const text = typeof response?.text === "string" ? response.text.trim().toLowerCase() : "";
+  return text === HELIX_ASK_JOB_INTERRUPTED_FALLBACK_TEXT;
+};
+
+const normalizeLocalAskResponse = (payload: unknown): LocalAskResponse => {
+  const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const rawText = typeof record.text === "string" ? record.text.trim() : "";
+  const message = typeof record.message === "string" ? record.message.trim() : "";
+  const interpreterConfirmPrompt =
+    typeof record.interpreter_confirm_prompt === "string" ? record.interpreter_confirm_prompt.trim() : "";
+  const failReason = typeof record.fail_reason === "string" ? record.fail_reason : "";
+  const failClass = typeof record.fail_class === "string" ? record.fail_class : "";
+  const blockedByGate =
+    record.ok === false &&
+    (record.error === "multilang_dispatch_blocked" ||
+      record.error === "multilang_confirmation_required" ||
+      failClass === "multilang_confidence_gate" ||
+      /^HELIX_(?:INTERPRETER|MULTILANG)_/.test(failReason));
+  const fallbackText = message || interpreterConfirmPrompt || (blockedByGate ? "Confirmation is required." : "");
+  const text = rawText || fallbackText || "No final answer returned.";
+  return {
+    ...(record as LocalAskResponse),
+    text,
+  };
+};
+
+const askLocalDirect = async (
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<LocalAskResponse> => {
+  const payload = await asJson<unknown>(
+    await fetch("/api/agi/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    }),
+  );
+  return normalizeLocalAskResponse(payload);
+};
 
 const waitForOnline = async (signal?: AbortSignal): Promise<number> => {
   if (!isNavigatorOffline()) return 0;
@@ -1399,7 +1642,7 @@ const pollAskJob = async (
       lastPartialText = job.partialText.trim();
     }
     if (job.status === "completed") {
-      if (job.result) return job.result;
+      if (job.result) return normalizeLocalAskResponse(job.result);
       return { text: lastPartialText } as LocalAskResponse;
     }
     if (job.status === "failed" || job.status === "cancelled") {
@@ -1443,6 +1686,19 @@ export async function askLocal(
     traceId?: string;
     personaId?: string;
     question?: string;
+    sourceQuestion?: string;
+    sourceLanguage?: string;
+    languageDetected?: string;
+    languageConfidence?: number;
+    codeMixed?: boolean;
+    pivotConfidence?: number;
+    translated?: boolean;
+    responseLanguage?: string;
+    preferredResponseLanguage?: string;
+    interpreter?: HelixInterpreterArtifact;
+    interpreter_schema_version?: "helix.interpreter.v1" | string;
+    multilangConfirm?: boolean;
+    lang_schema_version?: "helix.lang.v1" | string;
     debug?: boolean;
     verbosity?: "brief" | "normal" | "extended";
     searchQuery?: string;
@@ -1481,6 +1737,48 @@ export async function askLocal(
   if (options?.question) body.question = options.question;
   else if (promptQuestionMatch) body.question = promptQuestionMatch;
   else if (trimmedPrompt) body.question = trimmedPrompt;
+  if (typeof options?.sourceQuestion === "string" && options.sourceQuestion.trim()) {
+    body.sourceQuestion = options.sourceQuestion.trim();
+  }
+  if (typeof options?.sourceLanguage === "string" && options.sourceLanguage.trim()) {
+    body.sourceLanguage = options.sourceLanguage.trim();
+  }
+  if (typeof options?.languageDetected === "string" && options.languageDetected.trim()) {
+    body.languageDetected = options.languageDetected.trim();
+  }
+  if (typeof options?.languageConfidence === "number" && Number.isFinite(options.languageConfidence)) {
+    body.languageConfidence = options.languageConfidence;
+  }
+  if (typeof options?.codeMixed === "boolean") {
+    body.codeMixed = options.codeMixed;
+  }
+  if (typeof options?.pivotConfidence === "number" && Number.isFinite(options.pivotConfidence)) {
+    body.pivotConfidence = options.pivotConfidence;
+  }
+  if (typeof options?.translated === "boolean") {
+    body.translated = options.translated;
+  }
+  if (typeof options?.responseLanguage === "string" && options.responseLanguage.trim()) {
+    body.responseLanguage = options.responseLanguage.trim();
+  }
+  if (
+    typeof options?.preferredResponseLanguage === "string" &&
+    options.preferredResponseLanguage.trim()
+  ) {
+    body.preferredResponseLanguage = options.preferredResponseLanguage.trim();
+  }
+  if (options?.interpreter) {
+    body.interpreter = options.interpreter;
+  }
+  if (typeof options?.interpreter_schema_version === "string" && options.interpreter_schema_version.trim()) {
+    body.interpreter_schema_version = options.interpreter_schema_version.trim();
+  }
+  if (typeof options?.multilangConfirm === "boolean") {
+    body.multilangConfirm = options.multilangConfirm;
+  }
+  if (typeof options?.lang_schema_version === "string" && options.lang_schema_version.trim()) {
+    body.lang_schema_version = options.lang_schema_version.trim();
+  }
   if (typeof options?.debug === "boolean") body.debug = options.debug;
   if (options?.verbosity) body.verbosity = options.verbosity;
   if (typeof options?.searchQuery === "string" && options.searchQuery.trim()) {
@@ -1521,6 +1819,9 @@ export async function askLocal(
     });
     try {
       const result = await pollAskJob(job.jobId, { signal });
+      if (!signal?.aborted && isInterruptedJobFallbackResponse(result)) {
+        return await askLocalDirect(body, signal);
+      }
       return result;
     } finally {
       clearPendingHelixAskJob(job.jobId);
@@ -1539,6 +1840,9 @@ export async function askLocal(
       });
       try {
         const result = await pollAskJob(job.jobId, { signal });
+        if (!signal?.aborted && isInterruptedJobFallbackResponse(result)) {
+          return await askLocalDirect(body, signal);
+        }
         return result;
       } finally {
         clearPendingHelixAskJob(job.jobId);
@@ -1551,14 +1855,7 @@ export async function askLocal(
   if (isNavigatorOffline()) {
     await waitForOnline(signal);
   }
-  return asJson(
-    await fetch("/api/agi/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    }),
-  );
+  return await askLocalDirect(body, signal);
 }
 
 export async function askMoodHint(

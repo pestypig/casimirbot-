@@ -190,6 +190,29 @@ describe("POST /api/essence/ingest", () => {
     expect(hasTextEmbedding).toBe(true);
   });
 
+  it("accepts PDF uploads by default", async () => {
+    const pdfBuffer = Buffer.from("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n", "utf8");
+    const req: any = {
+      body: { creator_id: "paperbot", visibility: "private" },
+      auth: { sub: "paperbot" },
+      __mockFile: {
+        buffer: pdfBuffer,
+        mimetype: "application/pdf",
+        originalname: "paper.pdf",
+      } satisfies MockFile,
+    };
+    const res = createMockResponse();
+
+    await handler(req, res as any, () => undefined);
+    expect(res.statusCode).toBe(200);
+    expect(res.payload?.essence_id).toMatch(/[a-f0-9-]{36}/i);
+
+    await __flushIngestJobsForTest();
+    const envelope = await getEnvelope(res.payload.essence_id);
+    expect(envelope?.header.source.mime).toBe("application/pdf");
+    expect(envelope?.header.modality).toBe("text");
+  });
+
   it("adds captions and tags for image uploads", async () => {
     const req: any = {
       body: { creator_id: "artist", visibility: "private" },

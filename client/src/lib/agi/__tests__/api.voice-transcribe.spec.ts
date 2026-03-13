@@ -182,4 +182,98 @@ describe("askLocal capsule ids", () => {
     const payload = JSON.parse(String(createRequest.body)) as { capsuleIds?: string[] };
     expect(payload.capsuleIds).toEqual(capsuleIds.slice(0, 12));
   });
+
+  it("recovers from job-missing interrupted fallback by retrying direct ask", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-missing-race",
+            status: "queued",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: "not_found",
+          }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            text: "Recovered direct ask answer.",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "how do we solve the warp level in codebase?",
+    });
+
+    expect(response.text).toBe("Recovered direct ask answer.");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/jobs");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/api/agi/ask/jobs/job-missing-race");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/agi/ask");
+  });
+
+  it("maps blocked multilang responses to deterministic text when final text is missing", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-blocked-gate",
+            status: "queued",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-blocked-gate",
+            status: "completed",
+            result: {
+              ok: false,
+              error: "multilang_dispatch_blocked",
+              message: "Translation confidence is too low to dispatch retrieval safely.",
+              fail_reason: "HELIX_INTERPRETER_DISPATCH_BLOCKED",
+              fail_class: "multilang_confidence_gate",
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await askLocal(undefined, {
+      question: "Okay, explain what a warp bubble is in the codebase.",
+    });
+
+    expect(response.text).toBe("Translation confidence is too low to dispatch retrieval safely.");
+    expect(response.fail_reason).toBe("HELIX_INTERPRETER_DISPATCH_BLOCKED");
+    expect(response.fail_class).toBe("multilang_confidence_gate");
+  });
 });

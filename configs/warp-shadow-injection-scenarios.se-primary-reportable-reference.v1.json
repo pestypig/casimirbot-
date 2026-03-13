@@ -5,7 +5,7 @@
   "recovery_goal": "sem_ellipsometry_compatibility_recovery",
   "success_bar": "map_only",
   "baseline_reference": {
-    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-08.json",
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-11.json",
     "keys": [
       "marginRatioRaw",
       "marginRatioRawComputed",
@@ -80,19 +80,24 @@
           "d_fused_nm": 100.5,
           "u_fused_nm": 0.5,
           "U_fused_nm": 1,
-          "paired_run_id": "se_pair_run_2026_03_08_template",
-          "data_origin": "template_placeholder",
-          "instrument_run_ids": [],
+          "paired_run_id": "se_pair_run_2026_03_11_attempt",
+          "data_origin": "instrument_export",
+          "instrument_run_ids": [
+            "SEM_RUN_20260308",
+            "ELLIPS_RUN_20260308"
+          ],
           "raw_artifact_refs": [
+            "ellips.csv",
+            "sem.csv",
             "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv",
             "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv",
-            "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json",
+            "artifacts/research/full-solve/se-paired-runs/2026-03-11/pairing-manifest.prepared.json",
             "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json"
           ],
           "raw_artifact_sha256": {
             "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv": "5c35c938340a77b441dd1ceafce30740007c7873d6060f09972d017574d2d997",
             "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv": "10860ba2ff3c58c153624d6c3a5964cd498c0201f4cc1e6f8750739689e80217",
-            "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json": "98610b9e687b109c31400e869dc3d8d96e88c84eb17e047f9478c9f9ff5e8dff",
+            "artifacts/research/full-solve/se-paired-runs/2026-03-11/pairing-manifest.prepared.json": "58f1f3291e4317f51701df86872a813c41cba3d871255815513a894c8219c8d5",
             "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json": "18477fafadd3bc48f6434e7b9dd929b98d10baba2e372d1c525c9f66c2dcb5ef"
           },
           "rho_sem_ellip": 0.35,
@@ -110,8 +115,7 @@
             "method": "paired_dual_instrument_covariance_measured",
             "reportableReady": false,
             "blockedReasons": [
-              "measurement_provenance_not_instrument_export",
-              "missing_measurement_provenance_run_ids"
+              "missing_measurement_provenance_raw_hash_for_ref"
             ],
             "sourceRefs": [
               "EXP-SE-001",
@@ -155,19 +159,24 @@
           "d_fused_nm": 100.25,
           "u_fused_nm": 0.25,
           "U_fused_nm": 0.5,
-          "paired_run_id": "se_pair_run_2026_03_08_template",
-          "data_origin": "template_placeholder",
-          "instrument_run_ids": [],
+          "paired_run_id": "se_pair_run_2026_03_11_attempt",
+          "data_origin": "instrument_export",
+          "instrument_run_ids": [
+            "SEM_RUN_20260308",
+            "ELLIPS_RUN_20260308"
+          ],
           "raw_artifact_refs": [
+            "ellips.csv",
+            "sem.csv",
             "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv",
             "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv",
-            "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json",
+            "artifacts/research/full-solve/se-paired-runs/2026-03-11/pairing-manifest.prepared.json",
             "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json"
           ],
           "raw_artifact_sha256": {
             "docs/specs/data/se-paired-runs-template-2026-03-08/sem-measurements.csv": "5c35c938340a77b441dd1ceafce30740007c7873d6060f09972d017574d2d997",
             "docs/specs/data/se-paired-runs-template-2026-03-08/ellips-measurements.csv": "10860ba2ff3c58c153624d6c3a5964cd498c0201f4cc1e6f8750739689e80217",
-            "docs/specs/data/se-paired-runs-template-2026-03-08/pairing-manifest.json": "98610b9e687b109c31400e869dc3d8d96e88c84eb17e047f9478c9f9ff5e8dff",
+            "artifacts/research/full-solve/se-paired-runs/2026-03-11/pairing-manifest.prepared.json": "58f1f3291e4317f51701df86872a813c41cba3d871255815513a894c8219c8d5",
             "docs/specs/data/se-paired-runs-template-2026-03-08/covariance-budget.json": "18477fafadd3bc48f6434e7b9dd929b98d10baba2e372d1c525c9f66c2dcb5ef"
           },
           "rho_sem_ellip": 0.35,
@@ -185,8 +194,7 @@
             "method": "paired_dual_instrument_covariance_measured",
             "reportableReady": false,
             "blockedReasons": [
-              "measurement_provenance_not_instrument_export",
-              "missing_measurement_provenance_run_ids"
+              "missing_measurement_provenance_raw_hash_for_ref"
             ],
             "sourceRefs": [
               "EXP-SE-001",
@@ -205,7 +213,7 @@
   "profile": "se_primary_reportable_reference_v1",
   "reportableReferenceProfile": {
     "profileId": "se-primary-reportable-reference-v1",
-    "lockedOn": "2026-03-08",
+    "lockedOn": "2026-03-11",
     "lane": "sem_ellipsometry",
     "sourceClassAllowlist": [
       "primary",
@@ -226,8 +234,7 @@
     ],
     "reportableReady": false,
     "blockedReasons": [
-      "measurement_provenance_not_instrument_export",
-      "missing_measurement_provenance_run_ids"
+      "missing_measurement_provenance_raw_hash_for_ref"
     ]
   }
 }

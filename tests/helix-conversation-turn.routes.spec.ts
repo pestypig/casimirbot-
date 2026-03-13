@@ -256,4 +256,36 @@ describe("conversation-turn route", () => {
     expect(String(res.body.route_reason_code ?? "")).toMatch(/^dispatch:/);
     expect(String(res.body.brief?.text ?? "").toLowerCase()).not.toContain("share one specific goal or constraint");
   }, 20000);
+
+  it("dispatches multilingual direct questions that use full-width punctuation", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.41,
+          dispatch_hint: false,
+          clarify_needed: false,
+          reason: "Fallback classify output.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          text: "这是一个关于曲速泡的问题，我将进入观察推理并给出解释。",
+        }),
+      });
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "什么是二库比叶尔扭曲炮？",
+      traceId: "trace-multilang-fullwidth-question",
+      sourceLanguage: "zh-hans",
+      languageDetected: "zh-hans",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.classification?.mode).toBe("observe");
+    expect(res.body.dispatch?.dispatch_hint).toBe(true);
+    expect(String(res.body.route_reason_code ?? "")).toMatch(/^dispatch:/);
+  }, 20000);
 });

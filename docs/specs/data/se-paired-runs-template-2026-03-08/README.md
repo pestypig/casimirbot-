@@ -53,6 +53,15 @@ npm run warp:shadow:se-paired-evidence:validate -- \
 npm run warp:shadow:build-se-packs -- --paired-evidence docs/specs/data/se-paired-runs-template-2026-03-08/se-paired-run-evidence.v1.json
 ```
 
+7. Optional one-shot orchestration:
+
+```powershell
+npm run warp:shadow:se-reportable:attempt -- \
+  --bundle-dir docs/specs/data/se-paired-runs-template-2026-03-08 \
+  --run-ids SEM_RUN_001,ELLIPS_RUN_001 \
+  --raw-refs raw/sem-export.csv,raw/ellips-export.csv,raw/lab-metadata.json
+```
+
 ## Source anchors
 Use strict source refs from:
 - `EXP-SE-021..EXP-SE-031` (NIST SRM ellipsometry transfer anchors)

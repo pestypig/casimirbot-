@@ -253,6 +253,62 @@ const grAgentLoopLastAcceptedResidual = new Gauge({
   registers: [registry],
 });
 
+const helixAskMultilangTranslationTotal = new Counter({
+  name: "helix_ask_multilang_translation_total",
+  help: "Helix Ask multilingual translation outcomes",
+  labelNames: ["status"],
+  registers: [registry],
+});
+
+const helixAskMultilangLanguageMatchTotal = new Counter({
+  name: "helix_ask_multilang_language_match_total",
+  help: "Helix Ask multilingual response-language match outcomes",
+  labelNames: ["status"],
+  registers: [registry],
+});
+
+const helixAskMultilangFallbackTotal = new Counter({
+  name: "helix_ask_multilang_fallback_total",
+  help: "Helix Ask multilingual fallback usage outcomes",
+  labelNames: ["status"],
+  registers: [registry],
+});
+
+const helixAskMultilangCanonicalTermTotal = new Counter({
+  name: "helix_ask_multilang_canonical_term_total",
+  help: "Helix Ask canonical term preservation outcomes in multilingual mode",
+  labelNames: ["status"],
+  registers: [registry],
+});
+
+const helixAskMultilangAddedLatency = new Histogram({
+  name: "helix_ask_multilang_added_latency_ms",
+  help: "Added latency from multilingual processing in milliseconds",
+  buckets: [0, 10, 25, 50, 100, 200, 350, 500, 700, 1000, 1500],
+  registers: [registry],
+});
+
+const helixAskTermPriorEventsTotal = new Counter({
+  name: "helix_ask_term_prior_events_total",
+  help: "Helix Ask term-prior events",
+  labelNames: ["event"],
+  registers: [registry],
+});
+
+const helixAskTermRouteOutcomeTotal = new Counter({
+  name: "helix_ask_term_route_outcome_total",
+  help: "Helix Ask route outcomes by term id",
+  labelNames: ["term_id", "domain"],
+  registers: [registry],
+});
+
+const helixAskTermPriorImpactTotal = new Counter({
+  name: "helix_ask_term_prior_impact_total",
+  help: "Helix Ask term-prior impact buckets",
+  labelNames: ["impact"],
+  registers: [registry],
+});
+
 const normalizeStatus = (value?: boolean | string): "ok" | "error" => {
   if (typeof value === "boolean") {
     return value ? "ok" : "error";
@@ -264,6 +320,25 @@ const normalizeStatus = (value?: boolean | string): "ok" | "error" => {
     return "error";
   }
   return "ok";
+};
+
+const normalizeTermId = (value: string): string => {
+  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "_");
+  return normalized ? normalized.slice(0, 80) : "unknown";
+};
+
+const normalizeRouteDomain = (value: string): string => {
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "general" ||
+    normalized === "repo" ||
+    normalized === "hybrid" ||
+    normalized === "falsifiable" ||
+    normalized === "disabled"
+  ) {
+    return normalized;
+  }
+  return "unknown";
 };
 
 type GrAgentLoopMetricsAttempt = {
@@ -424,6 +499,42 @@ export const metrics = {
   },
   recordDebateVerification(verifier: string, ok: boolean): void {
     debateVerificationsTotal.inc({ verifier, result: ok ? "ok" : "fail" });
+  },
+  recordHelixAskMultilangTranslation(miss: boolean): void {
+    helixAskMultilangTranslationTotal.inc({ status: miss ? "miss" : "ok" });
+  },
+  recordHelixAskMultilangLanguageMatch(mismatch: boolean): void {
+    helixAskMultilangLanguageMatchTotal.inc({ status: mismatch ? "mismatch" : "ok" });
+  },
+  recordHelixAskMultilangFallback(fallbackUsed: boolean): void {
+    helixAskMultilangFallbackTotal.inc({ status: fallbackUsed ? "fallback" : "ok" });
+  },
+  recordHelixAskMultilangCanonicalTerm(corrupted: boolean): void {
+    helixAskMultilangCanonicalTermTotal.inc({ status: corrupted ? "corrupted" : "ok" });
+  },
+  observeHelixAskMultilangAddedLatency(durationMs: number): void {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return;
+    helixAskMultilangAddedLatency.observe(durationMs);
+  },
+  recordHelixAskTermPriorEvent(
+    event:
+      | "applied"
+      | "suppressed"
+      | "repo_override"
+      | "denylist_suppression"
+      | "term_disabled"
+      | "log_only",
+  ): void {
+    helixAskTermPriorEventsTotal.inc({ event });
+  },
+  recordHelixAskTermRouteOutcome(termId: string, domain: string): void {
+    helixAskTermRouteOutcomeTotal.inc({
+      term_id: normalizeTermId(termId),
+      domain: normalizeRouteDomain(domain),
+    });
+  },
+  recordHelixAskTermPriorImpact(impact: "helped" | "harmed" | "neutral"): void {
+    helixAskTermPriorImpactTotal.inc({ impact });
   },
   observeDebateWall(durationMs: number): void {
     if (!Number.isFinite(durationMs) || durationMs <= 0) {

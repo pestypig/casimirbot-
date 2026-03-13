@@ -171,7 +171,7 @@ essenceRouter.get("/themes", async (req, res) => {
 essenceRouter.post("/ingest", async (req, res) => {
   const { default: multer } = await import("multer");
   const MAX_MB = Number(process.env.ESSENCE_MAX_UPLOAD_MB ?? 25);
-  const ALLOW_MIME = (process.env.ESSENCE_UPLOAD_MIME ?? "text/plain,image/png,image/jpeg,image/gif,audio/wav,audio/mpeg,video/mp4,video/quicktime")
+  const ALLOW_MIME = (process.env.ESSENCE_UPLOAD_MIME ?? "text/plain,application/pdf,image/png,image/jpeg,image/gif,audio/wav,audio/mpeg,video/mp4,video/quicktime")
     .split(",")
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);

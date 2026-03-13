@@ -3,7 +3,7 @@
 Status: active debug guide.
 
 ## Latest Stable Checkpoint
-- `docs/helix-ask-turn-loop-checkpoint-2026-03-10.md`
+- `docs/helix-ask-turn-loop-checkpoint-2026-03-11.md`
 
 ## Turn-By-Turn Loop
 1. User speaks in natural chunks.

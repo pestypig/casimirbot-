@@ -26,6 +26,7 @@ type HelixAskSessionPrefs = {
   verbosity?: string;
   citationsRequired?: boolean;
   frontierLensLock?: boolean;
+  preferredResponseLanguage?: string;
 };
 
 export type HelixAskSessionMemory = {

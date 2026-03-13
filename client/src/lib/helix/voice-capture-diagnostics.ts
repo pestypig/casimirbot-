@@ -21,6 +21,12 @@ export type VoiceCaptureSegmentSnapshot = {
   dispatch: "none" | "queued" | "suppressed" | "completed";
   engine: string | null;
   error: string | null;
+  speakerId?: string | null;
+  speakerConfidence?: number | null;
+  speechProbability?: number | null;
+  snrDb?: number | null;
+  confirmAutoEligible?: boolean | null;
+  confirmBlockReason?: string | null;
 };
 
 export type VoicePlaybackDiagnosticsSnapshot = {
@@ -160,6 +166,7 @@ export type VoiceLaneTimelineDebugEvent = {
   authorityRejectStage?: "preflight" | "stream" | "final" | null;
   finalSource?: "normal_reasoning" | "strict_gate_override" | null;
   causalRefId?: string | null;
+  debugContext?: Record<string, unknown> | null;
 };
 
 export type VoiceCaptureDiagnosticsSnapshot = {
@@ -184,6 +191,25 @@ export type VoiceCaptureDiagnosticsSnapshot = {
   warnings: VoiceCaptureWarningCode[];
   checkpoints: VoiceCaptureCheckpointSnapshot[];
   segments: VoiceCaptureSegmentSnapshot[];
+  pendingConfirmation?: {
+    dispatchState: "auto" | "confirm" | "blocked" | null;
+    needsConfirmation: boolean;
+    pivotConfidence: number | null;
+    speechProbability: number | null;
+    snrDb: number | null;
+    speakerId: string | null;
+    speakerConfidence: number | null;
+    confirmAutoEligible: boolean | null;
+    confirmBlockReason: string | null;
+  } | null;
+  voiceFeatureFlags?: {
+    confirmV2RolloutEligible: boolean;
+    confirmV2Active: boolean;
+    confirmV2ShadowMode: boolean;
+    localAudioGateActive: boolean;
+    sessionSpeakerActive: boolean;
+    multiSpeakerUiActive: boolean;
+  };
   playback?: VoicePlaybackDiagnosticsSnapshot | null;
   playbackOutput?: VoicePlaybackOutputDiagnosticsSnapshot | null;
   timelineEvents?: VoiceLaneTimelineDebugEvent[];

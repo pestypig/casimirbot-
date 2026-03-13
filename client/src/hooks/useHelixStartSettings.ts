@@ -7,25 +7,29 @@ export type StartSettings = {
   showZen: boolean;
   enableSplashCursor: boolean;
   showHelixAskDebug: boolean;
+  showHelixAskReasoningEventLog: boolean;
   showHelixVoiceCaptureDiagnostics: boolean;
   showHelixVoiceEventTimelineDebug: boolean;
   showPowerShellDebug: boolean;
   powerShellScratch: string;
+  preferredResponseLanguage: string;
 };
 
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 3,
+  settingsVersion: 5,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
   enableSplashCursor: false,
   showHelixAskDebug: true,
+  showHelixAskReasoningEventLog: false,
   showHelixVoiceCaptureDiagnostics: false,
   showHelixVoiceEventTimelineDebug: false,
   showPowerShellDebug: false,
-  powerShellScratch: ""
+  powerShellScratch: "",
+  preferredResponseLanguage: "auto",
 };
 
 export const SETTINGS_STORAGE_KEY = "helix-start-settings";
@@ -44,8 +48,13 @@ export function useHelixStartSettings() {
       if (parsed.settingsVersion !== DEFAULT_SETTINGS.settingsVersion) {
         merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
         merged.showHelixAskDebug = DEFAULT_SETTINGS.showHelixAskDebug;
+        merged.showHelixAskReasoningEventLog = DEFAULT_SETTINGS.showHelixAskReasoningEventLog;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
         merged.showHelixVoiceEventTimelineDebug = DEFAULT_SETTINGS.showHelixVoiceEventTimelineDebug;
+        merged.preferredResponseLanguage =
+          typeof parsed.preferredResponseLanguage === "string" && parsed.preferredResponseLanguage.trim().length > 0
+            ? parsed.preferredResponseLanguage.trim()
+            : DEFAULT_SETTINGS.preferredResponseLanguage;
       }
       setUserSettings(merged);
     } catch {

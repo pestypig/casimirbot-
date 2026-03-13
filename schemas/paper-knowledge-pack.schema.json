@@ -1,0 +1,590 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://casimirbot/schemas/paper-knowledge-pack.schema.json",
+  "title": "Paper Knowledge Pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pack_id",
+    "run_id",
+    "paper_id",
+    "tenant_id",
+    "generated_at",
+    "document",
+    "claims",
+    "congruence_links",
+    "framework_deltas",
+    "math_registry",
+    "prediction_contracts",
+    "symbol_equivalence_map",
+    "derivation_lineage",
+    "falsifier_edges",
+    "maturity_gates",
+    "retrieval_index",
+    "review"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "pack_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+    "paper_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,128}$" },
+    "tenant_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "source_type", "source_uri", "source_sha256", "media_type"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "source_type": { "type": "string", "enum": ["pdf", "image"] },
+        "source_uri": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "source_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "media_type": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50000,
+      "items": { "$ref": "#/definitions/claim" }
+    },
+    "congruence_links": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": { "$ref": "#/definitions/congruenceLink" }
+    },
+    "framework_deltas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tree_delta", "dag_delta", "atlas_delta"],
+      "properties": {
+        "tree_delta": { "$ref": "#/definitions/treeDelta" },
+        "dag_delta": { "$ref": "#/definitions/dagDelta" },
+        "atlas_delta": { "$ref": "#/definitions/atlasDelta" }
+      }
+    },
+    "math_registry": { "$ref": "#/definitions/mathRegistry" },
+    "prediction_contracts": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/predictionContract" },
+      "maxItems": 200000
+    },
+    "symbol_equivalence_map": { "$ref": "#/definitions/symbolEquivalenceMap" },
+    "derivation_lineage": { "$ref": "#/definitions/derivationLineage" },
+    "falsifier_edges": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/falsifierEdge" },
+      "maxItems": 200000
+    },
+    "maturity_gates": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/maturityGate" },
+      "maxItems": 200000
+    },
+    "retrieval_index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lexical_ref", "vector_ref", "graph_anchor_refs"],
+      "properties": {
+        "lexical_ref": { "$ref": "#/definitions/indexRef" },
+        "vector_ref": { "$ref": "#/definitions/indexRef" },
+        "graph_anchor_refs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "minItems": 1,
+          "maxItems": 50000,
+          "uniqueItems": true
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewed_at", "reviewer_id", "reason_codes"],
+      "properties": {
+        "status": { "type": "string", "enum": ["approved", "requires_remerge"] },
+        "reviewed_at": { "type": "string", "format": "date-time" },
+        "reviewer_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reason_codes": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z0-9_:-]{2,128}$" },
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "definitions": {
+    "indexRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "index_id", "record_count"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "index_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "record_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "claim_type", "text", "confidence", "maturity_stage", "provenance"],
+      "properties": {
+        "claim_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+        "claim_type": {
+          "type": "string",
+          "enum": ["observation", "measurement", "theory", "theoretical_congruence"]
+        },
+        "text": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maturity_stage": {
+          "type": "string",
+          "enum": ["exploratory", "reduced-order", "diagnostic", "certified"]
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["doc_id", "page", "span", "extraction_method", "extracted_at"],
+          "properties": {
+            "doc_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+            "page": { "type": "integer", "minimum": 1 },
+            "span": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["start", "end"],
+              "properties": {
+                "start": { "type": "integer", "minimum": 0 },
+                "end": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "extraction_method": { "type": "string", "enum": ["pdf_text", "ocr", "manual", "hybrid"] },
+            "extracted_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "congruenceLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_claim_id", "target_node_id", "relation", "status", "score"],
+      "properties": {
+        "source_claim_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+        "target_node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "supports",
+            "contradicts",
+            "derives_from",
+            "measures",
+            "observed_in",
+            "equivalent_to",
+            "refines",
+            "falsifies"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["agreement", "partial_agreement", "tension", "conflict", "unknown"]
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "treeNodeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "parent_id", "label"],
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "parent_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "treeDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added_nodes", "updated_nodes"],
+      "properties": {
+        "added_nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/treeNodeRef" },
+          "maxItems": 50000
+        },
+        "updated_nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/treeNodeRef" },
+          "maxItems": 50000
+        }
+      }
+    },
+    "dagNodeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "node_type", "label"],
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "node_type": {
+          "type": "string",
+          "enum": [
+            "document",
+            "section",
+            "claim",
+            "entity",
+            "system",
+            "variable",
+            "measurement",
+            "theory",
+            "observation",
+            "equation",
+            "definition",
+            "unit",
+            "assumption",
+            "model",
+            "observable",
+            "hypothesis"
+          ]
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "dagEdgeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edge_id", "from", "to", "relation"],
+      "properties": {
+        "edge_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "from": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "to": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "supports",
+            "contradicts",
+            "derives_from",
+            "measures",
+            "observed_in",
+            "equivalent_to",
+            "refines",
+            "defines",
+            "uses_variable",
+            "has_unit",
+            "assumes",
+            "predicts",
+            "measured_as",
+            "fit_residual_of",
+            "falsifies",
+            "depends_on",
+            "equivalent_symbol"
+          ]
+        }
+      }
+    },
+    "dagDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added_nodes", "added_edges", "updated_edges"],
+      "properties": {
+        "added_nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/dagNodeRef" },
+          "maxItems": 200000
+        },
+        "added_edges": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/dagEdgeRef" },
+          "maxItems": 400000
+        },
+        "updated_edges": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/dagEdgeRef" },
+          "maxItems": 400000
+        }
+      }
+    },
+    "atlasPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["point_id", "node_id", "namespace"],
+      "properties": {
+        "point_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "namespace": { "type": "string", "pattern": "^[a-z0-9._:-]{2,128}$" }
+      }
+    },
+    "atlasDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["embedding_model", "spaces", "added_points", "updated_points"],
+      "properties": {
+        "embedding_model": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "spaces": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{2,128}$" },
+          "maxItems": 1024,
+          "uniqueItems": true
+        },
+        "added_points": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/atlasPoint" },
+          "maxItems": 200000
+        },
+        "updated_points": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/atlasPoint" },
+          "maxItems": 200000
+        }
+      }
+    },
+    "mathRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["equations", "definitions", "variables", "units", "assumptions"],
+      "properties": {
+        "equations": { "type": "array", "items": { "$ref": "#/definitions/equationRecord" } },
+        "definitions": { "type": "array", "items": { "$ref": "#/definitions/definitionRecord" } },
+        "variables": { "type": "array", "items": { "$ref": "#/definitions/variableRecord" } },
+        "units": { "type": "array", "items": { "$ref": "#/definitions/unitRecord" } },
+        "assumptions": { "type": "array", "items": { "$ref": "#/definitions/assumptionRecord" } }
+      }
+    },
+    "equationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["equation_id", "canonical_form", "variable_ids"],
+      "properties": {
+        "equation_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "canonical_form": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "variable_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "assumption_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "uniqueItems": true
+        },
+        "dimensionally_consistent": { "type": "boolean" }
+      }
+    },
+    "definitionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definition_id", "term", "statement"],
+      "properties": {
+        "definition_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "term": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 20000 }
+      }
+    },
+    "variableRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable_id", "symbol", "unit"],
+      "properties": {
+        "variable_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "unitRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "symbol", "quantity_kind"],
+      "properties": {
+        "unit_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "quantity_kind": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "assumptionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assumption_id", "statement", "scope"],
+      "properties": {
+        "assumption_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "scope": { "type": "string", "enum": ["local", "model", "global"] }
+      }
+    },
+    "predictionContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "model_node_id",
+        "input_bindings",
+        "predicted_observable",
+        "measured_observable",
+        "fit",
+        "status"
+      ],
+      "properties": {
+        "contract_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "model_node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "equation_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "uniqueItems": true
+        },
+        "input_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["variable_id", "value", "unit"],
+            "properties": {
+              "variable_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+              "value": { "type": "number" },
+              "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+            }
+          }
+        },
+        "predicted_observable": { "$ref": "#/definitions/observable" },
+        "measured_observable": { "$ref": "#/definitions/observable" },
+        "fit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["residual", "normalized_residual"],
+          "properties": {
+            "residual": { "type": "number" },
+            "normalized_residual": { "type": "number" },
+            "r2": { "type": "number" },
+            "chi2": { "type": "number" },
+            "dof": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "status": { "type": "string", "enum": ["match", "tension", "conflict", "insufficient_data"] }
+      }
+    },
+    "observable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable_id", "value", "unit"],
+      "properties": {
+        "variable_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "dataset_ref": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    },
+    "symbolEquivalenceMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolution_policy", "entries"],
+      "properties": {
+        "resolution_policy": { "type": "string", "enum": ["canonical_wins", "context_sensitive"] },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["canonical_symbol", "mapping_type", "aliases"],
+            "properties": {
+              "canonical_symbol": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "mapping_type": { "type": "string", "enum": ["exact", "scaled", "offset", "affine", "contextual"] },
+              "aliases": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["paper_id", "symbol", "unit"],
+                  "properties": {
+                    "paper_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,128}$" },
+                    "symbol": { "type": "string", "minLength": 1, "maxLength": 128 },
+                    "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+                  }
+                }
+              },
+              "transform": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "scale": { "type": "number" },
+                  "offset": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "derivationLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_version", "lineage_hash", "steps"],
+      "properties": {
+        "lineage_version": { "type": "integer", "minimum": 1 },
+        "lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "replay_seed": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step_id", "version", "operation", "at"],
+            "properties": {
+              "step_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+              "version": { "type": "integer", "minimum": 1 },
+              "operation": {
+                "type": "string",
+                "enum": ["define", "derive", "substitute", "normalize", "fit", "compare", "merge", "validate"]
+              },
+              "at": { "type": "string", "format": "date-time" },
+              "input_hashes": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "uniqueItems": true
+              },
+              "output_hashes": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "falsifierEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edge_id", "hypothesis_node_id", "falsifier_node_id", "status"],
+      "properties": {
+        "edge_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "hypothesis_node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "falsifier_node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "status": { "type": "string", "enum": ["pending", "tested_passed", "tested_failed", "inconclusive"] },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "maturityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "target_id", "required_stage", "current_stage", "status", "evaluated_at"],
+      "properties": {
+        "gate_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "target_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "required_stage": { "type": "string", "enum": ["exploratory", "reduced-order", "diagnostic", "certified"] },
+        "current_stage": { "type": "string", "enum": ["exploratory", "reduced-order", "diagnostic", "certified"] },
+        "status": { "type": "string", "enum": ["pass", "warn", "fail"] },
+        "blocking_reason": { "type": "string", "maxLength": 4096 },
+        "falsifier_edge_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "uniqueItems": true
+        },
+        "evaluated_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

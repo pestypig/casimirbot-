@@ -63,8 +63,9 @@ export type HelixAskIntentMatch = {
 
 export type HelixAskIntentMatchInput = {
   question: string;
-  hasRepoHints: boolean;
-  hasFilePathHints: boolean;
+  hasRepoHints?: boolean;
+  hasFilePathHints?: boolean;
+  preferGeneralWhenNoRepoHints?: boolean;
 };
 
 type IdeologyNodeRecord = {
@@ -256,6 +257,27 @@ const INTENT_PROFILES: HelixAskIntentProfile[] = [
     },
     matchers: [],
     priority: 25,
+  },
+  {
+    id: "repo.warp_math_congruence",
+    label: "Warp congruence math (repo grounded)",
+    domain: "repo",
+    tier: "F1",
+    strategy: "repo_rag",
+    formatPolicy: "steps",
+    stageTags: "on_request",
+    evidencePolicy: {
+      allowRepoCitations: true,
+      requireCitations: true,
+      allowedEvidenceKinds: ["repo_chunk"],
+    },
+    matchers: [
+      /\b(warp bubble|warp drive|warp|alcubierre|natario)\b/i,
+      /\b(congruence|equation|equations|math|mathematical|metric|tensor|riemann|ricci|curvature|einstein|geodesic|derive|derivation|proof|solver|solve)\b/i,
+    ],
+    requiresAllMatchers: true,
+    requireRepoHints: true,
+    priority: 70,
   },
   {
     id: "repo.warp_definition_docs_first",
@@ -576,16 +598,28 @@ export function matchHelixAskIntent(input: HelixAskIntentMatchInput): HelixAskIn
   let best: HelixAskIntentMatch | null = null;
   const normalized = question.toLowerCase();
   const hasRepoAnchorHint = REPO_ANCHOR_HINT_RE.test(normalized);
-  const inferredRepoHint = input.hasRepoHints || hasRepoAnchorHint;
+  const hasRepoHints = input.hasRepoHints === true;
+  const hasFilePathHints = input.hasFilePathHints === true;
+  const preferGeneralWhenNoRepoHints = input.preferGeneralWhenNoRepoHints === true;
+  const inferredRepoHint =
+    hasRepoHints || (!preferGeneralWhenNoRepoHints && hasRepoAnchorHint);
   const relationProfile = INTENT_PROFILES.find((profile) => profile.id === "hybrid.warp_ethos_relation");
   if (relationProfile && WARP_ETHOS_RELATION_COUPLED_RE.test(normalized)) {
     best = { profile: relationProfile, score: 999, reason: "warp_ethos_coupled" };
   }
   for (const profile of INTENT_PROFILES) {
+    if (
+      preferGeneralWhenNoRepoHints &&
+      !inferredRepoHint &&
+      !hasFilePathHints &&
+      profile.domain !== "general"
+    ) {
+      continue;
+    }
     const matches = countMatches(profile.matchers, normalized);
     if (matches <= 0) continue;
     if (profile.requireRepoHints && !inferredRepoHint) continue;
-    if (profile.requireFilePath && !input.hasFilePathHints) continue;
+    if (profile.requireFilePath && !hasFilePathHints) continue;
     if (profile.requiresAllMatchers && matches < profile.matchers.length) continue;
     const score = matches * 10 + (profile.priority ?? 0);
     if (!best || score > best.score) {

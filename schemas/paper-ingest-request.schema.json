@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://casimirbot/schemas/paper-ingest-request.schema.json",
+  "title": "Paper Ingest Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "submitted_at",
+    "tenant_id",
+    "submitted_by",
+    "paper",
+    "source",
+    "options"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "request_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "tenant_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "submitted_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_id", "channel"],
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "channel": { "type": "string", "enum": ["chat", "api", "batch", "cli"] },
+        "session_id": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paper_id", "title_hint", "topic_tags"],
+      "properties": {
+        "paper_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,128}$" },
+        "title_hint": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "authors_hint": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "maxItems": 128
+        },
+        "topic_tags": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{2,64}$" },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "uri", "filename", "media_type", "bytes", "sha256"],
+      "properties": {
+        "source_type": { "type": "string", "enum": ["pdf", "image"] },
+        "uri": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "filename": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "media_type": {
+          "type": "string",
+          "enum": [
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/tiff"
+          ]
+        },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "page_count_hint": { "type": "integer", "minimum": 1 },
+        "language_hints": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ocr_mode",
+        "chunking_profile",
+        "extraction_profile",
+        "review_mode",
+        "math_trace_mode",
+        "require_prediction_contracts",
+        "require_symbol_equivalence_map",
+        "require_falsifier_edges"
+      ],
+      "properties": {
+        "ocr_mode": { "type": "string", "enum": ["auto", "force", "off"] },
+        "chunking_profile": { "type": "string", "enum": ["default", "dense", "equation_aware"] },
+        "extraction_profile": {
+          "type": "string",
+          "enum": ["default", "physics", "physics_deep", "medical", "legal"]
+        },
+        "review_mode": { "type": "string", "enum": ["auto_if_high_confidence", "always_human"] },
+        "math_trace_mode": { "type": "string", "enum": ["strict", "balanced"] },
+        "require_prediction_contracts": { "type": "boolean" },
+        "require_symbol_equivalence_map": { "type": "boolean" },
+        "require_falsifier_edges": { "type": "boolean" },
+        "max_claims": { "type": "integer", "minimum": 1, "maximum": 50000 },
+        "max_runtime_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] }
+      }
+    },
+    "framework_targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tree_roots": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{2,128}$" },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "atlas_namespaces": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{2,128}$" },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "link_existing_paper_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,128}$" },
+          "maxItems": 2048,
+          "uniqueItems": true
+        }
+      }
+    },
+    "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 256 },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "maxProperties": 128
+    }
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "cases": [
+    {
+      "label": "warp definition docs and code",
+      "question": "In this repo, define warp bubble from docs and show where code models it. Cite file paths.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/knowledge/warp/warp-bubble.md", "modules/warp/natario-warp.ts"]
+      }
+    },
+    {
+      "label": "warp tree dag flow",
+      "question": "How do tree + DAG rules shape warp reasoning flow in this codebase? Cite files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/warp-tree-dag-walk-rules.md", "docs/warp-tree-dag-schema.md"]
+      }
+    },
+    {
+      "label": "warp console architecture map",
+      "question": "Map the warp console architecture and explain how it links to retrieval context. Cite repo paths.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/warp-console-architecture.md"]
+      }
+    },
+    {
+      "label": "natario implementation walkthrough",
+      "question": "Walk through the Natario warp implementation in this repo and list key functions/modules with citations.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["modules/warp/natario-warp.ts"]
+      }
+    },
+    {
+      "label": "warp geometry comparison",
+      "question": "Compare warp geometry variants described in this repository and cite the authoritative files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/warp-geometry-comparison.md"]
+      }
+    },
+    {
+      "label": "warp mechanics tree links",
+      "question": "What does the warp mechanics tree encode, and which runtime modules consume it? Cite files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/knowledge/warp/warp-mechanics-tree.json"]
+      }
+    },
+    {
+      "label": "warp retrieval channels",
+      "question": "For warp questions, how does Helix Ask retrieval use lexical/symbol/path channels? cite implementation files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/routes/agi.plan.ts", "server/services/helix-ask/repo-search.ts"]
+      }
+    },
+    {
+      "label": "stage0 lane behavior warp",
+      "question": "Explain how Stage-0 prefiltering interacts with warp/internal prompts in the retrieval ladder. Cite code paths.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/services/helix-ask/repo-search.ts", "server/services/helix-ask/stage0-index.ts"]
+      }
+    },
+    {
+      "label": "code floor for repo prompts",
+      "question": "How does the code-evidence floor enforce code-path coverage for repo/hybrid prompts? cite implementation.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/routes/agi.plan.ts"]
+      }
+    },
+    {
+      "label": "git tracked fallback lane",
+      "question": "Describe how git-tracked scan fallback is invoked and constrained in Helix Ask retrieval. Cite files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["scripts/helix_ask_git_tracked_scan.py", "server/services/helix-ask/repo-search.ts"]
+      }
+    },
+    {
+      "label": "warp docs first intent behavior",
+      "question": "Where are warp docs-first intent patterns defined and how do they affect evidence selection? cite repo files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/knowledge/warp/warp-bubble.md", "server/routes/agi.plan.ts"]
+      }
+    },
+    {
+      "label": "warp response grounding contract",
+      "question": "What grounding contract prevents generic warp answers and forces code/doc evidence? cite code/docs.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"]
+      }
+    },
+    {
+      "label": "warp multilingual retrieval safety",
+      "question": "For bilingual warp prompts, how is routing preserved while retrieval stays code-grounded? cite files.",
+      "expect": {
+        "citations": "require"
+      }
+    },
+    {
+      "label": "warp certainty tree relation",
+      "question": "How does the certainty framework tree influence warp answer confidence and gating? cite files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/knowledge/certainty-framework-tree.json"]
+      }
+    },
+    {
+      "label": "warp ideation vs implementation split",
+      "question": "Separate conceptual warp explanation from code implementation in this repo, with citations for both.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/knowledge/warp/warp-bubble.md", "modules/warp/natario-warp.ts"]
+      }
+    },
+    {
+      "label": "helix ask ladder placement",
+      "question": "Where does Stage-0 sit in the Helix Ask ladder and what remains unchanged in tree/DAG/atlas reasoning? cite files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/helix-ask-ladder.md", "server/routes/agi.plan.ts"]
+      }
+    },
+    {
+      "label": "warp module entrypoints",
+      "question": "List primary warp module entrypoints and supporting docs used for explanations in this repo. cite files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["modules/warp/natario-warp.ts", "docs/knowledge/warp/warp-bubble.md"]
+      }
+    },
+    {
+      "label": "stage0 fail-open handling",
+      "question": "How does Stage-0 fail-open behavior work when index is stale/mismatch/unavailable? cite code paths.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/services/helix-ask/stage0-index.ts", "server/services/helix-ask/repo-search.ts"]
+      }
+    },
+    {
+      "label": "warp retrieval diagnostics",
+      "question": "Show which debug fields report Stage-0 and retrieval channel behavior for warp/internal prompts. cite code files.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/routes/agi.plan.ts", "client/src/components/helix/HelixAskPill.tsx"]
+      }
+    },
+    {
+      "label": "warp explain explicit path guard 1",
+      "question": "Use server/services/helix-ask/repo-search.ts to explain Stage-0 explicit path bypass behavior.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/services/helix-ask/repo-search.ts"]
+      }
+    },
+    {
+      "label": "warp explain explicit path guard 2",
+      "question": "From modules/warp/natario-warp.ts, summarize how warp bubble terms appear in implementation comments or symbols.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["modules/warp/natario-warp.ts"]
+      }
+    },
+    {
+      "label": "warp explain explicit path guard 3",
+      "question": "Read docs/knowledge/warp/warp-bubble.md and explain its definition plus where runtime references it.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["docs/knowledge/warp/warp-bubble.md"]
+      }
+    },
+    {
+      "label": "warp explain explicit path guard 4",
+      "question": "Using server/routes/agi.plan.ts, explain where retrieval debug payload receives Stage-0 telemetry fields.",
+      "expect": {
+        "citations": "require",
+        "must_include": ["server/routes/agi.plan.ts"]
+      }
+    },
+    {
+      "label": "warp rollout gate summary",
+      "question": "Summarize the safe rollout sequence for Stage-0 (shadow to full) and include concrete config/env references from repo files.",
+      "expect": {
+        "citations": "require",
+        "must_include": [".env.example", "server/services/helix-ask/repo-search.ts"]
+      }
+    }
+  ]
+}

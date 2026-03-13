@@ -186,6 +186,15 @@ const cases: IntentCase[] = [
     expectedFormat: "brief",
     expectStageTags: false,
   },
+  {
+    question: "Show the warp congruence math equation and how the codebase maps it.",
+    hasRepoHints: true,
+    hasFilePathHints: false,
+    expectedId: "repo.warp_math_congruence",
+    expectedDomain: "repo",
+    expectedFormat: "steps",
+    expectStageTags: false,
+  },
 ];
 
 describe("Helix Ask intent routing", () => {
@@ -262,6 +271,30 @@ describe("Helix Ask intent routing", () => {
       certifying: false,
     });
     expect(match.profile.strictProvenanceFailReason).toBe(STRICT_PACKAGES_PROVENANCE_FAIL_REASON);
+  });
+
+  it("prefers general routing for multilingual conceptual warp prompts without repo cues", () => {
+    const question = "What is a warp bubble?";
+    const match = matchHelixAskIntent({
+      question,
+      hasRepoHints: false,
+      hasFilePathHints: false,
+      preferGeneralWhenNoRepoHints: true,
+    });
+    expect(match.profile.id).toBe("general.conceptual_define_compare");
+    expect(match.profile.domain).toBe("general");
+  });
+
+  it("prefers general routing for multilingual Helix Ask workflow prompts without repo cues", () => {
+    const question = "Explain how Helix Ask helps a research workflow.";
+    const match = matchHelixAskIntent({
+      question,
+      hasRepoHints: false,
+      hasFilePathHints: false,
+      preferGeneralWhenNoRepoHints: true,
+    });
+    expect(match.profile.id).toBe("general.conceptual_define_compare");
+    expect(match.profile.domain).toBe("general");
   });
 });
 

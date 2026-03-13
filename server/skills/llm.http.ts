@@ -126,7 +126,11 @@ async function getFetch(): Promise<typeof fetch> {
 }
 
 const normalizeBase = (): string => {
-  const base = (process.env.LLM_HTTP_BASE ?? "").trim();
+  const configuredBase = (process.env.LLM_HTTP_BASE ?? "").trim();
+  const allowDefaultOpenAiBase =
+    String(process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE ?? "1").trim() !== "0";
+  const hasApiKey = Boolean(process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
+  const base = configuredBase || (allowDefaultOpenAiBase && hasApiKey ? "https://api.openai.com" : "");
   if (!base) {
     throw new Error("LLM_HTTP_BASE not set");
   }

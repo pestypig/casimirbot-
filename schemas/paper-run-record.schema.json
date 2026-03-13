@@ -1,0 +1,352 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://casimirbot/schemas/paper-run-record.schema.json",
+  "title": "Paper Run Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "state_machine_id",
+    "run_id",
+    "request_id",
+    "paper_id",
+    "tenant_id",
+    "submitted_by",
+    "created_at",
+    "updated_at",
+    "lifecycle_state",
+    "current_stage",
+    "stage_attempts",
+    "transition_log",
+    "artifacts",
+    "validation"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "state_machine_id": { "type": "string", "const": "paper_run.v1" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+    "request_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+    "paper_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,128}$" },
+    "tenant_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "submitted_by": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "intake_validated",
+        "parsing",
+        "extracting",
+        "normalizing",
+        "graph_merging",
+        "indexing",
+        "review_pending",
+        "blocked",
+        "published",
+        "failed",
+        "canceled"
+      ]
+    },
+    "current_stage": {
+      "type": "string",
+      "enum": [
+        "none",
+        "parsing",
+        "extracting",
+        "normalizing",
+        "graph_merging",
+        "indexing",
+        "review_pending"
+      ]
+    },
+    "resume_stage": {
+      "type": "string",
+      "enum": [
+        "parsing",
+        "extracting",
+        "normalizing",
+        "graph_merging",
+        "indexing",
+        "review_pending"
+      ]
+    },
+    "stage_attempts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parsing",
+        "extracting",
+        "normalizing",
+        "graph_merging",
+        "indexing",
+        "review_pending"
+      ],
+      "properties": {
+        "parsing": { "type": "integer", "minimum": 0 },
+        "extracting": { "type": "integer", "minimum": 0 },
+        "normalizing": { "type": "integer", "minimum": 0 },
+        "graph_merging": { "type": "integer", "minimum": 0 },
+        "indexing": { "type": "integer", "minimum": 0 },
+        "review_pending": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "transition_log": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "event", "to", "at"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "intake_validated",
+              "parsing",
+              "extracting",
+              "normalizing",
+              "graph_merging",
+              "indexing",
+              "review_pending",
+              "blocked",
+              "published",
+              "failed",
+              "canceled"
+            ]
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "validate_intake",
+              "start_parse",
+              "parse_complete",
+              "extract_complete",
+              "normalize_complete",
+              "merge_complete",
+              "index_complete",
+              "review_approved",
+              "review_requires_remerge",
+              "soft_fail",
+              "retry_stage",
+              "hard_fail",
+              "abort_run"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "intake_validated",
+              "parsing",
+              "extracting",
+              "normalizing",
+              "graph_merging",
+              "indexing",
+              "review_pending",
+              "blocked",
+              "published",
+              "failed",
+              "canceled"
+            ]
+          },
+          "at": { "type": "string", "format": "date-time" },
+          "reason_code": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "actor": { "type": "string", "enum": ["system", "reviewer", "operator"] }
+        }
+      }
+    },
+    "stage_snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "status", "attempt"],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "parsing",
+              "extracting",
+              "normalizing",
+              "graph_merging",
+              "indexing",
+              "review_pending"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "passed", "failed", "blocked", "skipped"]
+          },
+          "attempt": { "type": "integer", "minimum": 0 },
+          "started_at": { "type": "string", "format": "date-time" },
+          "completed_at": { "type": "string", "format": "date-time" },
+          "duration_ms": { "type": "integer", "minimum": 0 },
+          "input_artifacts": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/artifactRef" },
+            "maxItems": 256
+          },
+          "output_artifacts": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/artifactRef" },
+            "maxItems": 256
+          },
+          "failure": { "$ref": "#/definitions/failureRecord" }
+        }
+      }
+    },
+    "first_fail": { "$ref": "#/definitions/failureRecord" },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parse_output",
+        "claim_output",
+        "normalized_output",
+        "graph_delta_output",
+        "index_output",
+        "knowledge_pack"
+      ],
+      "properties": {
+        "parse_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "claim_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "normalized_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "graph_delta_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "index_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "knowledge_pack": { "$ref": "#/definitions/nullableArtifactRef" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "math_trace_mode",
+        "prediction_contracts",
+        "symbol_equivalence",
+        "lineage",
+        "maturity_gates",
+        "falsifier_edges",
+        "overall_status"
+      ],
+      "properties": {
+        "math_trace_mode": { "type": "string", "enum": ["strict", "balanced"] },
+        "prediction_contracts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "validated", "status"],
+          "properties": {
+            "required": { "type": "boolean" },
+            "validated": { "type": "integer", "minimum": 0 },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "symbol_equivalence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "entries", "status"],
+          "properties": {
+            "required": { "type": "boolean" },
+            "entries": { "type": "integer", "minimum": 0 },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lineage_hash", "steps", "replayable", "status"],
+          "properties": {
+            "lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "steps": { "type": "integer", "minimum": 0 },
+            "replayable": { "type": "boolean" },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "maturity_gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["evaluated", "failed", "status"],
+          "properties": {
+            "evaluated": { "type": "integer", "minimum": 0 },
+            "failed": { "type": "integer", "minimum": 0 },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "falsifier_edges": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "count", "status"],
+          "properties": {
+            "required": { "type": "boolean" },
+            "count": { "type": "integer", "minimum": 0 },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "overall_status": { "type": "string", "enum": ["pass", "warn", "fail"] },
+        "reason_codes": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z0-9_:-]{2,128}$" },
+          "maxItems": 256,
+          "uniqueItems": true
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wall_time_ms": { "type": "integer", "minimum": 0 },
+        "queue_wait_ms": { "type": "integer", "minimum": 0 },
+        "parse_chunks": { "type": "integer", "minimum": 0 },
+        "claim_count": { "type": "integer", "minimum": 0 },
+        "conflict_count": { "type": "integer", "minimum": 0 },
+        "new_tree_nodes": { "type": "integer", "minimum": 0 },
+        "new_dag_nodes": { "type": "integer", "minimum": 0 },
+        "new_dag_edges": { "type": "integer", "minimum": 0 },
+        "new_atlas_points": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "definitions": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "sha256"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "media_type": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "nullableArtifactRef": {
+      "anyOf": [{ "$ref": "#/definitions/artifactRef" }, { "type": "null" }]
+    },
+    "failureRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "severity", "reason_code", "message", "observed_at"],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "parsing",
+            "extracting",
+            "normalizing",
+            "graph_merging",
+            "indexing",
+            "review_pending"
+          ]
+        },
+        "severity": { "type": "string", "enum": ["soft", "hard"] },
+        "reason_code": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "observed_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

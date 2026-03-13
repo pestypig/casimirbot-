@@ -129,6 +129,7 @@ def scan_file(file_path: str, lowered_terms: List[str], max_line_chars: int) -> 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Helix Ask git-tracked retrieval scan")
     parser.add_argument("--term", action="append", default=[], help="Search term (repeatable)")
+    parser.add_argument("--file", action="append", default=[], help="Optional explicit file list (repeatable)")
     parser.add_argument("--allow", action="append", default=[], help="Allowlist regex (repeatable)")
     parser.add_argument("--avoid", action="append", default=[], help="Avoidlist regex (repeatable)")
     parser.add_argument("--max-hits", type=int, default=24, help="Global max hits")
@@ -154,11 +155,21 @@ def main() -> int:
     max_file_bytes = max(1024, int(args.max_file_bytes))
     max_line_chars = max(60, int(args.max_line_chars))
 
-    try:
-        tracked_files = list_git_files()
-    except Exception as exc:  # pragma: no cover - defensive path
-        print(json.dumps({"hits": [], "truncated": False, "error": f"git_ls_files_failed:{exc}"}))
-        return 0
+    if args.file:
+        tracked_files = []
+        seen_files = set()
+        for raw in args.file:
+            normalized = (raw or "").strip().replace("\\", "/")
+            if not normalized or normalized in seen_files:
+                continue
+            seen_files.add(normalized)
+            tracked_files.append(normalized)
+    else:
+        try:
+            tracked_files = list_git_files()
+        except Exception as exc:  # pragma: no cover - defensive path
+            print(json.dumps({"hits": [], "truncated": False, "error": f"git_ls_files_failed:{exc}"}))
+            return 0
 
     per_term_counts: Dict[str, int] = {term: 0 for term in dedup_terms}
     hits: List[Dict[str, object]] = []
