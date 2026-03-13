@@ -90,7 +90,8 @@
         "math_trace_mode",
         "require_prediction_contracts",
         "require_symbol_equivalence_map",
-        "require_falsifier_edges"
+        "require_falsifier_edges",
+        "require_citation_registry"
       ],
       "properties": {
         "ocr_mode": { "type": "string", "enum": ["auto", "force", "off"] },
@@ -104,6 +105,7 @@
         "require_prediction_contracts": { "type": "boolean" },
         "require_symbol_equivalence_map": { "type": "boolean" },
         "require_falsifier_edges": { "type": "boolean" },
+        "require_citation_registry": { "type": "boolean" },
         "max_claims": { "type": "integer", "minimum": 1, "maximum": 50000 },
         "max_runtime_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
         "priority": { "type": "string", "enum": ["low", "normal", "high"] }

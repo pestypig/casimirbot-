@@ -207,6 +207,7 @@
       "required": [
         "parse_output",
         "claim_output",
+        "citation_output",
         "normalized_output",
         "graph_delta_output",
         "index_output",
@@ -215,6 +216,7 @@
       "properties": {
         "parse_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "claim_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "citation_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "normalized_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "graph_delta_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "index_output": { "$ref": "#/definitions/nullableArtifactRef" },
@@ -231,6 +233,7 @@
         "lineage",
         "maturity_gates",
         "falsifier_edges",
+        "citations",
         "overall_status"
       ],
       "properties": {
@@ -283,6 +286,17 @@
           "properties": {
             "required": { "type": "boolean" },
             "count": { "type": "integer", "minimum": 0 },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "citations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "extracted", "linked_claim_edges", "status"],
+          "properties": {
+            "required": { "type": "boolean" },
+            "extracted": { "type": "integer", "minimum": 0 },
+            "linked_claim_edges": { "type": "integer", "minimum": 0 },
             "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
           }
         },

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { isFastModeRuntimeMissingSymbolError } from "../server/services/helix-ask/runtime-errors";
 import {
   __testHelixAskReliabilityGuards,
@@ -258,6 +260,76 @@ describe("helix ask reliability guards", () => {
     expect(contract.required).toBe(true);
     expect(contract.ok).toBe(false);
     expect(contract.reason === "equation_missing" || contract.reason === "equation_and_citation_missing").toBe(true);
+  });
+
+  it("rescues explicit-path equation requests by scanning the requested file", () => {
+    const relPath = ".tmp-stage05-tests/explicit-equation-rescue.md";
+    const fullPath = path.join(process.cwd(), relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(
+      fullPath,
+      [
+        "# Congruence note",
+        "Intermediate text",
+        "ds^2 = -alpha^2 dt^2 + gamma_ij (dx^i - beta^i dt)(dx^j - beta^j dt)",
+      ].join("\n"),
+      "utf8",
+    );
+    try {
+      const rescue = __testHelixAskReliabilityGuards.buildExplicitPathEquationContractRescue({
+        question: "Show one warp congruence equation from docs and explain it.",
+        explicitPaths: [relPath],
+        allowedCitations: [relPath],
+      });
+      expect(rescue).toBeTruthy();
+      expect(rescue?.path).toBe(relPath);
+      expect(rescue?.equation).toMatch(/ds\^2/i);
+      const contract = __testHelixAskReliabilityGuards.evaluateEquationQuoteContract({
+        question: "Show one warp congruence equation from docs and explain it.",
+        answer: rescue?.answer ?? "",
+        allowedCitations: [relPath],
+      });
+      expect(contract.required).toBe(true);
+      expect(contract.ok).toBe(true);
+      expect(contract.reason).toBe("ok");
+    } finally {
+      fs.rmSync(fullPath, { force: true });
+    }
+  });
+
+  it("rescues non-explicit equation requests by scanning allowed citation files", () => {
+    const relPath = ".tmp-stage05-tests/general-equation-rescue.md";
+    const fullPath = path.join(process.cwd(), relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(
+      fullPath,
+      [
+        "# Warp congruence context",
+        "alpha note",
+        "ds^2 = -(alpha^2 - beta_i beta^i) dt^2 + 2 beta_i dx^i dt + gamma_ij dx^i dx^j",
+      ].join("\n"),
+      "utf8",
+    );
+    try {
+      const rescue = __testHelixAskReliabilityGuards.buildExplicitPathEquationContractRescue({
+        question: "Can you show one warp congruence equation and explain it with citation?",
+        explicitPaths: [],
+        allowedCitations: [relPath],
+      });
+      expect(rescue).toBeTruthy();
+      expect(rescue?.path).toBe(relPath);
+      expect(rescue?.equation).toMatch(/ds\^2/i);
+      const contract = __testHelixAskReliabilityGuards.evaluateEquationQuoteContract({
+        question: "Can you show one warp congruence equation and explain it with citation?",
+        answer: rescue?.answer ?? "",
+        allowedCitations: [relPath],
+      });
+      expect(contract.required).toBe(true);
+      expect(contract.ok).toBe(true);
+      expect(contract.reason).toBe("ok");
+    } finally {
+      fs.rmSync(fullPath, { force: true });
+    }
   });
 
   it("scores evidence mass higher when source diversity and coverage are strong", () => {

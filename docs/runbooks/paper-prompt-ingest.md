@@ -24,6 +24,7 @@ signals, and writes:
 - `*.request.json` (paper ingest request)
 - `*.run.json` (PaperRun lifecycle + validation summary)
 - `*.pack.json` (knowledge pack for tree/dag/atlas contracts)
+- `*.citations.json` (citation registry + claim citation links)
 - `*.envelope.json` (raw envelope snapshot, when available)
 
 Output directory:
@@ -47,6 +48,7 @@ Then show me the generated request/run/pack file paths.
 - `--require-prediction-contracts true`
 - `--require-symbol-map true`
 - `--require-falsifier-edges true`
+- `--require-citations true`
 - `--tenant-id <tenant>`
 - `--token <jwt>`
 
@@ -56,5 +58,7 @@ Then show me the generated request/run/pack file paths.
 - If `/api/essence/ingest` rejects PDFs (`415`), the script auto-falls back to
   local artifact generation and marks `ingestMode=local_pdf_fallback` in output.
 - For server-side PDF enrichment, include `application/pdf` in `ESSENCE_UPLOAD_MIME`.
+- If `--require-citations true` and no citations are extracted, the run is marked
+  `blocked` with `validation.overall_status=fail`.
 - This is a fast scan + catalog path. You can enrich the generated pack later
   with full equations, prediction contracts, and maturity/falsifier evidence.

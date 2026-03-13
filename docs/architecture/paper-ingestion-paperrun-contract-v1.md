@@ -77,24 +77,32 @@ No transition is allowed out of `published`, `failed`, or `canceled`.
   - `theoretical_congruence`
 - Requirement: every claim includes provenance span and confidence.
 
-3. `normalizing`
+3. `citation_extracting` (required sub-stage of extracting)
+- Inputs: parsed text blocks + extracted claims.
+- Outputs:
+  - `citation_registry` (normalized citations with DOI/arXiv/URL when available)
+  - `citation_links` (claim-to-citation links, with method and confidence)
+- Requirement: keep raw citation text + provenance spans for replay.
+
+4. `normalizing`
 - Inputs: raw claims.
 - Outputs: canonical entities, symbols, units, variable bindings.
 
-4. `graph_merging`
+5. `graph_merging`
 - Inputs: normalized claims.
 - Outputs:
   - `tree_delta`
   - `dag_delta`
   - `atlas_delta`
   - `math_registry` (equations, definitions, variables, units, assumptions)
+  - citation graph edges (`cites`)
   - contradiction and congruence edges.
 
-5. `indexing`
+6. `indexing`
 - Inputs: merged graph deltas + claims.
 - Outputs: lexical index ref, vector index ref, graph traversal anchors.
 
-6. `review_pending`
+7. `review_pending`
 - Inputs: generated knowledge pack.
 - Outputs: `approved` or `requires_remerge` with deterministic reason codes.
 
@@ -129,6 +137,11 @@ Each published paper knowledge pack must include:
   - `current_stage`
   - `status`
   - `blocking_reason`
+
+6. Citation trace layer
+- Structured `citation_registry` with normalized identifiers (DOI/arXiv/URL when available).
+- `citation_links` from claims to citations with extraction method (`marker`, `doi`, `arxiv`, `heuristic`).
+- Citation provenance retained for deterministic replay and audit.
 
 ## Retry and Failure Policy
 

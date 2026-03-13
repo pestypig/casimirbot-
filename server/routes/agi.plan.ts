@@ -19292,6 +19292,9 @@ type EquationQuoteContractResult = {
 
 const EQUATION_IN_TEXT_RE =
   /(?:\b[A-Za-z][A-Za-z0-9_^{}]*\s*=\s*[^\n]{2,})|(?:ds\^2\s*=)|(?:g_\{[^}]+\}\s*=)|(?:R_\{[^}]+\}\s*=)|(?:T_\{[^}]+\}\s*=)/i;
+const EQUATION_CODE_ASSIGNMENT_RE =
+  /^\s*(?:const|let|var|return|if|for|while|switch|case|function|class|interface|type|enum|export|import)\b/i;
+const EQUATION_JSON_LINE_RE = /^\s*["'][^"']+["']\s*:/;
 
 const normalizeEquationNeedle = (value: string): string =>
   value
@@ -19307,6 +19310,92 @@ const extractEquationNeedlesFromQuestion = (question: string): string[] => {
     .map((entry) => normalizeEquationNeedle(entry))
     .filter((entry) => entry.length >= 5 && entry.length <= 180);
   return Array.from(new Set(normalized)).slice(0, 4);
+};
+
+type ExplicitPathEquationContractRescue = {
+  answer: string;
+  path: string;
+  line: number;
+  equation: string;
+};
+
+const scoreEquationCandidateLine = (line: string, questionNeedles: string[]): number => {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length < 6 || trimmed.length > 420) return Number.NEGATIVE_INFINITY;
+  let score = 0;
+  const normalizedNeedle = normalizeEquationNeedle(trimmed);
+  if (questionNeedles.some((needle) => normalizedNeedle.includes(needle))) score += 120;
+  if (/\b(congruence|metric|tensor|riemann|ricci|curvature|einstein|geodesic)\b/i.test(trimmed)) score += 20;
+  if (/ds\^2|g_\{|R_\{|T_\{|\\frac|\\nabla|\\partial|∂|∇|Σ|Δ|∫/i.test(trimmed)) score += 40;
+  if (EQUATION_IN_TEXT_RE.test(trimmed)) score += 25;
+  if (trimmed.includes("=")) score += 8;
+  if (EQUATION_CODE_ASSIGNMENT_RE.test(trimmed)) score -= 40;
+  if (EQUATION_JSON_LINE_RE.test(trimmed)) score -= 30;
+  if (/;\s*$/.test(trimmed) && !/ds\^2|g_\{|R_\{|T_\{|\\frac|\\nabla|\\partial|∂|∇|Σ|Δ|∫/i.test(trimmed)) {
+    score -= 10;
+  }
+  return score;
+};
+
+const buildExplicitPathEquationContractRescue = (args: {
+  question: string;
+  explicitPaths: string[];
+  allowedCitations: string[];
+}): ExplicitPathEquationContractRescue | null => {
+  const questionNeedles = extractEquationNeedlesFromQuestion(args.question ?? "");
+  const candidatePaths = normalizeCitations([
+    ...(args.explicitPaths ?? []),
+    ...(args.allowedCitations ?? []),
+  ]).slice(0, 10);
+  for (const candidatePath of candidatePaths) {
+    const normalizedPath = normalizeAtlasRepoPath(candidatePath);
+    if (!normalizedPath || !isAtlasRepoPathSafe(normalizedPath)) continue;
+    const absolutePath = path.resolve(process.cwd(), normalizedPath);
+    if (!fs.existsSync(absolutePath)) continue;
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(absolutePath);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile() || stat.size <= 0 || stat.size > 1_048_576) continue;
+    let raw = "";
+    try {
+      raw = fs.readFileSync(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+    if (!raw || raw.includes("\u0000")) continue;
+    const lines = raw.split(/\r?\n/);
+    let bestLineIndex = -1;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < lines.length; i += 1) {
+      const score = scoreEquationCandidateLine(lines[i] ?? "", questionNeedles);
+      if (score > bestScore) {
+        bestScore = score;
+        bestLineIndex = i;
+      }
+    }
+    if (bestLineIndex < 0 || bestScore <= 0) continue;
+    const equationLine = clipAskText((lines[bestLineIndex] ?? "").trim(), 320);
+    if (!equationLine || !EQUATION_IN_TEXT_RE.test(equationLine)) continue;
+    const lineNumber = bestLineIndex + 1;
+    const answer = [
+      `Exact equation line (${normalizedPath}:L${lineNumber}):`,
+      equationLine,
+      "This is the direct equation anchor requested from repository evidence.",
+      `Sources: ${normalizedPath}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return {
+      answer,
+      path: normalizedPath,
+      line: lineNumber,
+      equation: equationLine,
+    };
+  }
+  return null;
 };
 
 const evaluateEquationQuoteContract = (args: {
@@ -21497,6 +21586,7 @@ export const __testHelixAskReliabilityGuards = {
   computeHelixAskEvidenceMassScore,
   applyHelixAskClaimGroundingGate,
   evaluateEquationQuoteContract,
+  buildExplicitPathEquationContractRescue,
   isEquationQuotePrompt,
   isWarpMathBroadPrompt,
 };
@@ -36900,7 +36990,8 @@ const executeHelixAsk = async ({
         answer: cleaned,
         allowedCitations: contractCitationTokens,
       });
-      if (debugPayload) {
+      const writeEquationQuoteContractDebug = (): void => {
+        if (!debugPayload) return;
         (debugPayload as Record<string, unknown>).equation_quote_contract = {
           required: equationQuoteContract.required,
           ok: equationQuoteContract.ok,
@@ -36911,7 +37002,8 @@ const executeHelixAsk = async ({
           matched_citations: equationQuoteContract.matchedCitations.slice(0, 8),
           question_needles: equationQuoteContract.questionNeedles.slice(0, 4),
         };
-      }
+      };
+      writeEquationQuoteContractDebug();
       if (equationQuoteContract.required && !equationQuoteContract.ok) {
         answerPath.push("equationQuoteContract:repair_attempt");
         let repairApplied = false;
@@ -37031,6 +37123,35 @@ const executeHelixAsk = async ({
           }
         }
         if (!repairApplied) {
+          const explicitPathRescue = buildExplicitPathEquationContractRescue({
+            question: baseQuestion,
+            explicitPaths: explicitRequestedRepoPaths,
+            allowedCitations: contractCitationTokens,
+          });
+          if (explicitPathRescue) {
+            const rescuedContract = evaluateEquationQuoteContract({
+              question: baseQuestion,
+              answer: explicitPathRescue.answer,
+              allowedCitations: contractCitationTokens,
+            });
+            if (rescuedContract.ok) {
+              cleaned = explicitPathRescue.answer;
+              equationQuoteContract = rescuedContract;
+              repairApplied = true;
+              answerPath.push("equationQuoteContract:explicit_path_rescue_applied");
+              if (debugPayload) {
+                const rescueMode =
+                  explicitRequestedRepoPaths.length > 0 ? "explicit_path_scan" : "citation_scan";
+                (debugPayload as Record<string, unknown>).equation_quote_contract_rescue = {
+                  mode: rescueMode,
+                  path: explicitPathRescue.path,
+                  line: explicitPathRescue.line,
+                };
+              }
+            }
+          }
+        }
+        if (!repairApplied) {
           cleaned =
             "I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
             "Please provide module/path/symbol (for example: docs/warp-geometry-congruence-report.md or modules/warp/natario-warp.ts) and retry.";
@@ -37040,6 +37161,7 @@ const executeHelixAsk = async ({
             (debugPayload as Record<string, unknown>).helix_ask_fail_class = "evidence_contract";
           }
         }
+        writeEquationQuoteContractDebug();
       }
 
       const claimCitationLinkage = evaluateClaimCitationLinkage(
