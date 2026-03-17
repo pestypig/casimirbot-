@@ -143,7 +143,7 @@ const MAX_DIRECTORY_RELOAD_MS = 300_000;
 const MIN_DIRECTORY_RELOAD_MS = 5_000;
 const CJK_RE = /[\u2e80-\u2eff\u2f00-\u2fdf\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
 const CONCEPTUAL_PROMPT_RE =
-  /\b(?:what\s+is|what'?s|define|definition|meaning|explain|concept|theory|in\s+plain\s+language|in\s+simple\s+terms|how\s+is)\b|\u4ec0\u4e48\u662f|\u89e3\u91ca|\u610f\u5473\u7740/u;
+  /\b(?:what\s+is|what'?s|define|definition|meaning|explain|concept|theory|in\s+plain\s+language|in\s+simple\s+terms|how\s+(?:is|does|do|can|could|would))\b|\u4ec0\u4e48\u662f|\u89e3\u91ca|\u610f\u5473\u7740/u;
 const RELATION_PROMPT_RE =
   /\b(?:relation|related|relationship|how\s+is|difference|versus|vs\.?|between|link(?:ed|age)?)\b|\u5173\u7cfb|\u8054\u7cfb|\u533a\u522b/u;
 

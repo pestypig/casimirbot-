@@ -91,7 +91,8 @@
         "require_prediction_contracts",
         "require_symbol_equivalence_map",
         "require_falsifier_edges",
-        "require_citation_registry"
+        "require_citation_registry",
+        "require_paper_card"
       ],
       "properties": {
         "ocr_mode": { "type": "string", "enum": ["auto", "force", "off"] },
@@ -106,6 +107,7 @@
         "require_symbol_equivalence_map": { "type": "boolean" },
         "require_falsifier_edges": { "type": "boolean" },
         "require_citation_registry": { "type": "boolean" },
+        "require_paper_card": { "type": "boolean" },
         "max_claims": { "type": "integer", "minimum": 1, "maximum": 50000 },
         "max_runtime_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
         "priority": { "type": "string", "enum": ["low", "normal", "high"] }

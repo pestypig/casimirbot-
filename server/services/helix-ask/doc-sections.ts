@@ -38,6 +38,20 @@ type DocSectionCacheEntry = {
 };
 
 const docSectionCache = new Map<string, DocSectionCacheEntry>();
+const DOC_SECTION_CACHE_MAX_ENTRIES = 64;
+const DOC_SECTION_MAX_READ_BYTES = 512 * 1024;
+
+const setDocSectionCache = (cacheKey: string, entry: DocSectionCacheEntry): void => {
+  if (docSectionCache.has(cacheKey)) {
+    docSectionCache.delete(cacheKey);
+  }
+  docSectionCache.set(cacheKey, entry);
+  while (docSectionCache.size > DOC_SECTION_CACHE_MAX_ENTRIES) {
+    const oldestKey = docSectionCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    docSectionCache.delete(oldestKey);
+  }
+};
 
 const normalizeDocText = (value: string): string => {
   return value
@@ -216,7 +230,20 @@ export const readDocSectionIndex = (filePath: string): DocSectionIndex => {
   }
   let raw = "";
   try {
-    raw = fs.readFileSync(fullPath, "utf8");
+    const maxReadBytes = Math.max(64 * 1024, DOC_SECTION_MAX_READ_BYTES);
+    if (stat && stat.size > maxReadBytes) {
+      const fd = fs.openSync(fullPath, "r");
+      try {
+        const bytesToRead = Math.min(stat.size, maxReadBytes);
+        const buffer = Buffer.allocUnsafe(bytesToRead);
+        const bytesRead = fs.readSync(fd, buffer, 0, bytesToRead, 0);
+        raw = buffer.subarray(0, bytesRead).toString("utf8");
+      } finally {
+        fs.closeSync(fd);
+      }
+    } else {
+      raw = fs.readFileSync(fullPath, "utf8");
+    }
   } catch {
     return { headings: [], aliases: [], sections: [] };
   }
@@ -232,7 +259,7 @@ export const readDocSectionIndex = (filePath: string): DocSectionIndex => {
     sections,
   };
   if (stat) {
-    docSectionCache.set(cacheKey, { mtimeMs: stat.mtimeMs, index });
+    setDocSectionCache(cacheKey, { mtimeMs: stat.mtimeMs, index });
   }
   return index;
 };

@@ -96,9 +96,19 @@ const splitAnswerForEnvelope = (
   const trimmed = text.trim();
   if (!trimmed) return { summary: "" };
   if (format === "steps") return { summary: trimmed };
+  const hasPathCitations =
+    /\[[^\]]+\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)(?::\d+)?\]/i.test(trimmed) ||
+    /\b(?:client|server|shared|modules|docs|tests|scripts|tools|cli)\/[^\s]+/i.test(trimmed);
+  const hasStructuredLines = /\n\s*(?:\d+\.|-|\*)\s+/m.test(trimmed);
   const paragraphs = splitParagraphs(trimmed);
   const maxSummaryParagraphs = format === "compare" ? 2 : 1;
   if (paragraphs.length <= 1) {
+    // Path/citation-heavy and list-structured answers often include ".ts"/".md" tokens.
+    // Sentence-level splitting can misinterpret those dots as sentence boundaries and
+    // corrupt envelope text (e.g. turning "[.../collapse.ts]" into "ts]").
+    if (hasPathCitations || hasStructuredLines) {
+      return { summary: trimmed };
+    }
     if (trimmed.length <= 420) return { summary: trimmed };
     const sentences = trimmed.match(/[^.!?]+[.!?]+(?:\s+|$)/g);
     if (!sentences || sentences.length <= 2) return { summary: trimmed };

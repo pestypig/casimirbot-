@@ -12,6 +12,11 @@ describe("Helix Ask math solver", () => {
     expect(isHelixAskMathQuestion(symbolic)).toBe(true);
   });
 
+  it("does not classify conceptual equation prompts as direct math solves", () => {
+    const conceptual = "what's the equation of the collapse of the wave function?";
+    expect(isHelixAskMathQuestion(conceptual)).toBe(false);
+  });
+
   it("solves linear equations with implicit multiplication", async () => {
     const result = await solveHelixAskMathQuestion(
       "Solve for x: 2x + 5 = 17. Explain briefly",

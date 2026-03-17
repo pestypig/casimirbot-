@@ -69,6 +69,8 @@ const finiteOrNull = (value: unknown): number | null => {
 };
 
 const isSha256Hex = (value: string): boolean => /^[a-f0-9]{64}$/i.test(value);
+const normalizeRef = (value: string): string => value.replace(/\\/g, '/').trim().toLowerCase();
+const isTemplateRef = (value: string): boolean => normalizeRef(value).includes('docs/specs/data/se-paired-runs-template-');
 
 const renderMarkdown = (payload: {
   evidencePath: string;
@@ -157,6 +159,8 @@ export const validateSemEllipsPairedEvidence = (options: {
   const rawArtifactSha256 = Object.fromEntries(
     rawArtifactSha256Entries.filter(([ref]) => ref.length > 0),
   );
+  const templateRefPresent = rawArtifactRefs.some((ref) => isTemplateRef(ref));
+  const templateRunId = pairedRunId?.toLowerCase().includes('template') ?? false;
   const uSemNm = finiteOrNull(payload.uncertainty?.u_sem_nm);
   const uEllipNm = finiteOrNull(payload.uncertainty?.u_ellip_nm);
   const rhoSemEllip = finiteOrNull(payload.uncertainty?.rho_sem_ellip);
@@ -249,6 +253,15 @@ export const validateSemEllipsPairedEvidence = (options: {
         detail: `Invalid SHA-256 hash format for raw artifact ref: ${ref}`,
       });
     }
+  }
+
+  if (templateRefPresent || templateRunId) {
+    issues.push({
+      code: 'template_placeholder_input',
+      severity: 'error',
+      detail:
+        'Template bundle inputs are rehearsal-only and cannot unlock reportable readiness. Use commit-tracked instrument-export artifacts.',
+    });
   }
 
   if (uSemNm == null || uSemNm <= 0) {

@@ -1,0 +1,2548 @@
+﻿{
+    "text":  "Unverified:\n- No repo-evidenced claims were confirmed yet. [modules/warp/natario-warp.ts] Reasoned connections (bounded):\n- Need at least two grounded points before drawing a connection. [modules/warp/natario-warp.ts] Next evidence:\n- Searched terms: Explain the congruence of the warp bubble solution?, warp bubble, calculateNatarioWarpBubble, warp pipeline\n- Checked files: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md,\n- Check files under modules or docs. - Search docs headings for \"Node: Warp Bubble\". [modules/warp/natario-warp.ts] - Search docs headings for \"Observer-Robust Warp Bubble Visualizer Build Plan\". [modules/warp/natario-warp.ts] - Search docs headings for \"Nat�rio-Casimir Warp Bubble Operations Runbook\". [modules/warp/natario-warp.ts] Sources: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-schema.md, docs/warp-console-architecture.md, docs/warp-congruence-universal-coverage-task.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/ui-components-tree.json",
+    "envelope":  {
+                     "mode":  "extended",
+                     "tier":  "F1",
+                     "answer":  "Unverified:\n- No repo-evidenced claims were confirmed yet. [modules/warp/natario-warp.ts] Reasoned connections (bounded):\n- Need at least two grounded points before drawing a connection. [modules/warp/natario-warp.ts] Next evidence:\n- Searched terms: Explain the congruence of the warp bubble solution?, warp bubble, calculateNatarioWarpBubble, warp pipeline\n- Checked files: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md,\n- Check files under modules or docs. - Search docs headings for \"Node: Warp Bubble\". [modules/warp/natario-warp.ts] - Search docs headings for \"Observer-Robust Warp Bubble Visualizer Build Plan\". [modules/warp/natario-warp.ts] - Search docs headings for \"Nat�rio-Casimir Warp Bubble Operations Runbook\". [modules/warp/natario-warp.ts] Sources: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-schema.md, docs/warp-console-architecture.md, docs/warp-congruence-universal-coverage-task.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/ui-components-tree.json",
+                     "sections":  [
+                                      {
+                                          "title":  "Tree Walk",
+                                          "body":  "Tree Walk: Warp Mechanics Walk (tree-derived; source: docs/knowledge/warp/warp-mechanics-tree.json)\nChain scaffold: root_to_leaf | continuity: fallback FAIL_NODE_MISSING_EQUATION_REF\n1. Role:anchor: Warp Mechanics Tree - A walkable map of warp geometry, proxies, and control levers. (docs/knowledge/warp/warp-mechanics-tree.json)\n\nTree Walk: UI Components Walk (tree-derived; source: docs/knowledge/ui-components-tree.json)\nChain scaffold: root_to_anchor | continuity: fallback root_to_anchor_unreachable\n1. Walk: UI Components Tree - Client-side surfaces, panels, renderers, and UI primitives. (docs/knowledge/ui-components-tree.json)\n\nTree Walk: Math Maturity + Verification Walk (tree-derived; source: docs/knowledge/physics/math-tree.json)\nChain scaffold: root_to_anchor | continuity: fallback FAIL_NODE_MISSING_EQUATION_REF\n1. Hint: Math Maturity Tree - Navigation hint only; no doc span bound. (docs/knowledge/physics/math-tree.json)",
+                                          "citations":  [
+                                                            "docs/knowledge/warp/warp-mechanics-tree.json",
+                                                            "docs/knowledge/ui-components-tree.json",
+                                                            "docs/knowledge/physics/math-tree.json"
+                                                        ],
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      },
+                                      {
+                                          "title":  "Key files",
+                                          "body":  "- docs/knowledge/warp/warp-bubble.md",
+                                          "citations":  [
+                                                            "docs/knowledge/warp/warp-bubble.md"
+                                                        ],
+                                          "layer":  "proof"
+                                      }
+                                  ],
+                     "extension":  {
+                                       "available":  true,
+                                       "title":  "Additional Repo Context",
+                                       "body":  "Additional repo context:\n- Evidence: Doc: warp congruence universal coverage task Heading: Warp Congruence Universal Coverage Task Subheading: Objective Subheading: Non-Goals Subheading: Inputs Subheading: Needle Hull Note Atlas graph candidate: d... (see docs/warp-congruence-universal-coverage-task.md)\n- Evidence: Section: Overview Span: L12-L14 Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. Key questions: How is zero expansion computed ... (see docs/knowledge/warp/natario-zero-expansion.md)\n- Evidence: Section: Overview Span: L9-L11 Definition: The Alcubierre metric is a canonical warp spacetime model used as a conceptual reference for bubble geometry. Key questions: Which terms are compared against the repo\u0027... (see docs/knowledge/warp/alcubierre-metric.md)",
+                                       "citations":  [
+                                                         "docs/warp-congruence-universal-coverage-task.md",
+                                                         "docs/knowledge/warp/natario-zero-expansion.md",
+                                                         "docs/knowledge/warp/alcubierre-metric.md"
+                                                     ]
+                                   }
+                 },
+    "prompt_ingested":  false,
+    "provenance_class":  "inferred",
+    "claim_tier":  "diagnostic",
+    "certifying":  false,
+    "debug":  {
+                  "two_pass":  false,
+                  "micro_pass":  true,
+                  "trace_id":  "ask:598a8c94-f8af-41ee-9506-200220d2481c",
+                  "llm_route_expected_backend":  "http",
+                  "llm_runtime_env":  "http",
+                  "llm_policy_env":  "http",
+                  "llm_http_base_present":  true,
+                  "llm_http_base_host":  "api.openai.com",
+                  "llm_api_key_present":  true,
+                  "llm_invoke_attempted":  true,
+                  "llm_force_probe_requested":  false,
+                  "llm_force_probe_enabled":  false,
+                  "tuning_enabled":  false,
+                  "fast_quality_mode":  false,
+                  "arbiter_repo_ratio":  0.45,
+                  "arbiter_hybrid_ratio":  0.25,
+                  "retry_topk_bonus":  4,
+                  "format_enforcement":  "strict",
+                  "soft_expansion":  0,
+                  "scaffold_tokens":  512,
+                  "evidence_tokens":  512,
+                  "repair_tokens":  192,
+                  "hypothesis_enabled":  false,
+                  "agent_loop_enabled":  true,
+                  "agent_loop_max_steps":  3,
+                  "agent_loop_budget_ms":  120000,
+                  "agent_action_budget_ms":  20000,
+                  "clocka_tool_cap":  2,
+                  "agent_loop_steps":  1,
+                  "agent_loop_actions":  [
+                                             {
+                                                 "action":  "expand_heading_aliases",
+                                                 "reason":  "doc_heading_seed_slots",
+                                                 "expectedGain":  "seed_slot_aliases",
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-17T16:53:19.318Z"
+                                             },
+                                             {
+                                                 "action":  "retrieve_mixed",
+                                                 "reason":  "default_scope",
+                                                 "expectedGain":  "balanced_retrieval",
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-17T16:53:48.032Z"
+                                             }
+                                         ],
+                  "agent_stop_reason":  "proof_density_sufficient",
+                  "agent_action_counts":  {
+                                              "expand_heading_aliases":  1,
+                                              "retrieve_mixed":  1
+                                          },
+                  "agent_attempts":  [
+                                         "expand_heading_aliases",
+                                         "retrieve_mixed"
+                                     ],
+                  "single_llm":  true,
+                  "definition_focus":  false,
+                  "capsule_dialogue_applied_count":  0,
+                  "capsule_evidence_applied_count":  0,
+                  "capsule_retry_applied":  false,
+                  "focus_guard_result":  "pass",
+                  "anchor_guard_result":  "pass",
+                  "capsule_latest_topic_shift":  false,
+                  "capsule_must_keep_terms":  [
+
+                                              ],
+                  "capsule_preferred_paths":  [
+
+                                              ],
+                  "block_scoped":  false,
+                  "slot_plan_explicit_path_focus":  false,
+                  "report_mode":  false,
+                  "report_blocks_count":  0,
+                  "slot_plan_pass_used":  false,
+                  "session_memory_used":  false,
+                  "explicit_repo_expectation":  true,
+                  "warp_proof_repo_cue":  true,
+                  "query_constraints":  {
+                                            "collapse_domain_lock":  false,
+                                            "hard_exclude_warp_family":  false,
+                                            "explicit_anchor_paths":  [
+
+                                                                      ]
+                                        },
+                  "repo_expectation_score":  3,
+                  "repo_expectation_level":  "high",
+                  "repo_expectation_signals":  [
+                                                   "explicit_repo",
+                                                   "tag:warp",
+                                                   "repo_hint",
+                                                   "term_prior_suppressed:explicit_repo_cue",
+                                                   "concept_match"
+                                               ],
+                  "explicit_repo_paths":  [
+
+                                          ],
+                  "term_prior_enabled":  true,
+                  "term_prior_log_only":  false,
+                  "term_prior_applied":  false,
+                  "term_prior_hard_force_general":  false,
+                  "term_prior_prefer_general":  false,
+                  "term_prior_suppressed_reason":  "explicit_repo_cue",
+                  "term_prior_term_hit_confidence":  1,
+                  "term_prior_pivot_confidence":  null,
+                  "term_prior_polysemy_ambiguous":  false,
+                  "term_prior_polysemy_group":  null,
+                  "term_prior_term_hits":  [
+                                               {
+                                                   "term_id":  "framework_warp_bubble",
+                                                   "category":  "framework",
+                                                   "canonical":  "warp bubble",
+                                                   "matched_in":  "both",
+                                                   "match_type":  "exact",
+                                                   "term_hit_confidence":  1,
+                                                   "repo_blocker_hit":  false
+                                               }
+                                           ],
+                  "term_prior_directory_denylist":  [
+
+                                                    ],
+                  "term_prior_directory_disabled":  [
+
+                                                    ],
+                  "topic_allowlist_tiers":  3,
+                  "topic_must_include_files":  [
+                                                   "modules/warp/warp-module.ts",
+                                                   "modules/warp/natario-warp.ts",
+                                                   "docs/warp-console-architecture.md"
+                                               ],
+                  "ambiguity_target_span":  "congruence of the warp bubble solution",
+                  "ambiguity_cluster_count":  9,
+                  "ambiguity_cluster_top_mass":  0.4390787247868926,
+                  "ambiguity_cluster_margin":  0.8085588059701493,
+                  "ambiguity_cluster_entropy":  0.8356683488994018,
+                  "ambiguity_cluster_candidates":  [
+                                                       {
+                                                           "label":  "modules/warp",
+                                                           "score":  0.265732,
+                                                           "mass":  0.439079,
+                                                           "count":  10
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-full-congruence-task.md",
+                                                           "score":  0.050872,
+                                                           "mass":  0.084058,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-geometry-congruence-synthesis.md",
+                                                           "score":  0.049108,
+                                                           "mass":  0.081143,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-console-architecture.md",
+                                                           "score":  0.047751,
+                                                           "mass":  0.0789,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-tree-dag-walk-rules.md",
+                                                           "score":  0.047027,
+                                                           "mass":  0.077704,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-tree-dag-schema.md",
+                                                           "score":  0.046325,
+                                                           "mass":  0.076544,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-congruence-universal-coverage-task.md",
+                                                           "score":  0.039724,
+                                                           "mass":  0.065636,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-geometry-congruence-report.md",
+                                                           "score":  0.038646,
+                                                           "mass":  0.063855,
+                                                           "count":  1
+                                                       },
+                                                       {
+                                                           "label":  "docs/warp-panel-congruence-audit.md",
+                                                           "score":  0.020021,
+                                                           "mass":  0.033081,
+                                                           "count":  1
+                                                       }
+                                                   ],
+                  "ambiguity_evidence_pass":  true,
+                  "ambiguity_evidence_scores":  [
+                                                    {
+                                                        "label":  "modules/warp",
+                                                        "score":  0.6,
+                                                        "docShare":  0.5,
+                                                        "matchRatio":  0.5
+                                                    },
+                                                    {
+                                                        "label":  "docs/warp-full-congruence-task.md",
+                                                        "score":  0.4333,
+                                                        "docShare":  0.5,
+                                                        "matchRatio":  0.3333
+                                                    }
+                                                ],
+                  "ambiguity_selected":  "modules/warp",
+                  "ambiguity_resolver_applied":  false,
+                  "ambiguity_resolver_reason":  "cluster_entropy",
+                  "ambiguity_resolver_token_count":  4,
+                  "ambiguity_resolver_short_prompt":  true,
+                  "ambiguity_resolver_top_score":  80,
+                  "ambiguity_resolver_margin":  80,
+                  "slot_dominance_margin":  0.8085588059701493,
+                  "ambiguity_resolver_candidates":  [
+                                                        "warp-bubble",
+                                                        "warp bubble",
+                                                        "warp field bubble"
+                                                    ],
+                  "ambiguity_resolver_bypassed":  "repo_code_query",
+                  "format":  "steps",
+                  "stage_tags":  false,
+                  "verbosity":  "extended",
+                  "topic_tags":  [
+                                     "warp"
+                                 ],
+                  "intent_id":  "repo.warp_math_congruence",
+                  "intent_domain":  "repo",
+                  "intent_tier":  "F1",
+                  "intent_strategy":  "repo_rag",
+                  "intent_reason":  "match:2",
+                  "frontier_theory_lens_source":  "none",
+                  "frontier_theory_lens_requested":  false,
+                  "frontier_theory_lens_active":  false,
+                  "frontier_session_lens_locked":  false,
+                  "frontier_session_followup_requested":  false,
+                  "frontier_session_reset_requested":  false,
+                  "frontier_session_lock_next":  false,
+                  "frontier_required_slots":  [
+                                                  "definitions",
+                                                  "baseline",
+                                                  "hypothesis",
+                                                  "anti_hypothesis",
+                                                  "falsifiers",
+                                                  "uncertainty_band",
+                                                  "claim_tier"
+                                              ],
+                  "is_repo_question":  true,
+                  "concept_fast_path_blocked_reason":  "repo_api_cue",
+                  "concept_fast_path_removed":  true,
+                  "graph_pack_lock":  {
+                                          "requested":  [
+
+                                                        ],
+                                          "applied":  [
+                                                          "warp-mechanics",
+                                                          "ui-components",
+                                                          "math"
+                                                      ]
+                                      },
+                  "graph_congruence_region":  {
+                                                  "B_equals_1":  true,
+                                                  "qi_metric_derived_equals_true":  true,
+                                                  "qi_strict_ok_equals_true":  true,
+                                                  "theta_geom_equals_true":  true,
+                                                  "vdb_two_wall_support_equals_true":  true,
+                                                  "ts_metric_derived_equals_true":  true,
+                                                  "cl3_metric_t00_available_equals_true":  true,
+                                                  "cl3_rho_gate_equals_true":  false
+                                              },
+                  "graph_congruence_chart":  "comoving_cartesian",
+                  "graph_framework":  {
+                                          "primary":  "warp-mechanics",
+                                          "trees":  [
+                                                        {
+                                                            "tree":  "warp-mechanics",
+                                                            "anchors":  [
+                                                                            "warp-bubble",
+                                                                            "warp-module",
+                                                                            "warp-mechanics-tree"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "warp-mechanics-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/warp/warp-mechanics-tree.json",
+                                                            "score":  331.1,
+                                                            "pathMode":  "root_to_leaf",
+                                                            "pathFallbackReason":  "FAIL_NODE_MISSING_EQUATION_REF",
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  32,
+                                                                                                 "evaluatedEdges":  92,
+                                                                                                 "blockedLinkCount":  4
+                                                                                             },
+                                                                               "allowedEdges":  11,
+                                                                               "blockedEdges":  81,
+                                                                               "resolvedInTreeEdges":  6,
+                                                                               "resolvedCrossTreeEdges":  5,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  69,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  10,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  2,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        },
+                                                        {
+                                                            "tree":  "ui-components",
+                                                            "anchors":  [
+                                                                            "ui-panel-warp-bubble",
+                                                                            "ui-renderer-warp-bubble",
+                                                                            "ui-panel-warp-drive"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "ui-components-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/ui-components-tree.json",
+                                                            "score":  300,
+                                                            "pathMode":  "root_to_anchor",
+                                                            "pathFallbackReason":  "root_to_anchor_unreachable",
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  83,
+                                                                                                 "evaluatedEdges":  169,
+                                                                                                 "blockedLinkCount":  0
+                                                                                             },
+                                                                               "allowedEdges":  0,
+                                                                               "blockedEdges":  169,
+                                                                               "resolvedInTreeEdges":  0,
+                                                                               "resolvedCrossTreeEdges":  0,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  169,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  0,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  0,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        },
+                                                        {
+                                                            "tree":  "math",
+                                                            "anchors":  [
+                                                                            "warp-viability-sim",
+                                                                            "math-pipeline-walk",
+                                                                            "pipeline-viability"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "math-maturity-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/physics/math-tree.json",
+                                                            "score":  103.4,
+                                                            "pathMode":  "root_to_anchor",
+                                                            "pathFallbackReason":  "FAIL_NODE_MISSING_EQUATION_REF",
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  68,
+                                                                                                 "evaluatedEdges":  156,
+                                                                                                 "blockedLinkCount":  0
+                                                                                             },
+                                                                               "allowedEdges":  7,
+                                                                               "blockedEdges":  149,
+                                                                               "resolvedInTreeEdges":  3,
+                                                                               "resolvedCrossTreeEdges":  4,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  146,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  0,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  3,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        }
+                                                    ]
+                                      },
+                  "graph_congruence_diagnostics":  {
+                                                       "treeCount":  3,
+                                                       "allowedEdges":  18,
+                                                       "blockedEdges":  399,
+                                                       "resolvedInTreeEdges":  9,
+                                                       "resolvedCrossTreeEdges":  9,
+                                                       "blockedByReason":  {
+                                                                               "blocked_link":  0,
+                                                                               "conceptual_disallowed":  384,
+                                                                               "proxy_disallowed":  0,
+                                                                               "cl_exceeds_allowed":  0,
+                                                                               "chart_mismatch":  10,
+                                                                               "condition_unsatisfied":  0,
+                                                                               "unresolved_target":  0,
+                                                                               "node_missing_equation_ref":  5,
+                                                                               "node_missing_claim_ids":  0
+                                                                           },
+                                                       "blockedByCondition":  {
+
+                                                                              },
+                                                       "strictSignals":  {
+                                                                             "B_equals_1":  true,
+                                                                             "qi_metric_derived_equals_true":  true,
+                                                                             "qi_strict_ok_equals_true":  true,
+                                                                             "theta_geom_equals_true":  true,
+                                                                             "vdb_two_wall_support_equals_true":  true,
+                                                                             "ts_metric_derived_equals_true":  true,
+                                                                             "cl3_metric_t00_available_equals_true":  true,
+                                                                             "cl3_rho_gate_equals_true":  false
+                                                                         }
+                                                   },
+                  "tree_walk_mode":  "root_to_leaf",
+                  "tree_walk_max_steps":  0,
+                  "bridge_traversal_candidates":  [
+
+                                                  ],
+                  "bridge_traversal_budget":  {
+                                                  "maxCandidates":  12,
+                                                  "maxDepth":  2
+                                              },
+                  "verification_anchor_required":  false,
+                  "stage0_used":  true,
+                  "stage0_shadow_only":  false,
+                  "stage0_candidate_count":  56,
+                  "stage0_hit_rate":  0,
+                  "stage0_fallback_reason":  null,
+                  "stage0_build_age_ms":  104450,
+                  "stage0_commit":  "5263528756309f437fdc65b0e6e900a4666b0b3f",
+                  "stage0_rollout_mode":  "full",
+                  "stage0_canary_hit":  true,
+                  "stage0_soft_must_include_applied":  true,
+                  "stage0_policy_decision":  "stage0_active",
+                  "stage0_fail_open_reason":  null,
+                  "preflight_stage0_used":  true,
+                  "preflight_stage0_shadow_only":  false,
+                  "preflight_stage0_candidate_count":  56,
+                  "preflight_stage0_hit_rate":  0,
+                  "preflight_stage0_fallback_reason":  null,
+                  "preflight_stage0_build_age_ms":  104450,
+                  "preflight_stage0_commit":  "5263528756309f437fdc65b0e6e900a4666b0b3f",
+                  "preflight_stage0_rollout_mode":  "full",
+                  "preflight_stage0_canary_hit":  true,
+                  "preflight_stage0_soft_must_include_applied":  true,
+                  "preflight_stage0_policy_decision":  "stage0_active",
+                  "preflight_stage0_fail_open_reason":  null,
+                  "stage05_used":  true,
+                  "stage05_file_count":  12,
+                  "stage05_card_count":  8,
+                  "stage05_kind_counts":  {
+                                              "code":  1,
+                                              "doc":  7,
+                                              "config":  0,
+                                              "data":  0,
+                                              "binary":  0
+                                          },
+                  "stage05_llm_used":  true,
+                  "stage05_fallback_reason":  null,
+                  "stage05_extract_ms":  28,
+                  "stage05_total_ms":  9434,
+                  "stage05_budget_capped":  true,
+                  "stage05_summary_required":  true,
+                  "stage05_summary_hard_fail":  false,
+                  "stage05_summary_fail_reason":  null,
+                  "stage05_soft_code_path_gap_applied":  false,
+                  "stage05_soft_runtime_fail_open":  false,
+                  "stage05_slot_plan":  {
+                                            "mode":  "dynamic",
+                                            "slots":  [
+                                                          "definition",
+                                                          "equation",
+                                                          "code_path"
+                                                      ],
+                                            "required":  [
+                                                             "definition",
+                                                             "equation",
+                                                             "code_path"
+                                                         ]
+                                        },
+                  "stage05_slot_coverage":  {
+                                                "required":  [
+                                                                 "definition",
+                                                                 "equation",
+                                                                 "code_path"
+                                                             ],
+                                                "present":  [
+                                                                "definition",
+                                                                "equation",
+                                                                "code_path"
+                                                            ],
+                                                "missing":  [
+
+                                                            ],
+                                                "ratio":  1
+                                            },
+                  "stage05_fullfile_mode":  true,
+                  "stage05_two_pass_used":  true,
+                  "stage05_two_pass_batches":  2,
+                  "stage05_overflow_policy":  "two_pass",
+                  "preflight_stage05_used":  true,
+                  "preflight_stage05_file_count":  12,
+                  "preflight_stage05_card_count":  8,
+                  "preflight_stage05_kind_counts":  {
+                                                        "code":  1,
+                                                        "doc":  7,
+                                                        "config":  0,
+                                                        "data":  0,
+                                                        "binary":  0
+                                                    },
+                  "preflight_stage05_llm_used":  true,
+                  "preflight_stage05_fallback_reason":  "stage05_budget_capped",
+                  "preflight_stage05_extract_ms":  28,
+                  "preflight_stage05_total_ms":  9434,
+                  "preflight_stage05_budget_capped":  true,
+                  "preflight_stage05_summary_required":  true,
+                  "preflight_stage05_summary_hard_fail":  false,
+                  "preflight_stage05_summary_fail_reason":  null,
+                  "preflight_stage05_soft_code_path_gap_applied":  false,
+                  "preflight_stage05_soft_runtime_fail_open":  false,
+                  "preflight_stage05_slot_plan":  {
+                                                      "mode":  "dynamic",
+                                                      "slots":  [
+                                                                    "definition",
+                                                                    "equation",
+                                                                    "code_path"
+                                                                ],
+                                                      "required":  [
+                                                                       "definition",
+                                                                       "equation",
+                                                                       "code_path"
+                                                                   ]
+                                                  },
+                  "preflight_stage05_slot_coverage":  {
+                                                          "required":  [
+                                                                           "definition",
+                                                                           "equation",
+                                                                           "code_path"
+                                                                       ],
+                                                          "present":  [
+                                                                          "definition",
+                                                                          "equation",
+                                                                          "code_path"
+                                                                      ],
+                                                          "missing":  [
+
+                                                                      ],
+                                                          "ratio":  1
+                                                      },
+                  "preflight_stage05_fullfile_mode":  true,
+                  "preflight_stage05_two_pass_used":  true,
+                  "preflight_stage05_two_pass_batches":  2,
+                  "preflight_stage05_overflow_policy":  "two_pass",
+                  "preflight_queries":  [
+                                            "Explain the congruence of the warp bubble solution?",
+                                            "warp bubble",
+                                            "modules/warp/warp-module.ts",
+                                            "calculateNatarioWarpBubble",
+                                            "docs/knowledge/warp/warp-bubble.md",
+                                            "docs/knowledge/warp/natario-zero-expansion.md",
+                                            "docs/knowledge/warp/shift-vector-expansion-scalar.md",
+                                            "warp pipeline"
+                                        ],
+                  "preflight_files":  [
+                                          "modules/warp/natario-warp.ts",
+                                          "docs/warp-tree-dag-walk-rules.md",
+                                          "docs/knowledge/warp/warp-bubble.md",
+                                          "docs/warp-tree-dag-schema.md",
+                                          "docs/warp-console-architecture.md",
+                                          "docs/warp-congruence-universal-coverage-task.md",
+                                          "docs/knowledge/warp/warp-mechanics-tree.json",
+                                          "docs/knowledge/ui-components-tree.json",
+                                          "docs/knowledge/physics/math-tree.json"
+                                      ],
+                  "preflight_file_count":  9,
+                  "preflight_doc_share":  0.8888888888888888,
+                  "preflight_evidence_ok":  true,
+                  "preflight_evidence_ratio":  0.8235294117647058,
+                  "preflight_repo_search_hits":  0,
+                  "preflight_retrieval_upgrade":  false,
+                  "preflight_stage0_general_promote":  false,
+                  "preflight_reuse":  true,
+                  "context_deferred":  true,
+                  "micro_pass_enabled":  true,
+                  "fast_quality_plan_pass_suppressed":  false,
+                  "plan_pass_used":  true,
+                  "plan_pass_forced":  true,
+                  "micro_pass_auto":  false,
+                  "micro_pass_reason":  "flag",
+                  "query_hints":  [
+                                      "Explain the congruence of the warp bubble solution?",
+                                      "warp bubble",
+                                      "modules/warp/warp-module.ts",
+                                      "calculateNatarioWarpBubble",
+                                      "docs/knowledge/warp/warp-bubble.md",
+                                      "docs/knowledge/warp/natario-zero-expansion.md"
+                                  ],
+                  "graph_hint_terms":  [
+                                           "Warp Bubble",
+                                           "warp-bubble",
+                                           "warp",
+                                           "bubble",
+                                           "geometry",
+                                           "Warp Module",
+                                           "warp-module",
+                                           "module",
+                                           "natario",
+                                           "Warp Mechanics Tree",
+                                           "warp-mechanics-tree",
+                                           "proxies"
+                                       ],
+                  "slot_tiers":  [
+                                     {
+                                         "id":  "warp-bubble",
+                                         "label":  "Warp Bubble",
+                                         "source":  "concept",
+                                         "required":  true,
+                                         "tier":  "A"
+                                     },
+                                     {
+                                         "id":  "node-warp-bubble",
+                                         "label":  "Node: Warp Bubble",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "observer-robust-warp-bubble-visualizer-build-plan",
+                                         "label":  "Observer-Robust Warp Bubble Visualizer Build Plan",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "nat-rio-casimir-warp-bubble-operations-runbook",
+                                         "label":  "Nat�rio-Casimir Warp Bubble Operations Runbook",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "warp-congruence-audit",
+                                         "label":  "Warp Congruence Audit",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "warp-congruence-build-plan-scientific-standard",
+                                         "label":  "Warp Congruence Build Plan (Scientific Standard)",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "warp-congruence-figure-review",
+                                         "label":  "Warp Congruence Figure Review",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "warp-module",
+                                         "label":  "Warp Module",
+                                         "source":  "graph",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "ui-panel-warp-bubble",
+                                         "label":  "Warp Bubble Panels",
+                                         "source":  "graph",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "ui-renderer-warp-bubble",
+                                         "label":  "Warp Bubble Renderer",
+                                         "source":  "graph",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "warp-viability-sim",
+                                         "label":  "Sim-Core Viability",
+                                         "source":  "graph",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "math-pipeline-walk",
+                                         "label":  "GR/Warp Pipeline Walk",
+                                         "source":  "graph",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     }
+                                 ],
+                  "slot_tier_counts":  {
+                                           "A":  1,
+                                           "B":  11,
+                                           "C":  1
+                                       },
+                  "slot_plan":  [
+                                    {
+                                        "id":  "warp-bubble",
+                                        "label":  "Warp Bubble",
+                                        "required":  true,
+                                        "source":  "concept",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs",
+                                                         "code"
+                                                     ],
+                                        "aliases":  [
+                                                        "warp bubble",
+                                                        "warp field bubble",
+                                                        "Overview",
+                                                        "Definition: In this repo, a warp bubble is a modeled spacetime region defined by a shift vector field and expansion constraints",
+                                                        "warp module",
+                                                        "natario warp"
+                                                    ],
+                                        "evidence_criteria":  [
+                                                                  "warp",
+                                                                  "bubble",
+                                                                  "geometry"
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "node-warp-bubble",
+                                        "label":  "Node: Warp Bubble",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Node: Warp Bubble",
+                                                        "warp mechanics tree",
+                                                        "Warp Mechanics Tree",
+                                                        "Nodes",
+                                                        "Source tree: docs/knowledge/warp/warp-mechanics-tree"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "observer-robust-warp-bubble-visualizer-build-plan",
+                                        "label":  "Observer-Robust Warp Bubble Visualizer Build Plan",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Observer-Robust Warp Bubble Visualizer Build Plan",
+                                                        "Scope, outcomes, and why this is a win",
+                                                        "Energy conditions demand minimization over observer directions",
+                                                        "What the visualizer must expose to keep the science interpretable"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "nat-rio-casimir-warp-bubble-operations-runbook",
+                                        "label":  "Nat�rio-Casimir Warp Bubble Operations Runbook",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Nat�rio-Casimir Warp Bubble Operations Runbook",
+                                                        "natario casimir operations runbook",
+                                                        "Scope",
+                                                        "1) Operating objective",
+                                                        "2) Run lifecycle",
+                                                        "2.1 Pre-flight"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "warp-congruence-audit",
+                                        "label":  "Warp Congruence Audit",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Warp Congruence Audit",
+                                                        "warp congruence audit",
+                                                        "Sources Reviewed",
+                                                        "Congruence Ladder (CL0-CL4)",
+                                                        "Executive Summary",
+                                                        "Telemetry Congruence Objective"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "warp-congruence-build-plan-scientific-standard",
+                                        "label":  "Warp Congruence Build Plan (Scientific Standard)",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Warp Congruence Build Plan (Scientific Standard)",
+                                                        "warp congruence build plan",
+                                                        "Sources",
+                                                        "Goal",
+                                                        "Non-Goals",
+                                                        "Guiding Principles (from the audit)"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "warp-congruence-figure-review",
+                                        "label":  "Warp Congruence Figure Review",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Warp Congruence Figure Review",
+                                                        "warp congruence figure review",
+                                                        "Sources",
+                                                        "Figure Provenance Tables",
+                                                        "Status: draft"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "warp-module",
+                                        "label":  "Warp Module",
+                                        "required":  false,
+                                        "source":  "graph",
+                                        "weak":  false,
+                                        "surfaces":  [
+
+                                                     ],
+                                        "aliases":  [
+                                                        "Warp Module",
+                                                        "warp-module",
+                                                        "warp",
+                                                        "module",
+                                                        "natario"
+                                                    ],
+                                        "evidence_criteria":  [
+                                                                  "warp",
+                                                                  "module",
+                                                                  "natario"
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "ui-panel-warp-bubble",
+                                        "label":  "Warp Bubble Panels",
+                                        "required":  false,
+                                        "source":  "graph",
+                                        "weak":  false,
+                                        "surfaces":  [
+
+                                                     ],
+                                        "aliases":  [
+                                                        "Warp Bubble Panels",
+                                                        "ui-panel-warp-bubble",
+                                                        "warp",
+                                                        "bubble"
+                                                    ],
+                                        "evidence_criteria":  [
+                                                                  "ui",
+                                                                  "warp",
+                                                                  "bubble"
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "ui-renderer-warp-bubble",
+                                        "label":  "Warp Bubble Renderer",
+                                        "required":  false,
+                                        "source":  "graph",
+                                        "weak":  false,
+                                        "surfaces":  [
+
+                                                     ],
+                                        "aliases":  [
+                                                        "Warp Bubble Renderer",
+                                                        "ui-renderer-warp-bubble",
+                                                        "renderer",
+                                                        "warp"
+                                                    ],
+                                        "evidence_criteria":  [
+                                                                  "ui",
+                                                                  "renderer",
+                                                                  "warp"
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "warp-viability-sim",
+                                        "label":  "Sim-Core Viability",
+                                        "required":  false,
+                                        "source":  "graph",
+                                        "weak":  false,
+                                        "surfaces":  [
+
+                                                     ],
+                                        "aliases":  [
+                                                        "Sim-Core Viability",
+                                                        "warp-viability-sim",
+                                                        "viability",
+                                                        "sim-core",
+                                                        "constraints"
+                                                    ],
+                                        "evidence_criteria":  [
+                                                                  "viability",
+                                                                  "sim-core",
+                                                                  "constraints"
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "math-pipeline-walk",
+                                        "label":  "GR/Warp Pipeline Walk",
+                                        "required":  false,
+                                        "source":  "graph",
+                                        "weak":  false,
+                                        "surfaces":  [
+
+                                                     ],
+                                        "aliases":  [
+                                                        "GR/Warp Pipeline Walk",
+                                                        "math-pipeline-walk",
+                                                        "pipeline",
+                                                        "warp",
+                                                        "verification"
+                                                    ],
+                                        "evidence_criteria":  [
+                                                                  "pipeline",
+                                                                  "gr",
+                                                                  "warp",
+                                                                  "verification"
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "congruence",
+                                        "label":  "congruence",
+                                        "required":  false,
+                                        "source":  "token",
+                                        "weak":  true,
+                                        "aliases":  [
+
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    }
+                                ],
+                  "slot_count":  13,
+                  "slot_required_count":  1,
+                  "hard_required_slots":  [
+                                              "warp-bubble"
+                                          ],
+                  "hard_required_slot_count":  1,
+                  "coverage_slots_source":  "concept",
+                  "queries":  [
+                                  "Explain the congruence of the warp bubble solution?",
+                                  "warp bubble",
+                                  "modules/warp/warp-module.ts",
+                                  "calculateNatarioWarpBubble",
+                                  "docs/knowledge/warp/warp-bubble.md",
+                                  "docs/knowledge/warp/natario-zero-expansion.md",
+                                  "docs/knowledge/warp/shift-vector-expansion-scalar.md",
+                                  "warp pipeline"
+                              ],
+                  "docs_first_enabled":  false,
+                  "plan_scope_allowlist_tiers":  0,
+                  "plan_scope_avoidlist":  0,
+                  "plan_scope_must_include":  0,
+                  "graph_framework_applied":  true,
+                  "context_files":  [
+                                        "modules/warp/natario-warp.ts",
+                                        "docs/warp-tree-dag-walk-rules.md",
+                                        "docs/knowledge/warp/warp-bubble.md",
+                                        "docs/warp-tree-dag-schema.md",
+                                        "docs/warp-console-architecture.md",
+                                        "docs/warp-congruence-universal-coverage-task.md",
+                                        "docs/knowledge/warp/warp-mechanics-tree.json",
+                                        "docs/knowledge/ui-components-tree.json",
+                                        "docs/knowledge/physics/math-tree.json"
+                                    ],
+                  "context_files_count":  9,
+                  "evidence_critic_applied":  true,
+                  "evidence_critic_ok":  true,
+                  "evidence_critic_ratio":  0.6818181818181818,
+                  "evidence_critic_count":  15,
+                  "evidence_critic_tokens":  22,
+                  "compaction_applied":  false,
+                  "compaction_dropped":  0,
+                  "compaction_kept":  5,
+                  "compaction_policy":  "definition-\u003epolicy-\u003eentrypoint-\u003etests",
+                  "compaction_budget":  {
+                                            "maxBlocks":  12,
+                                            "maxBytes":  18000,
+                                            "maxPerFile":  2
+                                        },
+                  "proof_span_rate":  1,
+                  "slot_doc_coverage_rate":  1,
+                  "topic_must_include_ok":  true,
+                  "viability_must_include_ok":  true,
+                  "verification_anchor_ok":  true,
+                  "plan_must_include_ok":  true,
+                  "atlas_required":  true,
+                  "atlas_requirement_failed":  false,
+                  "atlas_requirement_reason":  null,
+                  "evidence_gate_ok":  true,
+                  "evidence_match_ratio":  0.6818181818181818,
+                  "evidence_match_count":  15,
+                  "evidence_token_count":  22,
+                  "evidence_core_required":  true,
+                  "evidence_core_ok":  true,
+                  "evidence_core_match_ratio":  0.75,
+                  "evidence_core_match_count":  3,
+                  "evidence_core_token_count":  4,
+                  "evidence_use_question_tokens":  true,
+                  "evidence_signal_tokens":  [
+                                                 "warp",
+                                                 "Warp Bubble",
+                                                 "warp-bubble",
+                                                 "bubble",
+                                                 "geometry",
+                                                 "Warp Module",
+                                                 "warp-module",
+                                                 "module",
+                                                 "natario",
+                                                 "Warp Mechanics Tree",
+                                                 "warp-mechanics-tree",
+                                                 "proxies"
+                                             ],
+                  "evidence_tokens_preview":  [
+                                                  "congruence",
+                                                  "warp",
+                                                  "bubble",
+                                                  "solution",
+                                                  "warp-bubble",
+                                                  "geometry",
+                                                  "module",
+                                                  "warp-module",
+                                                  "natario",
+                                                  "mechanics",
+                                                  "tree",
+                                                  "warp-mechanics-tree"
+                                              ],
+                  "evidence_match_preview":  [
+                                                 "congruence",
+                                                 "warp",
+                                                 "bubble",
+                                                 "warp-bubble",
+                                                 "geometry",
+                                                 "module",
+                                                 "warp-module",
+                                                 "natario",
+                                                 "mechanics",
+                                                 "tree",
+                                                 "warp-mechanics-tree",
+                                                 "proxies"
+                                             ],
+                  "retrieval_confidence":  1,
+                  "retrieval_doc_share":  0.8,
+                  "retrieval_context_files":  [
+                                                  "modules/warp/natario-warp.ts",
+                                                  "docs/warp-tree-dag-walk-rules.md",
+                                                  "docs/knowledge/warp/warp-bubble.md",
+                                                  "modules/warp/warp-module.ts",
+                                                  "docs/warp-tree-dag-schema.md",
+                                                  "docs/warp-console-architecture.md",
+                                                  "docs/warp-congruence-universal-coverage-task.md",
+                                                  "docs/knowledge/warp/warp-mechanics-tree.json",
+                                                  "docs/knowledge/ui-components-tree.json",
+                                                  "docs/knowledge/physics/math-tree.json"
+                                              ],
+                  "retrieval_doc_hits":  8,
+                  "retrieval_context_file_count":  10,
+                  "retrieval_query_hit_count":  8,
+                  "retrieval_top_score":  0.08228954949696746,
+                  "retrieval_score_gap":  0.00708065257783784,
+                  "retrieval_atlas_graph_selected_count":  2,
+                  "retrieval_atlas_graph_runtime_link_count":  2,
+                  "retrieval_atlas_graph_edge_type_counts":  {
+                                                                 "use":  1
+                                                             },
+                  "retrieval_atlas_graph_query_overlap_count":  2,
+                  "retrieval_atlas_graph_corpus_member_count":  0,
+                  "retrieval_atlas_graph_script_doc_boost_count":  2,
+                  "retrieval_footprint_exact_paths":  [
+                                                          "modules/warp/natario-warp.ts",
+                                                          "docs/warp-tree-dag-walk-rules.md",
+                                                          "docs/knowledge/warp/warp-bubble.md",
+                                                          "docs/warp-tree-dag-schema.md",
+                                                          "docs/warp-console-architecture.md",
+                                                          "docs/warp-congruence-universal-coverage-task.md"
+                                                      ],
+                  "retrieval_footprint_path_count":  6,
+                  "retrieval_footprint_zone_hint":  "mapped_connected",
+                  "retrieval_has_exact_provenance":  true,
+                  "retrieval_channel_hits":  {
+                                                 "lexical":  8,
+                                                 "symbol":  8,
+                                                 "fuzzy":  4,
+                                                 "path":  4,
+                                                 "git_tracked":  1,
+                                                 "atlas":  8
+                                             },
+                  "retrieval_channel_top_scores":  {
+                                                       "lexical":  45,
+                                                       "symbol":  37.5,
+                                                       "fuzzy":  26,
+                                                       "path":  54,
+                                                       "git_tracked":  40,
+                                                       "atlas":  19.86
+                                                   },
+                  "retrieval_channel_weights":  {
+                                                    "lexical":  0.9166666666666667,
+                                                    "symbol":  0.6777777777777778,
+                                                    "fuzzy":  0.4444444444444444,
+                                                    "path":  1.5,
+                                                    "git_tracked":  0.9574074074074075,
+                                                    "atlas":  0.6155
+                                                },
+                  "atlas_channel_used":  true,
+                  "channel_contributions":  {
+                                                "lexical":  {
+                                                                "hits":  8,
+                                                                "top_score":  45,
+                                                                "weight":  0.9167,
+                                                                "used":  true
+                                                            },
+                                                "symbol":  {
+                                                               "hits":  8,
+                                                               "top_score":  37.5,
+                                                               "weight":  0.6778,
+                                                               "used":  true
+                                                           },
+                                                "fuzzy":  {
+                                                              "hits":  4,
+                                                              "top_score":  26,
+                                                              "weight":  0.4444,
+                                                              "used":  true
+                                                          },
+                                                "path":  {
+                                                             "hits":  4,
+                                                             "top_score":  54,
+                                                             "weight":  1.5,
+                                                             "used":  true
+                                                         },
+                                                "git_tracked":  {
+                                                                    "hits":  1,
+                                                                    "top_score":  40,
+                                                                    "weight":  0.9574,
+                                                                    "used":  true
+                                                                },
+                                                "atlas":  {
+                                                              "hits":  8,
+                                                              "top_score":  19.86,
+                                                              "weight":  0.6155,
+                                                              "used":  true
+                                                          }
+                                            },
+                  "doc_header_injected":  5,
+                  "slot_coverage_required":  [
+
+                                             ],
+                  "slot_coverage_missing":  [
+
+                                            ],
+                  "slot_coverage_ratio":  1,
+                  "slot_coverage_ok":  true,
+                  "coverage_slots_required":  [
+                                                  "warp-bubble"
+                                              ],
+                  "coverage_slots_covered":  [
+                                                 "warp-bubble"
+                                             ],
+                  "coverage_slots_missing":  [
+
+                                             ],
+                  "coverage_slots_ratio":  1,
+                  "docs_first_slot_covered":  [
+                                                  "warp-bubble"
+                                              ],
+                  "docs_first_slot_missing":  [
+
+                                              ],
+                  "docs_first_slot_ratio":  1,
+                  "slot_evidence":  [
+                                        {
+                                            "id":  "warp-bubble",
+                                            "label":  "Warp Bubble",
+                                            "doc_card_count":  5,
+                                            "alias_card_count":  5,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  1,
+                                            "missing_slots":  [
+
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "node-warp-bubble",
+                                            "label":  "Node: Warp Bubble",
+                                            "doc_card_count":  1,
+                                            "alias_card_count":  1,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "node-warp-bubble"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "observer-robust-warp-bubble-visualizer-build-plan",
+                                            "label":  "Observer-Robust Warp Bubble Visualizer Build Plan",
+                                            "doc_card_count":  0,
+                                            "alias_card_count":  0,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "observer-robust-warp-bubble-visualizer-build-plan"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "nat-rio-casimir-warp-bubble-operations-runbook",
+                                            "label":  "Nat�rio-Casimir Warp Bubble Operations Runbook",
+                                            "doc_card_count":  1,
+                                            "alias_card_count":  1,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "nat-rio-casimir-warp-bubble-operations-runbook"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "warp-congruence-audit",
+                                            "label":  "Warp Congruence Audit",
+                                            "doc_card_count":  0,
+                                            "alias_card_count":  0,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "warp-congruence-audit"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "warp-congruence-build-plan-scientific-standard",
+                                            "label":  "Warp Congruence Build Plan (Scientific Standard)",
+                                            "doc_card_count":  2,
+                                            "alias_card_count":  2,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "warp-congruence-build-plan-scientific-standard"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "warp-congruence-figure-review",
+                                            "label":  "Warp Congruence Figure Review",
+                                            "doc_card_count":  0,
+                                            "alias_card_count":  0,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "warp-congruence-figure-review"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "warp-module",
+                                            "label":  "Warp Module",
+                                            "doc_card_count":  5,
+                                            "alias_card_count":  5,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "warp-module"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "ui-panel-warp-bubble",
+                                            "label":  "Warp Bubble Panels",
+                                            "doc_card_count":  5,
+                                            "alias_card_count":  5,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "ui-panel-warp-bubble"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "ui-renderer-warp-bubble",
+                                            "label":  "Warp Bubble Renderer",
+                                            "doc_card_count":  5,
+                                            "alias_card_count":  5,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "ui-renderer-warp-bubble"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "warp-viability-sim",
+                                            "label":  "Sim-Core Viability",
+                                            "doc_card_count":  0,
+                                            "alias_card_count":  0,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "warp-viability-sim"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "math-pipeline-walk",
+                                            "label":  "GR/Warp Pipeline Walk",
+                                            "doc_card_count":  5,
+                                            "alias_card_count":  5,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "math-pipeline-walk"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "congruence",
+                                            "label":  "congruence",
+                                            "doc_card_count":  1,
+                                            "alias_card_count":  1,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "congruence"
+                                                              ]
+                                        }
+                                    ],
+                  "slot_doc_hit_rate":  1,
+                  "slot_alias_coverage_rate":  1,
+                  "controller_steps":  [
+                                           {
+                                               "step":  "initial",
+                                               "evidenceOk":  true,
+                                               "slotCoverageOk":  true,
+                                               "docCoverageOk":  true,
+                                               "missingSlots":  [
+
+                                                                ],
+                                               "retrievalConfidence":  1
+                                           }
+                                       ],
+                  "controller_attempts":  1,
+                  "capsule_retry_triggered":  false,
+                  "capsule_retry_reason":  "not_needed",
+                  "definition_doc_required":  false,
+                  "definition_doc_ok":  true,
+                  "definition_doc_blocks":  5,
+                  "controller_stop_reason":  "proof_density_sufficient",
+                  "stage0_code_path_count":  2,
+                  "stage0_doc_path_count":  8,
+                  "stage0_code_floor_pass":  true,
+                  "alignment_gate_decision":  "PASS",
+                  "open_world_bypass_mode":  "off",
+                  "alignment_gate_metrics":  {
+                                                 "alignment_real":  0.8655501682222425,
+                                                 "alignment_decoy":  0.2623353543029093,
+                                                 "coincidence_margin":  0.6032148139193332,
+                                                 "stability_3_rewrites":  0.9141144774748484,
+                                                 "contradiction_rate":  0.035433547793772974,
+                                                 "lower95_p_align":  0.7351715412523623,
+                                                 "sample_count":  44
+                                             },
+                  "alignment_explicit_anchor_override":  false,
+                  "alignment_gate_inputs":  {
+                                                "alignment_real":  0.8656,
+                                                "alignment_decoy":  0.2623,
+                                                "stability_3_rewrites":  0.9141,
+                                                "contradiction_rate":  0.0354,
+                                                "sample_count":  44,
+                                                "query_hits":  8,
+                                                "file_count":  10,
+                                                "channel_coverage":  1,
+                                                "score_gap":  0.0071,
+                                                "top_score":  0.0823
+                                            },
+                  "open_world_bypass_policy":  {
+                                                   "mode":  "repo_required",
+                                                   "action":  "none",
+                                                   "reason":  "alignment_gate_not_failed"
+                                               },
+                  "arbiter_mode":  "repo_grounded",
+                  "arbiter_reason":  "repo_ratio",
+                  "arbiter_strictness":  "high",
+                  "arbiter_user_expects_repo":  true,
+                  "requires_repo_evidence":  true,
+                  "arbiter_repo_ok":  true,
+                  "arbiter_hybrid_ok":  true,
+                  "arbiter_ratio":  1,
+                  "arbiter_topic_ok":  true,
+                  "arbiter_concept_match":  false,
+                  "runtime_budget_level":  "OVER",
+                  "runtime_budget_recommend":  "reduce_output_tokens",
+                  "runtime_budget_signals":  {
+                                                 "clockA_p95_ms":  28977,
+                                                 "tool_calls_last_tick":  1,
+                                                 "kv_tokens":  0,
+                                                 "queue_depth":  0,
+                                                 "lane_pressure":  {
+                                                                       "llm":  1,
+                                                                       "io":  1,
+                                                                       "media":  0.7317073170731707,
+                                                                       "physics":  0,
+                                                                       "perception":  0
+                                                                   }
+                                             },
+                  "arbiter_fail_reason":  null,
+                  "dottie_signal_applied":  false,
+                  "mode_rationale":  "repo_grounded:repo_ratio",
+                  "grounded_evidence_clarify_override":  false,
+                  "graph_node_acceptance_rate":  1,
+                  "graph_node_acceptance_total":  12,
+                  "graph_node_acceptance_rejected":  0,
+                  "graph_node_acceptance_missing":  [
+
+                                                    ],
+                  "graph_evidence_count":  18,
+                  "graph_evidence_doc_blocks":  6,
+                  "graph_evidence_types":  [
+                                               "code",
+                                               "doc",
+                                               "test"
+                                           ],
+                  "tree_walk":  {
+                                    "treeCount":  3,
+                                    "nodeCount":  3,
+                                    "nodesWithText":  3,
+                                    "nodesWithoutText":  0,
+                                    "stepCount":  3,
+                                    "treeIds":  [
+                                                    "warp-mechanics",
+                                                    "ui-components",
+                                                    "math"
+                                                ],
+                                    "primaryTreeId":  "warp-mechanics",
+                                    "boundCount":  2
+                                },
+                  "tree_walk_lines":  9,
+                  "tree_walk_block_present":  true,
+                  "tree_walk_bound_nodes":  2,
+                  "tree_walk_binding_rate":  0.667,
+                  "code_alignment_applied":  true,
+                  "code_alignment_symbols":  [
+                                                 "Subheading",
+                                                 "Heading",
+                                                 "Doc",
+                                                 "Natario",
+                                                 "Atlas",
+                                                 "Warp"
+                                             ],
+                  "code_alignment_resolved":  [
+                                                  "client/src/components/common/LRLDocsTooltip.tsx",
+                                                  "modules/warp/natario-warp.ts",
+                                                  "client/src/lib/code-index/atlas.ts",
+                                                  "modules/warp/natario-warp.ts"
+                                              ],
+                  "code_spans_added":  4,
+                  "prompt_items":  [
+                                       {
+                                           "type":  "intent",
+                                           "hash":  "fcb9c97d87f4",
+                                           "size":  52
+                                       },
+                                       {
+                                           "type":  "retrieval_summary",
+                                           "hash":  "90a98e22637c",
+                                           "size":  781
+                                       },
+                                       {
+                                           "type":  "selected_trees",
+                                           "hash":  "fe2f703cbe56",
+                                           "size":  35
+                                       },
+                                       {
+                                           "type":  "doc_spans",
+                                           "hash":  "4ec17568d54a",
+                                           "size":  740
+                                       },
+                                       {
+                                           "type":  "code_spans",
+                                           "hash":  "983ec81f1549",
+                                           "size":  229
+                                       },
+                                       {
+                                           "type":  "tree_walk",
+                                           "hash":  "a92793cd9835",
+                                           "size":  939
+                                       },
+                                       {
+                                           "type":  "slot_coverage",
+                                           "hash":  "b3233f68444d",
+                                           "size":  64
+                                       }
+                                   ],
+                  "prompt_item_count":  7,
+                  "tool_results_block":  "TOOL_RESULTS\n[retrieval_summary]\nqueries: Explain the congruence of the warp bubble solution?; warp bubble; modules/warp/warp-module.ts; calculateNatarioWarpBubble; docs/knowledge/warp/warp-bubble.md; docs/knowledge/warp/natario-zero-expansion.md; docs/knowledge/warp/shift-vector-expansion-scalar.md; warp pipeline\nfiles: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-schema.md, docs/warp-console-architecture.md, docs/warp-congruence-universal-coverage-task.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/ui-components-tree.json, docs/knowledge/physics/math-tree.json, docs/knowledge/warp/natario-zero-expansion.md, docs/knowledge/warp/alcubierre-metric.md, docs/knowledge/physics/math-maturity-stages.md\nconfidence: 1.00\n\n[doc_spans]\n- Doc: warp bubble (docs/knowledge/warp/warp-bubble.md)\n- Doc: warp tree dag schema (docs/warp-tree-dag-schema.md)\n- Doc: warp console architecture (docs/warp-console-architecture.md)\n- Doc: warp congruence universal coverage task (docs/warp-congruence-universal-coverage-task.md)\n- Doc: warp tree dag walk rules (docs/warp-tree-dag-walk-rules.md)\n- Section: Overview (docs/knowledge/warp/warp-mechanics-tree.json)\n- Section: Overview (docs/knowledge/warp/natario-zero-expansion.md)\n- Section: Overview (docs/knowledge/warp/alcubierre-metric.md)\n- Section: Overview (docs/knowledge/ui-components-tree.json)\n- Section: Overview (docs/knowledge/physics/math-maturity-stages.md)\n- Section: Overview (docs/knowledge/physics/gr-solver-tree.json)\n\n[code_spans]\n- Doc Span: L2-L6 (client/src/components/common/LRLDocsTooltip.tsx)\n- Natario Span: L65-L69 (modules/warp/natario-warp.ts)\n- Atlas Span: L1-L3 (client/src/lib/code-index/atlas.ts)\n- Warp Span: L1-L4 (modules/warp/natario-warp.ts)\n\n[tree_walk]\nTree Walk: Warp Mechanics Walk (tree-derived; source: docs/knowledge/warp/warp-mechanics-tree.json)\nChain scaffold: root_to_leaf | continuity: fallback FAIL_NODE_MISSING_EQUATION_REF\n1. Role:anchor: Warp Mechanics Tree - A walkable map of warp geometry, proxies, and control levers. (docs/knowledge/warp/warp-mechanics-tree.json)\n\nTree Walk: UI Components Walk (tree-derived; source: docs/knowledge/ui-components-tree.json)\nChain scaffold: root_to_anchor | continuity: fallback root_to_anchor_unreachable\n1. Walk: UI Components Tree - Client-side surfaces, panels, renderers, and UI primitives. (docs/knowledge/ui-components-tree.json)\n\nTree Walk: Math Maturity + Verification Walk (tree-derived; source: docs/knowledge/physics/math-tree.json)\nChain scaffold: root_to_anchor | continuity: fallback FAIL_NODE_MISSING_EQUATION_REF\n1. Hint: Math Maturity Tree - Navigation hint only; no doc span bound. (docs/knowledge/physics/math-tree.json)\n\nEND_TOOL_RESULTS",
+                  "tool_results_present":  true,
+                  "tool_results_items":  [
+                                             "retrieval_summary",
+                                             "doc_spans",
+                                             "code_spans",
+                                             "tree_walk"
+                                         ],
+                  "tool_results_hash":  "629bdc958a02",
+                  "synthesis_mode":  "deterministic_scaffold",
+                  "synthesis_mode_reasons":  [
+                                                 "single_llm"
+                                             ],
+                  "synthesis_reason":  "mode=deterministic_scaffold | repo=deterministic_stage05 | prompt=none | general=none | repo_scaffold=yes | prompt_scaffold=no | general_scaffold=no",
+                  "synthesis_repo_path":  "deterministic_stage05",
+                  "synthesis_prompt_path":  "none",
+                  "synthesis_general_path":  "none",
+                  "evidence_claim_count":  1,
+                  "evidence_claim_supported":  1,
+                  "evidence_claim_unsupported":  0,
+                  "evidence_claim_ratio":  1,
+                  "evidence_claim_gate_ok":  true,
+                  "evidence_claim_missing":  [
+
+                                             ],
+                  "ambiguity_terms":  [
+                                          "solution"
+                                      ],
+                  "ambiguity_gate_applied":  true,
+                  "needle_natario_relation_proof":  {
+                                                        "applicable":  false,
+                                                        "ok":  true,
+                                                        "outcome":  "not_applicable",
+                                                        "matched_edge_ids":  [
+
+                                                                             ],
+                                                        "missing_edge_ids":  [
+
+                                                                             ]
+                                                    },
+                  "clarify_gate_bypassed_reason":  "explicit_repo_mapping_prefers_llm",
+                  "evidence_cards":  "Repo evidence:\n- Evidence: Doc: warp bubble Heading: Overview --- id: warp-bubble aliases: [\"warp bubble\", \"warp field bubble\"] scope: repo-specific definition of a warp bubble model intentHints: [\"define\", \"what is\", \"explain\"] topicTags: [\"warp\", \"physics\"] mustIncludeFiles: [\"modules/warp/warp-modu... (see docs/knowledge/warp/warp-bubble.md)",
+                  "evidence_packet_v2_used":  true,
+                  "evidence_packet_v2":  {
+                                             "version":  "repo_atlas_evidence_packet_v2",
+                                             "route":  "repo",
+                                             "intent_id":  "repo.warp_math_congruence",
+                                             "intent_domain":  "repo",
+                                             "section_ids":  [
+                                                                 "repo"
+                                                             ],
+                                             "section_count":  1,
+                                             "evidence_text_chars":  331,
+                                             "evidence_cards_chars":  346,
+                                             "context_file_count":  13,
+                                             "doc_block_count":  11,
+                                             "retrieval_confidence":  1,
+                                             "retrieval_doc_share":  0.8,
+                                             "slot_coverage_ratio":  1,
+                                             "slot_missing_count":  0,
+                                             "doc_coverage_ratio":  1,
+                                             "doc_missing_count":  0,
+                                             "sources":  [
+                                                             "docs/knowledge/warp/warp-bubble.md"
+                                                         ],
+                                             "channel_contributions":  {
+                                                                           "lexical":  {
+                                                                                           "hits":  8,
+                                                                                           "top_score":  45,
+                                                                                           "weight":  0.9167,
+                                                                                           "used":  true
+                                                                                       },
+                                                                           "symbol":  {
+                                                                                          "hits":  8,
+                                                                                          "top_score":  37.5,
+                                                                                          "weight":  0.6778,
+                                                                                          "used":  true
+                                                                                      },
+                                                                           "fuzzy":  {
+                                                                                         "hits":  4,
+                                                                                         "top_score":  26,
+                                                                                         "weight":  0.4444,
+                                                                                         "used":  true
+                                                                                     },
+                                                                           "path":  {
+                                                                                        "hits":  4,
+                                                                                        "top_score":  54,
+                                                                                        "weight":  1.5,
+                                                                                        "used":  true
+                                                                                    },
+                                                                           "git_tracked":  {
+                                                                                               "hits":  1,
+                                                                                               "top_score":  40,
+                                                                                               "weight":  0.9574,
+                                                                                               "used":  true
+                                                                                           },
+                                                                           "atlas":  {
+                                                                                         "hits":  8,
+                                                                                         "top_score":  19.86,
+                                                                                         "weight":  0.6155,
+                                                                                         "used":  true
+                                                                                     }
+                                                                       }
+                                         },
+                  "answer_token_budget":  4096,
+                  "answer_token_cap":  4096,
+                  "answer_token_base":  4096,
+                  "answer_token_boosts":  [
+                                              "steps",
+                                              "evidence_mass:rich",
+                                              "force_full_floor"
+                                          ],
+                  "answer_token_reason":  "auto:steps,evidence_mass:rich,force_full_floor|evidence_mass=0.980",
+                  "answer_evidence_mass_score":  0.98,
+                  "answer_evidence_mass_band":  "rich",
+                  "answer_evidence_mass_source_count":  13,
+                  "answer_evidence_mass_independent_sources":  6,
+                  "llm_backend_used":  "http",
+                  "llm_provider_called":  true,
+                  "llm_call_stage":  "answer",
+                  "llm_invoke_started_at":  "2026-03-17T16:53:48.603Z",
+                  "llm_invoke_ended_at":  "2026-03-17T16:54:18.884Z",
+                  "llm_invoke_duration_ms":  30281,
+                  "llm_error_code":  "llm_http_timeout:15000",
+                  "llm_error_message":  "llm_http_timeout:15000",
+                  "llm_calls":  [
+                                    {
+                                        "stage":  "answer",
+                                        "backend":  "http",
+                                        "providerCalled":  true,
+                                        "startedAtIso":  "2026-03-17T16:53:48.603Z",
+                                        "endedAtIso":  "2026-03-17T16:54:18.884Z",
+                                        "durationMs":  30281,
+                                        "errorCode":  "llm_http_timeout:15000",
+                                        "errorMessage":  "llm_http_timeout:15000"
+                                    }
+                                ],
+                  "answer_generation_failed":  true,
+                  "answer_model_error":  "llm_http_timeout:15000",
+                  "answer_fallback_used":  true,
+                  "answer_fallback_reason":  "llm_error",
+                  "answer_runtime_fallback":  true,
+                  "answer_runtime_fallback_reason":  "repo_llm_unavailable_deterministic",
+                  "answer_runtime_fallback_deterministic":  true,
+                  "answer_short_sentences":  9,
+                  "answer_short_tokens":  260,
+                  "answer_retry_applied":  false,
+                  "answer_contract_primary_applied":  false,
+                  "answer_raw_text":  "Goals \u0026 invariants Components 1 Physics engine 2 Tools Atlas graph candidate: do...\n\n1. Goals \u0026 invariants Components 1 Physics engine 2 Tools Atlas graph candidate: do...\n\nIn practice, coupled constraints and feedback loops determine how outcomes evolve over time.\n\nMechanism: Goals \u0026 invariants Components 1 Physics engine 2 Tools Atlas graph candidate: do... -\u003e constrained interaction dynamics -\u003e Goals \u0026 invariants Components 1 Physics engine 2 Tools Atlas graph candidate: do..., because linked constraints amplify or dam.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.\n\nSources: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-schema.md, docs/warp-console-architecture.md, docs/warp-congruence-universal-coverage-task.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/ui-components-tree.json",
+                  "answer_contract_applied":  false,
+                  "report_mode_mismatch":  false,
+                  "report_scaffold_guard_triggered":  false,
+                  "answer_after_format":  "In practice, coupled constraints and feedback loops determine how outcomes evolve over time.\n\nMechanism: Goals \u0026 invariants Components 1 Physics engine 2 Tools Atlas graph candidate: do... -\u003e constrained interaction dynamics -\u003e Goals \u0026 invariants Components 1 Physics engine 2 Tools Atlas graph candidate: do..., because linked constraints amplify or dam.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: add directly relevant repo paths or artifact refs to raise confidence.\n\nSources: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-schema.md, docs/warp-console-architecture.md, docs/warp-congruence-universal-coverage-task.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/ui-components-tree.json",
+                  "frontier_lens_required":  false,
+                  "frontier_lens_candidate_count":  0,
+                  "scientific_response_applied":  true,
+                  "next_evidence_count":  6,
+                  "next_evidence_coverage":  0,
+                  "hypothesis_count":  0,
+                  "hypothesis_rate":  0,
+                  "claim_ref_rate":  1,
+                  "answer_after_fallback":  "Unverified:\n- No repo-evidenced claims were confirmed yet.\n\nReasoned connections (bounded):\n- Need at least two grounded points before drawing a connection.\n\nNext evidence:\n- Searched terms: Explain the congruence of the warp bubble solution?, warp bubble, calculateNatarioWarpBubble, warp pipeline\n- Checked files: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts\n- Check files under modules or docs.\n- Search docs headings for \"Node: Warp Bubble\".\n- Search docs headings for \"Observer-Robust Warp Bubble Visualizer Build Plan\".\n- Search docs headings for \"Nat�rio-Casimir Warp Bubble Operations Runbook\".",
+                  "junk_clean_applied":  false,
+                  "junk_clean_reasons":  [
+
+                                         ],
+                  "concept_lint_applied":  false,
+                  "concept_lint_reasons":  [
+
+                                           ],
+                  "physics_lint_applied":  false,
+                  "physics_lint_reasons":  [
+
+                                           ],
+                  "drift_repair_applied":  false,
+                  "drift_repair_attempts":  0,
+                  "drift_repair_improved":  false,
+                  "coverage_token_count":  5,
+                  "coverage_key_count":  1,
+                  "coverage_missing_key_count":  0,
+                  "coverage_ratio":  1,
+                  "coverage_missing_keys":  [
+
+                                            ],
+                  "coverage_gate_applied":  false,
+                  "claim_ledger":  [
+                                       {
+                                           "id":  "claim:1",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+                                                                 "modules/warp/natario-warp.ts",
+                                                                 "docs/warp-tree-dag-walk-rules.md",
+                                                                 "docs/knowledge/warp/warp-bubble.md"
+                                                             ],
+                                           "proof":  "source:modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md -\u003e cite -\u003e claim:1"
+                                       },
+                                       {
+                                           "id":  "claim:2",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+                                                                 "modules/warp/natario-warp.ts",
+                                                                 "docs/warp-tree-dag-walk-rules.md",
+                                                                 "docs/knowledge/warp/warp-bubble.md"
+                                                             ],
+                                           "proof":  "source:modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md -\u003e cite -\u003e claim:2"
+                                       },
+                                       {
+                                           "id":  "claim:3",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+                                                                 "modules/warp/natario-warp.ts",
+                                                                 "docs/warp-tree-dag-walk-rules.md",
+                                                                 "docs/knowledge/warp/warp-bubble.md",
+                                                                 "modules/warp/warp-module.ts"
+                                                             ],
+                                           "proof":  "source:modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts -\u003e cite -\u003e claim:3"
+                                       },
+                                       {
+                                           "id":  "claim:4",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+                                                                 "modules/warp/natario-warp.ts",
+                                                                 "docs/warp-tree-dag-walk-rules.md",
+                                                                 "docs/knowledge/warp/warp-bubble.md"
+                                                             ],
+                                           "proof":  "source:modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md -\u003e cite -\u003e claim:4"
+                                       },
+                                       {
+                                           "id":  "claim:5",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+                                                                 "modules/warp/natario-warp.ts",
+                                                                 "docs/warp-tree-dag-walk-rules.md",
+                                                                 "docs/knowledge/warp/warp-bubble.md"
+                                                             ],
+                                           "proof":  "source:modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md -\u003e cite -\u003e claim:5"
+                                       },
+                                       {
+                                           "id":  "claim:6",
+                                           "type":  "inference",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+                                                                 "modules/warp/natario-warp.ts",
+                                                                 "docs/warp-tree-dag-walk-rules.md",
+                                                                 "docs/knowledge/warp/warp-bubble.md"
+                                                             ],
+                                           "proof":  "source:modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md -\u003e cite -\u003e claim:6"
+                                       }
+                                   ],
+                  "uncertainty_register":  [
+                                               {
+                                                   "id":  "claim:1",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:2",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:3",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:4",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:5",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:6",
+                                                   "type":  "inference",
+                                                   "reason":  "missing_evidence"
+                                               }
+                                           ],
+                  "constraint_matrix":  {
+                                            "section_count":  0,
+                                            "constraints":  [
+                                                                {
+                                                                    "id":  "steps_format",
+                                                                    "satisfied":  false,
+                                                                    "detail":  "steps=0"
+                                                                },
+                                                                {
+                                                                    "id":  "citations_required",
+                                                                    "satisfied":  true,
+                                                                    "detail":  "citations=4"
+                                                                }
+                                                            ]
+                                        },
+                  "belief_claim_count":  6,
+                  "belief_supported_count":  0,
+                  "belief_unsupported_count":  6,
+                  "belief_unsupported_rate":  1,
+                  "belief_contradictions":  0,
+                  "belief_gate_applied":  false,
+                  "belief_gate_reason":  "evidence_anchor",
+                  "belief_graph_node_count":  7,
+                  "belief_graph_edge_count":  24,
+                  "belief_graph_claim_count":  6,
+                  "belief_graph_definition_count":  0,
+                  "belief_graph_conclusion_count":  1,
+                  "belief_graph_evidence_ref_count":  1,
+                  "belief_graph_constraint_count":  0,
+                  "belief_graph_supports":  0,
+                  "belief_graph_contradicts":  2,
+                  "belief_graph_depends_on":  3,
+                  "belief_graph_maps_to":  19,
+                  "belief_graph_claim_ids":  [
+                                                 "claim:1",
+                                                 "claim:2",
+                                                 "claim:3",
+                                                 "claim:4",
+                                                 "claim:5",
+                                                 "claim:6"
+                                             ],
+                  "belief_graph_unsupported_claim_ids":  [
+                                                             "claim:1",
+                                                             "claim:2",
+                                                             "claim:3",
+                                                             "claim:4",
+                                                             "claim:5",
+                                                             "claim:6"
+                                                         ],
+                  "belief_graph_contradiction_ids":  [
+                                                         "claim:4",
+                                                         "claim:5",
+                                                         "claim:6"
+                                                     ],
+                  "rattling_score":  0.8666666666666667,
+                  "rattling_gate_applied":  true,
+                  "grounded_sentence_rate":  0.16666666666666666,
+                  "tree_citation_share":  0,
+                  "tree_citation_total":  4,
+                  "tree_citation_tree":  0,
+                  "tree_citation_non_tree":  4,
+                  "rattling_base_distance":  0.8666666666666667,
+                  "rattling_perturbation_distance":  0.75,
+                  "rattling_claim_set_count":  3,
+                  "variant_selection_applied":  false,
+                  "variant_selection_reason":  "list_format",
+                  "variant_selection_candidate_count":  1,
+                  "gates":  {
+                                "evidence":  {
+                                                 "ok":  true,
+                                                 "matchCount":  15,
+                                                 "tokenCount":  22,
+                                                 "matchRatio":  0.6818181818181818,
+                                                 "criticApplied":  true,
+                                                 "criticOk":  true,
+                                                 "criticRatio":  0.6818181818181818,
+                                                 "criticCount":  15,
+                                                 "criticTokens":  22
+                                             },
+                                "coverage":  {
+                                                 "applied":  false,
+                                                 "ratio":  1,
+                                                 "tokenCount":  5,
+                                                 "keyCount":  1,
+                                                 "missingKeyCount":  0,
+                                                 "missingKeys":  [
+
+                                                                 ]
+                                             },
+                                "belief":  {
+                                               "applied":  false,
+                                               "reason":  "evidence_anchor",
+                                               "unsupportedRate":  1,
+                                               "unsupportedCount":  6,
+                                               "supportedCount":  0,
+                                               "claimCount":  6,
+                                               "contradictions":  0
+                                           },
+                                "beliefGraph":  {
+                                                    "nodeCount":  7,
+                                                    "edgeCount":  24,
+                                                    "claimCount":  6,
+                                                    "definitionCount":  0,
+                                                    "conclusionCount":  1,
+                                                    "evidenceRefCount":  1,
+                                                    "constraintCount":  0,
+                                                    "supports":  0,
+                                                    "contradicts":  2,
+                                                    "dependsOn":  3,
+                                                    "mapsTo":  19
+                                                },
+                                "rattling":  {
+                                                 "applied":  true,
+                                                 "score":  0.8666666666666667,
+                                                 "baseDistance":  0.8666666666666667,
+                                                 "perturbationDistance":  0.75,
+                                                 "claimSetCount":  3
+                                             },
+                                "lint":  {
+                                             "conceptApplied":  false,
+                                             "conceptReasons":  [
+
+                                                                ],
+                                             "physicsApplied":  false,
+                                             "physicsReasons":  [
+
+                                                                ]
+                                         },
+                                "variant":  {
+                                                "applied":  false,
+                                                "reason":  "list_format",
+                                                "candidateCount":  1
+                                            },
+                                "ambiguity":  {
+                                                  "resolverApplied":  false,
+                                                  "resolverReason":  "cluster_entropy",
+                                                  "resolverTokenCount":  4,
+                                                  "resolverShortPrompt":  true,
+                                                  "resolverTopScore":  80,
+                                                  "resolverMargin":  80,
+                                                  "resolverCandidates":  [
+                                                                             "warp-bubble",
+                                                                             "warp bubble",
+                                                                             "warp field bubble"
+                                                                         ],
+                                                  "targetSpan":  "congruence of the warp bubble solution",
+                                                  "clusterCount":  9,
+                                                  "clusterTopMass":  0.4390787247868926,
+                                                  "clusterMargin":  0.8085588059701493,
+                                                  "clusterEntropy":  0.8356683488994018,
+                                                  "clusterCandidates":  [
+                                                                            {
+                                                                                "label":  "modules/warp",
+                                                                                "score":  0.265732,
+                                                                                "mass":  0.439079,
+                                                                                "count":  10
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-full-congruence-task.md",
+                                                                                "score":  0.050872,
+                                                                                "mass":  0.084058,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-geometry-congruence-synthesis.md",
+                                                                                "score":  0.049108,
+                                                                                "mass":  0.081143,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-console-architecture.md",
+                                                                                "score":  0.047751,
+                                                                                "mass":  0.0789,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-tree-dag-walk-rules.md",
+                                                                                "score":  0.047027,
+                                                                                "mass":  0.077704,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-tree-dag-schema.md",
+                                                                                "score":  0.046325,
+                                                                                "mass":  0.076544,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-congruence-universal-coverage-task.md",
+                                                                                "score":  0.039724,
+                                                                                "mass":  0.065636,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-geometry-congruence-report.md",
+                                                                                "score":  0.038646,
+                                                                                "mass":  0.063855,
+                                                                                "count":  1
+                                                                            },
+                                                                            {
+                                                                                "label":  "docs/warp-panel-congruence-audit.md",
+                                                                                "score":  0.020021,
+                                                                                "mass":  0.033081,
+                                                                                "count":  1
+                                                                            }
+                                                                        ],
+                                                  "gateApplied":  true,
+                                                  "terms":  [
+                                                                "solution"
+                                                            ]
+                                              }
+                            },
+                  "answer_path":  [
+                                      "intent:repo.warp_math_congruence",
+                                      "domain:repo",
+                                      "strategy:repo_rag",
+                                      "concept:repo_api_cue_concept_suppressed",
+                                      "arbiter:repo_grounded",
+                                      "answer:fallback_runtime_repo_deterministic",
+                                      "answer:llm",
+                                      "citationRepair:skipped(intent)",
+                                      "platonic:gates",
+                                      "answerExtension:appended",
+                                      "citationPersistence:preserved",
+                                      "moveSelector:direct_answer",
+                                      "fallback:runtime_repo_preserve",
+                                      "citationContract:append_sources",
+                                      "semanticQuality:fail:CLAIM_CITATION_LINK_WEAK",
+                                      "citationScrub:unsupported_paths_removed",
+                                      "policy:non_report_scaffold_guard"
+                                  ],
+                  "citation_persistence_guard_applied":  true,
+                  "citation_persistence_sources":  [
+                                                       "modules/warp/natario-warp.ts",
+                                                       "docs/warp-tree-dag-walk-rules.md",
+                                                       "docs/knowledge/warp/warp-bubble.md",
+                                                       "docs/warp-tree-dag-schema.md",
+                                                       "docs/warp-console-architecture.md",
+                                                       "docs/warp-congruence-universal-coverage-task.md",
+                                                       "docs/knowledge/warp/warp-mechanics-tree.json",
+                                                       "docs/knowledge/ui-components-tree.json"
+                                                   ],
+                  "citation_persistence_appended":  false,
+                  "citation_persistence_ok":  true,
+                  "fuzzy_move_selector":  {
+                                              "selected":  "direct_answer",
+                                              "selected_move":  "direct_answer",
+                                              "move_scores":  {
+                                                                  "direct_answer":  0.7640999999999999,
+                                                                  "retrieve_more":  0.7178000000000002,
+                                                                  "fail_closed":  0.17769,
+                                                                  "relation_build":  -0.21260000000000007,
+                                                                  "clarify":  -0.37670000000000003
+                                                              },
+                                              "rejected_moves":  [
+                                                                     "retrieve_more",
+                                                                     "fail_closed",
+                                                                     "relation_build",
+                                                                     "clarify"
+                                                                 ],
+                                              "reject_reasons":  {
+                                                                     "direct_answer":  [
+
+                                                                                       ],
+                                                                     "retrieve_more":  [
+                                                                                           "lower_score"
+                                                                                       ],
+                                                                     "relation_build":  [
+                                                                                            "lower_score",
+                                                                                            "relation_intent_inactive"
+                                                                                        ],
+                                                                     "clarify":  [
+                                                                                     "lower_score"
+                                                                                 ],
+                                                                     "fail_closed":  [
+                                                                                         "lower_score",
+                                                                                         "risk_below_fail_closed_threshold"
+                                                                                     ]
+                                                                 },
+                                              "budget_pressure":  0.15,
+                                              "stop_reason":  "goal_satisfied",
+                                              "dynamic_biases":  {
+                                                                     "relationBuildBias":  0,
+                                                                     "retrieveMoreBias":  0,
+                                                                     "bridgeGap":  1,
+                                                                     "evidenceGap":  1,
+                                                                     "dualDomainGap":  0
+                                                                 },
+                                              "dynamic_bias_relation_build":  0,
+                                              "dynamic_bias_retrieve_more":  0,
+                                              "gaps":  {
+                                                           "bridge":  1,
+                                                           "evidence":  1,
+                                                           "dual_domain":  0
+                                                       },
+                                              "scores":  {
+                                                             "groundedness":  1,
+                                                             "uncertainty":  0,
+                                                             "safety":  0.3,
+                                                             "coverage":  0
+                                                         }
+                                          },
+                  "second_pass_attempted":  false,
+                  "second_pass_skipped_reason":  "move_not_eligible",
+                  "second_pass_result":  "not_run",
+                  "answer_runtime_fallback_pinned":  true,
+                  "answer_rescue_eligible":  false,
+                  "answer_rescue_trigger":  "none",
+                  "answer_rescue_quality_reasons":  [
+
+                                                    ],
+                  "answer_rescue_equation_guard":  true,
+                  "answer_rescue_attempted":  false,
+                  "runtime_clock_a":  {
+                                          "budget_ms":  0,
+                                          "complete_contract_on_budget":  true
+                                      },
+                  "runtime_clock_b":  {
+                                          "enabled":  true,
+                                          "deep_work_queued":  true,
+                                          "bridge_expansion_candidates":  0,
+                                          "non_blocking":  true
+                                      },
+                  "citation_contract_applied":  true,
+                  "citation_contract_sources":  [
+                                                    "modules/warp/natario-warp.ts",
+                                                    "docs/warp-tree-dag-walk-rules.md",
+                                                    "docs/knowledge/warp/warp-bubble.md",
+                                                    "docs/warp-tree-dag-schema.md",
+                                                    "docs/warp-console-architecture.md",
+                                                    "docs/warp-congruence-universal-coverage-task.md",
+                                                    "docs/knowledge/warp/warp-mechanics-tree.json",
+                                                    "docs/knowledge/ui-components-tree.json"
+                                                ],
+                  "equation_quote_contract":  {
+                                                  "required":  false,
+                                                  "ok":  true,
+                                                  "reason":  "not_required",
+                                                  "answer_has_equation":  false,
+                                                  "citation_matched":  false,
+                                                  "matched_needle":  false,
+                                                  "matched_citations":  [
+
+                                                                        ],
+                                                  "question_needles":  [
+
+                                                                       ],
+                                                  "equation_relevance_required":  false,
+                                                  "equation_relevance_score":  null,
+                                                  "equation_relevance_reason":  null
+                                              },
+                  "claim_citation_link_claim_count":  11,
+                  "claim_citation_link_citation_count":  14,
+                  "claim_citation_link_linked_count":  11,
+                  "claim_citation_link_ok":  true,
+                  "claim_citation_link_missing":  [
+
+                                                  ],
+                  "semantic_quality":  {
+                                           "claim_citation_link_rate":  0.16666666666666666,
+                                           "deterministic_claim_citation_link_rate":  0.16666666666666666,
+                                           "deterministic_claim_count":  6,
+                                           "deterministic_linked_claim_count":  1,
+                                           "unsupported_claim_rate":  0,
+                                           "repetition_penalty_fail":  false,
+                                           "contradiction_flag":  false,
+                                           "fail_reasons":  [
+                                                                "CLAIM_CITATION_LINK_WEAK"
+                                                            ]
+                                       },
+                  "citation_scrub_removed_paths":  [
+                                                       "modules/warp/warp-module.ts"
+                                                   ],
+                  "answer_final_text":  "Unverified:\n- No repo-evidenced claims were confirmed yet. [modules/warp/natario-warp.ts] Reasoned connections (bounded):\n- Need at least two grounded points before drawing a connection. [modules/warp/natario-warp.ts] Next evidence:\n- Searched terms: Explain the congruence of the warp bubble solution?, warp bubble, calculateNatarioWarpBubble, warp pipeline\n- Checked files: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md,\n- Check files under modules or docs. - Search docs headings for \"Node: Warp Bubble\". [modules/warp/natario-warp.ts] - Search docs headings for \"Observer-Robust Warp Bubble Visualizer Build Plan\". [modules/warp/natario-warp.ts] - Search docs headings for \"Nat�rio-Casimir Warp Bubble Operations Runbook\". [modules/warp/natario-warp.ts] Sources: modules/warp/natario-warp.ts, docs/warp-tree-dag-walk-rules.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-schema.md, docs/warp-console-architecture.md, docs/warp-congruence-universal-coverage-task.md, docs/knowledge/warp/warp-mechanics-tree.json, docs/knowledge/ui-components-tree.json",
+                  "answer_extension_available":  true,
+                  "answer_extension_items":  3,
+                  "answer_extension_doc_items":  3,
+                  "answer_extension_code_items":  0,
+                  "answer_extension_appended":  true,
+                  "live_events":  [
+                                      {
+                                          "ts":  "2026-03-17T16:53:37.348Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Preflight retrieval",
+                                          "detail":  "start",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Preflight retrieval - start",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-17T16:53:47.795Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Query hints ready",
+                                          "detail":  "6 hints",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Query hints ready - 6 hints",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-17T16:53:48.593Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Evidence cards ready",
+                                          "detail":  "deterministic",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Evidence cards ready - deterministic",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-17T16:53:48.600Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Generating answer",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Generating answer"
+                                      },
+                                      {
+                                          "ts":  "2026-03-17T16:53:48.603Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "LLM answer",
+                                          "detail":  "start",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: LLM answer - start",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-17T16:54:18.885Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "LLM answer",
+                                          "detail":  "error",
+                                          "ok":  false,
+                                          "durationMs":  30282,
+                                          "text":  "Helix Ask: LLM answer - error",
+                                          "meta":  {
+                                                       "elapsedMs":  30282
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-17T16:54:18.886Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Answer ready",
+                                          "durationMs":  30286,
+                                          "text":  "Helix Ask: Answer ready",
+                                          "meta":  {
+                                                       "elapsedMs":  30286
+                                                   }
+                                      }
+                                  ],
+                  "trace_events":  [
+                                       {
+                                           "ts":  "2026-03-17T16:53:37.348Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Preflight retrieval",
+                                           "detail":  "start",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Preflight retrieval - start",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-17T16:53:47.795Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Query hints ready",
+                                           "detail":  "6 hints",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Query hints ready - 6 hints",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-17T16:53:48.593Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Evidence cards ready",
+                                           "detail":  "deterministic",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Evidence cards ready - deterministic",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-17T16:53:48.600Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Generating answer",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Generating answer"
+                                       },
+                                       {
+                                           "ts":  "2026-03-17T16:53:48.603Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "LLM answer",
+                                           "detail":  "start",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: LLM answer - start",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-17T16:54:18.885Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "LLM answer",
+                                           "detail":  "error",
+                                           "ok":  false,
+                                           "durationMs":  30282,
+                                           "text":  "Helix Ask: LLM answer - error",
+                                           "meta":  {
+                                                        "elapsedMs":  30282
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-17T16:54:18.886Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Answer ready",
+                                           "durationMs":  30286,
+                                           "text":  "Helix Ask: Answer ready",
+                                           "meta":  {
+                                                        "elapsedMs":  30286
+                                                    }
+                                       }
+                                   ],
+                  "trace_summary":  [
+
+                                    ],
+                  "event_stable_fields":  {
+                                              "retrieval_route":  "graph:warp-mechanics",
+                                              "fallback_decision":  "none",
+                                              "contract_renderer_path":  "unknown",
+                                              "gate_outcomes":  {
+                                                                    "evidence_gate_ok":  true,
+                                                                    "claim_gate_ok":  true,
+                                                                    "doc_slot_gate_ok":  true
+                                                                }
+                                          },
+                  "event_journal":  {
+                                        "version":  "quake_frame_loop_v1",
+                                        "replay_parity":  true,
+                                        "deterministic":  true,
+                                        "event_count":  7,
+                                        "event_hash":  "sha256:d92e52b11b5fa21e48a2f22289a19a8a956097492bd6594f1f60dee1bb1a9fed",
+                                        "stable_fields":  {
+                                                              "retrieval_route":  "graph:warp-mechanics",
+                                                              "fallback_decision":  "none",
+                                                              "contract_renderer_path":  "unknown",
+                                                              "gate_outcomes":  {
+                                                                                    "evidence_gate_ok":  true,
+                                                                                    "claim_gate_ok":  true,
+                                                                                    "doc_slot_gate_ok":  true
+                                                                                }
+                                                          }
+                                    },
+                  "helix_ask_fail_reason":  null,
+                  "helix_ask_fail_class":  null,
+                  "fallback_reason":  "answer_fallback:llm_error",
+                  "fallback_reason_taxonomy":  "answer_fallback:llm_error",
+                  "term_prior_impact":  "neutral",
+                  "term_prior_repo_override_applied":  false,
+                  "term_prior_repo_evidence_strength":  0,
+                  "term_prior_repo_evidence_artifacts":  0,
+                  "context_capsule":  {
+                                          "version":  "v1",
+                                          "capsuleId":  "HXCAP-9014F43F",
+                                          "fingerprint":  "HXFP-000000",
+                                          "createdAtTsMs":  1773766458933,
+                                          "traceId":  "ask:598a8c94-f8af-41ee-9506-200220d2481c",
+                                          "runId":  "ask:598a8c94-f8af-41ee-9506-200220d2481c",
+                                          "convergence":  {
+                                                              "source":  "unknown",
+                                                              "proofPosture":  "unknown",
+                                                              "maturity":  "diagnostic",
+                                                              "phase":  "retrieve",
+                                                              "collapseEvent":  null
+                                                          },
+                                          "commit":  {
+                                                         "events":  [
+
+                                                                    ],
+                                                         "proof_verdict":  "UNKNOWN",
+                                                         "certificate_hash":  null,
+                                                         "certificate_integrity_ok":  null
+                                                     },
+                                          "stamp":  {
+                                                        "rulePreset":  "diagnostic",
+                                                        "tickHz":  20,
+                                                        "seed":  2206086277,
+                                                        "gridW":  80,
+                                                        "gridH":  16,
+                                                        "finalBits":  "00111011111111100100010000000111011111110110001111110000000000011111100000010001001000000001000101001111100000000000000110000010000100000000001000000000100001010110000101000011100000101000010001001100111000101110011111010100010100000111111001110011011000001001100010000000010000010000111011000100000101000100000011000010110000000000110110000000110000000100000101101100000000010110000001010001000010110010001000001100111111101100100010110001000001000000010011000001000100100001101100100011000001110110000000010000011100010111100000101000000000000000110000001000001111000000100100100000001000100000001100000000001100000001110010011000111000001111010010011001001010100000001000000000111100000000000000111100111010010000010000011000101100001110100000100000100001111000100110100000100011110000011100010000110111000100000100001010100010000011010001111001111100010000011001001100111000001000110000000001100000100010110000010011100100100010000000011100111010001010000010000010110010100000001010001101101000000110001011000010000000000000111110100011101001011110101010000011000111001000001101000011110000100100000100101000111100000100010000000010000000110100011000111000000000001001000000001001000010001000001100000011011110011111101001111100000111111111111000010011111110001100011001100011"
+                                                    },
+                                          "stamp_lines":  [
+                                                              "..........",
+                                                              "..........",
+                                                              ".........."
+                                                          ],
+                                          "safety":  {
+                                                         "strict_core":  true,
+                                                         "replay_active":  false,
+                                                         "fail_closed":  false
+                                                     }
+                                      },
+                  "context_capsule_id":  "HXCAP-9014F43F"
+              },
+    "context_capsule":  {
+                            "version":  "v1",
+                            "capsuleId":  "HXCAP-9014F43F",
+                            "fingerprint":  "HXFP-000000",
+                            "createdAtTsMs":  1773766458933,
+                            "traceId":  "ask:598a8c94-f8af-41ee-9506-200220d2481c",
+                            "runId":  "ask:598a8c94-f8af-41ee-9506-200220d2481c",
+                            "convergence":  {
+                                                "source":  "unknown",
+                                                "proofPosture":  "unknown",
+                                                "maturity":  "diagnostic",
+                                                "phase":  "retrieve",
+                                                "collapseEvent":  null
+                                            },
+                            "commit":  {
+                                           "events":  [
+
+                                                      ],
+                                           "proof_verdict":  "UNKNOWN",
+                                           "certificate_hash":  null,
+                                           "certificate_integrity_ok":  null
+                                       },
+                            "stamp":  {
+                                          "rulePreset":  "diagnostic",
+                                          "tickHz":  20,
+                                          "seed":  2206086277,
+                                          "gridW":  80,
+                                          "gridH":  16,
+                                          "finalBits":  "00111011111111100100010000000111011111110110001111110000000000011111100000010001001000000001000101001111100000000000000110000010000100000000001000000000100001010110000101000011100000101000010001001100111000101110011111010100010100000111111001110011011000001001100010000000010000010000111011000100000101000100000011000010110000000000110110000000110000000100000101101100000000010110000001010001000010110010001000001100111111101100100010110001000001000000010011000001000100100001101100100011000001110110000000010000011100010111100000101000000000000000110000001000001111000000100100100000001000100000001100000000001100000001110010011000111000001111010010011001001010100000001000000000111100000000000000111100111010010000010000011000101100001110100000100000100001111000100110100000100011110000011100010000110111000100000100001010100010000011010001111001111100010000011001001100111000001000110000000001100000100010110000010011100100100010000000011100111010001010000010000010110010100000001010001101101000000110001011000010000000000000111110100011101001011110101010000011000111001000001101000011110000100100000100101000111100000100010000000010000000110100011000111000000000001001000000001001000010001000001100000011011110011111101001111100000111111111111000010011111110001100011001100011"
+                                      },
+                            "stamp_lines":  [
+                                                "..........",
+                                                "..........",
+                                                ".........."
+                                            ],
+                            "safety":  {
+                                           "strict_core":  true,
+                                           "replay_active":  false,
+                                           "fail_closed":  false
+                                       }
+                        },
+    "report_mode":  false
+}

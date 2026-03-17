@@ -5,6 +5,39 @@ import { filterSignalTokens, tokenizeAskQuery } from "./query";
 
 export type Stage05CardKind = "code" | "doc" | "config" | "data" | "binary";
 
+export type Stage05EquationClass =
+  | "canonical_law"
+  | "derived_relation"
+  | "parameterization"
+  | "implementation_assignment"
+  | "metadata_trace"
+  | "unknown";
+
+export type Stage05DerivationLevel =
+  | "root_constant"
+  | "governing"
+  | "derived"
+  | "calibrated"
+  | "implementation"
+  | "trace_meta";
+
+export type Stage05DomainFamily =
+  | "collapse"
+  | "casimir"
+  | "warp"
+  | "tokamak"
+  | "polytrope"
+  | "phase"
+  | "generic";
+
+export type Stage05SymbolRole =
+  | "state_variable"
+  | "constant"
+  | "parameter"
+  | "operator"
+  | "observable"
+  | "other";
+
 export type Stage05SlotId =
   | "definition"
   | "mechanism"
@@ -41,6 +74,11 @@ export type Stage05EvidenceCard = {
   snippets: Stage05Snippet[];
   confidence: number;
   slotHits?: Stage05SlotId[];
+  equationClass?: Stage05EquationClass;
+  domainFamily?: Stage05DomainFamily;
+  derivationLevel?: Stage05DerivationLevel;
+  constantsDetected?: string[];
+  symbolRoles?: Array<{ symbol: string; role: Stage05SymbolRole }>;
 };
 
 export type Stage05Telemetry = {
@@ -89,6 +127,11 @@ export type Stage05LlmSummaryOutput = {
       symbolsOrKeys?: string[];
       confidence?: number;
       slotHits?: Stage05SlotId[];
+      equationClass?: Stage05EquationClass;
+      domainFamily?: Stage05DomainFamily;
+      derivationLevel?: Stage05DerivationLevel;
+      constantsDetected?: string[];
+      symbolRoles?: Array<{ symbol: string; role: Stage05SymbolRole }>;
     }
   >;
 };
@@ -227,10 +270,17 @@ const SLOT_SIGNAL_MAP: Record<Stage05SlotId, string[]> = {
   verification: ["verify", "proof", "test", "validate", "assert", "gate", "certificate"],
   failure_path: ["fail", "fallback", "error", "edge", "missing", "limit", "break", "retry"],
 };
+const STAGE05_EXPLICIT_CODE_PATH_SIGNALS = SLOT_SIGNAL_MAP.code_path.filter(
+  (signal) => signal !== "function" && signal !== "class",
+);
+const STAGE05_EXPLICIT_CODE_PATH_RE =
+  /\b(codebase|repo|repository|source(?:\s+code)?|implementation|module|file|path|symbol|where)\b/i;
 const WARP_MATH_FOCUS_RE =
   /(?:\b(?:warp|alcubierre|natario|bubble)\b[\s\S]{0,120}\b(?:math|equation|equations|formula|metric|tensor|congruence|derive|derivation|proof|solver|solve|general relativity|gr)\b)|(?:\b(?:math|equation|equations|formula|metric|tensor|congruence|derive|derivation|proof|solver|solve|general relativity|gr)\b[\s\S]{0,120}\b(?:warp|alcubierre|natario|bubble)\b)/i;
 const EQUATION_QUOTE_RE =
   /(?:\b(?:quote|exact|verbatim|show|return)\b[\s\S]{0,100}\b(?:equation|formula|metric|congruence)\b)|(?:\b(?:equation|formula|metric|congruence)\b[\s\S]{0,100}\b(?:quote|exact|verbatim|show|return)\b)|(?:\b(?:define|definition|what is|what's)\b[\s\S]{0,80}\b(?:equation|formula|metric)\b)/i;
+const HYBRID_PHYSICS_DIVERSITY_RE =
+  /\b(warp|casimir|congruence|metric|tensor|riemann|ricci|geodesic|physics|gr|relativity|energy|viability|solver)\b/i;
 
 const extractionCache = new Map<string, Stage05ExtractedCard>();
 const summaryCache = new Map<string, Stage05LlmSummaryOutput>();
@@ -331,6 +381,18 @@ const classifyKind = (
   const sample = buffer.subarray(0, Math.min(buffer.length, 512));
   if (sample.includes(0)) return "binary";
   return "code";
+};
+
+const classifyKindFromPathHint = (normalizedPath: string): Stage05CardKind => {
+  const ext = path.posix.extname(normalizedPath).toLowerCase();
+  if (BINARY_EXTENSIONS.has(ext)) return "binary";
+  if (CODE_EXTENSIONS.has(ext)) return "code";
+  if (DOC_EXTENSIONS.has(ext)) return "doc";
+  if (CONFIG_EXTENSIONS.has(ext)) return "config";
+  if (DATA_EXTENSIONS.has(ext)) return "data";
+  if (/^docs\//i.test(normalizedPath)) return "doc";
+  if (/(^|\/)(server|client|modules|shared|scripts|cli)\//i.test(normalizedPath)) return "code";
+  return "doc";
 };
 
 const buildSnippetFromLines = (
@@ -570,6 +632,129 @@ const extractBinaryCard = (
 const hashText = (value: string): string =>
   crypto.createHash("sha1").update(value).digest("hex");
 
+const STAGE05_CONTENT_PROBE_MAX_BYTES = 48 * 1024;
+const STAGE05_CONTENT_PROBE_SEGMENT_BYTES = 12 * 1024;
+const STAGE05_EQUATION_NOISE_LINE_RE =
+  /^\s*(?:[-*]\s+|\d+\.\s+).*(?:task|todo|checklist|roadmap|milestone|phase|backlog|next step|action item|ticket)\b/i;
+const STAGE05_ASSIGNMENT_ONLY_LINE_RE = /^\s*[A-Za-z_][A-Za-z0-9_.-]*\s*=\s*[^=]+$/;
+const STAGE05_EQUATION_STRUCTURE_LINE_RE =
+  /(?:\b(?:ds\^2|g_[a-z0-9{}]+|r_[a-z0-9{}]+|t_[a-z0-9{}]+|psi|rho|phi|beta|gamma)\b|[A-Za-z0-9_)\]}]\s*=\s*[-+A-Za-z0-9_({[\]|]|\b(?:dx|dy|dz|dt)\b)/i;
+
+const readStage05ProbeText = (absPath: string, stat: fs.Stats): string => {
+  if (stat.size <= 0) return "";
+  const readWhole = stat.size <= STAGE05_CONTENT_PROBE_MAX_BYTES;
+  const chunkSize = Math.max(1024, Math.min(STAGE05_CONTENT_PROBE_SEGMENT_BYTES, stat.size));
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(absPath, "r");
+    if (readWhole) {
+      const full = Buffer.alloc(Math.max(1, stat.size));
+      const readBytes = fs.readSync(fd, full, 0, full.length, 0);
+      return full.subarray(0, readBytes).toString("utf8");
+    }
+    const ranges = [
+      { pos: 0, len: chunkSize },
+      { pos: Math.max(0, Math.floor(stat.size / 2) - Math.floor(chunkSize / 2)), len: chunkSize },
+      { pos: Math.max(0, stat.size - chunkSize), len: chunkSize },
+    ];
+    const seen = new Set<string>();
+    const chunks: string[] = [];
+    for (const range of ranges) {
+      const key = `${range.pos}:${range.len}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const buffer = Buffer.alloc(range.len);
+      const readBytes = fs.readSync(fd, buffer, 0, range.len, range.pos);
+      if (readBytes <= 0) continue;
+      chunks.push(buffer.subarray(0, readBytes).toString("utf8"));
+    }
+    return chunks.join("\n...\n");
+  } catch {
+    return "";
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // ignore close errors from probe path
+      }
+    }
+  }
+};
+
+const countDistinctTermHits = (valueLower: string, terms: string[]): number => {
+  if (!valueLower || terms.length === 0) return 0;
+  let hits = 0;
+  const seen = new Set<string>();
+  for (const rawTerm of terms) {
+    const term = rawTerm.trim().toLowerCase();
+    if (!term || seen.has(term)) continue;
+    seen.add(term);
+    if (term.length < 2) continue;
+    if (term.includes(" ")) {
+      if (valueLower.includes(term)) hits += 1;
+      continue;
+    }
+    const pattern = new RegExp(`\\b${escapeRegExp(term)}\\b`, "i");
+    if (pattern.test(valueLower)) hits += 1;
+  }
+  return hits;
+};
+
+const scoreStage05ContentProbe = (args: {
+  normalizedPath: string;
+  kindHint: Stage05CardKind;
+  queryTokens: string[];
+  slotPlan: Stage05SlotPlan;
+  text: string;
+}): {
+  score: number;
+  equationLineCount: number;
+  equationStructureCount: number;
+  noiseLineCount: number;
+} | null => {
+  const normalizedText = args.text.replace(/\r/g, "\n").trim();
+  if (!normalizedText) return null;
+  const lower = normalizedText.toLowerCase();
+  const focusTerms = buildStage05FocusTerms(args.queryTokens, args.slotPlan, tokenizePath(args.normalizedPath));
+  const queryHits = countDistinctTermHits(lower, args.queryTokens);
+  const focusHits = countDistinctTermHits(lower, focusTerms);
+  const lines = normalizedText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  let equationLineCount = 0;
+  let equationStructureCount = 0;
+  let noiseLineCount = 0;
+  let symbolLineCount = 0;
+  let assignmentOnlyCount = 0;
+  for (const line of lines) {
+    const equationLine = hasEquationEvidenceText(line);
+    if (equationLine) equationLineCount += 1;
+    const equationStructure = STAGE05_EQUATION_STRUCTURE_LINE_RE.test(line);
+    if (equationStructure) equationStructureCount += 1;
+    if (STAGE05_EQUATION_NOISE_LINE_RE.test(line)) noiseLineCount += 1;
+    if (STAGE05_ASSIGNMENT_ONLY_LINE_RE.test(line)) assignmentOnlyCount += 1;
+    if (args.kindHint === "code" && (SYMBOL_RE.test(line) || CONST_SYMBOL_RE.test(line))) symbolLineCount += 1;
+  }
+  const equationSeeking = args.slotPlan.slots.includes("equation") || args.slotPlan.required.includes("equation");
+  const equationSupport =
+    Math.min(4, equationLineCount) * 0.7 +
+    Math.min(3, equationStructureCount) * 1.05 +
+    Math.min(2, symbolLineCount) * 0.35;
+  const baseScore = queryHits * 0.42 + focusHits * 0.38 + equationSupport;
+  const reliabilityBias =
+    args.kindHint === "code" ? 0.45 : args.kindHint === "doc" ? 0.15 : args.kindHint === "config" ? -0.2 : 0;
+  const penalty =
+    Math.min(4, noiseLineCount) * 0.45 +
+    Math.min(3, assignmentOnlyCount) * 0.25 +
+    (equationSeeking && equationLineCount > 0 && equationStructureCount === 0 ? 0.55 : 0);
+  const score = baseScore + reliabilityBias - penalty;
+  return {
+    score: Number(score.toFixed(4)),
+    equationLineCount,
+    equationStructureCount,
+    noiseLineCount,
+  };
+};
+
 const scorePathRelevance = (normalizedPath: string, queryTokens: string[], queryLower: string): number => {
   const lowerPath = normalizedPath.toLowerCase();
   const basename = path.posix.basename(lowerPath);
@@ -604,6 +789,9 @@ const hasAnySignal = (value: string, signals: string[]): boolean => {
   });
 };
 
+const hasExplicitCodePathDemand = (value: string): boolean =>
+  hasAnySignal(value, STAGE05_EXPLICIT_CODE_PATH_SIGNALS) || STAGE05_EXPLICIT_CODE_PATH_RE.test(value);
+
 const hasEquationEvidenceText = (value: string): boolean => {
   if (!value) return false;
   return EQUATION_LINE_RE.test(value);
@@ -616,6 +804,172 @@ const hasEquationEvidenceInCard = (
     .filter(Boolean)
     .join("\n");
   return hasEquationEvidenceText(equationText);
+};
+
+const TRACE_TABLE_ROW_RE = /^\s*\|[^|\n]+\|[^|\n]+\|/;
+const TRACE_ID_ROW_RE = /\b(?:SRC|EQT|EXP|REF)-\d{2,}\b/i;
+const CHECKLIST_OR_REPORT_RE =
+  /^\s*(?:[-*]\s+|\d+\.\s+)(?:\[[ xX]\]\s*)?(?:todo|task|checklist|roadmap|plan|audit|report|inventory|milestone)\b/i;
+
+const inferDomainFamilyFromCard = (pathValue: string, haystack: string): Stage05DomainFamily => {
+  const pathLower = pathValue.toLowerCase();
+  const lower = haystack.toLowerCase();
+  if (/(collapse|wave[\s_-]*function|quantum|measurement|born|schrodinger|dp-collapse)/i.test(`${pathLower} ${lower}`)) {
+    return "collapse";
+  }
+  if (/(casimir|dynamic-casimir|static-casimir|vacuum|boundary\s+modulation)/i.test(`${pathLower} ${lower}`)) {
+    return "casimir";
+  }
+  if (/(tokamak|plasma|mhd|q95|beta_p|beta_n|confinement)/i.test(`${pathLower} ${lower}`)) {
+    return "tokamak";
+  }
+  if (/(polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr)/i.test(`${pathLower} ${lower}`)) {
+    return "polytrope";
+  }
+  if (/(phase-scheduler|energy-pipeline|queue\/index|phase control|cadence)/i.test(`${pathLower} ${lower}`)) {
+    return "phase";
+  }
+  if (/(warp|natario|alcubierre|congruence|riemann|ricci|einstein|metric tensor)/i.test(`${pathLower} ${lower}`)) {
+    return "warp";
+  }
+  return "generic";
+};
+
+const inferEquationClassFromCard = (args: {
+  path: string;
+  kind: Stage05CardKind;
+  equationLine: string | null;
+  haystack: string;
+}): Stage05EquationClass => {
+  const line = (args.equationLine ?? "").trim();
+  const pathValue = args.path.toLowerCase();
+  if (!line) return "unknown";
+  if (TRACE_TABLE_ROW_RE.test(line) || TRACE_ID_ROW_RE.test(line)) return "metadata_trace";
+  if (CHECKLIST_OR_REPORT_RE.test(line)) return "metadata_trace";
+  if (/^docs\/(?:specs|audits|runbooks|reports)\//i.test(pathValue)) return "metadata_trace";
+  if (STAGE05_EQUATION_NOISE_LINE_RE.test(line)) return "metadata_trace";
+  if (STAGE05_ASSIGNMENT_ONLY_LINE_RE.test(line) && !/[+\-*/^]|\\(?:frac|partial|nabla|sum|int)/i.test(line)) {
+    return "metadata_trace";
+  }
+  if (
+    /\b(?:fit|fitting|calibration|calibrated|regression|table\s+[ivx]+|range|beta\s*=|alpha\s*=|gamma\s*=)\b/i.test(
+      `${line} ${args.haystack}`,
+    )
+  ) {
+    return "parameterization";
+  }
+  if (
+    args.kind === "code" &&
+    /^\s*(?:const|let|var|return)\b/i.test(line)
+  ) {
+    return "implementation_assignment";
+  }
+  if (/\b(?:ds\^2|g_[a-z0-9{}]+|r_[a-z0-9{}]+|t_[a-z0-9{}]+|hamiltonian|lagrangian)\b/i.test(line)) {
+    return "canonical_law";
+  }
+  if (/[A-Za-z0-9_)\]}]\s*=\s*[^=]/.test(line)) {
+    return "derived_relation";
+  }
+  return "unknown";
+};
+
+const inferDerivationLevelFromEquationClass = (
+  equationClass: Stage05EquationClass,
+  equationLine: string,
+): Stage05DerivationLevel => {
+  if (equationClass === "metadata_trace") return "trace_meta";
+  if (
+    /\b(?:hbar|mu0|epsilon0|k_b|c\b|g\b|pi|tau|planck|boltzmann|vacuum permittivity|vacuum permeability)\b/i.test(
+      equationLine,
+    )
+  ) {
+    return "root_constant";
+  }
+  if (equationClass === "canonical_law") return "governing";
+  if (equationClass === "derived_relation") return "derived";
+  if (equationClass === "parameterization") return "calibrated";
+  if (equationClass === "implementation_assignment") return "implementation";
+  return "derived";
+};
+
+const inferConstantsFromEquationLine = (equationLine: string): string[] => {
+  if (!equationLine) return [];
+  const constants = equationLine.match(
+    /\b(?:hbar|mu0|epsilon0|k_B|k_b|c|G|pi|tau|sigma|alpha|beta|gamma)\b/gi,
+  );
+  return stableUnique((constants ?? []).map((entry) => entry.trim())).slice(0, 8);
+};
+
+const inferSymbolRolesFromEquationLine = (
+  equationLine: string,
+): Array<{ symbol: string; role: Stage05SymbolRole }> => {
+  if (!equationLine || !equationLine.includes("=")) return [];
+  const [lhsRaw, rhsRaw] = equationLine.split("=", 2);
+  const lhs = lhsRaw?.trim() ?? "";
+  const rhs = rhsRaw?.trim() ?? "";
+  const lhsSymbols = lhs.match(/[A-Za-z][A-Za-z0-9_]{0,24}/g) ?? [];
+  const rhsSymbols = rhs.match(/[A-Za-z][A-Za-z0-9_]{0,24}/g) ?? [];
+  const out: Array<{ symbol: string; role: Stage05SymbolRole }> = [];
+  for (const symbol of stableUnique(lhsSymbols).slice(0, 3)) {
+    out.push({ symbol, role: "observable" });
+  }
+  for (const symbol of stableUnique(rhsSymbols).slice(0, 6)) {
+    let role: Stage05SymbolRole = "state_variable";
+    if (/^(?:hbar|mu0|epsilon0|k_B|k_b|c|G|pi|tau|sigma)$/i.test(symbol)) role = "constant";
+    else if (/^(?:alpha|beta|gamma|delta|lambda|theta|omega|q95|beta_p|beta_n)$/i.test(symbol)) role = "parameter";
+    out.push({ symbol, role });
+  }
+  return out.slice(0, 8);
+};
+
+const inferStage05EquationMetadata = (card: Pick<Stage05EvidenceCard, "path" | "kind" | "summary" | "symbolsOrKeys" | "snippets">): {
+  equationClass: Stage05EquationClass;
+  domainFamily: Stage05DomainFamily;
+  derivationLevel: Stage05DerivationLevel;
+  constantsDetected: string[];
+  symbolRoles: Array<{ symbol: string; role: Stage05SymbolRole }>;
+} => {
+  const haystack = [card.summary, card.symbolsOrKeys.join(" "), ...card.snippets.map((snippet) => snippet.text)]
+    .filter(Boolean)
+    .join("\n");
+  const equationLine =
+    card.snippets
+      .flatMap((snippet) => String(snippet.text ?? "").split(/\r?\n/))
+      .map((line) => line.trim())
+      .find((line) => hasEquationEvidenceText(line)) ?? null;
+  const equationClass = inferEquationClassFromCard({
+    path: card.path,
+    kind: card.kind,
+    equationLine,
+    haystack,
+  });
+  const derivationLevel = inferDerivationLevelFromEquationClass(equationClass, equationLine ?? haystack);
+  return {
+    equationClass,
+    domainFamily: inferDomainFamilyFromCard(card.path, haystack),
+    derivationLevel,
+    constantsDetected: inferConstantsFromEquationLine(equationLine ?? haystack),
+    symbolRoles: inferSymbolRolesFromEquationLine(equationLine ?? ""),
+  };
+};
+
+const normalizeSlotHitsForCardEvidence = (
+  card: Pick<Stage05EvidenceCard, "kind" | "summary" | "symbolsOrKeys" | "snippets">,
+  slotHits: Stage05SlotId[],
+): Stage05SlotId[] => {
+  if (!Array.isArray(slotHits) || slotHits.length === 0) return [];
+  const normalized = new Set<Stage05SlotId>();
+  for (const slot of slotHits) {
+    if (!SLOT_ID_ORDER.includes(slot)) continue;
+    normalized.add(slot);
+  }
+  if (card.kind !== "code") {
+    normalized.delete("code_path");
+  }
+  if (!hasEquationEvidenceInCard(card)) {
+    normalized.delete("equation");
+  }
+  return SLOT_ID_ORDER.filter((slot) => normalized.has(slot));
 };
 
 const deriveDynamicSlotPlan = (
@@ -633,6 +987,7 @@ const deriveDynamicSlotPlan = (
   const queryLower = query.toLowerCase();
   const warpMathFocused = WARP_MATH_FOCUS_RE.test(queryLower);
   const equationQuoteRequested = EQUATION_QUOTE_RE.test(queryLower);
+  const explicitCodePathDemand = hasExplicitCodePathDemand(queryLower);
   const slots = new Set<Stage05SlotId>();
   const required = new Set<Stage05SlotId>();
   slots.add("definition");
@@ -654,9 +1009,11 @@ const deriveDynamicSlotPlan = (
     slots.add("equation");
     slots.add("code_path");
     required.add("equation");
-    required.add("code_path");
+    if (explicitCodePathDemand) {
+      required.add("code_path");
+    }
   }
-  if (hasAnySignal(queryLower, SLOT_SIGNAL_MAP.code_path) || intentDomain === "repo" || intentDomain === "hybrid") {
+  if (explicitCodePathDemand || intentDomain === "repo" || intentDomain === "hybrid") {
     slots.add("code_path");
   }
   if (hasAnySignal(queryLower, SLOT_SIGNAL_MAP.example)) {
@@ -669,7 +1026,9 @@ const deriveDynamicSlotPlan = (
     slots.add("failure_path");
   }
   if (slots.has("code_path") && (intentDomain === "repo" || intentDomain === "hybrid")) {
-    required.add("code_path");
+    if (!equationQuoteRequested || explicitCodePathDemand) {
+      required.add("code_path");
+    }
   }
   if (slots.has("verification") && intentDomain === "falsifiable") {
     required.add("verification");
@@ -707,12 +1066,20 @@ const inferSlotHitsFromCard = (card: {
   if (card.kind === "code") hits.add("code_path");
   if (hasEquationEvidenceText(contentHaystack)) hits.add("equation");
   for (const slot of SLOT_ID_ORDER) {
-    if (slot === "equation") continue;
+    if (slot === "equation" || slot === "code_path") continue;
     if (hasAnySignal(signalHaystack, SLOT_SIGNAL_MAP[slot])) {
       hits.add(slot);
     }
   }
-  return SLOT_ID_ORDER.filter((slot) => hits.has(slot));
+  return normalizeSlotHitsForCardEvidence(
+    {
+      kind: card.kind,
+      summary: card.summary,
+      symbolsOrKeys: card.symbolsOrKeys,
+      snippets: card.snippets,
+    },
+    SLOT_ID_ORDER.filter((slot) => hits.has(slot)),
+  );
 };
 
 const buildSlotCoverage = (
@@ -720,22 +1087,36 @@ const buildSlotCoverage = (
   cards: Array<Pick<Stage05EvidenceCard, "summary" | "symbolsOrKeys" | "snippets" | "path" | "kind" | "slotHits">>,
 ): Stage05SlotCoverage => {
   const present = new Set<Stage05SlotId>();
+  let hasCodePathEvidence = false;
   for (const card of cards) {
-    const cardHits =
-      Array.isArray(card.slotHits) && card.slotHits.length > 0
-        ? card.slotHits
-        : inferSlotHitsFromCard({
-            path: card.path,
-            kind: card.kind,
-            summary: card.summary,
-            symbolsOrKeys: card.symbolsOrKeys,
-            snippets: card.snippets,
-          });
+    const inferredHits = inferSlotHitsFromCard({
+      path: card.path,
+      kind: card.kind,
+      summary: card.summary,
+      symbolsOrKeys: card.symbolsOrKeys,
+      snippets: card.snippets,
+    });
+    const parsedHits = parseSlotHits(card.slotHits);
+    const cardHits = normalizeSlotHitsForCardEvidence(
+      {
+        kind: card.kind,
+        summary: card.summary,
+        symbolsOrKeys: card.symbolsOrKeys,
+        snippets: card.snippets,
+      },
+      mergeSlotHits(parsedHits, inferredHits),
+    );
     for (const slot of cardHits) present.add(slot);
+    if (card.kind === "code" && cardHits.includes("code_path")) {
+      hasCodePathEvidence = true;
+    }
   }
   const requiredUnique = SLOT_ID_ORDER.filter((slot) => required.includes(slot));
-  const presentRequired = requiredUnique.filter((slot) => present.has(slot));
-  const missing = requiredUnique.filter((slot) => !present.has(slot));
+  const presentRequired = requiredUnique.filter((slot) => {
+    if (slot === "code_path") return hasCodePathEvidence;
+    return present.has(slot);
+  });
+  const missing = requiredUnique.filter((slot) => !presentRequired.includes(slot));
   const ratio = requiredUnique.length === 0 ? 1 : presentRequired.length / requiredUnique.length;
   return {
     required: requiredUnique,
@@ -748,6 +1129,33 @@ const buildSlotCoverage = (
 const estimateCardPayloadChars = (card: Stage05ExtractedCard): number => {
   const snippetChars = card.snippets.reduce((count, snippet) => count + snippet.text.length, 0);
   return card.summary.length + snippetChars + (card.fullText?.length ?? 0);
+};
+
+const selectCardsWithKindCoverage = (
+  cards: Stage05ExtractedCard[],
+  maxCards: number,
+  requiredKinds: Stage05CardKind[],
+): Stage05ExtractedCard[] => {
+  const limit = Math.max(1, maxCards);
+  if (cards.length <= limit && requiredKinds.length === 0) return cards;
+  const selected: Stage05ExtractedCard[] = [];
+  const selectedPathSet = new Set<string>();
+  const pushCard = (card: Stage05ExtractedCard | undefined): void => {
+    if (!card) return;
+    if (selectedPathSet.has(card.path)) return;
+    selectedPathSet.add(card.path);
+    selected.push(card);
+  };
+  for (const kind of requiredKinds) {
+    const candidate = cards.find((card) => card.kind === kind && !selectedPathSet.has(card.path));
+    pushCard(candidate);
+    if (selected.length >= limit) break;
+  }
+  for (const card of cards) {
+    if (selected.length >= limit) break;
+    pushCard(card);
+  }
+  return selected.slice(0, limit);
 };
 
 const compressFullTextForPrompt = (value: string, maxChars: number): string => {
@@ -1147,22 +1555,48 @@ const applyLlmSummaries = (
       symbolsOrKeys,
       snippets: card.snippets,
     });
-    let slotHits = mergeSlotHits(card.slotHits, patchSlotHits, inferredSlotHits);
-    if (
-      !hasEquationEvidenceInCard({
+    const slotHits = normalizeSlotHitsForCardEvidence(
+      {
+        kind: card.kind,
         summary,
         symbolsOrKeys,
         snippets: card.snippets,
-      })
-    ) {
-      slotHits = slotHits.filter((slot) => slot !== "equation");
-    }
+      },
+      mergeSlotHits(card.slotHits, patchSlotHits, inferredSlotHits),
+    );
     const symbolsChanged =
       symbolsOrKeys.length !== card.symbolsOrKeys.length ||
       symbolsOrKeys.some((entry, index) => entry !== card.symbolsOrKeys[index]);
     const slotChanged =
       (slotHits?.length ?? 0) !== (card.slotHits?.length ?? 0) ||
       (slotHits ?? []).some((entry, index) => entry !== card.slotHits?.[index]);
+    const inferredMetadata = inferStage05EquationMetadata({
+      path: card.path,
+      kind: card.kind,
+      summary,
+      symbolsOrKeys,
+      snippets: card.snippets,
+    });
+    const equationClass = patch.equationClass ?? card.equationClass ?? inferredMetadata.equationClass;
+    const domainFamily = patch.domainFamily ?? card.domainFamily ?? inferredMetadata.domainFamily;
+    const derivationLevel =
+      patch.derivationLevel ?? card.derivationLevel ?? inferredMetadata.derivationLevel;
+    const constantsDetected = Array.isArray(patch.constantsDetected)
+      ? stableUnique(
+          patch.constantsDetected
+            .map((entry) => String(entry ?? "").trim())
+            .filter(Boolean),
+        ).slice(0, 8)
+      : card.constantsDetected ?? inferredMetadata.constantsDetected;
+    const symbolRoles = Array.isArray(patch.symbolRoles)
+      ? patch.symbolRoles
+          .map((entry) => ({
+            symbol: String((entry as { symbol?: unknown }).symbol ?? "").trim(),
+            role: String((entry as { role?: unknown }).role ?? "other").trim() as Stage05SymbolRole,
+          }))
+          .filter((entry) => Boolean(entry.symbol))
+          .slice(0, 8)
+      : card.symbolRoles ?? inferredMetadata.symbolRoles;
     applied = applied || summary !== card.summary || symbolsChanged || slotChanged;
     return {
       ...card,
@@ -1170,6 +1604,11 @@ const applyLlmSummaries = (
       symbolsOrKeys,
       confidence,
       slotHits,
+      equationClass,
+      domainFamily,
+      derivationLevel,
+      constantsDetected,
+      symbolRoles,
     };
   });
   return { cards: next, applied };
@@ -1269,6 +1708,13 @@ const extractCardForPath = (
       ? undefined
       : buildStage05FocusedFullText(contentLines, snippets.slice(0, 6), fullTextBudget);
   const relevance = scorePathRelevance(normalizedPath, queryTokens, queryLower);
+  const equationMetadata = inferStage05EquationMetadata({
+    path: normalizedPath,
+    kind: extracted.kind,
+    summary: extracted.summary,
+    symbolsOrKeys: extracted.symbolsOrKeys,
+    snippets,
+  });
   const card: Stage05ExtractedCard = {
     path: normalizedPath,
     kind: extracted.kind,
@@ -1276,13 +1722,26 @@ const extractCardForPath = (
     symbolsOrKeys: stableUnique(extracted.symbolsOrKeys).slice(0, 10),
     snippets,
     confidence: clampNumber(extracted.confidence, 0, 1),
-    slotHits: inferSlotHitsFromCard({
-      path: normalizedPath,
-      kind: extracted.kind,
-      summary: extracted.summary,
-      symbolsOrKeys: extracted.symbolsOrKeys,
-      snippets,
-    }),
+    slotHits: normalizeSlotHitsForCardEvidence(
+      {
+        kind: extracted.kind,
+        summary: extracted.summary,
+        symbolsOrKeys: extracted.symbolsOrKeys,
+        snippets,
+      },
+      inferSlotHitsFromCard({
+        path: normalizedPath,
+        kind: extracted.kind,
+        summary: extracted.summary,
+        symbolsOrKeys: extracted.symbolsOrKeys,
+        snippets,
+      }),
+    ),
+    equationClass: equationMetadata.equationClass,
+    domainFamily: equationMetadata.domainFamily,
+    derivationLevel: equationMetadata.derivationLevel,
+    constantsDetected: equationMetadata.constantsDetected,
+    symbolRoles: equationMetadata.symbolRoles,
     fingerprint,
     relevance,
     extractedChars,
@@ -1356,13 +1815,88 @@ export async function buildStage05EvidenceCards(
   }
   const queryTokens = tokenizeSignal(query);
   const queryLower = query.toLowerCase();
-  const rankedPaths = normalizedPaths
-    .map((candidatePath) => ({
-      path: candidatePath,
-      score: scorePathRelevance(candidatePath, queryTokens, queryLower),
-    }))
-    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
-    .slice(0, Math.max(1, options.maxFiles));
+  const explicitCodePathDemand = hasExplicitCodePathDemand(queryLower);
+  const requiresCodeKind = slotPlan.required.includes("code_path");
+  const requiresHybridPhysicsDiversity =
+    options.intentDomain === "hybrid" && HYBRID_PHYSICS_DIVERSITY_RE.test(queryLower);
+  const equationSeeking =
+    slotPlan.slots.includes("equation") || slotPlan.required.includes("equation");
+  const pathWeight = equationSeeking ? 0.35 : 0.48;
+  const contentWeight = 1 - pathWeight;
+  const rankedPathCandidates = normalizedPaths
+    .map((candidatePath) => {
+      const kindHint = classifyKindFromPathHint(candidatePath);
+      const pathScore = scorePathRelevance(candidatePath, queryTokens, queryLower);
+      let score = pathScore;
+      const absPath = path.resolve(process.cwd(), candidatePath);
+      let probeScore: number | null = null;
+      let probeEquationLineCount = 0;
+      let probeEquationStructureCount = 0;
+      let probeNoiseLineCount = 0;
+      if (kindHint !== "binary") {
+        try {
+          const stat = fs.statSync(absPath);
+          if (stat.isFile() && stat.size > 0 && stat.size <= MAX_STAGE05_FILE_BYTES * 2) {
+            const probeText = readStage05ProbeText(absPath, stat);
+            const probe = scoreStage05ContentProbe({
+              normalizedPath: candidatePath,
+              kindHint,
+              queryTokens,
+              slotPlan,
+              text: probeText,
+            });
+            if (probe) {
+              probeScore = probe.score;
+              probeEquationLineCount = probe.equationLineCount;
+              probeEquationStructureCount = probe.equationStructureCount;
+              probeNoiseLineCount = probe.noiseLineCount;
+              score = pathScore * pathWeight + probe.score * contentWeight;
+            }
+          }
+        } catch {
+          // keep deterministic path score fallback when probe cannot be read
+        }
+      }
+      if (requiresCodeKind) {
+        if (kindHint === "code") score += 1.75;
+        if (kindHint === "doc") score -= 0.35;
+      }
+      if (requiresHybridPhysicsDiversity && kindHint === "doc") {
+        score += 0.35;
+      }
+      if (equationSeeking) {
+        if (probeEquationLineCount > 0) score += 0.55;
+        if (probeEquationLineCount > 0 && probeEquationStructureCount === 0) score -= 0.35;
+        if (probeNoiseLineCount >= 2 && probeEquationStructureCount === 0) score -= 0.65;
+      }
+      return {
+        path: candidatePath,
+        score: Number(score.toFixed(4)),
+        kindHint,
+        probeScore,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (b.probeScore ?? Number.NEGATIVE_INFINITY) -
+          (a.probeScore ?? Number.NEGATIVE_INFINITY) ||
+        a.path.localeCompare(b.path),
+    );
+  let rankedPaths = rankedPathCandidates.slice(0, Math.max(1, options.maxFiles));
+  const ensureRankedPathKind = (kind: Stage05CardKind): void => {
+    if (rankedPaths.some((entry) => entry.kindHint === kind)) return;
+    const candidate = rankedPathCandidates.find((entry) => entry.kindHint === kind);
+    if (!candidate) return;
+    rankedPaths = [candidate, ...rankedPaths.filter((entry) => entry.path !== candidate.path)];
+    rankedPaths = rankedPaths.slice(0, Math.max(1, options.maxFiles));
+  };
+  if (requiresCodeKind) {
+    ensureRankedPathKind("code");
+  }
+  if (requiresHybridPhysicsDiversity) {
+    ensureRankedPathKind("doc");
+  }
 
   const extractedCards: Stage05ExtractedCard[] = [];
   for (const entry of rankedPaths) {
@@ -1388,7 +1922,11 @@ export async function buildStage05EvidenceCards(
   }
 
   const equationRequired = slotPlan.required.includes("equation");
-  let workingCards = extractedCards
+  const requiredCardKinds: Stage05CardKind[] = [];
+  if (requiresCodeKind) requiredCardKinds.push("code");
+  if (requiresHybridPhysicsDiversity) requiredCardKinds.push("doc");
+  let workingCards = selectCardsWithKindCoverage(
+    extractedCards
     .sort((a, b) => {
       if (equationRequired) {
         const aEquation = hasEquationEvidenceInCard(a) ? 1 : 0;
@@ -1396,8 +1934,10 @@ export async function buildStage05EvidenceCards(
         if (bEquation !== aEquation) return bEquation - aEquation;
       }
       return b.relevance - a.relevance || b.confidence - a.confidence || a.path.localeCompare(b.path);
-    })
-    .slice(0, Math.max(1, options.maxCards));
+    }),
+    Math.max(1, options.maxCards),
+    requiredCardKinds,
+  );
   let llmUsed = false;
   let llmSummarySucceeded = false;
   let fallbackReason: string | null = null;
@@ -1702,7 +2242,10 @@ export async function buildStage05EvidenceCards(
   if (equationRequired) {
     workingCards = workingCards.map((card) => {
       if (!hasEquationEvidenceInCard(card)) return card;
-      const slotHits = mergeSlotHits(card.slotHits, ["equation"] as Stage05SlotId[]);
+      const slotHits = normalizeSlotHitsForCardEvidence(
+        card,
+        mergeSlotHits(card.slotHits, ["equation"] as Stage05SlotId[]),
+      );
       const changed =
         (slotHits?.length ?? 0) !== (card.slotHits?.length ?? 0) ||
         (slotHits ?? []).some((entry, index) => entry !== card.slotHits?.[index]);
@@ -1726,8 +2269,26 @@ export async function buildStage05EvidenceCards(
     })),
   );
   if (summaryRequired && hardFailOnSummaryError && slotCoverage.missing.length > 0) {
-    const reason = `stage05_slot_coverage_missing:${slotCoverage.missing.join(",")}`;
-    return buildSummaryHardFail(reason, slotCoverage);
+    const missingSlots = slotCoverage.missing;
+    const onlyMissingCodePath = missingSlots.length === 1 && missingSlots[0] === "code_path";
+    const allowSoftCodePathGap =
+      onlyMissingCodePath && slotPlan.required.includes("equation") && !explicitCodePathDemand;
+    if (!allowSoftCodePathGap) {
+      const reason = `stage05_slot_coverage_missing:${missingSlots.join(",")}`;
+      return buildSummaryHardFail(reason, slotCoverage);
+    }
+    fallbackReason = fallbackReason ?? "stage05_slot_soft_missing:code_path";
+  }
+  if (summaryRequired && hardFailOnSummaryError && requiresHybridPhysicsDiversity) {
+    const hasDocCard = workingCards.some((card) => card.kind === "doc");
+    const hasCodeCard = workingCards.some((card) => card.kind === "code");
+    if (!hasDocCard || !hasCodeCard) {
+      const missingKinds = [hasDocCard ? null : "doc", hasCodeCard ? null : "code"].filter(
+        (entry): entry is string => Boolean(entry),
+      );
+      const reason = `stage05_hybrid_diversity_missing:${missingKinds.join(",")}`;
+      return buildSummaryHardFail(reason, slotCoverage);
+    }
   }
 
   const kindCounts = buildKindCounts();
@@ -1764,6 +2325,11 @@ export async function buildStage05EvidenceCards(
     snippets: card.snippets,
     confidence: Number(card.confidence.toFixed(4)),
     slotHits: card.slotHits,
+    equationClass: card.equationClass,
+    domainFamily: card.domainFamily,
+    derivationLevel: card.derivationLevel,
+    constantsDetected: card.constantsDetected,
+    symbolRoles: card.symbolRoles,
   }));
   return { cards, telemetry };
 }

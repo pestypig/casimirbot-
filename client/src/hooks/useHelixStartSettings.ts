@@ -6,6 +6,7 @@ export type StartSettings = {
   preferDesktop: boolean;
   showZen: boolean;
   enableSplashCursor: boolean;
+  voiceNoisyEnvironmentMode: boolean;
   showHelixAskDebug: boolean;
   showHelixAskReasoningEventLog: boolean;
   showHelixVoiceCaptureDiagnostics: boolean;
@@ -18,11 +19,12 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 5,
+  settingsVersion: 6,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
   enableSplashCursor: false,
+  voiceNoisyEnvironmentMode: false,
   showHelixAskDebug: true,
   showHelixAskReasoningEventLog: false,
   showHelixVoiceCaptureDiagnostics: false,
@@ -47,6 +49,7 @@ export function useHelixStartSettings() {
       const merged: StartSettings = { ...DEFAULT_SETTINGS, ...parsed };
       if (parsed.settingsVersion !== DEFAULT_SETTINGS.settingsVersion) {
         merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
+        merged.voiceNoisyEnvironmentMode = DEFAULT_SETTINGS.voiceNoisyEnvironmentMode;
         merged.showHelixAskDebug = DEFAULT_SETTINGS.showHelixAskDebug;
         merged.showHelixAskReasoningEventLog = DEFAULT_SETTINGS.showHelixAskReasoningEventLog;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;

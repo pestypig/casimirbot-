@@ -1613,6 +1613,27 @@ function conceptEvidenceAnchored(input: HelixAskPlatonicInput): boolean {
   return match.card.aliases.some((alias) => evidenceTokens.has(alias.toLowerCase()));
 }
 
+function answerAnchorsEvidencePath(input: HelixAskPlatonicInput): boolean {
+  const normalizePath = (value: string): string =>
+    value.replace(/\\/g, "/").trim().toLowerCase();
+  const evidencePaths = (input.evidencePaths ?? [])
+    .map((entry) => normalizePath(entry))
+    .filter(Boolean);
+  if (evidencePaths.length === 0) return false;
+  const answerPaths = extractFilePathsFromText(input.answer ?? "")
+    .map((entry) => normalizePath(entry))
+    .filter(Boolean);
+  if (answerPaths.length > 0) {
+    const answerSet = new Set(answerPaths);
+    for (const evidencePath of evidencePaths) {
+      if (answerSet.has(evidencePath)) return true;
+      if (Array.from(answerSet).some((candidate) => candidate.endsWith(evidencePath))) return true;
+    }
+  }
+  const answerLower = String(input.answer ?? "").toLowerCase();
+  return evidencePaths.some((path) => answerLower.includes(path));
+}
+
 function applyBeliefGate(
   input: HelixAskPlatonicInput,
   summary: HelixAskBeliefSummary,
@@ -1635,6 +1656,10 @@ function applyBeliefGate(
   // Concept-anchored answers can be legitimate even when token overlap is thin.
   if (conceptEvidenceAnchored(input)) {
     return { answer: input.answer, applied: false };
+  }
+  // Repo/hybrid answers with explicit evidence anchors should not be rewritten into weak-reflection clarifiers.
+  if (input.evidenceGateOk && answerAnchorsEvidencePath(input)) {
+    return { answer: input.answer, applied: false, reason: "evidence_anchor" };
   }
   if (summary.unsupportedRate < BELIEF_UNSUPPORTED_MAX) {
     return { answer: input.answer, applied: false };

@@ -27,6 +27,24 @@ export const probeHelixAskAvailability = async (
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // Use a lightweight service-health probe first to avoid false negatives from
+    // full /api/agi/ask generation under transient load.
+    try {
+      const healthResponse = await fetchImpl(new URL("/api/helix/pipeline", baseUrl), {
+        method: "GET",
+        signal: controller.signal,
+      });
+      if (healthResponse.ok) {
+        return {
+          ok: true,
+          status: healthResponse.status,
+          message: "pipeline_health_ok",
+        };
+      }
+    } catch {
+      // fall through to ask-endpoint probe
+    }
+
     const response = await fetchImpl(new URL("/api/agi/ask", baseUrl), {
       method: "POST",
       headers: { "content-type": "application/json" },

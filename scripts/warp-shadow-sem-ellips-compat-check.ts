@@ -110,6 +110,8 @@ const finiteOrNull = (value: unknown): number | null => {
 };
 
 const isSha256Hex = (value: string): boolean => /^[a-f0-9]{64}$/i.test(value);
+const normalizeRef = (value: string): string => value.replace(/\\/g, '/').trim().toLowerCase();
+const isTemplateRef = (value: string): boolean => normalizeRef(value).includes('docs/specs/data/se-paired-runs-template-');
 
 const reduceReasonCode = (reasonCode: string): ReducedReasonCategory => {
   const code = String(reasonCode ?? '').trim().toLowerCase();
@@ -122,6 +124,7 @@ const reduceReasonCode = (reasonCode: string): ReducedReasonCategory => {
   if (code.includes('edge_uncertainty_overlap')) return 'uncertainty_edge_overlap';
   if (code.includes('strict_scope_ref_not_admissible')) return 'source_admissibility';
   if (code.includes('measurement_provenance')) return 'reportable_contract';
+  if (code.includes('template_placeholder_input')) return 'reportable_contract';
   if (code.includes('reportable_not_ready') || code.includes('reportable_ready_with_blocked_reasons')) {
     return 'reportable_contract';
   }
@@ -298,6 +301,11 @@ export const runSemEllipsCompatCheck = (options: {
         String(hash).trim().toLowerCase(),
       ] as const);
       const rawArtifactSha256 = Object.fromEntries(rawArtifactSha256Entries.filter(([ref]) => ref.length > 0));
+      const templateRefPresent = rawArtifactRefs.some((ref) => isTemplateRef(ref));
+      const templateRunId = String(context?.paired_run_id ?? '')
+        .trim()
+        .toLowerCase()
+        .includes('template');
       if (reportableReady === true) {
         if (blockedReasonsUnique.length > 0) reasons.push('reportable_ready_with_blocked_reasons');
         const uSemNm = finiteOrNull(context?.u_sem_nm);
@@ -335,12 +343,21 @@ export const runSemEllipsCompatCheck = (options: {
             reasons.push('invalid_measurement_provenance_raw_hash_format');
           }
         }
+        if (templateRefPresent || templateRunId) {
+          reasons.push('template_placeholder_input');
+        }
       } else {
         reasons.push('reportable_not_ready');
         if (blockedReasonsUnique.length > 0) {
           reasons.push(...blockedReasonsUnique);
+          if ((templateRefPresent || templateRunId) && !blockedReasonsUnique.includes('template_placeholder_input')) {
+            reasons.push('template_placeholder_input');
+          }
         } else {
           reasons.push('missing_reportable_blocked_reasons');
+          if (templateRefPresent || templateRunId) {
+            reasons.push('template_placeholder_input');
+          }
         }
       }
     }

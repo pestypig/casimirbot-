@@ -23,6 +23,7 @@
     "maturity_gates",
     "citation_registry",
     "citation_links",
+    "paper_card",
     "retrieval_index",
     "review"
   ],
@@ -94,6 +95,7 @@
       "items": { "$ref": "#/definitions/citationLink" },
       "maxItems": 400000
     },
+    "paper_card": { "$ref": "#/definitions/paperCard" },
     "retrieval_index": {
       "type": "object",
       "additionalProperties": false,
@@ -582,6 +584,156 @@
         "relation": { "type": "string", "enum": ["cites"] },
         "method": { "type": "string", "enum": ["marker", "doi", "arxiv", "heuristic"] },
         "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "paperCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concepts",
+        "quantitative_values",
+        "systems",
+        "math_objects",
+        "congruence_assessments"
+      ],
+      "properties": {
+        "concepts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardConcept" },
+          "maxItems": 200000
+        },
+        "quantitative_values": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardQuantValue" },
+          "maxItems": 200000
+        },
+        "systems": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardSystem" },
+          "maxItems": 200000
+        },
+        "math_objects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["equations", "definitions", "variables", "units", "assumptions"],
+          "properties": {
+            "equations": { "type": "array", "items": { "$ref": "#/definitions/equationRecord" } },
+            "definitions": { "type": "array", "items": { "$ref": "#/definitions/definitionRecord" } },
+            "variables": { "type": "array", "items": { "$ref": "#/definitions/variableRecord" } },
+            "units": { "type": "array", "items": { "$ref": "#/definitions/unitRecord" } },
+            "assumptions": { "type": "array", "items": { "$ref": "#/definitions/assumptionRecord" } }
+          }
+        },
+        "congruence_assessments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardCongruence" },
+          "maxItems": 200000
+        }
+      }
+    },
+    "paperCardProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_id", "page", "span", "extraction_method", "extracted_at"],
+      "properties": {
+        "doc_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "page": { "type": "integer", "minimum": 1 },
+        "span": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": { "type": "integer", "minimum": 0 },
+            "end": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "extraction_method": { "type": "string", "enum": ["pdf_text", "ocr", "manual", "hybrid"] },
+        "extracted_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "paperCardConcept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concept_id", "term", "aliases", "confidence", "provenance"],
+      "properties": {
+        "concept_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "term": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "definition": { "type": "string", "maxLength": 20000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "provenance": { "$ref": "#/definitions/paperCardProvenance" }
+      }
+    },
+    "paperCardQuantValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_id", "label", "value", "unit", "context", "confidence", "provenance"],
+      "properties": {
+        "value_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "context": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "provenance": { "$ref": "#/definitions/paperCardProvenance" }
+      }
+    },
+    "paperCardSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "name", "components", "interactions", "confidence", "provenance"],
+      "properties": {
+        "system_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "components": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "interactions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "provenance": { "$ref": "#/definitions/paperCardProvenance" }
+      }
+    },
+    "paperCardCongruence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessment_id",
+        "target_type",
+        "target_id",
+        "status",
+        "score",
+        "rationale",
+        "evidence_claim_ids"
+      ],
+      "properties": {
+        "assessment_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "target_type": { "type": "string", "enum": ["concept", "system", "value", "equation"] },
+        "target_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "status": {
+          "type": "string",
+          "enum": ["agreement", "partial_agreement", "tension", "conflict", "unknown"]
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+          "maxItems": 64,
+          "uniqueItems": true
+        }
       }
     },
     "derivationLineage": {

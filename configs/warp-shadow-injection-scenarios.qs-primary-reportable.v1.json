@@ -5,7 +5,7 @@
   "recovery_goal": "q_spoiling_recovery",
   "success_bar": "map_only",
   "baseline_reference": {
-    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-08.json",
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-17.json",
     "keys": [
       "marginRatioRaw",
       "marginRatioRawComputed",
@@ -3489,7 +3489,7 @@
   "profile": "qs_primary_reportable_v1",
   "preRegistrationProfile": {
     "profileId": "qs-primary-reportable-v1",
-    "lockedOn": "2026-03-08",
+    "lockedOn": "2026-03-17",
     "lane": "q_spoiling",
     "sourceClassAllowlist": [
       "primary",

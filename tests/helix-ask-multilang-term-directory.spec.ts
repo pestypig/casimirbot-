@@ -199,6 +199,30 @@ describe("helix ask multilingual term directory", () => {
     expect(explicitRepo.prior_suppressed_reason).toBe("explicit_repo_cue");
   });
 
+  it("treats 'how does' prompts as conceptual for term-prior decisions", () => {
+    const tempDir = createTempDir();
+    cleanupDirs.push(tempDir);
+    const configPath = path.join(tempDir, "directory.json");
+    writeDirectory(
+      configPath,
+      baseDirectory([buildEponymEntry("eponym_casimir", "Casimir", ["casimir", "dynamic casimir"])]),
+    );
+
+    const decision = computeHelixAskTermPriorDecision({
+      sourceText: "How does dynamic Casimir modulation feed into the system's physics outputs?",
+      pivotText: "How does dynamic Casimir modulation feed into the system's physics outputs?",
+      explicitRepoCue: false,
+      enabled: true,
+      pivotConfidence: 0.9,
+      directoryPath: configPath,
+    });
+
+    expect(decision.term_hits.some((hit) => hit.term_id === "eponym_casimir")).toBe(true);
+    expect(decision.conceptual_prompt).toBe(true);
+    expect(decision.prior_suppressed_reason).toBeNull();
+    expect(decision.applied).toBe(true);
+  });
+
   it("suppresses prior when polysemy group is ambiguous", () => {
     const tempDir = createTempDir();
     cleanupDirs.push(tempDir);

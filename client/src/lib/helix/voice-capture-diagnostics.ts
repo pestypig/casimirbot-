@@ -209,6 +209,7 @@ export type VoiceCaptureDiagnosticsSnapshot = {
     localAudioGateActive: boolean;
     sessionSpeakerActive: boolean;
     multiSpeakerUiActive: boolean;
+    noisyEnvironmentMode: boolean;
   };
   playback?: VoicePlaybackDiagnosticsSnapshot | null;
   playbackOutput?: VoicePlaybackOutputDiagnosticsSnapshot | null;

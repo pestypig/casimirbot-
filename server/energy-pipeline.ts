@@ -50,6 +50,12 @@ const INV16PI = 1 / (16 * Math.PI);
 
 // Production-quiet logging toggle
 const DEBUG_PIPE = process.env.NODE_ENV !== 'production' && (process.env.HELIX_DEBUG?.includes('pipeline') ?? false);
+const PIPELINE_THETA_AUDIT_LOG = DEBUG_PIPE && process.env.HELIX_PIPE_AUDIT_LOG === "1";
+const QI_GUARD_LOG_MIN_INTERVAL_MS = Number.isFinite(Number(process.env.QI_GUARD_LOG_MIN_INTERVAL_MS))
+  ? Math.max(250, Number(process.env.QI_GUARD_LOG_MIN_INTERVAL_MS))
+  : 5000;
+let lastQiGuardLogAt = 0;
+let lastQiGuardLogMode: "breach" | "debug" | null = null;
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 import {
   calculateDynamicCasimirWithNatario,
@@ -4842,22 +4848,24 @@ export async function calculateEnergyPipeline(
     };
   }
 
-  console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Pipeline):', {
-    mode: modelMode,
-    massMode,
-    formula: '++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff',
-    components: thetaComponents,
-    results: {
-      thetaRaw: thetaRaw,
-      thetaRawSci: thetaRaw.toExponential(2),
-      thetaCal: thetaCal,
-      thetaCalSci: thetaCal.toExponential(2),
-      ratio: thetaRaw / thetaCal,
-      gammaVdBRatio: gammaVdB_raw / gammaVdB_cal
-    },
-    expected_raw: 4.4e10,
-    ratio_vs_expected: thetaRaw / 4.4e10
-  });
+  if (PIPELINE_THETA_AUDIT_LOG) {
+    console.log('=┬â├╢├¼ ++-Scale Field Strength Audit (Raw vs Pipeline):', {
+      mode: modelMode,
+      massMode,
+      formula: '++ = +┬ª_geo^3 -+ q -+ +┬ª_VdB -+ d_eff',
+      components: thetaComponents,
+      results: {
+        thetaRaw: thetaRaw,
+        thetaRawSci: thetaRaw.toExponential(2),
+        thetaCal: thetaCal,
+        thetaCalSci: thetaCal.toExponential(2),
+        ratio: thetaRaw / thetaCal,
+        gammaVdBRatio: gammaVdB_raw / gammaVdB_cal
+      },
+      expected_raw: 4.4e10,
+      ratio_vs_expected: thetaRaw / 4.4e10
+    });
+  }
 
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
@@ -6386,11 +6394,19 @@ function emitQiGuardLog(state: EnergyPipelineState, qiGuard: any): void {
     clockingDetail: state.clocking ?? null,
   };
 
-  if (!Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1) {
+  const breach = !Number.isFinite(zetaForStatus) || (zetaForStatus as number) >= 1;
+  const mode: "breach" | "debug" = breach ? "breach" : "debug";
+  if (!breach && !DEBUG_PIPE) return;
+  const now = Date.now();
+  const shouldLog = now - lastQiGuardLogAt >= QI_GUARD_LOG_MIN_INTERVAL_MS || lastQiGuardLogMode !== mode;
+  if (!shouldLog) return;
+  lastQiGuardLogAt = now;
+  lastQiGuardLogMode = mode;
+  if (breach) {
     console.warn("[QI-guard] sampled integral exceeds bound", guardLog);
-  } else if (DEBUG_PIPE) {
-    console.log("[QI-guard]", guardLog);
+    return;
   }
+  console.log("[QI-guard]", guardLog);
 }
 
 function updateQiTelemetry(state: EnergyPipelineState) {

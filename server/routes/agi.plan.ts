@@ -219,9 +219,13 @@ import {
 } from "../services/helix-ask/repo-search";
 import {
   buildStage05EvidenceCards,
+  type Stage05DerivationLevel,
+  type Stage05DomainFamily,
   type Stage05EvidenceCard,
+  type Stage05EquationClass,
   type Stage05LlmSummaryInput,
   type Stage05LlmSummaryOutput,
+  type Stage05SymbolRole,
   type Stage05Telemetry,
 } from "../services/helix-ask/stage0-content";
 import {
@@ -3703,6 +3707,8 @@ const HELIX_ASK_STAGE05_SUMMARY_REQUIRED =
   String(process.env.HELIX_ASK_STAGE05_SUMMARY_REQUIRED ?? "1").trim() !== "0";
 const HELIX_ASK_STAGE05_HARD_FAIL_ON_SUMMARY_ERROR =
   String(process.env.HELIX_ASK_STAGE05_HARD_FAIL_ON_SUMMARY_ERROR ?? "1").trim() !== "0";
+const HELIX_ASK_STAGE05_PROGRESSIVE_FALLBACK =
+  String(process.env.HELIX_ASK_STAGE05_PROGRESSIVE_FALLBACK ?? "1").trim() !== "0";
 const HELIX_ASK_STAGE05_FULLFILE_MODE =
   String(process.env.HELIX_ASK_STAGE05_FULLFILE_MODE ?? "1").trim() !== "0";
 const HELIX_ASK_STAGE05_FULLFILE_OVERFLOW_POLICY =
@@ -4254,11 +4260,11 @@ const HELIX_ASK_CORE_NOISE =
 const HELIX_ASK_REPO_FORCE =
   /\b(cite files?|file paths?|codebase|repo|repository|where in the code|which file|which files|module|component|path\b|according to the codebase|according to the repo|according to the code)\b/i;
 const HELIX_ASK_REPO_EXPECTS =
-  /\b(in this system|in this repo|this repo|this system|helix ask|ask pipeline|ask system|codebase|repository|where in the code|which file|which files|file paths?|cite files?|according to the codebase|according to the repo|according to the code|per the codebase|per the repo|from the codebase|from the repo|from the code)\b/i;
+  /\b(in this system|in the system|this repo|this system|the system|system'?s|helix ask|ask pipeline|ask system|codebase|repository|where in the code|which file|which files|file paths?|cite files?|according to the codebase|according to the repo|according to the code|per the codebase|per the repo|from the codebase|from the repo|from the code)\b/i;
 const HELIX_ASK_REPO_HINT =
   /(helix|helix ask|ask system|ask pipeline|ask mode|this system|this repo|repository|repo\b|code|codebase|file|path|component|module|endpoint|api|server|client|ui|panel|pipeline|trace|essence|casimir|warp|alcubierre|resonance|code lattice|lattice|ideology|ethos|mission ethos|ideology tree|smoke test|smoke\.md|bug|error|crash|config|env|settings|docs\/)/i;
 const HELIX_ASK_REPO_HINT_EXPLICIT =
-  /(this system|this repo|repository|repo\b|codebase|where in the code|which file|which files|file paths?|cite files?|module|component|path\b|endpoint|api|server|client|ui|panel|docs\/|bug|error|crash|config|env|settings)/i;
+  /(this system|in the system|the system|system'?s|this repo|repository|repo\b|codebase|where in the code|which file|which files|file paths?|cite files?|module|component|path\b|endpoint|api|server|client|ui|panel|docs\/|bug|error|crash|config|env|settings)/i;
 const HELIX_ASK_ENDPOINT_HINT_RE = /\/api\/[a-z0-9/_-]+/gi;
 const HELIX_ASK_ENDPOINT_GUARD =
   String(process.env.HELIX_ASK_ENDPOINT_GUARD ?? "1").trim() !== "0";
@@ -4270,7 +4276,95 @@ const HELIX_ASK_WARP_PROOF_REPO_CUE =
 const HELIX_ASK_WARP_MATH_BROAD_QUERY_RE =
   /(?:\b(?:warp|alcubierre|natario|bubble)\b[\s\S]{0,120}\b(?:math|equation|equations|formula|metric|tensor|congruence|derive|derivation|proof|solver|solve|general relativity|gr)\b)|(?:\b(?:math|equation|equations|formula|metric|tensor|congruence|derive|derivation|proof|solver|solve|general relativity|gr)\b[\s\S]{0,120}\b(?:warp|alcubierre|natario|bubble)\b)/i;
 const HELIX_ASK_EQUATION_QUOTE_REQUEST_RE =
-  /(?:\b(?:quote|exact|verbatim|show|return|include|give|provide|write)\b[\s\S]{0,100}\b(?:equation|equations|formula|metric|tensor)\b)|(?:\b(?:equation|equations|formula|metric|tensor)\b[\s\S]{0,100}\b(?:quote|exact|verbatim|show|return|include|give|provide|write)\b)|(?:\b(?:derive|derivation|prove|proof)\b[\s\S]{0,100}\b(?:equation|equations|formula|metric|tensor)\b)/i;
+  /(?:\b(?:quote|exact|verbatim|show|return|include|give|provide|write)\b[\s\S]{0,100}\b(?:equation|equations|formula|metric|tensor)\b)|(?:\b(?:equation|equations|formula|metric|tensor)\b[\s\S]{0,100}\b(?:quote|exact|verbatim|show|return|include|give|provide|write)\b)|(?:\b(?:derive|derivation|prove|proof)\b[\s\S]{0,100}\b(?:equation|equations|formula|metric|tensor)\b)|(?:\bwhat(?:'s| is)[_\s]+the[_\s]+equation(?:[_\s]+of(?:[_\s]|$))?)|(?:\bwhat[_\s]+equation[_\s]+(?:describes?|defines?|governs?|is[_\s]+used)\b)|(?:\bwhich[_\s]+(?:equation|formula)[_\s]+(?:describes?|defines?|is[_\s]+used)\b)|(?:\bequation[_\s]+of(?:[_\s]|$))/i;
+const HELIX_ASK_EQUATION_REQUEST_BROAD_RE =
+  /\b(?:equation|equations|formula|metric|tensor)\b/i;
+const HELIX_ASK_EQUATION_QUOTE_STRICT_RE =
+  /\b(?:quote|exact|verbatim|show|return|include|give|provide|write|line|lines|extract|verifier?|verifiable)\b/i;
+const HELIX_ASK_EQUATION_MECHANISM_EXPLAIN_RE =
+  /\b(how (?:does|do|can)|why|explain|what(?:'s| is| it means)|meaning|feed(?:s|ing)?\s+into|system(?:'s)?\s+outputs?|outputs?)\b/i;
+const HELIX_ASK_EQUATION_QUOTE_ONLY_RE =
+  /\b(exact\s+equation\s+line|just\s+the\s+equation|only\s+the\s+equation|equation\s+only|no\s+explanation)\b/i;
+const HELIX_ASK_NEGATIVE_WARP_RE =
+  /(?:\b(?:do\s*not|don't|without|exclude|avoid|omit|not|never)\b[\s\S]{0,48}\b(?:warp|natario|alcubierre)\b)|(?:\b(?:warp|natario|alcubierre)\b[\s\S]{0,24}\b(?:excluded?|avoid|without|omit|forbidden|not)\b)/i;
+const HELIX_ASK_COLLAPSE_DOMAIN_LOCK_RE =
+  /\b(?:wave[\s-]*function|wavefunction|quantum\s+collapse|collapse\s+of\s+the\s+wave\s+function|collapse\s+operator|measurement\s+problem|born\s+rule|schrodinger|schrÃ¶dinger)\b/i;
+const HELIX_ASK_CASIMIR_DOMAIN_RE =
+  /\b(?:dynamic\s+casimir|casimir\s+modulation|casimir\s+effect|casimir\s+force|casimir)\b/i;
+const HELIX_ASK_TOKAMAK_DOMAIN_RE =
+  /\b(?:tokamak|plasma\s+stability|mhd|confinement)\b/i;
+const HELIX_ASK_POLYTROPE_DOMAIN_RE =
+  /\b(?:polytrope|lane[\s_-]*emden|hydrostatic\s+equilibrium)\b/i;
+const HELIX_ASK_PHASE_CONTROL_DOMAIN_RE =
+  /\b(?:phase\s+scheduler|scheduler\s+control|phase\s+control|energy\s+pipeline)\b/i;
+const HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE =
+  /\b(?:wave[\s_-]*function|wavefunction|psi(?:_[a-z0-9]+)?|density\s+matrix|state\s+vector|measurement|born|collapse|collapse\s+operator|project(?:ion|or)|schrodinger|schroedinger|hamiltonian|quantum)\b/i;
+const HELIX_ASK_WARP_GEOMETRY_EQUATION_SIGNAL_RE =
+  /\b(?:g_ij|k_ij|beta|gamma|theta|metric|tensor|curvature|riemann|ricci|einstein|warp|natario|alcubierre)\b/i;
+const HELIX_ASK_GENERIC_GEOMETRY_EQUATION_RE =
+  /\b(?:v|volume)(?:_[a-z0-9]+)?\s*=\s*\(?\s*4\s*\/\s*3\s*\)?[^\n]{0,120}(?:\b(?:r|radius)(?:_[a-z0-9]+)?\s*(?:\^|\*\*)\s*3\b|\b(?:r|radius)(?:_[a-z0-9]+)?\b\s*\*\s*\b(?:r|radius)(?:_[a-z0-9]+)?\b\s*\*\s*\b(?:r|radius)(?:_[a-z0-9]+)?\b)/i;
+const HELIX_ASK_WARP_FAMILY_PATH_RE =
+  /(?:^|\/)(?:docs\/warp|modules\/warp|docs\/knowledge\/warp|server\/skills\/physics\.warp)|(?:warp|natario|alcubierre)/i;
+const HELIX_ASK_COLLAPSE_FAMILY_PATH_RE =
+  /(?:^|\/)(?:server\/services\/mixer\/collapse|shared\/dp-collapse|tools\/agentic\/collapse|cli\/collapse-bench|server\/routes\/benchmarks\.collapse)|(?:collapse|wave[\s_-]*function|quantum|measurement|born)/i;
+const HELIX_ASK_CASIMIR_FAMILY_PATH_RE =
+  /(?:^|\/)(?:modules\/dynamic\/dynamic-casimir|modules\/sim_core\/static-casimir|docs\/knowledge\/physics\/dynamic-casimir-effect|docs\/knowledge\/physics\/casimir|shared\/dp-collapse|shared\/collapse-benchmark|server\/services\/mixer\/collapse|server\/services\/collapse-benchmark|server\/routes\/benchmarks\.collapse)|(?:casimir|dynamic-casimir)/i;
+const HELIX_ASK_TOKAMAK_FAMILY_PATH_RE =
+  /(?:^|\/)(?:server\/services\/physics\/tokamak|server\/routes\/physics\.tokamak|shared\/tokamak|tools\/tokamak|cli\/tokamak|docs\/knowledge\/physics\/stability-timestep)|(?:tokamak|plasma|mhd)/i;
+const HELIX_ASK_POLYTROPE_FAMILY_PATH_RE =
+  /(?:^|\/)(?:client\/src\/physics\/polytrope|client\/src\/pages\/star-hydrostatic-panel|docs\/knowledge\/physics\/hydrostatic-equilibrium|docs\/knowledge\/physics\/stellar-lifecycle)|(?:polytrope|lane[-_]?emden)/i;
+const HELIX_ASK_PHASE_FAMILY_PATH_RE =
+  /(?:^|\/)(?:server\/energy\/phase-scheduler|server\/energy-pipeline|server\/queue\/index|client\/src\/hooks\/use-energy-pipeline|server\/services\/jobs\/engine)|(?:phase-scheduler|energy-pipeline)/i;
+const HELIX_ASK_COLLAPSE_CORE_EQUATION_PATH_RE =
+  /(?:^|\/)(?:shared\/dp-collapse|server\/services\/mixer\/collapse|shared\/collapse-benchmark|cli\/collapse-bench|tools\/collapse-benchmark-runner|modules\/dynamic\/stress-energy-equations)/i;
+const HELIX_ASK_CASIMIR_CORE_EQUATION_PATH_RE =
+  /(?:^|\/)(?:modules\/sim_core\/static-casimir|modules\/dynamic\/dynamic-casimir|modules\/dynamic\/stress-energy-equations)/i;
+const HELIX_ASK_TOKAMAK_CORE_EQUATION_PATH_RE =
+  /(?:^|\/)(?:server\/services\/physics\/tokamak|shared\/tokamak|tools\/tokamak|cli\/tokamak)/i;
+const HELIX_ASK_POLYTROPE_CORE_EQUATION_PATH_RE =
+  /(?:^|\/)(?:client\/src\/physics\/polytrope|client\/src\/pages\/star-hydrostatic-panel)/i;
+const HELIX_ASK_PHASE_CORE_EQUATION_PATH_RE =
+  /(?:^|\/)(?:server\/energy\/phase-scheduler|server\/energy-pipeline)/i;
+const HELIX_ASK_WARP_CORE_EQUATION_PATH_RE =
+  /(?:^|\/)(?:modules\/dynamic\/natario-metric|modules\/warp\/natario-warp|modules\/warp\/warp-module|modules\/dynamic\/stress-energy-equations)/i;
+const HELIX_ASK_EQUATION_NOISE_PATH_RE =
+  /(?:^|\/)(?:tests\/|server\/_generated\/|docs\/ethos\/|external\/)/i;
+const HELIX_ASK_EQUATION_FAMILY_CORE_SEED_PATHS: Record<EquationCandidateDomainFamily, string[]> = {
+  collapse: [
+    "shared/dp-collapse.ts",
+    "server/services/mixer/collapse.ts",
+    "shared/collapse-benchmark.ts",
+    "cli/collapse-bench.ts",
+    "tools/collapse-benchmark-runner.ts",
+  ],
+  casimir: [
+    "modules/sim_core/static-casimir.ts",
+    "modules/dynamic/dynamic-casimir.ts",
+    "modules/dynamic/stress-energy-equations.ts",
+  ],
+  tokamak: [
+    "server/services/physics/tokamak.ts",
+    "shared/tokamak.ts",
+    "tools/tokamak.ts",
+    "cli/tokamak.ts",
+  ],
+  polytrope: [
+    "client/src/physics/polytrope.ts",
+    "client/src/pages/star-hydrostatic-panel.tsx",
+  ],
+  phase: [
+    "server/energy/phase-scheduler.ts",
+    "server/energy-pipeline.ts",
+    "server/queue/index.ts",
+  ],
+  warp: [
+    "modules/dynamic/natario-metric.ts",
+    "modules/warp/natario-warp.ts",
+    "modules/warp/warp-module.ts",
+    "modules/dynamic/stress-energy-equations.ts",
+  ],
+  generic: [],
+};
 const HELIX_ASK_VIABILITY_PATHS =
   /(server\/gr\/gr-evaluation\.ts|server\/gr\/gr-constraint-policy\.ts|server\/routes\/warp-viability\.ts|server\/skills\/physics\.warp\.viability|server\/skills\/physics\.gr\.grounding|types\/warpViability|server\/helix-core\.ts)/i;
 const HELIX_ASK_VERIFICATION_FOCUS =
@@ -4321,6 +4415,42 @@ const isWarpMathBroadPrompt = (value: string): boolean =>
 const isEquationQuotePrompt = (value: string): boolean =>
   HELIX_ASK_EQUATION_QUOTE_REQUEST_RE.test(value);
 
+const isEquationAskPrompt = (value: string): boolean =>
+  isEquationQuotePrompt(value) || HELIX_ASK_EQUATION_REQUEST_BROAD_RE.test(value);
+
+const isEquationStrictQuotePrompt = (value: string): boolean =>
+  isEquationQuotePrompt(value) &&
+  HELIX_ASK_EQUATION_QUOTE_STRICT_RE.test(value) &&
+  !HELIX_ASK_EQUATION_MECHANISM_EXPLAIN_RE.test(value);
+
+const isEquationPlusMechanismPrompt = (value: string): boolean =>
+  isEquationQuotePrompt(value) && HELIX_ASK_EQUATION_MECHANISM_EXPLAIN_RE.test(value);
+
+const isEquationQuoteOnlyPrompt = (value: string): boolean =>
+  isEquationQuotePrompt(value) &&
+  HELIX_ASK_EQUATION_QUOTE_ONLY_RE.test(value) &&
+  !HELIX_ASK_EQUATION_MECHANISM_EXPLAIN_RE.test(value);
+
+const isEquationBlendPrompt = (value: string): boolean =>
+  isEquationQuotePrompt(value) && !isEquationQuoteOnlyPrompt(value);
+
+const isWaveCollapseEquationPrompt = (value: string): boolean => {
+  if (!isEquationAskPrompt(value)) return false;
+  if (HELIX_ASK_COLLAPSE_DOMAIN_LOCK_RE.test(value)) return true;
+  if (/\b(?:shared\/dp-collapse|server\/services\/mixer\/collapse|collapse-bench(?:mark)?)\b/i.test(value)) {
+    return true;
+  }
+  if (
+    /\bcollapse\b/i.test(value) &&
+    /\b(?:wave|quantum|measurement|born|psi|state|superposition|schrodinger|schroedinger)\b/i.test(
+      value,
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
+
 type HelixAskVerbosity = "brief" | "normal" | "extended";
 
 const HELIX_ASK_DEFAULT_VERBOSITY = (() => {
@@ -4349,6 +4479,182 @@ type HelixAskVerbositySpec = {
     inPractice: string;
   };
   compareBullets: string;
+};
+
+type HelixAskQueryConstraints = {
+  collapseDomainLock: boolean;
+  hardExcludeWarpFamily: boolean;
+  excludedPathPatterns: RegExp[];
+  preferredPathPatterns: RegExp[];
+  explicitAnchorPaths: string[];
+};
+
+const normalizeConstraintPath = (value: string): string =>
+  (normalizeEvidenceRef(value) ?? value).replace(/\\/g, "/").trim();
+
+const isStructuredCitationToken = (value: string): boolean =>
+  /^(?:gate|certificate):/i.test(value.trim());
+
+const pathMatchesAnyPattern = (filePath: string, patterns: RegExp[]): boolean => {
+  if (!patterns.length) return false;
+  const normalized = normalizeConstraintPath(filePath);
+  return patterns.some((pattern) => pattern.test(normalized));
+};
+
+const applyQueryConstraintsToPathList = (
+  paths: string[],
+  constraints: HelixAskQueryConstraints,
+  options?: { preferAnchorPaths?: boolean },
+): string[] => {
+  if (!paths.length) return [];
+  const normalizedPaths = normalizeCitations(paths);
+  const citationTokens = normalizedPaths.filter((entry) => isStructuredCitationToken(entry));
+  const filePaths = normalizedPaths.filter((entry) => !isStructuredCitationToken(entry));
+  const filteredPaths =
+    constraints.excludedPathPatterns.length > 0
+      ? filePaths.filter((entry) => !pathMatchesAnyPattern(entry, constraints.excludedPathPatterns))
+      : filePaths.slice();
+  const effectivePaths = filteredPaths.length > 0 ? filteredPaths : filePaths;
+  const anchorPriority = options?.preferAnchorPaths !== false;
+  const anchorSet = new Set(
+    constraints.explicitAnchorPaths.map((entry) => normalizeConstraintPath(entry).toLowerCase()),
+  );
+  const prioritizedPaths = effectivePaths
+    .map((entry, index) => {
+      const normalized = normalizeConstraintPath(entry);
+      const anchorMatch = anchorSet.has(normalized.toLowerCase());
+      const preferredMatch = pathMatchesAnyPattern(normalized, constraints.preferredPathPatterns);
+      const rank =
+        (anchorPriority && anchorMatch ? 2000 : 0) +
+        (preferredMatch ? 400 : 0) -
+        index;
+      return { entry: normalized, rank };
+    })
+    .sort((left, right) => right.rank - left.rank || left.entry.localeCompare(right.entry))
+    .map((entry) => entry.entry);
+  return normalizeCitations([...prioritizedPaths, ...citationTokens]);
+};
+
+const applyQueryConstraintsToCandidates = (
+  candidates: AskCandidate[],
+  constraints: HelixAskQueryConstraints,
+): AskCandidate[] => {
+  if (candidates.length === 0) return candidates;
+  const filtered =
+    constraints.excludedPathPatterns.length > 0
+      ? candidates.filter((candidate) => !pathMatchesAnyPattern(candidate.filePath, constraints.excludedPathPatterns))
+      : candidates.slice();
+  const effective = filtered.length > 0 ? filtered : candidates;
+  const anchorSet = new Set(
+    constraints.explicitAnchorPaths.map((entry) => normalizeConstraintPath(entry).toLowerCase()),
+  );
+  const adjusted = effective.map((candidate) => {
+    const normalizedPath = normalizeConstraintPath(candidate.filePath);
+    const anchorMatch = anchorSet.has(normalizedPath.toLowerCase());
+    const preferredMatch = pathMatchesAnyPattern(normalizedPath, constraints.preferredPathPatterns);
+    let boost = 0;
+    if (anchorMatch) boost += 3;
+    if (preferredMatch) boost += 1.25;
+    if (
+      constraints.collapseDomainLock &&
+      constraints.preferredPathPatterns.length > 0 &&
+      !preferredMatch
+    ) {
+      boost -= 0.2;
+    }
+    if (boost === 0) return candidate;
+    return {
+      ...candidate,
+      score: Number((candidate.score + boost * 12).toFixed(6)),
+      rrfScore: Number((candidate.rrfScore + boost).toFixed(6)),
+    };
+  });
+  return adjusted.sort(
+    (left, right) =>
+      right.rrfScore - left.rrfScore ||
+      right.score - left.score ||
+      left.filePath.localeCompare(right.filePath),
+  );
+};
+
+const deriveHelixAskQueryConstraints = (
+  question: string,
+  explicitPaths?: string[],
+): HelixAskQueryConstraints => {
+  const normalizedQuestion = String(question ?? "").trim();
+  const explicitAnchorPaths = applyQueryConstraintsToPathList(
+    [
+      ...(explicitPaths ?? []),
+      ...extractFilePathsFromText(normalizedQuestion),
+    ],
+    {
+      collapseDomainLock: false,
+      hardExcludeWarpFamily: false,
+      excludedPathPatterns: [],
+      preferredPathPatterns: [],
+      explicitAnchorPaths: [],
+    },
+    { preferAnchorPaths: false },
+  );
+  const hasWarpPromptSignal = HELIX_ASK_WARP_FOCUS.test(normalizedQuestion);
+  const equationPrompt = isEquationQuotePrompt(normalizedQuestion);
+  const questionHasTestIntent = /\b(test|tests|spec|specs|fixture|mock)\b/i.test(normalizedQuestion);
+  const collapseDomainLock =
+    HELIX_ASK_COLLAPSE_DOMAIN_LOCK_RE.test(normalizedQuestion) && !hasWarpPromptSignal;
+  const casimirDomainLock =
+    HELIX_ASK_CASIMIR_DOMAIN_RE.test(normalizedQuestion) &&
+    !collapseDomainLock &&
+    !hasWarpPromptSignal;
+  const tokamakDomainLock = HELIX_ASK_TOKAMAK_DOMAIN_RE.test(normalizedQuestion) && !hasWarpPromptSignal;
+  const polytropeDomainLock =
+    HELIX_ASK_POLYTROPE_DOMAIN_RE.test(normalizedQuestion) && !hasWarpPromptSignal;
+  const phaseControlDomainLock =
+    HELIX_ASK_PHASE_CONTROL_DOMAIN_RE.test(normalizedQuestion) && !hasWarpPromptSignal;
+  const nonWarpDomainLock =
+    collapseDomainLock ||
+    casimirDomainLock ||
+    tokamakDomainLock ||
+    polytropeDomainLock ||
+    phaseControlDomainLock;
+  const hardExcludeWarpFamily =
+    HELIX_ASK_NEGATIVE_WARP_RE.test(normalizedQuestion) || (nonWarpDomainLock && !hasWarpPromptSignal);
+  const excludedPathPatterns: RegExp[] = hardExcludeWarpFamily ? [HELIX_ASK_WARP_FAMILY_PATH_RE] : [];
+  if (equationPrompt && explicitAnchorPaths.length === 0 && !questionHasTestIntent) {
+    excludedPathPatterns.push(HELIX_ASK_EQUATION_NOISE_PATH_RE);
+  }
+  const preferredPathPatterns: RegExp[] = [];
+  if (collapseDomainLock) preferredPathPatterns.push(HELIX_ASK_COLLAPSE_FAMILY_PATH_RE);
+  if (casimirDomainLock) preferredPathPatterns.push(HELIX_ASK_CASIMIR_FAMILY_PATH_RE);
+  if (tokamakDomainLock) preferredPathPatterns.push(HELIX_ASK_TOKAMAK_FAMILY_PATH_RE);
+  if (polytropeDomainLock) preferredPathPatterns.push(HELIX_ASK_POLYTROPE_FAMILY_PATH_RE);
+  if (phaseControlDomainLock) preferredPathPatterns.push(HELIX_ASK_PHASE_FAMILY_PATH_RE);
+  return {
+    collapseDomainLock,
+    hardExcludeWarpFamily,
+    excludedPathPatterns,
+    preferredPathPatterns,
+    explicitAnchorPaths,
+  };
+};
+
+const applyEquationAnchorPriority = (
+  contract: EquationQuoteContractResult,
+  explicitAnchors: string[],
+): EquationQuoteContractResult => {
+  if (!contract.required || explicitAnchors.length === 0) return contract;
+  const anchorSet = new Set(
+    explicitAnchors.map((entry) => normalizeConstraintPath(entry).toLowerCase()),
+  );
+  const hasAnchorCitation = contract.matchedCitations.some((citation) =>
+    anchorSet.has(normalizeConstraintPath(citation).toLowerCase()),
+  );
+  if (hasAnchorCitation) return contract;
+  return {
+    ...contract,
+    ok: false,
+    citationMatched: false,
+    reason: contract.answerHasEquation ? "citation_missing" : "equation_and_citation_missing",
+  };
 };
 
 const HELIX_ASK_VERBOSITY_SPECS: Record<HelixAskVerbosity, HelixAskVerbositySpec> = {
@@ -4467,6 +4773,14 @@ const HELIX_ASK_JOB_TIMEOUT_MS = clampNumber(
   ),
   30_000,
   30 * 60_000,
+);
+const HELIX_ASK_REQUEST_TIMEOUT_MS = clampNumber(
+  readNumber(
+    process.env.HELIX_ASK_REQUEST_TIMEOUT_MS ?? process.env.VITE_HELIX_ASK_REQUEST_TIMEOUT_MS,
+    Math.min(HELIX_ASK_JOB_TIMEOUT_MS, 180_000),
+  ),
+  15_000,
+  10 * 60_000,
 );
 const HELIX_ASK_JOB_HEARTBEAT_MS = clampNumber(
   readNumber(
@@ -4903,8 +5217,48 @@ const normalizeHelixAskError = (error: unknown): string => {
   return "error";
 };
 
+const HELIX_ASK_TIMEOUT_FAILURE_RE = /\b(helix_ask_timeout|request timed out|timed out|timeout|aborterror|aborted)\b/i;
+
+const shouldCountHelixAskCircuitFailure = (error: unknown): boolean => {
+  if (!error) return true;
+  if (typeof error === "object") {
+    const source = error as {
+      fail_class?: unknown;
+      fail_reason?: unknown;
+      message?: unknown;
+      error?: unknown;
+    };
+    const failClassRaw =
+      typeof source.fail_class === "string" && source.fail_class.trim().length > 0
+        ? source.fail_class
+        : null;
+    const failClass = failClassRaw?.trim().toLowerCase() ?? "";
+    if (failClass === "timeout_soft" || failClass === "timeout_hard") {
+      return false;
+    }
+    const failReasonRaw =
+      typeof source.fail_reason === "string" && source.fail_reason.trim().length > 0
+        ? source.fail_reason
+        : typeof source.error === "string" && source.error.trim().length > 0
+          ? source.error
+          : "";
+    const messageRaw =
+      typeof source.message === "string" && source.message.trim().length > 0
+        ? source.message
+        : normalizeHelixAskError(error);
+    const combined = `${messageRaw} ${failReasonRaw}`.trim();
+    if (combined && HELIX_ASK_TIMEOUT_FAILURE_RE.test(combined)) {
+      return false;
+    }
+    return true;
+  }
+  const message = normalizeHelixAskError(error);
+  return !HELIX_ASK_TIMEOUT_FAILURE_RE.test(message);
+};
+
 const recordHelixAskFailure = (error: unknown): void => {
   if (HELIX_ASK_FAILURE_MAX <= 0) return;
+  if (!shouldCountHelixAskCircuitFailure(error)) return;
   const message = normalizeHelixAskError(error);
   helixAskCircuit.failures += 1;
   helixAskCircuit.lastError = message.slice(0, 280);
@@ -5210,9 +5564,66 @@ const stripDeterministicNoiseArtifacts = (value: string): string => {
     .replace(/`{1,3}[^`]+`{1,3}/g, " ")
     .replace(/\b(?:notes?|tags?)\s*:\s*[^\n.]+(?:\.|$)/gi, " ")
     .replace(/\b\d+\s+symbol=grep\s+file=[^\s,;]+/gi, " ")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+  const preserveLineStructure = hasEquationStructuredSections(cleaned);
+  if (preserveLineStructure) {
+    const compactMechanismBullet = (line: string): string => {
+      const trimmedLine = line.trim();
+      if (!/^\d+\.\s+/.test(trimmedLine)) return line.trimEnd();
+      const citations = trimmedLine.match(/\[[^\]\n]{1,260}\]/g) ?? [];
+      const primaryCitation = citations[0] ?? "";
+      let text = trimmedLine.replace(/\[[^\]\n]{1,260}\]/g, " ").replace(/[ \t]{2,}/g, " ").trim();
+      if (primaryCitation && !text.includes(primaryCitation)) {
+        text = `${text} ${primaryCitation}`.trim();
+      }
+      return text;
+    };
+    const normalizedLines: string[] = [];
+    for (const rawLine of cleaned.split(/\r?\n/)) {
+      const line = rawLine.trimEnd();
+      if (!line.trim()) {
+        normalizedLines.push("");
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(line) && /\s\d+\.\s+/.test(line.trim())) {
+        const segments = line.trim().split(/\s(?=\d+\.\s+)/g);
+        for (const segment of segments) {
+          const compacted = compactMechanismBullet(dedupeAdjacentCitationBrackets(segment));
+          if (compacted) normalizedLines.push(compacted);
+        }
+        continue;
+      }
+      const compacted = compactMechanismBullet(dedupeAdjacentCitationBrackets(line));
+      normalizedLines.push(compacted);
+    }
+    const dedupedLines: string[] = [];
+    const seenBullets = new Set<string>();
+    for (const line of normalizedLines) {
+      if (!line.trim()) {
+        if (dedupedLines.length > 0 && dedupedLines[dedupedLines.length - 1] !== "") {
+          dedupedLines.push("");
+        }
+        continue;
+      }
+      const bulletKey = line.replace(/\[[^\]\n]{1,260}\]/g, "").toLowerCase().replace(/[ \t]+/g, " ").trim();
+      if (/^\d+\.\s+/.test(line.trim()) && seenBullets.has(bulletKey)) {
+        continue;
+      }
+      if (/^\d+\.\s+/.test(line.trim())) {
+        seenBullets.add(bulletKey);
+      }
+      dedupedLines.push(line);
+    }
+    cleaned = dedupedLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (hadRuntimeFallbackNoise && cleaned.length < 48) {
+      cleaned =
+        "Runtime retrieval failed for this request. Please retry or narrow the prompt to specific repo files.";
+    }
+    return cleaned;
+  }
 
   const sentenceParts = cleaned
     .split(/(?<=[.!?])\s+/)
@@ -5637,6 +6048,71 @@ function repairAnswerFilePathFragments(
   return repaired.join("\n");
 }
 
+function cleanDanglingFileExtensionFragments(value: string): string {
+  if (!value) return value;
+  return value
+    .replace(/([.!?])\s+(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\.(?=\s|$)/gi, "$1")
+    // Remove orphan dotted extension fragments left after partial path scrub (e.g. "[.ts]" / ".ts"),
+    // but preserve valid citations like "[server/services/mixer/collapse.ts]".
+    .replace(/\[\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi, "")
+    .replace(/(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi, "$1")
+    .replace(/(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\b(?=\s|[,.!?;:]|$)/gi, "$1")
+    // Remove orphaned extension+bracket fragments left after citation scrub (e.g. "ts]").
+    .replace(/(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/gi, "$1")
+    .replace(/(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\b(?=\s*\])/gi, "$1")
+    .replace(/\[\s*\]/g, "")
+    .replace(/(^|[\s(])\](?=\s|[,.!?;:]|$)/g, "$1")
+    .replace(/[ \t]{2,}/g, " ");
+}
+
+function dedupeAdjacentCitationBrackets(value: string): string {
+  if (!value) return value;
+  return value.replace(/(\[[^\]\n]{1,260}\])(?:\s+\1)+/g, "$1");
+}
+
+function hasEquationStructuredSections(value: string): boolean {
+  if (!value) return false;
+  return (
+    /^\s*Primary Topic\s*:/im.test(value) &&
+    /^\s*Primary Equation(?:\s*\([^)]+\))?\s*:/im.test(value) &&
+    /^\s*Mechanism Explanation\s*:/im.test(value)
+  );
+}
+
+function extractEquationMechanismSection(value: string): string {
+  if (!value) return "";
+  const normalized = value.replace(/\r/g, "");
+  const startMatch = /\bMechanism Explanation\s*:\s*/i.exec(normalized);
+  if (!startMatch || startMatch.index < 0) return "";
+  const start = startMatch.index + startMatch[0].length;
+  const tail = normalized.slice(start);
+  const endMatch =
+    /\n\s*(?:Related Cross-Topic Evidence(?:\s*\([^)]+\))?|Rejected Candidates(?:\s*\([^)]+\))?|Proof|Sources?)\s*:/i.exec(
+      tail,
+    );
+  const end = endMatch && endMatch.index >= 0 ? endMatch.index : tail.length;
+  return tail.slice(0, end).trim();
+}
+
+function hasEquationConsensusMechanismFrame(value: string): boolean {
+  const mechanism = extractEquationMechanismSection(value);
+  if (!mechanism) return false;
+  return (
+    /general-reference baseline:/i.test(mechanism) &&
+    /repo-grounded support:/i.test(mechanism) &&
+    /challenge status:/i.test(mechanism)
+  );
+}
+
+function hasDanglingFileExtensionResidue(value: string): boolean {
+  if (!value) return false;
+  return (
+    /(^|[\s(])(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\](?=\s|[,.!?;:]|$)/i.test(value) ||
+    /(^|[\s(\[])\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\]?(?=\s|[,.!?;:]|$)/i.test(value) ||
+    /\[\.(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\]/i.test(value)
+  );
+}
+
 function ensureSentence(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -5650,7 +6126,7 @@ function stripTruncationMarkers(value: string): string {
   for (; start < lines.length; start += 1) {
     const trimmed = lines[start].trim();
     if (!trimmed) continue;
-    if (/^(?:\.{3,}|â€¦)(?:\s*\(truncated\))?$/i.test(trimmed)) {
+    if (/^(?:\.{3,}|Ã¢â‚¬Â¦)(?:\s*\(truncated\))?$/i.test(trimmed)) {
       continue;
     }
     if (/\(truncated\)/i.test(trimmed)) {
@@ -8325,6 +8801,7 @@ const buildCanonicalSlotPlan = (args: {
   candidates?: HelixAskConceptCandidate[];
   seedSlots?: HelixAskSlotPlanEntry[];
   maxTokens?: number;
+  disableConceptCandidates?: boolean;
 }): HelixAskSlotPlan => {
   const slotOrder: string[] = [];
   const slotMap = new Map<string, HelixAskSlotPlanEntry>();
@@ -8399,7 +8876,9 @@ const buildCanonicalSlotPlan = (args: {
     }
     slotMap.set(id, mergeSlot(existing, incoming));
   };
-  const candidates = args.candidates ?? listConceptCandidates(args.question, 4);
+  const candidates = args.disableConceptCandidates
+    ? []
+    : args.candidates ?? listConceptCandidates(args.question, 4);
   for (const candidate of candidates) {
     const card = candidate.card;
     const aliasSources = [card.sourcePath, ...(card.mustIncludeFiles ?? [])].filter(Boolean);
@@ -9499,7 +9978,7 @@ const buildStage05CardPreviewSnippet = (card: Stage05EvidenceCard): string => {
     const equationSnippet = card.snippets.find(
       (snippet) =>
         snippet !== topSnippet &&
-        /[=∂∇∫Σ]|ds\^2|congruence|metric|tensor|riemann|ricci|curvature|einstein|geodesic/i.test(
+        /[=âˆ‚âˆ‡âˆ«Î£]|ds\^2|congruence|metric|tensor|riemann|ricci|curvature|einstein|geodesic/i.test(
           snippet.text,
         ),
     );
@@ -9518,6 +9997,101 @@ const buildStage05CardPreviewSnippet = (card: Stage05EvidenceCard): string => {
     lines.push(`Slots: ${card.slotHits.join(", ")}`);
   }
   return clipAskText(lines.join("\n"), HELIX_ASK_STAGE05_MAX_SNIPPET_CHARS);
+};
+
+const mergeStage05Cards = (
+  base: Stage05EvidenceCard[] | undefined,
+  incoming: Stage05EvidenceCard[] | undefined,
+): Stage05EvidenceCard[] => {
+  const merged = new Map<string, Stage05EvidenceCard>();
+  const ingest = (cards: Stage05EvidenceCard[] | undefined): void => {
+    if (!Array.isArray(cards)) return;
+    for (const card of cards) {
+      if (!card?.path) continue;
+      const normalizedPath = String(card.path).replace(/\\/g, "/").trim();
+      if (!normalizedPath) continue;
+      const existing = merged.get(normalizedPath);
+      if (!existing) {
+        merged.set(normalizedPath, { ...card, path: normalizedPath });
+        continue;
+      }
+      const nextScore = Number(card.confidence ?? 0);
+      const prevScore = Number(existing.confidence ?? 0);
+      if (nextScore >= prevScore) {
+        merged.set(normalizedPath, {
+          ...card,
+          path: normalizedPath,
+          snippets: Array.isArray(card.snippets) && card.snippets.length > 0 ? card.snippets : existing.snippets,
+          symbolsOrKeys:
+            Array.isArray(card.symbolsOrKeys) && card.symbolsOrKeys.length > 0
+              ? card.symbolsOrKeys
+              : existing.symbolsOrKeys,
+          slotHits:
+            Array.isArray(card.slotHits) && card.slotHits.length > 0 ? card.slotHits : existing.slotHits,
+        });
+      } else {
+        merged.set(normalizedPath, {
+          ...existing,
+          snippets:
+            Array.isArray(existing.snippets) && existing.snippets.length > 0
+              ? existing.snippets
+              : card.snippets,
+          symbolsOrKeys:
+            Array.isArray(existing.symbolsOrKeys) && existing.symbolsOrKeys.length > 0
+              ? existing.symbolsOrKeys
+              : card.symbolsOrKeys,
+          slotHits:
+            Array.isArray(existing.slotHits) && existing.slotHits.length > 0
+              ? existing.slotHits
+              : card.slotHits,
+        });
+      }
+    }
+  };
+  ingest(base);
+  ingest(incoming);
+  return Array.from(merged.values()).sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+};
+
+const extractEquationAnchorFromStage05Card = (
+  card: Stage05EvidenceCard,
+): { line: number; equation: string } | null => {
+  const snippets = Array.isArray(card.snippets) ? card.snippets : [];
+  for (const snippet of snippets) {
+    const snippetLines = String(snippet.text ?? "").split(/\r?\n/);
+    for (let index = 0; index < snippetLines.length; index += 1) {
+      const rawLine = snippetLines[index]?.trim();
+      if (!rawLine || !EQUATION_IN_TEXT_RE.test(rawLine)) continue;
+      if (!isEquationExactLineEligible({ line: rawLine, path: card.path })) continue;
+      const equation = extractConciseEquationFragment(rawLine) ?? clipAskText(rawLine, 320);
+      if (!equation || !EQUATION_IN_TEXT_RE.test(equation)) continue;
+      const line = Math.max(1, Number(snippet.start || 1) + index);
+      return { line, equation };
+    }
+  }
+  return null;
+};
+
+const buildStage05EvidenceScaffold = (args: {
+  cards: Stage05EvidenceCard[];
+  maxCards?: number;
+}): string => {
+  const cards = mergeStage05Cards([], args.cards).slice(0, Math.max(1, Math.min(8, args.maxCards ?? 6)));
+  if (cards.length === 0) return "";
+  const lines: string[] = [];
+  for (const card of cards) {
+    const slotLabel =
+      Array.isArray(card.slotHits) && card.slotHits.length > 0 ? ` | slots=${card.slotHits.join(",")}` : "";
+    lines.push(`- [${card.path}] ${ensureSentence(normalizeContractText(card.summary, 220))}${slotLabel}`);
+    const equationAnchor = extractEquationAnchorFromStage05Card(card);
+    if (equationAnchor) {
+      lines.push(`  - Equation candidate (${card.path}:L${equationAnchor.line}): ${equationAnchor.equation}`);
+    }
+    if (Array.isArray(card.symbolsOrKeys) && card.symbolsOrKeys.length > 0) {
+      lines.push(`  - Keys: ${card.symbolsOrKeys.slice(0, 6).join(", ")}`);
+    }
+  }
+  return clipAskText(lines.join("\n").trim(), HELIX_ASK_SCAFFOLD_CONTEXT_CHARS);
 };
 
 const buildStage05LlmPrompt = (input: Stage05LlmSummaryInput): string => {
@@ -9755,6 +10329,93 @@ const summarizeStage05CardsWithLlm = async (
   throw new Error("stage05_llm_invalid_output");
 };
 
+const STAGE05_CODE_PATH_HINT_RE =
+  /\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|c|cc|cpp|h|hpp|cs|rb|php|swift)$/i;
+
+function normalizeStage05Path(value: string): string {
+  return value.replace(/\\/g, "/").trim();
+}
+
+function buildStage05InputPaths(args: {
+  stage0Paths: Iterable<string>;
+  byPath: Map<string, AskCandidate>;
+  seedPaths?: Iterable<string>;
+  maxFiles: number;
+  intentDomain?: "general" | "repo" | "hybrid" | "falsifiable";
+}): string[] {
+  const stage0Ordered = Array.from(
+    new Set(
+      Array.from(args.stage0Paths)
+        .map((entry) => normalizeStage05Path(entry))
+        .filter(Boolean),
+    ),
+  );
+  const rankedCandidates = Array.from(args.byPath.values())
+    .sort((a, b) => b.score - a.score || a.filePath.localeCompare(b.filePath))
+    .map((candidate) => normalizeStage05Path(candidate.filePath))
+    .filter(Boolean);
+  const maxSeedCount = Math.max(args.maxFiles, args.maxFiles * 4);
+  const minSeedCount = Math.max(2, Math.min(args.maxFiles, 6));
+  const intentNeedsCodeSupport =
+    args.intentDomain === "repo" ||
+    args.intentDomain === "hybrid" ||
+    args.intentDomain === "falsifiable";
+  const selected: string[] = [];
+  const seen = new Set<string>();
+  const pushSelected = (candidatePath: string): boolean => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    selected.push(normalized);
+    return true;
+  };
+  for (const candidatePath of stage0Ordered) {
+    if (selected.length >= maxSeedCount) break;
+    pushSelected(candidatePath);
+  }
+  if (args.seedPaths) {
+    for (const seedPath of args.seedPaths) {
+      if (selected.length >= maxSeedCount) break;
+      pushSelected(seedPath);
+    }
+  }
+  const selectedHasCode = (): boolean =>
+    selected.some((pathValue) => STAGE05_CODE_PATH_HINT_RE.test(pathValue));
+  const replaceOneDocWith = (candidatePath: string): void => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized || seen.has(normalized)) return;
+    if (selected.length < maxSeedCount) {
+      pushSelected(normalized);
+      return;
+    }
+    const docIndex = selected.findIndex((entry) => !STAGE05_CODE_PATH_HINT_RE.test(entry));
+    if (docIndex < 0) return;
+    seen.delete(selected[docIndex] ?? "");
+    selected[docIndex] = normalized;
+    seen.add(normalized);
+  };
+  const ensureCodeSupport = (): void => {
+    if (selectedHasCode()) return;
+    const codeCandidate =
+      stage0Ordered.find((entry) => STAGE05_CODE_PATH_HINT_RE.test(entry)) ??
+      rankedCandidates.find((entry) => STAGE05_CODE_PATH_HINT_RE.test(entry));
+    if (!codeCandidate) return;
+    replaceOneDocWith(codeCandidate);
+  };
+  const shouldAugment = selected.length < minSeedCount || (intentNeedsCodeSupport && !selectedHasCode());
+  if (shouldAugment) {
+    if (intentNeedsCodeSupport) ensureCodeSupport();
+    for (const candidatePath of rankedCandidates) {
+      if (selected.length >= maxSeedCount) break;
+      pushSelected(candidatePath);
+    }
+  }
+  if (intentNeedsCodeSupport) {
+    ensureCodeSupport();
+  }
+  return selected.slice(0, maxSeedCount);
+}
+
 async function collectGitTrackedCandidatesForQueries(
   queries: string[],
   question: string,
@@ -9774,6 +10435,7 @@ async function collectGitTrackedCandidatesForQueries(
   queryHitCount: number;
   stage0?: RepoSearchStage0Telemetry;
   stage05?: Stage05Telemetry;
+  stage05Cards?: Stage05EvidenceCard[];
 }> {
   if (queries.length === 0) {
     return { candidates: [], queryHitCount: 0 };
@@ -9801,6 +10463,7 @@ async function collectGitTrackedCandidatesForQueries(
   let queryHitCount = 0;
   let stage0Telemetry: RepoSearchStage0Telemetry | undefined;
   let stage05Telemetry: Stage05Telemetry | undefined;
+  let stage05Cards: Stage05EvidenceCard[] = [];
   for (const query of normalizedQueries) {
     const result = HELIX_ASK_GIT_TRACKED_LANE
       ? await runGitTrackedRepoSearch({
@@ -9888,17 +10551,32 @@ async function collectGitTrackedCandidatesForQueries(
     }
   }
 
+  const stage05QueryConstraints = deriveHelixAskQueryConstraints(question);
+  const stage05EquationSeekingTurn =
+    isEquationQuotePrompt(question) &&
+    (options?.intentDomain === "repo" ||
+      options?.intentDomain === "hybrid" ||
+      options?.intentDomain === "falsifiable" ||
+      options?.intentId === "repo.repo_api_lookup");
   const stage05IntentEligible =
+    stage05EquationSeekingTurn ||
     HELIX_ASK_STAGE05_ALL_INTENTS ||
     options?.intentDomain === "repo" ||
     options?.intentDomain === "hybrid" ||
     options?.intentDomain === "falsifiable";
-  if (HELIX_ASK_STAGE05_ENABLED && stage05IntentEligible && stage0PathSet.size > 0) {
+  const stage05InputPaths = buildStage05InputPaths({
+    stage0Paths: stage0PathSet.values(),
+    byPath,
+    seedPaths: stage05QueryConstraints.explicitAnchorPaths,
+    maxFiles: HELIX_ASK_STAGE05_MAX_FILES,
+    intentDomain: options?.intentDomain,
+  });
+  if (HELIX_ASK_STAGE05_ENABLED && stage05IntentEligible && stage05InputPaths.length > 0) {
     const stage05Result = await buildStage05EvidenceCards({
       enabled: true,
       llmFirst: HELIX_ASK_STAGE05_LLM_FIRST,
       query: `${question}\n${normalizedQueries.join("; ")}`.trim(),
-      filePaths: Array.from(stage0PathSet.values()),
+      filePaths: stage05InputPaths,
       commit: stage0Telemetry?.commit ?? null,
       maxFiles: HELIX_ASK_STAGE05_MAX_FILES,
       maxCards: HELIX_ASK_STAGE05_MAX_CARDS,
@@ -9916,6 +10594,7 @@ async function collectGitTrackedCandidatesForQueries(
     });
     stage05Telemetry = stage05Result.telemetry;
     if (stage05Result.cards.length > 0) {
+      stage05Cards = mergeStage05Cards(stage05Cards, stage05Result.cards);
       const cardsByPath = new Map<string, Stage05EvidenceCard>();
       for (const card of stage05Result.cards) {
         cardsByPath.set(card.path.replace(/\\/g, "/"), card);
@@ -9947,7 +10626,8 @@ async function collectGitTrackedCandidatesForQueries(
       card_count: 0,
       kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
       llm_used: false,
-      fallback_reason: stage0PathSet.size > 0 ? "stage05_intent_excluded" : "stage05_no_stage0_candidates",
+      fallback_reason:
+        stage05InputPaths.length > 0 ? "stage05_intent_excluded" : "stage05_no_stage0_candidates",
       extract_ms: 0,
       total_ms: 0,
       budget_capped: false,
@@ -9966,7 +10646,7 @@ async function collectGitTrackedCandidatesForQueries(
   const candidates = Array.from(byPath.values())
     .sort((a, b) => b.score - a.score)
     .slice(0, candidatePool);
-  return { candidates, queryHitCount, stage0: stage0Telemetry, stage05: stage05Telemetry };
+  return { candidates, queryHitCount, stage0: stage0Telemetry, stage05: stage05Telemetry, stage05Cards };
 }
 
 function mergeCandidatesWithWeightedRrf(
@@ -10315,14 +10995,48 @@ function mergeRepoSearchStage0Telemetry(
   });
 }
 
+function isStage05SoftCodePathGapTelemetry(stage05: Stage05Telemetry | undefined): boolean {
+  if (!stage05?.summary_hard_fail) return false;
+  const missing = (stage05.slot_coverage?.missing ?? []).map((slot) => String(slot).trim());
+  if (missing.length !== 1 || missing[0] !== "code_path") return false;
+  const required = stage05.slot_plan?.required ?? [];
+  if (!required.includes("equation")) return false;
+  return true;
+}
+
+function isStage05SoftRuntimeFailTelemetry(stage05: Stage05Telemetry | undefined): boolean {
+  if (!stage05?.summary_hard_fail) return false;
+  const reason = String(stage05.summary_fail_reason ?? stage05.fallback_reason ?? "");
+  return /^stage05_llm_/i.test(reason);
+}
+
+function isStage05CoverageGapTelemetry(stage05: Stage05Telemetry | undefined): boolean {
+  if (!stage05?.summary_required) return false;
+  const missing = (stage05.slot_coverage?.missing ?? [])
+    .map((slot) => String(slot).trim())
+    .filter(Boolean);
+  return missing.length > 0;
+}
+
 function mergeStage05Telemetry(
   current: Stage05Telemetry | undefined,
   next: Stage05Telemetry | undefined,
 ): Stage05Telemetry | undefined {
   if (!next) return current;
   if (!current) {
+    const nextSoftCodePathGap = isStage05SoftCodePathGapTelemetry(next);
+    const nextSoftRuntimeFail = isStage05SoftRuntimeFailTelemetry(next);
+    const nextCoverageGap = isStage05CoverageGapTelemetry(next);
+    const nextHardFailEffective =
+      (next.summary_hard_fail || nextCoverageGap) && !nextSoftCodePathGap && !nextSoftRuntimeFail;
     return {
       ...next,
+      summary_hard_fail: nextHardFailEffective,
+      summary_fail_reason: nextHardFailEffective
+        ? next.summary_fail_reason ??
+          next.fallback_reason ??
+          (nextCoverageGap ? "stage05_slot_coverage_missing" : "stage05_summary_hard_fail")
+        : null,
       kind_counts: {
         code: next.kind_counts?.code ?? 0,
         doc: next.kind_counts?.doc ?? 0,
@@ -10339,8 +11053,23 @@ function mergeStage05Telemetry(
   const nextPresent = next.slot_coverage?.present ?? [];
   const mergedPresent = Array.from(new Set([...currentPresent, ...nextPresent]));
   const mergedMissing = mergedRequired.filter((slot) => !mergedPresent.includes(slot));
+  const nextSoftCodePathGap = isStage05SoftCodePathGapTelemetry(next);
+  const nextSoftRuntimeFail = isStage05SoftRuntimeFailTelemetry(next);
+  const nextCoverageGap = isStage05CoverageGapTelemetry(next);
+  const nextHardFailEffective =
+    (next.summary_hard_fail || nextCoverageGap) && !nextSoftCodePathGap && !nextSoftRuntimeFail;
+  const nextCoverageMissing = next.slot_coverage?.missing ?? [];
+  const nextRecoversSummaryHardFail =
+    nextSoftCodePathGap ||
+    nextSoftRuntimeFail ||
+    next.used &&
+    !next.summary_hard_fail &&
+    !nextCoverageGap &&
+    nextCoverageMissing.length === 0;
   const mergedSlotCoverage =
-    mergedRequired.length > 0
+    nextRecoversSummaryHardFail && next.slot_coverage
+      ? next.slot_coverage
+      : mergedRequired.length > 0
       ? {
           required: mergedRequired,
           present: mergedPresent,
@@ -10348,6 +11077,11 @@ function mergeStage05Telemetry(
           ratio: mergedRequired.length > 0 ? (mergedRequired.length - mergedMissing.length) / mergedRequired.length : 1,
         }
       : current.slot_coverage ?? next.slot_coverage ?? null;
+  const summaryHardFail = nextHardFailEffective
+    ? true
+    : nextRecoversSummaryHardFail
+      ? false
+      : current.summary_hard_fail;
   return {
     used: current.used || next.used,
     file_count: current.file_count + next.file_count,
@@ -10365,13 +11099,14 @@ function mergeStage05Telemetry(
     total_ms: current.total_ms + next.total_ms,
     budget_capped: current.budget_capped || next.budget_capped,
     summary_required: current.summary_required || next.summary_required,
-    summary_hard_fail: current.summary_hard_fail || next.summary_hard_fail,
-    summary_fail_reason:
-      next.summary_hard_fail
-        ? next.summary_fail_reason ?? next.fallback_reason ?? current.summary_fail_reason
-        : current.summary_hard_fail
-          ? current.summary_fail_reason
-          : next.summary_fail_reason ?? current.summary_fail_reason,
+    summary_hard_fail: summaryHardFail,
+    summary_fail_reason: summaryHardFail
+      ? nextHardFailEffective
+        ? next.summary_fail_reason ??
+          next.fallback_reason ??
+          (nextCoverageGap ? "stage05_slot_coverage_missing" : current.summary_fail_reason)
+        : current.summary_fail_reason
+      : null,
     slot_plan:
       next.slot_plan?.required?.length || next.slot_plan?.slots?.length ? next.slot_plan : current.slot_plan ?? null,
     slot_coverage: mergedSlotCoverage,
@@ -10460,14 +11195,41 @@ function applyStage05DebugFields(
   debugPayload.stage05_budget_capped = Boolean(debugPayload.stage05_budget_capped) || stage05.budget_capped;
   debugPayload.stage05_summary_required =
     Boolean(debugPayload.stage05_summary_required) || stage05.summary_required;
-  debugPayload.stage05_summary_hard_fail =
-    Boolean(debugPayload.stage05_summary_hard_fail) || stage05.summary_hard_fail;
-  if (stage05.summary_hard_fail) {
+  const stage05SoftCodePathGap = isStage05SoftCodePathGapTelemetry(stage05);
+  const stage05SoftRuntimeFail = isStage05SoftRuntimeFailTelemetry(stage05);
+  const stage05CoverageGap = isStage05CoverageGapTelemetry(stage05);
+  const stage05HardFailEffective =
+    (stage05.summary_hard_fail || stage05CoverageGap) &&
+    !stage05SoftCodePathGap &&
+    !stage05SoftRuntimeFail;
+  const stage05Recovered =
+    stage05SoftCodePathGap ||
+    stage05SoftRuntimeFail ||
+    nextUsed &&
+    !stage05.summary_hard_fail &&
+    !stage05CoverageGap &&
+    (stage05.slot_coverage?.missing?.length ?? 0) === 0;
+  if (stage05HardFailEffective) {
+    debugPayload.stage05_summary_hard_fail = true;
+  } else if (stage05Recovered) {
+    debugPayload.stage05_summary_hard_fail = false;
+  } else {
+    debugPayload.stage05_summary_hard_fail = Boolean(debugPayload.stage05_summary_hard_fail);
+  }
+  if (stage05HardFailEffective) {
     debugPayload.stage05_summary_fail_reason =
-      stage05.summary_fail_reason ?? stage05.fallback_reason ?? "stage05_summary_hard_fail";
+      stage05.summary_fail_reason ??
+      stage05.fallback_reason ??
+      (stage05CoverageGap ? "stage05_slot_coverage_missing" : "stage05_summary_hard_fail");
+  } else if (stage05Recovered) {
+    debugPayload.stage05_summary_fail_reason = null;
   } else if (debugPayload.stage05_summary_fail_reason === undefined) {
     debugPayload.stage05_summary_fail_reason = null;
   }
+  debugPayload.stage05_soft_code_path_gap_applied =
+    Boolean(debugPayload.stage05_soft_code_path_gap_applied) || stage05SoftCodePathGap;
+  debugPayload.stage05_soft_runtime_fail_open =
+    Boolean(debugPayload.stage05_soft_runtime_fail_open) || stage05SoftRuntimeFail;
   debugPayload.stage05_slot_plan = stage05.slot_plan ?? debugPayload.stage05_slot_plan ?? null;
   debugPayload.stage05_slot_coverage = stage05.slot_coverage ?? debugPayload.stage05_slot_coverage ?? null;
   debugPayload.stage05_fullfile_mode =
@@ -10492,8 +11254,17 @@ function applyStage05DebugFields(
   writeScoped("total_ms", stage05.total_ms);
   writeScoped("budget_capped", stage05.budget_capped);
   writeScoped("summary_required", stage05.summary_required);
-  writeScoped("summary_hard_fail", stage05.summary_hard_fail);
-  writeScoped("summary_fail_reason", stage05.summary_fail_reason ?? null);
+  writeScoped("summary_hard_fail", stage05HardFailEffective);
+  writeScoped(
+    "summary_fail_reason",
+    stage05HardFailEffective
+      ? stage05.summary_fail_reason ??
+        stage05.fallback_reason ??
+        (stage05CoverageGap ? "stage05_slot_coverage_missing" : "stage05_summary_hard_fail")
+      : null,
+  );
+  writeScoped("soft_code_path_gap_applied", stage05SoftCodePathGap);
+  writeScoped("soft_runtime_fail_open", stage05SoftRuntimeFail);
   writeScoped("slot_plan", stage05.slot_plan ?? null);
   writeScoped("slot_coverage", stage05.slot_coverage ?? null);
   writeScoped("fullfile_mode", stage05.fullfile_mode);
@@ -10770,6 +11541,7 @@ async function buildAskContextFromQueries(
   hasExactProvenance?: boolean;
   stage0?: RepoSearchStage0Telemetry;
   stage05?: Stage05Telemetry;
+  stage05Cards?: Stage05EvidenceCard[];
 }> {
   const snapshot = await loadCodeLattice();
   if (!snapshot) return { context: "", files: [] };
@@ -10779,9 +11551,14 @@ async function buildAskContextFromQueries(
     .map((entry) => ({ lane: entry.lane, query: entry.query.trim() }))
     .filter((entry) => entry.query.length > 0);
   if (!laneQueries.length) return { context: "", files: [] };
+  const queryConstraints = deriveHelixAskQueryConstraints(question);
   const limit = clampNumber(topK ?? HELIX_ASK_CONTEXT_FILES, 1, HELIX_ASK_CONTEXT_FILES);
   const perQueryLimit = Math.max(6, Math.ceil(limit / Math.max(1, laneQueries.length)));
   const candidatePool = Math.max(limit * 3, perQueryLimit * 2, 12);
+  const avoidlist = [
+    ...(options?.avoidlist ?? []),
+    ...queryConstraints.excludedPathPatterns,
+  ];
   const baseAllowlistTiers =
     topicProfile?.allowlistTiers?.length ? topicProfile.allowlistTiers : [[]];
   const allowlistTiers =
@@ -10811,6 +11588,7 @@ async function buildAskContextFromQueries(
   let atlasGraphScriptDocBoostCount = 0;
   let stage0Telemetry: RepoSearchStage0Telemetry | undefined;
   let stage05Telemetry: Stage05Telemetry | undefined;
+  let stage05Cards: Stage05EvidenceCard[] = [];
   const hasSourceLane = laneQueries.some((entry) => entry.lane === "source");
   const hasPivotLane = laneQueries.some((entry) => entry.lane === "pivot");
   const laneWeightsForRequest =
@@ -10834,11 +11612,12 @@ async function buildAskContextFromQueries(
     channelTopScores = initAskChannelStats();
     let tierStage0Telemetry: RepoSearchStage0Telemetry | undefined;
     let tierStage05Telemetry: Stage05Telemetry | undefined;
+    let tierStage05Cards: Stage05EvidenceCard[] = [];
     for (const laneQuery of laneQueries) {
       const multi = await collectAskCandidatesMultiChannel(snapshot, laneQuery.query, question, {
         topicProfile,
         allowlist,
-        avoidlist: options?.avoidlist,
+        avoidlist,
         candidatePool,
       });
       if (multi.queryHit) queryHitCount += 1;
@@ -10866,7 +11645,7 @@ async function buildAskContextFromQueries(
       const gitTracked = await collectGitTrackedCandidatesForQueries(laneGrouped, question, {
         topicProfile,
         allowlist,
-        avoidlist: options?.avoidlist,
+        avoidlist,
         candidatePool,
         mode: options?.mode ?? "preflight",
         intentDomain: options?.intentDomain,
@@ -10876,6 +11655,7 @@ async function buildAskContextFromQueries(
       });
       tierStage0Telemetry = mergeRepoSearchStage0Telemetry(tierStage0Telemetry, gitTracked.stage0);
       tierStage05Telemetry = mergeStage05Telemetry(tierStage05Telemetry, gitTracked.stage05);
+      tierStage05Cards = mergeStage05Cards(tierStage05Cards, gitTracked.stage05Cards ?? []);
       if (gitTracked.candidates.length > 0) {
         const laneCandidates = gitTracked.candidates.map((candidate) => ({
           ...candidate,
@@ -10904,13 +11684,17 @@ async function buildAskContextFromQueries(
       channelWeightsForTier,
       laneWeightsForRequest,
     );
-    topScore = merged.length ? merged[0].rrfScore : 0;
+    const constrainedMerged = applyQueryConstraintsToCandidates(merged, queryConstraints);
+    topScore = constrainedMerged.length ? constrainedMerged[0].rrfScore : 0;
     scoreGap =
-      merged.length >= 2 ? Math.max(0, merged[0].rrfScore - merged[1].rrfScore) : topScore;
-    const tierSelected = selectCandidatesWithMmr(merged, limit, HELIX_ASK_MMR_LAMBDA);
+      constrainedMerged.length >= 2
+        ? Math.max(0, constrainedMerged[0].rrfScore - constrainedMerged[1].rrfScore)
+        : topScore;
+    const tierSelected = selectCandidatesWithMmr(constrainedMerged, limit, HELIX_ASK_MMR_LAMBDA);
     if (!tierSelected.length) {
       stage0Telemetry = mergeRepoSearchStage0Telemetry(stage0Telemetry, tierStage0Telemetry);
       stage05Telemetry = mergeStage05Telemetry(stage05Telemetry, tierStage05Telemetry);
+      stage05Cards = mergeStage05Cards(stage05Cards, tierStage05Cards);
       continue;
     }
     const files = tierSelected.map((entry) => entry.filePath);
@@ -10939,6 +11723,7 @@ async function buildAskContextFromQueries(
     atlasGraphScriptDocBoostCount = graphSummary.atlasGraphScriptDocBoostCount;
     stage0Telemetry = mergeRepoSearchStage0Telemetry(stage0Telemetry, tierStage0Telemetry);
     stage05Telemetry = mergeStage05Telemetry(stage05Telemetry, tierStage05Telemetry);
+    stage05Cards = mergeStage05Cards(stage05Cards, tierStage05Cards);
     channelWeights = channelWeightsForTier;
     topicTier = tierIndex + 1;
     topicMustIncludeOk = mustIncludeOk;
@@ -10967,6 +11752,7 @@ async function buildAskContextFromQueries(
     atlasGraphScriptDocBoostCount,
     stage0: stage0Telemetry,
     stage05: stage05Telemetry,
+    stage05Cards,
   });
 }
 
@@ -10992,6 +11778,7 @@ function buildAskContextFromCandidates(args: {
   hasExactProvenance?: boolean;
   stage0?: RepoSearchStage0Telemetry;
   stage05?: Stage05Telemetry;
+  stage05Cards?: Stage05EvidenceCard[];
 }): {
   context: string;
   files: string[];
@@ -11016,6 +11803,7 @@ function buildAskContextFromCandidates(args: {
   hasExactProvenance?: boolean;
   stage0?: RepoSearchStage0Telemetry;
   stage05?: Stage05Telemetry;
+  stage05Cards?: Stage05EvidenceCard[];
 } {
   return finalizeAskContext(args);
 }
@@ -11635,6 +12423,7 @@ function finalizeAskContext({
   atlasGraphScriptDocBoostCount,
   stage0,
   stage05,
+  stage05Cards = [],
 }: {
   selected: AskCandidate[];
   topicTier?: number;
@@ -11653,6 +12442,7 @@ function finalizeAskContext({
   atlasGraphScriptDocBoostCount?: number;
   stage0?: RepoSearchStage0Telemetry;
   stage05?: Stage05Telemetry;
+  stage05Cards?: Stage05EvidenceCard[];
 }): {
   context: string;
   files: string[];
@@ -11677,6 +12467,7 @@ function finalizeAskContext({
   hasExactProvenance?: boolean;
   stage0?: RepoSearchStage0Telemetry;
   stage05?: Stage05Telemetry;
+  stage05Cards?: Stage05EvidenceCard[];
 } {
   const lines: string[] = [];
   const files: string[] = [];
@@ -11720,6 +12511,7 @@ function finalizeAskContext({
     hasExactProvenance: footprint.has_exact_provenance,
     stage0,
     stage05,
+    stage05Cards: mergeStage05Cards([], stage05Cards),
   };
 }
 
@@ -11890,7 +12682,60 @@ function buildGeneralAskPrompt(
 
 function extractQuestionFromPrompt(prompt: string): string {
   const match = prompt.match(/(?:^|\n)Question:\s*([^\n]+)/i);
-  return match?.[1]?.trim() ?? "";
+  return normalizeBundledQuestion((match?.[1] ?? "").trim());
+}
+
+function resolveHelixAskQuestionText(args: {
+  question?: string | null;
+  prompt?: string | null;
+}): string {
+  const normalizedQuestion = normalizeBundledQuestion((args.question ?? "").trim());
+  if (normalizedQuestion) return normalizedQuestion;
+  const prompt = (args.prompt ?? "").trim();
+  if (!prompt) return "";
+  const extractedFromPrompt = extractQuestionFromPrompt(prompt);
+  if (extractedFromPrompt) return extractedFromPrompt;
+  // Allow prompt-only API clients to route correctly when they provide plain question text.
+  const promptLines = prompt
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const compactPrompt = promptLines.join(" ").trim();
+  if (promptLines.length <= 2 && compactPrompt.length <= 600) {
+    const normalizedPrompt = normalizeBundledQuestion(compactPrompt);
+    return normalizedPrompt || compactPrompt;
+  }
+  const firstLine = promptLines[0] ?? "";
+  if (!firstLine) return "";
+  const normalizedFirstLine = normalizeBundledQuestion(firstLine);
+  return normalizedFirstLine || firstLine;
+}
+
+function normalizeBundledQuestion(value: string): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const stripWrapper = (input: string): string =>
+    input
+      .replace(/^\s*question:\s*/i, "")
+      .replace(/^[`"'[\](){}.,;\s]+/, "")
+      .replace(/[`"'[\](){}.,;\s]+$/, "")
+      .trim();
+  const normalized = stripWrapper(raw);
+  if (!normalized) return "";
+  const bundledParts = normalized
+    .split(/['"`]\s*,\s*['"`]/)
+    .map((entry) => stripWrapper(entry))
+    .filter(Boolean);
+  if (bundledParts.length > 1) {
+    return bundledParts[0] ?? "";
+  }
+  if (/question:/i.test(raw) && (normalized.match(/\?/g)?.length ?? 0) > 1) {
+    const firstQuestion = normalized.match(/^[^?]+\?/);
+    if (firstQuestion?.[0]) {
+      return stripWrapper(firstQuestion[0]);
+    }
+  }
+  return normalized;
 }
 
 function extractContextFromPrompt(prompt: string): string {
@@ -13275,9 +14120,17 @@ const rewriteConversationScientificVoice = (text: string): string => {
   const nextEvidenceBullets = extractSectionBullets(
     extractScientificSectionBody(text, "Next evidence:"),
   ).filter(
-    (entry) =>
-      !/^(Searched terms|Checked files|Clarify:|Search )/i.test(entry) &&
-      !isLowSignalScientificBullet(entry),
+    (entry) => {
+      if (/^(Searched terms|Clarify:|Search )/i.test(entry)) return false;
+      if (/^Checked files:/i.test(entry)) {
+        const payload = entry.replace(/^Checked files:\s*/i, "").trim();
+        if (!payload || payload.startsWith(",") || !/[a-z0-9]/i.test(payload) || !/[/.]/.test(payload)) {
+          return false;
+        }
+      }
+      if (/Search docs headings for\s+["']?\d+(?:[.)]|["'])/i.test(entry)) return false;
+      return !isLowSignalScientificBullet(entry);
+    },
   );
 
   const primaryLine = confirmedBullets[0] ?? reasonedBullets[0] ?? "";
@@ -15069,6 +15922,47 @@ function buildHelixAskEquationQuoteRepairPrompt(args: {
   return lines.join("\n");
 }
 
+function buildHelixAskEquationMechanismExpansionPrompt(args: {
+  question: string;
+  draft: string;
+  evidenceSnippet: string;
+  citationHints: string[];
+  responseLanguage?: string;
+}): string {
+  const normalizedResponseLanguage = normalizeLanguageTag(args.responseLanguage ?? null) ?? "en";
+  const lines = [
+    "You are Helix Ask.",
+    "Expansion pass for equation-plus-mechanism answers.",
+    "Preserve at least one exact equation/formula line with citation, then explain meaning and system usage grounded in evidence.",
+    "Do not output policy scaffolds, fallback labels, or gate diagnostics.",
+    "Required structure:",
+    "1) Exact equation line (verbatim) with [path:line] citation.",
+    "2) Meaning: what the equation states physically/mathematically.",
+    "3) System usage: where this equation or its terms influence code/docs/runtime outputs.",
+    "If code linkage is uncertain from evidence, say it is not confirmed; do not invent module paths.",
+  ];
+  if (!isEnglishLikeLanguage(normalizedResponseLanguage)) {
+    lines.push(`Return the final answer in language tag ${normalizedResponseLanguage}.`);
+  }
+  if (args.citationHints.length > 0) {
+    lines.push(`Allowed citations: ${args.citationHints.slice(0, 10).join(", ")}`);
+  }
+  lines.push("Use 2-4 short paragraphs after the equation line. Avoid repetition.");
+  lines.push(`Respond only between ${HELIX_ASK_ANSWER_START} and ${HELIX_ASK_ANSWER_END}.`);
+  lines.push("");
+  lines.push(`Question: ${args.question}`);
+  lines.push("");
+  lines.push("Current draft:");
+  lines.push(args.draft.trim() || "(empty)");
+  lines.push("");
+  lines.push("Evidence snippet:");
+  lines.push(args.evidenceSnippet.trim() || "(none)");
+  lines.push("");
+  lines.push(HELIX_ASK_ANSWER_START);
+  lines.push(HELIX_ASK_ANSWER_END);
+  return lines.join("\n");
+}
+
 function buildHelixAskConstraintPrompt(
   question: string,
   evidence: string,
@@ -16680,14 +17574,14 @@ const resolveBoundedUncertaintyFallbackLines = (responseLanguage?: string): {
   const normalizedResponseLanguage = normalizeLanguageTag(responseLanguage ?? null) ?? "en";
   if (normalizedResponseLanguage === "zh-hant" || normalizedResponseLanguage === "zh-tw" || normalizedResponseLanguage === "zh-hk") {
     return {
-      boundedUncertainty: "ç›®å‰æª¢ç´¢è­‰æ“šæœ‰é™ï¼›çµè«–åƒ…åŸºæ–¼å¯ç”¨ææ–™ï¼Œå¯èƒ½ä¸å®Œæ•´ã€‚",
-      missingEvidence: "ç¼ºå°‘è­‰æ“šï¼šè«‹æä¾›æ›´ç›´æŽ¥ç›¸é—œçš„å€‰åº«è·¯å¾‘æˆ–å·¥ä»¶å¼•ç”¨ä»¥æé«˜ç½®ä¿¡åº¦ã€‚",
+      boundedUncertainty: "Ã§â€ºÂ®Ã¥â€°ÂÃ¦ÂªÂ¢Ã§Â´Â¢Ã¨Â­â€°Ã¦â€œÅ¡Ã¦Å“â€°Ã©â„¢ÂÃ¯Â¼â€ºÃ§ÂµÂÃ¨Â«â€“Ã¥Æ’â€¦Ã¥Å¸ÂºÃ¦â€“Â¼Ã¥ÂÂ¯Ã§â€Â¨Ã¦ÂÂÃ¦â€“â„¢Ã¯Â¼Å’Ã¥ÂÂ¯Ã¨Æ’Â½Ã¤Â¸ÂÃ¥Â®Å’Ã¦â€¢Â´Ã£â‚¬â€š",
+      missingEvidence: "Ã§Â¼ÂºÃ¥Â°â€˜Ã¨Â­â€°Ã¦â€œÅ¡Ã¯Â¼Å¡Ã¨Â«â€¹Ã¦ÂÂÃ¤Â¾â€ºÃ¦â€ºÂ´Ã§â€ºÂ´Ã¦Å½Â¥Ã§â€ºÂ¸Ã©â€”Å“Ã§Å¡â€žÃ¥â‚¬â€°Ã¥ÂºÂ«Ã¨Â·Â¯Ã¥Â¾â€˜Ã¦Ë†â€“Ã¥Â·Â¥Ã¤Â»Â¶Ã¥Â¼â€¢Ã§â€Â¨Ã¤Â»Â¥Ã¦ÂÂÃ©Â«ËœÃ§Â½Â®Ã¤Â¿Â¡Ã¥ÂºÂ¦Ã£â‚¬â€š",
     };
   }
   if (normalizedResponseLanguage === "zh" || normalizedResponseLanguage === "zh-hans" || normalizedResponseLanguage === "zh-cn") {
     return {
-      boundedUncertainty: "å½“å‰æ£€ç´¢è¯æ®æœ‰é™ï¼›ç»“è®ºä»…åŸºäºŽå¯ç”¨ææ–™ï¼Œå¯èƒ½ä¸å®Œæ•´ã€‚",
-      missingEvidence: "ç¼ºå°‘è¯æ®ï¼šè¯·æä¾›æ›´ç›´æŽ¥ç›¸å…³çš„ä»“åº“è·¯å¾„æˆ–å·¥ä»¶å¼•ç”¨ä»¥æé«˜ç½®ä¿¡åº¦ã€‚",
+      boundedUncertainty: "Ã¥Â½â€œÃ¥â€°ÂÃ¦Â£â‚¬Ã§Â´Â¢Ã¨Â¯ÂÃ¦ÂÂ®Ã¦Å“â€°Ã©â„¢ÂÃ¯Â¼â€ºÃ§Â»â€œÃ¨Â®ÂºÃ¤Â»â€¦Ã¥Å¸ÂºÃ¤ÂºÅ½Ã¥ÂÂ¯Ã§â€Â¨Ã¦ÂÂÃ¦â€“â„¢Ã¯Â¼Å’Ã¥ÂÂ¯Ã¨Æ’Â½Ã¤Â¸ÂÃ¥Â®Å’Ã¦â€¢Â´Ã£â‚¬â€š",
+      missingEvidence: "Ã§Â¼ÂºÃ¥Â°â€˜Ã¨Â¯ÂÃ¦ÂÂ®Ã¯Â¼Å¡Ã¨Â¯Â·Ã¦ÂÂÃ¤Â¾â€ºÃ¦â€ºÂ´Ã§â€ºÂ´Ã¦Å½Â¥Ã§â€ºÂ¸Ã¥â€¦Â³Ã§Å¡â€žÃ¤Â»â€œÃ¥Âºâ€œÃ¨Â·Â¯Ã¥Â¾â€žÃ¦Ë†â€“Ã¥Â·Â¥Ã¤Â»Â¶Ã¥Â¼â€¢Ã§â€Â¨Ã¤Â»Â¥Ã¦ÂÂÃ©Â«ËœÃ§Â½Â®Ã¤Â¿Â¡Ã¥ÂºÂ¦Ã£â‚¬â€š",
     };
   }
   return {
@@ -16700,10 +17594,10 @@ const resolveBoundedUncertaintyFallbackLines = (responseLanguage?: string): {
 const resolveMechanismFallbackSentence = (responseLanguage?: string): string => {
   const normalizedResponseLanguage = normalizeLanguageTag(responseLanguage ?? null) ?? "en";
   if (normalizedResponseLanguage === "zh-hant" || normalizedResponseLanguage === "zh-tw" || normalizedResponseLanguage === "zh-hk") {
-    return "æ©Ÿåˆ¶ï¼šå¼•ç”¨è¼¸å…¥ -> å—ç´„æŸçš„ç®—å­å‹•åŠ›å­¸ -> å¸¶ä¾†æºé—œè¯çš„å…·é«”è§€æ¸¬çµæžœï¼Œå› ç‚ºåé¥‹èˆ‡ç´„æŸå…±åŒæ±ºå®šçµæžœã€‚";
+    return "Ã¦Â©Å¸Ã¥Ë†Â¶Ã¯Â¼Å¡Ã¥Â¼â€¢Ã§â€Â¨Ã¨Â¼Â¸Ã¥â€¦Â¥ -> Ã¥Ââ€”Ã§Â´â€žÃ¦ÂÅ¸Ã§Å¡â€žÃ§Â®â€”Ã¥Â­ÂÃ¥â€¹â€¢Ã¥Å â€ºÃ¥Â­Â¸ -> Ã¥Â¸Â¶Ã¤Â¾â€ Ã¦ÂºÂÃ©â€”Å“Ã¨ÂÂ¯Ã§Å¡â€žÃ¥â€¦Â·Ã©Â«â€Ã¨Â§â‚¬Ã¦Â¸Â¬Ã§ÂµÂÃ¦Å¾Å“Ã¯Â¼Å’Ã¥â€ºÂ Ã§â€šÂºÃ¥ÂÂÃ©Â¥â€¹Ã¨Ë†â€¡Ã§Â´â€žÃ¦ÂÅ¸Ã¥â€¦Â±Ã¥ÂÅ’Ã¦Â±ÂºÃ¥Â®Å¡Ã§ÂµÂÃ¦Å¾Å“Ã£â‚¬â€š";
   }
   if (normalizedResponseLanguage === "zh" || normalizedResponseLanguage === "zh-hans" || normalizedResponseLanguage === "zh-cn") {
-    return "æœºåˆ¶ï¼šå¼•ç”¨è¾“å…¥ -> å—çº¦æŸçš„ç®—å­åŠ¨åŠ›å­¦ -> å¸¦æ¥æºå…³è”çš„å…·ä½“è§‚æµ‹ç»“æžœï¼Œå› ä¸ºåé¦ˆä¸Žçº¦æŸå…±åŒå†³å®šç»“æžœã€‚";
+    return "Ã¦Å“ÂºÃ¥Ë†Â¶Ã¯Â¼Å¡Ã¥Â¼â€¢Ã§â€Â¨Ã¨Â¾â€œÃ¥â€¦Â¥ -> Ã¥Ââ€”Ã§ÂºÂ¦Ã¦ÂÅ¸Ã§Å¡â€žÃ§Â®â€”Ã¥Â­ÂÃ¥Å Â¨Ã¥Å â€ºÃ¥Â­Â¦ -> Ã¥Â¸Â¦Ã¦ÂÂ¥Ã¦ÂºÂÃ¥â€¦Â³Ã¨Ââ€Ã§Å¡â€žÃ¥â€¦Â·Ã¤Â½â€œÃ¨Â§â€šÃ¦Âµâ€¹Ã§Â»â€œÃ¦Å¾Å“Ã¯Â¼Å’Ã¥â€ºÂ Ã¤Â¸ÂºÃ¥ÂÂÃ©Â¦Ë†Ã¤Â¸Å½Ã§ÂºÂ¦Ã¦ÂÅ¸Ã¥â€¦Â±Ã¥ÂÅ’Ã¥â€ Â³Ã¥Â®Å¡Ã§Â»â€œÃ¦Å¾Å“Ã£â‚¬â€š";
   }
   return "Mechanism: cited inputs -> constrained operator dynamics -> concrete observed outcome with source-backed linkage, because feedback and constraints co-determine the result.";
 };
@@ -17128,9 +18022,9 @@ const HELIX_CONVERSATION_EXPLORATORY_RE =
   /\b(how|why|what|walk me through|full solve|explain|overview|tell me about|break down|understand|explore)\b/i;
 const HELIX_CONVERSATION_DIRECT_QUESTION_RE =
   /^(?:(?:ok|okay|yeah|yep|right|cool|nice)\b[\s,.-]*)?(?:what|how|why|when|where|who|can you|could you|would you|explain|define|tell me|walk me through)\b/i;
-const HELIX_CONVERSATION_QUESTION_PUNCT_RE = /[?？]/u;
+const HELIX_CONVERSATION_QUESTION_PUNCT_RE = /[?ï¼Ÿ]/u;
 const HELIX_CONVERSATION_CJK_DIRECT_QUESTION_RE =
-  /^(?:请问|請問|什么|甚么|甚麼|为什么|為什麼|怎么|怎麼|如何|谁|誰|哪|哪里|哪裡|何时|何時|是什麼|是什么)/u;
+  /^(?:è¯·é—®|è«‹å•|ä»€ä¹ˆ|ç”šä¹ˆ|ç”šéº¼|ä¸ºä»€ä¹ˆ|ç‚ºä»€éº¼|æ€Žä¹ˆ|æ€Žéº¼|å¦‚ä½•|è°|èª°|å“ª|å“ªé‡Œ|å“ªè£¡|ä½•æ—¶|ä½•æ™‚|æ˜¯ä»€éº¼|æ˜¯ä»€ä¹ˆ)/u;
 
 const hasConversationQuestionCue = (transcript: string): boolean => {
   const trimmed = transcript.trim();
@@ -18158,6 +19052,37 @@ const sanitizePlanClarifyLine = (value: string): string => {
   return line;
 };
 
+const sanitizeEvidenceHintAtom = (value: string): string =>
+  String(value ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/^[,;:\s-]+/, "")
+    .replace(/[,;:\s-]+$/, "")
+    .trim();
+
+const isLowSignalHeadingHintLabel = (value: string): boolean => {
+  const trimmed = sanitizeEvidenceHintAtom(value).replace(/^["'`]+|["'`]+$/g, "").trim();
+  if (!trimmed) return true;
+  if (/^\d+(?:[.)]|(?:\s*[-:]\s*))?$/i.test(trimmed)) return true;
+  if (/^[ivxlcdm]+$/i.test(trimmed)) return true;
+  if (/^[a-z]\.?$/i.test(trimmed)) return true;
+  const alphaChars = trimmed.replace(/[^a-z]/gi, "").length;
+  if (alphaChars < 3) return true;
+  return false;
+};
+
+const normalizeCheckedFileHint = (value: string): string | null => {
+  const normalized = sanitizeEvidenceHintAtom(value).replace(/\\/g, "/");
+  if (!normalized) return null;
+  const candidate = normalized.replace(/^["'`]+|["'`]+$/g, "").trim();
+  if (!candidate) return null;
+  if (candidate.startsWith(",")) return null;
+  if (!/[a-z0-9]/i.test(candidate)) return null;
+  if (candidate.length > 120) return null;
+  if (!/[/.]/.test(candidate)) return null;
+  if (/^\d+(?:\.\d+)?$/.test(candidate)) return null;
+  return candidate;
+};
+
 const SCIENTIFIC_REPORT_HEAD_RE =
   /^(Confirmed:|Unverified:|Reasoned connections|Hypotheses \(optional\)|Next evidence:)/im;
 
@@ -18247,15 +19172,17 @@ const buildNextEvidenceHints = (args: {
   }
   if (args.includeSearchSummary) {
     const terms = (args.searchedTerms ?? [])
-      .map((entry) => entry.trim())
+      .flatMap((entry) => String(entry ?? "").split(","))
+      .map((entry) => sanitizeEvidenceHintAtom(entry))
       .filter((entry) => entry && !entry.includes("/") && entry.length <= 60)
       .slice(0, 4);
     if (terms.length > 0) {
       pushHint(`Searched terms: ${terms.join(", ")}`);
     }
     const files = (args.searchedFiles ?? [])
-      .map((entry) => entry.trim())
-      .filter((entry) => entry && entry.length <= 120)
+      .flatMap((entry) => String(entry ?? "").split(","))
+      .map((entry) => normalizeCheckedFileHint(entry))
+      .filter((entry): entry is string => Boolean(entry))
       .slice(0, 4);
     if (files.length > 0) {
       pushHint(`Checked files: ${files.join(", ")}`);
@@ -18276,7 +19203,9 @@ const buildNextEvidenceHints = (args: {
     const slotEntry = args.slotPlan?.slots.find(
       (entry) => entry.id === slotId || normalizeSlotId(entry.label) === slotId,
     );
-    const label = slotEntry?.label ?? slotId;
+    const rawLabel = slotEntry?.label ?? slotId;
+    const label = sanitizeEvidenceHintAtom(rawLabel);
+    if (!label || isLowSignalHeadingHintLabel(label)) continue;
     const conceptCard =
       resolveConceptCardForSlot(slotId) ??
       (slotEntry?.label ? resolveConceptCardForSlot(slotEntry.label) : null);
@@ -18303,7 +19232,9 @@ const buildNextEvidenceHints = (args: {
         : buildDocHeadingSeedSlots(args.question);
     for (const seed of headingSeeds) {
       if (!seed.label) continue;
-      pushHint(`Search docs headings for "${seed.label}".`);
+      const label = sanitizeEvidenceHintAtom(seed.label);
+      if (!label || isLowSignalHeadingHintLabel(label)) continue;
+      pushHint(`Search docs headings for "${label}".`);
       if (hints.length >= limit) break;
     }
   }
@@ -18501,11 +19432,30 @@ const stripTelemetryLeakArtifacts = (
     /^Micro-pass:.*$/gim,
     /^Prompt ingest:.*$/gim,
     /^Graph congruence:.*$/gim,
+    /^\[\d{2}:\d{2}:\d{2}(?:\.\d{3})?\]\s+tool=(?:progress|event|error|debug)\s*\|.*$/gim,
+    /^tool=(?:progress|event|error|debug)\s*\|.*$/gim,
   ];
   for (const pattern of linePatterns) {
     if (pattern.test(next)) {
       next = next.replace(pattern, "").trim();
       reasons.push(`line:${pattern.source}`);
+    }
+  }
+  const inlinePatterns: Array<{ pattern: RegExp; reason: string }> = [
+    {
+      pattern:
+        /([^\n]*?)\s*\[\d{2}:\d{2}:\d{2}(?:\.\d{3})?\]\s+tool=(?:progress|event|error|debug)\s*\|[^\n]*/gim,
+      reason: "inline:timestamp_tool_trace",
+    },
+    {
+      pattern: /([^\n]*?)\s*tool=(?:progress|event|error|debug)\s*\|\s*seq=\d+[^\n]*/gim,
+      reason: "inline:tool_seq_trace",
+    },
+  ];
+  for (const { pattern, reason } of inlinePatterns) {
+    if (pattern.test(next)) {
+      next = next.replace(pattern, "$1").trim();
+      reasons.push(reason);
     }
   }
   next = next.replace(/\n{3,}/g, "\n\n").trim();
@@ -19256,6 +20206,28 @@ const splitGroundedSentences = (text: string): string[] => {
     .filter(Boolean);
 };
 
+const isEquationAnchorOnlyAnswer = (value: string): boolean => {
+  const text = value.trim();
+  if (!text) return true;
+  const nonSourceLines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^sources?\s*:/i.test(line));
+  if (nonSourceLines.length === 0) return true;
+  if (nonSourceLines.length <= 3 && /^exact equation line\b/i.test(nonSourceLines[0] ?? "")) {
+    return true;
+  }
+  const sentenceCount = splitGroundedSentences(text).filter(
+    (sentence) => !/^sources?\s*:/i.test(sentence.trim()),
+  ).length;
+  const mechanismSignal =
+    /\b(because|therefore|which means|this means|so that|drives|feeds|maps to|implemented|computed|propagates|used by)\b/i.test(
+      text,
+    ) || HELIX_ASK_MECHANISM_SENTENCE_RE.test(text);
+  return sentenceCount <= 2 && !mechanismSignal;
+};
+
 type ClaimCitationSemanticLinkageScore = {
   claimCount: number;
   linkedClaimCount: number;
@@ -19286,20 +20258,193 @@ type EquationQuoteContractResult = {
   citationMatched: boolean;
   matchedNeedle: boolean;
   matchedCitations: string[];
-  reason: "not_required" | "ok" | "equation_missing" | "citation_missing" | "equation_and_citation_missing";
+  reason:
+    | "not_required"
+    | "ok"
+    | "equation_missing"
+    | "citation_missing"
+    | "equation_and_citation_missing"
+    | "equation_relevance_missing";
   questionNeedles: string[];
+  equationRelevanceRequired?: boolean;
+  equationRelevanceScore?: number;
+  equationRelevanceReason?: "not_required" | "ok" | "weak_domain_signal" | "generic_geometry_mismatch";
 };
 
 const EQUATION_IN_TEXT_RE =
   /(?:\b[A-Za-z][A-Za-z0-9_^{}]*\s*=\s*[^\n]{2,})|(?:ds\^2\s*=)|(?:g_\{[^}]+\}\s*=)|(?:R_\{[^}]+\}\s*=)|(?:T_\{[^}]+\}\s*=)/i;
+const MATH_EQUATION_SIGNAL_RE =
+  /(?:ds\^2)|(?:\bK_ij\b)|(?:\brho_E\b)|(?:\btheta(?:_[A-Za-z0-9]+)?\s*=)|(?:\bbeta(?:_[A-Za-z0-9]+)?(?:\^[A-Za-z0-9]+)?\s*=)|(?:\bgamma_ij\b)|(?:Tr\(K\))|(?:\b[A-Za-z]_[A-Za-z0-9{}]+\s*=)|(?:\\frac)|(?:\\nabla)|(?:\\partial)|(?:âˆ‚|âˆ‡|Î£|Î”|âˆ«)/i;
 const EQUATION_CODE_ASSIGNMENT_RE =
   /^\s*(?:const|let|var|return|if|for|while|switch|case|function|class|interface|type|enum|export|import)\b/i;
 const EQUATION_JSON_LINE_RE = /^\s*["'][^"']+["']\s*:/;
+const EQUATION_RESCUE_MAX_FILE_SCAN = 36;
+const HELIX_ASK_EQUATION_BACKING_PRIMARY_COUNT = 1;
+const HELIX_ASK_EQUATION_BACKING_SUPPORT_MAX = 2;
+const HELIX_ASK_EQUATION_CLAIM_MAX = 4;
+const HELIX_ASK_EQUATION_LINK_PASS_TIMEOUT_MS = clampNumber(
+  Number(process.env.HELIX_ASK_EQUATION_LINK_PASS_TIMEOUT_MS ?? 220),
+  60,
+  2000,
+);
+const HELIX_ASK_EQUATION_ASK_RUNTIME_BUDGET_MS = clampNumber(
+  Number(process.env.HELIX_ASK_EQUATION_ASK_RUNTIME_BUDGET_MS ?? 30_000),
+  5_000,
+  120_000,
+);
+const HELIX_ASK_EQUATION_SEMANTIC_RERANK_ENABLED =
+  String(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_ENABLED ?? "1").trim() !== "0";
+const HELIX_ASK_EQUATION_SEMANTIC_RERANK_TOP_N = clampNumber(
+  Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_TOP_N ?? 6),
+  2,
+  12,
+);
+const HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_RAW = Number(
+  process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_MS ?? 0,
+);
+const HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_MS =
+  Number.isFinite(HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_RAW) &&
+  HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_RAW > 0
+    ? clampNumber(HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_RAW, 300, 20_000)
+    : 0;
+const HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS = clampNumber(
+  Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS ?? 420),
+  120,
+  1024,
+);
+const HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST = clampNumber(
+  Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST ?? 24),
+  4,
+  80,
+);
+const EQUATION_TASK_BULLET_RE =
+  /^\s*(?:[-*]\s+|\d+\.\s+)(?:\[[ xX]\]\s*)?(?:todo|task|checklist|roadmap|plan|audit|inventory|report|next step|next evidence)\b/i;
+const EQUATION_CONFIG_ASSIGNMENT_RE =
+  /^\s*(?:path|paths|file|files|manifest|config|enabled?|disabled?|flag|mode|policy)\b[^=]{0,40}=\s*/i;
+const EQUATION_QUERYSTRING_ASSIGNMENT_RE =
+  /(?:^|[?&])[a-z_][a-z0-9_]{1,40}\s*=\s*(?:\{?[A-Za-z0-9_.:-]+\}?|[^&\s]{1,64})(?:&|$)/i;
+const EQUATION_EXACT_DISALLOWED_PATH_RE =
+  /(?:^|\/)(?:docs\/(?:audits|runbooks|reports|architecture|specs)\/|docs\/.*(?:roadmap|checklist|task|inventory|audit|report)|.*(?:roadmap|checklist|task|inventory|audit|report)\.(?:md|json|ya?ml|toml))$/i;
+const EQUATION_OPERATOR_SIGNAL_RE =
+  /[+\-*/^]|\\(?:frac|partial|nabla|sum|int)|\b(?:diag|sqrt|exp|sin|cos|tan|rho|psi|beta|gamma|theta|k_ij|t00|tij|hamiltonian|schrodinger|schroedinger|born|omega|mu0|q95|beta_p|beta_n|dP\/dr|dm\/dr)\b/i;
+const EQUATION_MARKDOWN_TABLE_ROW_RE = /^\s*\|[^|\n]+\|[^|\n]+\|/;
+const EQUATION_TRACE_ID_RE = /\b(?:SRC|EQT|EXP|REF)-\d{2,}\b/i;
+const EQUATION_REJECT_ROW_RE =
+  /^\s*(?:[-*]\s+|\d+\.\s+)(?:\[[ xX]\]\s*)?(?:todo|task|checklist|roadmap|plan|audit|report|inventory|milestone)\b/i;
+const EQUATION_COMMENT_BANNER_RE = /^\s*(?:\/\/|#)\s*[-=*~]{4,}.*[-=*~]{4,}\s*$/;
+const EQUATION_TS_ASSERT_PROPERTY_ASSIGNMENT_RE =
+  /^\s*(?:\([^)]*\)\.)?[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+\s*=\s*[^=].*$/;
+const EQUATION_MOJIBAKE_RE = /(?:Ã.|â.|Ï.|Î.|Â.|�)/;
+const EQUATION_PRIMARY_SCORE_MIN = 62;
+const EQUATION_PRIMARY_PARAMETERIZATION_SCORE_MIN = 56;
+const EQUATION_PRIMARY_IMPLEMENTATION_SCORE_MIN = 52;
+const EQUATION_SECONDARY_SCORE_MIN = 60;
+const EQUATION_SECONDARY_CROSS_TOPIC_SCORE_MIN = 74;
+const EQUATION_PRIMARY_CONFIDENCE_BY_MODE: Record<HelixAskEquationAskMode, number> = {
+  broad: 55,
+  mid: 65,
+  specific: 75,
+};
+const HELIX_ASK_EQUATION_SELECTOR_ROLLOUT_PHASE = clampNumber(
+  Number(process.env.HELIX_ASK_EQUATION_SELECTOR_ROLLOUT_PHASE ?? 1),
+  1,
+  3,
+);
+const HELIX_ASK_EQUATION_RECOVERY_MAX_ATTEMPTS = 1;
+const EQUATION_SOURCE_RELIABILITY_BY_CLASS: Record<string, number> = {
+  code: 0.9,
+  knowledge_doc: 0.82,
+  general_doc: 0.58,
+  config: 0.42,
+  data: 0.45,
+  test: 0.35,
+  other: 0.5,
+};
+
+type EquationClaimSeed = {
+  claim: string;
+  required_evidence_tags: string[];
+  domain_terms: string[];
+};
+
+type EquationCandidateDomainFamily = Stage05DomainFamily;
+type HelixAskEquationAskMode = "broad" | "mid" | "specific";
+type HelixAskEquationStrictness = "low" | "med" | "high";
+type HelixAskEquationAllowedFallback = "no_substitution" | "general_explain";
+
+type HelixAskIntentContract = {
+  ask_mode: HelixAskEquationAskMode;
+  strictness: HelixAskEquationStrictness;
+  dominant_family: EquationCandidateDomainFamily;
+  explicit_paths: string[];
+  symbol_targets: string[];
+  required_outputs: string[];
+  allowed_fallback: HelixAskEquationAllowedFallback;
+  question_fingerprint: string;
+};
+
+type EquationCandidateTableRow = {
+  path: string;
+  line: number;
+  equation: string;
+  equation_class: Stage05EquationClass;
+  derivation_level: Stage05DerivationLevel;
+  family: EquationCandidateDomainFamily;
+  symbol_overlap: number;
+  semantic_fit: number;
+  source_reliability: number;
+  selection_score: number;
+  path_match: boolean;
+  rejection_reason: string | null;
+};
+
+type EquationRejectedCandidate = {
+  path: string;
+  line: number;
+  equation: string;
+  reason: string;
+  equationClass: Stage05EquationClass;
+  domainFamily: EquationCandidateDomainFamily;
+  score: number;
+};
+
+type EquationClaimBackingAssembly = {
+  text: string;
+  mode: "equation_claim_backing";
+  claimCount: number;
+  linkPassUsed: boolean;
+  linkTimeout: boolean;
+  candidateTotal: number;
+  candidateRejectedTotal: number;
+  candidateRejectedReasons: string[];
+  primarySelected: string | null;
+  primaryFamilyMatch: boolean;
+  supportSelectedCount: number;
+  secondaryCrossTopicCount: number;
+  tentative: boolean;
+  reason: string;
+  dominantFamily: EquationCandidateDomainFamily;
+  primaryClass: Stage05EquationClass | null;
+  primaryDerivationLevel: Stage05DerivationLevel | null;
+  primaryScore: number | null;
+  rejectedCount: number;
+  rejectedReasons: string[];
+  selectedPaths: string[];
+  primaryKey: string | null;
+  supportKeys: string[];
+  selectorLocked: boolean;
+  primaryAnchorValid: boolean;
+  symbolTargetHitRate: number | null;
+  claimToEquationLinkStrength: number;
+  crossTopicContaminationRate: number;
+  artifactLeakRate: number;
+  candidateTable: EquationCandidateTableRow[];
+};
 
 const normalizeEquationNeedle = (value: string): string =>
   value
     .toLowerCase()
-    .replace(/[“”"'`]/g, "")
+    .replace(/[â€œâ€"'`]/g, "")
     .replace(/\s+/g, "")
     .trim();
 
@@ -19312,6 +20457,154 @@ const extractEquationNeedlesFromQuestion = (question: string): string[] => {
   return Array.from(new Set(normalized)).slice(0, 4);
 };
 
+type EquationSemanticFit = {
+  required: boolean;
+  score: number;
+  ok: boolean;
+  reason: "not_required" | "ok" | "weak_domain_signal" | "generic_geometry_mismatch";
+};
+
+const extractPrimaryEquationLineFromAnswer = (answer: string): string | null => {
+  const lines = answer.split(/\r?\n/);
+  for (const line of lines) {
+    const raw = line.trim();
+    if (!raw) continue;
+    const fragment = extractConciseEquationFragment(raw) ?? clipAskText(raw, 320);
+    if (!fragment || !EQUATION_IN_TEXT_RE.test(fragment)) continue;
+    return fragment;
+  }
+  return null;
+};
+
+const scoreEquationSemanticFit = (args: {
+  question: string;
+  equationLine: string;
+  answerText?: string;
+  citations?: string[];
+}): EquationSemanticFit => {
+  const question = args.question ?? "";
+  const equationPrompt = isEquationAskPrompt(question);
+  const hasWarpPromptSignal = HELIX_ASK_WARP_FOCUS.test(question);
+  const wavePrompt = isWaveCollapseEquationPrompt(question);
+  const casimirPrompt =
+    equationPrompt &&
+    HELIX_ASK_CASIMIR_DOMAIN_RE.test(question) &&
+    !wavePrompt &&
+    !hasWarpPromptSignal;
+  const tokamakPrompt =
+    equationPrompt && HELIX_ASK_TOKAMAK_DOMAIN_RE.test(question) && !hasWarpPromptSignal;
+  const polytropePrompt =
+    equationPrompt && HELIX_ASK_POLYTROPE_DOMAIN_RE.test(question) && !hasWarpPromptSignal;
+  const phasePrompt =
+    equationPrompt && HELIX_ASK_PHASE_CONTROL_DOMAIN_RE.test(question) && !hasWarpPromptSignal;
+  const domainRequired =
+    wavePrompt || casimirPrompt || tokamakPrompt || polytropePrompt || phasePrompt;
+  if (!domainRequired) {
+    return {
+      required: false,
+      score: 0,
+      ok: true,
+      reason: "not_required",
+    };
+  }
+  const equationLine = args.equationLine ?? "";
+  const answerText = args.answerText ?? "";
+  const citations = normalizeCitations(args.citations ?? []);
+  const equationHasWaveSignal = HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE.test(equationLine);
+  const answerHasWaveSignal = HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE.test(answerText);
+  const equationHasCasimirSignal =
+    /\b(?:casimir|vacuum|boundary|modulation|frequency|omega|dynamic)\b/i.test(equationLine);
+  const answerHasCasimirSignal =
+    /\b(?:casimir|vacuum|boundary|modulation|frequency|omega|dynamic)\b/i.test(answerText);
+  const equationHasTokamakSignal =
+    /\b(?:tokamak|plasma|mhd|confinement|safety\s*factor|q95|beta_p|beta_n|stability)\b/i.test(
+      equationLine,
+    );
+  const answerHasTokamakSignal =
+    /\b(?:tokamak|plasma|mhd|confinement|safety\s*factor|q95|beta_p|beta_n|stability)\b/i.test(
+      answerText,
+    );
+  const equationHasPolytropeSignal =
+    /\b(?:polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr|pressure|density)\b/i.test(
+      equationLine,
+    );
+  const answerHasPolytropeSignal =
+    /\b(?:polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr|pressure|density)\b/i.test(
+      answerText,
+    );
+  const equationHasPhaseSignal =
+    /\b(?:phase|scheduler|pipeline|queue|latency|cadence|tick)\b/i.test(equationLine);
+  const answerHasPhaseSignal =
+    /\b(?:phase|scheduler|pipeline|queue|latency|cadence|tick)\b/i.test(answerText);
+  const equationLooksCommentContext =
+    /^\s*(?:\/\/|#|\/\*|\*)/.test(answerText) || /:\s*\/\/\s*[A-Za-z0-9]/.test(answerText);
+  const equationLooksMarkupAttribute =
+    /(?:\b(?:rel|href|src|class|id|name)\s*=\s*["'][^"']+["'])|<[^>]+=\s*["'][^"']+["'][^>]*>/i.test(
+      equationLine,
+    );
+  const equationLooksGenericGeometry = HELIX_ASK_GENERIC_GEOMETRY_EQUATION_RE.test(equationLine);
+  const equationLooksStressEnergyProxy = /\bT(?:00|11|22|33|ij)\b/i.test(equationLine);
+  const equationLooksWarpGeometry =
+    HELIX_ASK_WARP_GEOMETRY_EQUATION_SIGNAL_RE.test(equationLine) && !equationHasWaveSignal;
+  let score = 0;
+  if (wavePrompt) {
+    if (equationHasWaveSignal) score += 58;
+    if (answerHasWaveSignal) score += 24;
+    if (citations.some((entry) => HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(entry))) score += 18;
+    if (
+      !equationHasWaveSignal &&
+      citations.some((entry) => HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(entry)) &&
+      EQUATION_IN_TEXT_RE.test(equationLine) &&
+      /[*/^=]/.test(equationLine)
+    ) {
+      // Allow collapse-family implementation equations to remain as tentative evidence.
+      score += 16;
+    }
+    if (citations.some((entry) => HELIX_ASK_WARP_FAMILY_PATH_RE.test(entry))) score -= 16;
+    if (!equationHasWaveSignal) score -= 22;
+    if (equationLooksWarpGeometry) score -= 24;
+    if (equationLooksStressEnergyProxy && !equationHasWaveSignal) score -= 52;
+    if (equationLooksCommentContext && !equationHasWaveSignal) score -= 48;
+    if (equationLooksCommentContext && equationHasWaveSignal) score -= 12;
+    if (equationLooksGenericGeometry) score -= 92;
+  } else if (tokamakPrompt) {
+    if (equationHasTokamakSignal) score += 62;
+    if (answerHasTokamakSignal) score += 16;
+    if (citations.some((entry) => HELIX_ASK_TOKAMAK_FAMILY_PATH_RE.test(entry))) score += 24;
+    if (!equationHasTokamakSignal) score -= 44;
+    if (citations.some((entry) => HELIX_ASK_WARP_FAMILY_PATH_RE.test(entry))) score -= 20;
+  } else if (polytropePrompt) {
+    if (equationHasPolytropeSignal) score += 60;
+    if (answerHasPolytropeSignal) score += 16;
+    if (citations.some((entry) => HELIX_ASK_POLYTROPE_FAMILY_PATH_RE.test(entry))) score += 24;
+    if (!equationHasPolytropeSignal) score -= 40;
+    if (citations.some((entry) => HELIX_ASK_WARP_FAMILY_PATH_RE.test(entry))) score -= 18;
+  } else if (casimirPrompt) {
+    if (equationHasCasimirSignal) score += 54;
+    if (answerHasCasimirSignal) score += 14;
+    if (citations.some((entry) => HELIX_ASK_CASIMIR_FAMILY_PATH_RE.test(entry))) score += 22;
+    if (!equationHasCasimirSignal) score -= 36;
+    if (citations.some((entry) => HELIX_ASK_WARP_FAMILY_PATH_RE.test(entry))) score -= 16;
+  } else if (phasePrompt) {
+    if (equationHasPhaseSignal) score += 46;
+    if (answerHasPhaseSignal) score += 12;
+    if (citations.some((entry) => HELIX_ASK_PHASE_FAMILY_PATH_RE.test(entry))) score += 20;
+    if (!equationHasPhaseSignal) score -= 34;
+  }
+  if (equationLooksMarkupAttribute) score -= 100;
+  const ok =
+    score >= 22 &&
+    !equationLooksMarkupAttribute &&
+    !(wavePrompt && equationLooksGenericGeometry);
+  return {
+    required: domainRequired,
+    score,
+    ok,
+    reason:
+      ok ? "ok" : wavePrompt && equationLooksGenericGeometry ? "generic_geometry_mismatch" : "weak_domain_signal",
+  };
+};
+
 type ExplicitPathEquationContractRescue = {
   answer: string;
   path: string;
@@ -19319,34 +20612,1182 @@ type ExplicitPathEquationContractRescue = {
   equation: string;
 };
 
-const scoreEquationCandidateLine = (line: string, questionNeedles: string[]): number => {
+type EquationRescueCandidate = {
+  path: string;
+  line: number;
+  equation: string;
+  score: number;
+  semanticFit: EquationSemanticFit;
+  equationClass: Stage05EquationClass;
+  derivationLevel: Stage05DerivationLevel;
+  domainFamily: EquationCandidateDomainFamily;
+  sourceReliability: number;
+  rhsMathSignal: boolean;
+  stringLiteralSignal: boolean;
+  rejectionReason: string | null;
+  source?: "stage05" | "scan";
+};
+
+const equationCandidateKey = (candidate: Pick<EquationRescueCandidate, "path" | "line">): string =>
+  `${candidate.path}:L${candidate.line}`;
+
+const stripQuotedSegments = (value: string): string =>
+  value.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, " ");
+
+const detectEquationStringLiteralSignal = (line: string): boolean =>
+  /(['"`])(?:\\.|(?!\1).)*\1/.test(line);
+
+const detectEquationRhsMathSignal = (line: string): boolean => {
+  const dequoted = stripQuotedSegments(line);
+  const rhs = dequoted.includes("=") ? dequoted.slice(dequoted.indexOf("=") + 1) : dequoted;
+  return /[+\-*/^]|\\(?:frac|partial|nabla|sum|int)|\b(?:diag|sqrt|exp|sin|cos|tan|pow)\b/i.test(
+    rhs,
+  );
+};
+
+const hasEquationOperatorSignal = (line: string): boolean =>
+  EQUATION_OPERATOR_SIGNAL_RE.test(stripQuotedSegments(line));
+
+const extractConciseEquationFragment = (line: string): string | null => {
   const trimmed = line.trim();
-  if (!trimmed || trimmed.length < 6 || trimmed.length > 420) return Number.NEGATIVE_INFINITY;
+  if (!trimmed) return null;
+  const patterns = [
+    /ds\^2\s*=\s*[^.;\n]{8,320}/i,
+    /\bK_ij\s*=\s*[^.;\n]{8,320}/i,
+    /\brho_E\s*=\s*[^.;\n]{8,320}/i,
+    /\btheta(?:_[A-Za-z0-9]+)?\s*=\s*[^.;\n]{8,320}/i,
+    /\bbeta(?:_[A-Za-z0-9]+)?(?:\^[A-Za-z0-9]+)?\s*=\s*[^.;\n]{6,320}/i,
+    /[A-Za-z][A-Za-z0-9_^{}()]*\s*=\s*[^.;\n]{8,320}/,
+  ];
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (!match?.[0]) continue;
+    const fragment = match[0].replace(/[`]+/g, "").trim();
+    if (!fragment || fragment.length < 8) continue;
+    if (!EQUATION_IN_TEXT_RE.test(fragment)) continue;
+    return clipAskText(fragment, 320);
+  }
+  return null;
+};
+
+const isMojibakeSeparatorEquationLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (!EQUATION_MOJIBAKE_RE.test(trimmed)) return false;
+  return /[-=*~]{4,}/.test(trimmed) || /(?:\/\/|#)\s*[-=*~]{2,}/.test(trimmed);
+};
+
+const isEquationAliasAssignmentLine = (line: string): boolean => {
+  const trimmed = stripQuotedSegments(line.trim());
+  if (!trimmed) return false;
+  const normalized = trimmed
+    .replace(/\s*(?:(?:\/\/|#).*)$/, "")
+    .replace(/\s*\/\*.*$/, "")
+    .trim();
+  if (!normalized) return false;
+  if (!/=/.test(normalized)) return false;
+  if (/(?:==|===|!=|!==|<=|>=|=>)/.test(normalized)) return false;
+  const rhsMatch = normalized.match(/=\s*([^;]+)\s*;?\s*$/);
+  if (!rhsMatch?.[1]) return false;
+  const rhs = rhsMatch[1].trim();
+  if (!rhs) return false;
+  if (/[+\-*/^]/.test(rhs)) return false;
+  if (/\bMath\.[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(rhs)) return false;
+  if (/\b(?:sqrt|pow|exp|sin|cos|tan|log|min|max|abs)\s*\(/i.test(rhs)) return false;
+  if (/^[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?$/i.test(rhs)) return true;
+  if (/^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*(?:\[[^\]]+\])?$/.test(rhs)) {
+    return true;
+  }
+  return false;
+};
+
+const isEquationExactLineEligible = (args: {
+  line: string;
+  path: string;
+}): boolean => {
+  const trimmed = (args.line ?? "").trim();
+  const dequoted = stripQuotedSegments(trimmed);
+  const isCodePath = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)$/i.test(
+    args.path ?? "",
+  );
+  const stringLiteralSignal = detectEquationStringLiteralSignal(trimmed);
+  const rhsMathSignal = detectEquationRhsMathSignal(trimmed);
+  const hasPathLikeString = /["'][^"'\n]*(?:\/|\\)[^"'\n]*["']/i.test(trimmed);
+  const looksPathOrManifestAssignment =
+    /\b(?:path\.(?:resolve|join|normalize)|manifest(?:Path)?\b|dataset(?:s)?\/|\.json\b|https?:\/\/|file:\/\/)\b/i.test(
+      trimmed,
+    );
+  const hasDomainSemanticSignal =
+    /\b(?:psi|rho(?:_[a-z0-9]+)?|tau(?:_[a-z0-9]+)?|kappa(?:_[a-z0-9]+)?|collapse|wave|quantum|prob|mass|energy|volume|beta|gamma|theta|tensor|metric|casimir|tokamak|polytrope|phase|hbar|c2|r_c|ell|pi)\b/i.test(
+      dequoted,
+    );
+  const hasBitwiseSignal = /(?:>>>|<<|\|\s*0\b|\^)/.test(trimmed);
+  const hasArithmeticExpression =
+    /[*/]/.test(dequoted) ||
+    /\bMath\.[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(dequoted) ||
+    /\^/.test(dequoted);
+  if (!trimmed) return false;
+  if (!EQUATION_IN_TEXT_RE.test(trimmed)) return false;
+  if (EQUATION_TASK_BULLET_RE.test(trimmed)) return false;
+  if (
+    EQUATION_EXACT_DISALLOWED_PATH_RE.test(args.path ?? "") &&
+    /^\s*(?:[-*]|\d+\.)\s+/.test(trimmed)
+  ) {
+    return false;
+  }
+  if (
+    EQUATION_EXACT_DISALLOWED_PATH_RE.test(args.path ?? "") &&
+    !MATH_EQUATION_SIGNAL_RE.test(trimmed)
+  ) {
+    return false;
+  }
+  if (EQUATION_JSON_LINE_RE.test(trimmed)) return false;
+  if (EQUATION_CONFIG_ASSIGNMENT_RE.test(trimmed)) return false;
+  if (EQUATION_QUERYSTRING_ASSIGNMENT_RE.test(trimmed)) return false;
+  if (looksPathOrManifestAssignment) return false;
+  if (stringLiteralSignal && hasPathLikeString && !rhsMathSignal) return false;
+  if (EQUATION_MARKDOWN_TABLE_ROW_RE.test(trimmed)) return false;
+  if (EQUATION_TRACE_ID_RE.test(trimmed)) return false;
+  if (EQUATION_REJECT_ROW_RE.test(trimmed)) return false;
+  if (EQUATION_COMMENT_BANNER_RE.test(trimmed)) return false;
+  if (isMojibakeSeparatorEquationLine(trimmed)) return false;
+  if (isCodePath && isEquationAliasAssignmentLine(trimmed)) return false;
+  if (/=\s*(?:true|false|null)\b/i.test(trimmed)) return false;
+  if (/=\s*["'][^"']+["']\s*$/i.test(trimmed)) return false;
+  if (/^\s*(?:for|while|if|switch)\b/i.test(trimmed)) return false;
+  if (
+    /^\s*(?:const|let|var)?\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*[-+]?(?:\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*;?\s*$/i.test(
+      trimmed,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /^\s*(?:const|let|var)?\s*(?:x|y|z|w|t|i|j|k|res|tmp|idx|value)\s*=/i.test(trimmed) &&
+    !hasDomainSemanticSignal
+  ) {
+    return false;
+  }
+  if (hasBitwiseSignal && !hasDomainSemanticSignal) return false;
+  if (EQUATION_CODE_ASSIGNMENT_RE.test(trimmed) && !MATH_EQUATION_SIGNAL_RE.test(trimmed)) {
+    const implementationMathLike =
+      EQUATION_IN_TEXT_RE.test(trimmed) &&
+      ((!hasBitwiseSignal && hasArithmeticExpression && hasDomainSemanticSignal && !hasPathLikeString) ||
+        /\bMath\.pow\s*\(/i.test(trimmed) ||
+        (/\^/.test(trimmed) && hasDomainSemanticSignal));
+    if (!implementationMathLike) {
+      return false;
+    }
+  }
+  if (!hasEquationOperatorSignal(trimmed)) return false;
+  return true;
+};
+
+const isEquationWeakGenericCodeLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  const domainSignal =
+    /\b(?:psi|rho(?:_[a-z0-9]+)?|tau(?:_[a-z0-9]+)?|kappa(?:_[a-z0-9]+)?|collapse|wave|quantum|prob|mass|energy|volume|beta|gamma|theta|tensor|metric|casimir|tokamak|polytrope|phase|hbar|c2|r_c|ell)\b/i.test(
+      trimmed,
+    );
+  if (domainSignal) return false;
+  if (/^\s*(?:for|while|if|switch)\b/i.test(trimmed)) return true;
+  if (/^\s*(?:const|let|var)?\s*(?:x|y|z|w|t|i|j|k|res|tmp|idx|value)\s*=/i.test(trimmed)) return true;
+  if (/(?:>>>|<<|\|\s*0\b|\^)/.test(trimmed)) return true;
+  return false;
+};
+
+const isMetadataTraceEquationLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (EQUATION_MARKDOWN_TABLE_ROW_RE.test(trimmed)) return true;
+  if (EQUATION_TRACE_ID_RE.test(trimmed)) return true;
+  if (EQUATION_REJECT_ROW_RE.test(trimmed)) return true;
+  if (EQUATION_TASK_BULLET_RE.test(trimmed)) return true;
+  if (EQUATION_JSON_LINE_RE.test(trimmed)) return true;
+  if (EQUATION_CONFIG_ASSIGNMENT_RE.test(trimmed)) return true;
+  if (EQUATION_QUERYSTRING_ASSIGNMENT_RE.test(trimmed)) return true;
+  return false;
+};
+
+const inferEquationDomainFamily = (pathValue: string, equationLine: string): EquationCandidateDomainFamily => {
+  const haystack = `${pathValue} ${equationLine}`.toLowerCase();
+  if (
+    HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(pathValue) ||
+    /\b(?:collapse|wave[\s_-]*function|wavefunction|quantum|measurement|born|schrodinger|schroedinger|psi|rho_hat|density[\s_-]*matrix|state[\s_-]*vector|project(?:or|ion)|prob(?:ability)?)\b/i.test(
+      haystack,
+    )
+  ) {
+    return "collapse";
+  }
+  if (HELIX_ASK_CASIMIR_FAMILY_PATH_RE.test(pathValue) || /\b(?:casimir|vacuum|dynamic-casimir|modulation)\b/i.test(haystack)) {
+    return "casimir";
+  }
+  if (HELIX_ASK_TOKAMAK_FAMILY_PATH_RE.test(pathValue) || /\b(?:tokamak|plasma|mhd|q95|beta_p|beta_n|confinement)\b/i.test(haystack)) {
+    return "tokamak";
+  }
+  if (HELIX_ASK_POLYTROPE_FAMILY_PATH_RE.test(pathValue) || /\b(?:polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr)\b/i.test(haystack)) {
+    return "polytrope";
+  }
+  if (HELIX_ASK_PHASE_FAMILY_PATH_RE.test(pathValue) || /\b(?:phase|scheduler|pipeline|queue|cadence)\b/i.test(haystack)) {
+    return "phase";
+  }
+  if (HELIX_ASK_WARP_FAMILY_PATH_RE.test(pathValue) || /\b(?:warp|natario|alcubierre|congruence|riemann|ricci|einstein)\b/i.test(haystack)) {
+    return "warp";
+  }
+  return "generic";
+};
+
+const inferEquationClass = (args: {
+  path: string;
+  line: string;
+}): Stage05EquationClass => {
+  const trimmed = args.line.trim();
+  const normalizedPath = (normalizeAtlasRepoPath(args.path) ?? args.path).toLowerCase();
+  const isCodePath = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)$/i.test(
+    normalizedPath,
+  );
+  if (!trimmed) return "unknown";
+  if (isMetadataTraceEquationLine(trimmed)) return "metadata_trace";
+  if (EQUATION_COMMENT_BANNER_RE.test(trimmed) || isMojibakeSeparatorEquationLine(trimmed)) {
+    return "metadata_trace";
+  }
+  if (
+    /^docs\/(?:audits|runbooks|reports)\//i.test(normalizedPath) &&
+    !MATH_EQUATION_SIGNAL_RE.test(trimmed)
+  ) {
+    return "metadata_trace";
+  }
+  if (isCodePath && /^\s*(?:\/\/|#|\/\*|\*)/.test(trimmed)) {
+    return "metadata_trace";
+  }
+  if (
+    isCodePath &&
+    EQUATION_TS_ASSERT_PROPERTY_ASSIGNMENT_RE.test(trimmed) &&
+    /\bas\s+(?:any|unknown|Record<|[A-Za-z_][A-Za-z0-9_]*)\b/i.test(trimmed)
+  ) {
+    return "implementation_assignment";
+  }
+  if (
+    /\b(?:fit|fitting|regression|calibration|calibrated|table\s+[ivx]+|range|saturation|extraction)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return "parameterization";
+  }
+  if (
+    EQUATION_CODE_ASSIGNMENT_RE.test(trimmed) &&
+    /[=+\-*/^]|\\(?:frac|partial|nabla|sum|int)/i.test(trimmed)
+  ) {
+    return "implementation_assignment";
+  }
+  if (
+    isCodePath &&
+    /^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*[^=].+/.test(trimmed) &&
+    /[+\-*/^()]|\bMath\./i.test(trimmed)
+  ) {
+    return "implementation_assignment";
+  }
+  if (
+    isCodePath &&
+    EQUATION_TS_ASSERT_PROPERTY_ASSIGNMENT_RE.test(trimmed) &&
+    /[+\-*/^()]|\bMath\./i.test(trimmed)
+  ) {
+    return "implementation_assignment";
+  }
+  if (
+    isCodePath &&
+    /(^|[^=!<>])=([^=]|$)/.test(trimmed) &&
+    !/=>/.test(trimmed)
+  ) {
+    return "implementation_assignment";
+  }
+  if (/\b(?:ds\^2|g_[a-z0-9{}]+|r_[a-z0-9{}]+|t_[a-z0-9{}]+|hamiltonian|lagrangian)\b/i.test(trimmed)) {
+    return "canonical_law";
+  }
+  if (EQUATION_IN_TEXT_RE.test(trimmed)) return "derived_relation";
+  return "unknown";
+};
+
+const inferDerivationLevel = (
+  equationClass: Stage05EquationClass,
+  equationLine: string,
+): Stage05DerivationLevel => {
+  if (equationClass === "metadata_trace") return "trace_meta";
+  if (
+    /\b(?:hbar|mu0|epsilon0|k_b|k_B|c\b|G\b|pi|tau|planck|boltzmann)\b/i.test(equationLine)
+  ) {
+    return "root_constant";
+  }
+  if (equationClass === "canonical_law") return "governing";
+  if (equationClass === "derived_relation") return "derived";
+  if (equationClass === "parameterization") return "calibrated";
+  if (equationClass === "implementation_assignment") return "implementation";
+  return "derived";
+};
+
+const inferEquationSourceReliability = (pathValue: string): number => {
+  const normalizedPath = (normalizeAtlasRepoPath(pathValue) ?? pathValue).toLowerCase();
+  if (/(^|\/)tests?\//i.test(normalizedPath)) return EQUATION_SOURCE_RELIABILITY_BY_CLASS.test;
+  if (/\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)$/i.test(normalizedPath)) {
+    return EQUATION_SOURCE_RELIABILITY_BY_CLASS.code;
+  }
+  if (/^docs\/knowledge\//i.test(normalizedPath)) return EQUATION_SOURCE_RELIABILITY_BY_CLASS.knowledge_doc;
+  if (/^docs\//i.test(normalizedPath)) return EQUATION_SOURCE_RELIABILITY_BY_CLASS.general_doc;
+  if (/\.(json|yaml|yml|toml|ini|env)$/i.test(normalizedPath)) return EQUATION_SOURCE_RELIABILITY_BY_CLASS.config;
+  if (/\.(csv|tsv|parquet|sql)$/i.test(normalizedPath)) return EQUATION_SOURCE_RELIABILITY_BY_CLASS.data;
+  return EQUATION_SOURCE_RELIABILITY_BY_CLASS.other;
+};
+
+const resolveDominantEquationFamily = (
+  question: string,
+  queryConstraints: HelixAskQueryConstraints,
+): EquationCandidateDomainFamily => {
+  const lower = (question ?? "").toLowerCase();
+  const explicitPathHints = (queryConstraints.explicitAnchorPaths ?? [])
+    .map((entry) => (normalizeAtlasRepoPath(entry) ?? entry).replace(/\\/g, "/").toLowerCase())
+    .filter(Boolean);
+  if (explicitPathHints.some((entry) => HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(entry))) return "collapse";
+  if (explicitPathHints.some((entry) => HELIX_ASK_TOKAMAK_FAMILY_PATH_RE.test(entry))) return "tokamak";
+  if (explicitPathHints.some((entry) => HELIX_ASK_POLYTROPE_FAMILY_PATH_RE.test(entry))) return "polytrope";
+  if (explicitPathHints.some((entry) => HELIX_ASK_CASIMIR_FAMILY_PATH_RE.test(entry))) return "casimir";
+  if (explicitPathHints.some((entry) => HELIX_ASK_PHASE_FAMILY_PATH_RE.test(entry))) return "phase";
+  if (explicitPathHints.some((entry) => HELIX_ASK_WARP_FAMILY_PATH_RE.test(entry))) return "warp";
+  if (queryConstraints.collapseDomainLock || HELIX_ASK_COLLAPSE_DOMAIN_LOCK_RE.test(lower)) return "collapse";
+  if (isEquationAskPrompt(lower) && /\bcollapse\b/i.test(lower)) return "collapse";
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_TOKAMAK_FAMILY_PATH_RE)) return "tokamak";
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_POLYTROPE_FAMILY_PATH_RE)) return "polytrope";
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_CASIMIR_FAMILY_PATH_RE)) return "casimir";
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_PHASE_FAMILY_PATH_RE)) return "phase";
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_WARP_FAMILY_PATH_RE) || HELIX_ASK_WARP_FOCUS.test(lower)) {
+    return "warp";
+  }
+  return "generic";
+};
+
+const HELIX_ASK_EQUATION_LINE_RANGE_RE =
+  /\b(?:around|near|between|from)?\s*lines?\s*\d{1,5}(?:\s*(?:-|to|through)\s*\d{1,5})?\b/i;
+
+const classifyHelixAskEquationAskMode = (args: {
+  question: string;
+  explicitPaths: string[];
+  symbolTargets: string[];
+}): HelixAskEquationAskMode => {
+  const question = args.question ?? "";
+  if (!isEquationAskPrompt(question)) return "broad";
+  const hasExplicitPath = args.explicitPaths.length > 0;
+  const hasSymbolTargets = args.symbolTargets.length > 0;
+  const hasLineRangeAsk = HELIX_ASK_EQUATION_LINE_RANGE_RE.test(question);
+  const hasExplicitAnchorCue =
+    /\b(?:exact|verbatim|quote|file:line|line\s*anchor|quote\s+the\s+exact)\b/i.test(question) ||
+    hasLineRangeAsk;
+  if (hasExplicitPath && (hasSymbolTargets || hasLineRangeAsk || hasExplicitAnchorCue)) {
+    return "specific";
+  }
+  if (
+    /\b(?:explain|how|why|mechanism|map|parameteri[sz]e|feeds?|used|derive|context)\b/i.test(
+      question,
+    )
+  ) {
+    return "mid";
+  }
+  return "broad";
+};
+
+const resolveHelixAskEquationStrictness = (
+  question: string,
+  askMode: HelixAskEquationAskMode,
+): HelixAskEquationStrictness => {
+  if (isEquationStrictQuotePrompt(question) || askMode === "specific") return "high";
+  if (askMode === "mid") return "med";
+  return "low";
+};
+
+const buildHelixAskIntentContract = (args: {
+  question: string;
+  queryConstraints: HelixAskQueryConstraints;
+  explicitPaths?: string[];
+}): HelixAskIntentContract => {
+  const question = String(args.question ?? "");
+  const explicitPaths = applyQueryConstraintsToPathList(
+    [...(args.explicitPaths ?? []), ...(args.queryConstraints.explicitAnchorPaths ?? [])],
+    args.queryConstraints,
+    { preferAnchorPaths: false },
+  );
+  const symbolTargets = extractEquationSymbolTerms(question, 16);
+  const askMode = classifyHelixAskEquationAskMode({
+    question,
+    explicitPaths,
+    symbolTargets,
+  });
+  const dominantFamily = resolveDominantEquationFamily(question, args.queryConstraints);
+  const strictness = resolveHelixAskEquationStrictness(question, askMode);
+  const requiredOutputs = isEquationAskPrompt(question)
+    ? [
+        "Primary Topic",
+        "Primary Equation (Verified/Tentative/General Reference)",
+        "Mechanism Explanation",
+        "Related Cross-Topic Evidence (Optional)",
+        "Rejected Candidates (Why)",
+      ]
+    : [];
+  const allowedFallback: HelixAskEquationAllowedFallback =
+    askMode === "specific" ? "no_substitution" : "general_explain";
+  const questionFingerprint = sha256Hex(
+    stableJsonStringify({
+      question: question.trim().toLowerCase(),
+      explicit_paths: explicitPaths,
+      symbol_targets: symbolTargets,
+      ask_mode: askMode,
+      dominant_family: dominantFamily,
+    }),
+  );
+  return {
+    ask_mode: askMode,
+    strictness,
+    dominant_family: dominantFamily,
+    explicit_paths: explicitPaths,
+    symbol_targets: symbolTargets,
+    required_outputs: requiredOutputs,
+    allowed_fallback: allowedFallback,
+    question_fingerprint: questionFingerprint,
+  };
+};
+
+const hashHelixAskIntentContract = (contract: HelixAskIntentContract): string =>
+  sha256Hex(stableJsonStringify(contract));
+
+const assertHelixAskIntentContractStable = (args: {
+  expectedHash: string;
+  current: HelixAskIntentContract;
+}): { stable: boolean; expectedHash: string; currentHash: string } => {
+  const currentHash = hashHelixAskIntentContract(args.current);
+  return {
+    stable: currentHash === args.expectedHash,
+    expectedHash: args.expectedHash,
+    currentHash,
+  };
+};
+
+const resolveEquationRequiredEvidenceTags = (question: string): string[] => {
+  const tags = new Set<string>(["definition", "equation", "code_path"]);
+  if (/\b(?:how|why|mechanism|feed(?:s|ing)?\s+into|pipeline|flow|because|causal)\b/i.test(question)) {
+    tags.add("mechanism");
+  }
+  if (/\b(?:example|for example|instance|sample)\b/i.test(question)) {
+    tags.add("example");
+  }
+  if (/\b(?:verify|verification|prove|proof|validate|test)\b/i.test(question)) {
+    tags.add("verification");
+  }
+  if (/\b(?:failure|fail|error|fallback|runtime)\b/i.test(question)) {
+    tags.add("failure_path");
+  }
+  return Array.from(tags);
+};
+
+const extractEquationDomainTerms = (value: string, maxTerms = 12): string[] => {
+  const tokens = filterSignalTokens(tokenizeAskQuery(value ?? ""))
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 3);
+  const unique = Array.from(new Set(tokens));
+  return unique.slice(0, Math.max(3, maxTerms));
+};
+
+const HELIX_ASK_EQUATION_SYMBOL_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "around",
+  "as",
+  "at",
+  "be",
+  "by",
+  "candidate",
+  "candidates",
+  "canonical",
+  "client",
+  "codebase",
+  "computing",
+  "docs",
+  "each",
+  "equation",
+  "equations",
+  "exact",
+  "explain",
+  "family",
+  "flow",
+  "for",
+  "from",
+  "function",
+  "give",
+  "if",
+  "in",
+  "is",
+  "it",
+  "js",
+  "jsx",
+  "line",
+  "lines",
+  "mjs",
+  "modules",
+  "no",
+  "of",
+  "one",
+  "or",
+  "path",
+  "parameterize",
+  "parameterizes",
+  "quote",
+  "question",
+  "scripts",
+  "server",
+  "shared",
+  "single",
+  "symbol",
+  "symbols",
+  "terms",
+  "tests",
+  "the",
+  "then",
+  "this",
+  "tools",
+  "top",
+  "ts",
+  "tsx",
+  "using",
+  "what",
+  "with",
+]);
+
+const extractEquationSymbolTerms = (question: string, maxTerms = 12): string[] => {
+  const rawTerms = (question ?? "").match(/\b[A-Za-z][A-Za-z0-9_]{2,}\b/g) ?? [];
+  const seen = new Set<string>();
+  const symbolLike: string[] = [];
+  for (const raw of rawTerms) {
+    const term = raw.toLowerCase();
+    if (HELIX_ASK_EQUATION_SYMBOL_STOPWORDS.has(term)) continue;
+    if (/^\d+$/.test(term)) continue;
+    if (/^[a-z]{1,3}$/.test(term)) continue;
+    if (seen.has(term)) continue;
+    seen.add(term);
+    // Only keep explicit symbol-like tokens (underscore form) to avoid path/name noise.
+    if (!/_/.test(term)) continue;
+    symbolLike.push(term);
+    if (symbolLike.length >= Math.max(2, maxTerms)) break;
+  }
+  return symbolLike.slice(0, Math.max(2, maxTerms));
+};
+
+const sanitizeEquationClaimCandidate = (value: string): string => {
+  if (!value) return "";
+  let cleaned = stripInlinePathCitationsFromClaim(value);
+  cleaned = cleanDanglingFileExtensionFragments(cleaned);
+  cleaned = cleaned.replace(/\|\s*slots?=[^|]{0,240}/gi, " ");
+  cleaned = cleaned.replace(/\bkeys?:\s*[A-Za-z0-9_,\s.-]{0,240}/gi, " ");
+  cleaned = cleaned.replace(/\b(?:code|doc|config|data|test)\s*:\s*span:[^\n]{0,200}/gi, " ");
+  cleaned = cleaned
+    .replace(/^(?:\s*[-*]\s*|\s*\d+\.\s*)+/g, "")
+    .replace(/^\s*[\[\](){}:;,.!?-]+\s*/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned;
+};
+
+const isMeaningfulEquationClaimCandidate = (value: string): boolean => {
+  const text = String(value ?? "").trim();
+  if (text.length < 24) return false;
+  if (!/[A-Za-z]/.test(text)) return false;
+  if (/^(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\]?$/i.test(text)) return false;
+  if (
+    /\b(?:available evidence was weakly reflected|please narrow the request|specify the relevant files|couldn't verify an exact equation|exact canonical line was verifiable)\b/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /\b(?:slots?=|keys?:|span:|kind:|confidence:|symbols?orkeys?|source_map|contextfiles?|debugcontext)\b/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  if (/\|\s*slots?=/i.test(text)) return false;
+  if (/^\s*(?:code|doc|config|data|test):\s*span:/i.test(text)) return false;
+  if (/^\s*defines?\s+types?\s+for\b/i.test(text)) return false;
+  if (
+    /^(?:(?:\d+\.\s*)+)?(?:claim-first explanation|tentative equation backing|supporting equations|sources?|details?|proof|key files|context sources)\b/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /^(?:(?:\d+\.\s*)+)?(?:grounded equation candidates were retrieved|i couldn't verify|no exact equation line was verifiable)\b/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  const alphaCount = (text.match(/[A-Za-z]/g) ?? []).length;
+  const alphaRatio = alphaCount / Math.max(1, text.length);
+  if (alphaRatio < 0.35) return false;
+  return true;
+};
+
+const stripInlinePathCitationsFromClaim = (value: string): string => {
+  if (!value) return "";
+  let cleaned = value;
+  cleaned = cleaned.replace(
+    /\[[^\]\n]{0,240}(?:\/|\\)[^\]\n]{0,240}\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)(?::L?\d+(?::\d+)?)?[^\]\n]*\]/gi,
+    " ",
+  );
+  cleaned = cleaned.replace(
+    /\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)(?::L?\d+(?::\d+)?)?\b/gi,
+    " ",
+  );
+  cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+  return cleaned;
+};
+
+const deriveEquationClaimSeeds = (args: {
+  question: string;
+  draftAnswer: string;
+  answerContract: HelixAskAnswerContract | null;
+  evidenceText: string;
+  stage05Cards?: Stage05EvidenceCard[];
+  maxClaims?: number;
+}): EquationClaimSeed[] => {
+  const maxClaims = Math.max(1, Math.min(8, args.maxClaims ?? HELIX_ASK_EQUATION_CLAIM_MAX));
+  const requiredTags = resolveEquationRequiredEvidenceTags(args.question);
+  const seeds: string[] = [];
+  if (args.answerContract?.claims?.length) {
+    for (const claim of args.answerContract.claims) {
+      const normalized = ensureSentence(normalizeContractText(claim.text, 320));
+      if (normalized) seeds.push(normalized);
+      if (seeds.length >= maxClaims) break;
+    }
+  }
+  if (seeds.length === 0) {
+    seeds.push(...extractClaimCandidates(args.draftAnswer, maxClaims));
+  }
+  if (seeds.length === 0 && args.answerContract?.summary) {
+    const normalized = ensureSentence(normalizeContractText(args.answerContract.summary, 320));
+    if (normalized) seeds.push(normalized);
+  }
+  if (seeds.length === 0) {
+    seeds.push(...extractClaimCandidates(args.evidenceText, maxClaims));
+  }
+  if (seeds.length === 0 && Array.isArray(args.stage05Cards) && args.stage05Cards.length > 0) {
+    const rankedCards = [...args.stage05Cards].sort(
+      (left, right) => (right.confidence ?? 0) - (left.confidence ?? 0),
+    );
+    for (const card of rankedCards) {
+      const summaryCandidate = ensureSentence(
+        normalizeContractText(sanitizeEquationClaimCandidate(card.summary), 240),
+      );
+      if (!isMeaningfulEquationClaimCandidate(summaryCandidate)) continue;
+      seeds.push(summaryCandidate);
+      if (seeds.length >= maxClaims) break;
+    }
+  }
+  const out: EquationClaimSeed[] = [];
+  const seen = new Set<string>();
+  for (const claim of seeds) {
+    const normalized = ensureSentence(
+      normalizeContractText(sanitizeEquationClaimCandidate(claim), 320),
+    )
+      .trim();
+    if (!isMeaningfulEquationClaimCandidate(normalized)) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      claim: normalized,
+      required_evidence_tags: requiredTags.slice(),
+      domain_terms: extractEquationDomainTerms(`${args.question} ${normalized}`, 12),
+    });
+    if (out.length >= maxClaims) break;
+  }
+  if (out.length === 0) {
+    const fallbackClaim = ensureSentence(normalizeContractText(sanitizeEquationClaimCandidate(args.draftAnswer), 320));
+    if (isMeaningfulEquationClaimCandidate(fallbackClaim)) {
+      out.push({
+        claim: fallbackClaim,
+        required_evidence_tags: requiredTags.slice(),
+        domain_terms: extractEquationDomainTerms(`${args.question} ${fallbackClaim}`, 12),
+      });
+    }
+  }
+  return out;
+};
+
+const scoreEquationCandidateLine = (
+  line: string,
+  questionNeedles: string[],
+  question: string,
+  candidatePath: string,
+  questionSymbolTerms: string[] = [],
+): number => {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length < 6 || trimmed.length > 720) return Number.NEGATIVE_INFINITY;
+  if (isEquationWeakGenericCodeLine(trimmed)) return Number.NEGATIVE_INFINITY;
+  const hasWarpPromptSignal = HELIX_ASK_WARP_FOCUS.test(question);
+  const collapseDomainPrompt =
+    isWaveCollapseEquationPrompt(question) ||
+    (isEquationAskPrompt(question) && /\bcollapse\b/i.test(question) && !hasWarpPromptSignal);
+  const casimirDomainPrompt =
+    HELIX_ASK_CASIMIR_DOMAIN_RE.test(question) && !collapseDomainPrompt && !hasWarpPromptSignal;
+  const tokamakDomainPrompt = HELIX_ASK_TOKAMAK_DOMAIN_RE.test(question) && !hasWarpPromptSignal;
+  const polytropeDomainPrompt =
+    HELIX_ASK_POLYTROPE_DOMAIN_RE.test(question) && !hasWarpPromptSignal;
+  const phaseDomainPrompt =
+    HELIX_ASK_PHASE_CONTROL_DOMAIN_RE.test(question) && !hasWarpPromptSignal;
+  const normalizedPath = normalizeAtlasRepoPath(candidatePath) ?? candidatePath;
+  const collapseFamilyPath = HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(normalizedPath);
+  const lineHasWaveSignal = HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE.test(trimmed);
+  const lineHasCasimirSignal =
+    /\b(?:casimir|vacuum|boundary|modulation|frequency|omega|dynamic)\b/i.test(trimmed);
+  const lineHasTokamakSignal =
+    /\b(?:tokamak|plasma|mhd|confinement|safety\s*factor|q95|beta_p|beta_n|stability)\b/i.test(
+      trimmed,
+    );
+  const lineHasPolytropeSignal =
+    /\b(?:polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr|pressure|density)\b/i.test(trimmed);
+  const lineHasPhaseSignal =
+    /\b(?:phase|scheduler|pipeline|queue|latency|cadence|tick)\b/i.test(trimmed);
+  const lineLooksMarkupAttribute =
+    /(?:\b(?:rel|href|src|class|id|name)\s*=\s*["'][^"']+["'])|<[^>]+=\s*["'][^"']+["'][^>]*>/i.test(
+      trimmed,
+    );
+  const rhsMathSignal = detectEquationRhsMathSignal(trimmed);
+  const stringLiteralSignal = detectEquationStringLiteralSignal(trimmed);
+  const normalizedLine = trimmed.toLowerCase();
+  const symbolHits =
+    questionSymbolTerms.length > 0
+      ? questionSymbolTerms.filter((term) => normalizedLine.includes(term))
+      : [];
   let score = 0;
+  const hasMathSignal =
+    MATH_EQUATION_SIGNAL_RE.test(trimmed) ||
+    /\b(?:psi|rho_hat|density_matrix)(?:_[A-Za-z0-9]+)?\s*=/i.test(trimmed);
+  const hasEquationShape = EQUATION_IN_TEXT_RE.test(trimmed);
+  const collapseImplementationMathLike =
+    collapseFamilyPath &&
+    hasEquationShape &&
+    (/[*/^]/.test(trimmed) ||
+      /\bMath\.pow\s*\(/i.test(trimmed) ||
+      /\b(?:rho|kappa|tau|v_c|energy|mass|prob|collapse|benchmark|diagnostic)\b/i.test(trimmed));
   const normalizedNeedle = normalizeEquationNeedle(trimmed);
   if (questionNeedles.some((needle) => normalizedNeedle.includes(needle))) score += 120;
+  if (symbolHits.length > 0) {
+    score += Math.min(180, symbolHits.length * 56);
+    if (symbolHits.some((term) => /[_\d]/.test(term))) {
+      score += 26;
+    }
+  } else if (questionSymbolTerms.length > 0) {
+    score -= 44;
+  }
   if (/\b(congruence|metric|tensor|riemann|ricci|curvature|einstein|geodesic)\b/i.test(trimmed)) score += 20;
-  if (/ds\^2|g_\{|R_\{|T_\{|\\frac|\\nabla|\\partial|∂|∇|Σ|Δ|∫/i.test(trimmed)) score += 40;
-  if (EQUATION_IN_TEXT_RE.test(trimmed)) score += 25;
+  if (hasMathSignal) score += 52;
+  if (hasEquationShape) score += 25;
   if (trimmed.includes("=")) score += 8;
-  if (EQUATION_CODE_ASSIGNMENT_RE.test(trimmed)) score -= 40;
+  if (/\b(rho|theta|metric|tensor|curvature|beta|gamma|k_ij|t00|einstein|riemann)\b/i.test(trimmed) && trimmed.includes("=")) {
+    score += 14;
+  }
+  if (/[*/^]/.test(trimmed) && trimmed.includes("=")) score += 10;
+  if (EQUATION_CODE_ASSIGNMENT_RE.test(trimmed)) score -= 24;
   if (EQUATION_JSON_LINE_RE.test(trimmed)) score -= 30;
-  if (/;\s*$/.test(trimmed) && !/ds\^2|g_\{|R_\{|T_\{|\\frac|\\nabla|\\partial|∂|∇|Σ|Δ|∫/i.test(trimmed)) {
+  if (/=\s*(?:true|false|null)\b/i.test(trimmed)) score -= 140;
+  if (/\b(?:set|enabled?|disabled?|flag)\b/i.test(trimmed) && /=/.test(trimmed) && !/[+\-*/^]/.test(trimmed)) {
+    score -= 55;
+  }
+  if (lineLooksMarkupAttribute) score -= 190;
+  if (trimmed.includes("=>")) score -= 18;
+  if (/^\s*(?:notes?|overview|summary|description)\s*:/i.test(trimmed)) score -= 80;
+  if (/=\s*["'][^"']+["']\s*$/i.test(trimmed)) score -= 70;
+  if (stringLiteralSignal && !rhsMathSignal) score -= 90;
+  if (/\b(?:console\.log|logger|log:|trace|debug|warn|info)\b/i.test(trimmed)) score -= 95;
+  if (/`/.test(trimmed) && /\$\{[^}]+\}/.test(trimmed)) score -= 120;
+  if (/\bhttps?:\/\/|(^|[\s,])(docs|modules|server|client)\//i.test(trimmed)) score -= 20;
+  const wordCount = (trimmed.match(/[A-Za-z0-9_]+/g) ?? []).length;
+  if (wordCount >= 26 && !hasMathSignal) score -= 55;
+  if (/;\s*$/.test(trimmed) && !/ds\^2|g_\{|R_\{|T_\{|\\frac|\\nabla|\\partial|âˆ‚|âˆ‡|Î£|Î”|âˆ«/i.test(trimmed)) {
     score -= 10;
+  }
+  if (collapseDomainPrompt) {
+    if (lineHasWaveSignal) score += 60;
+    else if (collapseImplementationMathLike) {
+      // In-family implementation equations are valid tentative backing for collapse prompts.
+      score -= 18;
+    } else {
+      score -= 58;
+    }
+    if (collapseFamilyPath) score += 36;
+    else score -= 20;
+  }
+  if (casimirDomainPrompt) {
+    if (lineHasCasimirSignal) score += 56;
+    else score -= 48;
+    if (HELIX_ASK_CASIMIR_FAMILY_PATH_RE.test(normalizedPath)) score += 28;
+    else score -= 14;
+  }
+  if (tokamakDomainPrompt) {
+    if (lineHasTokamakSignal) score += 88;
+    else score -= 90;
+    if (HELIX_ASK_TOKAMAK_FAMILY_PATH_RE.test(normalizedPath)) score += 52;
+    else score -= 30;
+    if (HELIX_ASK_WARP_FAMILY_PATH_RE.test(normalizedPath)) score -= 42;
+  }
+  if (polytropeDomainPrompt) {
+    if (lineHasPolytropeSignal) score += 78;
+    else score -= 80;
+    if (HELIX_ASK_POLYTROPE_FAMILY_PATH_RE.test(normalizedPath)) score += 46;
+    else score -= 28;
+    if (HELIX_ASK_WARP_FAMILY_PATH_RE.test(normalizedPath)) score -= 36;
+  }
+  if (phaseDomainPrompt) {
+    if (lineHasPhaseSignal) score += 52;
+    else score -= 46;
+    if (HELIX_ASK_PHASE_FAMILY_PATH_RE.test(normalizedPath)) score += 30;
+    else score -= 16;
+  }
+  if (!hasMathSignal && !questionNeedles.length) score -= 18;
+  if (!rhsMathSignal && !hasMathSignal && EQUATION_CODE_ASSIGNMENT_RE.test(trimmed)) {
+    score -= 80;
+  }
+  const semanticFit = scoreEquationSemanticFit({
+    question,
+    equationLine: trimmed,
+    answerText: trimmed,
+    citations: [candidatePath],
+  });
+  if (semanticFit.required) {
+    score += semanticFit.score;
+    if (!semanticFit.ok) {
+      const softenSemanticPenalty =
+        collapseDomainPrompt && collapseImplementationMathLike && !lineHasWaveSignal;
+      score -= softenSemanticPenalty ? 20 : 72;
+    }
   }
   return score;
 };
 
-const buildExplicitPathEquationContractRescue = (args: {
+const scoreEquationDomainPathAffinity = (
+  normalizedPath: string,
+  questionTokens: string[],
+): number => {
+  const tokenSet = new Set(questionTokens.map((token) => token.toLowerCase()));
+  const hasToken = (...tokens: string[]): boolean => tokens.some((token) => tokenSet.has(token));
+  const collapseDomain =
+    hasToken("collapse", "wavefunction", "wave", "quantum", "measurement", "born", "schrodinger", "schroedinger") ||
+    (hasToken("wave", "function") && hasToken("collapse"));
+  const casimirDomain = hasToken("casimir", "dynamic") || (hasToken("dynamic") && hasToken("modulation"));
+  const tokamakDomain = hasToken("tokamak", "plasma", "mhd", "stability");
+  const polytropeDomain = hasToken("polytrope", "lane", "emden", "stellar", "hydrostatic");
+  const phaseDomain = hasToken("phase", "scheduler") || (hasToken("scheduler") && hasToken("control"));
+  const warpDomain = hasToken("warp", "natario", "alcubierre", "congruence", "metric", "tensor");
+  const domainRequested =
+    collapseDomain || casimirDomain || tokamakDomain || polytropeDomain || phaseDomain || warpDomain;
+
+  const isWarpPath = HELIX_ASK_WARP_FAMILY_PATH_RE.test(normalizedPath);
+  const isCollapsePath =
+    HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(normalizedPath) ||
+    /(wave|quantum|measurement|born|schrodinger|schroedinger|dp-collapse)/i.test(normalizedPath);
+  const isCasimirPath = /(casimir|dynamic-casimir|static-casimir)/i.test(normalizedPath);
+  const isTokamakPath = /(tokamak|plasma|mhd)/i.test(normalizedPath);
+  const isPolytropePath = /(polytrope|lane[-_]?emden|star-hydrostatic)/i.test(normalizedPath);
+  const isPhasePath = /(phase-scheduler|energy-pipeline|queue\/index)/i.test(normalizedPath);
+  const isStressEnergyPath = /(stress-energy|t00|tensor)/i.test(normalizedPath);
+
+  let score = 0;
+  if (collapseDomain) {
+    if (isCollapsePath) score += 130;
+    if (!isCollapsePath) score -= 44;
+    if (isWarpPath) score -= 95;
+    if (isTokamakPath || isPolytropePath) score -= 36;
+  }
+  if (casimirDomain) {
+    if (isCasimirPath || isStressEnergyPath) score += 120;
+    if (isWarpPath) score -= 58;
+    if (isTokamakPath && !isCasimirPath) score -= 28;
+  }
+  if (tokamakDomain) {
+    if (isTokamakPath || isStressEnergyPath) score += 130;
+    if (isWarpPath) score -= 82;
+    if (isCasimirPath && !isTokamakPath) score -= 24;
+  }
+  if (polytropeDomain) {
+    if (isPolytropePath) score += 140;
+    if (isWarpPath || isTokamakPath) score -= 60;
+  }
+  if (phaseDomain) {
+    if (isPhasePath) score += 120;
+    if (isWarpPath) score -= 50;
+  }
+  if (warpDomain && !collapseDomain && !tokamakDomain && !polytropeDomain) {
+    if (isWarpPath) score += 120;
+  }
+  if (!domainRequested && isWarpPath) {
+    score += 36;
+  }
+
+  if (/(^|\/)tests\//i.test(normalizedPath)) score -= 120;
+  if (/(^|\/)(?:tests|test|specs?)\/fixtures\//i.test(normalizedPath)) score -= 120;
+  if (/(^|\/)server\/_generated\//i.test(normalizedPath)) score -= 140;
+  if (/(^|\/)docs\/ethos\//i.test(normalizedPath)) score -= 90;
+  if (/(^|\/)docs\/knowledge\/dag-node-schema\.md$/i.test(normalizedPath)) score -= 160;
+  if (/(^|\/)docs\/audits\//i.test(normalizedPath) || /(^|\/)reports\//i.test(normalizedPath)) score -= 42;
+  if (/(^|\/)external\//i.test(normalizedPath)) score -= 70;
+
+  return score;
+};
+
+const scoreEquationRescuePath = (
+  candidatePath: string,
+  explicitPathSet: Set<string>,
+  queryConstraints: HelixAskQueryConstraints,
+  questionTokens: string[],
+  ordinal: number,
+): number => {
+  const normalizedPath = normalizeAtlasRepoPath(candidatePath);
+  if (!normalizedPath) return Number.NEGATIVE_INFINITY;
+  if (queryConstraints.excludedPathPatterns.some((pattern) => pattern.test(normalizedPath))) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  let score = -Math.min(ordinal, 200) * 0.25;
+  if (explicitPathSet.has(normalizedPath)) score += 300;
+  if (queryConstraints.explicitAnchorPaths.some((entry) => normalizeAtlasRepoPath(entry) === normalizedPath)) {
+    score += 220;
+  }
+  if (queryConstraints.preferredPathPatterns.some((pattern) => pattern.test(normalizedPath))) {
+    score += 95;
+  } else if (queryConstraints.collapseDomainLock && queryConstraints.preferredPathPatterns.length > 0) {
+    score -= 28;
+  }
+  if (questionTokens.length > 0) {
+    const lowerPath = normalizedPath.toLowerCase();
+    const tokenHits = questionTokens.filter((token) => token.length >= 4 && lowerPath.includes(token)).length;
+    if (tokenHits > 0) score += Math.min(70, tokenHits * 22);
+  }
+  score += scoreEquationDomainPathAffinity(normalizedPath, questionTokens);
+  if (/\b(equation|formula|metric|congruence|geometry|tensor|ricci|riemann|curvature|einstein|natario|alcubierre|warp)\b/i.test(normalizedPath)) {
+    score += 90;
+  }
+  if (/(^|\/)docs\/knowledge\/warp\//i.test(normalizedPath)) score += 50;
+  if (/(^|\/)docs\//i.test(normalizedPath)) score += 28;
+  if (/\.(md|txt|rst)$/i.test(normalizedPath)) score += 24;
+  if (/\.(ts|tsx|js|jsx|py|go|rs|c|cc|cpp|h|hpp|java|m)$/i.test(normalizedPath)) score += 12;
+  if (/\.(json|yaml|yml|toml)$/i.test(normalizedPath)) score -= 18;
+  if (/(tree|schema|inventory|walk-report|walk-config)\.(json|md)$/i.test(normalizedPath)) score -= 14;
+  if (/(^|\/)docs\/knowledge\/dag-node-schema\.md$/i.test(normalizedPath)) score -= 220;
+  if (/(^|\/)docs\/(?:specs|architecture|audits)\//i.test(normalizedPath)) score -= 36;
+  if (/(schema|contract|inventory|roadmap|checklist|audit|task|report)\.(md|json)$/i.test(normalizedPath)) score -= 40;
+  return score;
+};
+
+const rankEquationNearMissPath = (
+  candidatePath: string,
+  queryConstraints: HelixAskQueryConstraints,
+  questionTokens: string[],
+  ordinal: number,
+): number => {
+  const normalizedPath = normalizeAtlasRepoPath(candidatePath);
+  if (!normalizedPath) return Number.NEGATIVE_INFINITY;
+  if (queryConstraints.excludedPathPatterns.some((pattern) => pattern.test(normalizedPath))) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  let score = -Math.min(ordinal, 200) * 0.2;
+  if (queryConstraints.explicitAnchorPaths.some((entry) => normalizeAtlasRepoPath(entry) === normalizedPath)) {
+    score += 160;
+  }
+  if (queryConstraints.preferredPathPatterns.some((pattern) => pattern.test(normalizedPath))) {
+    score += 120;
+  }
+  const lowerPath = normalizedPath.toLowerCase();
+  const tokenHits = questionTokens.filter((token) => token.length >= 4 && lowerPath.includes(token)).length;
+  if (tokenHits > 0) score += Math.min(80, tokenHits * 18);
+  score += scoreEquationDomainPathAffinity(normalizedPath, questionTokens);
+  if (/(collapse|wave|quantum|measurement|born|equation|formula|schrodinger)/i.test(normalizedPath)) score += 34;
+  if (HELIX_ASK_WARP_FAMILY_PATH_RE.test(normalizedPath) && queryConstraints.collapseDomainLock) score -= 40;
+  if (/\.(ts|tsx|js|jsx|py|go|rs|md|txt)$/i.test(normalizedPath)) score += 10;
+  if (/\.(json|yaml|yml|toml)$/i.test(normalizedPath)) score -= 10;
+  if (/(^|\/)docs\/knowledge\/dag-node-schema\.md$/i.test(normalizedPath)) score -= 170;
+  if (/(schema|contract|inventory|roadmap|checklist|audit|task|report)\.(md|json)$/i.test(normalizedPath)) score -= 28;
+  return score;
+};
+
+const collectEquationRescueCandidates = (args: {
   question: string;
   explicitPaths: string[];
   allowedCitations: string[];
-}): ExplicitPathEquationContractRescue | null => {
-  const questionNeedles = extractEquationNeedlesFromQuestion(args.question ?? "");
+  stage05Cards?: Stage05EvidenceCard[];
+  queryConstraints?: HelixAskQueryConstraints;
+  maxCandidates?: number;
+  includeWeakSemantic?: boolean;
+}): EquationRescueCandidate[] => {
+  const question = args.question ?? "";
+  const explicitPaths = normalizeCitations(args.explicitPaths ?? []);
+  const allowedCitations = normalizeCitations(args.allowedCitations ?? []);
+  const queryConstraints =
+    args.queryConstraints ?? deriveHelixAskQueryConstraints(question, explicitPaths);
+  const maxCandidates = Math.max(1, Math.min(12, args.maxCandidates ?? 1));
+  const includeWeakSemantic = Boolean(args.includeWeakSemantic);
+  const stage05Cards = mergeStage05Cards([], args.stage05Cards ?? []);
+  const dominantFamily = resolveDominantEquationFamily(question, queryConstraints);
+  const coreFamilyPathRe = resolveEquationFamilyCorePathRegex(dominantFamily);
+  const incomingPathHints = normalizeCitations([
+    ...explicitPaths,
+    ...stage05Cards
+      .map((card) => normalizeAtlasRepoPath(card.path))
+      .filter((entry): entry is string => Boolean(entry) && isAtlasRepoPathSafe(entry)),
+    ...allowedCitations,
+  ]);
+  const hasInFamilyHint =
+    dominantFamily !== "generic" &&
+    coreFamilyPathRe != null &&
+    incomingPathHints.some((entry) => coreFamilyPathRe.test(entry));
+  const familyCoreSeedPaths =
+    dominantFamily !== "generic" &&
+    incomingPathHints.length >= 3 &&
+    !hasInFamilyHint
+      ? HELIX_ASK_EQUATION_FAMILY_CORE_SEED_PATHS[dominantFamily] ?? []
+      : [];
+  const questionNeedles = extractEquationNeedlesFromQuestion(question);
+  const questionSymbolTerms = extractEquationSymbolTerms(question);
+  const questionTokens = filterSignalTokens(tokenizeAskQuery(question)).map((entry) =>
+    entry.toLowerCase(),
+  );
+  const equationIntentPrompt =
+    isEquationQuotePrompt(question) || /\b(?:equation|equations|formula|metric|tensor)\b/i.test(question);
+  const domainScopedPrompt =
+    queryConstraints.collapseDomainLock || queryConstraints.preferredPathPatterns.length > 0;
+  const explicitPathSet = new Set(
+    explicitPaths
+      .map((entry) => normalizeAtlasRepoPath(entry))
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  const stage05PathHints = stage05Cards
+    .map((card) => normalizeAtlasRepoPath(card.path))
+    .filter((entry): entry is string => Boolean(entry) && isAtlasRepoPathSafe(entry));
   const candidatePaths = normalizeCitations([
-    ...(args.explicitPaths ?? []),
-    ...(args.allowedCitations ?? []),
-  ]).slice(0, 10);
+    ...explicitPaths,
+    ...stage05PathHints,
+    ...allowedCitations,
+    ...familyCoreSeedPaths,
+  ])
+    .map((candidatePath, ordinal) => ({
+      candidatePath,
+      score: scoreEquationRescuePath(
+        candidatePath,
+        explicitPathSet,
+        queryConstraints,
+        questionTokens,
+        ordinal,
+      ),
+    }))
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, EQUATION_RESCUE_MAX_FILE_SCAN)
+    .map((entry) => entry.candidatePath);
+
+  const candidates: EquationRescueCandidate[] = [];
+  const seen = new Set<string>();
+
+  if (stage05Cards.length > 0) {
+    for (const card of stage05Cards) {
+      const normalizedPath = normalizeAtlasRepoPath(card.path);
+      if (!normalizedPath || !isAtlasRepoPathSafe(normalizedPath)) continue;
+      if (queryConstraints.excludedPathPatterns.some((pattern) => pattern.test(normalizedPath))) continue;
+      const slots = Array.isArray(card.slotHits) ? card.slotHits : [];
+      const equationSeekingCard = slots.includes("equation") || slots.includes("code_path");
+      for (const snippet of Array.isArray(card.snippets) ? card.snippets : []) {
+        const lines = String(snippet.text ?? "").split(/\r?\n/);
+        for (let index = 0; index < lines.length; index += 1) {
+          const rawLine = lines[index]?.trim();
+          if (!rawLine) continue;
+          if (!EQUATION_IN_TEXT_RE.test(rawLine)) continue;
+          if (!isEquationExactLineEligible({ line: rawLine, path: normalizedPath })) continue;
+          const equationLine = extractConciseEquationFragment(rawLine) ?? clipAskText(rawLine, 320);
+          if (!equationLine || !EQUATION_IN_TEXT_RE.test(equationLine)) continue;
+          if (
+            !MATH_EQUATION_SIGNAL_RE.test(equationLine) &&
+            !/\b(?:psi|rho_hat|density_matrix)(?:_[A-Za-z0-9]+)?\s*=/i.test(equationLine) &&
+            !equationSeekingCard &&
+            questionNeedles.length === 0 &&
+            !equationIntentPrompt &&
+            !domainScopedPrompt
+          ) {
+            continue;
+          }
+          const semanticFit = scoreEquationSemanticFit({
+            question,
+            equationLine,
+            answerText: rawLine,
+            citations: [normalizedPath],
+          });
+          if (semanticFit.required && !semanticFit.ok && !includeWeakSemantic) continue;
+          const symbolBoostedScore = scoreEquationCandidateLine(
+            rawLine,
+            questionNeedles,
+            question,
+            normalizedPath,
+            questionSymbolTerms,
+          );
+          const explicitPathSymbolMatch =
+            questionSymbolTerms.length > 0 &&
+            explicitPathSet.has(normalizedPath) &&
+            questionSymbolTerms.some((term) => equationLine.toLowerCase().includes(term));
+          const explicitPathSymbolPenalty =
+            questionSymbolTerms.length > 0 &&
+            explicitPathSet.has(normalizedPath) &&
+            !explicitPathSymbolMatch;
+          const score =
+            symbolBoostedScore +
+            (explicitPathSymbolMatch ? 220 : 0) -
+            (explicitPathSymbolPenalty ? 28 : 0) +
+            (semanticFit.required ? semanticFit.score : 0) +
+            (semanticFit.ok ? 10 : 0) +
+            (equationSeekingCard ? 14 : 0) +
+            Math.round(Math.max(0, Math.min(1, Number(card.confidence ?? 0))) * 16);
+          if (score <= 0) continue;
+          const equationClass = inferEquationClass({
+            path: normalizedPath,
+            line: rawLine,
+          });
+          const derivationLevel = inferDerivationLevel(equationClass, equationLine);
+          const domainFamily =
+            card.domainFamily ?? inferEquationDomainFamily(normalizedPath, equationLine);
+          const sourceReliability = inferEquationSourceReliability(normalizedPath);
+          const lineNumber = Math.max(1, Number(snippet.start || 1) + index);
+          const key = `${normalizedPath}:L${lineNumber}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          candidates.push({
+            path: normalizedPath,
+            line: lineNumber,
+            equation: equationLine,
+            score,
+            semanticFit,
+            equationClass,
+            derivationLevel,
+            domainFamily,
+            sourceReliability,
+            rhsMathSignal: detectEquationRhsMathSignal(rawLine),
+            stringLiteralSignal: detectEquationStringLiteralSignal(rawLine),
+            rejectionReason: null,
+            source: "stage05",
+          });
+          if (candidates.length >= maxCandidates * 4) break;
+        }
+        if (candidates.length >= maxCandidates * 4) break;
+      }
+      if (candidates.length >= maxCandidates * 4) break;
+    }
+  }
+
   for (const candidatePath of candidatePaths) {
     const normalizedPath = normalizeAtlasRepoPath(candidatePath);
     if (!normalizedPath || !isAtlasRepoPathSafe(normalizedPath)) continue;
@@ -19367,35 +21808,1879 @@ const buildExplicitPathEquationContractRescue = (args: {
     }
     if (!raw || raw.includes("\u0000")) continue;
     const lines = raw.split(/\r?\n/);
-    let bestLineIndex = -1;
-    let bestScore = Number.NEGATIVE_INFINITY;
+    const scoredLines: Array<{
+      lineIndex: number;
+      score: number;
+      equationLine: string;
+      semanticFit: EquationSemanticFit;
+    }> = [];
     for (let i = 0; i < lines.length; i += 1) {
-      const score = scoreEquationCandidateLine(lines[i] ?? "", questionNeedles);
-      if (score > bestScore) {
-        bestScore = score;
-        bestLineIndex = i;
+      const rawLine = (lines[i] ?? "").trim();
+      if (!rawLine) continue;
+      if (!isEquationExactLineEligible({ line: rawLine, path: normalizedPath })) continue;
+      const baseScore = scoreEquationCandidateLine(
+        rawLine,
+        questionNeedles,
+        question,
+        normalizedPath,
+        questionSymbolTerms,
+      );
+      const explicitPathSymbolMatch =
+        questionSymbolTerms.length > 0 &&
+        explicitPathSet.has(normalizedPath) &&
+        questionSymbolTerms.some((term) => rawLine.toLowerCase().includes(term));
+      const explicitPathSymbolPenalty =
+        questionSymbolTerms.length > 0 && explicitPathSet.has(normalizedPath) && !explicitPathSymbolMatch;
+      const boostedBaseScore =
+        baseScore + (explicitPathSymbolMatch ? 220 : 0) - (explicitPathSymbolPenalty ? 28 : 0);
+      if (boostedBaseScore <= 0) continue;
+      const equationLine = extractConciseEquationFragment(rawLine) ?? clipAskText(rawLine, 320);
+      if (!equationLine || !EQUATION_IN_TEXT_RE.test(equationLine)) continue;
+      if (
+        !MATH_EQUATION_SIGNAL_RE.test(equationLine) &&
+        !/\b(?:psi|rho_hat|density_matrix)(?:_[A-Za-z0-9]+)?\s*=/i.test(equationLine) &&
+        questionNeedles.length === 0 &&
+        !equationIntentPrompt &&
+        !domainScopedPrompt
+      ) {
+        continue;
+      }
+      if (queryConstraints.collapseDomainLock && EQUATION_CODE_ASSIGNMENT_RE.test(rawLine)) {
+        const collapseImplementationMathLike =
+          MATH_EQUATION_SIGNAL_RE.test(equationLine) ||
+          (EQUATION_IN_TEXT_RE.test(equationLine) &&
+            (/[*/^]/.test(equationLine) ||
+              /\bMath\.pow\s*\(/i.test(equationLine) ||
+              /\b(?:v_[a-z0-9]+|e_[a-z0-9]+|rho(?:_[a-z0-9]+)?|kappa(?:_[a-z0-9]+)?|tau(?:_[a-z0-9]+)?|energy|mass|volume|pi)\b/i.test(
+                equationLine,
+              )));
+        if (!collapseImplementationMathLike) {
+          continue;
+        }
+      }
+      if (
+        queryConstraints.preferredPathPatterns.includes(HELIX_ASK_TOKAMAK_FAMILY_PATH_RE) &&
+        !/\b(?:tokamak|plasma|mhd|confinement|q95|beta_p|beta_n|stability)\b/i.test(
+          `${rawLine} ${equationLine}`,
+        )
+      ) {
+        continue;
+      }
+      if (
+        queryConstraints.preferredPathPatterns.includes(HELIX_ASK_POLYTROPE_FAMILY_PATH_RE) &&
+        !/\b(?:polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr|pressure|density)\b/i.test(
+          `${rawLine} ${equationLine}`,
+        )
+      ) {
+        continue;
+      }
+      const semanticFit = scoreEquationSemanticFit({
+        question,
+        equationLine,
+        answerText: rawLine,
+        citations: [normalizedPath],
+      });
+      if (semanticFit.required && !semanticFit.ok && !includeWeakSemantic) continue;
+      const combinedScore =
+        boostedBaseScore + (semanticFit.required ? semanticFit.score : 0) + (semanticFit.ok ? 12 : 0);
+      if (combinedScore <= 0) continue;
+      scoredLines.push({
+        lineIndex: i,
+        score: combinedScore,
+        equationLine,
+        semanticFit,
+      });
+    }
+    if (scoredLines.length === 0) continue;
+    scoredLines.sort((left, right) => right.score - left.score || left.lineIndex - right.lineIndex);
+    const selectedLines: Array<{
+      lineIndex: number;
+      score: number;
+      equationLine: string;
+      semanticFit: EquationSemanticFit;
+    }> = [];
+    const selectedLineIndexes = new Set<number>();
+    const pushSelectedLine = (entry: {
+      lineIndex: number;
+      score: number;
+      equationLine: string;
+      semanticFit: EquationSemanticFit;
+    }): void => {
+      if (selectedLineIndexes.has(entry.lineIndex)) return;
+      selectedLineIndexes.add(entry.lineIndex);
+      selectedLines.push(entry);
+    };
+    if (questionSymbolTerms.length > 0) {
+      for (const candidate of scoredLines) {
+        const normalizedEquation = candidate.equationLine.toLowerCase();
+        if (!questionSymbolTerms.some((term) => normalizedEquation.includes(term))) continue;
+        pushSelectedLine(candidate);
+        if (selectedLines.length >= 2) break;
       }
     }
-    if (bestLineIndex < 0 || bestScore <= 0) continue;
-    const equationLine = clipAskText((lines[bestLineIndex] ?? "").trim(), 320);
-    if (!equationLine || !EQUATION_IN_TEXT_RE.test(equationLine)) continue;
-    const lineNumber = bestLineIndex + 1;
-    const answer = [
-      `Exact equation line (${normalizedPath}:L${lineNumber}):`,
-      equationLine,
-      "This is the direct equation anchor requested from repository evidence.",
-      `Sources: ${normalizedPath}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-    return {
-      answer,
-      path: normalizedPath,
-      line: lineNumber,
-      equation: equationLine,
-    };
+    for (const candidate of scoredLines) {
+      if (selectedLines.length >= 2) break;
+      pushSelectedLine(candidate);
+    }
+    for (const candidate of selectedLines) {
+      const lineNumber = candidate.lineIndex + 1;
+      const key = `${normalizedPath}:L${lineNumber}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const equationClass = inferEquationClass({
+        path: normalizedPath,
+        line: lines[candidate.lineIndex] ?? candidate.equationLine,
+      });
+      const derivationLevel = inferDerivationLevel(equationClass, candidate.equationLine);
+      const domainFamily = inferEquationDomainFamily(normalizedPath, candidate.equationLine);
+      const sourceReliability = inferEquationSourceReliability(normalizedPath);
+      candidates.push({
+        path: normalizedPath,
+        line: lineNumber,
+        equation: candidate.equationLine,
+        score: candidate.score,
+        semanticFit: candidate.semanticFit,
+        equationClass,
+        derivationLevel,
+        domainFamily,
+        sourceReliability,
+        rhsMathSignal: detectEquationRhsMathSignal(lines[candidate.lineIndex] ?? candidate.equationLine),
+        stringLiteralSignal: detectEquationStringLiteralSignal(lines[candidate.lineIndex] ?? candidate.equationLine),
+        rejectionReason: null,
+        source: "scan",
+      });
+      if (candidates.length >= maxCandidates * 3) break;
+    }
+    if (candidates.length >= maxCandidates * 3) break;
   }
+
+  const anchorSet = new Set(
+    explicitPaths
+      .map((entry) => normalizeAtlasRepoPath(entry))
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  candidates.sort((left, right) => {
+    const leftAnchor = anchorSet.has(left.path) ? 1 : 0;
+    const rightAnchor = anchorSet.has(right.path) ? 1 : 0;
+    if (rightAnchor !== leftAnchor) return rightAnchor - leftAnchor;
+    const leftSemantic = left.semanticFit.ok ? 1 : 0;
+    const rightSemantic = right.semanticFit.ok ? 1 : 0;
+    if (rightSemantic !== leftSemantic) return rightSemantic - leftSemantic;
+    return right.score - left.score || left.path.localeCompare(right.path) || left.line - right.line;
+  });
+
+  return candidates.slice(0, maxCandidates);
+};
+
+const buildEquationRelevanceClarifyMessage = (args: {
+  question: string;
+  citationHints: string[];
+  queryConstraints: HelixAskQueryConstraints;
+}): string | null => {
+  if (!isWaveCollapseEquationPrompt(args.question)) return null;
+  const questionTokens = filterSignalTokens(tokenizeAskQuery(args.question ?? "")).map((entry) =>
+    entry.toLowerCase(),
+  );
+  const rankedCandidates = normalizeCitations(args.citationHints ?? [])
+    .map((candidatePath, ordinal) => ({
+      candidatePath,
+      score: rankEquationNearMissPath(candidatePath, args.queryConstraints, questionTokens, ordinal),
+    }))
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((left, right) => right.score - left.score)
+    .map((entry) => entry.candidatePath);
+  const closestCandidates = rankedCandidates.slice(0, 4);
+  const sourceHints = closestCandidates.length > 0 ? closestCandidates : ["server/services/mixer/collapse.ts"];
+  return [
+    "I couldn't verify an explicit wave-function-collapse equation with strong semantic fit from current repository evidence.",
+    `Closest repository candidates: ${sourceHints.join(", ")}.`,
+    "Please narrow by module/path/symbol and retry (for example: server/services/mixer/collapse.ts or shared/dp-collapse.ts).",
+    `Sources: ${sourceHints.join(", ")}`,
+  ].join(" ");
+};
+
+const buildExplicitPathEquationContractRescue = (args: {
+  question: string;
+  explicitPaths: string[];
+  allowedCitations: string[];
+}): ExplicitPathEquationContractRescue | null => {
+  const queryConstraints = deriveHelixAskQueryConstraints(args.question, args.explicitPaths);
+  const candidate = collectEquationRescueCandidates({
+    question: args.question,
+    explicitPaths: args.explicitPaths,
+    allowedCitations: args.allowedCitations,
+    queryConstraints,
+    maxCandidates: 1,
+    includeWeakSemantic: false,
+  })[0];
+  if (!candidate) return null;
+  const answer = [
+    `Exact equation line (${candidate.path}:L${candidate.line}):`,
+    candidate.equation,
+    "This is the direct equation anchor requested from repository evidence.",
+    `Sources: ${candidate.path}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    answer,
+    path: candidate.path,
+    line: candidate.line,
+    equation: candidate.equation,
+  };
+};
+
+const buildEquationCandidateSummary = (
+  candidates: EquationRescueCandidate[],
+): { text: string; sourceHints: string[] } | null => {
+  if (candidates.length === 0) return null;
+  const lines = candidates.map((candidate) => {
+    const fitNote =
+      candidate.semanticFit.required && !candidate.semanticFit.ok ? " (semantic-fit: weak)" : "";
+    return `- [${candidate.path}:L${candidate.line}] ${candidate.equation}${fitNote}`;
+  });
+  const sourceHints = normalizeCitations(candidates.map((entry) => entry.path)).slice(0, 8);
+  return {
+    text: lines.join("\n"),
+    sourceHints,
+  };
+};
+
+const buildEquationUnifiedDegradeAnswer = (args: {
+  question: string;
+  contract: HelixAskIntentContract;
+  candidates: EquationRescueCandidate[];
+  reason: string;
+}): string => {
+  const dominantFamily = args.contract.dominant_family;
+  const baseline = resolveEquationConsensusBaseline(dominantFamily);
+  const lines: string[] = [];
+  const hasPathAnchor = (candidate: Pick<EquationRescueCandidate, "path">): boolean =>
+    normalizePathKey(candidate.path).length > 0;
+  const formatCandidateBullet = (
+    label: string,
+    candidate: Pick<EquationRescueCandidate, "path" | "line" | "equation">,
+    options?: { crossTopic?: boolean },
+  ): string => {
+    const crossTopicSuffix = options?.crossTopic ? " (cross-topic)" : "";
+    if (hasPathAnchor(candidate) && Number.isFinite(candidate.line) && candidate.line > 0) {
+      return `${label} [${candidate.path}:L${candidate.line}] ${candidate.equation}${crossTopicSuffix}`;
+    }
+    if (hasPathAnchor(candidate)) {
+      return `${label} [${candidate.path}] ${candidate.equation}${crossTopicSuffix}`;
+    }
+    return `${label} ${candidate.equation}${crossTopicSuffix}`;
+  };
+  const explicitPathSet = new Set(
+    args.contract.explicit_paths
+      .map((entry) => (normalizeAtlasRepoPath(entry) ?? entry).toLowerCase())
+      .filter(Boolean),
+  );
+  const waveCollapsePrompt = isWaveCollapseEquationPrompt(args.question);
+  const displayCandidates = args.candidates.filter((candidate) => {
+    const normalizedPath = (normalizeAtlasRepoPath(candidate.path) ?? candidate.path).toLowerCase();
+    const explicitPathMatch = explicitPathSet.has(normalizedPath);
+    if (dominantFamily === "generic") return true;
+    if (candidate.domainFamily !== dominantFamily && !explicitPathMatch) return false;
+    if (!(waveCollapsePrompt && dominantFamily === "collapse")) return true;
+    const waveSignal =
+      HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE.test(candidate.equation) ||
+      /\b(?:rho_eff|kappa_collapse|e_g|v_c|hbar|psi|project(?:ion|or)|measurement|born|schrodinger|schroedinger)\b/i.test(
+        candidate.equation,
+      );
+    return waveSignal || explicitPathMatch;
+  });
+  const rankedDisplayCandidates = displayCandidates
+    .slice()
+    .sort(
+      (left, right) =>
+        Number(hasPathAnchor(right)) - Number(hasPathAnchor(left)) ||
+        right.score - left.score ||
+        left.path.localeCompare(right.path) ||
+        left.line - right.line,
+    );
+  const anchoredDisplayCandidates = rankedDisplayCandidates.filter((candidate) =>
+    hasPathAnchor(candidate),
+  );
+  const candidateSources = normalizeCitations(anchoredDisplayCandidates.map((entry) => entry.path));
+  const candidateSourcesNoTests = candidateSources.filter((path) => !/(?:^|\/)tests?\//i.test(path));
+  const familyFallbackSources: Record<EquationCandidateDomainFamily, string[]> = {
+    collapse: ["shared/dp-collapse.ts", "server/services/mixer/collapse.ts"],
+    casimir: ["modules/sim_core/static-casimir.ts", "modules/dynamic/stress-energy-equations.ts"],
+    tokamak: ["server/services/physics/tokamak.ts", "shared/tokamak.ts"],
+    polytrope: ["client/src/physics/polytrope.ts"],
+    phase: ["server/energy/phase-scheduler.ts", "server/energy-pipeline.ts"],
+    warp: ["modules/warp/natario-warp.ts", "docs/knowledge/warp/warp-bubble.md"],
+    generic: ["server/routes/agi.plan.ts"],
+  };
+  const sources =
+    candidateSourcesNoTests.length > 0
+      ? candidateSourcesNoTests
+      : candidateSources.length > 0
+        ? candidateSources
+      : args.contract.explicit_paths.length > 0
+        ? args.contract.explicit_paths
+        : familyFallbackSources[dominantFamily];
+  const mechanismAnchorPath =
+    anchoredDisplayCandidates.find(
+      (entry) =>
+        !/(?:^|\/)tests?\//i.test(entry.path) &&
+        !/^(?:server\/routes\/agi\.plan\.ts|docs\/helix-ask-flow\.md|shared\/schema\.ts)$/i.test(
+          entry.path.replace(/\\/g, "/"),
+        ) &&
+        /\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt|md)$/i.test(
+          entry.path,
+        ),
+    )?.path ??
+    sources.find((path) => !/(?:^|\/)tests?\//i.test(path)) ??
+    sources[0];
+  const mechanismAnchor = mechanismAnchorPath ? `[${mechanismAnchorPath}]` : "";
+  lines.push(`Primary Topic: ${dominantFamily === "generic" ? "generic" : dominantFamily}`);
+  lines.push("");
+  lines.push("Primary Equation (Tentative):");
+  if (args.contract.ask_mode === "specific") {
+    lines.push("- No verified symbol-match in explicit path for the requested targets.");
+    const explicitPathSet = new Set(
+      args.contract.explicit_paths.map((entry) => (normalizeAtlasRepoPath(entry) ?? entry).toLowerCase()),
+    );
+    const inPath = displayCandidates
+      .filter((candidate) => {
+        const candidatePath = (normalizeAtlasRepoPath(candidate.path) ?? candidate.path).toLowerCase();
+        return explicitPathSet.has(candidatePath);
+      })
+      .sort(
+        (left, right) =>
+          countEquationSymbolOverlap(right.equation, args.contract.symbol_targets) -
+            countEquationSymbolOverlap(left.equation, args.contract.symbol_targets) ||
+          right.score - left.score,
+      )
+      .slice(0, 2);
+    if (inPath.length > 0) {
+      for (const candidate of inPath) {
+        lines.push(`- Top in-path candidate: [${candidate.path}:L${candidate.line}] ${candidate.equation}`);
+      }
+    } else if (args.contract.explicit_paths.length > 0) {
+      lines.push(`- Checked explicit paths: ${args.contract.explicit_paths.slice(0, 4).join(", ")}`);
+    }
+  } else {
+    const inFamilyPool =
+      anchoredDisplayCandidates.length > 0 ? anchoredDisplayCandidates : rankedDisplayCandidates;
+    const inFamily = inFamilyPool
+      .filter((candidate) =>
+        dominantFamily === "generic" ? true : candidate.domainFamily === dominantFamily,
+      )
+      .slice(0, 2);
+    if (inFamily.length > 0) {
+      for (const candidate of inFamily) {
+        lines.push(formatCandidateBullet("- In-family candidate:", candidate));
+      }
+    } else {
+      lines.push("- No in-family canonical equation line was verifiable from current evidence.");
+    }
+  }
+  lines.push(
+    "- Uncertainty: this is a unified degrade response with explicit uncertainty and grounded candidate evidence.",
+  );
+  lines.push("");
+  lines.push("Mechanism Explanation:");
+  lines.push(`1. ${baseline}${mechanismAnchor ? ` ${mechanismAnchor}` : ""}`);
+  lines.push(
+    `2. Degrade reason: ${args.reason}. The answer remains constrained to ${dominantFamily} family evidence.${mechanismAnchor ? ` ${mechanismAnchor}` : ""}`,
+  );
+  lines.push(
+    `3. Next step: narrow by file path and symbol targets to increase deterministic anchor confidence.${mechanismAnchor ? ` ${mechanismAnchor}` : ""}`,
+  );
+  const relatedPool =
+    anchoredDisplayCandidates.length > 0 ? anchoredDisplayCandidates : rankedDisplayCandidates;
+  if (relatedPool.length > 0) {
+    lines.push("");
+    lines.push("Related Cross-Topic Evidence (Optional):");
+    for (const candidate of relatedPool.slice(0, 2)) {
+      const crossTopic =
+        dominantFamily !== "generic" && candidate.domainFamily !== dominantFamily
+          ? true
+          : false;
+      lines.push(formatCandidateBullet("-", candidate, { crossTopic }));
+    }
+  }
+  lines.push("");
+  lines.push("Rejected Candidates (Why):");
+  lines.push(
+    "- Primary substitution blocked by unified degrade policy (no fake primary anchor injection).",
+  );
+  lines.push("");
+  lines.push(`Sources: ${sources.slice(0, 8).join(", ")}`);
+  return lines.join("\n");
+};
+
+const buildEquationProgressiveFallbackAnswer = (args: {
+  question: string;
+  candidates: EquationRescueCandidate[];
+}): string | null => {
+  const summary = buildEquationCandidateSummary(args.candidates);
+  if (!summary) return null;
+  const queryConstraints = deriveHelixAskQueryConstraints(args.question ?? "", []);
+  const dominantFamily = resolveDominantEquationFamily(args.question ?? "", queryConstraints);
+  const topicLabel =
+    dominantFamily === "generic"
+      ? args.candidates[0]?.domainFamily ?? "generic"
+      : dominantFamily;
+  const primary = args.candidates[0];
+  if (!primary) return null;
+  const mechanismHints = args.candidates.slice(0, 2).map((candidate) => {
+    const fitHint =
+      candidate.semanticFit.required && !candidate.semanticFit.ok
+        ? "semantic fit is weak for this specific question"
+        : "semantic fit is acceptable for this question";
+    return `[${candidate.path}:L${candidate.line}] is a current anchor; ${fitHint}.`;
+  });
+  const uncertainLine = isWaveCollapseEquationPrompt(args.question ?? "")
+    ? "- Uncertainty: a single canonical wave-function-collapse line was not verifiable in this turn; grounded in-family candidates are provided."
+    : "- Uncertainty: no single canonical equation line was verifiable in this turn; grounded candidates are provided.";
+  const baselineLine = resolveEquationConsensusBaseline(topicLabel);
+  return [
+    `Primary Topic: ${topicLabel}`,
+    "",
+    "Primary Equation (Tentative):",
+    `- [${primary.path}:L${primary.line}] ${primary.equation}`,
+    uncertainLine,
+    "",
+    "Mechanism Explanation:",
+    `1. ${baselineLine}`,
+    `2. ${mechanismHints[0] ?? "A grounded in-family candidate line is selected as the provisional anchor."}`,
+    `3. ${mechanismHints[1] ?? "Additional candidates remain available for narrowing by module/path/symbol."}`,
+    "Related Cross-Topic Evidence (Optional):",
+    summary.text,
+    `Sources: ${summary.sourceHints.join(", ")}`,
+  ].join("\n");
+};
+
+const buildEquationDeterministicBlendAnswer = (args: {
+  question: string;
+  candidates: EquationRescueCandidate[];
+  maxSecondary?: number;
+}): string | null => {
+  if (args.candidates.length === 0) return null;
+  const primary = args.candidates[0];
+  if (!primary) return null;
+  const queryConstraints = deriveHelixAskQueryConstraints(args.question ?? "", []);
+  const dominantFamily = resolveDominantEquationFamily(args.question ?? "", queryConstraints);
+  const topicLabel = dominantFamily === "generic" ? primary.domainFamily || "generic" : dominantFamily;
+  const maxSecondary = Math.max(0, Math.min(4, args.maxSecondary ?? 2));
+  const secondary = args.candidates.slice(1, 1 + maxSecondary);
+  const sourceHints = normalizeCitations(args.candidates.map((entry) => entry.path)).slice(0, 8);
+  const linkedSources = secondary.map((entry) => `[${entry.path}]`).slice(0, 2);
+  const usageLine =
+    linkedSources.length > 0
+      ? `System usage: this relation is anchored in [${primary.path}] and linked code context in ${linkedSources.join(
+          " and ",
+        )} for congruence interpretation in this run.`
+      : `System usage: this relation is anchored in [${primary.path}] for congruence interpretation in this run.`;
+  const lines = [
+    `Primary Topic: ${topicLabel}`,
+    "",
+    "Primary Equation (Tentative):",
+    `- [${primary.path}:L${primary.line}] ${primary.equation}`,
+    "- Uncertainty: this line is implementation-level equation evidence and is treated as tentative until canonical in-family formulation is verified.",
+    "",
+    "Mechanism Explanation:",
+    "1. The selected equation line is the strongest grounded candidate from current retrieval and is used as a provisional anchor.",
+    `2. ${usageLine}`,
+  ];
+  if (secondary.length > 0) {
+    lines.push("");
+    lines.push("Related Cross-Topic Evidence (Optional):");
+    for (const candidate of secondary) {
+      lines.push(`- [${candidate.path}:L${candidate.line}] ${candidate.equation}`);
+    }
+  }
+  lines.push(`Sources: ${sourceHints.join(", ")}`);
+  return lines.filter(Boolean).join("\n");
+};
+
+const scoreEquationCandidateForClaimSeeds = (args: {
+  candidate: EquationRescueCandidate;
+  claims: EquationClaimSeed[];
+  question: string;
+}): number => {
+  const candidateText = `${args.candidate.equation} ${args.candidate.path}`.toLowerCase();
+  const claimTermSet = new Set<string>();
+  for (const claim of args.claims) {
+    for (const term of claim.domain_terms) {
+      if (term.length >= 3) claimTermSet.add(term.toLowerCase());
+    }
+  }
+  let maxClaimOverlap = 0;
+  for (const claim of args.claims) {
+    const overlap = claim.domain_terms.filter(
+      (term) => term.length >= 3 && candidateText.includes(term.toLowerCase()),
+    ).length;
+    if (overlap > maxClaimOverlap) maxClaimOverlap = overlap;
+  }
+  const totalOverlap = Array.from(claimTermSet).filter((term) => candidateText.includes(term)).length;
+  const domainAffinity = scoreEquationDomainPathAffinity(args.candidate.path, Array.from(claimTermSet));
+  const mathSignalDensity = Math.min(
+    10,
+    (args.candidate.equation.match(
+      /[+\-*/^=]|\\(?:frac|partial|nabla|sum|int)|\b(?:rho|psi|beta|gamma|theta|k_ij|t00|tij|hamiltonian|omega|mu0|q95|beta_p|beta_n)\b/gi,
+    ) ?? []).length,
+  );
+  let sourceReliability = 0;
+  if (/\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|m|swift|kt)$/i.test(args.candidate.path)) {
+    sourceReliability += 26;
+  } else if (/^docs\/knowledge\//i.test(args.candidate.path)) {
+    sourceReliability += 16;
+  } else if (/^docs\//i.test(args.candidate.path)) {
+    sourceReliability += 6;
+  }
+  if (EQUATION_EXACT_DISALLOWED_PATH_RE.test(args.candidate.path)) {
+    sourceReliability -= 44;
+  }
+  if (/(schema|contract|inventory|roadmap|checklist|audit|task|report)\.(md|json)$/i.test(args.candidate.path)) {
+    sourceReliability -= 24;
+  }
+  let score =
+    args.candidate.score +
+    maxClaimOverlap * 20 +
+    totalOverlap * 10 +
+    domainAffinity * 0.42 +
+    mathSignalDensity * 6 +
+    sourceReliability;
+  if (!args.candidate.semanticFit.ok) score -= 30;
+  if (args.candidate.semanticFit.required && args.candidate.semanticFit.ok) score += 14;
+  if (args.candidate.source === "stage05") score += 20;
+  if (isWaveCollapseEquationPrompt(args.question) && HELIX_ASK_COLLAPSE_FAMILY_PATH_RE.test(args.candidate.path)) {
+    score += 14;
+  }
+  return score;
+};
+
+const scoreEquationClassForPrimary = (equationClass: Stage05EquationClass): number => {
+  switch (equationClass) {
+    case "canonical_law":
+      return 1;
+    case "derived_relation":
+      return 0.92;
+    case "parameterization":
+      return 0.72;
+    case "implementation_assignment":
+      return 0.56;
+    case "metadata_trace":
+      return 0;
+    default:
+      return 0.45;
+  }
+};
+
+const scoreEquationDerivationForPrimary = (derivationLevel: Stage05DerivationLevel): number => {
+  switch (derivationLevel) {
+    case "root_constant":
+      return 0.94;
+    case "governing":
+      return 1;
+    case "derived":
+      return 0.9;
+    case "calibrated":
+      return 0.7;
+    case "implementation":
+      return 0.58;
+    case "trace_meta":
+      return 0;
+    default:
+      return 0.5;
+  }
+};
+
+const scoreEquationFamilySourcePriority = (
+  pathValue: string,
+  family: EquationCandidateDomainFamily,
+): number => {
+  const normalizedPath = (normalizeAtlasRepoPath(pathValue) ?? pathValue)
+    .replace(/\\/g, "/")
+    .toLowerCase();
+  const isCodePath = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)$/i.test(
+    normalizedPath,
+  );
+  const isKnowledgeDoc = /^docs\/knowledge\//i.test(normalizedPath);
+  const isDoc = /^docs\//i.test(normalizedPath);
+  const familyPathReByFamily: Record<EquationCandidateDomainFamily, RegExp | null> = {
+    collapse: HELIX_ASK_COLLAPSE_FAMILY_PATH_RE,
+    casimir: HELIX_ASK_CASIMIR_FAMILY_PATH_RE,
+    tokamak: HELIX_ASK_TOKAMAK_FAMILY_PATH_RE,
+    polytrope: HELIX_ASK_POLYTROPE_FAMILY_PATH_RE,
+    phase: HELIX_ASK_PHASE_FAMILY_PATH_RE,
+    warp: HELIX_ASK_WARP_FAMILY_PATH_RE,
+    generic: null,
+  };
+  const corePathReByFamily: Record<EquationCandidateDomainFamily, RegExp | null> = {
+    collapse: HELIX_ASK_COLLAPSE_CORE_EQUATION_PATH_RE,
+    casimir: HELIX_ASK_CASIMIR_CORE_EQUATION_PATH_RE,
+    tokamak: HELIX_ASK_TOKAMAK_CORE_EQUATION_PATH_RE,
+    polytrope: HELIX_ASK_POLYTROPE_CORE_EQUATION_PATH_RE,
+    phase: HELIX_ASK_PHASE_CORE_EQUATION_PATH_RE,
+    warp: HELIX_ASK_WARP_CORE_EQUATION_PATH_RE,
+    generic: null,
+  };
+  const familyRe = familyPathReByFamily[family];
+  const coreRe = corePathReByFamily[family];
+  const inFamily = familyRe ? familyRe.test(normalizedPath) : false;
+  const inCore = coreRe ? coreRe.test(normalizedPath) : false;
+
+  if (family === "generic") {
+    if (isCodePath) return 0.68;
+    if (isKnowledgeDoc) return 0.56;
+    if (isDoc) return 0.42;
+    return 0.5;
+  }
+  if (inCore) return isCodePath ? 1 : 0.86;
+  if (inFamily) {
+    if (isCodePath) return 0.78;
+    if (isKnowledgeDoc) return 0.62;
+    if (isDoc) return 0.45;
+    return 0.5;
+  }
+  if (isCodePath) return 0.24;
+  if (isDoc) return 0.16;
+  return 0.2;
+};
+
+const resolveEquationFamilyCorePathRegex = (
+  family: EquationCandidateDomainFamily,
+): RegExp | null => {
+  switch (family) {
+    case "collapse":
+      return HELIX_ASK_COLLAPSE_CORE_EQUATION_PATH_RE;
+    case "casimir":
+      return HELIX_ASK_CASIMIR_CORE_EQUATION_PATH_RE;
+    case "tokamak":
+      return HELIX_ASK_TOKAMAK_CORE_EQUATION_PATH_RE;
+    case "polytrope":
+      return HELIX_ASK_POLYTROPE_CORE_EQUATION_PATH_RE;
+    case "phase":
+      return HELIX_ASK_PHASE_CORE_EQUATION_PATH_RE;
+    case "warp":
+      return HELIX_ASK_WARP_CORE_EQUATION_PATH_RE;
+    default:
+      return null;
+  }
+};
+
+const collectEquationFamilyCoreCitationHints = (
+  citations: string[],
+  family: EquationCandidateDomainFamily,
+  maxItems = 2,
+): string[] => {
+  if (family === "generic" || maxItems <= 0) return [];
+  const coreRe = resolveEquationFamilyCorePathRegex(family);
+  if (!coreRe) return [];
+  const normalized = normalizeCitations(citations);
+  const core = normalized.filter((entry) => coreRe.test(entry));
+  return core.slice(0, maxItems);
+};
+
+const scoreEquationCandidateForSelection = (args: {
+  candidate: EquationRescueCandidate;
+  dominantFamily: EquationCandidateDomainFamily;
+  claimScore: number;
+}): number => {
+  const familyFit =
+    args.dominantFamily === "generic"
+      ? 0.7
+      : args.candidate.domainFamily === args.dominantFamily
+        ? 1
+        : args.candidate.domainFamily === "generic"
+          ? 0.35
+          : 0.2;
+  const derivationFit = scoreEquationDerivationForPrimary(args.candidate.derivationLevel);
+  const classFit = scoreEquationClassForPrimary(args.candidate.equationClass);
+  const semanticFit = args.candidate.semanticFit.required
+    ? args.candidate.semanticFit.ok
+      ? 1
+      : 0.2
+    : 0.75;
+  const reliability = Math.max(0, Math.min(1, args.candidate.sourceReliability));
+  const sourcePriority = scoreEquationFamilySourcePriority(
+    args.candidate.path,
+    args.dominantFamily,
+  );
+  const composite =
+    familyFit * 0.3 +
+    derivationFit * 0.16 +
+    classFit * 0.11 +
+    semanticFit * 0.19 +
+    reliability * 0.12 +
+    sourcePriority * 0.12;
+  const claimBoost = Math.max(0, Math.min(15, args.claimScore / 20));
+  return Number((composite * 100 + claimBoost).toFixed(2));
+};
+
+type EquationRankedCandidate = {
+  candidate: EquationRescueCandidate;
+  claimScore: number;
+  selectionScore: number;
+  semanticRerankFit: number | null;
+};
+
+const countEquationSymbolOverlap = (equationLine: string, symbolTargets: string[]): number => {
+  if (symbolTargets.length === 0) return 0;
+  const normalized = equationLine.toLowerCase();
+  let overlap = 0;
+  for (const symbol of symbolTargets) {
+    if (!symbol) continue;
+    if (normalized.includes(symbol.toLowerCase())) overlap += 1;
+  }
+  return overlap;
+};
+
+const buildEquationCandidateTable = (args: {
+  ranked: EquationRankedCandidate[];
+  contract: HelixAskIntentContract;
+  hasExplicitPathMatch: (candidate: EquationRescueCandidate) => boolean;
+}): EquationCandidateTableRow[] =>
+  args.ranked.map((entry) => ({
+    path: entry.candidate.path,
+    line: entry.candidate.line,
+    equation: entry.candidate.equation,
+    equation_class: entry.candidate.equationClass,
+    derivation_level: entry.candidate.derivationLevel,
+    family: entry.candidate.domainFamily,
+    symbol_overlap: countEquationSymbolOverlap(entry.candidate.equation, args.contract.symbol_targets),
+    semantic_fit: entry.candidate.semanticFit.required
+      ? clampNumber(entry.candidate.semanticFit.score, 0, 100)
+      : 75,
+    source_reliability: clampNumber(entry.candidate.sourceReliability * 100, 0, 100),
+    selection_score: entry.selectionScore,
+    path_match: args.hasExplicitPathMatch(entry.candidate),
+    rejection_reason: entry.candidate.rejectionReason,
+  }));
+
+const compareEquationCandidateRows = (
+  left: EquationCandidateTableRow,
+  right: EquationCandidateTableRow,
+): number =>
+  Number(right.path_match) - Number(left.path_match) ||
+  right.symbol_overlap - left.symbol_overlap ||
+  right.semantic_fit - left.semantic_fit ||
+  right.selection_score - left.selection_score ||
+  left.line - right.line ||
+  left.path.localeCompare(right.path);
+
+const selectEquationEvidenceDeterministic = (args: {
+  contract: HelixAskIntentContract;
+  dominantFamily: EquationCandidateDomainFamily;
+  ranked: EquationRankedCandidate[];
+  candidateTable: EquationCandidateTableRow[];
+  rejectCandidate: (entry: EquationRankedCandidate, reason: string) => void;
+}): {
+  primaryEntry: EquationRankedCandidate | null;
+  supportEntries: EquationRankedCandidate[];
+  secondaryCrossTopicCount: number;
+} => {
+  const tableByKey = new Map<string, EquationCandidateTableRow>();
+  for (const row of args.candidateTable) {
+    tableByKey.set(`${row.path}:L${row.line}`, row);
+  }
+  const rankedSorted = args.ranked
+    .slice()
+    .sort((left, right) => {
+      const leftRow = tableByKey.get(`${left.candidate.path}:L${left.candidate.line}`);
+      const rightRow = tableByKey.get(`${right.candidate.path}:L${right.candidate.line}`);
+      if (!leftRow || !rightRow) {
+        return (
+          right.selectionScore - left.selectionScore ||
+          left.candidate.line - right.candidate.line
+        );
+      }
+      return compareEquationCandidateRows(leftRow, rightRow);
+    });
+  const inFamily = rankedSorted.filter((entry) =>
+    args.dominantFamily === "generic"
+      ? true
+      : entry.candidate.domainFamily === args.dominantFamily,
+  );
+  const modeMin = EQUATION_PRIMARY_CONFIDENCE_BY_MODE[args.contract.ask_mode];
+  const supports: EquationRankedCandidate[] = [];
+  let primary: EquationRankedCandidate | null = null;
+  const classPreference: Stage05EquationClass[] = [
+    "canonical_law",
+    "derived_relation",
+    "parameterization",
+    "implementation_assignment",
+  ];
+  const tryPickPrimary = (
+    pool: EquationRankedCandidate[],
+    equationClass: Stage05EquationClass,
+  ): EquationRankedCandidate | null => {
+    const classMin =
+      equationClass === "canonical_law" || equationClass === "derived_relation"
+        ? Math.max(modeMin, EQUATION_PRIMARY_SCORE_MIN)
+        : equationClass === "parameterization"
+          ? Math.max(modeMin, EQUATION_PRIMARY_PARAMETERIZATION_SCORE_MIN)
+          : Math.max(modeMin, EQUATION_PRIMARY_IMPLEMENTATION_SCORE_MIN);
+    for (const entry of pool) {
+      const row = tableByKey.get(`${entry.candidate.path}:L${entry.candidate.line}`);
+      if (!row) continue;
+      if (entry.candidate.equationClass !== equationClass) continue;
+      if (entry.selectionScore < classMin) {
+        args.rejectCandidate(entry, "primary_score_below_mode_threshold");
+        continue;
+      }
+      if (args.contract.ask_mode === "specific") {
+        if (!row.path_match) {
+          args.rejectCandidate(entry, "specific_missing_path_match");
+          continue;
+        }
+        if (row.symbol_overlap <= 0) {
+          args.rejectCandidate(entry, "specific_missing_symbol_overlap");
+          continue;
+        }
+      }
+      return entry;
+    }
+    return null;
+  };
+  for (const equationClass of classPreference) {
+    primary = tryPickPrimary(inFamily, equationClass);
+    if (primary) break;
+  }
+  if (!primary && args.contract.ask_mode !== "specific") {
+    primary =
+      inFamily.find((entry) => entry.selectionScore >= modeMin - 8) ??
+      null;
+  }
+  const usedKeys = new Set<string>();
+  if (primary) usedKeys.add(`${primary.candidate.path}:L${primary.candidate.line}`);
+  for (const entry of rankedSorted) {
+    if (supports.length >= HELIX_ASK_EQUATION_BACKING_SUPPORT_MAX) break;
+    const key = `${entry.candidate.path}:L${entry.candidate.line}`;
+    if (usedKeys.has(key)) continue;
+    if (entry.candidate.equationClass === "metadata_trace") {
+      args.rejectCandidate(entry, "secondary_metadata_trace");
+      continue;
+    }
+    const row = tableByKey.get(key);
+    const crossTopic =
+      args.dominantFamily !== "generic" && entry.candidate.domainFamily !== args.dominantFamily;
+    const secondaryThreshold = crossTopic
+      ? Math.max(
+          EQUATION_SECONDARY_CROSS_TOPIC_SCORE_MIN,
+          modeMin + 10,
+        )
+      : Math.max(EQUATION_SECONDARY_SCORE_MIN, modeMin - 2);
+    if (entry.selectionScore < secondaryThreshold) {
+      args.rejectCandidate(entry, crossTopic ? "secondary_cross_topic_low_score" : "secondary_low_score");
+      continue;
+    }
+    if (args.contract.ask_mode === "specific" && row) {
+      if (!row.path_match) {
+        args.rejectCandidate(entry, "specific_secondary_missing_path_match");
+        continue;
+      }
+      if (row.symbol_overlap <= 0) {
+        args.rejectCandidate(entry, "specific_secondary_missing_symbol_overlap");
+        continue;
+      }
+    }
+    supports.push(entry);
+    usedKeys.add(key);
+  }
+  const secondaryCrossTopicCount = supports.filter(
+    (entry) =>
+      args.dominantFamily !== "generic" &&
+      entry.candidate.domainFamily !== args.dominantFamily,
+  ).length;
+  return {
+    primaryEntry: primary,
+    supportEntries: supports,
+    secondaryCrossTopicCount,
+  };
+};
+
+const extractEquationPrimaryKeyFromRenderedAnswer = (answer: string): string | null => {
+  const text = String(answer ?? "");
+  if (!text.trim()) return null;
+  const exactMatch = text.match(/Exact equation line\s*\(([^)\n]+:L\d+)\):/i);
+  if (exactMatch?.[1]) return exactMatch[1].trim();
+  const sectionMatch = text.match(/Primary Equation[\s\S]{0,600}/i);
+  const sectionText = sectionMatch?.[0] ?? text.slice(0, 600);
+  const bracketMatch = sectionText.match(/\[([^\]\n]+:L\d+)\]/i);
+  if (bracketMatch?.[1]) return bracketMatch[1].trim();
   return null;
+};
+
+const assertRenderedPrimaryMatchesSelection = (args: {
+  selectorPrimaryKey: string | null;
+  renderedText: string;
+}): { rendererPrimaryKey: string | null; match: boolean } => {
+  const rendererPrimaryKey = extractEquationPrimaryKeyFromRenderedAnswer(args.renderedText);
+  if (!args.selectorPrimaryKey) {
+    return { rendererPrimaryKey, match: rendererPrimaryKey == null };
+  }
+  return {
+    rendererPrimaryKey,
+    match: rendererPrimaryKey === args.selectorPrimaryKey,
+  };
+};
+
+const hasDominantFamilyEquationSignal = (
+  equationLine: string,
+  dominantFamily: EquationCandidateDomainFamily,
+): boolean => {
+  switch (dominantFamily) {
+    case "collapse":
+      return (
+        HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE.test(equationLine) ||
+        /\b(?:rho_eff|kappa_collapse|e_g|v_c|tau_ms|tau_s|hbar|collapse)\b/i.test(equationLine)
+      );
+    case "casimir":
+      return /\b(?:casimir|vacuum|boundary|modulation|frequency|omega|dynamic)\b/i.test(
+        equationLine,
+      );
+    case "tokamak":
+      return /\b(?:tokamak|plasma|mhd|confinement|safety\s*factor|q95|beta_p|beta_n|stability)\b/i.test(
+        equationLine,
+      );
+    case "polytrope":
+      return /\b(?:polytrope|lane[-_ ]?emden|hydrostatic|dP\/dr|dm\/dr|pressure|density)\b/i.test(
+        equationLine,
+      );
+    case "phase":
+      return /\b(?:phase|scheduler|pipeline|queue|latency|cadence|tick)\b/i.test(equationLine);
+    case "warp":
+      return HELIX_ASK_WARP_GEOMETRY_EQUATION_SIGNAL_RE.test(equationLine);
+    default:
+      return true;
+  }
+};
+
+const resolveEquationConsensusBaseline = (
+  dominantFamily: EquationCandidateDomainFamily,
+): string => {
+  switch (dominantFamily) {
+    case "collapse":
+      return "General-reference baseline: Pr(m) = ||Pm psi||^2 and psi' = (Pm psi) / sqrt(<psi|Pm|psi>) describe measurement projection and normalization.";
+    case "casimir":
+      return "General-reference baseline: Casimir energy and force scale with boundary conditions, and dynamic modulation is analyzed via mode-frequency changes.";
+    case "tokamak":
+      return "General-reference baseline: tokamak stability equations couple magnetic confinement, pressure gradients, and transport constraints.";
+    case "polytrope":
+      return "General-reference baseline: hydrostatic equilibrium links dP/dr, dm/dr, and an equation of state for stellar structure.";
+    case "phase":
+      return "General-reference baseline: scheduler control links phase cadence, queue state, and pipeline update rules.";
+    case "warp":
+      return "General-reference baseline: ADM-style metric and curvature relations define warp-geometry constraints.";
+    default:
+      return "General-reference baseline: governing equations define state evolution, while implementation equations parameterize runtime behavior.";
+  }
+};
+
+const buildEquationConsensusMechanismBodies = (args: {
+  dominantFamily: EquationCandidateDomainFamily;
+  primary: EquationRescueCandidate | null;
+  support: EquationRescueCandidate[];
+  selectedPaths: string[];
+  tentative: boolean;
+}): string[] => {
+  const baseline = resolveEquationConsensusBaseline(args.dominantFamily);
+  const primaryRef = args.primary ? `[${args.primary.path}:L${args.primary.line}]` : null;
+  const firstHint = args.selectedPaths[0] ? `[${args.selectedPaths[0]}]` : "current evidence";
+  const supportRef = args.support[0] ? `[${args.support[0].path}:L${args.support[0].line}]` : null;
+  const supportSummary = supportRef ? ` with support from ${supportRef}` : "";
+  const classLabel = args.primary?.equationClass
+    ? args.primary.equationClass.replace(/_/g, " ")
+    : "provisional";
+  const derivationLabel = args.primary?.derivationLevel
+    ? args.primary.derivationLevel.replace(/_/g, " ")
+    : "unspecified";
+  const supportsLine = args.primary
+    ? `Repo-grounded support: ${primaryRef} is treated as ${classLabel} evidence at ${derivationLabel} level${supportSummary}.`
+    : `Repo-grounded support: no canonical in-family line was verified this turn; nearest evidence is ${firstHint}.`;
+  const challengeLine = args.primary
+    ? hasDominantFamilyEquationSignal(args.primary.equation, args.dominantFamily)
+      ? "Challenge status: selected in-family evidence is coherent with the baseline claim, but completeness remains uncertain."
+      : "Challenge status: selected evidence does not encode the full canonical law and is treated as partial support only."
+    : "Challenge status: unresolved canonical anchor in this turn; mechanism interpretation remains provisional.";
+  return [baseline, supportsLine, challengeLine];
+};
+
+const resolveEquationTermMappingLine = (args: {
+  primary: EquationRescueCandidate | null;
+  support: EquationRescueCandidate[];
+  selectedPaths: string[];
+  tentative: boolean;
+}): string => {
+  if (!args.primary) {
+    const fallbackPath = args.selectedPaths[0] ?? "current evidence set";
+    return `Term-to-implementation mapping: equation-like signals were inferred from [${fallbackPath}] and should be treated as tentative until an exact line is verified.`;
+  }
+  const rawTerms = (args.primary.equation.match(/[A-Za-z][A-Za-z0-9_]{0,24}/g) ?? [])
+    .map((term) => term.toLowerCase())
+    .filter((term) => term.length >= 2);
+  const stop = new Set([
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "this",
+    "that",
+    "diag",
+    "true",
+    "false",
+    "null",
+  ]);
+  const terms = Array.from(new Set(rawTerms.filter((term) => !stop.has(term)))).slice(0, 3);
+  const codeSupport =
+    [args.primary, ...args.support].find((candidate) =>
+      /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|m|swift|kt)$/i.test(
+        candidate.path,
+      ),
+    ) ?? null;
+  const termLabel =
+    terms.length > 0 ? terms.map((term) => `\`${term}\``).join(", ") : "the equation variables";
+  const supportRef =
+    codeSupport && codeSupport.path !== args.primary.path
+      ? ` with runtime linkage in [${codeSupport.path}]`
+      : "";
+  const uncertaintySuffix = args.tentative ? " (tentative mapping)" : "";
+  return `Term-to-implementation mapping: ${termLabel} parameterize the claim mechanics and are grounded in [${args.primary.path}]${supportRef}.${uncertaintySuffix}`;
+};
+
+const buildEquationClaimBackingAssembly = (args: {
+  question: string;
+  draftAnswer: string;
+  answerContract: HelixAskAnswerContract | null;
+  evidenceText: string;
+  docBlocks: Array<{ path: string; block: string }>;
+  codeAlignment: HelixAskCodeAlignment | null;
+  stage05Cards?: Stage05EvidenceCard[];
+  allowedCitations: string[];
+  queryConstraints: HelixAskQueryConstraints;
+  strictPrompt: boolean;
+  explicitPathOnlyExtraction: boolean;
+  semanticRerankScores?: Record<string, number>;
+  intentContract?: HelixAskIntentContract;
+  recoveryReason?: "missing_symbol" | "missing_path_anchor" | "low_primary_confidence" | null;
+}): EquationClaimBackingAssembly | null => {
+  if (!isEquationAskPrompt(args.question)) return null;
+  const linkStarted = Date.now();
+  const claims = deriveEquationClaimSeeds({
+    question: args.question,
+    draftAnswer: args.draftAnswer,
+    answerContract: args.answerContract,
+    evidenceText: args.evidenceText,
+    stage05Cards: args.stage05Cards,
+    maxClaims: HELIX_ASK_EQUATION_CLAIM_MAX,
+  });
+  const citationHints = normalizeCitations([
+    ...args.allowedCitations,
+    ...extractFilePathsFromText(args.draftAnswer),
+    ...collectSourcesLineCitationRefs(args.draftAnswer),
+    ...args.docBlocks.map((block) => block.path),
+    ...(args.codeAlignment?.spans?.map((span) => span.filePath) ?? []),
+  ]);
+  const candidates = collectEquationRescueCandidates({
+    question: args.question,
+    explicitPaths: args.queryConstraints.explicitAnchorPaths,
+    allowedCitations: citationHints,
+    stage05Cards: args.stage05Cards,
+    queryConstraints: args.queryConstraints,
+    maxCandidates: 10,
+    includeWeakSemantic: true,
+  });
+  const linkTimeout = Date.now() - linkStarted > HELIX_ASK_EQUATION_LINK_PASS_TIMEOUT_MS;
+  const intentContract =
+    args.intentContract ??
+    buildHelixAskIntentContract({
+      question: args.question,
+      queryConstraints: args.queryConstraints,
+      explicitPaths: args.queryConstraints.explicitAnchorPaths,
+    });
+  const dominantFamily = intentContract.dominant_family;
+  const explicitPathKeys = new Set(
+    (intentContract.explicit_paths ?? [])
+      .map((entry) => normalizePathKey(entry))
+      .filter(Boolean),
+  );
+  const hasExplicitPathMatch = (candidate: EquationRescueCandidate): boolean => {
+    if (explicitPathKeys.size === 0) return false;
+    const candidateKey = normalizePathKey(candidate.path);
+    for (const explicitKey of explicitPathKeys) {
+      if (candidateKey === explicitKey) return true;
+      if (candidateKey.endsWith(explicitKey)) return true;
+      if (explicitKey.endsWith(candidateKey)) return true;
+    }
+    return false;
+  };
+  const ranked: EquationRankedCandidate[] = candidates
+    .map((candidate) => {
+      const claimScore = scoreEquationCandidateForClaimSeeds({
+        candidate,
+        claims,
+        question: args.question,
+      });
+      let selectionScore = scoreEquationCandidateForSelection({
+        candidate,
+        dominantFamily,
+        claimScore,
+      });
+      const rerankFitRaw = args.semanticRerankScores?.[equationCandidateKey(candidate)];
+      const rerankFit =
+        typeof rerankFitRaw === "number" && Number.isFinite(rerankFitRaw)
+          ? clampNumber(rerankFitRaw, 0, 1)
+          : null;
+      if (rerankFit !== null) {
+        selectionScore += rerankFit * HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST;
+        if (isWaveCollapseEquationPrompt(args.question) && rerankFit < 0.35) {
+          selectionScore -= 22;
+        }
+      }
+      if (explicitPathKeys.size > 0 && hasExplicitPathMatch(candidate)) {
+        selectionScore += 26;
+      }
+      selectionScore = Number(selectionScore.toFixed(2));
+      return {
+        candidate,
+        claimScore,
+        selectionScore,
+        semanticRerankFit: rerankFit,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.selectionScore - left.selectionScore ||
+        right.claimScore - left.claimScore ||
+        right.candidate.score - left.candidate.score,
+    );
+
+  const rejected: EquationRejectedCandidate[] = [];
+  const rejectCandidate = (
+    entry: (typeof ranked)[number],
+    reason: string,
+  ): void => {
+    entry.candidate.rejectionReason = reason;
+    if (rejected.some((item) => item.path === entry.candidate.path && item.line === entry.candidate.line)) return;
+    rejected.push({
+      path: entry.candidate.path,
+      line: entry.candidate.line,
+      equation: entry.candidate.equation,
+      reason,
+      equationClass: entry.candidate.equationClass,
+      domainFamily: entry.candidate.domainFamily,
+      score: entry.selectionScore,
+    });
+  };
+
+  const eligibleRanked = ranked.filter((entry) => {
+    const hasStrongMathSignal =
+      entry.candidate.rhsMathSignal || MATH_EQUATION_SIGNAL_RE.test(entry.candidate.equation);
+    const tsAssertAssignment =
+      /\bas\s+any\b/i.test(entry.candidate.equation) &&
+      EQUATION_TS_ASSERT_PROPERTY_ASSIGNMENT_RE.test(entry.candidate.equation);
+    const aliasAssignment = isEquationAliasAssignmentLine(entry.candidate.equation);
+    const mojibakeEquation = EQUATION_MOJIBAKE_RE.test(entry.candidate.equation);
+    const mojibakeCommentEquation =
+      /^\s*(?:\/\/|#|\*)/.test(entry.candidate.equation) &&
+      mojibakeEquation;
+    if (tsAssertAssignment) {
+      rejectCandidate(entry, "ts_assert_assignment_non_equation");
+      return false;
+    }
+    if (aliasAssignment) {
+      rejectCandidate(entry, "alias_assignment_non_equation");
+      return false;
+    }
+    if (mojibakeCommentEquation) {
+      rejectCandidate(entry, "comment_mojibake_equation");
+      return false;
+    }
+    if (mojibakeEquation && !hasStrongMathSignal) {
+      rejectCandidate(entry, "mojibake_non_math_equation");
+      return false;
+    }
+    if (mojibakeEquation && entry.candidate.domainFamily === "generic") {
+      rejectCandidate(entry, "mojibake_generic_equation");
+      return false;
+    }
+    const genericGeometryLine = HELIX_ASK_GENERIC_GEOMETRY_EQUATION_RE.test(entry.candidate.equation);
+    const hasDominantSignal = hasDominantFamilyEquationSignal(
+      entry.candidate.equation,
+      dominantFamily,
+    );
+    const waveCollapsePrompt = isWaveCollapseEquationPrompt(args.question);
+    const waveSemanticSignal =
+      HELIX_ASK_WAVE_COLLAPSE_EQUATION_SIGNAL_RE.test(entry.candidate.equation) ||
+      /\b(?:rho_eff|kappa_collapse|e_g|v_c|hbar|psi|project(?:ion|or)|measurement|born)\b/i.test(
+        entry.candidate.equation,
+      );
+    if (dominantFamily !== "generic" && genericGeometryLine && !hasDominantSignal) {
+      rejectCandidate(entry, "generic_geometry_off_topic");
+      return false;
+    }
+    const explicitPathMatch = hasExplicitPathMatch(entry.candidate);
+    if (
+      waveCollapsePrompt &&
+      dominantFamily === "collapse" &&
+      !waveSemanticSignal &&
+      !explicitPathMatch
+    ) {
+      rejectCandidate(
+        entry,
+        entry.candidate.equationClass === "implementation_assignment"
+          ? "wave_semantic_mismatch_impl"
+          : "wave_semantic_mismatch",
+      );
+      return false;
+    }
+        if (
+          entry.candidate.equationClass === "implementation_assignment" &&
+          entry.candidate.semanticFit.required &&
+          !entry.candidate.semanticFit.ok &&
+          !hasDominantSignal &&
+          !explicitPathMatch
+        ) {
+          rejectCandidate(entry, "implementation_semantic_mismatch");
+          return false;
+        }
+    if (entry.candidate.stringLiteralSignal && !hasStrongMathSignal) {
+      rejectCandidate(entry, "string_literal_not_math");
+      return false;
+    }
+    if (
+      entry.candidate.equationClass === "implementation_assignment" &&
+      !hasStrongMathSignal
+    ) {
+      rejectCandidate(entry, "implementation_rhs_not_math");
+      return false;
+    }
+    return true;
+  });
+  const inFamily = eligibleRanked.filter((entry) =>
+    dominantFamily === "generic" ? true : entry.candidate.domainFamily === dominantFamily,
+  );
+  const selection = selectEquationEvidenceDeterministic({
+    contract: intentContract,
+    dominantFamily,
+    ranked: eligibleRanked,
+    candidateTable: buildEquationCandidateTable({
+      ranked: ranked,
+      contract: intentContract,
+      hasExplicitPathMatch,
+    }),
+    rejectCandidate,
+  });
+  const primaryEntry = selection.primaryEntry;
+  const best = primaryEntry?.candidate ?? null;
+  const strictPrimaryMissing = args.strictPrompt && !best;
+  if (strictPrimaryMissing && args.explicitPathOnlyExtraction) {
+    return null;
+  }
+  const primary = best;
+  const primaryScore = primaryEntry?.selectionScore ?? null;
+  const support = selection.supportEntries.map((entry) => entry.candidate);
+  const candidateTable = buildEquationCandidateTable({
+    ranked,
+    contract: intentContract,
+    hasExplicitPathMatch,
+  });
+  const specificNoSubstitution =
+    intentContract.ask_mode === "specific" &&
+    intentContract.allowed_fallback === "no_substitution" &&
+    !primary;
+  const tentative = !primary || primary.equationClass === "implementation_assignment";
+  const familyCoreCitationHints = collectEquationFamilyCoreCitationHints(
+    citationHints,
+    dominantFamily,
+    2,
+  );
+  const selectedPaths = normalizeCitations([
+    ...(primary ? [primary.path] : []),
+    ...support.map((entry) => entry.path),
+    ...familyCoreCitationHints,
+    ...citationHints.slice(0, 4),
+  ]);
+  const claimBodies: string[] = [];
+  for (const claim of claims.slice(0, HELIX_ASK_EQUATION_CLAIM_MAX)) {
+    const normalizedClaim = ensureSentence(
+      normalizeContractText(sanitizeEquationClaimCandidate(claim.claim), 320),
+    )
+      .replace(/^(?:claim-first explanation:\s*)+/i, "")
+      .replace(/^(?:tentative equation backing(?:\s*\(.*?\))?:\s*)+/i, "")
+      .replace(/^(?:\d+\.\s*)+/i, "")
+      .trim();
+    if (!isMeaningfulEquationClaimCandidate(normalizedClaim)) continue;
+    claimBodies.push(normalizedClaim);
+  }
+  if (claimBodies.length === 0) {
+    const fallbackClaimRaw = ensureSentence(
+      normalizeContractText(sanitizeEquationClaimCandidate(args.draftAnswer), 320),
+    );
+    const fallbackClaim = ensureSentence(
+      fallbackClaimRaw
+        .replace(/^(?:claim-first explanation:\s*)+/i, "")
+        .replace(/^(?:tentative equation backing(?:\s*\(.*?\))?:\s*)+/i, "")
+        .replace(/^(?:\d+\.\s*)+/i, "")
+        .trim(),
+    );
+    if (isMeaningfulEquationClaimCandidate(fallbackClaim)) {
+      claimBodies.push(fallbackClaim);
+    }
+  }
+  if (claimBodies.length === 0) {
+    const hintA = selectedPaths[0] ?? "current evidence set";
+    const hintB = selectedPaths[1] ?? hintA;
+    claimBodies.push(
+      `Current repository evidence indicates this question maps to implementation operators and state-update behavior rather than a single canonical line. [${hintA}]`,
+    );
+    claimBodies.push(
+      `Retrieved code paths still provide equation-adjacent terms that can ground mechanism-level reasoning while exact-line verification remains uncertain. [${hintB}]`,
+    );
+  }
+
+  const lines: string[] = [];
+  const sectionTopic = dominantFamily === "generic" ? "generic" : dominantFamily;
+  lines.push(`Primary Topic: ${sectionTopic}`);
+  lines.push("");
+  if (primary) {
+    lines.push(
+      primary.equationClass === "implementation_assignment"
+        ? "Primary Equation (Tentative):"
+        : "Primary Equation (Verified):",
+    );
+    if (args.strictPrompt) {
+      lines.push(`Exact equation line (${primary.path}:L${primary.line}):`);
+      lines.push(primary.equation);
+    } else {
+      lines.push(`- [${primary.path}:L${primary.line}] ${primary.equation}`);
+    }
+    if (primary.equationClass === "implementation_assignment") {
+      lines.push(
+        "- Uncertainty: this line is implementation-level equation evidence and is treated as tentative until canonical in-family formulation is verified.",
+      );
+    }
+    lines.push("");
+  } else {
+    const fallbackCandidate =
+      inFamily.find((entry) => {
+        if (entry.candidate.equationClass === "metadata_trace") return false;
+        if (dominantFamily === "generic") return true;
+        return (
+          hasDominantFamilyEquationSignal(entry.candidate.equation, dominantFamily) ||
+          hasExplicitPathMatch(entry.candidate)
+        );
+      })?.candidate ?? null;
+    const inPathCandidates = candidateTable
+      .filter((row) => row.path_match)
+      .sort(compareEquationCandidateRows)
+      .slice(0, 2);
+    lines.push("Primary Equation (Tentative):");
+    if (specificNoSubstitution) {
+      lines.push("- No verified symbol-match in explicit path for requested targets.");
+      if (inPathCandidates.length > 0) {
+        for (const row of inPathCandidates) {
+          lines.push(`- Top in-path candidate: [${row.path}:L${row.line}] ${row.equation}`);
+        }
+      } else if (intentContract.explicit_paths.length > 0) {
+        lines.push(`- Checked explicit paths: ${intentContract.explicit_paths.slice(0, 4).join(", ")}`);
+      }
+    } else if (fallbackCandidate) {
+      lines.push(`- Candidate [${fallbackCandidate.path}:L${fallbackCandidate.line}] ${fallbackCandidate.equation}`);
+    } else {
+      const hintA = selectedPaths[0] ?? "current evidence";
+      lines.push(`- No in-family canonical equation line was verifiable from current evidence. [${hintA}]`);
+    }
+    lines.push(
+      "- Uncertainty: exact-line verification is pending; mechanism reasoning remains grounded to in-family evidence.",
+    );
+    lines.push("");
+  }
+  lines.push("Mechanism Explanation:");
+  const mechanismBodies = [
+    ...buildEquationConsensusMechanismBodies({
+      dominantFamily,
+      primary,
+      support,
+      selectedPaths,
+      tentative,
+    }),
+    ...claimBodies,
+  ];
+  const seenMechanism = new Set<string>();
+  const compactMechanismBodies: string[] = [];
+  for (const body of mechanismBodies) {
+    const trimmed = body.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seenMechanism.has(key)) continue;
+    seenMechanism.add(key);
+    compactMechanismBodies.push(trimmed);
+  }
+  for (const [index, body] of compactMechanismBodies.entries()) {
+    lines.push(`${index + 1}. ${body}`);
+  }
+  lines.push(
+    resolveEquationTermMappingLine({
+      primary,
+      support,
+      selectedPaths,
+      tentative,
+    }),
+  );
+  const crossTopicSupport = support.filter((entry) =>
+    dominantFamily === "generic" ? false : entry.domainFamily !== dominantFamily,
+  );
+  if (crossTopicSupport.length > 0) {
+    lines.push("");
+    lines.push("Related Cross-Topic Evidence (Optional):");
+    for (const candidate of crossTopicSupport) {
+      lines.push(`- [${candidate.path}:L${candidate.line}] ${candidate.equation}`);
+    }
+  }
+  if (rejected.length > 0) {
+    lines.push("");
+    lines.push("Rejected Candidates (Why):");
+    for (const candidate of rejected.slice(0, 4)) {
+      lines.push(
+        `- [${candidate.path}:L${candidate.line}] ${candidate.reason} (${candidate.equationClass}, score=${candidate.score.toFixed(
+          1,
+        )})`,
+      );
+    }
+  }
+  if (selectedPaths.length > 0) {
+    lines.push("");
+    lines.push(`Sources: ${selectedPaths.slice(0, 8).join(", ")}`);
+  }
+
+  const reason = primary
+    ? support.length > 0
+      ? "primary_with_support"
+      : "primary_only"
+    : specificNoSubstitution
+      ? "specific_no_symbol_match"
+    : inFamily.length > 0
+      ? "tentative_candidate_only"
+      : "tentative_no_exact";
+  const candidateRejectedReasons = rejected.slice(0, 8).map((entry) => entry.reason);
+  const renderedText = lines.filter(Boolean).join("\n").trim();
+  const primaryKey = primary ? `${primary.path}:L${primary.line}` : null;
+  const supportKeys = support.map((entry) => `${entry.path}:L${entry.line}`);
+  const symbolTargetHitRate =
+    intentContract.symbol_targets.length > 0 && primary
+      ? Number(
+          (
+            countEquationSymbolOverlap(primary.equation, intentContract.symbol_targets) /
+            Math.max(1, intentContract.symbol_targets.length)
+          ).toFixed(3),
+        )
+      : null;
+  const claimToEquationLinkStrength = Number(
+    clampNumber(
+      ((primaryScore ?? 0) / 100) * 0.7 + Math.min(0.3, claimBodies.length * 0.06),
+      0,
+      1,
+    ).toFixed(3),
+  );
+  const crossTopicContaminationRate = Number(
+    (
+      selection.secondaryCrossTopicCount /
+      Math.max(1, support.length)
+    ).toFixed(3),
+  );
+  const artifactLeakRate = Number(
+    (
+      ((renderedText.match(/\b(?:ts\]|tsx\]|js\])/gi) ?? []).length +
+        (renderedText.match(/\.\.\./g) ?? []).length) /
+      Math.max(1, renderedText.split(/\r?\n/).length)
+    ).toFixed(3),
+  );
+
+  return {
+    text: renderedText,
+    mode: "equation_claim_backing",
+    claimCount: claimBodies.length,
+    linkPassUsed: true,
+    linkTimeout,
+    candidateTotal: ranked.length,
+    candidateRejectedTotal: rejected.length,
+    candidateRejectedReasons,
+    primarySelected: primary ? `${primary.path}:L${primary.line}` : null,
+    primaryFamilyMatch:
+      primary != null ? dominantFamily === "generic" || primary.domainFamily === dominantFamily : false,
+    supportSelectedCount: support.length,
+    secondaryCrossTopicCount: crossTopicSupport.length,
+    tentative,
+    reason,
+    dominantFamily,
+    primaryClass: primary?.equationClass ?? null,
+    primaryDerivationLevel: primary?.derivationLevel ?? null,
+    primaryScore,
+    rejectedCount: rejected.length,
+    rejectedReasons: candidateRejectedReasons,
+    selectedPaths,
+    primaryKey,
+    supportKeys,
+    selectorLocked: true,
+    primaryAnchorValid: primaryKey != null,
+    symbolTargetHitRate,
+    claimToEquationLinkStrength,
+    crossTopicContaminationRate,
+    artifactLeakRate,
+    candidateTable,
+  };
+};
+
+const buildEquationProgressiveFallbackFromHints = (args: {
+  question: string;
+  citationHints: string[];
+  stage05Cards?: Stage05EvidenceCard[];
+  queryConstraints: HelixAskQueryConstraints;
+  maxCandidates?: number;
+}): { text: string; sourceHints: string[]; candidateCount: number; candidates: EquationRescueCandidate[] } | null => {
+  const rescueCandidates = collectEquationRescueCandidates({
+    question: args.question,
+    explicitPaths: args.queryConstraints.explicitAnchorPaths,
+    allowedCitations: normalizeCitations(args.citationHints),
+    stage05Cards: args.stage05Cards,
+    queryConstraints: args.queryConstraints,
+    maxCandidates: Math.max(2, Math.min(8, args.maxCandidates ?? 6)),
+    includeWeakSemantic: true,
+  });
+  if (rescueCandidates.length === 0) return null;
+  const text = buildEquationProgressiveFallbackAnswer({
+    question: args.question,
+    candidates: rescueCandidates,
+  });
+  if (!text) return null;
+  const sourceHints = normalizeCitations(rescueCandidates.map((entry) => entry.path)).slice(0, 8);
+  return {
+    text,
+    sourceHints,
+    candidateCount: rescueCandidates.length,
+    candidates: rescueCandidates,
+  };
+};
+
+const resolveEquationFallbackSourceDefaults = (
+  queryConstraints: HelixAskQueryConstraints,
+): string[] => {
+  if (queryConstraints.collapseDomainLock) {
+    return [
+      "server/services/mixer/collapse.ts",
+      "shared/dp-collapse.ts",
+      "shared/collapse-benchmark.ts",
+      "modules/dynamic/stress-energy-equations.ts",
+    ];
+  }
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_TOKAMAK_FAMILY_PATH_RE)) {
+    return [
+      "server/services/physics/tokamak-stability-proxies.ts",
+      "shared/tokamak-stability-proxies.ts",
+      "docs/knowledge/physics/stability-timestep.md",
+      "tools/tokamak-added-value-report.ts",
+    ];
+  }
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_POLYTROPE_FAMILY_PATH_RE)) {
+    return [
+      "client/src/physics/polytrope.ts",
+      "docs/knowledge/physics/hydrostatic-equilibrium.md",
+      "client/src/pages/star-hydrostatic-panel.tsx",
+      "docs/knowledge/physics/stellar-lifecycle.md",
+    ];
+  }
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_CASIMIR_FAMILY_PATH_RE)) {
+    return [
+      "modules/dynamic/dynamic-casimir.ts",
+      "docs/knowledge/physics/dynamic-casimir-effect.md",
+      "modules/sim_core/static-casimir.ts",
+      "docs/knowledge/physics/casimir-force-energy.md",
+    ];
+  }
+  if (queryConstraints.preferredPathPatterns.includes(HELIX_ASK_PHASE_FAMILY_PATH_RE)) {
+    return [
+      "server/energy/phase-scheduler.ts",
+      "server/energy-pipeline.ts",
+      "client/src/hooks/use-energy-pipeline.ts",
+      "server/queue/index.ts",
+    ];
+  }
+  return ["docs/warp-geometry-congruence-report.md", "modules/warp/natario-warp.ts"];
+};
+
+const resolveEquationFallbackExamples = (args: {
+  citationHints: string[];
+  queryConstraints: HelixAskQueryConstraints;
+}): [string, string] => {
+  const defaults = resolveEquationFallbackSourceDefaults(args.queryConstraints);
+  const hinted = normalizeCitations(args.citationHints ?? [])
+    .filter((entry) => !isStructuredCitationToken(entry))
+    .slice(0, 4);
+  const merged = normalizeCitations([...hinted, ...defaults]);
+  const first = merged[0] ?? defaults[0] ?? "server/services/mixer/collapse.ts";
+  const second = merged[1] ?? defaults[1] ?? first;
+  return [first, second];
+};
+
+const buildEquationStrictFallbackAnswer = (args: {
+  question: string;
+  sourceHints: string[];
+}): string => {
+  const queryConstraints = deriveHelixAskQueryConstraints(args.question ?? "", []);
+  const dominantFamily = resolveDominantEquationFamily(args.question ?? "", queryConstraints);
+  const topicLabel = dominantFamily === "generic" ? "generic" : dominantFamily;
+  const baselineLine = resolveEquationConsensusBaseline(dominantFamily);
+  const hintA = args.sourceHints[0] ?? "current evidence";
+  const hintB = args.sourceHints[1] ?? hintA;
+  if (isWaveCollapseEquationPrompt(args.question ?? "")) {
+    return [
+      `Primary Topic: ${topicLabel}`,
+      "",
+      "Primary Equation (Tentative):",
+      `- No in-family canonical equation line was verifiable from current evidence. [${hintA}]`,
+      "- Uncertainty: exact-line verification is pending; mechanism reasoning remains grounded to in-family evidence.",
+      "",
+      "Mechanism Explanation:",
+      `1. ${baselineLine}`,
+      `2. Current evidence indicates collapse-related implementation and benchmarking paths, but no single canonical collapse-postulate line was confirmed in this turn. [${hintA}]`,
+      `3. The nearest grounded context is available for follow-up extraction in [${hintA}] and [${hintB}].`,
+      `Sources: ${args.sourceHints.slice(0, 8).join(", ")}`,
+    ].join(" ");
+  }
+  return [
+    `Primary Topic: ${topicLabel}`,
+    "",
+    "Primary Equation (General Reference):",
+    `- No single canonical equation line was verifiable from current evidence. [${hintA}]`,
+    "",
+    "Mechanism Explanation:",
+    `1. ${baselineLine}`,
+    `2. I can still explain mechanism-level behavior from grounded files such as [${hintA}] and [${hintB}].`,
+    "3. If you provide module/path/symbol, the next pass can lock to one exact line and keep this structure.",
+    `Sources: ${args.sourceHints.slice(0, 8).join(", ")}`,
+  ].join("\n");
+};
+
+const buildEquationSoftFallbackMessage = (args: {
+  question: string;
+  citationHints: string[];
+  stage05Cards?: Stage05EvidenceCard[];
+  queryConstraints: HelixAskQueryConstraints;
+}): string => {
+  const broadProgressive = buildEquationProgressiveFallbackFromHints({
+    question: args.question,
+    citationHints: args.citationHints,
+    stage05Cards: args.stage05Cards,
+    queryConstraints: args.queryConstraints,
+    maxCandidates: 6,
+  });
+  if (broadProgressive) {
+    const preferBlend =
+      isEquationPlusMechanismPrompt(args.question) || isEquationBlendPrompt(args.question);
+    if (preferBlend) {
+      const blended = buildEquationDeterministicBlendAnswer({
+        question: args.question,
+        candidates: broadProgressive.candidates,
+        maxSecondary: 3,
+      });
+      if (blended) return blended;
+    }
+    return broadProgressive.text;
+  }
+  const questionTokens = filterSignalTokens(tokenizeAskQuery(args.question ?? "")).map((entry) =>
+    entry.toLowerCase(),
+  );
+  const rankedCandidates = normalizeCitations(args.citationHints ?? [])
+    .map((candidatePath, ordinal) => ({
+      candidatePath,
+      score: rankEquationNearMissPath(candidatePath, args.queryConstraints, questionTokens, ordinal),
+    }))
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((left, right) => right.score - left.score)
+    .map((entry) => entry.candidatePath);
+  const sourceHints =
+    rankedCandidates.slice(0, 6).length > 0
+      ? rankedCandidates.slice(0, 6)
+      : resolveEquationFallbackSourceDefaults(args.queryConstraints);
+  const rescueCandidates = collectEquationRescueCandidates({
+    question: args.question,
+    explicitPaths: args.queryConstraints.explicitAnchorPaths,
+    allowedCitations: sourceHints,
+    stage05Cards: args.stage05Cards,
+    queryConstraints: args.queryConstraints,
+    maxCandidates: 4,
+    includeWeakSemantic: true,
+  });
+  const fallbackBlend = buildEquationDeterministicBlendAnswer({
+    question: args.question,
+    candidates: rescueCandidates,
+    maxSecondary: 2,
+  });
+  const blendedPromptRequested =
+    isEquationBlendPrompt(args.question) || isEquationPlusMechanismPrompt(args.question);
+  if (!fallbackBlend && rescueCandidates.length === 0 && blendedPromptRequested) {
+    const [hintA, hintB] = resolveEquationFallbackExamples({
+      citationHints: sourceHints,
+      queryConstraints: args.queryConstraints,
+    });
+    return [
+      "Grounded equation candidates were retrieved, but no exact canonical line was verifiable in this turn.",
+      "",
+      "Claim-first explanation:",
+      `1. Current repository evidence suggests this request maps to implementation operators and state-update mechanics rather than a single universally canonical line. [${hintA}]`,
+      `2. The retrieved files still provide grounded model parameters and code-path context suitable for mechanism-level reasoning. [${hintB}]`,
+      "",
+      "Tentative equation backing (uncertainty-marked):",
+      `- No exact equation line was verifiable in this turn; nearest grounded evidence was [${hintA}] and [${hintB}].`,
+      "Uncertainty: exact-line verification is pending, but the claim narrative remains grounded in retrieved repository evidence.",
+      "",
+      `Term-to-implementation mapping: equation variables and operators are inferred from [${hintA}] with linked context in [${hintB}] (tentative mapping).`,
+      `Sources: ${sourceHints.slice(0, 8).join(", ")}`,
+    ].join("\n");
+  }
+  return (
+    fallbackBlend ??
+    buildEquationProgressiveFallbackAnswer({
+      question: args.question,
+      candidates: rescueCandidates,
+    }) ??
+    buildEquationStrictFallbackAnswer({
+      question: args.question,
+      sourceHints,
+    })
+  );
+};
+
+const EQUATION_FALLBACK_LOOP_SIGNAL_RE =
+  /\b(?:grounded equation candidates were retrieved|no exact canonical line was verifiable|i couldn't verify an exact equation quote|claim-first explanation)\b/i;
+const EQUATION_FALLBACK_ARTIFACT_SIGNAL_RE = /\b(?:ts|tsx|js|jsx|md)\]/i;
+const EQUATION_REPEATED_PATH_CITATION_RE =
+  /\[[^\]\n]{0,320}(?:\/|\\)[^\]\n]{0,320}\]\s+\[[^\]\n]{0,320}(?:\/|\\)[^\]\n]{0,320}\](?:\s+\[[^\]\n]{0,320}(?:\/|\\)[^\]\n]{0,320}\])+/i;
+
+const shouldApplyEquationGenericBypass = (args: {
+  question: string;
+  draftAnswer: string;
+  contract: EquationQuoteContractResult;
+  stage05Cards?: Stage05EvidenceCard[];
+  stage05CoverageSatisfied: boolean;
+  strictRequired: boolean;
+}): boolean => {
+  if (!isEquationAskPrompt(args.question)) return false;
+  if (args.contract.ok) return false;
+  const draft = String(args.draftAnswer ?? "").trim();
+  if (!draft) return true;
+  const hasEquationSignal = EQUATION_IN_TEXT_RE.test(draft);
+  const loopSignal = EQUATION_FALLBACK_LOOP_SIGNAL_RE.test(draft);
+  const artifactSignal = EQUATION_FALLBACK_ARTIFACT_SIGNAL_RE.test(draft);
+  const repeatedPathSignal = EQUATION_REPEATED_PATH_CITATION_RE.test(draft);
+  const stage05CardCount = args.stage05Cards?.length ?? 0;
+  if (loopSignal || artifactSignal || repeatedPathSignal) return true;
+  if (!hasEquationSignal && stage05CardCount === 0) return true;
+  if (!hasEquationSignal && !args.stage05CoverageSatisfied && !args.strictRequired) return true;
+  return false;
+};
+
+const buildHelixAskEquationGenericBypassPrompt = (args: {
+  question: string;
+  dominantFamily: EquationCandidateDomainFamily;
+  responseLanguage: string | null;
+}): string => {
+  const topicLabel = args.dominantFamily === "generic" ? "physics" : args.dominantFamily;
+  const lines = [
+    "You are generating a graceful fallback answer because repository equation extraction did not converge cleanly.",
+    `User question: ${args.question}`,
+    `Primary topic family: ${topicLabel}.`,
+    "",
+    "Provide a concise technical explanation that is still useful.",
+    "Rules:",
+    "- Do not include repo file paths, line numbers, bracket citations, telemetry, or debugging artifacts.",
+    "- Give one general-reference equation if appropriate; if no single canonical equation applies, state that explicitly.",
+    "- Explain term meaning and mechanism in plain technical language.",
+    "- Mark uncertainty once when repository verification is missing.",
+    "",
+    "Output format:",
+    "Primary Topic: <topic>",
+    "Primary Equation (General Reference): <equation or 'no single canonical equation'>",
+    "Mechanism Explanation:",
+    "1. <short explanation>",
+    "2. <short explanation>",
+    "Uncertainty: <one sentence>",
+  ];
+  if (args.responseLanguage && !isEnglishLikeLanguage(args.responseLanguage)) {
+    lines.push(`Respond in ${args.responseLanguage}.`);
+  }
+  return ensureFinalMarker(lines.join("\n"));
+};
+
+const buildHelixAskEquationSemanticRerankPrompt = (args: {
+  question: string;
+  dominantFamily: EquationCandidateDomainFamily;
+  candidates: EquationRescueCandidate[];
+}): string => {
+  const topicLabel = args.dominantFamily === "generic" ? "generic" : args.dominantFamily;
+  const candidateLines = args.candidates.map((candidate, index) => {
+    const id = `c${index + 1}`;
+    return `${id} | key=${equationCandidateKey(candidate)} | family=${candidate.domainFamily} | class=${candidate.equationClass} | derivation=${candidate.derivationLevel} | eq=${candidate.equation}`;
+  });
+  return ensureFinalMarker(
+    [
+      "You are ranking equation candidates by semantic fitness to the user question.",
+      `Question: ${args.question}`,
+      `Dominant family: ${topicLabel}`,
+      "",
+      "Candidates:",
+      ...candidateLines,
+      "",
+      "Return JSON only with this shape:",
+      "{\"ranked\":[{\"id\":\"c1\",\"fit\":0.0,\"reason\":\"...\"}]}",
+      "",
+      "Rules:",
+      "- fit in [0,1]",
+      "- higher fit means better semantic match to question intent",
+      "- penalize generic geometry equations if question is wave-function collapse",
+      "- do not invent candidates",
+      "- include every candidate id exactly once",
+    ].join("\n"),
+  );
+};
+
+const parseHelixAskEquationSemanticRerankScores = (
+  rawText: string,
+  candidates: EquationRescueCandidate[],
+): { scoresByKey: Record<string, number>; used: boolean; reason: string | null } => {
+  const trimmed = String(rawText ?? "").trim();
+  if (!trimmed) {
+    return { scoresByKey: {}, used: false, reason: "empty" };
+  }
+  const candidateIdToKey = new Map<string, string>();
+  candidates.forEach((candidate, index) => {
+    candidateIdToKey.set(`c${index + 1}`, equationCandidateKey(candidate));
+  });
+  const jsonCandidate = extractJsonObject(trimmed) ?? trimmed;
+  try {
+    const parsed = JSON.parse(jsonCandidate) as {
+      ranked?: Array<{ id?: string; fit?: number; reason?: string }>;
+    };
+    const ranked = Array.isArray(parsed?.ranked) ? parsed.ranked : [];
+    if (ranked.length === 0) {
+      return { scoresByKey: {}, used: false, reason: "missing_ranked_entries" };
+    }
+    const scoresByKey: Record<string, number> = {};
+    for (const entry of ranked) {
+      const id = String(entry?.id ?? "").trim();
+      if (!id) continue;
+      const key = candidateIdToKey.get(id);
+      if (!key) continue;
+      const fitRaw = typeof entry?.fit === "number" && Number.isFinite(entry.fit) ? entry.fit : 0;
+      const fit = clampNumber(fitRaw, 0, 1);
+      scoresByKey[key] = fit;
+    }
+    if (Object.keys(scoresByKey).length === 0) {
+      return { scoresByKey: {}, used: false, reason: "no_mapped_scores" };
+    }
+    return { scoresByKey, used: true, reason: null };
+  } catch {
+    return { scoresByKey: {}, used: false, reason: "invalid_json" };
+  }
 };
 
 const evaluateEquationQuoteContract = (args: {
@@ -19437,8 +23722,36 @@ const evaluateEquationQuoteContract = (args: {
   const matchedCitations =
     allowed.length === 0 ? answerCitations.slice(0, 8) : answerCitations.filter((entry) => allowed.includes(entry));
   const citationMatched = matchedCitations.length > 0;
+  const semanticFit: EquationSemanticFit = answerHasEquation
+    ? scoreEquationSemanticFit({
+        question,
+        equationLine: extractPrimaryEquationLineFromAnswer(answer) ?? answer,
+        answerText: answer,
+        citations: matchedCitations.length > 0 ? matchedCitations : answerCitations,
+      })
+    : {
+        required: false,
+        score: 0,
+        ok: true,
+        reason: "not_required",
+      };
 
   if (answerHasEquation && citationMatched) {
+    if (semanticFit.required && !semanticFit.ok) {
+      return {
+        required: true,
+        ok: false,
+        answerHasEquation,
+        citationMatched,
+        matchedNeedle,
+        matchedCitations,
+        reason: "equation_relevance_missing",
+        questionNeedles,
+        equationRelevanceRequired: semanticFit.required,
+        equationRelevanceScore: semanticFit.score,
+        equationRelevanceReason: semanticFit.reason,
+      };
+    }
     return {
       required: true,
       ok: true,
@@ -19448,6 +23761,9 @@ const evaluateEquationQuoteContract = (args: {
       matchedCitations,
       reason: "ok",
       questionNeedles,
+      equationRelevanceRequired: semanticFit.required,
+      equationRelevanceScore: semanticFit.score,
+      equationRelevanceReason: semanticFit.reason,
     };
   }
   return {
@@ -19464,6 +23780,9 @@ const evaluateEquationQuoteContract = (args: {
           ? "equation_missing"
           : "equation_and_citation_missing",
     questionNeedles,
+    equationRelevanceRequired: answerHasEquation ? semanticFit.required : false,
+    equationRelevanceScore: answerHasEquation ? semanticFit.score : undefined,
+    equationRelevanceReason: answerHasEquation ? semanticFit.reason : "not_required",
   };
 };
 
@@ -19724,12 +24043,26 @@ const scrubUnsupportedPaths = (
 ): { text: string; removed: string[] } => {
   if (!value.trim()) return { text: value, removed: [] };
   if (allowedPaths.length === 0) return { text: value, removed: [] };
+  const normalizeCitationComparablePath = (input: string): string => {
+    const normalized = (normalizeEvidenceRef(input) ?? input).replace(/\\/g, "/").trim();
+    if (!normalized) return "";
+    return normalized
+      .replace(/#L\d+(?:C\d+)?$/i, "")
+      .replace(/:L?\d+(?::\d+)?$/i, "")
+      .trim();
+  };
+  const dropComparableExtension = (input: string): string =>
+    input.replace(/\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)$/i, "");
   const escapeRegExp = (input: string): string =>
     input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const allowed = new Set<string>();
   for (const path of allowedPaths) {
     const normalized = normalizeEvidenceRef(path) ?? path;
     if (normalized) allowed.add(normalized);
+    const comparable = normalizeCitationComparablePath(path);
+    if (comparable) allowed.add(comparable);
+    const comparableNoExt = comparable ? dropComparableExtension(comparable) : "";
+    if (comparableNoExt) allowed.add(comparableNoExt);
     if (path) allowed.add(path);
   }
   const presentPaths = extractFilePathsFromText(value);
@@ -19739,7 +24072,16 @@ const scrubUnsupportedPaths = (
   for (const candidate of presentPaths) {
     if (/^(gate|certificate):/i.test(candidate)) continue;
     const normalized = normalizeEvidenceRef(candidate) ?? candidate;
-    if (allowed.has(normalized) || allowed.has(candidate)) continue;
+    const comparable = normalizeCitationComparablePath(candidate);
+    const comparableNoExt = comparable ? dropComparableExtension(comparable) : "";
+    if (
+      allowed.has(normalized) ||
+      allowed.has(candidate) ||
+      (comparable ? allowed.has(comparable) : false) ||
+      (comparableNoExt ? allowed.has(comparableNoExt) : false)
+    ) {
+      continue;
+    }
     removed.push(candidate);
     const escaped = escapeRegExp(candidate);
     cleaned = cleaned.replace(new RegExp(`\\[[^\\]]*${escaped}[^\\]]*\\]`, "g"), "");
@@ -19752,6 +24094,7 @@ const scrubUnsupportedPaths = (
     cleaned = cleaned.replace(/\s*\|\s*(?:symbol|file)=\s*(?=\s|$)/gi, "");
     cleaned = cleaned.replace(/\b(?:symbol|file)=\s*(?=\s|$)/gi, "");
     cleaned = cleaned.replace(/\s*\|\s*(?=\s*(?:\n|$))/g, "");
+    cleaned = cleanDanglingFileExtensionFragments(cleaned);
     cleaned = cleaned.replace(/[ \t]{2,}/g, " ");
     cleaned = cleaned.replace(/ +([,.;:])/g, "$1");
     cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
@@ -21569,6 +25912,7 @@ const normalizeHelixAskErrorEnvelope = (
 export const __testHelixAskOutputContract = {
   classifyHelixAskTimeoutFailClass,
   normalizeHelixAskErrorEnvelope,
+  shouldCountHelixAskCircuitFailure,
   buildHelixAskRequestMetadata,
   resolveDetectedResponseLanguageCandidate,
   contractVersion: HELIX_ASK_OUTPUT_CONTRACT_VERSION,
@@ -21587,13 +25931,36 @@ export const __testHelixAskReliabilityGuards = {
   applyHelixAskClaimGroundingGate,
   evaluateEquationQuoteContract,
   buildExplicitPathEquationContractRescue,
+  deriveHelixAskQueryConstraints,
+  applyQueryConstraintsToPathList,
+  applyEquationAnchorPriority,
   isEquationQuotePrompt,
+  isEquationStrictQuotePrompt,
+  isEquationPlusMechanismPrompt,
+  isEquationQuoteOnlyPrompt,
+  isEquationBlendPrompt,
+  isEquationAnchorOnlyAnswer,
   isWarpMathBroadPrompt,
+  isEquationExactLineEligible,
+  buildEquationSoftFallbackMessage,
+  shouldApplyEquationGenericBypass,
+  buildEquationClaimBackingAssembly,
+  buildEquationUnifiedDegradeAnswer,
+  buildHelixAskIntentContract,
+  hashHelixAskIntentContract,
+  assertHelixAskIntentContractStable,
+  extractEquationPrimaryKeyFromRenderedAnswer,
+  assertRenderedPrimaryMatchesSelection,
+  deriveEquationClaimSeeds,
+  rankEquationNearMissPath,
+  scoreEquationDomainPathAffinity,
 };
 
 export const __testHelixAskStage0Debug = {
   applyStage0DebugFields,
   mergeRepoSearchStage0Telemetry,
+  applyStage05DebugFields,
+  mergeStage05Telemetry,
 };
 
 export const __testCapsuleGrounding = {
@@ -21611,6 +25978,14 @@ export const __testCapsuleGrounding = {
 
 export const __testHelixAskDialogueFormatting = {
   rewriteConversationScientificVoice,
+  buildNextEvidenceHints,
+  normalizeBundledQuestion,
+  extractQuestionFromPrompt,
+  resolveHelixAskQuestionText,
+  buildStage05InputPaths,
+  stripTelemetryLeakArtifacts,
+  cleanDanglingFileExtensionFragments,
+  scrubUnsupportedPaths,
 };
 
 export const __testWarpDelegationGuard = {
@@ -21983,7 +26358,11 @@ const executeHelixAsk = async ({
       sessionId: askSessionId ?? null,
     });
     let prompt = parsed.data.prompt?.trim();
-    const question = parsed.data.question?.trim();
+    const question =
+      resolveHelixAskQuestionText({
+        question: parsed.data.question?.trim() ?? "",
+        prompt: prompt ?? "",
+      }) || undefined;
     let questionValue = question;
     if (HELIX_ASK_SESSION_MEMORY && askSessionId && requestedContextCapsuleIds.length > 0) {
       contextCapsuleMemoryPatchSummary = buildSessionMemoryPatchFromCapsules({
@@ -23718,13 +28097,7 @@ const executeHelixAsk = async ({
       });
       debugPayload.fast_quality_decisions = next;
     };
-    if (!questionValue && prompt) {
-      const extracted = extractQuestionFromPrompt(prompt);
-      if (extracted) {
-        questionValue = extracted;
-      }
-    }
-    const baseQuestion = (questionValue ?? question ?? "").trim();
+    const baseQuestion = (questionValue ?? question ?? prompt ?? "").trim();
     const sourceQuestion = (parsed.data.sourceQuestion ?? "").trim();
     const sourceLanguage =
       normalizeLanguageTag(parsed.data.sourceLanguage ?? null) ??
@@ -23956,14 +28329,28 @@ const executeHelixAsk = async ({
       blockScoped && blockSearchSeed
         ? blockSearchSeed
         : rawQuestion || baseQuestion;
-    const slotPreviewCandidates = listConceptCandidates(slotPreviewSeed, 4);
+    const slotPreviewPathHints = filterExistingEvidencePaths(extractFilePathsFromText(slotPreviewSeed));
+    const slotPreviewExplicitPathEquationMode =
+      isEquationAskPrompt(baseQuestion) && slotPreviewPathHints.length > 0;
+    if (debugPayload) {
+      (debugPayload as Record<string, unknown>).slot_plan_explicit_path_focus =
+        slotPreviewExplicitPathEquationMode;
+    }
+    const slotPreviewSeedFocused = slotPreviewExplicitPathEquationMode
+      ? slotPreviewPathHints.join(" ")
+      : slotPreviewSeed;
+    const slotPreviewCandidates = slotPreviewExplicitPathEquationMode
+      ? []
+      : listConceptCandidates(slotPreviewSeedFocused, 4);
     sessionMemoryForTags =
       HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
         ? getHelixAskSessionMemory(parsed.data.sessionId)
         : null;
     sessionMemory = sessionMemoryForTags;
-    memorySeedSlots = buildMemorySeedSlots(slotPreviewSeed, sessionMemory);
-    const headingSeedSlots = buildDocHeadingSeedSlots(slotPreviewSeed);
+    memorySeedSlots = buildMemorySeedSlots(slotPreviewSeedFocused, sessionMemory);
+    const headingSeedSlots = slotPreviewExplicitPathEquationMode
+      ? []
+      : buildDocHeadingSeedSlots(slotPreviewSeedFocused);
     memoryPinnedFiles = sessionMemory?.pinnedFiles ?? [];
     graphTreeLock = sessionMemoryForTags?.graphTreeIds?.slice() ?? [];
     if (headingSeedSlots.length > 0) {
@@ -23973,9 +28360,10 @@ const executeHelixAsk = async ({
       recordAgentAction("expand_filename_aliases", "session_pinned_files", "boost_query_hints");
     }
     let slotPreview = buildCanonicalSlotPlan({
-      question: slotPreviewSeed,
+      question: slotPreviewSeedFocused,
       candidates: slotPreviewCandidates,
       seedSlots: [...memorySeedSlots, ...headingSeedSlots],
+      disableConceptCandidates: slotPreviewExplicitPathEquationMode,
     });
     const initialReportQuestion = rawQuestion || baseQuestion;
     const warpEthosRelationReportQuery = isWarpEthosRelationQuestion(initialReportQuestion);
@@ -24109,9 +28497,10 @@ const executeHelixAsk = async ({
         slotPlanPassSlots = buildSlotPlanPassEntries(slotPlanPass);
         if (slotPlanPassSlots.length > 0) {
           slotPreview = buildCanonicalSlotPlan({
-            question: slotPreviewSeed,
+            question: slotPreviewSeedFocused,
             candidates: slotPreviewCandidates,
             seedSlots: [...memorySeedSlots, ...headingSeedSlots, ...slotPlanPassSlots],
+            disableConceptCandidates: slotPreviewExplicitPathEquationMode,
           });
         }
         logStepEnd(
@@ -24166,6 +28555,8 @@ const executeHelixAsk = async ({
       debugPayload.report_mode_reason = reportDecision.reason;
       debugPayload.report_blocks_count = reportDecision.blockCount;
       debugPayload.slot_plan_pass_used = slotPlanPassSlots.length > 0;
+      (debugPayload as Record<string, unknown>).slot_plan_explicit_path_focus =
+        slotPreviewExplicitPathEquationMode;
       if (dialogueProfileNonReportMode) {
         (debugPayload as Record<string, unknown>).report_mode_dialogue_guard = true;
       }
@@ -24822,26 +29213,36 @@ const executeHelixAsk = async ({
       return;
       }
     }
-    const hasFilePathHints = HELIX_ASK_FILE_HINT.test(baseQuestion);
-    const endpointHints = extractEndpointHints(baseQuestion);
+    const routingSourceText = [
+      baseQuestion,
+      questionValue ?? "",
+      question ?? "",
+      prompt ?? "",
+      sourceQuestion ?? "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const hasFilePathHints = HELIX_ASK_FILE_HINT.test(routingSourceText);
+    const endpointHints = extractEndpointHints(routingSourceText);
     const explicitCodeSymbolCue =
-      /\b[a-z][a-z0-9_]*[A-Z][A-Za-z0-9_]*\b/.test(baseQuestion) ||
-      /`[A-Za-z_][A-Za-z0-9_]*`/.test(baseQuestion) ||
-      /\b[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/.test(baseQuestion);
+      /\b[a-z][a-z0-9_]*[A-Z][A-Za-z0-9_]*\b/.test(routingSourceText) ||
+      /`[A-Za-z_][A-Za-z0-9_]*`/.test(routingSourceText) ||
+      /\b[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/.test(routingSourceText);
     const warpProofRepoCue =
-      HELIX_ASK_WARP_FOCUS.test(baseQuestion) && HELIX_ASK_WARP_PROOF_REPO_CUE.test(baseQuestion);
+      HELIX_ASK_WARP_FOCUS.test(routingSourceText) &&
+      HELIX_ASK_WARP_PROOF_REPO_CUE.test(routingSourceText);
     const explicitRepoApiCue =
       endpointHints.length > 0 ||
-      /\bllm\.[a-z0-9_.-]+\b/i.test(baseQuestion) ||
-      /\b(?:server|client|shared|docs|tests?)\/[a-z0-9_./-]+\b/i.test(baseQuestion) ||
+      /\bllm\.[a-z0-9_.-]+\b/i.test(routingSourceText) ||
+      /\b(?:server|client|shared|docs|tests?)\/[a-z0-9_./-]+\b/i.test(routingSourceText) ||
       explicitCodeSymbolCue ||
       warpProofRepoCue;
     const warpMathBroadPrompt = isWarpMathBroadPrompt(baseQuestion);
-    const equationQuotePrompt = isEquationQuotePrompt(baseQuestion);
+    const equationQuotePrompt = isEquationAskPrompt(baseQuestion);
     const explicitRepoExpectation =
       hasFilePathHints ||
-      HELIX_ASK_REPO_FORCE.test(baseQuestion) ||
-      HELIX_ASK_REPO_EXPECTS.test(baseQuestion) ||
+      HELIX_ASK_REPO_FORCE.test(routingSourceText) ||
+      HELIX_ASK_REPO_EXPECTS.test(routingSourceText) ||
       explicitRepoApiCue;
     if (termPriorEvaluate) {
       termPriorDecision = computeHelixAskTermPriorDecision({
@@ -24888,6 +29289,41 @@ const executeHelixAsk = async ({
     const explicitRequestedRepoPaths = explicitRepoExpectation
       ? filterExistingEvidencePaths(extractFilePathsFromText(baseQuestion))
       : [];
+    const queryConstraints = deriveHelixAskQueryConstraints(
+      baseQuestion,
+      explicitRequestedRepoPaths,
+    );
+    const equationIntentContract = buildHelixAskIntentContract({
+      question: baseQuestion,
+      queryConstraints,
+      explicitPaths: explicitRequestedRepoPaths,
+    });
+    const equationIntentContractHash = hashHelixAskIntentContract(equationIntentContract);
+    let equationIntentContractMutationDetected = false;
+    const checkEquationIntentContractStability = (stage: string): void => {
+      if (!isEquationAskPrompt(baseQuestion)) return;
+      const current = buildHelixAskIntentContract({
+        question: baseQuestion,
+        queryConstraints,
+        explicitPaths: explicitRequestedRepoPaths,
+      });
+      const stability = assertHelixAskIntentContractStable({
+        expectedHash: equationIntentContractHash,
+        current,
+      });
+      if (!stability.stable) {
+        equationIntentContractMutationDetected = true;
+        answerPath.push(`intent_contract_mutation_detected:${stage}`);
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.intent_contract_hash = equationIntentContractHash;
+        debugRecord.intent_contract_stable = stability.stable;
+        debugRecord.intent_contract_current_hash = stability.currentHash;
+        debugRecord.intent_contract = equationIntentContract;
+      }
+    };
+    checkEquationIntentContractStability("turn_start");
     const warpEthosRelationQuery = warpEthosRelationReportQuery;
     if (warpEthosRelationQuery) {
       relationToolCapBonus = 1;
@@ -24940,11 +29376,37 @@ const executeHelixAsk = async ({
     let stage05SummaryMissingSlots: string[] = [];
     let stage05SummaryClarifyLine: string | null = null;
     const absorbStage05SummaryGuard = (telemetry: Stage05Telemetry | undefined): void => {
-      if (!telemetry?.summary_hard_fail) return;
+      if (!telemetry) return;
+      const telemetryMissingSlots = telemetry.slot_coverage?.missing ?? [];
+      const telemetrySoftCodePathGap = isStage05SoftCodePathGapTelemetry(telemetry);
+      const telemetrySoftRuntimeFail = isStage05SoftRuntimeFailTelemetry(telemetry);
+      const telemetryCoverageGap = isStage05CoverageGapTelemetry(telemetry);
+      const telemetryHardFailEffective =
+        (telemetry.summary_hard_fail || telemetryCoverageGap) &&
+        !telemetrySoftCodePathGap &&
+        !telemetrySoftRuntimeFail;
+      const telemetryRecoversSummaryHardFail =
+        telemetrySoftCodePathGap ||
+        telemetrySoftRuntimeFail ||
+        telemetry.used &&
+        !telemetry.summary_hard_fail &&
+        !telemetryCoverageGap &&
+        telemetryMissingSlots.length === 0;
+      if (telemetryRecoversSummaryHardFail) {
+        stage05SummaryHardFail = false;
+        stage05SummaryFailReason = null;
+        stage05SummaryMissingSlots =
+          telemetrySoftCodePathGap || telemetrySoftRuntimeFail ? telemetryMissingSlots : [];
+        stage05SummaryClarifyLine = null;
+        return;
+      }
+      if (!telemetryHardFailEffective) return;
       stage05SummaryHardFail = true;
       stage05SummaryFailReason =
-        telemetry.summary_fail_reason ?? telemetry.fallback_reason ?? "stage05_summary_hard_fail";
-      stage05SummaryMissingSlots = telemetry.slot_coverage?.missing ?? [];
+        telemetry.summary_fail_reason ??
+        telemetry.fallback_reason ??
+        (telemetryCoverageGap ? "stage05_slot_coverage_missing" : "stage05_summary_hard_fail");
+      stage05SummaryMissingSlots = telemetryMissingSlots;
       const narrowHint =
         stage05SummaryMissingSlots.length > 0
           ? `missing slots: ${stage05SummaryMissingSlots.join(", ")}`
@@ -25090,6 +29552,11 @@ const executeHelixAsk = async ({
     if (debugPayload) {
       debugPayload.explicit_repo_expectation = explicitRepoExpectation;
       (debugPayload as Record<string, unknown>).warp_proof_repo_cue = warpProofRepoCue;
+      (debugPayload as Record<string, unknown>).query_constraints = {
+        collapse_domain_lock: queryConstraints.collapseDomainLock,
+        hard_exclude_warp_family: queryConstraints.hardExcludeWarpFamily,
+        explicit_anchor_paths: queryConstraints.explicitAnchorPaths.slice(0, 8),
+      };
       debugPayload.repo_expectation_score = repoExpectationScore;
       debugPayload.repo_expectation_level = repoExpectationLevel;
       debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
@@ -25153,6 +29620,7 @@ const executeHelixAsk = async ({
     let ambiguityCandidates: HelixAskConceptCandidate[] = [];
     let ambiguityCandidateLabels: string[] = [];
     if (!forcedAnswer) {
+      const equationClarifyBypass = isEquationQuotePrompt(baseQuestion);
       const ambiguityTargetSpan = extractClarifySpan(baseQuestion);
       const ambiguitySeedLabels = collectAmbiguitySeedLabels(
         [
@@ -25167,7 +29635,8 @@ const executeHelixAsk = async ({
         debugPayload.ambiguity_target_span = ambiguityTargetSpan;
       }
       const fastQualitySafetyContext = reportDecision.enabled;
-      const shouldSkipAmbiguityClusters = fastQualityMode && !fastQualitySafetyContext;
+      const shouldSkipAmbiguityClusters =
+        (fastQualityMode && !fastQualitySafetyContext) || equationClarifyBypass;
       if (debugPayload && fastQualityMode) {
         debugPayload.fast_quality_ambiguity_clusters_skipped = shouldSkipAmbiguityClusters;
         debugPayload.fast_quality_ambiguity_labels_disabled = true;
@@ -25315,6 +29784,7 @@ const executeHelixAsk = async ({
         /\b(?:what\s+is|what's|whats|define|explain|describe|meaning\s+of)\b/i.test(baseQuestion) &&
         filterCriticTokens(tokenizeAskQuery(baseQuestion)).length <= HELIX_ASK_AMBIGUITY_SHORT_TOKENS;
       if (
+        !equationClarifyBypass &&
         ambiguityResolution.shouldClarify &&
         HELIX_ASK_AMBIGUITY_EVIDENCE_PASS &&
         ambiguityClusterSummary?.clusters?.length
@@ -25422,7 +29892,8 @@ const executeHelixAsk = async ({
         !warpEthosRelationQuery &&
         !openWorldClarifyBypass &&
         !securityOpenWorldClarifyBypass &&
-        !repoCodeClarifyBypass;
+        !repoCodeClarifyBypass &&
+        !equationClarifyBypass;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
         debugPayload.ambiguity_resolver_applied = shouldApplyPreIntentClarify;
         debugPayload.ambiguity_resolver_reason = ambiguityResolution.reason;
@@ -25465,6 +29936,11 @@ const executeHelixAsk = async ({
         logEvent("Ambiguity resolver", "bypass_repo_code", "explicit_repo_or_code_query");
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
           debugPayload.ambiguity_resolver_bypassed = "repo_code_query";
+        }
+      } else if (ambiguityResolution.shouldClarify && equationClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_equation_query", "equation_quote_request");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "equation_query";
         }
       } else if (ambiguityResolution.shouldClarify && warpEthosRelationQuery) {
         logEvent("Ambiguity resolver", "bypass_relation_query", "warp_ethos_relation");
@@ -25606,6 +30082,12 @@ const executeHelixAsk = async ({
       !HELIX_ASK_FILE_HINT.test(baseQuestion);
     const frontierTheoryLensRequested =
       frontierTheoryLensRequestedDirect || frontierSessionFollowupRequested;
+    const frontierNonRepoFastPath =
+      (frontierTheoryLensRequested || frontierSessionLensLocked) &&
+      !frontierSessionResetRequested &&
+      !explicitRepoExpectation &&
+      !hasFilePathHints &&
+      !HELIX_ASK_REPO_FORCE.test(baseQuestion);
     const frontierTheoryLensRequestSource = frontierTheoryLensRequestedDirect
       ? "direct"
       : frontierSessionFollowupRequested
@@ -25626,6 +30108,15 @@ const executeHelixAsk = async ({
         "frontier_lens -> falsifiable",
         `profile=${frontierProfile.id};source=${frontierTheoryLensRequestSource}`,
       );
+    }
+    if (frontierNonRepoFastPath) {
+      requiresRepoEvidence = false;
+      hasRepoHints = false;
+      repoExpectationLevel = "low";
+      repoExpectationScore = 0;
+      if (!repoExpectationSignals.includes("frontier_non_repo_fast_path")) {
+        repoExpectationSignals.push("frontier_non_repo_fast_path");
+      }
     }
     let compositeApplied = false;
     let compositeRequiredFiles: string[] = [];
@@ -25779,6 +30270,7 @@ const executeHelixAsk = async ({
       hasFilePathHints ||
       endpointHints.length > 0 ||
       repoExpectationLevel === "high";
+    let securityOpenWorldIntentLocked = false;
     if (isSecurityRiskPrompt(baseQuestion) && !hasExplicitRepoSignals) {
       const securityOpenWorldProfile =
         getHelixAskIntentProfileById("general.conceptual_define_compare") ??
@@ -25791,6 +30283,7 @@ const executeHelixAsk = async ({
       if (!repoExpectationSignals.includes("security_open_world")) {
         repoExpectationSignals.push("security_open_world");
       }
+      securityOpenWorldIntentLocked = true;
       isIdeologyReferenceIntent = false;
       if (debugPayload) {
         debugPayload.repo_expectation_level = repoExpectationLevel;
@@ -26066,6 +30559,7 @@ const executeHelixAsk = async ({
     let docSlotSummary: ReturnType<typeof evaluateCoverageSlots> | null = null;
     let docSlotTargets: string[] = [];
     let docBlocks: Array<{ path: string; block: string }> = [];
+    let stage05EvidenceCards: Stage05EvidenceCard[] = [];
     let definitionRegistryBlocks: Array<{ path: string; block: string }> = [];
     let graphEvidenceItems: HelixAskGraphEvidence[] = [];
     let minDocEvidenceCards = 0;
@@ -26083,7 +30577,7 @@ const executeHelixAsk = async ({
         return false;
       });
     const openWorldAutoPromoteBlocked =
-      isOpenWorldExplainerQuestion(baseQuestion) &&
+      (isOpenWorldExplainerQuestion(baseQuestion) || isSecurityRiskPrompt(baseQuestion)) &&
       !hasExplicitRepoSignals;
     const shouldPromoteRepoFromEvidence = (paths: string[]): boolean => {
       if (intentStrategy === "constraint_report") return false;
@@ -26098,6 +30592,14 @@ const executeHelixAsk = async ({
       (intentDomain === "repo" || intentDomain === "hybrid" || intentDomain === "falsifiable");
     let wantsHybrid = intentStrategy === "hybrid_explain";
     let forceHybridNoEvidence = false;
+    if (
+      frontierNonRepoFastPath &&
+      intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID &&
+      !hasExplicitRepoSignals
+    ) {
+      isRepoQuestion = false;
+      wantsHybrid = false;
+    }
     if (intentStrategy === "constraint_report") {
       isRepoQuestion = false;
     }
@@ -26813,6 +31315,8 @@ const executeHelixAsk = async ({
               footprintZoneHint?: ReasoningTheaterFootprintZone;
               hasExactProvenance?: boolean;
               stage0?: RepoSearchStage0Telemetry;
+              stage05?: Stage05Telemetry;
+              stage05Cards?: Stage05EvidenceCard[];
             }
           | null = null;
     let preflightEvidence: EvidenceEligibility | null = null;
@@ -27049,7 +31553,9 @@ const executeHelixAsk = async ({
             HELIX_ASK_STAGE0_GENERAL_PROMOTE_RETRIEVAL &&
             !ideologyConversationalOpenWorldMode &&
             intentDomain === "general" &&
-            preflightStage0Active;
+            preflightStage0Active &&
+            !openWorldAutoPromoteBlocked &&
+            !securityOpenWorldIntentLocked;
           if (stage0GeneralPromoteEligible) {
             preflightSignalsOk = true;
           }
@@ -27132,6 +31638,10 @@ const executeHelixAsk = async ({
     ) {
       contextText = preflightContext.context;
       contextFiles = preflightContext.files.slice();
+      stage05EvidenceCards = mergeStage05Cards(
+        stage05EvidenceCards,
+        preflightContext.stage05Cards ?? [],
+      );
       preflightReuseApplied = true;
       if (debugPayload) {
         debugPayload.preflight_reuse = true;
@@ -27506,6 +32016,8 @@ const executeHelixAsk = async ({
       ].join(" | "),
     );
     let result: LocalAskResult;
+    let deterministicRepoRuntimeFallbackUsed = false;
+    let answerGenerationFailedForTurn = false;
     let generalScaffold = "";
     let repoScaffold = "";
     let repoScaffoldForPrompt = "";
@@ -28045,9 +32557,17 @@ const executeHelixAsk = async ({
         if (debugPayload && planDirectives) {
           debugPayload.plan_directives = planDirectives;
         }
-        const slotPlanQuestion =
-          blockScoped && blockSearchSeed ? blockSearchSeed : baseQuestion;
-        slotPlanHeadingSeedSlots = buildDocHeadingSeedSlots(slotPlanQuestion);
+        const slotPlanExplicitPathEquationMode =
+          slotPreviewExplicitPathEquationMode ||
+          (isEquationAskPrompt(baseQuestion) && explicitRequestedRepoPaths.length > 0);
+        const slotPlanQuestion = slotPlanExplicitPathEquationMode
+          ? explicitRequestedRepoPaths.join(" ")
+          : blockScoped && blockSearchSeed
+            ? blockSearchSeed
+            : baseQuestion;
+        slotPlanHeadingSeedSlots = slotPlanExplicitPathEquationMode
+          ? []
+          : buildDocHeadingSeedSlots(slotPlanQuestion);
         slotPlan = buildCanonicalSlotPlan({
           question: slotPlanQuestion,
           directives: planDirectives,
@@ -28058,6 +32578,7 @@ const executeHelixAsk = async ({
             ...slotPlanPassSlots,
             ...graphSeedSlots,
           ],
+          disableConceptCandidates: slotPlanExplicitPathEquationMode,
         });
         const requiredSlotIds = resolveRequiredSlots(slotPlan);
         coverageSlots = coverageSlotsFromRequest
@@ -28100,6 +32621,8 @@ const executeHelixAsk = async ({
             });
             debugPayload.slot_tiers = tierList.slice(0, 12);
             debugPayload.slot_tier_counts = tierCounts;
+            (debugPayload as Record<string, unknown>).slot_plan_explicit_path_focus =
+              slotPlanExplicitPathEquationMode;
           }
           if (coverageSlotsFromRequest) {
             const coverageSlotAliases = collectCoverageSlotAliases(slotAliasMap, coverageSlots);
@@ -28369,6 +32892,8 @@ const executeHelixAsk = async ({
           footprintZoneHint?: ReasoningTheaterFootprintZone;
           hasExactProvenance?: boolean;
           stage0?: RepoSearchStage0Telemetry;
+          stage05?: Stage05Telemetry;
+          stage05Cards?: Stage05EvidenceCard[];
         } = preflightMeta
           ? {
               files: contextFiles.slice(),
@@ -28392,6 +32917,8 @@ const executeHelixAsk = async ({
               footprintZoneHint: preflightMeta.footprintZoneHint,
               hasExactProvenance: preflightMeta.hasExactProvenance,
               stage0: preflightMeta.stage0,
+              stage05: preflightMeta.stage05,
+              stage05Cards: preflightMeta.stage05Cards,
             }
           : {
               files: contextFiles.slice(),
@@ -28448,6 +32975,8 @@ const executeHelixAsk = async ({
                 footprintZoneHint?: ReasoningTheaterFootprintZone;
                 hasExactProvenance?: boolean;
                 stage0?: RepoSearchStage0Telemetry;
+                stage05?: Stage05Telemetry;
+                stage05Cards?: Stage05EvidenceCard[];
               }
             | undefined;
           let docsFirstOk = false;
@@ -28571,6 +33100,10 @@ const executeHelixAsk = async ({
           }
           contextText = contextResult.context;
           contextFiles = contextResult.files.slice();
+          stage05EvidenceCards = mergeStage05Cards(
+            stage05EvidenceCards,
+            contextResult.stage05Cards ?? [],
+          );
           topicMustIncludeOk = contextResult.topicMustIncludeOk;
           contextMeta = contextResult;
           absorbStage05SummaryGuard((contextResult as { stage05?: Stage05Telemetry }).stage05);
@@ -29697,6 +34230,10 @@ const executeHelixAsk = async ({
           }
           contextText = result.context;
           contextFiles = result.files.slice();
+          stage05EvidenceCards = mergeStage05Cards(
+            stage05EvidenceCards,
+            result.stage05Cards ?? [],
+          );
           topicMustIncludeOk = result.topicMustIncludeOk;
           if (result.docHeaderInjected && result.docHeaderInjected > 0) {
             logEvent("Doc headers", "injected", `count=${result.docHeaderInjected}`, startedAt);
@@ -30711,7 +35248,24 @@ const executeHelixAsk = async ({
         ) {
           failClosedReason = null;
         }
-        if (stage05SummaryHardFail) {
+        if (
+          failClosedReason === "evidence_gate_failed" &&
+          isEquationAskPrompt(baseQuestion) &&
+          queryConstraints.explicitAnchorPaths.length > 0
+        ) {
+          const normalizedContext = contextText.toLowerCase();
+          const hasExplicitAnchorEvidence = queryConstraints.explicitAnchorPaths.some((entry) => {
+            const normalized = (normalizeAtlasRepoPath(entry) ?? entry).replace(/\\/g, "/").toLowerCase();
+            return normalized && normalizedContext.includes(normalized);
+          });
+          if (hasExplicitAnchorEvidence) {
+            failClosedReason = null;
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).grounded_evidence_clarify_override = true;
+            }
+          }
+        }
+        if (stage05SummaryHardFail && !HELIX_ASK_STAGE05_PROGRESSIVE_FALLBACK) {
           failClosedReason = "stage05_summary_hard_fail";
         }
         failClosedRepoEvidence = Boolean(failClosedReason);
@@ -30793,6 +35347,13 @@ const executeHelixAsk = async ({
           sampleCount: alignmentSampleCount,
         });
         alignmentGateDecision = alignmentGate.decision;
+        const explicitEquationAnchorEvidence =
+          isEquationAskPrompt(baseQuestion) &&
+          queryConstraints.explicitAnchorPaths.length > 0 &&
+          queryConstraints.explicitAnchorPaths.some((entry) => {
+            const normalized = (normalizeAtlasRepoPath(entry) ?? entry).replace(/\\/g, "/").toLowerCase();
+            return normalized && contextText.toLowerCase().includes(normalized);
+          });
         const openWorldBypassPolicy = resolveOpenWorldBypassPolicy({
           gateDecision: alignmentGate.decision,
           requiresRepoEvidence,
@@ -30802,7 +35363,11 @@ const executeHelixAsk = async ({
               isSecurityRiskPrompt(baseQuestion) ||
               intentDomain === "general"),
         });
-        if (openWorldBypassPolicy.action === "clarify_fail_closed" && !failClosedReason) {
+        if (
+          openWorldBypassPolicy.action === "clarify_fail_closed" &&
+          !failClosedReason &&
+          !explicitEquationAnchorEvidence
+        ) {
           failClosedReason = "alignment_gate_fail_repo_required";
           failClosedRepoEvidence = true;
         }
@@ -30824,6 +35389,8 @@ const executeHelixAsk = async ({
           debugPayload.alignment_gate_decision = alignmentGate.decision;
           debugPayload.open_world_bypass_mode = openWorldBypassMode;
           (debugPayload as Record<string, unknown>).alignment_gate_metrics = alignmentGate.metrics;
+          (debugPayload as Record<string, unknown>).alignment_explicit_anchor_override =
+            explicitEquationAnchorEvidence;
           (debugPayload as Record<string, unknown>).alignment_gate_inputs = {
             alignment_real: Number(alignmentReal.toFixed(4)),
             alignment_decoy: Number(alignmentDecoy.toFixed(4)),
@@ -30913,7 +35480,11 @@ const executeHelixAsk = async ({
             ? "repo_grounded"
             : rawArbiterMode;
         let arbiterReason = arbiterDecision.reason;
-        if (alignmentGateDecision === "FAIL" && openWorldBypassMode !== "active") {
+        if (
+          alignmentGateDecision === "FAIL" &&
+          openWorldBypassMode !== "active" &&
+          !explicitEquationAnchorEvidence
+        ) {
           arbiterMode = "clarify";
           arbiterReason = "alignment_gate_fail_repo_required";
         }
@@ -31053,10 +35624,14 @@ const executeHelixAsk = async ({
         }
         answerPath.push(`arbiter:${arbiterMode}`);
         if (arbiterMode === "hybrid" || arbiterMode === "clarify") {
-          const keepGeneralClarifyIntent =
-            preserveGeneralClarifyIntent &&
+          const securityOpenWorldGeneralLock =
+            securityOpenWorldIntentLocked &&
             arbiterMode === "clarify" &&
-            intentProfile.domain === "general";
+            intentProfile.domain === "general" &&
+            !explicitRepoExpectation &&
+            !hasFilePathHints;
+          const keepGeneralClarifyIntent =
+            preserveGeneralClarifyIntent || securityOpenWorldGeneralLock;
           const relationFallbackProfile =
             isRelationIntentRequested()
               ? getHelixAskIntentProfileById("hybrid.warp_ethos_relation")
@@ -31105,8 +35680,23 @@ const executeHelixAsk = async ({
           updateIntentDebug();
           wantsHybrid = !keepGeneralClarifyIntent;
           isRepoQuestion = !keepGeneralClarifyIntent;
+          if (
+            frontierNonRepoFastPath &&
+            intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID &&
+            !hasExplicitRepoSignals
+          ) {
+            wantsHybrid = false;
+            isRepoQuestion = false;
+          }
           if (arbiterMode === "clarify") {
             forceHybridNoEvidence = !keepGeneralClarifyIntent;
+            if (
+              frontierNonRepoFastPath &&
+              intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID &&
+              !hasExplicitRepoSignals
+            ) {
+              forceHybridNoEvidence = false;
+            }
             contextText = "";
             contextFiles = [];
             logEvent("Fallback", "clarify (arbiter)", intentReason);
@@ -31126,6 +35716,9 @@ const executeHelixAsk = async ({
           intentStrategy = fallbackProfile.strategy;
           formatSpec = resolveHelixAskFormat(baseQuestion, intentProfile, debugEnabled);
           if (hasTwoParagraphContract(baseQuestion)) {
+            formatSpec = { format: "compare", stageTags: false };
+          }
+          if (securityOpenWorldIntentLocked) {
             formatSpec = { format: "compare", stageTags: false };
           }
           intentReason = `${intentReasonBase}|arbiter:general`;
@@ -31505,6 +36098,35 @@ const executeHelixAsk = async ({
               ? definitionDocBlocks.map((block) => block.block).join("\n\n")
               : ""
             : "";
+          const stage05RepoScaffold = buildStage05EvidenceScaffold({
+            cards: stage05EvidenceCards,
+            maxCards: Math.min(6, HELIX_ASK_STAGE05_MAX_CARDS),
+          });
+          const stage05RepoPaths = filterExistingEvidencePaths(
+            stage05EvidenceCards.map((card) => card.path),
+          );
+          const applyStage05RepoScaffoldFallback = (
+            current: string,
+            sourceFiles: string[],
+            sourceContext: string,
+          ): string => {
+            if (current.trim()) return current;
+            if (!stage05RepoScaffold.trim()) return current;
+            const mergedFiles = filterExistingEvidencePaths([
+              ...sourceFiles,
+              ...stage05RepoPaths,
+            ]);
+            const withSources = appendEvidenceSources(
+              stage05RepoScaffold,
+              mergedFiles,
+              8,
+              sourceContext || contextText,
+            );
+            if (withSources.trim() && debugPayload) {
+              (debugPayload as Record<string, unknown>).evidence_cards_stage05_fallback = true;
+            }
+            return withSources.trim();
+          };
           const allowConceptFastPath =
             conceptFastPath &&
             conceptMatch &&
@@ -31584,10 +36206,14 @@ const executeHelixAsk = async ({
               maxBlocks: docScaffoldMax,
               definitionFocus,
             });
+            const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+            const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
             if (repoScaffold) {
-              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
               repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
+            }
+            repoScaffold = applyStage05RepoScaffoldFallback(repoScaffold, sourceFiles, sourceContext);
+            if (repoScaffold && repoSynthesisPath === "deterministic") {
+              repoSynthesisPath = "deterministic_stage05";
             }
             logProgress(
               "Evidence cards ready",
@@ -31651,11 +36277,12 @@ const executeHelixAsk = async ({
                 maxBlocks: docScaffoldMax,
                 definitionFocus,
               });
+              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
               if (repoScaffold) {
-                const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-                const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
                 repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
               }
+              repoScaffold = applyStage05RepoScaffoldFallback(repoScaffold, sourceFiles, sourceContext);
               pushFastQualityDecision("evidence_cards_llm", "deadline", "helper_timeout_fallback");
             } else {
               const { result: evidenceResult, overflow: evidenceOverflow } = evidenceHelperResult;
@@ -31666,11 +36293,12 @@ const executeHelixAsk = async ({
               if (repoScaffold && !formatSpec.stageTags) {
                 repoScaffold = stripStageTags(repoScaffold);
               }
+              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
               if (repoScaffold) {
-                const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-                const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
                 repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
               }
+              repoScaffold = applyStage05RepoScaffoldFallback(repoScaffold, sourceFiles, sourceContext);
               if (compositeRequest.enabled && compositeRequiredFiles.length && debugPayload) {
                 const missing = compositeRequiredFiles.filter(
                   (entry) => entry && !repoScaffold.toLowerCase().includes(entry.toLowerCase()),
@@ -31714,11 +36342,12 @@ const executeHelixAsk = async ({
               maxBlocks: docScaffoldMax,
               definitionFocus,
             });
+            const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
+            const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
             if (repoScaffold) {
-              const sourceFiles = definitionFocus ? definitionEvidenceFiles : contextFiles;
-              const sourceContext = definitionFocus ? definitionEvidenceContext : contextText;
               repoScaffold = appendEvidenceSources(repoScaffold, sourceFiles, 6, sourceContext);
             }
+            repoScaffold = applyStage05RepoScaffoldFallback(repoScaffold, sourceFiles, sourceContext);
             pushFastQualityDecision(
               "evidence_cards_llm",
               "skip",
@@ -32947,7 +37576,7 @@ const executeHelixAsk = async ({
       getFastElapsedMs() >= fastStageDeadlines.plan_retrieval
     ) {
       const focusedClarification =
-        "I donâ€™t have enough repository evidence within the fast-mode time budget. Please point me to the specific module or file path you want analyzed.";
+        "I donÃ¢â‚¬â„¢t have enough repository evidence within the fast-mode time budget. Please point me to the specific module or file path you want analyzed.";
       forcedAnswer = focusedClarification;
       forcedAnswerIsHard = true;
       recordFastDecision(
@@ -32958,7 +37587,7 @@ const executeHelixAsk = async ({
         fastStageDeadlines.finalize,
       );
     }
-    if (stage05SummaryHardFail) {
+    if (stage05SummaryHardFail && !HELIX_ASK_STAGE05_PROGRESSIVE_FALLBACK) {
       forcedAnswer =
         stage05SummaryClarifyLine ??
         "I couldn't complete required Stage-0.5 evidence summaries. Please narrow by module/path/symbol and retry.";
@@ -32974,6 +37603,11 @@ const executeHelixAsk = async ({
         (debugPayload as Record<string, unknown>).helix_ask_fail_reason =
           stage05SummaryFailReason ?? "stage05_summary_hard_fail";
         (debugPayload as Record<string, unknown>).helix_ask_fail_class = "runtime_contract";
+      }
+    } else if (stage05SummaryHardFail && HELIX_ASK_STAGE05_PROGRESSIVE_FALLBACK) {
+      answerPath.push("softBypass:stage05_summary_hard_fail");
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).stage05_summary_soft_bypass = true;
       }
     }
     const fallbackAnswer = forcedAnswer ?? conceptAnswer ?? "";
@@ -33174,6 +37808,28 @@ const executeHelixAsk = async ({
             : evidenceText,
           traceId: askTraceId,
         });
+        if (result.envelope) {
+          const normalizedAnswer = cleanDanglingFileExtensionFragments(
+            coerceString(result.envelope.answer),
+          ).trim();
+          result.envelope.answer = normalizedAnswer || forcedFinalText;
+          const sanitizedSections = (result.envelope.sections ?? [])
+            .map((section) => {
+              const sanitizedBody = cleanDanglingFileExtensionFragments(
+                coerceString(section?.body ?? ""),
+              ).trim();
+              if (!sanitizedBody) return null;
+              if (hasDanglingFileExtensionResidue(sanitizedBody) && section.layer === "details") {
+                return null;
+              }
+              return {
+                ...section,
+                body: sanitizedBody,
+              };
+            })
+            .filter((section): section is NonNullable<typeof section> => Boolean(section));
+          result.envelope.sections = sanitizedSections.length ? sanitizedSections : undefined;
+        }
         if (debugPayload) {
           debugPayload.answer_after_fallback = clipAskText(
             forcedFinalText,
@@ -33352,9 +38008,20 @@ const executeHelixAsk = async ({
       }
       if (fastQualityMode && getAskElapsedMs() >= FAST_QUALITY_FINALIZE_BY_MS) {
         markLlmSkipDebug("fast_quality_finalize_deadline");
+        const equationFastPath = isEquationAskPrompt(baseQuestion);
         const clarifyLine =
           "Repo evidence was insufficient within fast mode SLA. Please point me to the most relevant file or symbol so I can answer precisely.";
-        const fastQuality = applyImmediateQualityFloor(clarifyLine);
+        const fastTextBase = equationFastPath
+          ? buildEquationUnifiedDegradeAnswer({
+              question: baseQuestion,
+              contract: equationIntentContract,
+              candidates: [],
+              reason: "fast_quality_finalize_deadline",
+            })
+          : clarifyLine;
+        const fastQuality = equationFastPath
+          ? { text: fastTextBase, reasons: [] as string[] }
+          : applyImmediateQualityFloor(fastTextBase);
         const fastText = fastQuality.text;
         pushFastQualityDecision("finalize", "deadline", "finalize_deadline_reached_before_answer");
         const fastResult: LocalAskResult = {
@@ -33380,7 +38047,9 @@ const executeHelixAsk = async ({
         };
         if (debugPayload) {
           debugPayload.clarify_triggered = true;
-          debugPayload.fallback_reason = "fast_quality_finalize_deadline";
+          debugPayload.fallback_reason = equationFastPath
+            ? "fast_quality_finalize_deadline_equation_unified"
+            : "fast_quality_finalize_deadline";
           if (fastQuality.reasons.length > 0) {
             debugPayload.answer_quality_floor_applied = true;
             debugPayload.answer_quality_floor_reasons = fastQuality.reasons;
@@ -33870,7 +38539,6 @@ const executeHelixAsk = async ({
           : Date.now();
       let answerGenerationFailed = false;
       let retryApplied = false;
-      let deterministicRepoRuntimeFallbackUsed = false;
       let answerText = "";
       let answerMeta = isShortAnswer(answerText, verbosity);
       let resultForAnswer: LocalAskResult | null = null;
@@ -33899,6 +38567,7 @@ const executeHelixAsk = async ({
         } else if (fastQualityMode && !answerHelperBudget.ok) {
           markLlmSkipDebug("fast_quality_answer_budget");
           answerGenerationFailed = true;
+          answerGenerationFailedForTurn = true;
         } else {
         const { result: answerResult, overflow: answerOverflow, llm: answerLlm } =
           await runHelixAskLocalWithOverflowRetry(
@@ -34037,6 +38706,7 @@ const executeHelixAsk = async ({
         }
       } catch (error) {
         answerGenerationFailed = true;
+        answerGenerationFailedForTurn = true;
         const message = error instanceof Error ? error.message : String(error);
         const llmCall = (error as { __llm_call?: HelixAskLlmCallMeta } | null | undefined)?.__llm_call;
         const fallbackBackend = resolveLlmLocalBackend();
@@ -34185,6 +38855,7 @@ const executeHelixAsk = async ({
           debugPayload.answer_contract_primary_applied = false;
         }
       }
+      answerGenerationFailedForTurn = answerGenerationFailedForTurn || answerGenerationFailed;
       if (!answerGenerationFailed && llmAnswerStarted) {
         logDebug("llmLocalHandler MAIN complete", {
           textLength: typeof result.text === "string" ? result.text.length : 0,
@@ -34853,16 +39524,21 @@ const executeHelixAsk = async ({
       const isDocSourcePath = (value: string): boolean => {
         return value.trim().toLowerCase().startsWith("docs/");
       };
-      const allowedSourcePaths = filterExistingEvidencePaths(Array.from(
-        new Set([
-          ...conceptSourcePaths,
-          ...(
-            isIdeologyReferenceIntent
-              ? resolvedEvidencePaths.filter(isDocSourcePath)
-              : resolvedEvidencePaths
+      const allowedSourcePaths = applyQueryConstraintsToPathList(
+        filterExistingEvidencePaths(
+          Array.from(
+            new Set([
+              ...conceptSourcePaths,
+              ...(
+                isIdeologyReferenceIntent
+                  ? resolvedEvidencePaths.filter(isDocSourcePath)
+                  : resolvedEvidencePaths
+              ),
+            ]),
           ),
-        ]),
-      ));
+        ),
+        queryConstraints,
+      );
       cleaned = sanitizeSourcesLine(
         cleaned,
         allowedSourcePaths,
@@ -35641,7 +40317,13 @@ const executeHelixAsk = async ({
         cleaned = endpointGuardMessage;
         answerPath.push("endpointGuard:applied");
       }
-      if (!preserveReasoningOnlyAnswer && allowHybridFallback && intentStrategy === "hybrid_explain" && repoScaffold.trim()) {
+      if (
+        !preserveReasoningOnlyAnswer &&
+        allowHybridFallback &&
+        intentStrategy === "hybrid_explain" &&
+        repoScaffold.trim() &&
+        !equationQuotePrompt
+      ) {
         const guarded =
           /please point to the relevant files|available evidence was weakly reflected|repo evidence did not cover/i.test(
             cleaned,
@@ -35677,6 +40359,7 @@ const executeHelixAsk = async ({
       }
       cleaned = normalizeNumberedListLines(cleaned);
       cleaned = repairAnswerFilePathFragments(cleaned, contextFiles, evidenceText);
+      cleaned = cleanDanglingFileExtensionFragments(cleaned);
       cleaned = enforceHelixAskPromptContract(cleaned, baseQuestion);
       const citedPathStats = computeTreeCitationStats(extractFilePathsFromText(cleaned));
       const treeDominatedCitations =
@@ -36392,6 +41075,9 @@ const executeHelixAsk = async ({
           /\b(equation|equations|formula|metric|congruence|derive|derivation|proof|solver|math)\b/i.test(
             baseQuestion,
           ));
+      if (equationStrictRescueMode) {
+        weakEvidenceForDeterministicFallback = false;
+      }
       const weakEvidenceRescueEligible =
         weakEvidenceForDeterministicFallback &&
         !relationIntentActive &&
@@ -36406,7 +41092,12 @@ const executeHelixAsk = async ({
         !debugPayload?.llm_error_code &&
         !equationStrictRescueMode &&
         adaptiveRescueReasons.length > 0;
-      const answerRescueEligible = weakEvidenceRescueEligible || adaptiveRescueEligible;
+      const frontierFastRescueSuppressed =
+        frontierNonRepoFastPath &&
+        intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID &&
+        !hasExplicitRepoSignals;
+      const answerRescueEligible =
+        !frontierFastRescueSuppressed && (weakEvidenceRescueEligible || adaptiveRescueEligible);
       if (debugPayload) {
         (debugPayload as Record<string, unknown>).answer_rescue_eligible = answerRescueEligible;
         (debugPayload as Record<string, unknown>).answer_rescue_trigger = weakEvidenceRescueEligible
@@ -36780,10 +41471,13 @@ const executeHelixAsk = async ({
         extraCitationTokens: relationPacket ? Object.values(relationPacket.source_map) : undefined,
       });
       if (qualityFloorEligible && qualityFloorReasons.length > 0) {
-        const qualityFloorAllowedPaths = filterExistingEvidencePaths([
-          ...allowedSourcePaths,
-          ...finalCanonicalEvidence.allowedPaths,
-        ]);
+        const qualityFloorAllowedPaths = applyQueryConstraintsToPathList(
+          filterExistingEvidencePaths([
+            ...allowedSourcePaths,
+            ...finalCanonicalEvidence.allowedPaths,
+          ]),
+          queryConstraints,
+        );
         let qualityFloorCitations = normalizeCitations([
           ...qualityFloorAllowedPaths,
           ...finalCanonicalEvidence.citationTokens,
@@ -36971,11 +41665,16 @@ const executeHelixAsk = async ({
           }
         }
       }
-      const contractCitationTokens = normalizeCitations([
-        ...allowedSourcePaths,
-        ...finalCanonicalEvidence.contextFiles,
-        ...finalCanonicalEvidence.citationTokens,
-        ...(topicProfile?.mustIncludeFiles ?? []),
+      let contractCitationTokens = normalizeCitations([
+        ...applyQueryConstraintsToPathList(
+          [
+            ...allowedSourcePaths,
+            ...finalCanonicalEvidence.contextFiles,
+            ...(topicProfile?.mustIncludeFiles ?? []),
+          ],
+          queryConstraints,
+        ),
+        ...applyQueryConstraintsToPathList(finalCanonicalEvidence.citationTokens, queryConstraints),
       ]);
       if (citationLinkingRequired && contractCitationTokens.length > 0 && !hasSourcesLine(cleaned)) {
         cleaned = `${cleaned}\n\nSources: ${contractCitationTokens.slice(0, 8).join(", ")}`.trim();
@@ -36985,11 +41684,92 @@ const executeHelixAsk = async ({
           debugPayload.citation_contract_sources = contractCitationTokens.slice(0, 8);
         }
       }
+      if (
+        equationQuotePrompt &&
+        !Boolean((debugPayload as Record<string, unknown> | null | undefined)?.stage05_used) &&
+        (intentDomain === "repo" ||
+          intentDomain === "hybrid" ||
+          intentProfile.id === "repo.repo_api_lookup")
+      ) {
+        const onDemandStage05Paths = applyQueryConstraintsToPathList(
+          [
+            ...explicitRequestedRepoPaths,
+            ...queryConstraints.explicitAnchorPaths,
+            ...contractCitationTokens,
+            ...finalCanonicalEvidence.contextFiles,
+          ],
+          queryConstraints,
+        ).slice(0, Math.max(4, HELIX_ASK_STAGE05_MAX_FILES));
+        if (onDemandStage05Paths.length > 0) {
+          try {
+            const stage05OnDemand = await buildStage05EvidenceCards({
+              enabled: HELIX_ASK_STAGE05_ENABLED,
+              llmFirst: HELIX_ASK_STAGE05_LLM_FIRST,
+              query: baseQuestion,
+              filePaths: onDemandStage05Paths,
+              commit: null,
+              maxFiles: HELIX_ASK_STAGE05_MAX_FILES,
+              maxCards: HELIX_ASK_STAGE05_MAX_CARDS,
+              maxExtractChars: HELIX_ASK_STAGE05_MAX_EXTRACT_CHARS,
+              maxSnippetChars: HELIX_ASK_STAGE05_MAX_SNIPPET_CHARS,
+              timeoutMs: HELIX_ASK_STAGE05_TIMEOUT_MS,
+              binaryMetadataOnly: HELIX_ASK_STAGE05_BINARY_METADATA_ONLY,
+              summaryRequired: HELIX_ASK_STAGE05_SUMMARY_REQUIRED,
+              hardFailOnSummaryError: HELIX_ASK_STAGE05_HARD_FAIL_ON_SUMMARY_ERROR,
+              fullFileMode: HELIX_ASK_STAGE05_FULLFILE_MODE,
+              overflowPolicy: HELIX_ASK_STAGE05_FULLFILE_OVERFLOW_POLICY,
+              slotPlannerMode: HELIX_ASK_STAGE05_SLOT_PLANNER_MODE,
+              intentDomain,
+              summarizeWithLlm: summarizeStage05CardsWithLlm,
+            });
+            applyStage05DebugFields(
+              debugPayload as Record<string, unknown>,
+              stage05OnDemand.telemetry,
+              "equation_on_demand",
+            );
+            if (stage05OnDemand.cards.length > 0) {
+              contractCitationTokens = normalizeCitations([
+                ...contractCitationTokens,
+                ...stage05OnDemand.cards.map((card) => card.path),
+              ]);
+              answerPath.push("stage05:on_demand_equation");
+            } else {
+              answerPath.push("stage05:on_demand_equation_empty");
+            }
+          } catch (error) {
+            answerPath.push("stage05:on_demand_equation_error");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).equation_on_demand_stage05_error =
+                error instanceof Error ? error.message : String(error);
+            }
+          }
+        }
+      }
       let equationQuoteContract = evaluateEquationQuoteContract({
         question: baseQuestion,
         answer: cleaned,
         allowedCitations: contractCitationTokens,
       });
+      const preferredEquationAnchors = applyQueryConstraintsToPathList(
+        explicitRequestedRepoPaths,
+        queryConstraints,
+      );
+      equationQuoteContract = applyEquationAnchorPriority(
+        equationQuoteContract,
+        preferredEquationAnchors,
+      );
+      const equationPromptDetected = isEquationAskPrompt(baseQuestion);
+      const equationQuoteStrictRequired = isEquationStrictQuotePrompt(baseQuestion);
+      const stage05CodePathHardFailActive =
+        stage05SummaryHardFail && stage05SummaryMissingSlots.includes("code_path");
+      const stage05UsedForEquationContract = Boolean(
+        (debugPayload as Record<string, unknown> | null | undefined)?.stage05_used,
+      );
+      const stage05EquationCoverageSatisfied =
+        stage05UsedForEquationContract &&
+        !stage05SummaryHardFail &&
+        !stage05SummaryMissingSlots.includes("equation") &&
+        !stage05SummaryMissingSlots.includes("code_path");
       const writeEquationQuoteContractDebug = (): void => {
         if (!debugPayload) return;
         (debugPayload as Record<string, unknown>).equation_quote_contract = {
@@ -37001,10 +41781,402 @@ const executeHelixAsk = async ({
           matched_needle: equationQuoteContract.matchedNeedle,
           matched_citations: equationQuoteContract.matchedCitations.slice(0, 8),
           question_needles: equationQuoteContract.questionNeedles.slice(0, 4),
+          equation_relevance_required: equationQuoteContract.equationRelevanceRequired ?? false,
+          equation_relevance_score: equationQuoteContract.equationRelevanceScore ?? null,
+          equation_relevance_reason: equationQuoteContract.equationRelevanceReason ?? null,
         };
       };
       writeEquationQuoteContractDebug();
-      if (equationQuoteContract.required && !equationQuoteContract.ok) {
+      let equationFallbackAllowPaths: string[] = [];
+      let equationBackingTentative = false;
+      let equationBackingSelectedPaths: string[] = [];
+      let equationGenericBypassApplied = false;
+      let equationForcedGeneralExplain = false;
+      let equationBypassTriggered = false;
+      let equationBypassReason: string | null = null;
+      let equationRecoveryReason: "missing_symbol" | "missing_path_anchor" | "low_primary_confidence" | null = null;
+      let equationRecoveryAttempts = 0;
+      let equationSelectorPrimaryKey: string | null = null;
+      let equationRendererPrimaryKey: string | null = null;
+      let equationPrimaryAnchorMatch: boolean | null = null;
+      let equationSelectorStateLockCommitted = false;
+      let equationSemanticRerankScores: Record<string, number> = {};
+      let equationSemanticRerankUsed = false;
+      let equationSemanticRerankReason: string | null = null;
+      let equationSemanticRerankCandidateCount = 0;
+      const getEquationRuntimeElapsedMs = (): number => Math.max(0, Date.now() - answerStart);
+      let equationRuntimeBudgetStage: "within_budget" | "budget_breached" =
+        equationPromptDetected &&
+        getEquationRuntimeElapsedMs() > HELIX_ASK_EQUATION_ASK_RUNTIME_BUDGET_MS
+          ? "budget_breached"
+          : "within_budget";
+      const buildEquationUnifiedDegradeRuntimeAnswer = (
+        reason: string,
+        citationHints: string[],
+      ): string => {
+        const degradeCandidates = collectEquationRescueCandidates({
+          question: baseQuestion,
+          explicitPaths: equationIntentContract.explicit_paths,
+          allowedCitations: citationHints,
+          stage05Cards: stage05EvidenceCards,
+          queryConstraints,
+          maxCandidates: 6,
+          includeWeakSemantic: true,
+        });
+        return buildEquationUnifiedDegradeAnswer({
+          question: baseQuestion,
+          contract: equationIntentContract,
+          candidates: degradeCandidates,
+          reason,
+        });
+      };
+      const equationExplicitPathOnlyExtraction =
+        isEquationQuoteOnlyPrompt(baseQuestion) && queryConstraints.explicitAnchorPaths.length > 0;
+      if (
+        equationPromptDetected &&
+        HELIX_ASK_EQUATION_SEMANTIC_RERANK_ENABLED &&
+        equationRuntimeBudgetStage === "within_budget"
+      ) {
+        const rerankCandidates = collectEquationRescueCandidates({
+          question: baseQuestion,
+          explicitPaths: queryConstraints.explicitAnchorPaths,
+          allowedCitations: normalizeCitations([
+            ...contractCitationTokens,
+            ...allowedSourcePaths,
+            ...finalCanonicalEvidence.contextFiles,
+            ...finalCanonicalEvidence.citationTokens,
+          ]),
+          stage05Cards: stage05EvidenceCards,
+          queryConstraints,
+          maxCandidates: HELIX_ASK_EQUATION_SEMANTIC_RERANK_TOP_N,
+          includeWeakSemantic: true,
+        });
+        equationSemanticRerankCandidateCount = rerankCandidates.length;
+        if (rerankCandidates.length >= 2) {
+          const rerankBudgetCheck = canStartFastHelper(
+            "equation_semantic_rerank",
+            fastQualityBudgets.helperMinMs,
+            fastStageDeadlines.finalize,
+          );
+          if (fastQualityMode && !rerankBudgetCheck.ok) {
+            recordFastDecision(
+              "equation_semantic_rerank",
+              "skip_llm",
+              rerankBudgetCheck.reason ?? "min_budget_not_met",
+              rerankBudgetCheck.remainingMs,
+              fastStageDeadlines.finalize,
+            );
+            equationSemanticRerankReason = rerankBudgetCheck.reason ?? "fast_budget_skip";
+          } else {
+            const dominantFamily = resolveDominantEquationFamily(baseQuestion, queryConstraints);
+            const rerankPrompt = buildHelixAskEquationSemanticRerankPrompt({
+              question: baseQuestion,
+              dominantFamily,
+              candidates: rerankCandidates,
+            });
+            const rerankStart = logStepStart(
+              "LLM equation semantic rerank",
+              `candidates=${rerankCandidates.length}`,
+              {
+                maxTokens: HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "equation_semantic_rerank",
+                prompt: "buildHelixAskEquationSemanticRerankPrompt",
+                timeoutMs:
+                  fastQualityMode && HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_MS > 0
+                    ? HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_MS
+                    : "disabled",
+              },
+            );
+            try {
+              const helperResult = await runHelperWithRuntimeGuard(
+                "equation_semantic_rerank",
+                FAST_QUALITY_FINALIZE_BY_MS,
+                () => {
+                  const rerankCall = runHelixAskLocalWithOverflowRetry(
+                    {
+                      prompt: rerankPrompt,
+                      max_tokens: HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS,
+                      temperature: Math.min(parsed.data.temperature ?? 0.15, 0.25),
+                      seed: parsed.data.seed,
+                      stop: parsed.data.stop,
+                    },
+                    {
+                      personaId,
+                      sessionId: parsed.data.sessionId,
+                      traceId: askTraceId,
+                    },
+                    {
+                      fallbackMaxTokens: HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS,
+                      allowContextDrop: true,
+                      label: "equation_semantic_rerank",
+                    },
+                  );
+                  if (fastQualityMode && HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_MS > 0) {
+                    return withTimeout(
+                      rerankCall,
+                      HELIX_ASK_EQUATION_SEMANTIC_RERANK_TIMEOUT_MS,
+                      "equation_semantic_rerank",
+                    );
+                  }
+                  return rerankCall;
+                },
+              );
+              if (helperResult) {
+                const { result: rerankResult, overflow: rerankOverflow, llm: rerankLlm } = helperResult;
+                recordOverflow("equation_semantic_rerank", rerankOverflow);
+                appendLlmCallDebug(rerankLlm);
+                const rerankParse = parseHelixAskEquationSemanticRerankScores(
+                  rerankResult.text ?? "",
+                  rerankCandidates,
+                );
+                equationSemanticRerankScores = rerankParse.scoresByKey;
+                equationSemanticRerankUsed = rerankParse.used;
+                equationSemanticRerankReason = rerankParse.reason;
+                answerPath.push(
+                  rerankParse.used
+                    ? "equationSemanticRerank:applied"
+                    : `equationSemanticRerank:skipped:${rerankParse.reason ?? "no_reason"}`,
+                );
+                logStepEnd(
+                  "LLM equation semantic rerank",
+                  rerankParse.used ? "applied" : "rejected",
+                  rerankStart,
+                  true,
+                  {
+                    fn: "runHelixAskLocalWithOverflowRetry",
+                    label: "equation_semantic_rerank",
+                    scoreCount: Object.keys(rerankParse.scoresByKey).length,
+                  },
+                );
+              } else {
+                equationSemanticRerankReason = "timeout";
+                logStepEnd("LLM equation semantic rerank", "timeout", rerankStart, false, {
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "equation_semantic_rerank",
+                  error: "helper_timeout_fallback",
+                });
+              }
+            } catch (error) {
+              equationSemanticRerankReason =
+                error instanceof Error ? error.message : String(error);
+              logStepEnd("LLM equation semantic rerank", "error", rerankStart, false, {
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "equation_semantic_rerank",
+                error: equationSemanticRerankReason,
+              });
+            }
+          }
+        } else {
+          equationSemanticRerankReason = "insufficient_candidates";
+        }
+      }
+      checkEquationIntentContractStability("selector_pre");
+      const equationSelectorShadow =
+        equationPromptDetected && !equationGenericBypassApplied
+          ? buildEquationClaimBackingAssembly({
+              question: baseQuestion,
+              draftAnswer: cleaned,
+              answerContract,
+              evidenceText: finalCanonicalEvidence.evidenceWithSources,
+              docBlocks,
+              codeAlignment,
+              stage05Cards: stage05EvidenceCards,
+              allowedCitations: normalizeCitations([
+                ...contractCitationTokens,
+                ...allowedSourcePaths,
+                ...finalCanonicalEvidence.contextFiles,
+                ...finalCanonicalEvidence.citationTokens,
+              ]),
+              queryConstraints,
+              strictPrompt: equationQuoteStrictRequired,
+              explicitPathOnlyExtraction: equationExplicitPathOnlyExtraction,
+              semanticRerankScores: equationSemanticRerankScores,
+              intentContract: equationIntentContract,
+              recoveryReason: equationRecoveryReason,
+            })
+          : null;
+      let equationSelectorResolved = equationSelectorShadow;
+      if (
+        equationPromptDetected &&
+        equationSelectorResolved &&
+        !equationSelectorResolved.primarySelected &&
+        equationRecoveryAttempts < HELIX_ASK_EQUATION_RECOVERY_MAX_ATTEMPTS
+      ) {
+        if (
+          equationIntentContract.ask_mode === "specific" &&
+          equationIntentContract.symbol_targets.length > 0
+        ) {
+          equationRecoveryReason = "missing_symbol";
+        } else if (
+          equationIntentContract.ask_mode === "specific" &&
+          equationIntentContract.explicit_paths.length > 0
+        ) {
+          equationRecoveryReason = "missing_path_anchor";
+        } else {
+          equationRecoveryReason = "low_primary_confidence";
+        }
+        equationRecoveryAttempts += 1;
+        answerPath.push(`equationRecovery:attempt:${equationRecoveryReason}`);
+        const recovered = buildEquationClaimBackingAssembly({
+          question: baseQuestion,
+          draftAnswer: cleaned,
+          answerContract,
+          evidenceText: finalCanonicalEvidence.evidenceWithSources,
+          docBlocks,
+          codeAlignment,
+          stage05Cards: stage05EvidenceCards,
+          allowedCitations: normalizeCitations([
+            ...equationIntentContract.explicit_paths,
+            ...contractCitationTokens,
+            ...allowedSourcePaths,
+            ...finalCanonicalEvidence.contextFiles,
+            ...finalCanonicalEvidence.citationTokens,
+          ]),
+          queryConstraints,
+          strictPrompt: equationQuoteStrictRequired,
+          explicitPathOnlyExtraction: equationExplicitPathOnlyExtraction,
+          semanticRerankScores: equationSemanticRerankScores,
+          intentContract: equationIntentContract,
+          recoveryReason: equationRecoveryReason,
+        });
+        if (recovered?.primarySelected) {
+          equationSelectorResolved = recovered;
+          answerPath.push("equationRecovery:applied");
+        } else {
+          answerPath.push("equationRecovery:no_change");
+        }
+      }
+      const equationSelectorEnforced =
+        equationPromptDetected &&
+        !equationGenericBypassApplied &&
+        (HELIX_ASK_EQUATION_SELECTOR_ROLLOUT_PHASE >= 3 ||
+          (HELIX_ASK_EQUATION_SELECTOR_ROLLOUT_PHASE >= 2 &&
+            equationIntentContract.ask_mode === "specific"));
+      const equationSelectorFirst = equationSelectorEnforced ? equationSelectorResolved : null;
+      const equationSelectorLocked = Boolean(equationSelectorFirst?.selectorLocked);
+      if (debugPayload && equationPromptDetected) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.equation_selector_rollout_phase = HELIX_ASK_EQUATION_SELECTOR_ROLLOUT_PHASE;
+        debugRecord.equation_selector_enforced = equationSelectorEnforced;
+        debugRecord.shadow_primary_key = equationSelectorResolved?.primaryKey ?? null;
+        debugRecord.shadow_symbol_hit_rate = equationSelectorResolved?.symbolTargetHitRate ?? null;
+        debugRecord.equation_selector_shadow_rescue_applied = false;
+        debugRecord.equation_recovery_attempts = equationRecoveryAttempts;
+        debugRecord.equation_recovery_reason = equationRecoveryReason;
+      }
+      if (equationSelectorFirst) {
+        cleaned = equationSelectorFirst.text;
+        equationBackingTentative = equationSelectorFirst.tentative;
+        equationBackingSelectedPaths = equationSelectorFirst.selectedPaths.slice(0, 12);
+        equationSelectorPrimaryKey = equationSelectorFirst.primaryKey;
+        equationFallbackAllowPaths = normalizeCitations([
+          ...equationFallbackAllowPaths,
+          ...equationBackingSelectedPaths,
+        ]);
+        equationQuoteContract = applyEquationAnchorPriority(
+          evaluateEquationQuoteContract({
+            question: baseQuestion,
+            answer: cleaned,
+            allowedCitations: contractCitationTokens,
+          }),
+          preferredEquationAnchors,
+        );
+        answerPath.push("equationSelector:first_pass_applied");
+        answerPath.push("equationSelector:locked");
+        writeEquationQuoteContractDebug();
+      } else if (
+        equationPromptDetected &&
+        equationQuoteContract.required &&
+        !equationQuoteContract.ok &&
+        equationRuntimeBudgetStage === "budget_breached"
+      ) {
+        cleaned = buildEquationUnifiedDegradeRuntimeAnswer(
+          "runtime_budget_breached",
+          contractCitationTokens,
+        );
+        equationForcedGeneralExplain = true;
+        equationBypassTriggered = true;
+        equationBypassReason = "runtime_budget_breached";
+        answerPath.push("fallback:equation_runtime_budget_general_explain");
+      }
+      const equationSelectorPrimaryAvailable = Boolean(equationSelectorResolved?.primarySelected);
+      const equationSelectorNoPrimaryAfterRecovery =
+        equationPromptDetected &&
+        !equationSelectorPrimaryAvailable &&
+        equationRecoveryAttempts >= HELIX_ASK_EQUATION_RECOVERY_MAX_ATTEMPTS;
+      const equationFallbackAllowedByState =
+        !equationPromptDetected ||
+        answerGenerationFailedForTurn ||
+        equationRuntimeBudgetStage === "budget_breached" ||
+        equationSelectorNoPrimaryAfterRecovery;
+      if (
+        equationPromptDetected &&
+        !equationSelectorLocked &&
+        !equationForcedGeneralExplain &&
+        !answerGenerationFailedForTurn &&
+        equationRuntimeBudgetStage !== "budget_breached" &&
+        equationSelectorPrimaryAvailable &&
+        equationSelectorResolved?.text?.trim()
+      ) {
+        cleaned = equationSelectorResolved.text.trim();
+        equationSelectorStateLockCommitted = true;
+        equationBackingTentative = equationSelectorResolved.tentative;
+        equationBackingSelectedPaths = equationSelectorResolved.selectedPaths.slice(0, 12);
+        equationSelectorPrimaryKey = equationSelectorResolved.primaryKey;
+        equationFallbackAllowPaths = normalizeCitations([
+          ...equationFallbackAllowPaths,
+          ...equationBackingSelectedPaths,
+        ]);
+        equationQuoteContract = applyEquationAnchorPriority(
+          evaluateEquationQuoteContract({
+            question: baseQuestion,
+            answer: cleaned,
+            allowedCitations: contractCitationTokens,
+          }),
+          preferredEquationAnchors,
+        );
+        answerPath.push("equationSelector:state_lock_commit");
+        writeEquationQuoteContractDebug();
+      }
+      if (debugPayload && equationPromptDetected) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.equation_selector_primary_available = equationSelectorPrimaryAvailable;
+        debugRecord.equation_selector_no_primary_after_recovery = equationSelectorNoPrimaryAfterRecovery;
+        debugRecord.equation_fallback_allowed_by_state = equationFallbackAllowedByState;
+        debugRecord.equation_selector_state_lock_committed = equationSelectorStateLockCommitted;
+      }
+      if (equationSelectorLocked) {
+        answerPath.push("equationSelector:post_lock_style_only_cleanup");
+      }
+      if (
+        equationQuoteContract.required &&
+        !equationQuoteContract.ok &&
+        !stage05CodePathHardFailActive &&
+        !equationSelectorLocked &&
+        !equationForcedGeneralExplain &&
+        equationFallbackAllowedByState
+      ) {
+        if (getEquationRuntimeElapsedMs() > HELIX_ASK_EQUATION_ASK_RUNTIME_BUDGET_MS) {
+          equationRuntimeBudgetStage = "budget_breached";
+          cleaned = buildEquationUnifiedDegradeRuntimeAnswer(
+            "runtime_budget_breached",
+            contractCitationTokens,
+          );
+          equationForcedGeneralExplain = true;
+          equationBypassTriggered = true;
+          equationBypassReason = "runtime_budget_breached";
+          answerPath.push("fallback:equation_runtime_budget_general_explain");
+        }
+      }
+      if (
+        equationQuoteContract.required &&
+        !equationQuoteContract.ok &&
+        !stage05CodePathHardFailActive &&
+        !equationSelectorLocked &&
+        !equationForcedGeneralExplain &&
+        equationFallbackAllowedByState
+      ) {
         answerPath.push("equationQuoteContract:repair_attempt");
         let repairApplied = false;
         const equationRepairBudgetCheck = canStartFastHelper(
@@ -37088,9 +42260,13 @@ const executeHelixAsk = async ({
                   answer: repairText,
                   allowedCitations: contractCitationTokens,
                 });
-                if (repairedContract.ok) {
+                const repairedContractWithPriority = applyEquationAnchorPriority(
+                  repairedContract,
+                  preferredEquationAnchors,
+                );
+                if (repairedContractWithPriority.ok) {
                   cleaned = repairText;
-                  equationQuoteContract = repairedContract;
+                  equationQuoteContract = repairedContractWithPriority;
                   repairApplied = true;
                   answerPath.push("equationQuoteContract:repair_applied");
                 }
@@ -37134,9 +42310,13 @@ const executeHelixAsk = async ({
               answer: explicitPathRescue.answer,
               allowedCitations: contractCitationTokens,
             });
-            if (rescuedContract.ok) {
+            const rescuedContractWithPriority = applyEquationAnchorPriority(
+              rescuedContract,
+              preferredEquationAnchors,
+            );
+            if (rescuedContractWithPriority.ok) {
               cleaned = explicitPathRescue.answer;
-              equationQuoteContract = rescuedContract;
+              equationQuoteContract = rescuedContractWithPriority;
               repairApplied = true;
               answerPath.push("equationQuoteContract:explicit_path_rescue_applied");
               if (debugPayload) {
@@ -37152,16 +42332,887 @@ const executeHelixAsk = async ({
           }
         }
         if (!repairApplied) {
-          cleaned =
-            "I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
-            "Please provide module/path/symbol (for example: docs/warp-geometry-congruence-report.md or modules/warp/natario-warp.ts) and retry.";
-          answerPath.push("clarify:equation_quote_contract_missing");
+          const relevanceClarifyMessage =
+            equationQuoteContract.reason === "equation_relevance_missing"
+              ? buildEquationRelevanceClarifyMessage({
+                  question: baseQuestion,
+                  citationHints: contractCitationTokens,
+                  queryConstraints,
+                })
+              : null;
+          const progressiveFallbackHints = normalizeCitations([
+            ...contractCitationTokens,
+            ...(queryConstraints.collapseDomainLock
+              ? [
+                  "server/services/mixer/collapse.ts",
+                  "shared/dp-collapse.ts",
+                  "shared/collapse-benchmark.ts",
+                  "modules/dynamic/stress-energy-equations.ts",
+                ]
+              : []),
+          ]);
+          const progressiveFallback =
+            stage05EquationCoverageSatisfied || !equationQuoteStrictRequired
+              ? buildEquationProgressiveFallbackFromHints({
+                  question: baseQuestion,
+                  citationHints: progressiveFallbackHints,
+                  stage05Cards: stage05EvidenceCards,
+                  queryConstraints,
+                  maxCandidates: stage05EquationCoverageSatisfied ? 6 : 4,
+                })
+              : null;
+          const fallbackExamples = resolveEquationFallbackExamples({
+            citationHints: progressiveFallbackHints,
+            queryConstraints,
+          });
+          equationFallbackAllowPaths = normalizeCitations(fallbackExamples);
+          if (equationQuoteStrictRequired) {
+            if (progressiveFallback) {
+              cleaned = progressiveFallback.text;
+              equationFallbackAllowPaths = normalizeCitations([
+                ...equationFallbackAllowPaths,
+                ...progressiveFallback.sourceHints,
+              ]);
+              answerPath.push("fallback:equation_quote_contract_progressive");
+              if (debugPayload) {
+                (debugPayload as Record<string, unknown>).equation_quote_contract_soft_fallback = true;
+                (debugPayload as Record<string, unknown>).equation_quote_contract_soft_reason =
+                  equationQuoteContract.reason;
+                (debugPayload as Record<string, unknown>).equation_quote_contract_candidate_count =
+                  progressiveFallback.candidateCount;
+                (debugPayload as Record<string, unknown>).equation_quote_contract_candidate_sources =
+                  progressiveFallback.sourceHints.slice(0, 8);
+                (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
+                (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
+              }
+            } else {
+              const strictSoftFallback = buildEquationUnifiedDegradeRuntimeAnswer(
+                "strict_contract_unresolved",
+                contractCitationTokens,
+              );
+              if (strictSoftFallback.trim()) {
+                cleaned = strictSoftFallback.trim();
+                equationFallbackAllowPaths = normalizeCitations([
+                  ...equationFallbackAllowPaths,
+                  ...extractFilePathsFromText(cleaned),
+                  ...collectSourcesLineCitationRefs(cleaned),
+                ]);
+                answerPath.push("fallback:equation_quote_contract_strict_relaxed");
+                if (debugPayload) {
+                  (debugPayload as Record<string, unknown>).equation_quote_contract_soft_fallback = true;
+                  (debugPayload as Record<string, unknown>).equation_quote_contract_soft_reason =
+                    equationQuoteContract.reason;
+                  (debugPayload as Record<string, unknown>).equation_quote_contract_strict_relaxed = true;
+                  (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
+                  (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
+                }
+              } else {
+                cleaned =
+                  relevanceClarifyMessage ??
+                  ("I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
+                    `Please provide module/path/symbol (for example: [${fallbackExamples[0]}] or [${fallbackExamples[1]}]) and retry.`);
+                answerPath.push("clarify:equation_quote_contract_missing");
+                if (debugPayload) {
+                  (debugPayload as Record<string, unknown>).helix_ask_fail_reason =
+                    equationQuoteContract.reason === "equation_relevance_missing"
+                      ? "EQUATION_RELEVANCE_MISSING"
+                      : "EQUATION_QUOTE_CONTRACT_MISSING";
+                  (debugPayload as Record<string, unknown>).helix_ask_fail_class = "evidence_contract";
+                }
+              }
+            }
+          } else {
+            const preferBlendFallback =
+              isEquationPlusMechanismPrompt(baseQuestion) || isEquationBlendPrompt(baseQuestion);
+            const progressiveBlend =
+              preferBlendFallback && progressiveFallback
+                ? buildEquationDeterministicBlendAnswer({
+                    question: baseQuestion,
+                    candidates: progressiveFallback.candidates,
+                    maxSecondary: 3,
+                  })
+                : null;
+            cleaned =
+              progressiveBlend ??
+              progressiveFallback?.text ??
+              buildEquationUnifiedDegradeRuntimeAnswer(
+                "equation_contract_soft_fallback",
+                contractCitationTokens,
+              ) ??
+              relevanceClarifyMessage ??
+              ("I couldn't verify an exact equation quote with a matching file citation from current evidence. " +
+                `Closest files were [${fallbackExamples[0]}] and [${fallbackExamples[1]}].`);
+            equationFallbackAllowPaths = normalizeCitations([
+              ...equationFallbackAllowPaths,
+              ...extractFilePathsFromText(cleaned),
+              ...collectSourcesLineCitationRefs(cleaned),
+            ]);
+            answerPath.push("fallback:equation_quote_contract_soft");
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).equation_quote_contract_soft_fallback = true;
+              (debugPayload as Record<string, unknown>).equation_quote_contract_soft_reason =
+                equationQuoteContract.reason;
+              if (progressiveFallback) {
+                (debugPayload as Record<string, unknown>).equation_quote_contract_candidate_count =
+                  progressiveFallback.candidateCount;
+                (debugPayload as Record<string, unknown>).equation_quote_contract_candidate_sources =
+                  progressiveFallback.sourceHints.slice(0, 8);
+              }
+              (debugPayload as Record<string, unknown>).helix_ask_fail_reason = null;
+              (debugPayload as Record<string, unknown>).helix_ask_fail_class = null;
+            }
+          }
+        }
+        let equationGenericBypassNeeded = shouldApplyEquationGenericBypass({
+          question: baseQuestion,
+          draftAnswer: cleaned,
+          contract: equationQuoteContract,
+          stage05Cards: stage05EvidenceCards,
+          stage05CoverageSatisfied: stage05EquationCoverageSatisfied,
+          strictRequired: equationQuoteStrictRequired,
+        });
+        if (!equationFallbackAllowedByState) {
+          equationGenericBypassNeeded = false;
+          answerPath.push("equationQuoteContract:state_lock_skip_generic_bypass");
+        }
+        const shadowRescueMinScore = Math.max(
+          EQUATION_PRIMARY_IMPLEMENTATION_SCORE_MIN,
+          EQUATION_PRIMARY_CONFIDENCE_BY_MODE[equationIntentContract.ask_mode] - 5,
+        );
+        const shadowRescueEligible =
+          equationPromptDetected &&
+          !equationSelectorEnforced &&
+          !equationSelectorLocked &&
+          Boolean(equationSelectorResolved?.primarySelected) &&
+          Number(equationSelectorResolved?.primaryScore ?? 0) >= shadowRescueMinScore;
+        if (equationGenericBypassNeeded && shadowRescueEligible && equationSelectorResolved) {
+          cleaned = equationSelectorResolved.text;
+          equationBackingTentative = equationSelectorResolved.tentative;
+          equationBackingSelectedPaths = equationSelectorResolved.selectedPaths.slice(0, 12);
+          equationSelectorPrimaryKey = equationSelectorResolved.primaryKey;
+          equationFallbackAllowPaths = normalizeCitations([
+            ...equationFallbackAllowPaths,
+            ...equationBackingSelectedPaths,
+          ]);
+          equationQuoteContract = applyEquationAnchorPriority(
+            evaluateEquationQuoteContract({
+              question: baseQuestion,
+              answer: cleaned,
+              allowedCitations: contractCitationTokens,
+            }),
+            preferredEquationAnchors,
+          );
+          equationGenericBypassNeeded = false;
+          answerPath.push("equationSelector:shadow_rescue_applied");
           if (debugPayload) {
-            (debugPayload as Record<string, unknown>).helix_ask_fail_reason = "EQUATION_QUOTE_CONTRACT_MISSING";
-            (debugPayload as Record<string, unknown>).helix_ask_fail_class = "evidence_contract";
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_selector_shadow_rescue_applied = true;
+            debugRecord.equation_selector_shadow_rescue_score =
+              equationSelectorResolved.primaryScore ?? null;
+            debugRecord.equation_selector_shadow_rescue_min_score = shadowRescueMinScore;
+          }
+        }
+        if (equationGenericBypassNeeded) {
+          answerPath.push("equationQuoteContract:generic_bypass_attempt");
+          let genericBypassApplied = false;
+          const genericBypassBudgetCheck = canStartFastHelper(
+            "equation_generic_bypass",
+            fastQualityBudgets.helperMinMs,
+            fastStageDeadlines.finalize,
+          );
+          if (fastQualityMode && !genericBypassBudgetCheck.ok) {
+            recordFastDecision(
+              "equation_generic_bypass",
+              "skip_llm",
+              genericBypassBudgetCheck.reason ?? "min_budget_not_met",
+              genericBypassBudgetCheck.remainingMs,
+              fastStageDeadlines.finalize,
+            );
+          } else {
+            const genericBypassPrompt = buildHelixAskEquationGenericBypassPrompt({
+              question: baseQuestion,
+              dominantFamily: resolveDominantEquationFamily(baseQuestion, queryConstraints),
+              responseLanguage,
+            });
+            const genericBypassTokens = Math.min(
+              640,
+              Math.max(280, Math.round((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.5)),
+            );
+            const genericBypassStart = logStepStart(
+              "LLM equation generic bypass",
+              `tokens=${genericBypassTokens}`,
+              {
+                maxTokens: genericBypassTokens,
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "equation_generic_bypass",
+                prompt: "buildHelixAskEquationGenericBypassPrompt",
+              },
+            );
+            try {
+              const helperResult = await runHelperWithRuntimeGuard(
+                "equation_generic_bypass",
+                FAST_QUALITY_FINALIZE_BY_MS,
+                () =>
+                  runHelixAskLocalWithOverflowRetry(
+                    {
+                      prompt: genericBypassPrompt,
+                      max_tokens: genericBypassTokens,
+                      temperature: Math.min(parsed.data.temperature ?? 0.2, 0.35),
+                      seed: parsed.data.seed,
+                      stop: parsed.data.stop,
+                    },
+                    {
+                      personaId,
+                      sessionId: parsed.data.sessionId,
+                      traceId: askTraceId,
+                    },
+                    {
+                      fallbackMaxTokens: genericBypassTokens,
+                      allowContextDrop: true,
+                      label: "equation_generic_bypass",
+                    },
+                  ),
+              );
+              if (helperResult) {
+                const { result: genericResult, overflow: genericOverflow, llm: genericLlm } = helperResult;
+                recordOverflow("equation_generic_bypass", genericOverflow);
+                appendLlmCallDebug(genericLlm);
+                let genericText = formatHelixAskAnswer(
+                  stripPromptEchoFromAnswer(genericResult.text ?? "", baseQuestion).trim(),
+                );
+                genericText = stripInlineJsonArtifacts(stripTruncationMarkers(genericText));
+                genericText = stripRunawayAnswerArtifacts(genericText).trim();
+                const genericInvalid =
+                  /^clarify:/i.test(genericText) ||
+                  hasModelPlaceholderOrStub(genericText) ||
+                  hasArtifactJsonSpill(genericText);
+                if (!genericInvalid && genericText.length >= 120) {
+                  const equationDeterministicBypass = equationPromptDetected
+                    ? buildEquationUnifiedDegradeRuntimeAnswer(
+                        "equation_generic_bypass",
+                        contractCitationTokens,
+                      )
+                    : null;
+                  cleaned =
+                    equationDeterministicBypass && equationDeterministicBypass.trim().length > 0
+                      ? equationDeterministicBypass.trim()
+                      : genericText;
+                  openWorldBypassMode = equationPromptDetected ? "off" : "active";
+                  equationGenericBypassApplied = true;
+                  equationBackingTentative = true;
+                  genericBypassApplied = true;
+                  equationBypassTriggered = true;
+                  equationBypassReason = equationQuoteContract.reason ?? "generic_bypass";
+                  answerPath.push("fallback:equation_generic_llm_bypass");
+                  if (equationDeterministicBypass && equationDeterministicBypass.trim().length > 0) {
+                    answerPath.push("fallback:equation_generic_deterministic_unified");
+                  }
+                  if (debugPayload) {
+                    const debugRecord = debugPayload as Record<string, unknown>;
+                    debugRecord.equation_generic_bypass_applied = true;
+                    debugRecord.equation_generic_bypass_reason = equationQuoteContract.reason;
+                    debugRecord.equation_generic_bypass_tokens = genericBypassTokens;
+                    debugRecord.equation_generic_bypass_mode =
+                      equationDeterministicBypass && equationDeterministicBypass.trim().length > 0
+                        ? "deterministic_unified"
+                        : "open_world_llm";
+                    debugRecord.open_world_bypass_mode = openWorldBypassMode;
+                    debugRecord.helix_ask_fail_reason = null;
+                    debugRecord.helix_ask_fail_class = null;
+                  }
+                }
+                logStepEnd(
+                  "LLM equation generic bypass",
+                  genericBypassApplied ? "applied" : "rejected",
+                  genericBypassStart,
+                  true,
+                  {
+                    fn: "runHelixAskLocalWithOverflowRetry",
+                    label: "equation_generic_bypass",
+                    textLength: genericText.length,
+                  },
+                );
+              } else {
+                logStepEnd("LLM equation generic bypass", "timeout", genericBypassStart, false, {
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "equation_generic_bypass",
+                  error: "helper_timeout_fallback",
+                });
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              logStepEnd("LLM equation generic bypass", "error", genericBypassStart, false, {
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "equation_generic_bypass",
+                error: message,
+              });
+            }
+          }
+          if (debugPayload && !equationGenericBypassApplied) {
+            (debugPayload as Record<string, unknown>).equation_generic_bypass_applied = false;
+            (debugPayload as Record<string, unknown>).equation_generic_bypass_reason =
+              equationQuoteContract.reason;
           }
         }
         writeEquationQuoteContractDebug();
+      } else if (equationQuoteContract.required && !equationQuoteContract.ok && stage05CodePathHardFailActive) {
+        answerPath.push("equationQuoteContract:skipped_stage05_code_path_hard_fail");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).equation_quote_contract_skipped =
+            "stage05_code_path_hard_fail";
+        }
+        writeEquationQuoteContractDebug();
+      }
+
+      equationRuntimeBudgetStage =
+        equationPromptDetected &&
+        getEquationRuntimeElapsedMs() > HELIX_ASK_EQUATION_ASK_RUNTIME_BUDGET_MS
+          ? "budget_breached"
+          : "within_budget";
+      const equationMechanismRequested =
+        equationQuoteContract.required &&
+        (isEquationBlendPrompt(baseQuestion) || HELIX_ASK_EQUATION_MECHANISM_EXPLAIN_RE.test(baseQuestion));
+      const equationMechanismMode = isEquationPlusMechanismPrompt(baseQuestion)
+        ? "equation_plus_mechanism"
+        : "equation_quote_blend";
+      const equationSoftFallbackActive = Boolean(
+        (debugPayload as Record<string, unknown> | null | undefined)
+          ?.equation_quote_contract_soft_fallback,
+      );
+      const equationFallbackCandidateCountRaw = Number(
+        (debugPayload as Record<string, unknown> | null | undefined)
+          ?.equation_quote_contract_candidate_count ?? 0,
+      );
+      const equationFallbackCandidateCount = Number.isFinite(equationFallbackCandidateCountRaw)
+        ? Math.max(0, Math.floor(equationFallbackCandidateCountRaw))
+        : 0;
+      const equationCandidateFallbackAnswer =
+        /grounded equation candidates were retrieved:/i.test(cleaned);
+      const equationExpansionTrigger =
+        isEquationAnchorOnlyAnswer(cleaned) ||
+        equationCandidateFallbackAnswer ||
+        equationSoftFallbackActive ||
+        cleaned.length <= 560;
+      const equationMechanismExpandEligible =
+        equationQuoteContract.ok ||
+        equationSoftFallbackActive ||
+        (stage05EquationCoverageSatisfied && !equationQuoteStrictRequired) ||
+        (equationFallbackCandidateCount > 0 && !equationQuoteStrictRequired);
+      if (
+        equationMechanismRequested &&
+        equationMechanismExpandEligible &&
+        equationExpansionTrigger &&
+        !stage05CodePathHardFailActive &&
+        !equationGenericBypassApplied &&
+        !equationSelectorLocked &&
+        !equationForcedGeneralExplain &&
+        equationRuntimeBudgetStage === "within_budget"
+      ) {
+        answerPath.push("equationMechanismMode:expand_attempt");
+        let equationMechanismExpanded = false;
+        const expandBudgetCheck = canStartFastHelper(
+          "equation_mechanism_expand",
+          fastQualityBudgets.helperMinMs,
+          fastStageDeadlines.finalize,
+        );
+        if (fastQualityMode && !expandBudgetCheck.ok) {
+          recordFastDecision(
+            "equation_mechanism_expand",
+            "skip_llm",
+            expandBudgetCheck.reason ?? "min_budget_not_met",
+            expandBudgetCheck.remainingMs,
+            fastStageDeadlines.finalize,
+          );
+        } else {
+          const expandPrompt = buildHelixAskEquationMechanismExpansionPrompt({
+            question: baseQuestion,
+            draft: cleaned,
+            evidenceSnippet: clipAskText(
+              finalCanonicalEvidence.evidenceWithSources,
+              HELIX_ASK_SCAFFOLD_CONTEXT_CHARS,
+            ),
+            citationHints: contractCitationTokens.slice(0, 10),
+            responseLanguage,
+          });
+          const expandStart = logStepStart(
+            "LLM equation mechanism expansion",
+            `tokens=${Math.min(768, Math.max(320, Math.round((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.55)))}`,
+            {
+              maxTokens: Math.min(768, Math.max(320, Math.round((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.55))),
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "equation_mechanism_expand",
+              prompt: "buildHelixAskEquationMechanismExpansionPrompt",
+            },
+          );
+          try {
+            const helperResult = await runHelperWithRuntimeGuard(
+              "equation_mechanism_expand",
+              FAST_QUALITY_FINALIZE_BY_MS,
+              () =>
+                runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: expandPrompt,
+                    max_tokens: Math.min(
+                      768,
+                      Math.max(320, Math.round((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.55)),
+                    ),
+                    temperature: Math.min(parsed.data.temperature ?? 0.15, 0.35),
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: Math.min(
+                      768,
+                      Math.max(320, Math.round((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.55)),
+                    ),
+                    allowContextDrop: true,
+                    label: "equation_mechanism_expand",
+                  },
+                ),
+            );
+            if (helperResult) {
+              const { result: expandResult, overflow: expandOverflow, llm: expandLlm } = helperResult;
+              recordOverflow("equation_mechanism_expand", expandOverflow);
+              appendLlmCallDebug(expandLlm);
+              let expandedText = formatHelixAskAnswer(
+                stripPromptEchoFromAnswer(expandResult.text ?? "", baseQuestion).trim(),
+              );
+              expandedText = stripInlineJsonArtifacts(stripTruncationMarkers(expandedText));
+              expandedText = stripRunawayAnswerArtifacts(expandedText).trim();
+              const clarifyOnly = /^clarify:/i.test(expandedText);
+              if (!clarifyOnly && expandedText.length > 0) {
+                const expandedContract = evaluateEquationQuoteContract({
+                  question: baseQuestion,
+                  answer: expandedText,
+                  allowedCitations: contractCitationTokens,
+                });
+                const expandedContractWithPriority = applyEquationAnchorPriority(
+                  expandedContract,
+                  preferredEquationAnchors,
+                );
+                const expandedMechanismPresent =
+                  HELIX_ASK_MECHANISM_SENTENCE_RE.test(expandedText) ||
+                  /\b(because|therefore|which means|this means|feeds|maps to|used by|implemented|computed|output)\b/i.test(
+                    expandedText,
+                  );
+                if (
+                  expandedContractWithPriority.ok &&
+                  expandedMechanismPresent &&
+                  expandedText.length >= Math.max(240, cleaned.length + 60)
+                ) {
+                  cleaned = expandedText;
+                  equationQuoteContract = expandedContractWithPriority;
+                  equationMechanismExpanded = true;
+                  answerPath.push("equationMechanismMode:expand_applied");
+                }
+              }
+              logStepEnd(
+                "LLM equation mechanism expansion",
+                equationMechanismExpanded ? "applied" : "rejected",
+                expandStart,
+                true,
+                {
+                  fn: "runHelixAskLocalWithOverflowRetry",
+                  label: "equation_mechanism_expand",
+                  textLength: expandedText.length,
+                },
+              );
+            } else {
+              logStepEnd("LLM equation mechanism expansion", "timeout", expandStart, false, {
+                fn: "runHelixAskLocalWithOverflowRetry",
+                label: "equation_mechanism_expand",
+                error: "helper_timeout_fallback",
+              });
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logStepEnd("LLM equation mechanism expansion", "error", expandStart, false, {
+              fn: "runHelixAskLocalWithOverflowRetry",
+              label: "equation_mechanism_expand",
+              error: message,
+            });
+          }
+        }
+        if (!equationMechanismExpanded) {
+          answerPath.push("equationMechanismMode:expand_skipped");
+          if (isEquationAnchorOnlyAnswer(cleaned) || equationCandidateFallbackAnswer) {
+            const nonSourceLines = cleaned
+              .split(/\r?\n/)
+              .map((line) => line.trim())
+              .filter(Boolean)
+              .filter((line) => !/^sources?\s*:/i.test(line));
+            const anchorLines = nonSourceLines.slice(0, Math.min(2, nonSourceLines.length));
+            const fallbackEquationLine =
+              anchorLines.find((line) => EQUATION_IN_TEXT_RE.test(line)) ??
+              nonSourceLines.find((line) => EQUATION_IN_TEXT_RE.test(line)) ??
+              "";
+            const citationHints = normalizeCitations([
+              ...equationQuoteContract.matchedCitations,
+              ...contractCitationTokens,
+            ]);
+            const primaryCitation = citationHints[0] ?? null;
+            const codeCitation =
+              citationHints.find(
+                (entry) =>
+                  entry !== primaryCitation &&
+                  /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|c|cc|cpp|h|hpp|cs|m|swift|kt)$/i.test(
+                    entry,
+                  ),
+              ) ?? null;
+            if (fallbackEquationLine && primaryCitation) {
+              const fallbackLines: string[] = [];
+              if (anchorLines.length > 0) {
+                fallbackLines.push(...anchorLines);
+              } else {
+                fallbackLines.push(`Exact equation line (${primaryCitation}):`);
+                fallbackLines.push(fallbackEquationLine);
+              }
+              fallbackLines.push(
+                "Meaning: this equation states a concrete relation between the listed geometric terms, so sign/derivative choices determine the modeled congruence behavior.",
+              );
+              fallbackLines.push(
+                codeCitation
+                  ? `System usage: this relation is anchored in [${primaryCitation}] and linked code context in [${codeCitation}] for congruence interpretation in this run.`
+                  : `System usage: this relation is anchored in [${primaryCitation}] for congruence interpretation in this run; no direct executable code path was confirmed.`,
+              );
+              if (citationHints.length > 0) {
+                fallbackLines.push(`Sources: ${citationHints.slice(0, 6).join(", ")}`);
+              }
+              const deterministicFallback = fallbackLines.join("\n").trim();
+              const deterministicContract = evaluateEquationQuoteContract({
+                question: baseQuestion,
+                answer: deterministicFallback,
+                allowedCitations: contractCitationTokens,
+              });
+              const deterministicContractWithPriority = applyEquationAnchorPriority(
+                deterministicContract,
+                preferredEquationAnchors,
+              );
+              if (deterministicContractWithPriority.ok) {
+                cleaned = deterministicFallback;
+                equationQuoteContract = deterministicContractWithPriority;
+                equationMechanismExpanded = true;
+                answerPath.push("equationMechanismMode:deterministic_fallback_applied");
+              }
+            }
+          }
+        }
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).equation_mechanism_mode = equationMechanismMode;
+          (debugPayload as Record<string, unknown>).equation_mechanism_requested =
+            equationMechanismRequested;
+          (debugPayload as Record<string, unknown>).equation_mechanism_expand_eligible =
+            equationMechanismExpandEligible;
+          (debugPayload as Record<string, unknown>).equation_mechanism_expand_triggered =
+            equationExpansionTrigger;
+          (debugPayload as Record<string, unknown>).equation_mechanism_expand_applied =
+            equationMechanismExpanded;
+        }
+        writeEquationQuoteContractDebug();
+      }
+
+      const equationClaimBacking = equationGenericBypassApplied
+        ? null
+        : equationForcedGeneralExplain
+          ? null
+          : equationSelectorFirst ??
+            buildEquationClaimBackingAssembly({
+            question: baseQuestion,
+            draftAnswer: cleaned,
+            answerContract,
+            evidenceText: finalCanonicalEvidence.evidenceWithSources,
+            docBlocks,
+            codeAlignment,
+            stage05Cards: stage05EvidenceCards,
+            allowedCitations: normalizeCitations([
+              ...contractCitationTokens,
+              ...allowedSourcePaths,
+              ...finalCanonicalEvidence.contextFiles,
+              ...finalCanonicalEvidence.citationTokens,
+            ]),
+            queryConstraints,
+            strictPrompt: equationQuoteStrictRequired,
+            explicitPathOnlyExtraction: equationExplicitPathOnlyExtraction,
+            intentContract: equationIntentContract,
+            recoveryReason: equationRecoveryReason,
+          });
+      if (equationPromptDetected || equationQuoteContract.required) {
+        if (equationGenericBypassApplied && debugPayload) {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.equation_backing_mode = "generic_bypass";
+          debugRecord.equation_claim_count = 0;
+          debugRecord.equation_link_pass_used = false;
+          debugRecord.equation_link_timeout = false;
+          debugRecord.equation_candidate_total = 0;
+          debugRecord.equation_candidate_rejected_total = 0;
+          debugRecord.equation_candidate_rejected_reasons = [];
+          debugRecord.equation_primary_selected = null;
+          debugRecord.equation_selector_primary_confidence = null;
+          debugRecord.equation_selector_primary_family_match = false;
+          debugRecord.equation_support_selected_count = 0;
+          debugRecord.equation_selector_support_count = 0;
+          debugRecord.equation_secondary_cross_topic_count = 0;
+          debugRecord.equation_backing_tentative = true;
+          debugRecord.equation_backing_reason = "generic_bypass_for_feedback_loop";
+          debugRecord.equation_dominant_family = resolveDominantEquationFamily(
+            baseQuestion,
+            queryConstraints,
+          );
+          debugRecord.equation_primary_class = null;
+          debugRecord.equation_primary_derivation_level = null;
+          debugRecord.equation_primary_score = null;
+          debugRecord.equation_rejected_count = 0;
+          debugRecord.equation_rejected_reasons = [];
+          debugRecord.primary_anchor_valid = false;
+          debugRecord.primary_family_match = false;
+          debugRecord.symbol_target_hit_rate = null;
+          debugRecord.claim_to_equation_link_strength = 0;
+          debugRecord.cross_topic_contamination_rate = 0;
+          debugRecord.artifact_leak_rate = 0;
+          debugRecord.equation_bypass_triggered =
+            equationBypassTriggered || equationGenericBypassApplied;
+          debugRecord.equation_bypass_reason =
+            equationBypassReason ?? equationQuoteContract.reason ?? "generic_bypass";
+          debugRecord.equation_runtime_budget_stage = equationRuntimeBudgetStage;
+          debugRecord.equation_semantic_rerank_used = equationSemanticRerankUsed;
+          debugRecord.equation_semantic_rerank_reason = equationSemanticRerankReason;
+          debugRecord.equation_semantic_rerank_candidate_count =
+            equationSemanticRerankCandidateCount;
+          debugRecord.equation_semantic_rerank_score_count = Object.keys(
+            equationSemanticRerankScores,
+          ).length;
+        } else if (equationClaimBacking) {
+          cleaned = equationClaimBacking.text;
+          equationBackingTentative = equationClaimBacking.tentative;
+          equationBackingSelectedPaths = equationClaimBacking.selectedPaths.slice(0, 12);
+          equationSelectorPrimaryKey = equationClaimBacking.primaryKey;
+          equationFallbackAllowPaths = normalizeCitations([
+            ...equationFallbackAllowPaths,
+            ...equationBackingSelectedPaths,
+          ]);
+          equationQuoteContract = applyEquationAnchorPriority(
+            evaluateEquationQuoteContract({
+              question: baseQuestion,
+              answer: cleaned,
+              allowedCitations: contractCitationTokens,
+            }),
+            preferredEquationAnchors,
+          );
+          writeEquationQuoteContractDebug();
+          answerPath.push("equationBackingMode:equation_claim_backing");
+          if (equationBackingTentative) {
+            answerPath.push("equationBackingMode:tentative");
+          }
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_backing_mode = equationClaimBacking.mode;
+            debugRecord.equation_claim_count = equationClaimBacking.claimCount;
+            debugRecord.equation_link_pass_used = equationClaimBacking.linkPassUsed;
+            debugRecord.equation_link_timeout = equationClaimBacking.linkTimeout;
+            debugRecord.equation_candidate_total = equationClaimBacking.candidateTotal;
+            debugRecord.equation_candidate_rejected_total =
+              equationClaimBacking.candidateRejectedTotal;
+            debugRecord.equation_candidate_rejected_reasons =
+              equationClaimBacking.candidateRejectedReasons;
+            debugRecord.equation_primary_selected = equationClaimBacking.primarySelected;
+            debugRecord.equation_selector_primary_confidence = equationClaimBacking.primaryScore;
+            debugRecord.equation_selector_primary_family_match =
+              equationClaimBacking.primaryFamilyMatch;
+            debugRecord.equation_support_selected_count = equationClaimBacking.supportSelectedCount;
+            debugRecord.equation_selector_support_count = equationClaimBacking.supportSelectedCount;
+            debugRecord.equation_secondary_cross_topic_count =
+              equationClaimBacking.secondaryCrossTopicCount;
+            debugRecord.equation_backing_tentative = equationClaimBacking.tentative;
+            debugRecord.equation_backing_reason = equationClaimBacking.reason;
+            debugRecord.equation_dominant_family = equationClaimBacking.dominantFamily;
+            debugRecord.equation_primary_class = equationClaimBacking.primaryClass;
+            debugRecord.equation_primary_derivation_level =
+              equationClaimBacking.primaryDerivationLevel;
+            debugRecord.equation_primary_score = equationClaimBacking.primaryScore;
+            debugRecord.equation_rejected_count = equationClaimBacking.rejectedCount;
+            debugRecord.equation_rejected_reasons = equationClaimBacking.rejectedReasons;
+            debugRecord.primary_anchor_valid = equationClaimBacking.primaryAnchorValid;
+            debugRecord.primary_family_match = equationClaimBacking.primaryFamilyMatch;
+            debugRecord.symbol_target_hit_rate = equationClaimBacking.symbolTargetHitRate;
+            debugRecord.claim_to_equation_link_strength =
+              equationClaimBacking.claimToEquationLinkStrength;
+            debugRecord.cross_topic_contamination_rate =
+              equationClaimBacking.crossTopicContaminationRate;
+            debugRecord.artifact_leak_rate = equationClaimBacking.artifactLeakRate;
+            debugRecord.equation_bypass_triggered = equationBypassTriggered;
+            debugRecord.equation_bypass_reason = equationBypassReason;
+            debugRecord.equation_runtime_budget_stage = equationRuntimeBudgetStage;
+            debugRecord.equation_semantic_rerank_used = equationSemanticRerankUsed;
+            debugRecord.equation_semantic_rerank_reason = equationSemanticRerankReason;
+            debugRecord.equation_semantic_rerank_candidate_count =
+              equationSemanticRerankCandidateCount;
+            debugRecord.equation_semantic_rerank_score_count = Object.keys(
+              equationSemanticRerankScores,
+            ).length;
+            debugRecord.helix_ask_fail_reason = null;
+            debugRecord.helix_ask_fail_class = null;
+            const equationIntentGatePass =
+              (equationClaimBacking.primaryAnchorValid ||
+                equationClaimBacking.reason === "specific_no_symbol_match") &&
+              (equationClaimBacking.primaryFamilyMatch ||
+                equationClaimBacking.primarySelected == null) &&
+              equationClaimBacking.crossTopicContaminationRate <= 0.75 &&
+              equationClaimBacking.artifactLeakRate <= 0.12;
+            debugRecord.equation_intent_gate_pass = equationIntentGatePass;
+            answerPath.push(
+              equationIntentGatePass ? "equationQuality:intent_gate_pass" : "equationQuality:intent_gate_fail",
+            );
+          }
+        } else if (debugPayload) {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.equation_backing_mode = "equation_claim_backing";
+          debugRecord.equation_claim_count = 0;
+          debugRecord.equation_link_pass_used = true;
+          debugRecord.equation_link_timeout = false;
+          debugRecord.equation_candidate_total = 0;
+          debugRecord.equation_candidate_rejected_total = 0;
+          debugRecord.equation_candidate_rejected_reasons = [];
+          debugRecord.equation_primary_selected = null;
+          debugRecord.equation_selector_primary_confidence = null;
+          debugRecord.equation_selector_primary_family_match = false;
+          debugRecord.equation_support_selected_count = 0;
+          debugRecord.equation_selector_support_count = 0;
+          debugRecord.equation_secondary_cross_topic_count = 0;
+          debugRecord.equation_backing_tentative = false;
+          debugRecord.equation_backing_reason = equationExplicitPathOnlyExtraction
+            ? "explicit_path_only_no_match"
+            : "no_backing_generated";
+          debugRecord.equation_dominant_family = resolveDominantEquationFamily(
+            baseQuestion,
+            queryConstraints,
+          );
+          debugRecord.equation_primary_class = null;
+          debugRecord.equation_primary_derivation_level = null;
+          debugRecord.equation_primary_score = null;
+          debugRecord.equation_rejected_count = 0;
+          debugRecord.equation_rejected_reasons = [];
+          debugRecord.primary_anchor_valid = false;
+          debugRecord.primary_family_match = false;
+          debugRecord.symbol_target_hit_rate = null;
+          debugRecord.claim_to_equation_link_strength = 0;
+          debugRecord.cross_topic_contamination_rate = 0;
+          debugRecord.artifact_leak_rate = 0;
+          debugRecord.equation_bypass_triggered = equationBypassTriggered;
+          debugRecord.equation_bypass_reason = equationBypassReason;
+          debugRecord.equation_runtime_budget_stage = equationRuntimeBudgetStage;
+          debugRecord.equation_semantic_rerank_used = equationSemanticRerankUsed;
+          debugRecord.equation_semantic_rerank_reason = equationSemanticRerankReason;
+          debugRecord.equation_semantic_rerank_candidate_count =
+            equationSemanticRerankCandidateCount;
+          debugRecord.equation_semantic_rerank_score_count = Object.keys(
+            equationSemanticRerankScores,
+          ).length;
+        }
+      }
+
+      const equationSectionGuardNeeded =
+        equationPromptDetected &&
+        !equationGenericBypassApplied &&
+        !equationSelectorLocked &&
+        !equationExplicitPathOnlyExtraction &&
+        !hasEquationStructuredSections(cleaned);
+      if (equationSectionGuardNeeded) {
+        const sectionGuardAllowed = normalizeCitations([
+          ...contractCitationTokens,
+          ...allowedSourcePaths,
+          ...finalCanonicalEvidence.contextFiles,
+          ...finalCanonicalEvidence.citationTokens,
+          ...equationFallbackAllowPaths,
+        ]);
+        const sectionGuardBacking = buildEquationClaimBackingAssembly({
+          question: baseQuestion,
+          draftAnswer: cleaned,
+          answerContract,
+          evidenceText: finalCanonicalEvidence.evidenceWithSources,
+          docBlocks,
+          codeAlignment,
+          stage05Cards: stage05EvidenceCards,
+          allowedCitations: sectionGuardAllowed,
+          queryConstraints,
+          strictPrompt: false,
+          explicitPathOnlyExtraction: false,
+          intentContract: equationIntentContract,
+          recoveryReason: equationRecoveryReason,
+        });
+        if (sectionGuardBacking?.text?.trim()) {
+          cleaned = sectionGuardBacking.text.trim();
+          equationBackingTentative = sectionGuardBacking.tentative;
+          equationBackingSelectedPaths = sectionGuardBacking.selectedPaths.slice(0, 12);
+          equationFallbackAllowPaths = normalizeCitations([
+            ...equationFallbackAllowPaths,
+            ...equationBackingSelectedPaths,
+          ]);
+          equationQuoteContract = applyEquationAnchorPriority(
+            evaluateEquationQuoteContract({
+              question: baseQuestion,
+              answer: cleaned,
+              allowedCitations: contractCitationTokens,
+            }),
+            preferredEquationAnchors,
+          );
+          writeEquationQuoteContractDebug();
+          answerPath.push("equationBackingMode:section_guard_applied");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_section_guard_applied = true;
+          }
+        } else {
+          const fallbackHints = sectionGuardAllowed.slice(0, 8);
+          cleaned = buildEquationStrictFallbackAnswer({
+            question: baseQuestion,
+            sourceHints: fallbackHints.length > 0 ? fallbackHints : ["server/routes/agi.plan.ts"],
+          });
+          answerPath.push("equationBackingMode:section_guard_fallback");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_section_guard_applied = false;
+            debugRecord.equation_section_guard_fallback = true;
+          }
+        }
+      }
+
+      if (equationSelectorLocked) {
+        const renderedPrimary = assertRenderedPrimaryMatchesSelection({
+          selectorPrimaryKey: equationSelectorPrimaryKey,
+          renderedText: cleaned,
+        });
+        equationRendererPrimaryKey = renderedPrimary.rendererPrimaryKey;
+        equationPrimaryAnchorMatch = renderedPrimary.match;
+        if (!renderedPrimary.match && equationSelectorFirst?.text?.trim()) {
+          cleaned = equationSelectorFirst.text.trim();
+          answerPath.push("equationSelector:renderer_primary_mismatch_overwrite");
+          const rerendered = assertRenderedPrimaryMatchesSelection({
+            selectorPrimaryKey: equationSelectorPrimaryKey,
+            renderedText: cleaned,
+          });
+          equationRendererPrimaryKey = rerendered.rendererPrimaryKey;
+          equationPrimaryAnchorMatch = rerendered.match;
+        } else {
+          answerPath.push("equationSelector:renderer_primary_verified");
+        }
+      }
+      checkEquationIntentContractStability("render_post");
+      if (equationPromptDetected && debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        const shadowPrimaryCheck = assertRenderedPrimaryMatchesSelection({
+          selectorPrimaryKey: equationSelectorResolved?.primaryKey ?? null,
+          renderedText: cleaned,
+        });
+        debugRecord.equation_selector_primary_key = equationSelectorPrimaryKey;
+        debugRecord.equation_renderer_primary_key = equationRendererPrimaryKey;
+        debugRecord.equation_primary_anchor_match = equationPrimaryAnchorMatch;
+        debugRecord.shadow_primary_anchor_match = shadowPrimaryCheck.match;
+        debugRecord.intent_contract_mutation_detected = equationIntentContractMutationDetected;
       }
 
       const claimCitationLinkage = evaluateClaimCitationLinkage(
@@ -37192,9 +43243,19 @@ const executeHelixAsk = async ({
       });
       const deterministicClaimCitationLinkage = scoreDeterministicClaimCitationLinkage(cleaned);
       const semanticGateFailReasons: string[] = [];
-      semanticGateFailReasons.push(...deterministicClaimCitationLinkage.failReasons);
+      if (equationBackingTentative && equationQuoteContract.required) {
+        semanticGateFailReasons.push(
+          ...deterministicClaimCitationLinkage.failReasons.filter(
+            (reason) =>
+              reason !== "CLAIM_CITATION_LINK_WEAK" && reason !== "CLAIM_CITATION_LINK_MISSING",
+          ),
+        );
+      } else {
+        semanticGateFailReasons.push(...deterministicClaimCitationLinkage.failReasons);
+      }
       if (
         semanticQuality.claimCitationLinkRate < 0.9 &&
+        !(equationBackingTentative && equationQuoteContract.required) &&
         !semanticGateFailReasons.includes("CLAIM_CITATION_LINK_WEAK") &&
         !semanticGateFailReasons.includes("CLAIM_CITATION_LINK_MISSING")
       ) {
@@ -37224,44 +43285,106 @@ const executeHelixAsk = async ({
         hasModelPlaceholderOrStub(cleaned) ||
         isUnverifiedScaffoldScientificReport(cleaned.trim()) ||
         isPathIndexStyleAnswer(cleaned);
-      if (genericScaffoldDetected && !runtimeFallbackPinned) {
-        const emergencyFallback = RenderPlatonicFallback({
-          prompt: baseQuestion,
-          anchors: finalCanonicalEvidence.contextFiles,
-          constraints: ["final_output_guard", "no_generic_scaffold"],
-          budget: { maxChars: 1400, maxClaims: 4 },
-          format: formatSpec.format,
-          definitionFocus,
-          docBlocks,
-          codeAlignment,
-          evidenceText: finalCanonicalEvidence.evidenceWithSources,
-          allowedCitations: normalizeCitations([
+      if (
+        genericScaffoldDetected &&
+        !runtimeFallbackPinned &&
+        (!equationPromptDetected || equationFallbackAllowedByState || !equationSelectorPrimaryAvailable)
+      ) {
+        const warpCongruenceGuard =
+          intentProfile.id === "repo.warp_math_congruence" || isWarpMathBroadPrompt(baseQuestion);
+        if (warpCongruenceGuard) {
+          const warpGuardContract = buildHelixAskIntentContract({
+            question: baseQuestion,
+            queryConstraints,
+          });
+          const warpGuardCandidates = collectEquationRescueCandidates({
+            question: baseQuestion,
+            explicitPaths: queryConstraints.explicitAnchorPaths,
+            allowedCitations: normalizeCitations([
+              ...finalCanonicalEvidence.contextFiles,
+              ...finalCanonicalEvidence.citationTokens,
+              ...allowedSourcePaths,
+            ]),
+            stage05Cards: stage05EvidenceCards,
+            queryConstraints,
+            maxCandidates: 6,
+            includeWeakSemantic: true,
+          });
+          const warpDegrade = buildEquationUnifiedDegradeAnswer({
+            question: baseQuestion,
+            contract: warpGuardContract,
+            candidates: warpGuardCandidates,
+            reason: "warp_congruence_final_output_guard",
+          });
+          const warpGuardAllowPaths = normalizeCitations([
             ...finalCanonicalEvidence.contextFiles,
             ...finalCanonicalEvidence.citationTokens,
-          ]),
-        });
-        if (emergencyFallback.rendered.trim()) {
-          cleaned = emergencyFallback.rendered.trim();
-          answerPath.push("fallback:final_output_guard");
+            ...allowedSourcePaths,
+          ]);
+          const warpSanitized = scrubUnsupportedPaths(
+            warpDegrade,
+            warpGuardAllowPaths.length > 0 ? warpGuardAllowPaths : ["server/routes/agi.plan.ts"],
+          );
+          cleaned = (warpSanitized.text || warpDegrade).trim();
+          answerPath.push("fallback:final_output_guard_warp_degrade");
+        } else {
+          const emergencyFallback = RenderPlatonicFallback({
+            prompt: baseQuestion,
+            anchors: finalCanonicalEvidence.contextFiles,
+            constraints: ["final_output_guard", "no_generic_scaffold"],
+            budget: { maxChars: 1400, maxClaims: 4 },
+            format: formatSpec.format,
+            definitionFocus,
+            docBlocks,
+            codeAlignment,
+            evidenceText: finalCanonicalEvidence.evidenceWithSources,
+            allowedCitations: normalizeCitations([
+              ...finalCanonicalEvidence.contextFiles,
+              ...finalCanonicalEvidence.citationTokens,
+            ]),
+          });
+          if (emergencyFallback.rendered.trim()) {
+            cleaned = emergencyFallback.rendered.trim();
+            answerPath.push("fallback:final_output_guard");
+          }
         }
+      } else if (
+        genericScaffoldDetected &&
+        equationPromptDetected &&
+        !runtimeFallbackPinned &&
+        !equationFallbackAllowedByState &&
+        equationSelectorPrimaryAvailable
+      ) {
+        answerPath.push("fallback:final_output_guard_skipped_selector_lock");
       }
+      const fallbackCitationCandidates = normalizeCitations([
+        ...allowedSourcePaths,
+        ...finalCanonicalEvidence.contextFiles,
+        ...finalCanonicalEvidence.citationTokens,
+        ...equationFallbackAllowPaths,
+      ]);
+      const fallbackCitationNonTest = fallbackCitationCandidates.filter(
+        (path) => !/(?:^|\/)tests?\//i.test(path),
+      );
       const fallbackCitationAnchor =
-        normalizeCitations([
-          ...allowedSourcePaths,
-          ...finalCanonicalEvidence.contextFiles,
-          ...finalCanonicalEvidence.citationTokens,
-        ])[0] ?? "server/routes/agi.plan.ts";
-      if (citationLinkingRequired) {
+        fallbackCitationNonTest[0] ?? fallbackCitationCandidates[0] ?? "server/routes/agi.plan.ts";
+      if (citationLinkingRequired && !equationPromptDetected) {
         cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
+      } else if (citationLinkingRequired && equationPromptDetected) {
+        answerPath.push("citationContract:equation_skip_linking");
       }
-      const finalCitationAllowedPaths = filterExistingEvidencePaths(
+      const finalCitationAllowedPathsBase = filterExistingEvidencePaths(
         Array.from(
           new Set([
             ...allowedSourcePaths,
             ...finalCanonicalEvidence.allowedPaths,
+            ...equationFallbackAllowPaths,
           ]),
         ),
       );
+      const finalCitationAllowedPaths = equationPromptDetected
+        ? finalCitationAllowedPathsBase.filter((path) => !/(?:^|\/)tests?\//i.test(path))
+        : finalCitationAllowedPathsBase;
       const suppressGeneralCitations =
         !citationLinkingRequired &&
         intentDomain === "general" &&
@@ -37279,21 +43402,185 @@ const executeHelixAsk = async ({
             finalCitationScrub.removed.slice(0, 12);
         }
       }
+      const equationClaimBackingRescueNeeded =
+        equationPromptDetected &&
+        !equationGenericBypassApplied &&
+        !equationSelectorLocked &&
+        !equationForcedGeneralExplain &&
+        !equationExplicitPathOnlyExtraction &&
+        !suppressGeneralCitations &&
+        (isEquationAnchorOnlyAnswer(cleaned) ||
+          /^i couldn't verify\b/i.test(cleaned) ||
+          cleaned.length < 220);
+      if (equationClaimBackingRescueNeeded) {
+        const postScrubBacking = buildEquationClaimBackingAssembly({
+          question: baseQuestion,
+          draftAnswer: cleaned,
+          answerContract,
+          evidenceText: finalCanonicalEvidence.evidenceWithSources,
+          docBlocks,
+          codeAlignment,
+          stage05Cards: stage05EvidenceCards,
+          allowedCitations: normalizeCitations([
+            ...contractCitationTokens,
+            ...finalCitationAllowedPaths,
+            ...equationFallbackAllowPaths,
+          ]),
+          queryConstraints,
+          strictPrompt: equationQuoteStrictRequired,
+          explicitPathOnlyExtraction: false,
+          intentContract: equationIntentContract,
+          recoveryReason: equationRecoveryReason,
+        });
+        if (postScrubBacking && postScrubBacking.text.trim().length >= Math.max(220, cleaned.trim().length + 24)) {
+          const postScrubSanitized = scrubUnsupportedPaths(
+            postScrubBacking.text,
+            citationScrubAllowPaths,
+          );
+          cleaned = postScrubSanitized.text || postScrubBacking.text;
+          equationBackingTentative = postScrubBacking.tentative;
+          equationBackingSelectedPaths = postScrubBacking.selectedPaths.slice(0, 12);
+          equationFallbackAllowPaths = normalizeCitations([
+            ...equationFallbackAllowPaths,
+            ...equationBackingSelectedPaths,
+          ]);
+          answerPath.push("equationBackingMode:post_scrub_rescue_applied");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_backing_mode = postScrubBacking.mode;
+            debugRecord.equation_claim_count = postScrubBacking.claimCount;
+            debugRecord.equation_link_pass_used = postScrubBacking.linkPassUsed;
+            debugRecord.equation_link_timeout = postScrubBacking.linkTimeout;
+            debugRecord.equation_candidate_total = postScrubBacking.candidateTotal;
+            debugRecord.equation_candidate_rejected_total =
+              postScrubBacking.candidateRejectedTotal;
+            debugRecord.equation_candidate_rejected_reasons =
+              postScrubBacking.candidateRejectedReasons;
+            debugRecord.equation_primary_selected = postScrubBacking.primarySelected;
+            debugRecord.equation_selector_primary_confidence = postScrubBacking.primaryScore;
+            debugRecord.equation_selector_primary_family_match =
+              postScrubBacking.primaryFamilyMatch;
+            debugRecord.equation_support_selected_count = postScrubBacking.supportSelectedCount;
+            debugRecord.equation_selector_support_count = postScrubBacking.supportSelectedCount;
+            debugRecord.equation_secondary_cross_topic_count =
+              postScrubBacking.secondaryCrossTopicCount;
+            debugRecord.equation_backing_tentative = postScrubBacking.tentative;
+            debugRecord.equation_backing_reason = postScrubBacking.reason;
+            debugRecord.equation_dominant_family = postScrubBacking.dominantFamily;
+            debugRecord.equation_primary_class = postScrubBacking.primaryClass;
+            debugRecord.equation_primary_derivation_level =
+              postScrubBacking.primaryDerivationLevel;
+            debugRecord.equation_primary_score = postScrubBacking.primaryScore;
+            debugRecord.equation_rejected_count = postScrubBacking.rejectedCount;
+            debugRecord.equation_rejected_reasons = postScrubBacking.rejectedReasons;
+            debugRecord.equation_bypass_triggered = equationBypassTriggered;
+            debugRecord.equation_bypass_reason = equationBypassReason;
+            debugRecord.equation_runtime_budget_stage = equationRuntimeBudgetStage;
+            debugRecord.equation_semantic_rerank_used = equationSemanticRerankUsed;
+            debugRecord.equation_semantic_rerank_reason = equationSemanticRerankReason;
+            debugRecord.equation_semantic_rerank_candidate_count =
+              equationSemanticRerankCandidateCount;
+            debugRecord.equation_semantic_rerank_score_count = Object.keys(
+              equationSemanticRerankScores,
+            ).length;
+            debugRecord.equation_backing_rescue_applied = true;
+          }
+        } else {
+          answerPath.push("equationBackingMode:post_scrub_rescue_skipped");
+        }
+      }
+      const equationConsensusFrameNeeded =
+        equationPromptDetected &&
+        !equationGenericBypassApplied &&
+        !equationSelectorLocked &&
+        !equationExplicitPathOnlyExtraction &&
+        hasEquationStructuredSections(cleaned) &&
+        !hasEquationConsensusMechanismFrame(cleaned);
+      if (equationConsensusFrameNeeded) {
+        const consensusAllowed = normalizeCitations([
+          ...contractCitationTokens,
+          ...finalCitationAllowedPaths,
+          ...equationFallbackAllowPaths,
+          ...allowedSourcePaths,
+          ...finalCanonicalEvidence.contextFiles,
+          ...finalCanonicalEvidence.citationTokens,
+        ]);
+        const consensusBacking = buildEquationClaimBackingAssembly({
+          question: baseQuestion,
+          draftAnswer: cleaned,
+          answerContract,
+          evidenceText: finalCanonicalEvidence.evidenceWithSources,
+          docBlocks,
+          codeAlignment,
+          stage05Cards: stage05EvidenceCards,
+          allowedCitations: consensusAllowed,
+          queryConstraints,
+          strictPrompt: equationQuoteStrictRequired,
+          explicitPathOnlyExtraction: false,
+          semanticRerankScores: equationSemanticRerankScores,
+          intentContract: equationIntentContract,
+          recoveryReason: equationRecoveryReason,
+        });
+        if (consensusBacking?.text?.trim()) {
+          const consensusSanitized = scrubUnsupportedPaths(
+            consensusBacking.text,
+            citationScrubAllowPaths,
+          );
+          cleaned = (consensusSanitized.text || consensusBacking.text).trim();
+          equationBackingTentative = consensusBacking.tentative;
+          equationBackingSelectedPaths = consensusBacking.selectedPaths.slice(0, 12);
+          equationFallbackAllowPaths = normalizeCitations([
+            ...equationFallbackAllowPaths,
+            ...equationBackingSelectedPaths,
+          ]);
+          answerPath.push("equationBackingMode:consensus_frame_enforced");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_consensus_frame_enforced = true;
+            debugRecord.equation_backing_mode = consensusBacking.mode;
+            debugRecord.equation_backing_reason = consensusBacking.reason;
+          }
+          equationQuoteContract = applyEquationAnchorPriority(
+            evaluateEquationQuoteContract({
+              question: baseQuestion,
+              answer: cleaned,
+              allowedCitations: contractCitationTokens,
+            }),
+            preferredEquationAnchors,
+          );
+          writeEquationQuoteContractDebug();
+        } else {
+          answerPath.push("equationBackingMode:consensus_frame_enforce_skipped");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).equation_consensus_frame_enforced = false;
+          }
+        }
+      }
       if (suppressGeneralCitations) {
         cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
         answerPath.push("citationScrub:general_sources_suppressed");
-        const shouldAppendMarker = shouldAppendOpenWorldSourcesMarker({
-          answerText: cleaned,
-          treeWalkBlock,
-        });
-        if (shouldAppendMarker || !hasSourcesLine(cleaned)) {
-          cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
-          answerPath.push("citationScrub:open_world_sources_marker");
-          if (!shouldAppendMarker) {
-            answerPath.push("citationScrub:open_world_sources_marker_forced");
-          }
+        const securityOpenWorldPrompt =
+          isSecurityRiskPrompt(baseQuestion) &&
+          intentDomain === "general" &&
+          !explicitRepoExpectation &&
+          !hasFilePathHints;
+        if (securityOpenWorldPrompt) {
+          cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+          answerPath.push("citationScrub:open_world_uncertainty_marker_security");
         } else {
-          answerPath.push("citationScrub:open_world_sources_marker_skipped_tree_walk_citations");
+          const shouldAppendMarker = shouldAppendOpenWorldSourcesMarker({
+            answerText: cleaned,
+            treeWalkBlock,
+          });
+          if (shouldAppendMarker || !hasSourcesLine(cleaned)) {
+            cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
+            answerPath.push("citationScrub:open_world_sources_marker");
+            if (!shouldAppendMarker) {
+              answerPath.push("citationScrub:open_world_sources_marker_forced");
+            }
+          } else {
+            answerPath.push("citationScrub:open_world_sources_marker_skipped_tree_walk_citations");
+          }
         }
       }
       const frontierContractIntent =
@@ -37350,13 +43637,22 @@ const executeHelixAsk = async ({
           }
         }
       }
-      const finalNonReportGuard = enforceNonReportModeGuard(
-        cleaned,
-        reportDecision.enabled,
-        intentStrategy,
-      );
+      const preserveStructuredEquationAnswer =
+        equationPromptDetected &&
+        hasEquationStructuredSections(cleaned) &&
+        (equationSelectorLocked || equationSelectorStateLockCommitted || equationSelectorPrimaryAvailable) &&
+        !equationFallbackAllowedByState;
+      const finalNonReportGuard = preserveStructuredEquationAnswer
+        ? { text: cleaned, mismatch: false, hadScaffold: false }
+        : enforceNonReportModeGuard(
+            cleaned,
+            reportDecision.enabled,
+            intentStrategy,
+          );
       if (finalNonReportGuard.text !== cleaned) {
         answerPath.push("policy:non_report_scaffold_guard");
+      } else if (preserveStructuredEquationAnswer) {
+        answerPath.push("policy:non_report_scaffold_guard_skipped_equation_lock");
       }
       cleaned = finalNonReportGuard.text;
       const forcedWarpGuardActive = answerPath.includes("forcedAnswer:math_solver_warp_guard");
@@ -37405,7 +43701,18 @@ const executeHelixAsk = async ({
         "forcedAnswer:ideology_social_deterministic",
       );
       if (openWorldBypassMode === "active") {
-        if (!ideologyDeterministicFirstPassActive) {
+        if (equationPromptDetected) {
+          const equationOpenWorldDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
+            "open_world_bypass_equation",
+            contractCitationTokens,
+          );
+          const equationOpenWorldSanitized = scrubUnsupportedPaths(
+            equationOpenWorldDegrade,
+            citationScrubAllowPaths,
+          );
+          cleaned = (equationOpenWorldSanitized.text || equationOpenWorldDegrade).trim();
+          answerPath.push("openWorldBypass:equation_unified_degrade");
+        } else if (!ideologyDeterministicFirstPassActive) {
           cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
           cleaned = ensureOpenWorldBypassUncertainty(cleaned);
         } else if (debugPayload) {
@@ -37440,12 +43747,29 @@ const executeHelixAsk = async ({
         }
       }
       if (openWorldBypassMode === "active" && !ideologyDeterministicFirstPassActive) {
-        const guarded = ensureOpenWorldBypassUncertainty(
-          stripRepoCitationsForOpenWorldBypass(cleaned),
-        );
-        if (guarded !== cleaned) {
-          cleaned = guarded;
-          answerPath.push("openWorldBypass:final_uncertainty_guard");
+        if (equationPromptDetected) {
+          if (!hasRequiredEquationSections(cleaned)) {
+            const equationOpenWorldDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
+              "open_world_bypass_equation_final_guard",
+              contractCitationTokens,
+            );
+            const equationOpenWorldSanitized = scrubUnsupportedPaths(
+              equationOpenWorldDegrade,
+              citationScrubAllowPaths,
+            );
+            cleaned = (equationOpenWorldSanitized.text || equationOpenWorldDegrade).trim();
+            answerPath.push("openWorldBypass:final_equation_unified_guard");
+          } else {
+            answerPath.push("openWorldBypass:final_uncertainty_guard_skipped_equation");
+          }
+        } else {
+          const guarded = ensureOpenWorldBypassUncertainty(
+            stripRepoCitationsForOpenWorldBypass(cleaned),
+          );
+          if (guarded !== cleaned) {
+            cleaned = guarded;
+            answerPath.push("openWorldBypass:final_uncertainty_guard");
+          }
         }
       }
       const capsuleAnchorRequired =
@@ -37520,6 +43844,10 @@ const executeHelixAsk = async ({
         debugPayload.report_scaffold_guard_triggered =
           Boolean(debugPayload.report_scaffold_guard_triggered) || finalNonReportGuard.hadScaffold;
       }
+      // Final hygiene pass: remove orphan extension/bracket residue that may survive
+      // late-stage citation/contract rewrites (e.g. "ts]" / "md]").
+      cleaned = cleanDanglingFileExtensionFragments(cleaned);
+      cleaned = dedupeAdjacentCitationBrackets(cleaned);
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
@@ -37557,6 +43885,56 @@ const executeHelixAsk = async ({
         extensionText: extensionAlreadyInAnswer ? undefined : answerExtension?.text,
         extensionCitations: answerExtension?.citations,
       });
+      if (result.envelope) {
+        const cleanedAnswer = cleanDanglingFileExtensionFragments(cleanedText).trim();
+        let envelopeAnswer = cleanDanglingFileExtensionFragments(
+          coerceString(result.envelope.answer),
+        ).trim();
+        const envelopeAnswerLooksBroken =
+          !envelopeAnswer ||
+          hasDanglingFileExtensionResidue(envelopeAnswer) ||
+          envelopeAnswer.length < Math.max(80, Math.floor(cleanedAnswer.length * 0.35));
+        if (envelopeAnswerLooksBroken) {
+          envelopeAnswer = cleanedAnswer || envelopeAnswer;
+          answerPath.push("envelopeGuard:answer_fallback_to_cleaned");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).envelope_guard_applied = true;
+            (debugPayload as Record<string, unknown>).envelope_guard_reason = "answer_residue_or_truncation";
+          }
+        }
+        result.envelope.answer = envelopeAnswer;
+
+        const sanitizedSections = (result.envelope.sections ?? [])
+          .map((section) => {
+            const sanitizedBody = cleanDanglingFileExtensionFragments(
+              coerceString(section?.body ?? ""),
+            ).trim();
+            if (!sanitizedBody) return null;
+            if (hasDanglingFileExtensionResidue(sanitizedBody) && section.layer === "details") {
+              return null;
+            }
+            return {
+              ...section,
+              body: sanitizedBody,
+            };
+          })
+          .filter((section): section is NonNullable<typeof section> => Boolean(section));
+        result.envelope.sections = sanitizedSections.length ? sanitizedSections : undefined;
+
+        if (result.envelope.extension?.body) {
+          const sanitizedExtensionBody = cleanDanglingFileExtensionFragments(
+            coerceString(result.envelope.extension.body),
+          ).trim();
+          if (!sanitizedExtensionBody || hasDanglingFileExtensionResidue(sanitizedExtensionBody)) {
+            result.envelope.extension = undefined;
+          } else {
+            result.envelope.extension = {
+              ...result.envelope.extension,
+              body: sanitizedExtensionBody,
+            };
+          }
+        }
+      }
     }
     if (fastQualityMode && getFastElapsedMs() > fastStageDeadlines.finalize) {
       recordFastDecision(
@@ -38848,17 +45226,21 @@ planRouter.post("/ask", async (req, res) => {
     keepAlive.send(status, normalizedPayload);
   };
   try {
-    await executeHelixAsk({
-      request: requestData,
-      personaId,
-      tenantId:
-        req.tenantId ??
-        req.get("x-tenant-id") ??
-        req.get("x-customer-id") ??
-        req.get("x-org-id") ??
-        null,
-      responder: { send: safeSend },
-    });
+    await withTimeout(
+      executeHelixAsk({
+        request: requestData,
+        personaId,
+        tenantId:
+          req.tenantId ??
+          req.get("x-tenant-id") ??
+          req.get("x-customer-id") ??
+          req.get("x-org-id") ??
+          null,
+        responder: { send: safeSend },
+      }),
+      HELIX_ASK_REQUEST_TIMEOUT_MS,
+      "helix_ask_request",
+    );
   } catch (error) {
     recordHelixAskFailure(error);
     const message = error instanceof Error ? error.message : String(error);
@@ -39190,7 +45572,7 @@ planRouter.post("/ask/jobs", async (req, res) => {
     }
     return res.status(503).json(payload);
   }
-  const question = (request.question ?? request.prompt ?? "").trim();
+  const question = normalizeBundledQuestion((request.question ?? request.prompt ?? "").trim());
   let job: HelixAskJobRecord;
   try {
     job = await createHelixAskJob({
@@ -40506,3 +46888,5 @@ planRouter.get("/tools/logs/stream", (req, res) => {
 });
 
 export { planRouter };
+
+

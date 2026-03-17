@@ -39,6 +39,7 @@ This runner is not for:
 - SEM+ellipsometry typed pack (input): `configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json`
 - SEM+ellipsometry reportable prereg pack (input): `configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json`
 - SEM+ellipsometry reportable reference profile pack (input): `configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`
+- SEM+ellipsometry publication-overlay typed pack (input): `configs/warp-shadow-injection-scenarios.se-publication-typed.v1.json`
 - QEI operating envelope (input): `configs/warp-shadow-qei-operating-envelope.v1.json`
 - Runner (execution): `scripts/warp-shadow-injection-runner.ts`
 - Recovery checker (execution): `scripts/warp-shadow-qei-recovery-check.ts`
@@ -165,6 +166,16 @@ npm run warp:shadow:inject:se-primary-reportable -- --out artifacts/research/ful
 SEM+ellipsometry reportable reference profile run:
 ```bash
 npm run warp:shadow:inject:se-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-se-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-primary-reportable-reference-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry publication-overlay run (cross-study synthesis; reference-only):
+```bash
+npm run warp:shadow:inject:se-publication-overlay -- --out artifacts/research/full-solve/shadow-injection-run-se-publication-typed-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-publication-typed-YYYY-MM-DD.md
+```
+
+SEM+ellipsometry publication-overlay full chain (build + inject + compat + summary):
+```bash
+npm run warp:shadow:se-publication-overlay
 ```
 
 Q-spoiling evidence congruence check:

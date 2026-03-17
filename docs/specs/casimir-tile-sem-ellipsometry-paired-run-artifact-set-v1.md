@@ -92,6 +92,7 @@ npm run warp:shadow:se-reportable:attempt -- --bundle-dir artifacts/research/ful
    - `missing_measurement_provenance_raw_refs`
    - `missing_measurement_provenance_raw_hashes`
    - `missing_measurement_provenance_raw_hash_for_ref`
+   - `template_placeholder_input`
 
 ### Reportable Attempt Decision Path
 `npm run warp:shadow:se-reportable:attempt` evaluates readiness against the frozen reportable-reference profile, not the full envelope pack.
@@ -114,6 +115,7 @@ Mapping-only telemetry:
 4. `reportableReady=true` while blocked reasons are still present.
 5. Missing measurement provenance fields or non-instrument data origin.
 6. Missing or invalid SHA-256 hashes for raw artifact references.
+7. Template bundle refs or template run IDs are used for a reportable unlock attempt.
 
 ## Operator Notes
 1. Keep current boundary posture: lane remains `reference_only` until explicit promotion policy changes.

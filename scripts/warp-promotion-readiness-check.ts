@@ -21,6 +21,7 @@ const DEFAULT_LATEST_MD = path.join(DOC_AUDIT_DIR, 'warp-promotion-readiness-sui
 const DEFAULT_INTEGRITY_PATH = path.join(FULL_SOLVE_DIR, 'integrity-parity-suite-latest.json');
 const DEFAULT_CAPSULE_PATH = path.join(FULL_SOLVE_DIR, 'full-solve-reference-capsule-latest.json');
 const DEFAULT_EXTERNAL_MATRIX_PATH = path.join(EXTERNAL_WORK_DIR, 'external-work-comparison-matrix-latest.json');
+const DEFAULT_SE_PAIRED_RUNS_DIR = path.join(FULL_SOLVE_DIR, 'se-paired-runs');
 
 const DEFAULT_TRACE_OUT = path.join('artifacts', 'training-trace.jsonl');
 const DEFAULT_TRACE_EXPORT_OUT = path.join('artifacts', 'training-trace-export.jsonl');
@@ -88,6 +89,12 @@ type LaneSummary = {
   checkPath: string;
   runPath: string;
   scenarioPackPath: string;
+};
+
+type SePairedEvidenceResolution = {
+  evidencePath: string | null;
+  source: 'arg' | 'autodiscovered' | 'none';
+  reason: string | null;
 };
 
 const LANE_DEFS: LaneDef[] = [
@@ -167,7 +174,7 @@ const objectWithSortedKeys = (value: unknown): unknown => {
 };
 
 const checksumPayload = (payload: Record<string, unknown>): string => {
-  const volatileKeys = new Set(['generated_at', 'generated_on', 'checksum', 'normalized_checksum', 'traceId', 'runId']);
+  const volatileKeys = new Set(['generated_at', 'generated_on', 'checksum', 'normalized_checksum', 'traceId', 'runId', 'capsule_checksum']);
   const stripVolatile = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map((entry) => stripVolatile(entry));
     if (value && typeof value === 'object') {
@@ -318,6 +325,55 @@ ${laneRows || '| none | false | 0 | 0 | 0 | n/a |'}
 
 const getCommitPin = (): string => execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
 
+const resolveSePairedEvidence = (explicitPath?: string): SePairedEvidenceResolution => {
+  if (explicitPath) {
+    const resolved = resolvePathFromRoot(explicitPath);
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`SE paired evidence path not found: ${explicitPath}`);
+    }
+    return {
+      evidencePath: normalizePath(explicitPath),
+      source: 'arg',
+      reason: null,
+    };
+  }
+
+  if (!fs.existsSync(DEFAULT_SE_PAIRED_RUNS_DIR)) {
+    return {
+      evidencePath: null,
+      source: 'none',
+      reason: 'paired_runs_dir_missing',
+    };
+  }
+
+  const candidates = fs
+    .readdirSync(DEFAULT_SE_PAIRED_RUNS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((a, b) => b.localeCompare(a));
+
+  for (const dirName of candidates) {
+    const dirPath = path.join(DEFAULT_SE_PAIRED_RUNS_DIR, dirName);
+    const validatePath = path.join(dirPath, 'se-paired-evidence-validate.v1.json');
+    const evidencePath = path.join(dirPath, 'se-paired-run-evidence.v1.json');
+    if (!fs.existsSync(validatePath) || !fs.existsSync(evidencePath)) continue;
+    const validatePayload = readJson(validatePath);
+    if (validatePayload?.reportableReadyCandidate === true && (asNumber(validatePayload?.issueCount) ?? 0) === 0) {
+      return {
+        evidencePath: normalizePath(evidencePath),
+        source: 'autodiscovered',
+        reason: null,
+      };
+    }
+  }
+
+  return {
+    evidencePath: null,
+    source: 'none',
+    reason: 'no_reportable_ready_candidate_found',
+  };
+};
+
 export const runPromotionReadinessSuite = async (options: {
   outJsonPath?: string;
   outMdPath?: string;
@@ -327,6 +383,7 @@ export const runPromotionReadinessSuite = async (options: {
   traceOutPath?: string;
   traceExportOutPath?: string;
   traceExportUrl?: string;
+  sePairedEvidencePath?: string;
 }) => {
   const outJsonPath = options.outJsonPath ?? DEFAULT_OUT_JSON;
   const outMdPath = options.outMdPath ?? DEFAULT_OUT_MD;
@@ -336,6 +393,7 @@ export const runPromotionReadinessSuite = async (options: {
   const traceOutPath = options.traceOutPath ?? DEFAULT_TRACE_OUT;
   const traceExportOutPath = options.traceExportOutPath ?? DEFAULT_TRACE_EXPORT_OUT;
   const traceExportUrl = options.traceExportUrl ?? DEFAULT_TRACE_EXPORT_URL;
+  const sePairedEvidence = resolveSePairedEvidence(options.sePairedEvidencePath);
 
   const steps: StepRecord[] = [];
   const blockers: Blocker[] = [];
@@ -345,7 +403,15 @@ export const runPromotionReadinessSuite = async (options: {
   runNpm(['run', 'warp:external:refresh'], steps, 'external_refresh');
   for (const lane of LANE_DEFS) {
     runNpm(['run', lane.buildScenariosScript], steps, `${lane.laneId}_build_scenarios`);
-    runNpm(['run', lane.buildPacksScript], steps, `${lane.laneId}_build_packs`);
+    if (lane.laneId === 'sem_ellipsometry' && sePairedEvidence.evidencePath) {
+      runNpm(
+        ['run', lane.buildPacksScript, '--', '--paired-evidence', sePairedEvidence.evidencePath],
+        steps,
+        `${lane.laneId}_build_packs`,
+      );
+    } else {
+      runNpm(['run', lane.buildPacksScript], steps, `${lane.laneId}_build_packs`);
+    }
     runNpm(['run', lane.injectScript, '--', '--out', lane.runOutJsonPath, '--out-md', lane.runOutMdPath], steps, `${lane.laneId}_inject_reportable`);
     runNpm(['run', lane.checkScript, '--', '--scenarios', lane.reportableScenarioPath, '--run', lane.runOutJsonPath, '--out', lane.checkOutJsonPath, '--out-md', lane.checkOutMdPath], steps, `${lane.laneId}_check_reportable`);
   }
@@ -438,6 +504,11 @@ export const runPromotionReadinessSuite = async (options: {
       full_solve_reference_capsule_latest: normalizePath(DEFAULT_CAPSULE_PATH),
       external_work_matrix_latest: normalizePath(DEFAULT_EXTERNAL_MATRIX_PATH),
     },
+    se_paired_evidence: {
+      evidence_path: sePairedEvidence.evidencePath,
+      source: sePairedEvidence.source,
+      reason: sePairedEvidence.reason,
+    },
     capsule_checksum: asText(capsule?.checksum),
     external_matrix_stale_count: staleCount,
     rubric: {
@@ -510,6 +581,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     traceOutPath: readArgValue('--trace-out') ?? DEFAULT_TRACE_OUT,
     traceExportOutPath: readArgValue('--trace-export-out') ?? DEFAULT_TRACE_EXPORT_OUT,
     traceExportUrl: readArgValue('--trace-export-url') ?? DEFAULT_TRACE_EXPORT_URL,
+    sePairedEvidencePath: readArgValue('--se-paired-evidence'),
   })
     .then((result) => {
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

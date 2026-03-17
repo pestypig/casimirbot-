@@ -41,4 +41,21 @@ describe("Helix Ask output contract normalization", () => {
     expect((payload.timing?.elapsed_ms ?? 0) >= 20).toBe(true);
     expect(payload.debug?.trace_id).toBe("phase6-live-A-p01-s7-r2");
   });
+
+  it("does not count timeout-class failures toward circuit cooldown", () => {
+    expect(
+      __testHelixAskOutputContract.shouldCountHelixAskCircuitFailure({
+        status: 500,
+        fail_class: "timeout_hard",
+        fail_reason: "helix_ask_timeout",
+        message: "Request timed out",
+      }),
+    ).toBe(false);
+
+    expect(
+      __testHelixAskOutputContract.shouldCountHelixAskCircuitFailure(
+        new Error("Cannot access 'selectedMove' before initialization"),
+      ),
+    ).toBe(true);
+  });
 });

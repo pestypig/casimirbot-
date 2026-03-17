@@ -1,0 +1,44 @@
+{
+  "version": "helix_ask_equation_benchmark_matrix/1",
+  "description": "Matrix profiles for equation benchmark tuning.",
+  "baseline": "baseline",
+  "profiles": [
+    {
+      "name": "baseline",
+      "temperature": 0.2,
+      "verbosity": "extended",
+      "topK": 8,
+      "max_tokens": 900
+    },
+    {
+      "name": "equation_focus_balanced",
+      "temperature": 0.18,
+      "verbosity": "extended",
+      "topK": 10,
+      "max_tokens": 980,
+      "tuning": {
+        "fast_quality_mode": false,
+        "arbiter_repo_ratio": 0.9,
+        "arbiter_hybrid_ratio": 0.72,
+        "scaffold_tokens": 1152,
+        "evidence_tokens": 768,
+        "repair_tokens": 192
+      }
+    },
+    {
+      "name": "equation_focus_compact",
+      "temperature": 0.16,
+      "verbosity": "normal",
+      "topK": 6,
+      "max_tokens": 700,
+      "tuning": {
+        "fast_quality_mode": true,
+        "arbiter_repo_ratio": 0.8,
+        "arbiter_hybrid_ratio": 0.62,
+        "scaffold_tokens": 896,
+        "evidence_tokens": 576,
+        "repair_tokens": 128
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+    "version":  "helix_ask_equation_benchmark/1",
+    "description":  "targeted_post_restart",
+    "cases":  [
+                  {
+                      "id":  "phase_pipeline_equation",
+                      "label":  "phase pipeline equation",
+                      "question":  "Provide one equation-like relation used by phase scheduler or energy pipeline and explain its role.",
+                      "expect":  {
+                                     "requiredSections":  [
+                                                              "Primary Topic",
+                                                              "Primary Equation",
+                                                              "Mechanism Explanation"
+                                                          ],
+                                     "requireConsensusFrame":  true,
+                                     "requiredMechanismPatterns":  [
+                                                                       "General-reference baseline",
+                                                                       "Repo-grounded support",
+                                                                       "Challenge status"
+                                                                   ],
+                                     "preferredSourcePaths":  [
+                                                                  "server/energy/phase-scheduler.ts",
+                                                                  "server/energy-pipeline.ts"
+                                                              ],
+                                     "minMechanismChars":  110,
+                                     "passThreshold":  60
+                                 }
+                  },
+                  {
+                      "id":  "broad_equation_scientific",
+                      "label":  "broad scientific equation request",
+                      "question":  "Give one scientifically relevant equation grounded in repo evidence and explain what each term does in the system.",
+                      "expect":  {
+                                     "requiredSections":  [
+                                                              "Primary Topic",
+                                                              "Primary Equation",
+                                                              "Mechanism Explanation"
+                                                          ],
+                                     "requireConsensusFrame":  true,
+                                     "requiredMechanismPatterns":  [
+                                                                       "General-reference baseline",
+                                                                       "Repo-grounded support",
+                                                                       "Challenge status"
+                                                                   ],
+                                     "minMechanismChars":  130,
+                                     "passThreshold":  58
+                                 }
+                  },
+                  {
+                      "id":  "collapse_wave_equation_with_path_hint",
+                      "label":  "collapse wave equation explicit path hint",
+                      "question":  "Using shared/dp-collapse.ts and server/services/mixer/collapse.ts, explain one collapse equation and what it means.",
+                      "expect":  {
+                                     "primaryTopic":  "collapse",
+                                     "requiredSections":  [
+                                                              "Primary Topic",
+                                                              "Primary Equation",
+                                                              "Mechanism Explanation"
+                                                          ],
+                                     "requireConsensusFrame":  true,
+                                     "requiredMechanismPatterns":  [
+                                                                       "General-reference baseline",
+                                                                       "Repo-grounded support",
+                                                                       "Challenge status"
+                                                                   ],
+                                     "preferredEquationPatterns":  [
+                                                                       "psi|rho|collapse|measurement|born|state"
+                                                                   ],
+                                     "preferredSourcePaths":  [
+                                                                  "shared/dp-collapse.ts",
+                                                                  "server/services/mixer/collapse.ts"
+                                                              ],
+                                     "minMechanismChars":  140,
+                                     "passThreshold":  70
+                                 }
+                  }
+              ]
+}

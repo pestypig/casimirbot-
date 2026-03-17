@@ -138,6 +138,56 @@ Primary artifact:
 
 1. `artifacts/experiments/helix-ask-multilang-golden/helix-ask-multilang-golden-gate.<timestamp>.json`
 
+## Loop B5: Equation Benchmark (Anchor + Mechanism Quality)
+
+Run the equation benchmark pack when tuning equation selection/rerank behavior.
+
+```powershell
+$env:HELIX_ASK_BASE_URL="http://localhost:5050"
+$env:HELIX_ASK_EQUATION_BENCHMARK_FILE="scripts/helix-ask-equation-benchmark.json"
+$env:HELIX_ASK_EQUATION_BENCHMARK_TIMEOUT_MS="60000"
+npm run helix:ask:equation:benchmark
+```
+
+Strict gate mode (non-zero exit on any failed benchmark case):
+
+```powershell
+$env:HELIX_ASK_BASE_URL="http://localhost:5050"
+npm run helix:ask:equation:benchmark:strict
+```
+
+Primary artifacts:
+
+1. `artifacts/experiments/helix-ask-equation-benchmark/<run-id>/summary.json`
+2. `artifacts/experiments/helix-ask-equation-benchmark/<run-id>/results.json`
+3. `reports/helix-ask-equation-benchmark-latest.md`
+
+## Loop B6: Equation Benchmark Matrix (Profile Recommendation)
+
+Run the profile matrix to compare equation behavior across tuning variants and
+recommend a best profile versus baseline.
+
+```powershell
+$env:HELIX_ASK_BASE_URL="http://localhost:5050"
+$env:HELIX_ASK_EQUATION_BENCHMARK_FILE="scripts/helix-ask-equation-benchmark.json"
+$env:HELIX_ASK_EQUATION_BENCHMARK_MATRIX_FILE="scripts/helix-ask-equation-benchmark-matrix.json"
+$env:HELIX_ASK_EQUATION_BENCHMARK_MATRIX_TIMEOUT_MS="60000"
+npm run helix:ask:equation:benchmark:matrix
+```
+
+Strict matrix mode (non-zero exit when any profile has failed cases):
+
+```powershell
+$env:HELIX_ASK_BASE_URL="http://localhost:5050"
+npm run helix:ask:equation:benchmark:matrix:strict
+```
+
+Primary artifacts:
+
+1. `artifacts/experiments/helix-ask-equation-benchmark-matrix/<run-id>/summary.json`
+2. `artifacts/experiments/helix-ask-equation-benchmark-matrix/<run-id>/results.json`
+3. `reports/helix-ask-equation-benchmark-matrix-latest.md`
+
 ## Loop C: Casimir Gate (Required)
 
 Run for every patch:

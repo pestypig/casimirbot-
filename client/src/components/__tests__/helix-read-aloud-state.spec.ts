@@ -11,6 +11,7 @@ let shouldDispatchReasoningAttempt: typeof import("@/components/helix/HelixAskPi
 let shouldForceObserveDispatchFromSuppression: typeof import("@/components/helix/HelixAskPill").shouldForceObserveDispatchFromSuppression;
 let isArtifactDominatedReasoningText: typeof import("@/components/helix/HelixAskPill").isArtifactDominatedReasoningText;
 let sanitizeReasoningOutputText: typeof import("@/components/helix/HelixAskPill").sanitizeReasoningOutputText;
+let cleanReasoningDisplayArtifacts: typeof import("@/components/helix/HelixAskPill").cleanReasoningDisplayArtifacts;
 let hasDanglingTurnTail: typeof import("@/components/helix/HelixAskPill").hasDanglingTurnTail;
 let isLowInformationTailTranscript: typeof import("@/components/helix/HelixAskPill").isLowInformationTailTranscript;
 let isLikelyContinuationAddendum: typeof import("@/components/helix/HelixAskPill").isLikelyContinuationAddendum;
@@ -21,6 +22,7 @@ let decideExplorationLadderAction: typeof import("@/components/helix/HelixAskPil
 let resolveVoiceBargeHardCutReason: typeof import("@/components/helix/HelixAskPill").resolveVoiceBargeHardCutReason;
 let shouldResumeBargeHeldPlayback: typeof import("@/components/helix/HelixAskPill").shouldResumeBargeHeldPlayback;
 let shouldTreatMicSignalAsSpeech: typeof import("@/components/helix/HelixAskPill").shouldTreatMicSignalAsSpeech;
+let resolveVoiceNoiseHandlingProfile: typeof import("@/components/helix/HelixAskPill").resolveVoiceNoiseHandlingProfile;
 let isLikelyContinuationTailFragment: typeof import("@/components/helix/HelixAskPill").isLikelyContinuationTailFragment;
 let isGenericQueuedVoiceAcknowledgement: typeof import("@/components/helix/HelixAskPill").isGenericQueuedVoiceAcknowledgement;
 let extractLatestContinuationQuestionFocus: typeof import("@/components/helix/HelixAskPill").extractLatestContinuationQuestionFocus;
@@ -41,6 +43,7 @@ beforeAll(async () => {
     shouldForceObserveDispatchFromSuppression,
     isArtifactDominatedReasoningText,
     sanitizeReasoningOutputText,
+    cleanReasoningDisplayArtifacts,
     hasDanglingTurnTail,
     isLowInformationTailTranscript,
     isLikelyContinuationAddendum,
@@ -51,6 +54,7 @@ beforeAll(async () => {
     resolveVoiceBargeHardCutReason,
     shouldResumeBargeHeldPlayback,
     shouldTreatMicSignalAsSpeech,
+    resolveVoiceNoiseHandlingProfile,
     isLikelyContinuationTailFragment,
     isGenericQueuedVoiceAcknowledgement,
     extractLatestContinuationQuestionFocus,
@@ -292,6 +296,40 @@ describe("barge-in speech qualification", () => {
       }),
     ).toBe(true);
   });
+
+  it("applies stricter speech evidence in noisy-environment profile", () => {
+    const noisy = resolveVoiceNoiseHandlingProfile(true);
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: true,
+        speechProbability: 0.66,
+        snrDb: 9.8,
+        rms: 0.03,
+        speechTriggerThreshold: 0.018,
+        bargeMinSpeechProbability: noisy.bargeMinSpeechProbability,
+        bargeStrongSpeechProbability: noisy.bargeStrongSpeechProbability,
+        bargeMinSnrDb: noisy.bargeMinSnrDb,
+        bargeRmsMultiplier: noisy.bargeRmsMultiplier,
+      }),
+    ).toBe(false);
+    expect(
+      shouldTreatMicSignalAsSpeech({
+        speakingNow: true,
+        voiceOutputActive: true,
+        localAudioGateActive: true,
+        speechProbability: 0.9,
+        snrDb: 16,
+        rms: 0.042,
+        speechTriggerThreshold: 0.018,
+        bargeMinSpeechProbability: noisy.bargeMinSpeechProbability,
+        bargeStrongSpeechProbability: noisy.bargeStrongSpeechProbability,
+        bargeMinSnrDb: noisy.bargeMinSnrDb,
+        bargeRmsMultiplier: noisy.bargeRmsMultiplier,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("isRetryableVoiceChunkSynthesisError", () => {
@@ -443,6 +481,33 @@ describe("artifact-dominated output guards", () => {
     const cleaned = sanitizeReasoningOutputText(noisy);
     expect(cleaned).toContain("In practice, retry with narrower scope.");
     expect(cleaned.toLowerCase()).not.toContain("runtime fallback: fetch failed");
+  });
+});
+
+describe("cleanReasoningDisplayArtifacts", () => {
+  it("removes orphan extension fragments while preserving explanation text", () => {
+    const noisy = [
+      "Claim-first explanation:",
+      "1. ts] Grounded equation candidates were retrieved.",
+      "",
+      "Details",
+      "ts]",
+      "2. Claim-first explanation:. ts]",
+      "4. The retrieved files still provide grounded model parameters.",
+    ].join("\n");
+
+    const cleaned = cleanReasoningDisplayArtifacts(noisy);
+    expect(cleaned).not.toContain("ts]");
+    expect(cleaned).toContain("Grounded equation candidates were retrieved.");
+    expect(cleaned).toContain("The retrieved files still provide grounded model parameters.");
+  });
+
+  it("preserves file citations used in final answer text", () => {
+    const withCitations =
+      "Primary equation: [server/services/mixer/collapse.ts] -> collapseMix(state, knobs).";
+    const cleaned = cleanReasoningDisplayArtifacts(withCitations);
+    expect(cleaned).toContain("[server/services/mixer/collapse.ts]");
+    expect(cleaned).toContain("collapseMix");
   });
 });
 

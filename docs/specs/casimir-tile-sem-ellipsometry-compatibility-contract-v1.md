@@ -39,7 +39,7 @@ Lane sweep is fixed to:
 
 ## Reportable Fail-Closed Policy
 1. Reportable profiles are always emitted in frozen form.
-2. For this wave, reportable profiles are fail-closed blocked:
+2. Reportable profiles are fail-closed blocked by default:
    - `reportableReady=false`
    - `blockedReasons` must include:
      - `missing_paired_dual_instrument_run`
@@ -50,7 +50,8 @@ Lane sweep is fixed to:
      - `missing_measurement_provenance_raw_hashes`
      - `missing_measurement_provenance_raw_hash_for_ref`
      - `invalid_measurement_provenance_raw_hash_format`
-3. Reportable readiness can only move to true when paired SEM+ellipsometry run evidence, covariance uncertainty anchors, and measurement provenance anchors are present under strict source policy.
+     - `template_placeholder_input`
+3. Reportable readiness can move to true only when paired SEM+ellipsometry run evidence, covariance uncertainty anchors, and measurement provenance anchors are present under strict source policy and non-template evidence inputs.
 4. Artifact-set contract for unlock is defined in:
    - `docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md`
    - `docs/specs/casimir-tile-sem-ellipsometry-covariance-budget-template-v1.md`
@@ -68,6 +69,7 @@ npm run warp:shadow:build-se-packs -- --paired-evidence docs/specs/data/se-paire
 Builder behavior:
 1. Default (no `--paired-evidence`): reportable remains fail-closed blocked.
 2. With evidence file: reportable readiness is computed from evidence fields and strict source policy.
+3. Template bundle references are rehearsal-only and trigger `template_placeholder_input`; copy instrument-export artifacts to `artifacts/research/full-solve/se-paired-runs/<date>/` before unlock attempts.
 
 ## Scenario Contract
 Each `sem_ellipsometry` scenario should include:
@@ -113,6 +115,7 @@ Per scenario, checker output must emit:
    - `missing_measurement_provenance_raw_hashes`
    - `missing_measurement_provenance_raw_hash_for_ref`
    - `invalid_measurement_provenance_raw_hash_format`
+   - `template_placeholder_input`
 
 Edge policy:
 1. Boundary-overlap cases classify as `unknown`.

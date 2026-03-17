@@ -183,6 +183,33 @@ describe("Helix Ask llm debug skip metadata", () => {
     ).toBe(true);
   }, 45000);
 
+  it("does not short-circuit conceptual equation prompts into math solver output", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "what's the equation of the collapse of the wave function?",
+        debug: true,
+        sessionId: "llm-equation-concept-open-world",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        llm_invoke_attempted?: boolean;
+        llm_skip_reason?: string;
+        llm_skip_reason_detail?: string;
+        answer_path?: string[];
+      };
+    };
+    expect(payload.debug?.llm_invoke_attempted).toBe(true);
+    expect(payload.debug?.llm_skip_reason_detail).not.toBe("forcedAnswer:math_solver");
+    expect((payload.debug?.answer_path ?? []).includes("forcedAnswer:math_solver")).toBe(false);
+    expect((payload.debug?.answer_path ?? []).includes("clarify:ambiguity")).toBe(false);
+    expect(payload.text ?? "").not.toMatch(/The value of equation of the collapse of the wave function is/i);
+  }, 45000);
+
   it("keeps conceptual repo-term prompts on invoke path without primary contract short-circuit", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
       method: "POST",

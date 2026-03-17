@@ -1,0 +1,91 @@
+{
+    "version":  "helix_ask_equation_benchmark/1",
+    "description":  "smoke_subset",
+    "cases":  [
+                  {
+                      "id":  "collapse_wave_equation_broad",
+                      "label":  "collapse wave equation broad intent",
+                      "question":  "explain equation of the collapse of the wave function?",
+                      "expect":  {
+                                     "primaryTopic":  "collapse",
+                                     "requiredSections":  [
+                                                              "Primary Topic",
+                                                              "Primary Equation",
+                                                              "Mechanism Explanation"
+                                                          ],
+                                     "requireConsensusFrame":  true,
+                                     "requiredMechanismPatterns":  [
+                                                                       "General-reference baseline",
+                                                                       "Repo-grounded support",
+                                                                       "Challenge status"
+                                                                   ],
+                                     "preferredEquationPatterns":  [
+                                                                       "psi|rho|collapse|measurement|born|state"
+                                                                   ],
+                                     "preferredSourcePaths":  [
+                                                                  "server/services/mixer/collapse.ts",
+                                                                  "shared/dp-collapse.ts"
+                                                              ],
+                                     "forbiddenEquationPatterns":  [
+                                                                       "\\bvolume\\s*=\\s*\\(4\\s*/\\s*3\\)"
+                                                                   ],
+                                     "minMechanismChars":  140,
+                                     "passThreshold":  68
+                                 }
+                  },
+                  {
+                      "id":  "casimir_equation_mechanism",
+                      "label":  "dynamic casimir equation mechanism",
+                      "question":  "How does dynamic Casimir modulation feed into physics outputs? Show one equation and explain the implementation meaning.",
+                      "expect":  {
+                                     "requiredSections":  [
+                                                              "Primary Topic",
+                                                              "Primary Equation",
+                                                              "Mechanism Explanation"
+                                                          ],
+                                     "requireConsensusFrame":  true,
+                                     "requiredMechanismPatterns":  [
+                                                                       "General-reference baseline",
+                                                                       "Repo-grounded support",
+                                                                       "Challenge status"
+                                                                   ],
+                                     "preferredEquationPatterns":  [
+                                                                       "casimir|vacuum|omega|frequency|boundary|modulation"
+                                                                   ],
+                                     "preferredSourcePaths":  [
+                                                                  "modules/sim_core/static-casimir.ts",
+                                                                  "modules/dynamic/stress-energy-equations.ts"
+                                                              ],
+                                     "minMechanismChars":  140,
+                                     "passThreshold":  66
+                                 }
+                  },
+                  {
+                      "id":  "warp_congruence_equation",
+                      "label":  "warp congruence equation",
+                      "question":  "Show one equation used in warp congruence and explain what it means in implementation terms.",
+                      "expect":  {
+                                     "requiredSections":  [
+                                                              "Primary Topic",
+                                                              "Primary Equation",
+                                                              "Mechanism Explanation"
+                                                          ],
+                                     "requireConsensusFrame":  true,
+                                     "requiredMechanismPatterns":  [
+                                                                       "General-reference baseline",
+                                                                       "Repo-grounded support",
+                                                                       "Challenge status"
+                                                                   ],
+                                     "preferredEquationPatterns":  [
+                                                                       "g_ij|k_ij|beta|gamma|theta|metric|tensor|curvature"
+                                                                   ],
+                                     "preferredSourcePaths":  [
+                                                                  "modules/dynamic/natario-metric.ts",
+                                                                  "modules/warp/natario-warp.ts"
+                                                              ],
+                                     "minMechanismChars":  120,
+                                     "passThreshold":  66
+                                 }
+                  }
+              ]
+}

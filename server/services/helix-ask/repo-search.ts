@@ -751,6 +751,41 @@ const hasExplicitPathCue = (value: string): boolean => {
   return false;
 };
 
+const countExplicitPathCues = (value: string): number => {
+  if (!value.trim()) return 0;
+  const matcher = new RegExp(FILE_PATH_HINT_PATTERN, "gi");
+  let count = 0;
+  for (const match of value.matchAll(matcher)) {
+    const token = String(match[0] ?? "");
+    if (!token) continue;
+    if (pathTokenTargetsRepo(token)) count += 1;
+  }
+  return count;
+};
+
+const EXPLICIT_PATH_REQUEST_RE =
+  /\b(?:open|show|read|inspect|grep|search|find|trace|walk(?:\s+through)?|explain|summari(?:s|z)e|line|lines|path|file|files|module|modules)\b/i;
+const CONCEPTUAL_QUESTION_LEAD_RE =
+  /^(?:please\s+)?(?:how|what|why|when|where|which|who|can|could|would|should|do|does|did|is|are)\b/i;
+const CONCEPTUAL_QUESTION_VERB_RE =
+  /\b(?:define|describe|compare|evaluate|influence|impact|feed|solve|derive|work|works|mean|means)\b/i;
+
+const shouldTreatAsExplicitPathQuery = (value: string): boolean => {
+  const question = String(value ?? "").trim();
+  if (!question) return false;
+  const pathCueCount = countExplicitPathCues(question);
+  if (pathCueCount <= 0) return false;
+  if (EXPLICIT_SEARCH_RE.test(question) || EXPLICIT_PATH_REQUEST_RE.test(question)) return true;
+  const normalized = question.toLowerCase();
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  const hasConceptualLead = CONCEPTUAL_QUESTION_LEAD_RE.test(normalized);
+  const hasConceptualVerb = CONCEPTUAL_QUESTION_VERB_RE.test(normalized);
+  if (!hasConceptualLead && !hasConceptualVerb) return true;
+  if (wordCount <= 8 && pathCueCount >= 1) return true;
+  // Broad conceptual prompts may inherit path hints from term-prior expansion; do not bypass.
+  return false;
+};
+
 const hasMustIncludeConstraints = (mustIncludeFiles?: string[]): boolean =>
   Boolean(mustIncludeFiles?.some((entry) => String(entry ?? "").trim().length > 0));
 
@@ -838,10 +873,10 @@ const resolveStage0PolicyForRepoPlan = (
 const resolveHardBypassReasonForRepoPlan = (plan: RepoSearchPlan): string | null => {
   if (plan.explicit || plan.mode === "explicit") return "explicit_repo_query";
   const question = String(plan.rawQuestion ?? "").trim();
-  if (question && hasExplicitPathCue(question)) return "explicit_path_query";
+  if (question && shouldTreatAsExplicitPathQuery(question)) return "explicit_path_query";
   if (!question) {
     const joined = plan.terms.join(" ");
-    if (joined && hasExplicitPathCue(joined)) return "explicit_path_query";
+    if (joined && shouldTreatAsExplicitPathQuery(joined)) return "explicit_path_query";
   }
   return null;
 };
@@ -851,8 +886,12 @@ const resolveHardBypassReasonForGitTracked = (input: {
   sourceQuestion?: string;
   mustIncludeFiles?: string[];
 }): string | null => {
-  if (hasExplicitPathCue(String(input.sourceQuestion ?? ""))) return "explicit_path_query";
-  if (hasExplicitPathCue(input.query)) return "explicit_path_query";
+  const sourceQuestion = String(input.sourceQuestion ?? "").trim();
+  if (sourceQuestion) {
+    if (shouldTreatAsExplicitPathQuery(sourceQuestion)) return "explicit_path_query";
+    return null;
+  }
+  if (shouldTreatAsExplicitPathQuery(input.query)) return "explicit_path_query";
   return null;
 };
 

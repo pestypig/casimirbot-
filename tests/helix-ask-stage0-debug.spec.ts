@@ -126,4 +126,358 @@ describe("helix ask stage0 debug propagation", () => {
     expect(merged?.fallback_reason).toBeNull();
     expect(merged?.fail_open_reason).toBeNull();
   });
+
+  it("clears sticky stage0.5 hard-fail when a later pass recovers", () => {
+    const merged = __testHelixAskStage0Debug.mergeStage05Telemetry(
+      {
+        used: true,
+        file_count: 12,
+        card_count: 0,
+        kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
+        llm_used: true,
+        fallback_reason: null,
+        extract_ms: 40,
+        total_ms: 1800,
+        budget_capped: true,
+        summary_required: true,
+        summary_hard_fail: true,
+        summary_fail_reason: "stage05_slot_coverage_missing:code_path",
+        slot_plan: {
+          mode: "dynamic",
+          slots: ["definition", "mechanism", "equation", "code_path"],
+          required: ["definition", "mechanism", "equation", "code_path"],
+        },
+        slot_coverage: {
+          required: ["definition", "mechanism", "equation", "code_path"],
+          present: ["definition", "mechanism", "equation"],
+          missing: ["code_path"],
+          ratio: 0.75,
+        },
+        fullfile_mode: true,
+        two_pass_used: true,
+        two_pass_batches: 2,
+        overflow_policy: "two_pass",
+      },
+      {
+        used: true,
+        file_count: 12,
+        card_count: 8,
+        kind_counts: { code: 2, doc: 6, config: 0, data: 0, binary: 0 },
+        llm_used: true,
+        fallback_reason: null,
+        extract_ms: 8,
+        total_ms: 520,
+        budget_capped: false,
+        summary_required: true,
+        summary_hard_fail: false,
+        summary_fail_reason: null,
+        slot_plan: {
+          mode: "dynamic",
+          slots: ["definition", "mechanism", "equation", "code_path"],
+          required: ["definition", "mechanism", "equation", "code_path"],
+        },
+        slot_coverage: {
+          required: ["definition", "mechanism", "equation", "code_path"],
+          present: ["definition", "mechanism", "equation", "code_path"],
+          missing: [],
+          ratio: 1,
+        },
+        fullfile_mode: true,
+        two_pass_used: false,
+        two_pass_batches: 1,
+        overflow_policy: "two_pass",
+      },
+    );
+
+    expect(merged?.summary_hard_fail).toBe(false);
+    expect(merged?.summary_fail_reason).toBeNull();
+    expect(merged?.slot_coverage?.missing ?? []).toEqual([]);
+    expect(merged?.card_count).toBe(8);
+  });
+
+  it("updates debug payload to cleared stage0.5 hard-fail after recovery", () => {
+    const debugPayload: Record<string, unknown> = {};
+
+    __testHelixAskStage0Debug.applyStage05DebugFields(debugPayload, {
+      used: true,
+      file_count: 12,
+      card_count: 0,
+      kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
+      llm_used: true,
+      fallback_reason: null,
+      extract_ms: 55,
+      total_ms: 1800,
+      budget_capped: true,
+      summary_required: true,
+      summary_hard_fail: true,
+      summary_fail_reason: "stage05_slot_coverage_missing:code_path",
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "mechanism", "equation", "code_path"],
+        required: ["definition", "mechanism", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "mechanism", "equation", "code_path"],
+        present: ["definition", "mechanism", "equation"],
+        missing: ["code_path"],
+        ratio: 0.75,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 2,
+      overflow_policy: "two_pass",
+    });
+
+    __testHelixAskStage0Debug.applyStage05DebugFields(debugPayload, {
+      used: true,
+      file_count: 12,
+      card_count: 8,
+      kind_counts: { code: 2, doc: 6, config: 0, data: 0, binary: 0 },
+      llm_used: true,
+      fallback_reason: null,
+      extract_ms: 9,
+      total_ms: 540,
+      budget_capped: false,
+      summary_required: true,
+      summary_hard_fail: false,
+      summary_fail_reason: null,
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "mechanism", "equation", "code_path"],
+        required: ["definition", "mechanism", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "mechanism", "equation", "code_path"],
+        present: ["definition", "mechanism", "equation", "code_path"],
+        missing: [],
+        ratio: 1,
+      },
+      fullfile_mode: true,
+      two_pass_used: false,
+      two_pass_batches: 1,
+      overflow_policy: "two_pass",
+    });
+
+    expect(debugPayload.stage05_summary_hard_fail).toBe(false);
+    expect(debugPayload.stage05_summary_fail_reason).toBeNull();
+  });
+
+  it("downgrades code_path-only hard-fail for equation-required summaries during merge", () => {
+    const merged = __testHelixAskStage0Debug.mergeStage05Telemetry(undefined, {
+      used: true,
+      file_count: 12,
+      card_count: 0,
+      kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
+      llm_used: true,
+      fallback_reason: null,
+      extract_ms: 61,
+      total_ms: 36164,
+      budget_capped: true,
+      summary_required: true,
+      summary_hard_fail: true,
+      summary_fail_reason: "stage05_slot_coverage_missing:code_path",
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "mechanism", "equation", "code_path", "example"],
+        required: ["definition", "mechanism", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "mechanism", "equation", "code_path"],
+        present: ["definition", "mechanism", "equation"],
+        missing: ["code_path"],
+        ratio: 0.75,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 2,
+      overflow_policy: "two_pass",
+    });
+
+    expect(merged?.summary_hard_fail).toBe(false);
+    expect(merged?.summary_fail_reason).toBeNull();
+    expect(merged?.slot_coverage?.missing ?? []).toEqual(["code_path"]);
+  });
+
+  it("marks soft code_path gap in debug and suppresses hard-fail flag", () => {
+    const debugPayload: Record<string, unknown> = {};
+
+    __testHelixAskStage0Debug.applyStage05DebugFields(debugPayload, {
+      used: true,
+      file_count: 12,
+      card_count: 0,
+      kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
+      llm_used: true,
+      fallback_reason: null,
+      extract_ms: 61,
+      total_ms: 36164,
+      budget_capped: true,
+      summary_required: true,
+      summary_hard_fail: true,
+      summary_fail_reason: "stage05_slot_coverage_missing:code_path",
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "mechanism", "equation", "code_path", "example"],
+        required: ["definition", "mechanism", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "mechanism", "equation", "code_path"],
+        present: ["definition", "mechanism", "equation"],
+        missing: ["code_path"],
+        ratio: 0.75,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 2,
+      overflow_policy: "two_pass",
+    });
+
+    expect(debugPayload.stage05_summary_hard_fail).toBe(false);
+    expect(debugPayload.stage05_summary_fail_reason).toBeNull();
+    expect(debugPayload.stage05_soft_code_path_gap_applied).toBe(true);
+  });
+
+  it("downgrades stage0.5 llm timeout hard-fail to soft runtime fail-open", () => {
+    const merged = __testHelixAskStage0Debug.mergeStage05Telemetry(undefined, {
+      used: true,
+      file_count: 12,
+      card_count: 0,
+      kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
+      llm_used: false,
+      fallback_reason: null,
+      extract_ms: 7,
+      total_ms: 29231,
+      budget_capped: false,
+      summary_required: true,
+      summary_hard_fail: true,
+      summary_fail_reason: "stage05_llm_timeout",
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "equation", "code_path"],
+        required: ["definition", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "equation", "code_path"],
+        present: [],
+        missing: ["definition", "equation", "code_path"],
+        ratio: 0,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 1,
+      overflow_policy: "two_pass",
+    });
+
+    expect(merged?.summary_hard_fail).toBe(false);
+    expect(merged?.summary_fail_reason).toBeNull();
+  });
+
+  it("marks soft runtime fail-open in debug and suppresses hard-fail flag", () => {
+    const debugPayload: Record<string, unknown> = {};
+
+    __testHelixAskStage0Debug.applyStage05DebugFields(debugPayload, {
+      used: true,
+      file_count: 12,
+      card_count: 0,
+      kind_counts: { code: 0, doc: 0, config: 0, data: 0, binary: 0 },
+      llm_used: false,
+      fallback_reason: null,
+      extract_ms: 7,
+      total_ms: 29231,
+      budget_capped: false,
+      summary_required: true,
+      summary_hard_fail: true,
+      summary_fail_reason: "stage05_llm_timeout",
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "equation", "code_path"],
+        required: ["definition", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "equation", "code_path"],
+        present: [],
+        missing: ["definition", "equation", "code_path"],
+        ratio: 0,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 1,
+      overflow_policy: "two_pass",
+    });
+
+    expect(debugPayload.stage05_summary_hard_fail).toBe(false);
+    expect(debugPayload.stage05_summary_fail_reason).toBeNull();
+    expect(debugPayload.stage05_soft_runtime_fail_open).toBe(true);
+  });
+
+  it("treats missing required slot coverage as hard-fail even when cards exist", () => {
+    const merged = __testHelixAskStage0Debug.mergeStage05Telemetry(undefined, {
+      used: true,
+      file_count: 12,
+      card_count: 8,
+      kind_counts: { code: 4, doc: 1, config: 3, data: 0, binary: 0 },
+      llm_used: true,
+      fallback_reason: null,
+      extract_ms: 15,
+      total_ms: 29112,
+      budget_capped: false,
+      summary_required: true,
+      summary_hard_fail: false,
+      summary_fail_reason: null,
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "equation", "code_path"],
+        required: ["definition", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "equation", "code_path"],
+        present: [],
+        missing: ["definition", "equation", "code_path"],
+        ratio: 0,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 1,
+      overflow_policy: "two_pass",
+    });
+
+    expect(merged?.summary_hard_fail).toBe(true);
+    expect(merged?.summary_fail_reason).toBe("stage05_slot_coverage_missing");
+  });
+
+  it("marks debug hard-fail for missing required slot coverage despite nonzero cards", () => {
+    const debugPayload: Record<string, unknown> = {};
+
+    __testHelixAskStage0Debug.applyStage05DebugFields(debugPayload, {
+      used: true,
+      file_count: 12,
+      card_count: 8,
+      kind_counts: { code: 4, doc: 1, config: 3, data: 0, binary: 0 },
+      llm_used: true,
+      fallback_reason: null,
+      extract_ms: 15,
+      total_ms: 29112,
+      budget_capped: false,
+      summary_required: true,
+      summary_hard_fail: false,
+      summary_fail_reason: null,
+      slot_plan: {
+        mode: "dynamic",
+        slots: ["definition", "equation", "code_path"],
+        required: ["definition", "equation", "code_path"],
+      },
+      slot_coverage: {
+        required: ["definition", "equation", "code_path"],
+        present: [],
+        missing: ["definition", "equation", "code_path"],
+        ratio: 0,
+      },
+      fullfile_mode: true,
+      two_pass_used: true,
+      two_pass_batches: 1,
+      overflow_policy: "two_pass",
+    });
+
+    expect(debugPayload.stage05_summary_hard_fail).toBe(true);
+    expect(debugPayload.stage05_summary_fail_reason).toBe("stage05_slot_coverage_missing");
+  });
 });

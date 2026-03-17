@@ -1160,6 +1160,39 @@
       "weight": 1
     },
     {
+      "id": "paper-ingestion-runtime",
+      "label": "Paper Ingestion Runtime Walk",
+      "path": "docs/knowledge/paper-ingestion-runtime-tree.json",
+      "topicTags": [
+        "paper",
+        "knowledge",
+        "rag"
+      ],
+      "matchers": [
+        "paper ingest",
+        "paper ingestion",
+        "citation graph",
+        "claim extraction",
+        "theory congruence",
+        "observation measurement theory",
+        "dag tree paper"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 12,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "supports": 2,
+        "contradicts": 2,
+        "cites": 2,
+        "see-also": 1
+      },
+      "weight": 1
+    },
+    {
       "id": "essence-luma-noise",
       "label": "Essence, Luma, and Noise Walk",
       "path": "docs/knowledge/essence-luma-noise-tree.json",

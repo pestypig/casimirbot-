@@ -86,7 +86,12 @@ No transition is allowed out of `published`, `failed`, or `canceled`.
 
 4. `normalizing`
 - Inputs: raw claims.
-- Outputs: canonical entities, symbols, units, variable bindings.
+- Outputs: canonical entities, symbols, units, variable bindings plus `paper_card` primitives:
+  - `concepts`
+  - `systems`
+  - `quantitative_values`
+  - `math_objects`
+  - `congruence_assessments`
 
 5. `graph_merging`
 - Inputs: normalized claims.
@@ -94,6 +99,7 @@ No transition is allowed out of `published`, `failed`, or `canceled`.
   - `tree_delta`
   - `dag_delta`
   - `atlas_delta`
+  - paper scaffold branches (paper root + claim/concept/system/value/math/citation hubs)
   - `math_registry` (equations, definitions, variables, units, assumptions)
   - citation graph edges (`cites`)
   - contradiction and congruence edges.
@@ -143,6 +149,13 @@ Each published paper knowledge pack must include:
 - `citation_links` from claims to citations with extraction method (`marker`, `doi`, `arxiv`, `heuristic`).
 - Citation provenance retained for deterministic replay and audit.
 
+7. Paper card layer for Tree + DAG congruence
+- `paper_card.concepts`: concept inventory with provenance.
+- `paper_card.systems`: system records with components/interactions.
+- `paper_card.quantitative_values`: parsed values with unit/context.
+- `paper_card.math_objects`: equations/definitions/variables/units/assumptions.
+- `paper_card.congruence_assessments`: target-level agreement/tension/conflict status.
+
 ## Retry and Failure Policy
 
 - Retry budget is per stage.
@@ -160,6 +173,14 @@ Each published paper knowledge pack must include:
 - Ingest request schema: `schemas/paper-ingest-request.schema.json`
 - Run record schema: `schemas/paper-run-record.schema.json`
 - Knowledge pack schema: `schemas/paper-knowledge-pack.schema.json`
+- Persistent framework store path:
+  - `artifacts/papers/framework/paper-tree-dag-atlas.v1.json`
+  - Updated on every successful per-paper merge.
+  - Referenced in `run.artifacts.graph_delta_output`.
+- Authoritative runtime tree projection path:
+  - `docs/knowledge/paper-ingestion-runtime-tree.json`
+  - Regenerated from framework store on each successful ingest merge.
+  - Resolver-visible through `configs/graph-resolvers.json` lane `paper-ingestion-runtime`.
 
 These schemas define the wire format for each paper run and are intended to be
 validated at API boundaries and before persistence.

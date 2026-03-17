@@ -1,0 +1,1794 @@
+﻿{
+    "ok":  true,
+    "text":  "Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md.\n\nRuntime fallback: answerGenerationFailed is not defined. Mechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nIn practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nMechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nSources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+    "answer":  "Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md.\n\nRuntime fallback: answerGenerationFailed is not defined. Mechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nIn practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nMechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nSources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+    "fallback":  "runtime_deterministic",
+    "fail_reason":  "GENERIC_COLLAPSE",
+    "fail_class":  "infra_fail",
+    "debug":  {
+                  "two_pass":  false,
+                  "micro_pass":  true,
+                  "trace_id":  "ask:4fb4557e-f48e-4720-8bee-d67070231020",
+                  "llm_route_expected_backend":  "http",
+                  "llm_runtime_env":  "http",
+                  "llm_policy_env":  "http",
+                  "llm_http_base_present":  true,
+                  "llm_http_base_host":  "api.openai.com",
+                  "llm_api_key_present":  true,
+                  "llm_invoke_attempted":  true,
+                  "llm_force_probe_requested":  false,
+                  "llm_force_probe_enabled":  false,
+                  "tuning_enabled":  false,
+                  "fast_quality_mode":  false,
+                  "arbiter_repo_ratio":  0.45,
+                  "arbiter_hybrid_ratio":  0.25,
+                  "retry_topk_bonus":  4,
+                  "format_enforcement":  "strict",
+                  "soft_expansion":  0,
+                  "scaffold_tokens":  512,
+                  "evidence_tokens":  512,
+                  "repair_tokens":  192,
+                  "hypothesis_enabled":  false,
+                  "agent_loop_enabled":  true,
+                  "agent_loop_max_steps":  3,
+                  "agent_loop_budget_ms":  120000,
+                  "agent_action_budget_ms":  20000,
+                  "clocka_tool_cap":  2,
+                  "agent_loop_steps":  2,
+                  "agent_loop_actions":  [
+                                             {
+                                                 "action":  "expand_heading_aliases",
+                                                 "reason":  "doc_heading_seed_slots",
+                                                 "expectedGain":  "seed_slot_aliases",
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-17T16:52:58.851Z"
+                                             },
+                                             {
+                                                 "action":  "retrieve_mixed",
+                                                 "reason":  "default_scope",
+                                                 "expectedGain":  "balanced_retrieval",
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-17T16:53:01.056Z"
+                                             },
+                                             {
+                                                 "action":  "slot_local_retry",
+                                                 "reason":  "slot_missing",
+                                                 "expectedGain":  "recover_missing_slots",
+                                                 "observedDelta":  "slots:5-\u003e6; evidence:ok-\u003efail",
+                                                 "durationMs":  2253,
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-17T16:53:06.215Z"
+                                             }
+                                         ],
+                  "agent_stop_reason":  "clocka_tool_cap",
+                  "agent_action_counts":  {
+                                              "expand_heading_aliases":  1,
+                                              "retrieve_mixed":  1,
+                                              "slot_local_retry":  1
+                                          },
+                  "agent_attempts":  [
+                                         "expand_heading_aliases",
+                                         "retrieve_mixed",
+                                         "slot_local_retry"
+                                     ],
+                  "single_llm":  true,
+                  "definition_focus":  false,
+                  "capsule_dialogue_applied_count":  0,
+                  "capsule_evidence_applied_count":  0,
+                  "capsule_retry_applied":  false,
+                  "focus_guard_result":  "pass",
+                  "anchor_guard_result":  "pass",
+                  "capsule_latest_topic_shift":  false,
+                  "capsule_must_keep_terms":  [
+
+                                              ],
+                  "capsule_preferred_paths":  [
+
+                                              ],
+                  "block_scoped":  false,
+                  "slot_plan_explicit_path_focus":  false,
+                  "report_mode":  false,
+                  "report_blocks_count":  0,
+                  "slot_plan_pass_used":  false,
+                  "session_memory_used":  false,
+                  "intent_contract_hash":  "286ae980644423f8d47d520433412fc5b99a933ffc2bf703e2fb721ca66e20eb",
+                  "intent_contract_stable":  true,
+                  "intent_contract_current_hash":  "286ae980644423f8d47d520433412fc5b99a933ffc2bf703e2fb721ca66e20eb",
+                  "intent_contract":  {
+                                          "ask_mode":  "mid",
+                                          "strictness":  "med",
+                                          "dominant_family":  "collapse",
+                                          "explicit_paths":  [
+
+                                                             ],
+                                          "symbol_targets":  [
+
+                                                             ],
+                                          "required_outputs":  [
+                                                                   "Primary Topic",
+                                                                   "Primary Equation (Verified/Tentative/General Reference)",
+                                                                   "Mechanism Explanation",
+                                                                   "Related Cross-Topic Evidence (Optional)",
+                                                                   "Rejected Candidates (Why)"
+                                                               ],
+                                          "allowed_fallback":  "general_explain",
+                                          "question_fingerprint":  "55cb7ca46f04485c45197dc86837a13b1588b503ae4e491a7a8b547c64b033c3"
+                                      },
+                  "explicit_repo_expectation":  true,
+                  "warp_proof_repo_cue":  false,
+                  "query_constraints":  {
+                                            "collapse_domain_lock":  true,
+                                            "hard_exclude_warp_family":  true,
+                                            "explicit_anchor_paths":  [
+
+                                                                      ]
+                                        },
+                  "repo_expectation_score":  3,
+                  "repo_expectation_level":  "high",
+                  "repo_expectation_signals":  [
+                                                   "explicit_repo",
+                                                   "repo_hint",
+                                                   "term_prior_suppressed:term_hits_missing"
+                                               ],
+                  "explicit_repo_paths":  [
+
+                                          ],
+                  "term_prior_enabled":  true,
+                  "term_prior_log_only":  false,
+                  "term_prior_applied":  false,
+                  "term_prior_hard_force_general":  false,
+                  "term_prior_prefer_general":  false,
+                  "term_prior_suppressed_reason":  "term_hits_missing",
+                  "term_prior_term_hit_confidence":  0,
+                  "term_prior_pivot_confidence":  null,
+                  "term_prior_polysemy_ambiguous":  false,
+                  "term_prior_polysemy_group":  null,
+                  "term_prior_term_hits":  [
+
+                                           ],
+                  "term_prior_directory_denylist":  [
+
+                                                    ],
+                  "term_prior_directory_disabled":  [
+
+                                                    ],
+                  "ambiguity_target_span":  "equation of the collapse of the wave function",
+                  "ambiguity_resolver_applied":  false,
+                  "ambiguity_resolver_reason":  "short_prompt_low_signal",
+                  "ambiguity_resolver_token_count":  16,
+                  "ambiguity_resolver_short_prompt":  false,
+                  "ambiguity_resolver_top_score":  0,
+                  "ambiguity_resolver_margin":  0,
+                  "slot_dominance_margin":  0,
+                  "ambiguity_resolver_candidates":  [
+                                                        "Canonical Equation Backbone (Research Baseline)",
+                                                        "toe research context pack 2026 02 18",
+                                                        "ToE Research Context Pack (2026-02-18)"
+                                                    ],
+                  "ambiguity_resolver_bypassed":  "repo_code_query",
+                  "format":  "brief",
+                  "stage_tags":  false,
+                  "verbosity":  "extended",
+                  "intent_id":  "hybrid.concept_plus_system_mapping",
+                  "intent_domain":  "hybrid",
+                  "intent_tier":  "F1",
+                  "intent_secondary_tier":  "F0",
+                  "intent_strategy":  "hybrid_explain",
+                  "intent_reason":  "match:1|obligation:repo_required|arbiter:clarify|topic_gate:missing_core",
+                  "frontier_theory_lens_source":  "none",
+                  "frontier_theory_lens_requested":  false,
+                  "frontier_theory_lens_active":  false,
+                  "frontier_session_lens_locked":  false,
+                  "frontier_session_followup_requested":  false,
+                  "frontier_session_reset_requested":  false,
+                  "frontier_session_lock_next":  false,
+                  "frontier_required_slots":  [
+                                                  "definitions",
+                                                  "baseline",
+                                                  "hypothesis",
+                                                  "anti_hypothesis",
+                                                  "falsifiers",
+                                                  "uncertainty_band",
+                                                  "claim_tier"
+                                              ],
+                  "is_repo_question":  true,
+                  "graph_pack_lock":  {
+                                          "requested":  [
+
+                                                        ],
+                                          "applied":  [
+
+                                                      ]
+                                      },
+                  "graph_congruence_region":  {
+                                                  "B_equals_1":  true,
+                                                  "qi_metric_derived_equals_true":  true,
+                                                  "qi_strict_ok_equals_true":  true,
+                                                  "theta_geom_equals_true":  true,
+                                                  "vdb_two_wall_support_equals_true":  true,
+                                                  "ts_metric_derived_equals_true":  true,
+                                                  "cl3_metric_t00_available_equals_true":  true,
+                                                  "cl3_rho_gate_equals_true":  false
+                                              },
+                  "graph_congruence_chart":  "comoving_cartesian",
+                  "verification_anchor_required":  false,
+                  "stage0_used":  true,
+                  "stage0_shadow_only":  false,
+                  "stage0_candidate_count":  174,
+                  "stage0_hit_rate":  0,
+                  "stage0_fallback_reason":  null,
+                  "stage0_build_age_ms":  66797,
+                  "stage0_commit":  "5263528756309f437fdc65b0e6e900a4666b0b3f",
+                  "stage0_rollout_mode":  "full",
+                  "stage0_canary_hit":  true,
+                  "stage0_soft_must_include_applied":  false,
+                  "stage0_policy_decision":  "stage0_active",
+                  "stage0_fail_open_reason":  null,
+                  "preflight_stage0_used":  true,
+                  "preflight_stage0_shadow_only":  false,
+                  "preflight_stage0_candidate_count":  21,
+                  "preflight_stage0_hit_rate":  0,
+                  "preflight_stage0_fallback_reason":  null,
+                  "preflight_stage0_build_age_ms":  67175,
+                  "preflight_stage0_commit":  "5263528756309f437fdc65b0e6e900a4666b0b3f",
+                  "preflight_stage0_rollout_mode":  "full",
+                  "preflight_stage0_canary_hit":  true,
+                  "preflight_stage0_soft_must_include_applied":  false,
+                  "preflight_stage0_policy_decision":  "stage0_active",
+                  "preflight_stage0_fail_open_reason":  null,
+                  "stage05_used":  true,
+                  "stage05_file_count":  12,
+                  "stage05_card_count":  8,
+                  "stage05_kind_counts":  {
+                                              "code":  7,
+                                              "doc":  1,
+                                              "config":  1,
+                                              "data":  0,
+                                              "binary":  0
+                                          },
+                  "stage05_llm_used":  true,
+                  "stage05_fallback_reason":  null,
+                  "stage05_extract_ms":  38,
+                  "stage05_total_ms":  40,
+                  "stage05_budget_capped":  false,
+                  "stage05_summary_required":  true,
+                  "stage05_summary_hard_fail":  false,
+                  "stage05_summary_fail_reason":  null,
+                  "stage05_soft_code_path_gap_applied":  false,
+                  "stage05_soft_runtime_fail_open":  false,
+                  "stage05_slot_plan":  {
+                                            "mode":  "dynamic",
+                                            "slots":  [
+                                                          "definition",
+                                                          "equation",
+                                                          "code_path"
+                                                      ],
+                                            "required":  [
+                                                             "definition",
+                                                             "equation",
+                                                             "code_path"
+                                                         ]
+                                        },
+                  "stage05_slot_coverage":  {
+                                                "required":  [
+                                                                 "definition",
+                                                                 "equation",
+                                                                 "code_path"
+                                                             ],
+                                                "present":  [
+                                                                "definition",
+                                                                "equation",
+                                                                "code_path"
+                                                            ],
+                                                "missing":  [
+
+                                                            ],
+                                                "ratio":  1
+                                            },
+                  "stage05_fullfile_mode":  true,
+                  "stage05_two_pass_used":  true,
+                  "stage05_two_pass_batches":  1,
+                  "stage05_overflow_policy":  "two_pass",
+                  "preflight_stage05_used":  true,
+                  "preflight_stage05_file_count":  12,
+                  "preflight_stage05_card_count":  8,
+                  "preflight_stage05_kind_counts":  {
+                                                        "code":  7,
+                                                        "doc":  0,
+                                                        "config":  1,
+                                                        "data":  0,
+                                                        "binary":  0
+                                                    },
+                  "preflight_stage05_llm_used":  true,
+                  "preflight_stage05_fallback_reason":  null,
+                  "preflight_stage05_extract_ms":  38,
+                  "preflight_stage05_total_ms":  40,
+                  "preflight_stage05_budget_capped":  false,
+                  "preflight_stage05_summary_required":  true,
+                  "preflight_stage05_summary_hard_fail":  false,
+                  "preflight_stage05_summary_fail_reason":  null,
+                  "preflight_stage05_soft_code_path_gap_applied":  false,
+                  "preflight_stage05_soft_runtime_fail_open":  false,
+                  "preflight_stage05_slot_plan":  {
+                                                      "mode":  "dynamic",
+                                                      "slots":  [
+                                                                    "definition",
+                                                                    "equation",
+                                                                    "code_path"
+                                                                ],
+                                                      "required":  [
+                                                                       "definition",
+                                                                       "equation",
+                                                                       "code_path"
+                                                                   ]
+                                                  },
+                  "preflight_stage05_slot_coverage":  {
+                                                          "required":  [
+                                                                           "definition",
+                                                                           "equation",
+                                                                           "code_path"
+                                                                       ],
+                                                          "present":  [
+                                                                          "definition",
+                                                                          "equation",
+                                                                          "code_path"
+                                                                      ],
+                                                          "missing":  [
+
+                                                                      ],
+                                                          "ratio":  1
+                                                      },
+                  "preflight_stage05_fullfile_mode":  true,
+                  "preflight_stage05_two_pass_used":  true,
+                  "preflight_stage05_two_pass_batches":  1,
+                  "preflight_stage05_overflow_policy":  "two_pass",
+                  "preflight_repo_search_terms":  [
+                                                      "equation collapse",
+                                                      "collapse wave"
+                                                  ],
+                  "preflight_repo_search_paths":  [
+                                                      "docs",
+                                                      "server",
+                                                      "modules",
+                                                      "shared",
+                                                      "client/src"
+                                                  ],
+                  "preflight_repo_search_reason":  "preflight",
+                  "preflight_repo_search_hits":  0,
+                  "preflight_repo_search_truncated":  false,
+                  "preflight_repo_search_error":  "rg_not_found",
+                  "preflight_queries":  [
+                                            "Explain the equation of the collapse of the wave function in this codebase. If there is no single canonical equation, give the top 2 in-family equation candidates and explain what each parameterizes",
+                                            "Canonical Equation Backbone (Research Baseline)",
+                                            "canonical equation backbone research baseline",
+                                            "toe research context pack 2026 02 18",
+                                            "ToE Research Context Pack (2026-02-18)",
+                                            "Scope Boundary",
+                                            "Repo Congruence Map (Current State)",
+                                            "Research-Lane Domain Bundles"
+                                        ],
+                  "preflight_files":  [
+                                          "server/routes/benchmarks.collapse.ts",
+                                          "tools/agentic/collapse.ts",
+                                          "shared/collapse-benchmark.ts",
+                                          "docs/DP_COLLAPSE_DERIVATION.md",
+                                          "server/services/mixer/collapse.ts",
+                                          "server/db/migrations/018_trace_collapse_strategy.ts"
+                                      ],
+                  "preflight_file_count":  6,
+                  "preflight_doc_share":  0.16666666666666666,
+                  "preflight_evidence_ok":  false,
+                  "preflight_evidence_ratio":  0.0625,
+                  "preflight_retrieval_upgrade":  false,
+                  "preflight_stage0_general_promote":  false,
+                  "context_deferred":  true,
+                  "micro_pass_enabled":  true,
+                  "fast_quality_plan_pass_suppressed":  false,
+                  "plan_pass_used":  true,
+                  "plan_pass_forced":  true,
+                  "micro_pass_auto":  false,
+                  "micro_pass_reason":  "flag",
+                  "slot_tiers":  [
+                                     {
+                                         "id":  "canonical-equation-backbone-research-baseline",
+                                         "label":  "Canonical Equation Backbone (Research Baseline)",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "dp-collapse-tree",
+                                         "label":  "DP Collapse Tree",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "definition-dp-collapse-tree",
+                                         "label":  "Definition: DP Collapse Tree",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "node-dp-collapse-tree",
+                                         "label":  "Node: DP Collapse Tree",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "node-dp-collapse-derivation",
+                                         "label":  "Node: DP Collapse Derivation",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "node-dp-collapse-estimator",
+                                         "label":  "Node: DP Collapse Estimator",
+                                         "source":  "heading",
+                                         "required":  false,
+                                         "tier":  "B"
+                                     },
+                                     {
+                                         "id":  "equation",
+                                         "label":  "equation",
+                                         "source":  "token",
+                                         "required":  false,
+                                         "tier":  "C"
+                                     }
+                                 ],
+                  "slot_tier_counts":  {
+                                           "A":  0,
+                                           "B":  6,
+                                           "C":  1
+                                       },
+                  "slot_plan":  [
+                                    {
+                                        "id":  "canonical-equation-backbone-research-baseline",
+                                        "label":  "Canonical Equation Backbone (Research Baseline)",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Canonical Equation Backbone (Research Baseline)",
+                                                        "toe research context pack 2026 02 18",
+                                                        "ToE Research Context Pack (2026-02-18)",
+                                                        "Scope Boundary",
+                                                        "Repo Congruence Map (Current State)",
+                                                        "Research-Lane Domain Bundles"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "dp-collapse-tree",
+                                        "label":  "DP Collapse Tree",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "DP Collapse Tree",
+                                                        "dp collapse tree",
+                                                        "Nodes",
+                                                        "Node: DP Collapse Tree",
+                                                        "Node: DP Collapse Derivation",
+                                                        "Node: DP Collapse Estimator"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "definition-dp-collapse-tree",
+                                        "label":  "Definition: DP Collapse Tree",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "dp collapse tree",
+                                                        "DP Collapse Tree",
+                                                        "Nodes",
+                                                        "Node: DP Collapse Tree",
+                                                        "Node: DP Collapse Derivation",
+                                                        "Node: DP Collapse Estimator"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "node-dp-collapse-tree",
+                                        "label":  "Node: DP Collapse Tree",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Node: DP Collapse Tree",
+                                                        "dp collapse tree",
+                                                        "DP Collapse Tree",
+                                                        "Nodes",
+                                                        "Node: DP Collapse Derivation",
+                                                        "Node: DP Collapse Estimator"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "node-dp-collapse-derivation",
+                                        "label":  "Node: DP Collapse Derivation",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Node: DP Collapse Derivation",
+                                                        "dp collapse tree",
+                                                        "DP Collapse Tree",
+                                                        "Nodes",
+                                                        "Node: DP Collapse Tree",
+                                                        "Node: DP Collapse Estimator"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "node-dp-collapse-estimator",
+                                        "label":  "Node: DP Collapse Estimator",
+                                        "required":  false,
+                                        "source":  "heading",
+                                        "weak":  false,
+                                        "surfaces":  [
+                                                         "knowledge",
+                                                         "docs"
+                                                     ],
+                                        "aliases":  [
+                                                        "Node: DP Collapse Estimator",
+                                                        "dp collapse tree",
+                                                        "DP Collapse Tree",
+                                                        "Nodes",
+                                                        "Node: DP Collapse Tree",
+                                                        "Node: DP Collapse Derivation"
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    },
+                                    {
+                                        "id":  "equation",
+                                        "label":  "equation",
+                                        "required":  false,
+                                        "source":  "token",
+                                        "weak":  true,
+                                        "aliases":  [
+
+                                                    ],
+                                        "evidence_criteria":  [
+
+                                                              ]
+                                    }
+                                ],
+                  "slot_count":  7,
+                  "slot_required_count":  0,
+                  "hard_required_slots":  [
+
+                                          ],
+                  "hard_required_slot_count":  0,
+                  "coverage_slots_source":  "none",
+                  "queries":  [
+                                  "Explain the equation of the collapse of the wave function in this codebase. If there is no single canonical equation, give the top 2 in-family equation candidates and explain what each parameterizes",
+                                  "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                  "explain what each parameterizes",
+                                  "wave",
+                                  "function",
+                                  "there"
+                              ],
+                  "docs_first_enabled":  false,
+                  "plan_scope_allowlist_tiers":  0,
+                  "plan_scope_avoidlist":  0,
+                  "plan_scope_must_include":  0,
+                  "retrieval_stage0_used":  true,
+                  "retrieval_stage0_shadow_only":  false,
+                  "retrieval_stage0_candidate_count":  174,
+                  "retrieval_stage0_hit_rate":  0,
+                  "retrieval_stage0_fallback_reason":  null,
+                  "retrieval_stage0_build_age_ms":  68866,
+                  "retrieval_stage0_commit":  "5263528756309f437fdc65b0e6e900a4666b0b3f",
+                  "retrieval_stage0_rollout_mode":  "full",
+                  "retrieval_stage0_canary_hit":  true,
+                  "retrieval_stage0_soft_must_include_applied":  false,
+                  "retrieval_stage0_policy_decision":  "stage0_active",
+                  "retrieval_stage0_fail_open_reason":  null,
+                  "retrieval_stage05_used":  true,
+                  "retrieval_stage05_file_count":  12,
+                  "retrieval_stage05_card_count":  8,
+                  "retrieval_stage05_kind_counts":  {
+                                                        "code":  7,
+                                                        "doc":  0,
+                                                        "config":  1,
+                                                        "data":  0,
+                                                        "binary":  0
+                                                    },
+                  "retrieval_stage05_llm_used":  true,
+                  "retrieval_stage05_fallback_reason":  null,
+                  "retrieval_stage05_extract_ms":  33,
+                  "retrieval_stage05_total_ms":  36,
+                  "retrieval_stage05_budget_capped":  false,
+                  "retrieval_stage05_summary_required":  true,
+                  "retrieval_stage05_summary_hard_fail":  false,
+                  "retrieval_stage05_summary_fail_reason":  null,
+                  "retrieval_stage05_soft_code_path_gap_applied":  false,
+                  "retrieval_stage05_soft_runtime_fail_open":  false,
+                  "retrieval_stage05_slot_plan":  {
+                                                      "mode":  "dynamic",
+                                                      "slots":  [
+                                                                    "definition",
+                                                                    "equation",
+                                                                    "code_path"
+                                                                ],
+                                                      "required":  [
+                                                                       "definition",
+                                                                       "equation",
+                                                                       "code_path"
+                                                                   ]
+                                                  },
+                  "retrieval_stage05_slot_coverage":  {
+                                                          "required":  [
+                                                                           "definition",
+                                                                           "equation",
+                                                                           "code_path"
+                                                                       ],
+                                                          "present":  [
+                                                                          "definition",
+                                                                          "equation",
+                                                                          "code_path"
+                                                                      ],
+                                                          "missing":  [
+
+                                                                      ],
+                                                          "ratio":  1
+                                                      },
+                  "retrieval_stage05_fullfile_mode":  true,
+                  "retrieval_stage05_two_pass_used":  true,
+                  "retrieval_stage05_two_pass_batches":  1,
+                  "retrieval_stage05_overflow_policy":  "two_pass",
+                  "doc_header_injected":  10,
+                  "compaction_applied":  false,
+                  "compaction_dropped":  0,
+                  "compaction_kept":  6,
+                  "compaction_policy":  "definition-\u003epolicy-\u003eentrypoint-\u003etests",
+                  "compaction_budget":  {
+                                            "maxBlocks":  12,
+                                            "maxBytes":  18000,
+                                            "maxPerFile":  2
+                                        },
+                  "proof_span_rate":  1,
+                  "slot_doc_coverage_rate":  0.375,
+                  "context_files":  [
+                                        "server/routes/benchmarks.collapse.ts",
+                                        "shared/collapse-benchmark.ts",
+                                        "tools/agentic/collapse.ts",
+                                        "cli/collapse-bench.ts",
+                                        "docs/DP_COLLAPSE_DERIVATION.md",
+                                        "server/services/mixer/collapse.ts",
+                                        "server/db/migrations/018_trace_collapse_strategy.ts",
+                                        "docs/knowledge/trees/dp-collapse-tree.md",
+                                        "docs/audits/ticket-results/TOE-028-dp-collapse-runtime-contract.20260218T032824Z.json",
+                                        "tools/collapse-benchmark-runner.ts",
+                                        "shared/dp-collapse.ts",
+                                        "docs/collapse-benchmark-backend-roadmap.md",
+                                        "server/services/collapse-benchmark.ts",
+                                        "docs/knowledge/dp-collapse-tree.json",
+                                        "server/db/migrations/016_trace_collapse.ts",
+                                        "server/services/mixer/collapse.ts",
+                                        "server/services/mixer/collapse.ts",
+                                        "client/src/components/needle-hull-preset.tsx",
+                                        "scripts/validate-physics-equation-backbone.ts",
+                                        "reports/helix-ask-stellar-equation-framework.md",
+                                        "artifacts/research/stellar-framework/equation-targets.json",
+                                        "configs/physics-equation-backbone.v1.json",
+                                        "modules/dynamic/stress-energy-equations.ts",
+                                        "server/specialists/verifiers/philo.synthesis.verify.ts",
+                                        "server/energy/phase-scheduler.ts",
+                                        "server/qi/qi-snap-source.ts",
+                                        "server/metrics/index.ts",
+                                        "modules/core/physics-constants.ts",
+                                        "server/skills/llm.local.spawn.ts",
+                                        "server/instruments/pump-multitone.ts",
+                                        "server/modules/module-loader.ts",
+                                        "server/security/hull-guard.ts",
+                                        "modules/sim_core/static-casimir.ts",
+                                        "shared/contributions/truth-function-compiler.ts",
+                                        "server/routes.ts",
+                                        "docs/specs/casimir-tile-equation-provenance-contract-v1.md",
+                                        "shared/tokenizers/bpe.ts",
+                                        "client/src/lib/code-index/store.ts",
+                                        "tools/needle_ipeak_candidates.py",
+                                        "client/src/hooks/useHardwareFeeds.ts",
+                                        "client/src/pages/noisegen.tsx",
+                                        "shared/skills.ts",
+                                        "shared/agi-specialists.ts",
+                                        "server/specialists/solvers/philo.synthesis.ts",
+                                        "server/helix-core.ts",
+                                        "shared/schema.ts",
+                                        "shared/essence-themes.ts",
+                                        "server/energy-pipeline.ts"
+                                    ],
+                  "context_files_count":  48,
+                  "topic_tier":  1,
+                  "topic_must_include_ok":  true,
+                  "slot_evidence":  [
+                                        {
+                                            "id":  "canonical-equation-backbone-research-baseline",
+                                            "label":  "Canonical Equation Backbone (Research Baseline)",
+                                            "doc_card_count":  0,
+                                            "alias_card_count":  0,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "canonical-equation-backbone-research-baseline"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "dp-collapse-tree",
+                                            "label":  "DP Collapse Tree",
+                                            "doc_card_count":  2,
+                                            "alias_card_count":  2,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "dp-collapse-tree"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "definition-dp-collapse-tree",
+                                            "label":  "Definition: DP Collapse Tree",
+                                            "doc_card_count":  2,
+                                            "alias_card_count":  2,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "definition-dp-collapse-tree"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "node-dp-collapse-tree",
+                                            "label":  "Node: DP Collapse Tree",
+                                            "doc_card_count":  2,
+                                            "alias_card_count":  2,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "node-dp-collapse-tree"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "node-dp-collapse-derivation",
+                                            "label":  "Node: DP Collapse Derivation",
+                                            "doc_card_count":  2,
+                                            "alias_card_count":  2,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "node-dp-collapse-derivation"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "node-dp-collapse-estimator",
+                                            "label":  "Node: DP Collapse Estimator",
+                                            "doc_card_count":  2,
+                                            "alias_card_count":  2,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  0,
+                                            "missing_slots":  [
+                                                                  "node-dp-collapse-estimator"
+                                                              ]
+                                        },
+                                        {
+                                            "id":  "equation",
+                                            "label":  "equation",
+                                            "doc_card_count":  1,
+                                            "alias_card_count":  1,
+                                            "evidence_gate_ok":  true,
+                                            "coverage_ratio":  1,
+                                            "missing_slots":  [
+
+                                                              ]
+                                        }
+                                    ],
+                  "slot_doc_hit_rate":  0.8571428571428571,
+                  "slot_alias_coverage_rate":  0.8571428571428571,
+                  "evidence_critic_applied":  true,
+                  "evidence_critic_ok":  true,
+                  "evidence_critic_ratio":  0.5625,
+                  "evidence_critic_count":  9,
+                  "evidence_critic_tokens":  16,
+                  "viability_must_include_ok":  true,
+                  "verification_anchor_ok":  true,
+                  "plan_must_include_ok":  true,
+                  "atlas_required":  true,
+                  "atlas_requirement_failed":  true,
+                  "atlas_requirement_reason":  "atlas_required_no_hits",
+                  "evidence_gate_ok":  false,
+                  "evidence_match_ratio":  0.5625,
+                  "evidence_match_count":  9,
+                  "evidence_token_count":  16,
+                  "evidence_core_required":  true,
+                  "evidence_core_ok":  true,
+                  "evidence_core_match_ratio":  0.5625,
+                  "evidence_core_match_count":  9,
+                  "evidence_core_token_count":  16,
+                  "evidence_use_question_tokens":  true,
+                  "evidence_signal_tokens":  [
+
+                                             ],
+                  "evidence_tokens_preview":  [
+                                                  "equation",
+                                                  "collapse",
+                                                  "wave",
+                                                  "function",
+                                                  "codebase.",
+                                                  "there",
+                                                  "single",
+                                                  "canonical",
+                                                  "give",
+                                                  "top",
+                                                  "in-family",
+                                                  "candidates"
+                                              ],
+                  "evidence_match_preview":  [
+                                                 "equation",
+                                                 "collapse",
+                                                 "function",
+                                                 "single",
+                                                 "canonical",
+                                                 "top"
+                                             ],
+                  "retrieval_confidence":  0.7625000000000002,
+                  "retrieval_doc_share":  0.13043478260869565,
+                  "retrieval_context_files":  [
+                                                  "server/routes/benchmarks.collapse.ts",
+                                                  "shared/collapse-benchmark.ts",
+                                                  "tools/agentic/collapse.ts",
+                                                  "cli/collapse-bench.ts",
+                                                  "docs/DP_COLLAPSE_DERIVATION.md",
+                                                  "server/services/mixer/collapse.ts",
+                                                  "server/db/migrations/018_trace_collapse_strategy.ts",
+                                                  "docs/knowledge/trees/dp-collapse-tree.md",
+                                                  "docs/audits/ticket-results/TOE-028-dp-collapse-runtime-contract.20260218T032824Z.json",
+                                                  "tools/collapse-benchmark-runner.ts",
+                                                  "shared/dp-collapse.ts",
+                                                  "docs/collapse-benchmark-backend-roadmap.md",
+                                                  "server/services/collapse-benchmark.ts",
+                                                  "docs/knowledge/dp-collapse-tree.json",
+                                                  "server/db/migrations/016_trace_collapse.ts",
+                                                  "client/src/components/needle-hull-preset.tsx",
+                                                  "scripts/validate-physics-equation-backbone.ts",
+                                                  "reports/helix-ask-stellar-equation-framework.md",
+                                                  "artifacts/research/stellar-framework/equation-targets.json",
+                                                  "configs/physics-equation-backbone.v1.json",
+                                                  "modules/dynamic/stress-energy-equations.ts",
+                                                  "server/specialists/verifiers/philo.synthesis.verify.ts",
+                                                  "server/energy/phase-scheduler.ts",
+                                                  "server/qi/qi-snap-source.ts",
+                                                  "server/metrics/index.ts",
+                                                  "modules/core/physics-constants.ts",
+                                                  "server/skills/llm.local.spawn.ts",
+                                                  "server/instruments/pump-multitone.ts",
+                                                  "server/modules/module-loader.ts",
+                                                  "../../modules/sim_core/static-casimir.js",
+                                                  "server/security/hull-guard.ts",
+                                                  "modules/sim_core/static-casimir.ts",
+                                                  "shared/contributions/truth-function-compiler.ts",
+                                                  "server/routes.ts",
+                                                  "docs/specs/casimir-tile-equation-provenance-contract-v1.md",
+                                                  "shared/tokenizers/bpe.ts",
+                                                  "client/src/lib/code-index/store.ts",
+                                                  "client/src/hooks/useHardwareFeeds.ts",
+                                                  "client/src/pages/noisegen.tsx",
+                                                  "shared/skills.ts",
+                                                  "shared/agi-specialists.ts",
+                                                  "server/specialists/solvers/philo.synthesis.ts",
+                                                  "server/helix-core.ts",
+                                                  "shared/schema.ts",
+                                                  "shared/essence-themes.ts",
+                                                  "server/energy-pipeline.ts"
+                                              ],
+                  "retrieval_doc_hits":  6,
+                  "retrieval_context_file_count":  46,
+                  "retrieval_query_hit_count":  6,
+                  "retrieval_top_score":  1.270069,
+                  "retrieval_score_gap":  0.0007779999999999454,
+                  "retrieval_atlas_graph_selected_count":  0,
+                  "retrieval_atlas_graph_runtime_link_count":  0,
+                  "retrieval_atlas_graph_edge_type_counts":  {
+
+                                                             },
+                  "retrieval_atlas_graph_query_overlap_count":  0,
+                  "retrieval_atlas_graph_corpus_member_count":  0,
+                  "retrieval_atlas_graph_script_doc_boost_count":  0,
+                  "retrieval_footprint_exact_paths":  [
+                                                          "server/routes/benchmarks.collapse.ts",
+                                                          "shared/collapse-benchmark.ts",
+                                                          "tools/agentic/collapse.ts",
+                                                          "cli/collapse-bench.ts",
+                                                          "docs/DP_COLLAPSE_DERIVATION.md",
+                                                          "server/services/mixer/collapse.ts",
+                                                          "server/db/migrations/018_trace_collapse_strategy.ts",
+                                                          "docs/knowledge/trees/dp-collapse-tree.md",
+                                                          "docs/audits/ticket-results/TOE-028-dp-collapse-runtime-contract.20260218T032824Z.json",
+                                                          "tools/collapse-benchmark-runner.ts",
+                                                          "shared/dp-collapse.ts",
+                                                          "docs/collapse-benchmark-backend-roadmap.md"
+                                                      ],
+                  "retrieval_footprint_path_count":  46,
+                  "retrieval_footprint_zone_hint":  "owned_frontier",
+                  "retrieval_has_exact_provenance":  true,
+                  "retrieval_channel_hits":  {
+                                                 "lexical":  6,
+                                                 "symbol":  5,
+                                                 "fuzzy":  2,
+                                                 "path":  0,
+                                                 "git_tracked":  1,
+                                                 "atlas":  0
+                                             },
+                  "retrieval_channel_top_scores":  {
+                                                       "lexical":  108,
+                                                       "symbol":  94,
+                                                       "fuzzy":  3,
+                                                       "path":  0,
+                                                       "git_tracked":  26,
+                                                       "atlas":  0
+                                                   },
+                  "retrieval_channel_weights":  {
+                                                    "lexical":  1,
+                                                    "symbol":  0.7481481481481481,
+                                                    "fuzzy":  0.3083333333333333,
+                                                    "path":  0.75,
+                                                    "git_tracked":  0.6824074074074075,
+                                                    "atlas":  0.45
+                                                },
+                  "atlas_channel_used":  false,
+                  "channel_contributions":  {
+                                                "lexical":  {
+                                                                "hits":  6,
+                                                                "top_score":  108,
+                                                                "weight":  1,
+                                                                "used":  true
+                                                            },
+                                                "symbol":  {
+                                                               "hits":  5,
+                                                               "top_score":  94,
+                                                               "weight":  0.7481,
+                                                               "used":  true
+                                                           },
+                                                "fuzzy":  {
+                                                              "hits":  2,
+                                                              "top_score":  3,
+                                                              "weight":  0.3083,
+                                                              "used":  true
+                                                          },
+                                                "path":  {
+                                                             "hits":  0,
+                                                             "top_score":  0,
+                                                             "weight":  0.75,
+                                                             "used":  false
+                                                         },
+                                                "git_tracked":  {
+                                                                    "hits":  1,
+                                                                    "top_score":  26,
+                                                                    "weight":  0.6824,
+                                                                    "used":  true
+                                                                },
+                                                "atlas":  {
+                                                              "hits":  0,
+                                                              "top_score":  0,
+                                                              "weight":  0.45,
+                                                              "used":  false
+                                                          }
+                                            },
+                  "slot_coverage_required":  [
+
+                                             ],
+                  "slot_coverage_missing":  [
+
+                                            ],
+                  "slot_coverage_ratio":  1,
+                  "slot_coverage_ok":  true,
+                  "coverage_slots_required":  [
+                                                  "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                  "explain what each parameterizes",
+                                                  "equation",
+                                                  "collapse",
+                                                  "wave",
+                                                  "function",
+                                                  "there",
+                                                  "single"
+                                              ],
+                  "coverage_slots_covered":  [
+                                                 "equation",
+                                                 "collapse",
+                                                 "wave",
+                                                 "function"
+                                             ],
+                  "coverage_slots_missing":  [
+                                                 "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                 "explain what each parameterizes",
+                                                 "there",
+                                                 "single"
+                                             ],
+                  "coverage_slots_ratio":  0.5,
+                  "docs_first_slot_covered":  [
+                                                  "equation",
+                                                  "collapse"
+                                              ],
+                  "docs_first_slot_missing":  [
+                                                  "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                  "explain what each parameterizes",
+                                                  "wave",
+                                                  "function",
+                                                  "there",
+                                                  "single"
+                                              ],
+                  "docs_first_slot_ratio":  0.25,
+                  "controller_steps":  [
+                                           {
+                                               "step":  "initial",
+                                               "evidenceOk":  true,
+                                               "slotCoverageOk":  true,
+                                               "docCoverageOk":  true,
+                                               "missingSlots":  [
+                                                                    "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                                    "explain what each parameterizes",
+                                                                    "wave",
+                                                                    "function",
+                                                                    "there"
+                                                                ],
+                                               "retrievalConfidence":  0.9000000000000002
+                                           },
+                                           {
+                                               "step":  "retry",
+                                               "action":  "applied",
+                                               "reason":  "slot_missing",
+                                               "evidenceOk":  false,
+                                               "slotCoverageOk":  true,
+                                               "docCoverageOk":  true,
+                                               "missingSlots":  [
+                                                                    "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                                    "explain what each parameterizes",
+                                                                    "wave",
+                                                                    "function",
+                                                                    "there",
+                                                                    "single"
+                                                                ],
+                                               "retrievalConfidence":  0.7625000000000002
+                                           }
+                                       ],
+                  "controller_attempts":  2,
+                  "capsule_retry_triggered":  false,
+                  "capsule_retry_reason":  "not_needed",
+                  "retrieval_retry_stage0_used":  true,
+                  "retrieval_retry_stage0_shadow_only":  false,
+                  "retrieval_retry_stage0_candidate_count":  29,
+                  "retrieval_retry_stage0_hit_rate":  0,
+                  "retrieval_retry_stage0_fallback_reason":  null,
+                  "retrieval_retry_stage0_build_age_ms":  71424,
+                  "retrieval_retry_stage0_commit":  "5263528756309f437fdc65b0e6e900a4666b0b3f",
+                  "retrieval_retry_stage0_rollout_mode":  "full",
+                  "retrieval_retry_stage0_canary_hit":  true,
+                  "retrieval_retry_stage0_soft_must_include_applied":  false,
+                  "retrieval_retry_stage0_policy_decision":  "stage0_active",
+                  "retrieval_retry_stage0_fail_open_reason":  null,
+                  "retrieval_retry_stage05_used":  true,
+                  "retrieval_retry_stage05_file_count":  12,
+                  "retrieval_retry_stage05_card_count":  8,
+                  "retrieval_retry_stage05_kind_counts":  {
+                                                              "code":  7,
+                                                              "doc":  1,
+                                                              "config":  0,
+                                                              "data":  0,
+                                                              "binary":  0
+                                                          },
+                  "retrieval_retry_stage05_llm_used":  true,
+                  "retrieval_retry_stage05_fallback_reason":  null,
+                  "retrieval_retry_stage05_extract_ms":  30,
+                  "retrieval_retry_stage05_total_ms":  32,
+                  "retrieval_retry_stage05_budget_capped":  false,
+                  "retrieval_retry_stage05_summary_required":  true,
+                  "retrieval_retry_stage05_summary_hard_fail":  false,
+                  "retrieval_retry_stage05_summary_fail_reason":  null,
+                  "retrieval_retry_stage05_soft_code_path_gap_applied":  false,
+                  "retrieval_retry_stage05_soft_runtime_fail_open":  false,
+                  "retrieval_retry_stage05_slot_plan":  {
+                                                            "mode":  "dynamic",
+                                                            "slots":  [
+                                                                          "definition",
+                                                                          "equation",
+                                                                          "code_path"
+                                                                      ],
+                                                            "required":  [
+                                                                             "definition",
+                                                                             "equation",
+                                                                             "code_path"
+                                                                         ]
+                                                        },
+                  "retrieval_retry_stage05_slot_coverage":  {
+                                                                "required":  [
+                                                                                 "definition",
+                                                                                 "equation",
+                                                                                 "code_path"
+                                                                             ],
+                                                                "present":  [
+                                                                                "definition",
+                                                                                "equation",
+                                                                                "code_path"
+                                                                            ],
+                                                                "missing":  [
+
+                                                                            ],
+                                                                "ratio":  1
+                                                            },
+                  "retrieval_retry_stage05_fullfile_mode":  true,
+                  "retrieval_retry_stage05_two_pass_used":  true,
+                  "retrieval_retry_stage05_two_pass_batches":  1,
+                  "retrieval_retry_stage05_overflow_policy":  "two_pass",
+                  "controller_stop_reason":  "clocka_tool_cap",
+                  "definition_doc_required":  false,
+                  "definition_doc_ok":  true,
+                  "definition_doc_blocks":  6,
+                  "stage0_code_path_count":  34,
+                  "stage0_doc_path_count":  6,
+                  "stage0_code_floor_pass":  true,
+                  "alignment_gate_decision":  "FAIL",
+                  "open_world_bypass_mode":  "off",
+                  "alignment_gate_metrics":  {
+                                                 "alignment_real":  0.617592391304348,
+                                                 "alignment_decoy":  0.42975,
+                                                 "coincidence_margin":  0.18784239130434793,
+                                                 "stability_3_rewrites":  0.6499999999999999,
+                                                 "contradiction_rate":  0.25593776,
+                                                 "lower95_p_align":  0.4950982780309652,
+                                                 "sample_count":  64
+                                             },
+                  "alignment_explicit_anchor_override":  false,
+                  "alignment_gate_inputs":  {
+                                                "alignment_real":  0.6176,
+                                                "alignment_decoy":  0.4298,
+                                                "stability_3_rewrites":  0.65,
+                                                "contradiction_rate":  0.2559,
+                                                "sample_count":  64,
+                                                "query_hits":  6,
+                                                "file_count":  48,
+                                                "channel_coverage":  0.6,
+                                                "score_gap":  0.0008,
+                                                "top_score":  1.2701
+                                            },
+                  "open_world_bypass_policy":  {
+                                                   "mode":  "repo_required",
+                                                   "action":  "clarify_fail_closed",
+                                                   "reason":  "alignment_fail_repo_required"
+                                               },
+                  "arbiter_mode":  "clarify",
+                  "arbiter_reason":  "atlas_required_no_hits",
+                  "arbiter_strictness":  "high",
+                  "arbiter_user_expects_repo":  true,
+                  "requires_repo_evidence":  true,
+                  "arbiter_repo_ok":  false,
+                  "arbiter_hybrid_ok":  true,
+                  "arbiter_ratio":  0.7625000000000002,
+                  "arbiter_topic_ok":  true,
+                  "arbiter_concept_match":  false,
+                  "runtime_budget_level":  "OVER",
+                  "runtime_budget_recommend":  "reduce_output_tokens",
+                  "runtime_budget_signals":  {
+                                                 "clockA_p95_ms":  7628,
+                                                 "tool_calls_last_tick":  2,
+                                                 "kv_tokens":  0,
+                                                 "queue_depth":  0,
+                                                 "lane_pressure":  {
+                                                                       "llm":  1,
+                                                                       "io":  0.7625000000000002,
+                                                                       "media":  0.7317073170731707,
+                                                                       "physics":  0,
+                                                                       "perception":  0
+                                                                   }
+                                             },
+                  "arbiter_fail_reason":  null,
+                  "dottie_signal_applied":  false,
+                  "mode_rationale":  "clarify:atlas_required_no_hits",
+                  "grounded_evidence_clarify_override":  false,
+                  "clarify_triggered":  true,
+                  "graph_node_acceptance_rate":  0,
+                  "graph_node_acceptance_total":  0,
+                  "graph_node_acceptance_rejected":  0,
+                  "graph_node_acceptance_missing":  [
+
+                                                    ],
+                  "code_alignment_applied":  true,
+                  "code_alignment_symbols":  [
+                                                 "Subheading",
+                                                 "stage0",
+                                                 "Collapse",
+                                                 "Heading",
+                                                 "Stage",
+                                                 "Doc"
+                                             ],
+                  "code_alignment_resolved":  [
+                                                  "server/services/mixer/collapse.ts",
+                                                  "tests/collapse-mixer.spec.ts",
+                                                  "client/src/lib/checkpoints.ts",
+                                                  "client/src/components/common/LRLDocsTooltip.tsx",
+                                                  "tests/knowledge-corpus.spec.ts"
+                                              ],
+                  "code_spans_added":  5,
+                  "prompt_items":  [
+                                       {
+                                           "type":  "intent",
+                                           "hash":  "c9b5dfaa6a88",
+                                           "size":  63
+                                       },
+                                       {
+                                           "type":  "retrieval_summary",
+                                           "hash":  "0ee59919822f",
+                                           "size":  481
+                                       },
+                                       {
+                                           "type":  "doc_spans",
+                                           "hash":  "d73303e35ed2",
+                                           "size":  543
+                                       },
+                                       {
+                                           "type":  "code_spans",
+                                           "hash":  "dc9a53445872",
+                                           "size":  285
+                                       },
+                                       {
+                                           "type":  "slot_coverage",
+                                           "hash":  "73fe058cb8dd",
+                                           "size":  460
+                                       }
+                                   ],
+                  "prompt_item_count":  5,
+                  "tool_results_block":  "TOOL_RESULTS\n[retrieval_summary]\nqueries: Explain the equation of the collapse of the wave function in this codebase. If there is no single canonical equation, give the top 2 in-family equation candidates and explain what each parameterizes; Canonical Equation Backbone (Research Baseline); canonical equation backbone research baseline; toe research context pack 2026 02 18; ToE Research Context Pack (2026-02-18); Scope Boundary; Repo Congruence Map (Current State); Research-Lane Domain Bundles\nconfidence: 0.76\n\n[doc_spans]\n- Doc: TOE 028 dp collapse runtime contract.20260218T032824Z (docs/audits/ticket-results/TOE-028-dp-collapse-runtime-contract.20260218T032824Z.json)\n- Doc: dp collapse tree (docs/knowledge/dp-collapse-tree.json)\n- Title: DP Collapse Tree (docs/knowledge/trees/dp-collapse-tree.md)\n- Doc: casimir tile equation provenance contract v1 (docs/specs/casimir-tile-equation-provenance-contract-v1.md)\n- Doc: collapse benchmark backend roadmap (docs/collapse-benchmark-backend-roadmap.md)\n- Doc: DP COLLAPSE DERIVATION (docs/DP_COLLAPSE_DERIVATION.md)\n\n[code_spans]\n- Collapse Span: L1-L5 (server/services/mixer/collapse.ts)\n- Collapse Span: L1-L5 (tests/collapse-mixer.spec.ts)\n- Stage Span: L1-L5 (client/src/lib/checkpoints.ts)\n- Doc Span: L2-L6 (client/src/components/common/LRLDocsTooltip.tsx)\n- Doc Span: L45-L49 (tests/knowledge-corpus.spec.ts)\n\nEND_TOOL_RESULTS",
+                  "tool_results_present":  true,
+                  "tool_results_items":  [
+                                             "retrieval_summary",
+                                             "doc_spans",
+                                             "code_spans"
+                                         ],
+                  "tool_results_hash":  "628d6b22fe06",
+                  "evidence_cards_min_floor_applied":  true,
+                  "evidence_cards_min_floor_citations":  [
+
+                                                         ],
+                  "synthesis_mode":  "deterministic_scaffold",
+                  "synthesis_mode_reasons":  [
+                                                 "single_llm",
+                                                 "hybrid_route",
+                                                 "fail_closed_repo_evidence"
+                                             ],
+                  "synthesis_reason":  "mode=deterministic_scaffold | repo=deterministic | prompt=none | general=none | repo_scaffold=yes | prompt_scaffold=no | general_scaffold=no",
+                  "synthesis_repo_path":  "deterministic",
+                  "synthesis_prompt_path":  "none",
+                  "synthesis_general_path":  "none",
+                  "ambiguity_terms":  [
+                                          "equation",
+                                          "collapse"
+                                      ],
+                  "ambiguity_gate_applied":  true,
+                  "needle_natario_relation_proof":  {
+                                                        "applicable":  false,
+                                                        "ok":  true,
+                                                        "outcome":  "not_applicable",
+                                                        "matched_edge_ids":  [
+
+                                                                             ],
+                                                        "missing_edge_ids":  [
+
+                                                                             ]
+                                                    },
+                  "clarify_gate_bypassed_reason":  "explicit_repo_mapping_prefers_llm",
+                  "evidence_cards":  "Repo evidence:\nimport from \"node:crypto\"; import type CollapseMixerFeature, TEssenceEnvelope, CollapseMixerKnobs,.\n\nimport from \"vitest\"; import type from \"@shared/essence-schema\"; import from \"../server/ser... Mechanism: import from \"node:crypto\"; import type CollapseMixerFeature, TEssenceEnvelope, CollapseMixerKnobs,. -\u003e constrained interaction dynamics -\u003e import from \"vitest\"; import type from \"@shared/essence-schema\"; import from \"../server/ser..., because linked. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nIn practice, Evidence is limited; add the relevant repo file paths for stronger grounding.\n\nMechanism: import from \"node:crypto\"; import type CollapseMixerFeature, TEssenceEnvelope, CollapseMixerKnobs,. -\u003e constrained interaction dynamics -\u003e import from \"vitest\"; import type from \"@shared/essence-schema\"; import from \"../server/ser..., because linked.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: Evidence is limited; add the relevant repo file paths for stronger grounding.",
+                  "evidence_packet_v2_used":  true,
+                  "evidence_packet_v2":  {
+                                             "version":  "repo_atlas_evidence_packet_v2",
+                                             "route":  "repo",
+                                             "intent_id":  "hybrid.concept_plus_system_mapping",
+                                             "intent_domain":  "hybrid",
+                                             "section_ids":  [
+                                                                 "repo"
+                                                             ],
+                                             "section_count":  1,
+                                             "evidence_text_chars":  1132,
+                                             "evidence_cards_chars":  1147,
+                                             "context_file_count":  0,
+                                             "doc_block_count":  6,
+                                             "retrieval_confidence":  0.763,
+                                             "retrieval_doc_share":  0.13,
+                                             "slot_coverage_ratio":  0.5,
+                                             "slot_missing_count":  4,
+                                             "doc_coverage_ratio":  0.25,
+                                             "doc_missing_count":  6,
+                                             "sources":  [
+
+                                                         ],
+                                             "channel_contributions":  {
+                                                                           "lexical":  {
+                                                                                           "hits":  6,
+                                                                                           "top_score":  108,
+                                                                                           "weight":  1,
+                                                                                           "used":  true
+                                                                                       },
+                                                                           "symbol":  {
+                                                                                          "hits":  5,
+                                                                                          "top_score":  94,
+                                                                                          "weight":  0.7481,
+                                                                                          "used":  true
+                                                                                      },
+                                                                           "fuzzy":  {
+                                                                                         "hits":  2,
+                                                                                         "top_score":  3,
+                                                                                         "weight":  0.3083,
+                                                                                         "used":  true
+                                                                                     },
+                                                                           "path":  {
+                                                                                        "hits":  0,
+                                                                                        "top_score":  0,
+                                                                                        "weight":  0.75,
+                                                                                        "used":  false
+                                                                                    },
+                                                                           "git_tracked":  {
+                                                                                               "hits":  1,
+                                                                                               "top_score":  26,
+                                                                                               "weight":  0.6824,
+                                                                                               "used":  true
+                                                                                           },
+                                                                           "atlas":  {
+                                                                                         "hits":  0,
+                                                                                         "top_score":  0,
+                                                                                         "weight":  0.45,
+                                                                                         "used":  false
+                                                                                     }
+                                                                       }
+                                         },
+                  "answer_token_budget":  4096,
+                  "answer_token_cap":  4096,
+                  "answer_token_base":  4096,
+                  "answer_token_boosts":  [
+                                              "force_full_floor"
+                                          ],
+                  "answer_token_reason":  "auto:force_full_floor|evidence_mass=0.305",
+                  "answer_evidence_mass_score":  0.305,
+                  "answer_evidence_mass_band":  "thin",
+                  "answer_evidence_mass_source_count":  0,
+                  "answer_evidence_mass_independent_sources":  0,
+                  "llm_backend_used":  "http",
+                  "llm_provider_called":  true,
+                  "llm_model":  "gpt-4o-mini",
+                  "llm_http_status":  200,
+                  "llm_routed_via":  "llm.local.generate",
+                  "llm_call_stage":  "equation_semantic_rerank",
+                  "llm_invoke_started_at":  "2026-03-17T16:53:16.246Z",
+                  "llm_invoke_ended_at":  "2026-03-17T16:53:18.950Z",
+                  "llm_invoke_duration_ms":  2704,
+                  "llm_calls":  [
+                                    {
+                                        "stage":  "answer",
+                                        "backend":  "http",
+                                        "providerCalled":  true,
+                                        "model":  "gpt-4o-mini",
+                                        "status":  200,
+                                        "routedVia":  "llm.local.generate",
+                                        "startedAtIso":  "2026-03-17T16:53:07.037Z",
+                                        "endedAtIso":  "2026-03-17T16:53:16.178Z",
+                                        "durationMs":  9141
+                                    },
+                                    {
+                                        "stage":  "equation_semantic_rerank",
+                                        "backend":  "http",
+                                        "providerCalled":  true,
+                                        "model":  "gpt-4o-mini",
+                                        "status":  200,
+                                        "routedVia":  "llm.local.generate",
+                                        "startedAtIso":  "2026-03-17T16:53:16.246Z",
+                                        "endedAtIso":  "2026-03-17T16:53:18.950Z",
+                                        "durationMs":  2704
+                                    }
+                                ],
+                  "answer_retry_applied":  false,
+                  "answer_short_sentences":  17,
+                  "answer_short_tokens":  638,
+                  "answer_contract_primary_applied":  false,
+                  "answer_raw_text":  "In the context of the codebase, the collapse of the wave function is represented through various equations that are not strictly canonical but serve as foundational elements for understanding the dynamics involved. The two primary candidates for in-family equations related to the collapse mechanism are derived from the DP Collapse Tree and the DP Collapse Derivation documents. These documents outline the theoretical underpinnings and practical implementations of the collapse process, focusing on how different parameters interact within the system.\n\nTree Walk:\n1. The DP Collapse Tree outlines the structural relationships and dependencies involved in the collapse process, emphasizing the importance of interaction dynamics.\n2. The DP Collapse Derivation provides a mathematical framework that describes how the wave function collapses under specific conditions, detailing the parameters that govern this behavior.\n\nThe first candidate equation likely parameterizes the interaction dynamics between various components of the system, such as the CollapseMixerFeature and TEssenceEnvelope. This equation would focus on how these features interact to influence the overall collapse process, capturing the essence of the wave function\u0027s behavior under different scenarios. The second candidate equation may delve into the probabilistic aspects of the collapse, quantifying the likelihood of certain outcomes based on the state of the system prior to collapse.\n\nIn practice, the implementation of these equations is reflected in the codebase, particularly within the collapse.ts and collapse-mixer.spec.ts files. These files contain the logic and tests that validate the theoretical constructs laid out in the documentation. The exploration of these equations is still in a hypothesis-guided phase, indicating that while the foundational ideas are established, further testing and validation are necessary to confirm their efficacy and accuracy in real-world applications.\n\nIn practice, the evidence suggests that while the theoretical framework for the collapse of the wave function is being developed, it remains exploratory. The repo files, such as the DP Collapse Tree and the DP Collapse Derivation, provide essential insights into the mechanics of the collapse process, but the implementation details in the codebase are still being refined. As the project matures, the integration of these equations into a cohesive framework will be crucial for advancing the understanding of wave function collapse in this context.",
+                  "answer_contract_applied":  false,
+                  "report_mode_mismatch":  false,
+                  "report_scaffold_guard_triggered":  false,
+                  "answer_after_format":  "In the context of the codebase, the collapse of the wave function is represented through various equations that are not strictly canonical but serve as foundational elements for understanding the dynamics involved. The two primary candidates for in-family equations related to the collapse mechanism are derived from the DP Collapse Tree and the DP Collapse Derivation documents. These documents outline the theoretical underpinnings and practical implementations of the collapse process, focusing on how different parameters interact within the system.\n\nTree Walk:\n\nThe first candidate equation likely parameterizes the interaction dynamics between various components of the system, such as the CollapseMixerFeature and TEssenceEnvelope. This equation would focus on how these features interact to influence the overall collapse process, capturing the essence of the wave function\u0027s behavior under different scenarios. The second candidate equation may delve into the probabilistic aspects of the collapse, quantifying the likelihood of certain outcomes based on the state of the system prior to collapse.\n\nIn practice, the implementation of these equations is reflected in the codebase, particularly within the collapse.ts and collapse-mixer.spec.ts files. These files contain the logic and tests that validate the theoretical constructs laid out in the documentation. The exploration of these equations is still in a hypothesis-guided phase, indicating that while the foundational ideas are established, further testing and validation are necessary to confirm their efficacy and accuracy in real-world applications.\n\nIn practice, the evidence suggests that while the theoretical framework for the collapse of the wave function is being developed, it remains exploratory. The repo files, such as the DP Collapse Tree and the DP Collapse Derivation, provide essential insights into the mechanics of the collapse process, but the implementation details in the codebase are still being refined. As the project matures, the integration of these equations into a cohesive framework will be crucial for advancing the understanding of wave function collapse in this context.",
+                  "obligation_violation":  true,
+                  "frontier_lens_required":  false,
+                  "frontier_lens_candidate_count":  0,
+                  "scientific_response_applied":  true,
+                  "next_evidence_count":  6,
+                  "next_evidence_coverage":  1,
+                  "hypothesis_count":  0,
+                  "hypothesis_rate":  0,
+                  "claim_ref_rate":  0,
+                  "answer_after_fallback":  "Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md.\n\nRuntime fallback: answerGenerationFailed is not defined. Mechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nIn practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nMechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nSources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+                  "junk_clean_applied":  false,
+                  "junk_clean_reasons":  [
+
+                                         ],
+                  "concept_lint_applied":  false,
+                  "concept_lint_reasons":  [
+
+                                           ],
+                  "physics_lint_applied":  false,
+                  "physics_lint_reasons":  [
+
+                                           ],
+                  "drift_repair_applied":  false,
+                  "drift_repair_attempts":  0,
+                  "drift_repair_improved":  false,
+                  "coverage_token_count":  18,
+                  "coverage_key_count":  8,
+                  "coverage_missing_key_count":  7,
+                  "coverage_ratio":  0.125,
+                  "coverage_missing_keys":  [
+                                                "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                "explain what each parameterizes",
+                                                "equation",
+                                                "wave",
+                                                "function",
+                                                "there"
+                                            ],
+                  "coverage_gate_applied":  true,
+                  "coverage_gate_reason":  "missing_slots",
+                  "claim_ledger":  [
+                                       {
+                                           "id":  "claim:1",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:1"
+                                       },
+                                       {
+                                           "id":  "claim:2",
+                                           "type":  "fact",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:2"
+                                       },
+                                       {
+                                           "id":  "claim:3",
+                                           "type":  "inference",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:3"
+                                       }
+                                   ],
+                  "uncertainty_register":  [
+                                               {
+                                                   "id":  "claim:1",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:2",
+                                                   "type":  "fact",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:3",
+                                                   "type":  "inference",
+                                                   "reason":  "missing_evidence"
+                                               }
+                                           ],
+                  "constraint_matrix":  {
+                                            "section_count":  1,
+                                            "constraints":  [
+                                                                {
+                                                                    "id":  "citations_required",
+                                                                    "satisfied":  false,
+                                                                    "detail":  "citations=0"
+                                                                }
+                                                            ]
+                                        },
+                  "belief_claim_count":  3,
+                  "belief_supported_count":  0,
+                  "belief_unsupported_count":  3,
+                  "belief_unsupported_rate":  1,
+                  "belief_contradictions":  0,
+                  "belief_gate_applied":  false,
+                  "belief_graph_node_count":  3,
+                  "belief_graph_edge_count":  0,
+                  "belief_graph_claim_count":  3,
+                  "belief_graph_definition_count":  1,
+                  "belief_graph_conclusion_count":  1,
+                  "belief_graph_evidence_ref_count":  0,
+                  "belief_graph_constraint_count":  0,
+                  "belief_graph_supports":  0,
+                  "belief_graph_contradicts":  0,
+                  "belief_graph_depends_on":  0,
+                  "belief_graph_maps_to":  0,
+                  "belief_graph_claim_ids":  [
+                                                 "claim:1",
+                                                 "claim:2",
+                                                 "claim:3"
+                                             ],
+                  "belief_graph_unsupported_claim_ids":  [
+                                                             "claim:1",
+                                                             "claim:2",
+                                                             "claim:3"
+                                                         ],
+                  "belief_graph_contradiction_ids":  [
+
+                                                     ],
+                  "rattling_score":  1,
+                  "rattling_gate_applied":  false,
+                  "grounded_sentence_rate":  0,
+                  "tree_citation_share":  0,
+                  "tree_citation_total":  0,
+                  "tree_citation_tree":  0,
+                  "tree_citation_non_tree":  0,
+                  "clarify_precision":  1,
+                  "rattling_base_distance":  0.9436619718309859,
+                  "rattling_perturbation_distance":  1,
+                  "rattling_claim_set_count":  3,
+                  "gates":  {
+                                "evidence":  {
+                                                 "ok":  false,
+                                                 "matchCount":  9,
+                                                 "tokenCount":  16,
+                                                 "matchRatio":  0.5625,
+                                                 "criticApplied":  true,
+                                                 "criticOk":  true,
+                                                 "criticRatio":  0.5625,
+                                                 "criticCount":  9,
+                                                 "criticTokens":  16
+                                             },
+                                "coverage":  {
+                                                 "applied":  true,
+                                                 "reason":  "missing_slots",
+                                                 "ratio":  0.125,
+                                                 "tokenCount":  18,
+                                                 "keyCount":  8,
+                                                 "missingKeyCount":  7,
+                                                 "missingKeys":  [
+                                                                     "equation of the collapse of the wave function in this codebase. if there is no single canonical equation, give the top 2 in-family equation candidates",
+                                                                     "explain what each parameterizes",
+                                                                     "equation",
+                                                                     "wave",
+                                                                     "function",
+                                                                     "there"
+                                                                 ]
+                                             },
+                                "belief":  {
+                                               "applied":  false,
+                                               "unsupportedRate":  1,
+                                               "unsupportedCount":  3,
+                                               "supportedCount":  0,
+                                               "claimCount":  3,
+                                               "contradictions":  0
+                                           },
+                                "beliefGraph":  {
+                                                    "nodeCount":  3,
+                                                    "edgeCount":  0,
+                                                    "claimCount":  3,
+                                                    "definitionCount":  1,
+                                                    "conclusionCount":  1,
+                                                    "evidenceRefCount":  0,
+                                                    "constraintCount":  0,
+                                                    "supports":  0,
+                                                    "contradicts":  0,
+                                                    "dependsOn":  0,
+                                                    "mapsTo":  0
+                                                },
+                                "rattling":  {
+                                                 "applied":  false,
+                                                 "score":  1,
+                                                 "baseDistance":  0.9436619718309859,
+                                                 "perturbationDistance":  1,
+                                                 "claimSetCount":  3
+                                             },
+                                "lint":  {
+                                             "conceptApplied":  false,
+                                             "conceptReasons":  [
+
+                                                                ],
+                                             "physicsApplied":  false,
+                                             "physicsReasons":  [
+
+                                                                ]
+                                         },
+                                "variant":  {
+
+                                            },
+                                "ambiguity":  {
+                                                  "resolverApplied":  false,
+                                                  "resolverReason":  "short_prompt_low_signal",
+                                                  "resolverTokenCount":  16,
+                                                  "resolverShortPrompt":  false,
+                                                  "resolverTopScore":  0,
+                                                  "resolverMargin":  0,
+                                                  "resolverCandidates":  [
+                                                                             "Canonical Equation Backbone (Research Baseline)",
+                                                                             "toe research context pack 2026 02 18",
+                                                                             "ToE Research Context Pack (2026-02-18)"
+                                                                         ],
+                                                  "targetSpan":  "equation of the collapse of the wave function",
+                                                  "gateApplied":  true,
+                                                  "terms":  [
+                                                                "equation",
+                                                                "collapse"
+                                                            ]
+                                              }
+                            },
+                  "answer_path":  [
+                                      "intent:hybrid.concept_plus_system_mapping",
+                                      "domain:hybrid",
+                                      "strategy:hybrid_explain",
+                                      "arbiter:clarify",
+                                      "answer:llm",
+                                      "citationRepair:skipped(intent)",
+                                      "obligation:missing_repo_evidence",
+                                      "platonic:gates",
+                                      "answerExtension:appended",
+                                      "citationPersistence:append_sources",
+                                      "moveSelector:retrieve_more",
+                                      "equationSemanticRerank:applied"
+                                  ],
+                  "citation_persistence_guard_applied":  true,
+                  "citation_persistence_sources":  [
+                                                       "server/routes/agi.plan.ts",
+                                                       "docs/helix-ask-flow.md"
+                                                   ],
+                  "citation_persistence_appended":  true,
+                  "citation_persistence_ok":  true,
+                  "fuzzy_move_selector":  {
+                                              "selected":  "retrieve_more",
+                                              "selected_move":  "retrieve_more",
+                                              "move_scores":  {
+                                                                  "retrieve_more":  0.725514285714286,
+                                                                  "fail_closed":  0.5365199999999999,
+                                                                  "clarify":  0.4155214285714285,
+                                                                  "relation_build":  -0.07490000000000002,
+                                                                  "direct_answer":  -0.2911071428571429
+                                                              },
+                                              "rejected_moves":  [
+                                                                     "fail_closed",
+                                                                     "clarify",
+                                                                     "relation_build",
+                                                                     "direct_answer"
+                                                                 ],
+                                              "reject_reasons":  {
+                                                                     "direct_answer":  [
+                                                                                           "lower_score"
+                                                                                       ],
+                                                                     "retrieve_more":  [
+
+                                                                                       ],
+                                                                     "relation_build":  [
+                                                                                            "lower_score",
+                                                                                            "relation_intent_inactive"
+                                                                                        ],
+                                                                     "clarify":  [
+                                                                                     "lower_score"
+                                                                                 ],
+                                                                     "fail_closed":  [
+                                                                                         "lower_score"
+                                                                                     ]
+                                                                 },
+                                              "budget_pressure":  0.15,
+                                              "stop_reason":  "evidence_gain",
+                                              "dynamic_biases":  {
+                                                                     "relationBuildBias":  0,
+                                                                     "retrieveMoreBias":  0,
+                                                                     "bridgeGap":  1,
+                                                                     "evidenceGap":  1,
+                                                                     "dualDomainGap":  0
+                                                                 },
+                                              "dynamic_bias_relation_build":  0,
+                                              "dynamic_bias_retrieve_more":  0,
+                                              "gaps":  {
+                                                           "bridge":  1,
+                                                           "evidence":  1,
+                                                           "dual_domain":  0
+                                                       },
+                                              "scores":  {
+                                                             "groundedness":  0.35,
+                                                             "uncertainty":  0.5714285714285714,
+                                                             "safety":  0.3,
+                                                             "coverage":  0
+                                                         }
+                                          },
+                  "second_pass_attempted":  true,
+                  "second_pass_skipped_reason":  "none",
+                  "second_pass_result":  "pass",
+                  "second_pass_bridge_delta":  3,
+                  "second_pass_evidence_delta":  4,
+                  "second_pass_dual_domain_delta":  "gained",
+                  "relation_packet_evidence_count":  4,
+                  "relation_packet_bridge_count":  3,
+                  "relation_dual_domain_ok":  true,
+                  "answer_runtime_fallback_pinned":  false,
+                  "answer_rescue_eligible":  false,
+                  "answer_rescue_trigger":  "none",
+                  "answer_rescue_quality_reasons":  [
+
+                                                    ],
+                  "answer_rescue_equation_guard":  true,
+                  "answer_rescue_attempted":  false,
+                  "runtime_clock_a":  {
+                                          "budget_ms":  0,
+                                          "complete_contract_on_budget":  true
+                                      },
+                  "runtime_clock_b":  {
+                                          "enabled":  true,
+                                          "deep_work_queued":  true,
+                                          "bridge_expansion_candidates":  0,
+                                          "non_blocking":  true
+                                      },
+                  "equation_quote_contract":  {
+                                                  "required":  true,
+                                                  "ok":  false,
+                                                  "reason":  "equation_missing",
+                                                  "answer_has_equation":  false,
+                                                  "citation_matched":  true,
+                                                  "matched_needle":  false,
+                                                  "matched_citations":  [
+                                                                            "server/routes/agi.plan.ts"
+                                                                        ],
+                                                  "question_needles":  [
+
+                                                                       ],
+                                                  "equation_relevance_required":  false,
+                                                  "equation_relevance_score":  null,
+                                                  "equation_relevance_reason":  "not_required"
+                                              },
+                  "equation_selector_rollout_phase":  1,
+                  "equation_selector_enforced":  false,
+                  "shadow_primary_key":  "docs/DP_COLLAPSE_DERIVATION.md:L23",
+                  "shadow_symbol_hit_rate":  null,
+                  "equation_selector_shadow_rescue_applied":  false,
+                  "equation_recovery_attempts":  0,
+                  "equation_recovery_reason":  null,
+                  "fallback_reason":  "runtime_error_deterministic_fallback",
+                  "helix_ask_fail_reason":  "GENERIC_COLLAPSE",
+                  "helix_ask_fail_class":  "infra_fail",
+                  "answer_final_text":  "Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md.\n\nRuntime fallback: answerGenerationFailed is not defined. Mechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o. Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nIn practice, Missing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nMechanism: Runtime fallback: answerGenerationFailed is not defined Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md. -\u003e constrained interaction dynamics -\u003e Runtime fallback: answerGenerationFailed is not defined., because linked constraints amplify o.\n\nMaturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.\n\nMissing evidence: add stronger repo citations and linked test artifacts before upgrading maturity.\n\nSources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+                  "placeholder_fallback_applied":  false,
+                  "runtime_error":  "answerGenerationFailed is not defined"
+              },
+    "report_mode":  false
+}

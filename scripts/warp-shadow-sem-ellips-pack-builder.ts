@@ -103,6 +103,8 @@ const finiteOrNull = (value: unknown): number | null => {
 };
 
 const isSha256Hex = (value: string): boolean => /^[a-f0-9]{64}$/i.test(value);
+const normalizeRef = (value: string): string => value.replace(/\\/g, '/').trim().toLowerCase();
+const isTemplateRef = (value: string): boolean => normalizeRef(value).includes('docs/specs/data/se-paired-runs-template-');
 
 const unique = <T>(values: T[]): T[] => [...new Set(values)];
 
@@ -161,6 +163,8 @@ const resolveReportableUnlock = (
     String(hash).trim().toLowerCase(),
   ] as const);
   const rawArtifactSha256 = Object.fromEntries(rawArtifactSha256Entries.filter(([ref]) => ref.length > 0));
+  const templateRefPresent = rawArtifactRefs.some((ref) => isTemplateRef(ref));
+  const templateRunId = payload.pairedRunId?.trim().toLowerCase().includes('template') ?? false;
   if (dataOrigin !== 'instrument_export') {
     errors.push('measurement_provenance_not_instrument_export');
   }
@@ -182,6 +186,10 @@ const resolveReportableUnlock = (
     if (!isSha256Hex(hash)) {
       errors.push('invalid_measurement_provenance_raw_hash_format');
     }
+  }
+
+  if (templateRefPresent || templateRunId) {
+    errors.push('template_placeholder_input');
   }
 
   const uSemNm = finiteOrNull(payload.uncertainty?.u_sem_nm);

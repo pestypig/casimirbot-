@@ -35,6 +35,7 @@ This removes manual copy/edit from:
 - SEM+ellipsometry typed pack: `configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json`
 - SEM+ellipsometry reportable prereg pack: `configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json`
 - SEM+ellipsometry reportable reference profile pack: `configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json`
+- SEM+ellipsometry publication-overlay typed pack: `configs/warp-shadow-injection-scenarios.se-publication-typed.v1.json`
 
 ## Command
 ```bash
@@ -124,6 +125,14 @@ This expands strict SEM+ellipsometry anchors into:
 2. pass-2 typed pack (`se-primary-typed`) with `experimentalContext.semEllips` passthrough.
 3. frozen reportable prereg pack (`se-primary-reportable`) with locked refs/profile thresholds and explicit blocked reportable readiness.
 4. fixed reportable reference profile (`se-primary-reportable-reference`) with one stable scenario-id set for manuscript citations across reruns.
+
+SEM+ellipsometry publication-overlay pack build (cross-study synthesis; reference-only):
+```bash
+npm run warp:shadow:build-se-publication-overlay
+```
+This emits:
+1. publication-overlay typed pack (`se-publication-typed`) with `experimentalContext.semEllips` set to `publication_cross_study_synthesis`.
+2. deterministic reportable lock (`reportableReady=false`) and blocked-reason policy (`publication_cross_study_not_paired_instrument_design`, `reference_only_overlay`).
 
 Reportable unlock replay (when paired-run evidence is available):
 ```bash

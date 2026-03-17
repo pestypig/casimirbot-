@@ -81,4 +81,25 @@ describe("helix ask envelope practical paragraph promotion", () => {
       "Additional explanatory paragraph that should remain in details when no tree walk block exists.",
     );
   });
+
+  it("does not split path-citation answers into corrupted ts] fragments", () => {
+    const answer = [
+      "Claim-first explanation:",
+      "1. [server/services/mixer/collapse.ts] Grounded equation candidates were retrieved, but no exact canonical line was verifiable in this turn.",
+      "2. [shared/dp-collapse.ts] Current repository evidence maps to implementation operators.",
+      "3. [cli/collapse-bench.ts] The retrieved files still provide mechanism-level context.",
+    ].join("\n");
+
+    const envelope = buildHelixAskEnvelope({
+      answer,
+      format: "brief",
+      tier: "F1",
+      mode: "extended",
+    });
+
+    expect(envelope.answer).toContain("[server/services/mixer/collapse.ts]");
+    expect(envelope.answer).toContain("[shared/dp-collapse.ts]");
+    expect(envelope.answer).not.toMatch(/\n\s*\d+\.\s*ts\]\s+Grounded/i);
+    expect(envelope.answer).not.toContain("md]");
+  });
 });

@@ -119,6 +119,10 @@ const SOURCE_PAREN_PATTERN = new RegExp(`\\(\\s*source:\\s*${FILE_PATH_CITATION_
 const FILE_PATH_PAREN_PATTERN = new RegExp(`\\(\\s*${FILE_PATH_CITATION_SEGMENT}[^)]*\\)`, "gi");
 const FILE_BASENAME_PATTERN = /\b[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|md|json|yaml|yml)\b/gi;
 const RESIDUAL_EXTENSION_TOKEN_PATTERN = /\b(?:ts|tsx|js|jsx|md|json|yaml|yml)\b(?=[,;:])/gi;
+const DANGLING_EXTENSION_BRACKET_PATTERN =
+  /(^|[\s([{'"`])(?:ts|tsx|js|jsx|md|json|yaml|yml)\](?=[\s.,;:!?]|$)/gim;
+const ORPHAN_EXTENSION_LINE_PATTERN =
+  /(^|\n)\s*(?:\d+\.\s*)?(?:ts|tsx|js|jsx|md|json|yaml|yml)\](?=\s|$)/gi;
 const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
 const URL_PATTERN = /\bhttps?:\/\/[^\s)]+/gi;
 const RUNTIME_FALLBACK_FETCH_FAILED_RE = /\bruntime fallback:\s*fetch failed\.?/gi;
@@ -411,6 +415,19 @@ export function sanitizeReasoningOutputText(source: string): string {
   return stripVoiceCitationArtifacts(text)
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+export function cleanReasoningDisplayArtifacts(source: string): string {
+  if (!source) return "";
+  return source
+    .replace(/\r\n/g, "\n")
+    .replace(ORPHAN_EXTENSION_LINE_PATTERN, "$1")
+    .replace(DANGLING_EXTENSION_BRACKET_PATTERN, "$1")
+    .replace(/\[\s*\]/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -1138,12 +1155,18 @@ const VOICE_BARGE_RESUME_GRACE_MS = 2800;
 const VOICE_BARGE_HARD_CUT_PERSIST_MS = 700;
 const VOICE_BARGE_TRAFFIC_BUFFER_MS = 2600;
 const MIC_PLAYBACK_BARGE_START_MS_DESKTOP = 260;
+const MIC_PLAYBACK_BARGE_START_MS_DESKTOP_NOISY = 560;
 const MIC_PLAYBACK_BARGE_THRESHOLD_MULTIPLIER_MOBILE = 1.5;
 const MIC_PLAYBACK_BARGE_START_MS_MOBILE = 320;
+const MIC_PLAYBACK_BARGE_START_MS_MOBILE_NOISY = 680;
 const MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY = 0.52;
+const MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY_NOISY = 0.74;
 const MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY = 0.68;
+const MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY_NOISY = 0.86;
 const MIC_PLAYBACK_BARGE_MIN_SNR_DB = 8;
+const MIC_PLAYBACK_BARGE_MIN_SNR_DB_NOISY = 13;
 const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER = 1.35;
+const MIC_PLAYBACK_BARGE_RMS_MULTIPLIER_NOISY = 1.75;
 const VOICE_TRANSCRIPTION_BREATH_WINDOW_MS = 2600;
 const VOICE_TURN_CLOSE_SILENCE_MS = 3200;
 const VOICE_TURN_HASH_STABLE_DWELL_MS = 900;
@@ -1190,10 +1213,15 @@ const VOICE_HELD_TRANSCRIPT_MAX_AGE_MS = 30_000;
 const VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS = 3000;
 const VOICE_TRANSCRIPT_AUTO_CONFIRM_BLOCK_PIVOT_CONFIDENCE = 0.68;
 const VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY = 0.3;
+const VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY_NOISY = 0.44;
 const VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB = 4.5;
+const VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB_NOISY = 8.5;
 const VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS = 320;
+const VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS_NOISY = 440;
 const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY = 0.42;
+const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY_NOISY = 0.56;
 const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB = 7;
+const VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB_NOISY = 10.5;
 const VOICE_SESSION_SPEAKER_MATCH_DISTANCE = 0.42;
 const VOICE_SESSION_SPEAKER_MAX_PROFILES = 3;
 const HELIX_CONTEXT_CAPSULE_MAX_IDS = 12;
@@ -1219,6 +1247,64 @@ const SESSION_CAPSULE_CONFIDENCE_LABEL: Record<SessionCapsuleConfidenceBand, str
   building: "building",
   uncertain: "uncertain",
 };
+
+type VoiceNoiseHandlingProfile = {
+  bargeStartMsDesktop: number;
+  bargeStartMsMobile: number;
+  bargeMinSpeechProbability: number;
+  bargeStrongSpeechProbability: number;
+  bargeMinSnrDb: number;
+  bargeRmsMultiplier: number;
+  localGateMinSpeechProbability: number;
+  localGateMinSnrDb: number;
+  localGateMinDurationMs: number;
+  localGateLowQualitySpeechProbability: number;
+  localGateLowQualitySnrDb: number;
+};
+
+export function resolveVoiceNoiseHandlingProfile(noisyEnvironmentMode: boolean): VoiceNoiseHandlingProfile {
+  if (noisyEnvironmentMode) {
+    return {
+      bargeStartMsDesktop: MIC_PLAYBACK_BARGE_START_MS_DESKTOP_NOISY,
+      bargeStartMsMobile: MIC_PLAYBACK_BARGE_START_MS_MOBILE_NOISY,
+      bargeMinSpeechProbability: MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY_NOISY,
+      bargeStrongSpeechProbability: MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY_NOISY,
+      bargeMinSnrDb: MIC_PLAYBACK_BARGE_MIN_SNR_DB_NOISY,
+      bargeRmsMultiplier: MIC_PLAYBACK_BARGE_RMS_MULTIPLIER_NOISY,
+      localGateMinSpeechProbability: VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY_NOISY,
+      localGateMinSnrDb: VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB_NOISY,
+      localGateMinDurationMs: VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS_NOISY,
+      localGateLowQualitySpeechProbability: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY_NOISY,
+      localGateLowQualitySnrDb: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB_NOISY,
+    };
+  }
+  return {
+    bargeStartMsDesktop: MIC_PLAYBACK_BARGE_START_MS_DESKTOP,
+    bargeStartMsMobile: MIC_PLAYBACK_BARGE_START_MS_MOBILE,
+    bargeMinSpeechProbability: MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY,
+    bargeStrongSpeechProbability: MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY,
+    bargeMinSnrDb: MIC_PLAYBACK_BARGE_MIN_SNR_DB,
+    bargeRmsMultiplier: MIC_PLAYBACK_BARGE_RMS_MULTIPLIER,
+    localGateMinSpeechProbability: VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY,
+    localGateMinSnrDb: VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB,
+    localGateMinDurationMs: VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS,
+    localGateLowQualitySpeechProbability: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY,
+    localGateLowQualitySnrDb: VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB,
+  };
+}
+
+function isLowAudioQualitySignal(args: {
+  speechProbability: number | null | undefined;
+  snrDb: number | null | undefined;
+  lowQualitySpeechProbability: number;
+  lowQualitySnrDb: number;
+}): boolean {
+  return (
+    (typeof args.speechProbability === "number" &&
+      args.speechProbability < args.lowQualitySpeechProbability) ||
+    (typeof args.snrDb === "number" && args.snrDb < args.lowQualitySnrDb)
+  );
+}
 
 function createVoiceCaptureCheckpointMap(): Record<VoiceCaptureCheckpointKey, VoiceCaptureCheckpoint> {
   return VOICE_CAPTURE_CHECKPOINT_ORDER.reduce(
@@ -1847,14 +1933,23 @@ export function shouldTreatMicSignalAsSpeech(args: {
   snrDb: number;
   rms: number;
   speechTriggerThreshold: number;
+  bargeMinSpeechProbability?: number;
+  bargeStrongSpeechProbability?: number;
+  bargeMinSnrDb?: number;
+  bargeRmsMultiplier?: number;
 }): boolean {
   if (!args.speakingNow) return false;
   if (!args.voiceOutputActive || !args.localAudioGateActive) return true;
   const threshold = Math.max(args.speechTriggerThreshold, MIC_LEVEL_MIN_THRESHOLD);
-  const highProbability = args.speechProbability >= MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY;
-  const decisiveProbability = args.speechProbability >= MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY;
-  const highSnr = args.snrDb >= MIC_PLAYBACK_BARGE_MIN_SNR_DB;
-  const strongAmplitude = args.rms >= threshold * MIC_PLAYBACK_BARGE_RMS_MULTIPLIER;
+  const bargeMinSpeechProbability = args.bargeMinSpeechProbability ?? MIC_PLAYBACK_BARGE_MIN_SPEECH_PROBABILITY;
+  const bargeStrongSpeechProbability =
+    args.bargeStrongSpeechProbability ?? MIC_PLAYBACK_BARGE_STRONG_SPEECH_PROBABILITY;
+  const bargeMinSnrDb = args.bargeMinSnrDb ?? MIC_PLAYBACK_BARGE_MIN_SNR_DB;
+  const bargeRmsMultiplier = args.bargeRmsMultiplier ?? MIC_PLAYBACK_BARGE_RMS_MULTIPLIER;
+  const highProbability = args.speechProbability >= bargeMinSpeechProbability;
+  const decisiveProbability = args.speechProbability >= bargeStrongSpeechProbability;
+  const highSnr = args.snrDb >= bargeMinSnrDb;
+  const strongAmplitude = args.rms >= threshold * bargeRmsMultiplier;
   const signalCount = Number(highProbability) + Number(highSnr) + Number(strongAmplitude);
   return decisiveProbability || signalCount >= 2;
 }
@@ -2158,6 +2253,9 @@ function deriveVoiceSegmentLocalAnalysis(args: {
   zcrSum: number;
   rmsDbSum: number;
   durationMs: number;
+  minDurationMs?: number;
+  minSpeechProbability?: number;
+  minSnrDb?: number;
 }): VoiceSegmentLocalAnalysis {
   if (args.sampleCount <= 0) {
     return {
@@ -2174,10 +2272,12 @@ function deriveVoiceSegmentLocalAnalysis(args: {
   const centroid = clamp01(args.centroidSum / args.sampleCount);
   const zcr = clamp01(args.zcrSum / args.sampleCount);
   const rmsDb = args.rmsDbSum / args.sampleCount;
+  const minDurationMs = args.minDurationMs ?? VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS;
+  const minSpeechProbability = args.minSpeechProbability ?? VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY;
+  const minSnrDb = args.minSnrDb ?? VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB;
   const hardLowSignal =
-    args.durationMs >= VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS &&
-    (speechProbability < VOICE_LOCAL_AUDIO_GATE_MIN_SPEECH_PROBABILITY ||
-      snrDb < VOICE_LOCAL_AUDIO_GATE_MIN_SNR_DB);
+    args.durationMs >= minDurationMs &&
+    (speechProbability < minSpeechProbability || snrDb < minSnrDb);
   return {
     speechProbability,
     snrDb,
@@ -5813,6 +5913,11 @@ export function HelixAskPill({
   const voiceLocalAudioGateActive = voiceConfirmV2Active && HELIX_VOICE_LOCAL_AUDIO_GATE_ENABLED;
   const voiceSessionSpeakerActive = voiceConfirmV2Active && HELIX_VOICE_SESSION_SPEAKER_ENABLED;
   const voiceMultiSpeakerUiActive = voiceSessionSpeakerActive && HELIX_VOICE_MULTISPEAKER_UI_ENABLED;
+  const voiceNoisyEnvironmentMode = Boolean(userSettings.voiceNoisyEnvironmentMode);
+  const voiceNoiseProfile = useMemo(
+    () => resolveVoiceNoiseHandlingProfile(voiceNoisyEnvironmentMode),
+    [voiceNoisyEnvironmentMode],
+  );
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
   const [micArmState, setMicArmState] = useState<MicArmState>(() => {
     if (typeof window === "undefined") return "off";
@@ -11016,10 +11121,11 @@ export function HelixAskPill({
               : "No final answer returned.");
           const artifactDominated = isArtifactDominatedReasoningText(rawOutputText);
           const sanitizedOutputText = sanitizeReasoningOutputText(rawOutputText);
+          const displayOutputText = cleanReasoningDisplayArtifacts(rawOutputText);
           const outputText =
             artifactDominated && sanitizedOutputText.length < 72
               ? "I could not produce a readable grounded answer for this turn. Please restate it and I will retry with stricter grounding."
-              : sanitizedOutputText || rawOutputText;
+              : displayOutputText || rawOutputText;
           const responseDebugWithClientMode =
             response.debug || modeForAttempt
               ? {
@@ -13153,10 +13259,12 @@ export function HelixAskPill({
                   mergedPendingConfidence.confidence < VOICE_STT_TRANSLATION_CONFIRM_THRESHOLD);
               const mergedPendingLowAudioQuality =
                 nextSegment.lowAudioQuality === true ||
-                (typeof mergedPendingSpeechProbability === "number" &&
-                  mergedPendingSpeechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY) ||
-                (typeof mergedPendingSnrDb === "number" &&
-                  mergedPendingSnrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB);
+                isLowAudioQualitySignal({
+                  speechProbability: mergedPendingSpeechProbability,
+                  snrDb: mergedPendingSnrDb,
+                  lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+                  lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+                });
               const mergedPendingDispatchState = pendingConfirmation.dispatchState ?? "confirm";
               const mergedPendingPivotConfidence =
                 typeof result.pivot_confidence === "number"
@@ -13367,9 +13475,12 @@ export function HelixAskPill({
               : null;
           const lowAudioQuality =
             nextSegment.lowAudioQuality === true ||
-            (typeof speechProbability === "number" &&
-              speechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY) ||
-            (typeof snrDb === "number" && snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB);
+            isLowAudioQualitySignal({
+              speechProbability,
+              snrDb,
+              lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+              lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+            });
           const speakerConfirmBias =
             voiceConfirmV2Active && voiceSessionSpeakerActive
               ? Math.max(-0.08, Math.min(0.08, nextSegment.confirmBias ?? 0))
@@ -13788,6 +13899,7 @@ export function HelixAskPill({
     rememberConversationTurn,
     stopReadAloud,
     voiceConfirmV2Active,
+    voiceNoiseProfile,
     voiceSessionSpeakerActive,
   ]);
 
@@ -13911,11 +14023,12 @@ export function HelixAskPill({
       sourceLanguage: transcriptConfirmState.sourceLanguage ?? null,
       sourceText: transcriptConfirmState.sourceText ?? null,
       translated: transcriptConfirmState.translated,
-      lowAudioQuality:
-        (typeof transcriptConfirmState.speechProbability === "number" &&
-          transcriptConfirmState.speechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY) ||
-        (typeof transcriptConfirmState.snrDb === "number" &&
-          transcriptConfirmState.snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB),
+      lowAudioQuality: isLowAudioQualitySignal({
+        speechProbability: transcriptConfirmState.speechProbability,
+        snrDb: transcriptConfirmState.snrDb,
+        lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+        lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+      }),
       speechActive: voiceSpeechActiveRef.current,
       queuedSegmentCount: voiceTranscribeQueueRef.current.length,
     });
@@ -13927,11 +14040,12 @@ export function HelixAskPill({
       sourceLanguage: transcriptConfirmState.sourceLanguage ?? null,
       sourceText: transcriptConfirmState.sourceText ?? null,
       translated: transcriptConfirmState.translated,
-      lowAudioQuality:
-        (typeof transcriptConfirmState.speechProbability === "number" &&
-          transcriptConfirmState.speechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY) ||
-        (typeof transcriptConfirmState.snrDb === "number" &&
-          transcriptConfirmState.snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB),
+      lowAudioQuality: isLowAudioQualitySignal({
+        speechProbability: transcriptConfirmState.speechProbability,
+        snrDb: transcriptConfirmState.snrDb,
+        lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+        lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+      }),
       speechActive: false,
       queuedSegmentCount: 0,
     });
@@ -13980,11 +14094,12 @@ export function HelixAskPill({
           sourceLanguage: pending.sourceLanguage ?? null,
           sourceText: pending.sourceText ?? null,
           translated: pending.translated,
-          lowAudioQuality:
-            (typeof pending.speechProbability === "number" &&
-              pending.speechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY) ||
-            (typeof pending.snrDb === "number" &&
-              pending.snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB),
+          lowAudioQuality: isLowAudioQualitySignal({
+            speechProbability: pending.speechProbability,
+            snrDb: pending.snrDb,
+            lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+            lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+          }),
           speechActive: voiceSpeechActiveRef.current,
           queuedSegmentCount: voiceTranscribeQueueRef.current.length,
         });
@@ -13996,11 +14111,12 @@ export function HelixAskPill({
           sourceLanguage: pending.sourceLanguage ?? null,
           sourceText: pending.sourceText ?? null,
           translated: pending.translated,
-          lowAudioQuality:
-            (typeof pending.speechProbability === "number" &&
-              pending.speechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY) ||
-            (typeof pending.snrDb === "number" &&
-              pending.snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB),
+          lowAudioQuality: isLowAudioQualitySignal({
+            speechProbability: pending.speechProbability,
+            snrDb: pending.snrDb,
+            lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+            lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+          }),
           speechActive: false,
           queuedSegmentCount: 0,
         });
@@ -14059,6 +14175,8 @@ export function HelixAskPill({
     micArmState,
     transcriptConfirmState,
     voiceConfirmV2Active,
+    voiceNoiseProfile.localGateLowQualitySnrDb,
+    voiceNoiseProfile.localGateLowQualitySpeechProbability,
   ]);
 
   const queueSegmentForTranscription = useCallback(
@@ -14179,6 +14297,9 @@ export function HelixAskPill({
             zcrSum: analysisAccumulator?.zcrSum ?? 0,
             rmsDbSum: analysisAccumulator?.rmsDbSum ?? 0,
             durationMs,
+            minDurationMs: voiceNoiseProfile.localGateMinDurationMs,
+            minSpeechProbability: voiceNoiseProfile.localGateMinSpeechProbability,
+            minSnrDb: voiceNoiseProfile.localGateMinSnrDb,
           });
           let speakerId: string | null = null;
           let speakerConfidence: number | null = null;
@@ -14216,13 +14337,16 @@ export function HelixAskPill({
             }
             if (speakerConfidence >= 0.78 && localAnalysis.snrDb >= 10) {
               confirmBias = -0.04;
-            } else if (speakerConfidence < 0.48 || localAnalysis.snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB) {
+            } else if (
+              speakerConfidence < 0.48 ||
+              localAnalysis.snrDb < voiceNoiseProfile.localGateLowQualitySnrDb
+            ) {
               confirmBias = 0.05;
             }
           }
           const hardAudioGateReject =
             voiceLocalAudioGateActive &&
-            durationMs >= VOICE_LOCAL_AUDIO_GATE_MIN_DURATION_MS &&
+            durationMs >= voiceNoiseProfile.localGateMinDurationMs &&
             localAnalysis.lowQuality;
           const segmentId = `segment:${crypto.randomUUID()}`;
           const cutAtMs = Date.now();
@@ -14278,8 +14402,12 @@ export function HelixAskPill({
               speechProbability: localAnalysis.speechProbability,
               snrDb: localAnalysis.snrDb,
               lowAudioQuality:
-                localAnalysis.speechProbability < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SPEECH_PROBABILITY ||
-                localAnalysis.snrDb < VOICE_LOCAL_AUDIO_GATE_LOW_QUALITY_SNR_DB,
+                isLowAudioQualitySignal({
+                  speechProbability: localAnalysis.speechProbability,
+                  snrDb: localAnalysis.snrDb,
+                  lowQualitySpeechProbability: voiceNoiseProfile.localGateLowQualitySpeechProbability,
+                  lowQualitySnrDb: voiceNoiseProfile.localGateLowQualitySnrDb,
+                }),
               confirmBias,
             },
           );
@@ -14301,6 +14429,7 @@ export function HelixAskPill({
       patchVoiceSegmentAttempt,
       queueSegmentForTranscription,
       voiceLocalAudioGateActive,
+      voiceNoiseProfile,
       voiceSessionSpeakerActive,
     ],
   );
@@ -14353,10 +14482,10 @@ export function HelixAskPill({
     const speechStartMs =
       voiceOutputActive && voiceLocalAudioGateActive
         ? mobileAudioUserAgent
-          ? MIC_PLAYBACK_BARGE_START_MS_MOBILE
-          : MIC_PLAYBACK_BARGE_START_MS_DESKTOP
+          ? voiceNoiseProfile.bargeStartMsMobile
+          : voiceNoiseProfile.bargeStartMsDesktop
         : mobileAudioUserAgent && voiceOutputActive
-          ? MIC_PLAYBACK_BARGE_START_MS_MOBILE
+          ? voiceNoiseProfile.bargeStartMsMobile
           : MIC_SPEECH_START_MS;
     const rmsDb = 20 * Math.log10(Math.max(rms, 0.000001));
     const baselineDb = 20 * Math.log10(Math.max(baseline, 0.000001));
@@ -14380,6 +14509,10 @@ export function HelixAskPill({
       snrDb,
       rms,
       speechTriggerThreshold,
+      bargeMinSpeechProbability: voiceNoiseProfile.bargeMinSpeechProbability,
+      bargeStrongSpeechProbability: voiceNoiseProfile.bargeStrongSpeechProbability,
+      bargeMinSnrDb: voiceNoiseProfile.bargeMinSnrDb,
+      bargeRmsMultiplier: voiceNoiseProfile.bargeRmsMultiplier,
     });
     const now = Date.now();
 
@@ -14634,6 +14767,7 @@ export function HelixAskPill({
     setVoiceWarning,
     stopReadAloud,
     voiceLocalAudioGateActive,
+    voiceNoiseProfile,
   ]);
 
   const startVoiceCaptureLoop = useCallback(async () => {
@@ -16195,6 +16329,7 @@ export function HelixAskPill({
         localAudioGateActive: voiceLocalAudioGateActive,
         sessionSpeakerActive: voiceSessionSpeakerActive,
         multiSpeakerUiActive: voiceMultiSpeakerUiActive,
+        noisyEnvironmentMode: voiceNoisyEnvironmentMode,
       },
       playback: voiceAutoSpeakLastMetrics
         ? {
@@ -16321,6 +16456,7 @@ export function HelixAskPill({
     voiceLocalAudioGateActive,
     voiceSessionSpeakerActive,
     voiceMultiSpeakerUiActive,
+    voiceNoisyEnvironmentMode,
   ]);
 
   return (
@@ -16824,17 +16960,17 @@ export function HelixAskPill({
                                 alt={`${REASONING_THEATER_FRONTIER_ACTION_LABEL[reasoningTheaterFrontierAction]} frontier action`}
                                 className="relative z-[3] h-6 w-6 object-contain mix-blend-screen drop-shadow-[0_0_16px_rgba(148,163,184,0.6)]"
                                 loading="lazy"
-                                onError={(event) =>
+                                onError={(event) => {
+                                  const currentSrc = event.currentTarget?.currentSrc?.trim();
                                   setReasoningTheaterFrontierIconBrokenByPath((prev) => {
                                     const next = { ...prev };
                                     next[reasoningTheaterFrontierIconPath] = true;
-                                    const currentSrc = event.currentTarget.currentSrc?.trim();
                                     if (currentSrc) {
                                       next[currentSrc] = true;
                                     }
                                     return next;
-                                  })
-                                }
+                                  });
+                                }}
                               />
                             ) : null}
                             <span

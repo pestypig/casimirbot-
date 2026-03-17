@@ -226,13 +226,14 @@ Strict primary/standard pass-1 (`configs/warp-shadow-injection-scenarios.se-prim
 - pass-2 run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
 - reportable run summary: `scenarioCount=18`, `compatible=18`, `partial=0`, `incompatible=0`, `error=0`
 - reportable-reference run summary: `scenarioCount=2`, `compatible=2`, `partial=0`, `incompatible=0`, `error=0`
-- frozen reportable prereg profile records `reportableReady=false` with blocked reasons `missing_paired_dual_instrument_run` and `missing_covariance_uncertainty_anchor`.
-- when paired-evidence payloads are provided, reportable unlock additionally requires measurement provenance anchors (`data_origin=instrument_export`, non-empty instrument run IDs, and non-empty raw artifact refs); placeholder/template bundles remain fail-closed.
+- frozen reportable prereg profile records `reportableReady=false` with deterministic blocked reason `template_placeholder_input` for template-based attempts.
+- when paired-evidence payloads are provided, reportable unlock additionally requires measurement provenance anchors (`data_origin=instrument_export`, non-empty instrument run IDs, non-empty raw artifact refs, and per-ref SHA-256 hashes); placeholder/template bundles remain fail-closed.
 
 Lane-specific evidence congruence checks:
 - typed check (`artifacts/research/full-solve/se-compat-check-2026-03-06.json`): `congruent=8`, `incongruent=0`, `unknown=10`
-- reportable check (`artifacts/research/full-solve/se-compat-check-reportable-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=18`
-- reportable-reference check (`artifacts/research/full-solve/se-compat-check-reportable-reference-2026-03-06.json`): `congruent=0`, `incongruent=0`, `unknown=2`
+- reportable check (`artifacts/research/full-solve/se-compat-check-reportable-2026-03-15.json`): `congruent=0`, `incongruent=0`, `unknown=18`
+- reportable-reference check (`artifacts/research/full-solve/se-compat-check-reference-attempt-2026-03-15.json`): `congruent=0`, `incongruent=0`, `unknown=2`
+- reportable-attempt summary (`artifacts/research/full-solve/se-reportable-attempt-2026-03-15.json`): `verdict=blocked` with `blockedReasons=[template_placeholder_input, reportable_not_ready]`
 - dominant deterministic reason code on typed envelope: `edge_uncertainty_overlap`.
 - strict-source extraction was refreshed with numeric anchors from full text (`EXP-SE-016..EXP-SE-020` from `SRC-041`; updated `EXP-SE-012/013` from `SRC-050`), improving `u_sem_nm`/`u_ellip_nm` bookkeeping while keeping reportable fail-closed.
 
@@ -243,6 +244,26 @@ Interpretation rule:
 - reportable outputs remain fail-closed by design until paired dual-instrument covariance-aware uncertainty anchors are present;
 - paired-run closure path is now commit-tracked via `docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md` and `docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json`;
 - no promotion/canonical override is implied by this envelope mapping alone.
+
+## SEM+Ellipsometry Publication Overlay (Cross-Study Synthesis, Non-Blocking)
+This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
+
+Publication-overlay artifacts:
+- typed pack: `configs/warp-shadow-injection-scenarios.se-publication-typed.v1.json`
+- run: `artifacts/research/full-solve/shadow-injection-run-se-publication-typed-2026-03-17.json`
+- compat check: `artifacts/research/full-solve/se-compat-check-publication-2026-03-17.json`
+- summary: `artifacts/research/full-solve/se-publication-overlay-latest.json`
+
+Current overlay result:
+- run summary: `scenarioCount=6`, `compatible=6`, `partial=0`, `incompatible=0`, `error=0`
+- congruence summary: `congruent=2`, `incongruent=0`, `unknown=4`
+- dominant threshold reasons: `delta_exceeds_profile:SE-STD-2`, `delta_exceeds_profile:SE-ADV-1`, `U_fused_exceeds_profile:SE-ADV-1`
+- policy lock: `reportableUnlock=false`, blocked reasons include `publication_cross_study_not_paired_instrument_design`
+
+Interpretation rule:
+- this overlay is useful for envelope-mapping across heterogeneous studies;
+- it is intentionally non-promotional and does not unlock reportable SEM+ellipsometry status;
+- strict reportable unlock remains tied to paired same-run instrument exports with covariance + provenance integrity.
 
 ## Exploratory QCD Analog Citation Block (Non-Blocking)
 This lane is explicitly `reference_only` and does not alter canonical campaign decisions.

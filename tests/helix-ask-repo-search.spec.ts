@@ -334,6 +334,72 @@ describe("helix ask repo search", () => {
     }
   });
 
+  it("does not hard-bypass stage0 for broad conceptual source questions with inherited path hints", async () => {
+    const prevEnabled = process.env.HELIX_ASK_STAGE0_ENABLED;
+    const prevShadow = process.env.HELIX_ASK_STAGE0_SHADOW;
+    const prevRollout = process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE;
+    const prevCanary = process.env.HELIX_ASK_STAGE0_CANARY_PCT;
+    process.env.HELIX_ASK_STAGE0_ENABLED = "1";
+    process.env.HELIX_ASK_STAGE0_SHADOW = "0";
+    process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE = "full";
+    process.env.HELIX_ASK_STAGE0_CANARY_PCT = "100";
+    try {
+      const result = await runGitTrackedStage0CandidateLane({
+        query: "docs/knowledge/physics/dynamic-casimir-effect.md modulation outputs",
+        sourceQuestion: [
+          "How does dynamic Casimir modulation feed into the system's physics outputs?",
+          "docs/knowledge/physics/dynamic-casimir-effect.md",
+          "docs/papers.md",
+        ].join("\n"),
+        mode: "fallback",
+        intentDomain: "hybrid",
+        intentId: "hybrid.concept_plus_system_mapping",
+      });
+      expect(result.stage0?.fallback_reason).not.toBe("explicit_path_query");
+      expect(result.stage0?.policy_decision).not.toBe("explicit_path_query");
+    } finally {
+      if (prevEnabled === undefined) delete process.env.HELIX_ASK_STAGE0_ENABLED;
+      else process.env.HELIX_ASK_STAGE0_ENABLED = prevEnabled;
+      if (prevShadow === undefined) delete process.env.HELIX_ASK_STAGE0_SHADOW;
+      else process.env.HELIX_ASK_STAGE0_SHADOW = prevShadow;
+      if (prevRollout === undefined) delete process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE;
+      else process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE = prevRollout;
+      if (prevCanary === undefined) delete process.env.HELIX_ASK_STAGE0_CANARY_PCT;
+      else process.env.HELIX_ASK_STAGE0_CANARY_PCT = prevCanary;
+    }
+  });
+
+  it("does not hard-bypass stage0 when only internal query contains path-like tokens", async () => {
+    const prevEnabled = process.env.HELIX_ASK_STAGE0_ENABLED;
+    const prevShadow = process.env.HELIX_ASK_STAGE0_SHADOW;
+    const prevRollout = process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE;
+    const prevCanary = process.env.HELIX_ASK_STAGE0_CANARY_PCT;
+    process.env.HELIX_ASK_STAGE0_ENABLED = "1";
+    process.env.HELIX_ASK_STAGE0_SHADOW = "0";
+    process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE = "full";
+    process.env.HELIX_ASK_STAGE0_CANARY_PCT = "100";
+    try {
+      const result = await runGitTrackedStage0CandidateLane({
+        query: "docs/knowledge/physics/dynamic-casimir-effect.md modulation outputs",
+        sourceQuestion: "How does dynamic Casimir modulation feed into the system's physics outputs?",
+        mode: "fallback",
+        intentDomain: "hybrid",
+        intentId: "hybrid.concept_plus_system_mapping",
+      });
+      expect(result.stage0?.fallback_reason).not.toBe("explicit_path_query");
+      expect(result.stage0?.policy_decision).not.toBe("explicit_path_query");
+    } finally {
+      if (prevEnabled === undefined) delete process.env.HELIX_ASK_STAGE0_ENABLED;
+      else process.env.HELIX_ASK_STAGE0_ENABLED = prevEnabled;
+      if (prevShadow === undefined) delete process.env.HELIX_ASK_STAGE0_SHADOW;
+      else process.env.HELIX_ASK_STAGE0_SHADOW = prevShadow;
+      if (prevRollout === undefined) delete process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE;
+      else process.env.HELIX_ASK_STAGE0_ROLLOUT_MODE = prevRollout;
+      if (prevCanary === undefined) delete process.env.HELIX_ASK_STAGE0_CANARY_PCT;
+      else process.env.HELIX_ASK_STAGE0_CANARY_PCT = prevCanary;
+    }
+  });
+
   it("derives deterministic phrase search terms from adjacent query tokens", () => {
     const terms = extractRepoSearchTerms("How does intent directory routing work in helix ask?", null);
     expect(terms).toContain("intent directory");

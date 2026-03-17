@@ -121,6 +121,13 @@ export function HelixSettingsDialogContent({
               onChange={(value) => updateSettings({ enableSplashCursor: value })}
             />
             <PreferenceToggleRow
+              id="helix-voice-noisy-environment-mode"
+              label="Noisy environment mode"
+              description="Harden voice interruption/noise filters for loud places while keeping hands-free listening."
+              checked={userSettings.voiceNoisyEnvironmentMode}
+              onChange={(value) => updateSettings({ voiceNoisyEnvironmentMode: value })}
+            />
+            <PreferenceToggleRow
               id="helix-ask-debug"
               label="Helix Ask debug context"
               description="Show repo debug context with turn filter + copy export."

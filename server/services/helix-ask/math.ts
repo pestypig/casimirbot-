@@ -67,7 +67,7 @@ const withDefaultCertainty = (
 };
 
 const MATH_TRIGGER =
-  /\b(solve|derivative|d\/d[a-z]|equation|quadratic|algebra|integral|differentiate)\b|[A-Za-z_][A-Za-z0-9_]*\s*=\s*[A-Za-z_(]|[0-9]+\s*[+\-*/^=]/i;
+  /\b(solve|derivative|d\/d[a-z]|quadratic|algebra|integral|differentiate|evaluate|compute|determinant|matrix)\b|[A-Za-z_][A-Za-z0-9_]*\s*=\s*[A-Za-z_(]|[0-9]+\s*[+\-*/^=]/i;
 
 export function isHelixAskMathQuestion(question: string): boolean {
   const trimmed = question.trim();

@@ -237,6 +237,35 @@ describe("helix ask stage0.5 content lane", () => {
     expect(result.telemetry.slot_plan?.required).toContain("code_path");
   });
 
+  it("does not hard-require code_path for conceptual equation-of prompts without repo path cues", async () => {
+    const docPath = writeTestFile(
+      "docs/knowledge/physics/collapse-equation.md",
+      [
+        "# Collapse notes",
+        "S = |∫ g(t) ρ_neg(t) dt| / qi_limit",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "what's the equation of the collapse of the wave function?",
+      filePaths: [docPath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.telemetry.slot_plan?.required).toContain("equation");
+    expect(result.telemetry.slot_plan?.required ?? []).not.toContain("code_path");
+  });
+
   it("keeps equation slot coverage when llm summaries omit equation slot hits", async () => {
     const docPath = writeTestFile(
       "docs/warp-geometry-congruence-bridge.md",
@@ -316,6 +345,244 @@ describe("helix ask stage0.5 content lane", () => {
     expect(result.telemetry.slot_plan?.required ?? []).not.toContain("mechanism");
     expect(result.telemetry.slot_plan?.required ?? []).toContain("code_path");
     expect(result.telemetry.slot_plan?.required ?? []).toContain("equation");
+  });
+
+  it("does not count doc-only cards as code_path coverage for repo intents", async () => {
+    const docPath = writeTestFile(
+      "docs/knowledge/warp/doc-only-code-path.md",
+      [
+        "# Repo notes",
+        "This document references module paths but does not include executable code.",
+        "See modules/warp/natario-warp.ts for implementation details.",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "Where is the code path for the warp definition?",
+      filePaths: [docPath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "repo",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.telemetry.slot_plan?.required ?? []).toContain("code_path");
+    expect(result.telemetry.slot_coverage?.missing ?? []).toContain("code_path");
+  });
+
+  it("does not hard-require code_path for equation-focused repo prompts without explicit path cues", async () => {
+    const docPath = writeTestFile(
+      "docs/knowledge/warp/soft-code-path-gap.md",
+      [
+        "# Warp congruence equation",
+        "ds^2 = -c^2 dt^2 + a^2(dx^2 + dy^2 + dz^2)",
+        "This section explains congruence implications for warp metrics.",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: true,
+      query: "Show one equation used in warp congruence and explain what it means.",
+      filePaths: [docPath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 800,
+      binaryMetadataOnly: true,
+      intentDomain: "repo",
+      summaryRequired: true,
+      hardFailOnSummaryError: true,
+      summarizeWithLlm: async () => ({
+        summaries: {
+          [docPath]: {
+            summary:
+              "Warp congruence equation anchor: ds^2 = -c^2 dt^2 + a^2(dx^2 + dy^2 + dz^2).",
+            symbolsOrKeys: ["warp congruence equation"],
+            slotHits: ["definition", "equation"],
+            confidence: 0.87,
+          },
+        },
+      }),
+    });
+
+    expect(result.cards.length).toBeGreaterThan(0);
+    expect(result.telemetry.summary_hard_fail).toBe(false);
+    expect(result.telemetry.summary_fail_reason).toBeNull();
+    expect(result.telemetry.fallback_reason).toBeNull();
+    expect(result.telemetry.slot_plan?.required ?? []).not.toContain("code_path");
+    expect(result.telemetry.slot_coverage?.missing ?? []).not.toContain("code_path");
+  });
+
+  it("hard-fails hybrid physics prompts without doc+code diversity", async () => {
+    const codePath = writeTestFile(
+      "modules/warp/hybrid-diversity-code-only.ts",
+      [
+        "export function solveHybridWarp(alpha: number): number {",
+        "  return alpha * 3;",
+        "}",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: true,
+      query: "How does warp physics congruence solve work in this system?",
+      filePaths: [codePath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 800,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: true,
+      hardFailOnSummaryError: true,
+      summarizeWithLlm: async () => ({
+        summaries: {
+          [codePath]: {
+            summary: "Code path for hybrid warp congruence solve.",
+            symbolsOrKeys: ["solveHybridWarp"],
+            slotHits: ["definition", "code_path"],
+            confidence: 0.91,
+          },
+        },
+      }),
+    });
+
+    expect(result.cards).toEqual([]);
+    expect(result.telemetry.summary_hard_fail).toBe(true);
+    expect(result.telemetry.summary_fail_reason).toContain("stage05_hybrid_diversity_missing:doc");
+  });
+
+  it("forces a code candidate into the extraction window when code_path is required", async () => {
+    const docPaths = [
+      writeTestFile(
+        "docs/knowledge/physics/dce-a.md",
+        "# Dynamic Casimir\nDynamic Casimir modulation and outputs in physics systems.",
+      ),
+      writeTestFile(
+        "docs/knowledge/physics/dce-b.md",
+        "# Modulation\nHow dynamic Casimir modulation affects reported outputs.",
+      ),
+      writeTestFile(
+        "docs/knowledge/physics/dce-c.md",
+        "# Outputs\nSystem physics outputs and dynamic Casimir notes.",
+      ),
+      writeTestFile(
+        "docs/knowledge/physics/dce-d.md",
+        "# Evidence\nDynamic Casimir modulation overview.",
+      ),
+    ];
+    const codePath = writeTestFile(
+      "modules/physics/dce-compute.ts",
+      [
+        "export function computeDceOutput(x: number): number {",
+        "  return x * 0.5;",
+        "}",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "How does dynamic Casimir modulation feed into the system's physics outputs?",
+      filePaths: [...docPaths, codePath],
+      maxFiles: 3,
+      maxCards: 3,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.telemetry.file_count).toBe(3);
+    expect(result.cards.some((card) => card.kind === "code")).toBe(true);
+  });
+
+  it("prefers equation-bearing content over roadmap-like path matches during preselection", async () => {
+    const roadmapPath = writeTestFile(
+      "docs/collapse/collapse-equation-roadmap.md",
+      [
+        "# Collapse Equation Roadmap",
+        "- task: map milestones for equation reporting",
+        "- checklist: gather files and ownership",
+        "- phase: pending implementation notes",
+      ].join("\n"),
+    );
+    const equationPath = writeTestFile(
+      "docs/quantum/measurement-notes.md",
+      [
+        "# Measurement notes",
+        "Wave-function collapse relation: p(x) = |psi(x)|^2.",
+        "Normalization condition: integral p(x) dx = 1.",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "explain equation of the collapse of the wave function",
+      filePaths: [roadmapPath, equationPath],
+      maxFiles: 1,
+      maxCards: 1,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.telemetry.file_count).toBe(1);
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0]?.path).toBe(equationPath);
+    expect(result.cards[0]?.snippets.some((snippet) => snippet.text.includes("="))).toBe(true);
+  });
+
+  it("adds taxonomy metadata to stage-0.5 cards for equation-oriented content", async () => {
+    const equationPath = writeTestFile(
+      "modules/dynamic/collapse-equation-metadata.ts",
+      [
+        "export const collapseEnabled = true;",
+        "psi = Pm psi0 / sqrt(prob)",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "explain equation of the collapse of the wave function",
+      filePaths: [equationPath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.cards.length).toBeGreaterThan(0);
+    expect(result.cards[0]?.equationClass).toBeDefined();
+    expect(result.cards[0]?.domainFamily).toBeDefined();
+    expect(result.cards[0]?.derivationLevel).toBeDefined();
+    expect(Array.isArray(result.cards[0]?.constantsDetected)).toBe(true);
+    expect(Array.isArray(result.cards[0]?.symbolRoles)).toBe(true);
   });
 
 });

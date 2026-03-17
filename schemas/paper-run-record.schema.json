@@ -208,6 +208,7 @@
         "parse_output",
         "claim_output",
         "citation_output",
+        "paper_card_output",
         "normalized_output",
         "graph_delta_output",
         "index_output",
@@ -217,6 +218,7 @@
         "parse_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "claim_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "citation_output": { "$ref": "#/definitions/nullableArtifactRef" },
+        "paper_card_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "normalized_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "graph_delta_output": { "$ref": "#/definitions/nullableArtifactRef" },
         "index_output": { "$ref": "#/definitions/nullableArtifactRef" },
@@ -234,6 +236,7 @@
         "maturity_gates",
         "falsifier_edges",
         "citations",
+        "paper_card",
         "overall_status"
       ],
       "properties": {
@@ -297,6 +300,26 @@
             "required": { "type": "boolean" },
             "extracted": { "type": "integer", "minimum": 0 },
             "linked_claim_edges": { "type": "integer", "minimum": 0 },
+            "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
+          }
+        },
+        "paper_card": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "concepts",
+            "systems",
+            "quantitative_values",
+            "congruence_assessments",
+            "status"
+          ],
+          "properties": {
+            "required": { "type": "boolean" },
+            "concepts": { "type": "integer", "minimum": 0 },
+            "systems": { "type": "integer", "minimum": 0 },
+            "quantitative_values": { "type": "integer", "minimum": 0 },
+            "congruence_assessments": { "type": "integer", "minimum": 0 },
             "status": { "type": "string", "enum": ["pass", "warn", "fail"] }
           }
         },
