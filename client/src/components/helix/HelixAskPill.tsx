@@ -9,6 +9,8 @@ import React, {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { renderToString as renderKatexToString } from "katex";
+import "katex/dist/katex.min.css";
 import { BrainCircuit, Mic, Search, Square } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
@@ -4013,6 +4015,133 @@ function normalizeCitations(value: unknown): string[] {
   return value.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
 }
 
+type HelixAskMathToken =
+  | { kind: "text"; text: string }
+  | {
+      kind: "math";
+      text: string;
+      displayMode: boolean;
+      openDelimiter: string;
+      closeDelimiter: string;
+    };
+
+const HELIX_ASK_MATH_DELIMITERS: ReadonlyArray<{
+  openDelimiter: string;
+  closeDelimiter: string;
+  displayMode: boolean;
+}> = [
+  { openDelimiter: "$$", closeDelimiter: "$$", displayMode: true },
+  { openDelimiter: "\\[", closeDelimiter: "\\]", displayMode: true },
+  { openDelimiter: "\\(", closeDelimiter: "\\)", displayMode: false },
+  { openDelimiter: "$", closeDelimiter: "$", displayMode: false },
+];
+
+function isEscapedDelimiterAt(value: string, index: number): boolean {
+  if (index <= 0) return false;
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
+}
+
+function findNextUnescapedDelimiter(value: string, delimiter: string, startIndex: number): number {
+  let index = value.indexOf(delimiter, Math.max(0, startIndex));
+  while (index >= 0) {
+    if (!isEscapedDelimiterAt(value, index)) {
+      if (delimiter === "$" && value[index + 1] === "$") {
+        index = value.indexOf(delimiter, index + 1);
+        continue;
+      }
+      return index;
+    }
+    index = value.indexOf(delimiter, index + 1);
+  }
+  return -1;
+}
+
+function findNextMathOpenDelimiter(
+  value: string,
+  startIndex: number,
+):
+  | {
+      index: number;
+      openDelimiter: string;
+      closeDelimiter: string;
+      displayMode: boolean;
+    }
+  | null {
+  let winner:
+    | {
+        index: number;
+        openDelimiter: string;
+        closeDelimiter: string;
+        displayMode: boolean;
+      }
+    | null = null;
+  for (const delimiter of HELIX_ASK_MATH_DELIMITERS) {
+    const nextIndex = findNextUnescapedDelimiter(value, delimiter.openDelimiter, startIndex);
+    if (nextIndex < 0) continue;
+    if (!winner || nextIndex < winner.index) {
+      winner = {
+        index: nextIndex,
+        openDelimiter: delimiter.openDelimiter,
+        closeDelimiter: delimiter.closeDelimiter,
+        displayMode: delimiter.displayMode,
+      };
+    }
+  }
+  return winner;
+}
+
+function pushTextMathToken(tokens: HelixAskMathToken[], text: string): void {
+  if (!text) return;
+  const last = tokens[tokens.length - 1];
+  if (last && last.kind === "text") {
+    last.text += text;
+    return;
+  }
+  tokens.push({ kind: "text", text });
+}
+
+export function tokenizeHelixAskMathTokens(content: string): HelixAskMathToken[] {
+  const text = coerceText(content);
+  if (!text) return [];
+  const tokens: HelixAskMathToken[] = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    const nextOpen = findNextMathOpenDelimiter(text, cursor);
+    if (!nextOpen) {
+      pushTextMathToken(tokens, text.slice(cursor));
+      break;
+    }
+    if (nextOpen.index > cursor) {
+      pushTextMathToken(tokens, text.slice(cursor, nextOpen.index));
+    }
+    const contentStart = nextOpen.index + nextOpen.openDelimiter.length;
+    const closeIndex = findNextUnescapedDelimiter(text, nextOpen.closeDelimiter, contentStart);
+    if (closeIndex < 0) {
+      pushTextMathToken(tokens, nextOpen.openDelimiter);
+      cursor = contentStart;
+      continue;
+    }
+    const mathBody = text.slice(contentStart, closeIndex);
+    if (!mathBody.trim()) {
+      pushTextMathToken(tokens, `${nextOpen.openDelimiter}${mathBody}${nextOpen.closeDelimiter}`);
+    } else {
+      tokens.push({
+        kind: "math",
+        text: mathBody,
+        displayMode: nextOpen.displayMode,
+        openDelimiter: nextOpen.openDelimiter,
+        closeDelimiter: nextOpen.closeDelimiter,
+      });
+    }
+    cursor = closeIndex + nextOpen.closeDelimiter.length;
+  }
+  return tokens;
+}
+
 function asObjectRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -7322,11 +7451,9 @@ export function HelixAskPill({
     [openPanelById],
   );
 
-  const renderHelixAskContent = useCallback(
-    (content: unknown): ReactNode[] => {
+  const renderHelixAskTextWithPathLinks = useCallback(
+    (text: string, keyPrefix: string): ReactNode[] => {
       const parts: ReactNode[] = [];
-      const text = coerceText(content);
-      if (!text) return parts;
       HELIX_ASK_PATH_REGEX.lastIndex = 0;
       let lastIndex = 0;
       for (const match of text.matchAll(HELIX_ASK_PATH_REGEX)) {
@@ -7339,7 +7466,7 @@ export function HelixAskPill({
         if (panelId) {
           parts.push(
             <button
-              key={`${matchText}-${start}`}
+              key={`${keyPrefix}-${matchText}-${start}`}
               className="text-sky-300 underline underline-offset-2 hover:text-sky-200"
               onClick={() => openPanelById(panelId)}
               type="button"
@@ -7358,6 +7485,43 @@ export function HelixAskPill({
       return parts.length ? parts : [text];
     },
     [openPanelById],
+  );
+
+  const renderHelixAskContent = useCallback(
+    (content: unknown): ReactNode[] => {
+      const text = coerceText(content);
+      if (!text) return [];
+      const mathTokens = tokenizeHelixAskMathTokens(text);
+      if (mathTokens.length === 0) return [];
+      if (mathTokens.length === 1 && mathTokens[0]?.kind === "text") {
+        return renderHelixAskTextWithPathLinks(mathTokens[0].text, "plain");
+      }
+      const parts: ReactNode[] = [];
+      mathTokens.forEach((token, index) => {
+        if (token.kind === "text") {
+          parts.push(...renderHelixAskTextWithPathLinks(token.text, `text-${index}`));
+          return;
+        }
+        try {
+          const katexHtml = renderKatexToString(token.text, {
+            displayMode: token.displayMode,
+            strict: "ignore",
+            throwOnError: false,
+          });
+          parts.push(
+            <span
+              key={`math-${index}`}
+              className={token.displayMode ? "my-1 block overflow-x-auto text-slate-100" : "inline-block align-middle text-slate-100"}
+              dangerouslySetInnerHTML={{ __html: katexHtml }}
+            />,
+          );
+        } catch {
+          parts.push(`${token.openDelimiter}${token.text}${token.closeDelimiter}`);
+        }
+      });
+      return parts.length ? parts : [text];
+    },
+    [renderHelixAskTextWithPathLinks],
   );
 
   const renderEnvelopeSections = useCallback(

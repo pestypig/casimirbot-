@@ -1363,6 +1363,11 @@ function applyCoverageGate(
   if (missingSlots.length === 0) {
     return { answer: input.answer, applied: false, reason: "missing_slots_filtered" };
   }
+  // Preserve responses that already anchor to retrieved evidence paths even when
+  // lexical slot coverage is imperfect.
+  if (answerAnchorsEvidencePath(input)) {
+    return { answer: input.answer, applied: false, reason: "evidence_anchor_partial" };
+  }
   const guarded = `Repo evidence did not cover key terms from the question (${missingList}). Please point to the relevant files or narrow the request.`;
   if (
     input.evidenceGateOk !== true &&
@@ -1657,8 +1662,9 @@ function applyBeliefGate(
   if (conceptEvidenceAnchored(input)) {
     return { answer: input.answer, applied: false };
   }
-  // Repo/hybrid answers with explicit evidence anchors should not be rewritten into weak-reflection clarifiers.
-  if (input.evidenceGateOk && answerAnchorsEvidencePath(input)) {
+  // Repo/hybrid answers with explicit evidence anchors should not be rewritten
+  // into weak-reflection clarifiers, even when another gate reports weak score.
+  if (answerAnchorsEvidencePath(input)) {
     return { answer: input.answer, applied: false, reason: "evidence_anchor" };
   }
   if (summary.unsupportedRate < BELIEF_UNSUPPORTED_MAX) {

@@ -13378,6 +13378,12 @@ const buildSingleLlmShortAnswerFallback = (args: {
   headingSeedSlots?: HelixAskSlotPlanEntry[];
   requiresRepoEvidence?: boolean;
 }): string => {
+  const sanitizeFallbackHintText = (value: string): string =>
+    value
+      .normalize("NFKD")
+      .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   const implementationQuestion = isImplementationQuestion(args.question);
   const derivedDocBlocks = args.docBlocks.length
     ? args.docBlocks
@@ -13426,6 +13432,14 @@ const buildSingleLlmShortAnswerFallback = (args: {
       buildDocEvidenceBullet(block, args.definitionFocus && index === 0 ? "Definition" : "Evidence"),
     );
   const codeBullets = codeSource.slice(0, codeLimit).map((span) => buildCodeEvidenceBullet(span));
+  const anchorEvidenceHints = normalizeCitations([
+    ...(args.anchorFiles ?? []),
+    ...extractFilePathsFromText(args.evidenceText ?? ""),
+    ...extractCitationTokensFromText(args.evidenceText ?? ""),
+  ]).slice(0, 4);
+  if (docBullets.length === 0 && codeBullets.length === 0 && anchorEvidenceHints.length > 0) {
+    docBullets.push(`- Retrieved grounded repository anchors: ${anchorEvidenceHints.join(", ")}.`);
+  }
   const normalizedEvidence = [...docBullets, ...codeBullets].map(stripEvidenceBulletPrefix);
   const hasConfirmedEvidence = docBullets.length > 0 || codeBullets.length > 0;
   const lines: string[] = [hasConfirmedEvidence ? "Confirmed:" : "Unverified:"];
@@ -13471,7 +13485,10 @@ const buildSingleLlmShortAnswerFallback = (args: {
   lines.push("");
   lines.push("Next evidence:");
   if (nextEvidence.length > 0) {
-    nextEvidence.forEach((item) => lines.push(`- ${item}`));
+    nextEvidence
+      .map((item) => sanitizeFallbackHintText(item))
+      .filter(Boolean)
+      .forEach((item) => lines.push(`- ${item}`));
   } else {
     lines.push("- Provide the file path or doc section that defines the missing terms.");
   }
@@ -16331,6 +16348,13 @@ const DETERMINISTIC_CODE_LINE_RE =
   /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|useState|from\s+["']react["'])\b/i;
 const DETERMINISTIC_FACTUAL_VERB_RE =
   /\b(?:is|are|means|describes?|defines?|refers?|implements?|models?)\b/i;
+const DETERMINISTIC_MATH_SIGNAL_RE =
+  /[=+*/^]|\\(?:frac|partial|nabla)|\b(?:psi|rho|kappa|tau|beta|gamma|theta|omega|delta|hbar)\b/i;
+const DETERMINISTIC_SECTION_HEADER_RE =
+  /\b(?:goals?\s*&\s*invariants?|components?|objective|non-goals?|inputs?|outputs?|overview|checklist|roadmap|pipeline|architecture|runtime)\b/i;
+const DETERMINISTIC_EVENT_LOG_LINE_RE = /^\s*\[\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\]\s+tool=/i;
+const DETERMINISTIC_UI_SECTION_LINE_RE =
+  /^(?:details|tree walk|proof|key files|context sources|convergence snapshot|capsule guards|reasoning event log)\s*:?\s*$/i;
 const RELATION_MODEL_PLACEHOLDER_RE =
   /^(?:(?:\w+\.)?llm\.local(?:\s+stub result)?|placeholder|unable to answer|i cannot answer|model error)\b/i;
 const RELATION_CODE_NOISE_RE =
@@ -16376,6 +16400,35 @@ const hasModelPlaceholderOrStub = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
   return RELATION_MODEL_PLACEHOLDER_RE.test(normalized) || STUB_TEXT_RE.test(normalized) || GENERIC_GROUNDED_RE.test(normalized);
+};
+
+const isDeterministicHeadingScaffoldNoise = (value: string): boolean => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return true;
+  if (DETERMINISTIC_EVENT_LOG_LINE_RE.test(normalized)) return true;
+  if (DETERMINISTIC_UI_SECTION_LINE_RE.test(normalized)) return true;
+  const headingHits = normalized.match(
+    /\b(?:goals?|invariants?|components?|objective|non-goals?|inputs?|outputs?|overview|checklist|roadmap|pipeline|tools?|architecture|runtime)\b/gi,
+  );
+  const digitHits = normalized.match(/\b\d+\b/g);
+  const lowSignal =
+    !DETERMINISTIC_FACTUAL_VERB_RE.test(normalized) &&
+    !DETERMINISTIC_MATH_SIGNAL_RE.test(normalized);
+  if (lowSignal && (headingHits?.length ?? 0) >= 3 && (digitHits?.length ?? 0) >= 2) {
+    return true;
+  }
+  if (
+    lowSignal &&
+    /\b(?:components?|goals?\s*&\s*invariants?|objective|inputs?|outputs?)\b(?:\s+\d+\s+[A-Za-z][A-Za-z0-9_-]{2,}){1,}/i.test(
+      normalized,
+    )
+  ) {
+    return true;
+  }
+  if (lowSignal && DETERMINISTIC_SECTION_HEADER_RE.test(normalized) && !/[.!?]$/.test(normalized)) {
+    return true;
+  }
+  return false;
 };
 
 const HELIX_ASK_LABELED_PATH_INDEX_ENTRY_RE =
@@ -16548,6 +16601,7 @@ const isDeterministicMetadataNoise = (value: string): boolean => {
     return true;
   }
   if (/^\s*stage-0 candidate:/i.test(value)) return true;
+  if (isDeterministicHeadingScaffoldNoise(value)) return true;
   if (
     /\b(?:title|heading|subheading|id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\s*:/i.test(
       value,
@@ -16579,6 +16633,7 @@ const collectDeterministicEvidenceClaims = (args: {
     .filter((line) => !/^sources?:/i.test(line))
     .filter((line) => !/\b(?:notes?|tags?|minimal\s+artifact)\s*:/i.test(line))
     .filter((line) => !isDeterministicMetadataNoise(line))
+    .filter((line) => !isDeterministicHeadingScaffoldNoise(line))
     .filter((line) => !DETERMINISTIC_CODE_LINE_RE.test(line))
     .map((line) => {
       let score = 0;
@@ -17163,11 +17218,16 @@ const sanitizeHelixAskAnswerContract = (
 ): HelixAskAnswerContract => {
   const lookup = buildAllowedCitationLookup(allowedCitations);
   const fallbackSummary = "Answer grounded in retrieved evidence.";
-  const summary = ensureSentence(normalizeContractText(contract.summary || fallbackSummary, 360)) || fallbackSummary;
+  const rawSummary = ensureSentence(normalizeContractText(contract.summary || fallbackSummary, 360));
+  const summary =
+    !rawSummary || isDeterministicMetadataNoise(rawSummary) || isDeterministicHeadingScaffoldNoise(rawSummary)
+      ? fallbackSummary
+      : rawSummary;
   const claims = (contract.claims ?? [])
     .map((claim) => {
       const text = ensureSentence(normalizeContractText(claim.text, 280));
       if (!text) return null;
+      if (isDeterministicMetadataNoise(text) || isDeterministicHeadingScaffoldNoise(text)) return null;
       const evidence = filterAllowedContractCitations(claim.evidence, lookup);
       return evidence.length > 0 ? { text, evidence } : { text };
     })
@@ -17262,6 +17322,7 @@ const renderHelixAskAnswerContract = (
       if (normalizedSummary && normalizedSentence === normalizedSummary) continue;
       if (seen.has(normalizedSentence)) continue;
       if (isNoisyRenderedContractSentence(sentence)) continue;
+      if (isDeterministicMetadataNoise(sentence) || isDeterministicHeadingScaffoldNoise(sentence)) continue;
       seen.add(normalizedSentence);
       deduped.push(sentence);
     }
@@ -17281,6 +17342,7 @@ const renderHelixAskAnswerContract = (
   const leadSummary = (): string => {
     const summary = ensureSentence(normalizeContractText(contract.summary, 360));
     if (!summary) return "";
+    if (isDeterministicMetadataNoise(summary) || isDeterministicHeadingScaffoldNoise(summary)) return "";
     if (wantsPlainLanguage && !/^in plain language[,:\s]/i.test(summary)) {
       const prefix = deterministicLeadPrefix(summary);
       if (new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(summary)) {
@@ -17292,7 +17354,9 @@ const renderHelixAskAnswerContract = (
   };
   const claimSentencesRaw = (contract.claims ?? [])
     .map((claim) => ensureSentence(normalizeContractText(claim.text, 260)))
-    .filter(Boolean);
+    .filter((claim): claim is string => Boolean(claim))
+    .filter((claim) => !isDeterministicMetadataNoise(claim))
+    .filter((claim) => !isDeterministicHeadingScaffoldNoise(claim));
   const summarySeed = ensureSentence(normalizeContractText(contract.summary, 360)) || "";
   const normalizedSummarySeed = normalizeContractGateLine(summarySeed);
   const claimSentences = dedupeRenderedContractSentences(claimSentencesRaw, summarySeed);
@@ -17306,14 +17370,20 @@ const renderHelixAskAnswerContract = (
   const missingEvidenceClaims = claimSentences.filter((claim) =>
     /^missing evidence\b/i.test(claim.trim()),
   );
+  const practiceUncertainty =
+    contract.uncertainty && !/^missing evidence\b/i.test(contract.uncertainty.trim())
+      ? contract.uncertainty
+      : "";
   const practiceCandidate =
-    contract.uncertainty ||
+    practiceUncertainty ||
     semanticClaims.find((claim) => claim.toLowerCase() !== summarySeed.toLowerCase()) ||
     mechanismClaims[0] ||
     "";
   const normalizePracticeCandidate = (value: string): string => {
-    let normalized = ensureSentence(normalizeContractText(value, 220));
-    if (!normalized) return "";
+    const source = ensureSentence(normalizeContractText(value, 220));
+    if (!source) return "";
+    if (isDeterministicMetadataNoise(source) || isDeterministicHeadingScaffoldNoise(source)) return "";
+    let normalized = source;
     normalized = normalized.replace(/^mechanism\s*:\s*/i, "");
     if (/->/.test(normalized)) {
       normalized = "coupled constraints and feedback loops determine how outcomes evolve over time.";
@@ -17471,6 +17541,15 @@ const classifyFallbackReason = (args: {
   if ((args.qualityFloorReasons ?? []).length > 0) return "quality_floor:enforced";
   return "none";
 };
+
+const resolveAmbiguityAppliedForFallbackTaxonomy = (args: {
+  ambiguityApplied: boolean;
+  equationSelectorAuthorityLock: boolean;
+}): boolean => args.ambiguityApplied && !args.equationSelectorAuthorityLock;
+
+const shouldAllowSingleLlmScaffoldFallback = (args: {
+  deterministicRepoRuntimeFallbackUsed: boolean;
+}): boolean => !args.deterministicRepoRuntimeFallbackUsed;
 
 const expandOpenWorldQualityFloor = (args: {
   text: string;
@@ -19263,9 +19342,23 @@ const buildScientificMicroReport = (args: {
   confirmedCount: number;
   hypothesisCount: number;
 } => {
+  const sanitizeMicroReportHint = (value: string): string =>
+    value
+      .normalize("NFKD")
+      .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   const supportedClaims =
     args.claimLedger?.filter((entry) => entry.supported && entry.type !== "question") ?? [];
   const confirmedItems = supportedClaims.map((entry) => ensureSentence(entry.text)).slice(0, 3);
+  const anchorEvidenceHints = normalizeCitations(args.anchorFiles ?? []).slice(0, 4);
+  const fallbackAnchorHints =
+    anchorEvidenceHints.length > 0
+      ? anchorEvidenceHints
+      : normalizeCitations(args.searchedFiles ?? []).slice(0, 4);
+  if (confirmedItems.length === 0 && fallbackAnchorHints.length > 0) {
+    confirmedItems.push(`Retrieved grounded repository anchors: ${fallbackAnchorHints.join(", ")}.`);
+  }
   const lines: string[] = [];
   lines.push(args.forceUnverified || confirmedItems.length === 0 ? "Unverified:" : "Confirmed:");
   if (confirmedItems.length > 0) {
@@ -19292,6 +19385,10 @@ const buildScientificMicroReport = (args: {
     const secondText = clipAskText(second.text, 160);
     lines.push(
       `- ${firstText} (${firstRef}). ${secondText} (${secondRef}). Bounded linkage supported by cited evidence.`,
+    );
+  } else if (fallbackAnchorHints.length >= 2) {
+    lines.push(
+      `- Bounded linkage supported by cited repo evidence (${fallbackAnchorHints[0]} and ${fallbackAnchorHints[1]}).`,
     );
   } else {
     lines.push("- Need at least two grounded points before drawing a connection.");
@@ -19336,7 +19433,10 @@ const buildScientificMicroReport = (args: {
   lines.push("");
   lines.push("Next evidence:");
   if (nextEvidence.length > 0) {
-    nextEvidence.forEach((item) => lines.push(`- ${item}`));
+    nextEvidence
+      .map((item) => sanitizeMicroReportHint(item))
+      .filter(Boolean)
+      .forEach((item) => lines.push(`- ${item}`));
   } else {
     lines.push("- Provide the file path or doc section that defines the missing terms.");
   }
@@ -21184,9 +21284,18 @@ const sanitizeEquationClaimCandidate = (value: string): string => {
   if (!value) return "";
   let cleaned = stripInlinePathCitationsFromClaim(value);
   cleaned = cleanDanglingFileExtensionFragments(cleaned);
+  cleaned = cleaned.replace(/^\s*\[\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\]\s+tool=[^\n]*$/gim, " ");
+  cleaned = cleaned.replace(
+    /\b(?:Primary Topic|Primary Equation(?:\s*\([^)]+\))?|Mechanism Explanation|Related Cross-Topic Evidence(?:\s*\([^)]+\))?|Rejected Candidates(?:\s*\([^)]+\))?|Proof|Key files|Context sources|Convergence snapshot|Capsule guards|Reasoning event log|Details|Tree Walk|Expand With Retrieved Evidence|Hide Additional Repo Context|Question)\s*:/gi,
+    " ",
+  );
   cleaned = cleaned.replace(/\|\s*slots?=[^|]{0,240}/gi, " ");
   cleaned = cleaned.replace(/\bkeys?:\s*[A-Za-z0-9_,\s.-]{0,240}/gi, " ");
   cleaned = cleaned.replace(/\b(?:code|doc|config|data|test)\s*:\s*span:[^\n]{0,200}/gi, " ");
+  cleaned = cleaned.replace(
+    /\b(?:components?|goals?\s*&\s*invariants?|objective|non-goals?|inputs?|outputs?)\b(?:\s+\d+\s+[A-Za-z][A-Za-z0-9_-]{2,}){1,}/gi,
+    " ",
+  );
   cleaned = cleaned
     .replace(/^(?:\s*[-*]\s*|\s*\d+\.\s*)+/g, "")
     .replace(/^\s*[\[\](){}:;,.!?-]+\s*/g, "")
@@ -21199,6 +21308,14 @@ const isMeaningfulEquationClaimCandidate = (value: string): boolean => {
   const text = String(value ?? "").trim();
   if (text.length < 24) return false;
   if (!/[A-Za-z]/.test(text)) return false;
+  if (/^\s*\[\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\]\s+tool=/i.test(text)) return false;
+  if (
+    /^(?:details|tree walk|proof|key files|context sources|convergence snapshot|capsule guards|reasoning event log)\s*:?\s*$/i.test(
+      text,
+    )
+  ) {
+    return false;
+  }
   if (/^(?:ts|tsx|js|jsx|md|json|yaml|yml|toml)\]?$/i.test(text)) return false;
   if (
     /\b(?:available evidence was weakly reflected|please narrow the request|specify the relevant files|couldn't verify an exact equation|exact canonical line was verifiable)\b/i.test(
@@ -21234,6 +21351,18 @@ const isMeaningfulEquationClaimCandidate = (value: string): boolean => {
   const alphaCount = (text.match(/[A-Za-z]/g) ?? []).length;
   const alphaRatio = alphaCount / Math.max(1, text.length);
   if (alphaRatio < 0.35) return false;
+  const headingHits = text.match(
+    /\b(?:goals?|invariants?|components?|objective|non-goals?|inputs?|outputs?|overview|checklist|roadmap|pipeline|tools?|architecture|runtime)\b/gi,
+  );
+  const digitHits = text.match(/\b\d+\b/g);
+  const meaningSignal =
+    /\b(?:is|are|means|describes?|defines?|refers?|implements?|models?|maps?|computes?|derives?|uses?|drives?|because|therefore|through|via|indicates?|suggests?|remains?|provides?)\b/i.test(
+      text,
+    ) || DETERMINISTIC_MATH_SIGNAL_RE.test(text);
+  if (!meaningSignal) return false;
+  if ((headingHits?.length ?? 0) >= 3 && (digitHits?.length ?? 0) >= 2 && !DETERMINISTIC_MATH_SIGNAL_RE.test(text)) {
+    return false;
+  }
   return true;
 };
 
@@ -22803,6 +22932,37 @@ const buildEquationConsensusMechanismBodies = (args: {
   return [baseline, supportsLine, challengeLine];
 };
 
+const canonicalizeEquationMechanismBody = (value: string): string =>
+  String(value ?? "")
+    .replace(/^\s*(?:\d+\.\s*)+/, "")
+    .replace(/\b(?:general-reference baseline|repo-grounded support|challenge status)\s*:\s*/gi, "")
+    .replace(/\[[^\]\n]{1,260}\]/g, " ")
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const isEquationMechanismNearDuplicate = (candidate: string, accepted: string[]): boolean => {
+  if (!candidate) return true;
+  const candidateTokens = candidate.split(" ").filter((token) => token.length >= 3);
+  if (candidateTokens.length === 0) return true;
+  for (const seen of accepted) {
+    if (!seen) continue;
+    if (candidate === seen) return true;
+    const seenTokens = seen.split(" ").filter((token) => token.length >= 3);
+    if (seenTokens.length === 0) continue;
+    const seenSet = new Set(seenTokens);
+    let overlap = 0;
+    for (const token of candidateTokens) {
+      if (seenSet.has(token)) overlap += 1;
+    }
+    const union = new Set([...candidateTokens, ...seenTokens]).size;
+    const jaccard = union > 0 ? overlap / union : 0;
+    if (overlap >= 6 && jaccard >= 0.72) return true;
+  }
+  return false;
+};
+
 const resolveEquationTermMappingLine = (args: {
   primary: EquationRescueCandidate | null;
   support: EquationRescueCandidate[];
@@ -23106,6 +23266,10 @@ const buildEquationClaimBackingAssembly = (args: {
     )
       .replace(/^(?:claim-first explanation:\s*)+/i, "")
       .replace(/^(?:tentative equation backing(?:\s*\(.*?\))?:\s*)+/i, "")
+      .replace(
+        /^(?:primary topic|primary equation(?:\s*\([^)]+\))?|mechanism explanation|related cross-topic evidence(?:\s*\([^)]+\))?|rejected candidates(?:\s*\([^)]+\))?|proof|key files|sources?)\s*:\s*/i,
+        "",
+      )
       .replace(/^(?:\d+\.\s*)+/i, "")
       .trim();
     if (!isMeaningfulEquationClaimCandidate(normalizedClaim)) continue;
@@ -23119,6 +23283,10 @@ const buildEquationClaimBackingAssembly = (args: {
       fallbackClaimRaw
         .replace(/^(?:claim-first explanation:\s*)+/i, "")
         .replace(/^(?:tentative equation backing(?:\s*\(.*?\))?:\s*)+/i, "")
+        .replace(
+          /^(?:primary topic|primary equation(?:\s*\([^)]+\))?|mechanism explanation|related cross-topic evidence(?:\s*\([^)]+\))?|rejected candidates(?:\s*\([^)]+\))?|proof|key files|sources?)\s*:\s*/i,
+          "",
+        )
         .replace(/^(?:\d+\.\s*)+/i, "")
         .trim(),
     );
@@ -23195,6 +23363,12 @@ const buildEquationClaimBackingAssembly = (args: {
     lines.push("");
   }
   lines.push("Mechanism Explanation:");
+  const filteredClaimBodies = claimBodies.filter(
+    (body) =>
+      !/^(?:general-reference baseline|repo-grounded support|challenge status|primary topic|primary equation(?:\s*\([^)]+\))?|mechanism explanation|related cross-topic evidence(?:\s*\([^)]+\))?|rejected candidates(?:\s*\([^)]+\))?|proof|key files|sources?)\s*:/i.test(
+        body,
+      ),
+  );
   const mechanismBodies = [
     ...buildEquationConsensusMechanismBodies({
       dominantFamily,
@@ -23203,17 +23377,22 @@ const buildEquationClaimBackingAssembly = (args: {
       selectedPaths,
       tentative,
     }),
-    ...claimBodies,
+    ...filteredClaimBodies,
   ];
-  const seenMechanism = new Set<string>();
+  const seenMechanismCanonical: string[] = [];
   const compactMechanismBodies: string[] = [];
+  const primaryEquationCanonical = primary ? canonicalizeEquationMechanismBody(primary.equation) : "";
   for (const body of mechanismBodies) {
     const trimmed = body.trim();
     if (!trimmed) continue;
-    const key = trimmed.toLowerCase();
-    if (seenMechanism.has(key)) continue;
-    seenMechanism.add(key);
+    if (primary?.equation && trimmed.toLowerCase().includes(primary.equation.toLowerCase())) continue;
+    const canonical = canonicalizeEquationMechanismBody(trimmed);
+    if (!canonical) continue;
+    if (primaryEquationCanonical && canonical.includes(primaryEquationCanonical)) continue;
+    if (isEquationMechanismNearDuplicate(canonical, seenMechanismCanonical)) continue;
+    seenMechanismCanonical.push(canonical);
     compactMechanismBodies.push(trimmed);
+    if (compactMechanismBodies.length >= 4) break;
   }
   for (const [index, body] of compactMechanismBodies.entries()) {
     lines.push(`${index + 1}. ${body}`);
@@ -25925,6 +26104,7 @@ export const __testOnlyNonReportGuard = {
 
 export const __testHelixAskReliabilityGuards = {
   shouldOverrideClarifyForGroundedEvidence,
+  buildSingleLlmShortAnswerFallback,
   buildDeterministicRepoRuntimeFallback,
   buildHelixAskEvidencePacketV2,
   computeHelixAskEvidenceMassScore,
@@ -25954,6 +26134,8 @@ export const __testHelixAskReliabilityGuards = {
   deriveEquationClaimSeeds,
   rankEquationNearMissPath,
   scoreEquationDomainPathAffinity,
+  resolveAmbiguityAppliedForFallbackTaxonomy,
+  shouldAllowSingleLlmScaffoldFallback,
 };
 
 export const __testHelixAskStage0Debug = {
@@ -39264,6 +39446,9 @@ const executeHelixAsk = async ({
         !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
+        shouldAllowSingleLlmScaffoldFallback({
+          deterministicRepoRuntimeFallbackUsed,
+        }) &&
         hasToolEvidence &&
         !hasCitationsAfterClean &&
         singleLlmVeryShort;
@@ -39585,6 +39770,30 @@ const executeHelixAsk = async ({
           answerPath.push("citationFallback:sources");
           logProgress("Citation missing", "repaired");
           logEvent("Citation missing", "repaired", formatFileList(repoEvidencePaths));
+        } else if (deterministicRepoRuntimeFallbackUsed) {
+          const runtimePreserveSources = normalizeCitations([
+            ...contextFiles,
+            ...retrievalFilesSnapshot,
+            ...extractFilePathsFromText(cleaned),
+            ...extractCitationTokensFromText(cleaned),
+          ]).slice(0, 8);
+          if (runtimePreserveSources.length > 0) {
+            cleaned = sanitizeSourcesLine(
+              `${cleaned}\n\nSources: ${runtimePreserveSources.join(", ")}`,
+              runtimePreserveSources,
+              runtimePreserveSources,
+            );
+            answerPath.push("citationFallback:runtime_repo_preserve");
+            logProgress("Citation missing", "runtime_preserve");
+            logEvent("Citation missing", "runtime_preserve", formatFileList(runtimePreserveSources));
+          } else {
+            answerPath.push("citationFallback:runtime_repo_preserve_no_sources");
+            logProgress("Citation missing", "runtime_preserve_no_sources");
+            logEvent("Citation missing", "runtime_preserve_no_sources", "none");
+          }
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).scientific_response_skipped_runtime_fallback = true;
+          }
         } else if (HELIX_ASK_SCIENTIFIC_CLARIFY && !isIdeologyReferenceIntent) {
           const missingSlots =
             docSlotSummary?.missingSlots?.length
@@ -40138,6 +40347,7 @@ const executeHelixAsk = async ({
     const allowRattlingScientificEscalation = !warpEthosRelationQuery;
     const shouldRenderScientificMicroReport =
       HELIX_ASK_SCIENTIFIC_CLARIFY &&
+      !deterministicRepoRuntimeFallbackUsed &&
       !isIdeologyReferenceIntent &&
       !lockedByIdeologyTemplate &&
       !preserveReasoningOnlyAnswer &&
@@ -40370,6 +40580,9 @@ const executeHelixAsk = async ({
         !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
+        shouldAllowSingleLlmScaffoldFallback({
+          deterministicRepoRuntimeFallbackUsed,
+        }) &&
         hasToolEvidence &&
         treeDominatedCitations
       ) {
@@ -40661,6 +40874,9 @@ const executeHelixAsk = async ({
         !HELIX_ASK_FORCE_FULL_ANSWERS &&
         HELIX_ASK_SINGLE_LLM &&
         !isIdeologyReferenceIntent &&
+        shouldAllowSingleLlmScaffoldFallback({
+          deterministicRepoRuntimeFallbackUsed,
+        }) &&
         hasToolEvidence &&
         scientificFallbackReason
       ) {
@@ -42055,6 +42271,7 @@ const executeHelixAsk = async ({
             equationIntentContract.ask_mode === "specific"));
       const equationSelectorFirst = equationSelectorEnforced ? equationSelectorResolved : null;
       const equationSelectorLocked = Boolean(equationSelectorFirst?.selectorLocked);
+      let equationSelectorAuthorityLock = equationSelectorLocked;
       if (debugPayload && equationPromptDetected) {
         const debugRecord = debugPayload as Record<string, unknown>;
         debugRecord.equation_selector_rollout_phase = HELIX_ASK_EQUATION_SELECTOR_ROLLOUT_PHASE;
@@ -42121,6 +42338,7 @@ const executeHelixAsk = async ({
       ) {
         cleaned = equationSelectorResolved.text.trim();
         equationSelectorStateLockCommitted = true;
+        equationSelectorAuthorityLock = true;
         equationBackingTentative = equationSelectorResolved.tentative;
         equationBackingSelectedPaths = equationSelectorResolved.selectedPaths.slice(0, 12);
         equationSelectorPrimaryKey = equationSelectorResolved.primaryKey;
@@ -42145,15 +42363,16 @@ const executeHelixAsk = async ({
         debugRecord.equation_selector_no_primary_after_recovery = equationSelectorNoPrimaryAfterRecovery;
         debugRecord.equation_fallback_allowed_by_state = equationFallbackAllowedByState;
         debugRecord.equation_selector_state_lock_committed = equationSelectorStateLockCommitted;
+        debugRecord.equation_selector_authority_lock = equationSelectorAuthorityLock;
       }
-      if (equationSelectorLocked) {
+      if (equationSelectorAuthorityLock) {
         answerPath.push("equationSelector:post_lock_style_only_cleanup");
       }
       if (
         equationQuoteContract.required &&
         !equationQuoteContract.ok &&
         !stage05CodePathHardFailActive &&
-        !equationSelectorLocked &&
+        !equationSelectorAuthorityLock &&
         !equationForcedGeneralExplain &&
         equationFallbackAllowedByState
       ) {
@@ -42173,7 +42392,7 @@ const executeHelixAsk = async ({
         equationQuoteContract.required &&
         !equationQuoteContract.ok &&
         !stage05CodePathHardFailActive &&
-        !equationSelectorLocked &&
+        !equationSelectorAuthorityLock &&
         !equationForcedGeneralExplain &&
         equationFallbackAllowedByState
       ) {
@@ -42482,7 +42701,7 @@ const executeHelixAsk = async ({
         const shadowRescueEligible =
           equationPromptDetected &&
           !equationSelectorEnforced &&
-          !equationSelectorLocked &&
+          !equationSelectorAuthorityLock &&
           Boolean(equationSelectorResolved?.primarySelected) &&
           Number(equationSelectorResolved?.primaryScore ?? 0) >= shadowRescueMinScore;
         if (equationGenericBypassNeeded && shadowRescueEligible && equationSelectorResolved) {
@@ -42704,7 +42923,7 @@ const executeHelixAsk = async ({
         equationExpansionTrigger &&
         !stage05CodePathHardFailActive &&
         !equationGenericBypassApplied &&
-        !equationSelectorLocked &&
+        !equationSelectorAuthorityLock &&
         !equationForcedGeneralExplain &&
         equationRuntimeBudgetStage === "within_budget"
       ) {
@@ -43118,7 +43337,7 @@ const executeHelixAsk = async ({
       const equationSectionGuardNeeded =
         equationPromptDetected &&
         !equationGenericBypassApplied &&
-        !equationSelectorLocked &&
+        !equationSelectorAuthorityLock &&
         !equationExplicitPathOnlyExtraction &&
         !hasEquationStructuredSections(cleaned);
       if (equationSectionGuardNeeded) {
@@ -43181,15 +43400,15 @@ const executeHelixAsk = async ({
         }
       }
 
-      if (equationSelectorLocked) {
+      if (equationSelectorAuthorityLock) {
         const renderedPrimary = assertRenderedPrimaryMatchesSelection({
           selectorPrimaryKey: equationSelectorPrimaryKey,
           renderedText: cleaned,
         });
         equationRendererPrimaryKey = renderedPrimary.rendererPrimaryKey;
         equationPrimaryAnchorMatch = renderedPrimary.match;
-        if (!renderedPrimary.match && equationSelectorFirst?.text?.trim()) {
-          cleaned = equationSelectorFirst.text.trim();
+        if (!renderedPrimary.match && equationSelectorResolved?.text?.trim()) {
+          cleaned = equationSelectorResolved.text.trim();
           answerPath.push("equationSelector:renderer_primary_mismatch_overwrite");
           const rerendered = assertRenderedPrimaryMatchesSelection({
             selectorPrimaryKey: equationSelectorPrimaryKey,
@@ -43405,7 +43624,7 @@ const executeHelixAsk = async ({
       const equationClaimBackingRescueNeeded =
         equationPromptDetected &&
         !equationGenericBypassApplied &&
-        !equationSelectorLocked &&
+        !equationSelectorAuthorityLock &&
         !equationForcedGeneralExplain &&
         !equationExplicitPathOnlyExtraction &&
         !suppressGeneralCitations &&
@@ -43492,7 +43711,7 @@ const executeHelixAsk = async ({
       const equationConsensusFrameNeeded =
         equationPromptDetected &&
         !equationGenericBypassApplied &&
-        !equationSelectorLocked &&
+        !equationSelectorAuthorityLock &&
         !equationExplicitPathOnlyExtraction &&
         hasEquationStructuredSections(cleaned) &&
         !hasEquationConsensusMechanismFrame(cleaned);
@@ -43640,7 +43859,7 @@ const executeHelixAsk = async ({
       const preserveStructuredEquationAnswer =
         equationPromptDetected &&
         hasEquationStructuredSections(cleaned) &&
-        (equationSelectorLocked || equationSelectorStateLockCommitted || equationSelectorPrimaryAvailable) &&
+        (equationSelectorAuthorityLock || equationSelectorPrimaryAvailable) &&
         !equationFallbackAllowedByState;
       const finalNonReportGuard = preserveStructuredEquationAnswer
         ? { text: cleaned, mismatch: false, hadScaffold: false }
@@ -43848,6 +44067,84 @@ const executeHelixAsk = async ({
       // late-stage citation/contract rewrites (e.g. "ts]" / "md]").
       cleaned = cleanDanglingFileExtensionFragments(cleaned);
       cleaned = dedupeAdjacentCitationBrackets(cleaned);
+      if (!cleaned.trim()) {
+        let emptyAnswerGuardReason = "final_empty_answer_generic";
+        if (equationPromptDetected) {
+          const guardCandidates = collectEquationRescueCandidates({
+            question: baseQuestion,
+            explicitPaths: equationIntentContract.explicit_paths,
+            allowedCitations: normalizeCitations([
+              ...contractCitationTokens,
+              ...allowedSourcePaths,
+              ...finalCanonicalEvidence.contextFiles,
+              ...finalCanonicalEvidence.citationTokens,
+            ]),
+            stage05Cards: stage05EvidenceCards,
+            queryConstraints,
+            maxCandidates: 6,
+            includeWeakSemantic: true,
+          });
+          cleaned = buildEquationUnifiedDegradeAnswer({
+            question: baseQuestion,
+            contract: equationIntentContract,
+            candidates: guardCandidates,
+            reason: "final_empty_answer_guard",
+          }).trim();
+          emptyAnswerGuardReason = "final_empty_answer_equation_unified";
+        } else {
+          const useRepoRuntimeFallback =
+            isRepoQuestion ||
+            requiresRepoEvidence ||
+            explicitRepoExpectation ||
+            hasFilePathHints ||
+            intentDomain === "repo" ||
+            intentDomain === "hybrid";
+          const deterministicRepoRuntimeFallback = useRepoRuntimeFallback
+            ? buildDeterministicRepoRuntimeFallback({
+                question: baseQuestion,
+                format: formatSpec.format,
+                definitionFocus,
+                docBlocks,
+                codeAlignment,
+                evidenceText: evidencePacketV2?.evidenceText || evidenceText,
+                anchorFiles:
+                  evidencePacketV2?.contextFiles?.length
+                    ? evidencePacketV2.contextFiles
+                    : contextFiles,
+              })
+            : null;
+          if (deterministicRepoRuntimeFallback?.trim()) {
+            cleaned = deterministicRepoRuntimeFallback.trim();
+            emptyAnswerGuardReason = "final_empty_answer_repo_deterministic";
+          } else if (useRepoRuntimeFallback) {
+            cleaned =
+              "Runtime fallback: I couldn't preserve a non-empty repo-grounded final answer in this turn. " +
+              "Please retry with the exact file path(s) you want analyzed.";
+            emptyAnswerGuardReason = "final_empty_answer_repo";
+          } else {
+            cleaned = ensureOpenWorldBypassUncertainty(
+              "I couldn't preserve a non-empty final answer in this turn.",
+            );
+            emptyAnswerGuardReason = "final_empty_answer_open_world";
+          }
+        }
+        const emptyAnswerSources = normalizeCitations([
+          ...allowedSourcePaths,
+          ...finalCanonicalEvidence.contextFiles,
+          ...finalCanonicalEvidence.citationTokens,
+          ...contractCitationTokens,
+          ...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES,
+        ]);
+        if (!hasSourcesLine(cleaned) && emptyAnswerSources.length > 0) {
+          cleaned = `${cleaned.trim()}\n\nSources: ${emptyAnswerSources.slice(0, 8).join(", ")}`.trim();
+        }
+        answerPath.push(`finalOutputGuard:${emptyAnswerGuardReason}`);
+        if (debugPayload) {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.empty_answer_guard_applied = true;
+          debugRecord.empty_answer_guard_reason = emptyAnswerGuardReason;
+        }
+      }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
       if (finalCleanedPreview) {
         logEvent("Answer cleaned preview", "final", finalCleanedPreview, answerStart);
@@ -44117,6 +44414,13 @@ const executeHelixAsk = async ({
         typeof debugPayloadRecord.tool_results_fallback_reason === "string"
           ? debugPayloadRecord.tool_results_fallback_reason
           : null;
+      const equationSelectorAuthorityLockForTaxonomy = Boolean(
+        debugPayloadRecord.equation_selector_authority_lock,
+      );
+      const ambiguityAppliedForTaxonomy = resolveAmbiguityAppliedForFallbackTaxonomy({
+        ambiguityApplied: Boolean(debugPayloadRecord.ambiguity_gate_applied),
+        equationSelectorAuthorityLock: equationSelectorAuthorityLockForTaxonomy,
+      });
       const fallbackTaxonomy = classifyFallbackReason({
         fallbackReason,
         failClosedReason,
@@ -44124,9 +44428,15 @@ const executeHelixAsk = async ({
         answerShortFallbackReason,
         toolResultsFallbackReason,
         placeholderApplied: Boolean(debugPayloadRecord.placeholder_fallback_applied),
-        ambiguityApplied: Boolean(debugPayloadRecord.ambiguity_gate_applied),
+        ambiguityApplied: ambiguityAppliedForTaxonomy,
         qualityFloorReasons,
       });
+      if (
+        Boolean(debugPayloadRecord.ambiguity_gate_applied) &&
+        !ambiguityAppliedForTaxonomy
+      ) {
+        debugPayloadRecord.ambiguity_gate_taxonomy_suppressed_by_equation_lock = true;
+      }
       debugPayloadRecord.fallback_reason = fallbackTaxonomy;
       debugPayloadRecord.fallback_reason_taxonomy = fallbackTaxonomy;
     }

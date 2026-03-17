@@ -82,6 +82,26 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).toMatch(/morphospace|attractors/i);
   });
 
+  it("skips coverage fallback when answer already anchors retrieved evidence paths", () => {
+    const answer =
+      "The pipeline coordinates intent and retrieval through server/routes/agi.plan.ts and associated solver modules.";
+    const result = applyHelixAskPlatonicGates({
+      question: "How does the Helix Ask pipeline use morphospace attractors?",
+      answer,
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.helix_ask_pipeline_explain",
+      format: "brief",
+      evidenceGateOk: true,
+      evidenceText: "helix ask pipeline intent routing evidence gates and envelopes.",
+      evidencePaths: ["server/routes/agi.plan.ts"],
+    });
+    expect(result.coverageSummary.missingKeyCount).toBeGreaterThan(0);
+    expect(result.coverageGateApplied).toBe(false);
+    expect(result.answer).toBe(answer);
+    expect(result.answer).not.toMatch(/I don't see repo evidence/i);
+  });
+
   it("keeps hybrid conceptual answers when repo evidence is not required", () => {
     const answer =
       "Kinematics describes motion without modeling the forces, and it provides the baseline language for classical system behavior.";
@@ -148,6 +168,27 @@ describe("helix ask platonic gates", () => {
     });
     expect(result.beliefSummary.unsupportedRate).toBeGreaterThanOrEqual(0.85);
     expect(result.beliefGateApplied).toBe(true);
+  });
+
+  it("skips belief weak-reflection fallback when answer anchors retrieved evidence paths", () => {
+    const answer =
+      "The pipeline uses orbital harmonics and morphospace attractors to steer synthesis in server/routes/agi.plan.ts.";
+    const result = applyHelixAskPlatonicGates({
+      question: "How does the Helix Ask pipeline work?",
+      answer,
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.helix_ask_pipeline_explain",
+      format: "brief",
+      evidenceGateOk: false,
+      evidenceText: "helix ask pipeline intent evidence gate server/routes/agi.plan.ts",
+      requiresRepoEvidence: true,
+      evidencePaths: ["server/routes/agi.plan.ts"],
+    });
+    expect(result.coverageGateApplied).toBe(false);
+    expect(result.beliefGateApplied).toBe(false);
+    expect(result.answer).toBe(answer);
+    expect(result.answer).not.toMatch(/weakly reflected/i);
   });
 
   it("ignores instruction tokens when gating hybrid coverage", () => {

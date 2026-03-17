@@ -156,6 +156,34 @@ describe("helix ask reliability guards", () => {
     expect(fallback).toMatch(/docs\/knowledge\/warp\/warp-bubble\.md/i);
   });
 
+  it("uses anchor files as confirmed evidence in single-LLM short fallback", () => {
+    const fallback =
+      __testHelixAskReliabilityGuards.buildSingleLlmShortAnswerFallback({
+        question: "Explain the congruence of the warp bubble solution?",
+        definitionFocus: false,
+        docBlocks: [],
+        codeAlignment: null,
+        evidenceText: "Sources: modules/warp/natario-warp.ts",
+        anchorFiles: ["modules/warp/natario-warp.ts", "docs/knowledge/warp/warp-bubble.md"],
+        searchedTerms: ["warp bubble", "congruence"],
+        searchedFiles: ["modules/warp/natario-warp.ts"],
+        headingSeedSlots: [
+          {
+            id: "heading_warp",
+            label: "Natário-Casimir Warp Bubble Operations Runbook",
+            required: false,
+            source: "heading",
+            surfaces: [],
+          },
+        ],
+        requiresRepoEvidence: true,
+      }) ?? "";
+    expect(fallback).toMatch(/^Confirmed:/i);
+    expect(fallback).toMatch(/Retrieved grounded repository anchors:/i);
+    expect(fallback).toMatch(/modules\/warp\/natario-warp\.ts/i);
+    expect(fallback).not.toContain("�");
+  });
+
   it("filters stage0 score/symbol/file metadata noise from deterministic fallback output", () => {
     const fallback =
       __testHelixAskReliabilityGuards.buildDeterministicRepoRuntimeFallback({
@@ -183,6 +211,36 @@ describe("helix ask reliability guards", () => {
     expect(fallback).not.toMatch(/score=\d/i);
     expect(fallback).not.toMatch(/\bsymbol=/i);
     expect(fallback).not.toMatch(/\bfile=/i);
+  });
+
+  it("filters heading-index scaffold noise from deterministic fallback output", () => {
+    const fallback =
+      __testHelixAskReliabilityGuards.buildDeterministicRepoRuntimeFallback({
+        question: "Explain the congruence of the warp bubble solution.",
+        format: "brief",
+        definitionFocus: true,
+        docBlocks: [
+          {
+            path: "modules/warp/natario-warp.ts",
+            block:
+              "Goals & invariants Components 1 Physics engine 2 Tools 3 Runtime. The Natario zero-expansion model defines the warp bubble congruence guardrails.",
+          },
+        ],
+        codeAlignment: null,
+        evidenceText: [
+          "Goals & invariants Components 1 Physics engine 2 Tools 3 Runtime.",
+          "Mechanism: Goals & invariants Components 1 Physics engine 2 Tools -> constrained interaction dynamics -> Goals & invariants Components 1 Physics engine 2 Tools.",
+          "The Natario zero-expansion model defines the warp bubble congruence guardrails and expansion constraints.",
+          "Sources: modules/warp/natario-warp.ts",
+        ].join("\n"),
+        anchorFiles: ["modules/warp/natario-warp.ts"],
+      }) ?? "";
+
+    expect(fallback).toBeTruthy();
+    expect(fallback).not.toMatch(/Goals\s*&\s*invariants/i);
+    expect(fallback).not.toMatch(/Components\s+1/i);
+    expect(fallback).not.toMatch(/In practice,\s+coupled constraints and feedback loops/i);
+    expect(fallback).toMatch(/Natario zero-expansion model defines/i);
   });
 
   it("builds evidence packet v2 with canonical retrieval and coverage snapshot", () => {
@@ -657,6 +715,62 @@ describe("helix ask reliability guards", () => {
       expect(result?.text).toMatch(/Repo-grounded support:/i);
       expect(result?.text).toMatch(/Challenge status:/i);
       expect(result?.text).toMatch(/Term-to-implementation mapping:/i);
+    } finally {
+      fs.rmSync(fullPath, { force: true });
+    }
+  });
+
+  it("dedupes mechanism lines and strips section-heading echoes from claim bodies", () => {
+    const relPath = ".tmp-stage05-tests/equation-claim-backing-dedupe.ts";
+    const fullPath = path.join(process.cwd(), relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(
+      fullPath,
+      [
+        "export function collapseUpdate(psi0: number, Pm: number, prob: number) {",
+        "  const psi = (Pm * psi0) / Math.sqrt(Math.max(1e-30, prob));",
+        "  return psi;",
+        "}",
+      ].join("\n"),
+      "utf8",
+    );
+    try {
+      const question = "explain equation of the collapse of the wave function?";
+      const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+      const draftAnswer = [
+        "Primary Topic: collapse",
+        "Primary Equation (Tentative):",
+        "- [shared/dp-collapse.ts:L280] volume = (4 / 3) * PI * r * r * r",
+        "Mechanism Explanation:",
+        "1. General-reference baseline: Pr(m) = ||Pm psi||^2 and psi' = (Pm psi) / sqrt(<psi|Pm|psi>) describe measurement projection and normalization.",
+        "2. General-reference baseline: Pr(m) = ||Pm psi||^2 and psi' = (Pm psi) / sqrt(<psi|Pm|psi>) describe measurement projection and normalization.",
+      ].join("\n");
+      const result = __testHelixAskReliabilityGuards.buildEquationClaimBackingAssembly({
+        question,
+        draftAnswer,
+        answerContract: null,
+        evidenceText: `Sources: ${relPath}`,
+        docBlocks: [{ path: relPath, block: "const psi = (Pm * psi0) / Math.sqrt(Math.max(1e-30, prob));" }],
+        codeAlignment: null,
+        allowedCitations: [relPath],
+        queryConstraints: constraints,
+        strictPrompt: false,
+        explicitPathOnlyExtraction: false,
+      });
+      expect(result).toBeTruthy();
+      const mechanismSection =
+        (result?.text.match(/Mechanism Explanation:\n([\s\S]*?)(?:\n\n(?:Related Cross-Topic Evidence|Rejected Candidates|Sources):|$)/i)?.[1] ??
+          "") + "";
+      const numberedLines = mechanismSection
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => /^\d+\.\s+/.test(line));
+      expect(numberedLines.length).toBeGreaterThan(0);
+      expect(numberedLines.length).toBeLessThanOrEqual(4);
+      expect(mechanismSection).not.toMatch(/Primary Equation\s*\(/i);
+      expect(mechanismSection).not.toMatch(/Mechanism Explanation\s*:/i);
+      const baselineCount = (mechanismSection.match(/general-reference baseline:/gi) ?? []).length;
+      expect(baselineCount).toBe(1);
     } finally {
       fs.rmSync(fullPath, { force: true });
     }
@@ -2049,6 +2163,40 @@ describe("equation selector continuity contract", () => {
     expect(parity.match).toBe(true);
     expect(parity.rendererPrimaryKey).toBe("shared/dp-collapse.ts:L280");
     expect(mismatch.match).toBe(false);
+  });
+
+  it("suppresses ambiguity taxonomy when equation selector authority lock is active", () => {
+    const applyWithoutLock =
+      __testHelixAskReliabilityGuards.resolveAmbiguityAppliedForFallbackTaxonomy({
+        ambiguityApplied: true,
+        equationSelectorAuthorityLock: false,
+      });
+    const applyWithLock =
+      __testHelixAskReliabilityGuards.resolveAmbiguityAppliedForFallbackTaxonomy({
+        ambiguityApplied: true,
+        equationSelectorAuthorityLock: true,
+      });
+    const noAmbiguity =
+      __testHelixAskReliabilityGuards.resolveAmbiguityAppliedForFallbackTaxonomy({
+        ambiguityApplied: false,
+        equationSelectorAuthorityLock: false,
+      });
+    expect(applyWithoutLock).toBe(true);
+    expect(applyWithLock).toBe(false);
+    expect(noAmbiguity).toBe(false);
+  });
+
+  it("blocks single-LLM scaffold fallback when deterministic runtime fallback is pinned", () => {
+    const allowed =
+      __testHelixAskReliabilityGuards.shouldAllowSingleLlmScaffoldFallback({
+        deterministicRepoRuntimeFallbackUsed: false,
+      });
+    const blocked =
+      __testHelixAskReliabilityGuards.shouldAllowSingleLlmScaffoldFallback({
+        deterministicRepoRuntimeFallbackUsed: true,
+      });
+    expect(allowed).toBe(true);
+    expect(blocked).toBe(false);
   });
 
   it("builds unified degrade answers with fixed sections", () => {
