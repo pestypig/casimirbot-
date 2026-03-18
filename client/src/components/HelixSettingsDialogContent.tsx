@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AgiKnowledgePanel } from "@/components/AgiKnowledgePanel";
 import CoreKnowledgePanel from "@/components/CoreKnowledgePanel";
+import { buildHelixAskMathRenderDebugForText } from "@/components/helix/HelixAskPill";
 import type { SettingsTab, StartSettings } from "@/hooks/useHelixStartSettings";
 import { isFlagEnabled } from "@/lib/envFlags";
 import {
@@ -135,7 +136,10 @@ export function HelixSettingsDialogContent({
               onChange={(value) => updateSettings({ showHelixAskDebug: value })}
             />
             {userSettings.showHelixAskDebug ? (
-              <HelixAskDebugContextPanel snapshot={voiceDiagnostics} />
+              <>
+                <HelixAskDebugContextPanel snapshot={voiceDiagnostics} />
+                <HelixAskMathFormattingDebugPanel snapshot={voiceDiagnostics} />
+              </>
             ) : null}
             <PreferenceToggleRow
               id="helix-ask-reasoning-event-log"
@@ -655,6 +659,304 @@ function HelixAskDebugContextPanel({
   );
 }
 
+type HelixAskMathRenderDebugSnapshot = NonNullable<
+  ReturnType<typeof buildHelixAskMathRenderDebugForText>
+>;
+
+function buildMathTokenStatusKey(
+  status: HelixAskMathRenderDebugSnapshot["tokenStatuses"][number],
+): string {
+  return [
+    status.status,
+    status.reason ?? "",
+    status.displayMode === null ? "na" : status.displayMode ? "display" : "inline",
+    status.openDelimiter ?? "",
+    status.closeDelimiter ?? "",
+    status.tokenText,
+  ].join("|");
+}
+
+function mergeHelixAskMathRenderDebugSnapshot(
+  current: HelixAskMathRenderDebugSnapshot | null,
+  next: HelixAskMathRenderDebugSnapshot | null,
+): HelixAskMathRenderDebugSnapshot | null {
+  if (!current) return next;
+  if (!next) return current;
+  const katexErrorSamples = [...current.katexErrorSamples];
+  for (const sample of next.katexErrorSamples) {
+    if (katexErrorSamples.includes(sample)) continue;
+    katexErrorSamples.push(sample);
+    if (katexErrorSamples.length >= 5) break;
+  }
+  const bareIgnoredSamples = [...current.bareIgnoredSamples];
+  for (const sample of next.bareIgnoredSamples) {
+    if (bareIgnoredSamples.includes(sample)) continue;
+    bareIgnoredSamples.push(sample);
+    if (bareIgnoredSamples.length >= 5) break;
+  }
+  const tokenStatuses = [...current.tokenStatuses];
+  const seenTokenStatuses = new Set(tokenStatuses.map((status) => buildMathTokenStatusKey(status)));
+  for (const status of next.tokenStatuses) {
+    const key = buildMathTokenStatusKey(status);
+    if (seenTokenStatuses.has(key)) continue;
+    seenTokenStatuses.add(key);
+    tokenStatuses.push(status);
+    if (tokenStatuses.length >= 120) break;
+  }
+  return {
+    sourceChars: current.sourceChars + next.sourceChars,
+    tokenCount: current.tokenCount + next.tokenCount,
+    mathTokenCount: current.mathTokenCount + next.mathTokenCount,
+    delimiterMathCount: current.delimiterMathCount + next.delimiterMathCount,
+    bareMathCount: current.bareMathCount + next.bareMathCount,
+    katexErrorCount: current.katexErrorCount + next.katexErrorCount,
+    bareCandidateCount: current.bareCandidateCount + next.bareCandidateCount,
+    bareAcceptedCount: current.bareAcceptedCount + next.bareAcceptedCount,
+    bareIgnoredCount: current.bareIgnoredCount + next.bareIgnoredCount,
+    katexErrorSamples,
+    bareIgnoredSamples,
+    tokenStatuses,
+  };
+}
+
+function HelixAskMathFormattingDebugPanel({
+  snapshot,
+}: {
+  snapshot: VoiceCaptureDiagnosticsSnapshot | null;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const [selectedTurnKey, setSelectedTurnKey] = React.useState<string>("latest");
+  const turnSelectId = React.useId();
+  const mathEntries = React.useMemo(
+    () =>
+      [...(snapshot?.timelineEvents ?? [])]
+        .sort((a, b) => a.atMs - b.atMs)
+        .map((event) => {
+          const text = typeof event.text === "string" ? event.text.trim() : "";
+          if (!text) return null;
+          const debug = buildHelixAskMathRenderDebugForText(text);
+          if (!debug) return null;
+          return { event, debug };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is { event: VoiceLaneTimelineDebugEvent; debug: HelixAskMathRenderDebugSnapshot } =>
+            Boolean(entry),
+        )
+        .slice(-260),
+    [snapshot?.timelineEvents],
+  );
+  const turnOptions = React.useMemo(() => {
+    const grouped = new Map<string, { count: number; lastAtMs: number }>();
+    mathEntries.forEach(({ event }) => {
+      const key = getReasoningTimelineTurnKey(event);
+      const current = grouped.get(key);
+      if (current) {
+        current.count += 1;
+        current.lastAtMs = Math.max(current.lastAtMs, event.atMs);
+        return;
+      }
+      grouped.set(key, { count: 1, lastAtMs: event.atMs });
+    });
+    return [...grouped.entries()]
+      .map(([key, meta]) => ({ key, ...meta }))
+      .sort((a, b) => b.lastAtMs - a.lastAtMs);
+  }, [mathEntries]);
+  const latestTurnKey = turnOptions[0]?.key ?? null;
+  const latestTurnCount = turnOptions[0]?.count ?? 0;
+
+  React.useEffect(() => {
+    if (selectedTurnKey === "all" || selectedTurnKey === "latest") return;
+    const selectedStillExists = turnOptions.some((option) => option.key === selectedTurnKey);
+    if (!selectedStillExists) {
+      setSelectedTurnKey("latest");
+    }
+  }, [selectedTurnKey, turnOptions]);
+
+  const selectedEntries = React.useMemo(() => {
+    if (mathEntries.length === 0) return [];
+    if (selectedTurnKey === "all") return mathEntries;
+    const targetKey = selectedTurnKey === "latest" ? latestTurnKey : selectedTurnKey;
+    if (!targetKey) return [];
+    return mathEntries.filter(({ event }) => getReasoningTimelineTurnKey(event) === targetKey);
+  }, [latestTurnKey, mathEntries, selectedTurnKey]);
+  const aggregateDebug = React.useMemo(() => {
+    let merged: HelixAskMathRenderDebugSnapshot | null = null;
+    for (const entry of selectedEntries) {
+      merged = mergeHelixAskMathRenderDebugSnapshot(merged, entry.debug);
+    }
+    return merged;
+  }, [selectedEntries]);
+  const aggregateStatusCounts = React.useMemo(() => {
+    if (!aggregateDebug) {
+      return {
+        formatted: 0,
+        katex_error: 0,
+        ignored_reason: 0,
+      };
+    }
+    return aggregateDebug.tokenStatuses.reduce(
+      (acc, status) => {
+        if (status.status === "formatted") acc.formatted += 1;
+        else if (status.status === "katex_error") acc.katex_error += 1;
+        else acc.ignored_reason += 1;
+        return acc;
+      },
+      {
+        formatted: 0,
+        katex_error: 0,
+        ignored_reason: 0,
+      },
+    );
+  }, [aggregateDebug]);
+  const exportPayload = React.useMemo(() => {
+    if (selectedEntries.length === 0) return "";
+    return selectedEntries
+      .map(({ event, debug }) =>
+        JSON.stringify({
+          id: event.id,
+          atMs: event.atMs,
+          source: event.source,
+          kind: event.kind,
+          turnKey: getReasoningTimelineTurnKey(event),
+          traceId: event.traceId ?? null,
+          text: clipDiagnosticsText(event.text ?? "", 420),
+          mathDebug: debug,
+        }),
+      )
+      .join("\n");
+  }, [selectedEntries]);
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">
+          Helix Ask math formatting debug
+        </p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!exportPayload}
+          className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+            exportPayload
+              ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+              : "border-slate-600 text-slate-500"
+          }`}
+        >
+          {copied ? "copied" : "copy logs"}
+        </button>
+      </div>
+      {mathEntries.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No equation text found in timeline replies yet.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={turnSelectId} className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              Turn
+            </label>
+            <select
+              id={turnSelectId}
+              value={selectedTurnKey}
+              onChange={(event) => setSelectedTurnKey(event.target.value)}
+              className="h-7 min-w-[240px] rounded-md border border-slate-600 bg-slate-900 px-2 text-[11px] text-slate-100"
+            >
+              <option value="latest">Latest turn ({latestTurnCount})</option>
+              <option value="all">All turns ({mathEntries.length})</option>
+              {turnOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {clipDiagnosticsText(option.key, 64)} ({option.count})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              {selectedEntries.length} entries shown
+            </p>
+          </div>
+          {aggregateDebug ? (
+            <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] leading-5 text-slate-200">
+              <p>
+                Tokens: {aggregateDebug.mathTokenCount}/{aggregateDebug.tokenCount} math
+                {" "}(
+                delimiter {aggregateDebug.delimiterMathCount}, bare {aggregateDebug.bareMathCount})
+              </p>
+              <p>
+                KaTeX: {Math.max(0, aggregateDebug.mathTokenCount - aggregateDebug.katexErrorCount)} formatted | errors(red):{" "}
+                {aggregateDebug.katexErrorCount}
+              </p>
+              <p>
+                Bare candidates: {aggregateDebug.bareAcceptedCount}/{aggregateDebug.bareCandidateCount} accepted | ignored:{" "}
+                {aggregateDebug.bareIgnoredCount}
+              </p>
+              <p>
+                Token status: formatted={aggregateStatusCounts.formatted} | katex_error=
+                {aggregateStatusCounts.katex_error} | ignored_reason={aggregateStatusCounts.ignored_reason}
+              </p>
+              {aggregateDebug.katexErrorSamples.length > 0 ? (
+                <p className="mt-1 whitespace-pre-wrap">Error samples: {aggregateDebug.katexErrorSamples.join(" | ")}</p>
+              ) : null}
+              {aggregateDebug.bareIgnoredSamples.length > 0 ? (
+                <p className="mt-1 whitespace-pre-wrap">Ignored samples: {aggregateDebug.bareIgnoredSamples.join(" | ")}</p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="max-h-[32vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {selectedEntries.map(({ event, debug }) => (
+              <div key={`${event.id}-helix-math-debug`} className="rounded border border-white/10 bg-white/5 p-1.5">
+                <p className="whitespace-pre-wrap break-words">{formatVoiceTimelineDebugEvent(event)}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-emerald-100">
+                  math={debug.mathTokenCount}/{debug.tokenCount} | formatted=
+                  {Math.max(0, debug.mathTokenCount - debug.katexErrorCount)} | error={debug.katexErrorCount} |
+                  bare_ignored={debug.bareIgnoredCount}
+                </p>
+                {debug.tokenStatuses.length > 0 ? (
+                  <div className="mt-1 space-y-1">
+                    {debug.tokenStatuses.slice(0, 10).map((status, index) => (
+                      <p
+                        key={`${event.id}-math-status-${index}`}
+                        className={
+                          status.status === "katex_error"
+                            ? "whitespace-pre-wrap break-words text-rose-200"
+                            : status.status === "ignored_reason"
+                              ? "whitespace-pre-wrap break-words text-amber-200"
+                              : "whitespace-pre-wrap break-words text-cyan-100"
+                        }
+                      >
+                        {status.status}
+                        {status.reason ? `(${status.reason})` : ""}
+                        {status.displayMode === null ? "" : status.displayMode ? " [display]" : " [inline]"}:{" "}
+                        {status.tokenText}
+                      </p>
+                    ))}
+                    {debug.tokenStatuses.length > 10 ? (
+                      <p className="text-[9px] uppercase tracking-[0.1em] text-slate-400">
+                        +{debug.tokenStatuses.length - 10} more statuses
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function HelixAskReasoningEventLogPanel({
   snapshot,
 }: {
@@ -787,17 +1089,54 @@ function VoiceEventTimelineDebugPanel({
   snapshot: VoiceCaptureDiagnosticsSnapshot | null;
 }) {
   const [copied, setCopied] = React.useState(false);
+  const [selectedTurnKey, setSelectedTurnKey] = React.useState<string>("latest");
+  const turnSelectId = React.useId();
   const timelineEvents = React.useMemo(
     () =>
       [...(snapshot?.timelineEvents ?? [])]
+        .filter((event) => isVoiceLaneTrafficEvent(event))
         .sort((a, b) => a.atMs - b.atMs)
-        .slice(-220),
+        .slice(-360),
     [snapshot?.timelineEvents],
   );
-  const exportPayload = React.useMemo(() => {
-    if (timelineEvents.length === 0) return "";
-    return timelineEvents.map((event) => JSON.stringify(event)).join("\n");
+  const turnOptions = React.useMemo(() => {
+    const grouped = new Map<string, { count: number; lastAtMs: number }>();
+    timelineEvents.forEach((event) => {
+      const key = getReasoningTimelineTurnKey(event);
+      const current = grouped.get(key);
+      if (current) {
+        current.count += 1;
+        current.lastAtMs = Math.max(current.lastAtMs, event.atMs);
+        return;
+      }
+      grouped.set(key, { count: 1, lastAtMs: event.atMs });
+    });
+    return [...grouped.entries()]
+      .map(([key, meta]) => ({ key, ...meta }))
+      .sort((a, b) => b.lastAtMs - a.lastAtMs);
   }, [timelineEvents]);
+  const latestTurnKey = turnOptions[0]?.key ?? null;
+  const latestTurnCount = turnOptions[0]?.count ?? 0;
+
+  React.useEffect(() => {
+    if (selectedTurnKey === "all" || selectedTurnKey === "latest") return;
+    const selectedStillExists = turnOptions.some((option) => option.key === selectedTurnKey);
+    if (!selectedStillExists) {
+      setSelectedTurnKey("latest");
+    }
+  }, [selectedTurnKey, turnOptions]);
+
+  const selectedEvents = React.useMemo(() => {
+    if (timelineEvents.length === 0) return [];
+    if (selectedTurnKey === "all") return timelineEvents;
+    const targetKey = selectedTurnKey === "latest" ? latestTurnKey : selectedTurnKey;
+    if (!targetKey) return [];
+    return timelineEvents.filter((event) => getReasoningTimelineTurnKey(event) === targetKey);
+  }, [latestTurnKey, selectedTurnKey, timelineEvents]);
+  const exportPayload = React.useMemo(() => {
+    if (selectedEvents.length === 0) return "";
+    return selectedEvents.map((event) => JSON.stringify(event)).join("\n");
+  }, [selectedEvents]);
 
   const handleCopy = async () => {
     if (!exportPayload || !navigator?.clipboard?.writeText) return;
@@ -835,11 +1174,33 @@ function VoiceEventTimelineDebugPanel({
         </p>
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={turnSelectId} className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              Turn
+            </label>
+            <select
+              id={turnSelectId}
+              value={selectedTurnKey}
+              onChange={(event) => setSelectedTurnKey(event.target.value)}
+              className="h-7 min-w-[240px] rounded-md border border-slate-600 bg-slate-900 px-2 text-[11px] text-slate-100"
+            >
+              <option value="latest">Latest turn ({latestTurnCount})</option>
+              <option value="all">All turns ({timelineEvents.length})</option>
+              {turnOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {clipDiagnosticsText(option.key, 64)} ({option.count})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              {selectedEvents.length} events shown
+            </p>
+          </div>
           <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
-            {timelineEvents.length} events
+            scoped to prompt / brief / final / chunk traffic
           </p>
           <div className="max-h-[44vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
-            {timelineEvents.map((event) => (
+            {selectedEvents.map((event) => (
               <p key={event.id} className="whitespace-pre-wrap break-words">
                 {formatVoiceTimelineDebugEvent(event)}
               </p>
@@ -894,8 +1255,48 @@ function buildVoiceAudioDebugCopyPayload(snapshot: VoiceCaptureDiagnosticsSnapsh
 }
 
 function isHelixAskReasoningStepEvent(event: VoiceLaneTimelineDebugEvent): boolean {
-  if (event.source === "system" && event.kind === "build_info") return false;
-  return true;
+  if (event.source === "system") return false;
+  if (event.source === "voice_capture") return false;
+  if (event.source === "chunk_playback") return false;
+  if (event.source === "reasoning") {
+    return (
+      event.kind === "reasoning_attempt" ||
+      event.kind === "reasoning_stream" ||
+      event.kind === "reasoning_final" ||
+      event.kind === "action_receipt" ||
+      event.kind === "suppressed"
+    );
+  }
+  if (event.source === "conversation") {
+    return (
+      event.kind === "prompt_recorded" ||
+      event.kind === "brief" ||
+      event.kind === "reasoning_attempt" ||
+      event.kind === "reasoning_stream" ||
+      event.kind === "reasoning_final" ||
+      event.kind === "action_receipt" ||
+      event.kind === "suppressed"
+    );
+  }
+  return false;
+}
+
+function isVoiceLaneTrafficEvent(event: VoiceLaneTimelineDebugEvent): boolean {
+  if (event.source === "system" || event.source === "voice_capture") return false;
+  return (
+    event.kind === "prompt_recorded" ||
+    event.kind === "brief" ||
+    event.kind === "reasoning_stream" ||
+    event.kind === "reasoning_final" ||
+    event.kind === "action_receipt" ||
+    event.kind === "chunk_enqueue" ||
+    event.kind === "chunk_synth_start" ||
+    event.kind === "chunk_synth_ok" ||
+    event.kind === "chunk_synth_error" ||
+    event.kind === "chunk_play_start" ||
+    event.kind === "chunk_play_end" ||
+    event.kind === "chunk_drop"
+  );
 }
 
 function getReasoningTimelineTurnKey(event: VoiceLaneTimelineDebugEvent): string {
@@ -920,10 +1321,29 @@ function readHelixAskDebugStringArray(value: unknown): string[] {
 }
 
 function formatHelixAskDebugContextSummary(context: Record<string, unknown>): string {
+  const readNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+  const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+  const readString = (value: unknown): string | null =>
+    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
   const contextFileCount =
-    typeof context.contextFileCount === "number" && Number.isFinite(context.contextFileCount)
-      ? Math.max(0, Math.floor(context.contextFileCount))
+    readNumber(context.contextFileCount) !== null
+      ? Math.max(0, Math.floor(readNumber(context.contextFileCount) ?? 0))
       : readHelixAskDebugStringArray(context.contextFiles).length;
+  const retrievalChannelHitsRaw =
+    context.retrievalChannelHits && typeof context.retrievalChannelHits === "object"
+      ? (context.retrievalChannelHits as Record<string, unknown>)
+      : null;
+  const retrievalChannelHits =
+    retrievalChannelHitsRaw
+      ? Object.entries(retrievalChannelHitsRaw)
+          .map(([channel, value]) => {
+            const count = readNumber(value);
+            return count !== null ? `${channel}:${Math.max(0, Math.floor(count))}` : null;
+          })
+          .filter((entry): entry is string => Boolean(entry))
+          .join(",")
+      : readString(context.retrievalChannelHits);
   const stage05KindCountsRaw =
     context.stage05KindCounts && typeof context.stage05KindCounts === "object"
       ? (context.stage05KindCounts as Record<string, unknown>)
@@ -939,76 +1359,137 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
           .join(",")
       : null;
   const fields = [
-    typeof context.intentDomain === "string" ? `domain=${context.intentDomain}` : null,
-    typeof context.intentId === "string" ? `intent=${context.intentId}` : null,
-    typeof context.helixAskFailClass === "string" ? `fail_class=${context.helixAskFailClass}` : null,
-    typeof context.helixAskFailReason === "string" ? `fail_reason=${context.helixAskFailReason}` : null,
-    typeof context.retrievalChannelHits === "string" ? `channels=${context.retrievalChannelHits}` : null,
-    typeof context.stage0RolloutMode === "string" ? `stage0_mode=${context.stage0RolloutMode}` : null,
-    typeof context.stage0Used === "boolean" ? `stage0_used=${context.stage0Used ? "true" : "false"}` : null,
-    typeof context.stage0ShadowOnly === "boolean"
-      ? `stage0_shadow_only=${context.stage0ShadowOnly ? "true" : "false"}`
+    readString(context.intentDomain) ? `domain=${readString(context.intentDomain)}` : null,
+    readString(context.intentId) ? `intent=${readString(context.intentId)}` : null,
+    readString(context.helixAskFailClass) ? `fail_class=${readString(context.helixAskFailClass)}` : null,
+    readString(context.helixAskFailReason) ? `fail_reason=${readString(context.helixAskFailReason)}` : null,
+    retrievalChannelHits ? `channels=${retrievalChannelHits}` : null,
+    readString(context.stage0RolloutMode) ? `stage0_mode=${readString(context.stage0RolloutMode)}` : null,
+    readBoolean(context.stage0Used) !== null
+      ? `stage0_used=${readBoolean(context.stage0Used) ? "true" : "false"}`
       : null,
-    typeof context.stage0CandidateCount === "number" && Number.isFinite(context.stage0CandidateCount)
-      ? `stage0_candidates=${Math.max(0, Math.floor(context.stage0CandidateCount))}`
+    readBoolean(context.stage0ShadowOnly) !== null
+      ? `stage0_shadow_only=${readBoolean(context.stage0ShadowOnly) ? "true" : "false"}`
       : null,
-    typeof context.stage0HitRate === "number" && Number.isFinite(context.stage0HitRate)
-      ? `stage0_hit_rate=${context.stage0HitRate.toFixed(4)}`
+    readNumber(context.stage0CandidateCount) !== null
+      ? `stage0_candidates=${Math.max(0, Math.floor(readNumber(context.stage0CandidateCount) ?? 0))}`
       : null,
-    typeof context.stage0SoftMustIncludeApplied === "boolean"
-      ? `stage0_soft_must_include=${context.stage0SoftMustIncludeApplied ? "true" : "false"}`
+    readNumber(context.stage0HitRate) !== null
+      ? `stage0_hit_rate=${(readNumber(context.stage0HitRate) ?? 0).toFixed(4)}`
       : null,
-    typeof context.stage0PolicyDecision === "string" ? `stage0_policy=${context.stage0PolicyDecision}` : null,
-    typeof context.stage0FailOpenReason === "string" ? `stage0_fail_open=${context.stage0FailOpenReason}` : null,
-    typeof context.stage0FallbackReason === "string" ? `stage0_fallback=${context.stage0FallbackReason}` : null,
-    typeof context.stage0CodeFloorPass === "boolean"
-      ? `code_floor_pass=${context.stage0CodeFloorPass ? "true" : "false"}`
+    readBoolean(context.stage0SoftMustIncludeApplied) !== null
+      ? `stage0_soft_must_include=${readBoolean(context.stage0SoftMustIncludeApplied) ? "true" : "false"}`
       : null,
-    typeof context.stage0CodePathCount === "number" && Number.isFinite(context.stage0CodePathCount)
-      ? `code_paths=${Math.max(0, Math.floor(context.stage0CodePathCount))}`
+    readString(context.stage0PolicyDecision) ? `stage0_policy=${readString(context.stage0PolicyDecision)}` : null,
+    readString(context.stage0FailOpenReason) ? `stage0_fail_open=${readString(context.stage0FailOpenReason)}` : null,
+    readString(context.stage0FallbackReason) ? `stage0_fallback=${readString(context.stage0FallbackReason)}` : null,
+    readBoolean(context.stage0CodeFloorPass) !== null
+      ? `code_floor_pass=${readBoolean(context.stage0CodeFloorPass) ? "true" : "false"}`
       : null,
-    typeof context.stage0DocPathCount === "number" && Number.isFinite(context.stage0DocPathCount)
-      ? `doc_paths=${Math.max(0, Math.floor(context.stage0DocPathCount))}`
+    readNumber(context.stage0CodePathCount) !== null
+      ? `code_paths=${Math.max(0, Math.floor(readNumber(context.stage0CodePathCount) ?? 0))}`
       : null,
-    typeof context.stage05Used === "boolean" ? `stage05_used=${context.stage05Used ? "true" : "false"}` : null,
-    typeof context.stage05FileCount === "number" && Number.isFinite(context.stage05FileCount)
-      ? `stage05_files=${Math.max(0, Math.floor(context.stage05FileCount))}`
+    readNumber(context.stage0DocPathCount) !== null
+      ? `doc_paths=${Math.max(0, Math.floor(readNumber(context.stage0DocPathCount) ?? 0))}`
       : null,
-    typeof context.stage05CardCount === "number" && Number.isFinite(context.stage05CardCount)
-      ? `stage05_cards=${Math.max(0, Math.floor(context.stage05CardCount))}`
+    readBoolean(context.stage05Used) !== null
+      ? `stage05_used=${readBoolean(context.stage05Used) ? "true" : "false"}`
+      : null,
+    readNumber(context.stage05FileCount) !== null
+      ? `stage05_files=${Math.max(0, Math.floor(readNumber(context.stage05FileCount) ?? 0))}`
+      : null,
+    readNumber(context.stage05CardCount) !== null
+      ? `stage05_cards=${Math.max(0, Math.floor(readNumber(context.stage05CardCount) ?? 0))}`
       : null,
     stage05KindCounts ? `stage05_kinds=${stage05KindCounts}` : null,
-    typeof context.stage05LlmUsed === "boolean" ? `stage05_llm=${context.stage05LlmUsed ? "true" : "false"}` : null,
-    typeof context.stage05FallbackReason === "string" ? `stage05_fallback=${context.stage05FallbackReason}` : null,
-    typeof context.stage05ExtractMs === "number" && Number.isFinite(context.stage05ExtractMs)
-      ? `stage05_extract_ms=${Math.max(0, Math.floor(context.stage05ExtractMs))}`
+    readBoolean(context.stage05LlmUsed) !== null
+      ? `stage05_llm=${readBoolean(context.stage05LlmUsed) ? "true" : "false"}`
       : null,
-    typeof context.stage05TotalMs === "number" && Number.isFinite(context.stage05TotalMs)
-      ? `stage05_total_ms=${Math.max(0, Math.floor(context.stage05TotalMs))}`
+    readString(context.stage05FallbackReason) ? `stage05_fallback=${readString(context.stage05FallbackReason)}` : null,
+    readNumber(context.stage05ExtractMs) !== null
+      ? `stage05_extract_ms=${Math.max(0, Math.floor(readNumber(context.stage05ExtractMs) ?? 0))}`
       : null,
-    typeof context.stage05BudgetCapped === "boolean"
-      ? `stage05_budget_capped=${context.stage05BudgetCapped ? "true" : "false"}`
+    readNumber(context.stage05TotalMs) !== null
+      ? `stage05_total_ms=${Math.max(0, Math.floor(readNumber(context.stage05TotalMs) ?? 0))}`
       : null,
-    typeof context.stage05SummaryRequired === "boolean"
-      ? `stage05_summary_required=${context.stage05SummaryRequired ? "true" : "false"}`
+    readBoolean(context.stage05BudgetCapped) !== null
+      ? `stage05_budget_capped=${readBoolean(context.stage05BudgetCapped) ? "true" : "false"}`
       : null,
-    typeof context.stage05SummaryHardFail === "boolean"
-      ? `stage05_summary_hard_fail=${context.stage05SummaryHardFail ? "true" : "false"}`
+    readBoolean(context.stage05SummaryRequired) !== null
+      ? `stage05_summary_required=${readBoolean(context.stage05SummaryRequired) ? "true" : "false"}`
       : null,
-    typeof context.stage05SummaryFailReason === "string"
-      ? `stage05_summary_fail=${context.stage05SummaryFailReason}`
+    readBoolean(context.stage05SummaryHardFail) !== null
+      ? `stage05_summary_hard_fail=${readBoolean(context.stage05SummaryHardFail) ? "true" : "false"}`
       : null,
-    typeof context.stage05FullfileMode === "boolean"
-      ? `stage05_fullfile=${context.stage05FullfileMode ? "true" : "false"}`
+    readString(context.stage05SummaryFailReason)
+      ? `stage05_summary_fail=${readString(context.stage05SummaryFailReason)}`
       : null,
-    typeof context.stage05TwoPassUsed === "boolean"
-      ? `stage05_two_pass=${context.stage05TwoPassUsed ? "true" : "false"}`
+    readBoolean(context.stage05FullfileMode) !== null
+      ? `stage05_fullfile=${readBoolean(context.stage05FullfileMode) ? "true" : "false"}`
       : null,
-    typeof context.stage05TwoPassBatches === "number" && Number.isFinite(context.stage05TwoPassBatches)
-      ? `stage05_two_pass_batches=${Math.max(0, Math.floor(context.stage05TwoPassBatches))}`
+    readBoolean(context.stage05TwoPassUsed) !== null
+      ? `stage05_two_pass=${readBoolean(context.stage05TwoPassUsed) ? "true" : "false"}`
       : null,
-    typeof context.stage05OverflowPolicy === "string"
-      ? `stage05_overflow=${context.stage05OverflowPolicy}`
+    readNumber(context.stage05TwoPassBatches) !== null
+      ? `stage05_two_pass_batches=${Math.max(0, Math.floor(readNumber(context.stage05TwoPassBatches) ?? 0))}`
+      : null,
+    readString(context.stage05OverflowPolicy) ? `stage05_overflow=${readString(context.stage05OverflowPolicy)}` : null,
+    readString(context.intentContractHash)
+      ? `intent_contract=${clipDiagnosticsText(readString(context.intentContractHash) ?? "", 24)}`
+      : null,
+    readBoolean(context.intentContractMutationDetected) !== null
+      ? `intent_contract_mutation=${readBoolean(context.intentContractMutationDetected) ? "true" : "false"}`
+      : null,
+    readNumber(context.equationCandidateTotal) !== null
+      ? `eq_candidates=${Math.max(0, Math.floor(readNumber(context.equationCandidateTotal) ?? 0))}`
+      : null,
+    readNumber(context.equationCandidateRejectedTotal) !== null
+      ? `eq_rejected=${Math.max(0, Math.floor(readNumber(context.equationCandidateRejectedTotal) ?? 0))}`
+      : null,
+    readNumber(context.equationSelectorPrimaryConfidence) !== null
+      ? `eq_primary_conf=${(readNumber(context.equationSelectorPrimaryConfidence) ?? 0).toFixed(2)}`
+      : null,
+    readBoolean(context.equationSelectorPrimaryFamilyMatch) !== null
+      ? `eq_family_match=${readBoolean(context.equationSelectorPrimaryFamilyMatch) ? "true" : "false"}`
+      : null,
+    readNumber(context.equationSelectorSupportCount) !== null
+      ? `eq_supports=${Math.max(0, Math.floor(readNumber(context.equationSelectorSupportCount) ?? 0))}`
+      : null,
+    readString(context.equationSelectorPrimaryKey)
+      ? `eq_primary_key=${clipDiagnosticsText(readString(context.equationSelectorPrimaryKey) ?? "", 64)}`
+      : null,
+    readString(context.equationRendererPrimaryKey)
+      ? `eq_renderer_key=${clipDiagnosticsText(readString(context.equationRendererPrimaryKey) ?? "", 64)}`
+      : null,
+    readBoolean(context.equationPrimaryAnchorMatch) !== null
+      ? `eq_anchor_match=${readBoolean(context.equationPrimaryAnchorMatch) ? "true" : "false"}`
+      : null,
+    readString(context.equationDominantFamily) ? `eq_family=${readString(context.equationDominantFamily)}` : null,
+    readString(context.equationPrimaryClass) ? `eq_class=${readString(context.equationPrimaryClass)}` : null,
+    readString(context.equationPrimaryDerivationLevel)
+      ? `eq_derivation=${readString(context.equationPrimaryDerivationLevel)}`
+      : null,
+    readNumber(context.equationPrimaryScore) !== null
+      ? `eq_score=${(readNumber(context.equationPrimaryScore) ?? 0).toFixed(2)}`
+      : null,
+    readBoolean(context.equationBypassTriggered) !== null
+      ? `eq_bypass=${readBoolean(context.equationBypassTriggered) ? "true" : "false"}`
+      : null,
+    readString(context.equationBypassReason) ? `eq_bypass_reason=${readString(context.equationBypassReason)}` : null,
+    readString(context.equationRuntimeBudgetStage)
+      ? `eq_budget_stage=${readString(context.equationRuntimeBudgetStage)}`
+      : null,
+    readNumber(context.equationSecondaryCrossTopicCount) !== null
+      ? `eq_cross_topic_supports=${Math.max(0, Math.floor(readNumber(context.equationSecondaryCrossTopicCount) ?? 0))}`
+      : null,
+    readString(context.shadowPrimaryKey)
+      ? `shadow_primary=${clipDiagnosticsText(readString(context.shadowPrimaryKey) ?? "", 64)}`
+      : null,
+    readBoolean(context.shadowPrimaryAnchorMatch) !== null
+      ? `shadow_anchor_match=${readBoolean(context.shadowPrimaryAnchorMatch) ? "true" : "false"}`
+      : null,
+    readNumber(context.shadowSymbolHitRate) !== null
+      ? `shadow_symbol_hit_rate=${(readNumber(context.shadowSymbolHitRate) ?? 0).toFixed(4)}`
       : null,
     `context_files=${contextFileCount}`,
   ]
@@ -1021,6 +1502,9 @@ function formatVoiceTimelineDebugEvent(event: VoiceLaneTimelineDebugEvent): stri
   const timestamp = Number.isFinite(event.atMs)
     ? new Date(event.atMs).toISOString().split("T")[1]?.replace("Z", "") ?? "time"
     : "time";
+  const hasDebugContext = Boolean(
+    event.debugContext && typeof event.debugContext === "object" && !Array.isArray(event.debugContext),
+  );
   const fields = [
     `source=${event.source}`,
     `kind=${event.kind}`,
@@ -1038,6 +1522,7 @@ function formatVoiceTimelineDebugEvent(event: VoiceLaneTimelineDebugEvent): stri
     event.suppressionCause ? `cause=${event.suppressionCause}` : null,
     event.authorityRejectStage ? `stage=${event.authorityRejectStage}` : null,
     event.causalRefId ? `causal=${clipDiagnosticsText(event.causalRefId, 24)}` : null,
+    hasDebugContext ? "debug_context=1" : null,
     event.detail ? `detail=${clipDiagnosticsText(event.detail, 96)}` : null,
     event.text ? `text=${clipDiagnosticsText(event.text, 150)}` : null,
   ]

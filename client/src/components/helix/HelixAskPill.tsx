@@ -3833,6 +3833,30 @@ type HelixAskReply = {
     stage05_two_pass_used?: boolean;
     stage05_two_pass_batches?: number;
     stage05_overflow_policy?: "single_pass" | "two_pass" | null;
+    intent_contract_hash?: string;
+    intent_contract_mutation_detected?: boolean;
+    equation_candidate_total?: number;
+    equation_candidate_rejected_total?: number;
+    equation_candidate_rejected_reasons?: string[] | string;
+    equation_selector_primary_confidence?: number;
+    equation_selector_primary_family_match?: boolean;
+    equation_selector_support_count?: number;
+    equation_selector_primary_key?: string;
+    equation_renderer_primary_key?: string;
+    equation_primary_anchor_match?: boolean;
+    equation_bypass_triggered?: boolean;
+    equation_bypass_reason?: string;
+    equation_runtime_budget_stage?: string;
+    equation_dominant_family?: string;
+    equation_primary_class?: string;
+    equation_primary_derivation_level?: string;
+    equation_primary_score?: number;
+    equation_rejected_count?: number;
+    equation_rejected_reasons?: string[] | string;
+    equation_secondary_cross_topic_count?: number;
+    shadow_primary_key?: string;
+    shadow_primary_anchor_match?: boolean;
+    shadow_symbol_hit_rate?: number;
     gates?: {
       evidence?: {
         ok?: boolean;
@@ -4025,6 +4049,32 @@ type HelixAskMathToken =
       closeDelimiter: string;
     };
 
+type HelixAskMathTokenRenderStatus = "formatted" | "katex_error" | "ignored_reason";
+
+type HelixAskMathTokenDebugStatus = {
+  tokenText: string;
+  status: HelixAskMathTokenRenderStatus;
+  displayMode: boolean | null;
+  openDelimiter: string | null;
+  closeDelimiter: string | null;
+  reason: string | null;
+};
+
+type HelixAskMathRenderDebug = {
+  sourceChars: number;
+  tokenCount: number;
+  mathTokenCount: number;
+  delimiterMathCount: number;
+  bareMathCount: number;
+  katexErrorCount: number;
+  bareCandidateCount: number;
+  bareAcceptedCount: number;
+  bareIgnoredCount: number;
+  katexErrorSamples: string[];
+  bareIgnoredSamples: string[];
+  tokenStatuses: HelixAskMathTokenDebugStatus[];
+};
+
 const HELIX_ASK_MATH_DELIMITERS: ReadonlyArray<{
   openDelimiter: string;
   closeDelimiter: string;
@@ -4059,19 +4109,38 @@ function normalizeBareEquationCandidate(value: string): string {
   return compact.slice(0, cutIndex).trim();
 }
 
-function isLikelyBareEquationSegment(value: string): boolean {
+function classifyBareEquationCandidate(value: string): { accepted: boolean; reason: string | null } {
   const normalized = normalizeBareEquationCandidate(value);
-  if (!normalized) return false;
+  if (!normalized) return { accepted: false, reason: "empty_candidate" };
   const eqIndex = normalized.indexOf("=");
-  if (eqIndex <= 0 || eqIndex >= normalized.length - 1) return false;
+  if (eqIndex <= 0 || eqIndex >= normalized.length - 1) {
+    return { accepted: false, reason: "malformed_equals" };
+  }
   const lhs = normalized.slice(0, eqIndex).trim();
   const rhs = normalized.slice(eqIndex + 1).trim();
-  if (!lhs || !rhs) return false;
-  if (lhs.includes("/") || lhs.includes(":") || lhs.includes("\\")) return false;
-  if (/^(?:docs|server|client|modules|tools|scripts|tmp)\b/i.test(lhs)) return false;
-  if (/^https?:\/\//i.test(rhs)) return false;
-  if (!HELIX_ASK_BARE_EQUATION_SIGNAL_RE.test(rhs)) return false;
-  return true;
+  if (!lhs || !rhs) {
+    return { accepted: false, reason: "missing_lhs_or_rhs" };
+  }
+  if (/^(?:score|confidence|threshold|count|ratio|rate|rank|index|line|id)$/i.test(lhs)) {
+    return { accepted: false, reason: "lhs_metadata_assignment" };
+  }
+  if (lhs.includes("/") || lhs.includes(":") || lhs.includes("\\")) {
+    return { accepted: false, reason: "lhs_path_like" };
+  }
+  if (/^(?:docs|server|client|modules|tools|scripts|tmp)\b/i.test(lhs)) {
+    return { accepted: false, reason: "lhs_repo_prefix" };
+  }
+  if (/^https?:\/\//i.test(rhs)) {
+    return { accepted: false, reason: "rhs_url_like" };
+  }
+  if (!HELIX_ASK_BARE_EQUATION_SIGNAL_RE.test(rhs)) {
+    return { accepted: false, reason: "rhs_low_math_signal" };
+  }
+  return { accepted: true, reason: null };
+}
+
+function isLikelyBareEquationSegment(value: string): boolean {
+  return classifyBareEquationCandidate(value).accepted;
 }
 
 function tokenizeHelixAskBareEquationSegments(content: string): HelixAskMathToken[] {
@@ -4106,6 +4175,70 @@ function tokenizeHelixAskBareEquationSegments(content: string): HelixAskMathToke
     pushTextMathToken(tokens, text.slice(cursor));
   }
   return tokens.length > 0 ? tokens : [{ kind: "text", text }];
+}
+
+function collectHelixAskBareEquationCandidateStats(content: string): {
+  bareCandidateCount: number;
+  bareAcceptedCount: number;
+  bareIgnoredCount: number;
+  bareIgnoredSamples: string[];
+  bareIgnoredDetails: Array<{ candidate: string; reason: string }>;
+} {
+  const text = coerceText(content);
+  if (!text) {
+    return {
+      bareCandidateCount: 0,
+      bareAcceptedCount: 0,
+      bareIgnoredCount: 0,
+      bareIgnoredSamples: [],
+      bareIgnoredDetails: [],
+    };
+  }
+  let bareCandidateCount = 0;
+  let bareAcceptedCount = 0;
+  let bareIgnoredCount = 0;
+  const bareIgnoredSamples: string[] = [];
+  const bareIgnoredDetails: Array<{ candidate: string; reason: string }> = [];
+  HELIX_ASK_BARE_EQUATION_CANDIDATE_RE.lastIndex = 0;
+  for (const match of text.matchAll(HELIX_ASK_BARE_EQUATION_CANDIDATE_RE)) {
+    const raw = match[0] ?? "";
+    if (!raw) continue;
+    const candidate = normalizeBareEquationCandidate(raw);
+    if (!candidate) continue;
+    bareCandidateCount += 1;
+    const classification = classifyBareEquationCandidate(candidate);
+    if (classification.accepted) {
+      bareAcceptedCount += 1;
+    } else {
+      bareIgnoredCount += 1;
+      if (bareIgnoredSamples.length < 3) {
+        bareIgnoredSamples.push(clipText(candidate, 120));
+      }
+      if (bareIgnoredDetails.length < 24) {
+        bareIgnoredDetails.push({
+          candidate: clipText(candidate, 180),
+          reason: classification.reason ?? "unclassified_reject",
+        });
+      }
+    }
+  }
+  return {
+    bareCandidateCount,
+    bareAcceptedCount,
+    bareIgnoredCount,
+    bareIgnoredSamples,
+    bareIgnoredDetails,
+  };
+}
+
+function isLikelyCodeStyleMathToken(token: Extract<HelixAskMathToken, { kind: "math" }>): boolean {
+  if (token.openDelimiter !== "" || token.closeDelimiter !== "") return false;
+  const text = token.text;
+  if (!text) return false;
+  if (/\bMath\.[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(text)) return true;
+  if (/[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+/.test(text)) return true;
+  if (/\b(?:const|let|var)\b/.test(text)) return true;
+  return false;
 }
 
 function expandMathTokensWithBareEquations(tokens: HelixAskMathToken[]): HelixAskMathToken[] {
@@ -4244,6 +4377,99 @@ export function hasHelixAskRenderableMath(content: unknown): boolean {
   return tokenizeHelixAskMathTokens(text).some((token) => token.kind === "math");
 }
 
+export function buildHelixAskMathRenderDebugForText(content: unknown): HelixAskMathRenderDebug | null {
+  const text = coerceText(content);
+  if (!text) return null;
+  const tokens = tokenizeHelixAskMathTokens(text);
+  const mathTokens = tokens.filter((token): token is Extract<HelixAskMathToken, { kind: "math" }> => token.kind === "math");
+  const { bareCandidateCount, bareAcceptedCount, bareIgnoredCount, bareIgnoredSamples, bareIgnoredDetails } =
+    collectHelixAskBareEquationCandidateStats(text);
+  if (mathTokens.length === 0 && bareCandidateCount === 0) {
+    return null;
+  }
+  let katexErrorCount = 0;
+  const katexErrorSamples: string[] = [];
+  const tokenStatuses: HelixAskMathTokenDebugStatus[] = [];
+  for (const token of mathTokens) {
+    let status: HelixAskMathTokenRenderStatus = "formatted";
+    let reason: string | null = null;
+    if (isLikelyCodeStyleMathToken(token)) {
+      reason = "code_style_plaintext";
+      if (tokenStatuses.length < 64) {
+        tokenStatuses.push({
+          tokenText: clipText(token.text, 180),
+          status,
+          displayMode: token.displayMode,
+          openDelimiter: token.openDelimiter || null,
+          closeDelimiter: token.closeDelimiter || null,
+          reason,
+        });
+      }
+      continue;
+    }
+    try {
+      const html = renderKatexToString(token.text, {
+        displayMode: token.displayMode,
+        strict: "ignore",
+        throwOnError: false,
+      });
+      if (/\bkatex-error\b/i.test(html)) {
+        katexErrorCount += 1;
+        status = "katex_error";
+        reason = "katex_error_markup";
+        if (katexErrorSamples.length < 3) {
+          katexErrorSamples.push(clipText(token.text, 120));
+        }
+      }
+    } catch {
+      katexErrorCount += 1;
+      status = "katex_error";
+      reason = "katex_exception";
+      if (katexErrorSamples.length < 3) {
+        katexErrorSamples.push(clipText(token.text, 120));
+      }
+    }
+    if (tokenStatuses.length < 64) {
+      tokenStatuses.push({
+        tokenText: clipText(token.text, 180),
+        status,
+        displayMode: token.displayMode,
+        openDelimiter: token.openDelimiter || null,
+        closeDelimiter: token.closeDelimiter || null,
+        reason,
+      });
+    }
+  }
+  for (const ignored of bareIgnoredDetails) {
+    if (tokenStatuses.length >= 64) break;
+    tokenStatuses.push({
+      tokenText: ignored.candidate,
+      status: "ignored_reason",
+      displayMode: null,
+      openDelimiter: null,
+      closeDelimiter: null,
+      reason: ignored.reason,
+    });
+  }
+  const bareMathCount = mathTokens.filter(
+    (token) => token.openDelimiter === "" && token.closeDelimiter === "",
+  ).length;
+  return {
+    sourceChars: text.length,
+    tokenCount: tokens.length,
+    mathTokenCount: mathTokens.length,
+    delimiterMathCount: mathTokens.length - bareMathCount,
+    bareMathCount,
+    katexErrorCount,
+    bareCandidateCount,
+    bareAcceptedCount,
+    bareIgnoredCount,
+    katexErrorSamples,
+    bareIgnoredSamples,
+    tokenStatuses,
+  };
+}
+
 function asObjectRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -4319,6 +4545,23 @@ function buildHelixAskDebugContextSummary(
             : 0,
       }
     : null;
+  const normalizeReasonList = (value: string[] | string | undefined): string[] => {
+    if (Array.isArray(value)) {
+      return value
+        .filter((entry) => typeof entry === "string")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+    }
+    if (typeof value === "string" && value.trim()) {
+      return value
+        .split(/[;,|]/g)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+    }
+    return [];
+  };
   const summary: Record<string, unknown> = {
     contextFiles,
     contextFileCount: contextFiles.length,
@@ -4393,6 +4636,86 @@ function buildHelixAskDebugContextSummary(
         ? debug?.stage05_two_pass_batches
         : null,
     stage05OverflowPolicy: debug?.stage05_overflow_policy ?? null,
+    intentContractHash:
+      typeof debug?.intent_contract_hash === "string" ? debug?.intent_contract_hash : null,
+    intentContractMutationDetected:
+      typeof debug?.intent_contract_mutation_detected === "boolean"
+        ? debug?.intent_contract_mutation_detected
+        : null,
+    equationCandidateTotal:
+      typeof debug?.equation_candidate_total === "number" && Number.isFinite(debug?.equation_candidate_total)
+        ? debug?.equation_candidate_total
+        : null,
+    equationCandidateRejectedTotal:
+      typeof debug?.equation_candidate_rejected_total === "number" &&
+      Number.isFinite(debug?.equation_candidate_rejected_total)
+        ? debug?.equation_candidate_rejected_total
+        : null,
+    equationCandidateRejectedReasons: normalizeReasonList(debug?.equation_candidate_rejected_reasons),
+    equationSelectorPrimaryConfidence:
+      typeof debug?.equation_selector_primary_confidence === "number" &&
+      Number.isFinite(debug?.equation_selector_primary_confidence)
+        ? Number(debug?.equation_selector_primary_confidence.toFixed(2))
+        : null,
+    equationSelectorPrimaryFamilyMatch:
+      typeof debug?.equation_selector_primary_family_match === "boolean"
+        ? debug?.equation_selector_primary_family_match
+        : null,
+    equationSelectorSupportCount:
+      typeof debug?.equation_selector_support_count === "number" &&
+      Number.isFinite(debug?.equation_selector_support_count)
+        ? debug?.equation_selector_support_count
+        : null,
+    equationSelectorPrimaryKey:
+      typeof debug?.equation_selector_primary_key === "string"
+        ? debug?.equation_selector_primary_key
+        : null,
+    equationRendererPrimaryKey:
+      typeof debug?.equation_renderer_primary_key === "string"
+        ? debug?.equation_renderer_primary_key
+        : null,
+    equationPrimaryAnchorMatch:
+      typeof debug?.equation_primary_anchor_match === "boolean"
+        ? debug?.equation_primary_anchor_match
+        : null,
+    equationBypassTriggered:
+      typeof debug?.equation_bypass_triggered === "boolean" ? debug?.equation_bypass_triggered : null,
+    equationBypassReason:
+      typeof debug?.equation_bypass_reason === "string" ? debug?.equation_bypass_reason : null,
+    equationRuntimeBudgetStage:
+      typeof debug?.equation_runtime_budget_stage === "string"
+        ? debug?.equation_runtime_budget_stage
+        : null,
+    equationDominantFamily:
+      typeof debug?.equation_dominant_family === "string" ? debug?.equation_dominant_family : null,
+    equationPrimaryClass:
+      typeof debug?.equation_primary_class === "string" ? debug?.equation_primary_class : null,
+    equationPrimaryDerivationLevel:
+      typeof debug?.equation_primary_derivation_level === "string"
+        ? debug?.equation_primary_derivation_level
+        : null,
+    equationPrimaryScore:
+      typeof debug?.equation_primary_score === "number" && Number.isFinite(debug?.equation_primary_score)
+        ? Number(debug?.equation_primary_score.toFixed(2))
+        : null,
+    equationRejectedCount:
+      typeof debug?.equation_rejected_count === "number" && Number.isFinite(debug?.equation_rejected_count)
+        ? debug?.equation_rejected_count
+        : null,
+    equationRejectedReasons: normalizeReasonList(debug?.equation_rejected_reasons),
+    equationSecondaryCrossTopicCount:
+      typeof debug?.equation_secondary_cross_topic_count === "number" &&
+      Number.isFinite(debug?.equation_secondary_cross_topic_count)
+        ? debug?.equation_secondary_cross_topic_count
+        : null,
+    shadowPrimaryKey:
+      typeof debug?.shadow_primary_key === "string" ? debug?.shadow_primary_key : null,
+    shadowPrimaryAnchorMatch:
+      typeof debug?.shadow_primary_anchor_match === "boolean" ? debug?.shadow_primary_anchor_match : null,
+    shadowSymbolHitRate:
+      typeof debug?.shadow_symbol_hit_rate === "number" && Number.isFinite(debug?.shadow_symbol_hit_rate)
+        ? Number(debug?.shadow_symbol_hit_rate.toFixed(4))
+        : null,
   };
   return summary;
 }
@@ -7603,6 +7926,17 @@ export function HelixAskPill({
       mathTokens.forEach((token, index) => {
         if (token.kind === "text") {
           parts.push(...renderHelixAskTextWithPathLinks(token.text, `text-${index}`));
+          return;
+        }
+        if (isLikelyCodeStyleMathToken(token)) {
+          parts.push(
+            <code
+              key={`math-code-${index}`}
+              className="mx-0.5 rounded border border-slate-700 bg-slate-950/70 px-1 py-0.5 font-mono text-[0.9em] text-emerald-200"
+            >
+              {token.text}
+            </code>,
+          );
           return;
         }
         try {

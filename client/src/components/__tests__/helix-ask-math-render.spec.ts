@@ -2,10 +2,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 let tokenizeHelixAskMathTokens: typeof import("@/components/helix/HelixAskPill").tokenizeHelixAskMathTokens;
 let hasHelixAskRenderableMath: typeof import("@/components/helix/HelixAskPill").hasHelixAskRenderableMath;
+let buildHelixAskMathRenderDebugForText: typeof import("@/components/helix/HelixAskPill").buildHelixAskMathRenderDebugForText;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ tokenizeHelixAskMathTokens, hasHelixAskRenderableMath } = await import(
+  ({ tokenizeHelixAskMathTokens, hasHelixAskRenderableMath, buildHelixAskMathRenderDebugForText } = await import(
     "@/components/helix/HelixAskPill"
   ));
 });
@@ -54,5 +55,69 @@ describe("tokenizeHelixAskMathTokens", () => {
     expect(tokens).toHaveLength(1);
     expect(tokens[0]).toMatchObject({ kind: "text", text });
     expect(hasHelixAskRenderableMath(text)).toBe(false);
+  });
+
+  it("does not treat metadata score assignments as equations", () => {
+    const text = "Rejected Candidates: score=84.7";
+    const tokens = tokenizeHelixAskMathTokens(text);
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toMatchObject({ kind: "text", text });
+    expect(hasHelixAskRenderableMath(text)).toBe(false);
+  });
+
+  it("reports math formatting debug stats including ignored candidates", () => {
+    const debug = buildHelixAskMathRenderDebugForText(
+      "tau = hbar / DeltaE\nfoo = bar",
+    );
+    expect(debug).not.toBeNull();
+    expect(debug?.bareCandidateCount).toBe(2);
+    expect(debug?.bareAcceptedCount).toBe(1);
+    expect(debug?.bareIgnoredCount).toBe(1);
+    expect(debug?.mathTokenCount).toBeGreaterThanOrEqual(1);
+    expect(debug?.tokenStatuses.some((status) => status.status === "formatted")).toBe(true);
+    expect(
+      debug?.tokenStatuses.some(
+        (status) => status.status === "ignored_reason" && status.reason === "rhs_low_math_signal",
+      ),
+    ).toBe(true);
+  });
+
+  it("reports katex errors for invalid latex segments", () => {
+    const debug = buildHelixAskMathRenderDebugForText("Bad $\\sqrt{$ token.");
+    expect(debug).not.toBeNull();
+    expect(debug?.mathTokenCount).toBe(1);
+    expect(debug?.katexErrorCount).toBe(1);
+    expect(debug?.katexErrorSamples.length).toBeGreaterThan(0);
+    expect(debug?.tokenStatuses.some((status) => status.status === "katex_error")).toBe(true);
+  });
+
+  it("supports final-answer equation blocks with anchor lines and latex", () => {
+    const debug = buildHelixAskMathRenderDebugForText(
+      [
+        "Primary Equation (Verified):",
+        "- [shared/collapse-benchmark.ts:L571] rho_eff_kg_m3 = E_G_J / (Math.max(1e-30, C2 * V_c_m3))",
+        "- $\\tau = \\hbar / \\Delta E$",
+      ].join("\n"),
+    );
+    expect(debug).not.toBeNull();
+    expect(debug?.mathTokenCount).toBeGreaterThanOrEqual(2);
+    expect(debug?.tokenStatuses.some((status) => status.status === "formatted")).toBe(true);
+    expect(debug?.tokenStatuses.some((status) => /rho_eff_kg_m3/.test(status.tokenText))).toBe(true);
+  });
+
+  it("marks code-style equation tokens as formatted plaintext instead of katex_error", () => {
+    const debug = buildHelixAskMathRenderDebugForText(
+      "[shared/collapse-benchmark.ts:L570] rho_eff_kg_m3 = E_G_J / (Math.max(1e-30, C2 * V_c_m3))",
+    );
+    expect(debug).not.toBeNull();
+    expect(debug?.katexErrorCount).toBe(0);
+    expect(
+      debug?.tokenStatuses.some(
+        (status) =>
+          status.status === "formatted" &&
+          status.reason === "code_style_plaintext" &&
+          /rho_eff_kg_m3/.test(status.tokenText),
+      ),
+    ).toBe(true);
   });
 });
