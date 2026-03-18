@@ -1886,4 +1886,66 @@ export const mathStageRegistry: MathStageEntry[] = [
       zeta: "1",
     },
   },
+  {
+    tag: "HALOBANK_SOLAR",
+    module: "server/modules/halobank-solar/time-core.ts",
+    stage: "reduced-order",
+    notes: "Deterministic UTC/TAI/TT/TCG/TDB/TCB conversion core for HaloBank solar proofs.",
+    checks: [{ type: "test", path: "tests/halobank-solar-routes.spec.ts" }],
+    units: {
+      tai_minus_utc_s: "T",
+      tt_minus_utc_s: "T",
+      tdb_minus_tt_s: "T",
+      tcb_minus_tdb_s: "T",
+      tcg_minus_tt_s: "T",
+    },
+  },
+  {
+    tag: "HALOBANK_SOLAR",
+    module: "server/modules/halobank-solar/ephemeris-core.ts",
+    stage: "diagnostic",
+    notes: "Deterministic vector state core with BCRS/GCRS framing, observer handling, and compatibility exports.",
+    checks: [
+      { type: "test", path: "tests/halobank-solar-routes.spec.ts" },
+      { type: "snapshot", path: "tests/halobank-solar-routes.spec.ts" },
+    ],
+    units: {
+      pos_AU: "L",
+      vel_AU_per_day: "L T^-1",
+      light_time_s: "T",
+      ra_deg: "1",
+      dec_deg: "1",
+    },
+  },
+  {
+    tag: "HALOBANK_SOLAR",
+    module: "server/modules/halobank-solar/derived.ts",
+    stage: "diagnostic",
+    notes: "Derived proof modules for Mercury precession, eclipse timing, and resonance-libration gates.",
+    checks: [
+      { type: "test", path: "tests/halobank-solar-derived.spec.ts" },
+      { type: "snapshot", path: "tests/halobank-solar-derived.spec.ts" },
+    ],
+    units: {
+      mercury_arcsec_per_century: "1",
+      eclipse_contact_gap_deg: "1",
+      resonance_theta_span_deg: "1",
+      resonance_ratio_error: "1",
+    },
+  },
+  {
+    tag: "HALOBANK_SOLAR",
+    module: "server/routes/halobank-solar.ts",
+    stage: "diagnostic",
+    notes: "API contracts for vectors and derived proof modules with deterministic provenance/fail-id gate semantics.",
+    checks: [
+      { type: "test", path: "tests/halobank-solar-routes.spec.ts" },
+      { type: "test", path: "tests/halobank-solar-derived.spec.ts" },
+      { type: "snapshot", path: "tests/halobank-solar-routes.spec.ts" },
+    ],
+    units: {
+      gate_delta_value: "varies",
+      gate_delta_limit: "varies",
+    },
+  },
 ];

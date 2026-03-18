@@ -11,7 +11,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - derivation pass all waves: true
 - provenance commit valid all waves: true
 - replay pass all waves: true
-- provenance commit: 0dc5985b2ff02623e68be3c51019f32e641137a6
+- provenance commit: 7e8cc8952db5649e54d797a3786bd85e3fb0e96b
 - provenance freshness vs HEAD: fresh
 - canonical-authoritative statement: canonical campaign decision remains authoritative; sampling/K provenance evidence is fail-closed.
 

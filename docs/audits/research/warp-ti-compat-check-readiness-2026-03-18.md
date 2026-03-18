@@ -1,4 +1,4 @@
-# Timing Compatibility Check (2026-03-18T01:47:26.900Z)
+# Timing Compatibility Check (2026-03-18T02:05:31.748Z)
 
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 

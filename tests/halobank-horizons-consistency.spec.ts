@@ -64,7 +64,7 @@ describe("halobank horizons consistency gate", () => {
 
     expect(result.ok).toBe(true);
     expect(result.ephemeris?.consistency.verdict).toBe("FAIL");
-    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_OUT_OF_ENVELOPE");
+    expect(result.ephemeris?.consistency.firstFailId).toBe("HALOBANK_HORIZONS_RESIDUAL_DRIFT_OUT_OF_ENVELOPE");
     expect(result.ephemeris?.provenance.evidence.residualStatus).toBe("out_of_envelope");
   });
 

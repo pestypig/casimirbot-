@@ -1,0 +1,34 @@
+{
+  "schema_version": "halobank.solar.kernel.bundle/1",
+  "bundle_id": "DE440-SURROGATE-2026.03",
+  "release_policy": "pinned-manual-promotion",
+  "epoch_range": {
+    "start_iso": "1900-01-01T00:00:00.000Z",
+    "end_iso": "2100-12-31T23:59:59.000Z"
+  },
+  "assets": [
+    {
+      "id": "de440-surrogate",
+      "kind": "spk",
+      "path": "node_modules/astronomy-engine/astronomy.js",
+      "digest": "sha256:729c0ce37cc1a8096034a689039a5f04585ee8184177c638e8c74dec4fa3185a"
+    },
+    {
+      "id": "generic-earth-rotation-surrogate",
+      "kind": "pck",
+      "path": "node_modules/astronomy-engine/astronomy.js",
+      "digest": "sha256:729c0ce37cc1a8096034a689039a5f04585ee8184177c638e8c74dec4fa3185a"
+    },
+    {
+      "id": "leap-seconds-table-v1",
+      "kind": "lsk",
+      "path": "server/modules/halobank-solar/time-core.ts",
+      "digest": "sha256:5c789297be14cc89bf6c651aca33c21bfb105cc752580c6af6314de6f979f7ac"
+    }
+  ],
+  "signature": {
+    "alg": "sha256",
+    "signed_payload_hash": "sha256:1de978b6bae6b14a2d51e664c04ef8799a2e54197475e59622b2bba0a8b01136",
+    "signer": "halobank-solar-local-signer"
+  }
+}

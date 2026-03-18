@@ -4,8 +4,8 @@
 
 ## Result
 - artifact_type: `integrity_parity_suite/v1`
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
-- checksum: `5b81139240691b04764d842811a40d19c134bb6a255a166429c030f79ea16b40`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
+- checksum: `80ebb4ad519e3a67bea8d8c828f1f2fb9f59a5189618abfc171a8a232ed7c534`
 - final_parity_verdict: `PASS`
 - blocker_count: `0`
 
@@ -91,16 +91,16 @@
 ## Casimir Certificate
 - verdict: `PASS`
 - firstFail: `null`
-- traceId: `adapter:2c798dee-1ad3-4ae4-a1b0-eba7a7c9f719`
-- runId: `32884`
+- traceId: `adapter:9fe67bc2-a830-4d4f-9b16-1753063d3734`
+- runId: `32888`
 - certificateHash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
 - integrityOk: `true`
 - status: `GREEN`
 
 ## Repeatability
-- same_commit_prior_found: `true`
+- same_commit_prior_found: `false`
 - matches_prior_checksum: `true`
-- prior_checksum: `a0479849290edced86db0c0abd3fe011313f103d301c7769498eab6f326adf43`
+- prior_checksum: `e49fba94b3cb7d09a485c7edaa46ff8dfa971c19d82607ef42565c4150a114b2`
 
 ## Executed Steps
 | id | command | status |

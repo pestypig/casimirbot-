@@ -4,10 +4,10 @@
 
 ## Result
 - artifact_type: `promotion_readiness_suite/v1`
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
 - final_readiness_verdict: `PARTIAL`
 - readiness_gate_pass: `false`
-- checksum: `06cf116d3552b81ed79b47eea1334728ef3d7be11445d0fc4251a8527dbffbee`
+- checksum: `d69155191447fcd2a64ab17cc2b3116e625f7262eec1a88c2923f744c3756629`
 
 ## Coverage
 | lane | reportable_ready | congruent | incongruent | unknown | blocked_reasons |

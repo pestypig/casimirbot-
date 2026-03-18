@@ -1,7 +1,7 @@
 {
   "date": "2026-02-26",
-  "commitHash": "0dc5985b2ff02623e68be3c51019f32e641137a6",
-  "headCommitHash": "0dc5985b2ff02623e68be3c51019f32e641137a6",
+  "commitHash": "7e8cc8952db5649e54d797a3786bd85e3fb0e96b",
+  "headCommitHash": "7e8cc8952db5649e54d797a3786bd85e3fb0e96b",
   "commitHashShapeValid": true,
   "commitHashResolvable": true,
   "commitHashMatchesHead": true,
@@ -177,28 +177,28 @@
       {
         "field": "metricStressRhoSiMean_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.018422079157393162,
+        "slopeToMarginRatioRawComputed": -0.018512698345788215,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "metricT00Si_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.018422079157393162,
+        "slopeToMarginRatioRawComputed": -0.018512698345788215,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "rhoCoupledShadow_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.036844158314786324,
+        "slopeToMarginRatioRawComputed": -0.03702539669157643,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },
       {
         "field": "rhoMetric_Jm3",
         "estimationMode": "linear_slope_reference_substitution",
-        "slopeToMarginRatioRawComputed": -0.018422079157393162,
+        "slopeToMarginRatioRawComputed": -0.018512698345788215,
         "counterfactualMarginRatioRawComputed": 0.12890679702998564,
         "counterfactualPass": true
       },

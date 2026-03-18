@@ -1,4 +1,4 @@
-# SEM+Ellipsometry Compatibility Check (2026-03-18T01:47:30.220Z)
+# SEM+Ellipsometry Compatibility Check (2026-03-18T02:05:34.461Z)
 
 This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.
 

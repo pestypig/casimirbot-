@@ -5,7 +5,7 @@
   "recovery_goal": "sem_ellipsometry_publication_overlay",
   "success_bar": "map_only",
   "baseline_reference": {
-    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-17.json",
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-18.json",
     "keys": [
       "marginRatioRaw",
       "marginRatioRawComputed",

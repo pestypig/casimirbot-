@@ -1,0 +1,24 @@
+{
+  "schema_version": "halobank.solar.thresholds/1",
+  "epoch_window": {
+    "start_iso": "1900-01-01T00:00:00.000Z",
+    "end_iso": "2100-12-31T23:59:59.000Z"
+  },
+  "modules": {
+    "mercury_precession": {
+      "target_arcsec_per_century": 42.98,
+      "pass_tolerance_arcsec_per_century": 6.0,
+      "warn_tolerance_arcsec_per_century": 12.0,
+      "min_perihelion_events": 20
+    },
+    "earth_moon_eclipse_timing": {
+      "max_contact_separation_deg": 0.15,
+      "event_time_tolerance_s": 5400
+    },
+    "resonance_libration": {
+      "libration_span_deg_max": 300,
+      "ratio_tolerance": 0.25
+    }
+  }
+}
+

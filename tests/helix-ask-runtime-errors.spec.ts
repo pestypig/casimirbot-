@@ -125,6 +125,215 @@ describe("non-report guard ordering for runtime fallback", () => {
   });
 });
 
+describe("helix ask universal answer plan shadow", () => {
+  it("classifies equation prompts into equation_formalism profile", () => {
+    const question = "Explain the equation of the collapse of the wave function.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: true,
+      definitionFocus: false,
+      queryConstraints: constraints,
+    });
+    expect(family).toBe("equation_formalism");
+  });
+
+  it("classifies code-path asks into implementation profile", () => {
+    const question = "Where in repo is calculateNatarioWarpBubble implemented?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus: false,
+      queryConstraints: constraints,
+    });
+    expect(family).toBe("implementation_code_path");
+  });
+
+  it("builds a shadow answer plan and validates equation section structure", () => {
+    const question = "Explain the equation of the collapse of the wave function.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const intentContract = __testHelixAskReliabilityGuards.buildHelixAskIntentContract({
+      question,
+      queryConstraints: constraints,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "hybrid",
+      queryConstraints: constraints,
+      equationPrompt: true,
+      definitionFocus: false,
+      equationIntentContract: intentContract,
+      requiredOutputs: intentContract.required_outputs,
+      selectorPrimaryKey: "docs/dp_collapse_derivation.md:L5",
+      selectorLocked: true,
+      selectorFamily: "collapse",
+      allowedCitations: ["docs/dp_collapse_derivation.md", "server/services/mixer/collapse.ts"],
+      contextFileCount: 2,
+      lockIdSeed: "ask:test",
+    });
+    const rendered = [
+      "Primary Topic: collapse",
+      "",
+      "Primary Equation (Verified):",
+      "- [docs/dp_collapse_derivation.md:L5] tau = hbar / DeltaE",
+      "",
+      "Mechanism Explanation:",
+      "1. Derived relation in collapse family.",
+      "",
+      "Sources: docs/dp_collapse_derivation.md, server/services/mixer/collapse.ts",
+    ].join("\n");
+    const validation = __testHelixAskReliabilityGuards.validateHelixAskAnswerPlanShadow({
+      plan,
+      renderedText: rendered,
+    });
+    expect(plan.prompt_family).toBe("equation_formalism");
+    expect(plan.prompt_specificity).toBe("mid");
+    expect(validation.schema_valid).toBe(true);
+    expect(validation.family_format_accuracy).toBe(1);
+    expect(validation.fail_reasons).toEqual([]);
+  });
+
+  it("detects anchor-integrity and debug-leak violations", () => {
+    const question = "What is a warp bubble?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: ["docs/knowledge/warp/warp-bubble.md"],
+      contextFileCount: 1,
+      lockIdSeed: "ask:warp",
+    });
+    const rendered = [
+      "Definition: A warp bubble is a modeled spacetime region in this repo.",
+      "Why it matters: It bounds shift-field behavior.",
+      "Key terms: Natario, expansion scalar.",
+      "traceId=ask:abc123",
+      "Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/natario-warp.ts",
+    ].join("\n");
+    const validation = __testHelixAskReliabilityGuards.validateHelixAskAnswerPlanShadow({
+      plan,
+      renderedText: rendered,
+    });
+    expect(validation.fail_reasons).toContain("anchor_integrity_violation");
+    expect(validation.fail_reasons).toContain("debug_leak");
+    expect(validation.anchor_integrity_violations).toContain("modules/warp/natario-warp.ts");
+    expect(validation.debug_leak_hits).toContain("trace_id_debug");
+  });
+
+  it("builds deterministic family degrade output for mechanism prompts", () => {
+    const question = "How does the collapse benchmark pipeline work in this codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: ["server/services/mixer/collapse.ts"],
+      contextFileCount: 1,
+      lockIdSeed: "ask:mechanism",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText: "Collapse benchmark flow computes strategy outputs from bounded evidence.",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("mechanism_process");
+    expect(degraded).toMatch(/^Mechanism Explanation:/m);
+    expect(degraded).toMatch(/^Inputs\/Outputs:/m);
+    expect(degraded).toMatch(/^Constraints:/m);
+    expect(degraded).toMatch(/^Sources:/m);
+  });
+
+  it("produces deterministic lock hash for equivalent selection state", () => {
+    const seed = {
+      selectorLocked: true,
+      selectorPrimaryKey: "docs/dp_collapse_derivation.md:L5",
+      intentContractHash: "intent-hash-1",
+    };
+    const hashA = __testHelixAskReliabilityGuards.computeEquationSelectionLockHash(seed);
+    const hashB = __testHelixAskReliabilityGuards.computeEquationSelectionLockHash(seed);
+    const hashC = __testHelixAskReliabilityGuards.computeEquationSelectionLockHash({
+      ...seed,
+      selectorPrimaryKey: "docs/dp_collapse_derivation.md:L23",
+    });
+    expect(hashA).toBe(hashB);
+    expect(hashA).not.toBe(hashC);
+  });
+
+  it("downgrades verified equation label when integrity guard fails", () => {
+    const verified = [
+      "Primary Topic: collapse",
+      "",
+      "Primary Equation (Verified):",
+      "- [docs/dp_collapse_derivation.md:L5] tau = hbar / DeltaE",
+      "",
+      "Mechanism Explanation:",
+      "1. Derived relation in collapse family.",
+      "",
+      "Sources: docs/dp_collapse_derivation.md",
+    ].join("\n");
+    const downgraded =
+      __testHelixAskReliabilityGuards.downgradeRenderedPrimaryEquationToTentative({
+        answer: verified,
+        reason: "code_path_slot_missing",
+      });
+    expect(downgraded).toMatch(/^Primary Equation \(Tentative\):/m);
+    expect(downgraded).toMatch(/Uncertainty: verified label downgraded/i);
+  });
+
+  it("passes verified integrity when lock, anchor, and citation constraints are satisfied", () => {
+    const answer = [
+      "Primary Topic: collapse",
+      "",
+      "Primary Equation (Verified):",
+      "- [docs/dp_collapse_derivation.md:L5] tau = hbar / DeltaE",
+      "",
+      "Mechanism Explanation:",
+      "1. Derived relation in collapse family.",
+      "",
+      "Sources: docs/dp_collapse_derivation.md",
+    ].join("\n");
+    const integrity = __testHelixAskReliabilityGuards.evaluateRenderedEquationVerifiedIntegrity({
+      answer,
+      selectorAuthorityLock: true,
+      selectorPrimaryKey: "docs/dp_collapse_derivation.md:L5",
+      allowedCitations: ["docs/dp_collapse_derivation.md"],
+      stage05MissingSlots: [],
+    });
+    expect(integrity.pass).toBe(true);
+    expect(integrity.reason).toBeNull();
+  });
+
+  it("fails verified integrity when code_path evidence is missing", () => {
+    const answer = [
+      "Primary Topic: collapse",
+      "",
+      "Primary Equation (Verified):",
+      "- [docs/dp_collapse_derivation.md:L5] tau = hbar / DeltaE",
+      "",
+      "Mechanism Explanation:",
+      "1. Derived relation in collapse family.",
+      "",
+      "Sources: docs/dp_collapse_derivation.md",
+    ].join("\n");
+    const integrity = __testHelixAskReliabilityGuards.evaluateRenderedEquationVerifiedIntegrity({
+      answer,
+      selectorAuthorityLock: true,
+      selectorPrimaryKey: "docs/dp_collapse_derivation.md:L5",
+      allowedCitations: ["docs/dp_collapse_derivation.md"],
+      stage05MissingSlots: ["code_path"],
+    });
+    expect(integrity.pass).toBe(false);
+    expect(integrity.reason).toBe("code_path_slot_missing");
+  });
+});
+
 describe("helix ask reliability guards", () => {
   it("overrides clarify for grounded repo-required evidence under alignment fail", () => {
     const shouldOverride =

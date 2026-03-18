@@ -20413,6 +20413,17 @@ const HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS = clampNumber(
   1024,
 );
 const HELIX_ASK_EQUATION_STATE_VERSION = "selector_authoritative_v1";
+const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SHADOW_ENABLED =
+  String(process.env.HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SHADOW_ENABLED ?? "1").trim() !== "0";
+const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_VERSION = "helix_answer_plan_v1";
+const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_PROFILE_VERSION = "universal_composer_v1";
+const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_ENABLED =
+  String(process.env.HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_ENABLED ?? "1").trim() !== "0";
+const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY = clampNumber(
+  Number(process.env.HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY ?? 0.8),
+  0,
+  1,
+);
 const HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST = clampNumber(
   Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST ?? 24),
   4,
@@ -21264,6 +21275,515 @@ const assertHelixAskIntentContractStable = (args: {
     expectedHash: args.expectedHash,
     currentHash,
   };
+};
+
+type HelixAskAnswerPlanFamily =
+  | "definition_overview"
+  | "mechanism_process"
+  | "equation_formalism"
+  | "comparison_tradeoff"
+  | "troubleshooting_diagnosis"
+  | "implementation_code_path"
+  | "recommendation_decision"
+  | "general_overview";
+
+type HelixAskAnswerPlanSpecificity = "broad" | "mid" | "specific";
+
+type HelixAskAnswerPlanSection = {
+  id: string;
+  title: string;
+  required: boolean;
+};
+
+type HelixAskAnswerPlan = {
+  version: typeof HELIX_ASK_UNIVERSAL_ANSWER_PLAN_VERSION;
+  profile_id: string;
+  profile_version: string;
+  prompt_family: HelixAskAnswerPlanFamily;
+  prompt_specificity: HelixAskAnswerPlanSpecificity;
+  sections: HelixAskAnswerPlanSection[];
+  required_outputs: string[];
+  degrade_path_id: string;
+  selection_lock: {
+    lock_id: string;
+    selector_locked: boolean;
+    selector_primary_key: string | null;
+    selector_family: string | null;
+  };
+  evidence_pack: {
+    allowed_citations: string[];
+    context_file_count: number;
+    evidence_hash: string;
+  };
+};
+
+type HelixAskAnswerPlanShadowValidation = {
+  schema_valid: boolean;
+  fail_reasons: string[];
+  sections_present: string[];
+  required_section_count: number;
+  required_section_present_count: number;
+  family_format_accuracy: number;
+  anchor_integrity_violations: string[];
+  debug_leak_hits: string[];
+  degraded: boolean;
+  degrade_reason: string | null;
+};
+
+type HelixAskAnswerPlanShadowBuildArgs = {
+  question: string;
+  intentDomain: HelixAskDomain;
+  queryConstraints: HelixAskQueryConstraints;
+  equationPrompt: boolean;
+  definitionFocus: boolean;
+  equationIntentContract?: HelixAskIntentContract | null;
+  requiredOutputs?: string[];
+  selectorPrimaryKey?: string | null;
+  selectorLocked?: boolean;
+  selectorFamily?: string | null;
+  lockIdSeed?: string;
+  allowedCitations: string[];
+  contextFileCount: number;
+};
+
+type HelixAskAnswerPlanShadowValidateArgs = {
+  plan: HelixAskAnswerPlan;
+  renderedText: string;
+};
+
+const HELIX_ASK_UNIVERSAL_COMPOSER_DEBUG_LEAK_PATTERNS: Array<{
+  label: string;
+  pattern: RegExp;
+}> = [
+  { label: "timeline_json", pattern: /"id"\s*:\s*"timeline:/i },
+  { label: "reasoning_event", pattern: /\breasoning_(?:final|attempt)\b/i },
+  { label: "debug_context", pattern: /\bdebugContext\b/i },
+  { label: "selector_debug", pattern: /\bequation_selector_[a-z0-9_]+\b/i },
+  { label: "stage05_debug", pattern: /\bstage05_[a-z0-9_]+\b/i },
+  { label: "fallback_taxonomy_debug", pattern: /\bfallback_reason_taxonomy\b/i },
+  { label: "trace_id_debug", pattern: /\btraceId\s*[:=]/i },
+];
+
+const HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS: Record<
+  HelixAskAnswerPlanFamily,
+  HelixAskAnswerPlanSection[]
+> = {
+  definition_overview: [
+    { id: "definition", title: "Definition", required: true },
+    { id: "why_matters", title: "Why it matters", required: true },
+    { id: "key_terms", title: "Key terms", required: true },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  mechanism_process: [
+    { id: "mechanism", title: "Mechanism Explanation", required: true },
+    { id: "inputs_outputs", title: "Inputs/Outputs", required: true },
+    { id: "constraints", title: "Constraints", required: true },
+    { id: "failure_modes", title: "Common failure modes", required: false },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  equation_formalism: [
+    { id: "primary_topic", title: "Primary Topic", required: true },
+    { id: "primary_equation", title: "Primary Equation", required: true },
+    { id: "mechanism", title: "Mechanism Explanation", required: true },
+    { id: "cross_topic", title: "Related Cross-Topic Evidence", required: false },
+    { id: "rejected", title: "Rejected Candidates", required: false },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  comparison_tradeoff: [
+    { id: "option_a", title: "Option A/B", required: true },
+    { id: "differences", title: "Key differences", required: true },
+    { id: "choice", title: "When to choose", required: true },
+    { id: "risks", title: "Risks", required: true },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  troubleshooting_diagnosis: [
+    { id: "symptoms", title: "Symptoms", required: true },
+    { id: "likely_causes", title: "Most likely causes", required: true },
+    { id: "checks", title: "Checks", required: true },
+    { id: "fixes", title: "Fixes", required: true },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  implementation_code_path: [
+    { id: "where_repo", title: "Where in repo", required: true },
+    { id: "call_chain", title: "Call chain", required: true },
+    { id: "key_types", title: "Key structs/types", required: false },
+    { id: "safe_changes", title: "What to change safely", required: false },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  recommendation_decision: [
+    { id: "decision", title: "Decision", required: true },
+    { id: "rationale", title: "Rationale", required: true },
+    { id: "constraints", title: "Constraints", required: true },
+    { id: "risks", title: "Risks", required: true },
+    { id: "fallback", title: "Fallback plan", required: false },
+    { id: "sources", title: "Sources", required: true },
+  ],
+  general_overview: [
+    { id: "summary", title: "Summary", required: true },
+    { id: "evidence", title: "Evidence", required: true },
+    { id: "sources", title: "Sources", required: true },
+  ],
+};
+
+const classifyHelixAskAnswerPlanFamily = (args: {
+  question: string;
+  equationPrompt: boolean;
+  definitionFocus: boolean;
+  queryConstraints: HelixAskQueryConstraints;
+}): HelixAskAnswerPlanFamily => {
+  const question = String(args.question ?? "");
+  if (args.equationPrompt) return "equation_formalism";
+  if (/\b(?:compare|comparison|versus|vs\.?|difference|trade-?off|pros?\b|cons?\b)\b/i.test(question)) {
+    return "comparison_tradeoff";
+  }
+  if (
+    /\b(?:error|fail(?:ed|ing|ure)?|bug|debug|timeout|timed out|connection reset|connection refused|hang|hung|crash|not working|issue|problem)\b/i.test(
+      question,
+    )
+  ) {
+    return "troubleshooting_diagnosis";
+  }
+  if (
+    isImplementationQuestion(question) ||
+    args.queryConstraints.explicitAnchorPaths.length > 0 ||
+    /\b(?:file|path|line|function|module|class|route|endpoint)\b/i.test(question)
+  ) {
+    return "implementation_code_path";
+  }
+  if (/\b(?:recommend|should we|best|choose|decision|go\/no-go|go no-go|prioriti[sz]e|roadmap)\b/i.test(question)) {
+    return "recommendation_decision";
+  }
+  if (args.definitionFocus || isDefinitionQuestion(question)) {
+    return "definition_overview";
+  }
+  if (
+    /\b(?:how|mechanism|process|pipeline|flow|works?|working|derive|causal|why)\b/i.test(question)
+  ) {
+    return "mechanism_process";
+  }
+  return "general_overview";
+};
+
+const classifyHelixAskAnswerPlanSpecificity = (args: {
+  question: string;
+  queryConstraints: HelixAskQueryConstraints;
+  equationPrompt: boolean;
+  equationIntentContract?: HelixAskIntentContract | null;
+  family: HelixAskAnswerPlanFamily;
+}): HelixAskAnswerPlanSpecificity => {
+  if (args.equationPrompt && args.equationIntentContract) {
+    if (args.equationIntentContract.ask_mode === "specific") return "specific";
+    if (args.equationIntentContract.ask_mode === "mid") return "mid";
+    return "broad";
+  }
+  if (
+    args.queryConstraints.explicitAnchorPaths.length > 0 ||
+    /\b(?:file:line|line\s*\d+|quote exact|exact line|around lines?)\b/i.test(args.question)
+  ) {
+    return "specific";
+  }
+  if (args.family === "mechanism_process" || args.family === "comparison_tradeoff") {
+    return "mid";
+  }
+  if (args.family === "implementation_code_path" || args.family === "troubleshooting_diagnosis") {
+    return "mid";
+  }
+  return "broad";
+};
+
+const buildHelixAskAnswerPlanShadow = (
+  args: HelixAskAnswerPlanShadowBuildArgs,
+): HelixAskAnswerPlan => {
+  const family = classifyHelixAskAnswerPlanFamily({
+    question: args.question,
+    equationPrompt: args.equationPrompt,
+    definitionFocus: args.definitionFocus,
+    queryConstraints: args.queryConstraints,
+  });
+  const specificity = classifyHelixAskAnswerPlanSpecificity({
+    question: args.question,
+    queryConstraints: args.queryConstraints,
+    equationPrompt: args.equationPrompt,
+    equationIntentContract: args.equationIntentContract,
+    family,
+  });
+  const sections = HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS[family] ?? HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS.general_overview;
+  const profileId = `${family}:${specificity}`;
+  const lockSeed =
+    args.lockIdSeed?.trim() ||
+    sha256Hex(
+      stableJsonStringify({
+        question: args.question.trim().toLowerCase(),
+        selector_primary_key: args.selectorPrimaryKey ?? null,
+        selector_locked: Boolean(args.selectorLocked),
+      }),
+    ).slice(0, 16);
+  const allowedCitations = normalizeCitations(args.allowedCitations);
+  const evidenceHash = sha256Hex(stableJsonStringify(allowedCitations));
+  const requiredOutputs =
+    args.requiredOutputs?.length && args.equationPrompt
+      ? args.requiredOutputs.slice()
+      : sections.filter((section) => section.required).map((section) => section.title);
+  return {
+    version: HELIX_ASK_UNIVERSAL_ANSWER_PLAN_VERSION,
+    profile_id: profileId,
+    profile_version: HELIX_ASK_UNIVERSAL_ANSWER_PLAN_PROFILE_VERSION,
+    prompt_family: family,
+    prompt_specificity: specificity,
+    sections: sections.map((section) => ({ ...section })),
+    required_outputs: requiredOutputs,
+    degrade_path_id: `${family}_single_path_degrade`,
+    selection_lock: {
+      lock_id: lockSeed,
+      selector_locked: Boolean(args.selectorLocked),
+      selector_primary_key: args.selectorPrimaryKey ?? null,
+      selector_family: args.selectorFamily ?? null,
+    },
+    evidence_pack: {
+      allowed_citations: allowedCitations,
+      context_file_count: Math.max(0, args.contextFileCount),
+      evidence_hash: evidenceHash,
+    },
+  };
+};
+
+const escapeAnswerPlanHeadingRegExp = (input: string): string =>
+  input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const answerPlanSectionPresent = (renderedText: string, section: HelixAskAnswerPlanSection): boolean => {
+  const text = String(renderedText ?? "");
+  if (!text.trim()) return false;
+  if (section.id === "primary_equation") {
+    return /^\s*Primary Equation(?:\s*\([^)]+\))?\s*:/im.test(text);
+  }
+  if (section.id === "cross_topic") {
+    return /^\s*Related Cross-Topic Evidence(?:\s*\([^)]+\))?\s*:/im.test(text);
+  }
+  if (section.id === "rejected") {
+    return /^\s*Rejected Candidates(?:\s*\([^)]+\))?\s*:/im.test(text);
+  }
+  if (section.id === "sources") {
+    return /^\s*Sources?\s*:/im.test(text);
+  }
+  const heading = escapeAnswerPlanHeadingRegExp(section.title);
+  return new RegExp(`(?:^|\\n)\\s*(?:#{1,4}\\s*)?${heading}\\s*:`, "im").test(text);
+};
+
+const validateHelixAskAnswerPlanShadow = (
+  args: HelixAskAnswerPlanShadowValidateArgs,
+): HelixAskAnswerPlanShadowValidation => {
+  const failReasons: string[] = [];
+  const plan = args.plan;
+  const renderedText = String(args.renderedText ?? "");
+  const sections = Array.isArray(plan.sections) ? plan.sections : [];
+  const schemaValid =
+    plan.version === HELIX_ASK_UNIVERSAL_ANSWER_PLAN_VERSION &&
+    Boolean(plan.profile_id) &&
+    Boolean(plan.profile_version) &&
+    sections.length > 0 &&
+    Array.isArray(plan.evidence_pack.allowed_citations);
+  if (!schemaValid) {
+    failReasons.push("schema_invalid");
+  }
+
+  const sectionsPresent = sections
+    .filter((section) => answerPlanSectionPresent(renderedText, section))
+    .map((section) => section.title);
+  const requiredSections = sections.filter((section) => section.required);
+  const requiredPresentCount = requiredSections.filter((section) =>
+    answerPlanSectionPresent(renderedText, section),
+  ).length;
+  const requiredCount = requiredSections.length;
+  const familyFormatAccuracy =
+    requiredCount > 0 ? Number((requiredPresentCount / requiredCount).toFixed(3)) : 1;
+  if (requiredCount > 0 && requiredPresentCount < requiredCount) {
+    failReasons.push("required_sections_missing");
+  }
+
+  const allowedCitationSet = new Set(
+    normalizeCitations(plan.evidence_pack.allowed_citations).map((entry) =>
+      normalizeConstraintPath(entry).toLowerCase(),
+    ),
+  );
+  const citedRefs = normalizeCitations([
+    ...extractFilePathsFromText(renderedText),
+    ...extractCitationTokensFromText(renderedText),
+    ...collectSourcesLineCitationRefs(renderedText),
+  ]);
+  const anchorIntegrityViolations =
+    allowedCitationSet.size === 0
+      ? []
+      : citedRefs
+          .filter((entry) => !isStructuredCitationToken(entry))
+          .filter((entry) => !allowedCitationSet.has(normalizeConstraintPath(entry).toLowerCase()));
+  if (anchorIntegrityViolations.length > 0) {
+    failReasons.push("anchor_integrity_violation");
+  }
+
+  const debugLeakHits = HELIX_ASK_UNIVERSAL_COMPOSER_DEBUG_LEAK_PATTERNS.filter((entry) =>
+    entry.pattern.test(renderedText),
+  ).map((entry) => entry.label);
+  if (debugLeakHits.length > 0) {
+    failReasons.push("debug_leak");
+  }
+
+  const degraded =
+    /\bunified degrade response\b/i.test(renderedText) ||
+    /\bno verified symbol-match\b/i.test(renderedText) ||
+    /\bmissing evidence\b/i.test(renderedText) ||
+    /\buncertainty\b/i.test(renderedText);
+  const degradeReason = /\bno verified symbol-match\b/i.test(renderedText)
+    ? "specific_no_match"
+    : /\bunified degrade response\b/i.test(renderedText)
+      ? "unified_degrade"
+      : /\bmissing evidence\b/i.test(renderedText)
+        ? "missing_evidence"
+        : /\buncertainty\b/i.test(renderedText)
+          ? "uncertainty_label"
+          : null;
+
+  return {
+    schema_valid: schemaValid,
+    fail_reasons: Array.from(new Set(failReasons)),
+    sections_present: sectionsPresent,
+    required_section_count: requiredCount,
+    required_section_present_count: requiredPresentCount,
+    family_format_accuracy: familyFormatAccuracy,
+    anchor_integrity_violations: anchorIntegrityViolations.slice(0, 12),
+    debug_leak_hits: debugLeakHits,
+    degraded,
+    degrade_reason: degradeReason,
+  };
+};
+
+const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
+  plan: HelixAskAnswerPlan;
+  question: string;
+  existingText: string;
+  reason: string;
+}): string => {
+  const normalizedQuestion = String(args.question ?? "").trim();
+  const existingText = String(args.existingText ?? "").trim();
+  const sourceHints = normalizeCitations(args.plan.evidence_pack.allowed_citations).slice(0, 8);
+  const primarySource = sourceHints[0] ?? "server/routes/agi.plan.ts";
+  const evidenceSentence =
+    splitGroundedSentences(existingText).find((entry) => !/^sources?\s*:/i.test(entry)) ??
+    "Current answer draft was normalized through the family degrade path.";
+  const conciseEvidence = ensureSentence(clipAskText(evidenceSentence, 220));
+  const reasonText = args.reason.replace(/[_:]+/g, " ").trim() || "contract guard";
+  const lines: string[] = [];
+  switch (args.plan.prompt_family) {
+    case "definition_overview":
+      lines.push("Definition:");
+      lines.push(
+        `- ${conciseEvidence} [${primarySource}]`,
+      );
+      lines.push("");
+      lines.push("Why it matters:");
+      lines.push(
+        `- This answer used a definition-focused degrade path to preserve grounding while required sections are rebuilt (${reasonText}). [${primarySource}]`,
+      );
+      lines.push("");
+      lines.push("Key terms:");
+      lines.push(`- prompt=${normalizedQuestion || "definition request"}`);
+      lines.push(`- evidence_anchor=${primarySource}`);
+      break;
+    case "mechanism_process":
+      lines.push("Mechanism Explanation:");
+      lines.push(`1. ${conciseEvidence} [${primarySource}]`);
+      lines.push(
+        `2. Family degrade engaged due to ${reasonText}; mechanism details are kept bounded to current evidence.`,
+      );
+      lines.push("");
+      lines.push("Inputs/Outputs:");
+      lines.push("- Inputs: question intent + retrieved evidence paths.");
+      lines.push("- Outputs: bounded explanation with explicit uncertainty.");
+      lines.push("");
+      lines.push("Constraints:");
+      lines.push("- No post-lock anchor substitution.");
+      lines.push("- Style-only cleanup after composition.");
+      break;
+    case "comparison_tradeoff":
+      lines.push("Option A/B:");
+      lines.push(`- A: keep existing draft as-is (${reasonText}).`);
+      lines.push("- B: apply deterministic family compose guard (selected).");
+      lines.push("");
+      lines.push("Key differences:");
+      lines.push("- B enforces section contract and source hygiene.");
+      lines.push("- B suppresses internal debug leakage in user-visible output.");
+      lines.push("");
+      lines.push("When to choose:");
+      lines.push("- Choose B whenever required sections are missing.");
+      lines.push("");
+      lines.push("Risks:");
+      lines.push("- May reduce stylistic variance in exchange for reliability.");
+      break;
+    case "troubleshooting_diagnosis":
+      lines.push("Symptoms:");
+      lines.push(`- Output contract mismatch detected (${reasonText}).`);
+      lines.push("");
+      lines.push("Most likely causes:");
+      lines.push("- Required section omission in final rendering.");
+      lines.push("- Late-stage scaffold/debug residue.");
+      lines.push("");
+      lines.push("Checks:");
+      lines.push("- Verify section headers for the selected family profile.");
+      lines.push("- Verify citations are in locked evidence set.");
+      lines.push("");
+      lines.push("Fixes:");
+      lines.push("- Apply deterministic family degrade and re-run validation.");
+      break;
+    case "implementation_code_path":
+      lines.push("Where in repo:");
+      if (sourceHints.length > 0) {
+        for (const source of sourceHints.slice(0, 3)) {
+          lines.push(`- ${source}`);
+        }
+      } else {
+        lines.push("- No verified path anchors were available in this turn.");
+      }
+      lines.push("");
+      lines.push("Call chain:");
+      lines.push("- This response is in soft-enforce degrade mode; call-chain detail is limited to current evidence.");
+      lines.push("");
+      lines.push("What to change safely:");
+      lines.push("- Tighten retrieval hints with explicit path/symbol anchors, then retry.");
+      break;
+    case "recommendation_decision":
+      lines.push("Decision:");
+      lines.push("- Use deterministic family degrade output for this turn.");
+      lines.push("");
+      lines.push("Rationale:");
+      lines.push(`- Required answer sections were incomplete (${reasonText}).`);
+      lines.push("");
+      lines.push("Constraints:");
+      lines.push("- Preserve grounding to locked evidence only.");
+      lines.push("- No post-lock anchor mutation.");
+      lines.push("");
+      lines.push("Risks:");
+      lines.push("- Reduced prose freedom relative to full compose path.");
+      lines.push("");
+      lines.push("Fallback plan:");
+      lines.push("- Retry with narrower prompt scope and explicit evidence anchors.");
+      break;
+    case "equation_formalism":
+      // Equation degrade stays on the dedicated equation path.
+      lines.push(existingText || "Primary Topic: generic");
+      break;
+    case "general_overview":
+    default:
+      lines.push("Summary:");
+      lines.push(`- ${conciseEvidence} [${primarySource}]`);
+      lines.push("");
+      lines.push("Evidence:");
+      lines.push(
+        `- Family degrade applied due to ${reasonText}; output kept deterministic and grounded to available sources.`,
+      );
+      break;
+  }
+  lines.push("");
+  lines.push(`Sources: ${sourceHints.length > 0 ? sourceHints.join(", ") : primarySource}`);
+  return lines.join("\n").trim();
 };
 
 const resolveEquationRequiredEvidenceTags = (question: string): string[] => {
@@ -22957,6 +23477,173 @@ const assertRenderedPrimaryMatchesSelection = (args: {
     rendererPrimaryKey,
     match: rendererPrimaryKey === args.selectorPrimaryKey,
   };
+};
+
+const computeEquationSelectionLockHash = (args: {
+  selectorLocked: boolean;
+  selectorPrimaryKey: string | null;
+  intentContractHash: string;
+}): string =>
+  sha256Hex(
+    stableJsonStringify({
+      selector_locked: Boolean(args.selectorLocked),
+      selector_primary_key: args.selectorPrimaryKey ?? null,
+      intent_contract_hash: args.intentContractHash,
+    }),
+  );
+
+type RenderedPrimaryEquationPayload = {
+  label: "verified" | "tentative" | "general_reference" | "unknown";
+  path: string | null;
+  line: number | null;
+  equation: string | null;
+};
+
+const extractRenderedPrimaryEquationPayload = (answer: string): RenderedPrimaryEquationPayload => {
+  const text = String(answer ?? "");
+  const defaultPayload: RenderedPrimaryEquationPayload = {
+    label: "unknown",
+    path: null,
+    line: null,
+    equation: null,
+  };
+  if (!text.trim()) return defaultPayload;
+  const lines = text.split(/\r?\n/);
+  const headingIndex = lines.findIndex((line) =>
+    /^\s*Primary Equation(?:\s*\([^)]+\))?\s*:/i.test(line),
+  );
+  if (headingIndex < 0) return defaultPayload;
+  const heading = lines[headingIndex] ?? "";
+  const labelRaw = heading.match(/\(\s*([^)]+)\s*\)/i)?.[1]?.trim().toLowerCase() ?? "";
+  let label: RenderedPrimaryEquationPayload["label"] = "unknown";
+  if (labelRaw.includes("verified")) label = "verified";
+  else if (labelRaw.includes("tentative")) label = "tentative";
+  else if (labelRaw.includes("general")) label = "general_reference";
+
+  let candidateLine = "";
+  for (let index = headingIndex + 1; index < lines.length; index += 1) {
+    const raw = String(lines[index] ?? "").trim();
+    if (!raw) break;
+    if (
+      /^(?:Primary Topic:|Mechanism Explanation:|Related Cross-Topic Evidence|Rejected Candidates|Sources:|Proof|Key files|Context sources|Convergence snapshot|Capsule guards|Reasoning event log)\b/i.test(
+        raw,
+      )
+    ) {
+      break;
+    }
+    if (/^-/.test(raw)) {
+      candidateLine = raw;
+      break;
+    }
+    if (!candidateLine) candidateLine = raw;
+  }
+  if (!candidateLine) {
+    return { ...defaultPayload, label };
+  }
+  const keyMatch = candidateLine.match(/\[([^\]\n]+):L(\d+)\]/i);
+  const path = keyMatch?.[1]?.trim() ?? null;
+  const line =
+    keyMatch?.[2] && Number.isFinite(Number(keyMatch[2])) ? Number(keyMatch[2]) : null;
+  const withoutBullet = candidateLine.replace(/^\-\s*/, "");
+  const withoutCitation = withoutBullet.replace(/\[[^\]\n]+:L\d+\]\s*/i, "").trim();
+  const equation = extractConciseEquationFragment(withoutCitation) ?? (withoutCitation || null);
+  return {
+    label,
+    path,
+    line,
+    equation,
+  };
+};
+
+const downgradeRenderedPrimaryEquationToTentative = (args: {
+  answer: string;
+  reason: string;
+}): string => {
+  const text = String(args.answer ?? "");
+  if (!text.trim()) return text;
+  if (!/^\s*Primary Equation\s*\(\s*Verified\s*\)\s*:/im.test(text)) return text;
+  let downgraded = text.replace(
+    /^\s*Primary Equation\s*\(\s*Verified\s*\)\s*:/im,
+    "Primary Equation (Tentative):",
+  );
+  if (!/^\s*-\s*Uncertainty:/im.test(downgraded)) {
+    const lines = downgraded.split(/\r?\n/);
+    const headingIndex = lines.findIndex((line) =>
+      /^\s*Primary Equation(?:\s*\([^)]+\))?\s*:/i.test(line),
+    );
+    if (headingIndex >= 0) {
+      let insertAt = headingIndex + 1;
+      for (let index = headingIndex + 1; index < lines.length; index += 1) {
+        const raw = String(lines[index] ?? "").trim();
+        if (!raw) {
+          insertAt = index;
+          break;
+        }
+        if (
+          /^(?:Mechanism Explanation:|Related Cross-Topic Evidence|Rejected Candidates|Sources:|Proof|Key files|Context sources)\b/i.test(
+            raw,
+          )
+        ) {
+          insertAt = index;
+          break;
+        }
+        insertAt = index + 1;
+      }
+      lines.splice(
+        insertAt,
+        0,
+        `- Uncertainty: verified label downgraded due to equation integrity guard (${args.reason}).`,
+      );
+      downgraded = lines.join("\n");
+    }
+  }
+  return downgraded;
+};
+
+const evaluateRenderedEquationVerifiedIntegrity = (args: {
+  answer: string;
+  selectorAuthorityLock: boolean;
+  selectorPrimaryKey: string | null;
+  allowedCitations: string[];
+  stage05MissingSlots: string[];
+}): { pass: boolean; reason: string | null } => {
+  const payload = extractRenderedPrimaryEquationPayload(args.answer);
+  if (payload.label !== "verified") return { pass: true, reason: null };
+  if (!args.selectorAuthorityLock || !args.selectorPrimaryKey) {
+    return { pass: false, reason: "selector_lock_missing" };
+  }
+  if (args.stage05MissingSlots.includes("code_path")) {
+    return { pass: false, reason: "code_path_slot_missing" };
+  }
+  const rendererPrimary = extractEquationPrimaryKeyFromRenderedAnswer(args.answer);
+  if (!rendererPrimary || rendererPrimary !== args.selectorPrimaryKey) {
+    return { pass: false, reason: "primary_key_mismatch" };
+  }
+  const pathFromKey = args.selectorPrimaryKey.split(":L")[0] ?? "";
+  const allowedCitationSet = new Set(
+    normalizeCitations(args.allowedCitations).map((entry) => normalizeConstraintPath(entry).toLowerCase()),
+  );
+  if (pathFromKey && allowedCitationSet.size > 0) {
+    if (!allowedCitationSet.has(normalizeConstraintPath(pathFromKey).toLowerCase())) {
+      return { pass: false, reason: "anchor_not_in_locked_evidence" };
+    }
+  }
+  const equationLine = payload.equation ?? "";
+  const equationPath = payload.path ?? pathFromKey;
+  if (!equationLine || !equationPath) {
+    return { pass: false, reason: "equation_line_missing" };
+  }
+  if (
+    /\b(?:mechanism explanation|general-reference baseline|repo-grounded support|challenge status)\b/i.test(
+      equationLine,
+    )
+  ) {
+    return { pass: false, reason: "equation_line_contains_narrative" };
+  }
+  if (!isEquationExactLineEligible({ line: equationLine, path: equationPath })) {
+    return { pass: false, reason: "equation_line_not_exact_eligible" };
+  }
+  return { pass: true, reason: null };
 };
 
 const resolveEquationSourceFragmentFromPrimaryKey = (primaryKey: string): string | null => {
@@ -26302,8 +26989,15 @@ export const __testHelixAskReliabilityGuards = {
   buildHelixAskIntentContract,
   hashHelixAskIntentContract,
   assertHelixAskIntentContractStable,
+  classifyHelixAskAnswerPlanFamily,
+  buildHelixAskAnswerPlanShadow,
+  validateHelixAskAnswerPlanShadow,
+  buildHelixAskUniversalFamilyDegradeAnswer,
   extractEquationPrimaryKeyFromRenderedAnswer,
   assertRenderedPrimaryMatchesSelection,
+  computeEquationSelectionLockHash,
+  evaluateRenderedEquationVerifiedIntegrity,
+  downgradeRenderedPrimaryEquationToTentative,
   deriveEquationClaimSeeds,
   rankEquationNearMissPath,
   scoreEquationDomainPathAffinity,
@@ -42192,6 +42886,10 @@ const executeHelixAsk = async ({
       let equationRendererPrimaryKey: string | null = null;
       let equationPrimaryAnchorMatch: boolean | null = null;
       let equationSelectorStateLockCommitted = false;
+      let equationSelectionLockHashExpected: string | null = null;
+      let equationSelectionLockHashCurrent: string | null = null;
+      let equationSelectionLockHashMatch: boolean | null = null;
+      let equationVerifiedLabelIntegrityReason: string | null = null;
       let equationSemanticRerankScores: Record<string, number> = {};
       let equationSemanticRerankUsed = false;
       let equationSemanticRerankReason: string | null = null;
@@ -42206,6 +42904,16 @@ const executeHelixAsk = async ({
         if (!equationPromptDetected) return;
         if (equationDegradePathId) return;
         equationDegradePathId = reason.trim() || "unspecified";
+      };
+      const computeCurrentEquationSelectionLockHash = (): string =>
+        computeEquationSelectionLockHash({
+          selectorLocked: equationSelectorAuthorityLock,
+          selectorPrimaryKey: equationSelectorPrimaryKey,
+          intentContractHash: equationIntentContractHash,
+        });
+      const captureEquationSelectionLockHash = (): void => {
+        if (!equationSelectorAuthorityLock || !equationSelectorPrimaryKey) return;
+        equationSelectionLockHashExpected = computeCurrentEquationSelectionLockHash();
       };
       const buildEquationUnifiedDegradeRuntimeAnswer = (
         reason: string,
@@ -42483,6 +43191,7 @@ const executeHelixAsk = async ({
         );
         answerPath.push("equationSelector:first_pass_applied");
         answerPath.push("equationSelector:locked");
+        captureEquationSelectionLockHash();
         writeEquationQuoteContractDebug();
       } else if (
         equationPromptDetected &&
@@ -42537,6 +43246,7 @@ const executeHelixAsk = async ({
           preferredEquationAnchors,
         );
         answerPath.push("equationSelector:state_lock_commit");
+        captureEquationSelectionLockHash();
         writeEquationQuoteContractDebug();
       }
       if (debugPayload && equationPromptDetected) {
@@ -43612,6 +44322,10 @@ const executeHelixAsk = async ({
         debugRecord.equation_selector_primary_key = equationSelectorPrimaryKey;
         debugRecord.equation_renderer_primary_key = equationRendererPrimaryKey;
         debugRecord.equation_primary_anchor_match = equationPrimaryAnchorMatch;
+        debugRecord.equation_selection_lock_hash_expected = equationSelectionLockHashExpected;
+        debugRecord.equation_selection_lock_hash_current = equationSelectionLockHashCurrent;
+        debugRecord.equation_selection_lock_hash_match = equationSelectionLockHashMatch;
+        debugRecord.equation_verified_label_integrity_reason = equationVerifiedLabelIntegrityReason;
         debugRecord.shadow_primary_anchor_match = shadowPrimaryCheck.match;
         debugRecord.intent_contract_mutation_detected = equationIntentContractMutationDetected;
       }
@@ -44398,6 +45112,66 @@ const executeHelixAsk = async ({
           answerPath.push("equationSelector:post_lock_primary_preserved_final");
         }
       }
+      if (
+        equationSelectorAuthorityLock &&
+        equationSelectionLockHashExpected &&
+        equationSelectorPrimaryKey
+      ) {
+        equationSelectionLockHashCurrent = computeCurrentEquationSelectionLockHash();
+        equationSelectionLockHashMatch =
+          equationSelectionLockHashCurrent === equationSelectionLockHashExpected;
+        if (!equationSelectionLockHashMatch) {
+          equationPostLockGateOverrideAttempted = true;
+          if (equationSelectorResolved?.text?.trim()) {
+            cleaned = equationSelectorResolved.text.trim();
+            equationPostLockGateOverrideBlocked = true;
+            answerPath.push("equationSelector:selection_lock_hash_mismatch_restore");
+          } else {
+            cleaned = buildEquationUnifiedDegradeRuntimeAnswer(
+              "selection_lock_hash_mismatch",
+              normalizeCitations([
+                ...contractCitationTokens,
+                ...allowedSourcePaths,
+                ...finalCanonicalEvidence.contextFiles,
+                ...finalCanonicalEvidence.citationTokens,
+                ...equationFallbackAllowPaths,
+              ]),
+            );
+            equationForcedGeneralExplain = true;
+            markEquationDegradePath("selection_lock_hash_mismatch");
+            answerPath.push("equationSelector:selection_lock_hash_mismatch_degrade");
+          }
+        } else {
+          answerPath.push("equationSelector:selection_lock_hash_verified");
+        }
+      }
+      if (equationPromptDetected && /^\s*Primary Equation\s*\(\s*Verified\s*\)\s*:/im.test(cleaned)) {
+        const equationVerifiedIntegrity = evaluateRenderedEquationVerifiedIntegrity({
+          answer: cleaned,
+          selectorAuthorityLock: equationSelectorAuthorityLock,
+          selectorPrimaryKey: equationSelectorPrimaryKey,
+          allowedCitations: normalizeCitations([
+            ...contractCitationTokens,
+            ...allowedSourcePaths,
+            ...finalCanonicalEvidence.contextFiles,
+            ...finalCanonicalEvidence.citationTokens,
+            ...equationFallbackAllowPaths,
+          ]),
+          stage05MissingSlots: stage05SummaryMissingSlots,
+        });
+        if (!equationVerifiedIntegrity.pass) {
+          equationVerifiedLabelIntegrityReason = equationVerifiedIntegrity.reason ?? "integrity_guard_failed";
+          cleaned = downgradeRenderedPrimaryEquationToTentative({
+            answer: cleaned,
+            reason: equationVerifiedLabelIntegrityReason,
+          });
+          answerPath.push(
+            `equationVerifiedGuard:downgraded:${equationVerifiedLabelIntegrityReason}`,
+          );
+        } else {
+          answerPath.push("equationVerifiedGuard:pass");
+        }
+      }
       const preserveStructuredEquationAnswerFinal =
         equationPromptDetected &&
         hasEquationStructuredSections(cleaned) &&
@@ -44431,6 +45205,134 @@ const executeHelixAsk = async ({
             Boolean(debugRecord.report_scaffold_guard_triggered) ||
             terminalNonReportGuard.hadScaffold;
           debugRecord.report_terminal_guard_applied = terminalNonReportGuard.hadScaffold;
+        }
+      }
+      if (HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SHADOW_ENABLED) {
+        const composerAllowedCitations = normalizeCitations([
+          ...finalCitationAllowedPaths,
+          ...contractCitationTokens,
+          ...allowedSourcePaths,
+          ...finalCanonicalEvidence.contextFiles,
+          ...finalCanonicalEvidence.citationTokens,
+          ...equationFallbackAllowPaths,
+        ]);
+        const answerPlanShadow = buildHelixAskAnswerPlanShadow({
+          question: baseQuestion,
+          intentDomain,
+          queryConstraints,
+          equationPrompt: equationPromptDetected,
+          definitionFocus,
+          equationIntentContract,
+          requiredOutputs: equationIntentContract.required_outputs,
+          selectorPrimaryKey: equationSelectorPrimaryKey,
+          selectorLocked: equationSelectorAuthorityLock,
+          selectorFamily: equationIntentContract.dominant_family,
+          lockIdSeed: askTraceId,
+          allowedCitations: composerAllowedCitations,
+          contextFileCount: finalCanonicalEvidence.contextFiles.length,
+        });
+        const answerPlanValidationShadow = validateHelixAskAnswerPlanShadow({
+          plan: answerPlanShadow,
+          renderedText: cleaned,
+        });
+        const hardComposerGuardTriggered =
+          answerPlanValidationShadow.fail_reasons.includes("debug_leak") ||
+          answerPlanValidationShadow.fail_reasons.includes("anchor_integrity_violation");
+        const softSectionGuardTriggered =
+          HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_ENABLED &&
+          answerPlanValidationShadow.fail_reasons.includes("required_sections_missing") &&
+          answerPlanValidationShadow.family_format_accuracy <
+            HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY;
+        if (hardComposerGuardTriggered || softSectionGuardTriggered) {
+          const softReason =
+            answerPlanValidationShadow.fail_reasons[0] ??
+            (hardComposerGuardTriggered ? "composer_hard_guard" : "required_sections_missing");
+          if (answerPlanShadow.prompt_family === "equation_formalism") {
+            if (equationSelectorAuthorityLock && equationSelectorResolved?.text?.trim()) {
+              cleaned = equationSelectorResolved.text.trim();
+              equationPostLockGateOverrideAttempted = true;
+              equationPostLockGateOverrideBlocked = true;
+              answerPath.push(`composerSoftEnforce:equation_restore:${softReason}`);
+            } else {
+              const equationSoftDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
+                `composer_soft_enforce:${softReason}`,
+                composerAllowedCitations,
+              );
+              cleaned = equationSoftDegrade.trim();
+              markEquationDegradePath(`composer_soft_enforce:${softReason}`);
+              answerPath.push(`composerSoftEnforce:equation_degrade:${softReason}`);
+            }
+          } else {
+            cleaned = buildHelixAskUniversalFamilyDegradeAnswer({
+              plan: answerPlanShadow,
+              question: baseQuestion,
+              existingText: cleaned,
+              reason: softReason,
+            });
+            answerPath.push(`composerSoftEnforce:family_degrade:${softReason}`);
+          }
+        }
+        const validatedAfterEnforce = validateHelixAskAnswerPlanShadow({
+          plan: answerPlanShadow,
+          renderedText: cleaned,
+        });
+        answerPath.push(
+          validatedAfterEnforce.schema_valid
+            ? "composerShadow:schema_valid"
+            : "composerShadow:schema_invalid",
+        );
+        if (validatedAfterEnforce.fail_reasons.length > 0) {
+          answerPath.push(
+            `composerShadow:fail:${validatedAfterEnforce.fail_reasons.join(",")}`,
+          );
+        } else {
+          answerPath.push("composerShadow:pass");
+        }
+        if (debugPayload) {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.composer_shadow_enabled = true;
+          debugRecord.composer_profile_id = answerPlanShadow.profile_id;
+          debugRecord.composer_profile_version = answerPlanShadow.profile_version;
+          debugRecord.composer_prompt_family = answerPlanShadow.prompt_family;
+          debugRecord.composer_prompt_specificity = answerPlanShadow.prompt_specificity;
+          debugRecord.composer_schema_valid = validatedAfterEnforce.schema_valid;
+          debugRecord.composer_validation_fail_reason =
+            validatedAfterEnforce.fail_reasons[0] ?? null;
+          debugRecord.composer_validation_fail_reasons =
+            validatedAfterEnforce.fail_reasons;
+          debugRecord.composer_sections_present = validatedAfterEnforce.sections_present;
+          debugRecord.composer_required_section_count =
+            validatedAfterEnforce.required_section_count;
+          debugRecord.composer_required_section_present_count =
+            validatedAfterEnforce.required_section_present_count;
+          debugRecord.composer_family_format_accuracy =
+            validatedAfterEnforce.family_format_accuracy;
+          debugRecord.composer_anchor_integrity_violations_count =
+            validatedAfterEnforce.anchor_integrity_violations.length;
+          debugRecord.composer_anchor_integrity_violations =
+            validatedAfterEnforce.anchor_integrity_violations;
+          debugRecord.composer_debug_leak_hit_count =
+            validatedAfterEnforce.debug_leak_hits.length;
+          debugRecord.composer_debug_leak_hits =
+            validatedAfterEnforce.debug_leak_hits;
+          debugRecord.composer_degraded = validatedAfterEnforce.degraded;
+          debugRecord.composer_degrade_reason = validatedAfterEnforce.degrade_reason;
+          debugRecord.composer_degrade_path_id = answerPlanShadow.degrade_path_id;
+          debugRecord.composer_soft_enforce_applied =
+            hardComposerGuardTriggered || softSectionGuardTriggered;
+          debugRecord.composer_soft_enforce_reason = softSectionGuardTriggered
+            ? "required_sections_missing"
+            : hardComposerGuardTriggered
+              ? "hard_guard"
+              : null;
+          debugRecord.composer_selection_lock_id = answerPlanShadow.selection_lock.lock_id;
+          debugRecord.composer_selection_locked =
+            answerPlanShadow.selection_lock.selector_locked;
+          debugRecord.composer_selection_primary_key =
+            answerPlanShadow.selection_lock.selector_primary_key;
+          debugRecord.composer_selection_family =
+            answerPlanShadow.selection_lock.selector_family;
+          debugRecord.composer_evidence_hash = answerPlanShadow.evidence_pack.evidence_hash;
         }
       }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
@@ -44778,6 +45680,21 @@ const executeHelixAsk = async ({
               entry.includes("final_empty_answer_selector_restore"),
           ) || Boolean(debugPayloadRecord.equation_post_lock_gate_override_blocked);
         debugPayloadRecord.equation_state_version = HELIX_ASK_EQUATION_STATE_VERSION;
+        if (debugPayloadRecord.equation_selection_lock_hash_expected === undefined) {
+          debugPayloadRecord.equation_selection_lock_hash_expected =
+            equationSelectionLockHashExpected;
+        }
+        if (debugPayloadRecord.equation_selection_lock_hash_current === undefined) {
+          debugPayloadRecord.equation_selection_lock_hash_current =
+            equationSelectionLockHashCurrent;
+        }
+        if (debugPayloadRecord.equation_selection_lock_hash_match === undefined) {
+          debugPayloadRecord.equation_selection_lock_hash_match = equationSelectionLockHashMatch;
+        }
+        if (debugPayloadRecord.equation_verified_label_integrity_reason === undefined) {
+          debugPayloadRecord.equation_verified_label_integrity_reason =
+            equationVerifiedLabelIntegrityReason;
+        }
         debugPayloadRecord.equation_degrade_path_id = inferredDegradePathId;
         debugPayloadRecord.degrade_path_id = inferredDegradePathId;
         debugPayloadRecord.equation_post_lock_gate_override_attempted = inferredOverrideAttempted;

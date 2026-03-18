@@ -5,8 +5,8 @@
 ## Identity
 - artifact_type: `full_solve_reference_capsule/v1`
 - generator_version: `1.3.0`
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
-- checksum: `dcf2994113cb84c236ad288bc093f4aba6c24e0c197895e22e0d11d28a7c0d6f`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
+- checksum: `d1181f7ed42239abc3ba2c163e45a58988941436d9f5cca0896c4d3345f76414`
 - blocked: `false`
 
 ## Canonical State
@@ -15,8 +15,8 @@
 - strong_claim_pass_all: `true`
 
 ## Certification
-- trace_id: `adapter:5440c0a0-191e-4494-9dff-c2d22ee52887`
-- run_id: `32877`
+- trace_id: `adapter:5e1b55a9-971b-4145-8045-1fa1cfe4efec`
+- run_id: `32887`
 - certificate_hash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
 - integrity_ok: `true`
 - status: `GREEN`

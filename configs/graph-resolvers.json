@@ -631,6 +631,40 @@
       "weight": 1.12
     },
     {
+      "id": "halobank-solar-proof",
+      "label": "HaloBank Solar Proof Lane",
+      "path": "docs/knowledge/halobank-solar-proof-tree.json",
+      "topicTags": [
+        "halobank",
+        "solar",
+        "ephemeris",
+        "proof",
+        "knowledge"
+      ],
+      "matchers": [
+        "halobank solar",
+        "horizons vectors",
+        "mercury precession proof",
+        "eclipse timing proof",
+        "resonance libration",
+        "bcrs gcrs vectors",
+        "time scale tdb tcb tt"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 12,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "supports": 2,
+        "verifies": 2,
+        "see-also": 1
+      },
+      "weight": 1.14
+    },
+    {
       "id": "stellar-restoration",
       "label": "Stellar Restoration Walk",
       "path": "docs/knowledge/stellar-restoration-tree.json",

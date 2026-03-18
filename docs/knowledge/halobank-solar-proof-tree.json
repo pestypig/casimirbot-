@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "treeId": "halobank-solar-proof",
+  "rootId": "halobank-solar-proof-root",
+  "nodes": [
+    {
+      "id": "halobank-solar-proof-root",
+      "title": "HaloBank Relativistic Solar Proof Lane",
+      "tags": ["halobank", "solar", "ephemeris", "proof", "determinism"],
+      "bodyMD": "Deterministic evidence-gated lane for vectors/time-scales and derived solar proofs.",
+      "children": [
+        "halobank-solar-state-core",
+        "halobank-solar-time-core",
+        "halobank-solar-proof-mercury",
+        "halobank-solar-proof-eclipse",
+        "halobank-solar-proof-resonance"
+      ]
+    },
+    {
+      "id": "halobank-solar-state-core",
+      "title": "State Core Contract",
+      "tags": ["ephemeris", "bcrs", "gcrs", "state-core"],
+      "bodyMD": "Vectors endpoint returns deterministic states, provenance, gate verdict, and artifact refs under strict provenance semantics.",
+      "links": [
+        { "to": "halobank-solar-time-core", "rel": "supports" }
+      ],
+      "evidence": [
+        { "type": "code", "path": "server/routes/halobank-solar.ts", "contains": "/horizons/vectors" },
+        { "type": "code", "path": "server/modules/halobank-solar/ephemeris-core.ts", "contains": "buildSolarVectorBundle" },
+        { "type": "test", "path": "tests/halobank-solar-routes.spec.ts", "contains": "halobank solar vectors route" }
+      ]
+    },
+    {
+      "id": "halobank-solar-time-core",
+      "title": "Time Core Contract",
+      "tags": ["time-scale", "utc", "tt", "tdb", "tcb"],
+      "bodyMD": "Time-scale outputs explicitly include UTC/TAI/TT/TDB/TCB offsets with deterministic conversions.",
+      "links": [
+        { "to": "halobank-solar-state-core", "rel": "parent" }
+      ],
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/time-core.ts", "contains": "computeSolarTimeScales" },
+        { "type": "test", "path": "tests/halobank-solar-routes.spec.ts", "contains": "time_scales" }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-mercury",
+      "title": "Mercury Precession Proof Node",
+      "tags": ["mercury", "precession", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:mercury_precession"],
+      "validity": {
+        "equation_ref": "uncertainty_propagation"
+      },
+      "bodyMD": "Perihelion drift is computed over a time window and fails deterministically when tolerance or sample constraints are violated.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runMercuryPrecession" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "mercury precession module" }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-eclipse",
+      "title": "Earth-Moon Eclipse Timing Proof Node",
+      "tags": ["eclipse", "observer", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:earth_moon_eclipse_timing"],
+      "validity": {
+        "equation_ref": "runtime_safety_gate"
+      },
+      "bodyMD": "Event detection uses apparent Sun-Moon separation and deterministic gate thresholds for contact/timing windows.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runEarthMoonEclipseTiming" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "strict provenance fail for derived calls" }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-resonance",
+      "title": "Resonance Libration Proof Node",
+      "tags": ["resonance", "libration", "frequency", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:resonance_libration"],
+      "validity": {
+        "equation_ref": "uncertainty_propagation"
+      },
+      "bodyMD": "Resonance gate requires libration-angle span and mean-motion ratio error to satisfy configured limits.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runResonanceLibration" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "resonance_libration" }
+      ]
+    }
+  ]
+}
+

@@ -24,6 +24,7 @@ import { searchRouter } from "./routes/search";
 import { devTerminalRouter } from "./routes/dev-terminal";
 import { voiceRouter } from "./routes/voice";
 import { missionBoardRouter } from "./routes/mission-board";
+import { halobankSolarRouter } from "./routes/halobank-solar";
 import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
@@ -195,6 +196,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/dev-terminal", devTerminalRouter);
   app.use("/api/voice", voiceRouter);
   app.use("/api/mission-board", missionBoardRouter);
+  app.use("/api", halobankSolarRouter);
   const evolutionAuthEnabled = flagEnabled(
     process.env.ENABLE_AGI_AUTH ?? process.env.ENABLE_AUTH,
     false,

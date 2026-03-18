@@ -6,7 +6,7 @@
 - artifact_type: `external_work_run/v1`
 - work_id: `EXT-GR-FD-001`
 - title: GR frame-dragging observable replay (LAGEOS + GP-B + LARES context)
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
 - profile_commit_pin: `latest`
 - source_class: `primary`
 - confidence_tier: `medium`

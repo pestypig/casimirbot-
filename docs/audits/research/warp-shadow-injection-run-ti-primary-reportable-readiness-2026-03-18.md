@@ -11,7 +11,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - incompatible: 0
 - error: 0
 - scenario_pack: `configs/warp-shadow-injection-scenarios.ti-primary-reportable.v1.json`
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
 
 ## Recovery Contract
 - recovery_goal: timing_compatibility_recovery
@@ -32,18 +32,18 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Scenario Results
 | scenario_id | lane | experimental_context | classification | congruentSolvePass | marginRatioRaw | deltaMarginRatioRaw | fail_or_error |
 |---|---|---|---|---|---:|---:|---|
-| ti_primary_typed_wr_short_ps_sigma_6ps | timing | WR-SHORT-PS;sigma=6;ts=hardware | compatible | true | 0.23532774404059986 | -0.7646722559594001 | none |
-| ti_primary_typed_wr_short_ps_sigma_12ps | timing | WR-SHORT-PS;sigma=12;ts=hardware | compatible | true | 0.20825309986725563 | -0.7917469001327444 | none |
-| ti_primary_typed_wr_short_ps_sigma_50ps | timing | WR-SHORT-PS;sigma=50;ts=hardware | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| ti_primary_typed_wr_short_ps_sigma_100ps | timing | WR-SHORT-PS;sigma=100;ts=hardware | compatible | true | 0.20197005086128303 | -0.7980299491387169 | none |
-| ti_primary_typed_wr_short_ps_sigma_120ps | timing | WR-SHORT-PS;sigma=120;ts=hardware | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
+| ti_primary_typed_wr_short_ps_sigma_6ps | timing | WR-SHORT-PS;sigma=6;ts=hardware | compatible | true | 0.21803321417097948 | -0.7819667858290205 | none |
+| ti_primary_typed_wr_short_ps_sigma_12ps | timing | WR-SHORT-PS;sigma=12;ts=hardware | compatible | true | 0.20197005086128303 | -0.7980299491387169 | none |
+| ti_primary_typed_wr_short_ps_sigma_50ps | timing | WR-SHORT-PS;sigma=50;ts=hardware | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
+| ti_primary_typed_wr_short_ps_sigma_100ps | timing | WR-SHORT-PS;sigma=100;ts=hardware | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| ti_primary_typed_wr_short_ps_sigma_120ps | timing | WR-SHORT-PS;sigma=120;ts=hardware | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
 | ti_primary_typed_wr_short_ps_sigma_300ps | timing | WR-SHORT-PS;sigma=300;ts=hardware | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_6ps | timing | WR-LONGHAUL-EXP;sigma=6;ts=hardware | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_12ps | timing | WR-LONGHAUL-EXP;sigma=12;ts=hardware | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_50ps | timing | WR-LONGHAUL-EXP;sigma=50;ts=hardware | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_100ps | timing | WR-LONGHAUL-EXP;sigma=100;ts=hardware | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_120ps | timing | WR-LONGHAUL-EXP;sigma=120;ts=hardware | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| ti_primary_typed_wr_longhaul_exp_sigma_300ps | timing | WR-LONGHAUL-EXP;sigma=300;ts=hardware | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_6ps | timing | WR-LONGHAUL-EXP;sigma=6;ts=hardware | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_12ps | timing | WR-LONGHAUL-EXP;sigma=12;ts=hardware | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_50ps | timing | WR-LONGHAUL-EXP;sigma=50;ts=hardware | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_100ps | timing | WR-LONGHAUL-EXP;sigma=100;ts=hardware | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_120ps | timing | WR-LONGHAUL-EXP;sigma=120;ts=hardware | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| ti_primary_typed_wr_longhaul_exp_sigma_300ps | timing | WR-LONGHAUL-EXP;sigma=300;ts=hardware | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
 
 ## Failure Envelope
 

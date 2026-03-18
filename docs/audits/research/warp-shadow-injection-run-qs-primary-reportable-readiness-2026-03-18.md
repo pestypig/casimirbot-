@@ -11,7 +11,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - incompatible: 0
 - error: 0
 - scenario_pack: `configs/warp-shadow-injection-scenarios.qs-primary-reportable.v1.json`
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
 
 ## Recovery Contract
 - recovery_goal: q_spoiling_recovery
@@ -32,60 +32,60 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 ## Scenario Results
 | scenario_id | lane | experimental_context | classification | congruentSolvePass | marginRatioRaw | deltaMarginRatioRaw | fail_or_error |
 |---|---|---|---|---|---:|---:|---|
-| qs_primary_typed_hydride_q_disease_q0_1e10_f_1e0 | q_spoiling | hydride_q_disease;Q0=10000000000;F=1 | compatible | true | 0.2300048183594453 | -0.7699951816405547 | none |
-| qs_primary_typed_hydride_q_disease_q0_1e10_f_3e0 | q_spoiling | hydride_q_disease;Q0=10000000000;F=3 | compatible | true | 0.2163729288083322 | -0.7836270711916677 | none |
-| qs_primary_typed_hydride_q_disease_q0_1e10_f_1e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=10 | compatible | true | 0.2282565057759659 | -0.7717434942240341 | none |
-| qs_primary_typed_hydride_q_disease_q0_1e10_f_2e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=20 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_hydride_q_disease_q0_1e10_f_4e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=40 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_hydride_q_disease_q0_1e10_f_8e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=80 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_hydride_q_disease_q0_2e10_f_1e0 | q_spoiling | hydride_q_disease;Q0=20000000000;F=1 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
+| qs_primary_typed_hydride_q_disease_q0_1e10_f_1e0 | q_spoiling | hydride_q_disease;Q0=10000000000;F=1 | compatible | true | 0.2163729288083322 | -0.7836270711916677 | none |
+| qs_primary_typed_hydride_q_disease_q0_1e10_f_3e0 | q_spoiling | hydride_q_disease;Q0=10000000000;F=3 | compatible | true | 0.20197005086128303 | -0.7980299491387169 | none |
+| qs_primary_typed_hydride_q_disease_q0_1e10_f_1e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=10 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_1e10_f_2e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=20 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_1e10_f_4e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=40 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_1e10_f_8e1 | q_spoiling | hydride_q_disease;Q0=10000000000;F=80 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_2e10_f_1e0 | q_spoiling | hydride_q_disease;Q0=20000000000;F=1 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
 | qs_primary_typed_hydride_q_disease_q0_2e10_f_3e0 | q_spoiling | hydride_q_disease;Q0=20000000000;F=3 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
-| qs_primary_typed_hydride_q_disease_q0_2e10_f_1e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=10 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_hydride_q_disease_q0_2e10_f_2e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=20 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_hydride_q_disease_q0_2e10_f_4e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=40 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_hydride_q_disease_q0_2e10_f_8e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=80 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_hydride_q_disease_q0_3e10_f_1e0 | q_spoiling | hydride_q_disease;Q0=30000000000;F=1 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_hydride_q_disease_q0_3e10_f_3e0 | q_spoiling | hydride_q_disease;Q0=30000000000;F=3 | compatible | true | 0.2098531385402239 | -0.7901468614597761 | none |
-| qs_primary_typed_hydride_q_disease_q0_3e10_f_1e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=10 | compatible | true | 0.20508832087663792 | -0.7949116791233621 | none |
-| qs_primary_typed_hydride_q_disease_q0_3e10_f_2e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=20 | compatible | true | 0.2098531385402239 | -0.7901468614597761 | none |
-| qs_primary_typed_hydride_q_disease_q0_3e10_f_4e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=40 | compatible | true | 0.20197005086128303 | -0.7980299491387169 | none |
-| qs_primary_typed_hydride_q_disease_q0_3e10_f_8e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=80 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_trapped_flux_q0_1e10_f_1e0 | q_spoiling | trapped_flux;Q0=10000000000;F=1 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_trapped_flux_q0_1e10_f_3e0 | q_spoiling | trapped_flux;Q0=10000000000;F=3 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_1e10_f_1e1 | q_spoiling | trapped_flux;Q0=10000000000;F=10 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_trapped_flux_q0_1e10_f_2e1 | q_spoiling | trapped_flux;Q0=10000000000;F=20 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_trapped_flux_q0_1e10_f_4e1 | q_spoiling | trapped_flux;Q0=10000000000;F=40 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_1e10_f_8e1 | q_spoiling | trapped_flux;Q0=10000000000;F=80 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_trapped_flux_q0_2e10_f_1e0 | q_spoiling | trapped_flux;Q0=20000000000;F=1 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_2e10_f_3e0 | q_spoiling | trapped_flux;Q0=20000000000;F=3 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_2e10_f_1e1 | q_spoiling | trapped_flux;Q0=20000000000;F=10 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_2e10_f_2e1 | q_spoiling | trapped_flux;Q0=20000000000;F=20 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_trapped_flux_q0_2e10_f_4e1 | q_spoiling | trapped_flux;Q0=20000000000;F=40 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_2e10_f_8e1 | q_spoiling | trapped_flux;Q0=20000000000;F=80 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_trapped_flux_q0_3e10_f_1e0 | q_spoiling | trapped_flux;Q0=30000000000;F=1 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_trapped_flux_q0_3e10_f_3e0 | q_spoiling | trapped_flux;Q0=30000000000;F=3 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
-| qs_primary_typed_trapped_flux_q0_3e10_f_1e1 | q_spoiling | trapped_flux;Q0=30000000000;F=10 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_trapped_flux_q0_3e10_f_2e1 | q_spoiling | trapped_flux;Q0=30000000000;F=20 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_trapped_flux_q0_3e10_f_4e1 | q_spoiling | trapped_flux;Q0=30000000000;F=40 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_trapped_flux_q0_3e10_f_8e1 | q_spoiling | trapped_flux;Q0=30000000000;F=80 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_1e10_f_1e0 | q_spoiling | tls_oxide;Q0=10000000000;F=1 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_1e10_f_3e0 | q_spoiling | tls_oxide;Q0=10000000000;F=3 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_tls_oxide_q0_1e10_f_1e1 | q_spoiling | tls_oxide;Q0=10000000000;F=10 | compatible | true | 0.2035234136253071 | -0.7964765863746929 | none |
-| qs_primary_typed_tls_oxide_q0_1e10_f_2e1 | q_spoiling | tls_oxide;Q0=10000000000;F=20 | compatible | true | 0.2098531385402239 | -0.7901468614597761 | none |
-| qs_primary_typed_tls_oxide_q0_1e10_f_4e1 | q_spoiling | tls_oxide;Q0=10000000000;F=40 | compatible | true | 0.20042815053284566 | -0.7995718494671543 | none |
-| qs_primary_typed_tls_oxide_q0_1e10_f_8e1 | q_spoiling | tls_oxide;Q0=10000000000;F=80 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_tls_oxide_q0_2e10_f_1e0 | q_spoiling | tls_oxide;Q0=20000000000;F=1 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_2e10_f_3e0 | q_spoiling | tls_oxide;Q0=20000000000;F=3 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_tls_oxide_q0_2e10_f_1e1 | q_spoiling | tls_oxide;Q0=20000000000;F=10 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_2e10_f_2e1 | q_spoiling | tls_oxide;Q0=20000000000;F=20 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_tls_oxide_q0_2e10_f_4e1 | q_spoiling | tls_oxide;Q0=20000000000;F=40 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_tls_oxide_q0_2e10_f_8e1 | q_spoiling | tls_oxide;Q0=20000000000;F=80 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_tls_oxide_q0_3e10_f_1e0 | q_spoiling | tls_oxide;Q0=30000000000;F=1 | compatible | true | 0.19889763114770756 | -0.8011023688522925 | none |
-| qs_primary_typed_tls_oxide_q0_3e10_f_3e0 | q_spoiling | tls_oxide;Q0=30000000000;F=3 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_3e10_f_1e1 | q_spoiling | tls_oxide;Q0=30000000000;F=10 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_3e10_f_2e1 | q_spoiling | tls_oxide;Q0=30000000000;F=20 | compatible | true | 0.19737841176938295 | -0.802621588230617 | none |
-| qs_primary_typed_tls_oxide_q0_3e10_f_4e1 | q_spoiling | tls_oxide;Q0=30000000000;F=40 | compatible | true | 0.19587041201356292 | -0.8041295879864371 | none |
-| qs_primary_typed_tls_oxide_q0_3e10_f_8e1 | q_spoiling | tls_oxide;Q0=30000000000;F=80 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_hydride_q_disease_q0_2e10_f_1e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=10 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_2e10_f_2e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=20 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_2e10_f_4e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=40 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_2e10_f_8e1 | q_spoiling | hydride_q_disease;Q0=20000000000;F=80 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_hydride_q_disease_q0_3e10_f_1e0 | q_spoiling | hydride_q_disease;Q0=30000000000;F=1 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_hydride_q_disease_q0_3e10_f_3e0 | q_spoiling | hydride_q_disease;Q0=30000000000;F=3 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_hydride_q_disease_q0_3e10_f_1e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=10 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_3e10_f_2e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=20 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_3e10_f_4e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=40 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_hydride_q_disease_q0_3e10_f_8e1 | q_spoiling | hydride_q_disease;Q0=30000000000;F=80 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_trapped_flux_q0_1e10_f_1e0 | q_spoiling | trapped_flux;Q0=10000000000;F=1 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_trapped_flux_q0_1e10_f_3e0 | q_spoiling | trapped_flux;Q0=10000000000;F=3 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_1e10_f_1e1 | q_spoiling | trapped_flux;Q0=10000000000;F=10 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_1e10_f_2e1 | q_spoiling | trapped_flux;Q0=10000000000;F=20 | compatible | true | 0.18994902065476277 | -0.8100509793452373 | none |
+| qs_primary_typed_trapped_flux_q0_1e10_f_4e1 | q_spoiling | trapped_flux;Q0=10000000000;F=40 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_trapped_flux_q0_1e10_f_8e1 | q_spoiling | trapped_flux;Q0=10000000000;F=80 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_trapped_flux_q0_2e10_f_1e0 | q_spoiling | trapped_flux;Q0=20000000000;F=1 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_trapped_flux_q0_2e10_f_3e0 | q_spoiling | trapped_flux;Q0=20000000000;F=3 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_trapped_flux_q0_2e10_f_1e1 | q_spoiling | trapped_flux;Q0=20000000000;F=10 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_2e10_f_2e1 | q_spoiling | trapped_flux;Q0=20000000000;F=20 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_2e10_f_4e1 | q_spoiling | trapped_flux;Q0=20000000000;F=40 | compatible | true | 0.18994902065476277 | -0.8100509793452373 | none |
+| qs_primary_typed_trapped_flux_q0_2e10_f_8e1 | q_spoiling | trapped_flux;Q0=20000000000;F=80 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_3e10_f_1e0 | q_spoiling | trapped_flux;Q0=30000000000;F=1 | compatible | true | 0.18994902065476277 | -0.8100509793452373 | none |
+| qs_primary_typed_trapped_flux_q0_3e10_f_3e0 | q_spoiling | trapped_flux;Q0=30000000000;F=3 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_trapped_flux_q0_3e10_f_1e1 | q_spoiling | trapped_flux;Q0=30000000000;F=10 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_trapped_flux_q0_3e10_f_2e1 | q_spoiling | trapped_flux;Q0=30000000000;F=20 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_3e10_f_4e1 | q_spoiling | trapped_flux;Q0=30000000000;F=40 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_trapped_flux_q0_3e10_f_8e1 | q_spoiling | trapped_flux;Q0=30000000000;F=80 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_tls_oxide_q0_1e10_f_1e0 | q_spoiling | tls_oxide;Q0=10000000000;F=1 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_1e10_f_3e0 | q_spoiling | tls_oxide;Q0=10000000000;F=3 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_1e10_f_1e1 | q_spoiling | tls_oxide;Q0=10000000000;F=10 | compatible | true | 0.20508832087663792 | -0.7949116791233621 | none |
+| qs_primary_typed_tls_oxide_q0_1e10_f_2e1 | q_spoiling | tls_oxide;Q0=10000000000;F=20 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_tls_oxide_q0_1e10_f_4e1 | q_spoiling | tls_oxide;Q0=10000000000;F=40 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_1e10_f_8e1 | q_spoiling | tls_oxide;Q0=10000000000;F=80 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_2e10_f_1e0 | q_spoiling | tls_oxide;Q0=20000000000;F=1 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_2e10_f_3e0 | q_spoiling | tls_oxide;Q0=20000000000;F=3 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_2e10_f_1e1 | q_spoiling | tls_oxide;Q0=20000000000;F=10 | compatible | true | 0.18994902065476277 | -0.8100509793452373 | none |
+| qs_primary_typed_tls_oxide_q0_2e10_f_2e1 | q_spoiling | tls_oxide;Q0=20000000000;F=20 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_2e10_f_4e1 | q_spoiling | tls_oxide;Q0=20000000000;F=40 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_tls_oxide_q0_2e10_f_8e1 | q_spoiling | tls_oxide;Q0=20000000000;F=80 | compatible | true | 0.18994902065476277 | -0.8100509793452373 | none |
+| qs_primary_typed_tls_oxide_q0_3e10_f_1e0 | q_spoiling | tls_oxide;Q0=30000000000;F=1 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_3e10_f_3e0 | q_spoiling | tls_oxide;Q0=30000000000;F=3 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_tls_oxide_q0_3e10_f_1e1 | q_spoiling | tls_oxide;Q0=30000000000;F=10 | compatible | true | 0.19437355204452092 | -0.8056264479554791 | none |
+| qs_primary_typed_tls_oxide_q0_3e10_f_2e1 | q_spoiling | tls_oxide;Q0=30000000000;F=20 | compatible | true | 0.1928877525715478 | -0.8071122474284522 | none |
+| qs_primary_typed_tls_oxide_q0_3e10_f_4e1 | q_spoiling | tls_oxide;Q0=30000000000;F=40 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
+| qs_primary_typed_tls_oxide_q0_3e10_f_8e1 | q_spoiling | tls_oxide;Q0=30000000000;F=80 | compatible | true | 0.19141293484539879 | -0.8085870651546012 | none |
 
 ## Failure Envelope
 
