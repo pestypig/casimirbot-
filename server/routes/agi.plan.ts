@@ -44097,7 +44097,7 @@ const executeHelixAsk = async ({
           debugRecord.equation_semantic_rerank_score_count = Object.keys(
             equationSemanticRerankScores,
           ).length;
-        } else if (equationClaimBacking) {
+        } else if (equationClaimBacking && !equationSelectorAuthorityLock) {
           cleaned = equationClaimBacking.text;
           equationBackingTentative = equationClaimBacking.tentative;
           equationBackingSelectedPaths = equationClaimBacking.selectedPaths.slice(0, 12);
@@ -44220,11 +44220,17 @@ const executeHelixAsk = async ({
           debugRecord.equation_semantic_rerank_reason = equationSemanticRerankReason;
           debugRecord.equation_semantic_rerank_candidate_count =
             equationSemanticRerankCandidateCount;
-          debugRecord.equation_semantic_rerank_score_count = Object.keys(
-            equationSemanticRerankScores,
-          ).length;
+            debugRecord.equation_semantic_rerank_score_count = Object.keys(
+              equationSemanticRerankScores,
+            ).length;
+          }
+        } else if (equationClaimBacking && equationSelectorAuthorityLock) {
+          answerPath.push("equationBackingMode:skipped_selector_lock");
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.equation_backing_mode = "selector_lock_skip_claim_backing";
+          }
         }
-      }
 
       const equationSectionGuardNeeded =
         equationPromptDetected &&
@@ -45145,6 +45151,12 @@ const executeHelixAsk = async ({
           answerPath.push("equationSelector:selection_lock_hash_verified");
         }
       }
+      if (equationPromptDetected && debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.equation_selection_lock_hash_expected = equationSelectionLockHashExpected;
+        debugRecord.equation_selection_lock_hash_current = equationSelectionLockHashCurrent;
+        debugRecord.equation_selection_lock_hash_match = equationSelectionLockHashMatch;
+      }
       if (equationPromptDetected && /^\s*Primary Equation\s*\(\s*Verified\s*\)\s*:/im.test(cleaned)) {
         const equationVerifiedIntegrity = evaluateRenderedEquationVerifiedIntegrity({
           answer: cleaned,
@@ -45171,6 +45183,10 @@ const executeHelixAsk = async ({
         } else {
           answerPath.push("equationVerifiedGuard:pass");
         }
+      }
+      if (equationPromptDetected && debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.equation_verified_label_integrity_reason = equationVerifiedLabelIntegrityReason;
       }
       const preserveStructuredEquationAnswerFinal =
         equationPromptDetected &&
@@ -45681,19 +45697,16 @@ const executeHelixAsk = async ({
           ) || Boolean(debugPayloadRecord.equation_post_lock_gate_override_blocked);
         debugPayloadRecord.equation_state_version = HELIX_ASK_EQUATION_STATE_VERSION;
         if (debugPayloadRecord.equation_selection_lock_hash_expected === undefined) {
-          debugPayloadRecord.equation_selection_lock_hash_expected =
-            equationSelectionLockHashExpected;
+          debugPayloadRecord.equation_selection_lock_hash_expected = null;
         }
         if (debugPayloadRecord.equation_selection_lock_hash_current === undefined) {
-          debugPayloadRecord.equation_selection_lock_hash_current =
-            equationSelectionLockHashCurrent;
+          debugPayloadRecord.equation_selection_lock_hash_current = null;
         }
         if (debugPayloadRecord.equation_selection_lock_hash_match === undefined) {
-          debugPayloadRecord.equation_selection_lock_hash_match = equationSelectionLockHashMatch;
+          debugPayloadRecord.equation_selection_lock_hash_match = null;
         }
         if (debugPayloadRecord.equation_verified_label_integrity_reason === undefined) {
-          debugPayloadRecord.equation_verified_label_integrity_reason =
-            equationVerifiedLabelIntegrityReason;
+          debugPayloadRecord.equation_verified_label_integrity_reason = null;
         }
         debugPayloadRecord.equation_degrade_path_id = inferredDegradePathId;
         debugPayloadRecord.degrade_path_id = inferredDegradePathId;

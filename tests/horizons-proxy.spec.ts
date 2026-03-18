@@ -62,4 +62,33 @@ describe('server/utils/horizons-proxy getHorizonsElements', () => {
     expect(result.provenance.diagnostic).toBe(true);
     expect(result.provenance.certifying).toBe(false);
   });
+
+  it('parses json-format Horizons payload result text', async () => {
+    const resultText = [
+      'EC= 1.591429536350342E-02',
+      'OM= 1.776179030721728E+02 W = 2.863568704502947E+02',
+      'N = 1.142130337831415E-05 MA= 3.563524337712979E+02 TA= 3.562340674073986E+02',
+      'A = 9.991949045337009E-01 AD= 1.015097950669922E+00 PR= 3.652004531142557E+02',
+      'IN= 3.549055731418342E-03',
+    ].join('\n');
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          signature: { source: 'NASA/JPL Horizons API', version: '1.0' },
+          result: resultText,
+        }),
+    });
+
+    const { getHorizonsElements } = await import('../server/utils/horizons-proxy');
+    const result = await getHorizonsElements('2026');
+
+    expect(result.a_AU).toBeCloseTo(0.9991949045337009, 12);
+    expect(result.e).toBeCloseTo(0.01591429536350342, 10);
+    expect(result.omega_deg).toBeCloseTo(286.3568704502947, 10);
+    expect(result.M_deg).toBeCloseTo(356.3524337712979, 10);
+    expect(result.provenance.sourceClass).toBe('live');
+    expect(result.provenance.certifying).toBe(true);
+  });
 });

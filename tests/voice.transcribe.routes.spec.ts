@@ -199,6 +199,17 @@ describe("voice transcribe route", () => {
       interpreter_confirm_prompt: null,
       interpreter_term_ids: [],
       interpreter_concept_ids: [],
+      command_lane: {
+        version: "helix.voice.command_lane.v1",
+        decision: "none",
+        action: null,
+        confidence: null,
+        source: "none",
+        suppression_reason: "disabled",
+        strict_prefix_applied: false,
+        confirm_required: false,
+        utterance_id: expect.stringMatching(/^vcmd:/),
+      },
     });
     expect(sttHttpHandlerMock).toHaveBeenCalledWith(
       expect.objectContaining({

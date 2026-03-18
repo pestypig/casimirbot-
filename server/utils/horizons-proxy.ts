@@ -56,6 +56,7 @@ export async function getHorizonsElements(year: number | string): Promise<Horizo
       MAKE_EPHEM: 'YES',
       EPHEM_TYPE: 'ELEMENTS',
       CENTER: '@sun',
+      OUT_UNITS: 'AU-D',
       START_TIME: startDate,
       STOP_TIME: endDate,
       STEP_SIZE: '1d',
@@ -68,8 +69,9 @@ export async function getHorizonsElements(year: number | string): Promise<Horizo
       throw new Error(`Horizons API error: ${response.status}`);
     }
 
-    const data = await response.text();
-    const elements = parseHorizonsElements(data, yearStr);
+    const rawPayload = await response.text();
+    const horizonsOutput = extractHorizonsOutput(rawPayload);
+    const elements = parseHorizonsElements(horizonsOutput, yearStr);
 
     return {
       ...elements,
@@ -86,6 +88,37 @@ export async function getHorizonsElements(year: number | string): Promise<Horizo
   }
 }
 
+function extractHorizonsOutput(rawPayload: string): string {
+  const trimmed = rawPayload.trim();
+  if (!trimmed) {
+    throw new Error('Empty Horizons payload');
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as { result?: unknown; error?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.trim().length > 0) {
+      throw new Error(`Horizons API payload error: ${parsed.error}`);
+    }
+    if (typeof parsed.result === 'string' && parsed.result.trim().length > 0) {
+      return parsed.result;
+    }
+    throw new Error('Horizons API JSON payload missing result text');
+  } catch (error) {
+    // If payload is plain text, keep legacy parser behavior.
+    if (error instanceof SyntaxError) {
+      return rawPayload;
+    }
+    throw error;
+  }
+}
+
+function parseKeyValue(line: string, key: string): number | null {
+  const match = line.match(new RegExp(`(?:^|\\s)${key}\\s*=\\s*([0-9.E+-]+)`));
+  if (!match) return null;
+  const parsed = Number.parseFloat(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function parseHorizonsElements(horizonsOutput: string, year: string): Omit<HorizonsElements, 'provenance'> {
   const lines = horizonsOutput.split('\n');
   let a_AU: number | null = null;
@@ -96,48 +129,23 @@ function parseHorizonsElements(horizonsOutput: string, year: string): Omit<Horiz
   let M_deg: number | null = null;
 
   for (const line of lines) {
-    if (line.includes('A=')) {
-      const match = line.match(/(?:^|\s)A=\s*([0-9.E+-]+)/);
-      if (match) {
-        const parsed = parseFloat(match[1]);
-        a_AU = Number.isFinite(parsed) ? parsed : a_AU;
-      }
-    }
-    if (line.includes('EC=')) {
-      const match = line.match(/(?:^|\s)EC=\s*([0-9.E+-]+)/);
-      if (match) {
-        const parsed = parseFloat(match[1]);
-        e = Number.isFinite(parsed) ? parsed : e;
-      }
-    }
-    if (line.includes('IN=')) {
-      const match = line.match(/(?:^|\s)IN=\s*([0-9.E+-]+)/);
-      if (match) {
-        const parsed = parseFloat(match[1]);
-        i_deg = Number.isFinite(parsed) ? parsed : i_deg;
-      }
-    }
-    if (line.includes('OM=')) {
-      const match = line.match(/(?:^|\s)OM=\s*([0-9.E+-]+)/);
-      if (match) {
-        const parsed = parseFloat(match[1]);
-        Omega_deg = Number.isFinite(parsed) ? parsed : Omega_deg;
-      }
-    }
-    if (line.includes('W=')) {
-      const match = line.match(/(?:^|\s)W=\s*([0-9.E+-]+)/);
-      if (match) {
-        const parsed = parseFloat(match[1]);
-        omega_deg = Number.isFinite(parsed) ? parsed : omega_deg;
-      }
-    }
-    if (line.includes('MA=')) {
-      const match = line.match(/(?:^|\s)MA=\s*([0-9.E+-]+)/);
-      if (match) {
-        const parsed = parseFloat(match[1]);
-        M_deg = Number.isFinite(parsed) ? parsed : M_deg;
-      }
-    }
+    const maybeA = parseKeyValue(line, 'A');
+    if (maybeA !== null && a_AU === null) a_AU = maybeA;
+
+    const maybeEc = parseKeyValue(line, 'EC');
+    if (maybeEc !== null && e === null) e = maybeEc;
+
+    const maybeIn = parseKeyValue(line, 'IN');
+    if (maybeIn !== null && i_deg === null) i_deg = maybeIn;
+
+    const maybeOm = parseKeyValue(line, 'OM');
+    if (maybeOm !== null && Omega_deg === null) Omega_deg = maybeOm;
+
+    const maybeW = parseKeyValue(line, 'W');
+    if (maybeW !== null && omega_deg === null) omega_deg = maybeW;
+
+    const maybeMa = parseKeyValue(line, 'MA');
+    if (maybeMa !== null && M_deg === null) M_deg = maybeMa;
   }
 
   const missing: string[] = [];

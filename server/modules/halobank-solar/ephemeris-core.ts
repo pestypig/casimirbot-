@@ -1,4 +1,4 @@
-import * as Astronomy from "astronomy-engine";
+import * as AstronomyNamespace from "astronomy-engine";
 import type { SolarAberration, SolarFrame, SolarObserver } from "./types";
 
 const AU_M = 149_597_870_700;
@@ -76,6 +76,48 @@ const wrap360 = (value: number): number => {
   const wrapped = value % 360;
   return wrapped < 0 ? wrapped + 360 : wrapped;
 };
+
+type AstronomyApi = {
+  BaryState: (body: unknown, date: Date) => { x: number; y: number; z: number; vx: number; vy: number; vz: number };
+  Observer: new (latitudeDeg: number, longitudeDeg: number, heightKm: number) => unknown;
+  ObserverState: (date: Date, observer: unknown, ofdate: boolean) => {
+    x: number;
+    y: number;
+    z: number;
+    vx: number;
+    vy: number;
+    vz: number;
+  };
+};
+
+function resolveAstronomyApi(): AstronomyApi {
+  const namespace = AstronomyNamespace as unknown as Record<string, unknown> & { default?: unknown };
+  const candidates: Array<Record<string, unknown>> = [namespace];
+  if (namespace.default && typeof namespace.default === "object") {
+    candidates.push(namespace.default as Record<string, unknown>);
+  }
+
+  for (const candidate of candidates) {
+    if (
+      typeof candidate.BaryState === "function" &&
+      typeof candidate.Observer === "function" &&
+      typeof candidate.ObserverState === "function"
+    ) {
+      return candidate as unknown as AstronomyApi;
+    }
+  }
+
+  const namespaceKeys = Object.keys(namespace).sort();
+  const defaultKeys =
+    namespace.default && typeof namespace.default === "object"
+      ? Object.keys(namespace.default as Record<string, unknown>).sort()
+      : [];
+  throw new Error(
+    `HALOBANK_SOLAR_ASTRONOMY_ENGINE_API_UNAVAILABLE namespace=[${namespaceKeys.join(",")}] default=[${defaultKeys.join(",")}]`,
+  );
+}
+
+const Astronomy = resolveAstronomyApi();
 
 function getBody(id: number): BodyDef {
   const body = BODY_BY_ID.get(id);
@@ -276,4 +318,3 @@ export function buildSolarVectorBundle(request: SolarVectorRequest): SolarVector
     warnings,
   };
 }
-

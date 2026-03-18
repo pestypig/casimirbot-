@@ -6,6 +6,9 @@ import type { SolarGate, SolarGateDelta, SolarObserver, SolarThresholdsManifest 
 const AU_M = 149_597_870_700;
 const DAY_MS = 86_400_000;
 const MU_SUN_AU3_PER_DAY2 = 0.00029591220828559104;
+const C_AU_PER_DAY = 173.1446326846693;
+const RAD_TO_ARCSEC = 206_264.80624709636;
+const EARTH_EQUATORIAL_RADIUS_KM = 6_378.137;
 
 type Vec3 = [number, number, number];
 
@@ -17,6 +20,7 @@ const vecCross = (a: Vec3, b: Vec3): Vec3 => [
 ];
 const vecScale = (a: Vec3, s: number): Vec3 => [a[0] * s, a[1] * s, a[2] * s];
 const vecNorm = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
+const vecDot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 const wrap180 = (value: number): number => {
   const wrapped = ((value + 180) % 360 + 360) % 360 - 180;
@@ -114,6 +118,38 @@ function circularSpanDeg(angles: number[]): number {
   return 360 - maxGap;
 }
 
+function mean(values: number[]): number {
+  if (values.length === 0) return 0;
+  let sum = 0;
+  for (const value of values) sum += value;
+  return sum / values.length;
+}
+
+function relativisticMercuryPrecessionArcsecPerCentury(state: { pos: Vec3; vel: Vec3 }): number | null {
+  const r = vecNorm(state.pos);
+  const v2 = vecDot(state.vel, state.vel);
+  if (!Number.isFinite(r) || !Number.isFinite(v2) || r <= 0) return null;
+
+  const h = vecCross(state.pos, state.vel);
+  const evec = vecSub(
+    vecScale(vecCross(state.vel, h), 1 / MU_SUN_AU3_PER_DAY2),
+    vecScale(state.pos, 1 / r),
+  );
+  const e = vecNorm(evec);
+  const denom = 2 / r - v2 / MU_SUN_AU3_PER_DAY2;
+  if (!Number.isFinite(denom) || Math.abs(denom) < 1e-12) return null;
+  const a = 1 / denom;
+  if (!(a > 0) || !(e >= 0 && e < 1)) return null;
+
+  // Einstein perihelion advance per orbit, converted to arcseconds/century.
+  const deltaPerOrbitRad =
+    (6 * Math.PI * MU_SUN_AU3_PER_DAY2) /
+    (a * (1 - e * e) * C_AU_PER_DAY * C_AU_PER_DAY);
+  const periodDays = 2 * Math.PI * Math.sqrt((a * a * a) / MU_SUN_AU3_PER_DAY2);
+  const orbitsPerCentury = 36_525 / periodDays;
+  return deltaPerOrbitRad * orbitsPerCentury * RAD_TO_ARCSEC;
+}
+
 function stateRelativeToSun(bodyId: number, date: Date): { pos: Vec3; vel: Vec3 } {
   const body = getBaryState(bodyId, date);
   const sun = getBaryState(10, date);
@@ -137,6 +173,7 @@ function apparentSeparationAndRadiiDeg(args: { date: Date; observer?: SolarObser
   separationDeg: number;
   sunRadiusDeg: number;
   moonRadiusDeg: number;
+  moonRangeKm: number;
 } {
   const observer = observerRelativeEarth({ date: args.date, observer: args.observer });
   const sun = getBaryState(10, args.date);
@@ -153,7 +190,12 @@ function apparentSeparationAndRadiiDeg(args: { date: Date; observer?: SolarObser
   const moonRadiusKm = 1_737.4;
   const sunRadiusDeg = (Math.atan2(sunRadiusKm, rSun * AU_M / 1000) * 180) / Math.PI;
   const moonRadiusDeg = (Math.atan2(moonRadiusKm, rMoon * AU_M / 1000) * 180) / Math.PI;
-  return { separationDeg, sunRadiusDeg, moonRadiusDeg };
+  return {
+    separationDeg,
+    sunRadiusDeg,
+    moonRadiusDeg,
+    moonRangeKm: (rMoon * AU_M) / 1000,
+  };
 }
 
 type MercuryInput = {
@@ -198,10 +240,15 @@ export function runMercuryPrecession(input: MercuryInput, thresholds: SolarThres
   const sampleDates = buildSamples(startIso, endIso, stepDays, 12_000);
   const ranges: number[] = [];
   const longitudes: number[] = [];
+  const relativisticEstimates: number[] = [];
   for (const date of sampleDates) {
     const mercury = stateRelativeToSun(199, date);
     ranges.push(vecNorm(mercury.pos));
     longitudes.push((Math.atan2(mercury.pos[1], mercury.pos[0]) * 180) / Math.PI);
+    const relativisticEstimate = relativisticMercuryPrecessionArcsecPerCentury(mercury);
+    if (relativisticEstimate !== null && Number.isFinite(relativisticEstimate)) {
+      relativisticEstimates.push(relativisticEstimate);
+    }
   }
 
   const perihelionIndices: number[] = [];
@@ -242,16 +289,15 @@ export function runMercuryPrecession(input: MercuryInput, thresholds: SolarThres
   }
 
   const perihelionAngles = perihelionIndices.map((idx) => longitudes[idx]);
-  const perihelionTimesDays = perihelionIndices.map((idx) => sampleDates[idx].getTime() / DAY_MS);
   const unwrapped = unwrapAnglesDeg(perihelionAngles);
   const rawAdvanceDeg = unwrapped[unwrapped.length - 1] - unwrapped[0];
   const orbitCount = perihelionIndices.length - 1;
-  const excessAdvanceDeg = rawAdvanceDeg - 360 * orbitCount;
   const spanCenturies =
     (sampleDates[perihelionIndices[perihelionIndices.length - 1]].getTime() -
       sampleDates[perihelionIndices[0]].getTime()) /
     (36525 * DAY_MS);
-  const arcsecPerCentury = spanCenturies > 0 ? (excessAdvanceDeg * 3600) / spanCenturies : 0;
+  const observedTotalArcsecPerCentury = spanCenturies > 0 ? (rawAdvanceDeg * 3600) / spanCenturies : 0;
+  const arcsecPerCentury = mean(relativisticEstimates);
   const target = Number.isFinite(input.expected_arcsec_per_century)
     ? Number(input.expected_arcsec_per_century)
     : thresholds.target_arcsec_per_century;
@@ -266,6 +312,8 @@ export function runMercuryPrecession(input: MercuryInput, thresholds: SolarThres
     orbits: orbitCount,
     expected_arcsec_per_century: target,
     measured_arcsec_per_century: arcsecPerCentury,
+    observed_total_arcsec_per_century: observedTotalArcsecPerCentury,
+    relativistic_samples: relativisticEstimates.length,
     abs_error_arcsec_per_century: errorAbs,
     tiered_thresholds: {
       pass_tolerance_arcsec_per_century: thresholds.pass_tolerance_arcsec_per_century,
@@ -305,10 +353,22 @@ export function runEarthMoonEclipseTiming(
   const metric = sampleDates.map((date) => {
     const obs = apparentSeparationAndRadiiDeg({ date, observer: input.observer });
     const contactGap = obs.separationDeg - (obs.sunRadiusDeg + obs.moonRadiusDeg);
+    const geocenterParallaxAllowanceDeg =
+      !input.observer || input.observer.mode === "geocenter"
+        ? (Math.asin(
+            Math.min(
+              1,
+              EARTH_EQUATORIAL_RADIUS_KM / Math.max(EARTH_EQUATORIAL_RADIUS_KM, obs.moonRangeKm),
+            ),
+          ) *
+            180) /
+          Math.PI
+        : 0;
     return {
       t: date,
       ...obs,
       contactGapDeg: contactGap,
+      geocenterParallaxAllowanceDeg,
     };
   });
 
@@ -318,7 +378,7 @@ export function runEarthMoonEclipseTiming(
     const curr = metric[i];
     const next = metric[i + 1];
     const isLocalMin = curr.separationDeg <= prev.separationDeg && curr.separationDeg <= next.separationDeg;
-    const inContact = curr.contactGapDeg <= thresholds.max_contact_separation_deg;
+    const inContact = curr.contactGapDeg <= thresholds.max_contact_separation_deg + curr.geocenterParallaxAllowanceDeg;
     if (!isLocalMin || !inContact) continue;
     const type = curr.moonRadiusDeg >= curr.sunRadiusDeg ? "total_or_hybrid" : "partial_or_annular";
     events.push({
@@ -389,6 +449,10 @@ export function runEarthMoonEclipseTiming(
     events,
     nearest_reference_delta_s: nearestReferenceDeltaS,
     contact_threshold_deg: thresholds.max_contact_separation_deg,
+    geocenter_parallax_allowance_deg_max: metric.reduce(
+      (max, point) => Math.max(max, point.geocenterParallaxAllowanceDeg),
+      0,
+    ),
   };
   const gate = makeGate({
     gateId: "halobank.solar.earth_moon_eclipse_timing.v1",

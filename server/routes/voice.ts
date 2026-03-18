@@ -34,6 +34,7 @@ import {
   type HelixAskInterpreterArtifact,
   type HelixAskInterpreterStatus,
 } from "../services/helix-ask/interpreter";
+import { runVoiceCommandArbiter } from "../services/voice-command/command-arbiter";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -1707,6 +1708,23 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       );
     }
 
+    const commandLane = await runVoiceCommandArbiter({
+      transcript: result.text ?? "",
+      traceId: parsed.data.traceId ?? null,
+      speechProbability:
+        typeof result.speech_probability === "number"
+          ? result.speech_probability
+          : typeof parsed.data.speech_probability === "number"
+            ? parsed.data.speech_probability
+            : null,
+      snrDb:
+        typeof result.snr_db === "number"
+          ? result.snr_db
+          : typeof parsed.data.snr_db === "number"
+            ? parsed.data.snr_db
+            : null,
+    });
+
     return res.status(200).json({
       ok: true,
       text: result.text ?? "",
@@ -1769,6 +1787,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       interpreter_confirm_prompt: result.interpreter_confirm_prompt ?? null,
       interpreter_term_ids: Array.isArray(result.interpreter_term_ids) ? result.interpreter_term_ids : [],
       interpreter_concept_ids: Array.isArray(result.interpreter_concept_ids) ? result.interpreter_concept_ids : [],
+      command_lane: commandLane,
     });
   });
 });
