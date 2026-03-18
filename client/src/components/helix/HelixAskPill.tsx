@@ -4036,6 +4036,102 @@ const HELIX_ASK_MATH_DELIMITERS: ReadonlyArray<{
   { openDelimiter: "$", closeDelimiter: "$", displayMode: false },
 ];
 
+const HELIX_ASK_BARE_EQUATION_CANDIDATE_RE =
+  /[A-Za-z][A-Za-z0-9_]*(?:\([^=\n]{1,24}\))?\s*=\s*[^\n]{3,220}/g;
+const HELIX_ASK_BARE_EQUATION_SIGNAL_RE =
+  /(?:[0-9+\-*/^()|]|\b(?:sqrt|frac|integral|int|pi|hbar|delta|gamma|beta|rho|theta|tau|kappa|psi|phi|lambda)\b)/i;
+
+function normalizeBareEquationCandidate(value: string): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  const cutPatterns = [
+    /,\s*(?:with|where|and|but|which|that)\b/i,
+    /\s+-\s+(?:Keep|This|In|The|Term-to-implementation|Sources)\b/i,
+    /\.\s+(?:Keep|This|In|The|Term-to-implementation|Sources)\b/i,
+    /\s+Sources:\s*/i,
+  ];
+  let cutIndex = compact.length;
+  for (const pattern of cutPatterns) {
+    const match = compact.match(pattern);
+    if (!match || match.index === undefined) continue;
+    cutIndex = Math.min(cutIndex, match.index);
+  }
+  return compact.slice(0, cutIndex).trim();
+}
+
+function isLikelyBareEquationSegment(value: string): boolean {
+  const normalized = normalizeBareEquationCandidate(value);
+  if (!normalized) return false;
+  const eqIndex = normalized.indexOf("=");
+  if (eqIndex <= 0 || eqIndex >= normalized.length - 1) return false;
+  const lhs = normalized.slice(0, eqIndex).trim();
+  const rhs = normalized.slice(eqIndex + 1).trim();
+  if (!lhs || !rhs) return false;
+  if (lhs.includes("/") || lhs.includes(":") || lhs.includes("\\")) return false;
+  if (/^(?:docs|server|client|modules|tools|scripts|tmp)\b/i.test(lhs)) return false;
+  if (/^https?:\/\//i.test(rhs)) return false;
+  if (!HELIX_ASK_BARE_EQUATION_SIGNAL_RE.test(rhs)) return false;
+  return true;
+}
+
+function tokenizeHelixAskBareEquationSegments(content: string): HelixAskMathToken[] {
+  const text = coerceText(content);
+  if (!text) return [];
+  const tokens: HelixAskMathToken[] = [];
+  let cursor = 0;
+  HELIX_ASK_BARE_EQUATION_CANDIDATE_RE.lastIndex = 0;
+  for (const match of text.matchAll(HELIX_ASK_BARE_EQUATION_CANDIDATE_RE)) {
+    const raw = match[0] ?? "";
+    const start = match.index ?? -1;
+    if (!raw || start < 0) continue;
+    const candidate = normalizeBareEquationCandidate(raw);
+    if (!isLikelyBareEquationSegment(candidate)) continue;
+    const offset = raw.indexOf(candidate);
+    const mathStart = start + Math.max(0, offset);
+    const mathEnd = mathStart + candidate.length;
+    if (mathStart < cursor) continue;
+    if (mathStart > cursor) {
+      pushTextMathToken(tokens, text.slice(cursor, mathStart));
+    }
+    tokens.push({
+      kind: "math",
+      text: candidate,
+      displayMode: false,
+      openDelimiter: "",
+      closeDelimiter: "",
+    });
+    cursor = mathEnd;
+  }
+  if (cursor < text.length) {
+    pushTextMathToken(tokens, text.slice(cursor));
+  }
+  return tokens.length > 0 ? tokens : [{ kind: "text", text }];
+}
+
+function expandMathTokensWithBareEquations(tokens: HelixAskMathToken[]): HelixAskMathToken[] {
+  if (tokens.length === 0) return tokens;
+  const expanded: HelixAskMathToken[] = [];
+  for (const token of tokens) {
+    if (token.kind !== "text") {
+      expanded.push(token);
+      continue;
+    }
+    const splitTokens = tokenizeHelixAskBareEquationSegments(token.text);
+    if (splitTokens.length === 0) {
+      pushTextMathToken(expanded, token.text);
+      continue;
+    }
+    for (const splitToken of splitTokens) {
+      if (splitToken.kind === "text") {
+        pushTextMathToken(expanded, splitToken.text);
+      } else {
+        expanded.push(splitToken);
+      }
+    }
+  }
+  return expanded;
+}
+
 function isEscapedDelimiterAt(value: string, index: number): boolean {
   if (index <= 0) return false;
   let slashCount = 0;
@@ -4139,7 +4235,13 @@ export function tokenizeHelixAskMathTokens(content: string): HelixAskMathToken[]
     }
     cursor = closeIndex + nextOpen.closeDelimiter.length;
   }
-  return tokens;
+  return expandMathTokensWithBareEquations(tokens);
+}
+
+export function hasHelixAskRenderableMath(content: unknown): boolean {
+  const text = coerceText(content);
+  if (!text) return false;
+  return tokenizeHelixAskMathTokens(text).some((token) => token.kind === "math");
 }
 
 function asObjectRecord(value: unknown): Record<string, unknown> | null {
@@ -5498,6 +5600,7 @@ const HELIX_FILE_PANEL_HINTS: Array<{ pattern: RegExp; panelId: PanelDefinition[
   { pattern: /(agi\.plan|training-trace|essence|trace)/i, panelId: "agi-essence-console" },
   { pattern: /(docs\/|\.md$)/i, panelId: "docs-viewer" },
 ];
+const HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID: PanelDefinition["id"] = "needle-mk2-calculator";
 
 const HELIX_ATOMIC_LAUNCH_EVENT = "helix:atomic-launch";
 const HELIX_ATOMIC_LAUNCH_STORAGE_KEY = "helix.atomic.launch.v1";
@@ -7564,11 +7667,25 @@ export function HelixAskPill({
 
   const renderHelixAskEnvelope = useCallback(
     (reply: HelixAskReply) => {
+      const canLaunchCalculatorPanel = Boolean(getPanelDef(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID));
       if (!reply.envelope) {
+        const plainContent = coerceText(reply.content);
+        const hasEquationContent = canLaunchCalculatorPanel && hasHelixAskRenderableMath(plainContent);
         return (
-          <p className="whitespace-pre-wrap leading-relaxed">
-            {renderHelixAskContent(reply.content)}
-          </p>
+          <div className="space-y-2">
+            <p className="whitespace-pre-wrap leading-relaxed">
+              {renderHelixAskContent(plainContent)}
+            </p>
+            {hasEquationContent ? (
+              <button
+                type="button"
+                className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200"
+                onClick={() => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID)}
+              >
+                Open Calculator Panel
+              </button>
+            ) : null}
+          </div>
         );
       }
       const envelopeAnswer = coerceText(reply.envelope.answer).trim();
@@ -7588,6 +7705,11 @@ export function HelixAskPill({
         HELIX_ASK_MAX_RENDER_CHARS,
         expanded,
       );
+      const hasEquationContent =
+        canLaunchCalculatorPanel &&
+        (hasHelixAskRenderableMath(answerText) ||
+          sections.some((section) => hasHelixAskRenderableMath(section.body)) ||
+          (extensionAvailable && hasHelixAskRenderableMath(extensionBody)));
       const hasLongContent =
         hasLongText(envelopeAnswer || fallbackAnswer, HELIX_ASK_MAX_RENDER_CHARS) ||
         hasLongText(extensionBody, HELIX_ASK_MAX_RENDER_CHARS) ||
@@ -7597,6 +7719,15 @@ export function HelixAskPill({
           <p className="whitespace-pre-wrap leading-relaxed">
             {renderHelixAskContent(answerText)}
           </p>
+          {hasEquationContent ? (
+            <button
+              type="button"
+              className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 hover:text-emerald-200"
+              onClick={() => openPanelById(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID)}
+            >
+              Open Calculator Panel
+            </button>
+          ) : null}
           {hasLongContent ? (
             <button
               type="button"
@@ -7670,7 +7801,13 @@ export function HelixAskPill({
         </div>
       );
     },
-    [askExpandedByReply, askExtensionOpenByReply, renderEnvelopeSections, renderHelixAskContent],
+    [
+      askExpandedByReply,
+      askExtensionOpenByReply,
+      openPanelById,
+      renderEnvelopeSections,
+      renderHelixAskContent,
+    ],
   );
 
   const buildCopyText = useCallback((reply: HelixAskReply): string => {

@@ -45,6 +45,12 @@ Policy note:
 - Human-readable anchor: `docs/audits/research/warp-promotion-readiness-suite-latest.md`
 - Full refresh command: `npm run warp:promotion:readiness:check`
 
+## Default Needle Hull Mark 2 Proof Index Anchor
+- End-to-end proof index (machine-readable): `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json`
+- End-to-end proof index (human-readable): `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md`
+- Purpose: single source of truth for artifact paths used to substantiate generated-paper claims across canonical, parity, external-work, and evidence-lane scopes.
+- Usage: paper-generation outputs should cite this index first (JSON or MD), then cite claim-specific artifact paths from the index.
+
 Policy note:
 - External-work comparisons remain `reference_only` overlays until separately promoted by canonical governance policy.
 - Promotion-readiness artifacts are reporting overlays and do not override canonical gates.

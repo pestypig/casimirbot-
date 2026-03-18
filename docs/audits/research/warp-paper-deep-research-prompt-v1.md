@@ -83,6 +83,8 @@ Citation admissibility checks:
 - `docs/audits/research/warp-g4-curvature-applicability-audit-2026-03-02.md`
 - `docs/audits/research/warp-g4-uncertainty-audit-2026-03-02.md`
 - `docs/audits/research/warp-g4-literature-parity-replay-2026-03-02.md`
+- `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json`
+- `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md`
 
 ## Experimental Data Staging Inputs (reference-only, non-blocking)
 - `docs/audits/research/warp-qei-worldline-primer-2026-03-04.md`
@@ -126,6 +128,9 @@ Staging rule:
 
 ## Output Requirements
 Generate two outputs.
+
+Global citation rule:
+- Treat `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json` (or the MD companion) as the default top-level path map for generated paper references, then cite claim-specific artifact paths from that index.
 
 ### Output A: Defensible Now
 - Methods/results style

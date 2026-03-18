@@ -20412,6 +20412,7 @@ const HELIX_ASK_EQUATION_SEMANTIC_RERANK_MAX_TOKENS = clampNumber(
   120,
   1024,
 );
+const HELIX_ASK_EQUATION_STATE_VERSION = "selector_authoritative_v1";
 const HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST = clampNumber(
   Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST ?? 24),
   4,
@@ -20748,16 +20749,30 @@ const detectEquationRhsMathSignal = (line: string): boolean => {
 const hasEquationOperatorSignal = (line: string): boolean =>
   EQUATION_OPERATOR_SIGNAL_RE.test(stripQuotedSegments(line));
 
+const extractAssignmentEquationFragment = (line: string): string | null => {
+  const trimmed = String(line ?? "").trim();
+  if (!trimmed) return null;
+  const withoutPrefix = trimmed.replace(/^\s*(?:export\s+)?(?:const|let|var)\s+/i, "");
+  const match = withoutPrefix.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;\n]{8,320})/);
+  if (!match?.[1] || !match?.[2]) return null;
+  const fragment = `${match[1]} = ${match[2].trim()}`.replace(/[`]+/g, "").trim();
+  if (!fragment || fragment.length < 8) return null;
+  if (!EQUATION_IN_TEXT_RE.test(fragment)) return null;
+  return clipAskText(fragment, 320);
+};
+
 const extractConciseEquationFragment = (line: string): string | null => {
   const trimmed = line.trim();
   if (!trimmed) return null;
+  const assignment = extractAssignmentEquationFragment(trimmed);
+  if (assignment) return assignment;
   const patterns = [
-    /ds\^2\s*=\s*[^.;\n]{8,320}/i,
-    /\bK_ij\s*=\s*[^.;\n]{8,320}/i,
-    /\brho_E\s*=\s*[^.;\n]{8,320}/i,
-    /\btheta(?:_[A-Za-z0-9]+)?\s*=\s*[^.;\n]{8,320}/i,
-    /\bbeta(?:_[A-Za-z0-9]+)?(?:\^[A-Za-z0-9]+)?\s*=\s*[^.;\n]{6,320}/i,
-    /[A-Za-z][A-Za-z0-9_^{}()]*\s*=\s*[^.;\n]{8,320}/,
+    /ds\^2\s*=\s*[^;\n]{8,320}/i,
+    /\bK_ij\s*=\s*[^;\n]{8,320}/i,
+    /\brho_E\s*=\s*[^;\n]{8,320}/i,
+    /\btheta(?:_[A-Za-z0-9]+)?\s*=\s*[^;\n]{8,320}/i,
+    /\bbeta(?:_[A-Za-z0-9]+)?(?:\^[A-Za-z0-9]+)?\s*=\s*[^;\n]{6,320}/i,
+    /[A-Za-z][A-Za-z0-9_^{}()]*\s*=\s*[^;\n]{8,320}/,
   ];
   for (const pattern of patterns) {
     const match = trimmed.match(pattern);
@@ -20768,6 +20783,88 @@ const extractConciseEquationFragment = (line: string): string | null => {
     return clipAskText(fragment, 320);
   }
   return null;
+};
+
+const expandEquationCandidateLine = (
+  lines: string[],
+  lineIndex: number,
+  maxLookaheadLines = 3,
+): string => {
+  const firstLine = String(lines[lineIndex] ?? "").trim();
+  if (!firstLine) return "";
+  let combined = firstLine;
+  let cursor = lineIndex;
+  let parenBalance =
+    (firstLine.match(/\(/g)?.length ?? 0) - (firstLine.match(/\)/g)?.length ?? 0);
+  for (let step = 0; step < maxLookaheadLines; step += 1) {
+    if (cursor + 1 >= lines.length) break;
+    if (parenBalance <= 0 && /[;)]\s*$/.test(combined)) break;
+    const nextLine = String(lines[cursor + 1] ?? "").trim();
+    if (!nextLine) break;
+    if (
+      /^(?:Primary Topic:|Primary Equation\s*\(|Mechanism Explanation:|Related Cross-Topic Evidence|Rejected Candidates|Sources:)/i.test(
+        nextLine,
+      )
+    ) {
+      break;
+    }
+    if (/^(?:[-*]\s+|\d+\.\s+)/.test(nextLine) && !/^[.+\-/*(]/.test(nextLine)) {
+      break;
+    }
+    combined = `${combined} ${nextLine}`.trim();
+    parenBalance +=
+      (nextLine.match(/\(/g)?.length ?? 0) - (nextLine.match(/\)/g)?.length ?? 0);
+    cursor += 1;
+    if (parenBalance <= 0 && /[;)]\s*$/.test(nextLine)) break;
+  }
+  return combined;
+};
+
+const looksTruncatedEquationFragment = (equationLine: string): boolean => {
+  const normalized = String(equationLine ?? "").trim();
+  if (!normalized) return false;
+  const parenBalance =
+    (normalized.match(/\(/g)?.length ?? 0) - (normalized.match(/\)/g)?.length ?? 0);
+  if (parenBalance > 0) return true;
+  if (/[+\-*/^=]\s*$/.test(normalized)) return true;
+  if (/\b(?:Math|pow|max|min|sqrt|exp|sin|cos|tan|log)\s*$/i.test(normalized)) return true;
+  if (/\.\s*$/.test(normalized)) return true;
+  return false;
+};
+
+const repairEquationCandidateFromSource = (
+  candidate: EquationRescueCandidate,
+  sourceLinesCache?: Map<string, string[]>,
+): void => {
+  if (!candidate) return;
+  const shouldAttemptRepair = looksTruncatedEquationFragment(candidate.equation);
+  if (!shouldAttemptRepair) return;
+  const normalizedPath = normalizeAtlasRepoPath(candidate.path);
+  if (!normalizedPath || !isAtlasRepoPathSafe(normalizedPath)) return;
+  if (!Number.isFinite(candidate.line) || candidate.line <= 0) return;
+  let sourceLines = sourceLinesCache?.get(normalizedPath);
+  if (!sourceLines) {
+    const absolutePath = path.resolve(process.cwd(), normalizedPath);
+    if (!fs.existsSync(absolutePath)) return;
+    try {
+      const sourceRaw = fs.readFileSync(absolutePath, "utf8");
+      if (!sourceRaw || sourceRaw.includes("\u0000")) return;
+      sourceLines = sourceRaw.split(/\r?\n/);
+      sourceLinesCache?.set(normalizedPath, sourceLines);
+    } catch {
+      return;
+    }
+  }
+  const lineIndex = Math.max(0, Math.floor(candidate.line - 1));
+  if (lineIndex >= sourceLines.length) return;
+  const expanded = expandEquationCandidateLine(sourceLines, lineIndex, 4).trim();
+  if (!expanded) return;
+  const repaired = extractConciseEquationFragment(expanded) ?? clipAskText(expanded, 320);
+  if (!repaired) return;
+  if (repaired.length <= candidate.equation.length + 4) return;
+  candidate.equation = repaired;
+  candidate.rhsMathSignal = detectEquationRhsMathSignal(expanded);
+  candidate.stringLiteralSignal = detectEquationStringLiteralSignal(expanded);
 };
 
 const isMojibakeSeparatorEquationLine = (line: string): boolean => {
@@ -21835,9 +21932,11 @@ const collectEquationRescueCandidates = (args: {
       for (const snippet of Array.isArray(card.snippets) ? card.snippets : []) {
         const lines = String(snippet.text ?? "").split(/\r?\n/);
         for (let index = 0; index < lines.length; index += 1) {
-          const rawLine = lines[index]?.trim();
+          const firstLine = lines[index]?.trim();
+          if (!firstLine) continue;
+          if (!EQUATION_IN_TEXT_RE.test(firstLine)) continue;
+          const rawLine = expandEquationCandidateLine(lines, index);
           if (!rawLine) continue;
-          if (!EQUATION_IN_TEXT_RE.test(rawLine)) continue;
           if (!isEquationExactLineEligible({ line: rawLine, path: normalizedPath })) continue;
           const equationLine = extractConciseEquationFragment(rawLine) ?? clipAskText(rawLine, 320);
           if (!equationLine || !EQUATION_IN_TEXT_RE.test(equationLine)) continue;
@@ -21944,7 +22043,10 @@ const collectEquationRescueCandidates = (args: {
       semanticFit: EquationSemanticFit;
     }> = [];
     for (let i = 0; i < lines.length; i += 1) {
-      const rawLine = (lines[i] ?? "").trim();
+      const firstLine = (lines[i] ?? "").trim();
+      if (!firstLine) continue;
+      if (!EQUATION_IN_TEXT_RE.test(firstLine)) continue;
+      const rawLine = expandEquationCandidateLine(lines, i);
       if (!rawLine) continue;
       if (!isEquationExactLineEligible({ line: rawLine, path: normalizedPath })) continue;
       const baseScore = scoreEquationCandidateLine(
@@ -22088,6 +22190,12 @@ const collectEquationRescueCandidates = (args: {
       .map((entry) => normalizeAtlasRepoPath(entry))
       .filter((entry): entry is string => Boolean(entry)),
   );
+  if (candidates.length > 0) {
+    const sourceLinesCache = new Map<string, string[]>();
+    for (const candidate of candidates) {
+      repairEquationCandidateFromSource(candidate, sourceLinesCache);
+    }
+  }
   candidates.sort((left, right) => {
     const leftAnchor = anchorSet.has(left.path) ? 1 : 0;
     const rightAnchor = anchorSet.has(right.path) ? 1 : 0;
@@ -22851,6 +22959,55 @@ const assertRenderedPrimaryMatchesSelection = (args: {
   };
 };
 
+const resolveEquationSourceFragmentFromPrimaryKey = (primaryKey: string): string | null => {
+  const markerIndex = String(primaryKey ?? "").lastIndexOf(":L");
+  if (markerIndex <= 0) return null;
+  const rawPath = primaryKey.slice(0, markerIndex).trim();
+  const lineRaw = primaryKey.slice(markerIndex + 2).trim();
+  const line = Number(lineRaw);
+  if (!rawPath || !Number.isFinite(line) || line <= 0) return null;
+  const normalizedPath = normalizeAtlasRepoPath(rawPath);
+  if (!normalizedPath || !isAtlasRepoPathSafe(normalizedPath)) return null;
+  const absolutePath = path.resolve(process.cwd(), normalizedPath);
+  if (!fs.existsSync(absolutePath)) return null;
+  let sourceRaw = "";
+  try {
+    sourceRaw = fs.readFileSync(absolutePath, "utf8");
+  } catch {
+    return null;
+  }
+  if (!sourceRaw || sourceRaw.includes("\u0000")) return null;
+  const lines = sourceRaw.split(/\r?\n/);
+  const lineIndex = Math.max(0, Math.floor(line - 1));
+  if (lineIndex >= lines.length) return null;
+  const expanded = expandEquationCandidateLine(lines, lineIndex, 4).trim();
+  if (!expanded) return null;
+  return extractConciseEquationFragment(expanded) ?? clipAskText(expanded, 320);
+};
+
+const enforceRenderedPrimaryEquationFromSource = (
+  renderedText: string,
+  selectorPrimaryKey: string | null,
+): string => {
+  if (!selectorPrimaryKey || !renderedText?.trim()) return renderedText;
+  const sourceEquation = resolveEquationSourceFragmentFromPrimaryKey(selectorPrimaryKey);
+  if (!sourceEquation) return renderedText;
+  const escapeRegExp = (input: string): string => input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedKey = escapeRegExp(selectorPrimaryKey);
+  const exactLinePattern = new RegExp(
+    `(Exact equation line \\(${escapedKey}\\):\\s*\\r?\\n)([^\\r\\n]*)`,
+    "i",
+  );
+  if (exactLinePattern.test(renderedText)) {
+    return renderedText.replace(exactLinePattern, `$1${sourceEquation}`);
+  }
+  const bulletPattern = new RegExp(`(-\\s*\\[${escapedKey}\\]\\s*)([^\\r\\n]*)`, "i");
+  if (bulletPattern.test(renderedText)) {
+    return renderedText.replace(bulletPattern, `$1${sourceEquation}`);
+  }
+  return renderedText;
+};
+
 const hasDominantFamilyEquationSignal = (
   equationLine: string,
   dominantFamily: EquationCandidateDomainFamily,
@@ -23238,6 +23395,13 @@ const buildEquationClaimBackingAssembly = (args: {
   const primary = best;
   const primaryScore = primaryEntry?.selectionScore ?? null;
   const support = selection.supportEntries.map((entry) => entry.candidate);
+  if (primary || support.length > 0) {
+    const sourceLinesCache = new Map<string, string[]>();
+    if (primary) repairEquationCandidateFromSource(primary, sourceLinesCache);
+    for (const candidate of support) {
+      repairEquationCandidateFromSource(candidate, sourceLinesCache);
+    }
+  }
   const candidateTable = buildEquationCandidateTable({
     ranked,
     contract: intentContract,
@@ -24544,9 +24708,18 @@ const enforceNonReportModeGuard = (
   if (reportModeEnabled || intentStrategy === "constraint_report") {
     return { text: answer, mismatch: false, hadScaffold: false };
   }
-  const hadScaffold = hasReportScaffolding(answer);
-  const text = stripNonReportScaffolding(answer);
-  return { text, mismatch: hadScaffold && !hasReportScaffolding(text), hadScaffold };
+  const hadReportScaffold = hasReportScaffolding(answer);
+  const hadScientificScaffold = isScientificMicroReport(answer);
+  let text = stripNonReportScaffolding(answer);
+  if (hadScientificScaffold) {
+    const conversational = rewriteConversationScientificVoice(answer);
+    if (conversational.trim()) {
+      text = stripRunawayAnswerArtifacts(conversational);
+    }
+  }
+  const hadScaffold = hadReportScaffold || hadScientificScaffold;
+  const scaffoldCleared = !hasReportScaffolding(text) && !isScientificMicroReport(text);
+  return { text, mismatch: hadScaffold && scaffoldCleared, hadScaffold };
 };
 
 const resolveNonReportGuardContext = (
@@ -42010,6 +42183,9 @@ const executeHelixAsk = async ({
       let equationForcedGeneralExplain = false;
       let equationBypassTriggered = false;
       let equationBypassReason: string | null = null;
+      let equationDegradePathId: string | null = null;
+      let equationPostLockGateOverrideAttempted = false;
+      let equationPostLockGateOverrideBlocked = false;
       let equationRecoveryReason: "missing_symbol" | "missing_path_anchor" | "low_primary_confidence" | null = null;
       let equationRecoveryAttempts = 0;
       let equationSelectorPrimaryKey: string | null = null;
@@ -42026,10 +42202,16 @@ const executeHelixAsk = async ({
         getEquationRuntimeElapsedMs() > HELIX_ASK_EQUATION_ASK_RUNTIME_BUDGET_MS
           ? "budget_breached"
           : "within_budget";
+      const markEquationDegradePath = (reason: string): void => {
+        if (!equationPromptDetected) return;
+        if (equationDegradePathId) return;
+        equationDegradePathId = reason.trim() || "unspecified";
+      };
       const buildEquationUnifiedDegradeRuntimeAnswer = (
         reason: string,
         citationHints: string[],
       ): string => {
+        markEquationDegradePath(reason);
         const degradeCandidates = collectEquationRescueCandidates({
           question: baseQuestion,
           explicitPaths: equationIntentContract.explicit_paths,
@@ -43529,6 +43711,7 @@ const executeHelixAsk = async ({
             maxCandidates: 6,
             includeWeakSemantic: true,
           });
+          markEquationDegradePath("warp_congruence_final_output_guard");
           const warpDegrade = buildEquationUnifiedDegradeAnswer({
             question: baseQuestion,
             contract: warpGuardContract,
@@ -43921,16 +44104,22 @@ const executeHelixAsk = async ({
       );
       if (openWorldBypassMode === "active") {
         if (equationPromptDetected) {
-          const equationOpenWorldDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
-            "open_world_bypass_equation",
-            contractCitationTokens,
-          );
-          const equationOpenWorldSanitized = scrubUnsupportedPaths(
-            equationOpenWorldDegrade,
-            citationScrubAllowPaths,
-          );
-          cleaned = (equationOpenWorldSanitized.text || equationOpenWorldDegrade).trim();
-          answerPath.push("openWorldBypass:equation_unified_degrade");
+          if (equationSelectorAuthorityLock) {
+            equationPostLockGateOverrideAttempted = true;
+            equationPostLockGateOverrideBlocked = true;
+            answerPath.push("openWorldBypass:equation_unified_degrade_skipped_selector_lock");
+          } else {
+            const equationOpenWorldDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
+              "open_world_bypass_equation",
+              contractCitationTokens,
+            );
+            const equationOpenWorldSanitized = scrubUnsupportedPaths(
+              equationOpenWorldDegrade,
+              citationScrubAllowPaths,
+            );
+            cleaned = (equationOpenWorldSanitized.text || equationOpenWorldDegrade).trim();
+            answerPath.push("openWorldBypass:equation_unified_degrade");
+          }
         } else if (!ideologyDeterministicFirstPassActive) {
           cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
           cleaned = ensureOpenWorldBypassUncertainty(cleaned);
@@ -43953,31 +44142,43 @@ const executeHelixAsk = async ({
         !hasFilePathHints &&
         hasArtifactJsonSpill(cleaned);
       if (nonRepoArtifactLeakDetected) {
-        cleaned = buildLocalizedConfirmPrompt({
-          responseLanguage,
-          sourceLanguage,
-          concept: sourceQuestion || baseQuestion || null,
-        });
-        answerPath.push("gate:non_repo_artifact_leak_clarifier");
-        if (debugPayload) {
-          (debugPayload as Record<string, unknown>).non_repo_artifact_leak_guard_applied = true;
-          (debugPayload as Record<string, unknown>).non_repo_artifact_leak_guard_reason =
-            "artifact_json_spill";
+        if (equationPromptDetected && equationSelectorAuthorityLock) {
+          equationPostLockGateOverrideAttempted = true;
+          equationPostLockGateOverrideBlocked = true;
+          answerPath.push("gate:non_repo_artifact_leak_clarifier_skipped_selector_lock");
+        } else {
+          cleaned = buildLocalizedConfirmPrompt({
+            responseLanguage,
+            sourceLanguage,
+            concept: sourceQuestion || baseQuestion || null,
+          });
+          answerPath.push("gate:non_repo_artifact_leak_clarifier");
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).non_repo_artifact_leak_guard_applied = true;
+            (debugPayload as Record<string, unknown>).non_repo_artifact_leak_guard_reason =
+              "artifact_json_spill";
+          }
         }
       }
       if (openWorldBypassMode === "active" && !ideologyDeterministicFirstPassActive) {
         if (equationPromptDetected) {
           if (!hasRequiredEquationSections(cleaned)) {
-            const equationOpenWorldDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
-              "open_world_bypass_equation_final_guard",
-              contractCitationTokens,
-            );
-            const equationOpenWorldSanitized = scrubUnsupportedPaths(
-              equationOpenWorldDegrade,
-              citationScrubAllowPaths,
-            );
-            cleaned = (equationOpenWorldSanitized.text || equationOpenWorldDegrade).trim();
-            answerPath.push("openWorldBypass:final_equation_unified_guard");
+            if (equationSelectorAuthorityLock) {
+              equationPostLockGateOverrideAttempted = true;
+              equationPostLockGateOverrideBlocked = true;
+              answerPath.push("openWorldBypass:final_equation_unified_guard_skipped_selector_lock");
+            } else {
+              const equationOpenWorldDegrade = buildEquationUnifiedDegradeRuntimeAnswer(
+                "open_world_bypass_equation_final_guard",
+                contractCitationTokens,
+              );
+              const equationOpenWorldSanitized = scrubUnsupportedPaths(
+                equationOpenWorldDegrade,
+                citationScrubAllowPaths,
+              );
+              cleaned = (equationOpenWorldSanitized.text || equationOpenWorldDegrade).trim();
+              answerPath.push("openWorldBypass:final_equation_unified_guard");
+            }
           } else {
             answerPath.push("openWorldBypass:final_uncertainty_guard_skipped_equation");
           }
@@ -43996,7 +44197,7 @@ const executeHelixAsk = async ({
         capsulePreferredEvidencePaths.length > 0;
       const capsuleGuardApplicable =
         capsuleMustKeepTerms.length > 0 || capsuleAnchorRequired;
-      if (capsuleGuardApplicable) {
+      if (capsuleGuardApplicable && !(equationPromptDetected && equationSelectorAuthorityLock)) {
         let focusGuardPass = answerContainsCapsuleFocusTerm(cleaned, capsuleMustKeepTerms);
         let anchorGuardPass = answerHasCapsulePreferredAnchor(
           cleaned,
@@ -44050,6 +44251,12 @@ const executeHelixAsk = async ({
           focusGuardResult = "pass";
           anchorGuardResult = "pass";
         }
+      } else if (capsuleGuardApplicable && equationPromptDetected && equationSelectorAuthorityLock) {
+        equationPostLockGateOverrideAttempted = true;
+        equationPostLockGateOverrideBlocked = true;
+        focusGuardResult = "pass";
+        anchorGuardResult = "pass";
+        answerPath.push("capsuleGuard:skipped_selector_lock");
       } else {
         focusGuardResult = "pass";
         anchorGuardResult = "pass";
@@ -44067,9 +44274,28 @@ const executeHelixAsk = async ({
       // late-stage citation/contract rewrites (e.g. "ts]" / "md]").
       cleaned = cleanDanglingFileExtensionFragments(cleaned);
       cleaned = dedupeAdjacentCitationBrackets(cleaned);
+      if (equationSelectorAuthorityLock) {
+        const rehydratedPrimary = enforceRenderedPrimaryEquationFromSource(
+          cleaned,
+          equationSelectorPrimaryKey,
+        );
+        if (rehydratedPrimary !== cleaned) {
+          cleaned = rehydratedPrimary;
+          answerPath.push("equationSelector:post_lock_primary_line_rehydrated");
+        }
+      }
       if (!cleaned.trim()) {
         let emptyAnswerGuardReason = "final_empty_answer_generic";
-        if (equationPromptDetected) {
+        if (
+          equationPromptDetected &&
+          equationSelectorAuthorityLock &&
+          equationSelectorResolved?.text?.trim()
+        ) {
+          cleaned = equationSelectorResolved.text.trim();
+          equationPostLockGateOverrideAttempted = true;
+          equationPostLockGateOverrideBlocked = true;
+          emptyAnswerGuardReason = "final_empty_answer_selector_restore";
+        } else if (equationPromptDetected) {
           const guardCandidates = collectEquationRescueCandidates({
             question: baseQuestion,
             explicitPaths: equationIntentContract.explicit_paths,
@@ -44084,6 +44310,7 @@ const executeHelixAsk = async ({
             maxCandidates: 6,
             includeWeakSemantic: true,
           });
+          markEquationDegradePath("final_empty_answer_guard");
           cleaned = buildEquationUnifiedDegradeAnswer({
             question: baseQuestion,
             contract: equationIntentContract,
@@ -44143,6 +44370,67 @@ const executeHelixAsk = async ({
           const debugRecord = debugPayload as Record<string, unknown>;
           debugRecord.empty_answer_guard_applied = true;
           debugRecord.empty_answer_guard_reason = emptyAnswerGuardReason;
+        }
+      }
+      if (equationSelectorAuthorityLock) {
+        const finalPrimaryCheck = assertRenderedPrimaryMatchesSelection({
+          selectorPrimaryKey: equationSelectorPrimaryKey,
+          renderedText: cleaned,
+        });
+        equationRendererPrimaryKey = finalPrimaryCheck.rendererPrimaryKey;
+        equationPrimaryAnchorMatch = finalPrimaryCheck.match;
+        if (!finalPrimaryCheck.match) {
+          equationPostLockGateOverrideAttempted = true;
+          if (equationSelectorResolved?.text?.trim()) {
+            cleaned = equationSelectorResolved.text.trim();
+            equationPostLockGateOverrideBlocked = true;
+            answerPath.push("equationSelector:post_lock_override_blocked_final");
+            const restoredPrimaryCheck = assertRenderedPrimaryMatchesSelection({
+              selectorPrimaryKey: equationSelectorPrimaryKey,
+              renderedText: cleaned,
+            });
+            equationRendererPrimaryKey = restoredPrimaryCheck.rendererPrimaryKey;
+            equationPrimaryAnchorMatch = restoredPrimaryCheck.match;
+          } else {
+            answerPath.push("equationSelector:post_lock_override_unrecoverable");
+          }
+        } else {
+          answerPath.push("equationSelector:post_lock_primary_preserved_final");
+        }
+      }
+      const preserveStructuredEquationAnswerFinal =
+        equationPromptDetected &&
+        hasEquationStructuredSections(cleaned) &&
+        (equationSelectorAuthorityLock || equationSelectorPrimaryAvailable) &&
+        !equationFallbackAllowedByState;
+      const terminalScientificMarkerDetected =
+        /(?:^|[\r\n]|\s)(?:Confirmed:|Unverified:|Reasoned connections \(bounded\):|Hypotheses \(optional\):|Next evidence:)/i.test(
+          cleaned,
+        );
+      const terminalNonReportGuardEligible =
+        !reportDecision.enabled &&
+        intentStrategy !== "constraint_report" &&
+        !preserveStructuredEquationAnswerFinal &&
+        (terminalScientificMarkerDetected || hasReportScaffolding(cleaned) || isScientificMicroReport(cleaned));
+      if (terminalNonReportGuardEligible) {
+        const normalizedForTerminalGuard = normalizeScientificSectionLayout(cleaned);
+        const terminalNonReportGuard = enforceNonReportModeGuard(
+          normalizedForTerminalGuard,
+          reportDecision.enabled,
+          intentStrategy,
+        );
+        if (terminalNonReportGuard.text !== cleaned) {
+          cleaned = terminalNonReportGuard.text;
+          answerPath.push("policy:non_report_terminal_guard");
+        }
+        if (debugPayload) {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.report_mode_mismatch =
+            Boolean(debugRecord.report_mode_mismatch) || terminalNonReportGuard.mismatch;
+          debugRecord.report_scaffold_guard_triggered =
+            Boolean(debugRecord.report_scaffold_guard_triggered) ||
+            terminalNonReportGuard.hadScaffold;
+          debugRecord.report_terminal_guard_applied = terminalNonReportGuard.hadScaffold;
         }
       }
       const finalCleanedPreview = clipAskText(cleaned.trim(), HELIX_ASK_ANSWER_PREVIEW_CHARS);
@@ -44439,6 +44727,66 @@ const executeHelixAsk = async ({
       }
       debugPayloadRecord.fallback_reason = fallbackTaxonomy;
       debugPayloadRecord.fallback_reason_taxonomy = fallbackTaxonomy;
+      const equationPromptDetectedForTelemetry =
+        Boolean(
+          (debugPayloadRecord.equation_quote_contract as
+            | { required?: boolean | null }
+            | null
+            | undefined)?.required,
+        ) ||
+        typeof debugPayloadRecord.equation_selector_primary_key === "string" ||
+        answerPath.some((entry) => entry.startsWith("equation") || entry.includes(":equation_"));
+      if (equationPromptDetectedForTelemetry) {
+        const selectorAuthorityLocked = Boolean(debugPayloadRecord.equation_selector_authority_lock);
+        const primaryAnchorMatch =
+          typeof debugPayloadRecord.equation_primary_anchor_match === "boolean"
+            ? (debugPayloadRecord.equation_primary_anchor_match as boolean)
+            : null;
+        const anchorDriftDetected = selectorAuthorityLocked && primaryAnchorMatch === false;
+        const inferredDegradePathId =
+          typeof debugPayloadRecord.equation_degrade_path_id === "string" &&
+          debugPayloadRecord.equation_degrade_path_id.length > 0
+            ? (debugPayloadRecord.equation_degrade_path_id as string)
+            : (() => {
+                const fallbackMarker = answerPath.find(
+                  (entry) =>
+                    entry.startsWith("fallback:equation_") ||
+                    entry.startsWith("openWorldBypass:equation_") ||
+                    entry.startsWith("finalOutputGuard:final_empty_answer_equation_unified"),
+                );
+                if (!fallbackMarker) return null;
+                if (fallbackMarker.startsWith("fallback:")) {
+                  return fallbackMarker.slice("fallback:".length);
+                }
+                if (fallbackMarker.startsWith("openWorldBypass:")) {
+                  return fallbackMarker.slice("openWorldBypass:".length);
+                }
+                return fallbackMarker;
+              })();
+        const inferredOverrideAttempted =
+          answerPath.some(
+            (entry) =>
+              entry.includes("skipped_selector_lock") ||
+              entry.includes("post_lock_override_blocked_final") ||
+              entry.includes("post_lock_override_unrecoverable"),
+          ) || Boolean(debugPayloadRecord.equation_post_lock_gate_override_attempted);
+        const inferredOverrideBlocked =
+          answerPath.some(
+            (entry) =>
+              entry.includes("skipped_selector_lock") ||
+              entry.includes("post_lock_override_blocked_final") ||
+              entry.includes("final_empty_answer_selector_restore"),
+          ) || Boolean(debugPayloadRecord.equation_post_lock_gate_override_blocked);
+        debugPayloadRecord.equation_state_version = HELIX_ASK_EQUATION_STATE_VERSION;
+        debugPayloadRecord.equation_degrade_path_id = inferredDegradePathId;
+        debugPayloadRecord.degrade_path_id = inferredDegradePathId;
+        debugPayloadRecord.equation_post_lock_gate_override_attempted = inferredOverrideAttempted;
+        debugPayloadRecord.equation_post_lock_gate_override_blocked = inferredOverrideBlocked;
+        debugPayloadRecord.post_lock_gate_override_attempted = inferredOverrideAttempted;
+        debugPayloadRecord.post_lock_gate_override_blocked = inferredOverrideBlocked;
+        debugPayloadRecord.equation_anchor_drift_detected = anchorDriftDetected;
+        debugPayloadRecord.anchor_drift_detected = anchorDriftDetected;
+      }
     }
     if (termPriorDecision) {
       if (termPriorApplied && !termPriorRepoOverrideApplied) {

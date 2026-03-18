@@ -50,6 +50,7 @@ This runner is not for:
 - SEM+ellipsometry checker (execution): `scripts/warp-shadow-sem-ellips-compat-check.ts`
 - SEM+ellipsometry paired evidence ingest (execution): `scripts/warp-shadow-sem-ellips-paired-run-ingest.ts`
 - SEM+ellipsometry paired evidence validator (execution): `scripts/warp-shadow-sem-ellips-paired-evidence-validate.ts`
+- Recommended-profile replay orchestrator (execution): `scripts/warp-shadow-inject-recommended-profile.ts`
 - JSON output (default): `artifacts/research/full-solve/shadow-injection-run-YYYY-MM-DD.json`
 - Markdown output (default): `docs/audits/research/warp-shadow-injection-run-YYYY-MM-DD.md`
 
@@ -62,6 +63,16 @@ Optional:
 ```bash
 npm run warp:shadow:inject -- --scenarios configs/warp-shadow-injection-scenarios.v1.json --out artifacts/research/full-solve/shadow-injection-run-custom.json --out-md docs/audits/research/warp-shadow-injection-run-custom.md
 ```
+
+Recommended profile replay (all 4 reference lanes via one command):
+```bash
+npm run warp:shadow:inject:recommended-profile
+```
+Outputs:
+- `artifacts/research/full-solve/recommended-profile-replay-YYYY-MM-DD.json`
+- `docs/audits/research/warp-recommended-profile-replay-YYYY-MM-DD.md`
+- `artifacts/research/full-solve/recommended-profile-replay-latest.json`
+- `docs/audits/research/warp-recommended-profile-replay-latest.md`
 
 QEI recovery sweep:
 ```bash

@@ -8,6 +8,10 @@ This contract defines mandatory structure for any deep-research paper generated 
 Primary snapshot:
 - `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json`
 
+Default proof index anchor:
+- `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json`
+- `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md`
+
 ## Claim Tiers (must not be collapsed)
 
 1. `canonical-authoritative`
@@ -58,3 +62,9 @@ Paper must explicitly state:
 
 ## Boundary Statement (must be verbatim)
 “This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.”
+
+## Paper Reference Requirement
+Generated Needle Hull Mark 2 paper outputs must:
+1. cite `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json` or `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md` as the top-level proof map;
+2. cite claim-specific artifact paths from that index for each normative claim;
+3. mark claims `UNKNOWN` when indexed artifacts are missing or non-admissible.

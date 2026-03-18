@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "profile_id": "warp-casimir-tile-recommended-run-profile-v1",
+  "mode": "reference_only",
+  "boundaryStatement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "description": "Single commit-tracked recommended numeric profile for consistent replay of Casimir-tile full-solve references.",
+  "commit_pin": "latest",
+  "tile_profiles": {
+    "lab_coupon": {
+      "intended_use": "fabrication_measurement_target",
+      "gap_nm_target": 96,
+      "gap_nm_band": [
+        80,
+        150
+      ],
+      "area_mm2": 1.0,
+      "support_topology": "segmented_membrane",
+      "substrate": "HR-Si",
+      "membrane": "low-stress SiN",
+      "coating": "optional_Au",
+      "vacuum_torr_max": 1e-6,
+      "temperature_modes_K": [
+        300,
+        4
+      ],
+      "patch_voltage_rms_V": 0.05,
+      "derived_reference_at_96nm": {
+        "casimir_pressure_Pa": 15.3,
+        "electrostatic_patch_pressure_Pa": 1.2,
+        "total_load_pressure_Pa": 16.5
+      }
+    },
+    "system_mechanism": {
+      "intended_use": "pipeline_scenario_abstraction_only",
+      "gap_nm": 1,
+      "tileArea_cm2": 25,
+      "dutyCycle": "model_dependent",
+      "scope_note": "Do not use as direct fabrication geometry."
+    }
+  },
+  "lane_reference_targets": {
+    "q_spoiling": {
+      "scenario_pack_path": "configs/warp-shadow-injection-scenarios.qs-primary-reportable-reference.v1.json",
+      "reportableReady_expected": true,
+      "reference_targets": {
+        "q0_baseline": 20000000000,
+        "f_q_spoil": {
+          "hydride_q_disease": 20,
+          "trapped_flux": 10,
+          "tls_oxide": 20
+        }
+      }
+    },
+    "nanogap": {
+      "scenario_pack_path": "configs/warp-shadow-injection-scenarios.ng-primary-reportable-reference.v1.json",
+      "reportableReady_expected": true,
+      "reference_targets": {
+        "gap_nm": 96,
+        "profiles": {
+          "NG-STD-10": {
+            "u_g_mean_nm_max": 2.0,
+            "u_g_sigma_nm_max": 2.0
+          },
+          "NG-ADV-5": {
+            "u_g_mean_nm_max": 1.0,
+            "u_g_sigma_nm_max": 1.0
+          }
+        },
+        "current_reference_context": {
+          "u_g_mean_nm": 1.0,
+          "u_g_sigma_nm": 1.2,
+          "tip_method": "btr",
+          "fiducial_present": true
+        }
+      }
+    },
+    "timing": {
+      "scenario_pack_path": "configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json",
+      "reportableReady_expected": true,
+      "reference_targets": {
+        "WR-SHORT-PS": {
+          "sigma_t_ps_max": 100,
+          "tie_pp_ps_max": 200,
+          "reference_sigma_t_ps": 50,
+          "reference_tie_pp_ps": 150
+        },
+        "WR-LONGHAUL-EXP": {
+          "reference_sigma_t_ps": 6,
+          "reference_tie_pp_ps": 375,
+          "status": "exploratory_non_promotable_without_matched_topology"
+        }
+      }
+    },
+    "sem_ellipsometry": {
+      "scenario_pack_path": "configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json",
+      "reportableReady_expected": false,
+      "reference_targets": {
+        "SE-STD-2": {
+          "delta_se_nm_abs_max": 2.0,
+          "U_fused_nm_max": 2.0
+        },
+        "SE-ADV-1": {
+          "delta_se_nm_abs_max": 1.0,
+          "U_fused_nm_max": 1.0
+        }
+      },
+      "blockedReasons_expected": [
+        "missing_paired_dual_instrument_run",
+        "missing_covariance_uncertainty_anchor"
+      ]
+    }
+  },
+  "suggested_replay_commands": [
+    "npm run warp:shadow:inject:qs-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-qs-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-qs-primary-reportable-reference-YYYY-MM-DD.md",
+    "npm run warp:shadow:inject:ng-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-ng-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ng-primary-reportable-reference-YYYY-MM-DD.md",
+    "npm run warp:shadow:inject:ti-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-ti-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-ti-primary-reportable-reference-YYYY-MM-DD.md",
+    "npm run warp:shadow:inject:se-primary-reportable-reference -- --out artifacts/research/full-solve/shadow-injection-run-se-primary-reportable-reference-YYYY-MM-DD.json --out-md docs/audits/research/warp-shadow-injection-run-se-primary-reportable-reference-YYYY-MM-DD.md"
+  ],
+  "source_refs": [
+    "docs/specs/casimir-tile-spec-v1.md",
+    "docs/guarded-casimir-tile-code-mapped.md",
+    "configs/warp-shadow-injection-scenarios.qs-primary-reportable-reference.v1.json",
+    "configs/warp-shadow-injection-scenarios.ng-primary-reportable-reference.v1.json",
+    "configs/warp-shadow-injection-scenarios.ti-primary-reportable-reference.v1.json",
+    "configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json",
+    "artifacts/research/full-solve/promotion-readiness-suite-latest.json"
+  ],
+  "notes": [
+    "Keep Lab Coupon and System Mechanism profiles separate.",
+    "Use this profile as team default for reproducible replay and manuscript references.",
+    "Do not treat this profile as a canonical override or physical-feasibility claim."
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "artifact_type": "needle_hull_mark2_proof_anchor_index/v1",
+  "generator_version": "1.0.0",
+  "alias": "latest",
+  "posture": {
+    "reference_only": true,
+    "canonical_blocking": false
+  },
+  "boundary_statement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "canonical_authority_chain": [
+    "docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md",
+    "artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json",
+    "artifacts/research/full-solve/g4-governance-matrix-2026-02-27.json",
+    "docs/audits/research/warp-evidence-pack-2026-03-02.json",
+    "docs/audits/research/warp-evidence-snapshot-2026-03-02.md"
+  ],
+  "default_state_of_record_anchors": {
+    "integrity_parity": {
+      "machine": "artifacts/research/full-solve/integrity-parity-suite-latest.json",
+      "human": "docs/audits/research/warp-integrity-parity-suite-latest.md"
+    },
+    "reference_capsule": {
+      "machine": "artifacts/research/full-solve/full-solve-reference-capsule-latest.json",
+      "human": "docs/audits/research/warp-full-solve-reference-capsule-latest.md"
+    },
+    "promotion_readiness": {
+      "machine": "artifacts/research/full-solve/promotion-readiness-suite-latest.json",
+      "human": "docs/audits/research/warp-promotion-readiness-suite-latest.md"
+    },
+    "external_comparison_matrix": {
+      "machine": "artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json",
+      "human": "docs/audits/research/warp-external-work-comparison-matrix-latest.md"
+    }
+  },
+  "needle_hull_mark2_paper_inputs": [
+    "docs/audits/research/warp-paper-draft-A-defensible-now.md",
+    "docs/audits/research/warp-paper-draft-B-strong-claim-upgrade-spec.md",
+    "docs/audits/research/warp-paper-authoring-contract-2026-03-02.md",
+    "docs/audits/research/warp-paper-deep-research-prompt-v1.md",
+    "docs/audits/research/warp-commit-pinned-scientific-analysis-2026-03-02.md"
+  ],
+  "geometry_gr_observable_proof_paths": {
+    "scripts": [
+      "scripts/warp-full-solve-geometry-conformance.ts",
+      "scripts/warp-full-solve-reference-capsule-validate.ts",
+      "scripts/warp-shadow-gr-mercury-precession-replay.ts",
+      "scripts/warp-shadow-gr-lensing-deflection-replay.ts",
+      "scripts/warp-shadow-gr-frame-dragging-replay.ts",
+      "scripts/warp-shadow-gr-shapiro-delay-replay.ts"
+    ],
+    "snapshots": [
+      "docs/specs/data/gr-mercury-perihelion-einstein-1915.v1.json",
+      "docs/specs/data/gr-lensing-deflection-observable.v1.json",
+      "docs/specs/data/gr-frame-dragging-observable.v1.json",
+      "docs/specs/data/gr-shapiro-delay-observable.v1.json"
+    ]
+  },
+  "warp_family_method_track_proof_paths": [
+    "configs/warp-external-work-profiles.v1.json",
+    "scripts/warp-shadow-warp-geometry-replay.ts",
+    "scripts/warp-shadow-warp-energetics-replay.ts",
+    "scripts/warp-external-work-run.ts",
+    "scripts/warp-external-work-compare.ts",
+    "scripts/warp-external-work-matrix.ts"
+  ],
+  "evidence_lane_proof_paths": [
+    "docs/specs/casimir-tile-casimir-sign-compatibility-contract-v1.md",
+    "docs/specs/casimir-tile-q-spoiling-compatibility-contract-v1.md",
+    "docs/specs/casimir-tile-nanogap-compatibility-contract-v1.md",
+    "docs/specs/casimir-tile-timing-compatibility-contract-v1.md",
+    "docs/specs/casimir-tile-sem-ellipsometry-compatibility-contract-v1.md",
+    "scripts/warp-shadow-qcd-analog-replay.ts",
+    "docs/audits/research/warp-qcd-analog-replay-2026-03-17.md"
+  ],
+  "metrology_equation_provenance_paths": [
+    "docs/audits/research/warp-primary-standards-citation-pack-2026-03-04.md",
+    "docs/specs/casimir-tile-experimental-parameter-registry-2026-03-04.md",
+    "docs/specs/casimir-tile-paper-equation-trace-2026-03-04.md",
+    "docs/specs/casimir-tile-equation-provenance-contract-v1.md",
+    "docs/specs/casimir-tile-experimental-data-staging-ledger-v1.md",
+    "docs/specs/casimir-tile-spec-bookkeeping-v1.md"
+  ],
+  "sem_ellipsometry_specific_closure_paths": [
+    "docs/specs/casimir-tile-sem-ellipsometry-paired-run-artifact-set-v1.md",
+    "docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json",
+    "docs/specs/data/srm-si-sio2-calibration-v1.json",
+    "scripts/warp-shadow-sem-ellips-paired-manifest-prepare.ts",
+    "scripts/warp-shadow-sem-ellips-paired-run-ingest.ts",
+    "scripts/warp-shadow-sem-ellips-paired-evidence-validate.ts",
+    "scripts/warp-shadow-sem-ellips-reportable-attempt.ts",
+    "artifacts/research/full-solve/se-publication-overlay-latest.json"
+  ],
+  "deterministic_regeneration_commands": [
+    "npm run warp:proof-index:sync",
+    "npm run warp:full-solve:reference:refresh",
+    "npm run warp:external:refresh",
+    "npm run warp:promotion:readiness:check",
+    "npm run warp:integrity:check",
+    "npm run warp:shadow:inject:recommended-profile",
+    "npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --trace-out artifacts/training-trace.jsonl",
+    "curl.exe -fsS http://127.0.0.1:5050/api/agi/training-trace/export -o artifacts/training-trace-export.jsonl"
+  ],
+  "paper_generation_usage_rule": {
+    "top_level_anchor_required": true,
+    "top_level_anchor_path_md": "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md",
+    "top_level_anchor_path_json": "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json",
+    "claim_specific_paths_required": true,
+    "missing_artifact_behavior": "UNKNOWN_and_fail_closed_for_claim_tier_promotion"
+  }
+}

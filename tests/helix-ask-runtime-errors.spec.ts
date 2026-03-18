@@ -64,6 +64,65 @@ describe("non-report guard ordering for runtime fallback", () => {
     expect(guarded.text).toBe(answer);
     expect(guarded.hadScaffold).toBe(false);
   });
+
+  it("rewrites scientific scaffold fallback into user-facing prose in non-report mode", () => {
+    const context = __testOnlyNonReportGuard.resolveNonReportGuardContext(
+      "What is a warp bubble? How is it solved in the codebase?",
+    );
+    const scaffold = [
+      "Confirmed:",
+      "- Retrieved grounded repository anchors: modules/warp/natario-warp.ts, docs/knowledge/warp/warp-bubble.md.",
+      "",
+      "Reasoned connections (bounded):",
+      "- Bounded linkage supported by cited repo evidence (modules/warp/natario-warp.ts and docs/knowledge/warp/warp-bubble.md).",
+      "",
+      "Next evidence:",
+      "- Checked files: modules/warp/natario-warp.ts, modules/warp/warp-module.ts",
+      "",
+      "Sources: modules/warp/natario-warp.ts, docs/knowledge/warp/warp-bubble.md",
+    ].join("\n");
+    const guarded = __testOnlyNonReportGuard.enforceNonReportModeGuard(
+      scaffold,
+      context.reportModeEnabled,
+      context.intentStrategy,
+    );
+
+    expect(context.reportModeEnabled).toBe(false);
+    expect(guarded.hadScaffold).toBe(true);
+    expect(guarded.text).not.toMatch(/^Confirmed:/i);
+    expect(guarded.text).not.toMatch(/^Reasoned connections \(bounded\):/im);
+    expect(guarded.text).not.toMatch(/^Next evidence:/im);
+    expect(guarded.text).toMatch(/In practical terms,/i);
+    expect(guarded.text).toMatch(/^Sources:/im);
+  });
+
+  it("rewrites inline scientific scaffold headings emitted by fallback synthesis", () => {
+    const context = __testOnlyNonReportGuard.resolveNonReportGuardContext(
+      "What is a warp bubble? How is it solved in the codebase?",
+    );
+    const inlineScaffold = [
+      "Confirmed:",
+      "- Retrieved grounded repository anchors: modules/warp/natario-warp.ts, docs/warp-console-architecture.md, docs/knowledge/warp/warp-bubble.md, docs/warp-tree-dag-walk-rules.md. Reasoned connections (bounded):",
+      "- Bounded linkage supported by cited repo evidence (modules/warp/natario-warp.ts and docs/warp-console-architecture.md). Next evidence:",
+      "- Searched terms: What is a warp bubble?, warp bubble, calculateNatarioWarpBubble",
+      "- Checked files: modules/warp/natario-warp.ts, modules/warp/warp-module.ts",
+      "Sources: modules/warp/natario-warp.ts, docs/knowledge/warp/warp-bubble.md",
+    ].join("\n");
+    const guarded = __testOnlyNonReportGuard.enforceNonReportModeGuard(
+      inlineScaffold,
+      context.reportModeEnabled,
+      context.intentStrategy,
+    );
+
+    expect(context.reportModeEnabled).toBe(false);
+    expect(context.intentStrategy).not.toBe("constraint_report");
+    expect(guarded.hadScaffold).toBe(true);
+    expect(guarded.text).not.toMatch(/^Confirmed:/i);
+    expect(guarded.text).not.toMatch(/Reasoned connections \(bounded\):/i);
+    expect(guarded.text).not.toMatch(/Next evidence:/i);
+    expect(guarded.text).toMatch(/In practical terms,/i);
+    expect(guarded.text).toMatch(/^Sources:/im);
+  });
 });
 
 describe("helix ask reliability guards", () => {
@@ -2137,6 +2196,60 @@ describe("equation selector continuity contract", () => {
       expect(result?.primarySelected).toBeNull();
       expect(result?.reason).toBe("specific_no_symbol_match");
       expect(result?.text).toMatch(/No verified symbol-match in explicit path/i);
+    } finally {
+      fs.rmSync(fullPath, { force: true });
+    }
+  });
+
+  it("rehydrates truncated stage05 equation snippets from source line anchors", () => {
+    const relPath = ".tmp-stage05-tests/source-rehydrate-collapse.ts";
+    const fullPath = path.join(process.cwd(), relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(
+      fullPath,
+      [
+        "const E_G_J = HBAR / tau_for_E;",
+        "const rho_eff_kg_m3 = E_G_J / (Math.max(1e-30, C2 * V_c_m3));",
+        "const kappa_collapse_m2 = kappa_body(rho_eff_kg_m3);",
+      ].join("\n"),
+      "utf8",
+    );
+    try {
+      const question =
+        `From ${relPath}, quote exact equation lines computing rho_eff_kg_m3 and kappa_collapse_m2.`;
+      const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question, [
+        relPath,
+      ]);
+      const contract = __testHelixAskReliabilityGuards.buildHelixAskIntentContract({
+        question,
+        queryConstraints: constraints,
+        explicitPaths: [relPath],
+      });
+      const result = __testHelixAskReliabilityGuards.buildEquationClaimBackingAssembly({
+        question,
+        draftAnswer: "",
+        answerContract: null,
+        evidenceText: `Sources: ${relPath}`,
+        docBlocks: [{ path: relPath, block: "rho_eff_kg_m3 = E_G_J / (Math" }],
+        codeAlignment: null,
+        stage05Cards: [
+          {
+            path: relPath,
+            summary: "Truncated stage05 snippet rehydrate test",
+            slotHits: ["equation", "code_path"],
+            confidence: 0.9,
+            snippets: [{ start: 2, end: 2, text: "rho_eff_kg_m3 = E_G_J / (Math" }],
+          },
+        ],
+        allowedCitations: [relPath],
+        queryConstraints: constraints,
+        strictPrompt: false,
+        explicitPathOnlyExtraction: false,
+        intentContract: contract,
+      });
+      expect(result).toBeTruthy();
+      expect(result?.text).toMatch(/rho_eff_kg_m3\s*=\s*E_G_J\s*\/\s*\(Math\.max/i);
+      expect(result?.text).not.toMatch(/rho_eff_kg_m3\s*=\s*E_G_J\s*\/\s*\(Math\s*(?:\n|$)/i);
     } finally {
       fs.rmSync(fullPath, { force: true });
     }

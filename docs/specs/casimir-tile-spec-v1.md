@@ -118,6 +118,14 @@ Congruence decision:
 - Mark `UNKNOWN` if any required lane is missing.
 - Fail closed if `C_congruence < 0.8` or if uncertainty crosses the threshold.
 
+## Recommended Replay Profile
+
+- Team default replay anchor: `configs/warp-casimir-tile-recommended-run-profile.v1.json`
+- This profile separates:
+  1. `lab_coupon` fabrication/metrology targets (for physical test planning)
+  2. `system_mechanism` simulation abstraction defaults (for pipeline what-if runs)
+- It also pins reportable-reference scenario-pack paths for `q_spoiling`, `nanogap`, `timing`, and `sem_ellipsometry`.
+
 ## Traceability
 
 | Field | Value |

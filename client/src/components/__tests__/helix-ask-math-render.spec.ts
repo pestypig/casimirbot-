@@ -1,10 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 let tokenizeHelixAskMathTokens: typeof import("@/components/helix/HelixAskPill").tokenizeHelixAskMathTokens;
+let hasHelixAskRenderableMath: typeof import("@/components/helix/HelixAskPill").hasHelixAskRenderableMath;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ tokenizeHelixAskMathTokens } = await import("@/components/helix/HelixAskPill"));
+  ({ tokenizeHelixAskMathTokens, hasHelixAskRenderableMath } = await import(
+    "@/components/helix/HelixAskPill"
+  ));
 });
 
 describe("tokenizeHelixAskMathTokens", () => {
@@ -33,5 +36,23 @@ describe("tokenizeHelixAskMathTokens", () => {
       kind: "text",
       text: "Path client/src/app.tsx and dangling \\(x+y.",
     });
+  });
+
+  it("tokenizes bare equations without explicit delimiters", () => {
+    const tokens = tokenizeHelixAskMathTokens(
+      "Primary Equation: tau = hbar / DeltaE, with explicit units and kernel choice.",
+    );
+    const mathTokens = tokens.filter((token) => token.kind === "math");
+    expect(mathTokens).toHaveLength(1);
+    expect(mathTokens[0]).toMatchObject({ text: "tau = hbar / DeltaE", displayMode: false });
+    expect(hasHelixAskRenderableMath("tau = hbar / DeltaE")).toBe(true);
+  });
+
+  it("does not treat config-style assignments as equations", () => {
+    const text = 'profile = "equation_focus_compact"';
+    const tokens = tokenizeHelixAskMathTokens(text);
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toMatchObject({ kind: "text", text });
+    expect(hasHelixAskRenderableMath(text)).toBe(false);
   });
 });

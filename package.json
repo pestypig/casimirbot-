@@ -180,6 +180,8 @@
     "warp:shadow:build-se-packs:paired-template": "tsx scripts/warp-shadow-sem-ellips-pack-builder.ts --base configs/warp-shadow-injection-scenarios.se-primary-recovery.v1.json --out-pass1 configs/warp-shadow-injection-scenarios.se-primary-recovery.v1.json --out-pass2 configs/warp-shadow-injection-scenarios.se-primary-typed.v1.json --out-reportable configs/warp-shadow-injection-scenarios.se-primary-reportable.v1.json --out-reportable-reference configs/warp-shadow-injection-scenarios.se-primary-reportable-reference.v1.json --paired-evidence docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json",
     "warp:shadow:inject:cs-primary-reportable": "tsx scripts/warp-shadow-injection-runner.ts --scenarios configs/warp-shadow-injection-scenarios.cs-primary-reportable.v1.json",
     "warp:shadow:inject": "tsx scripts/warp-shadow-injection-runner.ts",
+    "warp:shadow:inject:recommended-profile": "tsx scripts/warp-shadow-inject-recommended-profile.ts",
+    "warp:proof-index:sync": "tsx scripts/warp-needle-hull-proof-anchor-index-sync.ts",
     "warp:shadow:inject:cs-primary-recovery": "tsx scripts/warp-shadow-injection-runner.ts --scenarios configs/warp-shadow-injection-scenarios.cs-primary-recovery.v1.json",
     "warp:shadow:inject:cs-primary-typed": "tsx scripts/warp-shadow-injection-runner.ts --scenarios configs/warp-shadow-injection-scenarios.cs-primary-typed.v1.json",
     "warp:shadow:inject:qs-primary-recovery": "tsx scripts/warp-shadow-injection-runner.ts --scenarios configs/warp-shadow-injection-scenarios.qs-primary-recovery.v1.json",

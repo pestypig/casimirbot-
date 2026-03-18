@@ -38,6 +38,12 @@ Interpretation rule:
 - Human-readable anchor: `docs/audits/research/warp-promotion-readiness-suite-latest.md`
 - Regeneration command: `npm run warp:promotion:readiness:check`
 
+## Default Needle Hull Mark 2 Proof Index Anchor
+- End-to-end proof index (machine-readable): `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json`
+- End-to-end proof index (human-readable): `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md`
+- Purpose: centralized path map for canonical authority, capsule/parity anchors, GR observable parity, external comparison, and lane evidence proofs used by generated paper outputs.
+- Usage: generated paper text should cite this index first (JSON or MD), then cite claim-specific artifact paths listed in the index.
+
 State-of-record rule:
 - “Reportable vs exploratory” manuscript language must be sourced from `integrity-parity-suite-latest` + `external-work-comparison-matrix-latest` + `promotion-readiness-suite-latest` only.
 

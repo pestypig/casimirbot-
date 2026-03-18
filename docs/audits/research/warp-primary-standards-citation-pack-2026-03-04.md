@@ -75,6 +75,11 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 | SRC-091 | SRM 2535 certificate anchor (nominal 14 nm SiO2 on Si) | M,N | NIST certificate 2535 | https://tsapps.nist.gov/srmext/certificates/archives/2535.pdf | archive | primary | medium | normative |
 | SRC-092 | SRM 2536 certificate anchor (nominal 10 nm SiO2 on Si) | M,N | NIST certificate 2536 | https://tsapps.nist.gov/srmext/certificates/archives/2536.pdf | archive | primary | medium | normative |
 | SRC-093 | NIST SRM archive listing for 2530/2531-2536 family | M,N | NIST archived certificates catalog | https://shop.nist.gov/ccrz__CCPage?cclcl=en_US&pageKey=SRMArchive | archive listing | standard | medium | supporting |
+| SRC-094 | Canonical DOI anchor for SP 260-109 (SRM-2530 preparation/certification monograph) | M,N | NBS Special Publication 260-109 DOI record | https://doi.org/10.6028/NBS.SP.260-109 | 1988 | standard | high | normative |
+| SRC-095 | Direct public PDF for SP 260-109 (full-text extraction/recompute surface) | M,N | NIST NVL publication PDF (`nbspecialpublication260-109.pdf`) | https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nbspecialpublication260-109.pdf | 1988 | standard | high | supporting |
+| SRC-096 | NIST SRM certificate archive index (direct link surface for 2530-1/2/3 and 2531-2536) | M,N | NIST SRM/RM Identification System (archived certificates) | https://tsapps.nist.gov/srmext/certificates/archives/ | archive index | standard | medium | supporting |
+| SRC-097 | ISO 16700 mirror/preview surface (used only as access helper; not normative replacement) | M,N | ITeh mirror catalog entry for ISO 16700:2016 | https://standards.iteh.ai/catalog/standards/iso/c5b80651-2d6a-4c4a-926c-9964932cde87/iso-16700-2016 | mirror capture | secondary | low | supporting |
+| SRC-098 | Cross-check lead containing SRM serial examples from ellipsometry monitoring context (non-official host) | M,N | "Development of the Nitride Film Thickness Standard" mirror page | https://doczz.net/doc/7900697/development-of-the-nitride-film-thickness-standard | unknown mirror date | secondary | low | non-admissible |
 | SRC-035 | CD-AFM standards comparison and uncertainty discussion (NIST publication) | M,N | NIST CD-AFM uncertainty publication | https://www.nist.gov/publications/comparison-and-uncertainties-standards-cd-afm-microscope-tip-width-calibration | 2004 | standard | high | normative |
 | SRC-036 | Blind tip reconstruction methodology foundation (Villarrubia) | M | Villarrubia, J. Res. NIST 102(4):425-454 | https://doi.org/10.6028/jres.102.030 | 1997 | primary | high | normative |
 | SRC-037 | End-to-end differentiable BTR under noisy AFM conditions | M | PMC9813222 | https://pmc.ncbi.nlm.nih.gov/articles/PMC9813222/ | 2023 | primary | medium | normative |
@@ -131,8 +136,14 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 - `SRC-085` and `SRC-086` are preferred standards/primary anchors for SRM-2530 ellipsometry pipeline calibration (`Psi/Delta`, wavelength anchor, and model-selection uncertainty context).
 - `SRC-087..SRC-092` are admissible primary certificate anchors for thickness-transfer calibration in the SEM+ellipsometry lane (`CH-SE-001`), with numeric per-certificate uncertainties required for reportable closure when extracted.
 - `SRC-093` is a catalog/supporting anchor for SRM family enumeration and cannot replace certificate-level numeric uncertainty extraction.
+- `SRC-094` is the preferred canonical DOI anchor for SP 260-109 citations; use this URL first in manuscript references.
+- `SRC-095` is admissible as a full-text extraction surface for SP 260-109 and can be cited alongside `SRC-094` for page-level equation/uncertainty traces.
+- `SRC-096` is admissible as the direct archive index discovery surface for SRM certificate links, but it does not replace certificate-level numeric tables.
+- `SRC-097` is mirror/supporting only and cannot replace official ISO `SRC-043` for normative claims.
+- `SRC-098` is non-admissible for normative claims; use only as an intake lead requiring confirmation against primary/official NIST surfaces.
 - Direct PDF/OCR extraction in this wave confirms archive surfaces expose nominal classes and addendum/process anchors, but do not expose populated serial-specific certificate tables for `SRC-087..SRC-092`; those values remain `UNKNOWN` until serial-resolved certificate surfaces are available.
 - Direct recheck on `2026-03-11` reopened NIST archive PDFs for `SRC-086..SRC-092` (`2530-1/2/3`, `2531..2536`) and confirmed the same result: accessible pages contain method/addendum context and nominal-class framing, but no populated serial-specific certified-thickness table values.
+- A direct web recheck on `2026-03-17` reaffirmed the same blocker through `SRC-094..SRC-096`: canonical SP 260-109 method surfaces are accessible, SRM archive PDFs are accessible, and serial-specific populated tables are still absent in accessible archive scans.
 - `SRC-071`, `SRC-072`, and `SRC-073` are admissible primary anchors for Core-4 warp-family geometry comparison under geometry-first scope.
 - `SRC-074` is admissible for Core-4 intake but remains domain-conditional in geometry-first comparison because its Einstein-Maxwell-plasma assumptions are not equivalent to the canonical vacuum/ADM baseline used by current local geometry conformance checks.
 - `SRC-071..SRC-074` are also admissible for Core-4 energetics/QEI reference-only comparison (`CH-WARP-002`) when outputs explicitly retain comparability blockers and do not override canonical reduced-order policy.
@@ -164,8 +175,10 @@ Commit-tracked, source-admissible citation pack for manuscript generation and cl
 ## Intake Notes (2026-03-04 Source Drop)
 - The new drop strengthens SEM calibration/governance coverage.
 - It closes the prior ellipsometry numeric blocker for `CH-SE-001` at reference-procedure level via `SRC-050`; dual-instrument raw datasets are still required for replay-grade closure.
+- User-provided SRM/ellipsometry links were capture-logged with full citation strings in `docs/audits/research/warp-srm-ellipsometry-link-capture-2026-03-17.md` and mapped to `SRC-085..SRC-093`.
+- User-provided Casimir sign-control links were capture-logged with full citation strings in `docs/audits/research/warp-casimir-sign-link-capture-2026-03-17.md` and mapped to `SRC-018`, `SRC-063`, `SRC-019`, and `SRC-020` with explicit admissibility tags.
 
 ## Commit Traceability
 - `commit_pin`: `latest`
 - `owner`: `research-governance`
-- `generated_on`: `2026-03-04`
+- `generated_on`: `2026-03-17`
