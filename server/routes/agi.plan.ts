@@ -20424,6 +20424,36 @@ const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY = clampNumber(
   0,
   1,
 );
+const HELIX_ASK_COMPOSER_V2_BRIEF_FIRST_ENABLED =
+  String(process.env.HELIX_ASK_COMPOSER_V2_BRIEF_FIRST_ENABLED ?? "1").trim() !== "0";
+const HELIX_ASK_COMPOSER_V2_SCOPE_RAW = String(
+  process.env.HELIX_ASK_COMPOSER_V2_SCOPE ?? "non_equation",
+)
+  .trim()
+  .toLowerCase();
+const HELIX_ASK_COMPOSER_V2_SCOPE: "non_equation" | "all" =
+  HELIX_ASK_COMPOSER_V2_SCOPE_RAW === "all" ? "all" : "non_equation";
+const HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY_RAW = String(
+  process.env.HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY ?? "normal",
+)
+  .trim()
+  .toLowerCase();
+const HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY: "brief" | "normal" | "extended" =
+  HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY_RAW === "extended"
+    ? "extended"
+    : HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY_RAW === "brief"
+      ? "brief"
+      : "normal";
+const HELIX_ASK_COMPOSER_V2_MAX_REPAIR_ATTEMPTS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_MAX_REPAIR_ATTEMPTS ?? 1),
+  0,
+  2,
+);
+const HELIX_ASK_COMPOSER_V2_MAX_TOKENS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_MAX_TOKENS ?? 760),
+  240,
+  1800,
+);
 const HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST = clampNumber(
   Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST ?? 24),
   4,
@@ -21751,6 +21781,1049 @@ const validateHelixAskAnswerPlanShadow = (
   };
 };
 
+type HelixAskComposerV2ClaimClass = "baseline_common" | "repo_grounded" | "reasoned_inference";
+type HelixAskComposerV2SectionId =
+  | "short_answer"
+  | "conceptual_baseline"
+  | "how_repo_solves_it"
+  | "evidence_proof_anchors"
+  | "uncertainty_open_gaps";
+
+type HelixAskComposerV2Claim = {
+  section: HelixAskComposerV2SectionId;
+  class: HelixAskComposerV2ClaimClass;
+  text: string;
+  citations?: string[];
+  uncertainty_marker?: string;
+};
+
+type HelixAskComposerV2Expansion = {
+  claims: HelixAskComposerV2Claim[];
+};
+
+type HelixAskComposerV2GroundedBrief = {
+  source: "deterministic_grounded_brief";
+  prompt_family: HelixAskAnswerPlanFamily;
+  prompt_specificity: HelixAskAnswerPlanSpecificity;
+  question: string;
+  short_answer_seed: string;
+  conceptual_baseline_seed: string;
+  repo_solve_seed: string;
+  evidence_anchor_hints: string[];
+  open_gaps_seed: string;
+};
+
+type HelixAskComposerV2ClaimCounts = {
+  baseline_common: number;
+  repo_grounded: number;
+  reasoned_inference: number;
+};
+
+type HelixAskComposerV2MaterializeResult = {
+  ok: boolean;
+  rendered_text: string;
+  expand_ok: boolean;
+  link_ok: boolean;
+  pre_link_fail_reasons: string[];
+  post_link_fail_reasons: string[];
+  claim_counts: HelixAskComposerV2ClaimCounts;
+  fallback_reason: string | null;
+};
+
+const HELIX_ASK_COMPOSER_V2_CLAIM_SCHEMA = z.object({
+  section: z.enum([
+    "short_answer",
+    "conceptual_baseline",
+    "how_repo_solves_it",
+    "evidence_proof_anchors",
+    "uncertainty_open_gaps",
+  ]),
+  class: z.enum(["baseline_common", "repo_grounded", "reasoned_inference"]),
+  text: z.string().min(1).max(520),
+  citations: z.array(z.string().min(1).max(260)).max(8).optional(),
+  uncertainty_marker: z.string().min(1).max(220).optional(),
+});
+
+const HELIX_ASK_COMPOSER_V2_EXPANSION_SCHEMA = z.object({
+  claims: z.array(HELIX_ASK_COMPOSER_V2_CLAIM_SCHEMA).min(1).max(36),
+});
+
+const HELIX_ASK_COMPOSER_V2_SECTION_ORDER: HelixAskComposerV2SectionId[] = [
+  "short_answer",
+  "conceptual_baseline",
+  "how_repo_solves_it",
+  "evidence_proof_anchors",
+  "uncertainty_open_gaps",
+];
+
+const HELIX_ASK_COMPOSER_V2_SECTION_TITLES: Record<HelixAskComposerV2SectionId, string> = {
+  short_answer: "Short answer",
+  conceptual_baseline: "Conceptual baseline",
+  how_repo_solves_it: "How repo solves it",
+  evidence_proof_anchors: "Evidence + proof anchors",
+  uncertainty_open_gaps: "Uncertainty / open gaps",
+};
+
+const HELIX_ASK_COMPOSER_V2_VERBOSITY_ORDER: Record<HelixAskVerbosity, number> = {
+  brief: 0,
+  normal: 1,
+  extended: 2,
+};
+
+const createHelixAskComposerV2ClaimCounts = (): HelixAskComposerV2ClaimCounts => ({
+  baseline_common: 0,
+  repo_grounded: 0,
+  reasoned_inference: 0,
+});
+
+const shouldApplyHelixAskComposerV2ForPlan = (plan: HelixAskAnswerPlan): boolean => {
+  if (!HELIX_ASK_COMPOSER_V2_BRIEF_FIRST_ENABLED) return false;
+  if (HELIX_ASK_COMPOSER_V2_SCOPE === "all") return true;
+  return plan.prompt_family !== "equation_formalism";
+};
+
+const resolveHelixAskComposerV2Verbosity = (requested: HelixAskVerbosity): HelixAskVerbosity => {
+  const requestedRank = HELIX_ASK_COMPOSER_V2_VERBOSITY_ORDER[requested] ?? 0;
+  const minRank = HELIX_ASK_COMPOSER_V2_VERBOSITY_ORDER[HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY] ?? 1;
+  if (requestedRank >= minRank) return requested;
+  return HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY;
+};
+
+const resolveHelixAskComposerV2MaxTokens = (verbosity: HelixAskVerbosity): number => {
+  const verbosityBudget = verbosity === "extended" ? 1200 : verbosity === "normal" ? 900 : 700;
+  return clampNumber(
+    Math.min(HELIX_ASK_COMPOSER_V2_MAX_TOKENS, verbosityBudget),
+    240,
+    HELIX_ASK_COMPOSER_V2_MAX_TOKENS,
+  );
+};
+
+const HELIX_ASK_COMPOSER_V2_TOPIC_STOPWORDS = new Set([
+  "what",
+  "where",
+  "when",
+  "why",
+  "how",
+  "and",
+  "the",
+  "this",
+  "that",
+  "with",
+  "from",
+  "into",
+  "codebase",
+  "repo",
+  "explain",
+  "define",
+  "definition",
+  "solved",
+  "solve",
+  "like",
+]);
+
+const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
+  const text = String(value ?? "").trim();
+  if (!text) return true;
+  if (!/[A-Za-z]/.test(text)) return true;
+  if (/^(?:\d+\.\s*)+$/.test(text)) return true;
+  if (/^\s*(?:[-*]|\d+\.)\s*$/.test(text)) return true;
+  if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(text)) return true;
+  if (/^sources?\s*:/i.test(text)) return true;
+  if (/\/\*\*?|^\s*\*|^\s*\*\/\s*$/.test(text)) return true;
+  if (/(?:^|\s)(?:const|let|var|function|return|import|export)\b/.test(text)) return true;
+  if (/=>|(?:\w+\s*\([^)]*\)\s*=>)|(?:\?\.)/.test(text)) return true;
+  if (/(?:NatÃ|Ãƒ|Ã‚|ï¿½)/i.test(text)) return true;
+  if (
+    /\b(?:bounded linkage supported by cited repo evidence|this response preserves grounded evidence|output was normalized to deterministic family structure and grounded to available sources|mechanism detail is bounded to currently verified evidence|claims are bounded to available artifacts|evidence is limited in current retrieval)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const extractComposerV2TopicTerms = (question: string): string[] =>
+  Array.from(
+    new Set(
+      (question.toLowerCase().match(/[a-z][a-z0-9_-]{2,}/g) ?? []).filter(
+        (token) => !HELIX_ASK_COMPOSER_V2_TOPIC_STOPWORDS.has(token),
+      ),
+    ),
+  ).slice(0, 4);
+
+const buildHelixAskComposerV2GroundedBrief = (args: {
+  plan: HelixAskAnswerPlan;
+  question: string;
+  existingText: string;
+  envelope: HelixAskIntentPolicyEnvelope;
+}): HelixAskComposerV2GroundedBrief => {
+  const question = String(args.question ?? "").trim();
+  const sourceHints = normalizeCitations(args.plan.evidence_pack.allowed_citations).slice(0, 10);
+  const codeHints = sourceHints
+    .filter(
+      (entry) =>
+        /\.(?:ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|cs)(?::\d+)?$/i.test(entry) ||
+        /(?:^|\/)(?:server|client|modules|scripts|tools|shared)\//i.test(entry),
+    )
+    .slice(0, 3);
+  const docHints = sourceHints.filter((entry) => !codeHints.includes(entry)).slice(0, 3);
+  const primaryAnchor = sourceHints[0] ?? "server/routes/agi.plan.ts";
+  const primaryDoc = docHints[0] ?? primaryAnchor;
+  const topicTerms = extractComposerV2TopicTerms(question);
+  const topicLabel = topicTerms.length > 0 ? topicTerms.join(" ") : "the requested topic";
+  const sentenceSeed =
+    splitGroundedSentences(String(args.existingText ?? ""))
+      .map((entry) => entry.trim())
+      .find((entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry)) ?? "";
+  const shortAnswerSeed = ensureSentence(
+    clipAskText(
+      sentenceSeed ||
+        `In this repository, ${topicLabel} is grounded in ${primaryDoc}${
+          codeHints.length > 0 ? ` and implemented through ${codeHints.slice(0, 2).join(" and ")}` : ""
+        }`,
+      240,
+    ),
+  );
+  const conceptualBaselineSeed = ensureSentence(
+    `Conceptually, this answer separates general context from repo-proof so claims stay traceable and testable`,
+  );
+  const repoSolveSeed = ensureSentence(
+    codeHints.length > 0
+      ? `Repository solve path runs through ${codeHints.slice(0, 2).join(" and ")} with constraints grounded in ${primaryDoc}`
+      : `Repository solve details are grounded in ${primaryDoc} and related anchors in the retrieved evidence set`,
+  );
+  const openGapsSeed = ensureSentence(
+    args.envelope.prompt_specificity === "specific"
+      ? "Some symbol-level or line-level detail may still need a narrower file:line anchor for full certainty"
+      : "Some derivation-level detail remains open until narrower anchors are requested",
+  );
+  return {
+    source: "deterministic_grounded_brief",
+    prompt_family: args.plan.prompt_family,
+    prompt_specificity: args.plan.prompt_specificity,
+    question,
+    short_answer_seed: shortAnswerSeed,
+    conceptual_baseline_seed: conceptualBaselineSeed,
+    repo_solve_seed: repoSolveSeed,
+    evidence_anchor_hints: sourceHints.length > 0 ? sourceHints.slice(0, 8) : [primaryAnchor],
+    open_gaps_seed: openGapsSeed,
+  };
+};
+
+const buildHelixAskComposerV2ExpandPrompt = (args: {
+  brief: HelixAskComposerV2GroundedBrief;
+  allowedCitations: string[];
+  verbosity: HelixAskVerbosity;
+}): string => {
+  const spec = resolveHelixAskVerbositySpec(args.verbosity);
+  const targetClaimCount = args.verbosity === "extended" ? 12 : args.verbosity === "normal" ? 9 : 7;
+  const lines: string[] = [];
+  lines.push("You are Helix Ask composer_v2_brief_first for non-equation prompts.");
+  lines.push("Use only the deterministic grounded brief and allowed citations provided below.");
+  lines.push("Return strict JSON only with this shape:");
+  lines.push(
+    '{"claims":[{"section":"short_answer|conceptual_baseline|how_repo_solves_it|evidence_proof_anchors|uncertainty_open_gaps","class":"baseline_common|repo_grounded|reasoned_inference","text":"...","citations":["path"],"uncertainty_marker":"..."}]}',
+  );
+  lines.push("Rules:");
+  lines.push("- Every claim must have section + class + text.");
+  lines.push("- baseline_common claims are allowed uncited, but only in section conceptual_baseline.");
+  lines.push("- repo_grounded claims must include citations from the allowed citation set.");
+  lines.push("- reasoned_inference claims must include citations from the allowed citation set and uncertainty_marker.");
+  lines.push("- Do not output internal scaffolding/debug/timeline fields.");
+  lines.push("- Keep claims concise and evidence-bounded.");
+  lines.push(
+    `Verbosity target: ${args.verbosity}. Write approximately ${targetClaimCount} claims and keep detail at ${spec.paragraphs.count} paragraphs equivalent.`,
+  );
+  lines.push("");
+  lines.push("Grounded brief:");
+  lines.push(`- prompt_family: ${args.brief.prompt_family}`);
+  lines.push(`- prompt_specificity: ${args.brief.prompt_specificity}`);
+  lines.push(`- question: ${args.brief.question}`);
+  lines.push(`- short_answer_seed: ${args.brief.short_answer_seed}`);
+  lines.push(`- conceptual_baseline_seed: ${args.brief.conceptual_baseline_seed}`);
+  lines.push(`- repo_solve_seed: ${args.brief.repo_solve_seed}`);
+  lines.push(`- open_gaps_seed: ${args.brief.open_gaps_seed}`);
+  lines.push(
+    `- evidence_anchor_hints: ${args.brief.evidence_anchor_hints.length > 0 ? args.brief.evidence_anchor_hints.join(", ") : "(none)"}`,
+  );
+  lines.push("");
+  lines.push(
+    `Allowed citations (use only these): ${args.allowedCitations.length > 0 ? args.allowedCitations.join(", ") : "(none)"}`,
+  );
+  return lines.join("\n");
+};
+
+const buildHelixAskComposerV2RepairPrompt = (args: {
+  priorRaw: string;
+  preFailReasons: string[];
+  postFailReasons: string[];
+  brief: HelixAskComposerV2GroundedBrief;
+  allowedCitations: string[];
+  verbosity: HelixAskVerbosity;
+}): string => {
+  const lines: string[] = [];
+  lines.push("Repair the previous composer_v2 output to satisfy the JSON claim contract.");
+  lines.push(
+    buildHelixAskComposerV2ExpandPrompt({
+      brief: args.brief,
+      allowedCitations: args.allowedCitations,
+      verbosity: args.verbosity,
+    }),
+  );
+  lines.push("");
+  lines.push(
+    `Previous fail reasons (pre-link): ${args.preFailReasons.length > 0 ? args.preFailReasons.join(", ") : "none"}`,
+  );
+  lines.push(
+    `Previous fail reasons (post-link): ${args.postFailReasons.length > 0 ? args.postFailReasons.join(", ") : "none"}`,
+  );
+  lines.push("Previous invalid output:");
+  lines.push(args.priorRaw.trim() || "(empty)");
+  return lines.join("\n");
+};
+
+const coerceHelixAskComposerV2SectionId = (
+  value: unknown,
+): HelixAskComposerV2SectionId | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[`"']/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^\w]/g, "_")
+    .replace(/_+/g, "_");
+  if (!normalized) return null;
+  if (
+    normalized === "short_answer" ||
+    normalized === "shortanswer" ||
+    normalized === "summary" ||
+    normalized === "definition"
+  ) {
+    return "short_answer";
+  }
+  if (
+    normalized === "conceptual_baseline" ||
+    normalized === "baseline" ||
+    normalized === "conceptual" ||
+    normalized === "conceptual_context"
+  ) {
+    return "conceptual_baseline";
+  }
+  if (
+    normalized === "how_repo_solves_it" ||
+    normalized === "repo_solution" ||
+    normalized === "mechanism" ||
+    normalized === "how_it_is_solved_in_codebase" ||
+    normalized === "how_solved"
+  ) {
+    return "how_repo_solves_it";
+  }
+  if (
+    normalized === "evidence_proof_anchors" ||
+    normalized === "evidence" ||
+    normalized === "proof" ||
+    normalized === "proof_anchors" ||
+    normalized === "repo_anchors"
+  ) {
+    return "evidence_proof_anchors";
+  }
+  if (
+    normalized === "uncertainty_open_gaps" ||
+    normalized === "uncertainty" ||
+    normalized === "open_gaps" ||
+    normalized === "limitations"
+  ) {
+    return "uncertainty_open_gaps";
+  }
+  return null;
+};
+
+const coerceHelixAskComposerV2ClaimClass = (
+  value: unknown,
+  section: HelixAskComposerV2SectionId,
+): HelixAskComposerV2ClaimClass => {
+  if (section === "conceptual_baseline") return "baseline_common";
+  if (section === "uncertainty_open_gaps") return "reasoned_inference";
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+    if (normalized.includes("baseline")) return "baseline_common";
+    if (normalized.includes("inference") || normalized.includes("uncertain")) {
+      return "reasoned_inference";
+    }
+  }
+  return "repo_grounded";
+};
+
+const coerceHelixAskComposerV2ClaimCitations = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return normalizeCitations(
+      value.filter((entry): entry is string => typeof entry === "string"),
+    ).slice(0, 8);
+  }
+  if (typeof value === "string") {
+    return normalizeCitations([value]).slice(0, 8);
+  }
+  return [];
+};
+
+const coerceHelixAskComposerV2ClaimText = (value: unknown): string => {
+  if (typeof value === "string") return value.trim();
+  return "";
+};
+
+const extractHelixAskComposerV2JsonCandidates = (raw: string): string[] => {
+  const candidates: string[] = [];
+  const push = (value: string | null | undefined) => {
+    const normalized = String(value ?? "").trim();
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) candidates.push(normalized);
+  };
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return candidates;
+  push(trimmed);
+  push(extractJsonObject(trimmed));
+  const fenceRe = /```(?:json)?\s*([\s\S]*?)```/gi;
+  for (const match of trimmed.matchAll(fenceRe)) {
+    push(match[1]);
+  }
+  const balancedScan = (text: string): void => {
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i];
+      if (start === -1) {
+        if (ch === "{") {
+          start = i;
+          depth = 1;
+          inString = false;
+          escaped = false;
+        }
+        continue;
+      }
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          push(text.slice(start, i + 1));
+          start = -1;
+        }
+      }
+    }
+  };
+  balancedScan(trimmed);
+  for (const match of trimmed.matchAll(fenceRe)) {
+    balancedScan(String(match[1] ?? ""));
+  }
+  return candidates;
+};
+
+const coerceHelixAskComposerV2ExpansionCandidate = (
+  value: unknown,
+): HelixAskComposerV2Expansion | null => {
+  if (!value) return null;
+  const root = value as Record<string, unknown>;
+  const claimPool = Array.isArray(value)
+    ? value
+    : Array.isArray(root.claims)
+      ? root.claims
+      : Array.isArray((root.data as Record<string, unknown> | undefined)?.claims)
+        ? ((root.data as Record<string, unknown>).claims as unknown[])
+        : Array.isArray((root.result as Record<string, unknown> | undefined)?.claims)
+          ? ((root.result as Record<string, unknown>).claims as unknown[])
+          : [];
+  if (claimPool.length === 0) return null;
+  const claims: HelixAskComposerV2Claim[] = [];
+  for (const entry of claimPool) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Record<string, unknown>;
+    const section =
+      coerceHelixAskComposerV2SectionId(row.section) ??
+      coerceHelixAskComposerV2SectionId(row.section_id) ??
+      coerceHelixAskComposerV2SectionId(row.heading) ??
+      coerceHelixAskComposerV2SectionId(row.bucket) ??
+      coerceHelixAskComposerV2SectionId(row.part);
+    if (!section) continue;
+    const text =
+      coerceHelixAskComposerV2ClaimText(row.text) ||
+      coerceHelixAskComposerV2ClaimText(row.claim) ||
+      coerceHelixAskComposerV2ClaimText(row.content) ||
+      coerceHelixAskComposerV2ClaimText(row.message);
+    if (!text) continue;
+    const citations = normalizeCitations([
+      ...coerceHelixAskComposerV2ClaimCitations(row.citations),
+      ...coerceHelixAskComposerV2ClaimCitations(row.sources),
+      ...extractFilePathsFromText(text),
+    ]).slice(0, 8);
+    const claim: HelixAskComposerV2Claim = {
+      section,
+      class: coerceHelixAskComposerV2ClaimClass(row.class ?? row.kind ?? row.type, section),
+      text,
+    };
+    if (citations.length > 0) claim.citations = citations;
+    const marker = coerceHelixAskComposerV2ClaimText(
+      row.uncertainty_marker ?? row.uncertainty ?? row.qualifier,
+    );
+    if (marker) {
+      claim.uncertainty_marker = marker;
+    } else if (
+      claim.class === "reasoned_inference" &&
+      hasHelixAskComposerV2UncertaintySignal(text)
+    ) {
+      claim.uncertainty_marker = "partial coverage in this turn";
+    }
+    claims.push(claim);
+  }
+  if (claims.length === 0) return null;
+  return { claims };
+};
+
+const parseHelixAskComposerV2SectionTextFallback = (
+  raw: string,
+): HelixAskComposerV2Expansion | null => {
+  const normalized = String(raw ?? "")
+    .replace(/^```(?:json|md|markdown|text)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  if (!normalized) return null;
+  const claims: HelixAskComposerV2Claim[] = [];
+  let activeSection: HelixAskComposerV2SectionId | null = null;
+  let structuredSignalDetected = false;
+  const lines = normalized.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^sources?\s*:/i.test(trimmed)) continue;
+    const headingCandidate = trimmed.replace(/^#+\s*/, "").replace(/:\s*$/, "").trim();
+    const headingSection = coerceHelixAskComposerV2SectionId(headingCandidate);
+    if (headingSection) {
+      activeSection = headingSection;
+      structuredSignalDetected = true;
+      continue;
+    }
+    const body = trimmed
+      .replace(/^\d+[\).\s-]+/, "")
+      .replace(/^[-*]\s+/, "")
+      .trim();
+    if (!body) continue;
+    const section =
+      activeSection ??
+      (hasHelixAskComposerV2UncertaintySignal(body)
+        ? "uncertainty_open_gaps"
+        : "how_repo_solves_it");
+    const claimClass = coerceHelixAskComposerV2ClaimClass(null, section);
+    const citations = normalizeCitations(extractFilePathsFromText(body)).slice(0, 8);
+    if (citations.length > 0) {
+      structuredSignalDetected = true;
+    }
+    const textBody =
+      citations.length === 1 && normalizeConstraintPath(body) === normalizeConstraintPath(citations[0])
+        ? `Anchor: ${citations[0]}`
+        : body;
+    const claim: HelixAskComposerV2Claim = {
+      section,
+      class: claimClass,
+      text: textBody,
+    };
+    if (citations.length > 0) {
+      claim.citations = citations;
+    }
+    if (claimClass === "reasoned_inference") {
+      claim.uncertainty_marker = hasHelixAskComposerV2UncertaintySignal(body)
+        ? "partial evidence in this turn"
+        : "open detail remains";
+    }
+    claims.push(claim);
+  }
+  if (claims.length === 0) {
+    const fallbackSentence = splitGroundedSentences(normalized)
+      .map((entry) => entry.trim())
+      .find((entry) => entry.length > 8);
+    if (fallbackSentence) {
+      const fallbackCitations = normalizeCitations(extractFilePathsFromText(fallbackSentence)).slice(0, 8);
+      const fallbackClaim: HelixAskComposerV2Claim = {
+        section: fallbackCitations.length > 0 ? "how_repo_solves_it" : "conceptual_baseline",
+        class: fallbackCitations.length > 0 ? "repo_grounded" : "baseline_common",
+        text: fallbackSentence,
+      };
+      if (fallbackCitations.length > 0) {
+        fallbackClaim.citations = fallbackCitations;
+      }
+      claims.push(fallbackClaim);
+    }
+  }
+  if (!structuredSignalDetected) return null;
+  if (claims.length === 0) return null;
+  return { claims };
+};
+
+const parseHelixAskComposerV2Expansion = (raw: string): {
+  expansion: HelixAskComposerV2Expansion | null;
+  failReasons: string[];
+} => {
+  const failReasons: string[] = [];
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) {
+    failReasons.push("empty_output");
+    return { expansion: null, failReasons };
+  }
+  const parseFailures: string[] = [];
+  const schemaFailures: string[] = [];
+  for (const candidate of extractHelixAskComposerV2JsonCandidates(trimmed)) {
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(candidate);
+    } catch {
+      parseFailures.push("json_parse_failed");
+      continue;
+    }
+    const direct = HELIX_ASK_COMPOSER_V2_EXPANSION_SCHEMA.safeParse(parsedJson);
+    if (direct.success) {
+      return { expansion: direct.data, failReasons };
+    }
+    const coerced = coerceHelixAskComposerV2ExpansionCandidate(parsedJson);
+    if (coerced) {
+      const coercedParsed = HELIX_ASK_COMPOSER_V2_EXPANSION_SCHEMA.safeParse(coerced);
+      if (coercedParsed.success) {
+        failReasons.push("schema_coerced");
+        return { expansion: coercedParsed.data, failReasons };
+      }
+    }
+    schemaFailures.push("schema_invalid");
+  }
+  const textFallback = parseHelixAskComposerV2SectionTextFallback(trimmed);
+  if (textFallback) {
+    const textParsed = HELIX_ASK_COMPOSER_V2_EXPANSION_SCHEMA.safeParse(textFallback);
+    if (textParsed.success) {
+      failReasons.push("plaintext_projection");
+      return { expansion: textParsed.data, failReasons };
+    }
+    schemaFailures.push("schema_invalid");
+  }
+  failReasons.push(...parseFailures, ...schemaFailures);
+  if (failReasons.length === 0) {
+    failReasons.push("json_parse_failed");
+  }
+  return { expansion: null, failReasons: Array.from(new Set(failReasons)) };
+};
+
+const normalizeHelixAskComposerV2ClaimText = (value: string): string => {
+  let cleaned = stripInlinePathCitationsFromClaim(String(value ?? ""), {
+    stripBarePaths: false,
+  });
+  cleaned = cleanDanglingFileExtensionFragments(cleaned);
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  cleaned = cleaned.replace(/^(?:[-*]\s*|\d+\.\s*)+/, "");
+  cleaned = cleaned.replace(/^[;:,]+/, "").trim();
+  if (!cleaned) return "";
+  return ensureSentence(clipAskText(cleaned, 320));
+};
+
+const hasHelixAskComposerV2UncertaintySignal = (value: string): boolean =>
+  /\b(?:uncertain|uncertainty|likely|tentative|partial|incomplete|open gap|unknown|may|might|cannot fully)\b/i.test(
+    value,
+  );
+
+const linkHelixAskComposerV2Claims = (args: {
+  expansion: HelixAskComposerV2Expansion;
+  allowedCitations: string[];
+  allowCitationFallback?: boolean;
+}): {
+  ok: boolean;
+  claims: HelixAskComposerV2Claim[];
+  failReasons: string[];
+  claimCounts: HelixAskComposerV2ClaimCounts;
+} => {
+  const failReasons: string[] = [];
+  const claimCounts = createHelixAskComposerV2ClaimCounts();
+  const firstAllowedCitation = normalizeCitations(args.allowedCitations)[0] ?? null;
+  const allowedCitationSet = new Set(
+    normalizeCitations(args.allowedCitations).map((entry) => normalizeConstraintPath(entry).toLowerCase()),
+  );
+  const linkedClaims: HelixAskComposerV2Claim[] = [];
+  for (const claim of args.expansion.claims) {
+    const rawClaimText = String(claim.text ?? "");
+    const text = normalizeHelixAskComposerV2ClaimText(rawClaimText);
+    if (!text) {
+      failReasons.push("empty_claim_text");
+      continue;
+    }
+    const hasDebugLeak = HELIX_ASK_UNIVERSAL_COMPOSER_DEBUG_LEAK_PATTERNS.some((entry) =>
+      entry.pattern.test(text),
+    );
+    if (hasDebugLeak) {
+      failReasons.push("debug_leak_claim");
+      continue;
+    }
+    let normalizedCitations = normalizeCitations([
+      ...(Array.isArray(claim.citations)
+        ? claim.citations.map((entry) => normalizeConstraintPath(entry))
+        : []),
+      ...extractFilePathsFromText(rawClaimText).map((entry) => normalizeConstraintPath(entry)),
+    ]).slice(0, 6);
+    if (
+      normalizedCitations.length === 0 &&
+      Boolean(args.allowCitationFallback) &&
+      firstAllowedCitation &&
+      (claim.class === "repo_grounded" || claim.class === "reasoned_inference")
+    ) {
+      normalizedCitations = [firstAllowedCitation];
+    }
+    if (claim.class === "baseline_common") {
+      if (claim.section !== "conceptual_baseline") {
+        failReasons.push("baseline_common_outside_conceptual_baseline");
+        continue;
+      }
+      claimCounts.baseline_common += 1;
+      linkedClaims.push({
+        section: claim.section,
+        class: claim.class,
+        text,
+      });
+      continue;
+    }
+    if (normalizedCitations.length === 0) {
+      failReasons.push("grounded_claim_missing_citations");
+      continue;
+    }
+    if (allowedCitationSet.size > 0) {
+      const invalidCitation = normalizedCitations.find(
+        (entry) => !allowedCitationSet.has(normalizeConstraintPath(entry).toLowerCase()),
+      );
+      if (invalidCitation) {
+        failReasons.push("grounded_claim_citation_not_allowed");
+        continue;
+      }
+    }
+    if (claim.class === "reasoned_inference") {
+      let marker = String(claim.uncertainty_marker ?? "").trim();
+      if (!marker && hasHelixAskComposerV2UncertaintySignal(text)) {
+        marker = "partial evidence in this turn";
+      }
+      if (!marker) {
+        failReasons.push("reasoned_inference_missing_uncertainty_marker");
+        continue;
+      }
+      if (!hasHelixAskComposerV2UncertaintySignal(`${text} ${marker}`)) {
+        failReasons.push("reasoned_inference_missing_uncertainty_signal");
+        continue;
+      }
+      claimCounts.reasoned_inference += 1;
+      linkedClaims.push({
+        section: claim.section,
+        class: claim.class,
+        text,
+        citations: normalizedCitations,
+        uncertainty_marker: marker,
+      });
+      continue;
+    }
+    claimCounts.repo_grounded += 1;
+    linkedClaims.push({
+      section: claim.section,
+      class: claim.class,
+      text,
+      citations: normalizedCitations,
+    });
+  }
+  if (claimCounts.repo_grounded + claimCounts.reasoned_inference === 0) {
+    failReasons.push("no_grounded_claims");
+  }
+  return {
+    ok: failReasons.length === 0 && linkedClaims.length > 0,
+    claims: linkedClaims,
+    failReasons: Array.from(new Set(failReasons)),
+    claimCounts,
+  };
+};
+
+const buildHelixAskComposerV2SectionFallbackLines = (args: {
+  section: HelixAskComposerV2SectionId;
+  brief: HelixAskComposerV2GroundedBrief;
+}): string[] => {
+  switch (args.section) {
+    case "short_answer":
+      return [args.brief.short_answer_seed];
+    case "conceptual_baseline":
+      return [args.brief.conceptual_baseline_seed];
+    case "how_repo_solves_it":
+      return [args.brief.repo_solve_seed];
+    case "evidence_proof_anchors":
+      return args.brief.evidence_anchor_hints.length > 0
+        ? args.brief.evidence_anchor_hints.slice(0, 4).map((entry) => `Anchor: ${entry}`)
+        : ["Anchor set was limited in this turn; use Sources for the strongest available references"];
+    case "uncertainty_open_gaps":
+    default:
+      return [args.brief.open_gaps_seed];
+  }
+};
+
+const renderHelixAskComposerV2FiveSectionAnswer = (args: {
+  claims: HelixAskComposerV2Claim[];
+  brief: HelixAskComposerV2GroundedBrief;
+  verbosity: HelixAskVerbosity;
+}): string => {
+  const grouped = new Map<HelixAskComposerV2SectionId, string[]>();
+  const sourcePool: string[] = [];
+  for (const sectionId of HELIX_ASK_COMPOSER_V2_SECTION_ORDER) {
+    grouped.set(sectionId, []);
+  }
+  for (const claim of args.claims) {
+    const lines = grouped.get(claim.section) ?? [];
+    let line = claim.text;
+    if (claim.citations && claim.citations.length > 0) {
+      sourcePool.push(...claim.citations);
+      line = `${line} [${claim.citations.slice(0, 2).join(", ")}]`;
+    }
+    if (claim.class === "reasoned_inference") {
+      const marker = String(claim.uncertainty_marker ?? "").trim();
+      if (marker) {
+        line = `${line} (uncertainty: ${marker})`;
+      }
+    }
+    lines.push(line.trim());
+    grouped.set(claim.section, lines);
+  }
+
+  const minCountsBySection: Record<HelixAskComposerV2SectionId, number> =
+    args.verbosity === "extended"
+      ? {
+          short_answer: 1,
+          conceptual_baseline: 2,
+          how_repo_solves_it: 3,
+          evidence_proof_anchors: 3,
+          uncertainty_open_gaps: 2,
+        }
+      : {
+          short_answer: 1,
+          conceptual_baseline: 2,
+          how_repo_solves_it: 2,
+          evidence_proof_anchors: 2,
+          uncertainty_open_gaps: 1,
+        };
+
+  const lines: string[] = [];
+  for (const sectionId of HELIX_ASK_COMPOSER_V2_SECTION_ORDER) {
+    const sectionTitle = HELIX_ASK_COMPOSER_V2_SECTION_TITLES[sectionId];
+    const sectionLines = (grouped.get(sectionId) ?? []).slice();
+    const fallbackLines = buildHelixAskComposerV2SectionFallbackLines({
+      section: sectionId,
+      brief: args.brief,
+    });
+    for (const fallback of fallbackLines) {
+      if (sectionLines.length >= minCountsBySection[sectionId]) break;
+      sectionLines.push(fallback);
+    }
+    while (sectionLines.length < minCountsBySection[sectionId]) {
+      sectionLines.push(args.brief.open_gaps_seed);
+    }
+    lines.push(`${sectionTitle}:`);
+    for (const sectionLine of sectionLines) {
+      const cleanedLine = normalizeHelixAskComposerV2ClaimText(sectionLine);
+      if (!cleanedLine) continue;
+      lines.push(`- ${cleanedLine}`);
+    }
+    lines.push("");
+  }
+  const mergedSources = normalizeCitations([
+    ...sourcePool,
+    ...args.brief.evidence_anchor_hints,
+  ]).slice(0, 12);
+  lines.push(
+    `Sources: ${mergedSources.length > 0 ? mergedSources.join(", ") : args.brief.evidence_anchor_hints[0] ?? "server/routes/agi.plan.ts"}`,
+  );
+  return lines.join("\n").trim();
+};
+
+const materializeHelixAskComposerV2Output = (args: {
+  rawExpansion: string;
+  brief: HelixAskComposerV2GroundedBrief;
+  allowedCitations: string[];
+  verbosity: HelixAskVerbosity;
+}): HelixAskComposerV2MaterializeResult => {
+  const parsed = parseHelixAskComposerV2Expansion(args.rawExpansion);
+  const claimCounts = createHelixAskComposerV2ClaimCounts();
+  if (!parsed.expansion) {
+    return {
+      ok: false,
+      rendered_text: "",
+      expand_ok: false,
+      link_ok: false,
+      pre_link_fail_reasons: parsed.failReasons,
+      post_link_fail_reasons: [],
+      claim_counts: claimCounts,
+      fallback_reason: parsed.failReasons[0] ?? "expand_parse_failed",
+    };
+  }
+  const linked = linkHelixAskComposerV2Claims({
+    expansion: parsed.expansion,
+    allowedCitations: args.allowedCitations,
+    allowCitationFallback:
+      parsed.failReasons.includes("plaintext_projection") ||
+      parsed.failReasons.includes("schema_coerced"),
+  });
+  if (!linked.ok) {
+    return {
+      ok: false,
+      rendered_text: "",
+      expand_ok: true,
+      link_ok: false,
+      pre_link_fail_reasons: parsed.failReasons,
+      post_link_fail_reasons: linked.failReasons,
+      claim_counts: linked.claimCounts,
+      fallback_reason: linked.failReasons[0] ?? "link_failed",
+    };
+  }
+  const rendered = renderHelixAskComposerV2FiveSectionAnswer({
+    claims: linked.claims,
+    brief: args.brief,
+    verbosity: args.verbosity,
+  });
+  return {
+    ok: Boolean(rendered),
+    rendered_text: rendered,
+    expand_ok: true,
+    link_ok: true,
+    pre_link_fail_reasons: parsed.failReasons,
+    post_link_fail_reasons: linked.failReasons,
+    claim_counts: linked.claimCounts,
+    fallback_reason: rendered ? null : "render_empty",
+  };
+};
+
+const scoreHelixAskComposerV2MaterializeResult = (
+  value: HelixAskComposerV2MaterializeResult,
+): number => {
+  const failPenalty =
+    value.pre_link_fail_reasons.length + value.post_link_fail_reasons.length;
+  const claimScore =
+    value.claim_counts.baseline_common +
+    value.claim_counts.repo_grounded * 2 +
+    value.claim_counts.reasoned_inference * 3;
+  return (
+    (value.ok ? 200 : 0) +
+    (value.link_ok ? 80 : 0) +
+    (value.expand_ok ? 40 : 0) +
+    claimScore -
+    failPenalty * 5
+  );
+};
+
+const shouldPreferHelixAskComposerV2Materialized = (
+  candidate: HelixAskComposerV2MaterializeResult,
+  current: HelixAskComposerV2MaterializeResult,
+): boolean => {
+  const candidateScore = scoreHelixAskComposerV2MaterializeResult(candidate);
+  const currentScore = scoreHelixAskComposerV2MaterializeResult(current);
+  if (candidateScore !== currentScore) return candidateScore > currentScore;
+  if (candidate.ok !== current.ok) return candidate.ok;
+  if (candidate.link_ok !== current.link_ok) return candidate.link_ok;
+  if (candidate.expand_ok !== current.expand_ok) return candidate.expand_ok;
+  return (
+    candidate.pre_link_fail_reasons.length + candidate.post_link_fail_reasons.length <
+    current.pre_link_fail_reasons.length + current.post_link_fail_reasons.length
+  );
+};
+
+const buildHelixAskComposerV2DeterministicProjectionClaims = (args: {
+  brief: HelixAskComposerV2GroundedBrief;
+  existingText: string;
+  allowedCitations: string[];
+}): HelixAskComposerV2Claim[] => {
+  const allowed = normalizeCitations(args.allowedCitations).slice(0, 8);
+  const firstCitation = allowed[0] ?? null;
+  const codeHints = allowed
+    .filter(
+      (entry) =>
+        /\.(?:ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|cs)(?::\d+)?$/i.test(entry) ||
+        /(?:^|\/)(?:server|client|modules|scripts|tools|shared)\//i.test(entry),
+    )
+    .slice(0, 3);
+  const docHints = allowed
+    .filter((entry) => !codeHints.includes(entry))
+    .slice(0, 3);
+  const sentenceSeed =
+    splitGroundedSentences(String(args.existingText ?? ""))
+      .map((entry) => entry.trim())
+      .find((entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry)) ??
+    "";
+  const normalizedSeedText = normalizeHelixAskComposerV2ClaimText(sentenceSeed);
+  const shortText =
+    (!isLowSignalHelixAskComposerV2SeedSentence(normalizedSeedText)
+      ? normalizedSeedText
+      : "") ||
+    normalizeHelixAskComposerV2ClaimText(args.brief.short_answer_seed) ||
+    "Answer is grounded to the retrieved repository anchors.";
+  const claims: HelixAskComposerV2Claim[] = [];
+  claims.push({
+    section: "short_answer",
+    class: "repo_grounded",
+    text: shortText,
+    citations: normalizeCitations([
+      ...codeHints.slice(0, 1),
+      ...(firstCitation ? [firstCitation] : []),
+    ]).slice(0, 2),
+  });
+  claims.push({
+    section: "conceptual_baseline",
+    class: "baseline_common",
+    text: normalizeHelixAskComposerV2ClaimText(args.brief.conceptual_baseline_seed),
+  });
+  claims.push({
+    section: "how_repo_solves_it",
+    class: "repo_grounded",
+    text: normalizeHelixAskComposerV2ClaimText(args.brief.repo_solve_seed),
+    citations: normalizeCitations([
+      ...codeHints.slice(0, 2),
+      ...(firstCitation ? [firstCitation] : []),
+    ]).slice(0, 3),
+  });
+  claims.push({
+    section: "evidence_proof_anchors",
+    class: "repo_grounded",
+    text: normalizeHelixAskComposerV2ClaimText(
+      docHints.length > 0
+        ? `Primary repo anchors: ${docHints.join(", ")}`
+        : `Primary repo anchors: ${allowed.slice(0, 3).join(", ")}`,
+    ),
+    citations: normalizeCitations([...docHints, ...codeHints, ...allowed]).slice(0, 4),
+  });
+  claims.push({
+    section: "uncertainty_open_gaps",
+    class: "reasoned_inference",
+    text:
+      normalizeHelixAskComposerV2ClaimText(args.brief.open_gaps_seed) ||
+      "Some implementation details remain partial in this evidence window.",
+    citations: normalizeCitations([...(firstCitation ? [firstCitation] : []), ...docHints]).slice(0, 2),
+    uncertainty_marker: "partial evidence window",
+  });
+  return claims;
+};
+
 const HELIX_ASK_UNIVERSAL_FAMILY_DEGRADE_INTERNAL_SENTENCE_RE =
   /\b(?:confirmed|reasoned connections \(bounded\)|next evidence|next\s+step|checked\s+files|retrieved grounded repository anchors|bounded linkage supported by cited repo evidence|definition-focused degrade path|required sections(?:\s+are)? missing|composer[_\s-]*soft[_\s-]*enforce|fallback_reason|traceid|turnkey)\b/i;
 
@@ -22267,17 +23340,23 @@ const isMeaningfulEquationClaimCandidate = (value: string): boolean => {
   return true;
 };
 
-const stripInlinePathCitationsFromClaim = (value: string): string => {
+const stripInlinePathCitationsFromClaim = (
+  value: string,
+  options: { stripBarePaths?: boolean } = {},
+): string => {
   if (!value) return "";
+  const stripBarePaths = options.stripBarePaths !== false;
   let cleaned = value;
   cleaned = cleaned.replace(
     /\[[^\]\n]{0,240}(?:\/|\\)[^\]\n]{0,240}\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)(?::L?\d+(?::\d+)?)?[^\]\n]*\]/gi,
     " ",
   );
-  cleaned = cleaned.replace(
-    /\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)(?::L?\d+(?::\d+)?)?\b/gi,
-    " ",
-  );
+  if (stripBarePaths) {
+    cleaned = cleaned.replace(
+      /\b[a-z0-9_./-]+\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)(?::L?\d+(?::\d+)?)?\b/gi,
+      " ",
+    );
+  }
   cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
   return cleaned;
 };
@@ -27278,6 +28357,15 @@ export const __testHelixAskReliabilityGuards = {
   buildHelixAskAnswerPlanShadow,
   validateHelixAskAnswerPlanShadow,
   buildHelixAskUniversalFamilyDegradeAnswer,
+  shouldApplyHelixAskComposerV2ForPlan,
+  resolveHelixAskComposerV2Verbosity,
+  isLowSignalHelixAskComposerV2SeedSentence,
+  buildHelixAskComposerV2GroundedBrief,
+  buildHelixAskComposerV2DeterministicProjectionClaims,
+  parseHelixAskComposerV2Expansion,
+  linkHelixAskComposerV2Claims,
+  renderHelixAskComposerV2FiveSectionAnswer,
+  materializeHelixAskComposerV2Output,
   extractEquationPrimaryKeyFromRenderedAnswer,
   assertRenderedPrimaryMatchesSelection,
   computeEquationSelectionLockHash,
@@ -45628,6 +46716,23 @@ const executeHelixAsk = async ({
             HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY;
         let composerSoftEnforceTriggerReason: string | null = null;
         let composerSoftEnforceAction: string | null = null;
+        const composerV2Enabled = shouldApplyHelixAskComposerV2ForPlan(answerPlanShadow);
+        let composerV2Applied = false;
+        let composerV2BriefSource: string | null = null;
+        let composerV2ClaimCounts = createHelixAskComposerV2ClaimCounts();
+        let composerV2PreLinkFailReasons: string[] = [];
+        let composerV2PostLinkFailReasons: string[] = [];
+        let composerV2RepairAttempted = false;
+        let composerV2FallbackReason: string | null = null;
+        let composerV2ExpandRawPreview: string | null = null;
+        let composerV2RepairRawPreview: string | null = null;
+        let composerV2ExpandCharCount = 0;
+        let composerV2RepairCharCount = 0;
+        let composerV2ExpandAttempts = 0;
+        let composerV2RepairAttempts = 0;
+        let composerV2ProjectionApplied = false;
+        let composerV2BestAttemptStage: "expand" | "repair" | "projection" | "deterministic_fallback" | null =
+          null;
         if (hardComposerGuardTriggered || softSectionGuardTriggered) {
           const softReason =
             answerPlanValidationShadow.fail_reasons[0] ??
@@ -45651,14 +46756,202 @@ const executeHelixAsk = async ({
               composerSoftEnforceAction = "equation_degrade";
             }
           } else {
-            cleaned = buildHelixAskUniversalFamilyDegradeAnswer({
-              plan: answerPlanShadow,
-              question: baseQuestion,
-              existingText: cleaned,
-              reason: softReason,
-            });
-            answerPath.push(`composerSoftEnforce:family_degrade:${softReason}`);
-            composerSoftEnforceAction = "family_degrade";
+            const composerV2EligibleForReason =
+              composerV2Enabled && softReason === "required_sections_missing";
+            if (composerV2EligibleForReason) {
+              const composerV2Verbosity = resolveHelixAskComposerV2Verbosity(verbosity);
+              const composerV2Brief = buildHelixAskComposerV2GroundedBrief({
+                plan: answerPlanShadow,
+                question: baseQuestion,
+                existingText: cleaned,
+                envelope: helixIntentPolicyEnvelope,
+              });
+              composerV2BriefSource = composerV2Brief.source;
+              answerPath.push("composerV2:brief_built");
+              const expandPrompt = buildHelixAskComposerV2ExpandPrompt({
+                brief: composerV2Brief,
+                allowedCitations: composerAllowedCitations,
+                verbosity: composerV2Verbosity,
+              });
+              let expansionRaw = "";
+              const preFailSet = new Set<string>();
+              const postFailSet = new Set<string>();
+              let materialized: HelixAskComposerV2MaterializeResult;
+              answerPath.push("composerV2:expand_start");
+              composerV2ExpandAttempts = 1;
+              try {
+                const expandResult = (await llmLocalHandler(
+                  {
+                    prompt: expandPrompt,
+                    max_tokens: resolveHelixAskComposerV2MaxTokens(composerV2Verbosity),
+                    temperature: 0.15,
+                    metadata: { kind: "helix.ask.composer_v2.expand" },
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: `${askTraceId}:composer_v2:expand`,
+                    tenantId,
+                  },
+                )) as { text?: unknown };
+                expansionRaw = typeof expandResult?.text === "string" ? expandResult.text : "";
+                composerV2ExpandCharCount = expansionRaw.length;
+                composerV2ExpandRawPreview = clipAskText(expansionRaw, 1200) || null;
+                answerPath.push("composerV2:expand_done");
+              } catch {
+                preFailSet.add("expand_model_error");
+                expansionRaw = "";
+                composerV2ExpandCharCount = 0;
+                composerV2ExpandRawPreview = null;
+                answerPath.push("composerV2:expand_error");
+              }
+              materialized = materializeHelixAskComposerV2Output({
+                rawExpansion: expansionRaw,
+                brief: composerV2Brief,
+                allowedCitations: composerAllowedCitations,
+                verbosity: composerV2Verbosity,
+              });
+              let bestMaterialized = materialized;
+              let bestAttemptStage: "expand" | "repair" = "expand";
+              materialized.pre_link_fail_reasons.forEach((reason) => preFailSet.add(reason));
+              materialized.post_link_fail_reasons.forEach((reason) => postFailSet.add(reason));
+              let repairAttempts = 0;
+              while (!materialized.ok && repairAttempts < HELIX_ASK_COMPOSER_V2_MAX_REPAIR_ATTEMPTS) {
+                composerV2RepairAttempted = true;
+                repairAttempts += 1;
+                composerV2RepairAttempts = repairAttempts;
+                const repairPrompt = buildHelixAskComposerV2RepairPrompt({
+                  priorRaw: expansionRaw,
+                  preFailReasons: Array.from(preFailSet),
+                  postFailReasons: Array.from(postFailSet),
+                  brief: composerV2Brief,
+                  allowedCitations: composerAllowedCitations,
+                  verbosity: composerV2Verbosity,
+                });
+                answerPath.push(`composerV2:repair_start:${repairAttempts}`);
+                const priorRaw = expansionRaw;
+                try {
+                  const repairResult = (await llmLocalHandler(
+                    {
+                      prompt: repairPrompt,
+                      max_tokens: resolveHelixAskComposerV2MaxTokens(composerV2Verbosity),
+                      temperature: 0.1,
+                      metadata: { kind: "helix.ask.composer_v2.repair" },
+                    },
+                    {
+                      personaId,
+                      sessionId: parsed.data.sessionId,
+                      traceId: `${askTraceId}:composer_v2:repair:${repairAttempts}`,
+                      tenantId,
+                    },
+                  )) as { text?: unknown };
+                  const repairedRaw =
+                    typeof repairResult?.text === "string" ? repairResult.text : "";
+                  if (repairedRaw.trim()) {
+                    expansionRaw = repairedRaw;
+                  } else {
+                    preFailSet.add("repair_empty_output");
+                    expansionRaw = priorRaw;
+                  }
+                  composerV2RepairCharCount = expansionRaw.length;
+                  composerV2RepairRawPreview = clipAskText(expansionRaw, 1200) || null;
+                  answerPath.push(`composerV2:repair_done:${repairAttempts}`);
+                } catch {
+                  preFailSet.add("repair_model_error");
+                  expansionRaw = priorRaw;
+                  composerV2RepairCharCount = 0;
+                  composerV2RepairRawPreview = null;
+                  answerPath.push(`composerV2:repair_error:${repairAttempts}`);
+                }
+                materialized = materializeHelixAskComposerV2Output({
+                  rawExpansion: expansionRaw,
+                  brief: composerV2Brief,
+                  allowedCitations: composerAllowedCitations,
+                  verbosity: composerV2Verbosity,
+                });
+                if (shouldPreferHelixAskComposerV2Materialized(materialized, bestMaterialized)) {
+                  bestMaterialized = materialized;
+                  bestAttemptStage = "repair";
+                }
+                materialized.pre_link_fail_reasons.forEach((reason) => preFailSet.add(reason));
+                materialized.post_link_fail_reasons.forEach((reason) => postFailSet.add(reason));
+              }
+              materialized = bestMaterialized;
+              composerV2BestAttemptStage = bestAttemptStage;
+              composerV2ClaimCounts = materialized.claim_counts;
+              composerV2PreLinkFailReasons = Array.from(preFailSet);
+              composerV2PostLinkFailReasons = Array.from(postFailSet);
+              answerPath.push(materialized.expand_ok ? "composerV2:expand_ok" : "composerV2:expand_fail");
+              answerPath.push(materialized.link_ok ? "composerV2:link_ok" : "composerV2:link_fail");
+              if (materialized.ok && materialized.rendered_text.trim()) {
+                cleaned = materialized.rendered_text.trim();
+                composerV2Applied = true;
+                composerSoftEnforceAction = "composer_v2";
+                composerV2FallbackReason = null;
+              } else {
+                const projectedClaims = buildHelixAskComposerV2DeterministicProjectionClaims({
+                  brief: composerV2Brief,
+                  existingText: cleaned,
+                  allowedCitations: composerAllowedCitations,
+                });
+                const projectedLink = linkHelixAskComposerV2Claims({
+                  expansion: { claims: projectedClaims },
+                  allowedCitations: composerAllowedCitations,
+                  allowCitationFallback: true,
+                });
+                if (projectedLink.ok) {
+                  const projectedText = renderHelixAskComposerV2FiveSectionAnswer({
+                    claims: projectedLink.claims,
+                    brief: composerV2Brief,
+                    verbosity: composerV2Verbosity,
+                  }).trim();
+                  if (projectedText) {
+                    cleaned = projectedText;
+                    composerV2Applied = true;
+                    composerV2ProjectionApplied = true;
+                    composerV2BestAttemptStage = "projection";
+                    composerV2FallbackReason = materialized.fallback_reason ?? "projection_recovered";
+                    composerSoftEnforceAction = "composer_v2_projection";
+                    composerV2ClaimCounts = projectedLink.claimCounts;
+                    answerPath.push("composerV2:projection_recovered");
+                  }
+                }
+                if (!composerV2Applied) {
+                  const deterministicV2Fallback = renderHelixAskComposerV2FiveSectionAnswer({
+                    claims: [],
+                    brief: composerV2Brief,
+                    verbosity: composerV2Verbosity,
+                  }).trim();
+                  if (deterministicV2Fallback) {
+                    cleaned = deterministicV2Fallback;
+                    answerPath.push("composerV2:fallback_deterministic");
+                    composerV2BestAttemptStage = "deterministic_fallback";
+                    composerV2FallbackReason = materialized.fallback_reason ?? "fallback_deterministic";
+                    composerSoftEnforceAction = "composer_v2_deterministic_fallback";
+                  } else {
+                    cleaned = buildHelixAskUniversalFamilyDegradeAnswer({
+                      plan: answerPlanShadow,
+                      question: baseQuestion,
+                      existingText: cleaned,
+                      reason: softReason,
+                    });
+                    answerPath.push(`composerSoftEnforce:family_degrade:${softReason}`);
+                    answerPath.push("composerV2:fallback_legacy");
+                    composerV2FallbackReason = materialized.fallback_reason ?? "fallback_legacy";
+                    composerSoftEnforceAction = "family_degrade";
+                  }
+                }
+              }
+            } else {
+              cleaned = buildHelixAskUniversalFamilyDegradeAnswer({
+                plan: answerPlanShadow,
+                question: baseQuestion,
+                existingText: cleaned,
+                reason: softReason,
+              });
+              answerPath.push(`composerSoftEnforce:family_degrade:${softReason}`);
+              composerSoftEnforceAction = "family_degrade";
+            }
           }
         }
         const validatedAfterEnforce = validateHelixAskAnswerPlanShadow({
@@ -45729,6 +47022,24 @@ const executeHelixAsk = async ({
             composerSoftEnforceTriggerReason;
           debugRecord.composer_soft_enforce_action =
             composerSoftEnforceAction;
+          debugRecord.composer_v2_enabled = composerV2Enabled;
+          debugRecord.composer_v2_applied = composerV2Applied;
+          debugRecord.composer_v2_brief_source = composerV2BriefSource;
+          debugRecord.composer_v2_claim_counts = composerV2ClaimCounts;
+          debugRecord.composer_v2_pre_link_fail_reasons =
+            composerV2PreLinkFailReasons;
+          debugRecord.composer_v2_post_link_fail_reasons =
+            composerV2PostLinkFailReasons;
+          debugRecord.composer_v2_repair_attempted = composerV2RepairAttempted;
+          debugRecord.composer_v2_fallback_reason = composerV2FallbackReason;
+          debugRecord.composer_v2_expand_char_count = composerV2ExpandCharCount;
+          debugRecord.composer_v2_expand_raw_preview = composerV2ExpandRawPreview;
+          debugRecord.composer_v2_repair_char_count = composerV2RepairCharCount;
+          debugRecord.composer_v2_repair_raw_preview = composerV2RepairRawPreview;
+          debugRecord.composer_v2_expand_attempts = composerV2ExpandAttempts;
+          debugRecord.composer_v2_repair_attempts = composerV2RepairAttempts;
+          debugRecord.composer_v2_projection_applied = composerV2ProjectionApplied;
+          debugRecord.composer_v2_best_attempt_stage = composerV2BestAttemptStage;
           debugRecord.composer_selection_lock_id = answerPlanShadow.selection_lock.lock_id;
           debugRecord.composer_selection_locked =
             answerPlanShadow.selection_lock.selector_locked;
@@ -48864,5 +50175,6 @@ planRouter.get("/tools/logs/stream", (req, res) => {
 });
 
 export { planRouter };
+
 
 

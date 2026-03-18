@@ -584,6 +584,788 @@ describe("helix ask universal answer plan shadow", () => {
     expect(degraded).not.toMatch(/Based on .* papers/i);
   });
 
+  it("rejects repo_grounded and reasoned_inference claims when citations are missing", () => {
+    const question = "How does the warp pipeline work in this codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 2,
+      lockIdSeed: "ask:composer-v2-missing-citations",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Mechanism is grounded in docs/knowledge/warp/warp-bubble.md.",
+      envelope,
+    });
+    const raw = JSON.stringify({
+      claims: [
+        { section: "short_answer", class: "repo_grounded", text: "Repo uses Natario flow." },
+        { section: "conceptual_baseline", class: "baseline_common", text: "Conceptual baseline of shift-field control." },
+        { section: "how_repo_solves_it", class: "repo_grounded", text: "Solver runs through module wiring." },
+        { section: "evidence_proof_anchors", class: "reasoned_inference", text: "Evidence likely supports this.", uncertainty_marker: "likely" },
+        { section: "uncertainty_open_gaps", class: "reasoned_inference", text: "Some details may be incomplete.", uncertainty_marker: "incomplete anchors" },
+      ],
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: raw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(false);
+    expect(materialized.post_link_fail_reasons).toContain("grounded_claim_missing_citations");
+  });
+
+  it("rejects baseline_common claims outside Conceptual baseline section", () => {
+    const question = "Explain the warp bubble mechanism.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: ["docs/knowledge/warp/warp-bubble.md", "modules/warp/natario-warp.ts"],
+      contextFileCount: 2,
+      lockIdSeed: "ask:composer-v2-baseline-lane",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp bubble is modeled in docs/knowledge/warp/warp-bubble.md.",
+      envelope,
+    });
+    const raw = JSON.stringify({
+      claims: [
+        { section: "short_answer", class: "baseline_common", text: "General baseline incorrectly placed." },
+        { section: "conceptual_baseline", class: "baseline_common", text: "Conceptual lane is valid here." },
+        {
+          section: "how_repo_solves_it",
+          class: "repo_grounded",
+          text: "Repo path resolves in natario module.",
+          citations: ["modules/warp/natario-warp.ts"],
+        },
+        {
+          section: "evidence_proof_anchors",
+          class: "repo_grounded",
+          text: "Primary anchor in docs.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "uncertainty_open_gaps",
+          class: "reasoned_inference",
+          text: "Some model assumptions may remain unresolved.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+          uncertainty_marker: "may remain unresolved",
+        },
+      ],
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: raw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(false);
+    expect(materialized.post_link_fail_reasons).toContain("baseline_common_outside_conceptual_baseline");
+  });
+
+  it("renders fixed 5-section contract for valid non-equation composer v2 output", () => {
+    const question = "How do we solve for the warp bubble in the codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:composer-v2-fixed-sections",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp bubble solve path is grounded in docs and module implementations.",
+      envelope,
+    });
+    const raw = JSON.stringify({
+      claims: [
+        {
+          section: "short_answer",
+          class: "repo_grounded",
+          text: "The repository solves warp flow through Natario module orchestration.",
+          citations: ["modules/warp/warp-module.ts"],
+        },
+        {
+          section: "conceptual_baseline",
+          class: "baseline_common",
+          text: "Conceptually this separates model assumptions from implementation checkpoints.",
+        },
+        {
+          section: "conceptual_baseline",
+          class: "baseline_common",
+          text: "Baseline context stays uncited to avoid mixing proof and framing.",
+        },
+        {
+          section: "how_repo_solves_it",
+          class: "repo_grounded",
+          text: "Core calculations execute in Natario warp routines.",
+          citations: ["modules/warp/natario-warp.ts"],
+        },
+        {
+          section: "evidence_proof_anchors",
+          class: "repo_grounded",
+          text: "Definition and constraints are anchored in warp knowledge docs.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "uncertainty_open_gaps",
+          class: "reasoned_inference",
+          text: "Some derivation details may require line-level anchors.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+          uncertainty_marker: "may require line-level anchors",
+        },
+      ],
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: raw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(true);
+    expect(materialized.rendered_text).toMatch(/^Short answer:/m);
+    expect(materialized.rendered_text).toMatch(/^Conceptual baseline:/m);
+    expect(materialized.rendered_text).toMatch(/^How repo solves it:/m);
+    expect(materialized.rendered_text).toMatch(/^Evidence \+ proof anchors:/m);
+    expect(materialized.rendered_text).toMatch(/^Uncertainty \/ open gaps:/m);
+    expect(materialized.rendered_text).toMatch(/^Sources:/m);
+  });
+
+  it("renders deterministic 5-section shape when composer v2 claims are empty", () => {
+    const question = "What is a warp bubble and how is it solved in this repo?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:composer-v2-deterministic-fallback-shape",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp bubble implementation is grounded in docs and modules.",
+      envelope,
+    });
+    const rendered = __testHelixAskReliabilityGuards.renderHelixAskComposerV2FiveSectionAnswer({
+      claims: [],
+      brief,
+      verbosity: "normal",
+    });
+    expect(rendered).toMatch(/^Short answer:/m);
+    expect(rendered).toMatch(/^Conceptual baseline:/m);
+    expect(rendered).toMatch(/^How repo solves it:/m);
+    expect(rendered).toMatch(/^Evidence \+ proof anchors:/m);
+    expect(rendered).toMatch(/^Uncertainty \/ open gaps:/m);
+    expect(rendered).toMatch(/^Sources:/m);
+  });
+
+  it("accepts fenced JSON composer v2 payloads with wrapper text", () => {
+    const question = "How is warp solved in this repo?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 2,
+      lockIdSeed: "ask:composer-v2-fenced-json",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp solve is anchored in docs and module code.",
+      envelope,
+    });
+    const fencedRaw = [
+      "Here is the strict JSON payload:",
+      "```json",
+      JSON.stringify({
+        claims: [
+          {
+            section: "short_answer",
+            class: "repo_grounded",
+            text: "Warp solve is grounded in repo modules.",
+            citations: ["modules/warp/natario-warp.ts"],
+          },
+          {
+            section: "conceptual_baseline",
+            class: "baseline_common",
+            text: "Baseline context remains uncited conceptual framing.",
+          },
+          {
+            section: "how_repo_solves_it",
+            class: "repo_grounded",
+            text: "Natario module computes the main solve path.",
+            citations: ["modules/warp/natario-warp.ts"],
+          },
+          {
+            section: "evidence_proof_anchors",
+            class: "repo_grounded",
+            text: "Definition anchor is present in warp bubble docs.",
+            citations: ["docs/knowledge/warp/warp-bubble.md"],
+          },
+          {
+            section: "uncertainty_open_gaps",
+            class: "reasoned_inference",
+            text: "Line-level detail may still require narrower anchors.",
+            citations: ["docs/knowledge/warp/warp-bubble.md"],
+            uncertainty_marker: "may require narrower anchors",
+          },
+        ],
+      }),
+      "```",
+    ].join("\n");
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: fencedRaw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(true);
+    expect(materialized.rendered_text).toMatch(/^How repo solves it:/m);
+  });
+
+  it("coerces aliased claim structures into valid composer v2 payloads", () => {
+    const question = "Explain warp mechanism in repo terms.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 2,
+      lockIdSeed: "ask:composer-v2-coerce-alias",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp mechanism is anchored in docs and module code.",
+      envelope,
+    });
+    const aliasedRaw = JSON.stringify({
+      data: {
+        claims: [
+          {
+            heading: "Short answer",
+            kind: "grounded",
+            content: "Warp mechanism is implemented in natario module.",
+            sources: ["modules/warp/natario-warp.ts"],
+          },
+          {
+            heading: "Conceptual baseline",
+            kind: "baseline",
+            content: "Conceptual framing remains separate from strict repo proof.",
+          },
+          {
+            heading: "How repo solves it",
+            kind: "grounded",
+            content: "Core solve path is executed in modules/warp/natario-warp.ts.",
+          },
+          {
+            heading: "Evidence + proof anchors",
+            kind: "grounded",
+            content: "Anchor docs include docs/knowledge/warp/warp-bubble.md.",
+          },
+          {
+            heading: "Uncertainty / open gaps",
+            kind: "inference",
+            content: "Some assumptions may remain unresolved.",
+            uncertainty: "may remain unresolved",
+            sources: ["docs/knowledge/warp/warp-bubble.md"],
+          },
+        ],
+      },
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: aliasedRaw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(true);
+    expect(materialized.pre_link_fail_reasons).toContain("schema_coerced");
+    expect(materialized.rendered_text).toMatch(/^Evidence \+ proof anchors:/m);
+  });
+
+  it("projects sectioned plaintext into composer v2 claims when JSON parsing fails", () => {
+    const question = "How does the warp solve path work?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 2,
+      lockIdSeed: "ask:composer-v2-plaintext-projection",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp solve path is grounded in repo evidence.",
+      envelope,
+    });
+    const plaintextRaw = [
+      "Short answer:",
+      "- Warp solve path is implemented in modules/warp/natario-warp.ts",
+      "",
+      "Conceptual baseline:",
+      "- Conceptually this separates baseline context from proof claims.",
+      "",
+      "How repo solves it:",
+      "- Runtime solve wiring uses modules/warp/natario-warp.ts and docs/knowledge/warp/warp-bubble.md",
+      "",
+      "Evidence + proof anchors:",
+      "- docs/knowledge/warp/warp-bubble.md",
+      "",
+      "Uncertainty / open gaps:",
+      "- Some derivation details may remain incomplete in this turn.",
+    ].join("\n");
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: plaintextRaw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(true);
+    expect(materialized.pre_link_fail_reasons).toContain("plaintext_projection");
+    expect(materialized.rendered_text).toMatch(/^Uncertainty \/ open gaps:/m);
+  });
+
+  it("filters low-signal composer v2 seed sentences for projection recovery", () => {
+    expect(
+      __testHelixAskReliabilityGuards.isLowSignalHelixAskComposerV2SeedSentence(
+        "; const resolveAlcubierreWallThickness = (params: NatarioWarpParams, R: number, sigma?: number) => const wall = (params.warpGeometry as any)?.wallThickness_m ??",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isLowSignalHelixAskComposerV2SeedSentence(
+        "Evidence is limited in current retrieval; claims are bounded to available artifacts and may be incomplete.",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isLowSignalHelixAskComposerV2SeedSentence(
+        "In this repository, warp bubble is grounded in docs/knowledge/warp/warp-bubble.md and implemented through modules/warp/natario-warp.ts.",
+      ),
+    ).toBe(false);
+  });
+
+  it("projection recovery prefers grounded brief short-answer seed over code-like existing text", () => {
+    const question = "How do we solve for the warp bubble in the code base. Like Needle Hull Mark 2?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:composer-v2-projection-seed-filter",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "",
+      envelope,
+    });
+    const projectedClaims =
+      __testHelixAskReliabilityGuards.buildHelixAskComposerV2DeterministicProjectionClaims({
+        brief,
+        existingText:
+          "; const resolveAlcubierreWallThickness = (params: NatarioWarpParams, R: number, sigma?: number) => const wall = (params.warpGeometry as any)?.wallThickness_m ??",
+        allowedCitations: plan.evidence_pack.allowed_citations,
+      });
+    const shortAnswerClaim = projectedClaims.find((claim) => claim.section === "short_answer");
+    expect(shortAnswerClaim?.text ?? "").toMatch(/^In this repository,/i);
+    expect(shortAnswerClaim?.text ?? "").not.toMatch(/resolveAlcubierreWallThickness/i);
+    expect(shortAnswerClaim?.text ?? "").not.toMatch(/Evidence is limited in current retrieval/i);
+  });
+
+  it("keeps bare repo paths in composer v2 claim prose instead of stripping sentence meaning", () => {
+    const question = "How is warp solved in this repo?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 2,
+      lockIdSeed: "ask:composer-v2-keep-path-prose",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "",
+      envelope,
+    });
+    const raw = JSON.stringify({
+      claims: [
+        {
+          section: "short_answer",
+          class: "repo_grounded",
+          text: "Solve path runs through modules/warp/natario-warp.ts with constraints in docs/knowledge/warp/warp-bubble.md.",
+          citations: ["modules/warp/natario-warp.ts"],
+        },
+        {
+          section: "conceptual_baseline",
+          class: "baseline_common",
+          text: "Conceptual framing remains separate from proof claims.",
+        },
+        {
+          section: "how_repo_solves_it",
+          class: "repo_grounded",
+          text: "Runtime path uses modules/warp/natario-warp.ts and docs/knowledge/warp/warp-bubble.md.",
+          citations: ["modules/warp/natario-warp.ts", "docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "evidence_proof_anchors",
+          class: "repo_grounded",
+          text: "Primary anchors include docs/knowledge/warp/warp-bubble.md.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "uncertainty_open_gaps",
+          class: "reasoned_inference",
+          text: "Some details may remain unresolved.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+          uncertainty_marker: "may remain unresolved",
+        },
+      ],
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: raw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(true);
+    expect(materialized.rendered_text).toMatch(/modules\/warp\/natario-warp\.ts/i);
+    expect(materialized.rendered_text).toMatch(/docs\/knowledge\/warp\/warp-bubble\.md/i);
+    expect(materialized.rendered_text).not.toMatch(/runs through and with constraints grounded in \./i);
+  });
+
+  it("enforces minimum normal verbosity for composer v2 and expands conceptual section detail", () => {
+    expect(__testHelixAskReliabilityGuards.resolveHelixAskComposerV2Verbosity("brief")).toBe("normal");
+    const question = "Define warp bubble in this repo.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: ["docs/knowledge/warp/warp-bubble.md"],
+      contextFileCount: 1,
+      lockIdSeed: "ask:composer-v2-min-verbosity",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp bubble definition is anchored in docs.",
+      envelope,
+    });
+    const raw = JSON.stringify({
+      claims: [
+        {
+          section: "short_answer",
+          class: "repo_grounded",
+          text: "Warp bubble definition is repo-grounded.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "conceptual_baseline",
+          class: "baseline_common",
+          text: "Conceptual baseline remains separated from proof claims.",
+        },
+        {
+          section: "how_repo_solves_it",
+          class: "repo_grounded",
+          text: "Documentation drives the baseline solve framing.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "evidence_proof_anchors",
+          class: "repo_grounded",
+          text: "Anchor docs support the described mechanism.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "uncertainty_open_gaps",
+          class: "reasoned_inference",
+          text: "Some assumptions may remain unresolved.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+          uncertainty_marker: "may remain unresolved",
+        },
+      ],
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: raw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: __testHelixAskReliabilityGuards.resolveHelixAskComposerV2Verbosity("brief"),
+    });
+    expect(materialized.ok).toBe(true);
+    expect(materialized.rendered_text).toMatch(/Conceptual baseline:\n(?:- .+\n){2,}/m);
+  });
+
+  it("invalid composer v2 output still yields deterministic failure state for legacy fallback", () => {
+    const question = "How does warp bubble solve work?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: ["docs/knowledge/warp/warp-bubble.md"],
+      contextFileCount: 1,
+      lockIdSeed: "ask:composer-v2-invalid-json",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Warp bubble solve path is documented in repo anchors.",
+      envelope,
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: "not-json-output",
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(false);
+    expect(materialized.fallback_reason).toBeTruthy();
+    expect(materialized.expand_ok && materialized.link_ok).toBe(false);
+  });
+
+  it("blocks debug/scaffold leakage claims from composer v2 output", () => {
+    const question = "Explain the warp mechanism in repo terms.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: ["docs/knowledge/warp/warp-bubble.md"],
+      contextFileCount: 1,
+      lockIdSeed: "ask:composer-v2-debug-leak",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "Mechanism is grounded in docs/knowledge/warp/warp-bubble.md.",
+      envelope,
+    });
+    const raw = JSON.stringify({
+      claims: [
+        {
+          section: "short_answer",
+          class: "repo_grounded",
+          text: "traceId=ask:abc123 should not appear",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "conceptual_baseline",
+          class: "baseline_common",
+          text: "Conceptual lane remains uncited.",
+        },
+        {
+          section: "how_repo_solves_it",
+          class: "repo_grounded",
+          text: "Repo solve anchor.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "evidence_proof_anchors",
+          class: "repo_grounded",
+          text: "Evidence anchor.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "uncertainty_open_gaps",
+          class: "reasoned_inference",
+          text: "Some details may remain open.",
+          citations: ["docs/knowledge/warp/warp-bubble.md"],
+          uncertainty_marker: "may remain open",
+        },
+      ],
+    });
+    const materialized = __testHelixAskReliabilityGuards.materializeHelixAskComposerV2Output({
+      rawExpansion: raw,
+      brief,
+      allowedCitations: plan.evidence_pack.allowed_citations,
+      verbosity: "normal",
+    });
+    expect(materialized.ok).toBe(false);
+    expect(materialized.post_link_fail_reasons).toContain("debug_leak_claim");
+  });
+
   it("produces deterministic lock hash for equivalent selection state", () => {
     const seed = {
       selectorLocked: true,
