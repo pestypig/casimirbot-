@@ -1,0 +1,156 @@
+{
+  "artifact_type": "needle_hull_mark2_theory_directory/v1",
+  "generator_version": "1.0.0",
+  "alias": "latest",
+  "theory_name": "Needle Hull Mark 2",
+  "theory_slug": "needle-hull-mark2",
+  "boundary_statement": "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+  "generated_at_utc": "2026-03-18T06:36:22.091Z",
+  "commit_pin": "35eb6be9c6b8add1bc73af4771633090aa0af3de",
+  "root_directory": "docs/audits/research/needle-hull-mark2",
+  "entrypoints": {
+    "latest_json": "docs/audits/research/needle-hull-mark2/theory-directory-latest.json",
+    "latest_md": "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+    "dated_json": "docs/audits/research/needle-hull-mark2/theory-directory-2026-03-18.json",
+    "dated_md": "docs/audits/research/needle-hull-mark2/theory-directory-2026-03-18.md"
+  },
+  "summary": {
+    "required_total": 22,
+    "required_missing": 0,
+    "optional_total": 0,
+    "optional_missing": 0,
+    "overall_status": "READY"
+  },
+  "missing_required_paths": [],
+  "sections": {
+    "entrypoints": [
+      {
+        "path": "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-state-of-record-synthesis-latest.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "artifacts/research/full-solve/state-of-record-synthesis-latest.json",
+        "required": true,
+        "exists": true
+      }
+    ],
+    "canonical_authority": [
+      {
+        "path": "artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "artifacts/research/full-solve/g4-governance-matrix-2026-02-27.json",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-evidence-pack-2026-03-02.json",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-evidence-snapshot-2026-03-02.md",
+        "required": true,
+        "exists": true
+      }
+    ],
+    "parity_and_readiness": [
+      {
+        "path": "docs/audits/research/warp-full-solve-reference-capsule-latest.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "artifacts/research/full-solve/full-solve-reference-capsule-latest.json",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-integrity-parity-suite-latest.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "artifacts/research/full-solve/integrity-parity-suite-latest.json",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-promotion-readiness-suite-latest.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "artifacts/research/full-solve/promotion-readiness-suite-latest.json",
+        "required": true,
+        "exists": true
+      }
+    ],
+    "external_comparison": [
+      {
+        "path": "docs/audits/research/warp-external-work-comparison-matrix-latest.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json",
+        "required": true,
+        "exists": true
+      }
+    ],
+    "evidence_and_provenance": [
+      {
+        "path": "docs/specs/casimir-tile-experimental-parameter-registry-2026-03-04.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/specs/casimir-tile-paper-equation-trace-2026-03-04.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/specs/casimir-tile-spec-bookkeeping-v1.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/specs/casimir-tile-experimental-data-staging-ledger-v1.md",
+        "required": true,
+        "exists": true
+      }
+    ],
+    "paper_generation": [
+      {
+        "path": "docs/audits/research/warp-paper-draft-A-defensible-now.md",
+        "required": true,
+        "exists": true
+      },
+      {
+        "path": "docs/audits/research/warp-paper-draft-B-strong-claim-upgrade-spec.md",
+        "required": true,
+        "exists": true
+      }
+    ]
+  },
+  "regeneration_commands": [
+    "npm run warp:proof-index:sync",
+    "npm run warp:state-of-record:synthesis",
+    "npm run warp:needle-hull:directory:sync",
+    "npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --trace-out artifacts/training-trace.jsonl",
+    "curl.exe -fsS http://127.0.0.1:5050/api/agi/training-trace/export -o artifacts/training-trace-export.jsonl"
+  ]
+}

@@ -138,6 +138,57 @@ describe("helix ask universal answer plan shadow", () => {
     expect(family).toBe("equation_formalism");
   });
 
+  it("treats conceptual codebase definitions as definition_overview, not implementation path asks", () => {
+    const question = "What is a warp bubble in this codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus: true,
+      queryConstraints: constraints,
+    });
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      equationIntentContract: null,
+    });
+    expect(family).toBe("definition_overview");
+    expect(envelope.prompt_family).toBe("definition_overview");
+    expect(envelope.requires_code_floor).toBe(false);
+    expect(envelope.allow_retrieval_retry).toBe(false);
+    expect(envelope.allow_two_pass).toBe(false);
+  });
+
+  it("marks specific equation asks as lock-required and suppresses pre-lock clarify", () => {
+    const question =
+      "From shared/collapse-benchmark.ts, quote rho_eff_kg_m3 and kappa_collapse_m2 equations and explain each term.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const intentContract = __testHelixAskReliabilityGuards.buildHelixAskIntentContract({
+      question,
+      queryConstraints: constraints,
+    });
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "hybrid",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: true,
+      definitionFocus: false,
+      equationIntentContract: intentContract,
+    });
+    expect(intentContract.ask_mode).toBe("specific");
+    expect(envelope.prompt_family).toBe("equation_formalism");
+    expect(envelope.lock_required_for_family).toBe(true);
+    expect(envelope.clarify_allowed_pre_lock).toBe(false);
+    expect(envelope.requires_code_floor).toBe(true);
+    expect(envelope.allow_retrieval_retry).toBe(true);
+    expect(envelope.allow_two_pass).toBe(true);
+  });
+
   it("classifies code-path asks into implementation profile", () => {
     const question = "Where in repo is calculateNatarioWarpBubble implemented?";
     const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
@@ -248,6 +299,289 @@ describe("helix ask universal answer plan shadow", () => {
     expect(degraded).toMatch(/^Inputs\/Outputs:/m);
     expect(degraded).toMatch(/^Constraints:/m);
     expect(degraded).toMatch(/^Sources:/m);
+  });
+
+  it("suppresses code-snippet leakage in mechanism degrade output", () => {
+    const question = "How do we solve for the warp bubble in the code base. Like Needle Hull Mark 2?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:mechanism-code-snippet",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText:
+        "; const resolveAlcubierreWallThickness = (params: NatarioWarpParams, R: number, sigma?: number) => const wall = (params.warpGeometry as any)?.wallThickness_m ??",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("mechanism_process");
+    expect(degraded).toMatch(/^Mechanism Explanation:/m);
+    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).not.toMatch(/resolveAlcubierreWallThickness/i);
+    expect(degraded).not.toMatch(/\bparams:\s*NatarioWarpParams/i);
+  });
+
+  it("suppresses numeric stub mechanism sentence and uses deterministic fallback", () => {
+    const question = "How do we solve for the warp bubble in the code base. Like Needle Hull Mark 2?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:mechanism-numeric-stub",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText: "1.",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("mechanism_process");
+    expect(degraded).toMatch(/^Mechanism Explanation:/m);
+    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).not.toMatch(/^1\.\s*1\./m);
+  });
+
+  it("suppresses citation-only mechanism sentence and uses deterministic fallback", () => {
+    const question = "How do we solve for the warp bubble in the code base. Like Needle Hull Mark 2?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:mechanism-citation-stub",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText: "1. [docs/knowledge/warp/warp-bubble.md] 1. [docs/knowledge/warp/warp-bubble.md]",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("mechanism_process");
+    expect(degraded).toMatch(/^Mechanism Explanation:/m);
+    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).not.toMatch(/^\s*1\.\s*\[docs\/knowledge\/warp\/warp-bubble\.md\]/im);
+  });
+
+  it("suppresses markdown section-fragment mechanism sentence and uses deterministic fallback", () => {
+    const question = "How do we solve for the warp bubble in the code base. Like Needle Hull Mark 2?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:mechanism-section-fragment",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText: "## Inputs - Base tree JSON files (with inline congruence metadata).",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("mechanism_process");
+    expect(degraded).toMatch(/^Mechanism Explanation:/m);
+    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).not.toMatch(/## Inputs - Base tree JSON files/i);
+  });
+
+  it("suppresses internal scaffold/reason leakage in definition degrade output", () => {
+    const question = "What is a warp bubble and how is it solved in the codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: ["docs/knowledge/warp/warp-bubble.md"],
+      contextFileCount: 1,
+      lockIdSeed: "ask:warp-definition",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText:
+        "Confirmed: Retrieved grounded repository anchors: modules/warp/natario-warp.ts, docs/knowledge/warp/warp-bubble.md. Reasoned connections (bounded): Bounded linkage supported by cited repo evidence. Next evidence: search docs headings.",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("definition_overview");
+    expect(degraded).toMatch(/^Definition:/m);
+    expect(degraded).toMatch(/^How it is solved in codebase:/m);
+    expect(degraded).toMatch(/^Why it matters:/m);
+    expect(degraded).toMatch(/^Key terms:/m);
+    expect(degraded).toMatch(/^Repo anchors:/m);
+    expect(degraded).toMatch(/^Sources:/m);
+    expect(degraded).toMatch(/Implementation path is partially covered in this turn/i);
+    expect(degraded).not.toMatch(/required sections missing/i);
+    expect(degraded).not.toMatch(/degrade path/i);
+    expect(degraded).not.toMatch(/prompt=/i);
+    expect(degraded).not.toMatch(/retrieved grounded repository anchors/i);
+    const validation = __testHelixAskReliabilityGuards.validateHelixAskAnswerPlanShadow({
+      plan,
+      renderedText: degraded,
+    });
+    expect(validation.fail_reasons).not.toContain("required_sections_missing");
+    expect(validation.family_format_accuracy).toBe(1);
+  });
+
+  it("replaces low-signal bounded-linkage definition sentence with deterministic summary", () => {
+    const question = "What is a warp bubble and how is it solved in the codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:warp-definition-low-signal",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText:
+        "In practical terms, Bounded linkage supported by cited repo evidence (modules/warp/natario-warp.ts and docs/warp-console-architecture.md).",
+      reason: "required_sections_missing",
+    });
+    expect(degraded).toMatch(/^Definition:/m);
+    expect(degraded).toMatch(/In this codebase, this concept is documented in/i);
+    expect(degraded).not.toMatch(/Bounded linkage supported by cited repo evidence/i);
+  });
+
+  it("adds role-aware code-path bullets in definition degrade output", () => {
+    const question = "What is a warp bubble and how is it solved in the codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:warp-definition-role-aware",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText:
+        "In practical terms, Bounded linkage supported by cited repo evidence (modules/warp/natario-warp.ts and docs/warp-console-architecture.md).",
+      reason: "required_sections_missing",
+    });
+    expect(degraded).toMatch(/^How it is solved in codebase:/m);
+    expect(degraded).toMatch(
+      /modules\/warp\/natario-warp\.ts:\s+computes Natario warp-bubble fields and congruence diagnostics\./i,
+    );
+    expect(degraded).toMatch(
+      /modules\/warp\/warp-module\.ts:\s+orchestrates warp module flow and runtime solve wiring\./i,
+    );
+    expect(degraded).not.toMatch(/This response preserves grounded evidence/i);
+  });
+
+  it("filters next-step checked-files scaffold from definition sentence", () => {
+    const question = "What is a warp bubble and how is it solved in the codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:warp-definition-next-step",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText:
+        "Next step: Checked files: modules/warp/natario-warp.ts, docs/warp-console-architecture.md, docs/knowledge/warp/warp-bubble.md, modules/warp/warp-module.ts.",
+      reason: "required_sections_missing",
+    });
+    expect(degraded).toMatch(/^Definition:/m);
+    expect(degraded).toMatch(/In this codebase, this concept is documented in/i);
+    expect(degraded).not.toMatch(/Next step:\s*Checked files:/i);
+  });
+
+  it("suppresses mojibake/jsdoc fragments in general-overview degrade output", () => {
+    const question = "We solve for the warp bubble in the code base.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:warp-general-overview",
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText:
+        "/** * NatÃ¡rio Zero-Expansion Warp Bubble Implementation * Based on \"Needle Hull\" and \"Geometry-Amplified Dynamic Casimir Effect\" papers * Implements sector-strobed Casimir lattice for warp field generation.",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("general_overview");
+    expect(degraded).toMatch(/^Summary:/m);
+    expect(degraded).toMatch(/^Evidence:/m);
+    expect(degraded).toMatch(/This repo-grounded summary is anchored in/i);
+    expect(degraded).not.toMatch(/\/\*\*/);
+    expect(degraded).not.toMatch(/NatÃ/i);
+    expect(degraded).not.toMatch(/Based on .* papers/i);
   });
 
   it("produces deterministic lock hash for equivalent selection state", () => {

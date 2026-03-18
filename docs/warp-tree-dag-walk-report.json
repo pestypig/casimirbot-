@@ -20,6 +20,7 @@
   },
   "startNodes": [
     "warp-mechanics-tree",
+    "needle-hull-mark2-theory-tree",
     "physics-foundations-tree",
     "brick-lattice-dataflow-tree",
     "math-maturity-tree",
@@ -32,10 +33,14 @@
   ],
   "walkMode": "bfs",
   "seedOrder": "lex",
-  "visitedCount": 15,
+  "visitedCount": 16,
   "visited": [
     {
       "id": "warp-mechanics-tree",
+      "depth": 0
+    },
+    {
+      "id": "needle-hull-mark2-theory-tree",
       "depth": 0
     },
     {
@@ -142,16 +147,16 @@
   ],
   "diagnostics": {
     "inventory": {
-      "nodesCount": 869,
-      "edgesCount": 3339,
+      "nodesCount": 876,
+      "edgesCount": 3350,
       "blockedLinkCount": 4
     },
     "globalFilter": {
       "allowedEdges": 40,
-      "blockedEdges": 3299,
+      "blockedEdges": 3310,
       "blockedByReason": {
         "blocked_link": 0,
-        "conceptual_disallowed": 3262,
+        "conceptual_disallowed": 3273,
         "proxy_disallowed": 20,
         "cl_exceeds_allowed": 0,
         "chart_mismatch": 10,
@@ -766,13 +771,13 @@
       ]
     },
     "traversalFilter": {
-      "evaluatedEdges": 245,
+      "evaluatedEdges": 257,
       "allowedEdges": 13,
-      "blockedEdges": 232,
+      "blockedEdges": 244,
       "enqueuedEdges": 12,
       "blockedByReason": {
         "blocked_link": 0,
-        "conceptual_disallowed": 231,
+        "conceptual_disallowed": 243,
         "proxy_disallowed": 0,
         "cl_exceeds_allowed": 0,
         "chart_mismatch": 0,
@@ -830,6 +835,126 @@
           "reason": "condition_unsatisfied",
           "condition": "cl3_metric_t00_available=true",
           "conditionKey": "cl3_metric_t00_available_equals_true",
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-entrypoints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-canonical-authority",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-parity-readiness",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-external-comparison",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-evidence-provenance",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-paper-generation",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-se-closure",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "nhm2-regeneration-runbook",
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "warp-mechanics-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "gr-solver-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "math-maturity-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
+          "chartDependency": null
+        },
+        {
+          "source": "needle-hull-mark2-theory-tree",
+          "target": "casimir-tiles-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "reason": "conceptual_disallowed",
+          "condition": null,
+          "conditionKey": null,
           "chartDependency": null
         },
         {
@@ -1255,126 +1380,6 @@
         {
           "source": "simulation-systems-tree",
           "target": "simulation-api",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-storage",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-core-modules",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-geometry-mesh",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-scuffem-service",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-dynamic-casimir",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-warp-module",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-tsn",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-parametric-sweeps",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-ui-surfaces",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-streaming",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "simulation-artifacts",
-          "edgeType": "hierarchy",
-          "requiresCL": "none",
-          "reason": "conceptual_disallowed",
-          "condition": null,
-          "conditionKey": null,
-          "chartDependency": null
-        },
-        {
-          "source": "simulation-systems-tree",
-          "target": "bridge-simulation-contracts-simulation-api",
           "edgeType": "hierarchy",
           "requiresCL": "none",
           "reason": "conceptual_disallowed",

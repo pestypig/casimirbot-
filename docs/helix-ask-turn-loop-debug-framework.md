@@ -1,75 +1,208 @@
 # Helix Ask Turn Loop And Non-Voice Debug Framework
 
-Status: active debug guide.
+Status: active debug guide (updated for current voice + command-lane runtime).
+
+## Canonical Sources For This Guide
+1. `docs/helix-ask-flow.md`
+2. `docs/architecture/voice-service-contract.md`
+3. `docs/helix-ask-readiness-debug-loop.md`
+4. `client/src/components/helix/HelixAskPill.tsx`
+5. `server/routes/voice.ts`
+6. `server/services/voice-command/command-arbiter.ts`
+7. `client/src/lib/helix/turn-loop-timeline-reference.ts`
 
 ## Latest Stable Checkpoint
 - `docs/helix-ask-turn-loop-checkpoint-2026-03-11.md`
 
-## Turn-By-Turn Loop
-1. User speaks in natural chunks.
-2. Segments merge into one draft turn while the assembler phase is `draft`.
-3. After silence + stability gates pass, the turn seals (`phase=sealed`).
-4. One brief is emitted for that sealed revision.
-5. One authoritative reasoning attempt runs for that sealed revision/token.
-6. Final answer is emitted from normal reasoning output.
-7. Any interruption hard-cuts playback, invalidates seal authority, reopens draft, and reseals on newer transcript.
+## Runtime Model (Current)
+The voice turn loop now has three coupled lanes:
 
-## How To Drive It During Dialogue
-1. Start broad.
-2. Interrupt quickly to refine scope while brief is speaking.
-3. Pause long enough to allow seal.
-4. Let final run if it is on track.
-5. Interrupt final only when you want a new direction.
+1. Capture lane:
+- segment cut
+- STT request
+- STT response
+- optional transcript confirm gate
+- dispatch queued/suppressed/completed
 
-## Interruption Example
-1. User: "What is a system?"
-2. Brief r1: "I will define the system and map components, interactions, and purpose."
-3. User interrupts: "Make it about quantum inequality."
-4. System hard-cuts playback, suppresses stale attempt, reseals revision 2.
-5. Brief r2: "I will frame it as a quantum system and tie it to inequality constraints."
-6. User interrupts again: "Compare to classical statistical mechanics."
-7. System reseals revision 3 and runs one authoritative attempt.
-8. Final speaks the comparison.
-9. User interrupts final: "Now relate this to Penrose collapse."
-10. Final is cut and a new draft/reseal chain starts.
+2. Command lane overlay (Phase 1):
+- parser/evaluator command arbitration on transcribe response
+- accepted actions: `send | cancel | retry`
+- deterministic 3s command confirm timer
+- command execution or cancel
 
-## Healthy Timeline Signals
-1. `prompt_recorded` appears for latest utterance.
-2. `brief` queued/running occurs before final.
-3. Older attempts are `suppressed` only when causally stale.
-4. No stale replay loop or soft lock.
-5. Final is spoken unless barge-in occurs.
-6. `build_info` is present with current client + server build provenance.
+3. Reasoning lane:
+- `prompt_recorded`
+- `brief` (queued/running)
+- `reasoning_attempt` / `reasoning_stream`
+- `reasoning_final` or typed suppression
 
-## Non-Voice Debug Framework
-Use the deterministic harness instead of mic/STT/TTS:
-- Module: `client/src/lib/helix/turn-loop-harness.ts`
-- Tests: `client/src/lib/helix/__tests__/turn-loop-harness.spec.ts`
-- Timeline reference analyzer: `client/src/lib/helix/turn-loop-timeline-reference.ts`
-- Timeline analyzer tests: `client/src/lib/helix/__tests__/turn-loop-timeline-reference.spec.ts`
+## Turn Loop (Authoritative Order)
+1. User speech is segmented and merged while assembler phase is `draft`.
+2. Seal occurs only when silence + hash stability + queue/in-flight gates all pass.
+3. A sealed revision can emit brief/final.
+4. Command-lane decisions from `/api/voice/transcribe` are authoritative for command actions.
+5. If transcript-confirm is active, transcript-confirm commands take precedence over command-lane confirms.
+6. Any new speech/interrupt can preempt playback and invalidate stale revision authority.
+7. Stale attempts must be suppressed with typed cause/stage metadata.
 
-The harness simulates:
-1. Segment merge and revision increments.
-2. Seal-gate evaluation (`closeSilence=3200ms`, `hashStable=900ms` by default).
-3. Attempt start/resolve with revision+seal authority checks.
-4. Interruption/reseal and stale-attempt suppression.
-5. Event timeline emission with sequence, revision, seal token, suppression cause, and reject stage.
+## Current Deterministic Checkpoints
+Voice capture checkpoint keys include:
+1. `track_live`
+2. `signal_detected`
+3. `segment_cut`
+4. `stt_request_started`
+5. `stt_response_ok`
+6. `stt_response_error`
+7. `confirm_auto_started`
+8. `confirm_auto_fired`
+9. `confirm_auto_cancelled`
+10. `confirm_blocked_reason`
+11. `command_detected`
+12. `command_suppressed`
+13. `command_confirm_started`
+14. `command_confirm_fired`
+15. `command_executed`
+16. `command_cancelled`
+17. `dispatch_queued`
+18. `dispatch_suppressed`
+19. `dispatch_completed`
 
-The timeline analyzer validates real voice-lane event logs as a reference:
-1. Parses JSONL timeline dumps (`timeline:*`, `voice-chunk:*`, etc.).
-2. Summarizes per-turn lifecycle health.
-3. Flags missing brief-before-final ordering.
-4. Flags missing typed suppression causes.
-5. Flags soft-lock candidates (suppression loops without final completion).
+## Transcript Confirm Policy (Current)
+Transcript confirm decisions are:
+1. `auto_confirm`
+2. `manual_confirm`
+3. `blocked`
 
-## Run The Debug Tests
+Reason labels:
+1. `eligible`
+2. `dispatch_blocked`
+3. `pivot_low_confidence`
+4. `translation_uncertain_without_pivot`
+5. `dispatch_not_confirm`
+6. `invalid_confidence`
+7. `low_audio_quality`
+8. `live_activity`
+
+## Command Lane Contract (Server-First)
+`/api/voice/transcribe` now returns additive `command_lane` metadata:
+1. `version`
+2. `decision`: `accepted | suppressed | none`
+3. `action`: `send | cancel | retry | null`
+4. `confidence`
+5. `source`: `parser | evaluator | none`
+6. `suppression_reason`
+7. `strict_prefix_applied`
+8. `confirm_required`
+9. `utterance_id`
+
+Phase-1 suppression reasons:
+1. `disabled`
+2. `kill_switch`
+3. `rollout_inactive`
+4. `audio_quality_low`
+5. `strict_prefix_required`
+6. `log_only`
+
+## Suppression Taxonomy For Practical Debug
+Use these first when triaging timeline failures:
+
+1. `dispatch_suppressed` + `authorityRejectStage=preflight`
+- meaning: request was blocked before reasoning execution.
+- common causes: low-quality/low-confidence gating, policy suppress, command/log-only modes.
+
+2. `artifact_guard_restart`
+- meaning: generation drifted into disallowed output shape; restarted observe lane.
+
+3. `phase_not_sealed`
+- meaning: attempt rejected due revision/seal authority mismatch.
+
+4. `inactive_attempt`
+- meaning: stale attempt/chunk superseded by newer same-turn attempt.
+
+5. `barge_in_hard_cut:*`
+- meaning: playback interrupted by speech detection/barge logic.
+
+## Practical Debug Workflow (In Practice)
+Run this workflow for real incidents before changing logic:
+
+1. Confirm server readiness:
 ```powershell
-npm run test -- client/src/lib/helix/__tests__/turn-loop-harness.spec.ts
-npm run test -- client/src/lib/helix/__tests__/turn-loop-timeline-reference.spec.ts
+Invoke-WebRequest -UseBasicParsing http://localhost:5050/health
 ```
 
-## What The Harness Verifies
-1. Seal only happens when all gate conditions are true at once.
-2. Interrupted stale attempts are suppressed with typed cause.
-3. Newest resealed attempt finalizes without soft lock.
-4. Event sequence is monotonic and replay-friendly.
+2. Capture one failing turn bundle:
+- `build_info`
+- `segment:*` entries
+- `timeline:*` entries for that `turnKey`
+- checkpoint row showing `stt_response_error` and confirm/dispatch checkpoints
+
+3. Classify the failure class:
+- Class A: `dispatch_suppressed` preflight
+- Class B: suppression loop (`artifact_guard_restart` or repeated `phase_not_sealed`)
+- Class C: barge/noise interruption
+- Class D: confirm timer/precedence regression
+- Class E: command lane false positive/false negative
+
+4. Apply class-specific checks:
+- Class A:
+  - verify `dispatch_state`, `needs_confirmation`, `pivot_confidence`, `confirm_block_reason`
+  - verify command-lane `decision/action/suppression_reason`
+- Class B:
+  - verify seal token/revision monotonicity
+  - verify stale attempts are suppressed with typed cause
+- Class C:
+  - check `speech_probability`, `snr_db`, noisy profile, barge thresholds
+- Class D:
+  - verify only one active confirm timer and transcript-confirm precedence behavior
+- Class E:
+  - verify strict-prefix mode, adaptive noise gate, keyword-in-sentence fallback to dictation
+
+5. Require deterministic evidence in report:
+- one prompt
+- one brief/final/suppression chain
+- one typed root-cause label
+- one fix recommendation tied to a gate/reason
+
+## Patch-Relevant Non-Voice Tests
+Use targeted tests first for voice command/confirm behavior:
+```powershell
+npx vitest run tests/voice.command-arbiter.spec.ts
+npx vitest run tests/voice.transcribe.routes.spec.ts
+npx vitest run client/src/lib/agi/__tests__/api.voice-transcribe.spec.ts
+npx vitest run client/src/components/__tests__/helix-ask-pill-ui.spec.tsx
+```
+
+Then optionally run broader readiness loops if the touched area requires it:
+1. contract battery
+2. variety battery
+3. patch probe
+4. multilingual gate (when multilingual routing/confirm changed)
+
+## Timeline Reference Analyzer
+Use:
+- `client/src/lib/helix/turn-loop-timeline-reference.ts`
+- `client/src/lib/helix/__tests__/turn-loop-timeline-reference.spec.ts`
+
+It flags:
+1. `missing_prompt_recorded`
+2. `missing_brief_before_final`
+3. `missing_typed_suppression_cause`
+4. `soft_lock_candidate`
+
+## Practical Root-Cause Examples (Current Incident Patterns)
+1. "Reasoning suppressed for this turn" with `dispatch_suppressed`:
+- this is usually a preflight dispatch gate block, not an LLM final-stage failure.
+
+2. Command phrase heard but no action:
+- expect `command_lane.decision=none|suppressed` and check `strict_prefix_applied` and `suppression_reason`.
+
+3. Confirm countdown disappears:
+- verify transcript-confirm vs command-confirm precedence and active-timer ownership.
+
+4. Voice output cut in noisy environment:
+- inspect barge thresholds with current `speech_probability` and `snr_db`.
+
+## Completion Gate
+For code/config patches affecting this area:
+1. targeted voice/command tests pass
+2. Casimir verify PASS with certificate hash and `integrityOk=true`

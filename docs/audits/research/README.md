@@ -43,3 +43,10 @@ For reusable GPT Pro style standalone research prompts, use:
 - `docs/audits/research/helix-ask-direct-codex-build-execution-readiness-assessment-2026-02-26.md` (assessment + closure delta: execute_with_guardrails scorecard, gap matrix, conversion plan)
 - `docs/audits/research/helix-ask-forward-facing-plan-phase-update-2026-02-27.md` (forward-facing implementation plan: alignment coincidence gate + bypass policy + output hygiene hardening)
 - `docs/audits/research/helix-ask-forward-facing-prompt-batch-2026-02-27.md` (forward-facing prompt batch and runbook aligned to the phase-update plan)
+
+## Needle Hull Mark 2 canonical entrypoint
+
+- cohesive directory: `docs/audits/research/needle-hull-mark2/`
+- machine index: `docs/audits/research/needle-hull-mark2/theory-directory-latest.json`
+- human index: `docs/audits/research/needle-hull-mark2/theory-directory-latest.md`
+- refresh command: `npm run warp:needle-hull:directory:refresh`

@@ -206,6 +206,7 @@ export type VoiceCaptureDiagnosticsSnapshot = {
     confirmV2RolloutEligible: boolean;
     confirmV2Active: boolean;
     confirmV2ShadowMode: boolean;
+    commandLaneUiEnabled?: boolean;
     localAudioGateActive: boolean;
     sessionSpeakerActive: boolean;
     multiSpeakerUiActive: boolean;

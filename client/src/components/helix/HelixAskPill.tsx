@@ -29,6 +29,7 @@ import {
   type ConversationExplorationPacket,
   type HelixInterpreterArtifact,
   type PendingHelixAskJob,
+  type VoiceCommandLaneEnvelope,
   type ToolLogEvent,
 } from "@/lib/agi/api";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
@@ -172,6 +173,10 @@ const HELIX_VOICE_SESSION_SPEAKER_ENABLED = parseVoiceEnvBoolean(
 );
 const HELIX_VOICE_MULTISPEAKER_UI_ENABLED = parseVoiceEnvBoolean(
   "VITE_HELIX_VOICE_MULTISPEAKER_UI_ENABLED",
+  false,
+);
+const HELIX_VOICE_COMMAND_LANE_ENABLED = parseVoiceEnvBoolean(
+  "VITE_HELIX_VOICE_COMMAND_LANE_ENABLED",
   false,
 );
 
@@ -679,6 +684,12 @@ export type VoiceCaptureCheckpointKey =
   | "confirm_auto_fired"
   | "confirm_auto_cancelled"
   | "confirm_blocked_reason"
+  | "command_detected"
+  | "command_suppressed"
+  | "command_confirm_started"
+  | "command_confirm_fired"
+  | "command_executed"
+  | "command_cancelled"
   | "translated"
   | "draft_appended"
   | "dispatch_queued"
@@ -957,6 +968,18 @@ type TranscriptConfirmState = {
   sttEngine: string | null;
 };
 
+type VoiceCommandConfirmState = {
+  id: string;
+  createdAtMs: number;
+  traceId: string;
+  segmentId: string;
+  utteranceId: string;
+  transcript: string;
+  action: "send" | "cancel" | "retry";
+  confidence: number | null;
+  source: "parser" | "evaluator" | "none";
+};
+
 export type TranscriptConfirmPolicyReason =
   | "dispatch_blocked"
   | "pivot_low_confidence"
@@ -1116,6 +1139,12 @@ const VOICE_CAPTURE_CHECKPOINT_ORDER: VoiceCaptureCheckpointKey[] = [
   "confirm_auto_fired",
   "confirm_auto_cancelled",
   "confirm_blocked_reason",
+  "command_detected",
+  "command_suppressed",
+  "command_confirm_started",
+  "command_confirm_fired",
+  "command_executed",
+  "command_cancelled",
   "translated",
   "draft_appended",
   "dispatch_queued",
@@ -1134,6 +1163,12 @@ const VOICE_CAPTURE_CHECKPOINT_LABEL: Record<VoiceCaptureCheckpointKey, string> 
   confirm_auto_fired: "confirm auto fire",
   confirm_auto_cancelled: "confirm auto cancel",
   confirm_blocked_reason: "confirm block reason",
+  command_detected: "command detected",
+  command_suppressed: "command suppressed",
+  command_confirm_started: "command confirm start",
+  command_confirm_fired: "command confirm fire",
+  command_executed: "command executed",
+  command_cancelled: "command cancelled",
   translated: "translated",
   draft_appended: "draft append",
   dispatch_queued: "dispatch queued",
@@ -1820,6 +1855,26 @@ export function isLowInformationTailTranscript(transcript: string): boolean {
   return compact.length <= 18;
 }
 
+export function shouldIgnoreLowQualityTranscriptBargeIn(args: {
+  lowAudioQuality: boolean;
+  confidence: number;
+  speechProbability: number | null | undefined;
+  snrDb: number | null | undefined;
+  hasActiveVoiceReasoningAttempt: boolean;
+  hasActiveVoicePlayback: boolean;
+  needsConfirmation: boolean;
+}): boolean {
+  if (!args.lowAudioQuality) return false;
+  if (args.needsConfirmation) return false;
+  if (!(args.hasActiveVoiceReasoningAttempt || args.hasActiveVoicePlayback)) return false;
+  const hasQualityTelemetry =
+    typeof args.speechProbability === "number" || typeof args.snrDb === "number";
+  const confidenceThreshold = hasQualityTelemetry
+    ? Math.max(0.82, VOICE_STT_CONFIRM_THRESHOLD + 0.12)
+    : Math.max(0.9, VOICE_STT_CONFIRM_THRESHOLD + 0.18);
+  return args.confidence < confidenceThreshold;
+}
+
 export function isLikelyContinuationAddendum(transcript: string): boolean {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized) return false;
@@ -2374,6 +2429,61 @@ export function parseTranscriptConfirmationVoiceCommand(
   return null;
 }
 
+export function normalizeVoiceCommandLaneEnvelope(
+  payload: VoiceCommandLaneEnvelope | null | undefined,
+): VoiceCommandLaneEnvelope | null {
+  if (!payload || typeof payload !== "object") return null;
+  const decision =
+    payload.decision === "accepted" || payload.decision === "suppressed" || payload.decision === "none"
+      ? payload.decision
+      : null;
+  if (!decision) return null;
+  const action =
+    payload.action === "send" || payload.action === "cancel" || payload.action === "retry"
+      ? payload.action
+      : null;
+  const source =
+    payload.source === "parser" || payload.source === "evaluator" || payload.source === "none"
+      ? payload.source
+      : "none";
+  const suppressionReason =
+    payload.suppression_reason === "disabled" ||
+    payload.suppression_reason === "kill_switch" ||
+    payload.suppression_reason === "rollout_inactive" ||
+    payload.suppression_reason === "audio_quality_low" ||
+    payload.suppression_reason === "strict_prefix_required" ||
+    payload.suppression_reason === "log_only"
+      ? payload.suppression_reason
+      : null;
+  const confidence =
+    typeof payload.confidence === "number" && Number.isFinite(payload.confidence)
+      ? clamp01(payload.confidence)
+      : null;
+  const utteranceId = typeof payload.utterance_id === "string" && payload.utterance_id.trim()
+    ? payload.utterance_id.trim()
+    : `vcmd:${crypto.randomUUID()}`;
+  return {
+    version:
+      typeof payload.version === "string" && payload.version.trim()
+        ? payload.version.trim()
+        : "helix.voice.command_lane.v1",
+    decision,
+    action,
+    confidence,
+    source,
+    suppression_reason: suppressionReason,
+    strict_prefix_applied: payload.strict_prefix_applied === true,
+    confirm_required: payload.confirm_required === true,
+    utterance_id: utteranceId,
+  };
+}
+
+export function describeVoiceCommandAction(action: "send" | "cancel" | "retry"): string {
+  if (action === "send") return "Send current draft";
+  if (action === "retry") return "Retry previous ask";
+  return "Cancel pending flow";
+}
+
 export function scoreVoiceTurnComplete(input: {
   transcript: string;
   pauseMs: number;
@@ -2688,6 +2798,67 @@ export function inferSuppressionCauseFromRouteReason(routeReasonCode?: string | 
   return `suppressed_${reason.replace(/[^a-z0-9_:-]+/g, "_")}`;
 }
 
+export function deriveVoiceTimelineSuppressionMeta(args: {
+  status: HelixTimelineEntry["status"];
+  type: HelixTimelineEntryType;
+  detail?: string | null;
+  meta?: Record<string, unknown> | null;
+}): {
+  suppressionCause: string | null;
+  authorityRejectStage: "preflight" | "stream" | "final" | null;
+} {
+  const meta = args.meta ?? {};
+  const detailLower = `${args.detail ?? ""}`.trim().toLowerCase();
+  const explicitSuppressionCause =
+    typeof meta.suppressionCause === "string" && meta.suppressionCause.trim()
+      ? meta.suppressionCause.trim()
+      : null;
+  const routeSuppressionCause = inferSuppressionCauseFromRouteReason(
+    typeof meta.routeReasonCode === "string" ? meta.routeReasonCode : null,
+  );
+  let suppressionCause = explicitSuppressionCause ?? routeSuppressionCause;
+
+  if (!suppressionCause) {
+    if (
+      detailLower.includes("phase_not_sealed") ||
+      detailLower.includes("seal_token_mismatch") ||
+      detailLower.includes("sealed_revision_mismatch") ||
+      detailLower.includes("dispatch_hash_mismatch") ||
+      detailLower.includes("inactive_attempt")
+    ) {
+      if (detailLower.includes("phase_not_sealed")) suppressionCause = "phase_not_sealed";
+      else if (detailLower.includes("seal_token_mismatch")) suppressionCause = "seal_token_mismatch";
+      else if (detailLower.includes("sealed_revision_mismatch")) suppressionCause = "sealed_revision_mismatch";
+      else if (detailLower.includes("dispatch_hash_mismatch")) suppressionCause = "dispatch_hash_mismatch";
+      else suppressionCause = "inactive_attempt";
+    } else if (detailLower.includes("superseded by newer")) {
+      suppressionCause = "inactive_attempt";
+    } else if (detailLower.includes("artifact-dominated") || detailLower.includes("artifact guard")) {
+      suppressionCause = "artifact_guard_restart";
+    } else if (detailLower.includes("clarifier requested")) {
+      suppressionCause = "clarifier_requested";
+    } else if (detailLower.includes("escalat")) {
+      suppressionCause = "escalation_restart";
+    } else if (args.status === "suppressed") {
+      suppressionCause = "suppressed_unspecified";
+    }
+  }
+
+  const explicitAuthorityRejectStage =
+    meta.authorityRejectStage === "preflight" ||
+    meta.authorityRejectStage === "stream" ||
+    meta.authorityRejectStage === "final"
+      ? meta.authorityRejectStage
+      : null;
+  const authorityRejectStage =
+    explicitAuthorityRejectStage ?? (suppressionCause ? (args.type === "reasoning_stream" ? "stream" : "final") : null);
+
+  return {
+    suppressionCause: suppressionCause ?? null,
+    authorityRejectStage,
+  };
+}
+
 export function isStrongQuestionDispatchCandidate(transcript: string): boolean {
   const normalized = transcript.trim().toLowerCase();
   if (!normalized || normalized.length < 18) return false;
@@ -2995,6 +3166,36 @@ function buildExplorationArtifactRetryPrompt(args: {
     "Previous artifact-dominated output (avoid repeating this pattern):",
     previous,
   ].join("\n");
+}
+
+function isExplorationArtifactRetryPrompt(promptText: string): boolean {
+  const normalized = promptText.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    normalized.startsWith("topic:") &&
+    normalized.includes("restart observe mode from the top of the reasoning chain.")
+  );
+}
+
+function extractOriginalTurnFromExplorationArtifactRetryPrompt(promptText: string): string | null {
+  const match =
+    /(?:^|\n)\s*Original user turn:\s*\n([\s\S]*?)(?:\n\s*Previous artifact-dominated output|\n\s*$)/i.exec(
+      promptText,
+    );
+  const extracted = match?.[1]?.trim() ?? "";
+  return extracted || null;
+}
+
+export function resolveReasoningAttemptTimelineText(
+  attempt: Pick<ReasoningAttempt, "source" | "prompt" | "recordedText">,
+): string {
+  const recordedText = typeof attempt.recordedText === "string" ? attempt.recordedText.trim() : "";
+  if (recordedText) return recordedText;
+  const prompt = attempt.prompt.trim();
+  if (!prompt) return "";
+  if (attempt.source !== "voice_auto") return prompt;
+  if (!isExplorationArtifactRetryPrompt(prompt)) return prompt;
+  return extractOriginalTurnFromExplorationArtifactRetryPrompt(prompt) ?? prompt;
 }
 
 function isRepoFileLocationRequestPrompt(promptText: string): boolean {
@@ -3784,6 +3985,16 @@ type HelixAskReply = {
     capsule_preferred_paths?: string[];
     focus_guard_result?: "pass" | "retry" | "clarify";
     anchor_guard_result?: "pass" | "retry" | "clarify";
+    policy_prompt_family?: string | null;
+    policy_prompt_specificity?: string | null;
+    policy_requires_code_floor?: boolean | null;
+    policy_requires_doc_floor?: boolean | null;
+    policy_clarify_allowed_pre_lock?: boolean | null;
+    policy_lock_required?: boolean | null;
+    policy_budget_profile?: string | null;
+    policy_allow_two_pass?: boolean | null;
+    policy_allow_retrieval_retry?: boolean | null;
+    policy_question_fingerprint?: string | null;
     retrieval_channel_hits?: string;
     stage0_used?: boolean;
     stage0_shadow_only?: boolean;
@@ -3857,6 +4068,15 @@ type HelixAskReply = {
     shadow_primary_key?: string;
     shadow_primary_anchor_match?: boolean;
     shadow_symbol_hit_rate?: number;
+    composer_prompt_family?: string | null;
+    composer_prompt_specificity?: string | null;
+    composer_schema_valid?: boolean | null;
+    composer_validation_fail_reason?: string | null;
+    composer_validation_fail_reasons?: string[] | string;
+    composer_family_format_accuracy?: number | null;
+    composer_soft_enforce_applied?: boolean | null;
+    composer_soft_enforce_reason?: string | null;
+    composer_soft_enforce_trigger_reason?: string | null;
     gates?: {
       evidence?: {
         ok?: boolean;
@@ -4377,6 +4597,66 @@ export function hasHelixAskRenderableMath(content: unknown): boolean {
   return tokenizeHelixAskMathTokens(text).some((token) => token.kind === "math");
 }
 
+const HELIX_ASK_EQUATION_FAMILY_ID = "equation_formalism";
+
+export function isHelixAskEquationFamilyDebug(debug: unknown): boolean {
+  const debugRecord = asObjectRecord(debug);
+  if (!debugRecord) return false;
+  const policyFamily =
+    typeof debugRecord.policy_prompt_family === "string"
+      ? debugRecord.policy_prompt_family.trim().toLowerCase()
+      : "";
+  const composerFamily =
+    typeof debugRecord.composer_prompt_family === "string"
+      ? debugRecord.composer_prompt_family.trim().toLowerCase()
+      : "";
+  if (policyFamily === HELIX_ASK_EQUATION_FAMILY_ID || composerFamily === HELIX_ASK_EQUATION_FAMILY_ID) {
+    return true;
+  }
+  if (
+    typeof debugRecord.equation_selector_primary_key === "string" &&
+    debugRecord.equation_selector_primary_key.trim().length > 0
+  ) {
+    return true;
+  }
+  if (debugRecord.equation_selector_authority_lock === true) {
+    return true;
+  }
+  const equationQuoteContract = asObjectRecord(debugRecord.equation_quote_contract);
+  if (equationQuoteContract && equationQuoteContract.required === true) {
+    return true;
+  }
+  return false;
+}
+
+export function shouldShowHelixAskCalculatorPanel(args: {
+  canLaunchPanel: boolean;
+  hasRenderableMath: boolean;
+  debug?: unknown;
+}): boolean {
+  if (!args.canLaunchPanel || !args.hasRenderableMath) return false;
+  const debugRecord = asObjectRecord(args.debug);
+  if (!debugRecord) {
+    // Legacy responses without debug context keep prior math-only behavior.
+    return true;
+  }
+  const policyFamily =
+    typeof debugRecord.policy_prompt_family === "string"
+      ? debugRecord.policy_prompt_family.trim().toLowerCase()
+      : "";
+  const composerFamily =
+    typeof debugRecord.composer_prompt_family === "string"
+      ? debugRecord.composer_prompt_family.trim().toLowerCase()
+      : "";
+  if (policyFamily || composerFamily) {
+    return (
+      policyFamily === HELIX_ASK_EQUATION_FAMILY_ID ||
+      composerFamily === HELIX_ASK_EQUATION_FAMILY_ID
+    );
+  }
+  return isHelixAskEquationFamilyDebug(debugRecord);
+}
+
 export function buildHelixAskMathRenderDebugForText(content: unknown): HelixAskMathRenderDebug | null {
   const text = coerceText(content);
   if (!text) return null;
@@ -4567,6 +4847,28 @@ function buildHelixAskDebugContextSummary(
     contextFileCount: contextFiles.length,
     intentDomain: debug?.intent_domain ?? null,
     intentId: debug?.intent_id ?? null,
+    policyPromptFamily:
+      typeof debug?.policy_prompt_family === "string" ? debug?.policy_prompt_family : null,
+    policyPromptSpecificity:
+      typeof debug?.policy_prompt_specificity === "string" ? debug?.policy_prompt_specificity : null,
+    policyRequiresCodeFloor:
+      typeof debug?.policy_requires_code_floor === "boolean" ? debug?.policy_requires_code_floor : null,
+    policyRequiresDocFloor:
+      typeof debug?.policy_requires_doc_floor === "boolean" ? debug?.policy_requires_doc_floor : null,
+    policyClarifyAllowedPreLock:
+      typeof debug?.policy_clarify_allowed_pre_lock === "boolean"
+        ? debug?.policy_clarify_allowed_pre_lock
+        : null,
+    policyLockRequired:
+      typeof debug?.policy_lock_required === "boolean" ? debug?.policy_lock_required : null,
+    policyBudgetProfile:
+      typeof debug?.policy_budget_profile === "string" ? debug?.policy_budget_profile : null,
+    policyAllowTwoPass:
+      typeof debug?.policy_allow_two_pass === "boolean" ? debug?.policy_allow_two_pass : null,
+    policyAllowRetrievalRetry:
+      typeof debug?.policy_allow_retrieval_retry === "boolean"
+        ? debug?.policy_allow_retrieval_retry
+        : null,
     helixAskFailClass: failClass,
     helixAskFailReason: failReason,
     retrievalChannelHits: debug?.retrieval_channel_hits ?? null,
@@ -4715,6 +5017,36 @@ function buildHelixAskDebugContextSummary(
     shadowSymbolHitRate:
       typeof debug?.shadow_symbol_hit_rate === "number" && Number.isFinite(debug?.shadow_symbol_hit_rate)
         ? Number(debug?.shadow_symbol_hit_rate.toFixed(4))
+        : null,
+    composerPromptFamily:
+      typeof debug?.composer_prompt_family === "string" ? debug?.composer_prompt_family : null,
+    composerPromptSpecificity:
+      typeof debug?.composer_prompt_specificity === "string"
+        ? debug?.composer_prompt_specificity
+        : null,
+    composerSchemaValid:
+      typeof debug?.composer_schema_valid === "boolean" ? debug?.composer_schema_valid : null,
+    composerValidationFailReason:
+      typeof debug?.composer_validation_fail_reason === "string"
+        ? debug?.composer_validation_fail_reason
+        : null,
+    composerValidationFailReasons: normalizeReasonList(debug?.composer_validation_fail_reasons),
+    composerFamilyFormatAccuracy:
+      typeof debug?.composer_family_format_accuracy === "number" &&
+      Number.isFinite(debug?.composer_family_format_accuracy)
+        ? Number(debug?.composer_family_format_accuracy.toFixed(3))
+        : null,
+    composerSoftEnforceApplied:
+      typeof debug?.composer_soft_enforce_applied === "boolean"
+        ? debug?.composer_soft_enforce_applied
+        : null,
+    composerSoftEnforceReason:
+      typeof debug?.composer_soft_enforce_reason === "string"
+        ? debug?.composer_soft_enforce_reason
+        : null,
+    composerSoftEnforceTriggerReason:
+      typeof debug?.composer_soft_enforce_trigger_reason === "string"
+        ? debug?.composer_soft_enforce_trigger_reason
         : null,
   };
   return summary;
@@ -6465,6 +6797,7 @@ export function HelixAskPill({
     !HELIX_VOICE_CONFIRM_V2_KILL_SWITCH &&
     HELIX_VOICE_CONFIRM_V2_SHADOW;
   const voiceConfirmV2Active = voiceConfirmV2RolloutEligible && !voiceConfirmV2ShadowMode;
+  const voiceCommandLaneUiEnabled = HELIX_VOICE_COMMAND_LANE_ENABLED;
   const voiceLocalAudioGateActive = voiceConfirmV2Active && HELIX_VOICE_LOCAL_AUDIO_GATE_ENABLED;
   const voiceSessionSpeakerActive = voiceConfirmV2Active && HELIX_VOICE_SESSION_SPEAKER_ENABLED;
   const voiceMultiSpeakerUiActive = voiceSessionSpeakerActive && HELIX_VOICE_MULTISPEAKER_UI_ENABLED;
@@ -6488,6 +6821,8 @@ export function HelixAskPill({
   const [voiceInputError, setVoiceInputError] = useState<string | null>(null);
   const [transcriptConfirmState, setTranscriptConfirmState] = useState<TranscriptConfirmState | null>(null);
   const [transcriptConfirmAutoCountdownSec, setTranscriptConfirmAutoCountdownSec] = useState<number | null>(null);
+  const [commandConfirmState, setCommandConfirmState] = useState<VoiceCommandConfirmState | null>(null);
+  const [commandConfirmAutoCountdownSec, setCommandConfirmAutoCountdownSec] = useState<number | null>(null);
   const [voiceMonitorMaxHeightPx, setVoiceMonitorMaxHeightPx] = useState(320);
   const [voiceMonitorLevel, setVoiceMonitorLevel] = useState(0);
   const [voiceMonitorThreshold, setVoiceMonitorThreshold] = useState(MIC_LEVEL_MIN_THRESHOLD);
@@ -6655,6 +6990,9 @@ export function HelixAskPill({
   const transcriptConfirmStateRef = useRef<TranscriptConfirmState | null>(null);
   const transcriptConfirmAutoTimerRef = useRef<number | null>(null);
   const transcriptConfirmAutoDeadlineMsRef = useRef<number | null>(null);
+  const commandConfirmStateRef = useRef<VoiceCommandConfirmState | null>(null);
+  const commandConfirmAutoTimerRef = useRef<number | null>(null);
+  const commandConfirmAutoDeadlineMsRef = useRef<number | null>(null);
   const voiceTranscribeBusyRef = useRef(false);
   const voiceSealPollTimerRef = useRef<number | null>(null);
   const voiceSegmentFlushTimerRef = useRef<number | null>(null);
@@ -6769,6 +7107,10 @@ export function HelixAskPill({
   useEffect(() => {
     transcriptConfirmStateRef.current = transcriptConfirmState;
   }, [transcriptConfirmState]);
+
+  useEffect(() => {
+    commandConfirmStateRef.current = commandConfirmState;
+  }, [commandConfirmState]);
 
   useEffect(() => {
     micArmStateRef.current = micArmState;
@@ -8004,7 +8346,11 @@ export function HelixAskPill({
       const canLaunchCalculatorPanel = Boolean(getPanelDef(HELIX_ASK_EQUATION_CALCULATOR_PANEL_ID));
       if (!reply.envelope) {
         const plainContent = coerceText(reply.content);
-        const hasEquationContent = canLaunchCalculatorPanel && hasHelixAskRenderableMath(plainContent);
+        const hasEquationContent = shouldShowHelixAskCalculatorPanel({
+          canLaunchPanel: canLaunchCalculatorPanel,
+          hasRenderableMath: hasHelixAskRenderableMath(plainContent),
+          debug: reply.debug,
+        });
         return (
           <div className="space-y-2">
             <p className="whitespace-pre-wrap leading-relaxed">
@@ -8039,11 +8385,15 @@ export function HelixAskPill({
         HELIX_ASK_MAX_RENDER_CHARS,
         expanded,
       );
-      const hasEquationContent =
-        canLaunchCalculatorPanel &&
-        (hasHelixAskRenderableMath(answerText) ||
-          sections.some((section) => hasHelixAskRenderableMath(section.body)) ||
-          (extensionAvailable && hasHelixAskRenderableMath(extensionBody)));
+      const hasRenderableMathContent =
+        hasHelixAskRenderableMath(answerText) ||
+        sections.some((section) => hasHelixAskRenderableMath(section.body)) ||
+        (extensionAvailable && hasHelixAskRenderableMath(extensionBody));
+      const hasEquationContent = shouldShowHelixAskCalculatorPanel({
+        canLaunchPanel: canLaunchCalculatorPanel,
+        hasRenderableMath: hasRenderableMathContent,
+        debug: reply.debug,
+      });
       const hasLongContent =
         hasLongText(envelopeAnswer || fallbackAnswer, HELIX_ASK_MAX_RENDER_CHARS) ||
         hasLongText(extensionBody, HELIX_ASK_MAX_RENDER_CHARS) ||
@@ -10666,11 +11016,12 @@ export function HelixAskPill({
       }
       const assemblerState =
         attempt.source === "voice_auto" ? getVoiceTurnAssemblerState(attempt.traceId) : null;
+      const timelineAttemptText = resolveReasoningAttemptTimelineText(attempt).trim() || attempt.prompt;
       const timelineEntry = addHelixTimelineEntry({
         type: "reasoning_attempt",
         source: attempt.source,
         status: status ?? (attempt.status === "suppressed" ? "suppressed" : "queued"),
-        text: clipText(attempt.prompt, 300),
+        text: clipText(timelineAttemptText, 300),
         detail: formatReasoningAttemptDetail(attempt, null),
         mode: attempt.mode,
         traceId: attempt.traceId,
@@ -12724,6 +13075,8 @@ export function HelixAskPill({
       setVoiceInputDeviceLabel(null);
       setVoiceTrackMuted(false);
       setTranscriptConfirmState(null);
+      setCommandConfirmState(null);
+      setCommandConfirmAutoCountdownSec(null);
       voiceTrackMutedRef.current = false;
       setConversationGovernor((prev) => ({
         ...prev,
@@ -13231,6 +13584,67 @@ export function HelixAskPill({
       getVoiceTurnAssemblerState,
       updateVoiceTurnAssemblerState,
     ],
+  );
+
+  const forceDispatchVoiceAssemblerTurn = useCallback(
+    (turnKey: string): boolean => {
+      const state = getVoiceTurnAssemblerState(turnKey);
+      if (!state) return false;
+      const transcript = state.draftTranscript.trim();
+      if (!transcript) return false;
+      const now = Date.now();
+      const sealedRevision =
+        state.transcriptRevision > 0 ? state.transcriptRevision : Math.max(1, state.sealedRevision);
+      const sealToken = crypto.randomUUID();
+      updateVoiceTurnAssemblerState(turnKey, (current) => ({
+        ...current,
+        phase: "sealed",
+        sealedRevision,
+        sealToken,
+        sealedAtMs: now,
+      }));
+      const sealedTurn: VoiceConfirmedTurn = {
+        id: `confirm:${turnKey}:forced:${sealedRevision}`,
+        traceId: turnKey,
+        segmentId: state.segmentId ?? `segment:${crypto.randomUUID()}`,
+        transcript,
+        recordedText: state.draftRecordedText || transcript,
+        completion: state.completion,
+        turnComplete: state.turnComplete,
+        sttEngine: state.sttEngine,
+        sourceLanguage: state.sourceLanguage,
+        languageDetected: state.languageDetected ?? state.sourceLanguage,
+        languageConfidence: state.languageConfidence,
+        codeMixed: state.codeMixed,
+        pivotConfidence: state.pivotConfidence,
+        dispatchState: state.dispatchState,
+        langSchemaVersion: state.langSchemaVersion ?? "helix.lang.v1",
+        interpreter: state.interpreter,
+        interpreterSchemaVersion: state.interpreterSchemaVersion,
+        interpreterStatus: state.interpreterStatus,
+        interpreterConfidence: state.interpreterConfidence,
+        interpreterDispatchState: state.interpreterDispatchState,
+        interpreterConfirmPrompt: state.interpreterConfirmPrompt,
+        interpreterTermIds: state.interpreterTermIds,
+        interpreterConceptIds: state.interpreterConceptIds,
+        speakerId: null,
+        speakerConfidence: null,
+        speechProbability: null,
+        snrDb: null,
+        translated: state.translated,
+        confidence: state.confidence,
+        confidenceReason: state.confidenceReason,
+        needsConfirmation: false,
+        translationUncertain: false,
+      };
+      void dispatchConfirmedVoiceTranscript(sealedTurn, {
+        transcriptRevision: sealedRevision,
+        sealToken,
+        sealedAtMs: now,
+      });
+      return true;
+    },
+    [dispatchConfirmedVoiceTranscript, getVoiceTurnAssemblerState, updateVoiceTurnAssemblerState],
   );
 
   const scheduleVoiceSealEvaluation = useCallback(
@@ -14039,9 +14453,79 @@ export function HelixAskPill({
               continue;
             }
           }
-          resolveBargeInFromTranscription(true);
-          stopReadAloud("barge_in");
-          setTranscriptConfirmState(null);
+          const commandLane = normalizeVoiceCommandLaneEnvelope(result.command_lane ?? null);
+          if (
+            voiceCommandLaneUiEnabled &&
+            transcriptConfirmStateRef.current === null &&
+            commandLane?.decision === "accepted" &&
+            (commandLane.action === "send" || commandLane.action === "cancel" || commandLane.action === "retry")
+          ) {
+            resolveBargeInFromTranscription(true);
+            stopReadAloud("barge_in");
+            clearHeldTranscriptState();
+            setCommandConfirmState({
+              id: `command:${traceId}:${nextSegment.id}:${commandLane.utterance_id}`,
+              createdAtMs: Date.now(),
+              traceId,
+              segmentId: nextSegment.id,
+              utteranceId: commandLane.utterance_id,
+              transcript,
+              action: commandLane.action,
+              confidence: commandLane.confidence,
+              source: commandLane.source,
+            });
+            patchVoiceSegmentAttempt(nextSegment.id, {
+              status: "stt_ok",
+              sttLatencyMs,
+              transcriptPreview: clipText(transcript, 120),
+              translated: Boolean(result.translated),
+              engine: result.engine ?? null,
+              error: null,
+              dispatch: "none",
+              speakerId: result.speaker_id ?? nextSegment.speakerId ?? null,
+              speakerConfidence:
+                typeof result.speaker_confidence === "number"
+                  ? result.speaker_confidence
+                  : nextSegment.speakerConfidence ?? null,
+              speechProbability:
+                typeof result.speech_probability === "number"
+                  ? result.speech_probability
+                  : nextSegment.speechProbability ?? null,
+              snrDb:
+                typeof result.snr_db === "number"
+                  ? result.snr_db
+                  : nextSegment.snrDb ?? null,
+              confirmAutoEligible: false,
+              confirmBlockReason: null,
+            });
+            markVoiceCheckpoint(
+              "stt_response_ok",
+              "ok",
+              `Voice command detected (${commandLane.action}).`,
+              sttLatencyMs,
+            );
+            markVoiceCheckpoint(
+              "command_detected",
+              "ok",
+              `Command ${commandLane.action} (${commandLane.source}).`,
+            );
+            setVoiceInputError(null);
+            setVoiceInputState("listening");
+            setConversationGovernor((prev) => ({
+              ...prev,
+              floor_owner: "none",
+              turn_state: "soft_pause",
+              cooling_down: false,
+            }));
+            continue;
+          }
+          if (voiceCommandLaneUiEnabled && commandLane?.decision === "suppressed") {
+            markVoiceCheckpoint(
+              "command_suppressed",
+              "warn",
+              `Command suppressed (${commandLane.suppression_reason ?? "policy"}).`,
+            );
+          }
           markVoiceCheckpoint(
             "stt_response_ok",
             "ok",
@@ -14188,6 +14672,49 @@ export function HelixAskPill({
             pauseMs: MIC_END_TURN_MS,
             stability: 1,
           });
+          const hasActiveVoiceReasoningAttempt = reasoningAttemptsRef.current.some(
+            (entry) =>
+              entry.source === "voice_auto" &&
+              (entry.status === "queued" || entry.status === "running" || entry.status === "streaming"),
+          );
+          const hasActiveVoicePlayback = Boolean(
+            voiceAutoSpeakActiveUtteranceRef.current || (playbackAudioRef.current && !playbackAudioRef.current.paused),
+          );
+          if (
+            shouldIgnoreLowQualityTranscriptBargeIn({
+              lowAudioQuality,
+              confidence: confidenceMeta.confidence,
+              speechProbability,
+              snrDb,
+              hasActiveVoiceReasoningAttempt,
+              hasActiveVoicePlayback,
+              needsConfirmation,
+            })
+          ) {
+            resolveBargeInFromTranscription(false);
+            markVoiceCheckpoint(
+              "stt_response_error",
+              "warn",
+              "Ignored low-quality transcript while keeping current playback active.",
+            );
+            patchVoiceSegmentAttempt(nextSegment.id, {
+              status: "stt_ok",
+              sttLatencyMs,
+              transcriptPreview: clipText(mergedTranscript, 180),
+              translated: Boolean(result.translated),
+              engine: result.engine ?? null,
+              error: null,
+              dispatch: "none",
+              speakerId,
+              speakerConfidence,
+              speechProbability,
+              snrDb,
+              confirmAutoEligible: false,
+              confirmBlockReason: "low_audio_quality",
+            });
+            setVoiceInputState("listening");
+            continue;
+          }
           const nextDraft = mergeVoiceTranscriptDraft(askDraftRef.current, mergedTranscript);
           syncAskDraftValue(nextDraft, {
             focus: true,
@@ -14216,6 +14743,9 @@ export function HelixAskPill({
             confirmBlockReason: null,
           });
           if (needsConfirmation) {
+            resolveBargeInFromTranscription(true);
+            stopReadAloud("barge_in");
+            setTranscriptConfirmState(null);
             setTranscriptConfirmState({
               id: `confirm:${traceId}`,
               createdAtMs: Date.now(),
@@ -14386,15 +14916,11 @@ export function HelixAskPill({
               "ok",
               `Holding turn for continuity (${holdReason}).`,
             );
+            resolveBargeInFromTranscription(false);
             patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "none" });
             setVoiceInputState("listening");
             continue;
           }
-          const hasActiveVoiceReasoningAttempt = reasoningAttemptsRef.current.some(
-            (entry) =>
-              entry.source === "voice_auto" &&
-              (entry.status === "queued" || entry.status === "running" || entry.status === "streaming"),
-          );
           if (isLowInformationTailTranscript(mergedTranscript) && hasActiveVoiceReasoningAttempt) {
             const heldTranscript = clipText(mergedTranscript, 720);
             voiceHeldTranscriptPrefixRef.current = heldTranscript;
@@ -14418,10 +14944,14 @@ export function HelixAskPill({
               "ok",
               "Holding low-information tail for continuation merge.",
             );
+            resolveBargeInFromTranscription(false);
             patchVoiceSegmentAttempt(nextSegment.id, { dispatch: "none" });
             setVoiceInputState("listening");
             continue;
           }
+          resolveBargeInFromTranscription(true);
+          stopReadAloud("barge_in");
+          setTranscriptConfirmState(null);
           voiceTurnGameplayLoopStartedAtMsRef.current = null;
           clearHeldTranscriptState();
           setConversationGovernor((prev) => ({
@@ -14534,6 +15064,7 @@ export function HelixAskPill({
     rememberConversationTurn,
     stopReadAloud,
     voiceConfirmV2Active,
+    voiceCommandLaneUiEnabled,
     voiceNoiseProfile,
     voiceSessionSpeakerActive,
   ]);
@@ -16417,6 +16948,162 @@ export function HelixAskPill({
     void runAsk(next);
   }, [askBusy, askQueue, runAsk]);
 
+  const clearCommandConfirmAutoTimer = useCallback(() => {
+    if (typeof window !== "undefined" && commandConfirmAutoTimerRef.current !== null) {
+      window.clearInterval(commandConfirmAutoTimerRef.current);
+      commandConfirmAutoTimerRef.current = null;
+    }
+    commandConfirmAutoDeadlineMsRef.current = null;
+    setCommandConfirmAutoCountdownSec(null);
+  }, []);
+
+  const executeVoiceCommandLaneAction = useCallback(
+    (action: "send" | "cancel" | "retry"): boolean => {
+      if (action === "cancel") {
+        const pendingTranscriptConfirm = transcriptConfirmStateRef.current;
+        if (pendingTranscriptConfirm) {
+          handleTranscriptConfirmationRetry();
+          markVoiceCheckpoint("command_executed", "ok", "Command cancel applied to transcript confirm.");
+          return true;
+        }
+        setAskStatus("Nothing to cancel right now.");
+        markVoiceCheckpoint("command_executed", "ok", "Command cancel resolved as no-op.");
+        return false;
+      }
+
+      if (action === "send") {
+        const activeTurnKey = voiceActiveAssemblerTurnKeyRef.current;
+        if (activeTurnKey && forceDispatchVoiceAssemblerTurn(activeTurnKey)) {
+          markVoiceCheckpoint("command_executed", "ok", "Command send forced immediate voice dispatch.");
+          return true;
+        }
+        const fallbackDraft = askDraftRef.current.trim();
+        if (fallbackDraft) {
+          if (askBusy) {
+            setAskQueue((prev) => [fallbackDraft, ...prev]);
+          } else {
+            void runAsk(fallbackDraft);
+          }
+          markVoiceCheckpoint("command_executed", "ok", "Command send dispatched current draft.");
+          return true;
+        }
+        setAskStatus("Nothing to send yet.");
+        markVoiceCheckpoint("command_executed", "ok", "Command send resolved as no-op.");
+        return false;
+      }
+
+      if (transcriptConfirmStateRef.current) {
+        handleTranscriptConfirmationRetry();
+        markVoiceCheckpoint("command_executed", "ok", "Command retry applied to transcript confirm.");
+        return true;
+      }
+      const pending = getPendingHelixAskJob();
+      if (pending?.jobId) {
+        void resumePendingAsk(pending);
+        markVoiceCheckpoint("command_executed", "ok", "Command retry resumed pending ask job.");
+        return true;
+      }
+      const lastQuestion = askReplies.find((entry) => entry.question?.trim())?.question?.trim() ?? "";
+      if (lastQuestion) {
+        if (askBusy) {
+          setAskQueue((prev) => [lastQuestion, ...prev]);
+        } else {
+          void runAsk(lastQuestion);
+        }
+        markVoiceCheckpoint("command_executed", "ok", "Command retry replayed last ask.");
+        return true;
+      }
+      setAskStatus("No previous ask to retry.");
+      markVoiceCheckpoint("command_executed", "ok", "Command retry resolved as no-op.");
+      return false;
+    },
+    [
+      askBusy,
+      askReplies,
+      forceDispatchVoiceAssemblerTurn,
+      handleTranscriptConfirmationRetry,
+      markVoiceCheckpoint,
+      resumePendingAsk,
+      runAsk,
+    ],
+  );
+
+  const handleCommandConfirmationAccept = useCallback(() => {
+    const pending = commandConfirmStateRef.current;
+    if (!pending || micArmStateRef.current !== "on") return;
+    clearCommandConfirmAutoTimer();
+    setCommandConfirmState(null);
+    executeVoiceCommandLaneAction(pending.action);
+  }, [clearCommandConfirmAutoTimer, executeVoiceCommandLaneAction]);
+
+  const handleCommandConfirmationCancel = useCallback(() => {
+    if (!commandConfirmStateRef.current) return;
+    clearCommandConfirmAutoTimer();
+    setCommandConfirmState(null);
+    markVoiceCheckpoint("command_cancelled", "ok", "Voice command confirmation cancelled.");
+  }, [clearCommandConfirmAutoTimer, markVoiceCheckpoint]);
+
+  useEffect(() => {
+    if (!transcriptConfirmState || !commandConfirmStateRef.current) return;
+    clearCommandConfirmAutoTimer();
+    setCommandConfirmState(null);
+    markVoiceCheckpoint("command_cancelled", "ok", "Voice command cancelled by transcript-confirm precedence.");
+  }, [clearCommandConfirmAutoTimer, markVoiceCheckpoint, transcriptConfirmState]);
+
+  useEffect(() => {
+    clearCommandConfirmAutoTimer();
+    if (typeof window === "undefined") return;
+    if (micArmState !== "on") return;
+    if (!commandConfirmState) return;
+    if (transcriptConfirmState) return;
+    commandConfirmAutoDeadlineMsRef.current = Date.now() + VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS;
+    setCommandConfirmAutoCountdownSec(Math.ceil(VOICE_TRANSCRIPT_AUTO_CONFIRM_DELAY_MS / 1000));
+    markVoiceCheckpoint("command_confirm_started", "ok", `Command ${commandConfirmState.action} awaiting confirmation.`);
+
+    commandConfirmAutoTimerRef.current = window.setInterval(() => {
+      const pending = commandConfirmStateRef.current;
+      if (!pending || pending.id !== commandConfirmState.id) {
+        clearCommandConfirmAutoTimer();
+        return;
+      }
+      if (transcriptConfirmStateRef.current) {
+        clearCommandConfirmAutoTimer();
+        setCommandConfirmState(null);
+        markVoiceCheckpoint(
+          "command_cancelled",
+          "ok",
+          "Voice command cancelled because transcript confirm became active.",
+        );
+        return;
+      }
+      const deadlineMs = commandConfirmAutoDeadlineMsRef.current;
+      if (deadlineMs === null) {
+        clearCommandConfirmAutoTimer();
+        return;
+      }
+      const remainingMs = Math.max(0, deadlineMs - Date.now());
+      const nextCountdownSec = Math.ceil(remainingMs / 1000);
+      setCommandConfirmAutoCountdownSec((current) =>
+        current === nextCountdownSec ? current : nextCountdownSec,
+      );
+      if (remainingMs > 0) return;
+      clearCommandConfirmAutoTimer();
+      markVoiceCheckpoint("command_confirm_fired", "ok", `Command ${pending.action} auto-confirmed.`);
+      handleCommandConfirmationAccept();
+    }, 120);
+
+    return () => {
+      clearCommandConfirmAutoTimer();
+    };
+  }, [
+    clearCommandConfirmAutoTimer,
+    commandConfirmState,
+    handleCommandConfirmationAccept,
+    markVoiceCheckpoint,
+    micArmState,
+    transcriptConfirmState,
+  ]);
+
   const handleStop = useCallback(() => {
     if (askAbortRef.current) {
       askAbortRef.current.abort();
@@ -16696,50 +17383,14 @@ export function HelixAskPill({
       .map((entry): VoiceLaneTimelineDebugEvent => {
         const meta = entry.meta ?? {};
         const debugContext = readHelixAskDebugContextFromMeta(meta);
-        const detailLower = `${entry.detail ?? ""}`.trim().toLowerCase();
-        const inferSuppressionCause = (): string | null => {
-          const explicit =
-            typeof meta.suppressionCause === "string" && meta.suppressionCause.trim()
-              ? meta.suppressionCause.trim()
-              : null;
-          if (explicit) return explicit;
-          const fromRouteReason = inferSuppressionCauseFromRouteReason(
-            typeof meta.routeReasonCode === "string" ? meta.routeReasonCode : null,
-          );
-          if (fromRouteReason) return fromRouteReason;
-          if (
-            detailLower.includes("phase_not_sealed") ||
-            detailLower.includes("seal_token_mismatch") ||
-            detailLower.includes("sealed_revision_mismatch") ||
-            detailLower.includes("dispatch_hash_mismatch") ||
-            detailLower.includes("inactive_attempt")
-          ) {
-            if (detailLower.includes("phase_not_sealed")) return "phase_not_sealed";
-            if (detailLower.includes("seal_token_mismatch")) return "seal_token_mismatch";
-            if (detailLower.includes("sealed_revision_mismatch")) return "sealed_revision_mismatch";
-            if (detailLower.includes("dispatch_hash_mismatch")) return "dispatch_hash_mismatch";
-            return "inactive_attempt";
-          }
-          if (detailLower.includes("superseded by newer")) return "inactive_attempt";
-          if (detailLower.includes("artifact-dominated") || detailLower.includes("artifact guard")) {
-            return "artifact_guard_restart";
-          }
-          if (detailLower.includes("clarifier requested")) return "clarifier_requested";
-          if (detailLower.includes("escalat")) return "escalation_restart";
-          if (entry.status === "suppressed") return "suppressed_unspecified";
-          return null;
-        };
-        const inferredSuppressionCause = inferSuppressionCause();
-        const inferredAuthorityRejectStage =
-          meta.authorityRejectStage === "preflight" ||
-          meta.authorityRejectStage === "stream" ||
-          meta.authorityRejectStage === "final"
-            ? meta.authorityRejectStage
-            : inferredSuppressionCause
-              ? entry.type === "reasoning_stream"
-                ? "stream"
-                : "final"
-              : null;
+        const suppressionMeta = deriveVoiceTimelineSuppressionMeta({
+          status: entry.status,
+          type: entry.type,
+          detail: entry.detail,
+          meta,
+        });
+        const inferredSuppressionCause = suppressionMeta.suppressionCause;
+        const inferredAuthorityRejectStage = suppressionMeta.authorityRejectStage;
         const source =
           entry.type === "conversation_recorded" || entry.type === "conversation_brief"
             ? "conversation"
@@ -16961,6 +17612,7 @@ export function HelixAskPill({
         confirmV2RolloutEligible: voiceConfirmV2RolloutEligible,
         confirmV2Active: voiceConfirmV2Active,
         confirmV2ShadowMode: voiceConfirmV2ShadowMode,
+        commandLaneUiEnabled: voiceCommandLaneUiEnabled,
         localAudioGateActive: voiceLocalAudioGateActive,
         sessionSpeakerActive: voiceSessionSpeakerActive,
         multiSpeakerUiActive: voiceMultiSpeakerUiActive,
@@ -17302,6 +17954,40 @@ export function HelixAskPill({
                   }`}
                 >
                   {voiceInputStatusLabel}
+                </div>
+              </div>
+            ) : null}
+            {!transcriptConfirmState && commandConfirmState ? (
+              <div className="-mt-1 px-4 pb-2 text-[11px]">
+                <div className="rounded-lg border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-2 text-cyan-50/95">
+                  <p className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/90">Voice command</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                    Detected: {describeVoiceCommandAction(commandConfirmState.action)}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-[10px] text-cyan-100/85">
+                    Heard: &quot;{clipText(commandConfirmState.transcript, 220)}&quot;
+                  </p>
+                  {commandConfirmAutoCountdownSec !== null ? (
+                    <p className="mt-1 text-[10px] text-cyan-100/90">
+                      Auto-confirming in {commandConfirmAutoCountdownSec}s. Say &quot;cancel&quot; to stop.
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md border border-cyan-300/40 bg-cyan-500/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-500/25"
+                      onClick={handleCommandConfirmationAccept}
+                    >
+                      Execute
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-md border border-slate-300/35 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-200 transition hover:bg-black/35"
+                      onClick={handleCommandConfirmationCancel}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}

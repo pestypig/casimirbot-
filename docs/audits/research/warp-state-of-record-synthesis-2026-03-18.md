@@ -5,10 +5,10 @@
 ## Result
 - artifact_type: `state_of_record_synthesis/v1`
 - commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
-- head_commit: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
-- stale_against_head: `false`
+- head_commit: `35eb6be9c6b8add1bc73af4771633090aa0af3de`
+- stale_against_head: `true`
 - overall_status: `PARTIAL`
-- checksum: `79951423f63945652956866e5978f9242996965dfdb276fb3ab3541933e6ff09`
+- checksum: `5a8ab14cb974213eaae784208b5c60530c8ed55f6f92f80a7ad5083c4eef8c46`
 
 ## Canonical
 - decision: `REDUCED_ORDER_ADMISSIBLE`
@@ -66,7 +66,8 @@
 ## Blockers
 | id | severity | code | detail |
 | --- | --- | --- | --- |
-| BLK-SOR-RDY-001 | HIGH | lane_reportable_blocked:sem_ellipsometry | missing_covariance_uncertainty_anchor,missing_paired_dual_instrument_run |
+| BLK-SOR-001 | MEDIUM | artifact_commit_pin_stale_vs_head | artifact commit_pin=7e8cc8952db5649e54d797a3786bd85e3fb0e96b differs from current HEAD=35eb6be9c6b8add1bc73af4771633090aa0af3de |
+| BLK-SOR-RDY-002 | HIGH | lane_reportable_blocked:sem_ellipsometry | missing_covariance_uncertainty_anchor,missing_paired_dual_instrument_run |
 
 ## Anchors
 - proof_index: `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json`

@@ -7,7 +7,9 @@ import { loadWarpAgentsConfig } from "../../modules/physics/warpAgents";
 import { recordTrainingTrace } from "../services/observability/training-trace-store";
 import { getGlobalPipelineState, setGlobalPipelineState } from "../energy-pipeline";
 import { runWarpFullSolveCalculator } from "../../scripts/warp-full-solve-calculator.js";
+import { runWarpVisualOrchestrator } from "../services/warp/visual-orchestrator";
 import path from "node:path";
+import { z } from "zod";
 
 const router = Router();
 const CALCULATOR_OUT_ROOT = path.resolve("artifacts", "research", "full-solve");
@@ -39,6 +41,42 @@ const resolveViabilityPolicy = async () => {
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   value != null && typeof value === "object" && !Array.isArray(value);
+
+const resolveBaseUrl = (req: Request): string => {
+  const protoHeader = req.headers?.["x-forwarded-proto"];
+  const hostHeader = req.headers?.["x-forwarded-host"];
+  const proto =
+    typeof protoHeader === "string"
+      ? protoHeader.split(",")[0].trim()
+      : req.protocol;
+  const host =
+    typeof hostHeader === "string"
+      ? hostHeader.split(",")[0].trim()
+      : req.get("host");
+  if (!host) {
+    throw new Error("host_unavailable");
+  }
+  return `${proto}://${host}`;
+};
+
+const visualOrchestratorRequestSchema = z
+  .object({
+    solveInput: z.record(z.string(), z.unknown()).optional(),
+    panels: z.array(z.string().min(1)).min(1).max(16).optional(),
+    timeoutMs: z.number().int().min(5_000).max(180_000).optional(),
+    pixelRatio: z.number().min(0.5).max(4).optional(),
+    viewport: z
+      .object({
+        width: z.number().int().min(640).max(4096).optional(),
+        height: z.number().int().min(480).max(4096).optional(),
+      })
+      .optional(),
+    outDir: z.string().min(1).optional(),
+    writeArtifacts: z.boolean().optional(),
+    visualThreshold: z.number().min(0).max(1).optional(),
+    continueOnPanelError: z.boolean().optional(),
+  })
+  .strict();
 
 const resolveCalculatorOutPath = (candidate: unknown): string | null => {
   if (typeof candidate !== "string" || candidate.trim().length === 0) return null;
@@ -189,7 +227,7 @@ router.post("/calculator", async (req: Request, res: Response) => {
   try {
     const body = isObjectRecord(req.body) ? req.body : {};
     const persist = body.persist === true;
-    const outPath = persist ? resolveCalculatorOutPath(body.outPath) : undefined;
+    const outPath = persist ? (resolveCalculatorOutPath(body.outPath) ?? undefined) : undefined;
     if (persist && !outPath) {
       res.status(400).json({
         error: "invalid_out_path",
@@ -214,6 +252,60 @@ router.post("/calculator", async (req: Request, res: Response) => {
     console.error("[warp-viability] calculator failed:", err);
     const message = err instanceof Error ? err.message : "Calculator execution failed";
     res.status(500).json({ error: "calculator_failed", message });
+  }
+});
+
+router.post("/visual-orchestrator/run", async (req: Request, res: Response) => {
+  const parsed = visualOrchestratorRequestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "invalid_request",
+      details: parsed.error.issues,
+    });
+    return;
+  }
+
+  let baseUrl: string;
+  try {
+    baseUrl = resolveBaseUrl(req);
+  } catch (err) {
+    res.status(400).json({
+      error: "invalid_host",
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  try {
+    const result = await runWarpVisualOrchestrator({
+      baseUrl,
+      solveInput: parsed.data.solveInput,
+      panels: parsed.data.panels,
+      timeoutMs: parsed.data.timeoutMs,
+      pixelRatio: parsed.data.pixelRatio,
+      viewport: parsed.data.viewport,
+      outDir: parsed.data.outDir,
+      writeArtifacts: parsed.data.writeArtifacts,
+      visualThreshold: parsed.data.visualThreshold,
+      continueOnPanelError: parsed.data.continueOnPanelError,
+    });
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === "playwright_unavailable") {
+      res.status(503).json({ error: "render_unavailable", message });
+      return;
+    }
+    if (message === "invalid_out_dir") {
+      res.status(400).json({
+        error: "invalid_out_dir",
+        message:
+          "outDir must resolve under artifacts/research/full-solve/visual-orchestrator.",
+      });
+      return;
+    }
+    console.error("[warp-viability] visual orchestrator failed:", err);
+    res.status(500).json({ error: "visual_orchestrator_failed", message });
   }
 });
 

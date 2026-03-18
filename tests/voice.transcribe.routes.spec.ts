@@ -42,6 +42,11 @@ const ORIGINAL_ENV = {
   STT_LOCAL_MODEL: process.env.STT_LOCAL_MODEL,
   STT_LOCAL_EMBEDDED_ENABLED: process.env.STT_LOCAL_EMBEDDED_ENABLED,
   WHISPER_HTTP_URL: process.env.WHISPER_HTTP_URL,
+  HELIX_VOICE_COMMAND_LANE_ENABLED: process.env.HELIX_VOICE_COMMAND_LANE_ENABLED,
+  HELIX_VOICE_COMMAND_LANE_LOG_ONLY: process.env.HELIX_VOICE_COMMAND_LANE_LOG_ONLY,
+  HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT: process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT,
+  HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE: process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE,
+  HELIX_VOICE_COMMAND_LANE_KILL_SWITCH: process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH,
 };
 
 const buildApp = () => {
@@ -70,6 +75,11 @@ describe("voice transcribe route", () => {
     delete process.env.STT_LOCAL_MODEL;
     process.env.STT_LOCAL_EMBEDDED_ENABLED = "0";
     delete process.env.WHISPER_HTTP_URL;
+    delete process.env.HELIX_VOICE_COMMAND_LANE_ENABLED;
+    delete process.env.HELIX_VOICE_COMMAND_LANE_LOG_ONLY;
+    delete process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT;
+    delete process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE;
+    delete process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH;
   });
 
   afterEach(() => {
@@ -138,6 +148,32 @@ describe("voice transcribe route", () => {
       delete process.env.WHISPER_HTTP_URL;
     } else {
       process.env.WHISPER_HTTP_URL = ORIGINAL_ENV.WHISPER_HTTP_URL;
+    }
+    if (ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_ENABLED === undefined) {
+      delete process.env.HELIX_VOICE_COMMAND_LANE_ENABLED;
+    } else {
+      process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_ENABLED;
+    }
+    if (ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_LOG_ONLY === undefined) {
+      delete process.env.HELIX_VOICE_COMMAND_LANE_LOG_ONLY;
+    } else {
+      process.env.HELIX_VOICE_COMMAND_LANE_LOG_ONLY = ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_LOG_ONLY;
+    }
+    if (ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT === undefined) {
+      delete process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT;
+    } else {
+      process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT;
+    }
+    if (ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE === undefined) {
+      delete process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE;
+    } else {
+      process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE =
+        ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE;
+    }
+    if (ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH === undefined) {
+      delete process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH;
+    } else {
+      process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH = ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH;
     }
   });
 
@@ -224,6 +260,602 @@ describe("voice transcribe route", () => {
       { personaId: "mission-1" },
     );
     expect(sttWhisperHandlerMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a prefixed send command under adaptive strict-prefix in noisy audio", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+    sttHttpHandlerMock.mockResolvedValue({
+      text: "helix send",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("snr_db", "6")
+      .field("speech_probability", "0.42")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "send",
+      source: "parser",
+      strict_prefix_applied: true,
+      confirm_required: true,
+    });
+  });
+
+  it("suppresses unprefixed send command under adaptive strict-prefix in noisy audio", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+    sttHttpHandlerMock.mockResolvedValue({
+      text: "send",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("snr_db", "6")
+      .field("speech_probability", "0.42")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "suppressed",
+      action: "send",
+      source: "parser",
+      suppression_reason: "strict_prefix_required",
+      strict_prefix_applied: true,
+      confirm_required: false,
+    });
+  });
+
+  it("keeps mid-sentence command keywords in dictation flow", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    sttHttpHandlerMock.mockResolvedValue({
+      text: "please explain how we retry the warp solver in this codebase",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("snr_db", "20")
+      .field("speech_probability", "0.94")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "none",
+      action: null,
+      confirm_required: false,
+    });
+  });
+
+  it("treats explanatory 'send' phrasing as dictation while preserving direct send commands", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    const dictationCases = [
+      "Explain what a warp bubble is in full solve send.",
+      "What does send mean in this codebase?",
+      "Please explain how send should behave in queued reasoning.",
+    ];
+
+    for (const [index, text] of dictationCases.entries()) {
+      sttHttpHandlerMock.mockResolvedValueOnce({
+        text,
+        language: "en",
+        duration_ms: 700,
+        segments: [],
+      });
+
+      const res = await request(buildApp())
+        .post("/api/voice/transcribe")
+        .field("traceId", `trace-send-dictation-${index}`)
+        .field("snr_db", "20")
+        .field("speech_probability", "0.95")
+        .attach("audio", Buffer.from("voice"), {
+          filename: "input.webm",
+          contentType: "audio/webm",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.command_lane).toMatchObject({
+        version: "helix.voice.command_lane.v1",
+        decision: "none",
+        action: null,
+        confirm_required: false,
+      });
+    }
+
+    const commandCases = ["send", "send now", "send this"];
+    for (const [index, text] of commandCases.entries()) {
+      sttHttpHandlerMock.mockResolvedValueOnce({
+        text,
+        language: "en",
+        duration_ms: 500,
+        segments: [],
+      });
+
+      const res = await request(buildApp())
+        .post("/api/voice/transcribe")
+        .field("traceId", `trace-send-command-${index}`)
+        .field("snr_db", "20")
+        .field("speech_probability", "0.95")
+        .attach("audio", Buffer.from("voice"), {
+          filename: "input.webm",
+          contentType: "audio/webm",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.command_lane).toMatchObject({
+        version: "helix.voice.command_lane.v1",
+        decision: "accepted",
+        action: "send",
+        source: "parser",
+        confirm_required: true,
+      });
+    }
+  });
+
+  it("treats explanatory retry/cancel phrasing as dictation while preserving direct commands", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    const dictationCases = [
+      "Can you explain how retry works in this code path?",
+      "Please describe when cancel should be used in the queue.",
+      "What does retry mean for resumable asks?",
+    ];
+
+    for (const [index, text] of dictationCases.entries()) {
+      sttHttpHandlerMock.mockResolvedValueOnce({
+        text,
+        language: "en",
+        duration_ms: 700,
+        segments: [],
+      });
+
+      const res = await request(buildApp())
+        .post("/api/voice/transcribe")
+        .field("traceId", `trace-retry-cancel-dictation-${index}`)
+        .field("snr_db", "20")
+        .field("speech_probability", "0.95")
+        .attach("audio", Buffer.from("voice"), {
+          filename: "input.webm",
+          contentType: "audio/webm",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.command_lane).toMatchObject({
+        version: "helix.voice.command_lane.v1",
+        decision: "none",
+        action: null,
+        confirm_required: false,
+      });
+    }
+
+    const commandCases: Array<{ text: string; action: "retry" | "cancel" }> = [
+      { text: "retry", action: "retry" },
+      { text: "retry that", action: "retry" },
+      { text: "cancel", action: "cancel" },
+      { text: "stop", action: "cancel" },
+    ];
+
+    for (const [index, { text, action }] of commandCases.entries()) {
+      sttHttpHandlerMock.mockResolvedValueOnce({
+        text,
+        language: "en",
+        duration_ms: 500,
+        segments: [],
+      });
+
+      const res = await request(buildApp())
+        .post("/api/voice/transcribe")
+        .field("traceId", `trace-retry-cancel-command-${index}`)
+        .field("snr_db", "20")
+        .field("speech_probability", "0.95")
+        .attach("audio", Buffer.from("voice"), {
+          filename: "input.webm",
+          contentType: "audio/webm",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.command_lane).toMatchObject({
+        version: "helix.voice.command_lane.v1",
+        decision: "accepted",
+        action,
+        source: "parser",
+        confirm_required: true,
+      });
+    }
+  });
+
+  it("accepts trailing cancel control in mixed dictation utterances", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "Okay, explain what a warp bubble is. Cancel that. Keep listening.",
+      language: "en",
+      duration_ms: 900,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-trailing-cancel-control")
+      .field("snr_db", "20")
+      .field("speech_probability", "0.95")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "cancel",
+      source: "parser",
+      confirm_required: true,
+    });
+  });
+
+  it("accepts trailing cancel control in no-punctuation STT variants", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "okay explain what a warp bubble is cancel that keep listening",
+      language: "en",
+      duration_ms: 900,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-trailing-cancel-no-punctuation")
+      .field("snr_db", "20")
+      .field("speech_probability", "0.95")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "cancel",
+      source: "parser",
+      confirm_required: true,
+    });
+  });
+
+  it("accepts direct negative-send phrasing as cancel control", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "Don't send that yet",
+      language: "en",
+      duration_ms: 700,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-negative-send-cancel")
+      .field("snr_db", "20")
+      .field("speech_probability", "0.95")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "cancel",
+      source: "parser",
+      confirm_required: true,
+    });
+  });
+
+  it("keeps explicit negation of cancel and semantic stop comparisons in dictation flow", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    const dictationCases = [
+      "not cancel keep going",
+      "stop talking not stop processing",
+    ];
+
+    for (const [index, text] of dictationCases.entries()) {
+      sttHttpHandlerMock.mockResolvedValueOnce({
+        text,
+        language: "en",
+        duration_ms: 700,
+        segments: [],
+      });
+
+      const res = await request(buildApp())
+        .post("/api/voice/transcribe")
+        .field("traceId", `trace-negation-dictation-${index}`)
+        .field("snr_db", "20")
+        .field("speech_probability", "0.95")
+        .attach("audio", Buffer.from("voice"), {
+          filename: "input.webm",
+          contentType: "audio/webm",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.command_lane).toMatchObject({
+        version: "helix.voice.command_lane.v1",
+        decision: "none",
+        action: null,
+        confirm_required: false,
+      });
+    }
+  });
+
+  it("supports mixed control wording: send-keep-listening and cancel-then-retry", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "send this part then keep listening",
+      language: "en",
+      duration_ms: 700,
+      segments: [],
+    });
+    const sendKeepListeningRes = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-send-keep-listening")
+      .field("snr_db", "20")
+      .field("speech_probability", "0.95")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+    expect(sendKeepListeningRes.status).toBe(200);
+    expect(sendKeepListeningRes.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "send",
+      source: "parser",
+      confirm_required: true,
+    });
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "cancel that. actually retry.",
+      language: "en",
+      duration_ms: 700,
+      segments: [],
+    });
+    const cancelRetryRes = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-cancel-then-retry")
+      .field("snr_db", "20")
+      .field("speech_probability", "0.95")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+    expect(cancelRetryRes.status).toBe(200);
+    expect(cancelRetryRes.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "retry",
+      source: "parser",
+      confirm_required: true,
+    });
+  });
+
+  it("accepts prefixed cancel control in noisy adaptive strict-prefix mode", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "okay helix cancel that",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-noisy-prefixed-cancel")
+      .field("snr_db", "6")
+      .field("speech_probability", "0.42")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "cancel",
+      source: "parser",
+      strict_prefix_applied: true,
+      confirm_required: true,
+    });
+  });
+
+  it("keeps noisy-mode safety: retry requires prefix while cancel does not", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "retry",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+    const noisyRetryRes = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-noisy-retry-unprefixed")
+      .field("snr_db", "6")
+      .field("speech_probability", "0.42")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+    expect(noisyRetryRes.status).toBe(200);
+    expect(noisyRetryRes.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "suppressed",
+      action: "retry",
+      source: "parser",
+      suppression_reason: "strict_prefix_required",
+      strict_prefix_applied: true,
+      confirm_required: false,
+    });
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "cancel",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+    const noisyCancelRes = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-noisy-cancel-unprefixed")
+      .field("snr_db", "6")
+      .field("speech_probability", "0.42")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+    expect(noisyCancelRes.status).toBe(200);
+    expect(noisyCancelRes.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "cancel",
+      source: "parser",
+      strict_prefix_applied: true,
+      confirm_required: true,
+    });
+  });
+
+  it("keeps mixed social utterances with command words in dictation flow", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    const mixedDictationCases = [
+      "Explain retry then send?",
+      "At the bar we said send but keep explaining the code path.",
+      "Can you compare cancel versus retry behavior in this queue?",
+      "I want the meaning of send in this system, not a command.",
+    ];
+
+    for (const [index, text] of mixedDictationCases.entries()) {
+      sttHttpHandlerMock.mockResolvedValueOnce({
+        text,
+        language: "en",
+        duration_ms: 800,
+        segments: [],
+      });
+
+      const res = await request(buildApp())
+        .post("/api/voice/transcribe")
+        .field("traceId", `trace-mixed-social-${index}`)
+        .field("snr_db", "8")
+        .field("speech_probability", "0.48")
+        .attach("audio", Buffer.from("voice"), {
+          filename: "input.webm",
+          contentType: "audio/webm",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.command_lane).toMatchObject({
+        version: "helix.voice.command_lane.v1",
+        decision: "none",
+        action: null,
+        confirm_required: false,
+      });
+    }
+  });
+
+  it("accepts explicit prefixed retry command in noisy social conditions", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
+    process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";
+    process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE = "adaptive";
+
+    sttHttpHandlerMock.mockResolvedValueOnce({
+      text: "helix retry",
+      language: "en",
+      duration_ms: 500,
+      segments: [],
+    });
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-noisy-prefixed-retry")
+      .field("snr_db", "6")
+      .field("speech_probability", "0.42")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.command_lane).toMatchObject({
+      version: "helix.voice.command_lane.v1",
+      decision: "accepted",
+      action: "retry",
+      source: "parser",
+      strict_prefix_applied: true,
+      confirm_required: true,
+    });
   });
 
   it("uses OPENAI_API_KEY first for OpenAI STT backend auth", async () => {

@@ -18,7 +18,16 @@
     "resonance_libration": {
       "libration_span_deg_max": 300,
       "ratio_tolerance": 0.25
+    },
+    "saros_cycle": {
+      "target_saros_days": 6585.3211,
+      "max_pair_abs_error_days": 2.0,
+      "min_pair_count": 3
+    },
+    "jovian_moon_event_timing": {
+      "max_contact_ratio": 1.05,
+      "event_time_tolerance_s": 7200,
+      "min_event_count": 1
     }
   }
 }
-

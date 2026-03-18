@@ -91,4 +91,46 @@ describe("halobank solar derived route", () => {
     expect(Array.isArray(res.body.result?.events)).toBe(true);
     expect(res.body.result?.events.length).toBeGreaterThan(0);
   });
+
+  it("detects Saros recurrence pairs in a long global eclipse window", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "saros_cycle",
+        input: {
+          start_iso: "2000-01-01T00:00:00.000Z",
+          end_iso: "2100-01-01T00:00:00.000Z",
+          max_events: 512,
+        },
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("saros_cycle");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.pair_count).toBeGreaterThan(0);
+    expect(Array.isArray(res.body.result?.pairs)).toBe(true);
+  });
+
+  it("detects jovian moon transit/occultation timing candidates from Earth", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "jovian_moon_event_timing",
+        input: {
+          start_iso: "2026-01-01T00:00:00.000Z",
+          end_iso: "2026-01-05T00:00:00.000Z",
+          step_minutes: 5,
+          moon: "io",
+          event: "any",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("jovian_moon_event_timing");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(Array.isArray(res.body.result?.events)).toBe(true);
+    expect(res.body.result?.events.length).toBeGreaterThan(0);
+  });
 });

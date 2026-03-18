@@ -384,6 +384,8 @@ export function DesktopWindow({ id, title, Loader }: DesktopWindowProps) {
         <motion.div
           className={windowClasses}
           style={{ ...style, zIndex: w.z }}
+          data-window-id={id}
+          data-panel-id={id}
           onMouseDown={() => focus(id)}
           initial={{ x: safePosition.x, y: safePosition.y, scale: 0.98, opacity: 0.95 }}
           animate={{

@@ -1,0 +1,169 @@
+{
+  "schema_version": "curvature_collapse_repro_contract/1",
+  "contract_id": "curvature-collapse-gr-kinematics-v1",
+  "status": "active",
+  "claim_tier_ceiling": "diagnostic",
+  "scope": {
+    "domain": "collapse_benchmark",
+    "summary": "Relativity-safe commit-event benchmark using curvature-unit diagnostics; not an FTL channel and not a literal objective-collapse simulator.",
+    "gr_regime": {
+      "chart": "comoving_cartesian",
+      "weak_field_assumption": true,
+      "allow_ftl_claims": false,
+      "allow_objective_collapse_claims": false
+    }
+  },
+  "canonical_equations": [
+    {
+      "id": "hazard_probability",
+      "expression": "p_trigger = 1 - exp(-dt/tau)",
+      "units": "dimensionless",
+      "source_path": "shared/collapse-benchmark.ts#hazardProbability"
+    },
+    {
+      "id": "present_length",
+      "expression": "L_present = min(r_c, c*tau)",
+      "units": "m",
+      "source_path": "shared/collapse-benchmark.ts#presentLengthMeters"
+    },
+    {
+      "id": "kappa_present",
+      "expression": "kappa_present = 1 / L_present^2",
+      "units": "m^-2",
+      "source_path": "shared/collapse-benchmark.ts#kappaPresentFromLength"
+    },
+    {
+      "id": "curvature_coupled_instability",
+      "expression": "instability = w1*drive_vs_body + w2*residual + w3*dispersion + w4*incoherence + w5*roots",
+      "units": "dimensionless",
+      "source_path": "shared/collapse-benchmark.ts#estimateTauRcFromCurvature"
+    }
+  ],
+  "coupling_inputs": [
+    {
+      "id": "kappa_drive_m2",
+      "units": "m^-2",
+      "role": "drive term in curvature ratio"
+    },
+    {
+      "id": "kappa_body_m2",
+      "units": "m^-2",
+      "role": "body baseline term in curvature ratio"
+    },
+    {
+      "id": "coherence",
+      "units": "dimensionless",
+      "role": "inverse instability contributor"
+    },
+    {
+      "id": "dispersion",
+      "units": "dimensionless",
+      "role": "instability contributor"
+    },
+    {
+      "id": "residual_rms",
+      "units": "model-space",
+      "role": "instability contributor"
+    },
+    {
+      "id": "roots_count",
+      "units": "count",
+      "role": "fragmentation contributor"
+    }
+  ],
+  "determinism_contract": {
+    "seed_required": true,
+    "step_index_required": true,
+    "hash_bound_fields": [
+      "inputs_hash",
+      "features_hash",
+      "run_hash",
+      "report_hash"
+    ]
+  },
+  "prediction_preregistration": {
+    "minimum_prediction_count": 1,
+    "required_fields": [
+      "prediction_id",
+      "hypothesis",
+      "null_model_id",
+      "sign_expectation",
+      "magnitude_band",
+      "falsifier_rule",
+      "dataset_refs",
+      "metric"
+    ],
+    "default_null_models": [
+      {
+        "id": "null_fixed_tau_rc",
+        "description": "Hold tau and r_c fixed (manual mode) and compare against curvature-coupled estimator."
+      },
+      {
+        "id": "null_dp_only",
+        "description": "Use DP-derived tau/r_c only with curvature estimator disabled."
+      }
+    ]
+  },
+  "evidence_tiers": [
+    {
+      "tier": "diagnostic",
+      "required": [
+        "unit_consistency",
+        "monotonicity_tests",
+        "deterministic_replay",
+        "null_model_comparison"
+      ],
+      "prohibited_language": [
+        "physically viable",
+        "proven",
+        "admissible"
+      ]
+    },
+    {
+      "tier": "reduced-order",
+      "required": [
+        "external_holdout",
+        "uncertainty_calibration",
+        "cross_dataset_replication"
+      ],
+      "prohibited_language": [
+        "certified"
+      ]
+    },
+    {
+      "tier": "certified",
+      "required": [
+        "all_hard_constraints_pass",
+        "admissible_certificate",
+        "certificate_integrity_ok"
+      ],
+      "prohibited_language": []
+    }
+  ],
+  "required_artifacts": [
+    "datasets/benchmarks/curvature-collapse-prediction-registry.v1.json",
+    "docs/specs/curvature-collapse-reproducibility-contract-v1.md",
+    "docs/specs/curvature-collapse-falsification-checklist-v1.md",
+    "reports/math-report.json"
+  ],
+  "required_tests": [
+    "tests/physics-contract.gate0.spec.ts",
+    "tests/collapse-benchmark.phase1.spec.ts",
+    "tests/collapse-benchmark.phase2.routes.spec.ts",
+    "tests/collapse-benchmark.phase4.estimator.spec.ts"
+  ],
+  "strict_blockers": [
+    {
+      "id": "missing_prediction_preregistration",
+      "reason_code": "CURVATURE_COLLAPSE_PREREG_MISSING"
+    },
+    {
+      "id": "null_model_not_beaten",
+      "reason_code": "CURVATURE_COLLAPSE_NULL_MODEL_FAIL"
+    },
+    {
+      "id": "casimir_verify_fail",
+      "reason_code": "CASIMIR_VERIFY_FAIL"
+    }
+  ]
+}

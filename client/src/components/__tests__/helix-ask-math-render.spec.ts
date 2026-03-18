@@ -3,12 +3,16 @@ import { beforeAll, describe, expect, it } from "vitest";
 let tokenizeHelixAskMathTokens: typeof import("@/components/helix/HelixAskPill").tokenizeHelixAskMathTokens;
 let hasHelixAskRenderableMath: typeof import("@/components/helix/HelixAskPill").hasHelixAskRenderableMath;
 let buildHelixAskMathRenderDebugForText: typeof import("@/components/helix/HelixAskPill").buildHelixAskMathRenderDebugForText;
+let shouldShowHelixAskCalculatorPanel: typeof import("@/components/helix/HelixAskPill").shouldShowHelixAskCalculatorPanel;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ tokenizeHelixAskMathTokens, hasHelixAskRenderableMath, buildHelixAskMathRenderDebugForText } = await import(
-    "@/components/helix/HelixAskPill"
-  ));
+  ({
+    tokenizeHelixAskMathTokens,
+    hasHelixAskRenderableMath,
+    buildHelixAskMathRenderDebugForText,
+    shouldShowHelixAskCalculatorPanel,
+  } = await import("@/components/helix/HelixAskPill"));
 });
 
 describe("tokenizeHelixAskMathTokens", () => {
@@ -119,5 +123,29 @@ describe("tokenizeHelixAskMathTokens", () => {
           /rho_eff_kg_m3/.test(status.tokenText),
       ),
     ).toBe(true);
+  });
+
+  it("suppresses calculator launch for non-equation family even when math-like text exists", () => {
+    const show = shouldShowHelixAskCalculatorPanel({
+      canLaunchPanel: true,
+      hasRenderableMath: true,
+      debug: {
+        policy_prompt_family: "definition_overview",
+        composer_prompt_family: "definition_overview",
+      },
+    });
+    expect(show).toBe(false);
+  });
+
+  it("keeps calculator launch for equation-family responses", () => {
+    const show = shouldShowHelixAskCalculatorPanel({
+      canLaunchPanel: true,
+      hasRenderableMath: true,
+      debug: {
+        policy_prompt_family: "equation_formalism",
+        equation_selector_primary_key: "shared/collapse-benchmark.ts:L570",
+      },
+    });
+    expect(show).toBe(true);
   });
 });

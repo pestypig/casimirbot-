@@ -864,6 +864,29 @@ export type HelixInterpreterArtifact = {
   dispatch_state: HelixInterpreterDispatchState;
 };
 
+export type VoiceCommandLaneAction = "send" | "cancel" | "retry";
+export type VoiceCommandLaneDecision = "accepted" | "suppressed" | "none";
+export type VoiceCommandLaneSource = "parser" | "evaluator" | "none";
+export type VoiceCommandLaneSuppressionReason =
+  | "disabled"
+  | "kill_switch"
+  | "rollout_inactive"
+  | "audio_quality_low"
+  | "strict_prefix_required"
+  | "log_only";
+
+export type VoiceCommandLaneEnvelope = {
+  version: "helix.voice.command_lane.v1" | string;
+  decision: VoiceCommandLaneDecision;
+  action: VoiceCommandLaneAction | null;
+  confidence: number | null;
+  source: VoiceCommandLaneSource;
+  suppression_reason: VoiceCommandLaneSuppressionReason | null;
+  strict_prefix_applied: boolean;
+  confirm_required: boolean;
+  utterance_id: string;
+};
+
 export type VoiceTranscribePayload = {
   audio: Blob;
   filename?: string;
@@ -923,6 +946,7 @@ export type VoiceTranscribeResponse = {
   interpreter_confirm_prompt?: string | null;
   interpreter_term_ids?: string[];
   interpreter_concept_ids?: string[];
+  command_lane?: VoiceCommandLaneEnvelope | null;
   error?: string;
   message?: string;
   details?: Record<string, unknown>;

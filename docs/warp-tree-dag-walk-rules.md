@@ -49,9 +49,9 @@ Use the built-in script with the default config:
 npx tsx scripts/warp-tree-dag-walk.ts --config docs/warp-tree-dag-walk-config.json
 ```
 
-Default tree set includes warp mechanics, physics foundations, brick-lattice dataflow, math,
-GR solver, simulation systems, uncertainty mechanics, panel concepts, panel registry, and
-resonance trees. Override with `--trees` to narrow the scope.
+Default tree set includes warp mechanics, the Needle Hull Mark 2 theory directory tree,
+physics foundations, brick-lattice dataflow, math, GR solver, simulation systems, uncertainty
+mechanics, panel concepts, panel registry, and resonance trees. Override with `--trees` to narrow the scope.
 
 Optional flags:
 ```text

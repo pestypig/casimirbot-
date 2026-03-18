@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-03-17T05:56:51.664Z",
-  "registryCount": 74,
+  "generatedAt": "2026-03-18T07:28:34.503Z",
+  "registryCount": 78,
   "coverage": {
     "exploratory": {
       "count": 18,
@@ -26,7 +26,7 @@
       ]
     },
     "reduced-order": {
-      "count": 28,
+      "count": 29,
       "modules": [
         "modules/gr/stress-energy.ts",
         "server/gr/gr-constraint-policy.ts",
@@ -55,11 +55,12 @@
         "shared/curvature-proxy.ts",
         "client/src/physics/curvature.ts",
         "client/src/lib/warp-proof-math.ts",
-        "server/helix-proof-pack.ts"
+        "server/helix-proof-pack.ts",
+        "server/modules/halobank-solar/time-core.ts"
       ]
     },
     "diagnostic": {
-      "count": 21,
+      "count": 24,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -81,7 +82,10 @@
         "server/services/observability/constraint-pack-evaluator.ts",
         "server/services/observability/constraint-pack-normalizer.ts",
         "server/services/observability/constraint-pack-telemetry.ts",
-        "server/routes/agi.constraint-packs.ts"
+        "server/routes/agi.constraint-packs.ts",
+        "server/modules/halobank-solar/ephemeris-core.ts",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts"
       ]
     },
     "certified": {
@@ -156,7 +160,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 74,
+    "entriesWithUnits": 78,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -165,13 +169,13 @@
         "missing": []
       },
       "reduced-order": {
-        "total": 28,
-        "withUnits": 28,
+        "total": 29,
+        "withUnits": 29,
         "missing": []
       },
       "diagnostic": {
-        "total": 21,
-        "withUnits": 21,
+        "total": 24,
+        "withUnits": 24,
         "missing": []
       },
       "certified": {
@@ -192,8 +196,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 630,
-    "edgeCount": 1323
+    "nodeCount": 638,
+    "edgeCount": 1340
   },
   "evidenceProfiles": [
     {

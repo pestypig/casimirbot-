@@ -399,6 +399,41 @@
       "weight": 1.1
     },
     {
+      "id": "needle-hull-mark2-theory",
+      "label": "Needle Hull Mark 2 Theory Directory Walk",
+      "path": "docs/knowledge/warp/needle-hull-mark2-theory-tree.json",
+      "pathMode": "root_to_leaf",
+      "topicTags": [
+        "warp",
+        "needle-hull",
+        "full-solve",
+        "theory-directory"
+      ],
+      "matchers": [
+        "needle hull mark 2",
+        "needle-hull mark 2",
+        "nhm2",
+        "full warp solve",
+        "state of record",
+        "proof anchor index",
+        "integrity parity",
+        "promotion readiness",
+        "external comparison matrix",
+        "theory directory"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 10,
+      "minAnchorScore": 3,
+      "preferGraph": true,
+      "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.25
+    },
+    {
       "id": "sector-control-runtime",
       "label": "Sector Control Runtime Walk",
       "path": "docs/knowledge/sector-control-runtime-tree.json",

@@ -72,6 +72,7 @@ type EdgeDecision = {
 
 const DEFAULT_TREES = [
   "docs/knowledge/warp/warp-mechanics-tree.json",
+  "docs/knowledge/warp/needle-hull-mark2-theory-tree.json",
   "docs/knowledge/physics/physics-foundations-tree.json",
   "docs/knowledge/physics/brick-lattice-dataflow-tree.json",
   "docs/knowledge/physics/math-tree.json",

@@ -1,0 +1,26 @@
+{
+  "schema_version": "curvature_collapse_prediction_registry/1",
+  "contract_id": "curvature-collapse-gr-kinematics-v1",
+  "created_at": "2026-03-18T00:00:00.000Z",
+  "predictions": [
+    {
+      "prediction_id": "PRED-CC-001",
+      "hypothesis": "Increasing instability decreases tau_ms and r_c_m versus null baselines.",
+      "null_model_id": "null_fixed_tau_rc",
+      "sign_expectation": {
+        "tau_ms": "decrease",
+        "r_c_m": "decrease"
+      },
+      "magnitude_band": {
+        "tau_ms_rel_min": 0.05,
+        "r_c_m_rel_min": 0.02
+      },
+      "falsifier_rule": "fail if instability_high has tau_ms >= instability_low or r_c_m >= instability_low",
+      "dataset_refs": [
+        "tests/collapse-benchmark.phase4.estimator.spec.ts",
+        "datasets/benchmarks/collapse-benchmark.fixture.json"
+      ],
+      "metric": "monotonicity(tau_ms,r_c_m | instability)"
+    }
+  ]
+}

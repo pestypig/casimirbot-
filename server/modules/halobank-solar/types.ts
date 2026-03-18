@@ -115,6 +115,15 @@ export type SolarThresholdsManifest = {
       libration_span_deg_max: number;
       ratio_tolerance: number;
     };
+    saros_cycle: {
+      target_saros_days: number;
+      max_pair_abs_error_days: number;
+      min_pair_count: number;
+    };
+    jovian_moon_event_timing: {
+      max_contact_ratio: number;
+      event_time_tolerance_s: number;
+      min_event_count: number;
+    };
   };
 };
-

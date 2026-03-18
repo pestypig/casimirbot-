@@ -72,6 +72,8 @@ const SEND_COMMAND_PHRASES = new Set([
 const RETRY_COMMAND_PHRASES = new Set([
   "retry",
   "retry that",
+  "retry this",
+  "retry it",
   "try again",
   "again",
   "redo",
@@ -79,6 +81,9 @@ const RETRY_COMMAND_PHRASES = new Set([
 ]);
 const CANCEL_COMMAND_PHRASES = new Set([
   "cancel",
+  "cancel that",
+  "cancel this",
+  "cancel it",
   "stop",
   "abort",
   "dismiss",
@@ -98,7 +103,7 @@ const COMMAND_KEYWORDS = new Set([
   "abort",
   "dismiss",
 ]);
-const LEADING_FILLER_WORDS = new Set(["please", "ok", "okay", "hey", "just"]);
+const LEADING_FILLER_WORDS = new Set(["please", "ok", "okay", "hey", "just", "actually"]);
 
 const EVALUATOR_OUTPUT_JSON_SCHEMA = {
   type: "object",
@@ -263,9 +268,92 @@ const tokenToAction = (token: string): VoiceCommandLaneAction | null => {
   return null;
 };
 
+const hasInlineHelixPrefix = (rawTranscript: string): boolean =>
+  /(^|[\s.!?;,:])helix\s+/i.test(rawTranscript.trim());
+
+const stripLeadingFillerAndPrefixTokens = (rawTokens: string[]): { tokens: string[]; hasHelixPrefix: boolean } => {
+  const tokens = [...rawTokens];
+  while (tokens.length > 1 && LEADING_FILLER_WORDS.has(tokens[0])) {
+    tokens.shift();
+  }
+  let hasHelixPrefix = false;
+  if (tokens[0] === "helix") {
+    hasHelixPrefix = true;
+    tokens.shift();
+  }
+  return { tokens, hasHelixPrefix };
+};
+
+const normalizeClauseCommandPhrase = (rawClause: string): string => {
+  const normalizedTokens = normalizeTranscript(rawClause).split(" ").filter(Boolean);
+  const { tokens } = stripLeadingFillerAndPrefixTokens(normalizedTokens);
+  return tokens.join(" ").trim();
+};
+
+const extractTrailingClauseCommand = (
+  rawTranscript: string,
+): { action: VoiceCommandLaneAction; confidence: number } | null => {
+  const clauses = rawTranscript
+    .split(/[.!?;]+/)
+    .map((entry) => normalizeClauseCommandPhrase(entry))
+    .filter(Boolean);
+  if (clauses.length === 0) return null;
+
+  const lastClause = clauses[clauses.length - 1] ?? "";
+  const priorClause = clauses.length > 1 ? clauses[clauses.length - 2] ?? "" : "";
+  const lastAction = extractCommandActionFromPhrase(lastClause);
+  if (lastAction) {
+    return {
+      action: lastAction,
+      confidence: 0.95,
+    };
+  }
+
+  const keepListeningTail =
+    lastClause === "keep listening" ||
+    lastClause === "continue listening" ||
+    lastClause === "stay listening";
+  const priorAction = priorClause ? extractCommandActionFromPhrase(priorClause) : null;
+  if (keepListeningTail && (priorAction === "cancel" || priorAction === "send")) {
+    return {
+      action: priorAction,
+      confidence: 0.95,
+    };
+  }
+
+  const normalizedWhole = normalizeTranscript(rawTranscript);
+  if (/^(?:do not|don t|dont|don't)\s+send(?:\s+(?:that|this|it))?(?:\s+yet)?$/.test(lastClause)) {
+    return {
+      action: "cancel",
+      confidence: 0.95,
+    };
+  }
+  if (
+    /\bcancel(?: that| this| it)?\b/.test(normalizedWhole) &&
+    /\b(keep|continue|stay) listening\b/.test(normalizedWhole)
+  ) {
+    return {
+      action: "cancel",
+      confidence: 0.9,
+    };
+  }
+  if (
+    /\bsend(?: that| this| it)?(?: part)?\b/.test(normalizedWhole) &&
+    /\b(keep|continue|stay) listening\b/.test(normalizedWhole) &&
+    !/\b(?:do not|don t|dont|don't)\s+send\b/.test(normalizedWhole)
+  ) {
+    return {
+      action: "send",
+      confidence: 0.9,
+    };
+  }
+  return null;
+};
+
 const isLikelyImperativeShape = (rawTranscript: string, normalizedTranscript: string): boolean => {
   if (!normalizedTranscript) return false;
   if (/[?]$/.test(rawTranscript.trim())) return false;
+  if (extractTrailingClauseCommand(rawTranscript)) return true;
   if (/^(what|why|how|where|when|who)\b/i.test(normalizedTranscript)) return false;
   const tokens = normalizedTranscript.split(" ").filter(Boolean);
   if (tokens.length === 0 || tokens.length > 10) return false;
@@ -286,13 +374,23 @@ export const parseVoiceCommandCandidate = (rawTranscript: string): ParserDecisio
       highLikelihood: false,
     };
   }
-  const hasHelixPrefix = normalized.startsWith("helix ");
-  let phrase = hasHelixPrefix ? normalized.slice("helix ".length).trim() : normalized;
-  const phraseTokens = phrase.split(" ").filter(Boolean);
-  while (phraseTokens.length > 1 && LEADING_FILLER_WORDS.has(phraseTokens[0])) {
-    phraseTokens.shift();
+  const hasHelixPrefixFromPunctuation = hasInlineHelixPrefix(rawTranscript);
+  const trailingClauseCommand = extractTrailingClauseCommand(rawTranscript);
+  if (trailingClauseCommand) {
+    return {
+      decision: "accepted",
+      action: trailingClauseCommand.action,
+      confidence: trailingClauseCommand.confidence,
+      hasHelixPrefix: hasHelixPrefixFromPunctuation,
+      keywordDetected: true,
+      highLikelihood: true,
+    };
   }
-  phrase = phraseTokens.join(" ").trim();
+  const normalizedTokens = normalized.split(" ").filter(Boolean);
+  const stripped = stripLeadingFillerAndPrefixTokens(normalizedTokens);
+  const phraseTokens = stripped.tokens;
+  const hasHelixPrefix = hasHelixPrefixFromPunctuation || stripped.hasHelixPrefix;
+  const phrase = phraseTokens.join(" ").trim();
   const keywordDetected = phraseTokens.some((token) => COMMAND_KEYWORDS.has(token));
   if (!keywordDetected) {
     return {
@@ -304,6 +402,44 @@ export const parseVoiceCommandCandidate = (rawTranscript: string): ParserDecisio
       highLikelihood: false,
     };
   }
+
+  const explicitNegativeSend = /^(?:do not|don t|dont|don't)\s+send(?:\s+(?:that|this|it))?(?:\s+yet)?$/.test(
+    phrase,
+  );
+  if (explicitNegativeSend) {
+    return {
+      decision: "accepted",
+      action: "cancel",
+      confidence: 0.93,
+      hasHelixPrefix,
+      keywordDetected: true,
+      highLikelihood: true,
+    };
+  }
+  if (/^(?:not)\s+(?:cancel|stop|send|retry)\b/.test(phrase)) {
+    return {
+      decision: "none",
+      action: null,
+      confidence: null,
+      hasHelixPrefix,
+      keywordDetected: true,
+      highLikelihood: false,
+    };
+  }
+  const hasNegatedCommandContext = phraseTokens.some(
+    (token, index) => index > 0 && COMMAND_KEYWORDS.has(token) && phraseTokens[index - 1] === "not",
+  );
+  if (hasNegatedCommandContext) {
+    return {
+      decision: "none",
+      action: null,
+      confidence: null,
+      hasHelixPrefix,
+      keywordDetected: true,
+      highLikelihood: false,
+    };
+  }
+
   const exactAction = extractCommandActionFromPhrase(phrase);
   if (exactAction) {
     return {
@@ -617,7 +753,7 @@ export const runVoiceCommandArbiter = async (
       confidence: evaluator.confidence,
     });
   }
-  const hasHelixPrefix = normalizeTranscript(input.transcript).startsWith("helix ");
+  const hasHelixPrefix = hasInlineHelixPrefix(input.transcript);
   if (
     strictPrefixApplied &&
     requiresStrictPrefixForAction(evaluator.action) &&

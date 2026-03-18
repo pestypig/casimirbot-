@@ -1,0 +1,542 @@
+{
+  "version": 1,
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  },
+  "rootId": "needle-hull-mark2-theory-tree",
+  "nodes": [
+    {
+      "id": "needle-hull-mark2-theory-tree",
+      "slug": "needle-hull-mark2-theory-tree",
+      "title": "Needle Hull Mark 2 Theory Tree",
+      "excerpt": "Canonical entry tree for the full Needle Hull Mark 2 solve and evidence lanes.",
+      "bodyMD": "This tree is the cohesive discovery lane for Needle Hull Mark 2.\n\nPrimary entrypoint directory: docs/audits/research/needle-hull-mark2/.",
+      "tags": [
+        "warp",
+        "needle-hull",
+        "full-solve",
+        "theory-directory"
+      ],
+      "children": [
+        "nhm2-entrypoints",
+        "nhm2-canonical-authority",
+        "nhm2-parity-readiness",
+        "nhm2-external-comparison",
+        "nhm2-evidence-provenance",
+        "nhm2-paper-generation",
+        "nhm2-se-closure",
+        "nhm2-regeneration-runbook"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "warp-mechanics-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "note": "Geometry and controls lineage."
+        },
+        {
+          "rel": "see-also",
+          "to": "gr-solver-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "note": "GR parity and solver conformance lane."
+        },
+        {
+          "rel": "see-also",
+          "to": "math-maturity-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "note": "Claim-tier and math-maturity contract lane."
+        },
+        {
+          "rel": "see-also",
+          "to": "casimir-tiles-tree",
+          "edgeType": "association",
+          "requiresCL": "none",
+          "note": "Casimir mechanism and lane evidence lineage."
+        }
+      ],
+      "summary": "Canonical entry tree for the full Needle Hull Mark 2 solve and evidence lanes.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/audits/research/needle-hull-mark2/theory-directory-latest.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/needle-hull-mark2/theory-directory-latest.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "nhm2-entrypoints",
+      "slug": "nhm2-entrypoints",
+      "title": "NHM2 Entry Points",
+      "excerpt": "Top-level pointers for machine and human state-of-record.",
+      "bodyMD": "Use these first:\n- docs/audits/research/needle-hull-mark2/theory-directory-latest.json\n- docs/audits/research/needle-hull-mark2/theory-directory-latest.md\n- docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json\n- docs/audits/research/warp-state-of-record-synthesis-latest.md",
+      "tags": [
+        "entrypoint",
+        "nhm2",
+        "state-of-record"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Top-level pointers for machine and human state-of-record.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/audits/research/needle-hull-mark2/theory-directory-latest.md"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-canonical-authority",
+      "slug": "nhm2-canonical-authority",
+      "title": "NHM2 Canonical Authority",
+      "excerpt": "Decision-ledger and governance matrix authority chain.",
+      "bodyMD": "Canonical authority chain uses the full-solve campaign report, decision ledger, governance matrix, evidence pack, and evidence snapshot.",
+      "tags": [
+        "canonical",
+        "governance",
+        "ledger"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Decision-ledger and governance matrix authority chain.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json"
+        },
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/g4-governance-matrix-2026-02-27.json"
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/warp-evidence-pack-2026-03-02.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-parity-readiness",
+      "slug": "nhm2-parity-readiness",
+      "title": "NHM2 Parity and Readiness",
+      "excerpt": "Reference capsule, integrity parity suite, and promotion readiness suite.",
+      "bodyMD": "This node captures parity and readiness anchors and their machine counterparts.",
+      "tags": [
+        "parity",
+        "readiness",
+        "capsule"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Reference capsule, integrity parity suite, and promotion readiness suite.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/full-solve-reference-capsule-latest.json"
+        },
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/integrity-parity-suite-latest.json"
+        },
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/promotion-readiness-suite-latest.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-external-comparison",
+      "slug": "nhm2-external-comparison",
+      "title": "NHM2 External Work Comparison",
+      "excerpt": "Core-4 + GR observable comparison matrix and method-track outputs.",
+      "bodyMD": "Snapshot-first external work comparisons are anchored in the external comparison matrix latest artifacts.",
+      "tags": [
+        "external",
+        "comparison",
+        "matrix"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Core-4 + GR observable comparison matrix and method-track outputs.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json"
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/warp-external-work-comparison-matrix-latest.md"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-evidence-provenance",
+      "slug": "nhm2-evidence-provenance",
+      "title": "NHM2 Evidence and Equation Provenance",
+      "excerpt": "Registry, equation trace, staging ledger, and bookkeeping references.",
+      "bodyMD": "Measurement and theory evidence provenance is tracked through the experimental registry and equation trace contracts.",
+      "tags": [
+        "evidence",
+        "registry",
+        "equations",
+        "provenance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Registry, equation trace, staging ledger, and bookkeeping references.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/specs/casimir-tile-experimental-parameter-registry-2026-03-04.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/specs/casimir-tile-paper-equation-trace-2026-03-04.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/specs/casimir-tile-spec-bookkeeping-v1.md"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-paper-generation",
+      "slug": "nhm2-paper-generation",
+      "title": "NHM2 Paper Generation Anchors",
+      "excerpt": "Defensible-now and strong-claim-upgrade drafts sourced from canonical artifacts.",
+      "bodyMD": "Paper generation should use the proof anchor index and state-of-record artifacts as top-level citation anchors.",
+      "tags": [
+        "paper",
+        "manuscript",
+        "claims"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Defensible-now and strong-claim-upgrade drafts sourced from canonical artifacts.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/audits/research/warp-paper-draft-A-defensible-now.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/warp-paper-draft-B-strong-claim-upgrade-spec.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/warp-paper-authoring-contract-2026-03-02.md"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-se-closure",
+      "slug": "nhm2-se-closure",
+      "title": "NHM2 SEM+Ellipsometry Closure",
+      "excerpt": "SE publication overlay and reportable-attempt closure state.",
+      "bodyMD": "Cross-study publication overlays can map compatibility, but reportable unlock remains blocked without paired, non-template instrument-export evidence.",
+      "tags": [
+        "metrology",
+        "sem",
+        "ellipsometry",
+        "uncertainty"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "SE publication overlay and reportable-attempt closure state.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/se-publication-overlay-latest.json"
+        },
+        {
+          "type": "artifact",
+          "path": "artifacts/research/full-solve/se-reportable-attempt-latest.json"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "nhm2-regeneration-runbook",
+      "slug": "nhm2-regeneration-runbook",
+      "title": "NHM2 Regeneration Runbook",
+      "excerpt": "Deterministic command chain to refresh theory-directory and state artifacts.",
+      "bodyMD": "Run in order:\n1) npm run warp:proof-index:sync\n2) npm run warp:state-of-record:synthesis\n3) npm run warp:needle-hull:directory:sync\n4) npm run casimir:verify -- --ci --url http://127.0.0.1:5050/api/agi/adapter/run --trace-out artifacts/training-trace.jsonl\n5) curl.exe -fsS http://127.0.0.1:5050/api/agi/training-trace/export -o artifacts/training-trace-export.jsonl",
+      "tags": [
+        "runbook",
+        "deterministic",
+        "verification"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "needle-hull-mark2-theory-tree"
+        }
+      ],
+      "summary": "Deterministic command chain to refresh theory-directory and state artifacts.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "needle-hull-mark2-theory-tree"
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "scripts/warp-needle-hull-theory-directory-sync.ts"
+        },
+        {
+          "type": "code",
+          "path": "scripts/warp-state-of-record-synthesis.ts"
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/needle-hull-mark2/theory-directory-latest.md"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    }
+  ]
+}

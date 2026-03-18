@@ -20,7 +20,13 @@ const DERIVED_GATE_ID = "halobank.solar.derived.consistency.v1";
 
 const DerivedBody = z
   .object({
-    module: z.enum(["mercury_precession", "earth_moon_eclipse_timing", "resonance_libration"]),
+    module: z.enum([
+      "mercury_precession",
+      "earth_moon_eclipse_timing",
+      "resonance_libration",
+      "saros_cycle",
+      "jovian_moon_event_timing",
+    ]),
     input: z.record(z.string(), z.unknown()).optional(),
     strict_provenance: z.boolean().optional(),
     evidence_refs: z.array(z.string()).optional(),
@@ -402,6 +408,8 @@ halobankSolarRouter.post("/halobank/derived", async (req, res) => {
       mercury_precession: ["uncertainty_propagation"],
       earth_moon_eclipse_timing: ["runtime_safety_gate"],
       resonance_libration: ["uncertainty_propagation"],
+      saros_cycle: ["periodicity_commensurability"],
+      jovian_moon_event_timing: ["line_of_sight_occultation_geometry"],
     };
     const provenance = {
       kernel_bundle_id: bundleManifest.bundle_id,

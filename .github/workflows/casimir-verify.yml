@@ -53,6 +53,9 @@ jobs:
           MATH_UNIT_WARNINGS_STRICT: "1"
         run: npm run math:validate
 
+      - name: Validate curvature-collapse reproducibility contract
+        run: npm run validate:curvature:collapse:contract
+
       - name: Generate CI reports
         run: npm run reports:ci
 
