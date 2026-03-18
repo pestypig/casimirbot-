@@ -14,7 +14,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - all window evidence ready: true
 - min curvatureRatio: 0
 - max curvatureRatio: 0
-- provenance commit: 5263528756309f437fdc65b0e6e900a4666b0b3f
+- provenance commit: 0dc5985b2ff02623e68be3c51019f32e641137a6
 - provenance freshness vs HEAD: fresh
 - canonical-authoritative statement: canonical campaign decision remains authoritative; curvature applicability evidence is fail-closed.
 

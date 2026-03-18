@@ -4,11 +4,11 @@
 
 ## Result
 - artifact_type: `state_of_record_synthesis/v1`
-- commit_pin: `5263528756309f437fdc65b0e6e900a4666b0b3f`
-- head_commit: `bd295ca5f4bd78fcb6a8dd2af2ba698c8dba0d46`
-- stale_against_head: `true`
+- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- head_commit: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- stale_against_head: `false`
 - overall_status: `PARTIAL`
-- checksum: `dac99ef23bb12f500572eb8c9cc553f8c2e637d382d50194c09f06070dceca4d`
+- checksum: `9277a668fe3ba9c103cadec549dd5eccb7eaa74925dd7046c64869b9ea435aea`
 
 ## Canonical
 - decision: `REDUCED_ORDER_ADMISSIBLE`
@@ -49,8 +49,8 @@
 ## Certification
 - verdict: `PASS`
 - firstFail: `null`
-- traceId: `adapter:1922af41-1ffe-4910-87b7-6213a6506a14`
-- runId: `32711`
+- traceId: `adapter:2c798dee-1ad3-4ae4-a1b0-eba7a7c9f719`
+- runId: `32884`
 - certificateHash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
 - integrityOk: `true`
 - status: `GREEN`
@@ -58,8 +58,7 @@
 ## Blockers
 | id | severity | code | detail |
 | --- | --- | --- | --- |
-| BLK-SOR-001 | MEDIUM | artifact_commit_pin_stale_vs_head | artifact commit_pin=5263528756309f437fdc65b0e6e900a4666b0b3f differs from current HEAD=bd295ca5f4bd78fcb6a8dd2af2ba698c8dba0d46 |
-| BLK-SOR-RDY-002 | HIGH | lane_reportable_blocked:sem_ellipsometry | missing_covariance_uncertainty_anchor,missing_paired_dual_instrument_run |
+| BLK-SOR-RDY-001 | HIGH | lane_reportable_blocked:sem_ellipsometry | missing_covariance_uncertainty_anchor,missing_paired_dual_instrument_run |
 
 ## Anchors
 - proof_index: `docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.json`

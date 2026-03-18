@@ -8,7 +8,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - canonical missing waves: none
 - mapping comparable all waves: true
 - mapping bridge ready all waves: true
-- provenance commit: 5263528756309f437fdc65b0e6e900a4666b0b3f
+- provenance commit: 0dc5985b2ff02623e68be3c51019f32e641137a6
 - provenance freshness vs HEAD: fresh
 - canonical-authoritative statement: canonical campaign decision remains authoritative; operator mapping audit is evidentiary and fail-closed.
 

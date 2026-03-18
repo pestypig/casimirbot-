@@ -5,7 +5,7 @@
   "recovery_goal": "timing_compatibility_recovery",
   "success_bar": "map_only",
   "baseline_reference": {
-    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-17.json",
+    "path": "artifacts/research/full-solve/shadow-injection-run-generated-2026-03-18.json",
     "keys": [
       "marginRatioRaw",
       "marginRatioRawComputed",
@@ -727,7 +727,7 @@
   "profile": "ti_primary_reportable_v1",
   "preRegistrationProfile": {
     "profileId": "ti-primary-reportable-v1",
-    "lockedOn": "2026-03-17",
+    "lockedOn": "2026-03-18",
     "lane": "timing",
     "sourceClassAllowlist": [
       "primary",

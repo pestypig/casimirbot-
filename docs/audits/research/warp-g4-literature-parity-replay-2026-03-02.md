@@ -10,7 +10,7 @@ This campaign defines falsifiable reduced-order full-solve gates and reproducibl
 - wave parity pass count: 4/4
 - all wave parity pass: true
 - candidate comparable pass all waves: true
-- provenance commit: 5263528756309f437fdc65b0e6e900a4666b0b3f
+- provenance commit: 0dc5985b2ff02623e68be3c51019f32e641137a6
 - provenance freshness vs HEAD: fresh
 - artifact commits match HEAD: true
 
