@@ -4,11 +4,11 @@
 
 ## Result
 - artifact_type: `state_of_record_synthesis/v1`
-- commit_pin: `0dc5985b2ff02623e68be3c51019f32e641137a6`
-- head_commit: `0dc5985b2ff02623e68be3c51019f32e641137a6`
+- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
+- head_commit: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
 - stale_against_head: `false`
 - overall_status: `PARTIAL`
-- checksum: `9277a668fe3ba9c103cadec549dd5eccb7eaa74925dd7046c64869b9ea435aea`
+- checksum: `79951423f63945652956866e5978f9242996965dfdb276fb3ab3541933e6ff09`
 
 ## Canonical
 - decision: `REDUCED_ORDER_ADMISSIBLE`
@@ -41,6 +41,14 @@
 | timing | true | 9 | 2 | 1 | none |
 | sem_ellipsometry | false | 0 | 0 | 18 | missing_covariance_uncertainty_anchor, missing_paired_dual_instrument_run |
 
+## SE Publication Overlay
+- available: `true`
+- reportable_unlock: `false`
+- run_summary: `scenarioCount=6, compatible=6, partial=0, incompatible=0, error=0`
+- congruence_summary: `congruent=2, incongruent=0, unknown=4`
+- blocked_reasons: `publication_cross_study_not_paired_instrument_design, reportable_unlock_reserved_for_instrument_export_paired_runs`
+- source: `artifacts/research/full-solve/se-publication-overlay-latest.json`
+
 ## External Comparison
 - summary: `total=14, compatible=7, partial=5, inconclusive=2`
 - stale_count: `0`
@@ -49,8 +57,8 @@
 ## Certification
 - verdict: `PASS`
 - firstFail: `null`
-- traceId: `adapter:2c798dee-1ad3-4ae4-a1b0-eba7a7c9f719`
-- runId: `32884`
+- traceId: `adapter:9fe67bc2-a830-4d4f-9b16-1753063d3734`
+- runId: `32888`
 - certificateHash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
 - integrityOk: `true`
 - status: `GREEN`

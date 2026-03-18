@@ -19,6 +19,10 @@ const DEFAULT_EXTERNAL_MATRIX_PATH = path.join(
   EXTERNAL_WORK_DIR,
   'external-work-comparison-matrix-latest.json',
 );
+const DEFAULT_SE_PUBLICATION_OVERLAY_PATH = path.join(
+  FULL_SOLVE_DIR,
+  'se-publication-overlay-latest.json',
+);
 const DEFAULT_PROOF_INDEX_PATH = path.join(
   'docs',
   'audits',
@@ -101,6 +105,7 @@ const buildMarkdown = (payload: Record<string, any>): string => {
   const geometry = payload.geometry;
   const gr = payload.gr_observables;
   const readiness = payload.readiness;
+  const sePublicationOverlay = payload.se_publication_overlay;
   const cert = payload.certification;
   const external = payload.external_work;
   const blockers = payload.blockers as Array<Record<string, any>>;
@@ -162,6 +167,18 @@ const buildMarkdown = (payload: Record<string, any>): string => {
       ]),
     );
   }
+  lines.push('');
+  lines.push('## SE Publication Overlay');
+  lines.push(`- available: \`${String(Boolean(sePublicationOverlay.available))}\``);
+  lines.push(`- reportable_unlock: \`${String(Boolean(sePublicationOverlay.reportable_unlock))}\``);
+  lines.push(
+    `- run_summary: \`scenarioCount=${sePublicationOverlay.run_summary.scenarioCount}, compatible=${sePublicationOverlay.run_summary.compatible}, partial=${sePublicationOverlay.run_summary.partial}, incompatible=${sePublicationOverlay.run_summary.incompatible}, error=${sePublicationOverlay.run_summary.error}\``,
+  );
+  lines.push(
+    `- congruence_summary: \`congruent=${sePublicationOverlay.compat_summary.congruent}, incongruent=${sePublicationOverlay.compat_summary.incongruent}, unknown=${sePublicationOverlay.compat_summary.unknown}\``,
+  );
+  lines.push(`- blocked_reasons: \`${(sePublicationOverlay.blocked_reasons ?? []).join(', ') || 'none'}\``);
+  lines.push(`- source: \`${sePublicationOverlay.source_path}\``);
   lines.push('');
   lines.push('## External Comparison');
   lines.push(
@@ -225,6 +242,9 @@ const main = () => {
   const external = requireJson('external comparison matrix', DEFAULT_EXTERNAL_MATRIX_PATH);
   const proofIndex = requireJson('proof anchor index', DEFAULT_PROOF_INDEX_PATH);
   const ledger = requireJson('decision ledger', DEFAULT_DECISION_LEDGER_PATH);
+  const sePublicationOverlay = fs.existsSync(resolvePathFromRoot(DEFAULT_SE_PUBLICATION_OVERLAY_PATH))
+    ? readJson(resolvePathFromRoot(DEFAULT_SE_PUBLICATION_OVERLAY_PATH))
+    : null;
   const headCommit = getHeadCommit();
 
   const commitPin =
@@ -335,6 +355,29 @@ const main = () => {
         lanes.filter((lane) => !Boolean(lane?.reportableReady)).length,
       lanes,
       source_path: normalizePath(DEFAULT_READINESS_PATH),
+    },
+    se_publication_overlay: {
+      available: Boolean(sePublicationOverlay),
+      reportable_unlock: Boolean(sePublicationOverlay?.policy?.reportableUnlock),
+      run_summary: {
+        scenarioCount: asNumber(sePublicationOverlay?.run?.summary?.scenarioCount) ?? 0,
+        compatible: asNumber(sePublicationOverlay?.run?.summary?.compatible) ?? 0,
+        partial: asNumber(sePublicationOverlay?.run?.summary?.partial) ?? 0,
+        incompatible: asNumber(sePublicationOverlay?.run?.summary?.incompatible) ?? 0,
+        error: asNumber(sePublicationOverlay?.run?.summary?.error) ?? 0,
+      },
+      compat_summary: {
+        scenarioCount: asNumber(sePublicationOverlay?.compat?.summary?.scenarioCount) ?? 0,
+        congruent: asNumber(sePublicationOverlay?.compat?.summary?.congruent) ?? 0,
+        incongruent: asNumber(sePublicationOverlay?.compat?.summary?.incongruent) ?? 0,
+        unknown: asNumber(sePublicationOverlay?.compat?.summary?.unknown) ?? 0,
+      },
+      blocked_reasons: Array.isArray(sePublicationOverlay?.policy?.blockedReasons)
+        ? sePublicationOverlay.policy.blockedReasons
+            .map((value: unknown) => String(value ?? '').trim())
+            .filter((value: string) => value.length > 0)
+        : [],
+      source_path: normalizePath(DEFAULT_SE_PUBLICATION_OVERLAY_PATH),
     },
     external_work: {
       summary: external?.summary_counts ?? {},
