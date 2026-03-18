@@ -216,6 +216,7 @@
     "warp:shadow:se-publication-overlay": "tsx scripts/warp-shadow-sem-ellips-publication-overlay.ts",
     "warp:shadow:se-repeat-determinism": "tsx scripts/warp-shadow-sem-ellips-repeat-determinism.ts",
     "warp:shadow:qcd-analog:replay": "tsx scripts/warp-shadow-qcd-analog-replay.ts",
+    "warp:state-of-record:synthesis": "tsx scripts/warp-state-of-record-synthesis.ts",
     "warp:external:profiles:validate": "tsx scripts/warp-external-work-profiles-validate.ts",
     "warp:external:run": "tsx scripts/warp-external-work-run.ts",
     "warp:external:compare": "tsx scripts/warp-external-work-compare.ts",
