@@ -1,0 +1,60 @@
+{
+  "artifact_type": "flagship_bundle_scorecard_canary_pack/v1",
+  "bundle_id": "nhm2.curvature-collapse",
+  "cases": [
+    {
+      "id": "measured_chain_expected_pass",
+      "expected_verdict": "pass",
+      "context": {
+        "canonicalDecisionOk": true,
+        "geometryPassCount": 5,
+        "geometryRequiredCount": 5,
+        "compatibleObservableCount": 4,
+        "totalObservableCount": 4,
+        "reportableReadyLaneCount": 2,
+        "blockedLaneCount": 1,
+        "readinessGatePass": false,
+        "blockerCount": 1
+      },
+      "expectations": [
+        {
+          "path_id": "path_casimir_force_to_stress_energy",
+          "expected_status": "match",
+          "required_reason_codes": ["measured_lane_reportable_ready"]
+        },
+        {
+          "path_id": "path_stress_energy_to_gr_diagnostics",
+          "expected_status": "match",
+          "required_reason_codes": ["canonical_geometry_closure"]
+        },
+        {
+          "path_id": "path_gr_diagnostics_to_curvature_proxy",
+          "expected_status": "match",
+          "required_reason_codes": ["gr_observable_compatibility_complete"]
+        }
+      ]
+    },
+    {
+      "id": "solar_quarantine_expected_fail",
+      "expected_verdict": "fail",
+      "context": {
+        "canonicalDecisionOk": true,
+        "geometryPassCount": 5,
+        "geometryRequiredCount": 5,
+        "compatibleObservableCount": 4,
+        "totalObservableCount": 4,
+        "reportableReadyLaneCount": 2,
+        "blockedLaneCount": 1,
+        "readinessGatePass": false,
+        "blockerCount": 1
+      },
+      "expectations": [
+        {
+          "path_id": "path_solar_coherence_to_collapse_hypothesis",
+          "expected_status": "diverge",
+          "required_reason_codes": ["hypothesis_only_quarantine", "tier_guard_diagnostic_only"]
+        }
+      ]
+    }
+  ]
+}

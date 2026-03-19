@@ -29,14 +29,16 @@ Define a deterministic, commit-pinned bridge artifact between integrity-parity s
 6. `geometry` (`required_checks`, `pass_count`, `required_count`, `all_pass`)
 7. `gr_observable_compatibility` (`mercury`, `lensing`, `frame_dragging`, `shapiro`)
 8. `lane_reportable_coverage`
-9. `blocker_taxonomy`
-10. `casimir` certificate block
-11. `rubric` pass flags
-12. `blockers`
-13. `final_readiness_verdict`
-14. `readiness_gate_pass`
-15. `normalized_checksum`
-16. `checksum`
+9. `bundle_scorecard` (flagship path statuses: `match | converge | diverge`, reason codes, residuals)
+10. `bundle_scorecard_refs` (dated/latest machine + human artifact refs)
+11. `blocker_taxonomy`
+12. `casimir` certificate block
+13. `rubric` pass flags
+14. `blockers`
+15. `final_readiness_verdict`
+16. `readiness_gate_pass`
+17. `normalized_checksum`
+18. `checksum`
 
 ## Lane Checker Minimum Contract
 For reportable profile decisions, lane checker outputs must include:
@@ -56,6 +58,8 @@ Readiness artifacts are reporting overlays and must not override canonical decis
 2. Latest aliases must be updated:
    - `artifacts/research/full-solve/promotion-readiness-suite-latest.json`
    - `docs/audits/research/warp-promotion-readiness-suite-latest.md`
+   - `artifacts/research/full-solve/flagship-bundle-scorecard-latest.json`
+   - `docs/audits/research/warp-flagship-bundle-scorecard-latest.md`
 3. Same commit rerun must preserve normalized checksum (timestamps excluded from checksum set).
 
 ## Fail-Closed Rules
@@ -63,6 +67,14 @@ Readiness artifacts are reporting overlays and must not override canonical decis
 2. Contract mismatch (`reportableReady=true` with non-empty blocked reasons) -> blocker.
 3. Casimir verification non-pass or integrity failure -> blocker.
 4. Non-comparable lanes remain explicit via blocked reason codes; never coerced into PASS.
+5. Bundle scorecard rules are CI-gated: no missing flagship paths, no tier over-claim, and the solar lane remains hypothesis-only (diverge-scored with explicit quarantine reason).
+
+## Canary Pack
+- Fixture: `tests/fixtures/warp-flagship-bundle-scorecard-canary.v1.json`
+- Required cases:
+  1. measured-chain expected-pass canary (`path_casimir_force_to_stress_energy`, `path_stress_energy_to_gr_diagnostics`, `path_gr_diagnostics_to_curvature_proxy`)
+  2. quarantined-solar expected-fail canary (`path_solar_coherence_to_collapse_hypothesis`)
+- CI command: `npm run validate:warp:flagship-scorecard`
 
 ## Traceability
 - owner: `research-governance`

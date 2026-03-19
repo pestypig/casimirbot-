@@ -4,6 +4,11 @@ import crypto from 'node:crypto';
 import { execSync, spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
+import {
+  buildFlagshipBundleScorecard,
+  validateFlagshipBundleScorecard,
+} from './warp-flagship-bundle-scorecard';
+
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
 const GENERATOR_VERSION = '1.0.0';
 const BOUNDARY_STATEMENT =
@@ -17,6 +22,10 @@ const DEFAULT_OUT_JSON = path.join(FULL_SOLVE_DIR, `promotion-readiness-suite-${
 const DEFAULT_OUT_MD = path.join(DOC_AUDIT_DIR, `warp-promotion-readiness-suite-${DATE_STAMP}.md`);
 const DEFAULT_LATEST_JSON = path.join(FULL_SOLVE_DIR, 'promotion-readiness-suite-latest.json');
 const DEFAULT_LATEST_MD = path.join(DOC_AUDIT_DIR, 'warp-promotion-readiness-suite-latest.md');
+const DEFAULT_SCORECARD_JSON = path.join(FULL_SOLVE_DIR, `flagship-bundle-scorecard-${DATE_STAMP}.json`);
+const DEFAULT_SCORECARD_MD = path.join(DOC_AUDIT_DIR, `warp-flagship-bundle-scorecard-${DATE_STAMP}.md`);
+const DEFAULT_SCORECARD_LATEST_JSON = path.join(FULL_SOLVE_DIR, 'flagship-bundle-scorecard-latest.json');
+const DEFAULT_SCORECARD_LATEST_MD = path.join(DOC_AUDIT_DIR, 'warp-flagship-bundle-scorecard-latest.md');
 
 const DEFAULT_INTEGRITY_PATH = path.join(FULL_SOLVE_DIR, 'integrity-parity-suite-latest.json');
 const DEFAULT_CAPSULE_PATH = path.join(FULL_SOLVE_DIR, 'full-solve-reference-capsule-latest.json');
@@ -301,9 +310,35 @@ const collectLaneSummary = (lane: LaneDef): LaneSummary => {
   };
 };
 
+const renderScorecardMarkdown = (scorecard: any): string => {
+  const pathRows = (scorecard.paths ?? [])
+    .map(
+      (entry: any) =>
+        `| ${entry.path_id} | ${entry.status} | ${entry.reason_codes.join(', ')} | ${JSON.stringify(entry.residuals)} | ${entry.max_claim_tier} | ${entry.hypothesis_only === true ? 'true' : 'false'} |`,
+    )
+    .join('\n');
+  return `# Flagship Bundle Scorecard (${DATE_STAMP})
+
+- artifact_type: \`${scorecard.artifact_type}\`
+- bundle_id: \`${scorecard.bundle_id}\`
+- max_claim_tier: \`${scorecard.max_claim_tier}\`
+- match_count: \`${scorecard.match_count}\`
+- converge_count: \`${scorecard.converge_count}\`
+- diverge_count: \`${scorecard.diverge_count}\`
+
+## Paths
+| path_id | status | reason_codes | residuals | max_claim_tier | hypothesis_only |
+|---|---|---|---|---|---|
+${pathRows || '| none | n/a | n/a | {} | n/a | false |'}
+`;
+};
+
 const renderMarkdown = (payload: any): string => {
   const laneRows = (payload.lane_reportable_coverage?.lanes ?? [])
     .map((lane: any) => `| ${lane.laneId} | ${lane.reportableReady === true ? 'true' : 'false'} | ${lane.evidenceCongruence.congruent} | ${lane.evidenceCongruence.incongruent} | ${lane.evidenceCongruence.unknown} | ${lane.blockedReasons.join(', ') || 'none'} |`)
+    .join('\n');
+  const scorecardRows = (payload.bundle_scorecard?.paths ?? [])
+    .map((entry: any) => `| ${entry.path_id} | ${entry.status} | ${entry.reason_codes.join(', ')} | ${JSON.stringify(entry.residuals)} |`)
     .join('\n');
   return `# Promotion Readiness Suite (${payload.generated_on})
 
@@ -320,6 +355,11 @@ const renderMarkdown = (payload: any): string => {
 | lane | reportable_ready | congruent | incongruent | unknown | blocked_reasons |
 |---|---|---:|---:|---:|---|
 ${laneRows || '| none | false | 0 | 0 | 0 | n/a |'}
+
+## Flagship bundle scorecard
+| path_id | status | reason_codes | residuals |
+|---|---|---|---|
+${scorecardRows || '| none | n/a | n/a | {} |'}
 `;
 };
 
@@ -389,6 +429,10 @@ export const runPromotionReadinessSuite = async (options: {
   const outMdPath = options.outMdPath ?? DEFAULT_OUT_MD;
   const latestJsonPath = options.latestJsonPath ?? DEFAULT_LATEST_JSON;
   const latestMdPath = options.latestMdPath ?? DEFAULT_LATEST_MD;
+  const scorecardJsonPath = DEFAULT_SCORECARD_JSON;
+  const scorecardMdPath = DEFAULT_SCORECARD_MD;
+  const scorecardLatestJsonPath = DEFAULT_SCORECARD_LATEST_JSON;
+  const scorecardLatestMdPath = DEFAULT_SCORECARD_LATEST_MD;
   const adapterUrl = options.adapterUrl ?? DEFAULT_ADAPTER_URL;
   const traceOutPath = options.traceOutPath ?? DEFAULT_TRACE_OUT;
   const traceExportOutPath = options.traceExportOutPath ?? DEFAULT_TRACE_EXPORT_OUT;
@@ -461,7 +505,25 @@ export const runPromotionReadinessSuite = async (options: {
   const casimirOk = casimirVerdict === 'PASS' && casimirIntegrityOk && Boolean(casimirCertificateHash);
   if (!casimirOk) addBlocker('casimir_verify_not_pass', 'verification', `verdict=${casimirVerdict} integrityOk=${String(casimirIntegrityOk)} cert=${String(casimirCertificateHash)}`, adapterUrl);
 
-  const criticalFailure = !canonicalDecisionOk || !geometryAllPass || !grObservableSetOk || !externalFreshOk || !casimirOk;
+  const preScorecardCriticalFailure = !canonicalDecisionOk || !geometryAllPass || !grObservableSetOk || !externalFreshOk || !casimirOk;
+  const preScorecardLaneBlockers = blockers.some((entry) => entry.category === 'lane_reportable_blocked');
+  const bundleScorecard = buildFlagshipBundleScorecard({
+    canonicalDecisionOk,
+    geometryPassCount,
+    geometryRequiredCount: REQUIRED_GEOMETRY_CHECKS.length,
+    compatibleObservableCount: Object.values(grStatuses).filter((status) => status === 'compatible').length,
+    totalObservableCount: Object.keys(grStatuses).length,
+    reportableReadyLaneCount: laneSummaries.filter((lane) => lane.reportableReady).length,
+    blockedLaneCount: laneSummaries.filter((lane) => !lane.reportableReady).length,
+    readinessGatePass: !preScorecardCriticalFailure && !preScorecardLaneBlockers,
+    blockerCount: blockers.length,
+  });
+  const bundleScorecardValidation = validateFlagshipBundleScorecard(bundleScorecard);
+  const scorecardRulesOk = bundleScorecardValidation.ok;
+  for (const error of bundleScorecardValidation.errors) {
+    addBlocker(`bundle_scorecard_rule:${error}`, 'contract_violation', error, scorecardJsonPath);
+  }
+  const criticalFailure = preScorecardCriticalFailure || !scorecardRulesOk;
   const hasLaneBlockers = blockers.some((entry) => entry.category === 'lane_reportable_blocked');
 
   const reducedReasonCounts = zeroReducedReasonCounts();
@@ -490,6 +552,11 @@ export const runPromotionReadinessSuite = async (options: {
       lanes: laneSummaries,
     },
     blocker_taxonomy: { reduced_reason_counts: reducedReasonCounts },
+    bundle_scorecard: bundleScorecard,
+    bundle_scorecard_refs: {
+      machine: normalizePath(scorecardLatestJsonPath),
+      human: normalizePath(scorecardLatestMdPath),
+    },
     casimir: {
       verdict: casimirVerdict,
       firstFail: casimirVerifyResponse?.firstFail ?? null,
@@ -549,14 +616,23 @@ export const runPromotionReadinessSuite = async (options: {
   payload.checksum = checksum;
 
   const markdown = renderMarkdown(payload);
+  const scorecardMarkdown = renderScorecardMarkdown(bundleScorecard);
   ensureDirForFile(outJsonPath);
   ensureDirForFile(outMdPath);
   ensureDirForFile(latestJsonPath);
   ensureDirForFile(latestMdPath);
+  ensureDirForFile(scorecardJsonPath);
+  ensureDirForFile(scorecardMdPath);
+  ensureDirForFile(scorecardLatestJsonPath);
+  ensureDirForFile(scorecardLatestMdPath);
   fs.writeFileSync(outJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  fs.writeFileSync(scorecardJsonPath, `${JSON.stringify(bundleScorecard, null, 2)}\n`);
+  fs.writeFileSync(scorecardMdPath, `${scorecardMarkdown}\n`);
+  fs.writeFileSync(scorecardLatestJsonPath, `${JSON.stringify(bundleScorecard, null, 2)}\n`);
+  fs.writeFileSync(scorecardLatestMdPath, `${scorecardMarkdown}\n`);
 
   return {
     ok: payload.final_readiness_verdict !== 'FAIL',

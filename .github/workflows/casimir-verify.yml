@@ -56,6 +56,9 @@ jobs:
       - name: Validate curvature-collapse reproducibility contract
         run: npm run validate:curvature:collapse:contract
 
+      - name: Validate flagship bundle scorecard canaries
+        run: npm run validate:warp:flagship-scorecard
+
       - name: Generate CI reports
         run: npm run reports:ci
 
