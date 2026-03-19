@@ -176,6 +176,18 @@
     },
     "zen-society": {
       "status": "covered_extension"
+    },
+    "needle-hull-mark2-theory": {
+      "status": "unmapped"
+    },
+    "sector-control-runtime": {
+      "status": "unmapped"
+    },
+    "halobank-solar-proof": {
+      "status": "unmapped"
+    },
+    "paper-ingestion-runtime": {
+      "status": "unmapped"
     }
   }
 }
