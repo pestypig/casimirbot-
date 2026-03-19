@@ -26,6 +26,139 @@
       }
     },
     {
+      "id": "physics_casimir_force_measurement__stress_energy_conservation",
+      "root_id": "physics_casimir_force_measurement",
+      "equation_id": "stress_energy_conservation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "nabla_mu T_mu_nu",
+        "rhs": "0"
+      },
+      "residual": {
+        "metric": "covariant_divergence_norm",
+        "comparator": "<=",
+        "threshold": "1.0e-6"
+      },
+      "falsifier": {
+        "condition": "covariant_divergence_norm > 1.0e-6",
+        "evidence": "conservation_violation_trace"
+      }
+    },
+    {
+      "id": "physics_collapse_benchmark__curvature_unit_proxy_contract",
+      "root_id": "physics_collapse_benchmark",
+      "equation_id": "curvature_unit_proxy_contract",
+      "binding": {
+        "operator": "equals",
+        "lhs": "curvature_unit_proxy_contract",
+        "rhs": "curvature_unit_proxy_contract"
+      },
+      "residual": {
+        "metric": "curvature_unit_proxy_contract_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "curvature_unit_proxy_contract_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_collapse_benchmark__uncertainty_propagation",
+      "root_id": "physics_collapse_benchmark",
+      "equation_id": "uncertainty_propagation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "sigma_f^2",
+        "rhs": "sum_i ((partial f / partial x_i)^2 * sigma_x_i^2)"
+      },
+      "residual": {
+        "metric": "uncertainty_calibration_ratio_error",
+        "comparator": "<=",
+        "threshold": "0.10"
+      },
+      "falsifier": {
+        "condition": "uncertainty_calibration_ratio_error > 0.10",
+        "evidence": "coverage_calibration_report"
+      }
+    },
+    {
+      "id": "physics_curvature_proxy__curvature_unit_proxy_contract",
+      "root_id": "physics_curvature_proxy",
+      "equation_id": "curvature_unit_proxy_contract",
+      "binding": {
+        "operator": "equals",
+        "lhs": "curvature_unit_proxy_contract",
+        "rhs": "curvature_unit_proxy_contract"
+      },
+      "residual": {
+        "metric": "curvature_unit_proxy_contract_residual",
+        "comparator": "<=",
+        "threshold": "1.0"
+      },
+      "falsifier": {
+        "condition": "curvature_unit_proxy_contract_residual > 1.0",
+        "evidence": "manual_review"
+      }
+    },
+    {
+      "id": "physics_curvature_proxy__uncertainty_propagation",
+      "root_id": "physics_curvature_proxy",
+      "equation_id": "uncertainty_propagation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "sigma_f^2",
+        "rhs": "sum_i ((partial f / partial x_i)^2 * sigma_x_i^2)"
+      },
+      "residual": {
+        "metric": "uncertainty_calibration_ratio_error",
+        "comparator": "<=",
+        "threshold": "0.10"
+      },
+      "falsifier": {
+        "condition": "uncertainty_calibration_ratio_error > 0.10",
+        "evidence": "coverage_calibration_report"
+      }
+    },
+    {
+      "id": "physics_gr_diagnostics__efe_baseline",
+      "root_id": "physics_gr_diagnostics",
+      "equation_id": "efe_baseline",
+      "binding": {
+        "operator": "equals",
+        "lhs": "G_mu_nu + Lambda * g_mu_nu",
+        "rhs": "(8 * pi * G / c^4) * T_mu_nu"
+      },
+      "residual": {
+        "metric": "einstein_tensor_residual_rms",
+        "comparator": "<=",
+        "threshold": "1.0e-3"
+      },
+      "falsifier": {
+        "condition": "einstein_tensor_residual_rms > 1.0e-3",
+        "evidence": "gr_constraint_gate_report"
+      }
+    },
+    {
+      "id": "physics_gr_diagnostics__stress_energy_conservation",
+      "root_id": "physics_gr_diagnostics",
+      "equation_id": "stress_energy_conservation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "nabla_mu T_mu_nu",
+        "rhs": "0"
+      },
+      "residual": {
+        "metric": "covariant_divergence_norm",
+        "comparator": "<=",
+        "threshold": "1.0e-6"
+      },
+      "falsifier": {
+        "condition": "covariant_divergence_norm > 1.0e-6",
+        "evidence": "conservation_violation_trace"
+      }
+    },
+    {
       "id": "physics_information_dynamics__runtime_safety_gate",
       "root_id": "physics_information_dynamics",
       "equation_id": "runtime_safety_gate",
@@ -142,6 +275,25 @@
       }
     },
     {
+      "id": "physics_solar_coherence_hypothesis__uncertainty_propagation",
+      "root_id": "physics_solar_coherence_hypothesis",
+      "equation_id": "uncertainty_propagation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "sigma_f^2",
+        "rhs": "sum_i ((partial f / partial x_i)^2 * sigma_x_i^2)"
+      },
+      "residual": {
+        "metric": "uncertainty_calibration_ratio_error",
+        "comparator": "<=",
+        "threshold": "0.10"
+      },
+      "falsifier": {
+        "condition": "uncertainty_calibration_ratio_error > 0.10",
+        "evidence": "coverage_calibration_report"
+      }
+    },
+    {
       "id": "physics_spacetime_gr__efe_baseline",
       "root_id": "physics_spacetime_gr",
       "equation_id": "efe_baseline",
@@ -158,6 +310,25 @@
       "falsifier": {
         "condition": "einstein_tensor_residual_rms > 1.0e-3",
         "evidence": "gr_constraint_gate_report"
+      }
+    },
+    {
+      "id": "physics_stress_energy_brick__stress_energy_conservation",
+      "root_id": "physics_stress_energy_brick",
+      "equation_id": "stress_energy_conservation",
+      "binding": {
+        "operator": "equals",
+        "lhs": "nabla_mu T_mu_nu",
+        "rhs": "0"
+      },
+      "residual": {
+        "metric": "covariant_divergence_norm",
+        "comparator": "<=",
+        "threshold": "1.0e-6"
+      },
+      "falsifier": {
+        "condition": "covariant_divergence_norm > 1.0e-6",
+        "evidence": "conservation_violation_trace"
       }
     },
     {
