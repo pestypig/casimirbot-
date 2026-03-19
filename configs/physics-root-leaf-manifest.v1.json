@@ -67,6 +67,63 @@
       ],
       "tree_lane": "physics_runtime_safety_control",
       "tree_path": "docs/knowledge/physics/physics-runtime-safety-control-tree.json"
+    },
+    {
+      "id": "physics_casimir_force_measurement",
+      "name": "Measured Casimir force normalization lane",
+      "equation_refs": [
+        "stress_energy_conservation"
+      ],
+      "tree_lane": "physics_casimir_force_measurement",
+      "tree_path": "docs/knowledge/physics/casimir-force-energy.md"
+    },
+    {
+      "id": "physics_stress_energy_brick",
+      "name": "Stress-energy brick normalization lane",
+      "equation_refs": [
+        "stress_energy_conservation"
+      ],
+      "tree_lane": "physics_stress_energy_brick",
+      "tree_path": "docs/knowledge/physics/stress-energy-tensor.md"
+    },
+    {
+      "id": "physics_gr_diagnostics",
+      "name": "GR diagnostics and evaluator lane",
+      "equation_refs": [
+        "efe_baseline",
+        "stress_energy_conservation"
+      ],
+      "tree_lane": "physics_gr_diagnostics",
+      "tree_path": "docs/knowledge/physics/connection-curvature.md"
+    },
+    {
+      "id": "physics_curvature_proxy",
+      "name": "Curvature proxy and kappa parity lane",
+      "equation_refs": [
+        "curvature_unit_proxy_contract",
+        "uncertainty_propagation"
+      ],
+      "tree_lane": "physics_curvature_proxy",
+      "tree_path": "docs/knowledge/curvature-ledger.md"
+    },
+    {
+      "id": "physics_collapse_benchmark",
+      "name": "Curvature collapse benchmark lane",
+      "equation_refs": [
+        "curvature_unit_proxy_contract",
+        "uncertainty_propagation"
+      ],
+      "tree_lane": "physics_collapse_benchmark",
+      "tree_path": "docs/knowledge/dp-collapse-tree.json"
+    },
+    {
+      "id": "physics_solar_coherence_hypothesis",
+      "name": "Solar coherence hypothesis lane",
+      "equation_refs": [
+        "uncertainty_propagation"
+      ],
+      "tree_lane": "physics_solar_coherence_hypothesis",
+      "tree_path": "docs/knowledge/solar-restoration.md"
     }
   ],
   "leaves": [
@@ -84,6 +141,31 @@
       "id": "leaf_human_ai_financial_safety",
       "prompt_family": "human protection from ai financial hack",
       "statement": "Safety guidance must be constrained by runtime control gates and evidence class."
+    },
+    {
+      "id": "leaf_stress_energy_brick",
+      "prompt_family": "measured casimir force to stress-energy brick",
+      "statement": "Measured Casimir force claims must land in stress-energy brick normalization with dataset IDs, sign conventions, and residual evidence."
+    },
+    {
+      "id": "leaf_gr_diagnostics",
+      "prompt_family": "stress-energy brick to gr diagnostics",
+      "statement": "Stress-energy to GR diagnostic claims must surface field-equation mappings, residuals, and deterministic evaluator checks."
+    },
+    {
+      "id": "leaf_curvature_proxy",
+      "prompt_family": "gr diagnostics to curvature proxy",
+      "statement": "Curvature proxy claims must expose kappa parity, unit locking, and uncertainty metadata before any bridge promotion."
+    },
+    {
+      "id": "leaf_collapse_benchmark",
+      "prompt_family": "curvature proxy to collapse benchmark",
+      "statement": "Collapse benchmark claims must remain diagnostic until preregistered null-competed evidence clears the contract."
+    },
+    {
+      "id": "leaf_solar_collapse_hypothesis",
+      "prompt_family": "solar coherence to collapse hypothesis",
+      "statement": "Solar coherence narratives stay hypothesis-scoped and subordinate to the measured Casimir to collapse benchmark family."
     }
   ],
   "paths": [
@@ -120,7 +202,8 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_FALSIFIER_MISSING"
-      }
+      },
+      "bundle_id": "legacy.root-leaf.audit"
     },
     {
       "id": "path_spacetime_context_to_life",
@@ -154,7 +237,8 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_PATH_INCOMPLETE"
-      }
+      },
+      "bundle_id": "legacy.root-leaf.audit"
     },
     {
       "id": "path_quantum_to_consciousness_bridge",
@@ -186,7 +270,8 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_STRICT_BRIDGE_FAIL"
-      }
+      },
+      "bundle_id": "legacy.root-leaf.audit"
     },
     {
       "id": "path_life_to_runtime_safety_actions",
@@ -218,7 +303,8 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_RUNTIME_SAFETY_MISSING"
-      }
+      },
+      "bundle_id": "legacy.root-leaf.audit"
     },
     {
       "id": "path_information_dynamics_to_life",
@@ -251,7 +337,8 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_INFORMATION_DYNAMICS_PATH_MISSING"
-      }
+      },
+      "bundle_id": "legacy.root-leaf.audit"
     },
     {
       "id": "path_prebiotic_chemistry_to_life",
@@ -283,7 +370,8 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_PREBIOTIC_PATH_MISSING"
-      }
+      },
+      "bundle_id": "legacy.root-leaf.audit"
     },
     {
       "id": "path_runtime_safety_control_to_financial_safety",
@@ -315,6 +403,177 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_RUNTIME_CONTROL_PATH_MISSING"
+      },
+      "bundle_id": "legacy.root-leaf.audit"
+    },
+    {
+      "id": "path_casimir_force_to_stress_energy",
+      "bundle_id": "nhm2.curvature-collapse",
+      "root_id": "physics_casimir_force_measurement",
+      "leaf_id": "leaf_stress_energy_brick",
+      "nodes": [
+        "physics_casimir_force_measurement",
+        "physics_stress_energy_brick",
+        "leaf_stress_energy_brick"
+      ],
+      "dag_bridges": [
+        "bridge-casimir-force-to-measured-mass-normalization",
+        "bridge-measured-mass-normalization-to-stress-energy-brick"
+      ],
+      "falsifier": {
+        "observable": "measured-force-inferred mass normalization with dataset coverage, force-sign parity, and fit residual evidence",
+        "reject_rule": "massDatasetId missing OR massSource != measured OR forceSignParityOk != true OR massFitResidual_rms_rel > 0.10 OR stressEnergyBrickCoverage < 0.95",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
+        "test_refs": [
+          "tests/pipeline-mass-mode.spec.ts",
+          "tests/casimir-inference.spec.ts",
+          "tests/stress-energy-matter.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_CASIMIR_STRESS_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_stress_energy_to_gr_diagnostics",
+      "bundle_id": "nhm2.curvature-collapse",
+      "root_id": "physics_stress_energy_brick",
+      "leaf_id": "leaf_gr_diagnostics",
+      "nodes": [
+        "physics_stress_energy_brick",
+        "physics_spacetime_gr",
+        "physics_gr_diagnostics",
+        "leaf_gr_diagnostics"
+      ],
+      "dag_bridges": [
+        "bridge-stress-energy-brick-to-gr-fieldset",
+        "bridge-gr-fieldset-to-diagnostics-ledger"
+      ],
+      "falsifier": {
+        "observable": "stress-energy brick to GR diagnostics residual parity and evaluator constraint coverage",
+        "reject_rule": "stressEnergyToGRResidual_rms > 0.10 OR grConstraintCoverage < 0.95 OR diagnosticReplayDeterminism != true",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
+        "test_refs": [
+          "tests/stress-energy-units.spec.ts",
+          "tests/stress-energy-matter.spec.ts",
+          "tests/gr-constraint-gate.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_STRESS_GR_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_gr_diagnostics_to_curvature_proxy",
+      "bundle_id": "nhm2.curvature-collapse",
+      "root_id": "physics_gr_diagnostics",
+      "leaf_id": "leaf_curvature_proxy",
+      "nodes": [
+        "physics_gr_diagnostics",
+        "physics_curvature_proxy",
+        "leaf_curvature_proxy"
+      ],
+      "dag_bridges": [
+        "bridge-gr-diagnostics-to-kappa-parity",
+        "bridge-curvature-ledger-to-kappa-proxy"
+      ],
+      "falsifier": {
+        "observable": "equation-grounded kappa parity bridge with unit lock and residual evidence",
+        "reject_rule": "kappaParityResidual_rms > 0.10 OR unitLockOk != true OR curvatureProxyCoverage < 0.95 OR missing residual evidence",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
+        "test_refs": [
+          "tests/stress-energy-units.spec.ts",
+          "tests/atomic-stress-energy-proxy.spec.ts",
+          "tests/physics-equation-backbone.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_GR_CURVATURE_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_curvature_proxy_to_collapse_benchmark",
+      "bundle_id": "nhm2.curvature-collapse",
+      "root_id": "physics_curvature_proxy",
+      "leaf_id": "leaf_collapse_benchmark",
+      "nodes": [
+        "physics_curvature_proxy",
+        "physics_collapse_benchmark",
+        "leaf_collapse_benchmark"
+      ],
+      "dag_bridges": [
+        "bridge-kappa-proxy-to-collapse-benchmark",
+        "bridge-curvature-ledger-to-tau-rc-benchmark"
+      ],
+      "falsifier": {
+        "observable": "prediction-registry-backed curvature proxy to tau/r_c benchmark comparison against preregistered null models",
+        "reject_rule": "predictionRegistryPresent != true OR nullModelComparisonWin != true OR holdoutReady != true OR benchmarkDeterminism != true",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
+        "test_refs": [
+          "tests/collapse-benchmark.phase2.routes.spec.ts",
+          "tests/collapse-benchmark.phase4.estimator.spec.ts",
+          "tests/curvature-collapse-contract.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_CURVATURE_COLLAPSE_BRIDGE_FAIL"
+      }
+    },
+    {
+      "id": "path_solar_coherence_to_collapse_hypothesis",
+      "bundle_id": "nhm2.curvature-collapse",
+      "root_id": "physics_solar_coherence_hypothesis",
+      "leaf_id": "leaf_solar_collapse_hypothesis",
+      "nodes": [
+        "physics_solar_coherence_hypothesis",
+        "physics_information_dynamics",
+        "physics_collapse_benchmark",
+        "leaf_solar_collapse_hypothesis"
+      ],
+      "dag_bridges": [
+        "bridge-solar-coherence-to-collapse-hypothesis",
+        "bridge-information-dynamics-to-hypothesis-quarantine"
+      ],
+      "falsifier": {
+        "observable": "hypothesis-only solar coherence lane with explicit quarantine against measured collapse promotion",
+        "reject_rule": "hypothesisLabelPresent != true OR quarantineStatus != true OR empiricalPromotionRequested == true",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+        "test_refs": [
+          "scripts/validate-physics-root-leaf-manifest.ts",
+          "tests/helix-ask-graph-resolver.spec.ts",
+          "tests/helix-ask-bridge.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_SOLAR_COLLAPSE_HYPOTHESIS_QUARANTINED"
       }
     }
   ],
@@ -331,5 +590,35 @@
       "proxy",
       "inferred"
     ]
-  }
+  },
+  "bridge_bundles": [
+    {
+      "id": "legacy.root-leaf.audit",
+      "summary": "Legacy broad root-to-leaf coverage for life, cosmology, consciousness, and runtime safety claims.",
+      "claim_scope": "runtime_contract",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_entropy_to_life_emergence",
+        "path_spacetime_context_to_life",
+        "path_quantum_to_consciousness_bridge",
+        "path_life_to_runtime_safety_actions",
+        "path_information_dynamics_to_life",
+        "path_prebiotic_chemistry_to_life",
+        "path_runtime_safety_control_to_financial_safety"
+      ]
+    },
+    {
+      "id": "nhm2.curvature-collapse",
+      "summary": "Flagship measured Casimir to curvature-collapse bridge family; promote only by sub-bridge evidence and keep solar coherence quarantined as hypothesis-only.",
+      "claim_scope": "cross_domain",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_casimir_force_to_stress_energy",
+        "path_stress_energy_to_gr_diagnostics",
+        "path_gr_diagnostics_to_curvature_proxy",
+        "path_curvature_proxy_to_collapse_benchmark",
+        "path_solar_coherence_to_collapse_hypothesis"
+      ]
+    }
+  ]
 }

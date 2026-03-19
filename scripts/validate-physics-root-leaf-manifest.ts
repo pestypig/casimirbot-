@@ -30,12 +30,21 @@ type PathMaturityGate = {
 
 type PathEntry = {
   id?: string;
+  bundle_id?: string;
   root_id?: string;
   leaf_id?: string;
   nodes?: string[];
   dag_bridges?: string[];
   falsifier?: PathFalsifier;
   maturity_gate?: PathMaturityGate;
+};
+
+type BridgeBundleEntry = {
+  id?: string;
+  summary?: string;
+  claim_scope?: string;
+  max_claim_tier?: string;
+  path_ids?: string[];
 };
 
 type PhysicsRootLeafManifest = {
@@ -45,6 +54,7 @@ type PhysicsRootLeafManifest = {
   roots?: RootEntry[];
   leaves?: LeafEntry[];
   paths?: PathEntry[];
+  bridge_bundles?: BridgeBundleEntry[];
 };
 
 type UncertaintyModel = {
@@ -73,6 +83,41 @@ const REQUIRED_ROOT_IDS = [
   "physics_biology_life",
   "physics_runtime_safety_control",
 ];
+
+const FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID = "nhm2.curvature-collapse";
+const REQUIRED_FLAGSHIP_PATH_IDS = [
+  "path_casimir_force_to_stress_energy",
+  "path_stress_energy_to_gr_diagnostics",
+  "path_gr_diagnostics_to_curvature_proxy",
+  "path_curvature_proxy_to_collapse_benchmark",
+  "path_solar_coherence_to_collapse_hypothesis",
+] as const;
+
+const REQUIRED_FLAGSHIP_PATH_SHAPES: Record<
+  (typeof REQUIRED_FLAGSHIP_PATH_IDS)[number],
+  { root_id: string; leaf_id: string }
+> = {
+  path_casimir_force_to_stress_energy: {
+    root_id: "physics_casimir_force_measurement",
+    leaf_id: "leaf_stress_energy_brick",
+  },
+  path_stress_energy_to_gr_diagnostics: {
+    root_id: "physics_stress_energy_brick",
+    leaf_id: "leaf_gr_diagnostics",
+  },
+  path_gr_diagnostics_to_curvature_proxy: {
+    root_id: "physics_gr_diagnostics",
+    leaf_id: "leaf_curvature_proxy",
+  },
+  path_curvature_proxy_to_collapse_benchmark: {
+    root_id: "physics_curvature_proxy",
+    leaf_id: "leaf_collapse_benchmark",
+  },
+  path_solar_coherence_to_collapse_hypothesis: {
+    root_id: "physics_solar_coherence_hypothesis",
+    leaf_id: "leaf_solar_collapse_hypothesis",
+  },
+};
 
 
 const REQUIRED_TREE_LANE_BY_ROOT: Record<string, { tree_lane: string; tree_path: string }> = {
@@ -225,6 +270,7 @@ export function validatePhysicsRootLeafManifest(options?: {
   const roots = Array.isArray(manifest.roots) ? manifest.roots : [];
   const leaves = Array.isArray(manifest.leaves) ? manifest.leaves : [];
   const paths = Array.isArray(manifest.paths) ? manifest.paths : [];
+  const bridgeBundles = Array.isArray(manifest.bridge_bundles) ? manifest.bridge_bundles : [];
 
   if (roots.length === 0) {
     errors.push("roots must contain at least one entry");
@@ -234,6 +280,9 @@ export function validatePhysicsRootLeafManifest(options?: {
   }
   if (paths.length === 0) {
     errors.push("paths must contain at least one entry");
+  }
+  if (bridgeBundles.length === 0) {
+    errors.push("bridge_bundles must contain at least one entry");
   }
 
   const rootIds = new Set<string>();
@@ -292,6 +341,7 @@ export function validatePhysicsRootLeafManifest(options?: {
   const coveredLeaves = new Set<string>();
   const coveredRootIds = new Set<string>();
   const pathIds = new Set<string>();
+  const pathEntryById = new Map<string, PathEntry>();
 
   paths.forEach((entry, index) => {
     const loc = `paths[${index}]`;
@@ -302,6 +352,12 @@ export function validatePhysicsRootLeafManifest(options?: {
       errors.push(`${loc}.id duplicated: ${id}`);
     } else {
       pathIds.add(id);
+      pathEntryById.set(id, entry);
+    }
+
+    const bundleId = typeof entry.bundle_id === "string" ? entry.bundle_id.trim() : "";
+    if (!bundleId) {
+      errors.push(`${loc}.bundle_id is required`);
     }
 
     const rootId = typeof entry.root_id === "string" ? entry.root_id.trim() : "";
@@ -444,6 +500,97 @@ export function validatePhysicsRootLeafManifest(options?: {
     errors.push(
       "paths must include at least one canonical entropy-first path ending at leaf_universe_produces_life",
     );
+  }
+
+  const bundleIds = new Set<string>();
+  bridgeBundles.forEach((entry, index) => {
+    const loc = `bridge_bundles[${index}]`;
+    const id = typeof entry.id === "string" ? entry.id.trim() : "";
+    if (!id) {
+      errors.push(`${loc}.id is required`);
+      return;
+    }
+    if (bundleIds.has(id)) {
+      errors.push(`${loc}.id duplicated: ${id}`);
+    }
+    bundleIds.add(id);
+
+    if (typeof entry.summary !== "string" || entry.summary.trim().length === 0) {
+      errors.push(`${loc}.summary is required`);
+    }
+    if (typeof entry.claim_scope !== "string" || entry.claim_scope.trim().length === 0) {
+      errors.push(`${loc}.claim_scope is required`);
+    }
+
+    const maxClaimTier = typeof entry.max_claim_tier === "string" ? entry.max_claim_tier.trim() : "";
+    if (!ALLOWED_CLAIM_TIERS.includes(maxClaimTier as (typeof ALLOWED_CLAIM_TIERS)[number])) {
+      errors.push(`${loc}.max_claim_tier must be one of ${ALLOWED_CLAIM_TIERS.join("|")}`);
+    } else if (tierRank(maxClaimTier) > tierRank(ceiling)) {
+      errors.push(`${loc}.max_claim_tier cannot exceed claim_tier_ceiling`);
+    }
+
+    const bundlePathIds = normalizeList(entry.path_ids);
+    if (bundlePathIds.length === 0) {
+      errors.push(`${loc}.path_ids must be non-empty`);
+    }
+
+    for (const bundlePathId of bundlePathIds) {
+      if (!pathIds.has(bundlePathId)) {
+        errors.push(`${loc}.path_ids references undefined path: ${bundlePathId}`);
+        continue;
+      }
+      const referencedPath = pathEntryById.get(bundlePathId);
+      const referencedBundleId =
+        typeof referencedPath?.bundle_id === "string" ? referencedPath.bundle_id.trim() : "";
+      if (referencedBundleId !== id) {
+        errors.push(`${loc}.path_ids entry ${bundlePathId} must declare bundle_id=${id}`);
+      }
+    }
+  });
+
+  const flagshipBundle = bridgeBundles.find((entry) => entry.id === FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID);
+  if (!flagshipBundle) {
+    errors.push(`missing required bridge bundle: ${FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID}`);
+  } else {
+    if (flagshipBundle.claim_scope !== "cross_domain") {
+      errors.push(
+        `bridge bundle ${FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID} must declare claim_scope=cross_domain`,
+      );
+    }
+    if (flagshipBundle.max_claim_tier !== "diagnostic") {
+      errors.push(
+        `bridge bundle ${FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID} must declare max_claim_tier=diagnostic`,
+      );
+    }
+    const flagshipPathIds = new Set(normalizeList(flagshipBundle.path_ids));
+    for (const requiredPathId of REQUIRED_FLAGSHIP_PATH_IDS) {
+      if (!flagshipPathIds.has(requiredPathId)) {
+        errors.push(
+          `bridge bundle ${FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID} missing required path_id: ${requiredPathId}`,
+        );
+      }
+    }
+  }
+
+  for (const requiredPathId of REQUIRED_FLAGSHIP_PATH_IDS) {
+    const pathEntry = pathEntryById.get(requiredPathId);
+    if (!pathEntry) {
+      errors.push(`missing required flagship path: ${requiredPathId}`);
+      continue;
+    }
+
+    const loc = `path ${requiredPathId}`;
+    if (pathEntry.bundle_id !== FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID) {
+      errors.push(`${loc} must declare bundle_id=${FLAGSHIP_CURVATURE_COLLAPSE_BUNDLE_ID}`);
+    }
+
+    const requiredShape = REQUIRED_FLAGSHIP_PATH_SHAPES[requiredPathId];
+    if (pathEntry.root_id !== requiredShape.root_id) {
+      errors.push(`${loc} must declare root_id=${requiredShape.root_id}`);
+    }
+    if (pathEntry.leaf_id !== requiredShape.leaf_id) {
+      errors.push(`${loc} must declare leaf_id=${requiredShape.leaf_id}`);
+    }
   }
 
   return {
