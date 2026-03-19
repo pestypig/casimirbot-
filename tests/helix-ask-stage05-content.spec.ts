@@ -159,6 +159,52 @@ describe("helix ask stage0.5 content lane", () => {
     expect(result.telemetry.slot_coverage?.missing.length ?? 0).toBeGreaterThan(0);
   });
 
+  it("fails open with deterministic cards on stage05 llm runtime summary errors", async () => {
+    const docPath = writeTestFile(
+      "docs/knowledge/warp/mock-stage05-runtime-fail-open.md",
+      [
+        "# Warp bubble solve overview",
+        "Mechanism summary for how warp solve flow is described in docs.",
+      ].join("\n"),
+    );
+    const codePath = writeTestFile(
+      "modules/warp/mock-stage05-runtime-fail-open.ts",
+      [
+        "export function solveWarpRuntime(alpha: number): number {",
+        "  return alpha * 4;",
+        "}",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: true,
+      query: "How is the warp bubble solved in the codebase?",
+      filePaths: [docPath, codePath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 800,
+      binaryMetadataOnly: true,
+      intentDomain: "repo",
+      summaryRequired: true,
+      hardFailOnSummaryError: true,
+      summarizeWithLlm: async () => {
+        throw new Error("llm_http_429");
+      },
+    });
+
+    expect(result.cards.length).toBeGreaterThan(0);
+    expect(result.telemetry.summary_hard_fail).toBe(true);
+    expect(result.telemetry.summary_fail_reason).toBe("stage05_llm_http_429");
+    expect(result.telemetry.fallback_reason).toBe("stage05_llm_http_429");
+    expect(result.telemetry.slot_coverage?.required ?? []).toEqual(
+      expect.arrayContaining(["definition", "mechanism", "code_path"]),
+    );
+    expect((result.telemetry.slot_coverage?.present?.length ?? 0)).toBeGreaterThan(0);
+  });
+
   it("accepts partial llm summary coverage when at least one card is summarized", async () => {
     const codePath = writeTestFile(
       "server/services/helix-ask/mock-stage05-partial.ts",

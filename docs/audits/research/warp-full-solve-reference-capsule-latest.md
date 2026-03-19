@@ -1,13 +1,13 @@
-# Full-Solve Reference Capsule (2026-03-18)
+# Full-Solve Reference Capsule (2026-03-19)
 
 "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim."
 
 ## Identity
 - artifact_type: `full_solve_reference_capsule/v1`
 - generator_version: `1.3.0`
-- commit_pin: `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`
-- checksum: `d1181f7ed42239abc3ba2c163e45a58988941436d9f5cca0896c4d3345f76414`
-- blocked: `false`
+- commit_pin: `e07f027f3181b7884498c4262cb6bad92085acc6`
+- checksum: `06ac0bf843b936b5958888c51288d2b1e995c547cba9549c0a80a3199b350d34`
+- blocked: `true`
 
 ## Canonical State
 - decision: `REDUCED_ORDER_ADMISSIBLE`
@@ -96,5 +96,9 @@
 ## Blockers
 | id | severity | path | reason |
 |---|---|---|---|
-| none | n/a | n/a | none |
+| commit_pin_mismatch_decision_ledger | HARD | n/a | source commit 7e8cc8952db5649e54d797a3786bd85e3fb0e96b does not match capsule commit pin e07f027f3181b7884498c4262cb6bad92085acc6 |
+| commit_pin_mismatch_evidence_snapshot | HARD | n/a | source commit 7e8cc8952db5649e54d797a3786bd85e3fb0e96b does not match capsule commit pin e07f027f3181b7884498c4262cb6bad92085acc6 |
+| commit_pin_mismatch_geometry_conformance | HARD | n/a | source commit 7e8cc8952db5649e54d797a3786bd85e3fb0e96b does not match capsule commit pin e07f027f3181b7884498c4262cb6bad92085acc6 |
+| commit_pin_mismatch_governance_matrix | HARD | n/a | source commit 7e8cc8952db5649e54d797a3786bd85e3fb0e96b does not match capsule commit pin e07f027f3181b7884498c4262cb6bad92085acc6 |
+| commit_pin_mismatch_promotion_bundle | HARD | n/a | source commit 7e8cc8952db5649e54d797a3786bd85e3fb0e96b does not match capsule commit pin e07f027f3181b7884498c4262cb6bad92085acc6 |
 

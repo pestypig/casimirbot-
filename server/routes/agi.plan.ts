@@ -64,6 +64,7 @@ import { ensureCasimirTelemetry } from "../services/casimir/telemetry";
 import { buildWhyBelongs } from "../services/planner/why-belongs";
 import { getTool, listTools, registerTool } from "../skills";
 import { llmLocalHandler, llmLocalSpec, resolveLlmLocalBackend, type LocalLlmBackend } from "../skills/llm.local";
+import { classifyLlmHttpError, getLlmHttpBreakerSnapshot, type LlmHttpErrorInfo } from "../skills/llm.http";
 import { lumaGenerateHandler, lumaGenerateSpec } from "../skills/luma.generate";
 import {
   noiseGenCoverHandler,
@@ -3750,6 +3751,21 @@ const HELIX_ASK_STAGE05_TIMEOUT_MS = clampNumber(
 );
 const HELIX_ASK_STAGE05_BINARY_METADATA_ONLY =
   String(process.env.HELIX_ASK_STAGE05_BINARY_METADATA_ONLY ?? "1").trim() !== "0";
+const HELIX_ASK_RETRIEVAL_SCOPE_RAW = String(process.env.HELIX_ASK_RETRIEVAL_SCOPE ?? "wide")
+  .trim()
+  .toLowerCase();
+const HELIX_ASK_RETRIEVAL_SCOPE: "standard" | "wide" =
+  HELIX_ASK_RETRIEVAL_SCOPE_RAW === "wide" ? "wide" : "standard";
+const HELIX_ASK_STAGE05_WIDE_SEED_MULTIPLIER = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_WIDE_SEED_MULTIPLIER, 8),
+  4,
+  16,
+);
+const HELIX_ASK_STAGE05_WIDE_EXTRA_PATHS = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_WIDE_EXTRA_PATHS, 48),
+  8,
+  240,
+);
 const HELIX_ASK_RRF_WEIGHT_ATLAS = clampNumber(
   readNumber(process.env.HELIX_ASK_RRF_WEIGHT_ATLAS ?? process.env.VITE_HELIX_ASK_RRF_WEIGHT_ATLAS, 0.9),
   0.1,
@@ -8438,9 +8454,36 @@ type DocHeadingInfo = {
 
 const docHeadingCache = new Map<string, DocHeadingInfo>();
 let docFileCache: string[] | null = null;
+let repoSourceFileCache: string[] | null = null;
 let conceptCardIndex: Map<string, HelixAskConceptCard> | null = null;
 const DOC_FILE_EXT_RE = /\.(md|json|ya?ml|txt)$/i;
 const DOC_FILE_ROOTS = ["docs/ethos", "docs/knowledge", "docs"];
+const REPO_SOURCE_FILE_EXT_RE =
+  /\.(md|json|ya?ml|txt|ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|c|cc|cpp|h|hpp|cs|rb|php|swift|sql)$/i;
+const REPO_SOURCE_ROOTS = [
+  "docs",
+  "server",
+  "modules",
+  "shared",
+  "client/src",
+  "scripts",
+  "cli",
+  "tests",
+];
+const REPO_SOURCE_SKIP_DIRS = new Set([
+  ".git",
+  ".github",
+  ".vscode",
+  ".idea",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  ".next",
+  ".turbo",
+  "artifacts",
+  "reports",
+]);
 
 const listDocFiles = (): string[] => {
   if (docFileCache) return docFileCache;
@@ -8470,6 +8513,38 @@ const listDocFiles = (): string[] => {
   };
   DOC_FILE_ROOTS.forEach((root) => walk(path.resolve(process.cwd(), root)));
   docFileCache = files;
+  return files;
+};
+
+const listRepoSourceFiles = (): string[] => {
+  if (repoSourceFileCache) return repoSourceFileCache;
+  const files: string[] = [];
+  const seen = new Set<string>();
+  const walk = (dir: string): void => {
+    if (!fs.existsSync(dir)) return;
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") && entry.name !== ".well-known") continue;
+      if (REPO_SOURCE_SKIP_DIRS.has(entry.name)) continue;
+      const nextPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(nextPath);
+        continue;
+      }
+      if (!REPO_SOURCE_FILE_EXT_RE.test(entry.name)) continue;
+      const normalized = path.relative(process.cwd(), nextPath).replace(/\\/g, "/");
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      files.push(normalized);
+    }
+  };
+  REPO_SOURCE_ROOTS.forEach((root) => walk(path.resolve(process.cwd(), root)));
+  repoSourceFileCache = files;
   return files;
 };
 
@@ -10331,18 +10406,498 @@ const summarizeStage05CardsWithLlm = async (
 
 const STAGE05_CODE_PATH_HINT_RE =
   /\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|kt|c|cc|cpp|h|hpp|cs|rb|php|swift)$/i;
+const STAGE05_MODULE_RESOLVE_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".py",
+  ".go",
+  ".rs",
+  ".java",
+  ".kt",
+  ".json",
+  ".md",
+];
+const STAGE05_CONNECTIVITY_SCAN_FILE_LIMIT = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_CONNECTIVITY_SCAN_FILE_LIMIT, 10),
+  2,
+  32,
+);
+const STAGE05_CONNECTIVITY_SCAN_CHARS = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_CONNECTIVITY_SCAN_CHARS, 40_000),
+  4_000,
+  300_000,
+);
+const STAGE05_CONNECTIVITY_SIGNAL_TOKEN_LIMIT = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_CONNECTIVITY_SIGNAL_TOKEN_LIMIT, 48),
+  8,
+  120,
+);
+const STAGE05_CONNECTIVITY_MAX_DEPTH = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_CONNECTIVITY_MAX_DEPTH, 2),
+  1,
+  4,
+);
+const STAGE05_CONNECTIVITY_MAX_LINKS_PER_FILE = clampNumber(
+  readNumber(process.env.HELIX_ASK_STAGE05_CONNECTIVITY_MAX_LINKS_PER_FILE, 24),
+  4,
+  64,
+);
+const STAGE05_CONNECTIVITY_STOP_TOKENS = new Set([
+  "const",
+  "function",
+  "return",
+  "import",
+  "export",
+  "from",
+  "class",
+  "interface",
+  "type",
+  "string",
+  "number",
+  "boolean",
+  "object",
+  "array",
+  "value",
+  "values",
+  "result",
+  "results",
+  "default",
+  "build",
+  "resolve",
+  "include",
+  "includes",
+  "using",
+  "used",
+  "true",
+  "false",
+  "null",
+  "undefined",
+  "module",
+  "modules",
+  "docs",
+  "server",
+  "client",
+  "shared",
+  "scripts",
+  "tests",
+  "file",
+  "files",
+  "path",
+  "paths",
+  "line",
+  "lines",
+  "summary",
+  "question",
+  "evidence",
+]);
+const stage05ConnectivityProbeCache = new Map<string, string>();
 
 function normalizeStage05Path(value: string): string {
   return value.replace(/\\/g, "/").trim();
 }
 
+const stage05PathNoExt = (value: string): string => {
+  const normalized = normalizeStage05Path(value).replace(/^\.\//, "").replace(/^\/+/, "");
+  if (!normalized) return "";
+  const ext = path.posix.extname(normalized);
+  const trimmed = ext ? normalized.slice(0, -ext.length) : normalized;
+  return trimmed.replace(/\/index$/i, "");
+};
+
+const readStage05ConnectivityProbeText = (filePath: string): string => {
+  const normalized = normalizeStage05Path(filePath);
+  if (!normalized) return "";
+  const cacheKey = normalized.toLowerCase();
+  const cached = stage05ConnectivityProbeCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const absolute = path.resolve(process.cwd(), normalized);
+  if (!fs.existsSync(absolute)) {
+    stage05ConnectivityProbeCache.set(cacheKey, "");
+    return "";
+  }
+  let raw = "";
+  try {
+    raw = fs.readFileSync(absolute, "utf8");
+  } catch {
+    raw = "";
+  }
+  const clipped = raw.slice(0, STAGE05_CONNECTIVITY_SCAN_CHARS);
+  stage05ConnectivityProbeCache.set(cacheKey, clipped);
+  return clipped;
+};
+
+const extractStage05ImportSpecsFromText = (text: string): string[] => {
+  if (!text.trim()) return [];
+  const specs = new Set<string>();
+  const push = (value: string): void => {
+    const cleaned = value.trim().replace(/^['"]|['"]$/g, "");
+    if (!cleaned || cleaned.startsWith("node:")) return;
+    if (cleaned.length > 200) return;
+    specs.add(cleaned);
+  };
+  const fromImportRe = /import\s+[^'"\n]+from\s+["']([^"']+)["']/g;
+  const sideEffectImportRe = /import\s+["']([^"']+)["']/g;
+  const requireRe = /require\(\s*["']([^"']+)["']\s*\)/g;
+  const pyFromRe = /from\s+([a-zA-Z0-9_./-]+)\s+import\s+/g;
+  const pyImportRe = /import\s+([a-zA-Z0-9_./-]+)(?:\s+as\s+[a-zA-Z0-9_]+)?/g;
+  for (const match of text.matchAll(fromImportRe)) push(String(match[1] ?? ""));
+  for (const match of text.matchAll(sideEffectImportRe)) push(String(match[1] ?? ""));
+  for (const match of text.matchAll(requireRe)) push(String(match[1] ?? ""));
+  for (const match of text.matchAll(pyFromRe)) push(String(match[1] ?? "").replace(/\./g, "/"));
+  for (const match of text.matchAll(pyImportRe)) push(String(match[1] ?? "").replace(/\./g, "/"));
+  return Array.from(specs);
+};
+
+const extractStage05PathHintsFromText = (text: string): string[] => {
+  const hints = new Set<string>();
+  for (const raw of extractFilePathsFromText(text)) {
+    const normalized = normalizeStage05Path(raw);
+    if (!normalized) continue;
+    hints.add(normalized);
+  }
+  return Array.from(hints);
+};
+
+const extractStage05SignalTokensFromText = (text: string): string[] => {
+  if (!text.trim()) return [];
+  const counts = new Map<string, number>();
+  const add = (tokenValue: string): void => {
+    const token = tokenValue.trim().toLowerCase();
+    if (token.length < 4) return;
+    if (STAGE05_CONNECTIVITY_STOP_TOKENS.has(token)) return;
+    if (/^[0-9]+$/.test(token)) return;
+    counts.set(token, (counts.get(token) ?? 0) + 1);
+  };
+  for (const match of text.matchAll(/[A-Za-z][A-Za-z0-9_-]{3,}/g)) {
+    add(String(match[0] ?? ""));
+  }
+  const ranked = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]))
+    .slice(0, STAGE05_CONNECTIVITY_SIGNAL_TOKEN_LIMIT)
+    .map(([token]) => token);
+  return ranked;
+};
+
+const resolveStage05ImportSpecToPaths = (args: {
+  seedPath: string;
+  spec: string;
+  sourceByLower: Map<string, string>;
+  sourceNoExtByLower: Map<string, string[]>;
+}): string[] => {
+  const specRaw = String(args.spec ?? "").trim();
+  if (!specRaw) return [];
+  const normalizedSpec = specRaw
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\?.*$/, "")
+    .replace(/#.*$/, "")
+    .replace(/\\/g, "/");
+  if (!normalizedSpec) return [];
+  const candidates = new Set<string>();
+  const seedDir = path.posix.dirname(normalizeStage05Path(args.seedPath));
+  const tryNoExt = (rawNoExt: string): void => {
+    const normalizedNoExt = stage05PathNoExt(rawNoExt);
+    if (!normalizedNoExt) return;
+    const directNoExtHits = args.sourceNoExtByLower.get(normalizedNoExt.toLowerCase()) ?? [];
+    directNoExtHits.forEach((entry) => candidates.add(entry));
+    for (const ext of STAGE05_MODULE_RESOLVE_EXTENSIONS) {
+      const full = `${normalizedNoExt}${ext}`;
+      const direct = args.sourceByLower.get(full.toLowerCase());
+      if (direct) candidates.add(direct);
+      const nested = args.sourceByLower.get(`${normalizedNoExt}/index${ext}`.toLowerCase());
+      if (nested) candidates.add(nested);
+    }
+  };
+  const aliasCandidateSpecs: string[] = [];
+  if (normalizedSpec.startsWith("./") || normalizedSpec.startsWith("../")) {
+    aliasCandidateSpecs.push(path.posix.normalize(path.posix.join(seedDir, normalizedSpec)));
+  } else if (normalizedSpec.startsWith("@/")) {
+    aliasCandidateSpecs.push(normalizedSpec.slice(2));
+  } else if (normalizedSpec.startsWith("~/")) {
+    aliasCandidateSpecs.push(normalizedSpec.slice(2));
+  } else if (normalizedSpec.startsWith("@shared/")) {
+    aliasCandidateSpecs.push(`shared/${normalizedSpec.slice("@shared/".length)}`);
+  } else if (normalizedSpec.startsWith("@server/")) {
+    aliasCandidateSpecs.push(`server/${normalizedSpec.slice("@server/".length)}`);
+  } else if (normalizedSpec.startsWith("@client/")) {
+    aliasCandidateSpecs.push(`client/src/${normalizedSpec.slice("@client/".length)}`);
+  } else if (normalizedSpec.startsWith("@modules/")) {
+    aliasCandidateSpecs.push(`modules/${normalizedSpec.slice("@modules/".length)}`);
+  } else if (normalizedSpec.startsWith("/")) {
+    aliasCandidateSpecs.push(normalizedSpec.slice(1));
+  } else {
+    aliasCandidateSpecs.push(normalizedSpec);
+  }
+  for (const aliasSpec of aliasCandidateSpecs) {
+    tryNoExt(aliasSpec);
+  }
+  return Array.from(candidates);
+};
+
+const collectWideStage05PathCandidates = (args: {
+  question: string;
+  existingPaths: Iterable<string>;
+  limit: number;
+}): {
+  candidates: Array<{ path: string; score: number; source: "lexical" | "connectivity" | "mixed" }>;
+  seedSignalTokenCount: number;
+  connectedHintPathCount: number;
+} => {
+  const normalizedQuestion = String(args.question ?? "").trim().toLowerCase();
+  const questionTokens = dedupeTokens(tokenizeAskQuery(args.question))
+    .map((token) => token.toLowerCase())
+    .filter((token) => token.length >= 4);
+  if (!normalizedQuestion || questionTokens.length === 0 || args.limit <= 0) {
+    return { candidates: [], seedSignalTokenCount: 0, connectedHintPathCount: 0 };
+  }
+  const sourceFiles = listRepoSourceFiles()
+    .map((entry) => normalizeStage05Path(entry))
+    .filter(Boolean);
+  const existing = new Set(
+    Array.from(args.existingPaths)
+      .map((entry) => normalizeStage05Path(entry).toLowerCase())
+      .filter(Boolean),
+  );
+  const sourceByLower = new Map<string, string>();
+  const sourceNoExtByLower = new Map<string, string[]>();
+  const registerSourcePath = (rawPath: string): void => {
+    const normalizedPath = normalizeStage05Path(rawPath);
+    if (!normalizedPath) return;
+    sourceByLower.set(normalizedPath.toLowerCase(), normalizedPath);
+    const noExt = stage05PathNoExt(normalizedPath).toLowerCase();
+    if (!noExt) return;
+    const existingNoExt = sourceNoExtByLower.get(noExt) ?? [];
+    if (!existingNoExt.includes(normalizedPath)) {
+      existingNoExt.push(normalizedPath);
+      sourceNoExtByLower.set(noExt, existingNoExt);
+    }
+  };
+  sourceFiles.forEach(registerSourcePath);
+
+  const scored = new Map<
+    string,
+    { score: number; lexical: boolean; connectivity: boolean }
+  >();
+  const upsertScored = (candidatePath: string, score: number, source: "lexical" | "connectivity"): void => {
+    const normalizedPath = normalizeStage05Path(candidatePath);
+    if (!normalizedPath || score <= 0) return;
+    const dedupeKey = normalizedPath.toLowerCase();
+    if (existing.has(dedupeKey)) return;
+    const prior = scored.get(dedupeKey);
+    const lexical = source === "lexical";
+    const connectivity = source === "connectivity";
+    if (!prior) {
+      scored.set(dedupeKey, { score, lexical, connectivity });
+      return;
+    }
+    scored.set(dedupeKey, {
+      score: Math.max(prior.score, score),
+      lexical: prior.lexical || lexical,
+      connectivity: prior.connectivity || connectivity,
+    });
+  };
+
+  const seedSignalTokens = new Map<string, number>();
+  const connectedHintPaths = new Set<string>();
+  const connectedPathDepth = new Map<string, number>();
+  const connectivityQuestionHitScore = new Map<string, number>();
+  const setConnectedPathDepth = (candidatePath: string, depth: number): string | null => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized) return null;
+    const resolved = sourceByLower.get(normalized.toLowerCase()) ?? normalized;
+    const dedupeKey = resolved.toLowerCase();
+    if (existing.has(dedupeKey)) return null;
+    const boundedDepth = Math.max(1, depth);
+    const priorDepth = connectedPathDepth.get(dedupeKey);
+    if (priorDepth === undefined || boundedDepth < priorDepth) {
+      connectedPathDepth.set(dedupeKey, boundedDepth);
+    }
+    connectedHintPaths.add(resolved);
+    return resolved;
+  };
+  const bumpConnectivityQuestionHitScore = (candidatePath: string, score: number): void => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized || score <= 0) return;
+    const dedupeKey = normalized.toLowerCase();
+    const prior = connectivityQuestionHitScore.get(dedupeKey) ?? 0;
+    if (score > prior) {
+      connectivityQuestionHitScore.set(dedupeKey, score);
+    }
+  };
+  const queue: Array<{ path: string; depth: number }> = [];
+  const queuedDepth = new Map<string, number>();
+  const enqueuePath = (candidatePath: string, depth: number): void => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized) return;
+    if (depth > STAGE05_CONNECTIVITY_MAX_DEPTH) return;
+    const dedupeKey = normalized.toLowerCase();
+    const priorDepth = queuedDepth.get(dedupeKey);
+    if (priorDepth !== undefined && priorDepth <= depth) return;
+    queuedDepth.set(dedupeKey, depth);
+    queue.push({ path: normalized, depth });
+  };
+  const seedPaths = Array.from(existing).slice(0, STAGE05_CONNECTIVITY_SCAN_FILE_LIMIT);
+  for (const seedPathLower of seedPaths) {
+    const seedPath = sourceByLower.get(seedPathLower) ?? seedPathLower;
+    enqueuePath(seedPath, 0);
+  }
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) break;
+    const seedText = readStage05ConnectivityProbeText(current.path);
+    if (!seedText.trim()) continue;
+    const questionHitCount = questionTokens.reduce(
+      (count, token) => (seedText.toLowerCase().includes(token) ? count + 1 : count),
+      0,
+    );
+    if (questionHitCount > 0) {
+      bumpConnectivityQuestionHitScore(
+        current.path,
+        Math.min(10, questionHitCount * 2 + (current.depth === 0 ? 2 : 0)),
+      );
+    }
+    const tokenWeight = current.depth === 0 ? 1 : current.depth === 1 ? 0.75 : 0.5;
+    for (const token of extractStage05SignalTokensFromText(seedText)) {
+      const prior = seedSignalTokens.get(token) ?? 0;
+      seedSignalTokens.set(token, prior + tokenWeight);
+    }
+    const maxLinks = Math.max(4, STAGE05_CONNECTIVITY_MAX_LINKS_PER_FILE);
+    const pathHints = extractStage05PathHintsFromText(seedText).slice(0, maxLinks);
+    for (const pathHint of pathHints) {
+      const resolvedHint = sourceByLower.get(normalizeStage05Path(pathHint).toLowerCase());
+      if (!resolvedHint) continue;
+      const registered = setConnectedPathDepth(resolvedHint, current.depth + 1);
+      if (registered) enqueuePath(registered, current.depth + 1);
+    }
+    const importSpecs = extractStage05ImportSpecsFromText(seedText).slice(0, maxLinks);
+    for (const importSpec of importSpecs) {
+      const resolvedPaths = resolveStage05ImportSpecToPaths({
+        seedPath: current.path,
+        spec: importSpec,
+        sourceByLower,
+        sourceNoExtByLower,
+      }).slice(0, maxLinks);
+      for (const resolvedPath of resolvedPaths) {
+        const registered = setConnectedPathDepth(resolvedPath, current.depth + 1);
+        if (registered) enqueuePath(registered, current.depth + 1);
+      }
+    }
+  }
+
+  for (const connectedPath of connectedHintPaths) {
+    const dedupeKey = connectedPath.toLowerCase();
+    const depth = connectedPathDepth.get(dedupeKey) ?? 1;
+    const depthScore = Math.max(8, 22 - (depth - 1) * 5);
+    const questionHitScore = connectivityQuestionHitScore.get(dedupeKey) ?? 0;
+    const kindBoost = STAGE05_CODE_PATH_HINT_RE.test(connectedPath) || isDocEvidencePath(connectedPath) ? 2 : 0;
+    upsertScored(connectedPath, depthScore + questionHitScore + kindBoost, "connectivity");
+  }
+
+  const rankedSeedTokens = Array.from(seedSignalTokens.entries())
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]))
+    .slice(0, STAGE05_CONNECTIVITY_SIGNAL_TOKEN_LIMIT);
+  for (const filePath of sourceFiles) {
+    const normalizedPath = normalizeStage05Path(filePath);
+    if (!normalizedPath) continue;
+    const dedupeKey = normalizedPath.toLowerCase();
+    if (existing.has(dedupeKey)) continue;
+    const pathLower = dedupeKey;
+    let score = 0;
+    for (const token of questionTokens) {
+      if (pathLower.includes(token)) score += 1;
+    }
+    const baseName = path.basename(pathLower);
+    for (const token of questionTokens) {
+      if (baseName.includes(token)) score += 1;
+    }
+    for (const [token, freq] of rankedSeedTokens) {
+      if (pathLower.includes(token)) score += 1 + Math.min(1.5, freq * 0.4);
+      if (baseName.includes(token)) score += 1;
+    }
+    const connectivityDepth = connectedPathDepth.get(dedupeKey);
+    if (connectivityDepth !== undefined) {
+      score += Math.max(6, 16 - (connectivityDepth - 1) * 4);
+    }
+    const probeEligible = score >= 2 || connectivityDepth !== undefined;
+    if (probeEligible) {
+      const probeText = readStage05ConnectivityProbeText(normalizedPath);
+      if (probeText.trim()) {
+        const probeLower = probeText.toLowerCase();
+        const probeQuestionHits = questionTokens.reduce(
+          (count, token) => (probeLower.includes(token) ? count + 1 : count),
+          0,
+        );
+        if (probeQuestionHits > 0) {
+          score += Math.min(10, probeQuestionHits * 2);
+        }
+      }
+    }
+    if (isCodeEvidencePath(normalizedPath)) score += 1;
+    if (isDocEvidencePath(normalizedPath)) score += 1;
+    if (score > 0) upsertScored(normalizedPath, score, "lexical");
+  }
+  const sourceRank = (source: "lexical" | "connectivity" | "mixed"): number =>
+    source === "connectivity" ? 3 : source === "mixed" ? 2 : 1;
+  const candidates = Array.from(scored.entries())
+    .map(([pathLower, details]) => ({
+      path: sourceByLower.get(pathLower) ?? pathLower,
+      score: details.score,
+      source: details.connectivity
+        ? details.lexical
+          ? ("mixed" as const)
+          : ("connectivity" as const)
+        : ("lexical" as const),
+    }))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        sourceRank(b.source) - sourceRank(a.source) ||
+        a.path.localeCompare(b.path),
+    )
+    .slice(0, args.limit);
+  return {
+    candidates,
+    seedSignalTokenCount: rankedSeedTokens.length,
+    connectedHintPathCount: connectedHintPaths.size,
+  };
+};
+
 function buildStage05InputPaths(args: {
+  question: string;
   stage0Paths: Iterable<string>;
   byPath: Map<string, AskCandidate>;
   seedPaths?: Iterable<string>;
   maxFiles: number;
+  retrievalScope: "standard" | "wide";
   intentDomain?: "general" | "repo" | "hybrid" | "falsifiable";
-}): string[] {
+}): {
+  paths: string[];
+  wideAddedCount: number;
+  connectivityAddedCount: number;
+  seedSignalTokenCount: number;
+  connectedHintPathCount: number;
+} {
+  const wideMode = args.retrievalScope === "wide";
+  const scoreByPath = new Map<string, number>();
+  for (const candidate of args.byPath.values()) {
+    const normalized = normalizeStage05Path(candidate.filePath);
+    if (!normalized) continue;
+    const score = Math.max(
+      readNumber((candidate as { score?: number }).score) ?? 0,
+      readNumber((candidate as { rrfScore?: number }).rrfScore) ?? 0,
+    );
+    const prior = scoreByPath.get(normalized) ?? 0;
+    if (score > prior) {
+      scoreByPath.set(normalized, score);
+    }
+  }
+  const resolveCandidateScore = (value: string): number => {
+    const normalized = normalizeStage05Path(value);
+    return normalized ? scoreByPath.get(normalized) ?? 0 : 0;
+  };
   const stage0Ordered = Array.from(
     new Set(
       Array.from(args.stage0Paths)
@@ -10354,7 +10909,10 @@ function buildStage05InputPaths(args: {
     .sort((a, b) => b.score - a.score || a.filePath.localeCompare(b.filePath))
     .map((candidate) => normalizeStage05Path(candidate.filePath))
     .filter(Boolean);
-  const maxSeedCount = Math.max(args.maxFiles, args.maxFiles * 4);
+  const maxSeedCount = Math.max(
+    args.maxFiles,
+    args.maxFiles * (wideMode ? HELIX_ASK_STAGE05_WIDE_SEED_MULTIPLIER : 4),
+  );
   const minSeedCount = Math.max(2, Math.min(args.maxFiles, 6));
   const intentNeedsCodeSupport =
     args.intentDomain === "repo" ||
@@ -10362,6 +10920,29 @@ function buildStage05InputPaths(args: {
     args.intentDomain === "falsifiable";
   const selected: string[] = [];
   const seen = new Set<string>();
+  const selectedPriority = new Map<string, number>();
+  const selectedConnectivity = new Set<string>();
+  const selectedExplicitSeeds = new Set<string>();
+  const selectedStage0 = new Set<string>();
+  const markPriority = (candidatePath: string, score: number): void => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized || !Number.isFinite(score)) return;
+    const prior = selectedPriority.get(normalized) ?? Number.NEGATIVE_INFINITY;
+    if (score > prior) selectedPriority.set(normalized, score);
+  };
+  const markSelectedOrigin = (
+    candidatePath: string,
+    options?: { stage0?: boolean; explicitSeed?: boolean; connectivity?: boolean; score?: number },
+  ): void => {
+    const normalized = normalizeStage05Path(candidatePath);
+    if (!normalized) return;
+    if (options?.stage0) selectedStage0.add(normalized);
+    if (options?.explicitSeed) selectedExplicitSeeds.add(normalized);
+    if (options?.connectivity) selectedConnectivity.add(normalized);
+    if (typeof options?.score === "number") {
+      markPriority(normalized, options.score);
+    }
+  };
   const pushSelected = (candidatePath: string): boolean => {
     const normalized = normalizeStage05Path(candidatePath);
     if (!normalized || seen.has(normalized)) return false;
@@ -10369,30 +10950,59 @@ function buildStage05InputPaths(args: {
     selected.push(normalized);
     return true;
   };
+  let wideAddedCount = 0;
+  let connectivityAddedCount = 0;
+  let seedSignalTokenCount = 0;
+  let connectedHintPathCount = 0;
   for (const candidatePath of stage0Ordered) {
     if (selected.length >= maxSeedCount) break;
-    pushSelected(candidatePath);
+    if (pushSelected(candidatePath)) {
+      markSelectedOrigin(candidatePath, {
+        stage0: true,
+        score:
+          40 +
+          resolveCandidateScore(candidatePath) * 2 +
+          (STAGE05_CODE_PATH_HINT_RE.test(candidatePath) ? 4 : isDocEvidencePath(candidatePath) ? 3 : 1),
+      });
+    }
   }
   if (args.seedPaths) {
     for (const seedPath of args.seedPaths) {
       if (selected.length >= maxSeedCount) break;
-      pushSelected(seedPath);
+      if (pushSelected(seedPath)) {
+        markSelectedOrigin(seedPath, {
+          explicitSeed: true,
+          score: 85 + resolveCandidateScore(seedPath) * 2,
+        });
+      }
     }
   }
   const selectedHasCode = (): boolean =>
     selected.some((pathValue) => STAGE05_CODE_PATH_HINT_RE.test(pathValue));
-  const replaceOneDocWith = (candidatePath: string): void => {
+  const replaceOneDocWith = (candidatePath: string, scoreBoost = 0): void => {
     const normalized = normalizeStage05Path(candidatePath);
     if (!normalized || seen.has(normalized)) return;
     if (selected.length < maxSeedCount) {
-      pushSelected(normalized);
+      if (pushSelected(normalized)) {
+        markSelectedOrigin(normalized, {
+          score: 55 + resolveCandidateScore(normalized) * 2 + scoreBoost,
+        });
+      }
       return;
     }
     const docIndex = selected.findIndex((entry) => !STAGE05_CODE_PATH_HINT_RE.test(entry));
     if (docIndex < 0) return;
-    seen.delete(selected[docIndex] ?? "");
+    const evicted = selected[docIndex] ?? "";
+    seen.delete(evicted);
+    selectedPriority.delete(evicted);
+    selectedConnectivity.delete(evicted);
+    selectedExplicitSeeds.delete(evicted);
+    selectedStage0.delete(evicted);
     selected[docIndex] = normalized;
     seen.add(normalized);
+    markSelectedOrigin(normalized, {
+      score: 55 + resolveCandidateScore(normalized) * 2 + scoreBoost,
+    });
   };
   const ensureCodeSupport = (): void => {
     if (selectedHasCode()) return;
@@ -10400,20 +11010,104 @@ function buildStage05InputPaths(args: {
       stage0Ordered.find((entry) => STAGE05_CODE_PATH_HINT_RE.test(entry)) ??
       rankedCandidates.find((entry) => STAGE05_CODE_PATH_HINT_RE.test(entry));
     if (!codeCandidate) return;
-    replaceOneDocWith(codeCandidate);
+    replaceOneDocWith(codeCandidate, 18);
   };
   const shouldAugment = selected.length < minSeedCount || (intentNeedsCodeSupport && !selectedHasCode());
   if (shouldAugment) {
     if (intentNeedsCodeSupport) ensureCodeSupport();
     for (const candidatePath of rankedCandidates) {
       if (selected.length >= maxSeedCount) break;
-      pushSelected(candidatePath);
+      if (pushSelected(candidatePath)) {
+        markSelectedOrigin(candidatePath, {
+          score:
+            32 +
+            resolveCandidateScore(candidatePath) * 2 +
+            (STAGE05_CODE_PATH_HINT_RE.test(candidatePath) ? 5 : isDocEvidencePath(candidatePath) ? 2 : 0),
+        });
+      }
+    }
+  }
+  if (wideMode) {
+    const wideCandidates = collectWideStage05PathCandidates({
+      question: args.question,
+      existingPaths: selected,
+      limit: HELIX_ASK_STAGE05_WIDE_EXTRA_PATHS,
+    });
+    seedSignalTokenCount = wideCandidates.seedSignalTokenCount;
+    connectedHintPathCount = wideCandidates.connectedHintPathCount;
+    for (const candidatePath of wideCandidates.candidates) {
+      if (selected.length >= maxSeedCount) break;
+      if (pushSelected(candidatePath.path)) {
+        wideAddedCount += 1;
+        const hasConnectivitySignal =
+          candidatePath.source === "connectivity" || candidatePath.source === "mixed";
+        markSelectedOrigin(candidatePath.path, {
+          connectivity: hasConnectivitySignal,
+          score:
+            72 +
+            resolveCandidateScore(candidatePath.path) * 2 +
+            candidatePath.score +
+            (candidatePath.source === "connectivity"
+              ? 24
+              : candidatePath.source === "mixed"
+                ? 16
+                : 6),
+        });
+        if (hasConnectivitySignal) {
+          connectivityAddedCount += 1;
+        }
+      }
     }
   }
   if (intentNeedsCodeSupport) {
     ensureCodeSupport();
   }
-  return selected.slice(0, maxSeedCount);
+  const priorityScore = (value: string): number => {
+    const normalized = normalizeStage05Path(value);
+    if (!normalized) return 0;
+    let score = selectedPriority.get(normalized) ?? resolveCandidateScore(normalized);
+    if (selectedExplicitSeeds.has(normalized)) score += 30;
+    if (selectedConnectivity.has(normalized)) score += 22;
+    if (selectedStage0.has(normalized)) score += 4;
+    if (STAGE05_CODE_PATH_HINT_RE.test(normalized)) score += 2;
+    if (isDocEvidencePath(normalized)) score += 2;
+    return score;
+  };
+  const sorted = [...selected].sort(
+    (left, right) => priorityScore(right) - priorityScore(left) || left.localeCompare(right),
+  );
+  const frontLimit = Math.max(4, Math.min(args.maxFiles, sorted.length));
+  const front: string[] = [];
+  const used = new Set<string>();
+  const pullBest = (predicate?: (value: string) => boolean): string | null => {
+    for (const candidatePath of sorted) {
+      if (used.has(candidatePath)) continue;
+      if (predicate && !predicate(candidatePath)) continue;
+      used.add(candidatePath);
+      front.push(candidatePath);
+      return candidatePath;
+    }
+    return null;
+  };
+  pullBest((value) => selectedExplicitSeeds.has(value));
+  if (intentNeedsCodeSupport) {
+    pullBest((value) => STAGE05_CODE_PATH_HINT_RE.test(value));
+  }
+  pullBest((value) => isDocEvidencePath(value));
+  if (wideMode && selectedConnectivity.size > 0) {
+    pullBest((value) => selectedConnectivity.has(value));
+  }
+  while (front.length < frontLimit) {
+    if (!pullBest()) break;
+  }
+  const reordered = [...front, ...sorted.filter((entry) => !used.has(entry))];
+  return {
+    paths: reordered.slice(0, maxSeedCount),
+    wideAddedCount,
+    connectivityAddedCount,
+    seedSignalTokenCount,
+    connectedHintPathCount,
+  };
 }
 
 async function collectGitTrackedCandidatesForQueries(
@@ -10564,13 +11258,16 @@ async function collectGitTrackedCandidatesForQueries(
     options?.intentDomain === "repo" ||
     options?.intentDomain === "hybrid" ||
     options?.intentDomain === "falsifiable";
-  const stage05InputPaths = buildStage05InputPaths({
+  const stage05InputPathBuild = buildStage05InputPaths({
+    question,
     stage0Paths: stage0PathSet.values(),
     byPath,
     seedPaths: stage05QueryConstraints.explicitAnchorPaths,
     maxFiles: HELIX_ASK_STAGE05_MAX_FILES,
+    retrievalScope: HELIX_ASK_RETRIEVAL_SCOPE,
     intentDomain: options?.intentDomain,
   });
+  const stage05InputPaths = stage05InputPathBuild.paths;
   if (HELIX_ASK_STAGE05_ENABLED && stage05IntentEligible && stage05InputPaths.length > 0) {
     const stage05Result = await buildStage05EvidenceCards({
       enabled: true,
@@ -10592,7 +11289,15 @@ async function collectGitTrackedCandidatesForQueries(
       intentDomain: options?.intentDomain,
       summarizeWithLlm: summarizeStage05CardsWithLlm,
     });
-    stage05Telemetry = stage05Result.telemetry;
+    stage05Telemetry = {
+      ...stage05Result.telemetry,
+      input_scope: HELIX_ASK_RETRIEVAL_SCOPE,
+      input_path_count: stage05InputPaths.length,
+      input_wide_added_count: stage05InputPathBuild.wideAddedCount,
+      input_connectivity_added_count: stage05InputPathBuild.connectivityAddedCount,
+      input_seed_signal_token_count: stage05InputPathBuild.seedSignalTokenCount,
+      input_connected_hint_path_count: stage05InputPathBuild.connectedHintPathCount,
+    };
     if (stage05Result.cards.length > 0) {
       stage05Cards = mergeStage05Cards(stage05Cards, stage05Result.cards);
       const cardsByPath = new Map<string, Stage05EvidenceCard>();
@@ -10640,6 +11345,12 @@ async function collectGitTrackedCandidatesForQueries(
       two_pass_used: false,
       two_pass_batches: 0,
       overflow_policy: HELIX_ASK_STAGE05_FULLFILE_OVERFLOW_POLICY,
+      input_scope: HELIX_ASK_RETRIEVAL_SCOPE,
+      input_path_count: stage05InputPaths.length,
+      input_wide_added_count: stage05InputPathBuild.wideAddedCount,
+      input_connectivity_added_count: stage05InputPathBuild.connectivityAddedCount,
+      input_seed_signal_token_count: stage05InputPathBuild.seedSignalTokenCount,
+      input_connected_hint_path_count: stage05InputPathBuild.connectedHintPathCount,
     };
   }
 
@@ -11114,6 +11825,24 @@ function mergeStage05Telemetry(
     two_pass_used: current.two_pass_used || next.two_pass_used,
     two_pass_batches: current.two_pass_batches + next.two_pass_batches,
     overflow_policy: next.overflow_policy ?? current.overflow_policy ?? "single_pass",
+    input_scope: next.input_scope ?? current.input_scope,
+    input_path_count: Math.max(current.input_path_count ?? 0, next.input_path_count ?? 0),
+    input_wide_added_count: Math.max(
+      current.input_wide_added_count ?? 0,
+      next.input_wide_added_count ?? 0,
+    ),
+    input_connectivity_added_count: Math.max(
+      current.input_connectivity_added_count ?? 0,
+      next.input_connectivity_added_count ?? 0,
+    ),
+    input_seed_signal_token_count: Math.max(
+      current.input_seed_signal_token_count ?? 0,
+      next.input_seed_signal_token_count ?? 0,
+    ),
+    input_connected_hint_path_count: Math.max(
+      current.input_connected_hint_path_count ?? 0,
+      next.input_connected_hint_path_count ?? 0,
+    ),
   };
 }
 
@@ -11170,6 +11899,39 @@ function applyStage05DebugFields(
   debugPayload.stage05_used = nextUsed;
   const prevFileCount = readNumber(debugPayload.stage05_file_count) ?? 0;
   debugPayload.stage05_file_count = Math.max(prevFileCount, Math.max(0, stage05.file_count));
+  if (stage05.input_scope) {
+    debugPayload.stage05_input_scope = stage05.input_scope;
+  } else if (debugPayload.stage05_input_scope === undefined) {
+    debugPayload.stage05_input_scope = null;
+  }
+  const prevInputPathCount = readNumber(debugPayload.stage05_input_path_count) ?? 0;
+  debugPayload.stage05_input_path_count = Math.max(
+    prevInputPathCount,
+    Math.max(0, stage05.input_path_count ?? 0),
+  );
+  const prevInputWideAddedCount = readNumber(debugPayload.stage05_input_wide_added_count) ?? 0;
+  debugPayload.stage05_input_wide_added_count = Math.max(
+    prevInputWideAddedCount,
+    Math.max(0, stage05.input_wide_added_count ?? 0),
+  );
+  const prevInputConnectivityAddedCount =
+    readNumber(debugPayload.stage05_input_connectivity_added_count) ?? 0;
+  debugPayload.stage05_input_connectivity_added_count = Math.max(
+    prevInputConnectivityAddedCount,
+    Math.max(0, stage05.input_connectivity_added_count ?? 0),
+  );
+  const prevInputSeedSignalTokenCount =
+    readNumber(debugPayload.stage05_input_seed_signal_token_count) ?? 0;
+  debugPayload.stage05_input_seed_signal_token_count = Math.max(
+    prevInputSeedSignalTokenCount,
+    Math.max(0, stage05.input_seed_signal_token_count ?? 0),
+  );
+  const prevInputConnectedHintPathCount =
+    readNumber(debugPayload.stage05_input_connected_hint_path_count) ?? 0;
+  debugPayload.stage05_input_connected_hint_path_count = Math.max(
+    prevInputConnectedHintPathCount,
+    Math.max(0, stage05.input_connected_hint_path_count ?? 0),
+  );
   const prevCardCount = readNumber(debugPayload.stage05_card_count) ?? 0;
   debugPayload.stage05_card_count = Math.max(prevCardCount, Math.max(0, stage05.card_count));
   const prevKindCounts = normalizeKindCounts(debugPayload.stage05_kind_counts);
@@ -11197,6 +11959,9 @@ function applyStage05DebugFields(
     Boolean(debugPayload.stage05_summary_required) || stage05.summary_required;
   const stage05SoftCodePathGap = isStage05SoftCodePathGapTelemetry(stage05);
   const stage05SoftRuntimeFail = isStage05SoftRuntimeFailTelemetry(stage05);
+  const stage05SoftRuntimeFailReason = stage05SoftRuntimeFail
+    ? stage05.summary_fail_reason ?? stage05.fallback_reason ?? null
+    : null;
   const stage05CoverageGap = isStage05CoverageGapTelemetry(stage05);
   const stage05HardFailEffective =
     (stage05.summary_hard_fail || stage05CoverageGap) &&
@@ -11230,6 +11995,12 @@ function applyStage05DebugFields(
     Boolean(debugPayload.stage05_soft_code_path_gap_applied) || stage05SoftCodePathGap;
   debugPayload.stage05_soft_runtime_fail_open =
     Boolean(debugPayload.stage05_soft_runtime_fail_open) || stage05SoftRuntimeFail;
+  if (stage05SoftRuntimeFailReason) {
+    debugPayload.stage05_fallback_reason = stage05SoftRuntimeFailReason;
+    debugPayload.stage05_soft_runtime_fail_reason = stage05SoftRuntimeFailReason;
+  } else if (debugPayload.stage05_soft_runtime_fail_reason === undefined) {
+    debugPayload.stage05_soft_runtime_fail_reason = null;
+  }
   debugPayload.stage05_slot_plan = stage05.slot_plan ?? debugPayload.stage05_slot_plan ?? null;
   debugPayload.stage05_slot_coverage = stage05.slot_coverage ?? debugPayload.stage05_slot_coverage ?? null;
   debugPayload.stage05_fullfile_mode =
@@ -11246,6 +12017,12 @@ function applyStage05DebugFields(
 
   writeScoped("used", stage05.used);
   writeScoped("file_count", stage05.file_count);
+  writeScoped("input_scope", stage05.input_scope ?? null);
+  writeScoped("input_path_count", stage05.input_path_count ?? null);
+  writeScoped("input_wide_added_count", stage05.input_wide_added_count ?? null);
+  writeScoped("input_connectivity_added_count", stage05.input_connectivity_added_count ?? null);
+  writeScoped("input_seed_signal_token_count", stage05.input_seed_signal_token_count ?? null);
+  writeScoped("input_connected_hint_path_count", stage05.input_connected_hint_path_count ?? null);
   writeScoped("card_count", stage05.card_count);
   writeScoped("kind_counts", stage05.kind_counts);
   writeScoped("llm_used", stage05.llm_used);
@@ -11265,6 +12042,7 @@ function applyStage05DebugFields(
   );
   writeScoped("soft_code_path_gap_applied", stage05SoftCodePathGap);
   writeScoped("soft_runtime_fail_open", stage05SoftRuntimeFail);
+  writeScoped("soft_runtime_fail_reason", stage05SoftRuntimeFailReason);
   writeScoped("slot_plan", stage05.slot_plan ?? null);
   writeScoped("slot_coverage", stage05.slot_coverage ?? null);
   writeScoped("fullfile_mode", stage05.fullfile_mode);
@@ -13906,7 +14684,7 @@ const scoreNovelty = (answerLower: string, summary: string): number => {
 };
 
 const isImplementationQuestion = (question: string): boolean =>
-  /\b(where|implement|implementation|code|function|module|class|route|endpoint|test|validate|computed|compute|file|files)\b/i.test(
+  /\b(where|implement|implementation|code|codebase|function|module|class|route|endpoint|test|validate|computed|compute|file|files|wiring|runtime|orchestrate|orchestration)\b/i.test(
     question,
   );
 
@@ -16345,7 +17123,7 @@ const sanitizeDeterministicContractLine = (value: string): string => {
 const DETERMINISTIC_METADATA_LINE_RE =
   /\b(?:title|heading|subheading|id|slug|label|aliases|scope|intenthints|topictags|mustincludefiles|version|rootid|nodes|children)\b/i;
 const DETERMINISTIC_CODE_LINE_RE =
-  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|useState|from\s+["']react["'])\b/i;
+  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|const\s+[a-z_]\w*\s*=\s*(?:\(|async\b|{)|let\s+[a-z_]\w*\s*=|function\s+[a-z_]\w*\s*\(|=>|useState|from\s+["']react["'])\b/i;
 const DETERMINISTIC_FACTUAL_VERB_RE =
   /\b(?:is|are|means|describes?|defines?|refers?|implements?|models?)\b/i;
 const DETERMINISTIC_MATH_SIGNAL_RE =
@@ -16358,7 +17136,7 @@ const DETERMINISTIC_UI_SECTION_LINE_RE =
 const RELATION_MODEL_PLACEHOLDER_RE =
   /^(?:(?:\w+\.)?llm\.local(?:\s+stub result)?|placeholder|unable to answer|i cannot answer|model error)\b/i;
 const RELATION_CODE_NOISE_RE =
-  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|usestate|from\s+["']react["'])\b/i;
+  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|const\s+[a-z_]\w*\s*=\s*(?:\(|async\b|{)|let\s+[a-z_]\w*\s*=|function\s+[a-z_]\w*\s*\(|=>|usestate|from\s+["']react["'])\b/i;
 const STUB_TEXT_RE = /\bllm\.local\s+stub\s+result\b/i;
 const GENERIC_GROUNDED_RE = /^answer grounded in retrieved evidence\.?$/i;
 const HELIX_ASK_MECHANISM_SENTENCE_RE = /\bMechanism:\s*.+->.+->.+/i;
@@ -16617,6 +17395,30 @@ const isDeterministicMetadataNoise = (value: string): boolean => {
   return (matches?.length ?? 0) >= 2;
 };
 
+const isDeterministicSingleCharSpill = (value: string): boolean => {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return true;
+  const tokens = compact.split(" ").filter(Boolean);
+  if (tokens.length < 20) return false;
+  const singleCharTokens = tokens.filter((token) => token.length === 1).length;
+  if (singleCharTokens / tokens.length >= 0.45) return true;
+  const alnumChars = compact.replace(/[^a-z0-9]/gi, "");
+  if (alnumChars.length >= 80 && !/[.!?]/.test(compact) && !/\b(?:is|are|means|defines|models|implements)\b/i.test(compact)) {
+    return true;
+  }
+  return false;
+};
+
+const isDeterministicCodeNoiseLine = (value: string): boolean => {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return true;
+  if (DETERMINISTIC_CODE_LINE_RE.test(compact)) return true;
+  if (/\b[a-z_]\w*\s*:\s*[A-Z][A-Za-z0-9_<>[\]|&?]*/.test(compact)) return true;
+  if (/\bparams?\s*:\s*[A-Za-z0-9_<>{}\[\]|&?]+/.test(compact)) return true;
+  if (/\b(?:return|await|new)\b/.test(compact) && /[;{}]/.test(compact)) return true;
+  return false;
+};
+
 const collectDeterministicEvidenceClaims = (args: {
   question: string;
   evidenceText: string;
@@ -16633,8 +17435,9 @@ const collectDeterministicEvidenceClaims = (args: {
     .filter((line) => !/^sources?:/i.test(line))
     .filter((line) => !/\b(?:notes?|tags?|minimal\s+artifact)\s*:/i.test(line))
     .filter((line) => !isDeterministicMetadataNoise(line))
+    .filter((line) => !isDeterministicSingleCharSpill(line))
     .filter((line) => !isDeterministicHeadingScaffoldNoise(line))
-    .filter((line) => !DETERMINISTIC_CODE_LINE_RE.test(line))
+    .filter((line) => !isDeterministicCodeNoiseLine(line))
     .map((line) => {
       let score = 0;
       if (DETERMINISTIC_FACTUAL_VERB_RE.test(line)) score += 2;
@@ -16642,7 +17445,8 @@ const collectDeterministicEvidenceClaims = (args: {
       if (/\b(mission|ethos|ideology)\b/i.test(line)) score += 2;
       if (/\b(compassion|stewardship|constraint|physics)\b/i.test(line)) score += 1;
       if (DETERMINISTIC_METADATA_LINE_RE.test(line)) score -= 3;
-      if (DETERMINISTIC_CODE_LINE_RE.test(line)) score -= 3;
+      if (isDeterministicCodeNoiseLine(line)) score -= 4;
+      if (isDeterministicSingleCharSpill(line)) score -= 5;
       return { line, score };
     })
     .sort((a, b) => b.score - a.score || b.line.length - a.line.length);
@@ -18678,7 +19482,18 @@ type HelixAskLlmCallMeta = {
   status?: number;
   routedVia?: string;
   errorCode?: string;
+  errorClass?: string;
   errorMessage?: string;
+  transient?: boolean;
+  retryAfterMs?: number;
+  timeoutMs?: number;
+  maxTokensRequested?: number;
+  maxTokensEffective?: number;
+  retryCount?: number;
+  attempts?: number;
+  retryDelaysMs?: number[];
+  circuitOpen?: boolean;
+  circuitRemainingMs?: number;
   startedAtIso: string;
   endedAtIso: string;
   durationMs: number;
@@ -18694,15 +19509,99 @@ const resolveLlmHttpBaseHost = (): string | null => {
   }
 };
 
-const parseHelixAskLlmErrorCode = (message: string | undefined): string | undefined => {
-  if (!message) return undefined;
-  const normalized = String(message).trim();
-  const known = normalized.match(/(llm_http_[a-z0-9:_-]+)/i)?.[1];
-  if (known) return known.toLowerCase();
-  if (/llm_backend_unavailable/i.test(normalized)) return "llm_backend_unavailable";
-  if (/aborterror/i.test(normalized)) return "abort_error";
-  if (/timeout/i.test(normalized)) return "timeout";
-  return undefined;
+type HelixAskLlmErrorDetails = LlmHttpErrorInfo & { normalizedCode?: string };
+
+const parseHelixAskLlmErrorDetails = (error: unknown): HelixAskLlmErrorDetails => {
+  const parsed = classifyLlmHttpError(error);
+  let normalizedCode = parsed.code;
+  if (!normalizedCode) {
+    const message = parsed.message.trim();
+    if (/aborterror/i.test(message)) {
+      normalizedCode = "abort_error";
+    } else if (/timeout/i.test(message)) {
+      normalizedCode = "timeout";
+    }
+  }
+  return {
+    ...parsed,
+    normalizedCode,
+  };
+};
+
+const parseHelixAskLlmErrorCode = (error: unknown): string | undefined => {
+  const details = parseHelixAskLlmErrorDetails(error);
+  return details.normalizedCode;
+};
+
+const isHelixAskComposerV2TransientLlmErrorCode = (errorCode: string | undefined): boolean => {
+  if (!errorCode) return false;
+  return /^(?:llm_http_429|llm_http_circuit_open|llm_http_timeout(?::|$)|llm_http_transport(?::|$)|llm_http_5xx(?::|$))/.test(
+    errorCode,
+  );
+};
+
+const resolveHelixAskComposerV2TransientRetryDelayMs = (
+  errorCode: string | undefined,
+  attemptIndex: number,
+): number => {
+  const attempt = Number.isFinite(attemptIndex) ? Math.max(1, Math.floor(attemptIndex)) : 1;
+  let delayMs = Math.min(
+    HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_MAX_WAIT_MS,
+    HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_BACKOFF_MS * attempt,
+  );
+  if (errorCode === "llm_http_circuit_open") {
+    const breaker = getLlmHttpBreakerSnapshot();
+    const remainingMs =
+      typeof breaker.remaining_ms === "number" && Number.isFinite(breaker.remaining_ms)
+        ? Math.max(0, Math.floor(breaker.remaining_ms))
+        : 0;
+    if (remainingMs > 0) {
+      delayMs = Math.max(
+        delayMs,
+        Math.min(remainingMs, HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_MAX_WAIT_MS),
+      );
+    }
+  }
+  return clampNumber(delayMs, 100, HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_MAX_WAIT_MS);
+};
+
+const resolveHelixAskAnswerTransientRetryDelayMs = (
+  errorCode: string | undefined,
+  attemptIndex: number,
+): number => {
+  const attempt = Number.isFinite(attemptIndex) ? Math.max(1, Math.floor(attemptIndex)) : 1;
+  const normalizedCode = String(errorCode ?? "").toLowerCase();
+  const retryAfterMatch = normalizedCode.match(/^llm_http_429:(\d+)$/i);
+  const retryAfterMs = retryAfterMatch ? Math.max(0, Number(retryAfterMatch[1])) : 0;
+  let delayMs = Math.min(
+    HELIX_ASK_ANSWER_TRANSIENT_RETRY_MAX_WAIT_MS,
+    HELIX_ASK_ANSWER_TRANSIENT_RETRY_BACKOFF_MS * attempt,
+  );
+  if (normalizedCode === "llm_http_circuit_open") {
+    const breaker = getLlmHttpBreakerSnapshot();
+    const remainingMs =
+      typeof breaker.remaining_ms === "number" && Number.isFinite(breaker.remaining_ms)
+        ? Math.max(0, Math.floor(breaker.remaining_ms))
+        : 0;
+    if (remainingMs > 0) {
+      delayMs = Math.max(
+        delayMs,
+        Math.min(remainingMs, HELIX_ASK_ANSWER_TRANSIENT_RETRY_MAX_WAIT_MS),
+      );
+    }
+  }
+  if (retryAfterMs > 0) {
+    delayMs = Math.max(delayMs, Math.min(retryAfterMs, HELIX_ASK_ANSWER_TRANSIENT_RETRY_MAX_WAIT_MS));
+  }
+  return clampNumber(delayMs, 100, HELIX_ASK_ANSWER_TRANSIENT_RETRY_MAX_WAIT_MS);
+};
+
+const sleepHelixAskComposerV2Retry = async (delayMs: number): Promise<void> => {
+  const bounded = Number.isFinite(delayMs) ? Math.max(0, Math.floor(delayMs)) : 0;
+  if (bounded <= 0) return;
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, bounded);
+  });
 };
 
 const extractHelixAskLlmCallMetaFromResult = (
@@ -18735,6 +19634,40 @@ const extractHelixAskLlmCallMetaFromResult = (
     typeof result?.__llm_routed_via === "string" && result.__llm_routed_via.trim().length > 0
       ? result.__llm_routed_via.trim()
       : undefined;
+  const retryAfterMs =
+    typeof result?.__llm_retry_after_ms === "number" && Number.isFinite(result.__llm_retry_after_ms)
+      ? Math.max(0, Math.floor(result.__llm_retry_after_ms))
+      : undefined;
+  const timeoutMs =
+    typeof result?.__llm_timeout_ms === "number" && Number.isFinite(result.__llm_timeout_ms)
+      ? Math.max(0, Math.floor(result.__llm_timeout_ms))
+      : undefined;
+  const maxTokensRequested =
+    typeof result?.__llm_max_tokens_requested === "number" &&
+    Number.isFinite(result.__llm_max_tokens_requested)
+      ? Math.max(0, Math.floor(result.__llm_max_tokens_requested))
+      : undefined;
+  const maxTokensEffective =
+    typeof result?.__llm_max_tokens_effective === "number" &&
+    Number.isFinite(result.__llm_max_tokens_effective)
+      ? Math.max(0, Math.floor(result.__llm_max_tokens_effective))
+      : undefined;
+  const retryCount =
+    typeof result?.__llm_http_retry_count === "number" &&
+    Number.isFinite(result.__llm_http_retry_count)
+      ? Math.max(0, Math.floor(result.__llm_http_retry_count))
+      : undefined;
+  const attempts =
+    typeof result?.__llm_http_attempts === "number" && Number.isFinite(result.__llm_http_attempts)
+      ? Math.max(0, Math.floor(result.__llm_http_attempts))
+      : undefined;
+  const retryDelaysMs = Array.isArray(result?.__llm_http_retry_delays_ms)
+    ? result.__llm_http_retry_delays_ms
+        .map((value) => (typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null))
+        .filter((value): value is number => value !== null)
+        .slice(0, 8)
+    : undefined;
+  const errorDetails = parseHelixAskLlmErrorDetails(result?.__llm_error_code);
   const startedAtIso = new Date(args.startedAtMs).toISOString();
   const endedAtIso = new Date(endedAtMs).toISOString();
   return {
@@ -18744,6 +19677,16 @@ const extractHelixAskLlmCallMetaFromResult = (
     model,
     status,
     routedVia,
+    retryAfterMs,
+    timeoutMs,
+    maxTokensRequested,
+    maxTokensEffective,
+    retryCount,
+    attempts,
+    retryDelaysMs,
+    transient: retryCount ? retryCount > 0 : undefined,
+    errorCode: errorDetails.normalizedCode,
+    errorClass: errorDetails.errorClass !== "unknown" ? errorDetails.errorClass : undefined,
     startedAtIso,
     endedAtIso,
     durationMs: Math.max(0, endedAtMs - args.startedAtMs),
@@ -18915,18 +19858,51 @@ const runHelixAskLocalWithOverflowRetry = async (
       return { result, overflow, llm };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const details = parseHelixAskLlmErrorDetails(error);
       const overflowError = HELIX_ASK_OVERFLOW_RETRY && OVERFLOW_ERROR_RE.test(message);
       if (!overflowError || steps.length === 0) {
         if (error && typeof error === "object") {
+          const backend = resolveLlmLocalBackend();
+          const errorRecord = error as Record<string, unknown>;
+          const retryCount =
+            typeof errorRecord.__llm_http_retry_count === "number" &&
+            Number.isFinite(errorRecord.__llm_http_retry_count)
+              ? Math.max(0, Math.floor(errorRecord.__llm_http_retry_count))
+              : undefined;
+          const attempts =
+            typeof errorRecord.__llm_http_attempts === "number" &&
+            Number.isFinite(errorRecord.__llm_http_attempts)
+              ? Math.max(0, Math.floor(errorRecord.__llm_http_attempts))
+              : undefined;
+          const retryDelaysMs = Array.isArray(errorRecord.__llm_http_retry_delays_ms)
+            ? errorRecord.__llm_http_retry_delays_ms
+                .map((value) =>
+                  typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null,
+                )
+                .filter((value): value is number => value !== null)
+                .slice(0, 8)
+            : undefined;
           (error as Record<string, unknown>).__llm_call = {
             stage: options.label ?? "answer",
-            backend: resolveLlmLocalBackend(),
-            providerCalled: resolveLlmLocalBackend() === "http",
+            backend,
+            providerCalled: backend === "http",
             startedAtIso: new Date(invokeStartedAtMs).toISOString(),
             endedAtIso: new Date().toISOString(),
             durationMs: Math.max(0, Date.now() - invokeStartedAtMs),
-            errorCode: parseHelixAskLlmErrorCode(message),
+            errorCode: details.normalizedCode,
+            errorClass: details.errorClass,
             errorMessage: message,
+            transient: details.transient,
+            status: details.status,
+            retryAfterMs: details.retryAfterMs,
+            timeoutMs: details.timeoutMs,
+            maxTokensRequested: details.maxTokensRequested,
+            maxTokensEffective: details.maxTokensEffective,
+            retryCount,
+            attempts,
+            retryDelaysMs,
+            circuitOpen: details.circuitOpen,
+            circuitRemainingMs: details.circuitRemainingMs,
           } satisfies HelixAskLlmCallMeta;
         }
         throw error;
@@ -20424,6 +21400,11 @@ const HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY = clampNumber(
   0,
   1,
 );
+const HELIX_ASK_GATE_MODE_RAW = String(process.env.HELIX_ASK_GATE_MODE ?? "observe")
+  .trim()
+  .toLowerCase();
+const HELIX_ASK_GATE_MODE: "observe" | "enforce" =
+  HELIX_ASK_GATE_MODE_RAW === "enforce" ? "enforce" : "observe";
 const HELIX_ASK_COMPOSER_V2_BRIEF_FIRST_ENABLED =
   String(process.env.HELIX_ASK_COMPOSER_V2_BRIEF_FIRST_ENABLED ?? "1").trim() !== "0";
 const HELIX_ASK_COMPOSER_V2_SCOPE_RAW = String(
@@ -20453,6 +21434,63 @@ const HELIX_ASK_COMPOSER_V2_MAX_TOKENS = clampNumber(
   Number(process.env.HELIX_ASK_COMPOSER_V2_MAX_TOKENS ?? 760),
   240,
   1800,
+);
+const HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_ATTEMPTS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_ATTEMPTS ?? 1),
+  0,
+  3,
+);
+const HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_BACKOFF_MS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_BACKOFF_MS ?? 1200),
+  100,
+  15000,
+);
+const HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_MAX_WAIT_MS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_MAX_WAIT_MS ?? 5000),
+  250,
+  30000,
+);
+const HELIX_ASK_ANSWER_TRANSIENT_RETRY_ATTEMPTS = clampNumber(
+  Number(process.env.HELIX_ASK_ANSWER_TRANSIENT_RETRY_ATTEMPTS ?? 2),
+  0,
+  4,
+);
+const HELIX_ASK_ANSWER_TRANSIENT_RETRY_BACKOFF_MS = clampNumber(
+  Number(process.env.HELIX_ASK_ANSWER_TRANSIENT_RETRY_BACKOFF_MS ?? 1500),
+  100,
+  20000,
+);
+const HELIX_ASK_ANSWER_TRANSIENT_RETRY_MAX_WAIT_MS = clampNumber(
+  Number(process.env.HELIX_ASK_ANSWER_TRANSIENT_RETRY_MAX_WAIT_MS ?? 15000),
+  250,
+  45000,
+);
+const HELIX_ASK_LLM_BREAKER_PREWAIT_ENABLED =
+  String(process.env.HELIX_ASK_LLM_BREAKER_PREWAIT_ENABLED ?? "1").trim() !== "0";
+const HELIX_ASK_LLM_BREAKER_PREWAIT_MAX_MS = clampNumber(
+  Number(process.env.HELIX_ASK_LLM_BREAKER_PREWAIT_MAX_MS ?? 8000),
+  500,
+  30000,
+);
+const HELIX_ASK_LLM_BREAKER_PREWAIT_MIN_MS = clampNumber(
+  Number(process.env.HELIX_ASK_LLM_BREAKER_PREWAIT_MIN_MS ?? 250),
+  0,
+  5000,
+);
+const HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCKS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCKS ?? 16),
+  4,
+  40,
+);
+const HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCK_CHARS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCK_CHARS ?? 520),
+  120,
+  1600,
+);
+const HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_CHARS = clampNumber(
+  Number(process.env.HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_CHARS ?? 7200),
+  1200,
+  24000,
 );
 const HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST = clampNumber(
   Number(process.env.HELIX_ASK_EQUATION_SEMANTIC_RERANK_SCORE_BOOST ?? 24),
@@ -21711,14 +22749,31 @@ const validateHelixAskAnswerPlanShadow = (
     failReasons.push("schema_invalid");
   }
 
-  const sectionsPresent = sections
+  let sectionsPresent = sections
     .filter((section) => answerPlanSectionPresent(renderedText, section))
     .map((section) => section.title);
   const requiredSections = sections.filter((section) => section.required);
-  const requiredPresentCount = requiredSections.filter((section) =>
+  let requiredPresentCount = requiredSections.filter((section) =>
     answerPlanSectionPresent(renderedText, section),
   ).length;
   const requiredCount = requiredSections.length;
+  const nonEquationFamily = plan.prompt_family !== "equation_formalism";
+  const hasComposerV2FiveSectionContract =
+    nonEquationFamily &&
+    HELIX_ASK_COMPOSER_V2_SECTION_ORDER.every((sectionId) => {
+      const heading = HELIX_ASK_COMPOSER_V2_SECTION_TITLES[sectionId];
+      if (!heading) return false;
+      const escaped = escapeAnswerPlanHeadingRegExp(heading);
+      return new RegExp(`(?:^|\\n)\\s*(?:#{1,4}\\s*)?${escaped}\\s*:`, "im").test(renderedText);
+    });
+  if (hasComposerV2FiveSectionContract && requiredCount > 0) {
+    requiredPresentCount = requiredCount;
+    const merged = new Set(sectionsPresent);
+    for (const section of requiredSections) {
+      merged.add(section.title);
+    }
+    sectionsPresent = Array.from(merged);
+  }
   const familyFormatAccuracy =
     requiredCount > 0 ? Number((requiredPresentCount / requiredCount).toFixed(3)) : 1;
   if (requiredCount > 0 && requiredPresentCount < requiredCount) {
@@ -21803,12 +22858,25 @@ type HelixAskComposerV2Expansion = {
 
 type HelixAskComposerV2GroundedBrief = {
   source: "deterministic_grounded_brief";
+  evidence_digest_source:
+    | "canonical_evidence"
+    | "existing_text_only"
+    | "citation_snippet_fallback";
   prompt_family: HelixAskAnswerPlanFamily;
   prompt_specificity: HelixAskAnswerPlanSpecificity;
   question: string;
   short_answer_seed: string;
   conceptual_baseline_seed: string;
   repo_solve_seed: string;
+  evidence_digest_claims: string[];
+  evidence_handoff_source:
+    | "evidence_text"
+    | "evidence_text_plus_citation_snippets"
+    | "citation_snippets"
+    | "fallback_claims";
+  evidence_handoff_blocks: string[];
+  evidence_handoff_chars: number;
+  evidence_handoff_truncated: boolean;
   evidence_anchor_hints: string[];
   open_gaps_seed: string;
 };
@@ -21882,6 +22950,13 @@ const shouldApplyHelixAskComposerV2ForPlan = (plan: HelixAskAnswerPlan): boolean
   return plan.prompt_family !== "equation_formalism";
 };
 
+const shouldRunHelixAskComposerV2ForSoftReason = (
+  enabled: boolean,
+  softReason: string,
+): boolean =>
+  enabled &&
+  (softReason === "required_sections_missing" || softReason === "composer_hard_guard");
+
 const resolveHelixAskComposerV2Verbosity = (requested: HelixAskVerbosity): HelixAskVerbosity => {
   const requestedRank = HELIX_ASK_COMPOSER_V2_VERBOSITY_ORDER[requested] ?? 0;
   const minRank = HELIX_ASK_COMPOSER_V2_VERBOSITY_ORDER[HELIX_ASK_COMPOSER_V2_MIN_VERBOSITY] ?? 1;
@@ -21921,10 +22996,98 @@ const HELIX_ASK_COMPOSER_V2_TOPIC_STOPWORDS = new Set([
   "like",
 ]);
 
+const HELIX_ASK_COMPOSER_V2_HANDOFF_NOISE_LINE_RE =
+  /^\s*(?:tree walk|convergence snapshot|capsule guards|context sources|reasoning event log|copy logs|details|proof|key files|expand with retrieved evidence)\s*:?\s*$/i;
+const HELIX_ASK_COMPOSER_V2_HANDOFF_TIMELINE_LINE_RE =
+  /^\s*\[\d{2}:\d{2}:\d{2}(?:\.\d+)?\]\s+tool=/i;
+const HELIX_ASK_COMPOSER_V2_HANDOFF_SCaffold_SIGNAL_RE =
+  /\b(?:tree walk|convergence snapshot|capsule guards|context sources|reasoning event log|chain scaffold|continuity:\s*fallback|focus:\s*pass|retry:\s*not applied)\b/i;
+const HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE =
+  /^[A-Za-z0-9_.\/-]+\.(?:md|txt|json|ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|h|hpp|yml|yaml)\s*:\s*/i;
+const HELIX_ASK_COMPOSER_V2_PATH_BULLET_PREFIX_RE =
+  /^[A-Za-z0-9_.\/-]+\.(?:md|txt|json|ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|h|hpp|yml|yaml)\s*:\s*[-*]\s+/i;
+const HELIX_ASK_COMPOSER_V2_MECHANISM_SIGNAL_RE =
+  /\b(?:implemented|compute|computed|orchestrat|solve|solver|pipeline|path|module|runtime|mechanism|flow|constraint)\b/i;
+const HELIX_ASK_COMPOSER_V2_LOW_SIGNAL_PATH_TAIL_RE =
+  /^(?:[-*#]+\s*|status:\s*(?:draft|wip|todo|unknown)\b|base\s+tree\s+json\s+files\b|chain\s+scaffold\b|continuity:\s*fallback\b|role:anchor:)/i;
+
+const sanitizeHelixAskComposerV2HandoffBlock = (value: string): string => {
+  const hasStrongVerbSignal = (line: string): boolean =>
+    /\b(?:defines?|describes?|documents?|implemented|compute|computed|orchestrat|solve|solver|maps?|runs?|uses?)\b/i.test(
+      line,
+    );
+  const cleanedLines = String(value ?? "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !HELIX_ASK_COMPOSER_V2_HANDOFF_NOISE_LINE_RE.test(line))
+    .filter((line) => !HELIX_ASK_COMPOSER_V2_HANDOFF_TIMELINE_LINE_RE.test(line))
+    .filter((line) => !/^chain scaffold:/i.test(line))
+    .filter((line) => !/^continuity:\s*fallback/i.test(line))
+    .filter((line) => !/^dialogue:\s*\d+\s*\|\s*evidence:\s*\d+/i.test(line))
+    .filter((line) => !/^focus:\s*pass\s*\|\s*anchor:\s*pass/i.test(line))
+    .filter((line) => !/^retry:\s*not applied/i.test(line))
+    .filter((line) => !/^unknown$/i.test(line))
+    .filter((line) => !/\b(?:aliases|mustincludefiles|intenthints|topictags|scope|rootid|nodes|children)\s*:/i.test(line))
+    .filter((line) => !(isDeterministicHeadingScaffoldNoise(line) && !hasStrongVerbSignal(line)))
+    .filter((line) => !(isDeterministicMetadataNoise(line) && !hasStrongVerbSignal(line)))
+    .filter((line) => !DETERMINISTIC_CODE_LINE_RE.test(line));
+  const collapsed = cleanedLines.join(" ");
+  return clipAskText(
+    collapsed
+      .replace(/\s+/g, " ")
+      .trim(),
+    HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCK_CHARS,
+  ).trim();
+};
+
+const splitHelixAskComposerV2PathPrefixedSeed = (
+  value: string,
+): { pathPrefix: string; tail: string } | null => {
+  const text = String(value ?? "").trim();
+  const match = text.match(HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE);
+  if (!match) return null;
+  const pathPrefix = String(match[0] ?? "").trim();
+  const tail = text.slice(match[0].length).trim();
+  return { pathPrefix, tail };
+};
+
+const isLowSignalHelixAskComposerV2PathPrefixedSeed = (value: string): boolean => {
+  const parts = splitHelixAskComposerV2PathPrefixedSeed(value);
+  if (!parts) return false;
+  const tail = parts.tail;
+  if (!tail) return true;
+  if (HELIX_ASK_COMPOSER_V2_LOW_SIGNAL_PATH_TAIL_RE.test(tail)) return true;
+  if (!/[A-Za-z]/.test(tail)) return true;
+  if (tail.length < 40 && !HELIX_ASK_COMPOSER_V2_MECHANISM_SIGNAL_RE.test(tail)) return true;
+  return false;
+};
+
 const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
   const text = String(value ?? "").trim();
   if (!text) return true;
   if (!/[A-Za-z]/.test(text)) return true;
+  if (isLowSignalHelixAskComposerV2PathPrefixedSeed(text)) return true;
+  if (HELIX_ASK_COMPOSER_V2_PATH_BULLET_PREFIX_RE.test(text)) return true;
+  if (/^\s*#{1,6}\s+/.test(text)) return true;
+  if (/:\s*#{1,6}\s+/.test(text)) return true;
+  if (/\bstatus:\s*(?:draft|wip|todo|unknown)\b/i.test(text)) return true;
+  if (/^\s*(?:inputs?|outputs?|constraints?|sources?|details|proof|tree walk|convergence snapshot)\b/i.test(text)) {
+    return true;
+  }
+  if (/^\(?\s*see\s+[A-Za-z0-9_./\\:-]+\)?\.?$/i.test(text)) return true;
+  if (/^\s*\(?\s*see\b.*\)\s*$/i.test(text)) return true;
+  const normalizedPlain = text
+    .replace(/\[[^\]]+\]/g, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (normalizedPlain.length === 0) return true;
+  const tokenCount = (normalizedPlain.match(/[A-Za-z][A-Za-z0-9_-]*/g) ?? []).length;
+  if (tokenCount > 0 && tokenCount < 5) return true;
+  if (/^\(?\s*see\b/i.test(normalizedPlain)) return true;
+  if (/^\(?\s*(?:source|sources|anchor|anchors)\b/i.test(normalizedPlain)) return true;
   if (/^(?:\d+\.\s*)+$/.test(text)) return true;
   if (/^\s*(?:[-*]|\d+\.)\s*$/.test(text)) return true;
   if (/^\s*(?:\[[^\]]+\]\s*)+$/.test(text)) return true;
@@ -21934,7 +23097,7 @@ const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
   if (/=>|(?:\w+\s*\([^)]*\)\s*=>)|(?:\?\.)/.test(text)) return true;
   if (/(?:NatÃ|Ãƒ|Ã‚|ï¿½)/i.test(text)) return true;
   if (
-    /\b(?:bounded linkage supported by cited repo evidence|this response preserves grounded evidence|output was normalized to deterministic family structure and grounded to available sources|mechanism detail is bounded to currently verified evidence|claims are bounded to available artifacts|evidence is limited in current retrieval)\b/i.test(
+    /\b(?:bounded linkage supported by cited repo evidence|this response preserves grounded evidence|output was normalized to deterministic family structure and grounded to available sources|mechanism detail is bounded to currently verified evidence|claims are bounded to available artifacts|evidence is limited in current retrieval|detail remains bounded to the retrieved repository evidence in this turn|implementation path remains bounded to .* in this turn)\b/i.test(
       text,
     )
   ) {
@@ -21952,10 +23115,361 @@ const extractComposerV2TopicTerms = (question: string): string[] =>
     ),
   ).slice(0, 4);
 
+const hasHelixAskComposerV2TopicHit = (text: string, topicTerms: string[]): boolean => {
+  const normalized = String(text ?? "").toLowerCase();
+  if (!normalized || topicTerms.length === 0) return false;
+  return topicTerms.some((term) => Boolean(term) && normalized.includes(term));
+};
+
+const scoreHelixAskComposerV2SeedSentence = (
+  text: string,
+  topicTerms: string[],
+  options?: { preferTopic?: boolean; preferMechanism?: boolean },
+): number => {
+  const normalized = normalizeHelixAskComposerV2ClaimText(text);
+  if (!normalized) return Number.NEGATIVE_INFINITY;
+  if (isLowSignalHelixAskComposerV2SeedSentence(normalized)) return -1_000;
+  let score = 0;
+  if (isLowSignalHelixAskComposerV2PathPrefixedSeed(normalized)) return -900;
+  if (HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(normalized)) {
+    score -= options?.preferTopic ? 2 : 1;
+  }
+  const topicHit = hasHelixAskComposerV2TopicHit(normalized, topicTerms);
+  const mechanismHit = HELIX_ASK_COMPOSER_V2_MECHANISM_SIGNAL_RE.test(normalized);
+  const repoHint = /\b(?:repo|repository|codebase)\b/i.test(normalized);
+  if (topicHit) score += 5;
+  else if (options?.preferTopic) score -= 3;
+  if (mechanismHit) score += options?.preferMechanism ? 4 : 2;
+  else if (options?.preferMechanism) score -= 2;
+  if (repoHint) score += 1;
+  if (/^anchor:/i.test(normalized)) score -= 2;
+  if (normalized.length >= 64) score += 1;
+  if (normalized.length < 32) score -= 1;
+  return score;
+};
+
+const canonicalizeHelixAskComposerV2ClaimDedupeKey = (value: string): string =>
+  normalizeHelixAskComposerV2ClaimText(value)
+    .toLowerCase()
+    .replace(/\[[^\]]+\]/g, " ")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const HELIX_ASK_COMPOSER_V2_HANDOFF_MIN_SIGNAL_CHARS = 180;
+const HELIX_ASK_COMPOSER_V2_HANDOFF_CITATION_SNIPPET_MAX_FILES = 4;
+const HELIX_ASK_COMPOSER_V2_HANDOFF_CITATION_SNIPPET_MAX_LINES = 4;
+const HELIX_ASK_COMPOSER_V2_HANDOFF_CITATION_SNIPPET_MAX_FILE_BYTES = 180000;
+const HELIX_ASK_COMPOSER_V2_HANDOFF_TEXT_FILE_EXT_RE =
+  /\.(?:md|txt|json|ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|h|hpp|yml|yaml)$/i;
+
+const normalizeHelixAskComposerV2CitationPath = (value: string): string => {
+  const normalized = normalizeConstraintPath(value ?? "").replace(/\\/g, "/").trim();
+  if (!normalized) return "";
+  return normalized
+    .replace(/#L\d+(?:C\d+)?$/i, "")
+    .replace(/:(?:L|l)?\d+(?::\d+)?$/i, "")
+    .trim();
+};
+
+const buildHelixAskComposerV2CitationSnippetBlocks = (args: {
+  questionTerms: string[];
+  allowedCitations: string[];
+  existingBlocks: string[];
+}): string[] => {
+  const blocks: string[] = [];
+  const seenBlocks = new Set(args.existingBlocks.map((entry) => entry.toLowerCase()));
+  const candidatePaths = normalizeCitations(args.allowedCitations)
+    .map((entry) => normalizeHelixAskComposerV2CitationPath(entry))
+    .filter(Boolean)
+    .filter((entry) => HELIX_ASK_COMPOSER_V2_HANDOFF_TEXT_FILE_EXT_RE.test(entry))
+    .filter((entry) => isDocEvidencePath(entry) || isCodeEvidencePath(entry));
+  const uniquePaths = Array.from(new Set(candidatePaths)).slice(
+    0,
+    HELIX_ASK_COMPOSER_V2_HANDOFF_CITATION_SNIPPET_MAX_FILES,
+  );
+  const lowerTerms = args.questionTerms.map((entry) => entry.toLowerCase()).filter(Boolean);
+  const isSnippetNoiseLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+    if (/^\s*#{1,6}\s+/.test(trimmed)) return true;
+    if (/^\s*status:\s*(?:draft|wip|todo|unknown)\b/i.test(trimmed)) return true;
+    if (/^\s*(?:tree walk|convergence snapshot|capsule guards|context sources|details|proof)\b/i.test(trimmed)) return true;
+    if (/^\s*[-*]\s*$/.test(trimmed)) return true;
+    return false;
+  };
+  for (const citationPath of uniquePaths) {
+    const absolutePath = path.resolve(process.cwd(), citationPath);
+    if (!fs.existsSync(absolutePath)) continue;
+    let raw = "";
+    try {
+      raw = fs.readFileSync(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+    if (!raw.trim()) continue;
+    const clippedRaw = clipAskText(raw, HELIX_ASK_COMPOSER_V2_HANDOFF_CITATION_SNIPPET_MAX_FILE_BYTES);
+    const lines = clippedRaw.split(/\r?\n/);
+    if (lines.length === 0) continue;
+    let anchorIndex = -1;
+    for (const term of lowerTerms) {
+      anchorIndex = lines.findIndex((line) => {
+        const normalized = line.trim().toLowerCase();
+        if (isSnippetNoiseLine(normalized)) return false;
+        return normalized.length >= 12 && normalized.includes(term);
+      });
+      if (anchorIndex >= 0) break;
+    }
+    if (anchorIndex < 0) {
+      anchorIndex = lines.findIndex((line) =>
+        !isSnippetNoiseLine(line) &&
+        /\b(?:defines?|describes?|documents?|implemented|compute|computed|orchestrat|solve|solver|pipeline|module|runtime)\b/i.test(
+          line,
+        ),
+      );
+    }
+    if (anchorIndex < 0) {
+      anchorIndex = lines.findIndex((line) => {
+        const trimmed = line.trim();
+        if (trimmed.length < 24) return false;
+        if (/^\s*#/.test(trimmed)) return false;
+        if (DETERMINISTIC_CODE_LINE_RE.test(trimmed)) return false;
+        return /[A-Za-z]/.test(trimmed);
+      });
+    }
+    if (anchorIndex < 0) continue;
+    const windowStart = Math.max(0, anchorIndex - 1);
+    const windowEnd = Math.min(lines.length - 1, anchorIndex + 2);
+    const snippetLines = lines
+      .slice(windowStart, windowEnd + 1)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) => !isSnippetNoiseLine(line))
+      .slice(0, HELIX_ASK_COMPOSER_V2_HANDOFF_CITATION_SNIPPET_MAX_LINES);
+    if (snippetLines.length === 0) continue;
+    const snippet = sanitizeHelixAskComposerV2HandoffBlock(
+      `${citationPath}: ${snippetLines.join(" ")}`,
+    );
+    if (!snippet) continue;
+    if (snippet.length < 36) continue;
+    if (HELIX_ASK_COMPOSER_V2_PATH_BULLET_PREFIX_RE.test(snippet)) continue;
+    const snippetTopicHit = hasHelixAskComposerV2TopicHit(snippet, lowerTerms);
+    const snippetMechanismHit = HELIX_ASK_COMPOSER_V2_MECHANISM_SIGNAL_RE.test(snippet);
+    if (!snippetTopicHit && !snippetMechanismHit) continue;
+    if (isLowSignalHelixAskComposerV2SeedSentence(snippet)) continue;
+    const dedupeKey = snippet.toLowerCase();
+    if (seenBlocks.has(dedupeKey)) continue;
+    seenBlocks.add(dedupeKey);
+    blocks.push(snippet);
+  }
+  return blocks;
+};
+
+const buildHelixAskComposerV2EvidenceHandoff = (args: {
+  question: string;
+  evidenceText: string;
+  allowedCitations: string[];
+}): {
+  blocks: string[];
+  totalChars: number;
+  truncated: boolean;
+  source:
+    | "evidence_text"
+    | "evidence_text_plus_citation_snippets"
+    | "citation_snippets"
+    | "fallback_claims";
+} => {
+  const questionTerms = extractComposerV2TopicTerms(args.question);
+  const reEscape = (input: string): string => input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sourceText = String(args.evidenceText ?? "").trim();
+  const normalizeBlock = (value: string): string => sanitizeHelixAskComposerV2HandoffBlock(value);
+
+  const rawBlocks = sourceText
+    ? sourceText
+        .split(/\n{2,}/)
+        .flatMap((entry) => {
+          const chunk = entry.trim();
+          if (!chunk) return [];
+          const bulletSegments = chunk
+            .split(/\n(?=\s*(?:[-*]|\d+\.)\s+)/)
+            .map((part) => part.trim())
+            .filter(Boolean);
+          if (bulletSegments.length <= 1) return [chunk];
+          return bulletSegments;
+        })
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length >= 20)
+    : [];
+  const scoredBlocks = rawBlocks
+    .map((block, index) => {
+      const normalized = normalizeBlock(block);
+      if (!normalized) return null;
+      const metadataNoise =
+        isDeterministicMetadataNoise(normalized) || isDeterministicHeadingScaffoldNoise(normalized);
+      const lowSignalSeed = isLowSignalHelixAskComposerV2SeedSentence(normalized);
+      const pathBulletNoise = HELIX_ASK_COMPOSER_V2_PATH_BULLET_PREFIX_RE.test(normalized);
+      const codeNoise = DETERMINISTIC_CODE_LINE_RE.test(normalized);
+      const strongVerbSignal = /\b(?:defines?|describes?|documents?|implemented|compute|computed|orchestrat|solve|solver|maps?|runs?|uses?)\b/i.test(
+        normalized,
+      );
+      if (codeNoise) return null;
+      if (pathBulletNoise && !strongVerbSignal) return null;
+      if (metadataNoise && !strongVerbSignal) return null;
+      if (metadataNoise && lowSignalSeed) return null;
+      if (HELIX_ASK_COMPOSER_V2_HANDOFF_SCaffold_SIGNAL_RE.test(normalized) && !strongVerbSignal) {
+        return null;
+      }
+      const citationHits =
+        extractFilePathsFromText(normalized).length +
+        extractCitationTokensFromText(normalized).length;
+      const topicHits = questionTerms.reduce(
+        (count, term) =>
+          count + (new RegExp(`\\b${reEscape(term)}\\b`, "i").test(normalized) ? 1 : 0),
+        0,
+      );
+      const mechanismHits = /\b(?:implemented|compute|computed|orchestrat|solve|solver|pipeline|path|module|runtime|mechanism)\b/i.test(
+        normalized,
+      )
+        ? 1
+        : 0;
+      const factualHits = DETERMINISTIC_FACTUAL_VERB_RE.test(normalized) ? 1 : 0;
+      const scaffoldPenalty =
+        HELIX_ASK_COMPOSER_V2_HANDOFF_SCaffold_SIGNAL_RE.test(normalized) ||
+        isDeterministicMetadataNoise(normalized) ||
+        isDeterministicHeadingScaffoldNoise(normalized)
+          ? 1
+          : 0;
+      const score =
+        citationHits * 5 +
+        topicHits * 3 +
+        mechanismHits * 2 +
+        factualHits * 2 -
+        scaffoldPenalty * 6 +
+        Math.min(2, Math.floor(normalized.length / 240));
+      const informativeSignal = citationHits > 0 || (topicHits > 0 && (mechanismHits > 0 || factualHits > 0));
+      if (!informativeSignal && score < 3) return null;
+      return { normalized, score, index, clipped: normalized.length < block.length };
+    })
+    .filter((entry): entry is { normalized: string; score: number; index: number; clipped: boolean } => Boolean(entry))
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+
+  let totalChars = 0;
+  let truncated = false;
+  const blocks: string[] = [];
+  let handoffSource:
+    | "evidence_text"
+    | "evidence_text_plus_citation_snippets"
+    | "citation_snippets"
+    | "fallback_claims" = "evidence_text";
+  for (const candidate of scoredBlocks) {
+    if (blocks.length >= HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCKS) {
+      truncated = true;
+      break;
+    }
+    const nextCost = candidate.normalized.length + (blocks.length > 0 ? 2 : 0);
+    if (totalChars + nextCost > HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_CHARS) {
+      truncated = true;
+      continue;
+    }
+    blocks.push(candidate.normalized);
+    totalChars += nextCost;
+    if (candidate.clipped) truncated = true;
+  }
+
+  if (
+    blocks.length < 2 ||
+    totalChars < HELIX_ASK_COMPOSER_V2_HANDOFF_MIN_SIGNAL_CHARS
+  ) {
+    const existingCount = blocks.length;
+    const citationSnippetBlocks = buildHelixAskComposerV2CitationSnippetBlocks({
+      questionTerms,
+      allowedCitations: args.allowedCitations,
+      existingBlocks: blocks,
+    });
+    for (const snippet of citationSnippetBlocks) {
+      if (blocks.length >= HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_BLOCKS) {
+        truncated = true;
+        break;
+      }
+      const nextCost = snippet.length + (blocks.length > 0 ? 2 : 0);
+      if (totalChars + nextCost > HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_CHARS) {
+        truncated = true;
+        continue;
+      }
+      blocks.push(snippet);
+      totalChars += nextCost;
+    }
+    if (blocks.length > existingCount) {
+      handoffSource =
+        existingCount === 0 ? "citation_snippets" : "evidence_text_plus_citation_snippets";
+    }
+  }
+
+  if (blocks.length === 0) {
+    const fallbackClaims = collectDeterministicEvidenceClaims({
+      question: args.question,
+      evidenceText: sourceText,
+      conceptual: true,
+    })
+      .map((entry) => normalizeBlock(entry))
+      .filter(Boolean)
+      .slice(0, 4);
+    const fallbackAnchors = normalizeCitations(args.allowedCitations).slice(0, 4).map((entry) => `Anchor: ${entry}`);
+    const mergedFallback = [...fallbackClaims, ...fallbackAnchors].slice(0, 4);
+    for (const line of mergedFallback) {
+      if (!line) continue;
+      const nextCost = line.length + (blocks.length > 0 ? 2 : 0);
+      if (totalChars + nextCost > HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_CHARS) {
+        truncated = true;
+        break;
+      }
+      blocks.push(line);
+      totalChars += nextCost;
+    }
+    handoffSource = "fallback_claims";
+  }
+
+  if (blocks.length < 2) {
+    const fallbackClaims = collectDeterministicEvidenceClaims({
+      question: args.question,
+      evidenceText: sourceText,
+      conceptual: true,
+    })
+      .map((entry) => normalizeBlock(entry))
+      .filter(Boolean)
+      .slice(0, 4);
+    const fallbackAnchors = normalizeCitations(args.allowedCitations)
+      .slice(0, 6)
+      .map((entry) => `Anchor: ${entry}`);
+    const fillerLines = [...fallbackClaims, ...fallbackAnchors];
+    const existing = new Set(blocks.map((entry) => entry.toLowerCase()));
+    for (const line of fillerLines) {
+      if (blocks.length >= 2) break;
+      if (!line) continue;
+      const normalizedLine = normalizeBlock(line);
+      if (!normalizedLine) continue;
+      const dedupeKey = normalizedLine.toLowerCase();
+      if (existing.has(dedupeKey)) continue;
+      const nextCost = normalizedLine.length + (blocks.length > 0 ? 2 : 0);
+      if (totalChars + nextCost > HELIX_ASK_COMPOSER_V2_HANDOFF_MAX_CHARS) {
+        truncated = true;
+        break;
+      }
+      blocks.push(normalizedLine);
+      totalChars += nextCost;
+      existing.add(dedupeKey);
+      handoffSource = "fallback_claims";
+    }
+  }
+
+  return { blocks, totalChars, truncated, source: handoffSource };
+};
+
 const buildHelixAskComposerV2GroundedBrief = (args: {
   plan: HelixAskAnswerPlan;
   question: string;
   existingText: string;
+  evidenceText?: string;
   envelope: HelixAskIntentPolicyEnvelope;
 }): HelixAskComposerV2GroundedBrief => {
   const question = String(args.question ?? "").trim();
@@ -21972,19 +23486,72 @@ const buildHelixAskComposerV2GroundedBrief = (args: {
   const primaryDoc = docHints[0] ?? primaryAnchor;
   const topicTerms = extractComposerV2TopicTerms(question);
   const topicLabel = topicTerms.length > 0 ? topicTerms.join(" ") : "the requested topic";
+  const canonicalEvidenceText = String(args.evidenceText ?? "").trim();
+  const evidenceHandoff = buildHelixAskComposerV2EvidenceHandoff({
+    question,
+    evidenceText: canonicalEvidenceText || String(args.existingText ?? ""),
+    allowedCitations: sourceHints,
+  });
+  const evidenceDigestSource: HelixAskComposerV2GroundedBrief["evidence_digest_source"] =
+    canonicalEvidenceText
+      ? "canonical_evidence"
+      : evidenceHandoff.source === "citation_snippets" ||
+          evidenceHandoff.source === "evidence_text_plus_citation_snippets"
+        ? "citation_snippet_fallback"
+        : "existing_text_only";
+  const digestSourceText = canonicalEvidenceText || String(args.existingText ?? "");
+  const evidenceDigestClaims = collectDeterministicEvidenceClaims({
+    question,
+    evidenceText: digestSourceText,
+    conceptual: args.plan.prompt_family !== "implementation_code_path",
+  })
+    .map((entry) =>
+      ensureSentence(
+        clipAskText(cleanDanglingFileExtensionFragments(sanitizeDeterministicContractLine(entry)), 300),
+      ),
+    )
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length >= 20 && !isLowSignalHelixAskComposerV2SeedSentence(entry))
+    .slice(0, 8);
+  const digestSeedSentence =
+    evidenceDigestClaims.find((entry) => entry.length >= 24) ??
+    (sourceHints[0]
+      ? `Primary anchor in this turn is ${sourceHints[0]} with additional support in ${
+          sourceHints.slice(1, 3).join(" and ") || sourceHints[0]
+        }`
+      : "");
   const sentenceSeed =
     splitGroundedSentences(String(args.existingText ?? ""))
       .map((entry) => entry.trim())
       .find((entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry)) ?? "";
-  const shortAnswerSeed = ensureSentence(
-    clipAskText(
-      sentenceSeed ||
-        `In this repository, ${topicLabel} is grounded in ${primaryDoc}${
-          codeHints.length > 0 ? ` and implemented through ${codeHints.slice(0, 2).join(" and ")}` : ""
-        }`,
-      240,
-    ),
-  );
+  const deterministicShortSeed = `In this repository, ${topicLabel} is grounded in ${primaryDoc}${
+    codeHints.length > 0 ? ` and implemented through ${codeHints.slice(0, 2).join(" and ")}` : ""
+  }`;
+  const shortSeedCandidates = [
+    sentenceSeed,
+    digestSeedSentence,
+    deterministicShortSeed,
+  ]
+    .map((entry) => normalizeHelixAskComposerV2ClaimText(entry))
+    .filter(Boolean)
+    .filter((entry) => !isLowSignalHelixAskComposerV2SeedSentence(entry))
+    .filter((entry) => !HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(entry));
+  let shortAnswerSeed = "";
+  let shortSeedScore = Number.NEGATIVE_INFINITY;
+  for (const candidate of shortSeedCandidates) {
+    const score = scoreHelixAskComposerV2SeedSentence(candidate, topicTerms, {
+      preferTopic: true,
+      preferMechanism: false,
+    });
+    if (score > shortSeedScore) {
+      shortSeedScore = score;
+      shortAnswerSeed = candidate;
+    }
+  }
+  if (!shortAnswerSeed) {
+    shortAnswerSeed = normalizeHelixAskComposerV2ClaimText(deterministicShortSeed);
+  }
+  shortAnswerSeed = ensureSentence(clipAskText(shortAnswerSeed, 240));
   const conceptualBaselineSeed = ensureSentence(
     `Conceptually, this answer separates general context from repo-proof so claims stay traceable and testable`,
   );
@@ -22000,12 +23567,18 @@ const buildHelixAskComposerV2GroundedBrief = (args: {
   );
   return {
     source: "deterministic_grounded_brief",
+    evidence_digest_source: evidenceDigestSource,
     prompt_family: args.plan.prompt_family,
     prompt_specificity: args.plan.prompt_specificity,
     question,
     short_answer_seed: shortAnswerSeed,
     conceptual_baseline_seed: conceptualBaselineSeed,
     repo_solve_seed: repoSolveSeed,
+    evidence_digest_claims: evidenceDigestClaims,
+    evidence_handoff_source: evidenceHandoff.source,
+    evidence_handoff_blocks: evidenceHandoff.blocks,
+    evidence_handoff_chars: evidenceHandoff.totalChars,
+    evidence_handoff_truncated: evidenceHandoff.truncated,
     evidence_anchor_hints: sourceHints.length > 0 ? sourceHints.slice(0, 8) : [primaryAnchor],
     open_gaps_seed: openGapsSeed,
   };
@@ -22040,6 +23613,8 @@ const buildHelixAskComposerV2ExpandPrompt = (args: {
   lines.push(`- prompt_family: ${args.brief.prompt_family}`);
   lines.push(`- prompt_specificity: ${args.brief.prompt_specificity}`);
   lines.push(`- question: ${args.brief.question}`);
+  lines.push(`- evidence_digest_source: ${args.brief.evidence_digest_source}`);
+  lines.push(`- evidence_handoff_source: ${args.brief.evidence_handoff_source}`);
   lines.push(`- short_answer_seed: ${args.brief.short_answer_seed}`);
   lines.push(`- conceptual_baseline_seed: ${args.brief.conceptual_baseline_seed}`);
   lines.push(`- repo_solve_seed: ${args.brief.repo_solve_seed}`);
@@ -22047,6 +23622,25 @@ const buildHelixAskComposerV2ExpandPrompt = (args: {
   lines.push(
     `- evidence_anchor_hints: ${args.brief.evidence_anchor_hints.length > 0 ? args.brief.evidence_anchor_hints.join(", ") : "(none)"}`,
   );
+  lines.push("- evidence_digest_claims:");
+  if (args.brief.evidence_digest_claims.length > 0) {
+    for (const claim of args.brief.evidence_digest_claims.slice(0, 8)) {
+      lines.push(`  - ${claim}`);
+    }
+  } else {
+    lines.push("  - (none)");
+  }
+  lines.push(
+    `- evidence_handoff: blocks=${args.brief.evidence_handoff_blocks.length}, chars=${args.brief.evidence_handoff_chars}, truncated=${args.brief.evidence_handoff_truncated}`,
+  );
+  lines.push("- evidence_handoff_blocks (retrieval handoff; treat as primary grounding context):");
+  if (args.brief.evidence_handoff_blocks.length > 0) {
+    for (let i = 0; i < args.brief.evidence_handoff_blocks.length; i += 1) {
+      lines.push(`  [BLOCK ${i + 1}] ${args.brief.evidence_handoff_blocks[i]}`);
+    }
+  } else {
+    lines.push("  [BLOCK 1] (none)");
+  }
   lines.push("");
   lines.push(
     `Allowed citations (use only these): ${args.allowedCitations.length > 0 ? args.allowedCitations.join(", ") : "(none)"}`,
@@ -22440,11 +24034,13 @@ const normalizeHelixAskComposerV2ClaimText = (value: string): string => {
   cleaned = cleaned.replace(/^(?:[-*]\s*|\d+\.\s*)+/, "");
   cleaned = cleaned.replace(/^[;:,]+/, "").trim();
   if (!cleaned) return "";
+  if (isDeterministicCodeNoiseLine(cleaned)) return "";
+  if (isDeterministicSingleCharSpill(cleaned)) return "";
   return ensureSentence(clipAskText(cleaned, 320));
 };
 
 const hasHelixAskComposerV2UncertaintySignal = (value: string): boolean =>
-  /\b(?:uncertain|uncertainty|likely|tentative|partial|incomplete|open gap|unknown|may|might|cannot fully)\b/i.test(
+  /\b(?:uncertain|uncertainty|likely|tentative|partial|incomplete|open gap|remains open|narrower anchors?|unknown|may|might|cannot fully)\b/i.test(
     value,
   );
 
@@ -22467,9 +24063,21 @@ const linkHelixAskComposerV2Claims = (args: {
   const linkedClaims: HelixAskComposerV2Claim[] = [];
   for (const claim of args.expansion.claims) {
     const rawClaimText = String(claim.text ?? "");
+    if (isDeterministicCodeNoiseLine(rawClaimText)) {
+      failReasons.push("claim_code_noise");
+      continue;
+    }
+    if (isDeterministicSingleCharSpill(rawClaimText)) {
+      failReasons.push("claim_single_char_spill");
+      continue;
+    }
     const text = normalizeHelixAskComposerV2ClaimText(rawClaimText);
     if (!text) {
       failReasons.push("empty_claim_text");
+      continue;
+    }
+    if (isLowSignalHelixAskComposerV2PathPrefixedSeed(text)) {
+      failReasons.push("claim_path_prefixed_low_signal");
       continue;
     }
     const hasDebugLeak = HELIX_ASK_UNIVERSAL_COMPOSER_DEBUG_LEAK_PATTERNS.some((entry) =>
@@ -22582,30 +24190,168 @@ const buildHelixAskComposerV2SectionFallbackLines = (args: {
   }
 };
 
+const hasHelixAskComposerV2RepoSolveSignal = (value: string): boolean => {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  if (extractFilePathsFromText(text).length > 0) return true;
+  return HELIX_ASK_COMPOSER_V2_MECHANISM_SIGNAL_RE.test(text);
+};
+
+const collectHelixAskComposerV2EvidenceSentenceSeeds = (
+  brief: HelixAskComposerV2GroundedBrief,
+): string[] => {
+  const digestSeeds = brief.evidence_digest_claims
+    .map((entry) => normalizeHelixAskComposerV2ClaimText(entry))
+    .filter(Boolean)
+    .filter((entry) => !isLowSignalHelixAskComposerV2SeedSentence(entry));
+  const handoffSeeds = brief.evidence_handoff_blocks
+    .flatMap((entry) => splitGroundedSentences(entry))
+    .map((entry) => normalizeHelixAskComposerV2ClaimText(entry))
+    .filter(Boolean)
+    .filter((entry) => !isLowSignalHelixAskComposerV2SeedSentence(entry))
+    .filter((entry) => !isLowSignalHelixAskComposerV2PathPrefixedSeed(entry))
+    .filter((entry) => !HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(entry));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of [...digestSeeds, ...handoffSeeds]) {
+    const dedupe = canonicalizeHelixAskComposerV2ClaimDedupeKey(entry);
+    if (!dedupe || seen.has(dedupe)) continue;
+    seen.add(dedupe);
+    out.push(entry);
+  }
+  return out;
+};
+
+const selectHelixAskComposerV2EvidenceSentenceForLane = (args: {
+  brief: HelixAskComposerV2GroundedBrief;
+  lane: "conceptual" | "repo";
+}): string | null => {
+  const topicTerms = extractComposerV2TopicTerms(args.brief.question);
+  const seeds = collectHelixAskComposerV2EvidenceSentenceSeeds(args.brief);
+  let best: string | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const seed of seeds) {
+    if (!seed) continue;
+    if (hasHelixAskComposerV2UncertaintySignal(seed)) continue;
+    const hasRepoSignal = hasHelixAskComposerV2RepoSolveSignal(seed);
+    if (args.lane === "conceptual" && hasRepoSignal) continue;
+    if (args.lane === "repo" && !hasRepoSignal) continue;
+    const score = scoreHelixAskComposerV2SeedSentence(seed, topicTerms, {
+      preferTopic: true,
+      preferMechanism: args.lane === "repo",
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      best = seed;
+    }
+  }
+  return best;
+};
+
+const buildHelixAskComposerV2SectionSupplementalFallbackLines = (args: {
+  section: HelixAskComposerV2SectionId;
+  brief: HelixAskComposerV2GroundedBrief;
+}): string[] => {
+  const codeHints = args.brief.evidence_anchor_hints
+    .filter(
+      (entry) =>
+        /\.(?:ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|cs)(?::\d+)?$/i.test(entry) ||
+        /(?:^|\/)(?:server|client|modules|scripts|tools|shared)\//i.test(entry),
+    )
+    .slice(0, 2);
+  const conceptualEvidenceLine = selectHelixAskComposerV2EvidenceSentenceForLane({
+    brief: args.brief,
+    lane: "conceptual",
+  });
+  const repoEvidenceLine = selectHelixAskComposerV2EvidenceSentenceForLane({
+    brief: args.brief,
+    lane: "repo",
+  });
+  const implementationFallback =
+    codeHints.length > 0
+      ? `Implementation path remains bounded to ${codeHints.join(" and ")} in this turn.`
+      : "Implementation detail remains bounded to the retrieved repo anchors in this turn.";
+  switch (args.section) {
+    case "short_answer":
+      return ["Answer is grounded in retrieved repository anchors for this turn."];
+    case "conceptual_baseline":
+      return [
+        conceptualEvidenceLine ??
+          "Conceptual baseline is limited to high-confidence context while proof claims remain explicitly repo-cited.",
+      ];
+    case "how_repo_solves_it":
+      return [repoEvidenceLine ?? implementationFallback, implementationFallback];
+    case "evidence_proof_anchors":
+      return ["Use the Sources list below for the complete anchor set in this turn."];
+    case "uncertainty_open_gaps":
+    default:
+      return ["Additional detail requires narrower evidence anchors for this turn."];
+  }
+};
+
 const renderHelixAskComposerV2FiveSectionAnswer = (args: {
   claims: HelixAskComposerV2Claim[];
   brief: HelixAskComposerV2GroundedBrief;
   verbosity: HelixAskVerbosity;
 }): string => {
-  const grouped = new Map<HelixAskComposerV2SectionId, string[]>();
+  type SectionLineEntry = {
+    baseText: string;
+    citations: string[];
+    uncertaintyMarker: string | null;
+  };
+  const grouped = new Map<HelixAskComposerV2SectionId, SectionLineEntry[]>();
   const sourcePool: string[] = [];
   for (const sectionId of HELIX_ASK_COMPOSER_V2_SECTION_ORDER) {
     grouped.set(sectionId, []);
   }
   for (const claim of args.claims) {
     const lines = grouped.get(claim.section) ?? [];
-    let line = claim.text;
-    if (claim.citations && claim.citations.length > 0) {
-      sourcePool.push(...claim.citations);
-      line = `${line} [${claim.citations.slice(0, 2).join(", ")}]`;
+    const baseText = normalizeHelixAskComposerV2ClaimText(claim.text);
+    if (!baseText) {
+      grouped.set(claim.section, lines);
+      continue;
     }
-    if (claim.class === "reasoned_inference") {
-      const marker = String(claim.uncertainty_marker ?? "").trim();
-      if (marker) {
-        line = `${line} (uncertainty: ${marker})`;
+    if (isDeterministicCodeNoiseLine(baseText) || isDeterministicSingleCharSpill(baseText)) {
+      grouped.set(claim.section, lines);
+      continue;
+    }
+    if (isLowSignalHelixAskComposerV2PathPrefixedSeed(baseText)) {
+      grouped.set(claim.section, lines);
+      continue;
+    }
+    if (claim.section === "short_answer" && HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(baseText)) {
+      grouped.set(claim.section, lines);
+      continue;
+    }
+    if (claim.section !== "uncertainty_open_gaps" && hasHelixAskComposerV2UncertaintySignal(baseText)) {
+      grouped.set(claim.section, lines);
+      continue;
+    }
+    const dedupeKey = canonicalizeHelixAskComposerV2ClaimDedupeKey(baseText);
+    if (!dedupeKey) {
+      grouped.set(claim.section, lines);
+      continue;
+    }
+    const nextCitations = normalizeCitations(claim.citations ?? []).slice(0, 8);
+    const nextUncertaintyMarker =
+      claim.class === "reasoned_inference"
+        ? String(claim.uncertainty_marker ?? "").trim() || null
+        : null;
+    const existing = lines.find(
+      (entry) => canonicalizeHelixAskComposerV2ClaimDedupeKey(entry.baseText) === dedupeKey,
+    );
+    if (existing) {
+      existing.citations = normalizeCitations([...existing.citations, ...nextCitations]).slice(0, 8);
+      if (!existing.uncertaintyMarker && nextUncertaintyMarker) {
+        existing.uncertaintyMarker = nextUncertaintyMarker;
       }
+    } else {
+      lines.push({
+        baseText,
+        citations: nextCitations,
+        uncertaintyMarker: nextUncertaintyMarker,
+      });
     }
-    lines.push(line.trim());
     grouped.set(claim.section, lines);
   }
 
@@ -22629,21 +24375,80 @@ const renderHelixAskComposerV2FiveSectionAnswer = (args: {
   const lines: string[] = [];
   for (const sectionId of HELIX_ASK_COMPOSER_V2_SECTION_ORDER) {
     const sectionTitle = HELIX_ASK_COMPOSER_V2_SECTION_TITLES[sectionId];
-    const sectionLines = (grouped.get(sectionId) ?? []).slice();
+    const sectionEntries = (grouped.get(sectionId) ?? []).slice();
     const fallbackLines = buildHelixAskComposerV2SectionFallbackLines({
       section: sectionId,
       brief: args.brief,
     });
     for (const fallback of fallbackLines) {
-      if (sectionLines.length >= minCountsBySection[sectionId]) break;
-      sectionLines.push(fallback);
+      if (sectionEntries.length >= minCountsBySection[sectionId]) break;
+      const normalizedFallback = normalizeHelixAskComposerV2ClaimText(fallback);
+      if (!normalizedFallback) continue;
+      if (isLowSignalHelixAskComposerV2PathPrefixedSeed(normalizedFallback)) continue;
+      if (sectionId !== "uncertainty_open_gaps" && hasHelixAskComposerV2UncertaintySignal(normalizedFallback)) {
+        continue;
+      }
+      const exists = sectionEntries.some(
+        (entry) =>
+          canonicalizeHelixAskComposerV2ClaimDedupeKey(entry.baseText) ===
+          canonicalizeHelixAskComposerV2ClaimDedupeKey(normalizedFallback),
+      );
+      if (!exists) {
+        sectionEntries.push({
+          baseText: normalizedFallback,
+          citations: [],
+          uncertaintyMarker: null,
+        });
+      }
     }
-    while (sectionLines.length < minCountsBySection[sectionId]) {
-      sectionLines.push(args.brief.open_gaps_seed);
+    let fallbackGuard = 0;
+    const supplementalFallbackLines = buildHelixAskComposerV2SectionSupplementalFallbackLines({
+      section: sectionId,
+      brief: args.brief,
+    });
+    let supplementalIndex = 0;
+    while (sectionEntries.length < minCountsBySection[sectionId] && fallbackGuard < 4) {
+      const fallbackText = normalizeHelixAskComposerV2ClaimText(
+        supplementalFallbackLines[supplementalIndex] ??
+          (sectionId === "uncertainty_open_gaps"
+            ? "Additional detail requires narrower evidence anchors for this turn."
+            : "Detail remains bounded to the retrieved repository evidence in this turn."),
+      );
+      if (!fallbackText) break;
+      if (sectionId !== "uncertainty_open_gaps" && hasHelixAskComposerV2UncertaintySignal(fallbackText)) {
+        fallbackGuard += 1;
+        supplementalIndex += 1;
+        continue;
+      }
+      const exists = sectionEntries.some(
+        (entry) =>
+          canonicalizeHelixAskComposerV2ClaimDedupeKey(entry.baseText) ===
+          canonicalizeHelixAskComposerV2ClaimDedupeKey(fallbackText),
+      );
+      if (!exists) {
+        sectionEntries.push({
+          baseText: fallbackText,
+          citations: [],
+          uncertaintyMarker: null,
+        });
+      }
+      fallbackGuard += 1;
+      supplementalIndex += 1;
     }
     lines.push(`${sectionTitle}:`);
-    for (const sectionLine of sectionLines) {
-      const cleanedLine = normalizeHelixAskComposerV2ClaimText(sectionLine);
+    for (const sectionEntry of sectionEntries) {
+      let line = sectionEntry.baseText;
+      if (sectionEntry.citations.length > 0) {
+        const citations = normalizeCitations(sectionEntry.citations).slice(0, 2);
+        if (citations.length > 0) {
+          sourcePool.push(...citations);
+          line = `${line} [${citations.join(", ")}]`;
+        }
+      }
+      if (sectionEntry.uncertaintyMarker) {
+        line = `${line} (uncertainty: ${sectionEntry.uncertaintyMarker})`;
+      }
+      const cleanedLine = normalizeHelixAskComposerV2ClaimText(line);
       if (!cleanedLine) continue;
       lines.push(`- ${cleanedLine}`);
     }
@@ -22754,6 +24559,7 @@ const buildHelixAskComposerV2DeterministicProjectionClaims = (args: {
   existingText: string;
   allowedCitations: string[];
 }): HelixAskComposerV2Claim[] => {
+  const topicTerms = extractComposerV2TopicTerms(args.brief.question);
   const allowed = normalizeCitations(args.allowedCitations).slice(0, 8);
   const firstCitation = allowed[0] ?? null;
   const codeHints = allowed
@@ -22766,20 +24572,165 @@ const buildHelixAskComposerV2DeterministicProjectionClaims = (args: {
   const docHints = allowed
     .filter((entry) => !codeHints.includes(entry))
     .slice(0, 3);
+  const digestSeed =
+    args.brief.evidence_digest_claims.find(
+      (entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry),
+    ) ?? "";
+  const handoffSeed =
+    args.brief.evidence_handoff_blocks
+      .flatMap((entry) => splitGroundedSentences(entry))
+      .map((entry) => entry.trim())
+      .find((entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry)) ?? "";
+  const digestMechanismSeed =
+    args.brief.evidence_digest_claims.find(
+      (entry) =>
+        !isLowSignalHelixAskComposerV2SeedSentence(entry) &&
+        (extractFilePathsFromText(entry).length > 0 ||
+          /\b(?:implemented|compute|computed|orchestrat|solve|solver|pipeline|path|module|runtime)\b/i.test(entry)),
+    ) ?? "";
+  const handoffMechanismSeed =
+    args.brief.evidence_handoff_blocks
+      .flatMap((entry) => splitGroundedSentences(entry))
+      .map((entry) => entry.trim())
+      .find(
+        (entry) =>
+          !isLowSignalHelixAskComposerV2SeedSentence(entry) &&
+          (extractFilePathsFromText(entry).length > 0 ||
+            /\b(?:implemented|compute|computed|orchestrat|solve|solver|pipeline|path|module|runtime)\b/i.test(entry)),
+      ) ?? "";
   const sentenceSeed =
     splitGroundedSentences(String(args.existingText ?? ""))
       .map((entry) => entry.trim())
       .find((entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry)) ??
     "";
   const normalizedSeedText = normalizeHelixAskComposerV2ClaimText(sentenceSeed);
-  const shortText =
-    (!isLowSignalHelixAskComposerV2SeedSentence(normalizedSeedText)
-      ? normalizedSeedText
-      : "") ||
-    normalizeHelixAskComposerV2ClaimText(args.brief.short_answer_seed) ||
-    "Answer is grounded to the retrieved repository anchors.";
+  const normalizedDigestSeedText = normalizeHelixAskComposerV2ClaimText(digestSeed);
+  const normalizedHandoffSeedText = normalizeHelixAskComposerV2ClaimText(handoffSeed);
+  const normalizedBriefShortSeed = normalizeHelixAskComposerV2ClaimText(args.brief.short_answer_seed);
+  const shortSeedCandidates = [
+    normalizedBriefShortSeed,
+    normalizedDigestSeedText,
+    normalizedHandoffSeedText,
+    normalizedSeedText,
+  ]
+    .filter(Boolean)
+    .filter((entry) => !isLowSignalHelixAskComposerV2PathPrefixedSeed(entry))
+    .filter((entry) => !HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(entry));
+  let shortText = "";
+  let shortBestScore = Number.NEGATIVE_INFINITY;
+  for (const candidate of shortSeedCandidates) {
+    const score = scoreHelixAskComposerV2SeedSentence(candidate, topicTerms, {
+      preferTopic: true,
+      preferMechanism: false,
+    });
+    if (score > shortBestScore) {
+      shortBestScore = score;
+      shortText = candidate;
+    }
+  }
+  if (!shortText || shortBestScore <= -900 || HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(shortText)) {
+    shortText = "Answer is grounded to the retrieved repository anchors.";
+  }
+  const normalizedRepoSolveSeed = normalizeHelixAskComposerV2ClaimText(args.brief.repo_solve_seed);
+  const normalizedDigestMechanismSeed = normalizeHelixAskComposerV2ClaimText(digestMechanismSeed);
+  const normalizedHandoffMechanismSeed = normalizeHelixAskComposerV2ClaimText(handoffMechanismSeed);
+  const repoSolveCandidates = [
+    normalizedRepoSolveSeed,
+    normalizedHandoffMechanismSeed,
+    normalizedDigestMechanismSeed,
+    normalizedHandoffSeedText,
+    normalizedDigestSeedText,
+  ].filter(Boolean);
+  let repoSolveText = "";
+  let repoSolveBestScore = Number.NEGATIVE_INFINITY;
+  for (const candidate of repoSolveCandidates) {
+    if (/runs through\s+and\s+with\s+constraints\s+grounded\s+in\s+\./i.test(candidate)) continue;
+    if (isLowSignalHelixAskComposerV2PathPrefixedSeed(candidate)) continue;
+    if (hasHelixAskComposerV2UncertaintySignal(candidate)) continue;
+    const score = scoreHelixAskComposerV2SeedSentence(candidate, topicTerms, {
+      preferTopic: true,
+      preferMechanism: true,
+    });
+    if (score > repoSolveBestScore) {
+      repoSolveBestScore = score;
+      repoSolveText = candidate;
+    }
+  }
+  if (!repoSolveText || repoSolveBestScore <= -900) {
+    repoSolveText =
+      codeHints.length > 0
+        ? `Repository solve path runs through ${codeHints.slice(0, 2).join(" and ")} with constraints grounded in ${docHints[0] ?? firstCitation ?? codeHints[0]}`
+        : "Repository solve details are grounded in retrieved repo anchors.";
+  }
+  let secondaryRepoSolveText = "";
+  for (const candidate of [normalizedHandoffMechanismSeed, normalizedDigestMechanismSeed, normalizedDigestSeedText]) {
+    const normalizedCandidate = normalizeHelixAskComposerV2ClaimText(candidate);
+    if (!normalizedCandidate) continue;
+    if (isLowSignalHelixAskComposerV2PathPrefixedSeed(normalizedCandidate)) continue;
+    if (hasHelixAskComposerV2UncertaintySignal(normalizedCandidate)) continue;
+    if (
+      canonicalizeHelixAskComposerV2ClaimDedupeKey(normalizedCandidate) ===
+      canonicalizeHelixAskComposerV2ClaimDedupeKey(repoSolveText)
+    ) {
+      continue;
+    }
+    const score = scoreHelixAskComposerV2SeedSentence(normalizedCandidate, topicTerms, {
+      preferTopic: true,
+      preferMechanism: true,
+    });
+    if (score >= 1) {
+      secondaryRepoSolveText = normalizedCandidate;
+      break;
+    }
+  }
+  let anchorEvidenceDetail = "";
+  for (const candidate of [normalizedHandoffSeedText, normalizedDigestSeedText, normalizedDigestMechanismSeed]) {
+    const normalizedCandidate = normalizeHelixAskComposerV2ClaimText(candidate);
+    if (!normalizedCandidate) continue;
+    if (isLowSignalHelixAskComposerV2PathPrefixedSeed(normalizedCandidate)) continue;
+    const score = scoreHelixAskComposerV2SeedSentence(normalizedCandidate, topicTerms, {
+      preferTopic: true,
+      preferMechanism: false,
+    });
+    if (score >= 1) {
+      anchorEvidenceDetail = normalizedCandidate;
+      break;
+    }
+  }
   const claims: HelixAskComposerV2Claim[] = [];
-  claims.push({
+  const claimKeys = new Set<string>();
+  const conceptualEvidenceSeed = selectHelixAskComposerV2EvidenceSentenceForLane({
+    brief: args.brief,
+    lane: "conceptual",
+  });
+  const repoEvidenceSeed = selectHelixAskComposerV2EvidenceSentenceForLane({
+    brief: args.brief,
+    lane: "repo",
+  });
+  const appendClaim = (claim: HelixAskComposerV2Claim): void => {
+    const normalizedText = normalizeHelixAskComposerV2ClaimText(claim.text);
+    if (!normalizedText) return;
+    if (isLowSignalHelixAskComposerV2PathPrefixedSeed(normalizedText)) return;
+    if (claim.section === "short_answer" && HELIX_ASK_COMPOSER_V2_PATH_PREFIX_RE.test(normalizedText)) return;
+    if (claim.section !== "uncertainty_open_gaps" && hasHelixAskComposerV2UncertaintySignal(normalizedText)) {
+      return;
+    }
+    const dedupeKey = canonicalizeHelixAskComposerV2ClaimDedupeKey(normalizedText);
+    if (!dedupeKey) return;
+    const sectionKey = `${claim.section}:${dedupeKey}`;
+    if (claimKeys.has(sectionKey)) return;
+    claimKeys.add(sectionKey);
+    claims.push({
+      ...claim,
+      text: normalizedText,
+      citations: normalizeCitations(claim.citations ?? []).slice(0, 8),
+      uncertainty_marker:
+        claim.class === "reasoned_inference"
+          ? String(claim.uncertainty_marker ?? "").trim() || undefined
+          : undefined,
+    });
+  };
+  appendClaim({
     section: "short_answer",
     class: "repo_grounded",
     text: shortText,
@@ -22788,21 +24739,56 @@ const buildHelixAskComposerV2DeterministicProjectionClaims = (args: {
       ...(firstCitation ? [firstCitation] : []),
     ]).slice(0, 2),
   });
-  claims.push({
+  appendClaim({
     section: "conceptual_baseline",
     class: "baseline_common",
     text: normalizeHelixAskComposerV2ClaimText(args.brief.conceptual_baseline_seed),
   });
-  claims.push({
+  if (args.brief.evidence_handoff_source !== "fallback_claims") {
+    appendClaim({
+      section: "conceptual_baseline",
+      class: "baseline_common",
+      text:
+        conceptualEvidenceSeed ??
+        (args.brief.evidence_handoff_source === "citation_snippets"
+          ? "Conceptual lane is expanded from citation-anchored snippets to preserve context while keeping proof claims separate."
+          : "Conceptual lane keeps generic context separate from repo-proof claims so grounding remains explicit."),
+    });
+  }
+  appendClaim({
     section: "how_repo_solves_it",
     class: "repo_grounded",
-    text: normalizeHelixAskComposerV2ClaimText(args.brief.repo_solve_seed),
+    text: normalizeHelixAskComposerV2ClaimText(repoSolveText),
     citations: normalizeCitations([
       ...codeHints.slice(0, 2),
       ...(firstCitation ? [firstCitation] : []),
     ]).slice(0, 3),
   });
-  claims.push({
+  if (secondaryRepoSolveText) {
+    appendClaim({
+      section: "how_repo_solves_it",
+      class: "repo_grounded",
+      text: secondaryRepoSolveText,
+      citations: normalizeCitations([
+        ...codeHints.slice(0, 2),
+        ...docHints.slice(0, 1),
+        ...(firstCitation ? [firstCitation] : []),
+      ]).slice(0, 3),
+    });
+  }
+  if (repoEvidenceSeed) {
+    appendClaim({
+      section: "how_repo_solves_it",
+      class: "repo_grounded",
+      text: repoEvidenceSeed,
+      citations: normalizeCitations([
+        ...codeHints.slice(0, 2),
+        ...docHints.slice(0, 1),
+        ...(firstCitation ? [firstCitation] : []),
+      ]).slice(0, 3),
+    });
+  }
+  appendClaim({
     section: "evidence_proof_anchors",
     class: "repo_grounded",
     text: normalizeHelixAskComposerV2ClaimText(
@@ -22812,7 +24798,19 @@ const buildHelixAskComposerV2DeterministicProjectionClaims = (args: {
     ),
     citations: normalizeCitations([...docHints, ...codeHints, ...allowed]).slice(0, 4),
   });
-  claims.push({
+  if (anchorEvidenceDetail) {
+    appendClaim({
+      section: "evidence_proof_anchors",
+      class: "repo_grounded",
+      text: anchorEvidenceDetail,
+      citations: normalizeCitations([
+        ...docHints,
+        ...codeHints,
+        ...allowed,
+      ]).slice(0, 4),
+    });
+  }
+  appendClaim({
     section: "uncertainty_open_gaps",
     class: "reasoned_inference",
     text:
@@ -28358,9 +30356,11 @@ export const __testHelixAskReliabilityGuards = {
   validateHelixAskAnswerPlanShadow,
   buildHelixAskUniversalFamilyDegradeAnswer,
   shouldApplyHelixAskComposerV2ForPlan,
+  shouldRunHelixAskComposerV2ForSoftReason,
   resolveHelixAskComposerV2Verbosity,
   isLowSignalHelixAskComposerV2SeedSentence,
   buildHelixAskComposerV2GroundedBrief,
+  buildHelixAskComposerV2ExpandPrompt,
   buildHelixAskComposerV2DeterministicProjectionClaims,
   parseHelixAskComposerV2Expansion,
   linkHelixAskComposerV2Claims,
@@ -29821,6 +31821,18 @@ const executeHelixAsk = async ({
       llm_model?: string;
       llm_http_status?: number;
       llm_routed_via?: string;
+      llm_error_class?: string;
+      llm_error_status?: number;
+      llm_error_retry_after_ms?: number;
+      llm_error_timeout_ms?: number;
+      llm_error_max_tokens_requested?: number;
+      llm_error_max_tokens_effective?: number;
+      llm_error_transient?: boolean;
+      llm_error_circuit_open?: boolean;
+      llm_error_circuit_remaining_ms?: number;
+      llm_retry_count?: number;
+      llm_attempt_count?: number;
+      llm_retry_delays_ms?: number[];
       llm_runtime_env?: string | null;
       llm_policy_env?: string | null;
       llm_http_base_present?: boolean;
@@ -29839,6 +31851,17 @@ const executeHelixAsk = async ({
         model?: string;
         status?: number;
         routedVia?: string;
+        errorClass?: string;
+        transient?: boolean;
+        retryAfterMs?: number;
+        timeoutMs?: number;
+        maxTokensRequested?: number;
+        maxTokensEffective?: number;
+        retryCount?: number;
+        attempts?: number;
+        retryDelaysMs?: number[];
+        circuitOpen?: boolean;
+        circuitRemainingMs?: number;
         startedAtIso: string;
         endedAtIso: string;
         durationMs: number;
@@ -30299,6 +32322,40 @@ const executeHelixAsk = async ({
       debugPayload.llm_invoke_ended_at = meta.endedAtIso;
       debugPayload.llm_invoke_duration_ms = meta.durationMs;
       if (meta.errorCode) debugPayload.llm_error_code = meta.errorCode;
+      if (meta.errorClass) debugPayload.llm_error_class = meta.errorClass;
+      if (typeof meta.status === "number" && Number.isFinite(meta.status)) {
+        debugPayload.llm_error_status = Math.floor(meta.status);
+      }
+      if (typeof meta.retryAfterMs === "number" && Number.isFinite(meta.retryAfterMs)) {
+        debugPayload.llm_error_retry_after_ms = Math.max(0, Math.floor(meta.retryAfterMs));
+      }
+      if (typeof meta.timeoutMs === "number" && Number.isFinite(meta.timeoutMs)) {
+        debugPayload.llm_error_timeout_ms = Math.max(0, Math.floor(meta.timeoutMs));
+      }
+      if (typeof meta.maxTokensRequested === "number" && Number.isFinite(meta.maxTokensRequested)) {
+        debugPayload.llm_error_max_tokens_requested = Math.max(0, Math.floor(meta.maxTokensRequested));
+      }
+      if (typeof meta.maxTokensEffective === "number" && Number.isFinite(meta.maxTokensEffective)) {
+        debugPayload.llm_error_max_tokens_effective = Math.max(0, Math.floor(meta.maxTokensEffective));
+      }
+      if (typeof meta.transient === "boolean") {
+        debugPayload.llm_error_transient = meta.transient;
+      }
+      if (typeof meta.circuitOpen === "boolean") {
+        debugPayload.llm_error_circuit_open = meta.circuitOpen;
+      }
+      if (typeof meta.circuitRemainingMs === "number" && Number.isFinite(meta.circuitRemainingMs)) {
+        debugPayload.llm_error_circuit_remaining_ms = Math.max(0, Math.floor(meta.circuitRemainingMs));
+      }
+      if (typeof meta.retryCount === "number" && Number.isFinite(meta.retryCount)) {
+        debugPayload.llm_retry_count = Math.max(0, Math.floor(meta.retryCount));
+      }
+      if (typeof meta.attempts === "number" && Number.isFinite(meta.attempts)) {
+        debugPayload.llm_attempt_count = Math.max(0, Math.floor(meta.attempts));
+      }
+      if (Array.isArray(meta.retryDelaysMs)) {
+        debugPayload.llm_retry_delays_ms = meta.retryDelaysMs.slice(0, 8);
+      }
       if (meta.errorMessage) debugPayload.llm_error_message = meta.errorMessage;
       delete debugPayload.llm_skip_reason;
       delete debugPayload.llm_skip_reason_detail;
@@ -34440,6 +36497,7 @@ const executeHelixAsk = async ({
     let result: LocalAskResult;
     let deterministicRepoRuntimeFallbackUsed = false;
     let answerGenerationFailedForTurn = false;
+    let llmUnavailableAtTurnStart = false;
     let generalScaffold = "";
     let repoScaffold = "";
     let repoScaffoldForPrompt = "";
@@ -34492,10 +36550,74 @@ const executeHelixAsk = async ({
       debugRecord.policy_budget_profile = helixIntentPolicyEnvelope.budget_profile;
       debugRecord.policy_allow_two_pass = helixIntentPolicyEnvelope.allow_two_pass;
       debugRecord.policy_allow_retrieval_retry = helixIntentPolicyEnvelope.allow_retrieval_retry;
+      debugRecord.policy_retrieval_scope = HELIX_ASK_RETRIEVAL_SCOPE;
       debugRecord.policy_question_fingerprint = helixIntentPolicyEnvelope.question_fingerprint;
       debugRecord.policy_requires_repo_evidence = requiresRepoEvidence;
     };
     syncIntentPolicyDebug();
+    let llmBreakerPrewaitOpenAtStart = false;
+    let llmBreakerPrewaitRemainingMsAtStart = 0;
+    let llmBreakerPrewaitAppliedMs = 0;
+    let llmBreakerPrewaitResult: "not_applicable" | "not_open" | "closed_after_wait" | "still_open_after_wait" =
+      "not_applicable";
+    if (
+      HELIX_ASK_LLM_BREAKER_PREWAIT_ENABLED &&
+      !forcedAnswer &&
+      resolveLlmLocalBackend() === "http"
+    ) {
+      const breakerAtStart = getLlmHttpBreakerSnapshot();
+      llmBreakerPrewaitOpenAtStart = Boolean(breakerAtStart.open);
+      llmBreakerPrewaitRemainingMsAtStart =
+        typeof breakerAtStart.remaining_ms === "number" && Number.isFinite(breakerAtStart.remaining_ms)
+          ? Math.max(0, Math.floor(breakerAtStart.remaining_ms))
+          : 0;
+      if (llmBreakerPrewaitOpenAtStart) {
+        const waitMsRaw = Math.min(
+          llmBreakerPrewaitRemainingMsAtStart,
+          HELIX_ASK_LLM_BREAKER_PREWAIT_MAX_MS,
+        );
+        const waitMs =
+          waitMsRaw > 0
+            ? clampNumber(
+                waitMsRaw,
+                Math.min(HELIX_ASK_LLM_BREAKER_PREWAIT_MIN_MS, HELIX_ASK_LLM_BREAKER_PREWAIT_MAX_MS),
+                HELIX_ASK_LLM_BREAKER_PREWAIT_MAX_MS,
+              )
+            : 0;
+        if (waitMs > 0) {
+          llmBreakerPrewaitAppliedMs = waitMs;
+          logEvent("LLM breaker prewait", "wait", `ms=${waitMs}`, undefined, true);
+          await sleepHelixAskComposerV2Retry(waitMs);
+        }
+        const breakerAfterWait = getLlmHttpBreakerSnapshot();
+        if (breakerAfterWait.open) {
+          llmBreakerPrewaitResult = "still_open_after_wait";
+          llmUnavailableAtTurnStart = true;
+          if (debugPayload && !debugPayload.llm_error_code) {
+            debugPayload.llm_error_code = "llm_http_circuit_open";
+            (debugPayload as Record<string, unknown>).llm_error_class = "circuit_open";
+            (debugPayload as Record<string, unknown>).llm_error_circuit_open = true;
+            (debugPayload as Record<string, unknown>).llm_error_circuit_remaining_ms =
+              typeof breakerAfterWait.remaining_ms === "number" && Number.isFinite(breakerAfterWait.remaining_ms)
+                ? Math.max(0, Math.floor(breakerAfterWait.remaining_ms))
+                : 0;
+          }
+        } else {
+          llmBreakerPrewaitResult = "closed_after_wait";
+        }
+      } else {
+        llmBreakerPrewaitResult = "not_open";
+      }
+    }
+    if (debugPayload) {
+      const debugRecord = debugPayload as Record<string, unknown>;
+      debugRecord.llm_breaker_prewait_enabled = HELIX_ASK_LLM_BREAKER_PREWAIT_ENABLED;
+      debugRecord.llm_breaker_open_at_start = llmBreakerPrewaitOpenAtStart;
+      debugRecord.llm_breaker_remaining_ms_at_start = llmBreakerPrewaitRemainingMsAtStart;
+      debugRecord.llm_breaker_wait_applied_ms = llmBreakerPrewaitAppliedMs;
+      debugRecord.llm_breaker_wait_result = llmBreakerPrewaitResult;
+      debugRecord.llm_unavailable_at_turn_start = llmUnavailableAtTurnStart;
+    }
     let alignmentGateDecision: "PASS" | "BORDERLINE" | "FAIL" = "PASS";
     let openWorldBypassMode: "off" | "active" = "off";
     let openWorldBypassEventEmitted = false;
@@ -34751,6 +36873,20 @@ const executeHelixAsk = async ({
               );
               logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
               logEvent("Query hints ready", "fast_mode", `${queryHints.length} deterministic hints`, queryStart);
+            }
+          } else if (llmUnavailableAtTurnStart) {
+            const queryStart = Date.now();
+            queryHints = deterministicQueryHints;
+            planDirectives = null;
+            logProgress("Query hints ready", `${queryHints.length} hints`, queryStart);
+            logEvent(
+              "Query hints ready",
+              "llm_unavailable_prewait",
+              `${queryHints.length} deterministic hints`,
+              queryStart,
+            );
+            if (debugPayload) {
+              (debugPayload as Record<string, unknown>).query_hints_llm_skipped_due_to_unavailable = true;
             }
           } else if (
             HELIX_ASK_QUERY_HINTS_PREFLIGHT_SHORT_CIRCUIT &&
@@ -40715,7 +42851,8 @@ const executeHelixAsk = async ({
         !primaryContractResult &&
         HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
         !HELIX_ASK_SINGLE_LLM &&
-        primaryContractEvidence.evidenceText.trim()
+        primaryContractEvidence.evidenceText.trim() &&
+        !llmUnavailableAtTurnStart
       ) {
         const contractPrimaryBudget = canStartFastHelper(
           "answer_contract_primary",
@@ -41002,6 +43139,19 @@ const executeHelixAsk = async ({
           }
         }
       }
+      if (
+        !primaryContractResult &&
+        HELIX_ASK_ANSWER_CONTRACT_PRIMARY &&
+        !HELIX_ASK_SINGLE_LLM &&
+        primaryContractEvidence.evidenceText.trim() &&
+        llmUnavailableAtTurnStart
+      ) {
+        answerPath.push("answerContract:primary_skipped_llm_unavailable");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).answer_contract_primary_skipped_due_to_llm_unavailable =
+            true;
+        }
+      }
       logDebug("llmLocalHandler MAIN start", {
         maxTokens: answerMaxTokens,
         temperature: parsed.data.temperature ?? null,
@@ -41043,6 +43193,11 @@ const executeHelixAsk = async ({
           : Date.now();
       let answerGenerationFailed = false;
       let retryApplied = false;
+      let answerLlmAttemptCount = 0;
+      let answerLlmTransientRetryCount = 0;
+      let answerLlmTransientRetryWaitTotalMs = 0;
+      const answerLlmTransientRetryCodes: string[] = [];
+      let answerLlmLastErrorCode: string | null = null;
       let answerText = "";
       let answerMeta = isShortAnswer(answerText, verbosity);
       let resultForAnswer: LocalAskResult | null = null;
@@ -41072,31 +43227,101 @@ const executeHelixAsk = async ({
           markLlmSkipDebug("fast_quality_answer_budget");
           answerGenerationFailed = true;
           answerGenerationFailedForTurn = true;
+        } else if (llmUnavailableAtTurnStart) {
+          markLlmSkipDebug("llm_breaker_unavailable_at_turn_start", "breaker_open_after_prewait");
+          answerPath.push("answer:skipped_llm_unavailable");
+          answerGenerationFailed = true;
+          answerGenerationFailedForTurn = true;
+          if (debugPayload) {
+            (debugPayload as Record<string, unknown>).llm_unavailable_root_stage = "answer_main_skipped";
+          }
         } else {
-        const { result: answerResult, overflow: answerOverflow, llm: answerLlm } =
-          await runHelixAskLocalWithOverflowRetry(
-            {
-              prompt: answerPrompt,
-              max_tokens: answerMaxTokens,
-              temperature: parsed.data.temperature,
-              seed: parsed.data.seed,
-              stop: parsed.data.stop,
-              model: dialogueProfileModel,
-            },
-            {
-              personaId,
-              sessionId: parsed.data.sessionId,
-              traceId: askTraceId,
-              onToken: streamEmitter.onToken,
-            },
-            {
-              fallbackMaxTokens: answerFallbackTokens,
-              allowContextDrop: true,
-              label: "answer",
-              dialogueProfile,
-              dialogueQuestion: baseQuestion,
-            },
-          );
+        let answerResult: LocalAskResult | null = null;
+        let answerOverflow: HelixAskOverflowMeta | undefined;
+        let answerLlm: HelixAskLlmCallMeta | undefined;
+        for (let answerAttemptIndex = 0; ; answerAttemptIndex += 1) {
+          answerLlmAttemptCount = answerAttemptIndex + 1;
+          try {
+            const attempt = await runHelixAskLocalWithOverflowRetry(
+              {
+                prompt: answerPrompt,
+                max_tokens: answerMaxTokens,
+                temperature: parsed.data.temperature,
+                seed: parsed.data.seed,
+                stop: parsed.data.stop,
+                model: dialogueProfileModel,
+              },
+              {
+                personaId,
+                sessionId: parsed.data.sessionId,
+                traceId: askTraceId,
+                onToken: streamEmitter.onToken,
+              },
+              {
+                fallbackMaxTokens: answerFallbackTokens,
+                allowContextDrop: true,
+                label: "answer",
+                dialogueProfile,
+                dialogueQuestion: baseQuestion,
+              },
+            );
+            answerResult = attempt.result as LocalAskResult;
+            answerOverflow = attempt.overflow;
+            answerLlm = attempt.llm;
+            break;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const errorDetails = parseHelixAskLlmErrorDetails(error);
+            const transientCode =
+              errorDetails.normalizedCode ??
+              parseHelixAskLlmErrorCode(
+                (error as { __llm_call?: { errorCode?: string } } | null | undefined)?.__llm_call
+                  ?.errorCode,
+              );
+            answerLlmLastErrorCode = transientCode ?? answerLlmLastErrorCode;
+            const canRetry =
+              Boolean(transientCode) &&
+              isHelixAskComposerV2TransientLlmErrorCode(transientCode) &&
+              answerAttemptIndex < HELIX_ASK_ANSWER_TRANSIENT_RETRY_ATTEMPTS;
+            logEvent(
+              "LLM answer failure class",
+              canRetry ? "transient" : "terminal",
+              [
+                `code=${transientCode ?? "unknown"}`,
+                `class=${errorDetails.errorClass}`,
+                `status=${errorDetails.status ?? "n/a"}`,
+                `retryAfterMs=${errorDetails.retryAfterMs ?? 0}`,
+                `timeoutMs=${errorDetails.timeoutMs ?? 0}`,
+                `maxTokens=${errorDetails.maxTokensEffective ?? answerMaxTokens}`,
+              ].join(" | "),
+              undefined,
+              canRetry,
+            );
+            if (!canRetry) {
+              throw error;
+            }
+            const retryWaitMs = resolveHelixAskAnswerTransientRetryDelayMs(
+              transientCode,
+              answerAttemptIndex + 1,
+            );
+            answerLlmTransientRetryCount += 1;
+            answerLlmTransientRetryWaitTotalMs += retryWaitMs;
+            if (transientCode) {
+              answerLlmTransientRetryCodes.push(transientCode);
+            }
+            answerPath.push(
+              `answer:transient_retry_wait:${answerAttemptIndex + 1}:${transientCode ?? "transient"}`,
+            );
+            logEvent(
+              "LLM answer transient retry",
+              "wait",
+              `attempt=${answerAttemptIndex + 1} code=${transientCode ?? "transient"} ms=${retryWaitMs}`,
+              undefined,
+              true,
+            );
+            await sleepHelixAskComposerV2Retry(retryWaitMs);
+          }
+        }
         recordOverflow("answer", answerOverflow);
         appendLlmCallDebug(answerLlm);
         answerText = (answerResult as LocalAskResult)?.text ?? "";
@@ -41214,11 +43439,28 @@ const executeHelixAsk = async ({
         const message = error instanceof Error ? error.message : String(error);
         const llmCall = (error as { __llm_call?: HelixAskLlmCallMeta } | null | undefined)?.__llm_call;
         const fallbackBackend = resolveLlmLocalBackend();
+        const parsedError = parseHelixAskLlmErrorDetails(error);
+        const parsedErrorCode =
+          llmCall?.errorCode ??
+          parsedError.normalizedCode ??
+          parseHelixAskLlmErrorCode(message) ??
+          answerLlmLastErrorCode ??
+          undefined;
+        answerLlmLastErrorCode = parsedErrorCode ?? answerLlmLastErrorCode;
         appendLlmCallDebug(
           llmCall
             ? {
                 ...llmCall,
-                errorCode: llmCall.errorCode ?? parseHelixAskLlmErrorCode(message),
+                errorCode: parsedErrorCode,
+                errorClass: llmCall.errorClass ?? parsedError.errorClass,
+                status: llmCall.status ?? parsedError.status,
+                transient: typeof llmCall.transient === "boolean" ? llmCall.transient : parsedError.transient,
+                retryAfterMs: llmCall.retryAfterMs ?? parsedError.retryAfterMs,
+                timeoutMs: llmCall.timeoutMs ?? parsedError.timeoutMs,
+                maxTokensRequested: llmCall.maxTokensRequested ?? parsedError.maxTokensRequested,
+                maxTokensEffective: llmCall.maxTokensEffective ?? parsedError.maxTokensEffective,
+                circuitOpen: typeof llmCall.circuitOpen === "boolean" ? llmCall.circuitOpen : parsedError.circuitOpen,
+                circuitRemainingMs: llmCall.circuitRemainingMs ?? parsedError.circuitRemainingMs,
                 errorMessage: llmCall.errorMessage ?? message,
               }
             : {
@@ -41228,9 +43470,32 @@ const executeHelixAsk = async ({
                 startedAtIso: new Date().toISOString(),
                 endedAtIso: new Date().toISOString(),
                 durationMs: 0,
-                errorCode: parseHelixAskLlmErrorCode(message),
+                errorCode: parsedErrorCode,
+                errorClass: parsedError.errorClass,
+                status: parsedError.status,
+                transient: parsedError.transient,
+                retryAfterMs: parsedError.retryAfterMs,
+                timeoutMs: parsedError.timeoutMs,
+                maxTokensRequested: parsedError.maxTokensRequested,
+                maxTokensEffective: parsedError.maxTokensEffective,
+                circuitOpen: parsedError.circuitOpen,
+                circuitRemainingMs: parsedError.circuitRemainingMs,
                 errorMessage: message,
               },
+        );
+        logEvent(
+          "LLM answer failure class",
+          "terminal",
+          [
+            `code=${parsedErrorCode ?? "unknown"}`,
+            `class=${parsedError.errorClass}`,
+            `status=${parsedError.status ?? "n/a"}`,
+            `retryAfterMs=${parsedError.retryAfterMs ?? 0}`,
+            `timeoutMs=${parsedError.timeoutMs ?? 0}`,
+            `maxTokens=${parsedError.maxTokensEffective ?? answerMaxTokens}`,
+          ].join(" | "),
+          answerStart,
+          false,
         );
         if (llmAnswerStarted) {
           logStepEnd(
@@ -41250,6 +43515,14 @@ const executeHelixAsk = async ({
           debugPayload.answer_model_error = message;
           debugPayload.answer_fallback_used = true;
           debugPayload.answer_fallback_reason = "llm_error";
+          const unavailableCode = parseHelixAskLlmErrorCode(parsedErrorCode);
+          if (
+            unavailableCode &&
+            (isHelixAskComposerV2TransientLlmErrorCode(unavailableCode) ||
+              unavailableCode === "llm_http_circuit_open")
+          ) {
+            (debugPayload as Record<string, unknown>).llm_unavailable_root_stage = "answer_main_error";
+          }
         }
       }
 
@@ -41352,6 +43625,11 @@ const executeHelixAsk = async ({
       if (debugPayload) {
         debugPayload.answer_short_sentences = answerMeta.sentences;
         debugPayload.answer_short_tokens = answerMeta.tokens;
+        debugPayload.answer_llm_attempt_count = answerLlmAttemptCount;
+        debugPayload.answer_llm_transient_retry_count = answerLlmTransientRetryCount;
+        debugPayload.answer_llm_transient_retry_wait_ms_total = answerLlmTransientRetryWaitTotalMs;
+        debugPayload.answer_llm_transient_retry_codes = Array.from(new Set(answerLlmTransientRetryCodes));
+        debugPayload.answer_llm_last_error_code = answerLlmLastErrorCode;
         if (!retryApplied) {
           debugPayload.answer_retry_applied = false;
         }
@@ -43808,11 +46086,19 @@ const executeHelixAsk = async ({
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             const llmCall = (error as { __llm_call?: HelixAskLlmCallMeta } | null | undefined)?.__llm_call;
+            const errorDetails = parseHelixAskLlmErrorDetails(error);
             appendLlmCallDebug(
               llmCall
                 ? {
                     ...llmCall,
-                    errorCode: llmCall.errorCode ?? parseHelixAskLlmErrorCode(message),
+                    errorCode: llmCall.errorCode ?? errorDetails.normalizedCode ?? parseHelixAskLlmErrorCode(message),
+                    errorClass: llmCall.errorClass ?? errorDetails.errorClass,
+                    status: llmCall.status ?? errorDetails.status,
+                    transient: typeof llmCall.transient === "boolean" ? llmCall.transient : errorDetails.transient,
+                    retryAfterMs: llmCall.retryAfterMs ?? errorDetails.retryAfterMs,
+                    timeoutMs: llmCall.timeoutMs ?? errorDetails.timeoutMs,
+                    maxTokensRequested: llmCall.maxTokensRequested ?? errorDetails.maxTokensRequested,
+                    maxTokensEffective: llmCall.maxTokensEffective ?? errorDetails.maxTokensEffective,
                     errorMessage: llmCall.errorMessage ?? message,
                   }
                 : {
@@ -43822,9 +46108,29 @@ const executeHelixAsk = async ({
                     startedAtIso: new Date().toISOString(),
                     endedAtIso: new Date().toISOString(),
                     durationMs: 0,
-                    errorCode: parseHelixAskLlmErrorCode(message),
+                    errorCode: errorDetails.normalizedCode ?? parseHelixAskLlmErrorCode(message),
+                    errorClass: errorDetails.errorClass,
+                    status: errorDetails.status,
+                    transient: errorDetails.transient,
+                    retryAfterMs: errorDetails.retryAfterMs,
+                    timeoutMs: errorDetails.timeoutMs,
+                    maxTokensRequested: errorDetails.maxTokensRequested,
+                    maxTokensEffective: errorDetails.maxTokensEffective,
                     errorMessage: message,
                   },
+            );
+            logEvent(
+              "LLM answer rescue failure class",
+              "error",
+              [
+                `code=${errorDetails.normalizedCode ?? "unknown"}`,
+                `class=${errorDetails.errorClass}`,
+                `status=${errorDetails.status ?? "n/a"}`,
+                `retryAfterMs=${errorDetails.retryAfterMs ?? 0}`,
+                `timeoutMs=${errorDetails.timeoutMs ?? 0}`,
+              ].join(" | "),
+              rescueStart,
+              false,
             );
             logStepEnd(
               "LLM answer rescue",
@@ -46709,16 +49015,33 @@ const executeHelixAsk = async ({
         const hardComposerGuardTriggered =
           answerPlanValidationShadow.fail_reasons.includes("debug_leak") ||
           answerPlanValidationShadow.fail_reasons.includes("anchor_integrity_violation");
+        const softSectionGuardMissingSections = answerPlanValidationShadow.fail_reasons.includes(
+          "required_sections_missing",
+        );
+        const softSectionGuardFailureObserved =
+          softSectionGuardMissingSections &&
+          (answerPlanShadow.prompt_family !== "equation_formalism" ||
+            answerPlanValidationShadow.family_format_accuracy <=
+              HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY);
+        const softSectionGuardObserved = softSectionGuardFailureObserved;
+        const softSectionGuardEligible = HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_ENABLED;
         const softSectionGuardTriggered =
-          HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_ENABLED &&
-          answerPlanValidationShadow.fail_reasons.includes("required_sections_missing") &&
-          answerPlanValidationShadow.family_format_accuracy <
-            HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY;
+          softSectionGuardEligible && softSectionGuardFailureObserved && HELIX_ASK_GATE_MODE === "enforce";
+        const softSectionGuardObserveSkipped =
+          softSectionGuardFailureObserved && HELIX_ASK_GATE_MODE !== "enforce";
         let composerSoftEnforceTriggerReason: string | null = null;
+        let composerSoftObserveReason: string | null = null;
+        let composerSoftHardGuardReason: string | null = null;
         let composerSoftEnforceAction: string | null = null;
         const composerV2Enabled = shouldApplyHelixAskComposerV2ForPlan(answerPlanShadow);
         let composerV2Applied = false;
         let composerV2BriefSource: string | null = null;
+        let composerV2EvidenceDigestSource: string | null = null;
+        let composerV2EvidenceDigestClaimCount = 0;
+        let composerV2HandoffSource: string | null = null;
+        let composerV2HandoffBlockCount = 0;
+        let composerV2HandoffChars = 0;
+        let composerV2HandoffTruncated = false;
         let composerV2ClaimCounts = createHelixAskComposerV2ClaimCounts();
         let composerV2PreLinkFailReasons: string[] = [];
         let composerV2PostLinkFailReasons: string[] = [];
@@ -46730,13 +49053,115 @@ const executeHelixAsk = async ({
         let composerV2RepairCharCount = 0;
         let composerV2ExpandAttempts = 0;
         let composerV2RepairAttempts = 0;
+        let composerV2ExpandTransientRetries = 0;
+        let composerV2RepairSkippedDueToExpandError = false;
+        let composerV2ExpandErrorCode: string | null = null;
         let composerV2ProjectionApplied = false;
+        let composerSoftObserveRewriteApplied = false;
         let composerV2BestAttemptStage: "expand" | "repair" | "projection" | "deterministic_fallback" | null =
           null;
+        if (softSectionGuardObserveSkipped) {
+          composerSoftObserveReason = "required_sections_missing";
+          answerPath.push("composerShadow:soft_guard_observed:required_sections_missing");
+          answerPath.push("composerShadow:soft_guard_observe_only");
+        }
+        if (
+          softSectionGuardObserveSkipped &&
+          !hardComposerGuardTriggered &&
+          answerPlanShadow.prompt_family !== "equation_formalism"
+        ) {
+          const observeSoftReason = "required_sections_missing";
+          const observeComposerV2ReasonMatch = shouldRunHelixAskComposerV2ForSoftReason(
+            composerV2Enabled,
+            observeSoftReason,
+          );
+          if (observeComposerV2ReasonMatch) {
+            const composerV2Verbosity = resolveHelixAskComposerV2Verbosity(verbosity);
+            const composerV2Brief = buildHelixAskComposerV2GroundedBrief({
+              plan: answerPlanShadow,
+              question: baseQuestion,
+              existingText: cleaned,
+              evidenceText: finalCanonicalEvidence.evidenceWithSources,
+              envelope: helixIntentPolicyEnvelope,
+            });
+            composerV2BriefSource = composerV2Brief.source;
+            composerV2EvidenceDigestSource = composerV2Brief.evidence_digest_source;
+            composerV2EvidenceDigestClaimCount = composerV2Brief.evidence_digest_claims.length;
+            composerV2HandoffSource = composerV2Brief.evidence_handoff_source;
+            composerV2HandoffBlockCount = composerV2Brief.evidence_handoff_blocks.length;
+            composerV2HandoffChars = composerV2Brief.evidence_handoff_chars;
+            composerV2HandoffTruncated = composerV2Brief.evidence_handoff_truncated;
+            answerPath.push("composerV2:brief_built");
+            const projectedClaims = buildHelixAskComposerV2DeterministicProjectionClaims({
+              brief: composerV2Brief,
+              existingText: cleaned,
+              allowedCitations: composerAllowedCitations,
+            });
+            const projectedLink = linkHelixAskComposerV2Claims({
+              expansion: { claims: projectedClaims },
+              allowedCitations: composerAllowedCitations,
+              allowCitationFallback: true,
+            });
+            if (projectedLink.ok) {
+              const projectedText = renderHelixAskComposerV2FiveSectionAnswer({
+                claims: projectedLink.claims,
+                brief: composerV2Brief,
+                verbosity: composerV2Verbosity,
+              }).trim();
+              if (projectedText) {
+                cleaned = projectedText;
+                composerV2Applied = true;
+                composerV2ProjectionApplied = true;
+                composerV2BestAttemptStage = "projection";
+                composerV2FallbackReason = "observe_projection";
+                composerV2ClaimCounts = projectedLink.claimCounts;
+                composerSoftObserveRewriteApplied = true;
+                composerSoftObserveReason = "required_sections_missing:projection";
+                composerSoftEnforceAction = "composer_v2_observe_projection";
+                answerPath.push("composerV2:observe_projection");
+              } else {
+                composerV2PostLinkFailReasons = Array.from(
+                  new Set([...composerV2PostLinkFailReasons, "observe_projection_empty"]),
+                );
+              }
+            } else {
+              composerV2PostLinkFailReasons = Array.from(
+                new Set([...composerV2PostLinkFailReasons, ...projectedLink.failReasons]),
+              );
+              answerPath.push("composerV2:observe_projection_link_fail");
+            }
+            if (!composerV2Applied) {
+              const deterministicV2Fallback = renderHelixAskComposerV2FiveSectionAnswer({
+                claims: [],
+                brief: composerV2Brief,
+                verbosity: composerV2Verbosity,
+              }).trim();
+              if (deterministicV2Fallback) {
+                cleaned = deterministicV2Fallback;
+                composerV2Applied = true;
+                composerV2BestAttemptStage = "deterministic_fallback";
+                composerV2FallbackReason = "observe_deterministic_fallback";
+                composerSoftObserveRewriteApplied = true;
+                composerSoftObserveReason = "required_sections_missing:deterministic_fallback";
+                composerSoftEnforceAction = "composer_v2_observe_deterministic_fallback";
+                answerPath.push("composerV2:observe_deterministic_fallback");
+              } else {
+                composerSoftEnforceAction = composerSoftEnforceAction ?? "observe_no_mutation";
+                answerPath.push("composerV2:observe_no_mutation");
+              }
+            }
+          }
+        }
         if (hardComposerGuardTriggered || softSectionGuardTriggered) {
+          composerSoftHardGuardReason = hardComposerGuardTriggered
+            ? answerPlanValidationShadow.fail_reasons.includes("debug_leak")
+              ? "debug_leak"
+              : answerPlanValidationShadow.fail_reasons.includes("anchor_integrity_violation")
+                ? "anchor_integrity_violation"
+                : "composer_hard_guard"
+            : null;
           const softReason =
-            answerPlanValidationShadow.fail_reasons[0] ??
-            (hardComposerGuardTriggered ? "composer_hard_guard" : "required_sections_missing");
+            hardComposerGuardTriggered ? "composer_hard_guard" : "required_sections_missing";
           composerSoftEnforceTriggerReason = softReason;
           if (answerPlanShadow.prompt_family === "equation_formalism") {
             if (equationSelectorAuthorityLock && equationSelectorResolved?.text?.trim()) {
@@ -46756,17 +49181,123 @@ const executeHelixAsk = async ({
               composerSoftEnforceAction = "equation_degrade";
             }
           } else {
-            const composerV2EligibleForReason =
-              composerV2Enabled && softReason === "required_sections_missing";
-            if (composerV2EligibleForReason) {
+            const composerV2ReasonMatch = shouldRunHelixAskComposerV2ForSoftReason(
+              composerV2Enabled,
+              softReason,
+            );
+            const composerV2LlmBreakerSnapshot = getLlmHttpBreakerSnapshot();
+            const composerV2SkipExpandForLlmUnavailable =
+              composerV2ReasonMatch &&
+              (answerGenerationFailedForTurn || composerV2LlmBreakerSnapshot.open === true);
+            if (composerV2SkipExpandForLlmUnavailable) {
               const composerV2Verbosity = resolveHelixAskComposerV2Verbosity(verbosity);
               const composerV2Brief = buildHelixAskComposerV2GroundedBrief({
                 plan: answerPlanShadow,
                 question: baseQuestion,
                 existingText: cleaned,
+                evidenceText: finalCanonicalEvidence.evidenceWithSources,
                 envelope: helixIntentPolicyEnvelope,
               });
               composerV2BriefSource = composerV2Brief.source;
+              composerV2EvidenceDigestSource = composerV2Brief.evidence_digest_source;
+              composerV2EvidenceDigestClaimCount = composerV2Brief.evidence_digest_claims.length;
+              composerV2HandoffSource = composerV2Brief.evidence_handoff_source;
+              composerV2HandoffBlockCount = composerV2Brief.evidence_handoff_blocks.length;
+              composerV2HandoffChars = composerV2Brief.evidence_handoff_chars;
+              composerV2HandoffTruncated = composerV2Brief.evidence_handoff_truncated;
+              answerPath.push("composerV2:brief_built");
+              answerPath.push("composerV2:expand_skipped_llm_unavailable");
+              if (debugPayload) {
+                const debugRecord = debugPayload as Record<string, unknown>;
+                if (!debugRecord.llm_unavailable_root_stage) {
+                  debugRecord.llm_unavailable_root_stage = "composer_v2_expand_skipped";
+                }
+              }
+              const priorLlmErrorCode =
+                parseHelixAskLlmErrorCode(
+                  typeof (debugPayload as Record<string, unknown> | null)?.llm_error_code === "string"
+                    ? String((debugPayload as Record<string, unknown>).llm_error_code)
+                    : undefined,
+                ) ??
+                (composerV2LlmBreakerSnapshot.open === true
+                  ? "llm_http_circuit_open"
+                  : "llm_unavailable");
+              composerV2ExpandAttempts = 0;
+              composerV2RepairAttempts = 0;
+              composerV2RepairSkippedDueToExpandError = true;
+              composerV2ExpandErrorCode = priorLlmErrorCode;
+              composerV2PreLinkFailReasons = Array.from(
+                new Set(["llm_unavailable_skip_expand", priorLlmErrorCode].filter(Boolean)),
+              );
+              composerV2PostLinkFailReasons = [];
+              const projectedClaims = buildHelixAskComposerV2DeterministicProjectionClaims({
+                brief: composerV2Brief,
+                existingText: cleaned,
+                allowedCitations: composerAllowedCitations,
+              });
+              const projectedLink = linkHelixAskComposerV2Claims({
+                expansion: { claims: projectedClaims },
+                allowedCitations: composerAllowedCitations,
+                allowCitationFallback: true,
+              });
+              if (projectedLink.ok) {
+                const projectedText = renderHelixAskComposerV2FiveSectionAnswer({
+                  claims: projectedLink.claims,
+                  brief: composerV2Brief,
+                  verbosity: composerV2Verbosity,
+                }).trim();
+                if (projectedText) {
+                  cleaned = projectedText;
+                  composerV2Applied = true;
+                  composerV2ProjectionApplied = true;
+                  composerV2BestAttemptStage = "projection";
+                  composerV2FallbackReason = "llm_unavailable_projection";
+                  composerSoftEnforceAction = "composer_v2_projection";
+                  composerV2ClaimCounts = projectedLink.claimCounts;
+                  answerPath.push("composerV2:projection_recovered");
+                }
+              }
+              if (!composerV2Applied) {
+                const deterministicV2Fallback = renderHelixAskComposerV2FiveSectionAnswer({
+                  claims: [],
+                  brief: composerV2Brief,
+                  verbosity: composerV2Verbosity,
+                }).trim();
+                if (deterministicV2Fallback) {
+                  cleaned = deterministicV2Fallback;
+                  answerPath.push("composerV2:fallback_deterministic");
+                  composerV2BestAttemptStage = "deterministic_fallback";
+                  composerV2FallbackReason = "llm_unavailable_deterministic_fallback";
+                  composerSoftEnforceAction = "composer_v2_deterministic_fallback";
+                } else {
+                  cleaned = buildHelixAskUniversalFamilyDegradeAnswer({
+                    plan: answerPlanShadow,
+                    question: baseQuestion,
+                    existingText: cleaned,
+                    reason: softReason,
+                  });
+                  answerPath.push(`composerSoftEnforce:family_degrade:${softReason}`);
+                  answerPath.push("composerV2:fallback_legacy");
+                  composerV2FallbackReason = "llm_unavailable_fallback_legacy";
+                  composerSoftEnforceAction = "family_degrade";
+                }
+              }
+            } else if (composerV2ReasonMatch) {
+              const composerV2Verbosity = resolveHelixAskComposerV2Verbosity(verbosity);
+              const composerV2Brief = buildHelixAskComposerV2GroundedBrief({
+                plan: answerPlanShadow,
+                question: baseQuestion,
+                existingText: cleaned,
+                evidenceText: finalCanonicalEvidence.evidenceWithSources,
+                envelope: helixIntentPolicyEnvelope,
+              });
+              composerV2BriefSource = composerV2Brief.source;
+              composerV2EvidenceDigestSource = composerV2Brief.evidence_digest_source;
+              composerV2EvidenceDigestClaimCount = composerV2Brief.evidence_digest_claims.length;
+              composerV2HandoffSource = composerV2Brief.evidence_handoff_source;
+              composerV2HandoffBlockCount = composerV2Brief.evidence_handoff_blocks.length;
+              composerV2HandoffChars = composerV2Brief.evidence_handoff_chars;
+              composerV2HandoffTruncated = composerV2Brief.evidence_handoff_truncated;
               answerPath.push("composerV2:brief_built");
               const expandPrompt = buildHelixAskComposerV2ExpandPrompt({
                 brief: composerV2Brief,
@@ -46776,34 +49307,76 @@ const executeHelixAsk = async ({
               let expansionRaw = "";
               const preFailSet = new Set<string>();
               const postFailSet = new Set<string>();
+              let expandModelError = false;
               let materialized: HelixAskComposerV2MaterializeResult;
-              answerPath.push("composerV2:expand_start");
-              composerV2ExpandAttempts = 1;
-              try {
-                const expandResult = (await llmLocalHandler(
-                  {
-                    prompt: expandPrompt,
-                    max_tokens: resolveHelixAskComposerV2MaxTokens(composerV2Verbosity),
-                    temperature: 0.15,
-                    metadata: { kind: "helix.ask.composer_v2.expand" },
-                  },
-                  {
-                    personaId,
-                    sessionId: parsed.data.sessionId,
-                    traceId: `${askTraceId}:composer_v2:expand`,
-                    tenantId,
-                  },
-                )) as { text?: unknown };
-                expansionRaw = typeof expandResult?.text === "string" ? expandResult.text : "";
-                composerV2ExpandCharCount = expansionRaw.length;
-                composerV2ExpandRawPreview = clipAskText(expansionRaw, 1200) || null;
-                answerPath.push("composerV2:expand_done");
-              } catch {
-                preFailSet.add("expand_model_error");
-                expansionRaw = "";
-                composerV2ExpandCharCount = 0;
-                composerV2ExpandRawPreview = null;
-                answerPath.push("composerV2:expand_error");
+              for (let expandAttempt = 0; ; expandAttempt += 1) {
+                composerV2ExpandAttempts = expandAttempt + 1;
+                answerPath.push(expandAttempt === 0 ? "composerV2:expand_start" : `composerV2:expand_retry:${expandAttempt}`);
+                try {
+                  const expandResult = (await llmLocalHandler(
+                    {
+                      prompt: expandPrompt,
+                      max_tokens: resolveHelixAskComposerV2MaxTokens(composerV2Verbosity),
+                      temperature: 0.15,
+                      metadata: { kind: "helix.ask.composer_v2.expand" },
+                    },
+                    {
+                      personaId,
+                      sessionId: parsed.data.sessionId,
+                      traceId: `${askTraceId}:composer_v2:expand`,
+                      tenantId,
+                    },
+                  )) as { text?: unknown };
+                  expansionRaw = typeof expandResult?.text === "string" ? expandResult.text : "";
+                  composerV2ExpandCharCount = expansionRaw.length;
+                  composerV2ExpandRawPreview = clipAskText(expansionRaw, 1200) || null;
+                  answerPath.push(expandAttempt === 0 ? "composerV2:expand_done" : `composerV2:expand_done:${expandAttempt}`);
+                  break;
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : String(error);
+                  const errorDetails = parseHelixAskLlmErrorDetails(error);
+                  const errorCode = errorDetails.normalizedCode ?? parseHelixAskLlmErrorCode(message);
+                  composerV2ExpandErrorCode = errorCode ?? null;
+                  const canRetry =
+                    isHelixAskComposerV2TransientLlmErrorCode(errorCode) &&
+                    expandAttempt < HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_ATTEMPTS;
+                  logEvent(
+                    "Composer V2 expand failure class",
+                    canRetry ? "transient" : "terminal",
+                    [
+                      `code=${errorCode ?? "unknown"}`,
+                      `class=${errorDetails.errorClass}`,
+                      `status=${errorDetails.status ?? "n/a"}`,
+                      `retryAfterMs=${errorDetails.retryAfterMs ?? 0}`,
+                      `timeoutMs=${errorDetails.timeoutMs ?? 0}`,
+                    ].join(" | "),
+                    answerStart,
+                    canRetry,
+                  );
+                  if (canRetry) {
+                    const retryDelayMs = resolveHelixAskComposerV2TransientRetryDelayMs(
+                      errorCode,
+                      expandAttempt + 1,
+                    );
+                    composerV2ExpandTransientRetries += 1;
+                    answerPath.push(
+                      `composerV2:expand_retry_wait:${expandAttempt + 1}:${retryDelayMs}:${errorCode ?? "transient"}`,
+                    );
+                    await sleepHelixAskComposerV2Retry(retryDelayMs);
+                    continue;
+                  }
+                  preFailSet.add("expand_model_error");
+                  if (errorCode) preFailSet.add(errorCode);
+                  if (errorDetails.errorClass && errorDetails.errorClass !== "unknown") {
+                    preFailSet.add(`expand_model_error_class:${errorDetails.errorClass}`);
+                  }
+                  expandModelError = true;
+                  expansionRaw = "";
+                  composerV2ExpandCharCount = 0;
+                  composerV2ExpandRawPreview = null;
+                  answerPath.push("composerV2:expand_error");
+                  break;
+                }
               }
               materialized = materializeHelixAskComposerV2Output({
                 rawExpansion: expansionRaw,
@@ -46816,7 +49389,16 @@ const executeHelixAsk = async ({
               materialized.pre_link_fail_reasons.forEach((reason) => preFailSet.add(reason));
               materialized.post_link_fail_reasons.forEach((reason) => postFailSet.add(reason));
               let repairAttempts = 0;
-              while (!materialized.ok && repairAttempts < HELIX_ASK_COMPOSER_V2_MAX_REPAIR_ATTEMPTS) {
+              const skipRepairLoop = expandModelError && !expansionRaw.trim();
+              if (skipRepairLoop) {
+                composerV2RepairSkippedDueToExpandError = true;
+                preFailSet.add("repair_skipped_expand_model_error");
+              }
+              while (
+                !skipRepairLoop &&
+                !materialized.ok &&
+                repairAttempts < HELIX_ASK_COMPOSER_V2_MAX_REPAIR_ATTEMPTS
+              ) {
                 composerV2RepairAttempted = true;
                 repairAttempts += 1;
                 composerV2RepairAttempts = repairAttempts;
@@ -46830,38 +49412,82 @@ const executeHelixAsk = async ({
                 });
                 answerPath.push(`composerV2:repair_start:${repairAttempts}`);
                 const priorRaw = expansionRaw;
-                try {
-                  const repairResult = (await llmLocalHandler(
-                    {
-                      prompt: repairPrompt,
-                      max_tokens: resolveHelixAskComposerV2MaxTokens(composerV2Verbosity),
-                      temperature: 0.1,
-                      metadata: { kind: "helix.ask.composer_v2.repair" },
-                    },
-                    {
-                      personaId,
-                      sessionId: parsed.data.sessionId,
-                      traceId: `${askTraceId}:composer_v2:repair:${repairAttempts}`,
-                      tenantId,
-                    },
-                  )) as { text?: unknown };
-                  const repairedRaw =
-                    typeof repairResult?.text === "string" ? repairResult.text : "";
-                  if (repairedRaw.trim()) {
-                    expansionRaw = repairedRaw;
-                  } else {
-                    preFailSet.add("repair_empty_output");
+                let repairCompleted = false;
+                for (let retryIndex = 0; !repairCompleted; retryIndex += 1) {
+                  try {
+                    const repairResult = (await llmLocalHandler(
+                      {
+                        prompt: repairPrompt,
+                        max_tokens: resolveHelixAskComposerV2MaxTokens(composerV2Verbosity),
+                        temperature: 0.1,
+                        metadata: { kind: "helix.ask.composer_v2.repair" },
+                      },
+                      {
+                        personaId,
+                        sessionId: parsed.data.sessionId,
+                        traceId: `${askTraceId}:composer_v2:repair:${repairAttempts}`,
+                        tenantId,
+                      },
+                    )) as { text?: unknown };
+                    const repairedRaw =
+                      typeof repairResult?.text === "string" ? repairResult.text : "";
+                    if (repairedRaw.trim()) {
+                      expansionRaw = repairedRaw;
+                    } else {
+                      preFailSet.add("repair_empty_output");
+                      expansionRaw = priorRaw;
+                    }
+                    composerV2RepairCharCount = expansionRaw.length;
+                    composerV2RepairRawPreview = clipAskText(expansionRaw, 1200) || null;
+                    answerPath.push(
+                      retryIndex === 0
+                        ? `composerV2:repair_done:${repairAttempts}`
+                        : `composerV2:repair_done:${repairAttempts}:retry${retryIndex}`,
+                    );
+                    repairCompleted = true;
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    const errorDetails = parseHelixAskLlmErrorDetails(error);
+                    const errorCode = errorDetails.normalizedCode ?? parseHelixAskLlmErrorCode(message);
+                    const canRetry =
+                      isHelixAskComposerV2TransientLlmErrorCode(errorCode) &&
+                      retryIndex < HELIX_ASK_COMPOSER_V2_TRANSIENT_RETRY_ATTEMPTS;
+                    logEvent(
+                      "Composer V2 repair failure class",
+                      canRetry ? "transient" : "terminal",
+                      [
+                        `code=${errorCode ?? "unknown"}`,
+                        `class=${errorDetails.errorClass}`,
+                        `status=${errorDetails.status ?? "n/a"}`,
+                        `retryAfterMs=${errorDetails.retryAfterMs ?? 0}`,
+                        `timeoutMs=${errorDetails.timeoutMs ?? 0}`,
+                      ].join(" | "),
+                      answerStart,
+                      canRetry,
+                    );
+                    if (canRetry) {
+                      const retryDelayMs = resolveHelixAskComposerV2TransientRetryDelayMs(
+                        errorCode,
+                        retryIndex + 1,
+                      );
+                      composerV2ExpandTransientRetries += 1;
+                      answerPath.push(
+                        `composerV2:repair_retry_wait:${repairAttempts}:${retryIndex + 1}:${retryDelayMs}:${errorCode ?? "transient"}`,
+                      );
+                      await sleepHelixAskComposerV2Retry(retryDelayMs);
+                      continue;
+                    }
+                    preFailSet.add("repair_model_error");
+                    if (errorCode) preFailSet.add(errorCode);
+                    if (errorDetails.errorClass && errorDetails.errorClass !== "unknown") {
+                      preFailSet.add(`repair_model_error_class:${errorDetails.errorClass}`);
+                    }
                     expansionRaw = priorRaw;
+                    composerV2RepairCharCount = 0;
+                    composerV2RepairRawPreview = null;
+                    answerPath.push(`composerV2:repair_error:${repairAttempts}`);
+                    repairCompleted = true;
                   }
-                  composerV2RepairCharCount = expansionRaw.length;
-                  composerV2RepairRawPreview = clipAskText(expansionRaw, 1200) || null;
-                  answerPath.push(`composerV2:repair_done:${repairAttempts}`);
-                } catch {
-                  preFailSet.add("repair_model_error");
-                  expansionRaw = priorRaw;
-                  composerV2RepairCharCount = 0;
-                  composerV2RepairRawPreview = null;
-                  answerPath.push(`composerV2:repair_error:${repairAttempts}`);
                 }
                 materialized = materializeHelixAskComposerV2Output({
                   rawExpansion: expansionRaw,
@@ -47011,13 +49637,25 @@ const executeHelixAsk = async ({
           debugRecord.composer_degrade_reason = validatedAfterEnforce.degrade_reason;
           debugRecord.composer_degrade_path_id = answerPlanShadow.degrade_path_id;
           debugRecord.composer_soft_enforce_applied =
-            hardComposerGuardTriggered || softSectionGuardTriggered;
+            hardComposerGuardTriggered || softSectionGuardTriggered || composerSoftObserveRewriteApplied;
+          debugRecord.composer_soft_enforce_gate_mode = HELIX_ASK_GATE_MODE;
+          debugRecord.composer_soft_enforce_enabled = softSectionGuardEligible;
+          debugRecord.composer_soft_enforce_soft_section_guard_observed =
+            softSectionGuardObserved;
+          debugRecord.composer_soft_enforce_observe_skip =
+            softSectionGuardObserveSkipped;
+          debugRecord.composer_soft_enforce_observe_reason =
+            composerSoftObserveReason;
+          debugRecord.composer_soft_enforce_observe_rewrite_applied =
+            composerSoftObserveRewriteApplied;
           debugRecord.composer_soft_enforce_hard_guard_triggered =
             hardComposerGuardTriggered;
+          debugRecord.composer_soft_enforce_hard_guard_reason =
+            composerSoftHardGuardReason;
           debugRecord.composer_soft_enforce_soft_section_guard_triggered =
             softSectionGuardTriggered;
           debugRecord.composer_soft_enforce_reason =
-            validatedAfterEnforce.fail_reasons[0] ?? null;
+            composerSoftEnforceTriggerReason;
           debugRecord.composer_soft_enforce_trigger_reason =
             composerSoftEnforceTriggerReason;
           debugRecord.composer_soft_enforce_action =
@@ -47025,6 +49663,12 @@ const executeHelixAsk = async ({
           debugRecord.composer_v2_enabled = composerV2Enabled;
           debugRecord.composer_v2_applied = composerV2Applied;
           debugRecord.composer_v2_brief_source = composerV2BriefSource;
+          debugRecord.composer_v2_evidence_digest_source = composerV2EvidenceDigestSource;
+          debugRecord.composer_v2_evidence_digest_claim_count = composerV2EvidenceDigestClaimCount;
+          debugRecord.composer_v2_handoff_source = composerV2HandoffSource;
+          debugRecord.composer_v2_handoff_block_count = composerV2HandoffBlockCount;
+          debugRecord.composer_v2_handoff_chars = composerV2HandoffChars;
+          debugRecord.composer_v2_handoff_truncated = composerV2HandoffTruncated;
           debugRecord.composer_v2_claim_counts = composerV2ClaimCounts;
           debugRecord.composer_v2_pre_link_fail_reasons =
             composerV2PreLinkFailReasons;
@@ -47038,6 +49682,10 @@ const executeHelixAsk = async ({
           debugRecord.composer_v2_repair_raw_preview = composerV2RepairRawPreview;
           debugRecord.composer_v2_expand_attempts = composerV2ExpandAttempts;
           debugRecord.composer_v2_repair_attempts = composerV2RepairAttempts;
+          debugRecord.composer_v2_transient_retries = composerV2ExpandTransientRetries;
+          debugRecord.composer_v2_repair_skipped_due_to_expand_error =
+            composerV2RepairSkippedDueToExpandError;
+          debugRecord.composer_v2_expand_error_code = composerV2ExpandErrorCode;
           debugRecord.composer_v2_projection_applied = composerV2ProjectionApplied;
           debugRecord.composer_v2_best_attempt_stage = composerV2BestAttemptStage;
           debugRecord.composer_selection_lock_id = answerPlanShadow.selection_lock.lock_id;

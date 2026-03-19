@@ -39,6 +39,58 @@ npm run dev
 Invoke-WebRequest -UseBasicParsing http://localhost:5050/api/agi/ask
 ```
 
+## Single-Prompt Success Checklist (Current)
+
+Use this checklist when validating one UI prompt quickly after a local patch.
+
+### What success looks like
+
+1. LLM transport health (core blocker)
+2. Event log includes `Helix Ask: LLM answer - done` (not `Helix Ask: LLM answer - error`).
+3. `debugContext` includes:
+4. `llm_http_status=200`
+5. `llm_provider_called=true`
+6. no `llm_error_code`
+7. If the call fails, failure details are specific and populated:
+8. `llm_error_class` (`rate_limited`, `timeout`, `context_limit`, `circuit_open`, or `transport`)
+9. `llm_error_code` (example: `llm_http_429:*`, `llm_http_timeout:*`, `llm_http_context_limit:400`)
+10. `llm_retry_count`, `llm_attempt_count`, `llm_retry_delays_ms`, `llm_error_retry_after_ms`
+
+11. Stage05 retrieval/handoff quality (filename-bias fix)
+12. `stage05CardCount > 0`
+13. `stage05SlotCoverage.ratio = 1`
+14. Connectivity debug fields are present:
+15. `stage05_input_connectivity_added_count`
+16. `stage05_input_seed_signal_token_count`
+17. `stage05_input_connected_hint_path_count`
+18. For conceptual warp prompts, answer text references mechanism/context (not only path-name-level generic lines).
+
+19. Composer/final assembly behavior
+20. Prefer answer path markers:
+21. `composerV2:brief_built`
+22. `composerV2:expand_ok`
+23. `composerV2:link_ok`
+24. Avoid repeated fallback markers:
+25. `composerV2:fallback_deterministic`
+26. `composerV2:fallback_legacy`
+27. Final answer must not include:
+28. garbled code spill
+29. duplicated boilerplate lines
+30. scaffold/debug leakage
+
+### What means we still failed
+
+1. `Helix Ask: LLM answer - error` is frequent and detailed class/code fields are missing.
+2. `stage05CardCount` and slot coverage are healthy, but final text remains generic fallback prose.
+3. Composer repeatedly lands on fallback markers despite healthy retrieval and healthy LLM transport.
+4. Output quality regresses into malformed code-like fragments, duplicated lines, or leakage artifacts.
+
+### Evidence to attach when scoring a run
+
+1. final answer text
+2. full `debugContext` JSON
+3. event log lines around `LLM answer` and any `composerV2:*` markers
+
 ## Loop A: Contract Battery
 
 Run deterministic regression checks for known contracts:

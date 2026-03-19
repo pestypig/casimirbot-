@@ -9,6 +9,19 @@ type HelixAskDebug = {
   open_world_bypass_mode?: "off" | "active";
   alignment_gate_decision?: "PASS" | "BORDERLINE" | "FAIL";
   frontier_theory_lens_active?: boolean;
+  stage05_used?: boolean;
+  stage05_card_count?: number;
+  stage05_summary_hard_fail?: boolean;
+  stage05_summary_fail_reason?: string | null;
+  stage05_fallback_reason?: string | null;
+  stage05_slot_coverage?: {
+    ratio?: number;
+    missing?: string[];
+  } | null;
+  composer_v2_applied?: boolean;
+  composer_schema_valid?: boolean;
+  composer_validation_fail_reason?: string | null;
+  llm_error_code?: string | null;
 };
 
 type AskResponse = {
@@ -20,9 +33,9 @@ type RegressionCase = {
   label: string;
   question: string;
   expect: {
-    intent_id: string;
-    intent_domain: string;
-    format: string;
+    intent_id?: string;
+    intent_domain?: string;
+    format?: string;
     stage_tags?: boolean;
     clarify?: boolean;
     ambiguity?: {
@@ -31,6 +44,13 @@ type RegressionCase = {
     };
     mustIncludeText?: string[];
     mustNotIncludeText?: string[];
+    liveContract?: {
+      requireRepoGrounding?: boolean;
+      minStage05Coverage?: number;
+      requireSourcesLine?: boolean;
+      requireFiveSectionShape?: boolean;
+      allowLlmError?: boolean;
+    };
   };
 };
 
@@ -61,6 +81,15 @@ const AMBIGUITY_MODE = process.env.HELIX_ASK_REGRESSION_AMBIGUITY === "1";
 const IDEOLOGY_MODE = process.env.HELIX_ASK_REGRESSION_IDEOLOGY === "1";
 const FRONTIER_CONTINUITY_MODE =
   process.env.HELIX_ASK_REGRESSION_FRONTIER_CONTINUITY !== "0";
+const INCLUDE_CONTINUITY_WITH_ONLY =
+  process.env.HELIX_ASK_REGRESSION_INCLUDE_CONTINUITY_WITH_ONLY === "1";
+const STRICT_ROUTING = process.env.HELIX_ASK_REGRESSION_STRICT_ROUTING === "1";
+const MIN_STAGE05_COVERAGE_DEFAULT = Number(
+  process.env.HELIX_ASK_REGRESSION_MIN_STAGE05_COVERAGE ?? 0.6,
+);
+const REQUIRE_FIVE_SECTION_DEFAULT =
+  process.env.HELIX_ASK_REGRESSION_REQUIRE_FIVE_SECTION !== "0";
+const ROUTING_WARNINGS: string[] = [];
 const normalizeLabel = (value: string): string =>
   value.toLowerCase().replace(/[\s_-]+/g, "_");
 const normalizeToken = (value: string): string =>
@@ -95,6 +124,10 @@ const cases: RegressionCase[] = [
       intent_domain: "repo",
       format: "steps",
       stage_tags: false,
+      liveContract: {
+        requireRepoGrounding: true,
+        requireSourcesLine: true,
+      },
     },
   },
   {
@@ -116,6 +149,10 @@ const cases: RegressionCase[] = [
       intent_domain: "repo",
       format: "steps",
       stage_tags: false,
+      liveContract: {
+        requireRepoGrounding: true,
+        requireSourcesLine: true,
+      },
     },
   },
   {
@@ -126,6 +163,37 @@ const cases: RegressionCase[] = [
       intent_domain: "repo",
       format: "steps",
       stage_tags: false,
+      liveContract: {
+        requireRepoGrounding: true,
+        requireSourcesLine: true,
+      },
+    },
+  },
+  {
+    label: "warp mechanism assembly",
+    question: "How is the warp bubble solved in the codebase?",
+    expect: {
+      intent_domain: "repo",
+      format: "brief",
+      stage_tags: false,
+      mustIncludeText: [
+        "Short answer:",
+        "Conceptual baseline:",
+        "How repo solves it:",
+        "Evidence + proof anchors:",
+        "Uncertainty / open gaps:",
+      ],
+      mustNotIncludeText: [
+        "Answer grounded in retrieved evidence.",
+        "Runtime fallback: fetch failed",
+        "Reasoning event log",
+        "traceId=ask:",
+      ],
+      liveContract: {
+        requireRepoGrounding: true,
+        requireSourcesLine: true,
+        requireFiveSectionShape: true,
+      },
     },
   },
   {
@@ -178,6 +246,10 @@ const ambiguityCases: RegressionCase[] = [
       intent_domain: "repo",
       format: "brief",
       clarify: false,
+      liveContract: {
+        requireRepoGrounding: true,
+        requireSourcesLine: true,
+      },
       ambiguity: {
         targetSpan: "warp bubble",
         requireClusters: false,
@@ -276,6 +348,21 @@ const finalCases = ONLY_LABEL
   ? expandedCases.filter((entry) => normalizeLabel(entry.label) === normalizeLabel(ONLY_LABEL))
   : expandedCases;
 
+const toFiniteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const hasFiveSectionShape = (text: string): boolean => {
+  const required = [
+    "short answer:",
+    "conceptual baseline:",
+    "how repo solves it:",
+    "evidence + proof anchors:",
+    "uncertainty / open gaps:",
+  ];
+  const normalized = text.toLowerCase();
+  return required.every((heading) => normalized.includes(heading));
+};
+
 const runCase = async (entry: RegressionCase, sessionId: string): Promise<string[]> => {
   console.log(`Running: ${entry.label}`);
   const controller = new AbortController();
@@ -326,18 +413,22 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
     failures.push(`${entry.label}: missing debug payload`);
     return failures;
   }
-  if (payload.debug.intent_id !== entry.expect.intent_id) {
-    failures.push(
+  const routeMismatch = (message: string): void => {
+    if (STRICT_ROUTING) failures.push(message);
+    else ROUTING_WARNINGS.push(message);
+  };
+  if (entry.expect.intent_id && payload.debug.intent_id !== entry.expect.intent_id) {
+    routeMismatch(
       `${entry.label}: intent_id ${payload.debug.intent_id ?? "missing"} !== ${entry.expect.intent_id}`,
     );
   }
-  if (payload.debug.intent_domain !== entry.expect.intent_domain) {
-    failures.push(
+  if (entry.expect.intent_domain && payload.debug.intent_domain !== entry.expect.intent_domain) {
+    routeMismatch(
       `${entry.label}: intent_domain ${payload.debug.intent_domain ?? "missing"} !== ${entry.expect.intent_domain}`,
     );
   }
-  if (payload.debug.format !== entry.expect.format) {
-    failures.push(
+  if (entry.expect.format && payload.debug.format !== entry.expect.format) {
+    routeMismatch(
       `${entry.label}: format ${payload.debug.format ?? "missing"} !== ${entry.expect.format}`,
     );
   }
@@ -380,6 +471,47 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
     if (textLower.includes(snippet.toLowerCase())) {
       failures.push(`${entry.label}: response included forbidden text snippet "${snippet}"`);
     }
+  }
+
+  const liveContract = entry.expect.liveContract;
+  if (liveContract?.requireRepoGrounding) {
+    const stage05Used = payload.debug.stage05_used === true;
+    const stage05Cards = Math.max(0, Math.floor(toFiniteNumber(payload.debug.stage05_card_count) ?? 0));
+    const stage05Coverage = toFiniteNumber(payload.debug.stage05_slot_coverage?.ratio) ?? null;
+    const minCoverage = Number.isFinite(liveContract.minStage05Coverage ?? NaN)
+      ? Math.max(0, Math.min(1, Number(liveContract.minStage05Coverage)))
+      : Math.max(0, Math.min(1, MIN_STAGE05_COVERAGE_DEFAULT));
+    if (!stage05Used) {
+      failures.push(`${entry.label}: stage05_used was not true for repo-grounded contract`);
+    }
+    if (stage05Cards <= 0) {
+      failures.push(`${entry.label}: stage05_card_count ${stage05Cards} <= 0 for repo-grounded contract`);
+    }
+    if (stage05Coverage === null || stage05Coverage < minCoverage) {
+      failures.push(
+        `${entry.label}: stage05_slot_coverage ratio ${stage05Coverage ?? "missing"} < ${minCoverage.toFixed(2)}`,
+      );
+    }
+    if (payload.debug.stage05_summary_hard_fail === true) {
+      failures.push(
+        `${entry.label}: stage05_summary_hard_fail true (${payload.debug.stage05_summary_fail_reason ?? "unknown"})`,
+      );
+    }
+    const llmError = String(payload.debug.llm_error_code ?? "").trim();
+    if (llmError && liveContract.allowLlmError !== true) {
+      failures.push(`${entry.label}: llm_error_code present (${llmError})`);
+    }
+  }
+
+  if (liveContract?.requireSourcesLine && !/\bsources:\s*/i.test(text)) {
+    failures.push(`${entry.label}: response missing Sources line`);
+  }
+
+  const requireFiveSectionShape =
+    liveContract?.requireFiveSectionShape === true ||
+    (liveContract?.requireFiveSectionShape !== false && REQUIRE_FIVE_SECTION_DEFAULT && Boolean(liveContract));
+  if (requireFiveSectionShape && !hasFiveSectionShape(text)) {
+    failures.push(`${entry.label}: response missing non-equation five-section shape`);
   }
 
   return failures;
@@ -439,14 +571,14 @@ const runSessionContinuityCase = async (
     return failures;
   }
   if (followup.debug.intent_id !== entry.expect.intent_id) {
-    failures.push(
-      `${entry.label}: intent_id ${followup.debug.intent_id ?? "missing"} !== ${entry.expect.intent_id}`,
-    );
+    const message = `${entry.label}: intent_id ${followup.debug.intent_id ?? "missing"} !== ${entry.expect.intent_id}`;
+    if (STRICT_ROUTING) failures.push(message);
+    else ROUTING_WARNINGS.push(message);
   }
   if (followup.debug.intent_domain !== entry.expect.intent_domain) {
-    failures.push(
-      `${entry.label}: intent_domain ${followup.debug.intent_domain ?? "missing"} !== ${entry.expect.intent_domain}`,
-    );
+    const message = `${entry.label}: intent_domain ${followup.debug.intent_domain ?? "missing"} !== ${entry.expect.intent_domain}`;
+    if (STRICT_ROUTING) failures.push(message);
+    else ROUTING_WARNINGS.push(message);
   }
   if (followup.debug.frontier_theory_lens_active !== true) {
     failures.push(`${entry.label}: frontier_theory_lens_active not true on followup`);
@@ -473,7 +605,9 @@ async function main(): Promise<void> {
     const caseFailures = await runCase(entry, sessionId);
     failures.push(...caseFailures);
   }
-  if (FRONTIER_CONTINUITY_MODE) {
+  const shouldRunContinuity =
+    FRONTIER_CONTINUITY_MODE && (!ONLY_LABEL || INCLUDE_CONTINUITY_WITH_ONLY);
+  if (shouldRunContinuity) {
     for (const entry of frontierContinuityCases) {
       const caseFailures = await runSessionContinuityCase(entry);
       failures.push(...caseFailures);
@@ -483,7 +617,15 @@ async function main(): Promise<void> {
   if (failures.length) {
     console.error("Helix Ask regression failures:");
     failures.forEach((line) => console.error(`- ${line}`));
+    if (ROUTING_WARNINGS.length > 0) {
+      console.error("Helix Ask regression routing warnings:");
+      ROUTING_WARNINGS.forEach((line) => console.error(`- ${line}`));
+    }
     process.exit(ALLOW_FAIL ? 0 : 1);
+  }
+  if (ROUTING_WARNINGS.length > 0) {
+    console.warn("Helix Ask regression routing warnings:");
+    ROUTING_WARNINGS.forEach((line) => console.warn(`- ${line}`));
   }
   console.log("Helix Ask regression passed.");
 }

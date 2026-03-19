@@ -4938,6 +4938,33 @@ function buildHelixAskDebugContextSummary(
         ? debug?.stage05_two_pass_batches
         : null,
     stage05OverflowPolicy: debug?.stage05_overflow_policy ?? null,
+    stage05InputScope:
+      typeof debug?.stage05_input_scope === "string" ? debug?.stage05_input_scope : null,
+    stage05InputPathCount:
+      typeof debug?.stage05_input_path_count === "number" &&
+      Number.isFinite(debug?.stage05_input_path_count)
+        ? debug?.stage05_input_path_count
+        : null,
+    stage05InputWideAddedCount:
+      typeof debug?.stage05_input_wide_added_count === "number" &&
+      Number.isFinite(debug?.stage05_input_wide_added_count)
+        ? debug?.stage05_input_wide_added_count
+        : null,
+    stage05InputConnectivityAddedCount:
+      typeof debug?.stage05_input_connectivity_added_count === "number" &&
+      Number.isFinite(debug?.stage05_input_connectivity_added_count)
+        ? debug?.stage05_input_connectivity_added_count
+        : null,
+    stage05InputSeedSignalTokenCount:
+      typeof debug?.stage05_input_seed_signal_token_count === "number" &&
+      Number.isFinite(debug?.stage05_input_seed_signal_token_count)
+        ? debug?.stage05_input_seed_signal_token_count
+        : null,
+    stage05InputConnectedHintPathCount:
+      typeof debug?.stage05_input_connected_hint_path_count === "number" &&
+      Number.isFinite(debug?.stage05_input_connected_hint_path_count)
+        ? debug?.stage05_input_connected_hint_path_count
+        : null,
     intentContractHash:
       typeof debug?.intent_contract_hash === "string" ? debug?.intent_contract_hash : null,
     intentContractMutationDetected:
@@ -5047,6 +5074,121 @@ function buildHelixAskDebugContextSummary(
     composerSoftEnforceTriggerReason:
       typeof debug?.composer_soft_enforce_trigger_reason === "string"
         ? debug?.composer_soft_enforce_trigger_reason
+        : null,
+    composerSoftEnforceGateMode:
+      typeof debug?.composer_soft_enforce_gate_mode === "string"
+        ? debug?.composer_soft_enforce_gate_mode
+        : null,
+    composerSoftEnforceEnabled:
+      typeof debug?.composer_soft_enforce_enabled === "boolean"
+        ? debug?.composer_soft_enforce_enabled
+        : null,
+    composerSoftEnforceSoftSectionGuardObserved:
+      typeof debug?.composer_soft_enforce_soft_section_guard_observed === "boolean"
+        ? debug?.composer_soft_enforce_soft_section_guard_observed
+        : null,
+    composerSoftEnforceObserveSkip:
+      typeof debug?.composer_soft_enforce_observe_skip === "boolean"
+        ? debug?.composer_soft_enforce_observe_skip
+        : null,
+    composerSoftEnforceObserveReason:
+      typeof debug?.composer_soft_enforce_observe_reason === "string"
+        ? debug?.composer_soft_enforce_observe_reason
+        : null,
+    composerSoftEnforceObserveRewriteApplied:
+      typeof debug?.composer_soft_enforce_observe_rewrite_applied === "boolean"
+        ? debug?.composer_soft_enforce_observe_rewrite_applied
+        : null,
+    composerSoftEnforceHardGuardTriggered:
+      typeof debug?.composer_soft_enforce_hard_guard_triggered === "boolean"
+        ? debug?.composer_soft_enforce_hard_guard_triggered
+        : null,
+    composerSoftEnforceHardGuardReason:
+      typeof debug?.composer_soft_enforce_hard_guard_reason === "string"
+        ? debug?.composer_soft_enforce_hard_guard_reason
+        : null,
+    composerSoftEnforceSoftSectionGuardTriggered:
+      typeof debug?.composer_soft_enforce_soft_section_guard_triggered === "boolean"
+        ? debug?.composer_soft_enforce_soft_section_guard_triggered
+        : null,
+    composerSoftEnforceAction:
+      typeof debug?.composer_soft_enforce_action === "string"
+        ? debug?.composer_soft_enforce_action
+        : null,
+    composerV2Enabled:
+      typeof debug?.composer_v2_enabled === "boolean" ? debug?.composer_v2_enabled : null,
+    composerV2Applied:
+      typeof debug?.composer_v2_applied === "boolean" ? debug?.composer_v2_applied : null,
+    composerV2BriefSource:
+      typeof debug?.composer_v2_brief_source === "string" ? debug?.composer_v2_brief_source : null,
+    composerV2EvidenceDigestSource:
+      typeof debug?.composer_v2_evidence_digest_source === "string"
+        ? debug?.composer_v2_evidence_digest_source
+        : null,
+    composerV2EvidenceDigestClaimCount:
+      typeof debug?.composer_v2_evidence_digest_claim_count === "number" &&
+      Number.isFinite(debug?.composer_v2_evidence_digest_claim_count)
+        ? debug?.composer_v2_evidence_digest_claim_count
+        : null,
+    composerV2HandoffSource:
+      typeof debug?.composer_v2_handoff_source === "string"
+        ? debug?.composer_v2_handoff_source
+        : null,
+    composerV2HandoffBlockCount:
+      typeof debug?.composer_v2_handoff_block_count === "number" &&
+      Number.isFinite(debug?.composer_v2_handoff_block_count)
+        ? debug?.composer_v2_handoff_block_count
+        : null,
+    composerV2HandoffChars:
+      typeof debug?.composer_v2_handoff_chars === "number" &&
+      Number.isFinite(debug?.composer_v2_handoff_chars)
+        ? debug?.composer_v2_handoff_chars
+        : null,
+    composerV2HandoffTruncated:
+      typeof debug?.composer_v2_handoff_truncated === "boolean"
+        ? debug?.composer_v2_handoff_truncated
+        : null,
+    composerV2ClaimCounts: asObjectRecord(debug?.composer_v2_claim_counts ?? null),
+    composerV2PreLinkFailReasons: normalizeReasonList(debug?.composer_v2_pre_link_fail_reasons),
+    composerV2PostLinkFailReasons: normalizeReasonList(debug?.composer_v2_post_link_fail_reasons),
+    composerV2RepairAttempted:
+      typeof debug?.composer_v2_repair_attempted === "boolean"
+        ? debug?.composer_v2_repair_attempted
+        : null,
+    composerV2FallbackReason:
+      typeof debug?.composer_v2_fallback_reason === "string"
+        ? debug?.composer_v2_fallback_reason
+        : null,
+    composerV2ExpandAttempts:
+      typeof debug?.composer_v2_expand_attempts === "number" &&
+      Number.isFinite(debug?.composer_v2_expand_attempts)
+        ? debug?.composer_v2_expand_attempts
+        : null,
+    composerV2RepairAttempts:
+      typeof debug?.composer_v2_repair_attempts === "number" &&
+      Number.isFinite(debug?.composer_v2_repair_attempts)
+        ? debug?.composer_v2_repair_attempts
+        : null,
+    composerV2TransientRetries:
+      typeof debug?.composer_v2_transient_retries === "number" &&
+      Number.isFinite(debug?.composer_v2_transient_retries)
+        ? debug?.composer_v2_transient_retries
+        : null,
+    composerV2RepairSkippedDueToExpandError:
+      typeof debug?.composer_v2_repair_skipped_due_to_expand_error === "boolean"
+        ? debug?.composer_v2_repair_skipped_due_to_expand_error
+        : null,
+    composerV2ExpandErrorCode:
+      typeof debug?.composer_v2_expand_error_code === "string"
+        ? debug?.composer_v2_expand_error_code
+        : null,
+    composerV2ProjectionApplied:
+      typeof debug?.composer_v2_projection_applied === "boolean"
+        ? debug?.composer_v2_projection_applied
+        : null,
+    composerV2BestAttemptStage:
+      typeof debug?.composer_v2_best_attempt_stage === "string"
+        ? debug?.composer_v2_best_attempt_stage
         : null,
   };
   return summary;

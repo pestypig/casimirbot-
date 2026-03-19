@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { filterSignalTokens, tokenizeAskQuery } from "./query";
+import { classifyLlmHttpError } from "../../skills/llm.http";
 
 export type Stage05CardKind = "code" | "doc" | "config" | "data" | "binary";
 
@@ -100,6 +101,12 @@ export type Stage05Telemetry = {
   two_pass_used: boolean;
   two_pass_batches: number;
   overflow_policy: "single_pass" | "two_pass";
+  input_scope?: "standard" | "wide";
+  input_path_count?: number;
+  input_wide_added_count?: number;
+  input_connectivity_added_count?: number;
+  input_seed_signal_token_count?: number;
+  input_connected_hint_path_count?: number;
 };
 
 export type Stage05LlmSummaryInput = {
@@ -297,13 +304,27 @@ const clipText = (value: string, maxChars: number): string => {
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const mapStage05SummaryErrorReason = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  const lower = message.toLowerCase();
-  if (lower.includes("llm_backend_unavailable")) return "stage05_llm_backend_unavailable";
-  if (lower.includes("llm_http_base not set")) return "stage05_llm_http_base_missing";
-  if (lower.includes("llm_http_")) return "stage05_llm_http_error";
-  if (lower.includes("aborterror") || lower.includes("timeout")) return "stage05_llm_timeout";
-  if (lower.includes("invalid_output")) return "stage05_llm_invalid_output";
+  const parsed = classifyLlmHttpError(error);
+  const code = String(parsed.code ?? "").toLowerCase();
+  const messageLower = String(parsed.message ?? "").toLowerCase();
+  if (code.includes("llm_backend_unavailable")) return "stage05_llm_backend_unavailable";
+  if (
+    code.includes("llm_http_base_missing") ||
+    code.includes("llm_http_base not set") ||
+    messageLower.includes("llm_http_base not set")
+  ) {
+    return "stage05_llm_http_base_missing";
+  }
+  if (parsed.errorClass === "timeout") return "stage05_llm_timeout";
+  if (parsed.errorClass === "rate_limited") return "stage05_llm_http_429";
+  if (parsed.errorClass === "circuit_open") return "stage05_llm_http_circuit_open";
+  if (parsed.errorClass === "context_limit") return "stage05_llm_context_limit";
+  if (parsed.errorClass === "transport") return "stage05_llm_transport_error";
+  if (parsed.errorClass === "server_error") return "stage05_llm_http_5xx";
+  if (code.includes("llm_http_")) return "stage05_llm_http_error";
+  const message = parsed.message;
+  if (/aborterror|timeout/i.test(message)) return "stage05_llm_timeout";
+  if (/invalid_output/i.test(message)) return "stage05_llm_invalid_output";
   return "stage05_llm_failed";
 };
 
@@ -1523,6 +1544,30 @@ const buildHardFailTelemetry = (args: {
   overflow_policy: args.overflowPolicy,
 });
 
+const isStage05SoftRuntimeFailOpenReason = (reason: string): boolean => {
+  const normalized = String(reason ?? "").trim().toLowerCase();
+  if (!normalized.startsWith("stage05_llm_")) return false;
+  if (normalized === "stage05_llm_unavailable") return false;
+  if (normalized === "stage05_llm_http_base_missing") return false;
+  return true;
+};
+
+const toStage05EvidenceCards = (cards: Stage05ExtractedCard[]): Stage05EvidenceCard[] =>
+  cards.map((card) => ({
+    path: card.path,
+    kind: card.kind,
+    summary: card.summary,
+    symbolsOrKeys: card.symbolsOrKeys,
+    snippets: card.snippets,
+    confidence: Number(card.confidence.toFixed(4)),
+    slotHits: card.slotHits,
+    equationClass: card.equationClass,
+    domainFamily: card.domainFamily,
+    derivationLevel: card.derivationLevel,
+    constantsDetected: card.constantsDetected,
+    symbolRoles: card.symbolRoles,
+  }));
+
 const applyLlmSummaries = (
   cards: Stage05ExtractedCard[],
   output: Stage05LlmSummaryOutput | null,
@@ -1964,6 +2009,49 @@ export async function buildStage05EvidenceCards(
     reason: string,
     coverage: Stage05SlotCoverage | null = null,
   ): { cards: Stage05EvidenceCard[]; telemetry: Stage05Telemetry } => {
+    if (isStage05SoftRuntimeFailOpenReason(reason) && workingCards.length > 0) {
+      const cards = toStage05EvidenceCards(workingCards);
+      const softCoverage =
+        coverage ??
+        buildSlotCoverage(
+          slotPlan.required,
+          cards.map((card) => ({
+            path: card.path,
+            kind: card.kind,
+            summary: card.summary,
+            symbolsOrKeys: card.symbolsOrKeys,
+            snippets: card.snippets,
+            slotHits: card.slotHits,
+          })),
+        );
+      const kindCounts = buildKindCounts();
+      for (const card of cards) {
+        kindCounts[card.kind] += 1;
+      }
+      return {
+        cards,
+        telemetry: {
+          used: true,
+          file_count: rankedPaths.length,
+          card_count: cards.length,
+          kind_counts: kindCounts,
+          llm_used: llmUsed,
+          fallback_reason: reason,
+          extract_ms: extractMs,
+          total_ms: Date.now() - startMs,
+          budget_capped: budgetCapped,
+          summary_required: summaryRequired,
+          summary_hard_fail: true,
+          summary_fail_reason: reason,
+          slot_plan: slotPlan,
+          slot_coverage: softCoverage,
+          fullfile_mode: fullFileMode,
+          two_pass_used: twoPassUsed,
+          two_pass_batches: twoPassBatches,
+          overflow_policy: overflowPolicy,
+        },
+      };
+    }
     const resolvedCoverage = coverage ?? buildSlotCoverage(slotPlan.required, []);
     return {
       cards: [],
@@ -2317,19 +2405,6 @@ export async function buildStage05EvidenceCards(
     two_pass_batches: twoPassBatches,
     overflow_policy: overflowPolicy,
   };
-  const cards: Stage05EvidenceCard[] = workingCards.map((card) => ({
-    path: card.path,
-    kind: card.kind,
-    summary: card.summary,
-    symbolsOrKeys: card.symbolsOrKeys,
-    snippets: card.snippets,
-    confidence: Number(card.confidence.toFixed(4)),
-    slotHits: card.slotHits,
-    equationClass: card.equationClass,
-    domainFamily: card.domainFamily,
-    derivationLevel: card.derivationLevel,
-    constantsDetected: card.constantsDetected,
-    symbolRoles: card.symbolRoles,
-  }));
+  const cards = toStage05EvidenceCards(workingCards);
   return { cards, telemetry };
 }

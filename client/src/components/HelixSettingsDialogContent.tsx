@@ -1326,10 +1326,31 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
   const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
   const readString = (value: unknown): string | null =>
     typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const readStringArray = (...values: unknown[]): string[] => {
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    values.forEach((value) => {
+      readHelixAskDebugStringArray(value).forEach((entry) => {
+        if (seen.has(entry)) return;
+        seen.add(entry);
+        merged.push(entry);
+      });
+    });
+    return merged;
+  };
   const contextFileCount =
     readNumber(context.contextFileCount) !== null
       ? Math.max(0, Math.floor(readNumber(context.contextFileCount) ?? 0))
       : readHelixAskDebugStringArray(context.contextFiles).length;
+  const composerV2PreLinkFailReasons = readStringArray(
+    context.composer_v2_pre_link_fail_reasons,
+    context.composerV2PreLinkFailReasons,
+  );
+  const composerV2PostLinkFailReasons = readStringArray(
+    context.composer_v2_post_link_fail_reasons,
+    context.composerV2PostLinkFailReasons,
+  );
+  const answerPathEntries = readStringArray(context.answer_path, context.answerPath);
   const retrievalChannelHitsRaw =
     context.retrievalChannelHits && typeof context.retrievalChannelHits === "object"
       ? (context.retrievalChannelHits as Record<string, unknown>)
@@ -1358,11 +1379,41 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
           })
           .join(",")
       : null;
+  const stage05SoftRuntimeFailOpen = readBoolean(
+    context.stage05SoftRuntimeFailOpen ?? context.stage05_soft_runtime_fail_open,
+  );
+  const stage05SoftRuntimeFailReason = readString(
+    context.stage05SoftRuntimeFailReason ?? context.stage05_soft_runtime_fail_reason,
+  );
   const fields = [
     readString(context.intentDomain) ? `domain=${readString(context.intentDomain)}` : null,
     readString(context.intentId) ? `intent=${readString(context.intentId)}` : null,
     readString(context.helixAskFailClass) ? `fail_class=${readString(context.helixAskFailClass)}` : null,
     readString(context.helixAskFailReason) ? `fail_reason=${readString(context.helixAskFailReason)}` : null,
+    readBoolean(context.llm_breaker_prewait_enabled) !== null
+      ? `llm_prewait=${readBoolean(context.llm_breaker_prewait_enabled) ? "true" : "false"}`
+      : null,
+    readBoolean(context.llm_breaker_open_at_start) !== null
+      ? `llm_breaker_open_start=${readBoolean(context.llm_breaker_open_at_start) ? "true" : "false"}`
+      : null,
+    readNumber(context.llm_breaker_remaining_ms_at_start) !== null
+      ? `llm_breaker_remaining_ms=${Math.max(
+          0,
+          Math.floor(readNumber(context.llm_breaker_remaining_ms_at_start) ?? 0),
+        )}`
+      : null,
+    readNumber(context.llm_breaker_wait_applied_ms) !== null
+      ? `llm_wait_applied_ms=${Math.max(0, Math.floor(readNumber(context.llm_breaker_wait_applied_ms) ?? 0))}`
+      : null,
+    readString(context.llm_breaker_wait_result)
+      ? `llm_wait_result=${readString(context.llm_breaker_wait_result)}`
+      : null,
+    readBoolean(context.llm_unavailable_at_turn_start) !== null
+      ? `llm_unavailable_start=${readBoolean(context.llm_unavailable_at_turn_start) ? "true" : "false"}`
+      : null,
+    readString(context.llm_unavailable_root_stage)
+      ? `llm_unavailable_root=${readString(context.llm_unavailable_root_stage)}`
+      : null,
     retrievalChannelHits ? `channels=${retrievalChannelHits}` : null,
     readString(context.stage0RolloutMode) ? `stage0_mode=${readString(context.stage0RolloutMode)}` : null,
     readBoolean(context.stage0Used) !== null
@@ -1398,6 +1449,59 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
     readNumber(context.stage05FileCount) !== null
       ? `stage05_files=${Math.max(0, Math.floor(readNumber(context.stage05FileCount) ?? 0))}`
       : null,
+    readString(context.stage05InputScope ?? context.stage05_input_scope)
+      ? `stage05_input_scope=${readString(context.stage05InputScope ?? context.stage05_input_scope)}`
+      : null,
+    readNumber(context.stage05InputPathCount ?? context.stage05_input_path_count) !== null
+      ? `stage05_input_paths=${Math.max(
+          0,
+          Math.floor(readNumber(context.stage05InputPathCount ?? context.stage05_input_path_count) ?? 0),
+        )}`
+      : null,
+    readNumber(context.stage05InputWideAddedCount ?? context.stage05_input_wide_added_count) !== null
+      ? `stage05_wide_added=${Math.max(
+          0,
+          Math.floor(
+            readNumber(context.stage05InputWideAddedCount ?? context.stage05_input_wide_added_count) ?? 0,
+          ),
+        )}`
+      : null,
+    readNumber(
+      context.stage05InputConnectivityAddedCount ?? context.stage05_input_connectivity_added_count,
+    ) !== null
+      ? `stage05_connectivity_added=${Math.max(
+          0,
+          Math.floor(
+            readNumber(
+              context.stage05InputConnectivityAddedCount ?? context.stage05_input_connectivity_added_count,
+            ) ?? 0,
+          ),
+        )}`
+      : null,
+    readNumber(
+      context.stage05InputSeedSignalTokenCount ?? context.stage05_input_seed_signal_token_count,
+    ) !== null
+      ? `stage05_seed_tokens=${Math.max(
+          0,
+          Math.floor(
+            readNumber(
+              context.stage05InputSeedSignalTokenCount ?? context.stage05_input_seed_signal_token_count,
+            ) ?? 0,
+          ),
+        )}`
+      : null,
+    readNumber(
+      context.stage05InputConnectedHintPathCount ?? context.stage05_input_connected_hint_path_count,
+    ) !== null
+      ? `stage05_connected_hints=${Math.max(
+          0,
+          Math.floor(
+            readNumber(
+              context.stage05InputConnectedHintPathCount ?? context.stage05_input_connected_hint_path_count,
+            ) ?? 0,
+          ),
+        )}`
+      : null,
     readNumber(context.stage05CardCount) !== null
       ? `stage05_cards=${Math.max(0, Math.floor(readNumber(context.stage05CardCount) ?? 0))}`
       : null,
@@ -1424,6 +1528,10 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
     readString(context.stage05SummaryFailReason)
       ? `stage05_summary_fail=${readString(context.stage05SummaryFailReason)}`
       : null,
+    stage05SoftRuntimeFailOpen !== null
+      ? `stage05_soft_runtime_fail_open=${stage05SoftRuntimeFailOpen ? "true" : "false"}`
+      : null,
+    stage05SoftRuntimeFailReason ? `stage05_soft_runtime_reason=${stage05SoftRuntimeFailReason}` : null,
     readBoolean(context.stage05FullfileMode) !== null
       ? `stage05_fullfile=${readBoolean(context.stage05FullfileMode) ? "true" : "false"}`
       : null,
@@ -1434,6 +1542,9 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
       ? `stage05_two_pass_batches=${Math.max(0, Math.floor(readNumber(context.stage05TwoPassBatches) ?? 0))}`
       : null,
     readString(context.stage05OverflowPolicy) ? `stage05_overflow=${readString(context.stage05OverflowPolicy)}` : null,
+    readString(context.policyRetrievalScope ?? context.policy_retrieval_scope)
+      ? `retrieval_scope=${readString(context.policyRetrievalScope ?? context.policy_retrieval_scope)}`
+      : null,
     readString(context.intentContractHash)
       ? `intent_contract=${clipDiagnosticsText(readString(context.intentContractHash) ?? "", 24)}`
       : null,
@@ -1490,6 +1601,100 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
       : null,
     readNumber(context.shadowSymbolHitRate) !== null
       ? `shadow_symbol_hit_rate=${(readNumber(context.shadowSymbolHitRate) ?? 0).toFixed(4)}`
+      : null,
+    readString(context.composerPromptFamily) ? `composer_family=${readString(context.composerPromptFamily)}` : null,
+    readString(context.composerPromptSpecificity)
+      ? `composer_specificity=${readString(context.composerPromptSpecificity)}`
+      : null,
+    readBoolean(context.composerSchemaValid) !== null
+      ? `composer_schema_valid=${readBoolean(context.composerSchemaValid) ? "true" : "false"}`
+      : null,
+    readNumber(context.composerFamilyFormatAccuracy) !== null
+      ? `composer_format_accuracy=${(readNumber(context.composerFamilyFormatAccuracy) ?? 0).toFixed(2)}`
+      : null,
+    readBoolean(context.composerSoftEnforceApplied) !== null
+      ? `composer_soft_enforce=${readBoolean(context.composerSoftEnforceApplied) ? "true" : "false"}`
+      : null,
+    readString(context.composerSoftEnforceTriggerReason)
+      ? `composer_soft_reason=${readString(context.composerSoftEnforceTriggerReason)}`
+      : null,
+    readBoolean(context.composer_v2_enabled) !== null
+      ? `composer_v2_enabled=${readBoolean(context.composer_v2_enabled) ? "true" : "false"}`
+      : null,
+    readBoolean(context.composer_v2_applied) !== null
+      ? `composer_v2_applied=${readBoolean(context.composer_v2_applied) ? "true" : "false"}`
+      : null,
+    readString(context.composer_v2_brief_source)
+      ? `composer_v2_brief=${readString(context.composer_v2_brief_source)}`
+      : null,
+    readString(context.composer_v2_evidence_digest_source)
+      ? `composer_v2_digest=${readString(context.composer_v2_evidence_digest_source)}`
+      : null,
+    readString(context.composer_v2_handoff_source)
+      ? `composer_v2_handoff_source=${readString(context.composer_v2_handoff_source)}`
+      : null,
+    readNumber(context.composer_v2_evidence_digest_claim_count) !== null
+      ? `composer_v2_digest_claims=${Math.max(
+          0,
+          Math.floor(readNumber(context.composer_v2_evidence_digest_claim_count) ?? 0),
+        )}`
+      : null,
+    readNumber(context.composer_v2_handoff_block_count) !== null
+      ? `composer_v2_handoff_blocks=${Math.max(
+          0,
+          Math.floor(readNumber(context.composer_v2_handoff_block_count) ?? 0),
+        )}`
+      : null,
+    readNumber(context.composer_v2_handoff_chars) !== null
+      ? `composer_v2_handoff_chars=${Math.max(0, Math.floor(readNumber(context.composer_v2_handoff_chars) ?? 0))}`
+      : null,
+    readBoolean(context.composer_v2_handoff_truncated) !== null
+      ? `composer_v2_handoff_truncated=${readBoolean(context.composer_v2_handoff_truncated) ? "true" : "false"}`
+      : null,
+    composerV2PreLinkFailReasons.length > 0
+      ? `composer_v2_pre_link_fails=${clipDiagnosticsText(composerV2PreLinkFailReasons.join(","), 96)}`
+      : null,
+    composerV2PostLinkFailReasons.length > 0
+      ? `composer_v2_post_link_fails=${clipDiagnosticsText(composerV2PostLinkFailReasons.join(","), 96)}`
+      : null,
+    readString(context.composer_v2_best_attempt_stage)
+      ? `composer_v2_best_stage=${readString(context.composer_v2_best_attempt_stage)}`
+      : null,
+    readString(context.composer_v2_fallback_reason)
+      ? `composer_v2_fallback=${readString(context.composer_v2_fallback_reason)}`
+      : null,
+    readNumber(context.composer_v2_expand_attempts) !== null
+      ? `composer_v2_expand_attempts=${Math.max(
+          0,
+          Math.floor(readNumber(context.composer_v2_expand_attempts) ?? 0),
+        )}`
+      : null,
+    readNumber(context.composer_v2_repair_attempts) !== null
+      ? `composer_v2_repair_attempts=${Math.max(
+          0,
+          Math.floor(readNumber(context.composer_v2_repair_attempts) ?? 0),
+        )}`
+      : null,
+    readNumber(context.composer_v2_transient_retries) !== null
+      ? `composer_v2_transient_retries=${Math.max(
+          0,
+          Math.floor(readNumber(context.composer_v2_transient_retries) ?? 0),
+        )}`
+      : null,
+    readBoolean(context.composer_v2_repair_attempted) !== null
+      ? `composer_v2_repair_attempted=${readBoolean(context.composer_v2_repair_attempted) ? "true" : "false"}`
+      : null,
+    readBoolean(context.composer_v2_repair_skipped_due_to_expand_error) !== null
+      ? `composer_v2_repair_skipped=${readBoolean(context.composer_v2_repair_skipped_due_to_expand_error) ? "true" : "false"}`
+      : null,
+    readString(context.composer_v2_expand_error_code)
+      ? `composer_v2_expand_error=${readString(context.composer_v2_expand_error_code)}`
+      : null,
+    readBoolean(context.composer_v2_projection_applied) !== null
+      ? `composer_v2_projection=${readBoolean(context.composer_v2_projection_applied) ? "true" : "false"}`
+      : null,
+    answerPathEntries.length > 0
+      ? `answer_path_tail=${clipDiagnosticsText(answerPathEntries.slice(-4).join(" > "), 120)}`
       : null,
     `context_files=${contextFileCount}`,
   ]
