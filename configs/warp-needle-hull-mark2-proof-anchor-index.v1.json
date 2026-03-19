@@ -37,7 +37,9 @@
     "docs/audits/research/warp-paper-draft-B-strong-claim-upgrade-spec.md",
     "docs/audits/research/warp-paper-authoring-contract-2026-03-02.md",
     "docs/audits/research/warp-paper-deep-research-prompt-v1.md",
-    "docs/audits/research/warp-commit-pinned-scientific-analysis-2026-03-02.md"
+    "docs/audits/research/warp-commit-pinned-scientific-analysis-2026-03-02.md",
+    "docs/audits/research/warp-needle-hull-mark2-conceptual-guide-latest.md",
+    "docs/audits/research/warp-needle-hull-mark2-reduced-order-full-solve-gates-and-evidence-governance-manuscript-latest.md"
   ],
   "geometry_gr_observable_proof_paths": {
     "scripts": [

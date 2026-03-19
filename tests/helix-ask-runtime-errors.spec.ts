@@ -1169,9 +1169,64 @@ describe("helix ask universal answer plan shadow", () => {
     ).toBe(true);
     expect(
       __testHelixAskReliabilityGuards.isLowSignalHelixAskComposerV2SeedSentence(
+        "Convergence snapshot unknown unknown diagnostic debrief unknown -> unknown -> -10.1%",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isLowSignalHelixAskComposerV2SeedSentence(
+        "Capsule guards Dialogue: 0 | Evidence: 0 Focus: pass | Anchor: pass Retry: not applied (not_needed)",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isLowSignalHelixAskComposerV2SeedSentence(
         "In this repository, warp bubble is grounded in docs/knowledge/warp/warp-bubble.md and implemented through modules/warp/natario-warp.ts.",
       ),
     ).toBe(false);
+  });
+
+  it("flags retrieval-healthy projection fallback as composer regression", () => {
+    const regression = __testHelixAskReliabilityGuards.evaluateHelixAskComposerV2ProjectionRegression({
+      promptFamily: "recommendation_decision",
+      composerApplied: true,
+      composerBestAttemptStage: "projection",
+      composerFallbackReason: "observe_projection",
+      stage05Used: true,
+      stage05CardCount: 8,
+      stage05SummaryHardFail: false,
+      stage05FallbackReason: null,
+      slotCoverageRatio: 1,
+      slotCoverageMissing: [],
+      llmInvokeAttempted: true,
+      llmProviderCalled: true,
+      llmHttpStatus: 200,
+      llmErrorCode: null,
+    });
+    expect(regression.triggered).toBe(true);
+    expect(regression.hard).toBe(true);
+    expect(regression.mode).toBe("projection");
+    expect(regression.retrieval_healthy).toBe(true);
+    expect(regression.llm_healthy).toBe(true);
+  });
+
+  it("does not flag projection regression when stage05 slot coverage is incomplete", () => {
+    const regression = __testHelixAskReliabilityGuards.evaluateHelixAskComposerV2ProjectionRegression({
+      promptFamily: "recommendation_decision",
+      composerApplied: true,
+      composerBestAttemptStage: "projection",
+      composerFallbackReason: "observe_projection",
+      stage05Used: true,
+      stage05CardCount: 8,
+      stage05SummaryHardFail: false,
+      stage05FallbackReason: null,
+      slotCoverageRatio: 0.75,
+      slotCoverageMissing: ["code_path"],
+      llmInvokeAttempted: true,
+      llmProviderCalled: true,
+      llmHttpStatus: 200,
+      llmErrorCode: null,
+    });
+    expect(regression.triggered).toBe(false);
+    expect(regression.retrieval_healthy).toBe(false);
   });
 
   it("linker rejects composer v2 code-noise and single-char spill claims", () => {
@@ -4063,6 +4118,51 @@ describe("helix ask dialogue formatting", () => {
 
     expect(seeded.paths.length).toBeGreaterThan(1);
     expect(seeded.wideAddedCount).toBeGreaterThan(0);
+  });
+
+  it("drops index-only generated artifacts from stage05 path seeds", () => {
+    const byPath = new Map(
+      [
+        {
+          filePath: "server/_generated/code-lattice.json",
+          preview: "generated noise",
+          score: 99,
+          rrfScore: 0,
+        },
+        {
+          filePath: "docs/knowledge/warp/warp-bubble.md",
+          preview: "doc",
+          score: 30,
+          rrfScore: 0,
+        },
+      ].map((entry) => [entry.filePath, entry]),
+    ) as any;
+    const seeded = __testHelixAskDialogueFormatting.buildStage05InputPaths({
+      question: "How is the warp bubble solved in this codebase?",
+      stage0Paths: ["server/_generated/code-lattice.json", "docs/knowledge/warp/warp-bubble.md"],
+      byPath,
+      maxFiles: 8,
+      retrievalScope: "wide",
+      intentDomain: "repo",
+    });
+
+    expect(seeded.paths).toContain("docs/knowledge/warp/warp-bubble.md");
+    expect(seeded.paths).not.toContain("server/_generated/code-lattice.json");
+  });
+
+  it("keeps wide expansion focused on signal paths over generated artifacts", () => {
+    const wide = __testHelixAskDialogueFormatting.collectWideStage05PathCandidates({
+      question: "How is stage05 connectivity retrieval ranked in this system?",
+      existingPaths: ["server/routes/agi.plan.ts"],
+      limit: 32,
+    });
+
+    expect(wide.candidates.length).toBeGreaterThan(0);
+    expect(
+      wide.candidates.some((entry) =>
+        /(^|\/)(?:server\/_generated\/|server_generated\/)/i.test(entry.path),
+      ),
+    ).toBe(false);
   });
 
   it("normalizes bundled quoted question lists to the primary question", () => {

@@ -4284,7 +4284,10 @@ const HELIX_ASK_REPO_HINT_EXPLICIT =
 const HELIX_ASK_ENDPOINT_HINT_RE = /\/api\/[a-z0-9/_-]+/gi;
 const HELIX_ASK_ENDPOINT_GUARD =
   String(process.env.HELIX_ASK_ENDPOINT_GUARD ?? "1").trim() !== "0";
-const HELIX_ASK_INDEX_ONLY_PATHS: RegExp[] = [/server\/_generated\/code-lattice\.json/i];
+const HELIX_ASK_INDEX_ONLY_PATHS: RegExp[] = [
+  /server\/_generated\/.+\.(?:json|ya?ml)$/i,
+  /server_generated\/.+\.(?:json|ya?ml)$/i,
+];
 const HELIX_ASK_VIABILITY_FOCUS =
   /\b(viability|certificate|constraint gate|constraint gates|admissible|warp viability)\b/i;
 const HELIX_ASK_WARP_PROOF_REPO_CUE =
@@ -8481,6 +8484,7 @@ const REPO_SOURCE_SKIP_DIRS = new Set([
   "coverage",
   ".next",
   ".turbo",
+  "_generated",
   "artifacts",
   "reports",
 ]);
@@ -10500,6 +10504,20 @@ function normalizeStage05Path(value: string): string {
   return value.replace(/\\/g, "/").trim();
 }
 
+const STAGE05_WIDE_NOISE_PATH_RE =
+  /(?:^|\/)(?:server\/_generated\/|server_generated\/|docs\/ethos\/|external\/|reports\/|artifacts\/|coverage\/|dist\/|build\/)/i;
+const STAGE05_WIDE_METADATA_ARTIFACT_RE =
+  /(?:^|\/)(?:code-lattice|repo-atlas|dag-node-schema|walk-report|walk-config|tree-walk|inventory)\.(?:json|ya?ml|md)$/i;
+
+const isStage05WideSignalPath = (candidatePath: string): boolean => {
+  const normalized = normalizeStage05Path(candidatePath);
+  if (!normalized) return false;
+  if (HELIX_ASK_INDEX_ONLY_PATHS.some((pattern) => pattern.test(normalized))) return false;
+  if (STAGE05_WIDE_NOISE_PATH_RE.test(normalized)) return false;
+  if (STAGE05_WIDE_METADATA_ARTIFACT_RE.test(normalized)) return false;
+  return true;
+};
+
 const stage05PathNoExt = (value: string): string => {
   const normalized = normalizeStage05Path(value).replace(/^\.\//, "").replace(/^\/+/, "");
   if (!normalized) return "";
@@ -10655,7 +10673,7 @@ const collectWideStage05PathCandidates = (args: {
   }
   const sourceFiles = listRepoSourceFiles()
     .map((entry) => normalizeStage05Path(entry))
-    .filter(Boolean);
+    .filter((entry) => Boolean(entry) && isStage05WideSignalPath(entry));
   const existing = new Set(
     Array.from(args.existingPaths)
       .map((entry) => normalizeStage05Path(entry).toLowerCase())
@@ -10684,6 +10702,7 @@ const collectWideStage05PathCandidates = (args: {
   const upsertScored = (candidatePath: string, score: number, source: "lexical" | "connectivity"): void => {
     const normalizedPath = normalizeStage05Path(candidatePath);
     if (!normalizedPath || score <= 0) return;
+    if (!isStage05WideSignalPath(normalizedPath)) return;
     const dedupeKey = normalizedPath.toLowerCase();
     if (existing.has(dedupeKey)) return;
     const prior = scored.get(dedupeKey);
@@ -10708,6 +10727,7 @@ const collectWideStage05PathCandidates = (args: {
     const normalized = normalizeStage05Path(candidatePath);
     if (!normalized) return null;
     const resolved = sourceByLower.get(normalized.toLowerCase()) ?? normalized;
+    if (!isStage05WideSignalPath(resolved)) return null;
     const dedupeKey = resolved.toLowerCase();
     if (existing.has(dedupeKey)) return null;
     const boundedDepth = Math.max(1, depth);
@@ -10732,6 +10752,7 @@ const collectWideStage05PathCandidates = (args: {
   const enqueuePath = (candidatePath: string, depth: number): void => {
     const normalized = normalizeStage05Path(candidatePath);
     if (!normalized) return;
+    if (!isStage05WideSignalPath(normalized)) return;
     if (depth > STAGE05_CONNECTIVITY_MAX_DEPTH) return;
     const dedupeKey = normalized.toLowerCase();
     const priorDepth = queuedDepth.get(dedupeKey);
@@ -10806,35 +10827,56 @@ const collectWideStage05PathCandidates = (args: {
     if (existing.has(dedupeKey)) continue;
     const pathLower = dedupeKey;
     let score = 0;
+    let pathTokenHits = 0;
+    let seedTokenPathHits = 0;
     for (const token of questionTokens) {
-      if (pathLower.includes(token)) score += 1;
+      if (pathLower.includes(token)) {
+        pathTokenHits += 1;
+        score += 0.75;
+      }
     }
     const baseName = path.basename(pathLower);
     for (const token of questionTokens) {
-      if (baseName.includes(token)) score += 1;
+      if (baseName.includes(token)) {
+        pathTokenHits += 1;
+        score += 0.6;
+      }
     }
     for (const [token, freq] of rankedSeedTokens) {
-      if (pathLower.includes(token)) score += 1 + Math.min(1.5, freq * 0.4);
-      if (baseName.includes(token)) score += 1;
+      if (pathLower.includes(token)) {
+        seedTokenPathHits += 1;
+        score += 0.7 + Math.min(1.2, freq * 0.35);
+      }
+      if (baseName.includes(token)) {
+        seedTokenPathHits += 1;
+        score += 0.5;
+      }
     }
     const connectivityDepth = connectedPathDepth.get(dedupeKey);
     if (connectivityDepth !== undefined) {
       score += Math.max(6, 16 - (connectivityDepth - 1) * 4);
     }
     const probeEligible = score >= 2 || connectivityDepth !== undefined;
+    let probeQuestionHits = 0;
     if (probeEligible) {
       const probeText = readStage05ConnectivityProbeText(normalizedPath);
       if (probeText.trim()) {
         const probeLower = probeText.toLowerCase();
-        const probeQuestionHits = questionTokens.reduce(
+        probeQuestionHits = questionTokens.reduce(
           (count, token) => (probeLower.includes(token) ? count + 1 : count),
           0,
         );
         if (probeQuestionHits > 0) {
-          score += Math.min(10, probeQuestionHits * 2);
+          score += Math.min(16, probeQuestionHits * 3);
         }
       }
     }
+    const hasConnectivitySignal = connectivityDepth !== undefined;
+    if (!hasConnectivitySignal && probeQuestionHits === 0 && pathTokenHits + seedTokenPathHits < 2) {
+      continue;
+    }
+    if (hasConnectivitySignal) score += 4;
+    if (probeQuestionHits > 0) score += 2;
     if (isCodeEvidencePath(normalizedPath)) score += 1;
     if (isDocEvidencePath(normalizedPath)) score += 1;
     if (score > 0) upsertScored(normalizedPath, score, "lexical");
@@ -10844,7 +10886,9 @@ const collectWideStage05PathCandidates = (args: {
   const candidates = Array.from(scored.entries())
     .map(([pathLower, details]) => ({
       path: sourceByLower.get(pathLower) ?? pathLower,
-      score: details.score,
+      score:
+        details.score +
+        (details.connectivity ? (details.lexical ? 8 : 12) : -3),
       source: details.connectivity
         ? details.lexical
           ? ("mixed" as const)
@@ -10946,6 +10990,7 @@ function buildStage05InputPaths(args: {
   const pushSelected = (candidatePath: string): boolean => {
     const normalized = normalizeStage05Path(candidatePath);
     if (!normalized || seen.has(normalized)) return false;
+    if (isIndexOnlyPath(normalized)) return false;
     seen.add(normalized);
     selected.push(normalized);
     return true;
@@ -22445,6 +22490,11 @@ const HELIX_ASK_UNIVERSAL_COMPOSER_DEBUG_LEAK_PATTERNS: Array<{
   { label: "stage05_debug", pattern: /\bstage05_[a-z0-9_]+\b/i },
   { label: "fallback_taxonomy_debug", pattern: /\bfallback_reason_taxonomy\b/i },
   { label: "trace_id_debug", pattern: /\btraceId\s*[:=]/i },
+  {
+    label: "scaffold_heading_leak",
+    pattern:
+      /(?:^|\n)\s*(?:tree walk|convergence snapshot|capsule guards|context sources|reasoning event log)\s*:?\s*(?:\n|$)/i,
+  },
 ];
 
 const HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS: Record<
@@ -23076,6 +23126,11 @@ const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
   if (/^\s*(?:inputs?|outputs?|constraints?|sources?|details|proof|tree walk|convergence snapshot)\b/i.test(text)) {
     return true;
   }
+  if (HELIX_ASK_COMPOSER_V2_HANDOFF_SCaffold_SIGNAL_RE.test(text)) return true;
+  if (/\b(?:dialogue:\s*\d+\s*\|\s*evidence:\s*\d+|focus:\s*pass\s*\|\s*anchor:\s*pass|retry:\s*not applied)\b/i.test(text)) {
+    return true;
+  }
+  if (/\bunknown\b(?:\s*(?:->|,|\/|\|)?\s*\bunknown\b){1,}/i.test(text)) return true;
   if (/^\(?\s*see\s+[A-Za-z0-9_./\\:-]+\)?\.?$/i.test(text)) return true;
   if (/^\s*\(?\s*see\b.*\)\s*$/i.test(text)) return true;
   const normalizedPlain = text
@@ -24552,6 +24607,113 @@ const shouldPreferHelixAskComposerV2Materialized = (
     candidate.pre_link_fail_reasons.length + candidate.post_link_fail_reasons.length <
     current.pre_link_fail_reasons.length + current.post_link_fail_reasons.length
   );
+};
+
+type HelixAskComposerV2ProjectionRegressionInput = {
+  promptFamily: HelixAskAnswerPlanFamily;
+  composerApplied: boolean;
+  composerBestAttemptStage: string | null;
+  composerFallbackReason: string | null;
+  stage05Used: boolean;
+  stage05CardCount: number;
+  stage05SummaryHardFail: boolean;
+  stage05FallbackReason: string | null;
+  slotCoverageRatio: number;
+  slotCoverageMissing: string[];
+  llmInvokeAttempted: boolean;
+  llmProviderCalled: boolean;
+  llmHttpStatus: number | null;
+  llmErrorCode: string | null;
+};
+
+type HelixAskComposerV2ProjectionRegressionResult = {
+  triggered: boolean;
+  hard: boolean;
+  retrieval_healthy: boolean;
+  llm_healthy: boolean;
+  mode: "none" | "projection" | "deterministic_fallback" | "legacy_fallback";
+  reasons: string[];
+};
+
+const evaluateHelixAskComposerV2ProjectionRegression = (
+  args: HelixAskComposerV2ProjectionRegressionInput,
+): HelixAskComposerV2ProjectionRegressionResult => {
+  const reasons: string[] = [];
+  if (args.promptFamily === "equation_formalism") {
+    reasons.push("equation_family");
+    return {
+      triggered: false,
+      hard: false,
+      retrieval_healthy: false,
+      llm_healthy: false,
+      mode: "none",
+      reasons,
+    };
+  }
+
+  const normalizedStage = String(args.composerBestAttemptStage ?? "").trim().toLowerCase();
+  const normalizedFallbackReason = String(args.composerFallbackReason ?? "").trim().toLowerCase();
+  const projectionLikeByStage = normalizedStage === "projection";
+  const deterministicLikeByStage = normalizedStage === "deterministic_fallback";
+  const projectionLikeByReason = /\bprojection\b/.test(normalizedFallbackReason);
+  const deterministicLikeByReason =
+    /\bdeterministic\b/.test(normalizedFallbackReason) ||
+    /\bfallback_deterministic\b/.test(normalizedFallbackReason);
+  const legacyLikeByReason = /\bfallback_legacy\b/.test(normalizedFallbackReason);
+  const mode: HelixAskComposerV2ProjectionRegressionResult["mode"] = projectionLikeByStage ||
+    projectionLikeByReason
+    ? "projection"
+    : deterministicLikeByStage || deterministicLikeByReason
+      ? "deterministic_fallback"
+      : legacyLikeByReason
+        ? "legacy_fallback"
+        : "none";
+
+  const stage05CardCount = Number.isFinite(args.stage05CardCount)
+    ? Math.max(0, args.stage05CardCount)
+    : 0;
+  const slotCoverageRatio = Number.isFinite(args.slotCoverageRatio) ? args.slotCoverageRatio : 0;
+  const slotCoverageMissing = Array.isArray(args.slotCoverageMissing)
+    ? args.slotCoverageMissing.map((entry) => String(entry ?? "").trim()).filter(Boolean)
+    : [];
+  const stage05FallbackReason = String(args.stage05FallbackReason ?? "").trim();
+  const retrievalHealthy =
+    args.stage05Used &&
+    stage05CardCount > 0 &&
+    !args.stage05SummaryHardFail &&
+    !stage05FallbackReason &&
+    slotCoverageMissing.length === 0 &&
+    slotCoverageRatio >= 1;
+  if (!args.stage05Used) reasons.push("stage05_not_used");
+  if (stage05CardCount <= 0) reasons.push("stage05_no_cards");
+  if (slotCoverageRatio < 1) reasons.push("slot_coverage_incomplete");
+  if (slotCoverageMissing.length > 0) reasons.push("slot_coverage_missing");
+  if (args.stage05SummaryHardFail) reasons.push("stage05_summary_hard_fail");
+  if (stage05FallbackReason) reasons.push("stage05_fallback_reason");
+
+  const llmErrorCode = String(args.llmErrorCode ?? "").trim();
+  const llmHealthy =
+    args.llmInvokeAttempted === true &&
+    args.llmProviderCalled === true &&
+    args.llmHttpStatus === 200 &&
+    !llmErrorCode;
+  if (!args.llmInvokeAttempted) reasons.push("llm_not_attempted");
+  if (!args.llmProviderCalled) reasons.push("llm_provider_not_called");
+  if (args.llmHttpStatus !== 200) reasons.push("llm_http_status_not_200");
+  if (llmErrorCode) reasons.push("llm_error_present");
+
+  if (!args.composerApplied) reasons.push("composer_not_applied");
+  if (mode === "none") reasons.push("composer_not_projection_like");
+  const triggered = retrievalHealthy && args.composerApplied && mode !== "none";
+  const hard = triggered && llmHealthy;
+  return {
+    triggered,
+    hard,
+    retrieval_healthy: retrievalHealthy,
+    llm_healthy: llmHealthy,
+    mode,
+    reasons: Array.from(new Set(reasons)),
+  };
 };
 
 const buildHelixAskComposerV2DeterministicProjectionClaims = (args: {
@@ -30357,6 +30519,7 @@ export const __testHelixAskReliabilityGuards = {
   buildHelixAskUniversalFamilyDegradeAnswer,
   shouldApplyHelixAskComposerV2ForPlan,
   shouldRunHelixAskComposerV2ForSoftReason,
+  evaluateHelixAskComposerV2ProjectionRegression,
   resolveHelixAskComposerV2Verbosity,
   isLowSignalHelixAskComposerV2SeedSentence,
   buildHelixAskComposerV2GroundedBrief,
@@ -30405,6 +30568,7 @@ export const __testHelixAskDialogueFormatting = {
   extractQuestionFromPrompt,
   resolveHelixAskQuestionText,
   buildStage05InputPaths,
+  collectWideStage05PathCandidates,
   stripTelemetryLeakArtifacts,
   cleanDanglingFileExtensionFragments,
   scrubUnsupportedPaths,
@@ -49058,6 +49222,8 @@ const executeHelixAsk = async ({
         let composerV2ExpandErrorCode: string | null = null;
         let composerV2ProjectionApplied = false;
         let composerSoftObserveRewriteApplied = false;
+        let composerV2LastBrief: HelixAskComposerV2GroundedBrief | null = null;
+        let composerV2ProjectionRegressionGuard: HelixAskComposerV2ProjectionRegressionResult | null = null;
         let composerV2BestAttemptStage: "expand" | "repair" | "projection" | "deterministic_fallback" | null =
           null;
         if (softSectionGuardObserveSkipped) {
@@ -49084,6 +49250,7 @@ const executeHelixAsk = async ({
               evidenceText: finalCanonicalEvidence.evidenceWithSources,
               envelope: helixIntentPolicyEnvelope,
             });
+            composerV2LastBrief = composerV2Brief;
             composerV2BriefSource = composerV2Brief.source;
             composerV2EvidenceDigestSource = composerV2Brief.evidence_digest_source;
             composerV2EvidenceDigestClaimCount = composerV2Brief.evidence_digest_claims.length;
@@ -49198,6 +49365,7 @@ const executeHelixAsk = async ({
                 evidenceText: finalCanonicalEvidence.evidenceWithSources,
                 envelope: helixIntentPolicyEnvelope,
               });
+              composerV2LastBrief = composerV2Brief;
               composerV2BriefSource = composerV2Brief.source;
               composerV2EvidenceDigestSource = composerV2Brief.evidence_digest_source;
               composerV2EvidenceDigestClaimCount = composerV2Brief.evidence_digest_claims.length;
@@ -49291,6 +49459,7 @@ const executeHelixAsk = async ({
                 evidenceText: finalCanonicalEvidence.evidenceWithSources,
                 envelope: helixIntentPolicyEnvelope,
               });
+              composerV2LastBrief = composerV2Brief;
               composerV2BriefSource = composerV2Brief.source;
               composerV2EvidenceDigestSource = composerV2Brief.evidence_digest_source;
               composerV2EvidenceDigestClaimCount = composerV2Brief.evidence_digest_claims.length;
@@ -49580,6 +49749,93 @@ const executeHelixAsk = async ({
             }
           }
         }
+        const debugRecordForComposerGuard =
+          debugPayload && typeof debugPayload === "object"
+            ? (debugPayload as Record<string, unknown>)
+            : null;
+        const stage05CardCountForComposerGuardRaw = Number(
+          debugRecordForComposerGuard?.stage05_card_count ??
+            (Array.isArray(stage05EvidenceCards) ? stage05EvidenceCards.length : 0),
+        );
+        const stage05CardCountForComposerGuard = Number.isFinite(stage05CardCountForComposerGuardRaw)
+          ? Math.max(0, stage05CardCountForComposerGuardRaw)
+          : 0;
+        const slotCoverageRatioForComposerGuardRaw = Number(
+          debugRecordForComposerGuard?.slot_coverage_ratio,
+        );
+        const slotCoverageRatioForComposerGuard = Number.isFinite(slotCoverageRatioForComposerGuardRaw)
+          ? slotCoverageRatioForComposerGuardRaw
+          : 0;
+        const slotCoverageMissingForComposerGuard = Array.isArray(
+          debugRecordForComposerGuard?.slot_coverage_missing,
+        )
+          ? (debugRecordForComposerGuard?.slot_coverage_missing as unknown[])
+              .map((entry) => String(entry ?? "").trim())
+              .filter(Boolean)
+          : [];
+        const stage05FallbackReasonForComposerGuard =
+          typeof debugRecordForComposerGuard?.stage05_fallback_reason === "string"
+            ? String(debugRecordForComposerGuard.stage05_fallback_reason).trim()
+            : null;
+        const llmHttpStatusForComposerGuardRaw = Number(debugRecordForComposerGuard?.llm_http_status);
+        const llmHttpStatusForComposerGuard = Number.isFinite(llmHttpStatusForComposerGuardRaw)
+          ? llmHttpStatusForComposerGuardRaw
+          : null;
+        const llmErrorCodeForComposerGuard =
+          typeof debugRecordForComposerGuard?.llm_error_code === "string"
+            ? String(debugRecordForComposerGuard.llm_error_code).trim()
+            : null;
+        composerV2ProjectionRegressionGuard = evaluateHelixAskComposerV2ProjectionRegression({
+          promptFamily: answerPlanShadow.prompt_family,
+          composerApplied: composerV2Applied,
+          composerBestAttemptStage: composerV2BestAttemptStage,
+          composerFallbackReason: composerV2FallbackReason,
+          stage05Used: Boolean(debugRecordForComposerGuard?.stage05_used),
+          stage05CardCount: stage05CardCountForComposerGuard,
+          stage05SummaryHardFail:
+            stage05SummaryHardFail || Boolean(debugRecordForComposerGuard?.stage05_summary_hard_fail),
+          stage05FallbackReason: stage05FallbackReasonForComposerGuard,
+          slotCoverageRatio: slotCoverageRatioForComposerGuard,
+          slotCoverageMissing: slotCoverageMissingForComposerGuard,
+          llmInvokeAttempted: Boolean(debugRecordForComposerGuard?.llm_invoke_attempted),
+          llmProviderCalled: Boolean(debugRecordForComposerGuard?.llm_provider_called),
+          llmHttpStatus: llmHttpStatusForComposerGuard,
+          llmErrorCode: llmErrorCodeForComposerGuard,
+        });
+        if (composerV2ProjectionRegressionGuard.triggered) {
+          answerPath.push(
+            `composerV2:guard_retrieval_healthy_${composerV2ProjectionRegressionGuard.mode}`,
+          );
+          if (composerV2ProjectionRegressionGuard.hard) {
+            const guardVerbosity = resolveHelixAskComposerV2Verbosity(verbosity);
+            const deterministicGuardRewrite = composerV2LastBrief
+              ? renderHelixAskComposerV2FiveSectionAnswer({
+                  claims: [],
+                  brief: composerV2LastBrief,
+                  verbosity: guardVerbosity,
+                }).trim()
+              : "";
+            if (deterministicGuardRewrite) {
+              cleaned = deterministicGuardRewrite;
+              composerV2Applied = true;
+              composerV2ProjectionApplied = false;
+              composerV2BestAttemptStage = "deterministic_fallback";
+              composerV2FallbackReason = "projection_guard_deterministic_fallback";
+              composerSoftEnforceAction = "composer_v2_projection_guard";
+              answerPath.push("composerV2:guard_rewrite_deterministic");
+            } else {
+              cleaned = buildHelixAskUniversalFamilyDegradeAnswer({
+                plan: answerPlanShadow,
+                question: baseQuestion,
+                existingText: cleaned,
+                reason: "composer_projection_guard",
+              });
+              composerV2FallbackReason = "projection_guard_family_degrade";
+              composerSoftEnforceAction = "composer_v2_projection_guard_degrade";
+              answerPath.push("composerV2:guard_rewrite_family_degrade");
+            }
+          }
+        }
         const validatedAfterEnforce = validateHelixAskAnswerPlanShadow({
           plan: answerPlanShadow,
           renderedText: cleaned,
@@ -49688,6 +49944,18 @@ const executeHelixAsk = async ({
           debugRecord.composer_v2_expand_error_code = composerV2ExpandErrorCode;
           debugRecord.composer_v2_projection_applied = composerV2ProjectionApplied;
           debugRecord.composer_v2_best_attempt_stage = composerV2BestAttemptStage;
+          debugRecord.composer_v2_projection_guard_triggered =
+            composerV2ProjectionRegressionGuard?.triggered ?? false;
+          debugRecord.composer_v2_projection_guard_hard =
+            composerV2ProjectionRegressionGuard?.hard ?? false;
+          debugRecord.composer_v2_projection_guard_mode =
+            composerV2ProjectionRegressionGuard?.mode ?? "none";
+          debugRecord.composer_v2_projection_guard_retrieval_healthy =
+            composerV2ProjectionRegressionGuard?.retrieval_healthy ?? false;
+          debugRecord.composer_v2_projection_guard_llm_healthy =
+            composerV2ProjectionRegressionGuard?.llm_healthy ?? false;
+          debugRecord.composer_v2_projection_guard_reasons =
+            composerV2ProjectionRegressionGuard?.reasons ?? [];
           debugRecord.composer_selection_lock_id = answerPlanShadow.selection_lock.lock_id;
           debugRecord.composer_selection_locked =
             answerPlanShadow.selection_lock.selector_locked;

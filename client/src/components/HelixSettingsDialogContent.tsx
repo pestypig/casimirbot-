@@ -636,6 +636,7 @@ function HelixAskDebugContextPanel({
           <div className="max-h-[44vh] space-y-2 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
             {selectedEntries.map(({ event, context }) => {
               const contextFiles = readHelixAskDebugStringArray(context.contextFiles);
+              const rawPayload = formatHelixAskDebugRawPayload(event, context);
               return (
                 <div key={`${event.id}-helix-debug`} className="rounded border border-white/10 bg-white/5 p-1.5">
                   <p className="whitespace-pre-wrap break-words">{formatVoiceTimelineDebugEvent(event)}</p>
@@ -649,6 +650,12 @@ function HelixAskDebugContextPanel({
                       {contextFiles.slice(0, 10).join("\n")}
                     </p>
                   ) : null}
+                  <details className="mt-1 rounded border border-slate-700/80 bg-slate-900/70 px-2 py-1 text-slate-300">
+                    <summary className="cursor-pointer select-none uppercase tracking-[0.14em] text-slate-400">
+                      raw event + debugContext
+                    </summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-words">{rawPayload}</pre>
+                  </details>
                 </div>
               );
             })}
@@ -1326,6 +1333,14 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
   const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
   const readString = (value: unknown): string | null =>
     typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const readNumberArray = (value: unknown): number[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) =>
+        typeof entry === "number" && Number.isFinite(entry) ? Math.max(0, Math.floor(entry)) : null,
+      )
+      .filter((entry): entry is number => entry !== null);
+  };
   const readStringArray = (...values: unknown[]): string[] => {
     const seen = new Set<string>();
     const merged: string[] = [];
@@ -1385,11 +1400,117 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
   const stage05SoftRuntimeFailReason = readString(
     context.stage05SoftRuntimeFailReason ?? context.stage05_soft_runtime_fail_reason,
   );
+  const stage05SlotCoverageRaw =
+    context.stage05_slot_coverage && typeof context.stage05_slot_coverage === "object"
+      ? (context.stage05_slot_coverage as Record<string, unknown>)
+      : context.stage05SlotCoverage && typeof context.stage05SlotCoverage === "object"
+        ? (context.stage05SlotCoverage as Record<string, unknown>)
+        : null;
+  const slotCoverageRatio = readNumber(
+    context.slot_coverage_ratio ??
+      context.stage05SlotCoverageRatio ??
+      stage05SlotCoverageRaw?.ratio,
+  );
+  const slotCoverageOk = readBoolean(
+    context.slot_coverage_ok ??
+      context.stage05SlotCoverageOk ??
+      stage05SlotCoverageRaw?.ok,
+  );
+  const slotCoverageRequired = readStringArray(
+    context.slot_coverage_required,
+    context.stage05SlotCoverageRequired,
+    stage05SlotCoverageRaw?.required,
+  );
+  const slotCoverageMissing = readStringArray(
+    context.slot_coverage_missing,
+    context.stage05SlotCoverageMissing,
+    stage05SlotCoverageRaw?.missing,
+  );
+  const llmRetryDelaysMs = readNumberArray(context.llm_retry_delays_ms);
+  const llmCalls = Array.isArray(context.llm_calls)
+    ? context.llm_calls
+        .filter((entry) => entry && typeof entry === "object")
+        .map((entry) => entry as Record<string, unknown>)
+    : [];
+  const latestLlmCall = llmCalls.length > 0 ? llmCalls[llmCalls.length - 1] : null;
   const fields = [
     readString(context.intentDomain) ? `domain=${readString(context.intentDomain)}` : null,
     readString(context.intentId) ? `intent=${readString(context.intentId)}` : null,
     readString(context.helixAskFailClass) ? `fail_class=${readString(context.helixAskFailClass)}` : null,
     readString(context.helixAskFailReason) ? `fail_reason=${readString(context.helixAskFailReason)}` : null,
+    readBoolean(context.llm_invoke_attempted) !== null
+      ? `llm_invoke_attempted=${readBoolean(context.llm_invoke_attempted) ? "true" : "false"}`
+      : null,
+    readString(context.llm_skip_reason) ? `llm_skip_reason=${readString(context.llm_skip_reason)}` : null,
+    readString(context.llm_skip_reason_detail)
+      ? `llm_skip_detail=${clipDiagnosticsText(readString(context.llm_skip_reason_detail) ?? "", 80)}`
+      : null,
+    readString(context.llm_backend_used) ? `llm_backend=${readString(context.llm_backend_used)}` : null,
+    readBoolean(context.llm_provider_called) !== null
+      ? `llm_provider_called=${readBoolean(context.llm_provider_called) ? "true" : "false"}`
+      : null,
+    readString(context.llm_model) ? `llm_model=${clipDiagnosticsText(readString(context.llm_model) ?? "", 40)}` : null,
+    readString(context.llm_call_stage) ? `llm_stage=${readString(context.llm_call_stage)}` : null,
+    readNumber(context.llm_http_status) !== null
+      ? `llm_http_status=${Math.floor(readNumber(context.llm_http_status) ?? 0)}`
+      : null,
+    readString(context.llm_error_class) ? `llm_error_class=${readString(context.llm_error_class)}` : null,
+    readString(context.llm_error_code) ? `llm_error_code=${readString(context.llm_error_code)}` : null,
+    readNumber(context.llm_error_status) !== null
+      ? `llm_error_status=${Math.floor(readNumber(context.llm_error_status) ?? 0)}`
+      : null,
+    readNumber(context.llm_error_retry_after_ms) !== null
+      ? `llm_error_retry_after_ms=${Math.max(0, Math.floor(readNumber(context.llm_error_retry_after_ms) ?? 0))}`
+      : null,
+    readNumber(context.llm_error_timeout_ms) !== null
+      ? `llm_error_timeout_ms=${Math.max(0, Math.floor(readNumber(context.llm_error_timeout_ms) ?? 0))}`
+      : null,
+    readNumber(context.llm_error_max_tokens_requested) !== null
+      ? `llm_error_max_tokens_requested=${Math.max(
+          0,
+          Math.floor(readNumber(context.llm_error_max_tokens_requested) ?? 0),
+        )}`
+      : null,
+    readNumber(context.llm_error_max_tokens_effective) !== null
+      ? `llm_error_max_tokens_effective=${Math.max(
+          0,
+          Math.floor(readNumber(context.llm_error_max_tokens_effective) ?? 0),
+        )}`
+      : null,
+    readBoolean(context.llm_error_transient) !== null
+      ? `llm_error_transient=${readBoolean(context.llm_error_transient) ? "true" : "false"}`
+      : null,
+    readBoolean(context.llm_error_circuit_open) !== null
+      ? `llm_error_circuit_open=${readBoolean(context.llm_error_circuit_open) ? "true" : "false"}`
+      : null,
+    readNumber(context.llm_error_circuit_remaining_ms) !== null
+      ? `llm_error_circuit_remaining_ms=${Math.max(
+          0,
+          Math.floor(readNumber(context.llm_error_circuit_remaining_ms) ?? 0),
+        )}`
+      : null,
+    readNumber(context.llm_retry_count) !== null
+      ? `llm_retry_count=${Math.max(0, Math.floor(readNumber(context.llm_retry_count) ?? 0))}`
+      : null,
+    readNumber(context.llm_attempt_count) !== null
+      ? `llm_attempt_count=${Math.max(0, Math.floor(readNumber(context.llm_attempt_count) ?? 0))}`
+      : null,
+    llmRetryDelaysMs.length > 0
+      ? `llm_retry_delays_ms=${clipDiagnosticsText(llmRetryDelaysMs.join(","), 90)}`
+      : null,
+    llmCalls.length > 0 ? `llm_calls=${llmCalls.length}` : null,
+    latestLlmCall && readString(latestLlmCall.stage)
+      ? `llm_last_stage=${readString(latestLlmCall.stage)}`
+      : null,
+    latestLlmCall && readNumber(latestLlmCall.status) !== null
+      ? `llm_last_status=${Math.floor(readNumber(latestLlmCall.status) ?? 0)}`
+      : null,
+    latestLlmCall && readString(latestLlmCall.errorClass)
+      ? `llm_last_error_class=${readString(latestLlmCall.errorClass)}`
+      : null,
+    latestLlmCall && readString(latestLlmCall.errorCode)
+      ? `llm_last_error_code=${readString(latestLlmCall.errorCode)}`
+      : null,
     readBoolean(context.llm_breaker_prewait_enabled) !== null
       ? `llm_prewait=${readBoolean(context.llm_breaker_prewait_enabled) ? "true" : "false"}`
       : null,
@@ -1505,6 +1626,14 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
     readNumber(context.stage05CardCount) !== null
       ? `stage05_cards=${Math.max(0, Math.floor(readNumber(context.stage05CardCount) ?? 0))}`
       : null,
+    slotCoverageRatio !== null ? `slot_coverage_ratio=${slotCoverageRatio.toFixed(3)}` : null,
+    slotCoverageOk !== null ? `slot_coverage_ok=${slotCoverageOk ? "true" : "false"}` : null,
+    slotCoverageRequired.length > 0 ? `slot_coverage_required=${slotCoverageRequired.length}` : null,
+    slotCoverageMissing.length > 0
+      ? `slot_coverage_missing=${clipDiagnosticsText(slotCoverageMissing.join(","), 110)}`
+      : slotCoverageRatio !== null
+        ? "slot_coverage_missing=none"
+        : null,
     stage05KindCounts ? `stage05_kinds=${stage05KindCounts}` : null,
     readBoolean(context.stage05LlmUsed) !== null
       ? `stage05_llm=${readBoolean(context.stage05LlmUsed) ? "true" : "false"}`
@@ -1693,14 +1822,42 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
     readBoolean(context.composer_v2_projection_applied) !== null
       ? `composer_v2_projection=${readBoolean(context.composer_v2_projection_applied) ? "true" : "false"}`
       : null,
+    answerPathEntries.length > 0 ? `answer_path_steps=${answerPathEntries.length}` : null,
     answerPathEntries.length > 0
       ? `answer_path_tail=${clipDiagnosticsText(answerPathEntries.slice(-4).join(" > "), 120)}`
+      : null,
+    answerPathEntries.length > 0
+      ? `answer_path=${clipDiagnosticsText(answerPathEntries.join(" > "), 260)}`
       : null,
     `context_files=${contextFileCount}`,
   ]
     .filter(Boolean)
     .join(" | ");
   return fields || "no debug summary fields";
+}
+
+function formatHelixAskDebugRawPayload(
+  event: VoiceLaneTimelineDebugEvent,
+  context: Record<string, unknown>,
+): string {
+  return JSON.stringify(
+    {
+      id: event.id,
+      atMs: event.atMs,
+      source: event.source,
+      kind: event.kind,
+      status: event.status ?? null,
+      traceId: event.traceId ?? null,
+      turnKey: event.turnKey ?? null,
+      attemptId: event.attemptId ?? null,
+      utteranceId: event.utteranceId ?? null,
+      detail: event.detail ?? null,
+      text: event.text ?? null,
+      debugContext: context,
+    },
+    null,
+    2,
+  );
 }
 
 function formatVoiceTimelineDebugEvent(event: VoiceLaneTimelineDebugEvent): string {
