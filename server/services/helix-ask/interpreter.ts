@@ -613,7 +613,6 @@ export const readHelixAskInterpreterConfigFromEnv = (): HelixAskInterpreterConfi
   const apiKeyRaw =
     process.env.HELIX_ASK_INTERPRETER_API_KEY ??
     process.env.OPENAI_API_KEY ??
-    process.env.LLM_HTTP_API_KEY ??
     "";
   return {
     enabled: readBool(process.env.HELIX_ASK_INTERPRETER_ENABLED, false),

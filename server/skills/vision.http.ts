@@ -73,7 +73,7 @@ export const visionHttpHandler: ToolHandler = async (_input: any, ctx: any) => {
   const model = resolveVisionModel();
   const apiKey =
     process.env.VISION_HTTP_API_KEY?.trim() ||
-    process.env.LLM_HTTP_API_KEY?.trim() ||
+    process.env.OPENAI_API_KEY?.trim() ||
     process.env.OLLAMA_API_KEY?.trim();
   const personaId = ctx?.personaId ?? "persona:unknown";
   const now = new Date().toISOString();

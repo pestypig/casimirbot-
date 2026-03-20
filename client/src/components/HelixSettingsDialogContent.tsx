@@ -1671,6 +1671,42 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
       ? `stage05_two_pass_batches=${Math.max(0, Math.floor(readNumber(context.stage05TwoPassBatches) ?? 0))}`
       : null,
     readString(context.stage05OverflowPolicy) ? `stage05_overflow=${readString(context.stage05OverflowPolicy)}` : null,
+    readBoolean(context.stage05AdaptiveExpandAttempted ?? context.stage05_adaptive_expand_attempted) !== null
+      ? `stage05_adaptive_attempted=${
+          readBoolean(context.stage05AdaptiveExpandAttempted ?? context.stage05_adaptive_expand_attempted)
+            ? "true"
+            : "false"
+        }`
+      : null,
+    readBoolean(context.stage05AdaptiveExpandApplied ?? context.stage05_adaptive_expand_applied) !== null
+      ? `stage05_adaptive_applied=${
+          readBoolean(context.stage05AdaptiveExpandApplied ?? context.stage05_adaptive_expand_applied)
+            ? "true"
+            : "false"
+        }`
+      : null,
+    readString(context.stage05AdaptiveExpandReason ?? context.stage05_adaptive_expand_reason)
+      ? `stage05_adaptive_reason=${clipDiagnosticsText(
+          readString(context.stage05AdaptiveExpandReason ?? context.stage05_adaptive_expand_reason) ?? "",
+          120,
+        )}`
+      : null,
+    readNumber(context.stage05AdaptiveExpandMaxFiles ?? context.stage05_adaptive_expand_max_files) !== null
+      ? `stage05_adaptive_max_files=${Math.max(
+          0,
+          Math.floor(
+            readNumber(context.stage05AdaptiveExpandMaxFiles ?? context.stage05_adaptive_expand_max_files) ?? 0,
+          ),
+        )}`
+      : null,
+    readNumber(context.stage05AdaptiveExpandMaxCards ?? context.stage05_adaptive_expand_max_cards) !== null
+      ? `stage05_adaptive_max_cards=${Math.max(
+          0,
+          Math.floor(
+            readNumber(context.stage05AdaptiveExpandMaxCards ?? context.stage05_adaptive_expand_max_cards) ?? 0,
+          ),
+        )}`
+      : null,
     readString(context.policyRetrievalScope ?? context.policy_retrieval_scope)
       ? `retrieval_scope=${readString(context.policyRetrievalScope ?? context.policy_retrieval_scope)}`
       : null,
@@ -1679,6 +1715,60 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
       : null,
     readBoolean(context.intentContractMutationDetected) !== null
       ? `intent_contract_mutation=${readBoolean(context.intentContractMutationDetected) ? "true" : "false"}`
+      : null,
+    readString(context.turnContractHash ?? context.turn_contract_hash)
+      ? `turn_contract=${clipDiagnosticsText(
+          readString(context.turnContractHash ?? context.turn_contract_hash) ?? "",
+          24,
+        )}`
+      : null,
+    readBoolean(context.plannerValid ?? context.planner_valid) !== null
+      ? `planner_valid=${readBoolean(context.plannerValid ?? context.planner_valid) ? "true" : "false"}`
+      : null,
+    readString(context.plannerMode ?? context.planner_mode)
+      ? `planner_mode=${readString(context.plannerMode ?? context.planner_mode)}`
+      : null,
+    readString(context.plannerSource ?? context.planner_source)
+      ? `planner_source=${clipDiagnosticsText(
+          readString(context.plannerSource ?? context.planner_source) ?? "",
+          36,
+        )}`
+      : null,
+    readNumber(context.objectiveCount ?? context.objective_count) !== null
+      ? `objectives=${Math.max(
+          0,
+          Math.floor(readNumber(context.objectiveCount ?? context.objective_count) ?? 0),
+        )}`
+      : null,
+    Array.isArray(context.slotMissing ?? context.slot_missing) &&
+    (context.slotMissing ?? context.slot_missing)?.length
+      ? `slot_missing=${clipDiagnosticsText(
+          ((context.slotMissing ?? context.slot_missing) as string[]).join(","),
+          110,
+        )}`
+      : null,
+    readBoolean(context.evidenceGap ?? context.evidence_gap) !== null
+      ? `evidence_gap=${readBoolean(context.evidenceGap ?? context.evidence_gap) ? "true" : "false"}`
+      : null,
+    readString(context.answerMode ?? context.answer_mode)
+      ? `answer_mode=${readString(context.answerMode ?? context.answer_mode)}`
+      : null,
+    readString(context.degradeMode ?? context.degrade_mode)
+      ? `degrade_mode=${clipDiagnosticsText(
+          readString(context.degradeMode ?? context.degrade_mode) ?? "",
+          48,
+        )}`
+      : null,
+    readBoolean(context.anchorIntegrityOk ?? context.anchor_integrity_ok) !== null
+      ? `anchor_integrity_ok=${
+          readBoolean(context.anchorIntegrityOk ?? context.anchor_integrity_ok) ? "true" : "false"
+        }`
+      : null,
+    Array.isArray(context.objectiveSupport ?? context.objective_support)
+      ? `objective_supports=${Math.max(
+          0,
+          ((context.objectiveSupport ?? context.objective_support) as unknown[]).length,
+        )}`
       : null,
     readNumber(context.equationCandidateTotal) !== null
       ? `eq_candidates=${Math.max(0, Math.floor(readNumber(context.equationCandidateTotal) ?? 0))}`

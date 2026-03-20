@@ -1,199 +1,192 @@
-# Needle Hull Mark 2 Reduced-Order Full-Solve Gates and Evidence Governance Manuscript
+# Needle Hull Mark 2 Reduced‑Order Full‑Solve Gates and Evidence Governance Manuscript
 
-## Executive abstract for scientists
+## Plain-language executive summary
 
-This manuscript summarizes the **Needle Hull Mark 2** “state-of-record” artifacts as a **governance-and-evidence campaign** for reduced-order *gate adjudication*, not a statement of real‑world device feasibility. The boundary is explicit and must be preserved: **“This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.”** fileciteturn56file0L1-L1
+“This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.” fileciteturn55file0L1-L1
 
-Within the **canonical-authoritative** lane, the campaign execution report records the decision label **REDUCED_ORDER_ADMISSIBLE** and a gate scoreboard of **PASS=8, FAIL=0, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1** (9 total gates, reconciled). fileciteturn52file0L1-L1 This same decision and counts are echoed by the campaign scoreboard JSON (lane=`readiness`). fileciteturn85file0L1-L1
+Needle Hull Mark 2 (NHM2), as documented in the state-of-record artifacts, is organized as a **governance-and-evidence program** rather than as a claim that any “warp” configuration is physically feasible or operationally realizable. The conceptual guide states this orientation explicitly: NHM2 exists to present (i) a math framework with explicit assumptions, (ii) a set of falsifiable gates, and (iii) a reproducible evidence/governance pipeline that can **fail closed** (i.e., it blocks upgrades when required evidence is missing rather than filling gaps with inference). fileciteturn54file0L1-L1 fileciteturn56file0L1-L1
 
-The **integrity parity** layer reports a **PASS** verdict (blocker_count=0) and asserts that canonical decision/count shape, geometry baseline checks, four GR-observable parity checks, and external-matrix taxonomy checks are all satisfied under the suite rubric. fileciteturn59file0L1-L1
+The repo’s **top-level proof map** is the proof-anchor index. It defines (a) a **canonical authority chain** for decisions and (b) default “state-of-record anchors” for human- and machine-readable summaries. fileciteturn55file0L1-L1 fileciteturn56file0L1-L1 In the canonical authority chain, the highest-precedence decision artifact is the campaign execution report (2026‑02‑24), followed by the G4 decision ledger and governance matrix, and then the evidence pack and evidence snapshot. fileciteturn55file0L1-L1 fileciteturn56file0L1-L1
 
-The **promotion-readiness** layer is **not fully ready for promotion**: the Promotion Readiness Suite verdict is **PARTIAL** with `readiness_gate_pass=false`, and explicitly marks **sem_ellipsometry** as `reportable_ready=false` with blocked reasons **missing_covariance_uncertainty_anchor** and **missing_paired_dual_instrument_run**. fileciteturn60file0L1-L1 This is repeated in the state‑of‑record synthesis, which also lists the SEM+ellipsometry lane blocker as **HIGH severity**. fileciteturn62file0L1-L1
+At the **canonical-authoritative** tier, the campaign execution report records an executive verdict **REDUCED_ORDER_ADMISSIBLE** with a reconciled gate scoreboard of **PASS=8, FAIL=0, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1** (9 total gates). fileciteturn57file0L1-L1 This counts/decision is echoed by the committed machine scoreboard JSON (`campaign-gate-scoreboard-2026-02-24.json`). fileciteturn22file0L1-L1 The same canonical report also classifies gate **G5** as **NOT_APPLICABLE** by policy in this campaign context, which is a key structural reason the record does **not** license feasibility language. fileciteturn57file0L1-L1
 
-An **external comparison overlay** exists as a non-canonical reference: the external work comparison matrix summarises **14** works with **7 compatible, 5 partial, 2 inconclusive, 0 stale** (and reduced blocker taxonomy dominated by `non_comparable_or_unknown`). fileciteturn61file0L1-L1 These external comparisons are explicitly framed as overlays in the overall proof-index and governance materials rather than as canonical decision overrides. fileciteturn50file0L1-L1
+Independent of that canonical adjudication, the repo runs **integrity parity** checks to ask a narrower question: “Do the consistency checks still hold?” The integrity parity suite (2026‑03‑18) reports **final_parity_verdict: PASS** with **blocker_count: 0**, and asserts that canonical decision/count shape, geometry baseline checks, GR-observable parity checks, external-matrix taxonomy checks, capsule validation, and Casimir verification all satisfied its rubric. fileciteturn59file0L1-L1
 
-No artifact set reviewed here authorizes a physical-feasibility claim; the repo’s guardrails additionally state that the system **must not** declare a configuration “physically viable” unless required hard constraints pass and the viability oracle produces an admissible status. fileciteturn83file0L1-L1
+Separately, the repo maintains a **promotion-readiness** layer that is explicitly *not the same* as canonical reduced-order gate admissibility. The promotion readiness suite (2026‑03‑18) is **PARTIAL** with `readiness_gate_pass: false`; it reports `reportable_ready: true` for `q_spoiling` and `timing`, but `reportable_ready: false` for `sem_ellipsometry`, with explicit blocked reasons `missing_covariance_uncertainty_anchor` and `missing_paired_dual_instrument_run`. fileciteturn60file0L1-L1
 
-## Methods and governance pipeline
+A third layer is the repo’s **external work comparison overlay**, which is explicitly a non-canonical “reference-only” overlay (it does not block or override canonical decisions). fileciteturn54file0L1-L1 fileciteturn56file0L1-L1 In the latest external comparison matrix (2026‑03‑18), 14 works are summarized as **7 compatible, 5 partial, 2 inconclusive, 0 stale**, with “partial/inconclusive” predominantly attributed to `non_comparable_or_unknown` reason codes. fileciteturn61file0L1-L1
 
-### Source-of-truth boundary and admissibility rules
+### Key terms defined once
 
-This manuscript treats **only the committed Needle Hull Mark 2 state‑of‑record artifacts** as authoritative evidence and marks missing fields as **UNKNOWN** rather than inferring values (per the project’s “missing artifact behavior” rule). fileciteturn50file0L1-L1 The paper-authoring contract requires that claim tiers remain separated and forbids upgrading claims (including feasibility language) from non-canonical tiers. fileciteturn57file0L1-L1
+**Canonical-authoritative (canonical):** the highest-precedence internal decision artifacts (e.g., the campaign execution report and its canonical chain), and the tier in which decision labels and gate scoreboards may be stated without being overridden by lower tiers. fileciteturn54file0L1-L1 fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
 
-### Claim tiers used in this manuscript
+**Fail-closed:** a policy posture in which missing required evidence blocks claim upgrades rather than being ignored; in the proof index this is codified as `missing_artifact_behavior: UNKNOWN_and_fail_closed_for_claim_tier_promotion`. fileciteturn54file0L1-L1 fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
 
-The evidence pack defines three claim tiers and treats them as non-collapsible: **canonical-authoritative**, **promoted-candidate**, and **exploratory**. fileciteturn55file0L1-L1 The authoring contract restates these tiers and explicitly disallows inferring physical feasibility from candidate-only evidence. fileciteturn57file0L1-L1
+**Congruence:** whether evidence and model outputs agree under lane rules, with lanes allowed to be congruent, incongruent, unknown, or blocked using explicit reason codes. fileciteturn54file0L1-L1 fileciteturn60file0L1-L1
 
-### Pipeline implemented by the state-of-record index
+**QI/QEI:** quantum inequality / quantum energy inequality style bounds used as **hard guardrails** in the governance stack, represented in the repo guardrails as an inequality of the form `int_T00_dt >= -K / tau^4` (Ford-Roman style lineage: `SRC-007`, `SRC-051`; Fewster‑Eveson worldline QEI: `SRC-008`, `SRC-052`). fileciteturn54file0L1-L1 fileciteturn65file0L1-L1 fileciteturn62file0L1-L1
 
-The proof anchor index is the top-level citation map and defines the canonical authority chain and “default state-of-record anchors.” fileciteturn49file0L1-L1 The canonical authority chain is:
+Why this matters: the executive summary establishes what NHM2 *is* in this repo—**a falsifiable, gate-driven evidence discipline**—and prevents readers from mistaking a “pipeline status” for a claim of physical feasibility. fileciteturn54file0L1-L1 fileciteturn64file0L1-L1
 
-- campaign execution report  
-- G4 decision ledger  
-- G4 governance matrix  
-- evidence pack  
-- evidence snapshot fileciteturn50file0L1-L1
+## Theory lineage
 
-A deterministic “canonical → parity → readiness → external comparison” governance pipeline is reflected across the index and the downstream suite artifacts:
+The repo frames its theory lineage as a **concept flow** from (a) GR observables → (b) warp-family context → (c) NHM2 gates/evidence governance, with attention to assumption domains and comparability. fileciteturn54file0L1-L1
 
-Canonical adjudication (decision + counts + per-wave gating) is recorded in the campaign execution report and companion campaign gate JSON artifacts. fileciteturn52file0L1-L1 fileciteturn85file0L1-L1 The **G4 decision ledger** and **G4 governance matrix** provide canonical G4 decomposition and governance classification metadata (including mismatch flags and per-wave rows). fileciteturn53file0L1-L1 fileciteturn54file0L1-L1
+### GR observables as “sanity anchors” for a GR-based computation stack
 
-Parity assurance (geometry + GR observable parity + external overlay consistency + certification presence) is summarized by the **Integrity Parity Suite**. fileciteturn59file0L1-L1
+In plain language, the conceptual guide states that GR describes gravity as geometry and that historical/modern tests (Mercury precession, light deflection, frame dragging, Shapiro delay) act as benchmarks for whether a GR-based computational framework is behaving sensibly. fileciteturn54file0L1-L1 The guide also enumerates external literature anchors for those tests using repo-internal source IDs (e.g., Einstein-era foundations `SRC-077`, `SRC-075`; modern synthesis `SRC-076`; lensing anchors `SRC-078`, `SRC-079`; frame-dragging anchors `SRC-080`, `SRC-081`, `SRC-082`; Shapiro anchors `SRC-083`, `SRC-084`). fileciteturn54file0L1-L1 fileciteturn62file0L1-L1
 
-Promotion readiness (reportable readiness by evidence lane) is summarized by the **Promotion Readiness Suite**, with lane-level congruent/incongruent/unknown accounting and explicit blocked reasons when reportable status cannot be earned. fileciteturn60file0L1-L1
+Technically, NHM2 operationalizes these as replayable “shadow” scripts and pinned snapshot paths: the proof index lists GR observable replay scripts (Mercury, lensing deflection, frame dragging, Shapiro delay) and the corresponding snapshot JSONs in `docs/specs/data/…`. fileciteturn55file0L1-L1 fileciteturn56file0L1-L1 The current reference capsule reports all four GR baseline statuses as `pass` and records numerical residuals for each baseline (e.g., Mercury perihelion residual, lensing residuals and gamma residual, frame-dragging residuals, Shapiro gamma residual) as well as the snapshot paths used. fileciteturn58file0L1-L1 The integrity parity suite reports these same observables as `signature_status: pass` with explicit residuals and tolerances. fileciteturn59file0L1-L1
 
-External comparison (method-track overlays to external “work profiles”) is summarized by the **External Work Comparison Matrix**, with stable reason taxonomies. fileciteturn61file0L1-L1
+Why this matters: these GR baselines are used as **framework integrity checks** (“is the GR stack numerically sane against known observables?”) rather than as evidence toward feasibility claims. That scoping is explicit in the conceptual guide’s “benchmark/sanity” framing. fileciteturn54file0L1-L1
 
-### Conflict handling rule
+### Warp-family lineage as a bounded, non-canonical comparison overlay
 
-Where artifacts disagree, the deep-research prompt embedded in the repo defines a precedence order that places the canonical execution report and governance artifacts above summaries/translations. fileciteturn58file0L1-L1 This matters because the “Warp Gates Executive Translation” conflicts with the canonical execution report and the machine scoreboard JSON (see Results and Claim-status matrix). fileciteturn84file0L1-L1 fileciteturn85file0L1-L1
+The conceptual guide defines a “Core‑4” comparison set (Alcubierre 1994 `SRC-071`, Natário 2002 `SRC-072`, Van den Broeck 1999 `SRC-073`, Lentz 2021 `SRC-074`) and states that these are tracked as **external reference overlays**, not “adopted as truth.” fileciteturn54file0L1-L1 The guide’s explicit rule is that when assumptions are non-comparable, the framework marks them partial/inconclusive rather than forcing pass/fail. fileciteturn54file0L1-L1
 
-## Results
+Technically, the proof index points to the method-track proof paths used to implement those overlays (external work profiles config and warp geometry/energetics replay scripts, plus external-work run/compare/matrix scripts). fileciteturn55file0L1-L1 fileciteturn56file0L1-L1 The external work comparison matrix shows how this policy appears in practice: several “warp-family” works are partial or inconclusive with `non_comparable_or_unknown` reason codes tied to geometry checks or energetics/QEI assumptions, while Natário-geometry work appears as compatible in this overlay. fileciteturn61file0L1-L1
 
-### Canonical gate outcome
+Why this matters: the overlay provides a disciplined way to say “our framework behaves similarly/differently under these assumptions,” while *preserving* the canonical decision boundary and refusing to collapse incompatible assumptions into a single narrative. fileciteturn56file0L1-L1 fileciteturn61file0L1-L1
 
-The canonical campaign execution report records:
+## NHM2 framework
 
-- Executive verdict: **REDUCED_ORDER_ADMISSIBLE**  
-- Gate scoreboard totals: **PASS=8, FAIL=0, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1**  
-- Cross-wave aggregate includes **G4: PASS** and **G5: NOT_APPLICABLE** (policy-scoped) fileciteturn52file0L1-L1
+NHM2, as represented by the state-of-record artifacts, is a **reduced-order full-solve gate framework** coupled to a **governance regime** and **evidence lanes**. The proof anchor index declares it as the default citation map for NHM2 paper generation, centralizing commit-tracked paths for end-to-end traceability. fileciteturn55file0L1-L1
 
-The machine scoreboard artifact matches this decision and counts and explicitly identifies lane=`readiness` and `reconciled=true`. fileciteturn85file0L1-L1 The first-fail map records `globalFirstFail="none"` and per-wave first fail “none.” fileciteturn86file0L1-L1
+### Tier separation and governance posture
 
-The G4 decision ledger also reports canonical decision **REDUCED_ORDER_ADMISSIBLE** with the same PASS/FAIL/UNKNOWN/NOT_READY/NOT_APPLICABLE counts; it additionally flags `classificationMismatch=true` and states the mismatch reason as a canonical override retaining the canonical class as authoritative. fileciteturn53file0L1-L1
+The proof index JSON records a posture of `reference_only: true` and `canonical_blocking: false` for the overall compilation, making explicit that overlays (e.g., external comparisons) do not override canonical decisions. fileciteturn56file0L1-L1 The authoring contract requires that claim tiers **must not be collapsed** into each other, and it defines three tiers: canonical-authoritative, promoted-candidate, and exploratory, with explicit “allowed/disallowed” boundaries (including disallowing physical-feasibility inference from non-canonical tiers). fileciteturn64file0L1-L1
 
-### Geometry conformance
+### Gate adjudication as the reduced-order “full-solve” output
 
-Geometry baseline checks are reported as all pass (5/5) in both the Integrity Parity Suite and the Reference Capsule, with test file anchors:
+The canonical campaign execution report defines a gate scoreboard over gates G0..G8 and records the aggregate result and per-wave gate statuses (Wave A–D). fileciteturn57file0L1-L1 The same decision/count shape is present in the committed gate scoreboard JSON. fileciteturn22file0L1-L1
 
-- metric_form_alignment — pass  
-- shift_mapping — pass  
-- york_time_sign_parity — pass  
-- natario_control_behavior — pass  
-- metric_derived_t00_path — pass fileciteturn59file0L1-L1 fileciteturn51file0L1-L1
+A key internal feature of the canonical report is **G4 diagnostics**, which explicitly name two hard constraints—FordRomanQI and ThetaAudit—as passing in each wave’s diagnostics, and then detail the diagnostic quantities (margin ratios, uncertainty fields, semantic bridge fields, sampling parameters, curvature applicability, and more). fileciteturn57file0L1-L1 This aligns with the repo’s guardrails file, which declares FordRomanQI and ThetaAudit as **HARD** constraints and provides their abstract forms (`int_T00_dt >= -K / tau^4` and `|thetaCal| <= theta_max`). fileciteturn65file0L1-L1
 
-The state-of-record synthesis likewise reports `geometry_all_pass=true (5/5)` and enumerates the four GR parity statuses as pass. fileciteturn62file0L1-L1
+### Why QI/QEI appears in this framework
 
-### GR observable parity
+The conceptual guide states that warp concepts frequently imply unusual stress-energy requirements, motivating the use of quantum-inequality-style constraints as hard guardrails, and it lists the relevant literature lineage by internal IDs (Ford & Roman: `SRC-007`, `SRC-051`; Fewster & Eveson: `SRC-008`, `SRC-052`; curved/stationary caveats: `SRC-053`, `SRC-054`, `SRC-056`). fileciteturn54file0L1-L1 fileciteturn62file0L1-L1 The citation pack scopes these QI/QEI items as admissible for normative use in this governance setting. fileciteturn62file0L1-L1
 
-The Integrity Parity Suite reports **compatible/pass** parity for four GR observables with explicit residuals and tolerances:
+At the implementation/governance level, the QEI worldline primer is explicitly referenced as a repo-governance standard (`SRC-057`) in the citation pack, indicating that the repo treats its own primer as an internal normative document for how QEI constraints are applied and checked in this campaign’s gates. fileciteturn62file0L1-L1
 
-- Mercury perihelion: residual `-0.0193 arcsec/century` vs tolerance `1`  
-- Lensing deflection: historical residual `-0.2304 arcsec` vs tolerance `0.5`; gamma residual `-0.0002` vs tolerance `0.001`  
-- Frame dragging: GP‑B residual `-2 mas/year` vs tolerance `14.4`; LAGEOS residual ratio `-0.01` vs tolerance `0.2`  
-- Shapiro delay: gamma residual `0.000021` vs tolerance `0.00007` fileciteturn59file0L1-L1
+### Evidence lanes and promotion-readiness governance
 
-The Reference Capsule includes the same four “baseline” statuses as `pass` and provides predicted/observed/residual numerical values and the snapshot paths used for those baselines. fileciteturn51file0L1-L1
+The conceptual guide emphasizes a critical separation: **mathematical solve passes are not the same as measurement closure**, and the repo therefore partitions evidence into “lanes” (e.g., Casimir sign-control, Q-spoiling, nanogap metrology, timing/clocking, SEM+ellipsometry) and tracks congruence/unknown/blocked states with reason codes. fileciteturn54file0L1-L1 The proof index enumerates the evidence-lane contracts (compatibility contracts per lane) and additional lane-specific proof paths (including SEM+ellipsometry closure artifacts and scripts). fileciteturn55file0L1-L1 fileciteturn56file0L1-L1
 
-### Evidence-lane congruence summaries
+Why this matters: NHM2’s central scientific contribution *in the state-of-record artifacts* is not a new physical claim; it is a **structured, falsifiable governance architecture** that keeps GR baselines, external overlays, hard-constraint gates, and experimental evidence separated and auditable. fileciteturn54file0L1-L1 fileciteturn64file0L1-L1
 
-Evidence-lane congruence is summarized at two levels: (i) typed vs reportable count accounting (capsule), and (ii) promotion readiness status (readiness suite).
+## Current status
 
-The Reference Capsule reports typed/reportable triplets (congruent / incongruent / unknown) per lane:
+This section reports what the **committed state-of-record artifacts** explicitly support, what is partial, and what is blocked—without inferring missing content and without making feasibility claims. fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
 
-- casimir_sign_control: typed `6 / 9 / 3`; reportable `6 / 9 / 3`  
-- q_spoiling: typed `5 / 24 / 25`; reportable `5 / 24 / 25`  
-- nanogap: typed `5 / 5 / 0`; reportable `5 / 5 / 0`  
-- timing: typed `9 / 2 / 1`; reportable `9 / 2 / 1`  
-- sem_ellipsometry: typed `0 / 0 / 2`; reportable `0 / 0 / 18`  
-- qcd_analog: typed `0 / 0 / 0`; reportable `0 / 0 / 0` fileciteturn51file0L1-L1
+### What is supported
 
-Promotion readiness is explicitly **PARTIAL** and describes which lanes are reportable-ready:
+The canonical campaign execution report supports the statement that, in the readiness lane (`--ci-fast-path`), the canonical reduced-order gate outcome is **REDUCED_ORDER_ADMISSIBLE** with the reconciled counts **PASS=8, FAIL=0, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1**. fileciteturn57file0L1-L1 The committed scoreboard JSON supports the same decision and count shape. fileciteturn22file0L1-L1 The committed first-fail map reports `globalFirstFail: none` and per-wave first fail “none” for the canonical lane snapshot. fileciteturn23file0L1-L1
 
-- q_spoiling: `reportable_ready=true`  
-- timing: `reportable_ready=true`  
-- sem_ellipsometry: `reportable_ready=false` with blocking reasons `missing_covariance_uncertainty_anchor` and `missing_paired_dual_instrument_run` fileciteturn60file0L1-L1
+The integrity parity suite supports that integrity parity is presently **PASS** with `blocker_count: 0`, and that its rubric items—including geometry baseline checks and the four GR observable parity checks—are satisfied. fileciteturn59file0L1-L1 The reference capsule supports that all geometry conformance checks listed in its table are `pass` and that the GR observable baseline statuses are `pass` with recorded numeric residuals and snapshot paths. fileciteturn58file0L1-L1
 
-The state-of-record synthesis repeats this status and lists two blockers, including a **HIGH severity** readiness blocker for SEM+ellipsometry reportability. fileciteturn62file0L1-L1
+### What is partial
 
-## Claim-status matrix
+Promotion readiness is partial: the promotion readiness suite explicitly records **final_readiness_verdict: PARTIAL** and `readiness_gate_pass: false`. fileciteturn60file0L1-L1 It also supports that `q_spoiling` and `timing` are `reportable_ready: true` in the readiness view, meaning those lanes are treated as reportable-ready under this suite’s policy. fileciteturn60file0L1-L1
 
-Status legend: **supported** = explicitly stated in admissible artifacts; **partial** = supported but bounded by an explicit blocker or tier restriction; **blocked** = artifact claims exist but required evidence is missing/unavailable for the relevant tier advancement; **unknown** = required field/path not present in committed artifacts.
+External comparisons are also “partial” in the specific technical sense used by the repo: the external work comparison matrix reports a mixture of compatible/partial/inconclusive results, with partialness dominated by explicit `non_comparable_or_unknown` reason codes. fileciteturn61file0L1-L1 The proof index posture supports that these remain overlays rather than canonical decision overrides. fileciteturn56file0L1-L1
 
-| Claim | Tier | Status | Artifact-path citation(s) | Notes / constraints |
-|---|---|---|---|---|
-| Boundary statement is a non-feasibility claim and must be verbatim | canonical-authoritative (governance) | supported | `docs/audits/research/warp-evidence-snapshot-2026-03-02.md` fileciteturn56file0L1-L1 | Manuscript must not claim physical feasibility. |
-| Canonical decision label is REDUCED_ORDER_ADMISSIBLE | canonical-authoritative | supported | `docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md` fileciteturn52file0L1-L1 | Decision is explicitly “reduced-order” and bounded by the boundary statement. |
-| Canonical gate counts: PASS=8, FAIL=0, UNKNOWN=0, NOT_READY=0, NOT_APPLICABLE=1 | canonical-authoritative | supported | `docs/audits/research/warp-full-solve-campaign-execution-report-2026-02-24.md` fileciteturn52file0L1-L1; `artifacts/research/full-solve/campaign-gate-scoreboard-2026-02-24.json` fileciteturn85file0L1-L1 | Canonical scoreboard is reconciled and lane=`readiness`. |
-| First fail is “none” (global and per-wave) | canonical-authoritative | supported | `artifacts/research/full-solve/campaign-first-fail-map-2026-02-24.json` fileciteturn86file0L1-L1 | Confirms no gate is the earliest blocker in this lane snapshot. |
-| G4 governance matrix shows no mismatch across waves | canonical-authoritative | supported | `artifacts/research/full-solve/g4-governance-matrix-2026-02-27.json` fileciteturn54file0L1-L1 | Governance matrix `mismatch=false`. |
-| Canonical G4 decision ledger indicates `classificationMismatch=true` but canonical class is authoritative | canonical-authoritative | supported | `artifacts/research/full-solve/g4-decision-ledger-2026-02-26.json` fileciteturn53file0L1-L1 | Treated as “diagnostic metadata,” not a decision override. |
-| Geometry baseline conformance checks (5/5) pass | integrity parity (validation) | supported | `docs/audits/research/warp-integrity-parity-suite-latest.md` fileciteturn59file0L1-L1 | Also echoed in capsule. fileciteturn51file0L1-L1 |
-| GR observable parity (Mercury, Lensing, Frame Dragging, Shapiro) passes within tolerances | integrity parity (validation) | supported | `docs/audits/research/warp-integrity-parity-suite-latest.md` fileciteturn59file0L1-L1 | Reported as `signature_status=pass` with residuals/tolerances. |
-| Integrity parity final verdict is PASS | parity | supported | `docs/audits/research/warp-integrity-parity-suite-latest.md` fileciteturn59file0L1-L1 | Machine parity JSON anchor is referenced but not present in committed artifacts (see Repro appendix). fileciteturn50file0L1-L1 |
-| Promotion readiness verdict is PARTIAL; readiness_gate_pass=false | promotion-readiness | supported | `docs/audits/research/warp-promotion-readiness-suite-latest.md` fileciteturn60file0L1-L1 | Blocks reportable claim upgrades for some lanes. |
-| SEM+ellipsometry reportable readiness is blocked with explicit reasons | promotion-readiness | supported | `docs/audits/research/warp-promotion-readiness-suite-latest.md` fileciteturn60file0L1-L1 | Blocked reasons are explicit; no inference needed. |
-| External comparison summary total=14, compatible=7, partial=5, inconclusive=2, stale_count=0 | exploratory overlay (noncanonical) | supported | `docs/audits/research/warp-external-work-comparison-matrix-latest.md` fileciteturn61file0L1-L1 | Treated as overlay only (does not override canonical). fileciteturn55file0L1-L1 |
-| Evidence-lane typed vs reportable counts for all lanes | reporting / capsule | supported | `docs/audits/research/warp-full-solve-reference-capsule-latest.md` fileciteturn51file0L1-L1 | SEM+ellipsometry has larger reportable unknown count than typed count; reported as-is. |
-| “Warp Gates Executive Translation” decision is NOT_READY with NOT_READY=8 | promotional translation | partial | `docs/audits/research/warp-gates-executive-translation-2026-02-24.md` fileciteturn84file0L1-L1 | Conflicts with canonical execution report + scoreboard. Canonical precedence rule applies. fileciteturn52file0L1-L1 fileciteturn85file0L1-L1 |
-| “Physically viable” declaration is prohibited without admissible oracle + hard constraints | governance / guardrail | supported | `WARP_AGENTS.md` fileciteturn83file0L1-L1 | Reinforces non-feasibility posture. |
+### What is blocked and why
 
-## Reproducibility appendix
+The promotion readiness suite is explicit that **SEM+ellipsometry is blocked** for reportable readiness, with blocked reasons `missing_covariance_uncertainty_anchor` and `missing_paired_dual_instrument_run`. fileciteturn60file0L1-L1 In the reference capsule, `sem_ellipsometry` reportable accounting shows large reportable-unknown counts (reported as-is) consistent with a lane that has not achieved reportable closure. fileciteturn58file0L1-L1
 
-### Commit pin
+Separately, the reference capsule marks itself `blocked: true` and lists multiple **HARD** blockers of type `commit_pin_mismatch_*`, each stating that a source commit (notably `7e8cc…`) does not match the capsule commit pin (`e07f…`). fileciteturn58file0L1-L1 Under the repo’s fail-closed posture, this is a governance-level block on treating the capsule as fully aligned across its source chain without additional reconciliation. fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
 
-Repo-level proof anchor and citation map is explicitly commit-addressable here: the proof anchor index artifacts used in this manuscript are fetched from commit `e07f027f3181b7884498c4262cb6bad92085acc6` (as shown in their `display_url`). fileciteturn49file0L1-L1 fileciteturn50file0L1-L1
+Why this matters: the current status is exactly what a fail-closed pipeline should expose—**clear progress signals** plus **explicit blockers**—so that readers can see where upgrades are prevented and why. fileciteturn54file0L1-L1 fileciteturn60file0L1-L1
 
-Multiple artifacts also embed **internal run commit pins** as explicit fields; the dominant one across parity/readiness/capsule is `7e8cc8952db5649e54d797a3786bd85e3fb0e96b`. fileciteturn51file0L1-L1 fileciteturn59file0L1-L1 fileciteturn60file0L1-L1 fileciteturn62file0L1-L1
+## Reproducibility
 
-### Checksums explicitly recorded in committed artifacts
+This section reports reproducibility anchors present in committed artifacts: commit pins, checksums, deterministic regeneration commands, and explicit missing-artifact behavior. fileciteturn55file0L1-L1 fileciteturn64file0L1-L1
 
-The following checksums are present as first-class fields:
+### Commit pin and repo snapshot notes
 
-- Integrity parity suite checksum: `80ebb4ad519e3a67bea8d8c828f1f2fb9f59a5189618abfc171a8a232ed7c534` fileciteturn59file0L1-L1  
-- Promotion readiness suite checksum: `d69155191447fcd2a64ab17cc2b3116e625f7262eec1a88c2923f744c3756629` fileciteturn60file0L1-L1  
-- Full-solve reference capsule checksum: `d1181f7ed42239abc3ba2c163e45a58988941436d9f5cca0896c4d3345f76414` fileciteturn51file0L1-L1  
-- State-of-record synthesis checksum: `5a8ab14cb974213eaae784208b5c60530c8ed55f6f92f80a7ad5083c4eef8c46` fileciteturn62file0L1-L1  
+The repository HEAD commit for the documentation sync (as retrieved via the GitHub connector) is `a3e94a3d43ce8655b2f4c608ed078b5bf152240f`. fileciteturn53file0L1-L1
 
-### missing_count and missing file list
+Within the state-of-record artifacts, multiple internal run commit pins are also explicitly embedded. For example, the integrity parity suite records `commit_pin: 7e8cc8952db5649e54d797a3786bd85e3fb0e96b`. fileciteturn59file0L1-L1 The promotion readiness suite also records that same commit pin. fileciteturn60file0L1-L1 The canonical campaign execution report’s G4 governance decomposition indicates a governance artifact commit and “current head commit” equal to `7e8cc…` for that specific canonical run context. fileciteturn57file0L1-L1
 
-Definition used here: **missing** = a path is referenced as required/anchor in the proof index, theory directory, or frozen evidence snapshot but is not readable as a committed file at the manuscript’s repo snapshot for this write‑up.
+The reference capsule is dated 2026‑03‑19 and records `commit_pin: e07f027f3181b7884498c4262cb6bad92085acc6`, while simultaneously listing blockers that assert a mismatch against source commit `7e8cc…`. fileciteturn58file0L1-L1 Because the capsule itself appears internally inconsistent across its chain, it is explicitly marked `blocked: true` and must be treated as governance-blocked until reconciled under the repo’s policy. fileciteturn58file0L1-L1 fileciteturn64file0L1-L1
 
-`missing_count = 13`
+### Checksum-bearing artifacts
 
-Missing paths (all referenced in state-of-record artifacts):
+Checksums are first-class fields in multiple committed artifacts, including:
+- Integrity parity suite checksum `80ebb4ad…7c534`. fileciteturn59file0L1-L1
+- Promotion readiness suite checksum `d6915519…56629`. fileciteturn60file0L1-L1
+- Reference capsule checksum `06ac0bf8…50d34`. fileciteturn58file0L1-L1
 
-- `artifacts/research/full-solve/state-of-record-synthesis-latest.json` (theory directory “required/present” but not committed/readable) fileciteturn63file0L1-L1  
-- `artifacts/research/full-solve/integrity-parity-suite-latest.json` (proof index “default anchor (machine)”) fileciteturn50file0L1-L1  
-- `artifacts/research/full-solve/full-solve-reference-capsule-latest.json` (proof index “default anchor (machine)”; also referenced by state-of-record synthesis anchors) fileciteturn50file0L1-L1 fileciteturn62file0L1-L1  
-- `artifacts/research/full-solve/promotion-readiness-suite-latest.json` (proof index “default anchor (machine)”; also referenced by state-of-record synthesis) fileciteturn50file0L1-L1 fileciteturn62file0L1-L1  
-- `artifacts/research/full-solve/external-work/external-work-comparison-matrix-latest.json` (proof index “default anchor (machine)”; also referenced by state-of-record synthesis anchors) fileciteturn50file0L1-L1 fileciteturn62file0L1-L1  
-- `artifacts/research/full-solve/external-work/external-work-comparison-matrix-2026-03-18.json` (explicit `matrix_path` in the capsule) fileciteturn51file0L1-L1  
-- `artifacts/research/full-solve/se-publication-overlay-latest.json` (proof index SEM+ellipsometry closure path; also referenced by state-of-record synthesis) fileciteturn50file0L1-L1 fileciteturn62file0L1-L1  
-- `artifacts/research/full-solve/warp-evidence-snapshot-2026-03-02.json` (evidence snapshot “Machine snapshot JSON (local artifact)”) fileciteturn56file0L1-L1  
-- `artifacts/research/full-solve/g4-calculator-2026-03-01.json` (evidence snapshot “required artifacts included”) fileciteturn56file0L1-L1  
-- `artifacts/research/full-solve/g4-candidate-promotion-check-2026-03-01.json` (evidence snapshot “required artifacts included”) fileciteturn56file0L1-L1  
-- `artifacts/research/full-solve/g4-promotion-bundle-2026-03-01.json` (evidence snapshot “required artifacts included”) fileciteturn56file0L1-L1  
-- `artifacts/training-trace.jsonl` (required by frozen snapshot; referenced for certification fields) fileciteturn56file0L1-L1  
-- `artifacts/training-trace-export.jsonl` (required by frozen snapshot) fileciteturn56file0L1-L1  
+### Deterministic regeneration commands
 
-Important discrepancy to report explicitly: the Needle Hull Mark 2 theory directory marks numerous `/artifacts/...latest.json` machine anchors as “required/present” and reports `required_missing: 0/22`. fileciteturn63file0L1-L1 Nevertheless, the repository’s own deep-research prompt warns that runtime files under `/artifacts/` may be uncommitted overlays and must not be hard-required unless committed at the pin. fileciteturn58file0L1-L1 This manuscript therefore treats these machine JSON anchors as **missing committed artifacts** and fails closed (UNKNOWN) on any claim that would require their contents beyond what is already present in the committed audit markdown.
+The proof index defines deterministic regeneration commands—including `warp:proof-index:sync`, `warp:full-solve:reference:refresh`, `warp:external:refresh`, `warp:promotion:readiness:check`, and `warp:integrity:check`—as the canonical starting points for rebuilding state-of-record artifacts. fileciteturn55file0L1-L1 fileciteturn56file0L1-L1
 
-## What must be closed next
+```bash
+npm run warp:proof-index:sync
+npm run warp:full-solve:reference:refresh
+npm run warp:external:refresh
+npm run warp:promotion:readiness:check
+npm run warp:integrity:check
+```
 
-This section is written as a **closure plan with falsifiers**, not as an argument for feasibility.
+### Missing artifact behavior
 
-### Close promotion readiness blockers
+The proof index enforces a usage rule: `missing_artifact_behavior: UNKNOWN_and_fail_closed_for_claim_tier_promotion`. fileciteturn55file0L1-L1 fileciteturn56file0L1-L1 The authoring contract also requires that if a value is unavailable, it must be explicitly marked `UNKNOWN` and not substituted with narrative assumptions. fileciteturn64file0L1-L1
 
-The highest-severity readiness blocker is that **sem_ellipsometry is not reportable-ready**, and the blocker reasons are explicit: **missing_covariance_uncertainty_anchor** and **missing_paired_dual_instrument_run**. fileciteturn60file0L1-L1  
-Concrete falsifier: until the Promotion Readiness Suite reports `sem_ellipsometry.reportable_ready=true` **and** removes those blocked reasons, any manuscript claim that depends on “reportable SEM+ellipsometry evidence” must remain **UNKNOWN** and must not be promoted. fileciteturn57file0L1-L1
+In addition, the proof index explicitly lists “default state-of-record anchors” that include **machine** and **human** artifact paths for each suite/capsule/matrix, which means the repo’s state-of-record model anticipates both views even when only the human markdown is available to a reader. fileciteturn55file0L1-L1 fileciteturn56file0L1-L1 Any claim that depends on the machine JSON contents, when those are not committed or not available in the reader’s snapshot, is therefore **UNKNOWN** by design under the stated policy. fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
 
-### Resolve state-of-record staleness flag
+Why this matters: reproducibility is treated as a *gate*—issues like commit mismatches and missing machine artifacts are not merely documentation annoyances; they are explicit blockers that prevent tier promotion. fileciteturn58file0L1-L1 fileciteturn64file0L1-L1
 
-The state-of-record synthesis sets `stale_against_head=true` and includes a blocker stating the artifact `commit_pin` differs from the current `HEAD`. fileciteturn62file0L1-L1  
-Concrete falsifier: any attempt to treat the synthesis as “current head” is invalidated unless `stale_against_head=false` in a refreshed synthesis artifact, or the manuscript explicitly declares itself **pinned** and does not claim head freshness. fileciteturn58file0L1-L1
+## Claim discipline
 
-### Make machine anchors commit-tracked or formally downgrade them to optional overlays
+This section distinguishes what may be said now from what may not be said now, using explicit repo policy artifacts and the non-feasibility boundary. fileciteturn64file0L1-L1 fileciteturn65file0L1-L1
 
-Multiple artifacts define machine JSON anchors (parity suite, capsule, readiness suite, external matrix, evidence snapshot JSON) as default proof paths. fileciteturn50file0L1-L1 fileciteturn56file0L1-L1 These anchors are missing as committed files (see missing list).  
-Concrete falsifier: any claim tier promotion that requires machine-readable provenance must fail closed unless these machine artifacts become committed and readable at the pin (or the proof index is revised to declare them non-required). The proof index explicitly defines `missing_artifact_behavior` as **UNKNOWN_and_fail_closed_for_claim_tier_promotion**. fileciteturn50file0L1-L1
+### What can be said now
 
-### Repair internal translation conflicts
+It is admissible to say that the repo defines and executes a **falsifiable reduced-order gate campaign** with tracked artifacts, a canonical authority chain, explicit count/decision outputs, and parity/readiness overlays, because that is exactly what the proof index and canonical report describe. fileciteturn55file0L1-L1 fileciteturn57file0L1-L1
 
-The “Warp Gates Executive Translation” currently states `Decision: NOT_READY` and `NOT_READY=8`, conflicting with canonical report and the scoreboard JSON which report `REDUCED_ORDER_ADMISSIBLE` with PASS=8 and NOT_READY=0. fileciteturn84file0L1-L1 fileciteturn85file0L1-L1  
-Concrete falsifier: any public-facing summary that repeats NOT_READY for this lane is falsified by the canonical scoreboard and should be treated as non-authoritative until regenerated or corrected under the documented precedence rule. fileciteturn58file0L1-L1
+It is admissible to report the canonical reduced-order outcome **REDUCED_ORDER_ADMISSIBLE** with its gate counts (PASS/FAIL/UNKNOWN/NOT_READY/NOT_APPLICABLE), because those fields are explicit in the canonical campaign execution report and machine scoreboard JSON. fileciteturn57file0L1-L1 fileciteturn22file0L1-L1
 
-### Maintain the non-feasibility boundary and “no physical viability” guardrail
+It is admissible to report that integrity parity tests currently pass (per the integrity parity suite) and that promotion readiness is partial (per the promotion readiness suite), including the specific blocked reasons for SEM+ellipsometry reportability. fileciteturn59file0L1-L1 fileciteturn60file0L1-L1
 
-The repo’s guardrails state the system must not declare any configuration “physically viable” absent hard constraint passage and an admissible viability oracle output. fileciteturn83file0L1-L1  
-Concrete falsifier: any manuscript phrasing implying feasibility, viability, or operational realizability is non-compliant unless (a) it is explicitly confined to an allowed tier and (b) the governing artifacts explicitly authorize it—otherwise it must be treated as a tier violation and rejected by the authoring contract’s non-goals. fileciteturn57file0L1-L1
+It is admissible to discuss external-literature lineage **as a referenced overlay** by using the repo’s SRC identifiers (e.g., Core‑4: `SRC-071..SRC-074`; GR tests: `SRC-075..SRC-084`; QI/QEI: `SRC-007`, `SRC-008`, `SRC-051..SRC-056`), because that mapping is explicitly provided in the conceptual guide and citation pack. fileciteturn54file0L1-L1 fileciteturn62file0L1-L1
+
+### What cannot be said now
+
+The repo does not authorize a physical feasibility claim in these artifacts. The boundary statement is explicit, and the authoring contract requires an explicit “non-goals” section that includes “no physical-feasibility claim unless strong-claim closure criteria are met,” and disallows canonical override from promoted/exploratory lanes. fileciteturn64file0L1-L1 fileciteturn55file0L1-L1
+
+The repo guardrails further state that the system **MUST NOT** declare any configuration “physically viable” unless all HARD constraints pass **and** a viability oracle produces an `ADMISSIBLE` status. fileciteturn65file0L1-L1 Since the state-of-record manuscript posture is explicitly `reference_only=true` and G5 is policy-scoped as `NOT_APPLICABLE` in the canonical report, the current artifact set cannot be used to justify “physically viable” or “operational” language. fileciteturn56file0L1-L1 fileciteturn57file0L1-L1
+
+Any claim that would require missing artifacts, missing numeric bounds, or missing lane closure evidence must be marked `UNKNOWN` and treated as non-promotable per the fail-closed rule. fileciteturn56file0L1-L1 fileciteturn64file0L1-L1 In particular, SEM+ellipsometry reportable closure is explicitly blocked; therefore, any manuscript statement depending on reportable SEM+ellipsometry evidence is not admissible for promotion. fileciteturn60file0L1-L1
+
+Why this matters: claim discipline is the mechanism that keeps NHM2 “physics-literate but safe” by ensuring the narrative cannot outrun the committed evidence. fileciteturn64file0L1-L1 fileciteturn65file0L1-L1
+
+## Next-steps closure plan with falsifiers
+
+This plan is presented as **falsifiable closure steps** consistent with the authoring contract’s requirement to include deterministic falsifiers (operator mapping, sampling/normalization, applicability, uncertainty, reproducibility). fileciteturn64file0L1-L1 It is not a feasibility argument. fileciteturn55file0L1-L1
+
+### Close the SEM+ellipsometry promotion-readiness blocker
+
+The promotion readiness suite identifies SEM+ellipsometry as not reportable-ready with explicit blocked reasons: `missing_covariance_uncertainty_anchor` and `missing_paired_dual_instrument_run`. fileciteturn60file0L1-L1 The proof index provides SEM+ellipsometry-specific closure paths (paired-run artifact-set spec, evidence template JSON, calibration data path, and associated ingestion/validation/reporting scripts). fileciteturn55file0L1-L1 fileciteturn56file0L1-L1
+
+Falsifier: **If** a refreshed promotion readiness suite continues to show `sem_ellipsometry.reportable_ready=false` **or** continues to list either blocked reason, **then** any claim that depends on reportable SEM+ellipsometry evidence remains `UNKNOWN` and cannot be promoted. fileciteturn60file0L1-L1 fileciteturn64file0L1-L1
+
+### Resolve commit-pin mismatch blockers in the reference capsule
+
+The reference capsule lists multiple HARD blockers asserting `commit_pin_mismatch_*` (sources at `7e8cc…` not matching capsule pin `e07f…`) and sets `blocked: true`. fileciteturn58file0L1-L1 The proof index lists deterministic regeneration commands including `warp:full-solve:reference:refresh` and integrity checks. fileciteturn56file0L1-L1
+
+Falsifier: **If** a refreshed capsule still reports `blocked: true` with commit-mismatch blockers, **then** the capsule cannot be used as a promotable reproducibility anchor beyond what is already supported by canonical and parity artifacts. fileciteturn58file0L1-L1 fileciteturn64file0L1-L1
+
+### Keep tier boundaries fail-closed under missing machine anchors
+
+The proof index defines machine and human anchor paths for parity, capsule, readiness, and external comparison matrix. fileciteturn56file0L1-L1 The usage rules require claim-specific paths and impose `UNKNOWN_and_fail_closed_for_claim_tier_promotion` for missing artifacts. fileciteturn56file0L1-L1
+
+Falsifier: **If** any claim upgrade depends on a machine anchor’s contents that are not available in the committed snapshot used for publication, **then** the upgrade fails by policy and must remain `UNKNOWN` or remain in a lower tier until the artifacts are commit-tracked in the relevant pinned snapshot. fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
+
+### Maintain hard-constraint guardrails and non-feasibility posture
+
+The repo’s guardrails prohibit declaring “physically viable” absent HARD constraint passage and an admissible viability oracle status. fileciteturn65file0L1-L1 The authoring contract also mandates explicit non-goals including no feasibility claims unless closure criteria are met. fileciteturn64file0L1-L1
+
+Falsifier: **If** any manuscript draft introduces feasibility/viability/operational claims without explicit authorization from canonical-authoritative artifacts meeting the guardrail conditions, **then** the draft violates policy and must be rejected or downgraded to `exploratory` with explicit non-feasibility disclaimers. fileciteturn65file0L1-L1 fileciteturn64file0L1-L1
+
+Why this matters: closure plans with falsifiers transform “next steps” from aspirational project management into **scientific stop-conditions** that prevent self-confirming narratives and keep the effort replay-safe. fileciteturn64file0L1-L1

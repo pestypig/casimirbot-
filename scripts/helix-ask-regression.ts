@@ -21,6 +21,14 @@ type HelixAskDebug = {
   composer_v2_applied?: boolean;
   composer_schema_valid?: boolean;
   composer_validation_fail_reason?: string | null;
+  planner_valid?: boolean;
+  planner_mode?: string;
+  turn_contract_hash?: string;
+  objective_count?: number;
+  evidence_gap?: boolean;
+  answer_mode?: string;
+  degrade_mode?: string;
+  anchor_integrity_ok?: boolean;
   llm_error_code?: string | null;
 };
 
@@ -49,6 +57,7 @@ type RegressionCase = {
       minStage05Coverage?: number;
       requireSourcesLine?: boolean;
       requireFiveSectionShape?: boolean;
+      allowFamilyFallbackShape?: boolean;
       allowLlmError?: boolean;
     };
   };
@@ -127,6 +136,7 @@ const cases: RegressionCase[] = [
       liveContract: {
         requireRepoGrounding: true,
         requireSourcesLine: true,
+        requireFiveSectionShape: false,
       },
     },
   },
@@ -152,6 +162,7 @@ const cases: RegressionCase[] = [
       liveContract: {
         requireRepoGrounding: true,
         requireSourcesLine: true,
+        requireFiveSectionShape: false,
       },
     },
   },
@@ -176,13 +187,6 @@ const cases: RegressionCase[] = [
       intent_domain: "repo",
       format: "brief",
       stage_tags: false,
-      mustIncludeText: [
-        "Short answer:",
-        "Conceptual baseline:",
-        "How repo solves it:",
-        "Evidence + proof anchors:",
-        "Uncertainty / open gaps:",
-      ],
       mustNotIncludeText: [
         "Answer grounded in retrieved evidence.",
         "Runtime fallback: fetch failed",
@@ -192,7 +196,37 @@ const cases: RegressionCase[] = [
       liveContract: {
         requireRepoGrounding: true,
         requireSourcesLine: true,
-        requireFiveSectionShape: true,
+        requireFiveSectionShape: false,
+        allowFamilyFallbackShape: true,
+      },
+    },
+  },
+  {
+    label: "repo roadmap planning",
+    question:
+      "Ok please organize my ideas to how they could be implemented in my code base in the future. I want profiles, a paywall, a voice lane, translation, and better retrieval planning.",
+    expect: {
+      intent_domain: "repo",
+      format: "brief",
+      stage_tags: false,
+      mustIncludeText: [
+        "Repo-Grounded Findings:",
+        "Implementation Roadmap:",
+        "Evidence Gaps:",
+        "Next Anchors Needed:",
+        "Sources:",
+      ],
+      mustNotIncludeText: [
+        "Short answer:",
+        "Conceptual baseline:",
+        "How repo solves it:",
+        "Reasoning event log",
+        "traceId=ask:",
+      ],
+      liveContract: {
+        requireRepoGrounding: true,
+        requireSourcesLine: true,
+        requireFiveSectionShape: false,
       },
     },
   },
@@ -363,6 +397,17 @@ const hasFiveSectionShape = (text: string): boolean => {
   return required.every((heading) => normalized.includes(heading));
 };
 
+const hasFamilyFallbackShape = (text: string): boolean => {
+  const normalized = text.toLowerCase();
+  const familyShapes = [
+    ["where in repo:", "call chain:", "sources:"],
+    ["mechanism explanation:", "inputs/outputs:", "sources:"],
+    ["definition:", "repo anchors:", "sources:"],
+    ["repo-grounded findings:", "implementation roadmap:", "sources:"],
+  ];
+  return familyShapes.some((shape) => shape.every((heading) => normalized.includes(heading)));
+};
+
 const runCase = async (entry: RegressionCase, sessionId: string): Promise<string[]> => {
   console.log(`Running: ${entry.label}`);
   const controller = new AbortController();
@@ -510,8 +555,13 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
   const requireFiveSectionShape =
     liveContract?.requireFiveSectionShape === true ||
     (liveContract?.requireFiveSectionShape !== false && REQUIRE_FIVE_SECTION_DEFAULT && Boolean(liveContract));
+  const allowFamilyFallbackShape = liveContract?.allowFamilyFallbackShape === true;
   if (requireFiveSectionShape && !hasFiveSectionShape(text)) {
-    failures.push(`${entry.label}: response missing non-equation five-section shape`);
+    if (!(allowFamilyFallbackShape && hasFamilyFallbackShape(text))) {
+      failures.push(`${entry.label}: response missing non-equation five-section shape`);
+    }
+  } else if (allowFamilyFallbackShape && !hasFiveSectionShape(text) && !hasFamilyFallbackShape(text)) {
+    failures.push(`${entry.label}: response missing accepted repo fallback shape`);
   }
 
   return failures;

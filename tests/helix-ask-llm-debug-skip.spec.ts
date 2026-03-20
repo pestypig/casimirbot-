@@ -10,7 +10,7 @@ const ENV_KEYS = [
   "HELIX_ASK_ALLOW_FORCE_LLM_PROBE",
   "LLM_RUNTIME",
   "LLM_HTTP_BASE",
-  "LLM_HTTP_API_KEY",
+  "OPENAI_API_KEY",
   "HULL_MODE",
 ] as const;
 
@@ -30,7 +30,7 @@ describe("Helix Ask llm debug skip metadata", () => {
     process.env.HELIX_ASK_ALLOW_FORCE_LLM_PROBE = "1";
     process.env.LLM_RUNTIME = "http";
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:9";
-    process.env.LLM_HTTP_API_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "test-key";
     process.env.HULL_MODE = "0";
 
     vi.resetModules();
@@ -408,3 +408,4 @@ describe("Helix Ask llm debug skip metadata", () => {
     expect((payload.debug?.llm_calls ?? []).length).toBeGreaterThan(0);
   }, 45000);
 });
+

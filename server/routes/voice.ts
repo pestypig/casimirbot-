@@ -204,14 +204,10 @@ const resolveWhisperHttpModel = (): string =>
 const resolveSttAuthKey = (): string | undefined =>
   process.env.WHISPER_HTTP_API_KEY?.trim() ||
   process.env.OPENAI_API_KEY?.trim() ||
-  process.env.LLM_HTTP_API_KEY?.trim() ||
   undefined;
 
 const resolveOpenAiSttAuthKey = (): string | undefined =>
-  process.env.OPENAI_API_KEY?.trim() ||
-  process.env.WHISPER_HTTP_API_KEY?.trim() ||
-  process.env.LLM_HTTP_API_KEY?.trim() ||
-  undefined;
+  process.env.OPENAI_API_KEY?.trim() || undefined;
 
 const resolveOpenAiSttBaseUrl = (): string => {
   const explicit = process.env.OPENAI_API_BASE?.trim();
@@ -1507,7 +1503,7 @@ const runVoiceTranscription = async (args: {
         interpreter_schema_version: HELIX_INTERPRETER_SCHEMA_VERSION,
         interpreter_status: interpreterStatus,
         interpreter_confidence: interpreterPivotConfidence,
-        interpreter_dispatch_state: interpreterDispatchTrusted ? interpreterArtifact.dispatch_state : null,
+        interpreter_dispatch_state: interpreterDispatchTrusted ? interpreterArtifact.dispatch_state : undefined,
         interpreter_confirm_prompt: interpreterArtifact.confirm_prompt,
         interpreter_term_ids: interpreterArtifact.term_ids,
         interpreter_concept_ids: interpreterArtifact.concept_ids,
@@ -1529,8 +1525,8 @@ const runVoiceTranscription = async (args: {
     }
   }
   pivotConfidence =
-    typeof baseResult.pivot_confidence === "number"
-      ? clamp01(baseResult.pivot_confidence)
+    typeof baseResult!.pivot_confidence === "number"
+      ? clamp01(baseResult!.pivot_confidence)
       : isEnglishLikeLanguage(sourceLanguage)
         ? 1
         : pivotConfidence;
@@ -1558,13 +1554,13 @@ const runVoiceTranscription = async (args: {
     }
   }
   const needsConfirmation =
-    (typeof baseResult.needs_confirmation === "boolean" ? baseResult.needs_confirmation : false) ||
+    (typeof baseResult!.needs_confirmation === "boolean" ? baseResult!.needs_confirmation : false) ||
     normalizedConfidence < STT_CONFIRM_CONFIDENCE_THRESHOLD ||
     translationUncertain ||
     languageConfidence < HELIX_ASK_LANG_CONF_MIN ||
     dispatchState !== "auto";
   baseResult = {
-    ...baseResult,
+    ...baseResult!,
     language_detected: languageDetected,
     language_confidence: languageConfidence,
     code_mixed: codeMixed,
@@ -1575,23 +1571,23 @@ const runVoiceTranscription = async (args: {
     needs_confirmation: needsConfirmation,
     translation_uncertain: translationUncertain,
     lang_schema_version: HELIX_LANG_SCHEMA_VERSION,
-    interpreter: interpreterArtifact ?? baseResult.interpreter,
+    interpreter: interpreterArtifact ?? baseResult!.interpreter,
     interpreter_schema_version:
-      baseResult.interpreter_schema_version ?? (interpreterArtifact ? HELIX_INTERPRETER_SCHEMA_VERSION : undefined),
-    interpreter_status: interpreterStatus ?? baseResult.interpreter_status,
+      baseResult!.interpreter_schema_version ?? (interpreterArtifact ? HELIX_INTERPRETER_SCHEMA_VERSION : undefined),
+    interpreter_status: interpreterStatus ?? baseResult!.interpreter_status,
     interpreter_confidence:
-      typeof baseResult.interpreter_confidence === "number"
-        ? clamp01(baseResult.interpreter_confidence)
+      typeof baseResult!.interpreter_confidence === "number"
+        ? clamp01(baseResult!.interpreter_confidence)
         : interpreterArtifact
           ? clamp01(interpreterArtifact.selected_pivot.confidence)
           : undefined,
     interpreter_dispatch_state:
       interpreterDispatchTrusted && interpreterArtifact
         ? interpreterArtifact.dispatch_state
-        : (baseResult.interpreter_dispatch_state ?? null),
-    interpreter_confirm_prompt: interpreterArtifact?.confirm_prompt ?? baseResult.interpreter_confirm_prompt ?? null,
-    interpreter_term_ids: interpreterArtifact?.term_ids ?? baseResult.interpreter_term_ids ?? [],
-    interpreter_concept_ids: interpreterArtifact?.concept_ids ?? baseResult.interpreter_concept_ids ?? [],
+        : baseResult!.interpreter_dispatch_state,
+    interpreter_confirm_prompt: interpreterArtifact?.confirm_prompt ?? baseResult!.interpreter_confirm_prompt ?? null,
+    interpreter_term_ids: interpreterArtifact?.term_ids ?? baseResult!.interpreter_term_ids ?? [],
+    interpreter_concept_ids: interpreterArtifact?.concept_ids ?? baseResult!.interpreter_concept_ids ?? [],
   };
 
   return { result: baseResult, failures, formatRecovery };
@@ -1673,7 +1669,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
           policyMode,
           outputMode,
           backendConfigured: false,
-          requiredEnv: ["WHISPER_HTTP_API_KEY|OPENAI_API_KEY|LLM_HTTP_API_KEY", "STT_LOCAL_URL"],
+          requiredEnv: ["WHISPER_HTTP_API_KEY|OPENAI_API_KEY", "STT_LOCAL_URL"],
         },
         parsed.data.traceId,
       );

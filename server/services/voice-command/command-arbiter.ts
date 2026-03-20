@@ -213,7 +213,6 @@ const readVoiceCommandArbiterConfigFromEnv = (): VoiceCommandArbiterConfig => {
   const evaluatorApiKeyRaw =
     process.env.HELIX_VOICE_COMMAND_LANE_EVALUATOR_API_KEY ??
     process.env.OPENAI_API_KEY ??
-    process.env.LLM_HTTP_API_KEY ??
     "";
   return {
     enabled: parseBoolean(process.env.HELIX_VOICE_COMMAND_LANE_ENABLED, false),

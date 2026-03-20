@@ -11,7 +11,7 @@ const ENV_KEYS = [
   "HELIX_ASK_ALLOW_FORCE_LLM_PROBE",
   "LLM_RUNTIME",
   "LLM_HTTP_BASE",
-  "LLM_HTTP_API_KEY",
+  "OPENAI_API_KEY",
   "HULL_MODE",
 ] as const;
 
@@ -32,7 +32,7 @@ describe("Helix Ask jobs endpoint regression", () => {
     process.env.HELIX_ASK_TWO_PASS = "0";
     process.env.HELIX_ASK_ALLOW_FORCE_LLM_PROBE = "1";
     process.env.LLM_RUNTIME = "http";
-    process.env.LLM_HTTP_API_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "test-key";
     process.env.HULL_MODE = "0";
 
     mockLlmServer = http.createServer((req, res) => {
@@ -472,3 +472,4 @@ describe("Helix Ask jobs endpoint regression", () => {
     );
   }, 120000);
 });
+

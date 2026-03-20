@@ -7,7 +7,6 @@ const envKeys = [
   "LLM_RUNTIME",
   "LLM_POLICY",
   "LLM_HTTP_BASE",
-  "LLM_HTTP_API_KEY",
   "OPENAI_API_KEY",
   "LLM_HTTP_RETRY_COUNT",
   "LLM_LOCAL_STRICT_NO_STUB",
@@ -70,7 +69,7 @@ describe("llm.local bridge routing", () => {
 
   it("routes through llm.http.generate bridge when only HTTP backend exists", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "test-key";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -97,3 +96,4 @@ describe("llm.local bridge routing", () => {
     expect((result as any).__llm_routed_via).toBe("llm.local.generate");
   });
 });
+

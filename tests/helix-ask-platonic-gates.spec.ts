@@ -394,6 +394,42 @@ describe("helix ask platonic gates", () => {
     expect(result.answer).not.toMatch(/weakly reflected/i);
   });
 
+  it("preserves template-locked deterministic repo answers across low lexical coverage", () => {
+    const answer = [
+      "Symptoms:",
+      "- Startup error symptoms are currently bounded to server/routes/agi.plan.ts in this turn.",
+      "",
+      "Most likely causes:",
+      "- Most likely causes currently point to server/routes/agi.plan.ts.",
+      "",
+      "Checks:",
+      "- Inspect server/routes/agi.plan.ts against the exact startup error.",
+      "",
+      "Fixes:",
+      "- Fixes should start with server/routes/agi.plan.ts and the concrete failing call path.",
+      "",
+      "Sources: server/routes/agi.plan.ts",
+    ].join("\n");
+    const result = applyHelixAskPlatonicGates({
+      question: "This repo throws an error on startup. How do I fix it?",
+      answer,
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.repo_debugging_root_cause",
+      format: "steps",
+      evidenceText: "server/routes/agi.plan.ts startup route logic",
+      evidencePaths: ["server/routes/agi.plan.ts"],
+      templateLockedAnswer: true,
+      requiresRepoEvidence: true,
+      coverageSlots: ["symptoms", "likely-causes", "fixes"],
+    });
+    expect(result.coverageGateApplied).toBe(false);
+    expect(result.coverageGateReason).toBe("template_locked");
+    expect(result.beliefGateApplied).toBe(false);
+    expect(result.beliefGateReason).toBe("template_locked");
+    expect(result.answer).toBe(answer);
+  });
+
   it("overrides ideology references with anchored concept + repo evidence", () => {
     const result = applyHelixAskPlatonicGates({
       question: "Using ideology.json, what does 'tend the Sun ledger' mean here?",

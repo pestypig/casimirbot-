@@ -201,6 +201,460 @@ describe("helix ask universal answer plan shadow", () => {
     expect(family).toBe("implementation_code_path");
   });
 
+  it("classifies repo solve-path questions into implementation profile with code floor", () => {
+    const question = "How is the warp bubble solved for in this codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus: false,
+      queryConstraints: constraints,
+    });
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    expect(family).toBe("implementation_code_path");
+    expect(envelope.prompt_family).toBe("implementation_code_path");
+    expect(envelope.requires_code_floor).toBe(true);
+  });
+
+  it("treats broad solved-form warp math prompts as warp-math eligible", () => {
+    const question = "How is the warp bubble traditionally solved and what is the needle hull mark 2 improvement?";
+    expect(__testHelixAskReliabilityGuards.isWarpMathBroadPrompt(question)).toBe(true);
+  });
+
+  it("does not treat warp solve-plus-improvement prompts as pure definitions", () => {
+    const question =
+      "How is the warp bubble traditionally solved and what is the needle hull mark 2 improvement?";
+    const definitionFocus = __testHelixAskReliabilityGuards.isDefinitionQuestion(question);
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus,
+      queryConstraints: constraints,
+    });
+    expect(definitionFocus).toBe(false);
+    expect(family).toBe("mechanism_process");
+  });
+
+  it("classifies needle-hull solve discovery prompts into implementation profile with code floor", () => {
+    const question = "Find me the warp bubble solutions for the needle hull mark 2 solve?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus: false,
+      queryConstraints: constraints,
+    });
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    expect(family).toBe("implementation_code_path");
+    expect(envelope.prompt_family).toBe("implementation_code_path");
+    expect(envelope.requires_code_floor).toBe(true);
+  });
+
+  it("classifies multi-objective planning prompts into roadmap_planning", () => {
+    const question =
+      "Ok please organize my ideas to how they could be implemented in my code base in the future. I want profiles, a paywall, a voice lane, translation, and better retrieval planning.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const family = __testHelixAskReliabilityGuards.classifyHelixAskAnswerPlanFamily({
+      question,
+      equationPrompt: false,
+      definitionFocus: false,
+      queryConstraints: constraints,
+    });
+    expect(family).toBe("roadmap_planning");
+    expect(__testHelixAskReliabilityGuards.isHelixAskRoadmapPlanningQuestion(question)).toBe(true);
+  });
+
+  it("does not outer-retry 429/circuit-open after transport layer already handled them", () => {
+    expect(
+      __testHelixAskReliabilityGuards.shouldRetryHelixAskOuterLlmCall({
+        errorCode: "llm_http_429:1200",
+        attemptIndex: 0,
+        maxAttempts: 2,
+      }),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.shouldRetryHelixAskOuterLlmCall({
+        errorCode: "llm_http_circuit_open",
+        attemptIndex: 0,
+        maxAttempts: 2,
+      }),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.shouldRetryHelixAskOuterLlmCall({
+        errorCode: "llm_http_timeout:15000",
+        attemptIndex: 0,
+        maxAttempts: 2,
+      }),
+    ).toBe(true);
+  });
+
+  it("preserves repo intent on stage05 transport degradation when repo code evidence remains strong", () => {
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskTransportPressureFallbackReason(
+        "stage05_llm_http_429",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveRepoIntentOnTransportDegradedCoverage({
+        stage05FallbackReason: "stage05_llm_http_429",
+        contextFiles: [
+          "modules/warp/natario-warp.ts",
+          "modules/warp/warp-module.ts",
+          "docs/knowledge/warp/warp-bubble.md",
+        ],
+        retrievalConfidence: 0.58,
+        hybridThreshold: 0.6,
+        requiresRepoEvidence: true,
+        hasRepoHints: true,
+        warpMathBroadPrompt: true,
+        intentDomain: "repo",
+        coveredSlots: ["mechanism", "code_path"],
+      }),
+    ).toBe(true);
+  });
+
+  it("suppresses answer rescue when the first real 429 is provider quota exhaustion", () => {
+    expect(
+      __testHelixAskReliabilityGuards.shouldSuppressHelixAskAnswerRescueForRateLimit({
+        llm_first_rate_limited_source: "provider_429",
+        llm_first_rate_limited_kind: "quota",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldSuppressHelixAskAnswerRescueForRateLimit({
+        llm_error_provider_text: "You exceeded your current quota. code=insufficient_quota",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldSuppressHelixAskAnswerRescueForRateLimit({
+        llm_first_rate_limited_source: "provider_429",
+        llm_first_rate_limited_kind: "tokens_per_minute",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldSuppressHelixAskAnswerRescueForRateLimit({
+        llm_first_rate_limited_source: "local_cooldown",
+      }),
+    ).toBe(true);
+  });
+
+  it("treats an explicit max_tokens request as a hard answer cap", () => {
+    const budget = __testHelixAskReliabilityGuards.computeAnswerTokenBudget({
+      verbosity: "extended",
+      format: "brief",
+      scaffoldTokens: 512,
+      evidenceText:
+        "docs/knowledge/warp/warp-bubble.md modules/warp/natario-warp.ts modules/warp/warp-module.ts",
+      definitionFocus: true,
+      composite: false,
+      hasRepoEvidence: true,
+      hasGeneralEvidence: false,
+      evidenceMass: {
+        sourceCount: 6,
+        independentSourceCount: 4,
+        slotCoverageRatio: 1,
+        docCoverageRatio: 1,
+        retrievalConfidence: 0.9,
+        retrievalDocShare: 0.8,
+      },
+      maxTokensOverride: 256,
+    });
+
+    expect(budget.tokens).toBe(256);
+    expect(budget.base).toBe(256);
+    expect(budget.reason).toBe("request_override");
+    expect(budget.boosts).toEqual(["request_override"]);
+    expect(budget.override).toBe(true);
+  });
+
+  it("forces direct concept answers for short general definitions with a strong concept match", () => {
+    expect(
+      __testHelixAskReliabilityGuards.shouldForceHelixAskShortDefinitionConceptAnswer({
+        intentDomain: "general",
+        conceptAvailable: true,
+        conceptDraftAvailable: true,
+        ambiguityReason: "short_definition",
+        ambiguityShortPrompt: true,
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        reportReason: "default",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldForceHelixAskShortDefinitionConceptAnswer({
+        intentDomain: "general",
+        conceptAvailable: true,
+        conceptDraftAvailable: true,
+        ambiguityReason: "short_definition",
+        ambiguityShortPrompt: true,
+        explicitRepoExpectation: true,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        reportReason: "default",
+      }),
+    ).toBe(false);
+  });
+
+  it("only uses scientific pre-intent clarify for repo-shaped turns", () => {
+    expect(
+      __testHelixAskReliabilityGuards.shouldUseScientificPreIntentClarify({
+        scientificClarifyEnabled: true,
+        requiresRepoEvidence: false,
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        intentDomain: "general",
+        isRepoQuestion: false,
+      }),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.shouldUseScientificPreIntentClarify({
+        scientificClarifyEnabled: true,
+        requiresRepoEvidence: true,
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        intentDomain: "general",
+        isRepoQuestion: false,
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldUseScientificPreIntentClarify({
+        scientificClarifyEnabled: true,
+        requiresRepoEvidence: false,
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        intentDomain: "repo",
+        isRepoQuestion: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("bypasses pre-intent ambiguity clarify for simple composition prompts", () => {
+    expect(
+      __testHelixAskReliabilityGuards.shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt({
+        question: "Say hello in one sentence.",
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+        intentDomain: "general",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt({
+        question: "What is a Needle Hull?",
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+        intentDomain: "general",
+      }),
+    ).toBe(false);
+  });
+
+  it("renders simple composition prompts locally", () => {
+    expect(
+      __testHelixAskReliabilityGuards.renderHelixAskSimpleCompositionalAnswer(
+        "Say hello in one sentence.",
+      ),
+    ).toBe("Hello.");
+    expect(
+      __testHelixAskReliabilityGuards.renderHelixAskSimpleCompositionalAnswer("Respond with ok"),
+    ).toBe("Ok.");
+  });
+
+  it("treats concept forced answers as hard short-circuit rules", () => {
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
+        "forcedAnswer:pre_intent_clarify",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
+        "forcedAnswer:simple_composition",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskClarifyForcedShortCircuitRule(
+        "forcedAnswer:pre_intent_clarify",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
+        "forcedAnswer:concept_short_definition",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule("forcedAnswer:concept"),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule("forcedAnswer:unknown"),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskConceptForcedShortCircuitRule(
+        "forcedAnswer:concept_short_definition",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskConceptForcedShortCircuitRule("forcedAnswer:concept"),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.isHelixAskConceptForcedShortCircuitRule(
+        "forcedAnswer:math_solver",
+      ),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossComposer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:concept_short_definition",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossComposer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:pre_intent_clarify",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:pre_intent_clarify",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossComposer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:simple_composition",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:simple_composition",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossComposer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:helix_pipeline",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:helix_pipeline",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossComposer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:math_solver",
+      }),
+    ).toBe(false);
+    expect(
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:concept_short_definition",
+      }),
+    ).toBe(false);
+  });
+
+  it("falls back to a deterministic turn contract when planner JSON is invalid", () => {
+    const question =
+      "Organize my future Helix Ask ideas into implementation phases for profiles, voice lane, and translation.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const parsed = __testHelixAskReliabilityGuards.parseHelixAskObjectivePlannerPass(
+      '{"goal":"x","objectives":[],"grounding_mode":"repo","output_family":"roadmap_planning"}',
+    );
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      plannerMode: "deterministic",
+      plannerValid: false,
+      plannerSource: "invalid_json_fallback",
+      plannerPass: parsed,
+    });
+    expect(parsed).toBeNull();
+    expect(contract.output_family).toBe("roadmap_planning");
+    expect(contract.planner.mode).toBe("deterministic");
+    expect(contract.planner.valid).toBe(false);
+    expect(contract.objectives.length).toBeGreaterThan(1);
+    expect(contract.required_slots).toContain("repo-mapping");
+    expect(contract.required_slots).toContain("implementation-touchpoints");
+    expect(__testHelixAskReliabilityGuards.hashHelixAskTurnContract(contract)).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("builds turn-contract objective support from covered slots", () => {
+    const question =
+      "Plan future work for profiles, voice lane, and translation in this repo.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      plannerMode: "deterministic",
+      plannerValid: true,
+      plannerSource: "heuristic_bootstrap",
+    });
+    const support = __testHelixAskReliabilityGuards.buildHelixAskTurnContractObjectiveSupport({
+      contract,
+      coveredSlots: ["repo-mapping", "implementation-touchpoints", "voice-lane"],
+    });
+    expect(support.length).toBe(contract.objectives.length);
+    expect(support.some((entry: { supported: boolean }) => entry.supported)).toBe(true);
+  });
+
+  it("adds modules to repo retrieval plan for implementation asks", () => {
+    const question = "How is the warp bubble solved for in this codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      plannerMode: "deterministic",
+      plannerValid: true,
+      plannerSource: "heuristic_bootstrap",
+    });
+    const retrievalPlan = __testHelixAskReliabilityGuards.buildHelixAskTurnRetrievalPlan(
+      contract,
+      constraints,
+    );
+    expect(contract.output_family).toBe("implementation_code_path");
+    expect(retrievalPlan.must_include).toContain("modules/**");
+    expect(retrievalPlan.must_include).toContain("server/**");
+    expect(retrievalPlan.must_include).toContain("docs/**");
+  });
+
   it("builds a shadow answer plan and validates equation section structure", () => {
     const question = "Explain the equation of the collapse of the wave function.";
     const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
@@ -292,7 +746,7 @@ describe("helix ask universal answer plan shadow", () => {
       contextFileCount: 3,
       lockIdSeed: "ask:composer-v2-shadow-compat",
     });
-    expect(plan.prompt_family).toBe("mechanism_process");
+    expect(plan.prompt_family).toBe("implementation_code_path");
     const rendered = [
       "Short answer:",
       "- Warp bubble is grounded in docs and implemented in modules.",
@@ -370,8 +824,8 @@ describe("helix ask universal answer plan shadow", () => {
       reason: "required_sections_missing",
     });
     expect(plan.prompt_family).toBe("mechanism_process");
-    expect(degraded).toMatch(/^Mechanism Explanation:/m);
-    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).toMatch(/^(?:Direct Answer|Mechanism Explanation):/m);
+    expect(degraded).toMatch(/grounded|warp-bubble|Needle Hull Mark 2/i);
     expect(degraded).not.toMatch(/resolveAlcubierreWallThickness/i);
     expect(degraded).not.toMatch(/\bparams:\s*NatarioWarpParams/i);
   });
@@ -400,8 +854,8 @@ describe("helix ask universal answer plan shadow", () => {
       reason: "required_sections_missing",
     });
     expect(plan.prompt_family).toBe("mechanism_process");
-    expect(degraded).toMatch(/^Mechanism Explanation:/m);
-    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).toMatch(/^(?:Direct Answer|Mechanism Explanation):/m);
+    expect(degraded).toMatch(/grounded|warp-bubble|Needle Hull Mark 2/i);
     expect(degraded).not.toMatch(/^1\.\s*1\./m);
   });
 
@@ -429,8 +883,8 @@ describe("helix ask universal answer plan shadow", () => {
       reason: "required_sections_missing",
     });
     expect(plan.prompt_family).toBe("mechanism_process");
-    expect(degraded).toMatch(/^Mechanism Explanation:/m);
-    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).toMatch(/^(?:Direct Answer|Mechanism Explanation):/m);
+    expect(degraded).toMatch(/grounded|warp-bubble|Needle Hull Mark 2/i);
     expect(degraded).not.toMatch(/^\s*1\.\s*\[docs\/knowledge\/warp\/warp-bubble\.md\]/im);
   });
 
@@ -458,8 +912,8 @@ describe("helix ask universal answer plan shadow", () => {
       reason: "required_sections_missing",
     });
     expect(plan.prompt_family).toBe("mechanism_process");
-    expect(degraded).toMatch(/^Mechanism Explanation:/m);
-    expect(degraded).toMatch(/Mechanism is grounded in/i);
+    expect(degraded).toMatch(/^(?:Direct Answer|Mechanism Explanation):/m);
+    expect(degraded).toMatch(/grounded|warp-bubble|Needle Hull Mark 2/i);
     expect(degraded).not.toMatch(/## Inputs - Base tree JSON files/i);
   });
 
@@ -628,6 +1082,67 @@ describe("helix ask universal answer plan shadow", () => {
     expect(degraded).not.toMatch(/Based on .* papers/i);
   });
 
+  it("builds partial-roadmap degrade output for roadmap planning prompts", () => {
+    const question =
+      "Organize my Helix Ask future plans for profiles, paywall, voice lane, translation, and retrieval upgrades.";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      plannerMode: "deterministic",
+      plannerValid: true,
+      plannerSource: "heuristic_bootstrap",
+    });
+    const support = __testHelixAskReliabilityGuards.buildHelixAskTurnContractObjectiveSupport({
+      contract,
+      coveredSlots: ["repo-mapping", "implementation-touchpoints", "voice-lane"],
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/helix-ask-flow.md",
+        "server/routes/agi.plan.ts",
+        "client/src/components/HelixSettingsDialogContent.tsx",
+      ],
+      contextFileCount: 3,
+      lockIdSeed: "ask:roadmap-planning",
+      turnContract: contract,
+      slotCoverageRatio: 0.5,
+      slotMissing: ["billing-credits", "transcription-translation"],
+      connectedHintPathCount: 1,
+      retrievalConfidence: 0.42,
+      evidenceGap: true,
+      objectiveSupport: support,
+    });
+    const degraded = __testHelixAskReliabilityGuards.buildHelixAskUniversalFamilyDegradeAnswer({
+      plan,
+      question,
+      existingText: "Repo-grounded summary prepared from current in-family evidence.",
+      reason: "required_sections_missing",
+    });
+    expect(plan.prompt_family).toBe("roadmap_planning");
+    expect(__testHelixAskReliabilityGuards.shouldApplyHelixAskComposerV2ForPlan(plan)).toBe(false);
+    expect(degraded).toMatch(/^Repo-Grounded Findings:/m);
+    expect(degraded).toMatch(/^Implementation Roadmap:/m);
+    expect(degraded).toMatch(/^Evidence Gaps:/m);
+    expect(degraded).toMatch(/^Next Anchors Needed:/m);
+    expect(degraded).toMatch(/^Sources:/m);
+    const validation = __testHelixAskReliabilityGuards.validateHelixAskAnswerPlanShadow({
+      plan,
+      renderedText: degraded,
+    });
+    expect(validation.fail_reasons).not.toContain("required_sections_missing");
+    expect(validation.family_format_accuracy).toBe(1);
+  });
+
   it("runs composer v2 for required-sections and hard-guard soft reasons", () => {
     expect(
       __testHelixAskReliabilityGuards.shouldRunHelixAskComposerV2ForSoftReason(
@@ -696,6 +1211,99 @@ describe("helix ask universal answer plan shadow", () => {
     expect(brief.evidence_digest_source).toBe("citation_snippet_fallback");
     const handoffText = brief.evidence_handoff_blocks.join(" ");
     expect(handoffText).toMatch(/warp-bubble|natario-warp|warp/i);
+  });
+
+  it("prefers topic-relevant warp anchors over generic UI paths in deterministic grounded brief", () => {
+    const question = "How is the warp bubble solved for in this codebase?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "server/energy-pipeline.ts",
+        "docs/alcubierre-alignment.md",
+        "client/src/lib/docs/docViewer.ts",
+        "modules/warp/natario-warp.ts",
+        "docs/knowledge/warp/warp-bubble.md",
+      ],
+      contextFileCount: 5,
+      lockIdSeed: "ask:composer-v2-warp-anchor-priority",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText: "",
+      evidenceText: "",
+      envelope,
+    });
+    expect(brief.short_answer_seed).toContain("modules/warp/natario-warp.ts");
+    expect(brief.short_answer_seed).not.toContain("client/src/lib/docs/docViewer.ts");
+    expect(brief.short_answer_seed).not.toMatch(/\bwarp bubble for\b/i);
+  });
+
+  it("renders family-specific implementation fallback instead of five-section shell when composer degrades", () => {
+    const question = "Find me the warp bubble solutions for the needle hull mark 2 solve?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/natario-zero-expansion.md",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+        "scripts/warp-full-solve-single-runner.ts",
+        "shared/hull-basis.ts",
+      ],
+      contextFileCount: 5,
+      lockIdSeed: "ask:composer-v2-implementation-family-fallback",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText:
+        "modules/warp/natario-warp.ts computes Natario warp-bubble fields and congruence diagnostics. modules/warp/warp-module.ts orchestrates warp module flow and runtime solve wiring.",
+      evidenceText:
+        "docs/knowledge/warp/natario-zero-expansion.md documents the zero-expansion / needle-hull theory anchor for this solve family.\nmodules/warp/natario-warp.ts computes Natario warp-bubble fields and congruence diagnostics.\nmodules/warp/warp-module.ts orchestrates warp module flow and runtime solve wiring.\nscripts/warp-full-solve-single-runner.ts runs the full-solve campaign around the core warp module.",
+      envelope,
+    });
+    const rendered = __testHelixAskReliabilityGuards.renderHelixAskComposerV2DeterministicFallbackAnswer({
+      plan,
+      question,
+      brief,
+      existingText: brief.evidence_handoff_blocks.join("\n"),
+      reason: "llm_unavailable:test",
+      verbosity: "normal",
+    });
+    expect(rendered).toMatch(/^Where in repo:/m);
+    expect(rendered).toMatch(/^Call chain:/m);
+    expect(rendered).toMatch(/^What to change safely:/m);
+    expect(rendered).toMatch(/modules\/warp\/natario-warp\.ts:\s+computes Natario warp-bubble fields and congruence diagnostics\./i);
+    expect(rendered).toMatch(/docs\/knowledge\/warp\/natario-zero-expansion\.md/i);
+    expect(rendered).not.toMatch(/^Short answer:/m);
   });
 
   it("rejects repo_grounded and reasoned_inference claims when citations are missing", () => {
@@ -1229,6 +1837,78 @@ describe("helix ask universal answer plan shadow", () => {
     expect(regression.retrieval_healthy).toBe(false);
   });
 
+  it("does not flag projection regression when retrieval confidence is below guard threshold", () => {
+    const regression = __testHelixAskReliabilityGuards.evaluateHelixAskComposerV2ProjectionRegression({
+      promptFamily: "recommendation_decision",
+      composerApplied: true,
+      composerBestAttemptStage: "projection",
+      composerFallbackReason: "observe_projection",
+      stage05Used: true,
+      stage05CardCount: 8,
+      stage05SummaryHardFail: false,
+      stage05FallbackReason: null,
+      slotCoverageRatio: 1,
+      slotCoverageMissing: [],
+      llmInvokeAttempted: true,
+      llmProviderCalled: true,
+      llmHttpStatus: 200,
+      llmErrorCode: null,
+      retrievalConfidence: 0.93,
+    });
+    expect(regression.triggered).toBe(false);
+    expect(regression.retrieval_healthy).toBe(false);
+    expect(regression.reasons).toContain("retrieval_confidence_low");
+  });
+
+  it("does not flag projection regression when stage05 is budget-capped with weak connectivity", () => {
+    const regression = __testHelixAskReliabilityGuards.evaluateHelixAskComposerV2ProjectionRegression({
+      promptFamily: "recommendation_decision",
+      composerApplied: true,
+      composerBestAttemptStage: "projection",
+      composerFallbackReason: "observe_projection",
+      stage05Used: true,
+      stage05CardCount: 8,
+      stage05SummaryHardFail: false,
+      stage05FallbackReason: null,
+      slotCoverageRatio: 1,
+      slotCoverageMissing: [],
+      llmInvokeAttempted: true,
+      llmProviderCalled: true,
+      llmHttpStatus: 200,
+      llmErrorCode: null,
+      retrievalConfidence: 1,
+      stage05BudgetCapped: true,
+      stage05ConnectivityAddedCount: 1,
+    });
+    expect(regression.triggered).toBe(false);
+    expect(regression.retrieval_healthy).toBe(false);
+    expect(regression.reasons).toContain("stage05_connectivity_low_when_capped");
+  });
+
+  it("flags projection regression with transport-degraded llm as non-hard", () => {
+    const regression = __testHelixAskReliabilityGuards.evaluateHelixAskComposerV2ProjectionRegression({
+      promptFamily: "recommendation_decision",
+      composerApplied: true,
+      composerBestAttemptStage: "projection",
+      composerFallbackReason: "observe_projection",
+      stage05Used: true,
+      stage05CardCount: 8,
+      stage05SummaryHardFail: false,
+      stage05FallbackReason: null,
+      slotCoverageRatio: 1,
+      slotCoverageMissing: [],
+      llmInvokeAttempted: true,
+      llmProviderCalled: true,
+      llmHttpStatus: 429,
+      llmErrorCode: "llm_http_429",
+      retrievalConfidence: 1,
+      stage05BudgetCapped: false,
+    });
+    expect(regression.triggered).toBe(true);
+    expect(regression.hard).toBe(false);
+    expect(regression.llm_healthy).toBe(false);
+  });
+
   it("linker rejects composer v2 code-noise and single-char spill claims", () => {
     const question = "How is the warp bubble solved in the codebase?";
     const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
@@ -1518,6 +2198,7 @@ describe("helix ask universal answer plan shadow", () => {
       envelope,
     });
     const prompt = __testHelixAskReliabilityGuards.buildHelixAskComposerV2ExpandPrompt({
+      plan,
       brief,
       allowedCitations: plan.evidence_pack.allowed_citations,
       verbosity: "normal",
@@ -1525,6 +2206,202 @@ describe("helix ask universal answer plan shadow", () => {
     expect(prompt).toMatch(/evidence_digest_claims:/i);
     expect(prompt).toMatch(/evidence_handoff_blocks/i);
     expect(prompt).toMatch(/modules\/warp\/natario-warp\.ts/i);
+    expect(prompt).toMatch(/Visible answer format plan:/i);
+  });
+
+  it("builds prompt-shaped answer-plan sections from planner format guidance", () => {
+    const question = "How is the warp bubble traditionally solved and what is the needle hull mark 2 improvement?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const turnContract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+      plannerMode: "llm",
+      plannerValid: true,
+      plannerSource: "unit_test",
+      plannerPass: {
+        goal: "Explain the traditional warp solve and the Needle Hull Mark 2 improvement in repo terms.",
+        grounding_mode: "repo",
+        output_family: "mechanism_process",
+        verbosity: "extended",
+        objectives: [
+          { label: "Explain the traditional warp-bubble solve path.", required_slots: ["definition", "mechanism"] },
+          { label: "Explain the Needle Hull Mark 2 improvement.", required_slots: ["mechanism", "code_path"] },
+        ],
+        sections: [
+          {
+            id: "direct_answer",
+            title: "Direct Answer",
+            required: true,
+            must_answer: ["State the high-level answer first."],
+            required_slots: ["definition"],
+            preferred_evidence: ["doc", "code"],
+            kind: "answer",
+          },
+          {
+            id: "traditional_solve",
+            title: "Traditional Solve",
+            required: true,
+            must_answer: ["Explain the traditional warp-bubble solve path."],
+            required_slots: ["mechanism"],
+            preferred_evidence: ["doc", "code"],
+            kind: "mechanism",
+          },
+          {
+            id: "needle_hull_mark_2",
+            title: "Needle Hull Mark 2 Improvement",
+            required: true,
+            must_answer: ["Explain the Needle Hull Mark 2 improvement."],
+            required_slots: ["mechanism", "code_path"],
+            preferred_evidence: ["code", "doc"],
+            kind: "comparison",
+          },
+          {
+            id: "implementation_in_repo",
+            title: "Implementation In Repo",
+            required: true,
+            must_answer: ["Map the strongest repo implementation anchors."],
+            required_slots: ["code_path"],
+            preferred_evidence: ["code", "runtime"],
+            kind: "repo",
+          },
+        ],
+      },
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "docs/knowledge/warp/natario-zero-expansion.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 4,
+      lockIdSeed: "ask:planner-shaped-format",
+      turnContract,
+    });
+    expect(plan.target_verbosity).toBe("extended");
+    expect(plan.sections.map((section) => section.title)).toEqual(
+      expect.arrayContaining([
+        "Direct Answer",
+        "Traditional Solve",
+        "Needle Hull Mark 2 Improvement",
+        "Implementation In Repo",
+        "Open Gaps",
+        "Sources",
+      ]),
+    );
+  });
+
+  it("renders planned answer sections instead of the legacy five-section shell for dynamic plans", () => {
+    const question = "How is the warp bubble traditionally solved and what is the needle hull mark 2 improvement?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const turnContract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+      plannerMode: "llm",
+      plannerValid: true,
+      plannerSource: "unit_test",
+      plannerPass: {
+        goal: "Explain traditional solve and the Needle Hull Mark 2 improvement in repo terms.",
+        grounding_mode: "repo",
+        output_family: "mechanism_process",
+        verbosity: "extended",
+        objectives: [
+          { label: "Traditional solve path", required_slots: ["definition", "mechanism"] },
+          { label: "Needle Hull Mark 2 improvement", required_slots: ["mechanism", "code_path"] },
+        ],
+        sections: [
+          { id: "direct_answer", title: "Direct Answer", required: true, required_slots: ["definition"], kind: "answer" },
+          { id: "traditional_solve", title: "Traditional Solve", required: true, required_slots: ["mechanism"], kind: "mechanism" },
+          { id: "needle_hull_mark_2", title: "Needle Hull Mark 2 Improvement", required: true, required_slots: ["mechanism", "code_path"], kind: "comparison" },
+          { id: "implementation_in_repo", title: "Implementation In Repo", required: true, required_slots: ["code_path"], kind: "repo" },
+        ],
+      },
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/warp-bubble.md",
+        "docs/knowledge/warp/natario-zero-expansion.md",
+        "modules/warp/warp-module.ts",
+        "modules/warp/natario-warp.ts",
+      ],
+      contextFileCount: 4,
+      lockIdSeed: "ask:planned-render",
+      turnContract,
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText:
+        "Traditional solve path is documented in docs/knowledge/warp/warp-bubble.md while modules/warp/warp-module.ts and modules/warp/natario-warp.ts carry the active implementation. Needle Hull Mark 2 improvement is anchored in docs/knowledge/warp/natario-zero-expansion.md.",
+      envelope,
+    });
+    const rendered = __testHelixAskReliabilityGuards.renderHelixAskComposerV2PlannedAnswer({
+      plan,
+      brief,
+      verbosity: "brief",
+      claims: [
+        {
+          section: "short_answer",
+          class: "repo_grounded",
+          text: "Traditional warp-bubble solve is documented in docs/knowledge/warp/warp-bubble.md and implemented through modules/warp/warp-module.ts and modules/warp/natario-warp.ts.",
+          citations: ["docs/knowledge/warp/warp-bubble.md", "modules/warp/warp-module.ts", "modules/warp/natario-warp.ts"],
+        },
+        {
+          section: "how_repo_solves_it",
+          class: "repo_grounded",
+          text: "Repository solve path runs through modules/warp/warp-module.ts and modules/warp/natario-warp.ts with constraints grounded in docs/knowledge/warp/warp-bubble.md.",
+          citations: ["modules/warp/warp-module.ts", "modules/warp/natario-warp.ts", "docs/knowledge/warp/warp-bubble.md"],
+        },
+        {
+          section: "evidence_proof_anchors",
+          class: "repo_grounded",
+          text: "Needle Hull Mark 2 improvement is anchored in docs/knowledge/warp/natario-zero-expansion.md.",
+          citations: ["docs/knowledge/warp/natario-zero-expansion.md"],
+        },
+        {
+          section: "uncertainty_open_gaps",
+          class: "reasoned_inference",
+          text: "Some parameter-level detail may still need narrower anchors.",
+          citations: ["docs/knowledge/warp/natario-zero-expansion.md"],
+          uncertainty_marker: "partial evidence window",
+        },
+      ],
+    });
+    expect(rendered).toMatch(/^Direct Answer:/m);
+    expect(rendered).toMatch(/^Traditional Solve:/m);
+    expect(rendered).toMatch(/^Needle Hull Mark 2 Improvement:/m);
+    expect(rendered).toMatch(/^Implementation In Repo:/m);
+    expect(rendered).toMatch(/^Open Gaps:/m);
+    expect(rendered).not.toMatch(/^Short answer:/m);
   });
 
   it("projection recovery uses evidence digest when existing text is low signal", () => {
@@ -2321,6 +3198,303 @@ describe("helix ask reliability guards", () => {
     expect(fallback).toBeTruthy();
     expect(fallback).not.toMatch(/Runtime fallback: Unable to complete a repo-grounded LLM pass/i);
     expect(fallback).toMatch(/docs\/knowledge\/warp\/warp-bubble\.md/i);
+  });
+
+  it("direct-uses deterministic repo runtime fallback for repo definition answers", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText:
+          "Definition:\n- In this repo, a warp bubble is a modeled spacetime region.\n\nSources: docs/knowledge/warp/warp-bubble.md",
+        promptFamily: "definition_overview",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(true);
+  });
+
+  it("does not direct-use deterministic repo runtime fallback for composited repo answers", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText:
+          "Definition:\n- In this repo, a warp bubble is a modeled spacetime region.\n\nSources: docs/knowledge/warp/warp-bubble.md",
+        promptFamily: "definition_overview",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: true,
+      });
+    expect(directUse).toBe(false);
+  });
+
+  it("direct-uses deterministic repo runtime fallback for implementation answers when family sections are present", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText: [
+          "Where in repo:",
+          "- modules/warp/warp-module.ts",
+          "",
+          "Call chain:",
+          "- modules/warp/warp-module.ts -> modules/warp/natario-warp.ts",
+          "",
+          "Sources: modules/warp/warp-module.ts, modules/warp/natario-warp.ts",
+        ].join("\n"),
+        promptFamily: "implementation_code_path",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(true);
+  });
+
+  it("direct-uses deterministic repo runtime fallback for roadmap answers when roadmap sections are present", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText: [
+          "Repo-Grounded Findings:",
+          "- Current repo grounding is anchored in server/routes/agi.plan.ts.",
+          "",
+          "Implementation Roadmap:",
+          "1. Add profiles.",
+          "",
+          "Sources: server/routes/agi.plan.ts",
+        ].join("\n"),
+        promptFamily: "roadmap_planning",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(true);
+  });
+
+  it("direct-uses deterministic repo runtime fallback for troubleshooting answers when family sections are present", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText: [
+          "Symptoms:",
+          "- Current failure surface is bounded to server/routes/agi.plan.ts in this turn.",
+          "",
+          "Most likely causes:",
+          "- The failing runtime path most likely crosses server/routes/agi.plan.ts.",
+          "",
+          "Checks:",
+          "- Inspect server/routes/agi.plan.ts against the exact startup error.",
+          "",
+          "Fixes:",
+          "- Start with server/routes/agi.plan.ts and narrow the failing call path.",
+          "",
+          "Sources: server/routes/agi.plan.ts",
+        ].join("\n"),
+        promptFamily: "troubleshooting_diagnosis",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(true);
+  });
+
+  it("direct-uses deterministic repo runtime fallback for recommendation answers when family sections are present", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText: [
+          "Decision:",
+          "- Start from server/routes/agi.plan.ts before widening the requested change.",
+          "",
+          "Rationale:",
+          "- Current grounding is strongest in server/routes/agi.plan.ts.",
+          "",
+          "Constraints:",
+          "- Preserve grounding to locked evidence only.",
+          "",
+          "Risks:",
+          "- Missing coverage for repo mapping can misplace the change surface.",
+          "",
+          "Fallback plan:",
+          "- Retry with explicit route/module anchors near server/routes/agi.plan.ts.",
+          "",
+          "Sources: server/routes/agi.plan.ts",
+        ].join("\n"),
+        promptFamily: "recommendation_decision",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(true);
+  });
+
+  it("does not direct-use deterministic repo runtime fallback for implementation answers with missing family sections", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText: "Implementation path remains bounded to modules/warp/warp-module.ts.\n\nSources: modules/warp/warp-module.ts",
+        promptFamily: "implementation_code_path",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(false);
+  });
+
+  it("builds troubleshooting family deterministic fallback without an explicit turn contract", () => {
+    const question = "This repo throws an error on startup. How do I fix it?";
+    const fallback =
+      __testHelixAskReliabilityGuards.buildDeterministicFamilyRepoRuntimeFallback({
+        question,
+        family: "troubleshooting_diagnosis",
+        intentDomain: "repo",
+        queryConstraints: __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question),
+        equationPrompt: false,
+        definitionFocus: false,
+        equationIntentContract: null,
+        selectorPrimaryKey: null,
+        selectorLocked: false,
+        selectorFamily: null,
+        lockIdSeed: "ask:troubleshooting-family-direct",
+        allowedCitations: [
+          "server/routes/agi.plan.ts",
+          "docs/helix-ask-flow.md",
+        ],
+        contextFiles: [
+          "server/routes/agi.plan.ts",
+          "docs/helix-ask-flow.md",
+        ],
+        turnContract: null,
+        slotCoverageRatio: 0.6667,
+        slotMissing: ["mechanism"],
+        connectedHintPathCount: 0,
+        retrievalConfidence: 0.9,
+        objectiveSupport: [],
+        existingText:
+          "Repository solve details are grounded in server/routes/agi.plan.ts. Sources: server/routes/agi.plan.ts",
+      });
+    expect(fallback).toBeTruthy();
+    expect(fallback).toMatch(/^Symptoms:/m);
+    expect(fallback).toMatch(/^Most likely causes:/m);
+    expect(fallback).toMatch(/^Fixes:/m);
+    expect(fallback).toMatch(/^Sources:/m);
+    expect(fallback).not.toMatch(/^Short answer:/m);
+  });
+
+  it("direct-uses deterministic relation packet answers when dual-domain relation evidence is ready", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRelationPacketAnswer({
+        relationQuestionFastPath: true,
+        relationPacketPresent: true,
+        relationDualDomainOk: true,
+        forceLlmProbe: false,
+      });
+    expect(directUse).toBe(true);
+  });
+
+  it("does not direct-use deterministic relation packet answers when force probe is enabled", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRelationPacketAnswer({
+        relationQuestionFastPath: true,
+        relationPacketPresent: true,
+        relationDualDomainOk: true,
+        forceLlmProbe: true,
+      });
+    expect(directUse).toBe(false);
+  });
+
+  it("preserves deterministic direct answers across composer when no llm call occurred", () => {
+    const preserve =
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskDeterministicAnswerAcrossComposer({
+        llmInvoked: false,
+        answerPath: [
+          "intent:repo.warp_definition_docs_first",
+          "answer:repo_runtime_deterministic_direct",
+        ],
+      });
+    expect(preserve).toBe(true);
+  });
+
+  it("does not preserve deterministic answers across composer after llm invocation", () => {
+    const preserve =
+      __testHelixAskReliabilityGuards.shouldPreserveHelixAskDeterministicAnswerAcrossComposer({
+        llmInvoked: true,
+        answerPath: [
+          "intent:hybrid.warp_ethos_relation",
+          "answerContract:relation_packet_pre_llm",
+        ],
+      });
+    expect(preserve).toBe(false);
+  });
+
+  it("disables stage05 llm summary in single-llm mode", () => {
+    const policy = __testHelixAskReliabilityGuards.resolveStage05SummaryPolicy({
+      singleLlm: true,
+      llmFirstEnabled: true,
+      summaryRequired: true,
+      hardFailOnSummaryError: true,
+    });
+    expect(policy).toEqual({
+      llmFirst: false,
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+  });
+
+  it("keeps stage05 llm summary enabled when single-llm mode is off", () => {
+    const policy = __testHelixAskReliabilityGuards.resolveStage05SummaryPolicy({
+      singleLlm: false,
+      llmFirstEnabled: true,
+      summaryRequired: true,
+      hardFailOnSummaryError: true,
+    });
+    expect(policy).toEqual({
+      llmFirst: true,
+      summaryRequired: true,
+      hardFailOnSummaryError: true,
+    });
+  });
+
+  it("scrubs local cooldown llm errors when no llm invocation occurred", () => {
+    const debugPayload: Record<string, unknown> = {
+      llm_invoke_attempted: false,
+      llm_error_code: "llm_http_429:109",
+      llm_error_class: "rate_limited",
+      llm_error_rate_limit_source: "local_cooldown",
+      llm_first_rate_limited_source: "local_cooldown",
+      llm_first_local_429_stage: "turn_start",
+    };
+    __testHelixAskReliabilityGuards.scrubSkippedLlmTransportErrors(
+      debugPayload as {
+        llm_invoke_attempted?: boolean;
+        llm_error_code?: string | null;
+        llm_error_rate_limit_source?: string | null;
+        llm_first_rate_limited_source?: string | null;
+      },
+    );
+    expect(debugPayload.llm_error_code).toBeUndefined();
+    expect(debugPayload.llm_error_rate_limit_source).toBeUndefined();
+    expect(debugPayload.llm_transport_state_suppressed).toBe("llm_http_429:109");
+    expect(debugPayload.llm_transport_state_suppressed_reason).toBe(
+      "no_llm_invocation_local_cooldown",
+    );
+  });
+
+  it("does not scrub llm errors when an llm invocation occurred", () => {
+    const debugPayload: Record<string, unknown> = {
+      llm_invoke_attempted: true,
+      llm_error_code: "llm_http_429",
+      llm_error_rate_limit_source: "provider_429",
+    };
+    __testHelixAskReliabilityGuards.scrubSkippedLlmTransportErrors(
+      debugPayload as {
+        llm_invoke_attempted?: boolean;
+        llm_error_code?: string | null;
+        llm_error_rate_limit_source?: string | null;
+        llm_first_rate_limited_source?: string | null;
+      },
+    );
+    expect(debugPayload.llm_error_code).toBe("llm_http_429");
+    expect(debugPayload.llm_transport_state_suppressed).toBeUndefined();
   });
 
   it("uses anchor files as confirmed evidence in single-LLM short fallback", () => {
@@ -4242,6 +5416,38 @@ describe("helix ask dialogue formatting", () => {
     expect(rewritten).not.toMatch(/Checked files:\s*,/i);
     expect(rewritten).not.toMatch(/Search docs headings for \"3\.\"/i);
     expect(rewritten).toMatch(/dynamic-casimir-effect\.md/i);
+  });
+
+  it("enforces open-world uncertainty markers after stripping sources", () => {
+    const raw = [
+      "Short answer:",
+      "- Keep alerts simple and monitor suspicious transfers.",
+      "",
+      "Sources: docs/knowledge/ethos/no-bypass-guardrail.md",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.ensureOpenWorldBypassUncertainty(
+      __testHelixAskDialogueFormatting.stripRepoCitationsForOpenWorldBypass(raw),
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/explicit uncertainty/i);
+    expect(guarded).not.toMatch(/^Sources:/im);
+  });
+
+  it("enforces ideology narrative anchors for social prompts", () => {
+    const guarded = __testHelixAskDialogueFormatting.enforceIdeologyNarrativeContracts(
+      "Short answer: civic policy should be cautious.",
+      "In plain language, how does Feedback Loop Hygiene affect society in the Ideology tree? Include a concrete example and a concise takeaway.",
+    );
+    expect(guarded).toMatch(/Mission Ethos/i);
+    expect(guarded).toMatch(/Feedback Loop Hygiene/i);
+    expect(guarded).toMatch(/\bexample\b/i);
+    expect(guarded).toMatch(/\btakeaway\b/i);
+  });
+
+  it("uses compare/no-stage-tags for hybrid fallback profile", () => {
+    const profile = __testHelixAskDialogueFormatting.resolveFallbackIntentProfile("hybrid");
+    expect(profile.formatPolicy).toBe("compare");
+    expect(profile.stageTags).toBe("never");
   });
 
   it("strips timestamped tool timeline tails from inline answer text", () => {

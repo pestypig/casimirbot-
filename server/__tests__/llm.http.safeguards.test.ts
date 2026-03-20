@@ -4,12 +4,13 @@ import {
   __setLlmHttpFetchForTests,
   classifyLlmHttpError,
   getLlmHttpBreakerSnapshot,
+  getLlmHttpRateLimitSnapshot,
   llmHttpHandler,
 } from "../skills/llm.http";
 
 const envKeys = [
   "LLM_HTTP_BASE",
-  "LLM_HTTP_API_KEY",
+  "OPENAI_API_KEY",
   "LLM_HTTP_RETRY_COUNT",
   "LLM_HTTP_429_RETRY_COUNT",
   "LLM_HTTP_429_RETRY_BACKOFF_MS",
@@ -31,7 +32,7 @@ describe("llm.http safeguards", () => {
 
   it("opens breaker after bounded failures and returns deterministic error", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
     process.env.LLM_HTTP_BREAKER_THRESHOLD = "1";
     process.env.LLM_HTTP_BREAKER_COOLDOWN_MS = "60000";
@@ -52,14 +53,14 @@ describe("llm.http safeguards", () => {
   it("keeps Hull allowlist enforcement on HTTP path", async () => {
     process.env.HULL_MODE = "1";
     process.env.LLM_HTTP_BASE = "https://api.openai.com";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
 
     await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/HULL_MODE: blocked outbound/);
   });
 
   it("returns deterministic provider metadata and correlation headers on success", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
@@ -89,7 +90,7 @@ describe("llm.http safeguards", () => {
 
   it("does not open breaker on repeated auth failures (401)", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
     process.env.LLM_HTTP_BREAKER_THRESHOLD = "1";
     process.env.LLM_HTTP_BREAKER_COOLDOWN_MS = "60000";
@@ -109,32 +110,91 @@ describe("llm.http safeguards", () => {
     expect(breaker.opened_at).toBeNull();
   });
 
-  it("does not open breaker on repeated 429 failures by default", async () => {
+  it("does not open breaker on repeated 429 failures by default and applies cooldown locally", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
-    process.env.LLM_HTTP_429_RETRY_COUNT = "0";
     process.env.LLM_HTTP_BREAKER_THRESHOLD = "1";
     process.env.LLM_HTTP_BREAKER_COOLDOWN_MS = "60000";
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
       ok: false,
       status: 429,
-      headers: { get: (name: string) => (name.toLowerCase() === "retry-after" ? "0" : null) },
+      headers: {
+        get: (name: string) => {
+          const normalized = name.toLowerCase();
+          if (normalized === "retry-after") return "0";
+          if (normalized === "x-request-id") return "req_provider_429";
+          if (normalized === "x-ratelimit-remaining-tokens") return "0";
+          return null;
+        },
+      },
+      text: async () => '{"error":{"message":"Rate limit reached for gpt-4o-mini on tokens per min. Limit: 10000.000000 / min."}}',
       json: async () => ({}),
     } as unknown as Response) as unknown as typeof fetch;
     __setLlmHttpFetchForTests(fetchMock);
 
-    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_429");
-    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("llm_http_429");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    let firstError: unknown;
+    try {
+      await llmHttpHandler({ prompt: "a" }, {});
+    } catch (error) {
+      firstError = error;
+    }
+    let secondError: unknown;
+    try {
+      await llmHttpHandler({ prompt: "a" }, {});
+    } catch (error) {
+      secondError = error;
+    }
+
+    expect(firstError).toBeTruthy();
+    expect(secondError).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const breaker = getLlmHttpBreakerSnapshot();
     expect(breaker.open).toBe(false);
     expect(breaker.consecutive_failures).toBe(0);
+    const rateLimit = getLlmHttpRateLimitSnapshot();
+    expect(rateLimit.open).toBe(true);
+    const firstParsed = classifyLlmHttpError(firstError);
+    expect(firstParsed.errorClass).toBe("rate_limited");
+    expect(firstParsed.providerCalled).toBe(true);
+    expect(firstParsed.rateLimitSource).toBe("provider_429");
+    expect(firstParsed.rateLimitKind).toBe("tokens_per_minute");
+    expect(firstParsed.providerRequestId).toBe("req_provider_429");
+    expect(firstParsed.promptTokensEstimate).toBeGreaterThan(0);
+    const secondParsed = classifyLlmHttpError(secondError);
+    expect(secondParsed.errorClass).toBe("rate_limited");
+    expect(secondParsed.providerCalled).toBe(false);
+    expect(secondParsed.rateLimitSource).toBe("local_cooldown");
+  });
+
+  it("defaults provider 429 retries to zero when env is unset", async () => {
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
+    process.env.OPENAI_API_KEY = "k";
+    delete process.env.LLM_HTTP_RETRY_COUNT;
+    delete process.env.LLM_HTTP_429_RETRY_COUNT;
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: { get: () => "0" },
+      json: async () => ({}),
+    } as unknown as Response) as unknown as typeof fetch;
+    __setLlmHttpFetchForTests(fetchMock);
+
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/llm_http_429/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires OPENAI_API_KEY and ignores legacy LLM_HTTP_API_KEY fallback", async () => {
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
+    process.env.LLM_HTTP_API_KEY = "legacy-key";
+    delete process.env.OPENAI_API_KEY;
+
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow("OPENAI_API_KEY not set");
   });
 
   it("retries 429 using retry-after/backoff and can recover without opening breaker", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
     process.env.LLM_HTTP_429_RETRY_COUNT = "2";
     process.env.LLM_HTTP_429_RETRY_BACKOFF_MS = "1";
@@ -162,14 +222,38 @@ describe("llm.http safeguards", () => {
     expect(result.__llm_http_retry_count).toBe(1);
     expect(result.__llm_http_attempts).toBe(2);
     expect(result.__llm_timeout_ms).toBeGreaterThan(0);
+    expect(result.__llm_prompt_tokens_estimate).toBeGreaterThan(0);
     const breaker = getLlmHttpBreakerSnapshot();
     expect(breaker.open).toBe(false);
     expect(breaker.consecutive_failures).toBe(0);
   });
 
+  it("holds a retry-after cooldown across requests after a 429", async () => {
+    process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
+    process.env.OPENAI_API_KEY = "k";
+    process.env.LLM_HTTP_RETRY_COUNT = "0";
+    process.env.LLM_HTTP_429_RETRY_COUNT = "0";
+    process.env.LLM_HTTP_429_RETRY_BACKOFF_MS = "1";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: { get: (name: string) => (name.toLowerCase() === "retry-after" ? "1" : null) },
+      json: async () => ({}),
+    } as unknown as Response) as unknown as typeof fetch;
+    __setLlmHttpFetchForTests(fetchMock);
+
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/llm_http_429/);
+    const snapshot = getLlmHttpRateLimitSnapshot();
+    expect(snapshot.open).toBe(true);
+    expect(snapshot.remaining_ms).toBeGreaterThan(0);
+
+    await expect(llmHttpHandler({ prompt: "a" }, {})).rejects.toThrow(/llm_http_429/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("classifies context-window 400 errors as context_limit", async () => {
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
-    process.env.LLM_HTTP_API_KEY = "k";
+    process.env.OPENAI_API_KEY = "k";
     process.env.LLM_HTTP_RETRY_COUNT = "0";
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue({
       ok: false,
@@ -193,3 +277,4 @@ describe("llm.http safeguards", () => {
     expect(parsed.transient).toBe(false);
   });
 });
+

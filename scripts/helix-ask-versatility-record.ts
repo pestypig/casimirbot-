@@ -571,6 +571,8 @@ const makeRepoTechnicalPrompts = (): PromptCase[] => {
     "How is platonic gate scoring attached to final response debug?",
     "What checks enforce presence of citations in repo/hybrid responses?",
     "Describe the interaction between relation query detection and graph resolver.",
+    "Organize future Helix Ask work for profiles, paywall, voice lane, translation, and retrieval planning into a repo-grounded implementation roadmap.",
+    "Map a multi-objective Helix Ask roadmap for API access, profiles, billing, voice lane, and translation without falling back to a generic five-section answer.",
   ];
   return base.map((question, index) => ({
     id: `repo_tech_${String(index + 1).padStart(2, "0")}_${slug(question)}`,

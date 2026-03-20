@@ -107,6 +107,20 @@ export type Stage05Telemetry = {
   input_connectivity_added_count?: number;
   input_seed_signal_token_count?: number;
   input_connected_hint_path_count?: number;
+  adaptive_expand_attempted?: boolean;
+  adaptive_expand_applied?: boolean;
+  adaptive_expand_reason?: string | null;
+  adaptive_expand_max_files?: number;
+  adaptive_expand_max_cards?: number;
+  llm_error_code?: string | null;
+  llm_error_class?: string | null;
+  llm_retry_after_ms?: number | null;
+  llm_provider_called?: boolean | null;
+  llm_rate_limit_source?: string | null;
+  llm_rate_limit_kind?: string | null;
+  llm_provider_request_id?: string | null;
+  llm_prompt_tokens_estimate?: number | null;
+  llm_request_body_bytes?: number | null;
 };
 
 export type Stage05LlmSummaryInput = {
@@ -1508,6 +1522,15 @@ const buildEmptyTelemetry = (
   two_pass_used: false,
   two_pass_batches: 0,
   overflow_policy: options?.overflowPolicy ?? "single_pass",
+  llm_error_code: null,
+  llm_error_class: null,
+  llm_retry_after_ms: null,
+  llm_provider_called: null,
+  llm_rate_limit_source: null,
+  llm_rate_limit_kind: null,
+  llm_provider_request_id: null,
+  llm_prompt_tokens_estimate: null,
+  llm_request_body_bytes: null,
 });
 
 const buildHardFailTelemetry = (args: {
@@ -1542,6 +1565,15 @@ const buildHardFailTelemetry = (args: {
   two_pass_used: args.twoPassUsed,
   two_pass_batches: Math.max(0, args.twoPassBatches),
   overflow_policy: args.overflowPolicy,
+  llm_error_code: null,
+  llm_error_class: null,
+  llm_retry_after_ms: null,
+  llm_provider_called: null,
+  llm_rate_limit_source: null,
+  llm_rate_limit_kind: null,
+  llm_provider_request_id: null,
+  llm_prompt_tokens_estimate: null,
+  llm_request_body_bytes: null,
 });
 
 const isStage05SoftRuntimeFailOpenReason = (reason: string): boolean => {
@@ -1986,6 +2018,7 @@ export async function buildStage05EvidenceCards(
   let llmUsed = false;
   let llmSummarySucceeded = false;
   let fallbackReason: string | null = null;
+  let summaryLlmError: ReturnType<typeof classifyLlmHttpError> | null = null;
 
   const totalPayloadChars = workingCards.reduce((count, card) => count + estimateCardPayloadChars(card), 0);
   const budgetCapped = totalPayloadChars > options.maxExtractChars;
@@ -2004,6 +2037,44 @@ export async function buildStage05EvidenceCards(
   if (budgetCapped) {
     fallbackReason = "stage05_budget_capped";
   }
+
+  const recordSummaryLlmError = (parsed: ReturnType<typeof classifyLlmHttpError>): void => {
+    if (!parsed.code && parsed.errorClass === "unknown") return;
+    if (!summaryLlmError) {
+      summaryLlmError = parsed;
+      return;
+    }
+    const currentIsProvider429 =
+      summaryLlmError.errorClass === "rate_limited" && summaryLlmError.rateLimitSource === "provider_429";
+    const nextIsProvider429 =
+      parsed.errorClass === "rate_limited" && parsed.rateLimitSource === "provider_429";
+    if (!currentIsProvider429 && nextIsProvider429) {
+      summaryLlmError = parsed;
+    }
+  };
+
+  const buildSummaryLlmTelemetry = (): Partial<Stage05Telemetry> => ({
+    llm_error_code: summaryLlmError?.code ?? null,
+    llm_error_class: summaryLlmError?.errorClass ?? null,
+    llm_retry_after_ms:
+      typeof summaryLlmError?.retryAfterMs === "number" && Number.isFinite(summaryLlmError.retryAfterMs)
+        ? Math.max(0, Math.floor(summaryLlmError.retryAfterMs))
+        : null,
+    llm_provider_called:
+      typeof summaryLlmError?.providerCalled === "boolean" ? summaryLlmError.providerCalled : null,
+    llm_rate_limit_source: summaryLlmError?.rateLimitSource ?? null,
+    llm_rate_limit_kind: summaryLlmError?.rateLimitKind ?? null,
+    llm_provider_request_id: summaryLlmError?.providerRequestId ?? null,
+    llm_prompt_tokens_estimate:
+      typeof summaryLlmError?.promptTokensEstimate === "number" &&
+      Number.isFinite(summaryLlmError.promptTokensEstimate)
+        ? Math.max(0, Math.floor(summaryLlmError.promptTokensEstimate))
+        : null,
+    llm_request_body_bytes:
+      typeof summaryLlmError?.requestBodyBytes === "number" && Number.isFinite(summaryLlmError.requestBodyBytes)
+        ? Math.max(0, Math.floor(summaryLlmError.requestBodyBytes))
+        : null,
+  });
 
   const buildSummaryHardFail = (
     reason: string,
@@ -2049,26 +2120,30 @@ export async function buildStage05EvidenceCards(
           two_pass_used: twoPassUsed,
           two_pass_batches: twoPassBatches,
           overflow_policy: overflowPolicy,
+          ...buildSummaryLlmTelemetry(),
         },
       };
     }
     const resolvedCoverage = coverage ?? buildSlotCoverage(slotPlan.required, []);
     return {
       cards: [],
-      telemetry: buildHardFailTelemetry({
-        fallbackReason: reason,
-        extractMs,
-        totalMs: Date.now() - startMs,
-        fileCount: rankedPaths.length,
-        budgetCapped,
-        slotPlan,
-        slotCoverage: resolvedCoverage,
-        fullFileMode,
-        overflowPolicy,
-        twoPassUsed,
-        twoPassBatches,
-        llmUsed,
-      }),
+      telemetry: {
+        ...buildHardFailTelemetry({
+          fallbackReason: reason,
+          extractMs,
+          totalMs: Date.now() - startMs,
+          fileCount: rankedPaths.length,
+          budgetCapped,
+          slotPlan,
+          slotCoverage: resolvedCoverage,
+          fullFileMode,
+          overflowPolicy,
+          twoPassUsed,
+          twoPassBatches,
+          llmUsed,
+        }),
+        ...buildSummaryLlmTelemetry(),
+      },
     };
   };
 
@@ -2136,6 +2211,7 @@ export async function buildStage05EvidenceCards(
         if (!summaryOutput.summaries) return { output: null, reason: "stage05_llm_invalid_output" };
         return { output: alignSummaryOutputToCards(summaryOutput, targetCards), reason: null };
       } catch (error) {
+        recordSummaryLlmError(classifyLlmHttpError(error));
         return { output: null, reason: mapStage05SummaryErrorReason(error) };
       }
     };
@@ -2404,6 +2480,7 @@ export async function buildStage05EvidenceCards(
     two_pass_used: twoPassUsed,
     two_pass_batches: twoPassBatches,
     overflow_policy: overflowPolicy,
+    ...buildSummaryLlmTelemetry(),
   };
   const cards = toStage05EvidenceCards(workingCards);
   return { cards, telemetry };

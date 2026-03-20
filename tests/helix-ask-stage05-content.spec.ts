@@ -199,6 +199,8 @@ describe("helix ask stage0.5 content lane", () => {
     expect(result.telemetry.summary_hard_fail).toBe(true);
     expect(result.telemetry.summary_fail_reason).toBe("stage05_llm_http_429");
     expect(result.telemetry.fallback_reason).toBe("stage05_llm_http_429");
+    expect(result.telemetry.llm_error_code).toBe("llm_http_429");
+    expect(result.telemetry.llm_error_class).toBe("rate_limited");
     expect(result.telemetry.slot_coverage?.required ?? []).toEqual(
       expect.arrayContaining(["definition", "mechanism", "code_path"]),
     );

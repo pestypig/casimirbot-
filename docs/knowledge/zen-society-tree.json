@@ -754,7 +754,12 @@
         "zen-artifact-local-stability-compact",
         "zen-artifact-metric-integrity-guardrail",
         "zen-artifact-protocol",
-        "zen-artifact-training-certification-gate"
+        "zen-artifact-training-certification-gate",
+        "zen-artifact-civic-oxygen-compact",
+        "zen-artifact-institution-first-recognition-framework",
+        "zen-artifact-election-readiness-ladder",
+        "zen-artifact-survivable-opposition-framework",
+        "zen-artifact-external-support-integrity-framework"
       ],
       "links": [
         {
@@ -1420,6 +1425,256 @@
           "path": "docs/zen-society/templates/artifacts/training-certification-gate.md",
           "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
           "content_hash": "sha256:698ea9ccfdf4a9daf53d3375c80357d43071166b929ec85c397c9045b9685a65"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "zen-artifact-civic-oxygen-compact",
+      "slug": "zen-artifact-civic-oxygen-compact",
+      "title": "Civic Oxygen Compact",
+      "excerpt": "Artifact template for Civic Oxygen Compact.",
+      "bodyMD": "Civic Oxygen Compact artifact template (docs/zen-society/templates/artifacts/civic-oxygen-compact.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Civic Oxygen Compact.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/civic-oxygen-compact.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:268d5af07f68915b40e447529e5ea10bbae13eb20dd9b80bfec25deca36705be"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "zen-artifact-institution-first-recognition-framework",
+      "slug": "zen-artifact-institution-first-recognition-framework",
+      "title": "Institution First Recognition Framework",
+      "excerpt": "Artifact template for Institution First Recognition Framework.",
+      "bodyMD": "Institution First Recognition Framework artifact template (docs/zen-society/templates/artifacts/institution-first-recognition-framework.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Institution First Recognition Framework.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/institution-first-recognition-framework.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:c9d469f0d0c01f1f38a2ebe3f2440a87536a974c35e63ef0cacd0839fc210681"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "zen-artifact-election-readiness-ladder",
+      "slug": "zen-artifact-election-readiness-ladder",
+      "title": "Election Readiness Ladder",
+      "excerpt": "Artifact template for Election Readiness Ladder.",
+      "bodyMD": "Election Readiness Ladder artifact template (docs/zen-society/templates/artifacts/election-readiness-ladder.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Election Readiness Ladder.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/election-readiness-ladder.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:15d44485d523d9c8a6343cced1eca5d2bbf4efc07ee58addf5873cb46b3e2d17"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "zen-artifact-survivable-opposition-framework",
+      "slug": "zen-artifact-survivable-opposition-framework",
+      "title": "Survivable Opposition Framework",
+      "excerpt": "Artifact template for Survivable Opposition Framework.",
+      "bodyMD": "Survivable Opposition Framework artifact template (docs/zen-society/templates/artifacts/survivable-opposition-framework.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for Survivable Opposition Framework.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/survivable-opposition-framework.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:1cd608baa4a1caf9c5e12249961a0fb33139605849458195eb1e47958d6473a3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "zen-society-artifacts"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "zen-artifact-external-support-integrity-framework",
+      "slug": "zen-artifact-external-support-integrity-framework",
+      "title": "External Support Integrity Framework",
+      "excerpt": "Artifact template for External Support Integrity Framework.",
+      "bodyMD": "External Support Integrity Framework artifact template (docs/zen-society/templates/artifacts/external-support-integrity-framework.md).\n\nMinimal artifact: artifact template summary.",
+      "tags": [
+        "zen",
+        "artifacts"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "zen-society-artifacts"
+        }
+      ],
+      "summary": "Artifact template for External Support Integrity Framework.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/zen-society/templates/artifacts/external-support-integrity-framework.md",
+          "repo_rev": "a3e94a3d3ec61aae562a36d30dbfa49c338025b7",
+          "content_hash": "sha256:6f0619f284264fcbcc05f9f655194f9aa8125f4224d41c8adb3c23b1cf8f1581"
         }
       ],
       "inputs": [],

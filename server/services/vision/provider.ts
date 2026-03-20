@@ -23,7 +23,7 @@ class OpenAiVisionProvider implements VisionProvider {
     const base = env("VISION_HTTP_BASE");
     if (!base || typeof fetch !== "function") return undefined;
     const model = env("VISION_HTTP_MODEL") || env("LLM_HTTP_MODEL") || "gpt-4o-mini";
-    const apiKey = env("VISION_HTTP_API_KEY") || env("LLM_HTTP_API_KEY");
+    const apiKey = env("VISION_HTTP_API_KEY") || env("OPENAI_API_KEY");
     const body = {
       model,
       messages: [
@@ -61,7 +61,7 @@ class OllamaVisionProvider implements VisionProvider {
       env("VISION_HTTP_MODEL") ||
       env("LLM_HTTP_MODEL") ||
       "qwen3-vl";
-    const apiKey = env("OLLAMA_API_KEY") || env("VISION_HTTP_API_KEY") || env("LLM_HTTP_API_KEY");
+    const apiKey = env("OLLAMA_API_KEY") || env("VISION_HTTP_API_KEY");
     const messages = [
       {
         role: "user",

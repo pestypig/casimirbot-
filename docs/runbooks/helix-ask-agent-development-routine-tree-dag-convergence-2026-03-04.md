@@ -1,7 +1,7 @@
 # Helix Ask Agent Development Routine (Tree/DAG Convergence)
 
 Date: March 4, 2026  
-Scope: Retrieval attribution and tree/DAG convergence for Helix Ask
+Scope: ~Retrieval attribution and tree/DAG convergence for Helix Ask~
 
 ## Purpose
 

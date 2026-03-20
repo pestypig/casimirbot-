@@ -19,6 +19,14 @@ export type LlmHttpErrorClass =
   | "backend_unavailable"
   | "unknown";
 
+export type LlmHttpRateLimitSource = "provider_429" | "local_cooldown";
+export type LlmHttpRateLimitKind =
+  | "requests_per_minute"
+  | "tokens_per_minute"
+  | "quota"
+  | "concurrency"
+  | "unknown";
+
 export type LlmHttpErrorInfo = {
   code?: string;
   message: string;
@@ -32,6 +40,17 @@ export type LlmHttpErrorInfo = {
   breakerFailure: boolean;
   circuitOpen: boolean;
   circuitRemainingMs?: number;
+  providerCalled?: boolean;
+  rateLimitSource?: LlmHttpRateLimitSource;
+  rateLimitKind?: LlmHttpRateLimitKind;
+  providerRequestId?: string;
+  providerRetryAfterRaw?: string;
+  providerErrorText?: string;
+  providerRateLimitHeaders?: Record<string, string>;
+  promptMessagesCount?: number;
+  promptChars?: number;
+  promptTokensEstimate?: number;
+  requestBodyBytes?: number;
 };
 
 export const llmHttpSpec: ToolSpecShape = {
@@ -47,12 +66,13 @@ export const llmHttpSpec: ToolSpecShape = {
 let fetchImpl: typeof fetch | null = typeof globalThis.fetch === "function" ? globalThis.fetch : null;
 let llmHttpBreakerConsecutiveFailures = 0;
 let llmHttpBreakerOpenedAt = 0;
+let llmHttpRateLimitedUntil = 0;
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 const getTimeoutMs = (): number => clamp(Number(process.env.LLM_HTTP_TIMEOUT_MS ?? 15_000), 500, 60_000);
 const getRetryCount = (): number => clamp(Number(process.env.LLM_HTTP_RETRY_COUNT ?? 1), 0, 2);
 const getRetryBackoffMs = (): number => clamp(Number(process.env.LLM_HTTP_RETRY_BACKOFF_MS ?? 250), 50, 5_000);
-const get429RetryCount = (): number => clamp(Number(process.env.LLM_HTTP_429_RETRY_COUNT ?? 3), 0, 8);
+const get429RetryCount = (): number => clamp(Number(process.env.LLM_HTTP_429_RETRY_COUNT ?? 0), 0, 8);
 const get429RetryBackoffMs = (): number =>
   clamp(Number(process.env.LLM_HTTP_429_RETRY_BACKOFF_MS ?? 750), 50, 60_000);
 const shouldCount429BreakerFailures = (): boolean =>
@@ -63,10 +83,106 @@ const getBreakerCooldownMs = (): number => clamp(Number(process.env.LLM_HTTP_BRE
 const LLM_HTTP_CODE_RE = /(llm_http_[a-z0-9:_-]+)/i;
 const LLM_HTTP_CONTEXT_LIMIT_RE =
   /\b(context length|context window|max(?:imum)? context|too many tokens|token limit|max_tokens|prompt too long|length exceeded)\b/i;
+const LLM_HTTP_DEBUG_TEXT_LIMIT = 400;
+const LLM_HTTP_RATE_LIMIT_HEADERS = [
+  "retry-after",
+  "x-request-id",
+  "openai-request-id",
+  "x-ratelimit-limit-requests",
+  "x-ratelimit-remaining-requests",
+  "x-ratelimit-reset-requests",
+  "x-ratelimit-limit-tokens",
+  "x-ratelimit-remaining-tokens",
+  "x-ratelimit-reset-tokens",
+] as const;
+
+type LlmHttpPromptStats = {
+  promptMessagesCount: number;
+  promptChars: number;
+  promptTokensEstimate: number;
+  requestBodyBytes: number;
+};
+
+const clipDebugText = (value: string, maxChars = LLM_HTTP_DEBUG_TEXT_LIMIT): string => {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxChars) return normalized;
+  if (maxChars <= 3) return normalized.slice(0, maxChars);
+  return `${normalized.slice(0, maxChars - 3)}...`;
+};
+
+const stringifyMessageContent = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => {
+        if (typeof entry === "string") return entry;
+        if (entry && typeof entry === "object") {
+          const textCandidate =
+            typeof (entry as { text?: unknown }).text === "string"
+              ? (entry as { text: string }).text
+              : JSON.stringify(entry);
+          return textCandidate;
+        }
+        return String(entry ?? "");
+      })
+      .join(" ");
+  }
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return String(value ?? "");
+};
+
+const estimatePromptStats = (messages: Array<{ role?: unknown; content?: unknown }>, requestBody: unknown): LlmHttpPromptStats => {
+  const promptMessagesCount = Array.isArray(messages) ? messages.length : 0;
+  const promptChars = (messages ?? []).reduce((sum, entry) => {
+    const role = typeof entry?.role === "string" ? entry.role : "";
+    const content = stringifyMessageContent(entry?.content);
+    return sum + role.length + content.length;
+  }, 0);
+  const promptTokensEstimate = Math.max(
+    promptMessagesCount * 4,
+    Math.ceil(promptChars / 4) + promptMessagesCount * 2,
+  );
+  const requestBodyBytes = Buffer.byteLength(JSON.stringify(requestBody ?? {}), "utf8");
+  return {
+    promptMessagesCount,
+    promptChars,
+    promptTokensEstimate,
+    requestBodyBytes,
+  };
+};
+
+const extractRateLimitHeaders = (response: Response): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const name of LLM_HTTP_RATE_LIMIT_HEADERS) {
+    const value = response.headers?.get?.(name);
+    if (typeof value === "string" && value.trim()) {
+      out[name] = value.trim();
+    }
+  }
+  return out;
+};
+
+const inferRateLimitKind = (
+  responseErrorText: string,
+  headers: Record<string, string>,
+): LlmHttpRateLimitKind => {
+  const haystack = `${responseErrorText} ${Object.values(headers).join(" ")}`.toLowerCase();
+  if (/insufficient_quota|quota|billing/i.test(haystack)) return "quota";
+  if (/tokens?\s+per\s+min|tokens?\s+per\s+minute|tpm\b/i.test(haystack)) return "tokens_per_minute";
+  if (/requests?\s+per\s+min|requests?\s+per\s+minute|rpm\b/i.test(haystack)) return "requests_per_minute";
+  if (/concurr|simultaneous|parallel request/i.test(haystack)) return "concurrency";
+  if ((headers["x-ratelimit-remaining-tokens"] ?? "") === "0") return "tokens_per_minute";
+  if ((headers["x-ratelimit-remaining-requests"] ?? "") === "0") return "requests_per_minute";
+  return "unknown";
+};
 
 const resetBreaker = (): void => {
   llmHttpBreakerConsecutiveFailures = 0;
   llmHttpBreakerOpenedAt = 0;
+};
+
+const resetRateLimitWindow = (): void => {
+  llmHttpRateLimitedUntil = 0;
 };
 
 const refreshBreakerWindow = (): void => {
@@ -77,6 +193,21 @@ const refreshBreakerWindow = (): void => {
   if (elapsedMs >= getBreakerCooldownMs()) {
     resetBreaker();
   }
+};
+
+const refreshRateLimitWindow = (): void => {
+  if (!llmHttpRateLimitedUntil) {
+    return;
+  }
+  if (Date.now() >= llmHttpRateLimitedUntil) {
+    resetRateLimitWindow();
+  }
+};
+
+const noteRateLimitWindow = (delayMs: number): void => {
+  const boundedDelayMs = Number.isFinite(delayMs) ? Math.max(0, Math.floor(delayMs)) : 0;
+  if (boundedDelayMs <= 0) return;
+  llmHttpRateLimitedUntil = Math.max(llmHttpRateLimitedUntil, Date.now() + boundedDelayMs);
 };
 
 export const getLlmHttpBreakerSnapshot = (): {
@@ -103,8 +234,24 @@ export const getLlmHttpBreakerSnapshot = (): {
   };
 };
 
+export const getLlmHttpRateLimitSnapshot = (): {
+  open: boolean;
+  until_at: string | null;
+  remaining_ms: number;
+} => {
+  refreshRateLimitWindow();
+  const open = llmHttpRateLimitedUntil > 0;
+  const remainingMs = open ? Math.max(0, llmHttpRateLimitedUntil - Date.now()) : 0;
+  return {
+    open,
+    until_at: open ? new Date(llmHttpRateLimitedUntil).toISOString() : null,
+    remaining_ms: remainingMs,
+  };
+};
+
 export const __resetLlmHttpBreakerForTests = (): void => {
   resetBreaker();
+  resetRateLimitWindow();
 };
 
 export const __setLlmHttpFetchForTests = (impl: typeof fetch | null): void => {
@@ -128,6 +275,17 @@ const createLlmHttpError = (args: {
   maxTokensEffective?: number;
   transient?: boolean;
   breakerFailure?: boolean;
+  providerCalled?: boolean;
+  rateLimitSource?: LlmHttpRateLimitSource;
+  rateLimitKind?: LlmHttpRateLimitKind;
+  providerRequestId?: string;
+  providerRetryAfterRaw?: string;
+  providerErrorText?: string;
+  providerRateLimitHeaders?: Record<string, string>;
+  promptMessagesCount?: number;
+  promptChars?: number;
+  promptTokensEstimate?: number;
+  requestBodyBytes?: number;
 }): Error => {
   const error = new Error(args.message ?? args.code);
   const record = error as Error & {
@@ -139,6 +297,17 @@ const createLlmHttpError = (args: {
     llmMaxTokensEffective?: number;
     llmTransient?: boolean;
     llmBreakerFailure?: boolean;
+    llmProviderCalled?: boolean;
+    llmRateLimitSource?: LlmHttpRateLimitSource;
+    llmRateLimitKind?: LlmHttpRateLimitKind;
+    llmProviderRequestId?: string;
+    llmProviderRetryAfterRaw?: string;
+    llmProviderErrorText?: string;
+    llmProviderRateLimitHeaders?: Record<string, string>;
+    llmPromptMessagesCount?: number;
+    llmPromptChars?: number;
+    llmPromptTokensEstimate?: number;
+    llmRequestBodyBytes?: number;
   };
   record.llmErrorCode = args.code;
   if (typeof args.status === "number" && Number.isFinite(args.status)) {
@@ -158,6 +327,33 @@ const createLlmHttpError = (args: {
   }
   if (typeof args.transient === "boolean") record.llmTransient = args.transient;
   if (typeof args.breakerFailure === "boolean") record.llmBreakerFailure = args.breakerFailure;
+  if (typeof args.providerCalled === "boolean") record.llmProviderCalled = args.providerCalled;
+  if (args.rateLimitSource) record.llmRateLimitSource = args.rateLimitSource;
+  if (args.rateLimitKind) record.llmRateLimitKind = args.rateLimitKind;
+  if (typeof args.providerRequestId === "string" && args.providerRequestId.trim()) {
+    record.llmProviderRequestId = args.providerRequestId.trim();
+  }
+  if (typeof args.providerRetryAfterRaw === "string" && args.providerRetryAfterRaw.trim()) {
+    record.llmProviderRetryAfterRaw = args.providerRetryAfterRaw.trim();
+  }
+  if (typeof args.providerErrorText === "string" && args.providerErrorText.trim()) {
+    record.llmProviderErrorText = clipDebugText(args.providerErrorText);
+  }
+  if (args.providerRateLimitHeaders && Object.keys(args.providerRateLimitHeaders).length > 0) {
+    record.llmProviderRateLimitHeaders = args.providerRateLimitHeaders;
+  }
+  if (typeof args.promptMessagesCount === "number" && Number.isFinite(args.promptMessagesCount)) {
+    record.llmPromptMessagesCount = Math.max(0, Math.floor(args.promptMessagesCount));
+  }
+  if (typeof args.promptChars === "number" && Number.isFinite(args.promptChars)) {
+    record.llmPromptChars = Math.max(0, Math.floor(args.promptChars));
+  }
+  if (typeof args.promptTokensEstimate === "number" && Number.isFinite(args.promptTokensEstimate)) {
+    record.llmPromptTokensEstimate = Math.max(0, Math.floor(args.promptTokensEstimate));
+  }
+  if (typeof args.requestBodyBytes === "number" && Number.isFinite(args.requestBodyBytes)) {
+    record.llmRequestBodyBytes = Math.max(0, Math.floor(args.requestBodyBytes));
+  }
   return error;
 };
 
@@ -171,6 +367,17 @@ export const classifyLlmHttpError = (error: unknown): LlmHttpErrorInfo => {
         llmTimeoutMs?: unknown;
         llmMaxTokensRequested?: unknown;
         llmMaxTokensEffective?: unknown;
+        llmProviderCalled?: unknown;
+        llmRateLimitSource?: unknown;
+        llmRateLimitKind?: unknown;
+        llmProviderRequestId?: unknown;
+        llmProviderRetryAfterRaw?: unknown;
+        llmProviderErrorText?: unknown;
+        llmProviderRateLimitHeaders?: unknown;
+        llmPromptMessagesCount?: unknown;
+        llmPromptChars?: unknown;
+        llmPromptTokensEstimate?: unknown;
+        llmRequestBodyBytes?: unknown;
       })
     | undefined;
   const codeFromProperty =
@@ -222,6 +429,58 @@ export const classifyLlmHttpError = (error: unknown): LlmHttpErrorInfo => {
   const maxTokensEffective =
     typeof record?.llmMaxTokensEffective === "number" && Number.isFinite(record.llmMaxTokensEffective)
       ? Math.max(0, Math.floor(record.llmMaxTokensEffective))
+      : undefined;
+  const providerCalled =
+    typeof record?.llmProviderCalled === "boolean" ? record.llmProviderCalled : undefined;
+  const rateLimitSource =
+    record?.llmRateLimitSource === "provider_429" || record?.llmRateLimitSource === "local_cooldown"
+      ? record.llmRateLimitSource
+      : undefined;
+  const rateLimitKind =
+    record?.llmRateLimitKind === "requests_per_minute" ||
+    record?.llmRateLimitKind === "tokens_per_minute" ||
+    record?.llmRateLimitKind === "quota" ||
+    record?.llmRateLimitKind === "concurrency" ||
+    record?.llmRateLimitKind === "unknown"
+      ? record.llmRateLimitKind
+      : undefined;
+  const providerRequestId =
+    typeof record?.llmProviderRequestId === "string" && record.llmProviderRequestId.trim()
+      ? record.llmProviderRequestId.trim()
+      : undefined;
+  const providerRetryAfterRaw =
+    typeof record?.llmProviderRetryAfterRaw === "string" && record.llmProviderRetryAfterRaw.trim()
+      ? record.llmProviderRetryAfterRaw.trim()
+      : undefined;
+  const providerErrorText =
+    typeof record?.llmProviderErrorText === "string" && record.llmProviderErrorText.trim()
+      ? clipDebugText(record.llmProviderErrorText)
+      : undefined;
+  const providerRateLimitHeaders =
+    record?.llmProviderRateLimitHeaders &&
+    typeof record.llmProviderRateLimitHeaders === "object" &&
+    !Array.isArray(record.llmProviderRateLimitHeaders)
+      ? Object.fromEntries(
+          Object.entries(record.llmProviderRateLimitHeaders as Record<string, unknown>)
+            .map(([key, value]) => [String(key), typeof value === "string" ? value.trim() : String(value ?? "").trim()])
+            .filter(([, value]) => value.length > 0),
+        )
+      : undefined;
+  const promptMessagesCount =
+    typeof record?.llmPromptMessagesCount === "number" && Number.isFinite(record.llmPromptMessagesCount)
+      ? Math.max(0, Math.floor(record.llmPromptMessagesCount))
+      : undefined;
+  const promptChars =
+    typeof record?.llmPromptChars === "number" && Number.isFinite(record.llmPromptChars)
+      ? Math.max(0, Math.floor(record.llmPromptChars))
+      : undefined;
+  const promptTokensEstimate =
+    typeof record?.llmPromptTokensEstimate === "number" && Number.isFinite(record.llmPromptTokensEstimate)
+      ? Math.max(0, Math.floor(record.llmPromptTokensEstimate))
+      : undefined;
+  const requestBodyBytes =
+    typeof record?.llmRequestBodyBytes === "number" && Number.isFinite(record.llmRequestBodyBytes)
+      ? Math.max(0, Math.floor(record.llmRequestBodyBytes))
       : undefined;
 
   let errorClass: LlmHttpErrorClass = "unknown";
@@ -284,10 +543,21 @@ export const classifyLlmHttpError = (error: unknown): LlmHttpErrorInfo => {
     breakerFailure,
     circuitOpen,
     circuitRemainingMs,
+    providerCalled,
+    rateLimitSource,
+    rateLimitKind,
+    providerRequestId,
+    providerRetryAfterRaw,
+    providerErrorText,
+    providerRateLimitHeaders,
+    promptMessagesCount,
+    promptChars,
+    promptTokensEstimate,
+    requestBodyBytes,
   };
 };
 
-const ensureBreakerClosed = (): void => {
+const ensureBreakerClosed = (promptStats?: Partial<LlmHttpPromptStats>): void => {
   refreshBreakerWindow();
   if (!llmHttpBreakerOpenedAt) return;
   const breaker = getLlmHttpBreakerSnapshot();
@@ -297,6 +567,38 @@ const ensureBreakerClosed = (): void => {
     transient: true,
     breakerFailure: false,
     retryAfterMs: breaker.remaining_ms,
+    providerCalled: false,
+    promptMessagesCount: promptStats?.promptMessagesCount,
+    promptChars: promptStats?.promptChars,
+    promptTokensEstimate: promptStats?.promptTokensEstimate,
+    requestBodyBytes: promptStats?.requestBodyBytes,
+  });
+};
+
+const ensureRateLimitWindowClosed = (promptStats?: Partial<LlmHttpPromptStats>): void => {
+  refreshRateLimitWindow();
+  if (!llmHttpRateLimitedUntil) return;
+  const rateLimit = getLlmHttpRateLimitSnapshot();
+  throw createLlmHttpError({
+    code:
+      typeof rateLimit.remaining_ms === "number" && rateLimit.remaining_ms > 0
+        ? `llm_http_429:${Math.max(0, Math.floor(rateLimit.remaining_ms))}`
+        : "llm_http_429",
+    message:
+      typeof rateLimit.remaining_ms === "number" && rateLimit.remaining_ms > 0
+        ? `llm_http_429:${Math.max(0, Math.floor(rateLimit.remaining_ms))}`
+        : "llm_http_429",
+    status: 429,
+    retryAfterMs: rateLimit.remaining_ms,
+    transient: true,
+    breakerFailure: false,
+    providerCalled: false,
+    rateLimitSource: "local_cooldown",
+    rateLimitKind: "unknown",
+    promptMessagesCount: promptStats?.promptMessagesCount,
+    promptChars: promptStats?.promptChars,
+    promptTokensEstimate: promptStats?.promptTokensEstimate,
+    requestBodyBytes: promptStats?.requestBodyBytes,
   });
 };
 
@@ -395,7 +697,7 @@ const normalizeBase = (): string => {
   const configuredBase = (process.env.LLM_HTTP_BASE ?? "").trim();
   const allowDefaultOpenAiBase =
     String(process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE ?? "1").trim() !== "0";
-  const hasApiKey = Boolean(process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
+  const hasApiKey = Boolean(process.env.OPENAI_API_KEY?.trim());
   const base = configuredBase || (allowDefaultOpenAiBase && hasApiKey ? "https://api.openai.com" : "");
   if (!base) {
     throw new Error("LLM_HTTP_BASE not set");
@@ -406,7 +708,6 @@ const normalizeBase = (): string => {
 };
 
 export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
-  ensureBreakerClosed();
   const base = normalizeBase();
   const timeoutMs = getTimeoutMs();
   const envMaxTokensRaw = Number(process.env.LLM_HTTP_MAX_TOKENS ?? NaN);
@@ -426,9 +727,9 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
       ? input.temperature
       : Number(process.env.LLM_HTTP_TEMPERATURE ?? 0.2);
   const maxTokens = requestedMaxTokens ?? envMaxTokens;
-  const apiKey = process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim();
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("LLM_HTTP_API_KEY or OPENAI_API_KEY not set; cannot call OpenAI");
+    throw new Error("OPENAI_API_KEY not set; cannot call OpenAI");
   }
   const personaId = ctx?.personaId ?? "persona:unknown";
   const now = new Date().toISOString();
@@ -444,6 +745,7 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     max_tokens: maxTokens,
     stream: false,
   };
+  const promptStats = estimatePromptStats(messages, requestBody);
 
   const correlationHeaders: Record<string, string> = {};
   const traceId = typeof input?.traceId === "string" && input.traceId.trim()
@@ -467,6 +769,8 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     correlationHeaders["X-Tenant-Id"] = tenantId;
     correlationHeaders["X-Customer-Id"] = tenantId;
   }
+  ensureBreakerClosed(promptStats);
+  ensureRateLimitWindowClosed(promptStats);
 
   const retries = getRetryCount();
   const retries429 = get429RetryCount();
@@ -480,6 +784,7 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
   let text = "";
   let usage: any = {};
   let responseStatus = 0;
+  let providerRequestId: string | undefined;
   for (let attempt = 0; ; attempt += 1) {
     attemptsUsed = attempt + 1;
     try {
@@ -505,10 +810,21 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
             maxTokensEffective: maxTokens,
             transient: true,
             breakerFailure: true,
+            providerCalled: true,
+            promptMessagesCount: promptStats.promptMessagesCount,
+            promptChars: promptStats.promptChars,
+            promptTokensEstimate: promptStats.promptTokensEstimate,
+            requestBodyBytes: promptStats.requestBodyBytes,
           });
         }
         if (response.status === 429) {
           const retryAfterMs = parseRetryAfterMs(response);
+          const retryAfterRaw = response.headers?.get?.("retry-after") ?? undefined;
+          const providerHeaders = extractRateLimitHeaders(response);
+          const providerRequestId =
+            providerHeaders["x-request-id"] ?? providerHeaders["openai-request-id"] ?? undefined;
+          const rateLimitKind = inferRateLimitKind(responseErrorText, providerHeaders);
+          noteRateLimitWindow(Math.max(retryAfterMs, retry429BackoffMs));
           throw createLlmHttpError({
             code: retryAfterMs > 0 ? `llm_http_429:${retryAfterMs}` : "llm_http_429",
             message: retryAfterMs > 0 ? `llm_http_429:${retryAfterMs}` : "llm_http_429",
@@ -519,6 +835,17 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
             maxTokensEffective: maxTokens,
             transient: true,
             breakerFailure: shouldCount429BreakerFailures(),
+            providerCalled: true,
+            rateLimitSource: "provider_429",
+            rateLimitKind,
+            providerRequestId,
+            providerRetryAfterRaw: retryAfterRaw,
+            providerErrorText: responseErrorText,
+            providerRateLimitHeaders: providerHeaders,
+            promptMessagesCount: promptStats.promptMessagesCount,
+            promptChars: promptStats.promptChars,
+            promptTokensEstimate: promptStats.promptTokensEstimate,
+            requestBodyBytes: promptStats.requestBodyBytes,
           });
         }
         if (response.status === 400 && LLM_HTTP_CONTEXT_LIMIT_RE.test(responseErrorText)) {
@@ -531,6 +858,11 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
             maxTokensEffective: maxTokens,
             transient: false,
             breakerFailure: false,
+            providerCalled: true,
+            promptMessagesCount: promptStats.promptMessagesCount,
+            promptChars: promptStats.promptChars,
+            promptTokensEstimate: promptStats.promptTokensEstimate,
+            requestBodyBytes: promptStats.requestBodyBytes,
           });
         }
         throw createLlmHttpError({
@@ -542,18 +874,26 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
           maxTokensEffective: maxTokens,
           transient: false,
           breakerFailure: false,
+          providerCalled: true,
+          promptMessagesCount: promptStats.promptMessagesCount,
+          promptChars: promptStats.promptChars,
+          promptTokensEstimate: promptStats.promptTokensEstimate,
+          requestBodyBytes: promptStats.requestBodyBytes,
         });
       }
+      const providerHeaders = extractRateLimitHeaders(response);
+      providerRequestId = providerHeaders["x-request-id"] ?? providerHeaders["openai-request-id"] ?? undefined;
       payload = (await response.json()) as any;
       text = payload?.choices?.[0]?.message?.content ?? "";
       usage = payload?.usage ?? {};
+      resetRateLimitWindow();
       resetBreaker();
       break;
     } catch (error) {
       const parsed = classifyLlmHttpError(error);
       const errorCode = parseLlmHttpErrorCode(error);
       const is429 = parsed.errorClass === "rate_limited";
-      const maxRetries = is429 ? Math.max(retries, retries429) : retries;
+      const maxRetries = is429 ? retries429 : retries;
       const canRetry = attempt < maxRetries && isRetryableError(error);
       if (canRetry) {
         const retryAfterMs =
@@ -603,6 +943,10 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
       outRecord.__llm_timeout_ms = timeoutMs;
       outRecord.__llm_max_tokens_requested = requestedMaxTokens ?? null;
       outRecord.__llm_max_tokens_effective = maxTokens ?? null;
+      outRecord.__llm_prompt_messages_count = promptStats.promptMessagesCount;
+      outRecord.__llm_prompt_chars = promptStats.promptChars;
+      outRecord.__llm_prompt_tokens_estimate = promptStats.promptTokensEstimate;
+      outRecord.__llm_request_body_bytes = promptStats.requestBodyBytes;
       if (lastRetryAfterMs > 0) {
         outRecord.__llm_retry_after_ms = lastRetryAfterMs;
       }
@@ -685,6 +1029,23 @@ export const llmHttpHandler: ToolHandler = async (input: any, ctx: any) => {
     __llm_timeout_ms: timeoutMs,
     __llm_max_tokens_requested: requestedMaxTokens ?? null,
     __llm_max_tokens_effective: maxTokens ?? null,
+    __llm_prompt_messages_count: promptStats.promptMessagesCount,
+    __llm_prompt_chars: promptStats.promptChars,
+    __llm_prompt_tokens_estimate: promptStats.promptTokensEstimate,
+    __llm_request_body_bytes: promptStats.requestBodyBytes,
+    __llm_usage_prompt_tokens:
+      typeof usage?.prompt_tokens === "number" && Number.isFinite(usage.prompt_tokens)
+        ? Math.max(0, Math.floor(usage.prompt_tokens))
+        : null,
+    __llm_usage_completion_tokens:
+      typeof usage?.completion_tokens === "number" && Number.isFinite(usage.completion_tokens)
+        ? Math.max(0, Math.floor(usage.completion_tokens))
+        : null,
+    __llm_usage_total_tokens:
+      typeof usage?.total_tokens === "number" && Number.isFinite(usage.total_tokens)
+        ? Math.max(0, Math.floor(usage.total_tokens))
+        : null,
+    __llm_provider_request_id: providerRequestId ?? null,
     __llm_retry_after_ms: lastRetryAfterMs > 0 ? lastRetryAfterMs : null,
     __llm_routed_via:
       typeof ctx?.routedVia === "string" && ctx.routedVia.trim()

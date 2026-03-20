@@ -590,14 +590,92 @@ const maybeInfinitive = (value: string): string => {
   return `${infinitive}${trimmed.slice(first.length)}`;
 };
 
-const buildConversationalConceptIntro = (card: HelixAskConceptCard): string => {
+const buildConceptDisplayLabel = (match: HelixAskConceptMatch): string => {
+  const preferred =
+    match.matchedField === "alias" && match.matchedTerm
+      ? match.matchedTerm
+      : match.card.label
+        ? unquoteValue(match.card.label)
+        : match.card.id.replace(/-/g, " ");
+  const normalized = preferred.trim().replace(/-/g, " ");
+  if (!normalized) return match.card.id;
+  return normalized === normalized.toLowerCase() ? toTitleCase(normalized) : normalized;
+};
+
+const splitConceptSentences = (value?: string): string[] => {
+  if (!value) return [];
+  return (value.match(/[^.!?]+[.!?]?/g) ?? []).map((entry) => entry.trim()).filter(Boolean);
+};
+
+const buildMatchedTermPattern = (term: string): RegExp | null => {
+  const trimmed = term.trim();
+  if (!trimmed) return null;
+  const pattern = trimmed
+    .split(/\s+/)
+    .map((token) => escapeRegexTerm(token))
+    .join("\\s+");
+  if (!pattern) return null;
+  return new RegExp(`\\b${pattern}\\b`, "i");
+};
+
+const selectMatchedTermNoteSentence = (match: HelixAskConceptMatch): string | null => {
+  const { card, matchedField, matchedTerm } = match;
+  if (matchedField !== "alias" || !card.notes) return null;
+  const termPattern = buildMatchedTermPattern(matchedTerm);
+  if (!termPattern) return null;
+  for (const sentence of splitConceptSentences(card.notes)) {
+    if (!termPattern.test(sentence)) continue;
+    const clauseMatch = sentence.match(new RegExp(`\\bso\\s+(${termPattern.source}[^.?!]*)`, "i"));
+    if (clauseMatch?.[1]?.trim()) {
+      return ensureSentence(clauseMatch[1].trim());
+    }
+    return ensureSentence(sentence);
+  }
+  return null;
+};
+
+const buildUnderlyingModelSentence = (definition: string): string => {
+  const trimmed = sentenceNormalize(definition);
+  const modelMatch = trimmed.match(/^The\s+(.+?)\s+defines\s+(.+)$/i);
+  if (modelMatch?.[1] && modelMatch?.[2]) {
+    return ensureSentence(
+      `The underlying model is the ${modelMatch[1]}, which defines ${modelMatch[2]}`,
+    );
+  }
+  return ensureSentence(trimmed);
+};
+
+const selectImplementationSentence = (
+  card: HelixAskConceptCard,
+  excludedSentences: string[],
+): string | null => {
+  const excluded = new Set(
+    excludedSentences.map((entry) => sentenceNormalize(entry).toLowerCase()).filter(Boolean),
+  );
+  for (const sentence of splitConceptSentences(card.notes)) {
+    const normalized = sentenceNormalize(sentence).toLowerCase();
+    if (!normalized || excluded.has(normalized)) continue;
+    if (
+      /\b(implementation|checks?|reports?|validation|validated|pipeline|guardrails?|stress-energy|module|runtime)\b/i.test(
+        sentence,
+      )
+    ) {
+      return ensureSentence(sentence);
+    }
+  }
+  return null;
+};
+
+const buildConversationalConceptIntro = (match: HelixAskConceptMatch): string => {
+  const { card } = match;
   const label = card.label ? unquoteValue(card.label) : card.id;
   const definitionText = card.definition.trim();
   if (!definitionText) return "";
   const definitionStart = definitionText.toLowerCase();
+  const displayLabel = buildConceptDisplayLabel(match);
   const plainStart = definitionStart.startsWith(label.toLowerCase())
     ? definitionText
-    : `In plain language, ${label} means ${definitionText.charAt(0).toLowerCase() + definitionText.slice(1)}`;
+    : `In plain language, ${displayLabel} means ${definitionText.charAt(0).toLowerCase() + definitionText.slice(1)}`;
   const definitionSentence = ensureSentence(plainStart);
 
   const questions = parseQuestionList(card.keyQuestions);
@@ -608,8 +686,7 @@ const buildConversationalConceptIntro = (card: HelixAskConceptCard): string => {
   );
   const practicalQuestions =
     questions.length > 0
-      ? `In practice, it is easiest to test by asking:
-- ${questions.join("\n- ")}`
+      ? `A useful verification question is: ${questions[0]}`
       : "";
   const practicalImpact = societalEffect
     ? ensureSentence(
@@ -644,10 +721,29 @@ const buildConceptTechnicalLines = (card: HelixAskConceptCard): string[] => {
 export function renderConceptAnswer(match: HelixAskConceptMatch | null): string {
   if (!match) return "";
   const { card } = match;
-  const intro = buildConversationalConceptIntro(card);
+  const intro = buildConversationalConceptIntro(match);
   const technicalLines = buildConceptTechnicalLines(card);
   const technical = technicalLines.length > 0 ? `Technical notes:\n${technicalLines.join("\n")}` : "";
   return [intro, technical].filter(Boolean).join("\n\n");
+}
+
+export function renderShortConceptDefinition(match: HelixAskConceptMatch | null): string {
+  if (!match) return "";
+  const { card } = match;
+  const primary = selectMatchedTermNoteSentence(match) ?? ensureSentence(card.definition);
+  const extras: string[] = [primary];
+  const definitionSentence = ensureSentence(card.definition);
+  if (
+    sentenceNormalize(primary).toLowerCase() !== sentenceNormalize(definitionSentence).toLowerCase() &&
+    match.matchedField === "alias"
+  ) {
+    extras.push(buildUnderlyingModelSentence(card.definition));
+  }
+  const implementation = selectImplementationSentence(card, extras);
+  if (implementation) {
+    extras.push(implementation);
+  }
+  return extras.join(" ").trim();
 }
 
 export function renderConceptDefinition(match: HelixAskConceptMatch | null): string {

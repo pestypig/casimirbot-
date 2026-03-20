@@ -68,9 +68,9 @@ const callOpenAIBackend = async (
   model: string,
   ctx?: any,
 ): Promise<{ text: string; model: string }> => {
-  const apiKey = (process.env.OPENAI_API_KEY ?? process.env.LLM_HTTP_API_KEY ?? "").trim();
+  const apiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY (or LLM_HTTP_API_KEY) is required for physics.warp.ask when using OpenAI backend");
+    throw new Error("OPENAI_API_KEY is required for physics.warp.ask when using OpenAI backend");
   }
   const llm = getTool("llm.http.generate");
   if (llm) {

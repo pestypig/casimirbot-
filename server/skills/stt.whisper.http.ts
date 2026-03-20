@@ -72,7 +72,6 @@ const resolveApiKey = (explicitKey?: string): string | undefined => {
   return (
     process.env.WHISPER_HTTP_API_KEY?.trim() ||
     process.env.OPENAI_API_KEY?.trim() ||
-    process.env.LLM_HTTP_API_KEY?.trim() ||
     undefined
   );
 };

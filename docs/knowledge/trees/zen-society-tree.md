@@ -155,6 +155,31 @@ Zen society docs and templates. Minimal artifact: docs/zen-society/*.md.
 - type: concept
 - summary: Training Certification Gate artifact template (docs/zen-society/templates/artifacts/training-certification-gate.md). Minimal artifact: artifact template summary.
 
+### Node: Civic Oxygen Compact
+- id: zen-artifact-civic-oxygen-compact
+- type: concept
+- summary: Civic Oxygen Compact artifact template (docs/zen-society/templates/artifacts/civic-oxygen-compact.md). Minimal artifact: artifact template summary.
+
+### Node: Institution First Recognition Framework
+- id: zen-artifact-institution-first-recognition-framework
+- type: concept
+- summary: Institution First Recognition Framework artifact template (docs/zen-society/templates/artifacts/institution-first-recognition-framework.md). Minimal artifact: artifact template summary.
+
+### Node: Election Readiness Ladder
+- id: zen-artifact-election-readiness-ladder
+- type: concept
+- summary: Election Readiness Ladder artifact template (docs/zen-society/templates/artifacts/election-readiness-ladder.md). Minimal artifact: artifact template summary.
+
+### Node: Survivable Opposition Framework
+- id: zen-artifact-survivable-opposition-framework
+- type: concept
+- summary: Survivable Opposition Framework artifact template (docs/zen-society/templates/artifacts/survivable-opposition-framework.md). Minimal artifact: artifact template summary.
+
+### Node: External Support Integrity Framework
+- id: zen-artifact-external-support-integrity-framework
+- type: concept
+- summary: External Support Integrity Framework artifact template (docs/zen-society/templates/artifacts/external-support-integrity-framework.md). Minimal artifact: artifact template summary.
+
 ### Node: Zen Society Core <-> Zen Society Templates Bridge
 - id: bridge-zen-society-core-zen-society-templates
 - type: bridge

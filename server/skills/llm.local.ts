@@ -39,7 +39,7 @@ export const resolveLlmLocalBackend = (): LocalLlmBackend => {
   const allowDefaultOpenAiBase =
     String(process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE ?? "1").trim() !== "0";
   const hasHttpBase = Boolean(process.env.LLM_HTTP_BASE?.trim());
-  const hasHttpKey = Boolean(process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim());
+  const hasHttpKey = Boolean(process.env.OPENAI_API_KEY?.trim());
   const hasHttp = hasHttpBase || (allowDefaultOpenAiBase && hasHttpKey);
   const useSpawn =
     process.env.ENABLE_LLM_LOCAL_SPAWN === "1" ||

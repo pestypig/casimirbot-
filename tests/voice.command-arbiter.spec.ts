@@ -12,7 +12,6 @@ const ORIGINAL_ENV = {
   HELIX_VOICE_COMMAND_LANE_KILL_SWITCH: process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH,
   HELIX_VOICE_COMMAND_LANE_EVALUATOR_API_KEY: process.env.HELIX_VOICE_COMMAND_LANE_EVALUATOR_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-  LLM_HTTP_API_KEY: process.env.LLM_HTTP_API_KEY,
 };
 
 const restoreEnv = () => {
@@ -31,7 +30,6 @@ describe("voice command arbiter", () => {
   beforeEach(() => {
     delete process.env.HELIX_VOICE_COMMAND_LANE_EVALUATOR_API_KEY;
     delete process.env.OPENAI_API_KEY;
-    delete process.env.LLM_HTTP_API_KEY;
     process.env.HELIX_VOICE_COMMAND_LANE_ENABLED = "1";
     process.env.HELIX_VOICE_COMMAND_LANE_LOG_ONLY = "0";
     process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT = "100";

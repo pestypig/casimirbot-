@@ -31,7 +31,6 @@ import { resetVoiceRouteState, voiceRouter } from "../server/routes/voice";
 const ORIGINAL_ENV = {
   ENABLE_VOICE_TRANSCRIBE: process.env.ENABLE_VOICE_TRANSCRIBE,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-  LLM_HTTP_API_KEY: process.env.LLM_HTTP_API_KEY,
   WHISPER_HTTP_API_KEY: process.env.WHISPER_HTTP_API_KEY,
   WHISPER_HTTP_MODEL: process.env.WHISPER_HTTP_MODEL,
   STT_POLICY_MODE: process.env.STT_POLICY_MODE,
@@ -64,7 +63,6 @@ describe("voice transcribe route", () => {
     recoverSttInvalidFormatToPcmWavMock.mockReset();
     delete process.env.ENABLE_VOICE_TRANSCRIBE;
     delete process.env.OPENAI_API_KEY;
-    delete process.env.LLM_HTTP_API_KEY;
     delete process.env.WHISPER_HTTP_API_KEY;
     delete process.env.WHISPER_HTTP_MODEL;
     delete process.env.STT_POLICY_MODE;
@@ -93,11 +91,6 @@ describe("voice transcribe route", () => {
       delete process.env.OPENAI_API_KEY;
     } else {
       process.env.OPENAI_API_KEY = ORIGINAL_ENV.OPENAI_API_KEY;
-    }
-    if (ORIGINAL_ENV.LLM_HTTP_API_KEY === undefined) {
-      delete process.env.LLM_HTTP_API_KEY;
-    } else {
-      process.env.LLM_HTTP_API_KEY = ORIGINAL_ENV.LLM_HTTP_API_KEY;
     }
     if (ORIGINAL_ENV.WHISPER_HTTP_API_KEY === undefined) {
       delete process.env.WHISPER_HTTP_API_KEY;
@@ -861,7 +854,6 @@ describe("voice transcribe route", () => {
   it("uses OPENAI_API_KEY first for OpenAI STT backend auth", async () => {
     process.env.WHISPER_HTTP_API_KEY = "stt-key";
     process.env.OPENAI_API_KEY = "openai-key";
-    process.env.LLM_HTTP_API_KEY = "llm-key";
     sttHttpHandlerMock.mockResolvedValue({
       text: "Key precedence check",
       language: "en",

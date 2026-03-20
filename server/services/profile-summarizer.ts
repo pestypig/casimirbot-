@@ -83,7 +83,7 @@ async function callPrimaryLlm(prompt: string): Promise<string> {
   }
 
   const base = (process.env.LLM_HTTP_BASE ?? "").replace(/\/+$/, "");
-  const apiKey = process.env.LLM_HTTP_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim();
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!base || !apiKey) {
     throw new Error("llm_http_unconfigured");
   }

@@ -1349,6 +1349,9 @@ function applyCoverageGate(
   if (summary.keyCount === 0) {
     return { answer: input.answer, applied: false };
   }
+  if (input.templateLockedAnswer) {
+    return { answer: input.answer, applied: false, reason: "template_locked" };
+  }
   if (summary.coverageRatio >= COVERAGE_MIN_RATIO) {
     return { answer: input.answer, applied: false };
   }
@@ -1657,6 +1660,9 @@ function applyBeliefGate(
   }
   if (!input.evidenceText || input.evidenceText.trim().length === 0) {
     return { answer: input.answer, applied: false };
+  }
+  if (input.templateLockedAnswer) {
+    return { answer: input.answer, applied: false, reason: "template_locked" };
   }
   // Concept-anchored answers can be legitimate even when token overlap is thin.
   if (conceptEvidenceAnchored(input)) {
@@ -1974,8 +1980,8 @@ export function applyHelixAskPlatonicGates(input: HelixAskPlatonicInput): HelixA
     extractFilePathsFromText(gatedInput.answer).length > 0 ||
     /^\s*sources?\s*:/im.test(gatedInput.answer);
   const skipRattlingReplacement =
-    gatedInput.intentId === "repo.ideology_reference" &&
-    (Boolean(gatedInput.templateLockedAnswer) || Boolean(gatedInput.conceptMatch));
+    Boolean(gatedInput.templateLockedAnswer) ||
+    (gatedInput.intentId === "repo.ideology_reference" && Boolean(gatedInput.conceptMatch));
   if (
     rattlingGateApplied &&
     (gatedInput.domain === "repo" || gatedInput.domain === "falsifiable") &&
