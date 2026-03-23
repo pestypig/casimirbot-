@@ -144,6 +144,33 @@ import {
 import { buildHelixAskEnvelope } from "../services/helix-ask/envelope";
 import { extractFilePathsFromText } from "../services/helix-ask/paths";
 import {
+  buildPromptResearchRetrievalContract,
+  parsePromptResearchContract,
+  renderPromptResearchFailClosedAnswer,
+  type PromptResearchContract,
+  type PromptResearchRetrievalContract,
+} from "../services/helix-ask/prompt-research-contract";
+import {
+  buildPromptResearchGenerationContract,
+  type PromptResearchGenerationContract,
+} from "../services/helix-ask/generation-contract";
+import { buildObligationEvidence, type ObligationEvidence } from "../services/helix-ask/evidence-contract";
+import {
+  buildHelixAskTurnContractObligations as buildHelixAskTurnContractObligationsBase,
+} from "../services/helix-ask/obligations";
+import {
+  buildHelixAskTurnContractObligationCoverage as buildHelixAskTurnContractObligationCoverageBase,
+} from "../services/helix-ask/obligation-coverage";
+import {
+  buildHelixAskAnswerPlanSections as buildHelixAskAnswerPlanSectionsBase,
+} from "../services/helix-ask/answer-plan";
+import { rankPathsByPrecedence } from "../services/helix-ask/retrieval-contract";
+import {
+  buildPromptResearchContractProvenanceTableBlock,
+  repairPromptResearchContractAnswer,
+  validatePromptResearchContractAnswer,
+} from "../services/helix-ask/research-validator";
+import {
   computeHelixAskTermPriorDecision,
   canonicalTermPreservationRatio,
   HELIX_LANG_SCHEMA_VERSION,
@@ -218,6 +245,7 @@ import {
 } from "../services/helix-ask/concepts";
 import {
   buildRepoSearchPlan,
+  extractRepoSearchIdentifiers,
   formatRepoSearchEvidence,
   runGitTrackedRepoSearch,
   runGitTrackedStage0CandidateLane,
@@ -5669,7 +5697,9 @@ const stripDeterministicNoiseArtifacts = (value: string): string => {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const preserveLineStructure = hasEquationStructuredSections(cleaned);
+  const preserveLineStructure =
+    hasEquationStructuredSections(cleaned) ||
+    HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(cleaned);
   if (preserveLineStructure) {
     const compactMechanismBullet = (line: string): string => {
       const trimmedLine = line.trim();
@@ -5795,13 +5825,18 @@ function extractAnswerBlock(value: string): string {
 
 function formatHelixAskAnswer(answer: string): string {
   if (!answer) return answer;
+  const preserveStructuredSectionHeadings =
+    hasEquationStructuredSections(answer) ||
+    HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(answer);
   const lines = answer.split(/\r?\n/);
   const formatted: string[] = [];
   let lastWasBlank = true;
   for (const rawLine of lines) {
     let line = rawLine.trimEnd();
     if (line) {
-      line = line.replace(HELIX_ASK_LABEL_PREFIX_RE, "");
+      if (!preserveStructuredSectionHeadings) {
+        line = line.replace(HELIX_ASK_LABEL_PREFIX_RE, "");
+      }
     }
     if (!line.trim()) {
       if (!lastWasBlank && formatted.length) {
@@ -5835,7 +5870,9 @@ function formatHelixAskAnswer(answer: string): string {
       .trim();
   let packed = formatted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   if (!packed) return packed;
-  packed = packed.replace(HELIX_ASK_LABEL_PREFIX_RE, "").trim();
+  if (!preserveStructuredSectionHeadings) {
+    packed = packed.replace(HELIX_ASK_LABEL_PREFIX_RE, "").trim();
+  }
   const seen = new Set<string>();
   const deduped = packed
     .split(/\n{2,}/)
@@ -5866,6 +5903,9 @@ const trim = (value: string): string => value.replace(/\s+/g, " ").trim();
 
 const HELIX_ASK_NOTE_CLAUSE_RE =
   /(?:^|[.;]\s*)([A-Za-z][A-Za-z0-9\s-]*?)\s*:\s*([^.;]+)(?=(?:[.;]\s*[A-Za-z][A-Za-z0-9\s-]*\s*:|$))/g;
+
+const HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE =
+  /^(?:Definition|Why it matters|Key terms|Repo anchors|How it is solved in codebase|Where in repo|Call chain|What to change safely|Repo-Grounded Findings|Implementation Roadmap|Evidence Gaps|Next Anchors Needed|Definitions|Baseline|Hypothesis|Anti-hypothesis|Falsifiers|Uncertainty band|Claim tier)\s*:/im;
 
 const toTitleCase = (value: string): string =>
   value
@@ -6082,6 +6122,57 @@ function ensureOpenWorldBypassUncertainty(value: string): string {
     return body;
   }
   return `${prefix}\n\n${body}`;
+}
+
+function buildSecurityOpenWorldBestEffortAnswer(): string {
+  return [
+    ensureOpenWorldBypassUncertainty(""),
+    "Practical steps:",
+    "- Treat urgent payment requests, account-reset notices, or investment pitches as untrusted until you verify them through a separate channel you already control.",
+    "- Turn on MFA, transaction alerts, and account freezes where available so fraudulent changes are easier to catch early.",
+    "- Do not click payment or login links from messages; type the official site yourself or call the number printed on the card or statement.",
+    "- If money or identity data may already be exposed, contact the bank immediately, change passwords, and place a fraud alert or credit freeze.",
+  ].join("\n");
+}
+
+function rewriteOpenWorldBestEffortAnswer(value: string, question: string): string {
+  const stripped = stripRepoCitationsForOpenWorldBypass(value);
+  const filtered = stripped
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        !/^(?:Direct Answer|Mechanism Explanation|Inputs\/Outputs|Constraints|Common failure modes|How It Works|Implementation In Repo|Repo anchors|Key terms|Why it matters|Option A\/B|Key differences|When to choose|Risks|Open Gaps|Sources)\s*:/i.test(
+          line,
+        ),
+    )
+    .filter((line) => !/\b(?:docs|server|client|modules|shared|scripts|tests|tools)\/\S+/i.test(line))
+    .filter(
+      (line) =>
+        !/\[[^\]\n]{1,260}\.(?:md|json|ts|tsx|js|jsx|py|go|rs|java|kt|cpp|cc|c|cs)[^\]\n]*\]/i.test(
+          line,
+        ),
+    )
+    .filter((line) => !/\b(?:repo|repository|repo-grounded|implementation anchors)\b/i.test(line));
+  const rewritten = filtered.join(" ").replace(/\s{2,}/g, " ").trim();
+  if (isSecurityRiskPrompt(question)) {
+    if (!rewritten) return buildSecurityOpenWorldBestEffortAnswer();
+    return `${ensureOpenWorldBypassUncertainty("")}\n\n${rewritten}\n\n${buildSecurityOpenWorldBestEffortAnswer()
+      .split(/\r?\n/)
+      .slice(1)
+      .join("\n")}`.trim();
+  }
+  return ensureOpenWorldBypassUncertainty(rewritten);
+}
+
+function shouldForceIdeologyNarrativeDeterministic(question: string): boolean {
+  return (
+    HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(question) &&
+    /\b(?:plain language|conversational|narrative|root-to-leaf|takeaway|default narrative style|do not return technical notes|switch to a plain-language narrative)\b/i.test(
+      question,
+    )
+  );
 }
 
 
@@ -6374,6 +6465,11 @@ type HelixAskAnswerBudget = {
   evidenceMassBand: "thin" | "medium" | "rich";
   evidenceSourceCount: number;
   evidenceIndependentSourceCount: number;
+  retrievalContextBudget: number;
+  sectionOverflowPolicy: "single_pass" | "sectional_compose";
+  sectionCount: number;
+  appendixCount: number;
+  requiredTableCount: number;
 };
 
 const HELIX_ASK_SHORT_SENTENCE_TARGET: Record<HelixAskVerbosity, number> = {
@@ -6416,6 +6512,8 @@ const computeAnswerTokenBudget = ({
   hasGeneralEvidence,
   evidenceMass,
   maxTokensOverride,
+  promptResearchContract,
+  promptResearchGenerationContract,
 }: {
   verbosity: HelixAskVerbosity;
   format: HelixAskFormat;
@@ -6427,8 +6525,11 @@ const computeAnswerTokenBudget = ({
   hasGeneralEvidence?: boolean;
   evidenceMass?: HelixAskEvidenceMassSignals | null;
   maxTokensOverride?: number | null;
+  promptResearchContract?: PromptResearchContract | null;
+  promptResearchGenerationContract?: PromptResearchGenerationContract | null;
 }): HelixAskAnswerBudget => {
   const evidenceMassScore = computeHelixAskEvidenceMassScore(evidenceMass);
+  const promptResearchBudget = promptResearchGenerationContract?.budget ?? null;
   if (typeof maxTokensOverride === "number" && Number.isFinite(maxTokensOverride) && maxTokensOverride > 0) {
     const requested = Math.max(0, maxTokensOverride);
     const requestedCap = clampNumber(requested, 1, HELIX_ASK_ANSWER_MAX_TOKENS);
@@ -6443,6 +6544,11 @@ const computeAnswerTokenBudget = ({
       evidenceMassBand: evidenceMassScore.band,
       evidenceSourceCount: evidenceMassScore.sourceCount,
       evidenceIndependentSourceCount: evidenceMassScore.independentSourceCount,
+      retrievalContextBudget: promptResearchBudget?.retrieval_context_budget ?? 0,
+      sectionOverflowPolicy: promptResearchBudget?.section_overflow_policy ?? "single_pass",
+      sectionCount: promptResearchBudget?.section_count ?? 0,
+      appendixCount: promptResearchBudget?.appendix_count ?? 0,
+      requiredTableCount: promptResearchBudget?.required_table_count ?? 0,
     };
   }
   let base =
@@ -6459,6 +6565,10 @@ const computeAnswerTokenBudget = ({
   if (definitionFocus) {
     base += 250;
     boosts.push("definition");
+  }
+  if (promptResearchContract?.mode === "research_contract" && promptResearchBudget) {
+    base = Math.max(base, promptResearchBudget.answer_max_tokens);
+    boosts.push("prompt_research_contract");
   }
   if (composite) {
     base += 300;
@@ -6517,6 +6627,11 @@ const computeAnswerTokenBudget = ({
     evidenceMassBand: evidenceMassScore.band,
     evidenceSourceCount: evidenceMassScore.sourceCount,
     evidenceIndependentSourceCount: evidenceMassScore.independentSourceCount,
+    retrievalContextBudget: promptResearchBudget?.retrieval_context_budget ?? 0,
+    sectionOverflowPolicy: promptResearchBudget?.section_overflow_policy ?? "single_pass",
+    sectionCount: promptResearchBudget?.section_count ?? 0,
+    appendixCount: promptResearchBudget?.appendix_count ?? 0,
+    requiredTableCount: promptResearchBudget?.required_table_count ?? 0,
   };
 };
 
@@ -6967,9 +7082,20 @@ function parseQueryHints(raw: string, limit: number): string[] {
   return hints;
 }
 
-function mergeHelixAskQueries(base: string[], hints: string[], limit: number): string[] {
+function mergeHelixAskQueries(
+  ...parts: Array<string[] | number | null | undefined>
+): string[] {
   const merged: string[] = [];
   const seen = new Set<string>();
+  const maybeLimit = parts.length > 0 ? parts[parts.length - 1] : undefined;
+  const limit =
+    typeof maybeLimit === "number" && Number.isFinite(maybeLimit)
+      ? maybeLimit
+      : HELIX_ASK_OBJECTIVE_PLANNER_MAX_QUERY_HINTS;
+  const groups =
+    typeof maybeLimit === "number" && Number.isFinite(maybeLimit)
+      ? parts.slice(0, -1)
+      : parts;
   const push = (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -6978,8 +7104,10 @@ function mergeHelixAskQueries(base: string[], hints: string[], limit: number): s
     seen.add(key);
     merged.push(trimmed);
   };
-  base.forEach(push);
-  hints.forEach(push);
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    group.forEach(push);
+  }
   return merged.slice(0, Math.max(1, limit));
 }
 
@@ -14739,6 +14867,7 @@ const buildDeterministicFamilyRepoRuntimeFallback = (args: {
   const turnContract = args.turnContract ?? fallbackTurnContract;
   const family = turnContract.output_family.trim();
   if (
+    family !== "definition_overview" &&
     family !== "implementation_code_path" &&
     family !== "roadmap_planning" &&
     family !== "troubleshooting_diagnosis" &&
@@ -14769,6 +14898,8 @@ const buildDeterministicFamilyRepoRuntimeFallback = (args: {
     retrievalConfidence: args.retrievalConfidence,
     evidenceGap,
     objectiveSupport: args.objectiveSupport,
+    evidenceText: args.existingText,
+    promptResearchRetrievalContract: null,
   });
   const rendered = buildHelixAskUniversalFamilyDegradeAnswer({
     plan,
@@ -14781,8 +14912,30 @@ const buildDeterministicFamilyRepoRuntimeFallback = (args: {
     plan,
     renderedText: rendered,
   });
-  if (!validation.schema_valid) return null;
+  if (!validation.schema_valid) {
+    if (family === "definition_overview") {
+      return rendered;
+    }
+    return null;
+  }
   return rendered;
+};
+
+const selectDeterministicRepoRuntimeFallbackCandidate = (args: {
+  promptFamily?: string | null;
+  familyFallback?: string | null;
+  baseFallback?: string | null;
+}): string | null => {
+  const familyFallback =
+    typeof args.familyFallback === "string" ? args.familyFallback.trim() : "";
+  if (familyFallback) return familyFallback;
+  const family = (args.promptFamily ?? "").trim();
+  if (family === "definition_overview") {
+    return null;
+  }
+  const baseFallback =
+    typeof args.baseFallback === "string" ? args.baseFallback.trim() : "";
+  return baseFallback || null;
 };
 
 const shouldDirectUseDeterministicRepoRuntimeFallback = (args: {
@@ -14834,16 +14987,54 @@ const shouldDirectUseDeterministicRepoRuntimeFallback = (args: {
   return false;
 };
 
+const shouldApplyTermPriorGeneralArbiterLock = (args: {
+  termPriorGeneralRouteLock: boolean;
+  termPriorRepoOverrideApplied: boolean;
+  explicitRepoExpectation: boolean;
+  hasFilePathHints: boolean;
+  endpointHintCount: number;
+  relationHeuristicPrompt: boolean;
+}): boolean => {
+  if (!args.termPriorGeneralRouteLock) return false;
+  if (args.termPriorRepoOverrideApplied) return false;
+  if (args.explicitRepoExpectation) return false;
+  if (args.hasFilePathHints) return false;
+  if (args.endpointHintCount > 0) return false;
+  if (args.relationHeuristicPrompt) return false;
+  return true;
+};
+
+const shouldApplyTermPriorPhysicsRelationGeneralRoute = (args: {
+  termPriorApplied: boolean;
+  termPriorPreferGeneralRouting: boolean;
+  termPriorRelationCue: boolean;
+  explicitRepoExpectation: boolean;
+  hasFilePathHints: boolean;
+  endpointHintCount: number;
+  relationHeuristicPrompt: boolean;
+}): boolean => {
+  if (!args.termPriorApplied) return false;
+  if (!args.termPriorPreferGeneralRouting) return false;
+  if (!args.termPriorRelationCue) return false;
+  if (args.explicitRepoExpectation) return false;
+  if (args.hasFilePathHints) return false;
+  if (args.endpointHintCount > 0) return false;
+  if (args.relationHeuristicPrompt) return false;
+  return true;
+};
+
 const shouldDirectUseDeterministicRelationPacketAnswer = (args: {
   relationQuestionFastPath: boolean;
   relationPacketPresent: boolean;
   relationDualDomainOk: boolean;
   forceLlmProbe: boolean;
+  controllerPrimaryPreferred: boolean;
 }): boolean => {
   if (!args.relationQuestionFastPath) return false;
   if (!args.relationPacketPresent) return false;
   if (!args.relationDualDomainOk) return false;
   if (args.forceLlmProbe) return false;
+  if (args.controllerPrimaryPreferred) return false;
   return true;
 };
 
@@ -14851,12 +15042,144 @@ const shouldPreserveHelixAskDeterministicAnswerAcrossComposer = (args: {
   llmInvoked: boolean;
   answerPath: string[];
 }): boolean => {
+  const frontierDeterministicAnswer = args.answerPath.some(
+    (entry) =>
+      entry === "qualityFloor:frontier_contract" || entry === "frontier:final_contract_enforced",
+  );
+  if (frontierDeterministicAnswer) return true;
   if (args.llmInvoked) return false;
   return args.answerPath.some((entry) =>
     entry === "answer:repo_runtime_deterministic_direct" ||
     entry === "answerContract:deterministic_pre_llm" ||
-    entry === "answerContract:relation_packet_pre_llm",
+    entry === "answerContract:relation_packet_pre_llm" ||
+    entry === "qualityFloor:frontier_contract" ||
+    entry === "frontier:final_contract_enforced",
   );
+};
+
+const shouldBlockHelixAskDeterministicPreserveAcrossComposer = (args: {
+  preserveDeterministicCandidate: boolean;
+  preserveForcedAnswer: boolean;
+  answerPath: string[];
+}): boolean => {
+  if (!args.preserveDeterministicCandidate || args.preserveForcedAnswer) return false;
+  const hardContractDeterministicAnswer = args.answerPath.some((entry) =>
+    entry === "qualityFloor:frontier_contract" ||
+    entry === "frontier:final_contract_enforced" ||
+    entry === "frontier:hard_guard_clarify" ||
+    entry === "relationFallback:deterministic_guard",
+  );
+  return !hardContractDeterministicAnswer;
+};
+
+const shouldEscalateHelixAskComposerSoftGuardObserve = (args: {
+  softSectionGuardFailureObserved: boolean;
+  familyFormatAccuracy: number;
+  minAccuracy: number;
+  failReasons: string[];
+  gateMode: "observe" | "enforce";
+}): boolean => {
+  if (!args.softSectionGuardFailureObserved) return false;
+  if (args.gateMode === "enforce") return false;
+  const normalizedFailReasons = new Set(
+    (args.failReasons ?? []).map((reason) => String(reason ?? "").trim().toLowerCase()),
+  );
+  if (normalizedFailReasons.has("debug_leak") || normalizedFailReasons.has("anchor_integrity_violation")) {
+    return true;
+  }
+  const familyFormatAccuracy = Number(args.familyFormatAccuracy);
+  const minAccuracy = Number.isFinite(args.minAccuracy) ? clampNumber(args.minAccuracy, 0, 1) : 1;
+  if (!Number.isFinite(familyFormatAccuracy)) return true;
+  return familyFormatAccuracy <= minAccuracy;
+};
+
+const shouldPinHelixAskDeterministicAnswerPreFinalize = (args: {
+  deterministicRepoRuntimeFallbackUsed: boolean;
+  answerPath: string[];
+}): boolean => {
+  if (args.deterministicRepoRuntimeFallbackUsed) return true;
+  return args.answerPath.some((entry) =>
+    entry === "answer:repo_runtime_deterministic_direct" ||
+    entry === "answerContract:deterministic_pre_llm" ||
+    entry === "answerContract:relation_packet_pre_llm" ||
+    entry === "qualityFloor:frontier_contract" ||
+    entry === "frontier:final_contract_enforced",
+  );
+};
+
+const shouldRestoreHelixAskDeterministicPlatonicAnswer = (args: {
+  preserveDeterministicPlatonicAnswer: boolean;
+  ungatedReasoningAnswer: string;
+  platonicAnswer: string;
+}): boolean =>
+  args.preserveDeterministicPlatonicAnswer &&
+  args.ungatedReasoningAnswer.trim() !== args.platonicAnswer.trim();
+
+const sanitizePinnedHelixAskDeterministicAnswer = (value: string): string => {
+  if (!value) return value;
+  let cleaned = stripCitationRepairArtifacts(stripInlineJsonArtifacts(value)).trim();
+  cleaned = cleanDanglingFileExtensionFragments(cleaned);
+  cleaned = dedupeAdjacentCitationBrackets(cleaned);
+  cleaned = cleaned.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned;
+};
+
+const finalizePinnedHelixAskDeterministicAnswer = (args: {
+  answer: string;
+  allowedSourcePaths: string[];
+  citationTokens: string[];
+}): string => {
+  let cleaned = sanitizePinnedHelixAskDeterministicAnswer(args.answer);
+  cleaned = sanitizeSourcesLine(cleaned, args.allowedSourcePaths, args.citationTokens);
+  cleaned = sanitizePinnedHelixAskDeterministicAnswer(cleaned);
+  return cleaned;
+};
+
+const stripHelixAskInstructionPlaceholderArtifacts = (value: string): string => {
+  if (!value) return value;
+  let cleaned = value;
+  cleaned = cleaned.replace(
+    /\bfor\s+State what remains uncertain or under-evidenced in this turn\.?/gi,
+    "for this turn",
+  );
+  cleaned = cleaned.replace(
+    /State what remains uncertain or under-evidenced in this turn\.?/gi,
+    "this turn",
+  );
+  cleaned = cleaned
+    .replace(/;\s*;\s*/g, "; ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
+  return cleaned.trim();
+};
+
+const stripHelixAskObjectiveCheckpointArtifacts = (value: string): string => {
+  if (!value) return value;
+  let cleaned = value;
+  cleaned = cleaned.replace(
+    /Objective checkpoints:\s*[\s\S]*?(?=(?:\nSources:\s|\bSources:\s|$))/gi,
+    "",
+  );
+  cleaned = cleaned.replace(
+    /(?:^|\n)\s*(status|missing|evidence|summary)\s*=[^\n]*(?=\n|$)/gi,
+    "",
+  );
+  cleaned = cleaned
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .trim();
+  return cleaned;
+};
+
+const shouldSkipCitationRelinkingForStructuredDeterministicAnswer = (args: {
+  deterministicAnswerPinnedPreFinalize: boolean;
+  answerPath: string[];
+  text: string;
+}): boolean => {
+  if (!args.deterministicAnswerPinnedPreFinalize) return false;
+  if (args.answerPath.includes("platonic:deterministic_restore_final")) return true;
+  return HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(args.text);
 };
 
 const scrubSkippedLlmTransportErrors = (
@@ -17855,11 +18178,21 @@ const detectRelationDeterministicFallbackReasons = (value: string): string[] => 
   if (!hasWarpSignal || !hasEthosSignal) {
     reasons.add("missing_dual_domain_terms");
   }
+  if (hasArtifactJsonSpill(value)) {
+    reasons.add("artifact_json_spill");
+  }
   if (isDeterministicMetadataNoise(normalized)) {
     reasons.add("metadata_noise");
   }
   if (RELATION_CODE_NOISE_RE.test(normalized)) {
     reasons.add("code_noise");
+  }
+  if (
+    /\b(current evidence is incomplete|primary implementation anchors? for .* remain partial in this turn|missing slots:)\b/i.test(
+      normalized,
+    )
+  ) {
+    reasons.add("template_gap_scaffold");
   }
   return Array.from(reasons);
 };
@@ -18116,15 +18449,156 @@ const evaluateRelationContractHardFail = (args: {
   return reasons;
 };
 
-const buildRelationModeContractFromPacket = (packet: RelationAssemblyPacket): HelixAskAnswerContract => ({
-  summary: `what_is_warp_bubble: ${packet.definitions.warp_definition}`,
-  claims: [
-    { text: `what_is_mission_ethos: ${packet.definitions.ethos_definition}`, evidence: Object.values(packet.source_map).slice(0, 2) },
-    { text: `how_they_connect: ${packet.bridge_claims.slice(0, 3).join(" ")}`, evidence: Object.values(packet.source_map).slice(0, 4) },
-    { text: `constraints_and_falsifiability: ${packet.constraints.join(" ")} ${packet.falsifiability_hooks[0] ?? ""}`, evidence: Object.values(packet.source_map).slice(0, 6) },
-  ],
-  sources: Object.values(packet.source_map).slice(0, 8),
-});
+type RelationCompletenessSlot = "entity_a" | "entity_b" | "mechanism";
+
+type RelationSemanticCompleteness = {
+  pass: boolean;
+  missing: RelationCompletenessSlot[];
+  hasEntityA: boolean;
+  hasEntityB: boolean;
+  hasMechanism: boolean;
+};
+
+const RELATION_ENTITY_A_RE = /\b(?:warp|warp-bubble|bubble|spacetime|metric)\b/i;
+const RELATION_ENTITY_B_RE = /\b(?:mission\s+ethos|ethos|stewardship|ideology|policy)\b/i;
+const RELATION_MECHANISM_RE =
+  /\b(?:constrain(?:s|ed|ing)?|bind(?:s|ing)?|link(?:s|ed|ing)?|connect(?:s|ed|ion)?|bridge|govern(?:s|ed|ance)?|gate(?:s|d)?|verif(?:y|ies|ied|ication)|checkpoint|audit(?:able)?|evidence|falsifi(?:able|ability)|constraint)\b/i;
+
+const evaluateRelationSemanticCompleteness = (answer: string): RelationSemanticCompleteness => {
+  const normalized = normalizeContractText(String(answer ?? ""), 6000);
+  const hasEntityA = RELATION_ENTITY_A_RE.test(normalized);
+  const hasEntityB = RELATION_ENTITY_B_RE.test(normalized);
+  const hasMechanism = RELATION_MECHANISM_RE.test(normalized) && (hasEntityA || hasEntityB);
+  const missing: RelationCompletenessSlot[] = [];
+  if (!hasEntityA) missing.push("entity_a");
+  if (!hasEntityB) missing.push("entity_b");
+  if (!hasMechanism) missing.push("mechanism");
+  return {
+    pass: missing.length === 0,
+    missing,
+    hasEntityA,
+    hasEntityB,
+    hasMechanism,
+  };
+};
+
+const repairRelationSemanticCompleteness = (args: {
+  answer: string;
+  relationPacket: RelationAssemblyPacket | null;
+  missing: RelationCompletenessSlot[];
+}): {
+  text: string;
+  applied: boolean;
+  missingBefore: RelationCompletenessSlot[];
+} => {
+  const missing = args.missing.slice();
+  if (!args.answer.trim() || missing.length === 0) {
+    return { text: args.answer, applied: false, missingBefore: missing };
+  }
+  const fallbackWarp =
+    "Warp context: a warp bubble is a bounded spacetime configuration under this repository's warp model.";
+  const fallbackEthos =
+    "Ethos context: mission ethos constrains capability claims to verified, non-harmful operation.";
+  const fallbackMechanism =
+    "Mechanism: ethos constraints gate warp viability claims through auditable evidence checkpoints and falsifiability hooks.";
+  const warpLine = ensureRelationContractSentence(
+    args.relationPacket?.definitions.warp_definition ?? "",
+    fallbackWarp,
+  );
+  const ethosLine = ensureRelationContractSentence(
+    args.relationPacket?.definitions.ethos_definition ?? "",
+    fallbackEthos,
+  );
+  const mechanismSeed =
+    args.relationPacket?.bridge_claims?.[0] ??
+    args.relationPacket?.constraints?.physics_bound ??
+    args.relationPacket?.falsifiability_hooks?.[0] ??
+    "";
+  const mechanismLine = ensureRelationContractSentence(mechanismSeed, fallbackMechanism);
+  const repairSentences: string[] = [];
+  if (missing.includes("entity_a")) repairSentences.push(warpLine);
+  if (missing.includes("entity_b")) repairSentences.push(ethosLine);
+  if (missing.includes("mechanism")) repairSentences.push(mechanismLine);
+  if (repairSentences.length === 0) {
+    return { text: args.answer, applied: false, missingBefore: missing };
+  }
+  const repairBlock = repairSentences.join("\n");
+  const lines = args.answer.split(/\r?\n/);
+  const sourceIndex = lines.findIndex((line) => /^\s*Sources?\s*:/i.test(line));
+  let nextText = args.answer.trim();
+  if (sourceIndex >= 0) {
+    const before = lines.slice(0, sourceIndex).join("\n").trimEnd();
+    const after = lines.slice(sourceIndex).join("\n").trimStart();
+    nextText = `${before}\n\n${repairBlock}\n\n${after}`.trim();
+  } else {
+    nextText = `${nextText}\n\n${repairBlock}`.trim();
+  }
+  return {
+    text: nextText,
+    applied: true,
+    missingBefore: missing,
+  };
+};
+
+const RELATION_PATH_ONLY_RE =
+  /^(?:[A-Za-z]:)?[A-Za-z0-9_./\\-]+\.(?:md|json|ts|tsx|js|jsx|py)(?:#[A-Za-z0-9:_-]+)?\.?$/i;
+
+const isLowSignalRelationArtifactText = (value: string): boolean => {
+  if (!value) return true;
+  if (RELATION_CODE_NOISE_RE.test(value)) return true;
+  if (/\bexport\s+default\s+function\b/i.test(value)) return true;
+  if (/\bconst\s+[A-Za-z_]\w*\s*=/.test(value) && /[;{}()]/.test(value)) return true;
+  if (RELATION_PATH_ONLY_RE.test(value)) return true;
+  const pathHits = extractFilePathsFromText(value);
+  if (
+    pathHits.length > 0 &&
+    !/\b(is|are|means|requires|constrains|connects|relates|because|must|binds|enables|links)\b/i.test(
+      value,
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const ensureRelationContractSentence = (value: string, fallback: string): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return fallback;
+  if (isLowSignalRelationArtifactText(normalized)) return fallback;
+  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+};
+
+const buildRelationModeContractFromPacket = (packet: RelationAssemblyPacket): HelixAskAnswerContract => {
+  const relationSources = Object.values(packet.source_map).slice(0, 8);
+  const warpDefinition = ensureRelationContractSentence(
+    packet.definitions.warp_definition,
+    "A warp bubble is a bounded spacetime configuration under this repository's warp model.",
+  );
+  const ethosDefinition = ensureRelationContractSentence(
+    packet.definitions.ethos_definition,
+    "Mission ethos constrains capability claims to verified, non-harmful operation.",
+  );
+  const bridgeMechanism = ensureRelationContractSentence(
+    packet.bridge_claims.slice(0, 3).join(" "),
+    "Warp development is constrained by mission-ethos checkpoints tied to reproducible evidence.",
+  );
+  const constraintAndHook = ensureRelationContractSentence(
+    [packet.constraints.join(" "), packet.falsifiability_hooks[0] ?? ""]
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .join(" "),
+    "Constraint and falsifiability hooks must pass before viability claims are accepted.",
+  );
+  return {
+    summary: warpDefinition,
+    claims: [
+      { text: ethosDefinition, evidence: relationSources.slice(0, 2) },
+      { text: bridgeMechanism, evidence: relationSources.slice(0, 4) },
+      { text: constraintAndHook, evidence: relationSources.slice(0, 6) },
+    ],
+    sources: relationSources,
+  };
+};
 const buildHelixAskAnswerContractPrompt = (
   question: string,
   evidence: string,
@@ -18817,6 +19291,7 @@ const renderHelixAskAnswerContract = (
       sectionsByType.details.push(practiceLine);
     }
   } else if (format === "compare") {
+    const relationNaturalCompare = noveltyContext?.family === "relation";
     const explicitCompareLines = (contract.comparisons ?? [])
       .map((entry) => {
         const detail = ensureSentence(normalizeContractText(entry.detail, 220));
@@ -18829,6 +19304,7 @@ const renderHelixAskAnswerContract = (
           return "";
         }
         if (isNoisyRenderedContractSentence(detail)) return "";
+        if (relationNaturalCompare) return `- ${ensureSentence(detail)}`;
         return `- ${ensureSentence(`${label}: ${detail}`)}`;
       })
       .filter(Boolean);
@@ -18839,6 +19315,7 @@ const renderHelixAskAnswerContract = (
       explicitCompareLines.length > 0
         ? explicitCompareLines
         : semanticClaims.slice(0, 3).map((claim, index) => {
+            if (relationNaturalCompare) return `- ${ensureSentence(claim)}`;
             if (index === 0) return `- ${ensureSentence(`${compareLabels.what}: ${claim}`)}`;
             if (index === 1) return `- ${ensureSentence(`${compareLabels.why}: ${claim}`)}`;
             return `- ${ensureSentence(`${compareLabels.constraint}: ${claim}`)}`;
@@ -19088,6 +19565,16 @@ const rewriteUnsupportedScaffoldToBoundedUncertainty = (
 ): string => {
   const scaffoldRe = /\bAnswer grounded in retrieved evidence\.?/gi;
   if (!scaffoldRe.test(text)) return text;
+  if (
+    /(?:^|\n)\s*(?:Direct Answer|Definition|Mechanism Explanation|Symptoms|Where in repo|Call chain|Key structs\/types|What to change safely|Open Gaps|Sources)\s*:/im.test(
+      text,
+    )
+  ) {
+    return text
+      .replace(scaffoldRe, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
   const localizedLines = resolveBoundedUncertaintyFallbackLines(responseLanguage);
   const rewritten = text.replace(
     scaffoldRe,
@@ -20222,6 +20709,32 @@ const shouldSuppressHelixAskAnswerRescueForRateLimit = (debugPayload: {
   return /insufficient_quota|exceeded your current quota/.test(providerText);
 };
 
+const shouldForceRepoGroundedForRepoApiLookup = (args: {
+  intentId?: string | null;
+  arbiterMode: "repo_grounded" | "hybrid" | "general" | "clarify";
+  explicitRepoExpectation: boolean;
+  retrievalConfidence: number;
+  repoThreshold: number;
+  hasRepoHints: boolean;
+  evidenceGateOk: boolean;
+  mustIncludeOk: boolean;
+  topicMustIncludeOk?: boolean;
+  alignmentGateDecision?: "PASS" | "FAIL" | null;
+  openWorldBypassMode?: "active" | "inactive";
+  failClosedReason?: string | null;
+}): boolean => {
+  if (args.intentId !== "repo.repo_api_lookup") return false;
+  if (args.arbiterMode !== "clarify") return false;
+  if (!args.explicitRepoExpectation) return false;
+  if (args.topicMustIncludeOk === false) return false;
+  const failClosedReason = String(args.failClosedReason ?? "").trim();
+  if (failClosedReason === "stage05_summary_hard_fail") {
+    return false;
+  }
+  const confidence = Number.isFinite(args.retrievalConfidence) ? args.retrievalConfidence : 0;
+  return confidence >= 0.6;
+};
+
 const shouldForceHelixAskShortDefinitionConceptAnswer = (args: {
   intentDomain?: HelixAskDomain;
   conceptAvailable?: boolean;
@@ -20262,6 +20775,26 @@ const shouldUseScientificPreIntentClarify = (args: {
   return false;
 };
 
+const hasHelixAskRepoTechnicalCue = (question: string): boolean => {
+  const trimmed = question.trim();
+  if (!trimmed) return false;
+  const hasCodeLikeIdentifier =
+    /\b[a-z][a-z0-9]*(?:_[a-z0-9]+){1,}\b/.test(trimmed) ||
+    /\b[a-z][a-z0-9_]*[A-Z][A-Za-z0-9_]*\b/.test(trimmed) ||
+    /`[A-Za-z_][A-Za-z0-9_]*`/.test(trimmed) ||
+    /\b[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/.test(trimmed) ||
+    /\/api\/[a-z0-9/_-]+/i.test(trimmed);
+  if (hasCodeLikeIdentifier) return true;
+  const internalMechanicsPrompt =
+    /\b(?:how does|where (?:is|are)|walk through|show|describe|explain|what determines|what checks|what does)\b/i.test(
+      trimmed,
+    ) &&
+    /\b(?:debug payload|debug live events|diagnostics?|relation packet|answer contract|citation repair|training-trace|intent directory|topic tags|quality mode|fallback reasons?|source paths?|adapter\/run|sanitizeSourcesLine|report_mode_reason|answer_path|arbiter_mode)\b/i.test(
+      trimmed,
+    );
+  return internalMechanicsPrompt;
+};
+
 const shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt = (args: {
   question: string;
   explicitRepoExpectation?: boolean;
@@ -20282,9 +20815,245 @@ const shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt = (args: {
   ) {
     return false;
   }
+  const writingAdvicePrompt =
+    /\b(short answer|brief answer|short response|one sentence|opening paragraph|takeaway|summary|wording|phrasing|structure)\b/i.test(
+      trimmed,
+    ) &&
+    /\b(clean way|best way|good way|how should i|how do i|what(?:'s| is) (?:a )?(?:clean|good|best) way)\b/i.test(
+      trimmed,
+    );
+  if (writingAdvicePrompt) return true;
   if (hasConversationQuestionCue(trimmed)) return false;
   if (trimmed.length > 120) return false;
   return /^(?:say|write|reply|respond|give|tell|draft|compose)\b/i.test(trimmed);
+};
+
+const HELIX_ASK_DEFINITION_TARGET_GENERIC_RE =
+  /^(?:this|that|it|they|them|thing|things|stuff|term|concept|idea|one|ones|those|these)$/i;
+
+const hasHelixAskConcreteDefinitionTarget = (question: string): boolean => {
+  const trimmed = question.trim();
+  if (!trimmed) return false;
+  const normalized = trimmed.replace(HELIX_CONVERSATION_LEADING_FILLER_RE, "").trim();
+  const matched = normalized.match(
+    /^(?:what\s+is|what's|whats|define|describe|explain|meaning\s+of)\s+(.+?)[.?!]*$/i,
+  );
+  if (!matched) return false;
+  let target = (matched[1] ?? "").trim();
+  target = target.replace(/^["'`([{<\s]+|["'`)\]}>]+$/g, "").trim();
+  target = target.replace(/^(?:the|a|an)\s+/i, "").trim();
+  target = target.replace(/\b(?:in|for)\s+(?:simple|plain)\s+terms$/i, "").trim();
+  if (!target) return false;
+  const targetTokens = filterCriticTokens(tokenizeAskQuery(target));
+  if (targetTokens.length === 0) return false;
+  if (targetTokens.every((token) => HELIX_ASK_DEFINITION_TARGET_GENERIC_RE.test(token))) {
+    return false;
+  }
+  return true;
+};
+
+const shouldBypassHelixAskPreIntentClarifyForDefinitionTarget = (args: {
+  question: string;
+  explicitRepoExpectation?: boolean;
+  hasFilePathHints?: boolean;
+  endpointHintCount?: number;
+  requiresRepoEvidence?: boolean;
+}): boolean => {
+  const trimmed = args.question.trim();
+  if (!trimmed) return false;
+  if (args.explicitRepoExpectation) {
+    return false;
+  }
+  return hasHelixAskConcreteDefinitionTarget(trimmed);
+};
+
+const shouldBypassHelixAskPreIntentClarifyForCompareTarget = (question: string): boolean => {
+  const trimmed = question.trim();
+  if (!trimmed) return false;
+  if (!/\b(?:compare|comparison|different|difference|versus|vs\.?|contrast|between)\b/i.test(trimmed)) {
+    return false;
+  }
+  const normalized = trimmed.replace(HELIX_CONVERSATION_LEADING_FILLER_RE, "").trim();
+  const compareBody = normalized
+    .replace(/^(?:please\s+)?(?:compare|contrast)\b/i, "")
+    .replace(/\bdifference\s+between\b/i, "between")
+    .trim();
+  const segments = compareBody
+    .split(/\b(?:and|vs\.?|versus)\b/i)
+    .map((part) => part.replace(/^between\b/i, "").replace(/[?.!,;:]+$/g, "").trim())
+    .filter(Boolean);
+  const informativeSegments = segments.filter((segment) => {
+    const tokens = filterCriticTokens(tokenizeAskQuery(segment));
+    if (tokens.length === 0) return false;
+    if (tokens.every((token) => HELIX_ASK_DEFINITION_TARGET_GENERIC_RE.test(token))) return false;
+    return true;
+  });
+  return informativeSegments.length >= 2;
+};
+
+const shouldPreferHelixAskPlannerLlmInFastMode = (args: {
+  fastQualityMode: boolean;
+  question: string;
+  intentDomain: HelixAskDomain;
+  requiresRepoEvidence: boolean;
+  explicitRepoExpectation: boolean;
+  hasFilePathHints: boolean;
+  endpointHintCount: number;
+}): boolean => {
+  if (!args.fastQualityMode) return true;
+  const repoSignal =
+    args.requiresRepoEvidence ||
+    args.explicitRepoExpectation ||
+    args.hasFilePathHints ||
+    args.endpointHintCount > 0 ||
+    args.intentDomain === "repo" ||
+    args.intentDomain === "hybrid" ||
+    args.intentDomain === "falsifiable" ||
+    hasHelixAskRepoTechnicalCue(args.question);
+  if (!repoSignal) return false;
+  const trimmed = args.question.trim();
+  if (
+    trimmed.length < 18 &&
+    !args.explicitRepoExpectation &&
+    !args.hasFilePathHints &&
+    args.endpointHintCount <= 0
+  ) {
+    return false;
+  }
+  return true;
+};
+
+const shouldUseHelixAskRiskTriggeredTwoPass = (args: {
+  enabled: boolean;
+  allowByPolicy: boolean;
+  question: string;
+  promptIngested: boolean;
+  hasRepoHints: boolean;
+  isRepoQuestion: boolean;
+  requiresRepoEvidence: boolean;
+  format: HelixAskFormat;
+  retrievalConfidence: number;
+  hybridThreshold: number;
+  slotMissingCount: number;
+  docMissingCount: number;
+}): {
+  use: boolean;
+  reason:
+    | "disabled"
+    | "policy"
+    | "prompt_ingested"
+    | "heuristic_trigger"
+    | "risk_trigger"
+    | "none";
+} => {
+  if (!args.enabled) {
+    return { use: false, reason: "disabled" };
+  }
+  if (!args.allowByPolicy) {
+    return { use: false, reason: "policy" };
+  }
+  if (args.promptIngested) {
+    return { use: false, reason: "prompt_ingested" };
+  }
+  const trimmed = args.question.trim();
+  if (!trimmed) {
+    return { use: false, reason: "none" };
+  }
+  if (HELIX_ASK_TWO_PASS_TRIGGER.test(trimmed)) {
+    return { use: true, reason: "heuristic_trigger" };
+  }
+  const repoSignal = args.hasRepoHints || args.isRepoQuestion || args.requiresRepoEvidence;
+  const coverageGap = args.slotMissingCount > 0 || args.docMissingCount > 0;
+  const lowConfidence =
+    Number.isFinite(args.retrievalConfidence) &&
+    args.retrievalConfidence < Math.max(0.25, args.hybridThreshold - 0.1);
+  const formatPressure = args.format === "steps";
+  if (repoSignal && (coverageGap || lowConfidence || formatPressure)) {
+    return { use: true, reason: "risk_trigger" };
+  }
+  return { use: false, reason: "none" };
+};
+
+const shouldOverrideHelixAskRetrievalRetryPolicy = (args: {
+  fastQualityMode: boolean;
+  isRepoQuestion: boolean;
+  hasRepoHints: boolean;
+  missingSlotsForRetry: boolean;
+  retrievalConfidence: number;
+  hybridThreshold: number;
+}): boolean => {
+  if (!args.fastQualityMode) return false;
+  if (!args.isRepoQuestion) return false;
+  if (!args.hasRepoHints) return false;
+  return (
+    args.missingSlotsForRetry ||
+    (Number.isFinite(args.retrievalConfidence) &&
+      args.retrievalConfidence < Math.max(0.2, args.hybridThreshold - 0.2))
+  );
+};
+
+const renderHelixAskSimpleWritingAdviceAnswer = (question: string): string | null => {
+  const trimmed = question.trim();
+  if (!trimmed) return null;
+  const writingAdvicePrompt =
+    /\b(short answer|brief answer|short response|one sentence|opening paragraph|takeaway|summary|wording|phrasing|structure)\b/i.test(
+      trimmed,
+    ) &&
+    /\b(clean way|best way|good way|how should i|how do i|what(?:'s| is) (?:a )?(?:clean|good|best) way)\b/i.test(
+      trimmed,
+    );
+  if (!writingAdvicePrompt) return null;
+  return (
+    "Lead with the direct answer, follow with one sentence that gives the key reason or evidence, " +
+    "and end with a caveat or next step only if it changes the outcome. That keeps the response short, " +
+    "readable, and easy to expand when the reader needs more context.\n\n" +
+    "Sources: docs/helix-ask-flow.md, docs/helix-ask-agent-policy.md"
+  );
+};
+
+const shouldUseGeneralAmbiguityAnswerFloor = (args: {
+  intentDomain: HelixAskDomain;
+  requiresRepoEvidence: boolean;
+  explicitRepoExpectation: boolean;
+  hasFilePathHints: boolean;
+  endpointHintCount: number;
+}): boolean =>
+  args.intentDomain === "general" &&
+  !args.requiresRepoEvidence &&
+  !args.explicitRepoExpectation &&
+  !args.hasFilePathHints &&
+  args.endpointHintCount <= 0;
+
+const buildGeneralAmbiguityAnswerFloor = (args: {
+  question: string;
+  clarifyLine: string;
+}): string => {
+  const writingAdvice = renderHelixAskSimpleWritingAdviceAnswer(args.question);
+  if (writingAdvice) {
+    const answer = `${writingAdvice}\n\nClarify: ${args.clarifyLine}`.trim();
+    if (answer.length >= HELIX_ASK_QUALITY_MIN_TEXT_CHARS) {
+      return answer;
+    }
+    return (
+      `${answer}\n` +
+      "Use concrete nouns, measurable evidence, and one explicit uncertainty so reviewers can audit every claim."
+    ).trim();
+  }
+  const compactQuestion = args.question.trim();
+  const questionPrefix = compactQuestion ? `For "${compactQuestion}", ` : "";
+  const scaffold = (
+    `${questionPrefix}start with one concrete claim, one strongest supporting piece of evidence, ` +
+    "and one uncertainty line so the reader can separate fact from assumption. " +
+    "Then add one implication sentence that states what decision the evidence supports now and what new data would change it.\n\n" +
+    `Clarify: ${args.clarifyLine}`
+  ).trim();
+  if (scaffold.length >= HELIX_ASK_QUALITY_MIN_TEXT_CHARS) {
+    return scaffold;
+  }
+  return (
+    `${scaffold}\n` +
+    "Prefer direct language over abstractions so the reader can verify what is known, what is inferred, and what is still missing."
+  ).trim();
 };
 
 const renderHelixAskSimpleCompositionalAnswer = (question: string): string | null => {
@@ -20317,6 +21086,7 @@ const isHelixAskHardForcedShortCircuitRule = (rule: string | null | undefined): 
   rule === "forcedAnswer:constraint_report" ||
   rule === "forcedAnswer:helix_pipeline" ||
   rule === "forcedAnswer:stage05_summary_hard_fail" ||
+  rule === "forcedAnswer:research_contract_fail_closed" ||
   rule === "forcedAnswer:concept" ||
   rule === "forcedAnswer:concept_short_definition";
 
@@ -20326,11 +21096,48 @@ const isHelixAskConceptForcedShortCircuitRule = (rule: string | null | undefined
 const isHelixAskClarifyForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
   rule === "forcedAnswer:pre_intent_clarify";
 
+const isHelixAskResearchContractFailClosedForcedShortCircuitRule = (
+  rule: string | null | undefined,
+): boolean => rule === "forcedAnswer:research_contract_fail_closed";
+
 const isHelixAskSimpleForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
   rule === "forcedAnswer:simple_composition";
 
 const isHelixAskPipelineForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
   rule === "forcedAnswer:helix_pipeline";
+
+const shouldFastPathFinalizeHelixAskForcedAnswer = (args: {
+  shouldShortCircuitAnswer: boolean;
+  fallbackAnswer: string;
+  forcedAnswerIsHard: boolean;
+  forcedRule?: string | null;
+  conceptFastPath: boolean;
+  isIdeologyReferenceIntent: boolean;
+  verbosity: HelixAskVerbosity;
+}): boolean => {
+  if (!args.shouldShortCircuitAnswer) return false;
+  if (!args.forcedAnswerIsHard) return false;
+  const forcedRule = args.forcedRule ?? null;
+  if (isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule)) {
+    return true;
+  }
+  const normalizedFallback = String(args.fallbackAnswer ?? "").trim();
+  if (!normalizedFallback) return false;
+  if (hasSourcesLine(normalizedFallback)) {
+    return true;
+  }
+  if (HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(normalizedFallback)) {
+    return true;
+  }
+  if (
+    args.isIdeologyReferenceIntent &&
+    args.conceptFastPath &&
+    String(args.verbosity ?? "").trim().length > 0
+  ) {
+    return true;
+  }
+  return false;
+};
 
 const shouldPreserveHelixAskForcedAnswerAcrossComposer = (args: {
   forcedAnswerPinned: boolean;
@@ -20339,6 +21146,7 @@ const shouldPreserveHelixAskForcedAnswerAcrossComposer = (args: {
   args.forcedAnswerPinned &&
   (isHelixAskConceptForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
+    isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskPipelineForcedShortCircuitRule(args.forcedRule ?? null));
 
@@ -20348,6 +21156,7 @@ const shouldPreserveHelixAskForcedAnswerAcrossFinalizer = (args: {
 }): boolean =>
   args.forcedAnswerPinned &&
   (isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
+    isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskPipelineForcedShortCircuitRule(args.forcedRule ?? null));
 
@@ -21898,6 +22707,7 @@ const REPORT_MODE_REFERENCE_RE = /\b(report|technical notes?|compare\/report|rep
 const REPORT_MODE_CONDITIONAL_GUARD_RE = /\bif you are about to output\b/i;
 
 const IDEOLOGY_TECHNICAL_NOTES_RE = /\n{2,}Technical notes:\s*[\s\S]*$/i;
+const IDEOLOGY_COMPARE_REPORT_LITERAL_RE = /\bcompare\/report\b/gi;
 const IDEOLOGY_TECHNICAL_ALLOW_RE =
   /\b(include|add|with|show|provide|give|append)\b(?:\s+[^\s]+){0,2}\s+(technical\s+notes?|technical\s+breakdown|report\s+mode|diagnostic\s+report|debug\s+trace)\b/i;
 const IDEOLOGY_TECHNICAL_BLOCK_RE =
@@ -21912,15 +22722,37 @@ const shouldAllowIdeologyTechnicalNotes = (question: string): boolean => {
   return explicitAllow;
 };
 
+const stripIdeologyNarrativeLeakage = (value: string): string =>
+  value
+    .replace(IDEOLOGY_COMPARE_REPORT_LITERAL_RE, "comparison report")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+const hasWarpEthosDomainPair = (question: string): boolean => {
+  const normalized = question.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  const hasWarp = HELIX_ASK_RELATION_WARP_QUERY_RE.test(normalized);
+  const hasEthos = HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(normalized);
+  return hasWarp && hasEthos;
+};
+
+const hasWarpEthosRelationConnectorCue = (question: string): boolean => {
+  const normalized = question.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  return HELIX_ASK_RELATION_QUERY_RE.test(normalized) || HELIX_ASK_RELATION_CONNECTOR_RE.test(normalized);
+};
+
+const isWarpEthosRelationHeuristicQuestion = (question: string): boolean => {
+  if (!question?.trim()) return false;
+  return hasWarpEthosDomainPair(question) && hasWarpEthosRelationConnectorCue(question);
+};
+
 const isWarpEthosRelationQuestion = (question: string): boolean => {
   if (!question?.trim()) return false;
   const normalized = question.replace(/\s+/g, " ").trim();
-  const hasWarp = HELIX_ASK_RELATION_WARP_QUERY_RE.test(normalized);
-  const hasEthos = HELIX_ASK_RELATION_ETHOS_QUERY_RE.test(normalized);
-  if (!hasWarp || !hasEthos) return false;
+  if (!hasWarpEthosDomainPair(normalized)) return false;
   const hasConnector =
-    HELIX_ASK_RELATION_QUERY_RE.test(normalized) ||
-    HELIX_ASK_RELATION_CONNECTOR_RE.test(normalized) ||
+    hasWarpEthosRelationConnectorCue(normalized) ||
     /\bdefine\b[\s\S]{0,120}\b(?:then|and)\b[\s\S]{0,80}\bconnect\b/i.test(normalized) ||
     /\bwhat(?:'s| is)\b[\s\S]{0,80}\bbridge\b/i.test(normalized);
   const compactConnector = /\b(?:relation|relationship|connect(?:ion)?|link|bridge|interplay|fit)\b/i.test(
@@ -23316,6 +24148,29 @@ type HelixAskTurnContractObjective = {
   query_hints: string[];
 };
 
+type HelixAskAnswerObligationKind =
+  | "direct_answer"
+  | "definition"
+  | "mechanism"
+  | "comparison"
+  | "implementation"
+  | "process"
+  | "change"
+  | "diagnosis"
+  | "roadmap"
+  | "uncertainty";
+
+type HelixAskAnswerObligation = {
+  id: string;
+  label: string;
+  kind: HelixAskAnswerObligationKind;
+  required: boolean;
+  required_slots: string[];
+  preferred_evidence: HelixAskAnswerFormatEvidenceKind[];
+  objective_label?: string | null;
+  section_title?: string | null;
+};
+
 type HelixAskAnswerFormatEvidenceKind = "doc" | "code" | "test" | "runtime";
 type HelixAskAnswerFormatSectionKind =
   | "answer"
@@ -23347,6 +24202,7 @@ type HelixAskTurnContract = {
   version: typeof HELIX_ASK_TURN_CONTRACT_VERSION;
   goal: string;
   objectives: HelixAskTurnContractObjective[];
+  obligations: HelixAskAnswerObligation[];
   grounding_mode: HelixAskTurnContractGroundingMode;
   output_family: HelixAskAnswerPlanFamily;
   prompt_specificity: HelixAskAnswerPlanSpecificity;
@@ -23366,6 +24222,16 @@ type HelixAskTurnContract = {
     valid: boolean;
     source: string;
   };
+  prompt_research_contract?: {
+    mode: "research_contract";
+    verbatim_constraints: string[];
+    provenance_table_schema: string[];
+    required_top_level_titles: string[];
+    appendix_required: boolean;
+    claim_discipline_required: boolean;
+    self_check_required: boolean;
+    unknown_marker: string;
+  } | null;
   answer_format: {
     sections: HelixAskAnswerPlanSection[];
     preferred_verbosity: HelixAskVerbosity | null;
@@ -23376,6 +24242,27 @@ type HelixAskEvidencePackObjectiveSupport = {
   objective: string;
   supported: boolean;
   matched_slots: string[];
+};
+
+type HelixAskEvidencePackObligationCoverageStatus = "covered" | "partial" | "missing";
+
+type HelixAskEvidencePackObligationCoverage = {
+  obligation_id: string;
+  label: string;
+  kind: HelixAskAnswerObligationKind;
+  status: HelixAskEvidencePackObligationCoverageStatus;
+  matched_slots: string[];
+  missing_slots: string[];
+  evidence_refs: string[];
+  doc_refs: string[];
+  code_refs: string[];
+};
+
+type HelixAskEvidencePackBlock = {
+  id: string;
+  label: string;
+  content: string;
+  citations: string[];
 };
 
 type HelixAskEvidencePack = {
@@ -23389,6 +24276,9 @@ type HelixAskEvidencePack = {
   retrieval_confidence: number | null;
   evidence_gap: boolean;
   objective_support: HelixAskEvidencePackObjectiveSupport[];
+  obligation_coverage: HelixAskEvidencePackObligationCoverage[];
+  obligation_evidence: ObligationEvidence[];
+  evidence_blocks: HelixAskEvidencePackBlock[];
 };
 
 type HelixAskAnswerPlanSection = {
@@ -23400,6 +24290,11 @@ type HelixAskAnswerPlanSection = {
   preferred_evidence?: HelixAskAnswerFormatEvidenceKind[];
   kind?: HelixAskAnswerFormatSectionKind;
   objective_label?: string | null;
+  obligation_ids?: string[];
+  coverage_status?: HelixAskEvidencePackObligationCoverageStatus;
+  evidence_refs?: string[];
+  matched_slots?: string[];
+  missing_slots?: string[];
 };
 
 type HelixAskAnswerPlan = {
@@ -23431,8 +24326,16 @@ type HelixAskAnswerPlanShadowValidation = {
   family_format_accuracy: number;
   anchor_integrity_violations: string[];
   debug_leak_hits: string[];
+  placeholder_section_count: number;
   degraded: boolean;
   degrade_reason: string | null;
+};
+
+type HelixAskPlannedSectionFallbackEntry = {
+  text: string;
+  citations?: string[];
+  uncertainty?: string | null;
+  raw?: boolean;
 };
 
 type HelixAskAnswerPlanShadowBuildArgs = {
@@ -23456,6 +24359,13 @@ type HelixAskAnswerPlanShadowBuildArgs = {
   retrievalConfidence?: number | null;
   evidenceGap?: boolean;
   objectiveSupport?: HelixAskEvidencePackObjectiveSupport[];
+  evidenceText?: string;
+  evidenceSections?: Array<{
+    id?: string;
+    label: string;
+    content: string;
+  }>;
+  promptResearchRetrievalContract?: PromptResearchRetrievalContract | null;
 };
 
 type HelixAskAnswerPlanShadowValidateArgs = {
@@ -23654,6 +24564,401 @@ const inferHelixAskAnswerPlanSectionEvidenceKinds = (args: {
   }
 };
 
+const normalizeHelixAskAnswerObligationLabel = (value: string, fallback: string): string => {
+  const normalized = normalizeHelixAskTurnContractText(value, 160)
+    .replace(/^\s*(?:plan\s+for|notes:\s+see)\s+/i, "")
+    .replace(/\s*[?]+\s*$/g, "")
+    .trim();
+  return normalized || fallback;
+};
+
+const mapHelixAskSectionKindToObligationKind = (
+  kind: HelixAskAnswerFormatSectionKind,
+): HelixAskAnswerObligationKind => {
+  switch (kind) {
+    case "definition":
+      return "definition";
+    case "mechanism":
+      return "mechanism";
+    case "comparison":
+      return "comparison";
+    case "repo":
+      return "implementation";
+    case "diagnosis":
+      return "diagnosis";
+    case "roadmap":
+      return "roadmap";
+    case "gaps":
+      return "uncertainty";
+    case "answer":
+    default:
+      return "direct_answer";
+  }
+};
+
+const inferHelixAskAnswerObligationKind = (args: {
+  family: HelixAskAnswerPlanFamily;
+  label: string;
+  requiredSlots: string[];
+  sectionKind?: HelixAskAnswerFormatSectionKind | null;
+}): HelixAskAnswerObligationKind => {
+  if (args.sectionKind) {
+    return mapHelixAskSectionKindToObligationKind(args.sectionKind);
+  }
+  const signal = `${args.label} ${args.requiredSlots.join(" ")}`.toLowerCase();
+  if (/(?:compare|difference|versus|vs\.?|tradeoff|improvement)/.test(signal)) {
+    return "comparison";
+  }
+  if (/(?:why|mechanism|process|flow|works?|solved?|computed?|derived?)/.test(signal)) {
+    return "mechanism";
+  }
+  if (/(?:repo|code|path|module|file|call\s+chain|implementation|runtime)/.test(signal)) {
+    return "implementation";
+  }
+  if (/(?:check|cause|fix|diagnos|failure|problem|issue)/.test(signal)) {
+    return "diagnosis";
+  }
+  if (/(?:plan|roadmap|next\s+steps?|milestone|phase|rollout|change)/.test(signal)) {
+    return "roadmap";
+  }
+  if (/(?:uncertain|unknown|gap|missing)/.test(signal)) {
+    return "uncertainty";
+  }
+  if (/(?:what\s+is|define|definition|term)/.test(signal)) {
+    return "definition";
+  }
+  switch (args.family) {
+    case "definition_overview":
+      return "definition";
+    case "mechanism_process":
+    case "equation_formalism":
+      return "mechanism";
+    case "comparison_tradeoff":
+      return "comparison";
+    case "implementation_code_path":
+      return "implementation";
+    case "troubleshooting_diagnosis":
+      return "diagnosis";
+    case "roadmap_planning":
+      return "roadmap";
+    default:
+      return "direct_answer";
+  }
+};
+
+const createHelixAskAnswerObligation = (args: {
+  id: string;
+  label: string;
+  family: HelixAskAnswerPlanFamily;
+  required: boolean;
+  requiredSlots?: string[];
+  preferredEvidence?: HelixAskAnswerFormatEvidenceKind[];
+  sectionKind?: HelixAskAnswerFormatSectionKind | null;
+  objectiveLabel?: string | null;
+  sectionTitle?: string | null;
+}): HelixAskAnswerObligation => {
+  const requiredSlots = (args.requiredSlots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean);
+  const kind = inferHelixAskAnswerObligationKind({
+    family: args.family,
+    label: args.label,
+    requiredSlots,
+    sectionKind: args.sectionKind ?? null,
+  });
+  const preferredEvidence =
+    args.preferredEvidence ??
+    inferHelixAskAnswerPlanSectionEvidenceKinds({
+      kind:
+        args.sectionKind ??
+        (kind === "definition"
+          ? "definition"
+          : kind === "mechanism" || kind === "process"
+            ? "mechanism"
+            : kind === "comparison"
+              ? "comparison"
+              : kind === "implementation"
+                ? "repo"
+                : kind === "diagnosis"
+                  ? "diagnosis"
+                  : kind === "roadmap" || kind === "change"
+                    ? "roadmap"
+                    : kind === "uncertainty"
+                      ? "gaps"
+                      : "answer"),
+      requiredSlots,
+    });
+  return {
+    id: slugifyHelixAskAnswerPlanSectionId(args.id, "obligation"),
+    label: normalizeHelixAskAnswerObligationLabel(args.label, args.sectionTitle ?? args.id),
+    kind,
+    required: args.required,
+    required_slots: requiredSlots.slice(0, 6),
+    preferred_evidence: preferredEvidence.slice(0, 4),
+    objective_label: args.objectiveLabel ?? null,
+    section_title: args.sectionTitle ?? null,
+  };
+};
+
+const doesHelixAskPlannerSectionCoverObjective = (args: {
+  objective: HelixAskTurnContractObjective;
+  sections: Array<{
+    title?: string | null;
+    must_answer?: string[] | null;
+    objective_label?: string | null;
+    required_slots?: string[] | null;
+  }>;
+}): boolean => {
+  const objectiveTerms = extractHelixAskTurnObjectiveTerms(args.objective.label, 4);
+  const objectiveSlots = new Set(
+    (args.objective.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean),
+  );
+  if (objectiveTerms.length === 0 && objectiveSlots.size === 0) return false;
+  return args.sections.some((section) => {
+    const sectionText = [
+      section.title ?? "",
+      section.objective_label ?? "",
+      ...(section.must_answer ?? []),
+      ...((section.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean) as string[]),
+    ]
+      .join(" ")
+      .toLowerCase();
+    const termOverlap = objectiveTerms.filter((term) => sectionText.includes(term.toLowerCase())).length;
+    const sectionSlots = new Set(
+      (section.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean),
+    );
+    const slotOverlap = Array.from(objectiveSlots).filter((slot) => sectionSlots.has(slot)).length;
+    if (termOverlap >= Math.min(2, objectiveTerms.length)) return true;
+    if (termOverlap >= 1 && slotOverlap >= 1) return true;
+    if (objectiveTerms.length === 0 && slotOverlap >= 1) return true;
+    return false;
+  });
+};
+
+const buildHelixAskTurnContractObligations = (args: {
+  question: string;
+  family: HelixAskAnswerPlanFamily;
+  objectives: HelixAskTurnContractObjective[];
+  requiredSlots: string[];
+  plannerSections?: HelixAskAnswerPlanSection[];
+  requiresRepoEvidence: boolean;
+}): HelixAskAnswerObligation[] => {
+  const fallbackSections =
+    HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS[args.family] ??
+    HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS.general_overview;
+  return buildHelixAskTurnContractObligationsBase({
+    question: args.question,
+    family: args.family,
+    objectives: args.objectives,
+    requiredSlots: args.requiredSlots,
+    plannerSections: args.plannerSections,
+    fallbackSections,
+    requiresRepoEvidence: args.requiresRepoEvidence,
+  });
+};
+
+const selectHelixAskObligationEvidenceRefs = (args: {
+  obligation: HelixAskAnswerObligation;
+  allowedCitations: string[];
+  precedencePaths?: string[];
+}): { evidenceRefs: string[]; docRefs: string[]; codeRefs: string[] } => {
+  const citations = rankPathsByPrecedence(
+    prioritizeHelixAskAllowedCitations(args.allowedCitations, 12),
+    args.precedencePaths ?? [],
+    12,
+  );
+  const codeRefs = citations.filter(
+    (entry) =>
+      /\.(?:ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|cs)(?::\d+)?$/i.test(entry) ||
+      /(?:^|\/)(?:server|client|modules|shared|scripts|tools)\//i.test(entry),
+  );
+  const docRefs = citations.filter((entry) => !codeRefs.includes(entry));
+  const preferred = args.obligation.preferred_evidence;
+  const evidenceRefs = [
+    ...(preferred.includes("code") ? codeRefs : []),
+    ...(preferred.includes("doc") ? docRefs : []),
+    ...(preferred.includes("runtime") || preferred.includes("test") ? citations : []),
+    ...citations,
+  ];
+  return {
+    evidenceRefs: Array.from(new Set(evidenceRefs)).slice(0, 6),
+    docRefs: docRefs.slice(0, 4),
+    codeRefs: codeRefs.slice(0, 4),
+  };
+};
+
+const buildHelixAskTurnContractObligationCoverage = (args: {
+  obligations: HelixAskAnswerObligation[];
+  coveredSlots: string[];
+  allowedCitations: string[];
+  precedencePaths?: string[];
+}): HelixAskEvidencePackObligationCoverage[] => {
+  return buildHelixAskTurnContractObligationCoverageBase({
+    obligations: args.obligations,
+    coveredSlots: args.coveredSlots,
+    allowedCitations: args.allowedCitations,
+    precedencePaths: args.precedencePaths,
+    prioritizeCitations: prioritizeHelixAskAllowedCitations,
+  }) as HelixAskEvidencePackObligationCoverage[];
+};
+
+const buildHelixAskEvidencePackBlocks = (args: {
+  question: string;
+  allowedCitations: string[];
+  evidenceText?: string;
+  sections?: Array<{
+    id?: string;
+    label: string;
+    content: string;
+  }>;
+}): HelixAskEvidencePackBlock[] => {
+  const isLowSignalHelixAskEvidenceBlockContent = (value: string): boolean => {
+    const text = String(value ?? "").trim();
+    if (!text || text.length < 24) return true;
+    if (/^\s*(?:md|doc|code|test)\s+score=\d/i.test(text)) return true;
+    if (/\b(?:stage-?0\s+candidate|stage0-candidate|symbol=stage0|score=\d+(?:\.\d+)?|file=[^\s)]+)\b/i.test(text)) {
+      return true;
+    }
+    if (
+      /^\s*(?:doc|code|evidence)\s*:\s*(?:heading|subheading|section|span|score|symbol|file)\b/i.test(text) ||
+      /\bheading:\b.*\bsubheading:\b/i.test(text)
+    ) {
+      return true;
+    }
+    return false;
+  };
+  const buildFileBackedEvidenceSnippet = (filePath: string): string => {
+    const normalizedPath = normalizeConstraintPath(filePath).replace(/\\/g, "/").trim();
+    if (!normalizedPath) return "";
+    const resolvedPath = path.isAbsolute(normalizedPath)
+      ? normalizedPath
+      : path.resolve(process.cwd(), normalizedPath);
+    if (!fs.existsSync(resolvedPath)) return "";
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(resolvedPath);
+    } catch {
+      return "";
+    }
+    if (!stat.isFile() || stat.size > 512_000) return "";
+    let raw = "";
+    try {
+      raw = fs.readFileSync(resolvedPath, "utf8");
+    } catch {
+      return "";
+    }
+    const lines = raw.split(/\r?\n/);
+    const ext = path.extname(normalizedPath).toLowerCase();
+    const candidates: Array<{ text: string; score: number }> = [];
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index]?.trim() ?? "";
+      if (line.length < 20) continue;
+      if (/^\s*(?:---|\*\*\/|\/\*\*?|\/\/\s*$|#\s*$)\s*$/.test(line)) continue;
+      if (/^\s*(?:id|aliases|scope|title|heading|subheading|score|symbol|file)\s*:/i.test(line)) continue;
+      const start = Math.max(0, index - (/\.(?:md|markdown|txt|json)$/i.test(ext) ? 0 : 1));
+      const end = Math.min(lines.length - 1, index + 2);
+      const window = lines
+        .slice(start, end + 1)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .join(" ");
+      const cleaned =
+        sanitizeHelixAskComposerV2HandoffBlock(window) ||
+        clipAskText(
+          sanitizeDeterministicContractLine(window.replace(/\s+/g, " ").trim()),
+          420,
+        );
+      if (!cleaned || cleaned.length < 24) continue;
+      if (isLowSignalHelixAskEvidenceBlockContent(cleaned)) continue;
+      const definitionHit = /\b(?:is|means|refers to|defines?|modeled|spacetime|shift vector)\b/i.test(cleaned)
+        ? 1
+        : 0;
+      const mechanismHit = /\b(?:compute|solver|solve|module|runtime|orchestrat|constraint|diagnostic|field)\b/i.test(cleaned)
+        ? 1
+        : 0;
+      const score =
+        scoreCoverageRelevance(questionTerms, `${normalizedPath} ${cleaned}`) +
+        definitionHit * 0.4 +
+        mechanismHit * 0.3;
+      if (score <= 0 && candidates.length >= 4) continue;
+      candidates.push({ text: cleaned, score });
+    }
+    const best = candidates.sort((left, right) => right.score - left.score)[0]?.text ?? "";
+    return best && !isLowSignalHelixAskEvidenceBlockContent(best) ? best : "";
+  };
+  const questionTerms = tokenizeCoverageRelevance(args.question);
+  const seen = new Set<string>();
+  const allowed = prioritizeHelixAskAllowedCitations(args.allowedCitations, 24);
+  const citationBasenames = allowed.map((entry) => ({
+    entry,
+    basename: path.posix.basename((normalizeEvidenceRef(entry) ?? entry).replace(/\\/g, "/")).toLowerCase(),
+  }));
+  const blocks: HelixAskEvidencePackBlock[] = [];
+  const pushBlock = (id: string, label: string, content: string, explicitCitations?: string[]): void => {
+    const normalizedLabel = normalizeHelixAskTurnContractText(label, 72) || id;
+    const normalizedContent =
+      sanitizeHelixAskComposerV2HandoffBlock(content) ||
+      clipAskText(
+        sanitizeDeterministicContractLine(String(content ?? "").replace(/\s+/g, " ").trim()),
+        420,
+      );
+    if (!normalizedContent || normalizedContent.length < 24) return;
+    if (isLowSignalHelixAskEvidenceBlockContent(normalizedContent)) return;
+    const dedupeKey = `${normalizedLabel}:${normalizedContent}`.toLowerCase();
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    const lowerContent = normalizedContent.toLowerCase();
+    const extracted = normalizeCitations([
+      ...extractFilePathsFromText(normalizedContent),
+      ...extractCitationTokensFromText(normalizedContent),
+    ]);
+    const inferred = citationBasenames
+      .filter(
+        ({ entry, basename }) =>
+          lowerContent.includes(entry.toLowerCase()) ||
+          (basename.length >= 4 && lowerContent.includes(basename)),
+      )
+      .map(({ entry }) => entry);
+    const citations = normalizeCitations([...extracted, ...inferred, ...(explicitCitations ?? [])]).slice(0, 6);
+    const relevance =
+      scoreCoverageRelevance(questionTerms, `${normalizedLabel} ${normalizedContent}`) +
+      (citations.length > 0 ? 0.05 : 0);
+    if (relevance <= 0 && citations.length === 0 && blocks.length >= 4) return;
+    blocks.push({
+      id: slugifyHelixAskAnswerPlanSectionId(id, "evidence"),
+      label: normalizedLabel,
+      content: normalizedContent,
+      citations,
+    });
+  };
+  for (const [index, section] of (args.sections ?? []).entries()) {
+    pushBlock(section.id ?? `section_${index + 1}`, section.label, section.content);
+  }
+  if (blocks.length < 6) {
+    const rawBlocks = String(args.evidenceText ?? "")
+      .split(/\n{2,}/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length >= 24)
+      .slice(0, 8);
+    for (const [index, block] of rawBlocks.entries()) {
+      pushBlock(`evidence_${index + 1}`, "Evidence", block);
+      if (blocks.length >= 8) break;
+    }
+  }
+  if (blocks.length < 6) {
+    for (const [index, citation] of allowed.entries()) {
+      const snippet = buildFileBackedEvidenceSnippet(citation);
+      if (!snippet) continue;
+      pushBlock(
+        `file_${index + 1}`,
+        path.posix.basename((normalizeEvidenceRef(citation) ?? citation).replace(/\\/g, "/")),
+        snippet,
+        [citation],
+      );
+      if (blocks.length >= 8) break;
+    }
+  }
+  return blocks.slice(0, 8);
+};
+
 const createHelixAskAnswerPlanSection = (args: {
   id: string;
   title: string;
@@ -23664,6 +24969,11 @@ const createHelixAskAnswerPlanSection = (args: {
   preferredEvidence?: HelixAskAnswerFormatEvidenceKind[];
   kind?: HelixAskAnswerFormatSectionKind;
   objectiveLabel?: string | null;
+  obligationIds?: string[];
+  coverageStatus?: HelixAskEvidencePackObligationCoverageStatus;
+  evidenceRefs?: string[];
+  matchedSlots?: string[];
+  missingSlots?: string[];
 }): HelixAskAnswerPlanSection => {
   const requiredSlots = (args.requiredSlots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean);
   const normalizedMustAnswer = (args.mustAnswer ?? [args.title])
@@ -23689,6 +24999,11 @@ const createHelixAskAnswerPlanSection = (args: {
     preferred_evidence: preferredEvidence.slice(0, 4),
     kind: inferredKind,
     objective_label: args.objectiveLabel ?? null,
+    obligation_ids: Array.from(new Set((args.obligationIds ?? []).map((entry) => String(entry ?? "").trim()).filter(Boolean))).slice(0, 6),
+    coverage_status: args.coverageStatus,
+    evidence_refs: normalizeCitations(args.evidenceRefs ?? []).slice(0, 6),
+    matched_slots: Array.from(new Set((args.matchedSlots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean))).slice(0, 6),
+    missing_slots: Array.from(new Set((args.missingSlots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean))).slice(0, 6),
   };
 };
 
@@ -23802,199 +25117,73 @@ const buildHelixAskObjectiveSectionTitle = (args: {
   return label;
 };
 
+const buildHelixAskObligationSectionTitle = (args: {
+  obligation: HelixAskAnswerObligation;
+  index: number;
+}): string => {
+  const explicitSectionTitle = normalizeHelixAskAnswerObligationLabel(
+    args.obligation.section_title ?? "",
+    "",
+  );
+  if (explicitSectionTitle) {
+    return explicitSectionTitle;
+  }
+  const label = normalizeHelixAskAnswerObligationLabel(
+    args.obligation.label,
+    `Section ${args.index + 1}`,
+  );
+  const preferLabel =
+    label.length <= 72 &&
+    !/^(?:what|how|why|where|which|who|when|whether)\b/i.test(label) &&
+    !/^state what remains\b/i.test(label);
+  switch (args.obligation.kind) {
+    case "direct_answer":
+      return "Direct Answer";
+    case "definition":
+      return preferLabel ? label : "Definition";
+    case "mechanism":
+    case "process":
+      return preferLabel ? label : "How It Works";
+    case "comparison":
+      return preferLabel ? label : "Comparison";
+    case "implementation":
+      return preferLabel ? label : "Implementation In Repo";
+    case "diagnosis":
+      return preferLabel ? label : "Diagnosis";
+    case "roadmap":
+    case "change":
+      return preferLabel ? label : "Implementation Roadmap";
+    case "uncertainty":
+      return args.obligation.section_title ?? "Open Gaps";
+    default:
+      return label;
+  }
+};
+
 const buildHelixAskAnswerPlanSections = (args: {
   question: string;
   family: HelixAskAnswerPlanFamily;
   objectives: HelixAskTurnContractObjective[];
   requiredSlots: string[];
   plannerSections?: HelixAskAnswerPlanSection[];
+  obligations?: HelixAskAnswerObligation[];
+  obligationCoverage?: HelixAskEvidencePackObligationCoverage[];
   requiresRepoEvidence: boolean;
 }): HelixAskAnswerPlanSection[] => {
   const fallbackSections =
     HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS[args.family] ??
     HELIX_ASK_ANSWER_PLAN_PROFILE_SECTIONS.general_overview;
-  const normalizedPlannerSections = (args.plannerSections ?? [])
-    .map((section, index) => {
-      const title = normalizeHelixAskTurnContractText(section.title ?? "", 72);
-      if (!title) return null;
-      const requiredSlots = (section.required_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean);
-      return createHelixAskAnswerPlanSection({
-        id: section.id ?? `${title}_${index + 1}`,
-        title,
-        required: section.required !== false,
-        family: args.family,
-        requiredSlots,
-        mustAnswer: section.must_answer ?? [title],
-        preferredEvidence: normalizeHelixAskAnswerFormatEvidenceKinds(
-          section.preferred_evidence ?? [],
-          inferHelixAskAnswerPlanSectionEvidenceKinds({
-            kind: normalizeHelixAskAnswerFormatSectionKind(
-              String(section.kind ?? ""),
-              inferHelixAskAnswerPlanSectionKindFromShape({
-                family: args.family,
-                id: section.id ?? title,
-                title,
-                requiredSlots,
-              }),
-            ),
-            requiredSlots,
-          }),
-        ),
-        kind: normalizeHelixAskAnswerFormatSectionKind(
-          String(section.kind ?? ""),
-          inferHelixAskAnswerPlanSectionKindFromShape({
-            family: args.family,
-            id: section.id ?? title,
-            title,
-            requiredSlots,
-          }),
-        ),
-        objectiveLabel: section.objective_label ?? null,
-      });
-    })
-    .filter((section): section is HelixAskAnswerPlanSection => Boolean(section));
-  if (normalizedPlannerSections.length > 0) {
-    const planned = normalizedPlannerSections.slice(0, 8);
-    if (!planned.some((section) => section.kind === "gaps")) {
-      planned.splice(
-        Math.max(1, planned.length),
-        0,
-        createHelixAskAnswerPlanSection({
-          id: "open_gaps",
-          title: args.family === "roadmap_planning" ? "Evidence Gaps" : "Open Gaps",
-          required: args.requiresRepoEvidence,
-          family: args.family,
-          kind: "gaps",
-          requiredSlots: ["failure_path"],
-          mustAnswer: ["State what remains weak or only partially evidenced."],
-        }),
-      );
-    }
-    if (!planned.some((section) => section.kind === "sources")) {
-      planned.push(
-        createHelixAskAnswerPlanSection({
-          id: "sources",
-          title: "Sources",
-          required: true,
-          family: args.family,
-          kind: "sources",
-        }),
-      );
-    }
-    return planned.slice(0, 8);
-  }
-  const shouldBuildObjectiveShape =
-    (args.objectives.length > 1 &&
-      args.question.trim().length >= 140 &&
-      args.family !== "roadmap_planning" &&
-      args.family !== "implementation_code_path" &&
-      args.family !== "comparison_tradeoff") ||
-    ((args.family === "mechanism_process" || args.family === "general_overview") &&
-      /\b(?:traditional(?:ly)?|improvement|better|difference|compare|versus|vs\.?|needle\s+hull(?:\s+(?:mark|mk)\s*2)?|mark\s*2|mk\s*2)\b/i.test(
-        args.question,
-      ));
-  if (!shouldBuildObjectiveShape) {
-    return fallbackSections.map((section) =>
-      createHelixAskAnswerPlanSection({
-        id: section.id,
-        title: section.title,
-        required: section.required,
-        family: args.family,
-        requiredSlots: section.required_slots,
-        mustAnswer: section.must_answer,
-        preferredEvidence: section.preferred_evidence,
-        kind: section.kind,
-        objectiveLabel: section.objective_label ?? null,
-      }),
-    );
-  }
-  const sections: HelixAskAnswerPlanSection[] = [];
-  const pushSection = (section: HelixAskAnswerPlanSection): void => {
-    const titleKey = section.title.trim().toLowerCase();
-    const idKey = section.id.trim().toLowerCase();
-    if (sections.some((entry) => entry.id.trim().toLowerCase() === idKey || entry.title.trim().toLowerCase() === titleKey)) {
-      return;
-    }
-    sections.push(section);
-  };
-  pushSection(
-    createHelixAskAnswerPlanSection({
-      id: args.family === "definition_overview" ? "definition" : "direct_answer",
-      title: args.family === "definition_overview" ? "Definition" : "Direct Answer",
-      required: true,
-      family: args.family,
-      kind: args.family === "definition_overview" ? "definition" : "answer",
-      requiredSlots: args.requiredSlots.slice(0, 3),
-      mustAnswer: [args.objectives[0]?.label ?? args.question],
-    }),
-  );
-  for (const [index, objective] of args.objectives.entries()) {
-    const requiredSlots = objective.required_slots.map((slot) => normalizeSlotId(slot)).filter(Boolean);
-    const kind = inferHelixAskAnswerPlanSectionKindFromShape({
-      family: args.family,
-      id: objective.label,
-      title: objective.label,
-      requiredSlots,
-    });
-    const title = buildHelixAskObjectiveSectionTitle({
-      family: args.family,
-      objective,
-      index,
-      question: args.question,
-      kind,
-    });
-    pushSection(
-      createHelixAskAnswerPlanSection({
-        id: title,
-        title,
-        required: true,
-        family: args.family,
-        kind,
-        requiredSlots,
-        mustAnswer: [objective.label],
-        objectiveLabel: objective.label,
-      }),
-    );
-  }
-  if (
-    args.requiresRepoEvidence &&
-    !sections.some((section) => section.kind === "repo") &&
-    args.requiredSlots.some((slot) => slot === "code_path" || slot === "repo_mapping" || slot === "implementation_touchpoints")
-  ) {
-    pushSection(
-      createHelixAskAnswerPlanSection({
-        id: "implementation_in_repo",
-        title: "Implementation In Repo",
-        required: true,
-        family: args.family,
-        kind: "repo",
-        requiredSlots: ["code_path"],
-        mustAnswer: ["Map the strongest repo implementation anchors."],
-      }),
-    );
-  }
-  pushSection(
-    createHelixAskAnswerPlanSection({
-      id: args.family === "roadmap_planning" ? "evidence_gaps" : "open_gaps",
-      title: args.family === "roadmap_planning" ? "Evidence Gaps" : "Open Gaps",
-      required: args.requiresRepoEvidence || args.objectives.length > 1,
-      family: args.family,
-      kind: "gaps",
-      requiredSlots: ["failure_path"],
-      mustAnswer: ["State what remains uncertain or under-evidenced in this turn."],
-    }),
-  );
-  pushSection(
-    createHelixAskAnswerPlanSection({
-      id: "sources",
-      title: "Sources",
-      required: true,
-      family: args.family,
-      kind: "sources",
-      mustAnswer: ["List the locked repo sources used for this answer."],
-    }),
-  );
-  return sections.slice(0, 8);
+  return buildHelixAskAnswerPlanSectionsBase({
+    question: args.question,
+    family: args.family,
+    objectives: args.objectives,
+    requiredSlots: args.requiredSlots,
+    plannerSections: args.plannerSections,
+    obligations: args.obligations,
+    obligationCoverage: args.obligationCoverage,
+    requiresRepoEvidence: args.requiresRepoEvidence,
+    fallbackSections,
+  }) as HelixAskAnswerPlanSection[];
 };
 
 const classifyHelixAskAnswerPlanFamily = (args: {
@@ -24028,6 +25217,12 @@ const classifyHelixAskAnswerPlanFamily = (args: {
       question,
     ) &&
     implementationContextCue;
+  const repoTechnicalExplainCue =
+    !args.definitionFocus &&
+    hasHelixAskRepoTechnicalCue(question) &&
+    /\b(?:how|where|why|explain|describe|trace|map|populate(?:d|s)?|useful|diagnostic|diagnostics?)\b/i.test(
+      question,
+    );
   const implementationLocateCue =
     !args.definitionFocus &&
     /\b(?:find|show|locate|trace|map|walk(?:\s+me)?\s+through|give(?:\s+me)?)\b/i.test(question) &&
@@ -24038,6 +25233,7 @@ const classifyHelixAskAnswerPlanFamily = (args: {
   const explicitCodePathCue =
     args.queryConstraints.explicitAnchorPaths.length > 0 ||
     implementationExplainCue ||
+    repoTechnicalExplainCue ||
     implementationLocateCue ||
     /\b(?:where(?:\s+in)?\s+(?:repo|codebase)|which\s+(?:file|module|path|line)|line\s*\d+|file:line)\b/i.test(
       question,
@@ -24244,6 +25440,7 @@ const extractHelixAskTurnObjectiveFragments = (question: string): string[] => {
   const normalized = String(question ?? "")
     .replace(/\r\n/g, "\n")
     .replace(/\b(?:next\s+idea|another\s+idea|in addition|eventually)\b\s*:?/gi, "\n")
+    .replace(/\b(?:and|but)\s+(?=(?:how|what|why|where|which|who|when|whether)\b)/gi, "\n")
     .replace(/[•\u2022]/g, "\n")
     .replace(/>\s+/g, " ")
     .trim();
@@ -24277,11 +25474,8 @@ const extractHelixAskTurnObjectiveFragments = (question: string): string[] => {
     .map((entry) => normalizeHelixAskTurnContractText(entry, 120))
     .filter((entry) => entry.length >= 4)
     .filter((entry) => !HELIX_ASK_TURN_CONTRACT_TEXT_STOPWORDS.has(entry.toLowerCase()))
-    .map((entry) =>
-      /\b(?:plan|implement|roadmap|phase|work)\b/i.test(entry)
-        ? entry
-        : `Plan for ${entry}`,
-    );
+    .map((entry) => entry.replace(/^\s*plan\s+for\s+/i, "").trim())
+    .filter(Boolean);
   const uniqueListObjectives = Array.from(new Set(listObjectives)).slice(
     0,
     HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES,
@@ -24302,6 +25496,26 @@ const extractHelixAskTurnObjectiveTerms = (value: string, maxTerms = 3): string[
     ),
   ).slice(0, Math.max(1, maxTerms));
 
+const extractHelixAskTurnObjectiveSymbolHints = (value: string, maxHints = 3): string[] => {
+  const hints = new Set<string>();
+  const push = (entry: string): void => {
+    const normalized = String(entry ?? "").trim();
+    if (!normalized || normalized.length < 4) return;
+    hints.add(normalized);
+  };
+  const endpointMatches = value.match(/\/api\/[a-z0-9/_-]+/gi) ?? [];
+  endpointMatches.forEach(push);
+  const snakeCaseMatches = value.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+){1,}\b/g) ?? [];
+  snakeCaseMatches.forEach(push);
+  const camelCaseMatches = value.match(/\b[a-z][a-z0-9_]*[A-Z][A-Za-z0-9_]*\b/g) ?? [];
+  camelCaseMatches.forEach(push);
+  const callMatches = value.match(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\)/g) ?? [];
+  callMatches
+    .map((entry) => entry.replace(/\s*\(\s*\)\s*$/, ""))
+    .forEach(push);
+  return Array.from(hints).slice(0, Math.max(1, maxHints));
+};
+
 const buildHelixAskTurnObjectiveSlots = (
   label: string,
   family: HelixAskAnswerPlanFamily,
@@ -24317,6 +25531,22 @@ const buildHelixAskTurnObjectiveSlots = (
       matchedRule = true;
       slots.add(rule.slot);
     }
+  }
+  if (/\b(?:what\s+is|what's|define|definition|term)\b/i.test(label)) {
+    slots.add("definition");
+  }
+  if (/\b(?:how|mechanism|process|flow|pipeline|works?|solved?|computed?|derived?)\b/i.test(label)) {
+    slots.add("mechanism");
+  }
+  if (/\b(?:equation|formula|derive|derivation)\b/i.test(label)) {
+    slots.add("equation");
+  }
+  if (
+    /\b(?:repo|codebase|module|path|call\s+chain|runtime|implemented?|implementation|full\s+solve|solver)\b/i.test(
+      label,
+    )
+  ) {
+    slots.add("code_path");
   }
   if (!matchedRule || slots.size < 3) {
     for (const term of extractHelixAskTurnObjectiveTerms(label, 2)) {
@@ -24334,6 +25564,13 @@ const buildHelixAskTurnObjectiveQueryHints = (
   const hints = new Set<string>();
   const normalizedLabel = normalizeHelixAskTurnContractText(label, 120);
   if (normalizedLabel) hints.add(normalizedLabel);
+  const symbolHints = extractHelixAskTurnObjectiveSymbolHints(label, 2);
+  for (const symbol of symbolHints) {
+    hints.add(symbol);
+    if (groundingMode !== "open") {
+      hints.add(`${symbol} implementation`);
+    }
+  }
   for (const rule of HELIX_ASK_TURN_CONTRACT_OBJECTIVE_SLOT_RULES) {
     if (rule.pattern.test(label)) {
       hints.add(rule.query);
@@ -24348,6 +25585,140 @@ const buildHelixAskTurnObjectiveQueryHints = (
     }
   }
   return Array.from(hints).slice(0, 5);
+};
+
+const buildHelixAskPromptResearchObjectiveInputs = (args: {
+  contract: PromptResearchContract;
+  family: HelixAskAnswerPlanFamily;
+  groundingMode: HelixAskTurnContractGroundingMode;
+}): HelixAskObjectivePlannerPassObjective[] => {
+  const objectives: HelixAskObjectivePlannerPassObjective[] = [];
+  const pushObjective = (
+    label: string,
+    mustCover: string[],
+    extraHints: string[] = [],
+  ): void => {
+    const normalizedLabel = normalizeHelixAskTurnContractText(label, 180);
+    if (!normalizedLabel) return;
+    const objectiveSignal = [normalizedLabel, ...mustCover].join(" ").trim();
+    const requiredSlots = buildHelixAskTurnObjectiveSlots(objectiveSignal, args.family);
+    const queryHints = Array.from(
+      new Set(
+        [
+          normalizedLabel,
+          ...mustCover
+            .map((entry) => normalizeHelixAskTurnContractText(entry, 120))
+            .filter(Boolean)
+            .slice(0, 3),
+          ...extraHints
+            .map((entry) => normalizeHelixAskTurnContractText(entry, 120))
+            .filter(Boolean)
+            .slice(0, 3),
+          ...buildHelixAskTurnObjectiveQueryHints(objectiveSignal, args.groundingMode),
+        ].filter(Boolean),
+      ),
+    ).slice(0, 5);
+    objectives.push({
+      label: normalizedLabel,
+      required_slots: requiredSlots,
+      query_hints: queryHints,
+    });
+  };
+
+  for (const section of args.contract.required_top_level_structure) {
+    pushObjective(section.title, section.must_cover, args.contract.required_repo_inputs.slice(0, 2));
+    if (objectives.length >= HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES) break;
+  }
+  if (
+    objectives.length < HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES &&
+    args.contract.appendix_requirements.length > 0
+  ) {
+    pushObjective(
+      "Derivation Appendix",
+      args.contract.appendix_requirements.slice(0, 4),
+      args.contract.required_repo_inputs.slice(0, 2),
+    );
+  }
+  if (
+    objectives.length < HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES &&
+    args.contract.claim_discipline.length > 0
+  ) {
+    pushObjective("Claim Discipline", args.contract.claim_discipline.slice(0, 4));
+  }
+  if (
+    objectives.length < HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES &&
+    args.contract.self_check.length > 0
+  ) {
+    pushObjective("Self-Check", args.contract.self_check.slice(0, 4));
+  }
+  return objectives.slice(0, HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES);
+};
+
+const buildHelixAskPromptResearchPlannerSections = (args: {
+  contract: PromptResearchContract;
+  family: HelixAskAnswerPlanFamily;
+}): HelixAskObjectivePlannerPassSection[] => {
+  const sections: HelixAskObjectivePlannerPassSection[] = [];
+  const pushSection = (title: string, mustAnswer: string[]): void => {
+    const normalizedTitle = normalizeHelixAskTurnContractText(title, 72);
+    if (!normalizedTitle) return;
+    const requiredSlots = buildHelixAskTurnObjectiveSlots(
+      [normalizedTitle, ...mustAnswer].join(" "),
+      args.family,
+    );
+    const kind = inferHelixAskAnswerPlanSectionKindFromShape({
+      family: args.family,
+      id: normalizedTitle,
+      title: normalizedTitle,
+      requiredSlots,
+    });
+    sections.push({
+      id: slugifyHelixAskAnswerPlanSectionId(normalizedTitle, `section_${sections.length + 1}`),
+      title: normalizedTitle,
+      required: true,
+      must_answer: mustAnswer
+        .map((entry) => normalizeHelixAskTurnContractText(entry, 160))
+        .filter(Boolean)
+        .slice(0, 4),
+      required_slots: requiredSlots,
+      preferred_evidence: inferHelixAskAnswerPlanSectionEvidenceKinds({ kind, requiredSlots }),
+      kind,
+    });
+  };
+
+  for (const section of args.contract.required_top_level_structure) {
+    const mustCover = Array.from(
+      new Set(
+        [
+          /\bboundary\b/i.test(section.title)
+            ? args.contract.verbatim_constraints[0] ?? null
+            : null,
+          ...section.must_cover,
+        ].filter(Boolean) as string[],
+      ),
+    );
+    pushSection(section.title, mustCover);
+    if (sections.length >= 8) break;
+  }
+  if (sections.length < 8 && args.contract.appendix_requirements.length > 0) {
+    pushSection("Derivation Appendix", args.contract.appendix_requirements.slice(0, 4));
+  }
+  if (sections.length < 8 && args.contract.provenance_table_schema.length > 0) {
+    pushSection(
+      "Provenance Table",
+      [
+        `Use columns: ${args.contract.provenance_table_schema.join(", ")}`,
+        `Missing substitutions should be ${args.contract.fail_closed_behavior.unknown_marker}`,
+      ],
+    );
+  }
+  if (sections.length < 8 && args.contract.claim_discipline.length > 0) {
+    pushSection("Claim Discipline", args.contract.claim_discipline.slice(0, 4));
+  }
+  if (sections.length < 8 && args.contract.self_check.length > 0) {
+    pushSection("Self-Check", args.contract.self_check.slice(0, 4));
+  }
+  return sections.slice(0, 8);
 };
 
 const normalizeHelixAskTurnContractFamily = (
@@ -24445,7 +25816,10 @@ const buildHelixAskTurnContract = (args: {
   plannerValid: boolean;
   plannerSource: string;
   plannerPass?: HelixAskObjectivePlannerPass | null;
+  promptResearchContract?: PromptResearchContract | null;
 }): HelixAskTurnContract => {
+  const researchContract =
+    args.promptResearchContract?.mode === "research_contract" ? args.promptResearchContract : null;
   const fallbackFamily = classifyHelixAskAnswerPlanFamily({
     question: args.question,
     equationPrompt: args.equationPrompt,
@@ -24476,11 +25850,22 @@ const buildHelixAskTurnContract = (args: {
     args.requiresRepoEvidence || args.intentDomain === "repo"
       ? "repo"
       : requestedGrounding ?? defaultGroundingMode;
-  const fallbackObjectiveLabels = extractHelixAskTurnObjectiveFragments(args.question);
+  const researchObjectiveInputs = researchContract
+    ? buildHelixAskPromptResearchObjectiveInputs({
+        contract: researchContract,
+        family,
+        groundingMode,
+      })
+    : [];
+  const fallbackObjectiveLabels = researchObjectiveInputs.length
+    ? []
+    : extractHelixAskTurnObjectiveFragments(args.question);
   const objectiveInputs: HelixAskObjectivePlannerPassObjective[] =
-    args.plannerPass?.objectives?.length
-      ? args.plannerPass.objectives
-      : fallbackObjectiveLabels.map((label): HelixAskObjectivePlannerPassObjective => ({ label }));
+    researchObjectiveInputs.length
+      ? researchObjectiveInputs
+      : args.plannerPass?.objectives?.length
+        ? args.plannerPass.objectives
+        : fallbackObjectiveLabels.map((label): HelixAskObjectivePlannerPassObjective => ({ label }));
   const objectives = objectiveInputs
     .map((entry) => {
       const label = normalizeHelixAskTurnContractText(entry.label, 180);
@@ -24519,6 +25904,7 @@ const buildHelixAskTurnContract = (args: {
     });
   }
   const goal =
+    normalizeHelixAskTurnContractText(researchContract?.purpose ?? "", 180) ||
     normalizeHelixAskTurnContractText(args.plannerPass?.goal ?? "", 180) ||
     normalizeHelixAskTurnContractText(args.question, 180) ||
     "Answer the current ask.";
@@ -24528,6 +25914,8 @@ const buildHelixAskTurnContract = (args: {
     requiredSlots: args.plannerPass?.required_slots,
   });
   const queryHints = mergeHelixAskQueries(
+    researchContract?.required_repo_inputs.slice(0, 4) ?? [],
+    researchContract?.canonical_precedence_paths.slice(0, 4) ?? [],
     args.plannerPass?.query_hints?.map((hint) => normalizeHelixAskTurnContractText(hint, 120)).filter(Boolean) ?? [],
     objectives.flatMap((objective) => objective.query_hints),
     HELIX_ASK_OBJECTIVE_PLANNER_MAX_QUERY_HINTS,
@@ -24537,6 +25925,10 @@ const buildHelixAskTurnContract = (args: {
       [
         objectives.length > 1 ? "multi_objective" : null,
         args.requiresRepoEvidence ? "repo_grounding_required" : null,
+        researchContract ? "prompt_research_contract" : null,
+        researchContract?.fail_closed_behavior.missing_required_inputs_stop
+          ? "fail_closed_required_inputs"
+          : null,
         args.queryConstraints.explicitAnchorPaths.length > 0 ? "explicit_anchor_paths" : null,
         groundingMode === "open" ? "open_world_allowed" : null,
       ].filter(Boolean) as string[],
@@ -24549,10 +25941,42 @@ const buildHelixAskTurnContract = (args: {
     args.queryConstraints.explicitAnchorPaths.length === 0
       ? "Which objective should be pinned to explicit repo anchors first?"
       : "");
+  const plannerSectionSource = args.plannerPass?.sections?.length
+    ? researchContract
+      ? buildHelixAskPromptResearchPlannerSections({
+          contract: researchContract,
+          family,
+        })
+      : args.plannerPass.sections
+    : researchContract
+      ? buildHelixAskPromptResearchPlannerSections({
+          contract: researchContract,
+          family,
+        })
+      : [];
+  const plannerSections = plannerSectionSource.map((section) => ({
+    id: section.id ?? section.title ?? "section",
+    title: section.title ?? "Section",
+    required: section.required !== false,
+    must_answer: section.must_answer ?? [],
+    required_slots: section.required_slots ?? [],
+    preferred_evidence: normalizeHelixAskAnswerFormatEvidenceKinds(section.preferred_evidence ?? [], []),
+    kind: normalizeHelixAskAnswerFormatSectionKind(String(section.kind ?? ""), "answer"),
+    objective_label: null,
+  }));
+  const obligations = buildHelixAskTurnContractObligations({
+    question: args.question,
+    family,
+    objectives,
+    requiredSlots,
+    plannerSections,
+    requiresRepoEvidence: args.requiresRepoEvidence,
+  });
   return {
     version: HELIX_ASK_TURN_CONTRACT_VERSION,
     goal,
     objectives,
+    obligations,
     grounding_mode: groundingMode,
     output_family: family,
     prompt_specificity: specificity,
@@ -24572,17 +25996,22 @@ const buildHelixAskTurnContract = (args: {
       valid: args.plannerValid,
       source: args.plannerSource,
     },
+    prompt_research_contract: researchContract
+      ? {
+          mode: "research_contract",
+          verbatim_constraints: researchContract.verbatim_constraints.slice(0, 4),
+          provenance_table_schema: researchContract.provenance_table_schema.slice(0, 12),
+          required_top_level_titles: researchContract.required_top_level_structure
+            .map((section) => section.title)
+            .slice(0, 12),
+          appendix_required: researchContract.appendix_requirements.length > 0,
+          claim_discipline_required: researchContract.claim_discipline.length > 0,
+          self_check_required: researchContract.self_check.length > 0,
+          unknown_marker: researchContract.fail_closed_behavior.unknown_marker,
+        }
+      : null,
     answer_format: {
-      sections: (args.plannerPass?.sections ?? []).map((section) => ({
-        id: section.id ?? section.title ?? "section",
-        title: section.title ?? "Section",
-        required: section.required !== false,
-        must_answer: section.must_answer ?? [],
-        required_slots: section.required_slots ?? [],
-        preferred_evidence: normalizeHelixAskAnswerFormatEvidenceKinds(section.preferred_evidence ?? [], []),
-        kind: normalizeHelixAskAnswerFormatSectionKind(String(section.kind ?? ""), "answer"),
-        objective_label: null,
-      })),
+      sections: plannerSections,
       preferred_verbosity: args.plannerPass?.verbosity ?? null,
     },
   };
@@ -24629,8 +26058,13 @@ const buildHelixAskTurnContractSeedSlots = (
 const buildHelixAskTurnRetrievalPlan = (
   contract: HelixAskTurnContract,
   constraints: HelixAskQueryConstraints,
+  promptResearchRetrievalContract?: PromptResearchRetrievalContract | null,
+  promptResearchGenerationContract?: PromptResearchGenerationContract | null,
 ): HelixAskTurnRetrievalPlan => {
   const mustInclude = new Set<string>();
+  const researchMustReadCount = promptResearchRetrievalContract?.must_read_paths.length ?? 0;
+  const researchRetrievalContextBudget =
+    promptResearchGenerationContract?.budget?.retrieval_context_budget ?? 0;
   if (contract.grounding_mode !== "open") {
     mustInclude.add("docs/**");
     mustInclude.add("server/**");
@@ -24647,14 +26081,54 @@ const buildHelixAskTurnRetrievalPlan = (
   for (const explicitPath of constraints.explicitAnchorPaths.slice(0, 4)) {
     mustInclude.add(explicitPath);
   }
+  for (const requiredPath of promptResearchRetrievalContract?.must_read_paths.slice(0, 8) ?? []) {
+    mustInclude.add(requiredPath);
+  }
+  for (const precedencePath of promptResearchRetrievalContract?.precedence_paths.slice(0, 4) ?? []) {
+    mustInclude.add(precedencePath);
+  }
+  const rankedMustInclude = rankPathsByPrecedence(
+    Array.from(mustInclude),
+    promptResearchRetrievalContract?.precedence_paths ?? [],
+    8,
+  );
   return {
-    depth_budget: Math.min(8, Math.max(3, contract.objectives.length + 2)),
-    diversity_budget: Math.min(10, Math.max(3, contract.objectives.length * 2)),
-    connectivity_budget: Math.min(8, Math.max(2, contract.objectives.length)),
-    must_include: Array.from(mustInclude).slice(0, 8),
+    depth_budget: Math.min(
+      12,
+      Math.max(
+        3,
+        contract.objectives.length + 2,
+        researchMustReadCount > 0 ? 5 : 0,
+        researchRetrievalContextBudget > 0 ? Math.ceil(researchRetrievalContextBudget / 4) + 2 : 0,
+      ),
+    ),
+    diversity_budget: Math.min(
+      14,
+      Math.max(
+        3,
+        contract.objectives.length * 2,
+        researchMustReadCount > 0 ? researchMustReadCount + 2 : 0,
+        researchRetrievalContextBudget,
+      ),
+    ),
+    connectivity_budget: Math.min(
+      10,
+      Math.max(
+        2,
+        contract.objectives.length,
+        researchMustReadCount > 0 ? Math.ceil(researchMustReadCount / 2) : 0,
+        researchRetrievalContextBudget > 0 ? Math.ceil(researchRetrievalContextBudget / 2) : 0,
+      ),
+    ),
+    must_include: rankedMustInclude,
     query_count: Math.min(
       HELIX_ASK_OBJECTIVE_PLANNER_MAX_QUERY_HINTS,
-      Math.max(contract.query_hints.length, contract.objectives.length * 3),
+      Math.max(
+        contract.query_hints.length,
+        contract.objectives.length * 3,
+        researchMustReadCount > 0 ? researchMustReadCount + 4 : 0,
+        researchRetrievalContextBudget > 0 ? researchRetrievalContextBudget + 4 : 0,
+      ),
     ),
   };
 };
@@ -24680,6 +26154,705 @@ const buildHelixAskTurnContractObjectiveSupport = (args: {
   });
 };
 
+const inferHelixAskObjectiveSlotsFromObligationCoverage = (
+  obligationCoverage: HelixAskEvidencePackObligationCoverage[],
+): string[] => {
+  if (!obligationCoverage.length) return [];
+  const inferred = new Set<string>();
+  const normalizedRefs = obligationCoverage
+    .flatMap((coverage) => [...coverage.evidence_refs, ...coverage.doc_refs, ...coverage.code_refs])
+    .map((ref) => ref.replace(/\\/g, "/").trim().toLowerCase())
+    .filter(Boolean);
+  if (normalizedRefs.length > 0) {
+    inferred.add("repo-mapping");
+  }
+  if (obligationCoverage.some((coverage) => coverage.code_refs.length > 0)) {
+    inferred.add("implementation-touchpoints");
+    inferred.add("code-path");
+  }
+  if (obligationCoverage.some((coverage) => coverage.kind === "roadmap")) {
+    inferred.add("next-steps");
+  }
+  if (normalizedRefs.some((ref) => /(\/|^)(voice|audio|tts|speaker|mic|callout|stt)(\/|\.|$)/i.test(ref))) {
+    inferred.add("voice-lane");
+  }
+  if (
+    normalizedRefs.some((ref) =>
+      /(translation|translate|transcript|transcrib|multilang|language|interpreter|whisper)/i.test(ref),
+    )
+  ) {
+    inferred.add("transcription-translation");
+  }
+  if (normalizedRefs.some((ref) => ref.endsWith(".md") || ref.includes("/docs/") || ref.includes("/knowledge/"))) {
+    inferred.add("definition");
+  }
+  return Array.from(inferred).map((slot) => normalizeSlotId(slot)).filter(Boolean);
+};
+
+const normalizeHelixAskObjectiveLabelKey = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const inferHelixAskObjectiveSlotHitsFromEvidence = (
+  requiredSlots: string[],
+  objectiveLabel: string,
+  evidenceRefs: string[],
+): string[] => {
+  if (requiredSlots.length === 0 || evidenceRefs.length === 0) return [];
+  const corpus = `${objectiveLabel}\n${evidenceRefs.join("\n")}`.toLowerCase();
+  const inferred: string[] = [];
+  const hasPathSignal = evidenceRefs.some((entry) => /[a-z0-9_./-]+\.[a-z0-9]+/i.test(entry));
+  const maybeAdd = (slot: string, test: boolean): void => {
+    if (!test) return;
+    if (!requiredSlots.includes(slot)) return;
+    if (inferred.includes(slot)) return;
+    inferred.push(slot);
+  };
+  for (const slot of requiredSlots) {
+    const slotKey = normalizeSlotId(slot);
+    if (!slotKey) continue;
+    switch (slotKey) {
+      case "voice-lane":
+        maybeAdd(slot, /(voice|audio|tts|stt|speaker|microphone|mic|callout)/i.test(corpus));
+        break;
+      case "transcription-translation":
+        maybeAdd(slot, /(transcrib|translation|translate|multilang|whisper|language)/i.test(corpus));
+        break;
+      case "mechanism":
+        maybeAdd(slot, /(mechanism|pipeline|flow|controller|scheduler|phase|how\b)/i.test(corpus));
+        break;
+      case "relate":
+      case "relation":
+        maybeAdd(slot, /(relat|bridge|connect|link)/i.test(corpus));
+        break;
+      case "uncertainty":
+        maybeAdd(slot, /(uncertain|unknown|hypothesis|exploratory|not yet|maturity)/i.test(corpus));
+        break;
+      case "evidence":
+        maybeAdd(slot, hasPathSignal || /(evidence|artifact|source)/i.test(corpus));
+        break;
+      case "repo-mapping":
+      case "code-path":
+      case "implementation-touchpoints":
+        maybeAdd(slot, hasPathSignal);
+        break;
+      case "definition":
+        maybeAdd(slot, /(what is|definition|meaning|\bdocs\/|\.md\b)/i.test(corpus));
+        break;
+      default:
+        maybeAdd(slot, corpus.includes(slotKey.replace(/-/g, " ")));
+        break;
+    }
+  }
+  return inferred;
+};
+
+const buildHelixAskObjectiveMiniAnswers = (args: {
+  states: HelixAskObjectiveLoopState[];
+  support: HelixAskEvidencePackObjectiveSupport[];
+  obligationCoverage: HelixAskEvidencePackObligationCoverage[];
+  objectiveRetrievalSelectedFiles?: Array<{
+    objective_id: string;
+    pass_index: number;
+    files: string[];
+  }>;
+  fallbackEvidenceRefs?: string[];
+  enableHeuristicInference?: boolean;
+}): HelixAskObjectiveMiniAnswer[] => {
+  if (args.states.length === 0) return [];
+  const supportByLabel = new Map(
+    args.support.map((entry) => [normalizeHelixAskObjectiveLabelKey(entry.objective), entry] as const),
+  );
+  const objectiveFilesById = new Map<string, string[]>();
+  for (const entry of args.objectiveRetrievalSelectedFiles ?? []) {
+    const objectiveId = String(entry.objective_id ?? "").trim();
+    if (!objectiveId) continue;
+    const prior = objectiveFilesById.get(objectiveId) ?? [];
+    const merged = Array.from(
+      new Set(
+        [...prior, ...(Array.isArray(entry.files) ? entry.files : [])]
+          .map((filePath) => String(filePath ?? "").trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 8);
+    objectiveFilesById.set(objectiveId, merged);
+  }
+  const fallbackEvidence = (args.fallbackEvidenceRefs ?? []).slice(0, 8);
+  const answers: HelixAskObjectiveMiniAnswer[] = [];
+  const enableHeuristicInference = args.enableHeuristicInference !== false;
+  for (const state of args.states) {
+    const objectiveKey = normalizeHelixAskObjectiveLabelKey(state.objective_label);
+    const support = supportByLabel.get(objectiveKey);
+    const objectiveTokens = new Set(
+      objectiveKey
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 3),
+    );
+    const matchingCoverage = args.obligationCoverage.filter((coverage) => {
+      const coverageKey = normalizeHelixAskObjectiveLabelKey(coverage.label);
+      if (!coverageKey) return false;
+      if (coverageKey === objectiveKey || coverageKey.includes(objectiveKey) || objectiveKey.includes(coverageKey)) {
+        return true;
+      }
+      const coverageTokens = coverageKey.split(/\s+/).filter((token) => token.length >= 3);
+      const overlap = coverageTokens.filter((token) => objectiveTokens.has(token)).length;
+      return overlap >= 2;
+    });
+    const objectiveEvidenceRefs = objectiveFilesById.get(state.objective_id) ?? [];
+    const evidenceRefs = Array.from(
+      new Set(
+        [
+          ...objectiveEvidenceRefs,
+          ...(support?.matched_slots ?? []),
+          ...matchingCoverage.flatMap((entry) => entry.evidence_refs),
+          ...matchingCoverage.flatMap((entry) => entry.code_refs),
+          ...matchingCoverage.flatMap((entry) => entry.doc_refs),
+        ]
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      ),
+    ).slice(0, 8);
+    const inferredSlots = enableHeuristicInference
+      ? inferHelixAskObjectiveSlotHitsFromEvidence(
+          state.required_slots,
+          state.objective_label,
+          evidenceRefs,
+        )
+      : [];
+    const matchedSlots = Array.from(
+      new Set([
+        ...state.matched_slots,
+        ...(support?.matched_slots ?? []),
+        ...inferredSlots,
+      ]),
+    ).filter(Boolean);
+    const missingSlots =
+      state.required_slots.length > 0
+        ? state.required_slots.filter((slot) => !matchedSlots.includes(slot))
+        : [];
+    const status: HelixAskObjectiveMiniAnswerStatus =
+      state.status === "blocked"
+        ? "blocked"
+        : missingSlots.length === 0
+          ? "covered"
+          : "partial";
+    const evidencePreview = (evidenceRefs.length > 0 ? evidenceRefs : fallbackEvidence).slice(0, 4);
+    const summary = [
+      `${state.objective_label}: ${status === "covered" ? "covered" : status === "partial" ? "partially covered" : "blocked"}.`,
+      evidencePreview.length > 0
+        ? `Evidence: ${evidencePreview.join(", ")}.`
+        : "Evidence: none captured.",
+      missingSlots.length > 0 ? `Missing slots: ${missingSlots.join(", ")}.` : "Missing slots: none.",
+    ].join(" ");
+    answers.push({
+      objective_id: state.objective_id,
+      objective_label: state.objective_label,
+      status,
+      matched_slots: matchedSlots,
+      missing_slots: missingSlots,
+      evidence_refs: evidenceRefs.length > 0 ? evidenceRefs : fallbackEvidence,
+      summary,
+    });
+  }
+  return answers;
+};
+
+const summarizeHelixAskObjectiveMiniValidation = (
+  miniAnswers: HelixAskObjectiveMiniAnswer[],
+): HelixAskObjectiveMiniValidation => {
+  const total = miniAnswers.length;
+  const covered = miniAnswers.filter((entry) => entry.status === "covered").length;
+  const partial = miniAnswers.filter((entry) => entry.status === "partial").length;
+  const blocked = miniAnswers.filter((entry) => entry.status === "blocked").length;
+  const unresolved = Math.max(0, total - covered);
+  return {
+    total,
+    covered,
+    partial,
+    blocked,
+    unresolved,
+  };
+};
+
+const buildHelixAskObjectiveMiniCritiquePrompt = (args: {
+  question: string;
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  responseLanguage?: string | null;
+}): string => {
+  const objectiveBlocks = args.miniAnswers
+    .map((entry, index) => {
+      const matched = entry.matched_slots.join(", ") || "none";
+      const missing = entry.missing_slots.join(", ") || "none";
+      const evidence = entry.evidence_refs.slice(0, 6).join(", ") || "none";
+      return [
+        `${index + 1}. objective_id=${entry.objective_id}`,
+        `label=${entry.objective_label}`,
+        `current_status=${entry.status}`,
+        `matched_slots=${matched}`,
+        `missing_slots=${missing}`,
+        `evidence_refs=${evidence}`,
+        `summary=${entry.summary}`,
+      ].join("\n");
+    })
+    .join("\n\n");
+  return [
+    "You are Helix Ask objective mini-critic.",
+    "Return strict JSON only. No markdown. No commentary.",
+    "Schema:",
+    '{ "objectives": [{"objective_id":"string","status":"covered|partial|blocked","missing_slots":["slot-id"],"reason":"string"}] }',
+    "Rules:",
+    "- Include each objective_id exactly once.",
+    "- Status must be one of covered|partial|blocked.",
+    "- missing_slots must use only slot ids from that objective context when possible.",
+    "- If status=covered, missing_slots must be empty.",
+    "- Keep reason brief.",
+    `responseLanguage=${args.responseLanguage ?? "auto"}`,
+    "",
+    `Question: ${args.question}`,
+    "",
+    "Objective checkpoints:",
+    objectiveBlocks,
+  ].join("\n");
+};
+
+const parseHelixAskObjectiveMiniCritique = (
+  raw: string,
+): HelixAskObjectiveMiniCritique | null => {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return null;
+  const jsonCandidate = extractJsonObject(trimmed) ?? trimmed;
+  try {
+    const parsed = JSON.parse(jsonCandidate) as Record<string, unknown>;
+    const objectiveRaw = Array.isArray(parsed.objectives) ? parsed.objectives : [];
+    const objectives: HelixAskObjectiveMiniCritiqueObjective[] = [];
+    for (const entry of objectiveRaw) {
+      if (!entry || typeof entry !== "object") continue;
+      const record = entry as Record<string, unknown>;
+      const objectiveId = String(record.objective_id ?? "").trim();
+      if (!objectiveId) continue;
+      const statusRaw = String(record.status ?? "")
+        .trim()
+        .toLowerCase();
+      const normalizedStatus =
+        statusRaw === "covered" || statusRaw === "complete"
+          ? "covered"
+          : statusRaw === "blocked"
+            ? "blocked"
+            : statusRaw === "partial"
+              ? "partial"
+              : null;
+      if (!normalizedStatus) continue;
+      const missingSlots = Array.isArray(record.missing_slots)
+        ? record.missing_slots
+            .map((slot) => normalizeSlotId(String(slot ?? "")))
+            .filter((slot): slot is string => Boolean(slot))
+            .slice(0, 8)
+        : [];
+      objectives.push({
+        objective_id: objectiveId,
+        status: normalizedStatus,
+        missing_slots: normalizedStatus === "covered" ? [] : missingSlots,
+        reason: normalizeHelixAskTurnContractText(String(record.reason ?? ""), 180) || undefined,
+      });
+    }
+    if (objectives.length === 0) return null;
+    return { objectives };
+  } catch {
+    return null;
+  }
+};
+
+const applyHelixAskObjectiveMiniCritique = (args: {
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  critique: HelixAskObjectiveMiniCritique;
+  objectiveStates: HelixAskObjectiveLoopState[];
+}): HelixAskObjectiveMiniAnswer[] => {
+  const critiqueById = new Map(
+    args.critique.objectives.map((entry) => [entry.objective_id, entry] as const),
+  );
+  const stateById = new Map(
+    args.objectiveStates.map((entry) => [entry.objective_id, entry] as const),
+  );
+  return args.miniAnswers.map((entry) => {
+    const critique = critiqueById.get(entry.objective_id);
+    if (!critique) return entry;
+    const state = stateById.get(entry.objective_id);
+    const requiredSlots =
+      state?.required_slots.length
+        ? state.required_slots
+        : Array.from(new Set([...entry.matched_slots, ...entry.missing_slots]));
+    const filteredMissing = Array.from(
+      new Set(critique.missing_slots.filter((slot) => requiredSlots.includes(slot))),
+    );
+    const status = critique.status;
+    const missingSlots =
+      status === "covered"
+        ? []
+        : filteredMissing.length > 0
+          ? filteredMissing
+          : status === "partial"
+            ? entry.missing_slots
+            : filteredMissing;
+    const matchedSlots = requiredSlots.filter((slot) => !missingSlots.includes(slot));
+    const reasonSentence = critique.reason ? ` LLM critic: ${critique.reason}.` : "";
+    return {
+      ...entry,
+      status,
+      matched_slots: matchedSlots,
+      missing_slots: missingSlots,
+      summary: `${entry.summary}${reasonSentence}`.trim(),
+    };
+  });
+};
+
+const buildHelixAskObjectiveAssemblyPrompt = (args: {
+  question: string;
+  currentAnswer: string;
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  responseLanguage?: string | null;
+}): string => {
+  const objectiveLines = args.miniAnswers
+    .map((entry, index) => {
+      const evidence = entry.evidence_refs.slice(0, 4).join(", ") || "none";
+      const missing = entry.missing_slots.join(", ") || "none";
+      return `${index + 1}. ${entry.objective_label}\nstatus=${entry.status}\nmissing=${missing}\nevidence=${evidence}\nsummary=${entry.summary}`;
+    })
+    .join("\n\n");
+  return [
+    "You are Helix Ask objective assembler.",
+    "Return a concise final answer only, no JSON and no debug metadata.",
+    "Preserve existing citations and uncertainty statements.",
+    "Use objective checkpoints internally; do not expose planner/checkpoint labels or status fields in the final answer.",
+    "Use the same language as the current answer unless responseLanguage explicitly requests a different language.",
+    `responseLanguage=${args.responseLanguage ?? "auto"}`,
+    "",
+    `Question: ${args.question}`,
+    "",
+    "Objective checkpoints:",
+    objectiveLines,
+    "",
+    "Current answer draft:",
+    args.currentAnswer,
+  ].join("\n");
+};
+
+const buildDeterministicHelixAskObjectiveAssembly = (args: {
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  currentAnswer: string;
+}): string => {
+  const trimmedCurrent = args.currentAnswer.trim();
+  if (
+    args.miniAnswers.length === 1 &&
+    args.miniAnswers[0]?.status === "covered" &&
+    trimmedCurrent.length > 0
+  ) {
+    return trimmedCurrent;
+  }
+  const unresolved = args.miniAnswers
+    .filter((entry) => entry.status !== "covered")
+    .slice(0, 3);
+  if (!trimmedCurrent) {
+    return unresolved.length > 0
+      ? `Current evidence remains incomplete for: ${unresolved
+          .map((entry) => entry.objective_label)
+          .join("; ")}.`
+      : args.miniAnswers
+          .slice(0, 2)
+          .map((entry) => entry.summary)
+          .join(" ");
+  }
+  if (unresolved.length === 0) return trimmedCurrent;
+  const unresolvedLine = unresolved
+    .map((entry) => {
+      const missing = entry.missing_slots.slice(0, 3).join(", ");
+      return missing ? `${entry.objective_label} (missing: ${missing})` : entry.objective_label;
+    })
+    .join("; ");
+  return `${trimmedCurrent}\n\nRemaining uncertainty: ${unresolvedLine}.`;
+};
+
+const HELIX_ASK_OBJECTIVE_LOOP_TERMINAL: ReadonlySet<HelixAskObjectiveLoopStatus> = new Set([
+  "complete",
+  "blocked",
+]);
+
+const isHelixAskObjectiveTerminalStatus = (status: HelixAskObjectiveLoopStatus): boolean =>
+  HELIX_ASK_OBJECTIVE_LOOP_TERMINAL.has(status);
+
+const isHelixAskObjectiveCoverageSatisfied = (state: HelixAskObjectiveLoopState): boolean =>
+  state.required_slots.length === 0 ||
+  state.required_slots.every((slot) => state.matched_slots.includes(slot));
+
+const shouldBypassHelixAskObjectiveScopedRetrievalAgentGate = (args: {
+  canAgentAct: boolean;
+  objectiveAttempt: number;
+  objectiveHasPriorRetrievalPass: boolean;
+}): boolean => {
+  if (args.canAgentAct) return false;
+  if (args.objectiveAttempt > 0) return false;
+  return !args.objectiveHasPriorRetrievalPass;
+};
+
+const collectHelixAskObjectiveScopedRetrievalRecoveryTargets = (args: {
+  states: HelixAskObjectiveLoopState[];
+  retrievalQueries: Array<{ objective_id: string }>;
+  maxObjectives: number;
+}): HelixAskObjectiveLoopState[] => {
+  const coveredObjectiveIds = new Set(
+    args.retrievalQueries
+      .map((entry) => String(entry?.objective_id ?? "").trim())
+      .filter(Boolean),
+  );
+  return args.states
+    .filter((state) => !isHelixAskObjectiveTerminalStatus(state.status))
+    .filter((state) => state.required_slots.length > 0)
+    .filter((state) => !coveredObjectiveIds.has(state.objective_id))
+    .slice(0, Math.max(0, args.maxObjectives));
+};
+
+const collectHelixAskObjectiveIdsWithoutScopedRetrievalPass = (args: {
+  states: HelixAskObjectiveLoopState[];
+  retrievalQueries: Array<{ objective_id: string }>;
+  unresolvedOnly?: boolean;
+  maxObjectives: number;
+}): string[] => {
+  const coveredObjectiveIds = new Set(
+    args.retrievalQueries
+      .map((entry) => String(entry?.objective_id ?? "").trim())
+      .filter(Boolean),
+  );
+  const unresolvedOnly = args.unresolvedOnly !== false;
+  return args.states
+    .filter((state) => !unresolvedOnly || !isHelixAskObjectiveTerminalStatus(state.status))
+    .filter((state) => state.required_slots.length > 0)
+    .filter((state) => !coveredObjectiveIds.has(state.objective_id))
+    .map((state) => state.objective_id)
+    .slice(0, Math.max(0, args.maxObjectives));
+};
+
+const enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers = (args: {
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  states: HelixAskObjectiveLoopState[];
+  retrievalQueries: Array<{ objective_id: string }>;
+  maxObjectives: number;
+}): {
+  miniAnswers: HelixAskObjectiveMiniAnswer[];
+  missingObjectiveIds: string[];
+} => {
+  const missingObjectiveIds = collectHelixAskObjectiveIdsWithoutScopedRetrievalPass({
+    states: args.states,
+    retrievalQueries: args.retrievalQueries,
+    unresolvedOnly: false,
+    maxObjectives: args.maxObjectives,
+  });
+  if (missingObjectiveIds.length === 0) {
+    return {
+      miniAnswers: args.miniAnswers,
+      missingObjectiveIds,
+    };
+  }
+  const missingSet = new Set(missingObjectiveIds);
+  const stateById = new Map(
+    args.states.map((entry) => [entry.objective_id, entry] as const),
+  );
+  const patched = args.miniAnswers.map((entry) => {
+    if (!missingSet.has(entry.objective_id)) return entry;
+    const state = stateById.get(entry.objective_id);
+    const requiredSlots =
+      state?.required_slots.length
+        ? state.required_slots
+        : Array.from(new Set([...entry.matched_slots, ...entry.missing_slots]));
+    const derivedMissingSlots = requiredSlots.filter(
+      (slot) => !entry.matched_slots.includes(slot),
+    );
+    const missingSlots = Array.from(
+      new Set(
+        [
+          ...entry.missing_slots,
+          ...derivedMissingSlots,
+          ...(requiredSlots.length > 0 ? [] : ["evidence"]),
+        ].filter(Boolean),
+      ),
+    ).slice(0, 8);
+    const status: HelixAskObjectiveMiniAnswerStatus =
+      entry.status === "blocked" ? "blocked" : "partial";
+    return {
+      ...entry,
+      status,
+      missing_slots: missingSlots,
+      summary: `${entry.summary} Scoped retrieval pass missing for this objective.`.trim(),
+    };
+  });
+  return {
+    miniAnswers: patched,
+    missingObjectiveIds,
+  };
+};
+
+const buildHelixAskObjectiveLoopState = (
+  contract: HelixAskTurnContract | null,
+): HelixAskObjectiveLoopState[] => {
+  if (!contract || contract.objectives.length === 0) return [];
+  return contract.objectives.map((objective, index) => {
+    const objectiveId = slugifyHelixAskAnswerPlanSectionId(objective.label, `objective_${index + 1}`);
+    return {
+      objective_id: objectiveId,
+      objective_label: objective.label,
+      required_slots: Array.from(
+        new Set(objective.required_slots.map((slot) => normalizeSlotId(slot)).filter(Boolean)),
+      ),
+      matched_slots: [],
+      status: "pending",
+      attempt: 0,
+    };
+  });
+};
+
+const transitionHelixAskObjectiveState = (args: {
+  state: HelixAskObjectiveLoopState;
+  to: HelixAskObjectiveLoopStatus;
+  reason: string;
+  at?: string;
+}): { state: HelixAskObjectiveLoopState; transition?: HelixAskObjectiveTransition } => {
+  const at = args.at ?? new Date().toISOString();
+  const from = args.state.status;
+  const next: HelixAskObjectiveLoopState = { ...args.state };
+  if (args.to === "retrieving") {
+    next.attempt = Math.max(0, (next.attempt ?? 0) + 1);
+    next.started_at = next.started_at ?? at;
+    next.ended_at = undefined;
+    next.blocked_reason = undefined;
+  } else if (args.to === "blocked") {
+    next.ended_at = at;
+    next.blocked_reason = args.reason;
+  } else if (args.to === "complete") {
+    next.ended_at = at;
+    next.blocked_reason = undefined;
+  }
+  next.status = args.to;
+  const shouldRecordTransition = from !== args.to || args.to === "retrieving";
+  if (!shouldRecordTransition) {
+    return { state: next };
+  }
+  return {
+    state: next,
+    transition: {
+      objective_id: next.objective_id,
+      from,
+      to: args.to,
+      reason: args.reason,
+      at,
+    },
+  };
+};
+
+const applyHelixAskObjectiveCoverageSnapshot = (args: {
+  states: HelixAskObjectiveLoopState[];
+  coveredSlots: string[];
+  retrievalConfidence?: number;
+  objectiveIds?: string[];
+  transitionReason?: string;
+  at?: string;
+  transitionLog?: HelixAskObjectiveTransition[];
+}): HelixAskObjectiveLoopState[] => {
+  const covered = new Set(args.coveredSlots.map((slot) => normalizeSlotId(slot)).filter(Boolean));
+  const objectiveScope = Array.isArray(args.objectiveIds) && args.objectiveIds.length > 0
+    ? new Set(args.objectiveIds.map((entry) => String(entry ?? "").trim()).filter(Boolean))
+    : null;
+  const at = args.at ?? new Date().toISOString();
+  const out: HelixAskObjectiveLoopState[] = [];
+  for (const state of args.states) {
+    if (objectiveScope && !objectiveScope.has(state.objective_id)) {
+      out.push(state);
+      continue;
+    }
+    const matched = state.required_slots.filter(
+      (slot) => covered.has(slot) || state.matched_slots.includes(slot),
+    );
+    let next: HelixAskObjectiveLoopState = {
+      ...state,
+      matched_slots: Array.from(new Set(matched)),
+      retrieval_confidence: Number.isFinite(args.retrievalConfidence)
+        ? Number(args.retrievalConfidence)
+        : state.retrieval_confidence,
+    };
+    if (
+      !isHelixAskObjectiveTerminalStatus(next.status) &&
+      isHelixAskObjectiveCoverageSatisfied(next) &&
+      (next.status === "pending" || next.status === "retrieving")
+    ) {
+      const transitioned = transitionHelixAskObjectiveState({
+        state: next,
+        to: "synthesizing",
+        reason: args.transitionReason ?? "objective_coverage_satisfied",
+        at,
+      });
+      next = transitioned.state;
+      if (transitioned.transition && args.transitionLog) {
+        args.transitionLog.push(transitioned.transition);
+      }
+    }
+    out.push(next);
+  }
+  return out;
+};
+
+const summarizeHelixAskObjectiveLoopState = (states: HelixAskObjectiveLoopState[]) => {
+  const total = states.length;
+  const completeCount = states.filter((state) => state.status === "complete").length;
+  const blockedCount = states.filter((state) => state.status === "blocked").length;
+  const terminalCount = states.filter((state) => isHelixAskObjectiveTerminalStatus(state.status)).length;
+  const unresolvedCount = Math.max(0, total - terminalCount);
+  const completionRate = total > 0 ? Number((completeCount / total).toFixed(4)) : 1;
+  return {
+    total,
+    completeCount,
+    blockedCount,
+    terminalCount,
+    unresolvedCount,
+    completionRate,
+  };
+};
+
+const finalizeHelixAskObjectiveLoopState = (args: {
+  states: HelixAskObjectiveLoopState[];
+  validationPassed: boolean;
+  failReason?: string | null;
+  at?: string;
+  transitionLog?: HelixAskObjectiveTransition[];
+}): HelixAskObjectiveLoopState[] => {
+  const at = args.at ?? new Date().toISOString();
+  return args.states.map((state) => {
+    if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
+    const coverageSatisfied = isHelixAskObjectiveCoverageSatisfied(state);
+    const to =
+      args.validationPassed && coverageSatisfied
+        ? "complete"
+        : ("blocked" as HelixAskObjectiveLoopStatus);
+    const reason =
+      to === "complete"
+        ? "objective_finalize_complete"
+        : args.failReason?.trim()
+          ? args.failReason.trim()
+          : coverageSatisfied
+            ? "quality_gate_fail"
+            : "missing_required_slots";
+    const transitioned = transitionHelixAskObjectiveState({
+      state,
+      to,
+      reason,
+      at,
+    });
+    if (transitioned.transition && args.transitionLog) {
+      args.transitionLog.push(transitioned.transition);
+    }
+    return transitioned.state;
+  });
+};
+
 const buildHelixAskObjectivePlannerPrompt = (args: {
   question: string;
   requiresRepoEvidence: boolean;
@@ -24690,6 +26863,7 @@ const buildHelixAskObjectivePlannerPrompt = (args: {
     "You are Helix Ask objective planner.",
     "Return strict JSON only. No markdown. No commentary.",
     "Do not emit file paths, code symbols, citations, or final-answer prose.",
+    "Do not use placeholder section titles or objective labels such as Plan for X or Notes: See X.",
     `Use one of these output_family values: definition_overview, mechanism_process, equation_formalism, comparison_tradeoff, troubleshooting_diagnosis, implementation_code_path, roadmap_planning, recommendation_decision, general_overview.`,
     "Use grounding_mode repo when repo grounding is required, hybrid when both repo and open-world planning are useful, open when repo grounding is not required.",
     `Limit objectives to ${HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES}.`,
@@ -24943,12 +27117,55 @@ const buildHelixAskAnswerPlanShadow = (
   const turnContract = args.turnContract ?? fallbackTurnContract;
   const family = turnContract.output_family;
   const specificity = turnContract.prompt_specificity;
+  const allowedCitations = rankPathsByPrecedence(
+    prioritizeHelixAskAllowedCitations(args.allowedCitations, 16),
+    args.promptResearchRetrievalContract?.precedence_paths ?? [],
+    16,
+  );
+  const coveredSlots = Array.from(
+    new Set(
+      [
+        ...turnContract.required_slots.filter(
+          (slot) => !(args.slotMissing ?? []).map((entry) => normalizeSlotId(entry)).includes(normalizeSlotId(slot)),
+        ),
+        ...(args.objectiveSupport ?? []).flatMap((entry) => entry.matched_slots ?? []),
+      ]
+        .map((slot) => normalizeSlotId(slot))
+        .filter(Boolean),
+    ),
+  );
+  const obligationCoverage = buildHelixAskTurnContractObligationCoverage({
+    obligations: turnContract.obligations ?? [],
+    coveredSlots,
+    allowedCitations,
+    precedencePaths: args.promptResearchRetrievalContract?.precedence_paths ?? [],
+  });
+  const evidenceBlocks = buildHelixAskEvidencePackBlocks({
+    question: args.question,
+    allowedCitations,
+    evidenceText: args.evidenceText,
+    sections: args.evidenceSections,
+  });
+  const obligationEvidence = buildObligationEvidence({
+    obligationCoverage: obligationCoverage.map((coverage) => ({
+      obligation_id: coverage.obligation_id,
+      status: coverage.status,
+      evidence_refs: coverage.evidence_refs,
+    })),
+    evidenceBlocks: evidenceBlocks.map((block) => ({
+      content: block.content,
+      citations: block.citations,
+    })),
+    retrievalContract: args.promptResearchRetrievalContract ?? null,
+  });
   const sections = buildHelixAskAnswerPlanSections({
     question: args.question,
     family,
     objectives: turnContract.objectives,
     requiredSlots: turnContract.required_slots,
     plannerSections: turnContract.answer_format.sections,
+    obligations: turnContract.obligations,
+    obligationCoverage,
     requiresRepoEvidence: turnContract.constraints.requires_repo_evidence,
   });
   const targetVerbosity = resolveHelixAskAnswerPlanTargetVerbosity({
@@ -24967,7 +27184,6 @@ const buildHelixAskAnswerPlanShadow = (
         selector_locked: Boolean(args.selectorLocked),
       }),
     ).slice(0, 16);
-  const allowedCitations = prioritizeHelixAskAllowedCitations(args.allowedCitations, 16);
   const evidenceHash = sha256Hex(
     stableJsonStringify({
       allowed_citations: allowedCitations,
@@ -24979,6 +27195,9 @@ const buildHelixAskAnswerPlanShadow = (
         ? Number((args.retrievalConfidence ?? 0).toFixed(3))
         : null,
       objective_support: args.objectiveSupport ?? [],
+      obligation_coverage: obligationCoverage,
+      obligation_evidence: obligationEvidence,
+      evidence_blocks: evidenceBlocks,
       turn_contract_hash: hashHelixAskTurnContract(turnContract),
     }),
   );
@@ -25020,12 +27239,18 @@ const buildHelixAskAnswerPlanShadow = (
         : null,
       evidence_gap: Boolean(args.evidenceGap),
       objective_support: (args.objectiveSupport ?? []).slice(0, HELIX_ASK_OBJECTIVE_PLANNER_MAX_OBJECTIVES),
+      obligation_coverage: obligationCoverage.slice(0, 8),
+      obligation_evidence: obligationEvidence.slice(0, 8),
+      evidence_blocks: evidenceBlocks,
     },
   };
 };
 
 const escapeAnswerPlanHeadingRegExp = (input: string): string =>
   input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const HELIX_ASK_ANSWER_PLAN_PLACEHOLDER_LINE_RE =
+  /^\s*-\s*(?:plan\s+for\b|notes:\s+see\b)/i;
 
 const answerPlanSectionPresent = (renderedText: string, section: HelixAskAnswerPlanSection): boolean => {
   const text = String(renderedText ?? "");
@@ -25122,6 +27347,14 @@ const validateHelixAskAnswerPlanShadow = (
     failReasons.push("debug_leak");
   }
 
+  const placeholderLineCount = renderedText
+    .split(/\r?\n/)
+    .filter((line) => HELIX_ASK_ANSWER_PLAN_PLACEHOLDER_LINE_RE.test(line))
+    .length;
+  if (placeholderLineCount > 0) {
+    failReasons.push("placeholder_section");
+  }
+
   const degraded =
     /\bunified degrade response\b/i.test(renderedText) ||
     /\bno verified symbol-match\b/i.test(renderedText) ||
@@ -25146,6 +27379,7 @@ const validateHelixAskAnswerPlanShadow = (
     family_format_accuracy: familyFormatAccuracy,
     anchor_integrity_violations: anchorIntegrityViolations.slice(0, 12),
     debug_leak_hits: debugLeakHits,
+    placeholder_section_count: placeholderLineCount,
     degraded,
     degrade_reason: degradeReason,
   };
@@ -25434,6 +27668,8 @@ const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
   if (/^\s*(?:inputs?|outputs?|constraints?|sources?|details|proof|tree walk|convergence snapshot)\b/i.test(text)) {
     return true;
   }
+  if (/^\s*notes?\s*:\s*see\b/i.test(text)) return true;
+  if (/^\s*plan\s+for\b/i.test(text)) return true;
   if (HELIX_ASK_COMPOSER_V2_HANDOFF_SCaffold_SIGNAL_RE.test(text)) return true;
   if (/\b(?:dialogue:\s*\d+\s*\|\s*evidence:\s*\d+|focus:\s*pass\s*\|\s*anchor:\s*pass|retry:\s*not applied)\b/i.test(text)) {
     return true;
@@ -25441,6 +27677,8 @@ const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
   if (/\bunknown\b(?:\s*(?:->|,|\/|\|)?\s*\bunknown\b){1,}/i.test(text)) return true;
   if (/^\(?\s*see\s+[A-Za-z0-9_./\\:-]+\)?\.?$/i.test(text)) return true;
   if (/^\s*\(?\s*see\b.*\)\s*$/i.test(text)) return true;
+  if (/\b20\d{6}T\d{6}Z(?:\s+20\d{6}T\d{6}Z(?:\.[A-Za-z0-9_-]+)?)?(?:\.json)?(?:\.\.\.)?\b/i.test(text)) return true;
+  if (/\b[A-Za-z0-9._/-]+\.json\.\.\./i.test(text)) return true;
   const normalizedPlain = text
     .replace(/\[[^\]]+\]/g, " ")
     .replace(/\([^)]*\)/g, " ")
@@ -25467,6 +27705,19 @@ const isLowSignalHelixAskComposerV2SeedSentence = (value: string): boolean => {
     return true;
   }
   return false;
+};
+
+const isUsableHelixAskEvidenceBlockForGrounding = (block: {
+  label?: string | null;
+  content?: string | null;
+  citations?: string[] | null;
+}): boolean => {
+  const content = String(block.content ?? "").trim();
+  if (!content) return false;
+  const normalized = `${String(block.label ?? "").trim()}: ${content}`.trim();
+  if (isLowSignalHelixAskComposerV2SeedSentence(normalized)) return false;
+  if ((block.citations ?? []).length === 0 && content.length < 48) return false;
+  return true;
 };
 
 const extractComposerV2TopicTerms = (question: string): string[] =>
@@ -25879,20 +28130,33 @@ const buildHelixAskComposerV2GroundedBrief = (args: {
   const primaryAnchor = rankedSourceHints[0] ?? "server/routes/agi.plan.ts";
   const primaryDoc = docHints[0] ?? primaryAnchor;
   const topicLabel = topicTerms.length > 0 ? topicTerms.join(" ") : "the requested topic";
-  const canonicalEvidenceText = String(args.evidenceText ?? "").trim();
+  const rawCanonicalEvidenceText = String(args.evidenceText ?? "").trim();
+  const canonicalEvidenceText =
+    rawCanonicalEvidenceText && !isLowSignalHelixAskComposerV2SeedSentence(rawCanonicalEvidenceText)
+      ? rawCanonicalEvidenceText
+      : "";
+  const usableEvidenceBlocks = (args.plan.evidence_pack.evidence_blocks ?? []).filter(
+    isUsableHelixAskEvidenceBlockForGrounding,
+  );
+  const evidenceBlockText = usableEvidenceBlocks
+    .map((block) => `${block.label}: ${block.content}`)
+    .join("\n\n");
   const evidenceHandoff = buildHelixAskComposerV2EvidenceHandoff({
     question,
-    evidenceText: canonicalEvidenceText || String(args.existingText ?? ""),
+    evidenceText: canonicalEvidenceText || evidenceBlockText || String(args.existingText ?? ""),
     allowedCitations: sourceHints,
   });
   const evidenceDigestSource: HelixAskComposerV2GroundedBrief["evidence_digest_source"] =
     canonicalEvidenceText
       ? "canonical_evidence"
-      : evidenceHandoff.source === "citation_snippets" ||
+      : evidenceBlockText
+        ? "citation_snippet_fallback"
+        : evidenceHandoff.source === "citation_snippets" ||
           evidenceHandoff.source === "evidence_text_plus_citation_snippets"
         ? "citation_snippet_fallback"
         : "existing_text_only";
-  const digestSourceText = canonicalEvidenceText || String(args.existingText ?? "");
+  const digestSourceText =
+    canonicalEvidenceText || evidenceBlockText || String(args.existingText ?? "");
   const evidenceDigestClaims = collectDeterministicEvidenceClaims({
     question,
     evidenceText: digestSourceText,
@@ -25906,8 +28170,23 @@ const buildHelixAskComposerV2GroundedBrief = (args: {
     .map((entry) => entry.trim())
     .filter((entry) => entry.length >= 20 && !isLowSignalHelixAskComposerV2SeedSentence(entry))
     .slice(0, 8);
+  const blockSeedSentence =
+    usableEvidenceBlocks
+      .map((block) => {
+        const sentence =
+          collectDeterministicEvidenceClaims({
+            question,
+            evidenceText: `${block.label}: ${block.content}`,
+            conceptual: args.plan.prompt_family !== "implementation_code_path",
+          })[0] ?? "";
+        return ensureSentence(
+          clipAskText(cleanDanglingFileExtensionFragments(sanitizeDeterministicContractLine(sentence)), 300),
+        );
+      })
+      .find((entry) => entry.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry)) ?? "";
   const digestSeedSentence =
-    evidenceDigestClaims.find((entry) => entry.length >= 24) ??
+    evidenceDigestClaims.find((entry) => entry.length >= 24) ||
+    blockSeedSentence ||
     (sourceHints[0]
       ? `Primary anchor in this turn is ${sourceHints[0]} with additional support in ${
           sourceHints.slice(1, 3).join(" and ") || sourceHints[0]
@@ -25923,6 +28202,7 @@ const buildHelixAskComposerV2GroundedBrief = (args: {
   const shortSeedCandidates = [
     sentenceSeed,
     digestSeedSentence,
+    blockSeedSentence,
     deterministicShortSeed,
   ]
     .map((entry) => normalizeHelixAskComposerV2ClaimText(entry))
@@ -26994,15 +29274,88 @@ const selectHelixAskPlannedSectionClaimLanes = (
   }
 };
 
+const selectHelixAskPlannedSectionEvidenceBlocks = (args: {
+  plan: HelixAskAnswerPlan;
+  section: HelixAskAnswerPlanSection;
+}): HelixAskEvidencePackBlock[] => {
+  const questionTerms = tokenizeCoverageRelevance(
+    [
+      args.plan.turn_contract.goal,
+      args.section.title,
+      args.section.objective_label ?? "",
+      ...(args.section.must_answer ?? []),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+  const preferredRefs = new Set(
+    normalizeCitations([
+      ...(args.section.evidence_refs ?? []),
+      ...(args.plan.evidence_pack.allowed_citations ?? []),
+    ]).slice(0, 16),
+  );
+  return (args.plan.evidence_pack.evidence_blocks ?? [])
+    .filter(isUsableHelixAskEvidenceBlockForGrounding)
+    .map((block, index) => {
+      const relevance = scoreCoverageRelevance(questionTerms, `${block.label} ${block.content}`);
+      const citationMatchCount = block.citations.filter((entry) => preferredRefs.has(entry)).length;
+      const codeHit = block.citations.some((entry) => isCodeEvidencePath(entry)) ? 1 : 0;
+      const docHit = block.citations.some((entry) => isDocEvidencePath(entry)) ? 1 : 0;
+      const definitionHit = /\b(?:defines?|definition|means|refers to|modeled|shift vector field|spacetime region)\b/i.test(
+        `${block.label} ${block.content}`,
+      )
+        ? 1
+        : 0;
+      const mechanismHit = /\b(?:defines?|describes?|documents?|implemented|compute|computed|orchestrat|solve|solver|pipeline|module|runtime|constraint|flow)\b/i.test(
+        block.content,
+      )
+        ? 1
+        : 0;
+      let score = relevance * 10 + citationMatchCount * 4 + mechanismHit * 2;
+      if ((args.section.kind ?? "answer") === "repo") score += codeHit * 3 + docHit;
+      if ((args.section.kind ?? "answer") === "definition") score += docHit * 2;
+      if ((args.section.kind ?? "answer") === "mechanism") score += mechanismHit * 2 + codeHit;
+      if ((args.section.kind ?? "answer") === "answer") score += definitionHit * 4 + docHit * 2;
+      if ((args.section.kind ?? "answer") === "definition") score += definitionHit * 4;
+      return { block, score, index };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((entry) => entry.block)
+    .slice(0, 3);
+};
+
+const collectHelixAskRepoTechnicalFocusHints = (args: {
+  question: string;
+  queryHints?: string[] | null;
+  limit?: number;
+}): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (value: string): void => {
+    const normalized = String(value ?? "").trim();
+    if (!normalized || seen.has(normalized)) return;
+    if (/^(?:docs|server|client|modules|scripts|tools|shared)$/i.test(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  };
+  for (const identifier of extractRepoSearchIdentifiers(args.question)) push(identifier);
+  for (const hint of args.queryHints ?? []) {
+    for (const identifier of extractRepoSearchIdentifiers(String(hint ?? ""))) push(identifier);
+  }
+  return out.slice(0, Math.max(1, args.limit ?? 3));
+};
+
 const buildHelixAskPlannedSectionFallbackLines = (args: {
   plan: HelixAskAnswerPlan;
   section: HelixAskAnswerPlanSection;
   brief: HelixAskComposerV2GroundedBrief;
-}): string[] => {
+}): HelixAskPlannedSectionFallbackEntry[] => {
   const hints = normalizeCitations([
     ...args.plan.evidence_pack.allowed_citations,
     ...args.brief.evidence_anchor_hints,
   ]).slice(0, 8);
+  const promptResearchMeta = args.plan.turn_contract.prompt_research_contract;
   const codeHints = hints.filter(
     (entry) =>
       /\.(?:ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|cs)(?::\d+)?$/i.test(entry) ||
@@ -27018,56 +29371,283 @@ const buildHelixAskPlannedSectionFallbackLines = (args: {
     docHints.find((entry) => /(?:needle-hull|mark2|mark-2|natario-zero-expansion)/i.test(entry)) ??
     docHints[1] ??
     baselineDoc;
-  const repoPath = codeHints.slice(0, 2);
+  const repoPath = (args.section.evidence_refs ?? []).filter((entry) => codeHints.includes(entry)).slice(0, 2);
   const focusTitle = args.section.title.toLowerCase();
+  const focusLabel = normalizeHelixAskAnswerObligationLabel(
+    args.section.objective_label ?? args.section.must_answer?.[0] ?? args.section.title,
+    args.section.title,
+  );
+  const repoTechnicalFocusHints = collectHelixAskRepoTechnicalFocusHints({
+    question: args.plan.turn_contract.goal,
+    queryHints: args.plan.turn_contract.query_hints,
+    limit: 4,
+  });
+  const primaryRepoTechnicalFocus = repoTechnicalFocusHints[0] ?? "";
+  const evidenceBlocks = selectHelixAskPlannedSectionEvidenceBlocks({
+    plan: args.plan,
+    section: args.section,
+  });
+  const evidenceRefs = normalizeCitations(args.section.evidence_refs ?? []).slice(0, 3);
+  const matchedSlots = (args.section.matched_slots ?? []).filter(Boolean);
+  const missingSlots = (args.section.missing_slots ?? []).filter(Boolean);
+  const evidenceBlockClaims = evidenceBlocks
+    .flatMap((block) =>
+      collectDeterministicEvidenceClaims({
+        question: `${args.plan.turn_contract.goal} ${focusLabel}`,
+        evidenceText: block.content,
+        conceptual: (args.section.kind ?? "answer") !== "repo",
+      }).map((claim) => ({
+        text: ensureSentence(
+          clipAskText(cleanDanglingFileExtensionFragments(sanitizeDeterministicContractLine(claim)), 320),
+        ),
+        citations: block.citations,
+      })),
+    )
+    .filter((entry) => entry.text.length >= 24 && !isLowSignalHelixAskComposerV2SeedSentence(entry.text));
+  const primaryEvidenceLine = evidenceBlockClaims[0]?.text ?? "";
+  const supportingEvidenceLine =
+    evidenceBlockClaims.find(
+      (entry) =>
+        entry.text &&
+        primaryEvidenceLine &&
+        canonicalizeHelixAskComposerV2ClaimDedupeKey(entry.text) !==
+          canonicalizeHelixAskComposerV2ClaimDedupeKey(primaryEvidenceLine),
+    )?.text ?? "";
+  const blockCitations = normalizeCitations(evidenceBlocks.flatMap((block) => block.citations));
+  const blockCodeRefs = blockCitations.filter((entry) => isCodeEvidencePath(entry)).slice(0, 3);
+  const evidenceSummary =
+    evidenceRefs.length > 0
+      ? `Grounded by ${evidenceRefs.join(", ")}`
+      : hints.length > 0
+        ? `Grounded by ${hints.slice(0, 2).join(", ")}`
+        : "Grounded by the retrieved evidence in this turn";
+  const rawEntries: HelixAskPlannedSectionFallbackEntry[] = [];
+  if (
+    promptResearchMeta?.verbatim_constraints.length &&
+    /\bboundary\b/i.test(args.section.title)
+  ) {
+    for (const constraint of promptResearchMeta.verbatim_constraints.slice(0, 2)) {
+      rawEntries.push({ text: constraint, raw: true });
+    }
+  }
+  if (
+    promptResearchMeta?.provenance_table_schema.length &&
+    /^provenance table$/i.test(args.section.title)
+  ) {
+    const tableBlock = buildPromptResearchContractProvenanceTableBlock({
+      schema: promptResearchMeta.provenance_table_schema,
+      unknownMarker: promptResearchMeta.unknown_marker,
+    });
+    if (tableBlock) {
+      return [
+        ...rawEntries,
+        {
+          text: tableBlock,
+          raw: true,
+        },
+      ];
+    }
+  }
+  const line = (text: string, citations: string[] = []): HelixAskPlannedSectionFallbackEntry => ({
+    text,
+    citations,
+  });
   switch (args.section.kind ?? "answer") {
     case "definition":
     case "answer":
-      return [args.brief.short_answer_seed, args.brief.conceptual_baseline_seed];
+      return [
+        ...rawEntries,
+        line(primaryEvidenceLine || ensureSentence(args.brief.short_answer_seed), blockCitations),
+        line(
+          supportingEvidenceLine ||
+            (blockCodeRefs.length > 0
+              ? ensureSentence(
+                  `Implementation anchors in this turn include ${blockCodeRefs.slice(0, 2).join(" and ")}`,
+                )
+              : ensureSentence(evidenceSummary)),
+          blockCitations,
+        ),
+      ];
     case "mechanism":
-      if (/traditional/.test(focusTitle)) {
-        return [
-          ensureSentence(
-            repoPath.length > 0
-              ? `Traditional warp-bubble solve is framed in ${baselineDoc} and implemented through ${repoPath.join(" and ")}`
-              : `Traditional warp-bubble solve is framed in ${baselineDoc}`,
-          ),
-        ];
-      }
-      if (/needle hull|mark 2|mark2|mk 2|mk2/.test(focusTitle)) {
-        return [
-          ensureSentence(
-            repoPath.length > 0
-              ? `Needle Hull Mark 2 improvement is anchored in ${needleDoc} and tied to the active warp implementation through ${repoPath.join(" and ")}`
-              : `Needle Hull Mark 2 improvement is anchored in ${needleDoc}`,
-          ),
-        ];
-      }
-      return [args.brief.repo_solve_seed, args.brief.conceptual_baseline_seed];
+      return [
+        ...rawEntries,
+        line(
+          primaryEvidenceLine ||
+            (repoPath.length > 0
+              ? ensureSentence(`${focusLabel} is traced through ${repoPath.join(" and ")}`)
+              : ensureSentence(`${focusLabel} remains grounded in ${baselineDoc}`)),
+          blockCitations,
+        ),
+        line(supportingEvidenceLine || ensureSentence(args.brief.repo_solve_seed), blockCitations),
+      ];
     case "comparison":
       return [
-        ensureSentence(`Traditional baseline is documented in ${baselineDoc}`),
-        ensureSentence(`Needle Hull Mark 2 improvement is anchored in ${needleDoc}`),
+        ...rawEntries,
+        line(
+          primaryEvidenceLine ||
+            ensureSentence(`${focusLabel} compares evidence anchored in ${baselineDoc}`),
+          blockCitations,
+        ),
+        line(
+          supportingEvidenceLine ||
+            ensureSentence(
+              evidenceRefs.length > 1
+                ? `Secondary comparison anchors include ${evidenceRefs.slice(1).join(", ")}`
+                : `Secondary comparison anchors include ${needleDoc}`,
+            ),
+          blockCitations,
+        ),
       ];
     case "repo":
+      if (/where in repo|implementation in repo/.test(focusTitle)) {
+        return [
+          ...rawEntries,
+          line(
+            primaryEvidenceLine ||
+              (blockCodeRefs.length > 0
+                ? ensureSentence(
+                    primaryRepoTechnicalFocus
+                      ? `${primaryRepoTechnicalFocus} is anchored in ${blockCodeRefs[0]}${
+                          blockCodeRefs[1] ? ` with supporting flow in ${blockCodeRefs[1]}` : ""
+                        }`
+                      : `Primary implementation anchors for ${focusLabel} are ${blockCodeRefs.slice(0, 2).join(" and ")}`,
+                  )
+                : ensureSentence(`Primary implementation anchors remain partial for ${focusLabel}`)),
+            blockCitations,
+          ),
+          line(
+            supportingEvidenceLine ||
+              (evidenceRefs.length > 0
+                ? ensureSentence(`Supporting evidence in this turn is grounded in ${evidenceRefs.slice(0, 2).join(" and ")}`)
+                : ensureSentence(evidenceSummary)),
+            blockCitations,
+          ),
+        ];
+      }
+      if (/call chain/.test(focusTitle)) {
+        return [
+          ...rawEntries,
+          line(
+            primaryEvidenceLine ||
+              (blockCodeRefs.length > 0
+                ? ensureSentence(
+                    primaryRepoTechnicalFocus
+                      ? `${primaryRepoTechnicalFocus} is traced through ${blockCodeRefs.slice(0, 2).join(" and ")} in this turn`
+                      : `Repository runtime path is traced through ${blockCodeRefs.slice(0, 2).join(" and ")}`,
+                  )
+                : ensureSentence(`Call-chain detail remains bounded for ${focusLabel}`)),
+            blockCitations,
+          ),
+          line(
+            supportingEvidenceLine ||
+              (matchedSlots.length > 0
+                ? ensureSentence(`Covered implementation slots: ${matchedSlots.join(", ")}`)
+                : blockCodeRefs.length > 0
+                  ? ensureSentence(`Use ${blockCodeRefs[0]} as the first write/read anchor before editing downstream cleanup or reporting`)
+                  : ensureSentence(args.brief.repo_solve_seed)),
+            blockCitations,
+          ),
+        ];
+      }
+      if (/key structs\/types|key symbols/.test(focusTitle)) {
+        return [
+          ...rawEntries,
+          line(
+            primaryEvidenceLine ||
+              (repoTechnicalFocusHints.length > 0
+                ? ensureSentence(`Prompt-explicit symbols in this turn include ${repoTechnicalFocusHints.slice(0, 3).join(", ")}`)
+                : blockCodeRefs.length > 0
+                  ? ensureSentence(`Primary implementation symbols should be inspected in ${blockCodeRefs[0]}`)
+                  : ensureSentence(`Key symbols remain bounded for ${focusLabel}`)),
+            blockCitations,
+          ),
+        ];
+      }
+      if (/what to change safely|safe changes/.test(focusTitle)) {
+        return [
+          ...rawEntries,
+          line(
+            primaryEvidenceLine ||
+              (blockCodeRefs.length > 0
+                ? ensureSentence(
+                    primaryRepoTechnicalFocus
+                      ? `Start with writes to ${primaryRepoTechnicalFocus} in ${blockCodeRefs[0]} before changing downstream formatting or diagnostics`
+                      : `Start with the primary implementation anchor ${blockCodeRefs[0]} before changing downstream formatting or diagnostics`,
+                  )
+                : ensureSentence(`Keep edits bounded to the verified implementation anchors for ${focusLabel}`)),
+            blockCitations,
+          ),
+          line(
+            supportingEvidenceLine ||
+              ensureSentence("For line-level edits, narrow the next pass with explicit symbol or file:line anchors."),
+            blockCitations,
+          ),
+        ];
+      }
       return [
-        repoPath.length > 0
-          ? ensureSentence(`Primary implementation anchors for this section are ${repoPath.join(" and ")}`)
-          : "Implementation anchors are limited in this turn; use the locked sources below.",
-        args.brief.repo_solve_seed,
+        ...rawEntries,
+        line(
+          primaryEvidenceLine ||
+            (repoPath.length > 0
+              ? ensureSentence(
+                  `Primary implementation anchors for ${focusLabel} are ${repoPath.join(" and ")}`,
+                )
+              : ensureSentence(`Implementation anchors remain partial for ${focusLabel}`)),
+          blockCitations,
+        ),
+        line(
+          supportingEvidenceLine ||
+            (matchedSlots.length > 0
+              ? ensureSentence(`Covered implementation slots: ${matchedSlots.join(", ")}`)
+              : blockCodeRefs.length > 0
+                ? ensureSentence(
+                    `Primary implementation anchors in this turn are ${blockCodeRefs.slice(0, 2).join(" and ")}`,
+                  )
+                : ensureSentence(args.brief.repo_solve_seed)),
+          blockCitations,
+        ),
       ];
     case "roadmap":
-      return [args.brief.repo_solve_seed, args.brief.open_gaps_seed];
+      return [
+        ...rawEntries,
+        line(
+          primaryEvidenceLine ||
+            ensureSentence(`${focusLabel} is constrained by ${evidenceSummary.toLowerCase()}`),
+          blockCitations,
+        ),
+        line(supportingEvidenceLine || ensureSentence(args.brief.open_gaps_seed), blockCitations),
+      ];
     case "diagnosis":
       return [
-        "Most likely issue remains bounded to the current implementation and evidence path.",
-        "Use the cited repo anchors below to verify the failing stage directly.",
+        ...rawEntries,
+        line(
+          primaryEvidenceLine ||
+            ensureSentence(
+              `Current diagnosis for ${focusLabel} remains bounded to the cited evidence path.`,
+            ),
+          blockCitations,
+        ),
+        line(
+          supportingEvidenceLine ||
+            ensureSentence("Use the cited repo anchors below to verify the failing stage directly."),
+          blockCitations,
+        ),
       ];
     case "gaps":
-      return [args.brief.open_gaps_seed];
+      return [
+        ...rawEntries,
+        line(
+          missingSlots.length > 0
+            ? ensureSentence(
+                `Current evidence is incomplete for ${focusLabel}; missing slots: ${missingSlots.join(", ")}`,
+              )
+            : ensureSentence(args.brief.open_gaps_seed),
+          blockCitations,
+        ),
+      ];
     case "sources":
     default:
-      return [];
+      return rawEntries;
   }
 };
 
@@ -27115,13 +29695,39 @@ const renderHelixAskComposerV2PlannedAnswer = (args: {
       }))
       .filter((entry) => Boolean(entry.text))
       .sort((a, b) => b.score - a.score);
-    const chosen: Array<{ text: string; citations: string[]; uncertainty: string | null }> = [];
+    const fallbackEntries = buildHelixAskPlannedSectionFallbackLines({
+      plan: args.plan,
+      section,
+      brief: args.brief,
+    });
+    const chosen: Array<{
+      text: string;
+      citations: string[];
+      uncertainty: string | null;
+      raw: boolean;
+    }> = [];
     const seen = new Set<string>();
+    for (const entry of fallbackEntries.filter((fallback) => fallback.raw)) {
+      const key = canonicalizeHelixAskComposerV2ClaimDedupeKey(entry.text);
+      if (!entry.text || !key || seen.has(key)) continue;
+      seen.add(key);
+      chosen.push({
+        text: entry.text,
+        citations: normalizeCitations(entry.citations ?? []).slice(0, 3),
+        uncertainty: entry.uncertainty ?? null,
+        raw: true,
+      });
+    }
     for (const entry of candidateClaims) {
       const key = canonicalizeHelixAskComposerV2ClaimDedupeKey(entry.text);
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      chosen.push({ text: entry.text, citations: entry.citations, uncertainty: entry.uncertainty });
+      chosen.push({
+        text: entry.text,
+        citations: entry.citations,
+        uncertainty: entry.uncertainty,
+        raw: false,
+      });
       const targetCount =
         (section.kind ?? "answer") === "answer" || (section.kind ?? "answer") === "definition"
           ? 1 + Math.max(0, targetRank - 1)
@@ -27130,18 +29736,18 @@ const renderHelixAskComposerV2PlannedAnswer = (args: {
             : 2 + Math.max(0, targetRank - 1);
       if (chosen.length >= targetCount) break;
     }
-    const fallbackLines = buildHelixAskPlannedSectionFallbackLines({
-      plan: args.plan,
-      section,
-      brief: args.brief,
-    });
-    for (const fallback of fallbackLines) {
+    for (const fallback of fallbackEntries.filter((entry) => !entry.raw)) {
       if (chosen.length >= ((section.kind ?? "answer") === "gaps" ? 1 : 2 + Math.max(0, targetRank - 1))) break;
-      const normalizedFallback = normalizeHelixAskComposerV2ClaimText(fallback);
+      const normalizedFallback = normalizeHelixAskComposerV2ClaimText(fallback.text);
       const key = canonicalizeHelixAskComposerV2ClaimDedupeKey(normalizedFallback);
       if (!normalizedFallback || !key || seen.has(key)) continue;
       seen.add(key);
-      chosen.push({ text: normalizedFallback, citations: [], uncertainty: null });
+      chosen.push({
+        text: normalizedFallback,
+        citations: normalizeCitations(fallback.citations ?? []).slice(0, 3),
+        uncertainty: fallback.uncertainty ?? null,
+        raw: false,
+      });
     }
     lines.push(`${section.title}:`);
     if (chosen.length === 0) {
@@ -27156,6 +29762,10 @@ const renderHelixAskComposerV2PlannedAnswer = (args: {
       continue;
     }
     for (const entry of chosen) {
+      if (entry.raw) {
+        lines.push(entry.text);
+        continue;
+      }
       let line = entry.text;
       if (entry.citations.length > 0) {
         line = `${line} [${entry.citations.join(", ")}]`;
@@ -27684,6 +30294,9 @@ const HELIX_ASK_UNIVERSAL_FAMILY_DEGRADE_SECTION_FRAGMENT_RE =
 const isLowSignalHelixAskUniversalFamilyDegradeSentence = (value: string): boolean => {
   const text = String(value ?? "").trim();
   if (!text) return true;
+  if (/^evidence is limited in current retrieval/i.test(text)) return true;
+  if (/\b20\d{6}T\d{6}Z(?:\s+20\d{6}T\d{6}Z(?:\.[A-Za-z0-9_-]+)?)?(?:\.json)?(?:\.\.\.)?\b/i.test(text)) return true;
+  if (/\b[A-Za-z0-9._/-]+\.json\.\.\./i.test(text)) return true;
   if (/^\s*(?:\d+\.\s*)?(?:\[[A-Za-z0-9._\/:-]+\]\s*)+\s*$/i.test(text)) return true;
   const citationStripped = text.replace(/\[[^\]]+\]/g, " ").replace(/\s{2,}/g, " ").trim();
   if (/^(?:\d+\.\s*)+$/.test(citationStripped)) return true;
@@ -27726,7 +30339,9 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
     selectHelixAskUniversalFamilyDegradeEvidenceSentence(existingText) ??
     "Repo-grounded summary prepared from current in-family evidence.";
   const conciseEvidence = ensureSentence(clipAskText(evidenceSentence, 220));
-  const asksHowSolvedInCodebase = /\b(?:how\s+(?:is|are|it)|solved?|implemented?|computed?|codebase|call\s+chain|pipeline)\b/i.test(
+  const asksDefinitionQuestion =
+    /\b(?:what\s+is|what's|define|definition of|what does)\b/i.test(normalizedQuestion);
+  const asksHowSolvedInCodebase = /\b(?:how\s+(?:is|are|it)|solved?|implemented?|computed?|call\s+chain|pipeline)\b/i.test(
     normalizedQuestion,
   );
   const asksNeedleHullMark2 =
@@ -27735,6 +30350,12 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
     /\b(?:improvement|improved|better|difference|compare|comparison|traditional(?:ly)?)\b/i.test(
       normalizedQuestion,
     );
+  const repoTechnicalFocusHints = collectHelixAskRepoTechnicalFocusHints({
+    question: normalizedQuestion,
+    queryHints: args.plan.turn_contract.query_hints,
+    limit: 4,
+  });
+  const primaryRepoTechnicalFocus = repoTechnicalFocusHints[0] ?? "";
   const codeSourceHints = sourceHints
     .filter((entry) =>
       /\.(?:ts|tsx|js|mjs|cjs|py|go|rs|java|kt|cpp|cc|c|cs)(?::\d+)?$/i.test(entry) ||
@@ -27829,35 +30450,172 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
   if (doesHelixAskAnswerPlanUseDynamicSections(args.plan)) {
     for (const section of args.plan.sections) {
       if ((section.kind ?? "answer") === "sources") continue;
+      const sectionLabel = normalizeHelixAskAnswerObligationLabel(
+        section.objective_label ?? section.must_answer?.[0] ?? section.title,
+        section.title,
+      );
+      const sectionEvidenceRefs = normalizeCitations(section.evidence_refs ?? []).slice(0, 3);
+      const sectionMissingSlots = (section.missing_slots ?? []).filter(Boolean);
+      const lowerTitle = section.title.toLowerCase();
+      const conceptLabel = questionTopicTerms.join(" ").trim() || "this concept";
+      const deterministicDefinitionSentence =
+        codeSourceHints.length > 0
+          ? ensureSentence(
+              `In this codebase, ${conceptLabel} is grounded in ${baselineWarpDocHint}, with primary implementation surfaces in ${codeSourceHints.slice(0, 2).join(" and ")}`,
+            )
+          : ensureSentence(`In this codebase, ${conceptLabel} is grounded in ${baselineWarpDocHint}`);
       lines.push(`${section.title}:`);
       switch (section.kind ?? "answer") {
         case "comparison":
-          lines.push(`- ${ensureSentence(`Traditional baseline is anchored in ${baselineWarpDocHint}`)}`);
-          lines.push(`- ${ensureSentence(`Needle Hull Mark 2 improvement is anchored in ${needleHullDocHint}`)}`);
+          lines.push(
+            `- ${ensureSentence(
+              `${sectionLabel} is grounded in ${sectionEvidenceRefs[0] ?? baselineWarpDocHint}`,
+            )}`,
+          );
+          lines.push(
+            `- ${ensureSentence(
+              `Comparison anchors include ${sectionEvidenceRefs.slice(1).join(", ") || needleHullDocHint}`,
+            )}`,
+          );
           break;
         case "repo":
-          if (codeSourceHints.length > 0) {
-            lines.push(`- ${ensureSentence(`Primary implementation anchors for this section are ${codeSourceHints.slice(0, 2).join(" and ")}`)}`);
+          if (/how it is solved in codebase/.test(lowerTitle)) {
+            if (docSourceHints.length > 0) {
+              lines.push(`- ${ensureSentence(`Definition and constraints are grounded in ${docSourceHints[0]}`)}`);
+            }
+            if (codeSourceHints.length > 0) {
+              for (const source of codeSourceHints.slice(0, 3)) {
+                lines.push(`- ${source}: ${describeCodeSourceRole(source)}`);
+              }
+            } else {
+              lines.push("- Implementation path is partially covered in this turn; refine with explicit function/path anchors.");
+            }
+          } else if (/repo anchors/.test(lowerTitle)) {
+            for (const source of [...docSourceHints, ...codeSourceHints].slice(0, 3)) {
+              lines.push(`- ${source}`);
+            }
+          } else if (/where in repo|implementation in repo/.test(lowerTitle)) {
+            if (codeSourceHints[0]) {
+              lines.push(
+                `- ${ensureSentence(
+                  primaryRepoTechnicalFocus
+                    ? `${primaryRepoTechnicalFocus} is anchored in ${codeSourceHints[0]}${
+                        codeSourceHints[1] ? ` with supporting flow in ${codeSourceHints[1]}` : ""
+                      }`
+                    : `Primary implementation anchors for ${sectionLabel} are ${codeSourceHints.slice(0, 2).join(" and ")}`,
+                )}`,
+              );
+            }
+            if (codeSourceHints.length > 0) {
+              for (const source of codeSourceHints.slice(0, 3)) {
+                lines.push(`- ${source}: ${describeCodeSourceRole(source)}`);
+              }
+            } else {
+              lines.push(`- ${ensureSentence(`Primary implementation anchors for ${sectionLabel} remain partial in this turn`)}`);
+            }
+          } else if (/call chain/.test(lowerTitle)) {
+            if (!isLowSignalHelixAskUniversalFamilyDegradeSentence(conciseEvidence)) {
+              lines.push(`- ${ensureSentence(conciseEvidence)} [${primarySource}]`);
+            }
+            lines.push(
+              `- ${ensureSentence(
+                codeSourceHints.length > 0
+                  ? primaryRepoTechnicalFocus
+                    ? `${primaryRepoTechnicalFocus} is traced through ${codeSourceHints.slice(0, 2).join(" and ")} in this turn`
+                    : `Repository runtime path runs through ${codeSourceHints.slice(0, 2).join(" and ")}`
+                  : `Call-chain detail remains bounded to ${primarySource}`,
+              )}`,
+            );
+            if (docSourceHints[0]) {
+              lines.push(`- ${ensureSentence(`Contract and theory framing for this path is grounded in ${docSourceHints[0]}`)}`);
+            }
+          } else if (/key structs\/types/.test(lowerTitle)) {
+            if (repoTechnicalFocusHints.length > 0) {
+              lines.push(
+                `- ${ensureSentence(
+                  `Prompt-explicit symbols in this turn include ${repoTechnicalFocusHints.slice(0, 3).join(", ")}`,
+                )}`,
+              );
+            } else if (codeSourceHints[0]) {
+              lines.push(`- ${ensureSentence(`Primary implementation symbols should be inspected in ${codeSourceHints[0]}`)}`);
+            } else {
+              lines.push(`- ${ensureSentence(`Key symbols remain bounded for ${sectionLabel}`)}`);
+            }
+          } else if (/what to change safely|safe changes/.test(lowerTitle)) {
+            lines.push(
+              `- ${ensureSentence(
+                codeSourceHints[0]
+                  ? primaryRepoTechnicalFocus
+                    ? `Start with writes to ${primaryRepoTechnicalFocus} in ${codeSourceHints[0]} before changing downstream formatting or diagnostics`
+                    : `Start with the primary implementation anchor ${codeSourceHints[0]} before changing downstream formatting or diagnostics`
+                  : `Keep edits bounded to the verified implementation anchors for ${sectionLabel}`,
+              )}`,
+            );
+            lines.push("- For line-level edits, narrow the next pass with explicit symbol or file:line anchors.");
+          } else {
+            if (codeSourceHints.length > 0) {
+              lines.push(`- ${ensureSentence(`Primary implementation anchors for ${sectionLabel} are ${codeSourceHints.slice(0, 2).join(" and ")}`)}`);
+            }
+            if (!isLowSignalHelixAskUniversalFamilyDegradeSentence(conciseEvidence)) {
+              lines.push(`- ${ensureSentence(conciseEvidence)}`);
+            } else if (codeSourceHints[0]) {
+              lines.push(`- ${ensureSentence(`Primary implementation detail in this turn is anchored in ${codeSourceHints[0]}`)}`);
+            }
           }
-          lines.push(`- ${ensureSentence(conciseEvidence)}`);
           break;
         case "mechanism":
           lines.push(`- ${ensureSentence(conciseEvidence)}`);
-          if (asksNeedleHullMark2 && asksImprovement) {
+          if (sectionEvidenceRefs.length > 0) {
+            lines.push(`- ${ensureSentence(`${sectionLabel} is anchored in ${sectionEvidenceRefs.join(", ")}`)}`);
+          } else if (asksNeedleHullMark2 && asksImprovement) {
             lines.push(`- ${ensureSentence(`Needle Hull Mark 2 improvement is currently anchored in ${needleHullDocHint}`)}`);
           } else {
             lines.push(`- ${ensureSentence(`Mechanism detail remains bounded to ${baselineWarpDocHint} and the currently retrieved implementation anchors.`)}`);
           }
           break;
         case "gaps":
-          lines.push("- Some detail remains bounded to the current evidence window and may need narrower anchors.");
+          lines.push(
+            `- ${
+              sectionMissingSlots.length > 0
+                ? ensureSentence(`Current evidence is incomplete for ${sectionLabel}; missing slots: ${sectionMissingSlots.join(", ")}`)
+                : "Some detail remains bounded to the current evidence window and may need narrower anchors."
+            }`,
+          );
           break;
         case "definition":
+          if (/key terms/.test(lowerTitle)) {
+            lines.push(
+              `- ${ensureSentence(
+                questionTopicTerms.length > 0
+                  ? `Key terms include ${questionTopicTerms.join(", ")}`
+                  : "Key terms remain bounded to the currently cited evidence",
+              )}`,
+            );
+          } else {
+            lines.push(`- ${deterministicDefinitionSentence}`);
+          }
+          break;
         case "answer":
         default:
-          lines.push(`- ${ensureSentence(conciseEvidence)}`);
-          if (section.must_answer?.length) {
-            lines.push(`- ${ensureSentence(section.must_answer[0])}`);
+          if (/why it matters/.test(lowerTitle)) {
+            lines.push(
+              `- ${
+                asksHowSolvedInCodebase
+                  ? "It links the repo-level definition to concrete implementation paths so the mechanism can be inspected and verified."
+                  : "It provides a repo-grounded definition with explicit scope for follow-up mechanism or equation asks."
+              }`,
+            );
+          } else {
+            lines.push(
+              `- ${ensureSentence(
+                /^repo-grounded summary prepared from current in-family evidence\.?$/i.test(conciseEvidence)
+                  ? `This repo-grounded summary is anchored in ${sectionEvidenceRefs[0] ?? primarySource}`
+                  : conciseEvidence,
+              )}`,
+            );
+          }
+          if (sectionEvidenceRefs.length > 0 && !/why it matters/.test(lowerTitle)) {
+            lines.push(`- ${ensureSentence(`${sectionLabel} is grounded in ${sectionEvidenceRefs.join(", ")}`)}`);
           }
           break;
       }
@@ -27875,17 +30633,20 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
     case "definition_overview":
       {
       const shouldUseDeterministicDefinitionSentence =
+        asksDefinitionQuestion ||
+        isLowSignalHelixAskUniversalFamilyDegradeSentence(conciseEvidence) ||
         /\b(?:in practical terms,\s*)?bounded linkage supported by cited repo evidence\b/i.test(conciseEvidence) ||
         /\brepo-grounded summary prepared from current in-family evidence\b/i.test(conciseEvidence);
       const deterministicDefinitionSentence = (() => {
         const docAnchor = docSourceHints[0] ?? primarySource;
         const implAnchors = codeSourceHints.slice(0, 2);
+        const conceptLabel = questionTopicTerms.slice(0, 3).join(" ").trim() || "this concept";
         if (implAnchors.length > 0) {
           return ensureSentence(
-            `In this codebase, this concept is documented in ${docAnchor} and implemented through ${implAnchors.join(" and ")}`,
+            `In this codebase, ${conceptLabel} is grounded in ${docAnchor}, with primary implementation surfaces in ${implAnchors.join(" and ")}`,
           );
         }
-        return ensureSentence(`In this codebase, this concept is documented in ${docAnchor}`);
+        return ensureSentence(`In this codebase, ${conceptLabel} is grounded in ${docAnchor}`);
       })();
       lines.push("Definition:");
       lines.push(
@@ -28047,6 +30808,17 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
       break;
     case "implementation_code_path":
       lines.push("Where in repo:");
+      if (codeSourceHints[0]) {
+        lines.push(
+          `- ${ensureSentence(
+            primaryRepoTechnicalFocus
+              ? `${primaryRepoTechnicalFocus} is anchored in ${codeSourceHints[0]}${
+                  codeSourceHints[1] ? ` with supporting flow in ${codeSourceHints[1]}` : ""
+                }`
+              : `Primary implementation anchors are ${codeSourceHints.slice(0, 2).join(" and ")}`,
+          )}`,
+        );
+      }
       if (docSourceHints.length > 0) {
         for (const source of docSourceHints.slice(0, 2)) {
           lines.push(`- ${source}: ${describeDocSourceRole(source)}`);
@@ -28062,11 +30834,20 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
       }
       lines.push("");
       lines.push("Call chain:");
+      if (!isLowSignalHelixAskUniversalFamilyDegradeSentence(conciseEvidence)) {
+        lines.push(`- ${ensureSentence(conciseEvidence)} [${primarySource}]`);
+      }
       if (docSourceHints[0]) {
         lines.push(`- Start from ${docSourceHints[0]} for the bounded theory and guardrail framing.`);
       }
       if (codeSourceHints[0]) {
-        lines.push(`- Core solve computation runs through ${codeSourceHints[0]}.`);
+        lines.push(
+          `- ${
+            primaryRepoTechnicalFocus
+              ? ensureSentence(`${primaryRepoTechnicalFocus} is traced through ${codeSourceHints[0]}`)
+              : ensureSentence(`Repository runtime path runs through ${codeSourceHints[0]}`)
+          }`,
+        );
       }
       if (codeSourceHints[1]) {
         lines.push(`- Runtime/module orchestration continues in ${codeSourceHints[1]}.`);
@@ -28078,15 +30859,31 @@ const buildHelixAskUniversalFamilyDegradeAnswer = (args: {
         lines.push("- Call-chain detail is limited because the current evidence pack did not include verified runtime anchors.");
       }
       lines.push("");
-      if (sourceHints.length > 3) {
-        lines.push("Key structs/types:");
+      lines.push("Key structs/types:");
+      if (repoTechnicalFocusHints.length > 0) {
+        lines.push(`- Prompt-explicit symbols in this turn include ${repoTechnicalFocusHints.slice(0, 3).join(", ")}.`);
+      } else if (sourceHints.length > 3) {
         for (const source of sourceHints.slice(3, 6)) {
           lines.push(`- ${source}`);
         }
-        lines.push("");
+      } else if (codeSourceHints[0]) {
+        lines.push(`- Primary implementation symbols should be inspected in ${codeSourceHints[0]}.`);
+      } else {
+        lines.push("- No symbol-level anchors were available in this turn.");
       }
+      lines.push("");
       lines.push("What to change safely:");
-      lines.push("- Start with the module/orchestrator anchors above and keep the doc constraints aligned with the runtime path.");
+      if (codeSourceHints[0]) {
+        lines.push(
+          `- ${
+            primaryRepoTechnicalFocus
+              ? ensureSentence(`Start with writes to ${primaryRepoTechnicalFocus} in ${codeSourceHints[0]} before changing downstream formatting or diagnostics`)
+              : ensureSentence(`Start with the module/orchestrator anchor ${codeSourceHints[0]} before changing downstream formatting or diagnostics`)
+          }`,
+        );
+      } else {
+        lines.push("- Start with the module/orchestrator anchors above and keep the doc constraints aligned with the runtime path.");
+      }
       lines.push("- For line-level edits, retry with explicit function, symbol, or file:line anchors.");
       break;
     case "roadmap_planning":
@@ -31590,15 +34387,24 @@ const sanitizeSourcesLine = (
   allowedTokens: string[],
 ): string => {
   if (!value) return value;
+  const OPEN_WORLD_SOURCES_MARKER_TEXT =
+    "Sources: open-world best-effort (no repo citations required).";
+  const OPEN_WORLD_SOURCES_MARKER_RE =
+    /^\s*sources?\s*:\s*open-world\s+best-effort(?:\s*\(no\s+repo\s+citations\s+required\))?\.?\s*$/i;
   const allowedPathSet = new Set(allowedPaths.map((path) => path.toLowerCase()));
   const allowedTokenSet = new Set(allowedTokens.map((token) => token.toLowerCase()));
   const lines = value.split(/\r?\n/);
   const output: string[] = [];
   const sourcePool: string[] = [];
+  let openWorldMarkerRequested = false;
   for (const line of lines) {
     const match = line.match(/^\s*sources?\s*:\s*(.+)$/i);
     if (!match) {
       output.push(line);
+      continue;
+    }
+    if (OPEN_WORLD_SOURCES_MARKER_RE.test(line)) {
+      openWorldMarkerRequested = true;
       continue;
     }
     const rawPaths = normalizeCitations(extractFilePathsFromText(line));
@@ -31623,6 +34429,14 @@ const sanitizeSourcesLine = (
       output.push("");
     }
     output.push(`Sources: ${mergedSources.join(", ")}`);
+  } else if (openWorldMarkerRequested) {
+    while (output.length > 0 && !output[output.length - 1]?.trim()) {
+      output.pop();
+    }
+    if (output.length > 0) {
+      output.push("");
+    }
+    output.push(OPEN_WORLD_SOURCES_MARKER_TEXT);
   }
   return output.join("\n").trim();
 };
@@ -32060,10 +34874,12 @@ const resolvePreIntentAmbiguity = ({
   const shortDefinitionPrompt =
     shortPrompt &&
     /\b(?:what\s+is|what's|whats|define|explain|describe|meaning\s+of)\b/i.test(question);
+  const concreteDefinitionTarget = hasHelixAskConcreteDefinitionTarget(question);
   const shortGeneralDefinitionClarify =
     shortDefinitionPrompt &&
     !explicitRepoExpectation &&
-    repoExpectationLevel === "low";
+    repoExpectationLevel === "low" &&
+    !concreteDefinitionTarget;
   const shouldClarify =
     (shortPrompt &&
       (clusterSplit ||
@@ -33423,9 +36239,20 @@ export const __testHelixAskReliabilityGuards = {
   buildSingleLlmShortAnswerFallback,
   buildDeterministicRepoRuntimeFallback,
   buildDeterministicFamilyRepoRuntimeFallback,
+  selectDeterministicRepoRuntimeFallbackCandidate,
   shouldDirectUseDeterministicRepoRuntimeFallback,
+  shouldApplyTermPriorGeneralArbiterLock,
+  shouldApplyTermPriorPhysicsRelationGeneralRoute,
   shouldDirectUseDeterministicRelationPacketAnswer,
   shouldPreserveHelixAskDeterministicAnswerAcrossComposer,
+  shouldBlockHelixAskDeterministicPreserveAcrossComposer,
+  shouldEscalateHelixAskComposerSoftGuardObserve,
+  shouldPinHelixAskDeterministicAnswerPreFinalize,
+  shouldRestoreHelixAskDeterministicPlatonicAnswer,
+  sanitizePinnedHelixAskDeterministicAnswer,
+  finalizePinnedHelixAskDeterministicAnswer,
+  stripHelixAskObjectiveCheckpointArtifacts,
+  shouldSkipCitationRelinkingForStructuredDeterministicAnswer,
   scrubSkippedLlmTransportErrors,
   buildHelixAskEvidencePacketV2,
   computeHelixAskEvidenceMassScore,
@@ -33455,16 +36282,35 @@ export const __testHelixAskReliabilityGuards = {
   isHelixAskRoadmapPlanningQuestion,
   buildHelixAskObjectivePlannerPrompt,
   parseHelixAskObjectivePlannerPass,
+  extractHelixAskTurnObjectiveFragments,
   buildHelixAskTurnContract,
+  buildHelixAskTurnContractObligations,
   hashHelixAskTurnContract,
   buildHelixAskTurnContractSeedSlots,
   buildHelixAskTurnRetrievalPlan,
   buildHelixAskTurnContractObjectiveSupport,
+  inferHelixAskObjectiveSlotsFromObligationCoverage,
+  buildHelixAskObjectiveMiniAnswers,
+  summarizeHelixAskObjectiveMiniValidation,
+  buildHelixAskObjectiveMiniCritiquePrompt,
+  parseHelixAskObjectiveMiniCritique,
+  applyHelixAskObjectiveMiniCritique,
+  buildDeterministicHelixAskObjectiveAssembly,
+  buildHelixAskObjectiveLoopState,
+  shouldBypassHelixAskObjectiveScopedRetrievalAgentGate,
+  collectHelixAskObjectiveScopedRetrievalRecoveryTargets,
+  collectHelixAskObjectiveIdsWithoutScopedRetrievalPass,
+  enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers,
+  applyHelixAskObjectiveCoverageSnapshot,
+  summarizeHelixAskObjectiveLoopState,
+  finalizeHelixAskObjectiveLoopState,
+  buildHelixAskTurnContractObligationCoverage,
   classifyHelixAskAnswerPlanFamily,
   buildHelixAskAnswerPlanSections,
   buildHelixAskAnswerPlanShadow,
   validateHelixAskAnswerPlanShadow,
   buildHelixAskUniversalFamilyDegradeAnswer,
+  buildHelixAskPlannedSectionFallbackLines,
   shouldApplyHelixAskComposerV2ForPlan,
   shouldRunHelixAskComposerV2ForSoftReason,
   evaluateHelixAskComposerV2ProjectionRegression,
@@ -33474,17 +36320,39 @@ export const __testHelixAskReliabilityGuards = {
   isHelixAskTransportPressureFallbackReason,
   shouldPreserveRepoIntentOnTransportDegradedCoverage,
   shouldSuppressHelixAskAnswerRescueForRateLimit,
+  shouldForceRepoGroundedForRepoApiLookup,
   shouldForceHelixAskShortDefinitionConceptAnswer,
+  isWarpEthosRelationHeuristicQuestion,
+  isWarpEthosRelationQuestion,
+  evaluateRelationSemanticCompleteness,
+  repairRelationSemanticCompleteness,
+  buildRelationModeContractFromPacket,
+  detectRelationDeterministicFallbackReasons,
+  hasArtifactJsonSpill,
   shouldUseScientificPreIntentClarify,
+  shouldPreferHelixAskPlannerLlmInFastMode,
+  shouldUseHelixAskRiskTriggeredTwoPass,
+  shouldOverrideHelixAskRetrievalRetryPolicy,
+  shouldUseGeneralAmbiguityAnswerFloor,
+  buildGeneralAmbiguityAnswerFloor,
+  hasHelixAskRepoTechnicalCue,
+  hasHelixAskConcreteDefinitionTarget,
+  shouldBypassHelixAskPreIntentClarifyForCompareTarget,
   shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt,
+  shouldBypassHelixAskPreIntentClarifyForDefinitionTarget,
+  renderHelixAskAnswerContract,
+  renderHelixAskSimpleWritingAdviceAnswer,
   renderHelixAskSimpleCompositionalAnswer,
+  stripDeterministicNoiseArtifacts,
   isHelixAskHardForcedShortCircuitRule,
   isHelixAskConceptForcedShortCircuitRule,
   isHelixAskClarifyForcedShortCircuitRule,
   shouldPreserveHelixAskForcedAnswerAcrossComposer,
   shouldPreserveHelixAskForcedAnswerAcrossFinalizer,
+  shouldFastPathFinalizeHelixAskForcedAnswer,
   resolveStage05SummaryPolicy,
   isLowSignalHelixAskComposerV2SeedSentence,
+  rewriteUnsupportedScaffoldToBoundedUncertainty,
   buildHelixAskComposerV2GroundedBrief,
   buildHelixAskComposerV2ExpandPrompt,
   buildHelixAskComposerV2DeterministicProjectionClaims,
@@ -33494,6 +36362,7 @@ export const __testHelixAskReliabilityGuards = {
   renderHelixAskComposerV2PlannedAnswer,
   renderHelixAskComposerV2FiveSectionAnswer,
   materializeHelixAskComposerV2Output,
+  formatHelixAskAnswer,
   extractEquationPrimaryKeyFromRenderedAnswer,
   assertRenderedPrimaryMatchesSelection,
   computeEquationSelectionLockHash,
@@ -33533,6 +36402,8 @@ export const __testHelixAskDialogueFormatting = {
   enforceIdeologyNarrativeContracts,
   ensureOpenWorldBypassUncertainty,
   stripRepoCitationsForOpenWorldBypass,
+  rewriteOpenWorldBestEffortAnswer,
+  shouldForceIdeologyNarrativeDeterministic,
   resolveFallbackIntentProfile,
   buildNextEvidenceHints,
   normalizeBundledQuestion,
@@ -33603,6 +36474,85 @@ type HelixAskControllerStep = {
   docCoverageOk?: boolean;
   missingSlots?: string[];
   retrievalConfidence?: number;
+};
+
+type HelixAskObjectiveLoopStatus =
+  | "pending"
+  | "retrieving"
+  | "synthesizing"
+  | "critiqued"
+  | "repaired"
+  | "complete"
+  | "blocked";
+
+type HelixAskObjectiveLoopState = {
+  objective_id: string;
+  objective_label: string;
+  required_slots: string[];
+  matched_slots: string[];
+  status: HelixAskObjectiveLoopStatus;
+  attempt: number;
+  started_at?: string;
+  ended_at?: string;
+  blocked_reason?: string;
+  retrieval_confidence?: number;
+};
+
+type HelixAskObjectiveTransition = {
+  objective_id: string;
+  from: HelixAskObjectiveLoopStatus | null;
+  to: HelixAskObjectiveLoopStatus;
+  reason: string;
+  at: string;
+};
+
+type HelixAskObjectiveRetrievalPass = {
+  pass_index: number;
+  reason: string;
+  objective_ids: string[];
+  query_count: number;
+  query_preview: string[];
+  selected_files_count?: number;
+  selected_files?: string[];
+  retrieval_confidence_before?: number;
+  retrieval_confidence_after?: number;
+  completed_objective_ids?: string[];
+  blocked_objective_ids?: string[];
+  exhausted?: boolean;
+  at: string;
+};
+
+type HelixAskObjectiveMiniAnswerStatus = "covered" | "partial" | "blocked";
+
+type HelixAskObjectiveMiniAnswer = {
+  objective_id: string;
+  objective_label: string;
+  status: HelixAskObjectiveMiniAnswerStatus;
+  matched_slots: string[];
+  missing_slots: string[];
+  evidence_refs: string[];
+  summary: string;
+};
+
+type HelixAskObjectiveMiniValidation = {
+  total: number;
+  covered: number;
+  partial: number;
+  blocked: number;
+  unresolved: number;
+};
+
+type HelixAskObjectiveMiniCritiqueStatus = "covered" | "partial" | "blocked";
+
+type HelixAskObjectiveMiniCritiqueObjective = {
+  objective_id: string;
+  status: HelixAskObjectiveMiniCritiqueStatus;
+  missing_slots: string[];
+  reason?: string;
+};
+
+type HelixAskObjectiveMiniCritique = {
+  objectives: HelixAskObjectiveMiniCritiqueObjective[];
 };
 
 type HelixAskCompactionSummary = {
@@ -34679,6 +37629,46 @@ const executeHelixAsk = async ({
       controller_steps?: HelixAskControllerStep[];
       controller_stop_reason?: string;
       controller_attempts?: number;
+      objective_loop_enabled?: boolean;
+      objective_loop_patch_revision?: string;
+      objective_loop_state?: HelixAskObjectiveLoopState[];
+      objective_transition_log?: HelixAskObjectiveTransition[];
+      objective_retrieval_passes?: HelixAskObjectiveRetrievalPass[];
+      objective_retrieval_queries?: Array<{
+        objective_id: string;
+        pass_index: number;
+        queries: string[];
+      }>;
+      objective_retrieval_selected_files?: Array<{
+        objective_id: string;
+        pass_index: number;
+        files: string[];
+      }>;
+      objective_retrieval_confidence_delta?: Array<{
+        objective_id: string;
+        pass_index: number;
+        before: number;
+        after: number;
+        delta: number;
+      }>;
+      objective_retrieval_exhausted?: boolean;
+      objective_total_count?: number;
+      objective_terminal_count?: number;
+      objective_unresolved_count?: number;
+      objective_completion_rate?: number;
+      objective_blocked_count?: number;
+      objective_finalize_gate_passed?: boolean;
+      objective_mini_answers?: HelixAskObjectiveMiniAnswer[];
+      objective_mini_validation?: HelixAskObjectiveMiniValidation | null;
+      objective_mini_critic_mode?: "llm" | "heuristic_fallback" | "none";
+      objective_mini_critic_attempted?: boolean;
+      objective_mini_critic_invoked?: boolean;
+      objective_mini_critic_fail_reason?: string | null;
+      objective_assembly_mode?: "llm" | "deterministic_fallback" | "none";
+      objective_assembly_input_count?: number;
+      objective_assembly_fail_reason?: string | null;
+      objective_assembly_llm_attempted?: boolean;
+      objective_assembly_llm_invoked?: boolean;
       retrieval_iterations?: number;
       prompt_items?: Array<{
         type: string;
@@ -35827,6 +38817,30 @@ const executeHelixAsk = async ({
       debugPayload.fast_quality_decisions = next;
     };
     const baseQuestion = (questionValue ?? question ?? prompt ?? "").trim();
+    const promptResearchContractInput =
+      (prompt && prompt.trim().length > 0 ? prompt : parsed.data.question?.trim() ?? baseQuestion).trim();
+    const promptResearchContract = parsePromptResearchContract(promptResearchContractInput);
+    const promptResearchRetrievalContract = buildPromptResearchRetrievalContract(
+      promptResearchContract,
+    );
+    const promptResearchGenerationContract = buildPromptResearchGenerationContract({
+      contract: promptResearchContract,
+      answerCap: HELIX_ASK_ANSWER_MAX_TOKENS,
+    });
+    const promptResearchRepoRequired = Boolean(
+      promptResearchRetrievalContract?.must_read_paths.length ||
+        promptResearchRetrievalContract?.precedence_paths.length,
+    );
+    const promptResearchContractMissingRequiredPaths = Array.from(
+      new Set([
+        ...(promptResearchRetrievalContract?.missing_required_paths ?? []),
+        ...(promptResearchRetrievalContract?.unreadable_required_paths ?? []),
+      ]),
+    );
+    const promptResearchContractFailClosed =
+      promptResearchContract?.fail_closed_behavior.enabled === true &&
+      promptResearchContract?.fail_closed_behavior.missing_required_inputs_stop === true &&
+      promptResearchContractMissingRequiredPaths.length > 0;
     const sourceQuestion = (parsed.data.sourceQuestion ?? "").trim();
     const sourceLanguage =
       normalizeLanguageTag(parsed.data.sourceLanguage ?? null) ??
@@ -36895,7 +39909,7 @@ const executeHelixAsk = async ({
         : null;
       if (HELIX_ASK_ENFORCE_GLOBAL_QUALITY_FLOOR) {
         const reportRelationQuery =
-          HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+          isWarpEthosRelationHeuristicQuestion(baseQuestion) ||
           isWarpEthosRelationQuestion(baseQuestion);
         const reportMinChars = reportRelationQuery
           ? HELIX_ASK_RELATION_QUALITY_MIN_TEXT_CHARS
@@ -36989,9 +40003,11 @@ const executeHelixAsk = async ({
     const hasFilePathHints = HELIX_ASK_FILE_HINT.test(routingSourceText);
     const endpointHints = extractEndpointHints(routingSourceText);
     const explicitCodeSymbolCue =
+      /\b[a-z][a-z0-9]*(?:_[a-z0-9]+){1,}\b/.test(routingSourceText) ||
       /\b[a-z][a-z0-9_]*[A-Z][A-Za-z0-9_]*\b/.test(routingSourceText) ||
       /`[A-Za-z_][A-Za-z0-9_]*`/.test(routingSourceText) ||
       /\b[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/.test(routingSourceText);
+    const explicitRepoTechnicalCue = hasHelixAskRepoTechnicalCue(routingSourceText);
     const warpProofRepoCue =
       HELIX_ASK_WARP_FOCUS.test(routingSourceText) &&
       HELIX_ASK_WARP_PROOF_REPO_CUE.test(routingSourceText);
@@ -37000,6 +40016,7 @@ const executeHelixAsk = async ({
       /\bllm\.[a-z0-9_.-]+\b/i.test(routingSourceText) ||
       /\b(?:server|client|shared|docs|tests?)\/[a-z0-9_./-]+\b/i.test(routingSourceText) ||
       explicitCodeSymbolCue ||
+      explicitRepoTechnicalCue ||
       warpProofRepoCue;
     const warpMathBroadPrompt = isWarpMathBroadPrompt(baseQuestion);
     const equationQuotePrompt = isEquationAskPrompt(baseQuestion);
@@ -37276,6 +40293,10 @@ const executeHelixAsk = async ({
         repoExpectationScore = Math.max(repoExpectationScore, 2);
         repoExpectationSignals.push("concept_match");
       }
+      if (promptResearchRepoRequired) {
+        repoExpectationScore = Math.max(repoExpectationScore, 3);
+        repoExpectationSignals.push("prompt_research_contract");
+      }
       const tagSignals = multilangPreferGeneralRouting
         ? []
         : topicTags.filter((tag) => repoNativeTags.has(tag));
@@ -37307,11 +40328,12 @@ const executeHelixAsk = async ({
         : repoExpectationScore >= 2
           ? "medium"
           : "low";
-      let requiresRepoEvidence = explicitRepoExpectation || conceptRepoMatch;
+    let requiresRepoEvidence = explicitRepoExpectation || conceptRepoMatch || promptResearchRepoRequired;
       let hasRepoHints =
         explicitRepoExpectation ||
         repoHintMatched ||
         conceptRepoMatch ||
+        promptResearchRepoRequired ||
         repoExpectationLevel !== "low";
     if (debugPayload) {
       debugPayload.explicit_repo_expectation = explicitRepoExpectation;
@@ -37325,6 +40347,39 @@ const executeHelixAsk = async ({
       debugPayload.repo_expectation_level = repoExpectationLevel;
       debugPayload.repo_expectation_signals = repoExpectationSignals.slice();
       debugPayload.explicit_repo_paths = explicitRequestedRepoPaths.slice(0, 8);
+      if (promptResearchContract) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.prompt_contract_mode = promptResearchContract.mode;
+        debugRecord.prompt_contract_required_inputs =
+          promptResearchContract.required_repo_inputs.slice(0, 16);
+        debugRecord.prompt_contract_missing_inputs =
+          promptResearchContractMissingRequiredPaths.slice(0, 16);
+        debugRecord.prompt_contract_precedence_paths =
+          promptResearchContract.canonical_precedence_paths.slice(0, 16);
+        debugRecord.prompt_contract_structure_titles =
+          promptResearchContract.required_top_level_structure.map((section) => section.title).slice(0, 12);
+        debugRecord.prompt_contract_fail_closed =
+          promptResearchContract.fail_closed_behavior.enabled;
+        debugRecord.prompt_contract_stop_reason =
+          promptResearchContract.fail_closed_behavior.stop_reason;
+        debugRecord.prompt_contract_allowed_extra_retrieval_rule =
+          promptResearchContract.allowed_extra_retrieval_rule;
+        debugRecord.answer_generation_budget = promptResearchGenerationContract?.budget
+          ? {
+              retrieval_context_budget:
+                promptResearchGenerationContract.budget.retrieval_context_budget,
+              answer_max_tokens: promptResearchGenerationContract.budget.answer_max_tokens,
+              section_overflow_policy:
+                promptResearchGenerationContract.budget.section_overflow_policy,
+              section_count: promptResearchGenerationContract.budget.section_count,
+              appendix_count: promptResearchGenerationContract.budget.appendix_count,
+              required_table_count:
+                promptResearchGenerationContract.budget.required_table_count,
+            }
+          : null;
+        debugRecord.answer_sectional_compose_required =
+          promptResearchGenerationContract?.sectional_compose_required ?? false;
+      }
       if (termPriorDecision) {
         const debugRecord = debugPayload as Record<string, unknown>;
         debugRecord.term_prior_enabled = termPriorActive;
@@ -37583,7 +40638,16 @@ const executeHelixAsk = async ({
       let ambiguityResolution = blockScoped
         ? { ...ambiguityResolutionRaw, shouldClarify: false, reason: undefined }
         : ambiguityResolutionRaw;
+      const definitionTargetClarifyBypass =
+        shouldBypassHelixAskPreIntentClarifyForDefinitionTarget({
+          question: baseQuestion,
+          explicitRepoExpectation,
+          hasFilePathHints,
+          endpointHintCount: endpointHints.length,
+          requiresRepoEvidence,
+        });
       const preserveClarifyForShortDefinition =
+        !definitionTargetClarifyBypass &&
         !explicitRepoExpectation &&
         repoExpectationLevel === "low" &&
         !hasFilePathHints &&
@@ -37696,10 +40760,13 @@ const executeHelixAsk = async ({
           endpointHintCount: endpointHints.length,
           requiresRepoEvidence,
         });
+      const compareTargetClarifyBypass =
+        shouldBypassHelixAskPreIntentClarifyForCompareTarget(baseQuestion);
       const repoCodeClarifyBypass =
         !isSecurityRiskPrompt(baseQuestion) &&
         (explicitRepoExpectation ||
           hasFilePathHints ||
+          hasHelixAskRepoTechnicalCue(baseQuestion) ||
           /(^|[\s`"'(])(?:codebase|repo|module|route|handler|function|class|file|path)(?:[\s`"'.,:;!?)]|$)/i
             .test(baseQuestion));
       const shouldApplyPreIntentClarify =
@@ -37708,6 +40775,8 @@ const executeHelixAsk = async ({
         !openWorldClarifyBypass &&
         !securityOpenWorldClarifyBypass &&
         !compositionalClarifyBypass &&
+        !compareTargetClarifyBypass &&
+        !definitionTargetClarifyBypass &&
         !repoCodeClarifyBypass &&
         !equationClarifyBypass;
       if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
@@ -37753,6 +40822,16 @@ const executeHelixAsk = async ({
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
           debugPayload.ambiguity_resolver_bypassed = "compositional_prompt";
         }
+      } else if (ambiguityResolution.shouldClarify && compareTargetClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_compare_target", "compare_has_explicit_targets");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "compare_target";
+        }
+      } else if (ambiguityResolution.shouldClarify && definitionTargetClarifyBypass) {
+        logEvent("Ambiguity resolver", "bypass_definition_target", "definition_has_explicit_target");
+        if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
+          debugPayload.ambiguity_resolver_bypassed = "definition_target";
+        }
       } else if (ambiguityResolution.shouldClarify && repoCodeClarifyBypass) {
         logEvent("Ambiguity resolver", "bypass_repo_code", "explicit_repo_or_code_query");
         if (debugPayload && HELIX_ASK_AMBIGUITY_RESOLVER) {
@@ -37780,17 +40859,20 @@ const executeHelixAsk = async ({
     const originalIntentProfile = intentMatch.profile;
     const relationIntentByProfile = originalIntentProfile.id === "hybrid.warp_ethos_relation";
     const relationIntentStrong = isWarpEthosRelationQuestion(baseQuestion);
+    const relationHeuristicPrompt = relationIntentStrong || isWarpEthosRelationHeuristicQuestion(baseQuestion);
     const termPriorRelationCue =
       Boolean(termPriorDecision?.physics_relation_prompt) ||
       relationIntentStrong ||
       HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion);
-    const termPriorPhysicsRelationGeneral =
-      termPriorApplied &&
-      termPriorPreferGeneralRouting &&
-      termPriorRelationCue &&
-      !explicitRepoExpectation &&
-      !hasFilePathHints &&
-      endpointHints.length === 0;
+    const termPriorPhysicsRelationGeneral = shouldApplyTermPriorPhysicsRelationGeneralRoute({
+      termPriorApplied,
+      termPriorPreferGeneralRouting,
+      termPriorRelationCue,
+      explicitRepoExpectation,
+      hasFilePathHints,
+      endpointHintCount: endpointHints.length,
+      relationHeuristicPrompt,
+    });
     const termPriorPolysemyGeneral =
       Boolean(termPriorDecision?.polysemy_ambiguous) &&
       !explicitRepoExpectation &&
@@ -37801,7 +40883,7 @@ const executeHelixAsk = async ({
       relationIntentStrong ||
       (!explicitRepoExpectation &&
         !termPriorGeneralRouteLock &&
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion));
+        relationHeuristicPrompt);
     const explicitCompositeDirective =
       /\b(synthesi[sz]e|fit together|unified synthesis|cross-domain synthesis|system synthesis)\b/i.test(
         baseQuestion,
@@ -38346,7 +41428,7 @@ const executeHelixAsk = async ({
       if (
         !explicitRepoExpectation &&
         !compositeRequest.enabled &&
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion)
+        isWarpEthosRelationHeuristicQuestion(baseQuestion)
       )
         return true;
       return false;
@@ -38436,6 +41518,8 @@ const executeHelixAsk = async ({
       hasRepoEvidence: isRepoQuestion,
       hasGeneralEvidence: !isRepoQuestion,
       maxTokensOverride: parsed.data.max_tokens,
+      promptResearchContract,
+      promptResearchGenerationContract,
     });
     let promptIngested = false;
     let promptIngestReason: string | undefined;
@@ -38579,7 +41663,23 @@ const executeHelixAsk = async ({
           debugPayload.hypothesis_rate = scientific.hypothesisCount > 0 ? 1 : 0;
         }
       } else {
-        forcedAnswer = preIntentClarify;
+        if (
+          shouldUseGeneralAmbiguityAnswerFloor({
+            intentDomain,
+            requiresRepoEvidence,
+            explicitRepoExpectation,
+            hasFilePathHints,
+            endpointHintCount: endpointHints.length,
+          })
+        ) {
+          forcedAnswer = buildGeneralAmbiguityAnswerFloor({
+            question: baseQuestion,
+            clarifyLine: preIntentClarify,
+          });
+          answerPath.push("clarify:pre_intent_answer_floor");
+        } else {
+          forcedAnswer = preIntentClarify;
+        }
         forcedAnswerIsHard = true;
       }
       answerPath.push("forcedAnswer:pre_intent_clarify");
@@ -38600,7 +41700,9 @@ const executeHelixAsk = async ({
         requiresRepoEvidence,
       })
     ) {
-      const simpleCompositionalAnswer = renderHelixAskSimpleCompositionalAnswer(baseQuestion);
+      const simpleCompositionalAnswer =
+        renderHelixAskSimpleCompositionalAnswer(baseQuestion) ??
+        renderHelixAskSimpleWritingAdviceAnswer(baseQuestion);
       if (simpleCompositionalAnswer) {
         forcedAnswer = simpleCompositionalAnswer;
         forcedAnswerIsHard = true;
@@ -39388,11 +42490,21 @@ const executeHelixAsk = async ({
             Boolean(preflightEvidence?.ok) ||
             (preflightFiles.length >= HELIX_ASK_PREFLIGHT_MIN_FILES &&
               preflightDocShare >= HELIX_ASK_PREFLIGHT_DOC_SHARE);
+          const compositionalPromptBypass =
+            shouldBypassHelixAskPreIntentClarifyForCompositionalPrompt({
+              question: baseQuestion,
+              explicitRepoExpectation,
+              hasFilePathHints,
+              endpointHintCount: endpointHints.length,
+              requiresRepoEvidence,
+              intentDomain,
+            });
           const stage0GeneralPromoteEligible =
             HELIX_ASK_STAGE0_GENERAL_PROMOTE_RETRIEVAL &&
             !ideologyConversationalOpenWorldMode &&
             intentDomain === "general" &&
             preflightStage0Active &&
+            !compositionalPromptBypass &&
             !openWorldAutoPromoteBlocked &&
             !securityOpenWorldIntentLocked;
           if (stage0GeneralPromoteEligible) {
@@ -39402,6 +42514,7 @@ const executeHelixAsk = async ({
             !ideologyConversationalOpenWorldMode &&
             intentDomain === "general" &&
             preflightSignalsOk &&
+            !compositionalPromptBypass &&
             (
               hasExplicitRepoSignals ||
               (!openWorldAutoPromoteBlocked && hasRepoCodeEvidencePathsForAsk(preflightFiles)) ||
@@ -39899,11 +43012,347 @@ const executeHelixAsk = async ({
       plannerMode: "deterministic",
       plannerValid: true,
       plannerSource: "heuristic_bootstrap",
+      promptResearchContract,
     });
     let helixTurnContractHash = hashHelixAskTurnContract(helixTurnContract);
     let helixTurnContractSeedSlots = buildHelixAskTurnContractSeedSlots(helixTurnContract);
-    let helixTurnRetrievalPlan = buildHelixAskTurnRetrievalPlan(helixTurnContract, queryConstraints);
+    let helixTurnRetrievalPlan = buildHelixAskTurnRetrievalPlan(
+      helixTurnContract,
+      queryConstraints,
+      promptResearchRetrievalContract,
+      promptResearchGenerationContract,
+    );
     let helixTurnObjectiveSupport: HelixAskEvidencePackObjectiveSupport[] = [];
+    const objectiveLoopEnabled = !forcedAnswer;
+    let objectiveLoopState: HelixAskObjectiveLoopState[] = objectiveLoopEnabled
+      ? buildHelixAskObjectiveLoopState(helixTurnContract)
+      : [];
+    let objectiveTransitionLog: HelixAskObjectiveTransition[] = [];
+    let objectiveRetrievalPasses: HelixAskObjectiveRetrievalPass[] = [];
+    let objectiveRetrievalQueriesLog: Array<{
+      objective_id: string;
+      pass_index: number;
+      queries: string[];
+    }> = [];
+    let objectiveRetrievalSelectedFilesLog: Array<{
+      objective_id: string;
+      pass_index: number;
+      files: string[];
+    }> = [];
+    let objectiveRetrievalConfidenceDeltaLog: Array<{
+      objective_id: string;
+      pass_index: number;
+      before: number;
+      after: number;
+      delta: number;
+    }> = [];
+    let objectiveRetrievalExhausted = false;
+    let objectiveMiniAnswers: HelixAskObjectiveMiniAnswer[] = [];
+    let objectiveMiniValidation: HelixAskObjectiveMiniValidation | null = null;
+    let objectiveMiniCriticMode: "llm" | "heuristic_fallback" | "none" = "none";
+    let objectiveMiniCriticFailReason: string | null = null;
+    let objectiveMiniCriticLlmAttempted = false;
+    let objectiveMiniCriticLlmInvoked = false;
+    let objectiveAssemblyMode: "llm" | "deterministic_fallback" | "none" = "none";
+    let objectiveAssemblyFailReason: string | null = null;
+    let objectiveAssemblyLlmAttempted = false;
+    let objectiveAssemblyLlmInvoked = false;
+    const retrieveConfidenceSafe = (value?: number): number =>
+      Number.isFinite(value) ? Number(value) : 0;
+    const OBJECTIVE_TRANSITION_LOG_MAX = 160;
+    const OBJECTIVE_RETRIEVAL_PASS_LOG_MAX = 64;
+    const OBJECTIVE_SCOPED_RETRIEVAL_MAX_OBJECTIVES = 6;
+    const OBJECTIVE_SCOPED_RETRIEVAL_MAX_QUERY_HINTS = 6;
+    const OBJECTIVE_SCOPED_RETRIEVAL_MAX_ATTEMPTS = 2;
+    const OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX = 24;
+    const HELIX_ASK_OBJECTIVE_LOOP_PATCH_REVISION = "2026-03-23-objective-loop-recovery-enforce-v2";
+    let applyContextAttempt: (
+      label: string,
+      result: Awaited<ReturnType<typeof buildAskContextFromQueries>>,
+      startedAt: number,
+      queries: string[],
+      scopeOverride?: HelixAskPlanScope | null,
+      objectiveIds?: string[],
+    ) => { applied: boolean; observedDelta?: string; missingSlots: string[] } = () => ({
+      applied: false,
+      missingSlots: [],
+    });
+    const recordObjectiveTransition = (
+      state: HelixAskObjectiveLoopState,
+      to: HelixAskObjectiveLoopStatus,
+      reason: string,
+      at?: string,
+    ): HelixAskObjectiveLoopState => {
+      const transitioned = transitionHelixAskObjectiveState({
+        state,
+        to,
+        reason,
+        at,
+      });
+      if (transitioned.transition) {
+        objectiveTransitionLog.push(transitioned.transition);
+        if (objectiveTransitionLog.length > OBJECTIVE_TRANSITION_LOG_MAX) {
+          objectiveTransitionLog = objectiveTransitionLog.slice(-OBJECTIVE_TRANSITION_LOG_MAX);
+        }
+      }
+      return transitioned.state;
+    };
+    const syncObjectiveLoopDebug = (): void => {
+      if (!debugPayload) return;
+      const summary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
+      debugPayload.objective_loop_enabled = objectiveLoopEnabled;
+      debugPayload.objective_loop_patch_revision = HELIX_ASK_OBJECTIVE_LOOP_PATCH_REVISION;
+      debugPayload.objective_total_count = summary.total;
+      debugPayload.objective_terminal_count = summary.terminalCount;
+      debugPayload.objective_unresolved_count = summary.unresolvedCount;
+      debugPayload.objective_completion_rate = summary.completionRate;
+      debugPayload.objective_blocked_count = summary.blockedCount;
+      debugPayload.objective_loop_state = objectiveLoopState.slice(0, 16);
+      debugPayload.objective_transition_log = objectiveTransitionLog.slice(-64);
+      debugPayload.objective_retrieval_passes = objectiveRetrievalPasses.slice(-24);
+      debugPayload.objective_retrieval_queries = objectiveRetrievalQueriesLog.slice(-24);
+      debugPayload.objective_retrieval_selected_files = objectiveRetrievalSelectedFilesLog.slice(-24);
+      debugPayload.objective_retrieval_confidence_delta =
+        objectiveRetrievalConfidenceDeltaLog.slice(-24);
+      debugPayload.objective_retrieval_exhausted = objectiveRetrievalExhausted;
+      debugPayload.objective_mini_answers = objectiveMiniAnswers.slice(0, 12);
+      debugPayload.objective_mini_validation = objectiveMiniValidation;
+      debugPayload.objective_mini_critic_mode = objectiveMiniCriticMode;
+      debugPayload.objective_mini_critic_attempted = objectiveMiniCriticLlmAttempted;
+      debugPayload.objective_mini_critic_invoked = objectiveMiniCriticLlmInvoked;
+      debugPayload.objective_mini_critic_fail_reason = objectiveMiniCriticFailReason;
+      debugPayload.objective_assembly_mode = objectiveAssemblyMode;
+      debugPayload.objective_assembly_input_count = objectiveMiniAnswers.length;
+      debugPayload.objective_assembly_fail_reason = objectiveAssemblyFailReason;
+      debugPayload.objective_assembly_llm_attempted = objectiveAssemblyLlmAttempted;
+      debugPayload.objective_assembly_llm_invoked = objectiveAssemblyLlmInvoked;
+    };
+    const pushObjectiveRetrievalProbe = (args: {
+      objectiveId: string;
+      queries: string[];
+      files: string[];
+      before: number;
+      after: number;
+      passIndex?: number;
+    }): void => {
+      const passIndex = Number.isFinite(args.passIndex) && args.passIndex && args.passIndex > 0
+        ? Number(args.passIndex)
+        : objectiveRetrievalPasses.length;
+      objectiveRetrievalQueriesLog.push({
+        objective_id: args.objectiveId,
+        pass_index: passIndex,
+        queries: args.queries.slice(0, 12),
+      });
+      objectiveRetrievalSelectedFilesLog.push({
+        objective_id: args.objectiveId,
+        pass_index: passIndex,
+        files: args.files.slice(0, 16),
+      });
+      objectiveRetrievalConfidenceDeltaLog.push({
+        objective_id: args.objectiveId,
+        pass_index: passIndex,
+        before: Number(args.before.toFixed(4)),
+        after: Number(args.after.toFixed(4)),
+        delta: Number((args.after - args.before).toFixed(4)),
+      });
+      if (objectiveRetrievalQueriesLog.length > OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX) {
+        objectiveRetrievalQueriesLog = objectiveRetrievalQueriesLog.slice(-OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX);
+      }
+      if (objectiveRetrievalSelectedFilesLog.length > OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX) {
+        objectiveRetrievalSelectedFilesLog = objectiveRetrievalSelectedFilesLog.slice(
+          -OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX,
+        );
+      }
+      if (objectiveRetrievalConfidenceDeltaLog.length > OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX) {
+        objectiveRetrievalConfidenceDeltaLog = objectiveRetrievalConfidenceDeltaLog.slice(
+          -OBJECTIVE_SCOPED_RETRIEVAL_PASS_MAX,
+        );
+      }
+    };
+    const beginObjectiveRetrievalPass = (
+      reason: string,
+      queries: string[],
+      objectiveIds?: string[],
+    ): void => {
+      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
+      const objectiveScope = Array.isArray(objectiveIds) && objectiveIds.length > 0
+        ? new Set(objectiveIds.map((entry) => String(entry ?? "").trim()).filter(Boolean))
+        : null;
+      const at = new Date().toISOString();
+      objectiveLoopState = objectiveLoopState.map((state) => {
+        if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
+        if (objectiveScope && !objectiveScope.has(state.objective_id)) return state;
+        return recordObjectiveTransition(state, "retrieving", reason, at);
+      });
+      const summary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
+      const scopedObjectiveIds = objectiveScope
+        ? objectiveLoopState
+            .filter((entry) => objectiveScope.has(entry.objective_id))
+            .map((entry) => entry.objective_id)
+        : objectiveLoopState.map((entry) => entry.objective_id);
+      objectiveRetrievalPasses.push({
+        pass_index: objectiveRetrievalPasses.length + 1,
+        reason,
+        objective_ids: scopedObjectiveIds,
+        query_count: queries.length,
+        query_preview: queries.slice(0, 8),
+        retrieval_confidence_before: retrieveConfidenceSafe(retrievalConfidence),
+        retrieval_confidence_after: retrieveConfidenceSafe(retrievalConfidence),
+        completed_objective_ids: objectiveLoopState
+          .filter((entry) => entry.status === "complete")
+          .map((entry) => entry.objective_id),
+        blocked_objective_ids: objectiveLoopState
+          .filter((entry) => entry.status === "blocked")
+          .map((entry) => entry.objective_id),
+        exhausted: summary.unresolvedCount > 0,
+        at,
+      });
+      objectiveRetrievalExhausted = summary.unresolvedCount > 0;
+      if (objectiveRetrievalPasses.length > OBJECTIVE_RETRIEVAL_PASS_LOG_MAX) {
+        objectiveRetrievalPasses = objectiveRetrievalPasses.slice(-OBJECTIVE_RETRIEVAL_PASS_LOG_MAX);
+      }
+      syncObjectiveLoopDebug();
+    };
+    const applyObjectiveCoverageSnapshot = (args: {
+      coveredSlots: string[];
+      reason: string;
+      files?: string[];
+      retrievalConfidence?: number;
+      objectiveIds?: string[];
+    }): void => {
+      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
+      objectiveLoopState = applyHelixAskObjectiveCoverageSnapshot({
+        states: objectiveLoopState,
+        coveredSlots: args.coveredSlots,
+        objectiveIds: args.objectiveIds,
+        retrievalConfidence: args.retrievalConfidence,
+        transitionReason: args.reason,
+        transitionLog: objectiveTransitionLog,
+      });
+      if (objectiveRetrievalPasses.length > 0) {
+        const lastIndex = objectiveRetrievalPasses.length - 1;
+        const last = objectiveRetrievalPasses[lastIndex];
+        objectiveRetrievalPasses[lastIndex] = {
+          ...last,
+          selected_files_count: args.files?.length ?? last.selected_files_count ?? 0,
+          selected_files: (args.files ?? []).slice(0, 16),
+          retrieval_confidence_after: retrieveConfidenceSafe(args.retrievalConfidence),
+          completed_objective_ids: objectiveLoopState
+            .filter((entry) => entry.status === "complete")
+            .map((entry) => entry.objective_id),
+          blocked_objective_ids: objectiveLoopState
+            .filter((entry) => entry.status === "blocked")
+            .map((entry) => entry.objective_id),
+          exhausted:
+            summarizeHelixAskObjectiveLoopState(objectiveLoopState).unresolvedCount > 0,
+        };
+        objectiveRetrievalExhausted = Boolean(objectiveRetrievalPasses[lastIndex].exhausted);
+      }
+      syncObjectiveLoopDebug();
+    };
+    const reconcileObjectiveLoopFromSupport = (
+      objectiveSupport: HelixAskEvidencePackObjectiveSupport[],
+      reason = "objective_support_reconciled",
+    ): void => {
+      if (!objectiveLoopEnabled || objectiveLoopState.length === 0 || objectiveSupport.length === 0) return;
+      const supportByLabel = new Map(
+        objectiveSupport.map((entry) => [entry.objective.trim().toLowerCase(), entry] as const),
+      );
+      objectiveLoopState = objectiveLoopState.map((state) => {
+        if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
+        const support = supportByLabel.get(state.objective_label.trim().toLowerCase());
+        if (!support) return state;
+        const supportMatched = new Set(
+          (support.matched_slots ?? []).map((slot) => normalizeSlotId(slot)).filter(Boolean),
+        );
+        let nextMatchedSlots = state.required_slots.filter((slot) => supportMatched.has(slot));
+        if (support.supported && nextMatchedSlots.length === 0 && state.required_slots.length > 0) {
+          nextMatchedSlots = state.required_slots.slice();
+        }
+        const next: HelixAskObjectiveLoopState = {
+          ...state,
+          matched_slots: Array.from(new Set(nextMatchedSlots)),
+        };
+        if (
+          isHelixAskObjectiveCoverageSatisfied(next) &&
+          (next.status === "pending" || next.status === "retrieving")
+        ) {
+          return recordObjectiveTransition(next, "synthesizing", reason);
+        }
+        return next;
+      });
+      syncObjectiveLoopDebug();
+    };
+    const setObjectivePhase = (
+      nextStatus: HelixAskObjectiveLoopStatus,
+      reason: string,
+      filter?: (state: HelixAskObjectiveLoopState) => boolean,
+    ): void => {
+      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
+      objectiveLoopState = objectiveLoopState.map((state) => {
+        if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
+        if (filter && !filter(state)) return state;
+        return recordObjectiveTransition(state, nextStatus, reason);
+      });
+      syncObjectiveLoopDebug();
+    };
+    const finalizeObjectiveLoopState = (validationPassed: boolean, failReason?: string | null): void => {
+      if (!objectiveLoopEnabled || objectiveLoopState.length === 0) return;
+      objectiveLoopState = finalizeHelixAskObjectiveLoopState({
+        states: objectiveLoopState,
+        validationPassed,
+        failReason,
+        transitionLog: objectiveTransitionLog,
+      });
+      const summary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
+      if (debugPayload) {
+        debugPayload.objective_finalize_gate_passed =
+          summary.unresolvedCount === 0 && summary.blockedCount === 0;
+      }
+      objectiveRetrievalExhausted = summary.unresolvedCount > 0;
+      syncObjectiveLoopDebug();
+    };
+    let objectiveLoopFinalized = false;
+    let objectiveLoopValidationPassed = false;
+    let objectiveLoopFailReason: string | null = null;
+    const updateObjectiveLoopValidation = (
+      validationPassed: boolean,
+      failReason?: string | null,
+    ): void => {
+      objectiveLoopValidationPassed = validationPassed;
+      if (!validationPassed) {
+        objectiveLoopFailReason = failReason?.trim() ? failReason.trim() : objectiveLoopFailReason;
+      } else {
+        objectiveLoopFailReason = null;
+      }
+    };
+    const finalizeObjectiveLoopBeforeResponse = (args?: {
+      validationPassed?: boolean;
+      failReason?: string | null;
+    }): void => {
+      if (!objectiveLoopEnabled || objectiveLoopState.length === 0 || objectiveLoopFinalized) return;
+      const validationPassed =
+        typeof args?.validationPassed === "boolean"
+          ? args.validationPassed
+          : objectiveLoopValidationPassed;
+      const failReason =
+        args?.failReason?.trim()
+          ? args.failReason.trim()
+          : objectiveLoopFailReason;
+      finalizeObjectiveLoopState(validationPassed, failReason);
+      objectiveLoopFinalized = true;
+    };
+    if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+      const at = new Date().toISOString();
+      objectiveTransitionLog = objectiveLoopState.map((state) => ({
+        objective_id: state.objective_id,
+        from: null,
+        to: state.status,
+        reason: "initialized",
+        at,
+      }));
+      syncObjectiveLoopDebug();
+    }
     const isRoadmapTurnContractLocked = (): boolean =>
       helixTurnContract.output_family === "roadmap_planning" &&
       (helixTurnContract.constraints.requires_repo_evidence ||
@@ -39974,13 +43423,28 @@ const executeHelixAsk = async ({
         must_include: helixTurnRetrievalPlan.must_include.slice(0, 8),
         query_count: helixTurnRetrievalPlan.query_count,
       };
+      if (promptResearchRetrievalContract) {
+        debugRecord.prompt_retrieval_contract = {
+          must_read_paths: promptResearchRetrievalContract.must_read_paths.slice(0, 16),
+          precedence_paths: promptResearchRetrievalContract.precedence_paths.slice(0, 16),
+          expansion_rule: promptResearchRetrievalContract.expansion_rule,
+          missing_required_paths: promptResearchRetrievalContract.missing_required_paths.slice(0, 16),
+          unreadable_required_paths:
+            promptResearchRetrievalContract.unreadable_required_paths.slice(0, 16),
+        };
+      }
     };
     syncIntentPolicyDebug();
     const applyHelixTurnContractState = (nextContract: HelixAskTurnContract): void => {
       helixTurnContract = nextContract;
       helixTurnContractHash = hashHelixAskTurnContract(helixTurnContract);
       helixTurnContractSeedSlots = buildHelixAskTurnContractSeedSlots(helixTurnContract);
-      helixTurnRetrievalPlan = buildHelixAskTurnRetrievalPlan(helixTurnContract, queryConstraints);
+      helixTurnRetrievalPlan = buildHelixAskTurnRetrievalPlan(
+        helixTurnContract,
+        queryConstraints,
+        promptResearchRetrievalContract,
+        promptResearchGenerationContract,
+      );
       helixIntentPolicyEnvelope = buildHelixAskIntentPolicyEnvelope({
         question: baseQuestion,
         intentDomain,
@@ -39993,6 +43457,41 @@ const executeHelixAsk = async ({
       });
       syncRoadmapTurnContractIntentState();
       syncIntentPolicyDebug();
+      if (objectiveLoopEnabled) {
+        const previousByLabel = new Map(
+          objectiveLoopState.map((state) => [state.objective_label.toLowerCase(), state] as const),
+        );
+        const rebuilt = buildHelixAskObjectiveLoopState(helixTurnContract).map((nextState) => {
+          const prev = previousByLabel.get(nextState.objective_label.toLowerCase());
+          if (!prev) return nextState;
+          return {
+            ...nextState,
+            matched_slots: prev.matched_slots.slice(0, nextState.required_slots.length || 8),
+            status: prev.status,
+            attempt: prev.attempt,
+            started_at: prev.started_at,
+            ended_at: prev.ended_at,
+            blocked_reason: prev.blocked_reason,
+            retrieval_confidence: prev.retrieval_confidence,
+          };
+        });
+        objectiveLoopState = rebuilt;
+        const at = new Date().toISOString();
+        for (const state of objectiveLoopState) {
+          if (state.status !== "pending") continue;
+          objectiveTransitionLog.push({
+            objective_id: state.objective_id,
+            from: null,
+            to: "pending",
+            reason: "contract_rebuild",
+            at,
+          });
+        }
+        if (objectiveTransitionLog.length > OBJECTIVE_TRANSITION_LOG_MAX) {
+          objectiveTransitionLog = objectiveTransitionLog.slice(-OBJECTIVE_TRANSITION_LOG_MAX);
+        }
+        syncObjectiveLoopDebug();
+      }
     };
     const rebuildHelixTurnContractDeterministic = (
       plannerSource: string,
@@ -40010,9 +43509,28 @@ const executeHelixAsk = async ({
           plannerMode: "deterministic",
           plannerValid,
           plannerSource,
+          promptResearchContract,
         }),
       );
     };
+    if (!forcedAnswer && promptResearchContractFailClosed) {
+      forcedAnswer = renderPromptResearchFailClosedAnswer({
+        missingPaths: promptResearchContractMissingRequiredPaths,
+        stopReason: promptResearchContract?.fail_closed_behavior.stop_reason ?? "Fail-closed",
+      });
+      forcedAnswerIsHard = true;
+      answerPath.push("forcedAnswer:research_contract_fail_closed");
+      answerPath.push("failClosed:prompt_research_contract_required_inputs_missing");
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.answer_blocked = true;
+        debugRecord.answer_stop_reason =
+          promptResearchContract?.fail_closed_behavior.stop_reason ?? "Fail-closed";
+        debugRecord.answer_missing_paths = promptResearchContractMissingRequiredPaths.slice(0, 16);
+        debugRecord.fail_reason = "PROMPT_CONTRACT_REQUIRED_INPUT_MISSING";
+        debugRecord.fail_class = "input_contract";
+      }
+    }
     let llmUnavailableAtTurnStartReason: "breaker" | "rate_limit" | null = null;
     let llmBreakerPrewaitOpenAtStart = false;
     let llmBreakerPrewaitRemainingMsAtStart = 0;
@@ -40393,9 +43911,23 @@ const executeHelixAsk = async ({
           rebuildHelixTurnContractDeterministic("planner_block_scoped_skip");
         } else if (llmUnavailableAtTurnStart) {
           rebuildHelixTurnContractDeterministic("planner_llm_unavailable_skip");
-        } else if (fastQualityMode) {
+        } else if (
+          fastQualityMode &&
+          !shouldPreferHelixAskPlannerLlmInFastMode({
+            fastQualityMode,
+            question: baseQuestion,
+            intentDomain,
+            requiresRepoEvidence,
+            explicitRepoExpectation,
+            hasFilePathHints,
+            endpointHintCount: endpointHints.length,
+          })
+        ) {
           rebuildHelixTurnContractDeterministic("planner_fast_quality_deterministic");
         } else if (baseQuestion) {
+          if (debugPayload && fastQualityMode) {
+            (debugPayload as Record<string, unknown>).planner_fast_quality_llm = true;
+          }
           const plannerStart = logStepStart(
             "LLM objective planner",
             `tokens=${HELIX_ASK_OBJECTIVE_PLANNER_TOKENS}`,
@@ -40454,6 +43986,7 @@ const executeHelixAsk = async ({
                   plannerValid: true,
                   plannerSource: "objective_planner_llm",
                   plannerPass,
+                  promptResearchContract,
                 }),
               );
             } else {
@@ -41294,6 +44827,9 @@ const executeHelixAsk = async ({
         docSlotTargets = [];
           docBlocks = mergeDefinitionRegistryBlocks([], definitionRegistryBlocks);
         minDocEvidenceCards = 0;
+        if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+          beginObjectiveRetrievalPass(contextText ? "context_reuse" : "initial_retrieval", queries);
+        }
 
         if (!contextText) {
           const scope = planScope ?? undefined;
@@ -42511,6 +46047,21 @@ const executeHelixAsk = async ({
             intent: buildConvergenceIntentMeta(),
           },
         );
+        if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+          const objectiveCoveredSlots = Array.from(
+            new Set([
+              ...(slotCoverage.covered ?? []),
+              ...(coverageSlotSummary?.coveredSlots ?? []),
+              ...(docSlotSummary?.coveredSlots ?? []),
+            ]),
+          );
+          applyObjectiveCoverageSnapshot({
+            coveredSlots: objectiveCoveredSlots,
+            reason: "retrieval_coverage_snapshot",
+            files: contextFilesSnapshot,
+            retrievalConfidence,
+          });
+        }
         logEvent(
           "Retrieval channels",
           "ok",
@@ -42568,12 +46119,13 @@ const executeHelixAsk = async ({
               : coverageSlotSummary?.missingSlots ?? [],
           retrievalConfidence,
         });
-        const applyContextAttempt = (
+        applyContextAttempt = (
           label: string,
           result: Awaited<ReturnType<typeof buildAskContextFromQueries>>,
           startedAt: number,
           queries: string[],
           scopeOverride?: HelixAskPlanScope | null,
+          objectiveIds?: string[],
         ): { applied: boolean; observedDelta?: string; missingSlots: string[] } => {
           const beforeMissingSlots =
             docSlotSummary?.missingSlots?.length ??
@@ -42973,8 +46525,205 @@ const executeHelixAsk = async ({
             docSlotSummary?.missingSlots?.length
               ? docSlotSummary.missingSlots
               : coverageSlotSummary?.missingSlots ?? [];
+          if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+            const objectiveCoveredSlots = Array.from(
+              new Set([
+                ...(attemptSlotCoverage.covered ?? []),
+                ...(coverageSlotSummary?.coveredSlots ?? []),
+                ...(docSlotSummary?.coveredSlots ?? []),
+              ]),
+            );
+            applyObjectiveCoverageSnapshot({
+              coveredSlots: objectiveCoveredSlots,
+              reason: `retrieval_${label}_coverage_snapshot`,
+              files: attemptFiles,
+              retrievalConfidence,
+              objectiveIds,
+            });
+          }
           return { applied: true, observedDelta, missingSlots };
         };
+        if (
+          objectiveLoopEnabled &&
+          objectiveLoopState.length > 0 &&
+          !promptIngested
+        ) {
+          const unresolvedObjectiveStates = objectiveLoopState
+            .filter((state) => !isHelixAskObjectiveTerminalStatus(state.status))
+            .slice(0, OBJECTIVE_SCOPED_RETRIEVAL_MAX_OBJECTIVES);
+          let objectiveScopedRetrievalBypassCount = 0;
+          const objectiveContractsByLabel = new Map(
+            helixTurnContract.objectives.map((objective) => [
+              normalizeHelixAskObjectiveLabelKey(objective.label),
+              objective,
+            ] as const),
+          );
+          for (const unresolvedState of unresolvedObjectiveStates) {
+            let objectiveAttempt = 0;
+            while (objectiveAttempt < OBJECTIVE_SCOPED_RETRIEVAL_MAX_ATTEMPTS) {
+              const currentState = objectiveLoopState.find(
+                (state) => state.objective_id === unresolvedState.objective_id,
+              );
+              if (!currentState || isHelixAskObjectiveTerminalStatus(currentState.status)) break;
+              if (currentState.required_slots.length === 0) break;
+              const objectiveHasPriorRetrievalPass = objectiveRetrievalQueriesLog.some(
+                (entry) => entry.objective_id === currentState.objective_id,
+              );
+              const agentCanActNow = canAgentAct();
+              const objectiveAllowAgentGateBypass =
+                shouldBypassHelixAskObjectiveScopedRetrievalAgentGate({
+                  canAgentAct: agentCanActNow,
+                  objectiveAttempt,
+                  objectiveHasPriorRetrievalPass,
+                });
+              if (!agentCanActNow && !objectiveAllowAgentGateBypass) break;
+              if (objectiveAllowAgentGateBypass) {
+                objectiveScopedRetrievalBypassCount += 1;
+                answerPath.push(
+                  `objectiveScopedRetrieval:${currentState.objective_id}:attempt${objectiveAttempt + 1}:budget_bypass`,
+                );
+              }
+              const objectiveMustRunBaselinePass = !objectiveHasPriorRetrievalPass;
+              const objectiveMissingSlots = currentState.required_slots.filter(
+                (slot) => !currentState.matched_slots.includes(slot),
+              );
+              if (!objectiveMustRunBaselinePass && objectiveMissingSlots.length === 0) break;
+              const objectiveContract = objectiveContractsByLabel.get(
+                normalizeHelixAskObjectiveLabelKey(currentState.objective_label),
+              );
+              const objectiveTargetSlots =
+                objectiveMustRunBaselinePass && currentState.required_slots.length > 0
+                  ? currentState.required_slots
+                  : objectiveMissingSlots;
+              const objectiveSlotHints = buildRetryHintsForSlots(slotPlan, objectiveTargetSlots);
+              const objectiveHints = [
+                currentState.objective_label,
+                objectiveContract?.label ?? "",
+                ...(objectiveContract?.query_hints ?? []),
+                ...objectiveTargetSlots,
+                ...objectiveSlotHints,
+                ...verificationAnchorHints,
+              ]
+                .filter(Boolean)
+                .slice(0, OBJECTIVE_SCOPED_RETRIEVAL_MAX_QUERY_HINTS * 2);
+              const objectiveQueries = mergeHelixAskQueries(
+                [baseQuestion],
+                objectiveHints,
+                Math.min(
+                  HELIX_ASK_QUERY_MERGE_MAX + 2,
+                  HELIX_ASK_QUERY_MERGE_MAX + OBJECTIVE_SCOPED_RETRIEVAL_MAX_QUERY_HINTS,
+                ),
+              );
+              if (objectiveQueries.length === 0) break;
+              objectiveAttempt += 1;
+              beginObjectiveRetrievalPass(
+                `objective_scoped:${currentState.objective_id}:attempt${objectiveAttempt}`,
+                objectiveQueries,
+                [currentState.objective_id],
+              );
+              const objectivePassIndex = objectiveRetrievalPasses.length;
+              const objectiveBefore = retrieveConfidenceSafe(retrievalConfidence);
+              const objectiveStart = logStepStart(
+                "Retrieval objective-loop",
+                `${currentState.objective_id} attempt=${objectiveAttempt} queries=${objectiveQueries.length}`,
+                {
+                  objectiveId: currentState.objective_id,
+                  attempt: objectiveAttempt,
+                  queryCount: objectiveQueries.length,
+                  fn: "buildAskContextFromQueries",
+                  phase: "objective_scoped",
+                },
+              );
+              const objectiveResult = await buildAskContextFromQueries(
+                baseQuestion,
+                objectiveQueries,
+                parsed.data.topK,
+                topicProfile,
+                {
+                  ...(planScope ?? {}),
+                  mode: "fallback",
+                  intentDomain,
+                  intentId: intentProfile.id,
+                  topicTags,
+                  sessionId: parsed.data.sessionId ?? null,
+                  codeMixed: codeMixedTurn,
+                },
+              );
+              const objectiveOutcome = applyContextAttempt(
+                `objective-${currentState.objective_id}-attempt-${objectiveAttempt}`,
+                objectiveResult,
+                objectiveStart,
+                objectiveQueries,
+                planScope ?? undefined,
+                [currentState.objective_id],
+              );
+              const objectiveAfter = retrieveConfidenceSafe(retrievalConfidence);
+              pushObjectiveRetrievalProbe({
+                objectiveId: currentState.objective_id,
+                queries: objectiveQueries,
+                files: objectiveResult.files,
+                before: objectiveBefore,
+                after: objectiveAfter,
+                passIndex: objectivePassIndex,
+              });
+              const objectiveAfterState = objectiveLoopState.find(
+                (state) => state.objective_id === currentState.objective_id,
+              );
+              const objectiveMissingAfter = objectiveAfterState
+                ? objectiveAfterState.required_slots.filter(
+                    (slot) => !objectiveAfterState.matched_slots.includes(slot),
+                  )
+                : objectiveOutcome.missingSlots;
+              if (objectiveOutcome.applied) {
+                answerPath.push(
+                  `objectiveScopedRetrieval:${currentState.objective_id}:attempt${objectiveAttempt}:applied`,
+                );
+                logStepEnd(
+                  "Retrieval objective-loop",
+                  `files=${objectiveResult.files.length} remaining=${objectiveMissingAfter.length}`,
+                  objectiveStart,
+                  true,
+                  {
+                    objectiveId: currentState.objective_id,
+                    attempt: objectiveAttempt,
+                    files: objectiveResult.files.length,
+                    missingSlots: objectiveMissingAfter,
+                    fn: "buildAskContextFromQueries",
+                  },
+                );
+              } else {
+                answerPath.push(
+                  `objectiveScopedRetrieval:${currentState.objective_id}:attempt${objectiveAttempt}:no_context`,
+                );
+                logStepEnd(
+                  "Retrieval objective-loop",
+                  "no_context",
+                  objectiveStart,
+                  false,
+                  {
+                    objectiveId: currentState.objective_id,
+                    attempt: objectiveAttempt,
+                    fn: "buildAskContextFromQueries",
+                  },
+                );
+              }
+              if (!objectiveAfterState || objectiveMissingAfter.length === 0) break;
+            }
+          }
+          const objectiveSummary = summarizeHelixAskObjectiveLoopState(objectiveLoopState);
+          objectiveRetrievalExhausted = objectiveSummary.unresolvedCount > 0;
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.objective_scoped_retrieval_attempted = true;
+            debugRecord.objective_scoped_retrieval_target_count = unresolvedObjectiveStates.length;
+            debugRecord.objective_scoped_retrieval_exhausted = objectiveRetrievalExhausted;
+            debugRecord.objective_scoped_retrieval_budget_bypass_applied =
+              objectiveScopedRetrievalBypassCount > 0;
+            debugRecord.objective_scoped_retrieval_budget_bypass_count =
+              objectiveScopedRetrievalBypassCount;
+          }
+          syncObjectiveLoopDebug();
+        }
         const capsuleContextFocusHit = answerContainsCapsuleFocusTerm(
           contextText,
           capsuleMustKeepTerms,
@@ -43024,6 +46773,9 @@ const executeHelixAsk = async ({
             HELIX_ASK_CONTEXT_FILES,
             (parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES) + 1,
           );
+          if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+            beginObjectiveRetrievalPass("capsule_retry", capsuleRetryQueries);
+          }
           const capsuleRetryStart = logStepStart(
             "Retrieval capsule-retry",
             `queries=${capsuleRetryQueries.length}`,
@@ -43105,9 +46857,19 @@ const executeHelixAsk = async ({
             "plan_retrieval_stage_budget_exhausted",
           );
         }
+        const retrievalRetryPolicyOverride = shouldOverrideHelixAskRetrievalRetryPolicy({
+          fastQualityMode,
+          isRepoQuestion,
+          hasRepoHints,
+          missingSlotsForRetry,
+          retrievalConfidence,
+          hybridThreshold: arbiterHybridThreshold,
+        });
+        const allowRetrievalRetryEffective =
+          helixIntentPolicyEnvelope.allow_retrieval_retry || retrievalRetryPolicyOverride;
         const shouldRetryRetrieval =
           HELIX_ASK_RETRIEVAL_RETRY_ENABLED &&
-          helixIntentPolicyEnvelope.allow_retrieval_retry &&
+          allowRetrievalRetryEffective &&
           !promptIngested &&
           hasRepoHints &&
           (
@@ -43120,6 +46882,12 @@ const executeHelixAsk = async ({
           !planRetrievalBudgetExceeded;
         if (debugPayload && !helixIntentPolicyEnvelope.allow_retrieval_retry) {
           (debugPayload as Record<string, unknown>).retrieval_retry_skipped_by_policy = true;
+        }
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).retrieval_retry_policy_override =
+            retrievalRetryPolicyOverride;
+          (debugPayload as Record<string, unknown>).retrieval_retry_allow_effective =
+            allowRetrievalRetryEffective;
         }
         if (debugPayload && fastQualityMode) {
           debugPayload.fast_quality_retry_strict_mode = true;
@@ -43147,6 +46915,9 @@ const executeHelixAsk = async ({
             HELIX_ASK_CONTEXT_FILES,
             (parsed.data.topK ?? HELIX_ASK_CONTEXT_FILES) + retryTopKBonus,
           );
+          if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+            beginObjectiveRetrievalPass("retry_retrieval", retryQueries);
+          }
           const retryStart = logStepStart(
             "Retrieval retry",
             `slots=${retrySlotTargets.length} queries=${retryQueries.length}`,
@@ -43246,6 +47017,9 @@ const executeHelixAsk = async ({
             HELIX_ASK_QUERY_MERGE_MAX + 2,
           );
           const codeScope = buildCodeFirstPlanScopeOverride(planScope ?? undefined);
+          if (objectiveLoopEnabled && objectiveLoopState.length > 0) {
+            beginObjectiveRetrievalPass("code_first_retrieval", codeQueries);
+          }
           const codeStart = logStepStart(
             "Retrieval code-first",
             `slots=${codeSlotTargets.length} queries=${codeQueries.length}`,
@@ -43616,7 +47390,7 @@ const executeHelixAsk = async ({
         if (
           failClosedReason === "doc_slot_missing" &&
           (warpEthosRelationQuery ||
-            HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) ||
+            isWarpEthosRelationHeuristicQuestion(baseQuestion) ||
             isWarpEthosRelationQuestion(baseQuestion) ||
             intentProfile.id === "hybrid.warp_ethos_relation") &&
           relationPacket &&
@@ -43923,12 +47697,16 @@ const executeHelixAsk = async ({
             debugRecord.frontier_route_guard_reason = "FRONTIER_LENS_NON_GENERAL_GUARD";
           }
         }
-        const termPriorGeneralArbiterLock =
-          termPriorGeneralRouteLock &&
-          !termPriorRepoOverrideApplied &&
-          !explicitRepoExpectation &&
-          !hasFilePathHints &&
-          endpointHints.length === 0;
+      const termPriorGeneralArbiterLock =
+          shouldApplyTermPriorGeneralArbiterLock({
+            termPriorGeneralRouteLock,
+            termPriorRepoOverrideApplied,
+            explicitRepoExpectation,
+            hasFilePathHints,
+            endpointHintCount: endpointHints.length,
+            relationHeuristicPrompt:
+              warpEthosRelationQuery || isWarpEthosRelationHeuristicQuestion(baseQuestion),
+          });
         if (termPriorGeneralArbiterLock && arbiterMode !== "general") {
           arbiterMode = "general";
           arbiterReason = "term_prior_general_lock";
@@ -43969,6 +47747,25 @@ const executeHelixAsk = async ({
           if (debugPayload) {
             (debugPayload as Record<string, unknown>).stage05_transport_repo_preserve = true;
           }
+        }
+        const repoApiLookupGroundedOverride = shouldForceRepoGroundedForRepoApiLookup({
+          intentId: intentProfile.id,
+          arbiterMode,
+          explicitRepoExpectation,
+          retrievalConfidence,
+          repoThreshold: arbiterRepoRatio,
+          hasRepoHints,
+          evidenceGateOk: evidenceGate.ok,
+          mustIncludeOk,
+          topicMustIncludeOk,
+          alignmentGateDecision,
+          openWorldBypassMode,
+          failClosedReason,
+        });
+        if (repoApiLookupGroundedOverride) {
+          arbiterMode = "repo_grounded";
+          arbiterReason = "repo_api_lookup_grounded_override";
+          answerPath.push("arbiterOverride:repo_api_lookup_grounded");
         }
         const arbiterStrictness = arbiterDecision.strictness;
         const arbiterRepoOk = arbiterDecision.repoOk;
@@ -45210,7 +49007,7 @@ const executeHelixAsk = async ({
       if (ambiguityTerms.length > 0) {
         clarifyOverride = buildAmbiguityClarifyLine(ambiguityTerms);
         if (debugPayload) {
-          debugPayload.ambiguity_gate_applied = true;
+          (debugPayload as Record<string, unknown>).ambiguity_terms_detected = true;
         }
       }
       const relationQuery = isRelationIntentRequested();
@@ -45456,6 +49253,7 @@ const executeHelixAsk = async ({
         }
         answerPath.push("clarify:ambiguity");
         if (debugPayload) {
+          debugPayload.ambiguity_gate_applied = true;
           debugPayload.fallback_reason = "ambiguity_clarify";
           debugPayload.ambiguity_clarify_rate = 1;
         }
@@ -45689,9 +49487,11 @@ const executeHelixAsk = async ({
           answerPath.push("forcedAnswer:helix_pipeline");
         }
         const ideologySynthesis = intentProfile.id === "repo.ideology_reference";
+        const ideologyNarrativeDeterministicRequested =
+          ideologySynthesis && shouldForceIdeologyNarrativeDeterministic(baseQuestion);
         if (
           ideologySynthesis &&
-          ideologySocialScenarioCueDetected &&
+          (ideologySocialScenarioCueDetected || ideologyNarrativeDeterministicRequested) &&
           !forcedAnswer &&
           String(repoScaffoldForPrompt ?? "").trim()
         ) {
@@ -45701,13 +49501,21 @@ const executeHelixAsk = async ({
             conceptMatch,
             contextFiles,
           });
-          // Let the LLM run long-form synthesis when available; keep this as fallback text.
-          forcedAnswerIsHard = false;
+          forcedAnswerIsHard = ideologyNarrativeDeterministicRequested;
           answerPath.push("forcedAnswer:ideology_social_deterministic");
+          if (forcedAnswerIsHard) {
+            answerPath.push("forcedAnswer:ideology_social_deterministic_hard");
+          }
           if (debugPayload) {
             (debugPayload as Record<string, unknown>).ideology_deterministic_first_pass = true;
+            (debugPayload as Record<string, unknown>).ideology_deterministic_hard =
+              forcedAnswerIsHard;
           }
-          logEvent("Deterministic ideology", "first_pass", "social_scenario");
+          logEvent(
+            "Deterministic ideology",
+            "first_pass",
+            ideologyNarrativeDeterministicRequested ? "explicit_narrative_contract" : "social_scenario",
+          );
         }
         if (ideologySynthesis) {
           prompt = ensureFinalMarker(
@@ -45867,17 +49675,33 @@ const executeHelixAsk = async ({
         );
       }
     } else if (!skipMicroPass && !dryRun && !HELIX_ASK_SINGLE_LLM) {
-      const useTwoPass =
-        HELIX_ASK_TWO_PASS &&
-        helixIntentPolicyEnvelope.allow_two_pass &&
-        Boolean(questionValue) &&
-        HELIX_ASK_TWO_PASS_TRIGGER.test(questionValue ?? "");
+      const twoPassDecision = shouldUseHelixAskRiskTriggeredTwoPass({
+        enabled: HELIX_ASK_TWO_PASS,
+        allowByPolicy: helixIntentPolicyEnvelope.allow_two_pass,
+        question: questionValue ?? "",
+        promptIngested,
+        hasRepoHints,
+        isRepoQuestion,
+        requiresRepoEvidence,
+        format: formatSpec.format,
+        retrievalConfidence,
+        hybridThreshold: Math.min(HELIX_ASK_ARBITER_REPO_RATIO, HELIX_ASK_ARBITER_HYBRID_RATIO),
+        slotMissingCount: coverageSlotSummary?.missingSlots?.length ?? 0,
+        docMissingCount: docSlotSummary?.missingSlots?.length ?? 0,
+      });
+      const useTwoPass = twoPassDecision.use;
       if (debugPayload && !helixIntentPolicyEnvelope.allow_two_pass) {
         (debugPayload as Record<string, unknown>).two_pass_skipped_by_policy = true;
+      }
+      if (debugPayload) {
+        (debugPayload as Record<string, unknown>).two_pass_decision_reason = twoPassDecision.reason;
+        (debugPayload as Record<string, unknown>).two_pass_risk_triggered =
+          twoPassDecision.reason === "risk_trigger";
       }
       if (useTwoPass) {
         if (debugPayload) {
           debugPayload.two_pass = true;
+          (debugPayload as Record<string, unknown>).two_pass_reason = twoPassDecision.reason;
         }
         const extractedContext = extractContextFromPrompt(prompt ?? "");
         if (extractedContext) {
@@ -46137,7 +49961,7 @@ const executeHelixAsk = async ({
           conceptual: !isImplementationQuestion(baseQuestion),
         });
         let expanded = next;
-        for (const claim of [...expansionClaims, "Answer grounded in retrieved evidence."]) {
+        for (const claim of expansionClaims) {
           if (expanded.length >= minChars) break;
           const sentence = ensureSentence(normalizeContractText(claim, 320));
           if (!sentence) continue;
@@ -46178,6 +50002,8 @@ const executeHelixAsk = async ({
           forcedRule === "forcedAnswer:math_solver_warp_guard";
         const isConceptForcedRule = isHelixAskConceptForcedShortCircuitRule(forcedRule);
         const isClarifyForcedRule = isHelixAskClarifyForcedShortCircuitRule(forcedRule);
+        const isResearchContractFailClosedForcedRule =
+          isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule);
         const isStage05HardFailForcedRule =
           forcedRule === "forcedAnswer:stage05_summary_hard_fail";
         const hasClarifyOrFailClosedPath = answerPath.some(
@@ -46185,7 +50011,11 @@ const executeHelixAsk = async ({
         );
         const hardForcedShortCircuit =
           forcedAnswerIsHard &&
-          (!hasClarifyOrFailClosedPath || isMathForcedRule || isConceptForcedRule || isClarifyForcedRule) &&
+          (!hasClarifyOrFailClosedPath ||
+            isMathForcedRule ||
+            isConceptForcedRule ||
+            isClarifyForcedRule ||
+            isResearchContractFailClosedForcedRule) &&
           forcedRule !== null &&
           isHelixAskHardForcedShortCircuitRule(forcedRule);
         const stage05HardFailShortCircuit =
@@ -46202,6 +50032,8 @@ const executeHelixAsk = async ({
       forcedRule === "forcedAnswer:math_solver_warp_guard";
     const isConceptForcedRule = isHelixAskConceptForcedShortCircuitRule(forcedRule);
     const isClarifyForcedRule = isHelixAskClarifyForcedShortCircuitRule(forcedRule);
+    const isResearchContractFailClosedForcedRule =
+      isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule);
     const isStage05HardFailForcedRule =
       forcedRule === "forcedAnswer:stage05_summary_hard_fail";
     const hasClarifyOrFailClosedPath = answerPath.some(
@@ -46209,7 +50041,11 @@ const executeHelixAsk = async ({
     );
     const forcedAnswerShortCircuitEligible =
       forcedAnswerIsHard &&
-      ((!hasClarifyOrFailClosedPath || isMathForcedRule || isConceptForcedRule || isClarifyForcedRule) ||
+      ((!hasClarifyOrFailClosedPath ||
+        isMathForcedRule ||
+        isConceptForcedRule ||
+        isClarifyForcedRule ||
+        isResearchContractFailClosedForcedRule) ||
         isStage05HardFailForcedRule) &&
       forcedRule !== null &&
       isHelixAskHardForcedShortCircuitRule(forcedRule);
@@ -46235,12 +50071,15 @@ const executeHelixAsk = async ({
           !bypassShortCircuit;
       }
     }
-    const shouldFastPathFinalize =
-      shouldShortCircuitAnswer &&
-      isIdeologyReferenceIntent &&
-      conceptFastPath &&
-      forcedAnswerIsHard &&
-      String(verbosity ?? "").trim().length > 0;
+    const shouldFastPathFinalize = shouldFastPathFinalizeHelixAskForcedAnswer({
+      shouldShortCircuitAnswer,
+      fallbackAnswer,
+      forcedAnswerIsHard,
+      forcedRule,
+      conceptFastPath,
+      isIdeologyReferenceIntent,
+      verbosity,
+    });
     let answerContractPrimaryUsed = false;
     if (shouldShortCircuitAnswer && !bypassShortCircuit) {
       markLlmSkipDebug("short_circuit_forced_answer", forcedRule);
@@ -46250,20 +50089,57 @@ const executeHelixAsk = async ({
       );
       const forcedMeta = isShortAnswer(forcedCleanText, verbosity);
       result = { text: forcedCleanText } as LocalAskResult;
+      if (isResearchContractFailClosedForcedRule) {
+        result.blocked = true;
+        result.stop_reason = promptResearchContract?.fail_closed_behavior.stop_reason ?? "Fail-closed";
+        result.fail_reason = "PROMPT_CONTRACT_REQUIRED_INPUT_MISSING";
+        result.fail_class = "input_contract";
+        result.missing_paths = promptResearchContractMissingRequiredPaths.slice(0, 16);
+      }
       if (debugPayload) {
         debugPayload.answer_short_sentences = forcedMeta.sentences;
         debugPayload.answer_short_tokens = forcedMeta.tokens;
+        if (isResearchContractFailClosedForcedRule) {
+          debugPayload.answer_blocked = true;
+          debugPayload.answer_stop_reason =
+            promptResearchContract?.fail_closed_behavior.stop_reason ?? "Fail-closed";
+        }
       }
       logProgress("Answer ready", "concept", answerStart);
       answerPath.push("answer:forced");
       if (shouldFastPathFinalize) {
-        const forcedQuality = applyImmediateQualityFloor(forcedCleanText);
+        const forcedQuality = isResearchContractFailClosedForcedRule
+          ? { text: forcedCleanText, reasons: [] as string[] }
+          : applyImmediateQualityFloor(forcedCleanText);
         const forcedFinalText = stripDeterministicNoiseArtifacts(forcedQuality.text);
         if (forcedQuality.reasons.length > 0) {
           answerPath.push("qualityFloor:early_finalize");
         }
         answerPath.push("answer:fast_path_finalize");
         result.text = forcedFinalText;
+        setObjectivePhase(
+          "synthesizing",
+          "forced_answer_materialized",
+          (state) =>
+            state.status === "pending" ||
+            state.status === "retrieving" ||
+            state.status === "synthesizing",
+        );
+        setObjectivePhase(
+          "critiqued",
+          "forced_answer_fast_finalize",
+          (state) =>
+            state.status === "synthesizing" ||
+            state.status === "retrieving" ||
+            state.status === "pending" ||
+            state.status === "critiqued",
+        );
+        updateObjectiveLoopValidation(
+          !isResearchContractFailClosedForcedRule,
+          isResearchContractFailClosedForcedRule
+            ? "prompt_contract_required_input_missing"
+            : null,
+        );
         result.envelope = buildHelixAskEnvelope({
           answer: forcedFinalText,
           format: formatSpec.format,
@@ -46427,6 +50303,12 @@ const executeHelixAsk = async ({
             intent: buildConvergenceIntentMeta(),
           },
         );
+        finalizeObjectiveLoopBeforeResponse({
+          validationPassed: !isResearchContractFailClosedForcedRule,
+          failReason: isResearchContractFailClosedForcedRule
+            ? "prompt_contract_required_input_missing"
+            : null,
+        });
         scrubSkippedLlmTransportErrors(debugPayload);
         const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
         attachContextCapsuleToResult(responsePayload as LocalAskResult, forcedFinalText);
@@ -46460,6 +50342,8 @@ const executeHelixAsk = async ({
         hasGeneralEvidence: Boolean(generalEvidenceForBudget?.trim()),
         evidenceMass: answerEvidenceMassSignals,
         maxTokensOverride: parsed.data.max_tokens,
+        promptResearchContract,
+        promptResearchGenerationContract,
       });
       const answerMaxTokens = answerBudget.tokens;
       if (debugPayload) {
@@ -46468,6 +50352,14 @@ const executeHelixAsk = async ({
         debugPayload.answer_token_base = answerBudget.base;
         debugPayload.answer_token_boosts = answerBudget.boosts;
         debugPayload.answer_token_reason = answerBudget.reason;
+        debugPayload.answer_retrieval_context_budget =
+          answerBudget.retrievalContextBudget;
+        debugPayload.answer_section_overflow_policy =
+          answerBudget.sectionOverflowPolicy;
+        debugPayload.answer_section_count = answerBudget.sectionCount;
+        debugPayload.answer_appendix_count = answerBudget.appendixCount;
+        debugPayload.answer_required_table_count =
+          answerBudget.requiredTableCount;
         debugPayload.answer_evidence_mass_score = answerBudget.evidenceMassScore;
         debugPayload.answer_evidence_mass_band = answerBudget.evidenceMassBand;
         debugPayload.answer_evidence_mass_source_count = answerBudget.evidenceSourceCount;
@@ -46513,6 +50405,24 @@ const executeHelixAsk = async ({
             ? { fail_reason: strictConceptFailReason, fail_class: "input_contract" }
             : {}),
         };
+        setObjectivePhase(
+          "synthesizing",
+          "fast_quality_deadline_materialized",
+          (state) =>
+            state.status === "pending" ||
+            state.status === "retrieving" ||
+            state.status === "synthesizing",
+        );
+        setObjectivePhase(
+          "critiqued",
+          "fast_quality_deadline_finalize",
+          (state) =>
+            state.status === "synthesizing" ||
+            state.status === "retrieving" ||
+            state.status === "pending" ||
+            state.status === "critiqued",
+        );
+        updateObjectiveLoopValidation(false, "fast_quality_finalize_deadline");
         if (debugPayload) {
           debugPayload.clarify_triggered = true;
           debugPayload.fallback_reason = equationFastPath
@@ -46557,6 +50467,12 @@ const executeHelixAsk = async ({
             intent: buildConvergenceIntentMeta(),
           },
         );
+        finalizeObjectiveLoopBeforeResponse({
+          validationPassed: false,
+          failReason: debugPayload?.fallback_reason === "fast_quality_finalize_deadline_equation_unified"
+            ? "fast_quality_finalize_deadline_equation_unified"
+            : "fast_quality_finalize_deadline",
+        });
         scrubSkippedLlmTransportErrors(debugPayload);
         const responsePayload = debugPayload ? { ...fastResult, debug: debugPayload } : fastResult;
         attachContextCapsuleToResult(responsePayload as LocalAskResult, fastText);
@@ -46574,18 +50490,33 @@ const executeHelixAsk = async ({
         retrievalConfidence >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_CONFIDENCE &&
         retrievalDocShare >= HELIX_ASK_EVIDENCE_CARDS_DETERMINISTIC_DOC_SHARE;
       const relationQuestionFastPath =
-        HELIX_ASK_RELATION_QUERY_RE.test(baseQuestion) &&
+        isWarpEthosRelationHeuristicQuestion(baseQuestion) &&
         Boolean(relationPacket?.bridge_claims.length && relationPacket.bridge_claims.length >= 2);
+      const controllerPrimaryRelationPreferred =
+        relationQuestionFastPath &&
+        !forcedAnswerIsHard &&
+        !llmUnavailableAtTurnStart;
       const relationPacketDirectSkipEligible =
         shouldDirectUseDeterministicRelationPacketAnswer({
           relationQuestionFastPath,
           relationPacketPresent: Boolean(relationPacket),
           relationDualDomainOk,
           forceLlmProbe,
+          controllerPrimaryPreferred: controllerPrimaryRelationPreferred,
         });
       const deterministicConceptualQuestion = !isImplementationQuestion(baseQuestion);
       const primaryContractDirectSkipEligible =
-        relationQuestionFastPath || explicitRepoExpectation || strictConceptProvenance;
+        (relationQuestionFastPath && !controllerPrimaryRelationPreferred) ||
+        explicitRepoExpectation ||
+        strictConceptProvenance;
+      if (controllerPrimaryRelationPreferred && relationQuestionFastPath) {
+        answerPath.push("controller:relation_llm_primary");
+        if (debugPayload) {
+          (debugPayload as Record<string, unknown>).relation_packet_direct_skip_blocked = true;
+          (debugPayload as Record<string, unknown>).relation_packet_direct_skip_blocked_reason =
+            "controller_primary";
+        }
+      }
       const primaryContractEvidence = resolveHelixAskCanonicalEvidenceContext({
         packet: evidencePacketV2,
         evidenceText,
@@ -46619,7 +50550,8 @@ const executeHelixAsk = async ({
         !HELIX_ASK_SINGLE_LLM &&
         primaryContractEvidence.evidenceText.trim() &&
         !primaryContractResult &&
-        (strongDeterministicContractSignals || relationQuestionFastPath)
+        (strongDeterministicContractSignals ||
+          (relationQuestionFastPath && !controllerPrimaryRelationPreferred))
       ) {
         const deterministicAllowedCitations = primaryContractEvidence.citationTokens;
         const deterministicPrimaryContract = buildDeterministicAnswerContractFallback({
@@ -47047,46 +50979,51 @@ const executeHelixAsk = async ({
             0,
             Math.floor(
               readNumber(
-                (debugPayload as Record<string, unknown>).stage05_input_connected_hint_path_count,
+                (debugPayload as Record<string, string | number | undefined>)
+                  .stage05_input_connected_hint_path_count,
                 0,
               ) ?? 0,
             ),
           )
         : 0;
       const deterministicRepoRuntimeFallbackCandidate = useRepoRuntimeFallbackForAnswer
-        ? buildDeterministicFamilyRepoRuntimeFallback({
-            question: baseQuestion,
-            family: helixTurnContract?.output_family ?? helixIntentPolicyEnvelope.prompt_family,
-            intentDomain,
-            queryConstraints,
-            equationPrompt: isEquationAskPrompt(baseQuestion),
-            definitionFocus,
-            equationIntentContract,
-            selectorPrimaryKey: null,
-            selectorLocked: false,
-            selectorFamily: null,
-            lockIdSeed: askTraceId,
-            allowedCitations: normalizeCitations([
-              ...(evidencePacketV2?.contextFiles ?? []),
-              ...contextFiles,
-              ...extractFilePathsFromText(evidencePacketV2?.evidenceText || evidenceText),
-              ...extractCitationTokensFromText(evidencePacketV2?.evidenceText || evidenceText),
-            ]),
-            contextFiles:
-              evidencePacketV2?.contextFiles?.length
-                ? evidencePacketV2.contextFiles
-                : contextFiles,
-            turnContract: helixTurnContract,
-            slotCoverageRatio: coverageSlotSummary?.ratio ?? docSlotSummary?.ratio ?? 0,
-            slotMissing: directRuntimeSlotMissing,
-            connectedHintPathCount: directRuntimeConnectedHintPathCount,
-            retrievalConfidence,
-            objectiveSupport: directRuntimeObjectiveSupport,
-            existingText:
-              deterministicRepoRuntimeFallbackBase ||
-              evidencePacketV2?.evidenceText ||
-              evidenceText,
-          }) ?? deterministicRepoRuntimeFallbackBase
+        ? selectDeterministicRepoRuntimeFallbackCandidate({
+            promptFamily: helixTurnContract?.output_family ?? helixIntentPolicyEnvelope.prompt_family,
+            familyFallback: buildDeterministicFamilyRepoRuntimeFallback({
+              question: baseQuestion,
+              family: helixTurnContract?.output_family ?? helixIntentPolicyEnvelope.prompt_family,
+              intentDomain,
+              queryConstraints,
+              equationPrompt: isEquationAskPrompt(baseQuestion),
+              definitionFocus,
+              equationIntentContract,
+              selectorPrimaryKey: null,
+              selectorLocked: false,
+              selectorFamily: null,
+              lockIdSeed: askTraceId,
+              allowedCitations: normalizeCitations([
+                ...(evidencePacketV2?.contextFiles ?? []),
+                ...contextFiles,
+                ...extractFilePathsFromText(evidencePacketV2?.evidenceText || evidenceText),
+                ...extractCitationTokensFromText(evidencePacketV2?.evidenceText || evidenceText),
+              ]),
+              contextFiles:
+                evidencePacketV2?.contextFiles?.length
+                  ? evidencePacketV2.contextFiles
+                  : contextFiles,
+              turnContract: helixTurnContract,
+              slotCoverageRatio: coverageSlotSummary?.ratio ?? docSlotSummary?.ratio ?? 0,
+              slotMissing: directRuntimeSlotMissing,
+              connectedHintPathCount: directRuntimeConnectedHintPathCount,
+              retrievalConfidence,
+              objectiveSupport: directRuntimeObjectiveSupport,
+              existingText:
+                deterministicRepoRuntimeFallbackBase ||
+                evidencePacketV2?.evidenceText ||
+                evidenceText,
+            }),
+            baseFallback: deterministicRepoRuntimeFallbackBase,
+          })
         : null;
       const directDeterministicRepoRuntimeFallback =
         !primaryContractResult &&
@@ -47624,18 +51561,43 @@ const executeHelixAsk = async ({
       if (!result?.text) {
         throw new Error("No answer generated");
       }
+      setObjectivePhase(
+        "synthesizing",
+        llmAnswerStarted ? "answer_llm_materialized" : "answer_deterministic_materialized",
+        (state) =>
+          state.status === "pending" ||
+          state.status === "retrieving" ||
+          state.status === "synthesizing",
+      );
     }
 
     let cleanedText: string | undefined;
     let answerExtension: HelixAskAnswerExtensionResult | null = null;
     if (typeof result.text === "string" && result.text.trim()) {
-      const rawAnswerBase = stripPromptEchoFromAnswer(result.text, baseQuestion).trim();
-      let answerContract = parseHelixAskAnswerContractPayload(rawAnswerBase);
+      const deterministicDirectAnswerPinnedByPath =
+        shouldPinHelixAskDeterministicAnswerPreFinalize({
+          deterministicRepoRuntimeFallbackUsed,
+          answerPath,
+        });
+      const structuredDeterministicDraftDetected =
+        HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(result.text);
+      const deterministicDirectAnswerPreClean =
+        deterministicDirectAnswerPinnedByPath || structuredDeterministicDraftDetected;
+      const rawAnswerBase = deterministicDirectAnswerPreClean
+        ? result.text.trim()
+        : stripPromptEchoFromAnswer(result.text, baseQuestion).trim();
+      let answerContract = deterministicDirectAnswerPreClean
+        ? null
+        : parseHelixAskAnswerContractPayload(rawAnswerBase);
       const rawAnswerText = answerContract
         ? rawAnswerBase
         : stripInlineJsonArtifacts(rawAnswerBase).trim();
-      let cleaned = formatHelixAskAnswer(rawAnswerText);
-      cleaned = stripInlineJsonArtifacts(cleaned);
+      let cleaned = deterministicDirectAnswerPreClean
+        ? rawAnswerText
+        : formatHelixAskAnswer(rawAnswerText);
+      if (!deterministicDirectAnswerPreClean) {
+        cleaned = stripInlineJsonArtifacts(cleaned);
+      }
       const rawAnswerSentences = extractOrderedAnswerSentences(rawAnswerText, 3);
       const rawPreview = clipAskText(
         rawAnswerText.replace(/\s+/g, " ").trim(),
@@ -47643,6 +51605,14 @@ const executeHelixAsk = async ({
       );
       if (debugPayload) {
         debugPayload.answer_raw_text = clipAskText(rawAnswerText, HELIX_ASK_ANSWER_PREVIEW_CHARS);
+        (debugPayload as Record<string, unknown>).answer_preclean_mode =
+          deterministicDirectAnswerPreClean ? "pinned_structured" : "formatted";
+        (debugPayload as Record<string, unknown>).answer_preclean_reason =
+          deterministicDirectAnswerPinnedByPath
+            ? "deterministic_path_pin"
+            : structuredDeterministicDraftDetected
+              ? "structured_draft_detected"
+              : "generic_formatter";
       }
       if (rawPreview) {
         logEvent("Answer raw preview", "llm", rawPreview, answerStart);
@@ -48259,18 +52229,35 @@ const executeHelixAsk = async ({
             answerPath.push("hybridFallback:repoEvidence");
           }
         }
-        if (!formatSpec.stageTags) {
-          cleaned = stripStageTags(cleaned);
+        const preservePinnedDeterministicCleanup =
+          deterministicDirectAnswerPreClean ||
+          HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(cleaned);
+        if (preservePinnedDeterministicCleanup) {
+          cleaned = sanitizePinnedHelixAskDeterministicAnswer(cleaned);
+        } else {
+          if (!formatSpec.stageTags) {
+            cleaned = stripStageTags(cleaned);
+          }
+          cleaned = stripCitationRepairArtifacts(cleaned);
+          cleaned = stripInlineJsonArtifacts(cleaned);
+          cleaned = stripTrivialOrdinalBullets(cleaned);
+          cleaned = dedupeReportParagraphs(cleaned).text;
         }
-        cleaned = stripCitationRepairArtifacts(cleaned);
-        cleaned = stripInlineJsonArtifacts(cleaned);
-        cleaned = stripTrivialOrdinalBullets(cleaned);
-        cleaned = dedupeReportParagraphs(cleaned).text;
       }
+      const preservePinnedDeterministicCleanup =
+        deterministicDirectAnswerPreClean ||
+        HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(cleaned);
+      const forcedAnswerPinned =
+        forcedAnswerShortCircuitEligible &&
+        answerPath.includes("answer:forced");
       const conceptSourcePaths = conceptMatch ? buildConceptEvidencePaths(conceptMatch) : [];
       const resolvedEvidencePaths = citationCanonicalEvidence.allowedPaths.length
         ? citationCanonicalEvidence.allowedPaths.slice(0, 12)
         : resolveEvidencePaths(evidenceText, contextFiles, contextText, 12);
+      const pinnedAnswerEvidencePaths =
+        preservePinnedDeterministicCleanup || forcedAnswerPinned
+          ? filterExistingEvidencePaths(extractFilePathsFromText(cleaned))
+          : [];
       const isDocSourcePath = (value: string): boolean => {
         return value.trim().toLowerCase().startsWith("docs/");
       };
@@ -48284,6 +52271,7 @@ const executeHelixAsk = async ({
                   ? resolvedEvidencePaths.filter(isDocSourcePath)
                   : resolvedEvidencePaths
               ),
+              ...pinnedAnswerEvidencePaths,
             ]),
           ),
         ),
@@ -48294,8 +52282,12 @@ const executeHelixAsk = async ({
         allowedSourcePaths,
         citationCanonicalEvidence.citationTokens,
       );
-      cleaned = stripRunawayAnswerArtifacts(cleaned);
-      cleaned = stripDeterministicNoiseArtifacts(cleaned);
+      if (preservePinnedDeterministicCleanup) {
+        cleaned = sanitizePinnedHelixAskDeterministicAnswer(cleaned);
+      } else {
+        cleaned = stripRunawayAnswerArtifacts(cleaned);
+        cleaned = stripDeterministicNoiseArtifacts(cleaned);
+      }
       const repoEvidencePaths = allowedSourcePaths.slice(0, 6);
       if (requiresRepoEvidence && !hasRepoCitations()) {
         if (repoEvidencePaths.length) {
@@ -49075,7 +53067,16 @@ const executeHelixAsk = async ({
         console.warn("[helix-ask] training trace emit failed", error);
       }
     }
-      if (preserveReasoningOnlyAnswer) {
+      const restoreDeterministicPlatonicAnswer =
+        shouldRestoreHelixAskDeterministicPlatonicAnswer({
+          preserveDeterministicPlatonicAnswer,
+          ungatedReasoningAnswer,
+          platonicAnswer: platonicResult.answer,
+        });
+      if (restoreDeterministicPlatonicAnswer) {
+        answerPath.push("platonic:deterministic_restore");
+        cleaned = ungatedReasoningAnswer;
+      } else if (preserveReasoningOnlyAnswer) {
         if (platonicResult.answer.trim() !== ungatedReasoningAnswer.trim()) {
           answerPath.push("policy:voice_reasoning_preserve");
           logEvent("Platonic gates", "diagnostic_only", "voice_or_observe_preserve_reasoning");
@@ -49096,6 +53097,7 @@ const executeHelixAsk = async ({
         !shouldAllowIdeologyTechnicalNotes(baseQuestion)
       ) {
         cleaned = cleaned.replace(IDEOLOGY_TECHNICAL_NOTES_RE, "").trim();
+        cleaned = stripIdeologyNarrativeLeakage(cleaned);
       }
       if (endpointGuardApplied && endpointGuardMessage) {
         cleaned = endpointGuardMessage;
@@ -49141,10 +53143,21 @@ const executeHelixAsk = async ({
           }
         }
       }
-      cleaned = normalizeNumberedListLines(cleaned);
-      cleaned = repairAnswerFilePathFragments(cleaned, contextFiles, evidenceText);
-      cleaned = cleanDanglingFileExtensionFragments(cleaned);
-      cleaned = enforceHelixAskPromptContract(cleaned, baseQuestion);
+      const preservePinnedDeterministicFinalize =
+        preserveDeterministicPlatonicAnswer && deterministicDirectAnswerPreClean;
+      if (preservePinnedDeterministicFinalize) {
+        cleaned = finalizePinnedHelixAskDeterministicAnswer({
+          answer: ungatedReasoningAnswer,
+          allowedSourcePaths,
+          citationTokens: citationCanonicalEvidence.citationTokens,
+        });
+        answerPath.push("platonic:deterministic_restore_final");
+      } else {
+        cleaned = normalizeNumberedListLines(cleaned);
+        cleaned = repairAnswerFilePathFragments(cleaned, contextFiles, evidenceText);
+        cleaned = cleanDanglingFileExtensionFragments(cleaned);
+        cleaned = enforceHelixAskPromptContract(cleaned, baseQuestion);
+      }
       const citedPathStats = computeTreeCitationStats(extractFilePathsFromText(cleaned));
       const treeDominatedCitations =
         citedPathStats.total > 0 &&
@@ -49387,7 +53400,12 @@ const executeHelixAsk = async ({
         };
         debugPayload.answer_path = answerPath;
       }
-      if (forcedAnswerIsHard) {
+      const deterministicAnswerPinnedPreFinalize =
+        shouldPinHelixAskDeterministicAnswerPreFinalize({
+          deterministicRepoRuntimeFallbackUsed,
+          answerPath,
+        });
+      if (forcedAnswerIsHard || deterministicAnswerPinnedPreFinalize) {
         answerExtension = {
           available: false,
           citations: [],
@@ -49421,13 +53439,15 @@ const executeHelixAsk = async ({
         answerPath.push("answerExtension:appended");
       }
       if (!answerContractApplied) {
-        cleaned = repairSparseScientificSections(
-          cleaned,
-          answerExtension.citations.length > 0
-            ? answerExtension.citations
-            : extractFilePathsFromText(cleaned),
-          rawAnswerSentences,
-        );
+        if (!deterministicAnswerPinnedPreFinalize) {
+          cleaned = repairSparseScientificSections(
+            cleaned,
+            answerExtension.citations.length > 0
+              ? answerExtension.citations
+              : extractFilePathsFromText(cleaned),
+            rawAnswerSentences,
+          );
+        }
         if (isIdeologyReferenceIntent) {
           cleaned = rewriteIdeologyScientificVoice(cleaned, baseQuestion);
           cleaned = enforceIdeologyNarrativeContracts(cleaned, baseQuestion);
@@ -49435,7 +53455,11 @@ const executeHelixAsk = async ({
         cleaned = stripTrivialOrdinalBullets(cleaned);
         cleaned = dedupeReportParagraphs(cleaned).text;
       }
-      if (dialogueProfile === "dot_min_steps_v1" && !isIdeologyReferenceIntent) {
+      if (
+        dialogueProfile === "dot_min_steps_v1" &&
+        !isIdeologyReferenceIntent &&
+        !deterministicAnswerPinnedPreFinalize
+      ) {
         cleaned = rewriteConversationScientificVoice(cleaned);
       }
       const scientificFallbackReason =
@@ -49774,15 +53798,11 @@ const executeHelixAsk = async ({
           debugPayload.relation_dual_domain_ok = relationDualDomainOk;
         }
       }
-
-      const forcedAnswerPinned =
-        forcedAnswerShortCircuitEligible &&
-        answerPath.includes("answer:forced");
       const preserveForcedAnswerAcrossComposer = shouldPreserveHelixAskForcedAnswerAcrossComposer({
         forcedAnswerPinned,
         forcedRule,
       });
-      const preserveDeterministicAnswerAcrossComposer =
+      let preserveDeterministicAnswerAcrossComposer =
         shouldPreserveHelixAskDeterministicAnswerAcrossComposer({
           llmInvoked: debugPayload?.llm_invoke_attempted === true,
           answerPath,
@@ -50341,28 +54361,71 @@ const executeHelixAsk = async ({
         if (qualityFloorCitations.length === 0) {
           qualityFloorCitations = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
         }
-        const qualityFloorContract = relationPacket
-          ? sanitizeHelixAskAnswerContract(
-              buildRelationModeContractFromPacket(relationPacket),
-              qualityFloorCitations,
-            )
-          : sanitizeHelixAskAnswerContract(
-              buildDeterministicAnswerContractFallback({
-                question: baseQuestion,
-                format: formatSpec.format,
-                definitionFocus,
-                docBlocks,
-                codeAlignment,
-                evidenceText: finalCanonicalEvidence.evidenceWithSources,
-                allowedCitations: qualityFloorCitations,
-              }),
-              qualityFloorCitations,
+        const frontierQualityFloorIntent =
+          intentProfile.id === HELIX_ASK_FRONTIER_INTENT_ID;
+        let qualityFloorRendered = "";
+        if (frontierQualityFloorIntent) {
+          const fallbackVerification =
+            frontierVerification ??
+            runFrontierVerificationPass(
+              cleaned,
+              [
+                finalCanonicalEvidence.evidenceWithSources,
+                contextText,
+                promptContextText,
+              ]
+                .filter(Boolean)
+                .join("\n\n"),
             );
-        let qualityFloorRendered = renderHelixAskAnswerContract(
-          qualityFloorContract,
-          formatSpec.format,
-          baseQuestion,
-        );
+          const fallbackSlotSummary =
+            frontierSlotSummary ??
+            evaluateFrontierScientificSlots(cleaned, HELIX_ASK_FRONTIER_REQUIRED_SLOTS);
+          const frontierNextEvidence = buildNextEvidenceHints({
+            question: baseQuestion,
+            missingSlots: fallbackSlotSummary.missing,
+            slotPlan,
+            anchorFiles: contextFiles,
+            searchedTerms: retrievalQueries,
+            searchedFiles: retrievalFilesSnapshot,
+            includeSearchSummary: true,
+            planClarify: planDirectives?.clarifyQuestion,
+            headingSeedSlots:
+              slotPlanHeadingSeedSlots.length > 0 ? slotPlanHeadingSeedSlots : headingSeedSlots,
+            limit: 4,
+          });
+          qualityFloorRendered = renderFrontierScientificContract({
+            question: baseQuestion,
+            verification: fallbackVerification,
+            slotSummary: fallbackSlotSummary,
+            planClarify: planDirectives?.clarifyQuestion,
+            nextEvidence: frontierNextEvidence,
+            requireLensCandidate: true,
+          });
+        }
+        if (!qualityFloorRendered.trim()) {
+          const qualityFloorContract = relationPacket
+            ? sanitizeHelixAskAnswerContract(
+                buildRelationModeContractFromPacket(relationPacket),
+                qualityFloorCitations,
+              )
+            : sanitizeHelixAskAnswerContract(
+                buildDeterministicAnswerContractFallback({
+                  question: baseQuestion,
+                  format: formatSpec.format,
+                  definitionFocus,
+                  docBlocks,
+                  codeAlignment,
+                  evidenceText: finalCanonicalEvidence.evidenceWithSources,
+                  allowedCitations: qualityFloorCitations,
+                }),
+                qualityFloorCitations,
+              );
+          qualityFloorRendered = renderHelixAskAnswerContract(
+            qualityFloorContract,
+            formatSpec.format,
+            baseQuestion,
+          );
+        }
         qualityFloorRendered = sanitizeSourcesLine(
           qualityFloorRendered,
           qualityFloorAllowedPaths,
@@ -50370,10 +54433,14 @@ const executeHelixAsk = async ({
         );
         if (qualityFloorRendered.trim()) {
           cleaned = qualityFloorRendered.trim();
-          answerPath.push("qualityFloor:deterministic_contract");
+          answerPath.push(
+            frontierQualityFloorIntent
+              ? "qualityFloor:frontier_contract"
+              : "qualityFloor:deterministic_contract",
+          );
           logEvent(
             "Answer quality floor",
-            "deterministic_contract",
+            frontierQualityFloorIntent ? "frontier_contract" : "deterministic_contract",
             qualityFloorReasons.join(","),
             answerStart,
           );
@@ -50429,7 +54496,7 @@ const executeHelixAsk = async ({
             evidenceText: finalCanonicalEvidence.evidenceWithSources,
             conceptual: !isImplementationQuestion(baseQuestion),
           });
-          const expandable = [...expansionClaims, "Answer grounded in retrieved evidence."];
+          const expandable = [...expansionClaims];
           let expanded = cleaned.trim();
           for (const claim of expandable) {
             if (expanded.length >= finalMinChars) break;
@@ -52131,6 +56198,38 @@ const executeHelixAsk = async ({
       }
 
       cleaned = enforceAtomicClaimTierNarration(cleaned, viewerLaunch);
+      const relationCompletenessRequired = isRelationIntentRequested() || warpEthosRelationQuery;
+      let relationCompletenessBefore: RelationSemanticCompleteness | null = null;
+      let relationCompletenessAfter: RelationSemanticCompleteness | null = null;
+      let relationCompletenessRepairApplied = false;
+      if (relationCompletenessRequired) {
+        relationCompletenessBefore = evaluateRelationSemanticCompleteness(cleaned);
+        relationCompletenessAfter = relationCompletenessBefore;
+        if (!relationCompletenessBefore.pass) {
+          const relationCompletenessRepair = repairRelationSemanticCompleteness({
+            answer: cleaned,
+            relationPacket,
+            missing: relationCompletenessBefore.missing,
+          });
+          if (relationCompletenessRepair.applied) {
+            cleaned = relationCompletenessRepair.text;
+            relationCompletenessRepairApplied = true;
+            relationCompletenessAfter = evaluateRelationSemanticCompleteness(cleaned);
+            answerPath.push(
+              `relationCompleteness:repair:${relationCompletenessRepair.missingBefore.join(",")}`,
+            );
+          }
+        }
+        if (!(relationCompletenessAfter?.pass ?? true)) {
+          answerPath.push(`relationCompleteness:fail:${relationCompletenessAfter?.missing.join(",")}`);
+        } else {
+          answerPath.push(
+            relationCompletenessRepairApplied
+              ? "relationCompleteness:pass_after_repair"
+              : "relationCompleteness:pass",
+          );
+        }
+      }
       const semanticQuality = evaluateSemanticQuality({
         text: cleaned,
         supportedClaimCount: (platonicResult.claimLedger ?? []).filter(
@@ -52161,6 +56260,11 @@ const executeHelixAsk = async ({
       if (semanticQuality.unsupportedClaimRate > 0.1) semanticGateFailReasons.push("unsupported_claim_rate_high");
       if (semanticQuality.repetitionPenaltyFail) semanticGateFailReasons.push("repetition_penalty");
       if (semanticQuality.contradictionFlag) semanticGateFailReasons.push("contradiction_flag");
+      if (relationCompletenessRequired && relationCompletenessAfter && !relationCompletenessAfter.pass) {
+        semanticGateFailReasons.push(
+          `relation_completeness_missing:${relationCompletenessAfter.missing.join(",")}`,
+        );
+      }
       if (semanticGateFailReasons.length > 0) {
         answerPath.push(`semanticQuality:fail:${semanticGateFailReasons.join(",")}`);
       } else {
@@ -52175,6 +56279,10 @@ const executeHelixAsk = async ({
           unsupported_claim_rate: semanticQuality.unsupportedClaimRate,
           repetition_penalty_fail: semanticQuality.repetitionPenaltyFail,
           contradiction_flag: semanticQuality.contradictionFlag,
+          relation_completeness_required: relationCompletenessRequired,
+          relation_completeness_before: relationCompletenessBefore,
+          relation_completeness_after: relationCompletenessAfter,
+          relation_completeness_repair_applied: relationCompletenessRepairApplied,
           fail_reasons: semanticGateFailReasons,
         };
       }
@@ -52266,8 +56374,24 @@ const executeHelixAsk = async ({
       );
       const fallbackCitationAnchor =
         fallbackCitationNonTest[0] ?? fallbackCitationCandidates[0] ?? "server/routes/agi.plan.ts";
-      if (citationLinkingRequired && !equationPromptDetected) {
+      const skipCitationRelinkingForStructuredDeterministicAnswer =
+        shouldSkipCitationRelinkingForStructuredDeterministicAnswer({
+          deterministicAnswerPinnedPreFinalize,
+          answerPath,
+          text: cleaned,
+        });
+      if (
+        citationLinkingRequired &&
+        !equationPromptDetected &&
+        !skipCitationRelinkingForStructuredDeterministicAnswer
+      ) {
         cleaned = enforceCitationLinkedClaims(cleaned, fallbackCitationAnchor);
+      } else if (
+        citationLinkingRequired &&
+        !equationPromptDetected &&
+        skipCitationRelinkingForStructuredDeterministicAnswer
+      ) {
+        answerPath.push("citationContract:structured_preserve_skip_linking");
       } else if (citationLinkingRequired && equationPromptDetected) {
         answerPath.push("citationContract:equation_skip_linking");
       }
@@ -52463,7 +56587,7 @@ const executeHelixAsk = async ({
           !explicitRepoExpectation &&
           !hasFilePathHints;
         if (securityOpenWorldPrompt) {
-          cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+          cleaned = rewriteOpenWorldBestEffortAnswer(cleaned, baseQuestion);
           answerPath.push("citationScrub:open_world_uncertainty_marker_security");
         } else {
           const shouldAppendMarker = shouldAppendOpenWorldSourcesMarker({
@@ -52481,6 +56605,10 @@ const executeHelixAsk = async ({
           }
         }
       } else if (suppressGeneralCitations) {
+        if (!hasSourcesLine(cleaned)) {
+          cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
+          answerPath.push("citationScrub:open_world_sources_marker_forced_clarify");
+        }
         answerPath.push("citationScrub:skipped_forced_clarify");
       }
       const frontierContractIntent =
@@ -52622,8 +56750,7 @@ const executeHelixAsk = async ({
             answerPath.push("openWorldBypass:equation_unified_degrade");
           }
         } else if (!ideologyDeterministicFirstPassActive) {
-          cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
-          cleaned = ensureOpenWorldBypassUncertainty(cleaned);
+          cleaned = rewriteOpenWorldBestEffortAnswer(cleaned, baseQuestion);
         } else if (debugPayload) {
           (debugPayload as Record<string, unknown>).open_world_bypass_note =
             "ideology_deterministic_first_pass_preserved";
@@ -52684,9 +56811,7 @@ const executeHelixAsk = async ({
             answerPath.push("openWorldBypass:final_uncertainty_guard_skipped_equation");
           }
         } else {
-          const guarded = ensureOpenWorldBypassUncertainty(
-            stripRepoCitationsForOpenWorldBypass(cleaned),
-          );
+          const guarded = rewriteOpenWorldBestEffortAnswer(cleaned, baseQuestion);
           if (guarded !== cleaned) {
             cleaned = guarded;
             answerPath.push("openWorldBypass:final_uncertainty_guard");
@@ -53018,7 +57143,7 @@ const executeHelixAsk = async ({
           docSlotSummary?.missingSlots?.length
             ? docSlotSummary.missingSlots
             : coverageSlotSummary?.missingSlots ?? [];
-        const finalCoveredSlots = Array.from(
+        let finalCoveredSlots = Array.from(
           new Set([
             ...(coverageSlotSummary?.coveredSlots ?? []),
             ...(docSlotSummary?.coveredSlots ?? []),
@@ -53028,6 +57153,7 @@ const executeHelixAsk = async ({
           contract: helixTurnContract,
           coveredSlots: finalCoveredSlots,
         });
+        reconcileObjectiveLoopFromSupport(helixTurnObjectiveSupport);
         const connectedHintPathCount = debugPayload
           ? Math.max(
               0,
@@ -53063,11 +57189,52 @@ const executeHelixAsk = async ({
           retrievalConfidence,
           evidenceGap,
           objectiveSupport: helixTurnObjectiveSupport,
+          evidenceText: finalCanonicalEvidence.evidenceWithSources,
+          evidenceSections: evidencePacketV2?.sections,
+          promptResearchRetrievalContract,
         });
+        const inferredObjectiveSlots = inferHelixAskObjectiveSlotsFromObligationCoverage(
+          answerPlanShadow.evidence_pack.obligation_coverage,
+        );
+        if (inferredObjectiveSlots.length > 0) {
+          finalCoveredSlots = Array.from(new Set([...finalCoveredSlots, ...inferredObjectiveSlots]));
+          helixTurnObjectiveSupport = buildHelixAskTurnContractObjectiveSupport({
+            contract: helixTurnContract,
+            coveredSlots: finalCoveredSlots,
+          });
+          answerPlanShadow.evidence_pack.objective_support = helixTurnObjectiveSupport;
+          reconcileObjectiveLoopFromSupport(
+            helixTurnObjectiveSupport,
+            "objective_support_inferred_from_obligations",
+          );
+          applyObjectiveCoverageSnapshot({
+            coveredSlots: finalCoveredSlots,
+            reason: "obligation_coverage_slot_inference",
+            files: finalCanonicalEvidence.contextFiles,
+            retrievalConfidence,
+          });
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.objective_inferred_covered_slots = inferredObjectiveSlots;
+            debugRecord.objective_covered_slots_merged = finalCoveredSlots;
+          }
+        }
         const answerPlanValidationShadow = validateHelixAskAnswerPlanShadow({
           plan: answerPlanShadow,
           renderedText: cleaned,
         });
+        const preserveDeterministicAnswerCandidate =
+          shouldPreserveHelixAskDeterministicAnswerAcrossComposer({
+            llmInvoked: debugPayload?.llm_invoke_attempted === true,
+            answerPath,
+          });
+        const deterministicPreserveBlocked = shouldBlockHelixAskDeterministicPreserveAcrossComposer({
+          preserveDeterministicCandidate: preserveDeterministicAnswerCandidate,
+          preserveForcedAnswer: preserveForcedAnswerAcrossComposer,
+          answerPath,
+        });
+        preserveDeterministicAnswerAcrossComposer =
+          preserveDeterministicAnswerCandidate && !deterministicPreserveBlocked;
         const preserveAnswerAcrossComposer =
           preserveForcedAnswerAcrossComposer || preserveDeterministicAnswerAcrossComposer;
         const hardComposerGuardTriggered =
@@ -53084,10 +57251,21 @@ const executeHelixAsk = async ({
               HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY);
         const softSectionGuardObserved = softSectionGuardFailureObserved;
         const softSectionGuardEligible = HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_ENABLED;
+        const softSectionGuardEscalatedEnforce =
+          softSectionGuardEligible &&
+          shouldEscalateHelixAskComposerSoftGuardObserve({
+            softSectionGuardFailureObserved,
+            familyFormatAccuracy: answerPlanValidationShadow.family_format_accuracy,
+            minAccuracy: HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SOFT_ENFORCE_MIN_ACCURACY,
+            failReasons: answerPlanValidationShadow.fail_reasons,
+            gateMode: HELIX_ASK_GATE_MODE,
+          });
         const softSectionGuardTriggered =
-          softSectionGuardEligible && softSectionGuardFailureObserved && HELIX_ASK_GATE_MODE === "enforce";
+          softSectionGuardEligible &&
+          softSectionGuardFailureObserved &&
+          (HELIX_ASK_GATE_MODE === "enforce" || softSectionGuardEscalatedEnforce);
         const softSectionGuardObserveSkipped =
-          softSectionGuardFailureObserved && HELIX_ASK_GATE_MODE !== "enforce";
+          softSectionGuardFailureObserved && !softSectionGuardTriggered;
         let composerSoftEnforceTriggerReason: string | null = null;
         let composerSoftObserveReason: string | null = null;
         let composerSoftHardGuardReason: string | null = null;
@@ -53125,9 +57303,12 @@ const executeHelixAsk = async ({
         if (preserveForcedAnswerAcrossComposer) {
           answerPath.push("composerShadow:preserve_forced_answer");
           composerSoftEnforceAction = "preserve_forced_answer";
-        } else if (preserveDeterministicAnswerAcrossComposer) {
-          answerPath.push("composerShadow:preserve_deterministic_answer");
-          composerSoftEnforceAction = "preserve_deterministic_answer";
+        } else if (deterministicPreserveBlocked) {
+          answerPath.push("composerShadow:deterministic_preserve_blocked");
+          composerSoftEnforceAction = "deterministic_preserve_blocked";
+        }
+        if (softSectionGuardEscalatedEnforce) {
+          answerPath.push("composerShadow:soft_guard_escalated_enforce");
         } else if (softSectionGuardObserveSkipped) {
           composerSoftObserveReason = "required_sections_missing";
           answerPath.push("composerShadow:soft_guard_observed:required_sections_missing");
@@ -53815,6 +57996,50 @@ const executeHelixAsk = async ({
             );
           }
         }
+        const promptResearchValidationBefore = promptResearchContract
+          ? validatePromptResearchContractAnswer(promptResearchContract, cleaned)
+          : null;
+        let promptResearchValidationAfter = promptResearchValidationBefore;
+        let promptResearchRepairActions: string[] = [];
+        if (
+          promptResearchContract &&
+          !promptResearchContractFailClosed &&
+          promptResearchValidationBefore &&
+          promptResearchValidationBefore.fail_reasons.length > 0
+        ) {
+          const promptResearchRepair = repairPromptResearchContractAnswer({
+            contract: promptResearchContract,
+            text: cleaned,
+            generationContract: promptResearchGenerationContract,
+            planSections: answerPlanShadow.sections.map((section) => ({
+              title: section.title,
+              obligation_ids: section.obligation_ids,
+              evidence_refs: section.evidence_refs,
+              must_answer: section.must_answer,
+            })),
+            obligationEvidence: answerPlanShadow.evidence_pack.obligation_evidence.map((entry) => ({
+              obligation_id: entry.obligation_id,
+              status: entry.status,
+              supporting_repo_paths: entry.supporting_repo_paths,
+              supporting_snippets: entry.supporting_snippets,
+            })),
+          });
+          if (promptResearchRepair.applied && promptResearchRepair.text.trim()) {
+            cleaned = promptResearchRepair.text.trim();
+            promptResearchRepairActions = promptResearchRepair.actions.slice(0, 6);
+            answerPath.push(
+              `researchContract:repair:${promptResearchRepairActions.join(",")}`,
+            );
+          }
+          promptResearchValidationAfter = promptResearchRepair.validation_after;
+        }
+        if (promptResearchValidationAfter) {
+          answerPath.push(
+            promptResearchValidationAfter.fail_reasons.length > 0
+              ? `researchContract:fail:${promptResearchValidationAfter.fail_reasons.join(",")}`
+              : "researchContract:pass",
+          );
+        }
         const validatedAfterEnforce = preserveAnswerAcrossComposer
           ? {
               ...answerPlanValidationShadow,
@@ -53827,6 +58052,27 @@ const executeHelixAsk = async ({
               plan: answerPlanShadow,
               renderedText: cleaned,
             });
+        setObjectivePhase(
+          "critiqued",
+          validatedAfterEnforce.schema_valid
+            ? "composer_validation_pass"
+            : "composer_validation_fail",
+          (state) =>
+            state.status === "synthesizing" ||
+            state.status === "retrieving" ||
+            state.status === "pending" ||
+            state.status === "critiqued",
+        );
+        if (promptResearchRepairActions.length > 0) {
+          setObjectivePhase(
+            "repaired",
+            "research_contract_repair_applied",
+            (state) =>
+              state.status === "critiqued" ||
+              state.status === "synthesizing" ||
+              state.status === "repaired",
+          );
+        }
         answerPath.push(
           validatedAfterEnforce.schema_valid
             ? "composerShadow:schema_valid"
@@ -53838,6 +58084,524 @@ const executeHelixAsk = async ({
           );
         } else {
           answerPath.push("composerShadow:pass");
+        }
+        const objectiveLoopComposerValidationPassed =
+          validatedAfterEnforce.schema_valid &&
+          validatedAfterEnforce.fail_reasons.length === 0 &&
+          (promptResearchValidationAfter?.fail_reasons.length ?? 0) === 0;
+        const objectiveLoopComposerFailReason =
+          validatedAfterEnforce.fail_reasons[0] ??
+          promptResearchValidationAfter?.fail_reasons?.[0] ??
+          null;
+        updateObjectiveLoopValidation(
+          objectiveLoopComposerValidationPassed,
+          objectiveLoopComposerFailReason,
+        );
+        const canRunObjectiveScopedRetrievalRecovery =
+          objectiveLoopEnabled &&
+          objectiveLoopState.length > 0 &&
+          !promptIngested;
+        if (canRunObjectiveScopedRetrievalRecovery) {
+          const objectiveRecoveryTargets =
+            collectHelixAskObjectiveScopedRetrievalRecoveryTargets({
+              states: objectiveLoopState,
+              retrievalQueries: objectiveRetrievalQueriesLog,
+              maxObjectives: OBJECTIVE_SCOPED_RETRIEVAL_MAX_OBJECTIVES,
+            });
+          let objectiveRecoveryApplied = false;
+          let objectiveRecoveryCount = 0;
+          let objectiveRecoveryBudgetBypassCount = 0;
+          let objectiveRecoveryErrorCount = 0;
+          const objectiveRecoveryErrorCodes = new Set<string>();
+          let objectiveRecoverySkippedReason: string | null = null;
+          if (objectiveRecoveryTargets.length > 0) {
+            const objectiveContractsByLabel = new Map(
+              helixTurnContract.objectives.map((objective) => [
+                normalizeHelixAskObjectiveLabelKey(objective.label),
+                objective,
+              ] as const),
+            );
+            for (const recoveryState of objectiveRecoveryTargets) {
+              const currentState = objectiveLoopState.find(
+                (state) => state.objective_id === recoveryState.objective_id,
+              );
+              if (!currentState || isHelixAskObjectiveTerminalStatus(currentState.status)) continue;
+              if (currentState.required_slots.length === 0) continue;
+              const objectiveHasPriorRetrievalPass = objectiveRetrievalQueriesLog.some(
+                (entry) => entry.objective_id === currentState.objective_id,
+              );
+              const agentCanActNow = canAgentAct();
+              const objectiveAllowAgentGateBypass =
+                shouldBypassHelixAskObjectiveScopedRetrievalAgentGate({
+                  canAgentAct: agentCanActNow,
+                  objectiveAttempt: 0,
+                  objectiveHasPriorRetrievalPass,
+                });
+              if (!agentCanActNow && !objectiveAllowAgentGateBypass) {
+                objectiveRecoverySkippedReason =
+                  objectiveRecoverySkippedReason ?? "agent_gate_blocked";
+                continue;
+              }
+              if (objectiveAllowAgentGateBypass) {
+                objectiveRecoveryBudgetBypassCount += 1;
+                answerPath.push(
+                  `objectiveScopedRetrievalRecovery:${currentState.objective_id}:attempt1:budget_bypass`,
+                );
+              }
+              const objectiveContract = objectiveContractsByLabel.get(
+                normalizeHelixAskObjectiveLabelKey(currentState.objective_label),
+              );
+              const objectiveMissingSlots = currentState.required_slots.filter(
+                (slot) => !currentState.matched_slots.includes(slot),
+              );
+              const objectiveTargetSlots =
+                objectiveMissingSlots.length > 0
+                  ? objectiveMissingSlots
+                  : currentState.required_slots;
+              const objectiveSlotHints = buildRetryHintsForSlots(
+                slotPlan,
+                objectiveTargetSlots,
+              );
+              const objectiveHints = [
+                currentState.objective_label,
+                objectiveContract?.label ?? "",
+                ...(objectiveContract?.query_hints ?? []),
+                ...objectiveTargetSlots,
+                ...objectiveSlotHints,
+                ...verificationAnchorHints,
+              ]
+                .filter(Boolean)
+                .slice(0, OBJECTIVE_SCOPED_RETRIEVAL_MAX_QUERY_HINTS * 2);
+              const objectiveQueries = mergeHelixAskQueries(
+                [baseQuestion],
+                objectiveHints,
+                Math.min(
+                  HELIX_ASK_QUERY_MERGE_MAX + 2,
+                  HELIX_ASK_QUERY_MERGE_MAX + OBJECTIVE_SCOPED_RETRIEVAL_MAX_QUERY_HINTS,
+                ),
+              );
+              if (objectiveQueries.length === 0) {
+                objectiveRecoverySkippedReason =
+                  objectiveRecoverySkippedReason ?? "no_recovery_queries";
+                continue;
+              }
+              beginObjectiveRetrievalPass(
+                `objective_recovery:${currentState.objective_id}:attempt1`,
+                objectiveQueries,
+                [currentState.objective_id],
+              );
+              const objectivePassIndex = objectiveRetrievalPasses.length;
+              const objectiveBefore = retrieveConfidenceSafe(retrievalConfidence);
+              const objectiveStart = logStepStart(
+                "Retrieval objective-recovery",
+                `${currentState.objective_id} attempt=1 queries=${objectiveQueries.length}`,
+                {
+                  objectiveId: currentState.objective_id,
+                  attempt: 1,
+                  queryCount: objectiveQueries.length,
+                  fn: "buildAskContextFromQueries",
+                  phase: "objective_recovery",
+                },
+              );
+              try {
+                const objectiveResult = await buildAskContextFromQueries(
+                  baseQuestion,
+                  objectiveQueries,
+                  parsed.data.topK,
+                  topicProfile,
+                  {
+                    ...(planScope ?? {}),
+                    mode: "fallback",
+                    intentDomain,
+                    intentId: intentProfile.id,
+                    topicTags,
+                    sessionId: parsed.data.sessionId ?? null,
+                    codeMixed: codeMixedTurn,
+                  },
+                );
+                const objectiveOutcome = applyContextAttempt(
+                  `objective-recovery-${currentState.objective_id}-attempt-1`,
+                  objectiveResult,
+                  objectiveStart,
+                  objectiveQueries,
+                  planScope ?? undefined,
+                  [currentState.objective_id],
+                );
+                const objectiveAfter = retrieveConfidenceSafe(retrievalConfidence);
+                pushObjectiveRetrievalProbe({
+                  objectiveId: currentState.objective_id,
+                  queries: objectiveQueries,
+                  files: objectiveResult.files,
+                  before: objectiveBefore,
+                  after: objectiveAfter,
+                  passIndex: objectivePassIndex,
+                });
+                objectiveRecoveryApplied = true;
+                objectiveRecoveryCount += 1;
+                const objectiveAfterState = objectiveLoopState.find(
+                  (state) => state.objective_id === currentState.objective_id,
+                );
+                const objectiveMissingAfter = objectiveAfterState
+                  ? objectiveAfterState.required_slots.filter(
+                      (slot) => !objectiveAfterState.matched_slots.includes(slot),
+                    )
+                  : objectiveOutcome.missingSlots;
+                if (objectiveOutcome.applied) {
+                  answerPath.push(
+                    `objectiveScopedRetrievalRecovery:${currentState.objective_id}:attempt1:applied`,
+                  );
+                  logStepEnd(
+                    "Retrieval objective-recovery",
+                    `files=${objectiveResult.files.length} remaining=${objectiveMissingAfter.length}`,
+                    objectiveStart,
+                    true,
+                    {
+                      objectiveId: currentState.objective_id,
+                      attempt: 1,
+                      files: objectiveResult.files.length,
+                      missingSlots: objectiveMissingAfter,
+                      fn: "buildAskContextFromQueries",
+                    },
+                  );
+                } else {
+                  answerPath.push(
+                    `objectiveScopedRetrievalRecovery:${currentState.objective_id}:attempt1:no_context`,
+                  );
+                  logStepEnd(
+                    "Retrieval objective-recovery",
+                    "no_context",
+                    objectiveStart,
+                    false,
+                    {
+                      objectiveId: currentState.objective_id,
+                      attempt: 1,
+                      fn: "buildAskContextFromQueries",
+                    },
+                  );
+                }
+              } catch (error) {
+                objectiveRecoveryErrorCount += 1;
+                const errorCode =
+                  error instanceof Error
+                    ? error.message || error.name || "objective_recovery_error"
+                    : String(error);
+                if (errorCode) {
+                  objectiveRecoveryErrorCodes.add(errorCode);
+                }
+                objectiveRecoverySkippedReason =
+                  objectiveRecoverySkippedReason ??
+                  "objective_recovery_error";
+                answerPath.push(
+                  `objectiveScopedRetrievalRecovery:${currentState.objective_id}:attempt1:error`,
+                );
+                logStepEnd(
+                  "Retrieval objective-recovery",
+                  "error",
+                  objectiveStart,
+                  false,
+                  {
+                    objectiveId: currentState.objective_id,
+                    attempt: 1,
+                    fn: "buildAskContextFromQueries",
+                    error: errorCode,
+                  },
+                );
+                continue;
+              }
+            }
+          }
+          if (debugPayload) {
+            const debugRecord = debugPayload as Record<string, unknown>;
+            debugRecord.objective_scoped_retrieval_recovery_attempted = true;
+            debugRecord.objective_scoped_retrieval_recovery_target_count =
+              objectiveRecoveryTargets.length;
+            debugRecord.objective_scoped_retrieval_recovery_applied =
+              objectiveRecoveryApplied;
+            debugRecord.objective_scoped_retrieval_recovery_count =
+              objectiveRecoveryCount;
+            debugRecord.objective_scoped_retrieval_recovery_budget_bypass_count =
+              objectiveRecoveryBudgetBypassCount;
+            debugRecord.objective_scoped_retrieval_recovery_error_count =
+              objectiveRecoveryErrorCount;
+            debugRecord.objective_scoped_retrieval_recovery_error_codes =
+              Array.from(objectiveRecoveryErrorCodes).slice(0, 8);
+            debugRecord.objective_scoped_retrieval_recovery_skipped_reason =
+              objectiveRecoverySkippedReason;
+          }
+          syncObjectiveLoopDebug();
+        }
+        const objectiveMiniCriticBudget = clampNumber(
+          Math.floor((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.3),
+          140,
+          420,
+        );
+        const objectiveMiniCriticModel =
+          dialogueProfile === "dot_min_steps_v1"
+            ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+            : undefined;
+        const canUseObjectiveMiniCritic =
+          !llmUnavailableAtTurnStart &&
+          !answerGenerationFailedForTurn &&
+          !preserveAnswerAcrossComposer &&
+          (!fastQualityMode || getFastElapsedMs() < fastStageDeadlines.finalize);
+        objectiveMiniCriticLlmAttempted = canUseObjectiveMiniCritic;
+        objectiveMiniCriticLlmInvoked = false;
+        objectiveMiniCriticFailReason = null;
+        objectiveMiniCriticMode = "none";
+        objectiveMiniAnswers = buildHelixAskObjectiveMiniAnswers({
+          states: objectiveLoopState,
+          support: helixTurnObjectiveSupport,
+          obligationCoverage: answerPlanShadow.evidence_pack.obligation_coverage,
+          objectiveRetrievalSelectedFiles: objectiveRetrievalSelectedFilesLog,
+          fallbackEvidenceRefs: finalCanonicalEvidence.contextFiles,
+          enableHeuristicInference: !canUseObjectiveMiniCritic,
+        });
+        if (objectiveMiniAnswers.length > 0) {
+          if (canUseObjectiveMiniCritic) {
+            try {
+              objectiveMiniCriticLlmInvoked = true;
+              const objectiveMiniCritiquePrompt = applyDialogueProfilePrompt(
+                buildHelixAskObjectiveMiniCritiquePrompt({
+                  question: baseQuestion,
+                  miniAnswers: objectiveMiniAnswers,
+                  responseLanguage,
+                }),
+                dialogueProfile,
+                baseQuestion,
+              );
+              const objectiveMiniCritiqueAttempt = await runHelixAskLocalWithOverflowRetry(
+                {
+                  prompt: objectiveMiniCritiquePrompt,
+                  max_tokens: objectiveMiniCriticBudget,
+                  temperature: parsed.data.temperature,
+                  seed: parsed.data.seed,
+                  stop: parsed.data.stop,
+                  model: objectiveMiniCriticModel,
+                },
+                {
+                  personaId,
+                  sessionId: parsed.data.sessionId,
+                  traceId: askTraceId,
+                },
+                {
+                  fallbackMaxTokens: objectiveMiniCriticBudget,
+                  allowContextDrop: true,
+                  label: "objective_mini_critic",
+                  dialogueProfile,
+                  dialogueQuestion: baseQuestion,
+                },
+              );
+              const miniCritique = parseHelixAskObjectiveMiniCritique(
+                stripPromptEchoFromAnswer(
+                  String(objectiveMiniCritiqueAttempt.result?.text ?? ""),
+                  baseQuestion,
+                ),
+              );
+              if (miniCritique?.objectives.length) {
+                objectiveMiniAnswers = applyHelixAskObjectiveMiniCritique({
+                  miniAnswers: objectiveMiniAnswers,
+                  critique: miniCritique,
+                  objectiveStates: objectiveLoopState,
+                });
+                objectiveMiniCriticMode = "llm";
+                objectiveMiniCriticFailReason = null;
+                answerPath.push("objectiveMiniCritic:llm");
+              } else {
+                objectiveMiniCriticMode = "heuristic_fallback";
+                objectiveMiniCriticFailReason = "objective_mini_critic_parse_failed";
+                answerPath.push("objectiveMiniCritic:fallback");
+              }
+            } catch (error) {
+              objectiveMiniCriticMode = "heuristic_fallback";
+              objectiveMiniCriticFailReason =
+                error instanceof Error ? error.message : String(error);
+              answerPath.push("objectiveMiniCritic:fallback");
+            }
+          } else {
+            objectiveMiniCriticMode = "heuristic_fallback";
+            objectiveMiniCriticFailReason = "objective_mini_critic_llm_skipped";
+            answerPath.push("objectiveMiniCritic:fallback");
+          }
+        }
+        const objectiveScopedRetrievalEnforcement =
+          enforceHelixAskObjectiveScopedRetrievalRequirementForMiniAnswers({
+            miniAnswers: objectiveMiniAnswers,
+            states: objectiveLoopState,
+            retrievalQueries: objectiveRetrievalQueriesLog,
+            maxObjectives: OBJECTIVE_SCOPED_RETRIEVAL_MAX_OBJECTIVES,
+          });
+        objectiveMiniAnswers = objectiveScopedRetrievalEnforcement.miniAnswers;
+        const objectiveMissingScopedRetrievalIds =
+          objectiveScopedRetrievalEnforcement.missingObjectiveIds;
+        const objectiveMissingScopedRetrievalAny =
+          objectiveMissingScopedRetrievalIds.length > 0;
+        objectiveMiniValidation = summarizeHelixAskObjectiveMiniValidation(objectiveMiniAnswers);
+        if (objectiveMiniValidation.unresolved > 0) {
+          updateObjectiveLoopValidation(
+            false,
+            objectiveMissingScopedRetrievalAny
+              ? "objective_retrieval_missing_for_unresolved"
+              : "objective_mini_validation_unresolved",
+          );
+          answerPath.push(
+            `objectiveMiniValidation:unresolved:${objectiveMiniValidation.unresolved}`,
+          );
+        } else {
+          answerPath.push("objectiveMiniValidation:pass");
+        }
+        if (objectiveMissingScopedRetrievalAny) {
+          answerPath.push(
+            `objectiveRetrievalMissing:${objectiveMissingScopedRetrievalIds.length}`,
+          );
+        }
+        if (debugPayload) {
+          const debugRecord = debugPayload as Record<string, unknown>;
+          debugRecord.objective_missing_scoped_retrieval_ids =
+            objectiveMissingScopedRetrievalIds.slice();
+          debugRecord.objective_missing_scoped_retrieval_count =
+            objectiveMissingScopedRetrievalIds.length;
+          debugRecord.objective_missing_scoped_retrieval_enforced =
+            objectiveMissingScopedRetrievalAny;
+        }
+        if (objectiveMiniAnswers.length > 0) {
+          const miniById = new Map(
+            objectiveMiniAnswers.map((entry) => [entry.objective_id, entry] as const),
+          );
+          objectiveLoopState = objectiveLoopState.map((state) => {
+            if (isHelixAskObjectiveTerminalStatus(state.status)) return state;
+            const mini = miniById.get(state.objective_id);
+            if (!mini) return state;
+            const nextState: HelixAskObjectiveLoopState = {
+              ...state,
+              matched_slots: Array.from(new Set([...state.matched_slots, ...mini.matched_slots])),
+            };
+            if (mini.status === "covered") {
+              return recordObjectiveTransition(
+                nextState,
+                "complete",
+                "objective_mini_validation_covered",
+              );
+            }
+            return recordObjectiveTransition(
+              nextState,
+              "blocked",
+              mini.status === "blocked"
+                ? "objective_mini_validation_blocked"
+                : "objective_mini_validation_unresolved",
+            );
+          });
+          const shouldAssembleFromMiniAnswers = objectiveMiniAnswers.length > 0;
+          if (shouldAssembleFromMiniAnswers) {
+            let assembledObjectiveText: string | null = null;
+            const objectiveAssemblyBudget = clampNumber(
+              Math.floor((parsed.data.max_tokens ?? HELIX_ASK_ANSWER_MAX_TOKENS) * 0.45),
+              180,
+              680,
+            );
+            const objectiveAssemblyModel =
+              dialogueProfile === "dot_min_steps_v1"
+                ? (process.env.LLM_HTTP_MODEL?.trim() || "gpt-4o-mini")
+                : undefined;
+            const canUseLlmAssembly =
+              !llmUnavailableAtTurnStart &&
+              !answerGenerationFailedForTurn &&
+              !preserveAnswerAcrossComposer &&
+              !objectiveMissingScopedRetrievalAny &&
+              (!fastQualityMode || getFastElapsedMs() < fastStageDeadlines.finalize);
+            objectiveAssemblyLlmAttempted = canUseLlmAssembly;
+            objectiveAssemblyLlmInvoked = false;
+            if (canUseLlmAssembly) {
+              try {
+                objectiveAssemblyLlmInvoked = true;
+                const objectiveAssemblyPrompt = applyDialogueProfilePrompt(
+                  buildHelixAskObjectiveAssemblyPrompt({
+                    question: baseQuestion,
+                    currentAnswer: cleaned,
+                    miniAnswers: objectiveMiniAnswers,
+                    responseLanguage,
+                  }),
+                  dialogueProfile,
+                  baseQuestion,
+                );
+                const objectiveAssemblyAttempt = await runHelixAskLocalWithOverflowRetry(
+                  {
+                    prompt: objectiveAssemblyPrompt,
+                    max_tokens: objectiveAssemblyBudget,
+                    temperature: parsed.data.temperature,
+                    seed: parsed.data.seed,
+                    stop: parsed.data.stop,
+                    model: objectiveAssemblyModel,
+                  },
+                  {
+                    personaId,
+                    sessionId: parsed.data.sessionId,
+                    traceId: askTraceId,
+                  },
+                  {
+                    fallbackMaxTokens: objectiveAssemblyBudget,
+                    allowContextDrop: true,
+                    label: "objective_assembly",
+                    dialogueProfile,
+                    dialogueQuestion: baseQuestion,
+                  },
+                );
+                const objectiveAssemblyDraft = formatHelixAskAnswer(
+                  stripPromptEchoFromAnswer(
+                    String(objectiveAssemblyAttempt.result?.text ?? ""),
+                    baseQuestion,
+                  ),
+                )
+                  .trim();
+                if (objectiveAssemblyDraft) {
+                  assembledObjectiveText = objectiveAssemblyDraft;
+                  objectiveAssemblyMode = "llm";
+                  objectiveAssemblyFailReason = null;
+                } else {
+                  objectiveAssemblyFailReason = "objective_assembly_empty";
+                }
+              } catch (error) {
+                objectiveAssemblyFailReason =
+                  error instanceof Error ? error.message : String(error);
+              }
+            }
+            if (!assembledObjectiveText) {
+              assembledObjectiveText = buildDeterministicHelixAskObjectiveAssembly({
+                miniAnswers: objectiveMiniAnswers,
+                currentAnswer: cleaned,
+              }).trim();
+              objectiveAssemblyMode = "deterministic_fallback";
+              if (!objectiveAssemblyFailReason) {
+                objectiveAssemblyFailReason = objectiveMissingScopedRetrievalAny
+                  ? "objective_assembly_waiting_for_scoped_retrieval"
+                  : canUseLlmAssembly
+                    ? "objective_assembly_deterministic_fallback"
+                    : "objective_assembly_llm_skipped";
+              }
+            }
+            if (assembledObjectiveText) {
+              cleaned = stripInlineJsonArtifacts(assembledObjectiveText).trim();
+              answerPath.push(
+                objectiveAssemblyMode === "llm"
+                  ? "objectiveAssembly:llm"
+                  : "objectiveAssembly:deterministic_fallback",
+              );
+            }
+          } else {
+            objectiveAssemblyMode = "none";
+            objectiveAssemblyFailReason = null;
+          }
+          syncObjectiveLoopDebug();
+        } else {
+          objectiveMiniValidation = summarizeHelixAskObjectiveMiniValidation([]);
+          objectiveMiniCriticMode = "none";
+          objectiveMiniCriticFailReason = null;
+          objectiveMiniCriticLlmAttempted = false;
+          objectiveMiniCriticLlmInvoked = false;
+          objectiveAssemblyMode = "none";
+          objectiveAssemblyFailReason = "objective_mini_answers_empty";
+          updateObjectiveLoopValidation(false, "objective_mini_answers_empty");
+          answerPath.push("objectiveMiniValidation:empty");
+          syncObjectiveLoopDebug();
         }
         if (debugPayload) {
           const debugRecord = debugPayload as Record<string, unknown>;
@@ -53876,13 +58640,49 @@ const executeHelixAsk = async ({
             validatedAfterEnforce.debug_leak_hits.length;
           debugRecord.composer_debug_leak_hits =
             validatedAfterEnforce.debug_leak_hits;
+          debugRecord.composer_placeholder_section_count =
+            validatedAfterEnforce.placeholder_section_count;
+          debugRecord.answer_validation_failures = [
+            ...validatedAfterEnforce.fail_reasons,
+            ...(promptResearchValidationAfter?.fail_reasons ?? []),
+          ];
+          debugRecord.prompt_research_validation_failures =
+            promptResearchValidationAfter?.fail_reasons ?? [];
+          debugRecord.prompt_research_validation_missing_verbatim_constraints =
+            promptResearchValidationAfter?.missing_verbatim_constraints ?? [];
+          debugRecord.prompt_research_validation_missing_required_sections =
+            promptResearchValidationAfter?.missing_required_sections ?? [];
+          debugRecord.prompt_research_validation_missing_support_sections =
+            promptResearchValidationAfter?.missing_support_sections ?? [];
+          debugRecord.prompt_research_validation_missing_provenance_columns =
+            promptResearchValidationAfter?.missing_provenance_columns ?? [];
+          debugRecord.prompt_research_validation_placeholder_hits =
+            promptResearchValidationAfter?.placeholder_hits ?? [];
+          debugRecord.prompt_research_validation_repair_actions =
+            promptResearchRepairActions;
+          debugRecord.answer_sectional_compose_used =
+            promptResearchRepairActions.includes("append_sectional_compose_sections");
           debugRecord.composer_degraded = validatedAfterEnforce.degraded;
           debugRecord.composer_degrade_reason = validatedAfterEnforce.degrade_reason;
           debugRecord.composer_degrade_path_id = answerPlanShadow.degrade_path_id;
+          const composerSoftEnforceEffectiveMode: "observe" | "enforce" =
+            hardComposerGuardTriggered || softSectionGuardTriggered || softSectionGuardEscalatedEnforce
+              ? "enforce"
+              : HELIX_ASK_GATE_MODE;
           debugRecord.composer_soft_enforce_applied =
-            hardComposerGuardTriggered || softSectionGuardTriggered || composerSoftObserveRewriteApplied;
+            hardComposerGuardTriggered ||
+            softSectionGuardTriggered ||
+            composerSoftObserveRewriteApplied ||
+            deterministicPreserveBlocked ||
+            softSectionGuardEscalatedEnforce;
           debugRecord.composer_soft_enforce_gate_mode = HELIX_ASK_GATE_MODE;
+          debugRecord.composer_soft_enforce_effective_mode =
+            composerSoftEnforceEffectiveMode;
           debugRecord.composer_soft_enforce_enabled = softSectionGuardEligible;
+          debugRecord.composer_soft_enforce_deterministic_preserve_blocked =
+            deterministicPreserveBlocked;
+          debugRecord.composer_soft_enforce_escalated_enforce =
+            softSectionGuardEscalatedEnforce;
           debugRecord.composer_soft_enforce_soft_section_guard_observed =
             softSectionGuardObserved;
           debugRecord.composer_soft_enforce_observe_skip =
@@ -53953,9 +58753,39 @@ const executeHelixAsk = async ({
           debugRecord.composer_evidence_hash = answerPlanShadow.evidence_pack.evidence_hash;
           debugRecord.turn_contract_hash = helixTurnContractHash;
           debugRecord.objective_count = helixTurnContract.objectives.length;
+          debugRecord.answer_obligation_count =
+            helixTurnContract.obligations.length;
+          debugRecord.answer_obligations =
+            helixTurnContract.obligations.map((obligation: HelixAskAnswerObligation) => ({
+              id: obligation.id,
+              label: obligation.label,
+              kind: obligation.kind,
+              required: obligation.required,
+              required_slots: obligation.required_slots,
+            }));
           debugRecord.slot_missing = answerPlanShadow.evidence_pack.slot_missing;
           debugRecord.evidence_gap = answerPlanShadow.evidence_pack.evidence_gap;
           debugRecord.objective_support = answerPlanShadow.evidence_pack.objective_support;
+          debugRecord.answer_obligation_coverage =
+            answerPlanShadow.evidence_pack.obligation_coverage;
+          debugRecord.answer_obligations_missing =
+            answerPlanShadow.evidence_pack.obligation_coverage
+              .filter(
+                (coverage: HelixAskEvidencePackObligationCoverage) =>
+                  coverage.status !== "covered",
+              )
+              .map((coverage: HelixAskEvidencePackObligationCoverage) => coverage.label);
+          debugRecord.answer_obligation_evidence =
+            answerPlanShadow.evidence_pack.obligation_evidence.slice(0, 8);
+          debugRecord.answer_evidence_blocks =
+            answerPlanShadow.evidence_pack.evidence_blocks.slice(0, 6);
+          debugRecord.answer_plan_sections = answerPlanShadow.sections.map((section: HelixAskAnswerPlanSection) => ({
+            id: section.id,
+            title: section.title,
+            kind: section.kind ?? "answer",
+            coverage_status: section.coverage_status ?? null,
+            obligation_ids: section.obligation_ids ?? [],
+          }));
           debugRecord.anchor_integrity_ok =
             validatedAfterEnforce.anchor_integrity_violations.length === 0;
           debugRecord.answer_mode =
@@ -53981,8 +58811,9 @@ const executeHelixAsk = async ({
         "forcedAnswer:ideology_social_deterministic",
       );
       if (openWorldBypassMode === "active" && !ideologyDeterministicPostComposerActive) {
-        const openWorldPostComposerGuarded = ensureOpenWorldBypassUncertainty(
-          stripRepoCitationsForOpenWorldBypass(cleaned),
+        const openWorldPostComposerGuarded = rewriteOpenWorldBestEffortAnswer(
+          cleaned,
+          baseQuestion,
         );
         if (openWorldPostComposerGuarded !== cleaned) {
           cleaned = openWorldPostComposerGuarded;
@@ -53990,14 +58821,68 @@ const executeHelixAsk = async ({
         }
       }
       if (intentProfile.id === "repo.ideology_reference") {
-        const ideologyNarrativePostComposer = enforceIdeologyNarrativeContracts(
+        const ideologyNarrativePostComposer = stripIdeologyNarrativeLeakage(
+          enforceIdeologyNarrativeContracts(
           rewriteIdeologyScientificVoice(cleaned, baseQuestion),
           baseQuestion,
+          ),
         );
         if (ideologyNarrativePostComposer !== cleaned) {
           cleaned = ideologyNarrativePostComposer;
           answerPath.push("ideology:post_composer_narrative_guard");
         }
+      }
+      const frontierPostComposerIntent =
+        intentProfile.id === "falsifiable.frontier_consciousness_theory_lens" ||
+        answerPath.includes("frontier:hard_guard_clarify");
+      if (frontierPostComposerIntent && !hasRequiredFrontierHeadings(cleaned)) {
+        const frontierEvidenceContext = [
+          postContractEvidence.evidenceWithSources,
+          contextText,
+          promptContextText,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        const frontierVerificationPostComposer = runFrontierVerificationPass(
+          cleaned,
+          frontierEvidenceContext,
+        );
+        const frontierSlotSummaryPostComposer = evaluateFrontierScientificSlots(
+          cleaned,
+          HELIX_ASK_FRONTIER_REQUIRED_SLOTS,
+        );
+        const frontierNextEvidencePostComposer = buildNextEvidenceHints({
+          question: baseQuestion,
+          missingSlots: frontierSlotSummaryPostComposer.missing,
+          slotPlan,
+          anchorFiles: postContractEvidence.contextFiles,
+          searchedTerms: retrievalQueries,
+          searchedFiles: retrievalFilesSnapshot,
+          includeSearchSummary: true,
+          planClarify: planDirectives?.clarifyQuestion,
+          headingSeedSlots:
+            slotPlanHeadingSeedSlots.length > 0 ? slotPlanHeadingSeedSlots : headingSeedSlots,
+          limit: 4,
+        });
+        cleaned = renderFrontierScientificContract({
+          question: baseQuestion,
+          verification: frontierVerificationPostComposer,
+          slotSummary: frontierSlotSummaryPostComposer,
+          planClarify: planDirectives?.clarifyQuestion,
+          nextEvidence: frontierNextEvidencePostComposer,
+          requireLensCandidate: true,
+        });
+        answerPath.push("frontier:post_composer_contract_enforced");
+      }
+      const placeholderScrubbed = stripHelixAskInstructionPlaceholderArtifacts(cleaned);
+      if (placeholderScrubbed !== cleaned) {
+        cleaned = placeholderScrubbed;
+        answerPath.push("finalClean:instruction_placeholder_scrub");
+      }
+      const objectiveCheckpointScrubbed = stripHelixAskObjectiveCheckpointArtifacts(cleaned);
+      if (objectiveCheckpointScrubbed !== cleaned) {
+        cleaned = objectiveCheckpointScrubbed;
+        answerPath.push("finalClean:objective_checkpoint_scrub");
       }
       if (HELIX_ASK_UNIVERSAL_ANSWER_PLAN_SHADOW_ENABLED) {
         const finalSourcesAllowlist = prioritizeHelixAskAllowedCitations([
@@ -54498,6 +59383,7 @@ const executeHelixAsk = async ({
         }
       }
     }
+    finalizeObjectiveLoopBeforeResponse();
     scrubSkippedLlmTransportErrors(debugPayload);
     const responsePayload = debugPayload ? { ...result, debug: debugPayload } : result;
     attachContextCapsuleToResult(

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   __testOnlyEvaluateFailures,
   buildRunDiagnostics,
+  buildProbabilityScorecard,
   createArtifactBundlePaths,
   toDiagnosticRollup,
 } from "../scripts/helix-ask-versatility-record";
@@ -132,6 +133,76 @@ describe("helix ask versatility diagnostics", () => {
 
     expect(failures).toContain("runtime_fallback_answer");
   });
+
+  it("flags debug/scaffold leakage and code fragment spill signatures", () => {
+    const failures = __testOnlyEvaluateFailures(
+      {
+        family: "relation",
+        prompt: "Explain relation simply.",
+        expected_report_mode: false,
+      } as any,
+      {
+        status: 200,
+        latency_ms: 31,
+        payload: {
+          text: "Tree Walk: Needle Hull\nwhat_is_mission_ethos: Mission ethos...\nexport default function ElectronOrbitalPanel() {}\nSources: docs/knowledge/warp/natario-zero-expansion.md",
+          report_mode: false,
+          debug: {
+            report_mode: false,
+            relation_packet_built: true,
+            relation_dual_domain_ok: true,
+            relation_packet_bridge_count: 2,
+            relation_packet_evidence_count: 2,
+          },
+        },
+      } as any,
+    );
+
+    expect(failures).toContain("debug_scaffold_leak");
+    expect(failures).toContain("code_fragment_spill");
+  });
+
+  it("builds probability scorecard with Wilson confidence intervals", () => {
+    const scorecard = buildProbabilityScorecard([
+      {
+        family: "relation",
+        expected_intent_id: "hybrid.warp_ethos_relation",
+        debug: {
+          intent_id: "hybrid.warp_ethos_relation",
+          relation_packet_built: true,
+          relation_dual_domain_ok: true,
+          relation_packet_bridge_count: 2,
+          relation_packet_evidence_count: 2,
+        },
+        failures: [],
+      },
+      {
+        family: "repo_technical",
+        expected_intent_id: "repo.helix_ask_pipeline_explain",
+        debug: {
+          intent_id: "repo.helix_ask_pipeline_explain",
+        },
+        failures: [],
+      },
+      {
+        family: "ambiguous_general",
+        expected_intent_id: "general.conceptual_define_compare",
+        debug: {
+          intent_id: "wrong.intent",
+        },
+        failures: ["runtime_fallback_answer", "debug_scaffold_leak"],
+      },
+    ] as Array<any>);
+
+    expect(scorecard.method).toBe("wilson_95");
+    expect(scorecard.metrics.route_correct_by_family.relation.p).toBe(1);
+    expect(scorecard.metrics.route_correct_by_family.repo_technical.p).toBe(1);
+    expect(scorecard.metrics.route_correct_by_family.ambiguous_general.p).toBe(0);
+    expect(scorecard.metrics.no_runtime_fallback.p).toBeCloseTo(2 / 3, 5);
+    expect(scorecard.metrics.no_debug_leak.p).toBeCloseTo(2 / 3, 5);
+    expect(scorecard.metrics.frontier_scaffold_complete.total).toBe(3);
+  });
+
   it("rolls up pass/fail/unknown counts for required diagnostics", () => {
     const rollup = toDiagnosticRollup([
       {

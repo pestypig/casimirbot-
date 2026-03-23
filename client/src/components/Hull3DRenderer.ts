@@ -30,6 +30,12 @@ import {
   type ObserverFrameKey,
   type ObserverRobustSelection,
 } from "@/lib/stress-energy-brick";
+import {
+  DEFAULT_GEODESIC_DIAGNOSTICS_CHANNEL,
+  DEFAULT_METRIC_VOLUME_CHANNEL,
+  type HullGeodesicDiagnostics,
+  type HullMetricVolumeContract,
+} from "@/lib/metric-volume-contract";
 import { metricModeFromWarpFieldType, type MetricModeId } from "@shared/metric-eval";
 import type { WarpFieldType } from "@shared/schema";
 
@@ -786,6 +792,10 @@ type CurvatureBrickMessage = {
 
 
 
+};
+
+type MetricVolumeMessage = HullMetricVolumeContract & {
+  channels?: Record<string, { data?: Float32Array | ArrayBuffer | ArrayLike<number>; min?: number; max?: number }>;
 };
 
 type LatticeStrobeHist = {
@@ -4921,6 +4931,11 @@ uniform float u_R;
 uniform float u_sigma;
 uniform float u_beta;
 uniform int u_metricMode;
+uniform int u_geoScientific;
+uniform int u_metricFieldEnabled;
+uniform sampler3D u_metricABTex;
+uniform sampler3D u_metricGammaTex;
+uniform vec3 u_metricDims;
 
 #if ENABLE_SPACETIME_GRID
 uniform sampler3D u_spaceGridSdf;
@@ -5442,6 +5457,260 @@ vec3 integrateGeodesic(vec3 origin, vec3 dir, float betaAmp) {
 
 }
 
+float mget(mat4 m, int row, int col) {
+  return m[col][row];
+}
+
+float comp4(vec4 v, int i) {
+  return i == 0 ? v.x : (i == 1 ? v.y : (i == 2 ? v.z : v.w));
+}
+
+vec3 metricBounds() {
+  vec3 axesSafe = max(abs(u_axes), vec3(1e-4));
+  return axesSafe * max(u_domainScale, 1e-3);
+}
+
+bool sampleMetricPrimitive(vec3 pos, out float alpha, out vec3 beta, out vec3 gammaDiag) {
+  alpha = 1.0;
+  beta = vec3(0.0);
+  gammaDiag = vec3(1.0);
+  if (u_metricFieldEnabled == 0) return false;
+  vec3 bounds = metricBounds();
+  vec3 centered = pos / bounds;
+  bool inBounds = max(abs(centered.x), max(abs(centered.y), abs(centered.z))) <= 1.0;
+  vec3 uvw = clamp(centered * 0.5 + 0.5, 0.0, 1.0);
+  vec4 ab = texture(u_metricABTex, uvw);
+  vec4 gg = texture(u_metricGammaTex, uvw);
+  alpha = max(ab.w, 1e-6);
+  beta = ab.xyz;
+  gammaDiag = max(gg.xyz, vec3(1e-6));
+  return inBounds;
+}
+
+void buildMetricMatrices(float alpha, vec3 beta, vec3 gammaDiag, out mat4 g, out mat4 gInv) {
+  float invA2 = 1.0 / max(alpha * alpha, 1e-12);
+  float invGx = 1.0 / max(gammaDiag.x, 1e-12);
+  float invGy = 1.0 / max(gammaDiag.y, 1e-12);
+  float invGz = 1.0 / max(gammaDiag.z, 1e-12);
+
+  float g00 = -(alpha * alpha) +
+    gammaDiag.x * beta.x * beta.x +
+    gammaDiag.y * beta.y * beta.y +
+    gammaDiag.z * beta.z * beta.z;
+  float g01 = gammaDiag.x * beta.x;
+  float g02 = gammaDiag.y * beta.y;
+  float g03 = gammaDiag.z * beta.z;
+
+  g = mat4(0.0);
+  g[0][0] = g00;
+  g[1][0] = g01;
+  g[2][0] = g02;
+  g[3][0] = g03;
+  g[0][1] = g01;
+  g[1][1] = gammaDiag.x;
+  g[0][2] = g02;
+  g[2][2] = gammaDiag.y;
+  g[0][3] = g03;
+  g[3][3] = gammaDiag.z;
+
+  gInv = mat4(0.0);
+  gInv[0][0] = -invA2;
+  gInv[0][1] = beta.x * invA2;
+  gInv[0][2] = beta.y * invA2;
+  gInv[0][3] = beta.z * invA2;
+  gInv[1][0] = beta.x * invA2;
+  gInv[2][0] = beta.y * invA2;
+  gInv[3][0] = beta.z * invA2;
+  gInv[1][1] = invGx - beta.x * beta.x * invA2;
+  gInv[2][2] = invGy - beta.y * beta.y * invA2;
+  gInv[3][3] = invGz - beta.z * beta.z * invA2;
+  gInv[1][2] = -beta.x * beta.y * invA2;
+  gInv[2][1] = gInv[1][2];
+  gInv[1][3] = -beta.x * beta.z * invA2;
+  gInv[3][1] = gInv[1][3];
+  gInv[2][3] = -beta.y * beta.z * invA2;
+  gInv[3][2] = gInv[2][3];
+}
+
+float metricPartial(mat4 dgdx, mat4 dgdy, mat4 dgdz, int derivIdx, int row, int col) {
+  if (derivIdx == 1) return mget(dgdx, row, col);
+  if (derivIdx == 2) return mget(dgdy, row, col);
+  if (derivIdx == 3) return mget(dgdz, row, col);
+  return 0.0;
+}
+
+float solveNullK0(mat4 g, vec3 spatial) {
+  float sx = spatial.x;
+  float sy = spatial.y;
+  float sz = spatial.z;
+  float A = mget(g, 0, 0);
+  float B = 2.0 * (mget(g, 0, 1) * sx + mget(g, 0, 2) * sy + mget(g, 0, 3) * sz);
+  float C =
+    mget(g, 1, 1) * sx * sx +
+    mget(g, 2, 2) * sy * sy +
+    mget(g, 3, 3) * sz * sz +
+    2.0 * (
+      mget(g, 1, 2) * sx * sy +
+      mget(g, 1, 3) * sx * sz +
+      mget(g, 2, 3) * sy * sz
+    );
+  float disc = max(B * B - 4.0 * A * C, 0.0);
+  float root = sqrt(disc);
+  float denom = abs(2.0 * A) > 1e-12 ? 2.0 * A : (A < 0.0 ? -2e-12 : 2e-12);
+  float r1 = (-B - root) / denom;
+  float r2 = (-B + root) / denom;
+  bool r1Finite = !(isnan(r1) || isinf(r1));
+  bool r2Finite = !(isnan(r2) || isinf(r2));
+  if (r1 > 0.0 && r1Finite) return r1;
+  if (r2 > 0.0 && r2Finite) return r2;
+  if (r1Finite) return r1;
+  if (r2Finite) return r2;
+  return 1.0;
+}
+
+void sampleMetricAndDerivativesScientific(
+  vec3 pos,
+  out mat4 g,
+  out mat4 gInv,
+  out mat4 dgdx,
+  out mat4 dgdy,
+  out mat4 dgdz,
+  out float gradNorm
+) {
+  float alpha;
+  vec3 beta;
+  vec3 gammaDiag;
+  sampleMetricPrimitive(pos, alpha, beta, gammaDiag);
+  buildMetricMatrices(alpha, beta, gammaDiag, g, gInv);
+
+  vec3 bounds = metricBounds();
+  vec3 dims = max(u_metricDims, vec3(1.0));
+  vec3 h = max((2.0 * bounds) / dims, vec3(1e-5));
+
+  float aPx; vec3 bPx; vec3 gPx;
+  float aMx; vec3 bMx; vec3 gMx;
+  float aPy; vec3 bPy; vec3 gPy;
+  float aMy; vec3 bMy; vec3 gMy;
+  float aPz; vec3 bPz; vec3 gPz;
+  float aMz; vec3 bMz; vec3 gMz;
+  sampleMetricPrimitive(pos + vec3(h.x, 0.0, 0.0), aPx, bPx, gPx);
+  sampleMetricPrimitive(pos - vec3(h.x, 0.0, 0.0), aMx, bMx, gMx);
+  sampleMetricPrimitive(pos + vec3(0.0, h.y, 0.0), aPy, bPy, gPy);
+  sampleMetricPrimitive(pos - vec3(0.0, h.y, 0.0), aMy, bMy, gMy);
+  sampleMetricPrimitive(pos + vec3(0.0, 0.0, h.z), aPz, bPz, gPz);
+  sampleMetricPrimitive(pos - vec3(0.0, 0.0, h.z), aMz, bMz, gMz);
+
+  mat4 gxP; mat4 gxI;
+  mat4 gxM; mat4 gxMI;
+  mat4 gyP; mat4 gyI;
+  mat4 gyM; mat4 gyMI;
+  mat4 gzP; mat4 gzI;
+  mat4 gzM; mat4 gzMI;
+  buildMetricMatrices(aPx, bPx, gPx, gxP, gxI);
+  buildMetricMatrices(aMx, bMx, gMx, gxM, gxMI);
+  buildMetricMatrices(aPy, bPy, gPy, gyP, gyI);
+  buildMetricMatrices(aMy, bMy, gMy, gyM, gyMI);
+  buildMetricMatrices(aPz, bPz, gPz, gzP, gzI);
+  buildMetricMatrices(aMz, bMz, gMz, gzM, gzMI);
+
+  dgdx = (gxP - gxM) / (2.0 * h.x);
+  dgdy = (gyP - gyM) / (2.0 * h.y);
+  dgdz = (gzP - gzM) / (2.0 * h.z);
+  gradNorm = length(vec3(
+    metricPartial(dgdx, dgdy, dgdz, 1, 0, 0),
+    metricPartial(dgdx, dgdy, dgdz, 2, 0, 0),
+    metricPartial(dgdx, dgdy, dgdz, 3, 0, 0)
+  ));
+}
+
+void geodesicAccelScientific(vec3 pos, vec4 k4, out vec4 accel, out float gradNorm) {
+  mat4 g;
+  mat4 gInv;
+  mat4 dgdx;
+  mat4 dgdy;
+  mat4 dgdz;
+  sampleMetricAndDerivativesScientific(pos, g, gInv, dgdx, dgdy, dgdz, gradNorm);
+  accel = vec4(0.0);
+  for (int mu = 0; mu < 4; mu++) {
+    float accumMu = 0.0;
+    for (int nu = 0; nu < 4; nu++) {
+      float accumNu = 0.0;
+      for (int a = 0; a < 4; a++) {
+        for (int b = 0; b < 4; b++) {
+          float dABNu = metricPartial(dgdx, dgdy, dgdz, a, b, nu);
+          float dBANu = metricPartial(dgdx, dgdy, dgdz, b, a, nu);
+          float dNuAB = metricPartial(dgdx, dgdy, dgdz, nu, a, b);
+          float ka = comp4(k4, a);
+          float kb = comp4(k4, b);
+          accumNu += (dABNu + dBANu - dNuAB) * ka * kb;
+        }
+      }
+      accumMu += 0.5 * mget(gInv, mu, nu) * accumNu;
+    }
+    if (mu == 0) accel.x = -accumMu;
+    else if (mu == 1) accel.y = -accumMu;
+    else if (mu == 2) accel.z = -accumMu;
+    else accel.w = -accumMu;
+  }
+}
+
+void rk4Scientific(
+  vec4 x4,
+  vec4 k4,
+  float h,
+  out vec4 xNext,
+  out vec4 kNext,
+  out float gradOut
+) {
+  vec4 a1; float g1;
+  geodesicAccelScientific(x4.yzw, k4, a1, g1);
+  vec4 x2 = x4 + 0.5 * h * k4;
+  vec4 k2In = k4 + 0.5 * h * a1;
+  vec4 a2; float g2;
+  geodesicAccelScientific(x2.yzw, k2In, a2, g2);
+  vec4 x3 = x4 + 0.5 * h * k2In;
+  vec4 k3In = k4 + 0.5 * h * a2;
+  vec4 a3; float g3;
+  geodesicAccelScientific(x3.yzw, k3In, a3, g3);
+  vec4 x4End = x4 + h * k3In;
+  vec4 k4In = k4 + h * a3;
+  vec4 a4; float g4;
+  geodesicAccelScientific(x4End.yzw, k4In, a4, g4);
+  xNext = x4 + (h / 6.0) * (k4 + 2.0 * k2In + 2.0 * k3In + k4In);
+  kNext = k4 + (h / 6.0) * (a1 + 2.0 * a2 + 2.0 * a3 + a4);
+  gradOut = 0.25 * (g1 + g2 + g3 + g4);
+}
+
+vec3 integrateGeodesicScientific(vec3 origin, vec3 dir) {
+  vec4 x4 = vec4(0.0, origin);
+  vec3 spatial = normalize(dir);
+  mat4 g0; mat4 gInv0; mat4 dgx0; mat4 dgy0; mat4 dgz0; float grad0;
+  sampleMetricAndDerivativesScientific(origin, g0, gInv0, dgx0, dgy0, dgz0, grad0);
+  vec4 k4 = vec4(solveNullK0(g0, spatial), spatial);
+  float baseStep = max(u_geoStep, 1e-5);
+  vec3 bounds = metricBounds();
+  float exitRs = max(u_R, 1e-4) * max(u_geoMaxDist, 1.0);
+  for (int i = 0; i < ${SKYBOX_MAX_STEPS}; i++) {
+    if (i >= u_geoSteps) break;
+    vec4 acc; float gradCurr;
+    geodesicAccelScientific(x4.yzw, k4, acc, gradCurr);
+    float h = clamp(baseStep / (1.0 + 0.6 * gradCurr), baseStep * 0.2, baseStep * 1.5);
+    vec4 xNext; vec4 kNext; float gradOut;
+    rk4Scientific(x4, k4, h, xNext, kNext, gradOut);
+    x4 = xNext;
+    k4 = kNext;
+    mat4 gNow; mat4 gInvNow; mat4 dgxNow; mat4 dgyNow; mat4 dgzNow; float gradNow;
+    sampleMetricAndDerivativesScientific(x4.yzw, gNow, gInvNow, dgxNow, dgyNow, dgzNow, gradNow);
+    float k0 = solveNullK0(gNow, k4.yzw);
+    k4.x = k0;
+    vec3 spatialNow = k4.yzw;
+    float mag = max(length(spatialNow), 1e-8);
+    k4.yzw = spatialNow / mag;
+    if (length(x4.yzw / max(bounds, vec3(1e-4))) > exitRs && u_geoMaxDist > 0.0) break;
+  }
+  return normalize(k4.yzw);
+}
+
 
 
 
@@ -5861,7 +6130,11 @@ void main() {
     vec3 rayDir = viewRayDir(v_ndc);
     vec3 skyDir = rayDir;
     if (u_skyboxMode == 2 && u_geoSteps > 0 && u_geoStep > 0.0) {
-      skyDir = integrateGeodesic(u_cameraPos, rayDir, u_beta);
+      if (u_geoScientific != 0 && u_metricFieldEnabled != 0) {
+        skyDir = integrateGeodesicScientific(u_cameraPos, rayDir);
+      } else {
+        skyDir = integrateGeodesic(u_cameraPos, rayDir, u_beta);
+      }
     }
     vec3 sky = sampleSkybox(skyDir);
     // Env map is authored in sRGB; convert to linear before exposure/compositing.
@@ -6624,6 +6897,11 @@ void main() {
 
 const OVERLAY_VS = `#version 300 es
 
+precision highp float;
+precision highp int;
+precision highp sampler3D;
+precision highp sampler2D;
+
 layout(location=0) in vec3 a_pos;
 layout(location=1) in vec3 a_color;
 layout(location=2) in float a_fall;
@@ -6894,6 +7172,7 @@ void main() {
 const OVERLAY_FS = `#version 300 es
 
 precision highp float;
+precision highp int;
 
 uniform int u_legacyEnabled;
 uniform int u_legacyPointPass;
@@ -8469,6 +8748,7 @@ export class Hull3DRenderer {
   private curvatureBusId: string | null = null;
   private t00BusId: string | null = null;
   private fluxBusId: string | null = null;
+  private metricBusId: string | null = null;
   private observerSelectionBusId: string | null = null;
   private observerDirectionOverlayBusId: string | null = null;
 
@@ -8495,6 +8775,24 @@ export class Hull3DRenderer {
 
 
   private intentBusUnsub: (() => void) | null = null;
+
+  private geodesicDiagnostics: HullGeodesicDiagnostics = {
+    mode: "disabled",
+    scientificEnabled: false,
+    metricAvailable: false,
+    metricSource: null,
+    chart: null,
+    dims: null,
+    maxNullResidual: null,
+    stepConvergence: null,
+    bundleSpread: null,
+    consistency: "unknown",
+    consistencyNote: null,
+    steps: 0,
+    stepScale_m: 0,
+    updatedAt: 0,
+  };
+  private geodesicDiagLastPublishMs = 0;
 
   private spacetimeGridState: {
     enabled: boolean;
@@ -8819,6 +9117,21 @@ export class Hull3DRenderer {
     range: [1e-12, 1e-12] as [number, number],
   };
   private t00StampWarned = false;
+  private metricVolume = {
+    texAB: null as WebGLTexture | null,
+    texGamma: null as WebGLTexture | null,
+    fallbackAB: null as WebGLTexture | null,
+    fallbackGamma: null as WebGLTexture | null,
+    dims: [1, 1, 1] as [number, number, number],
+    version: 0,
+    updatedAt: 0,
+    hasData: false,
+    source: null as string | null,
+    chart: null as string | null,
+    consistency: "unknown" as "ok" | "warn" | "fail" | "unknown",
+    consistencyNote: null as string | null,
+    alphaRange: [1, 1] as [number, number],
+  };
   private observerSelection: ObserverRobustSelection = { condition: "nec", frame: "Eulerian" };
   private observerDirectionOverlay: ObserverDirectionOverlayConfig = {
     enabled: false,
@@ -8851,6 +9164,12 @@ export class Hull3DRenderer {
 
 
   private rayTargetSize: [number, number] = [0, 0];
+  private rayTargetFailure = {
+    width: 0,
+    height: 0,
+    nextRetryAtMs: 0,
+    failCount: 0,
+  };
 
   private rayIdEnabled = false;
 
@@ -9762,6 +10081,9 @@ export class Hull3DRenderer {
     });
     this.fluxBusId = subscribe("hull3d:flux", (payload: any) => {
       this.handleFluxBrick(payload);
+    });
+    this.metricBusId = subscribe(DEFAULT_METRIC_VOLUME_CHANNEL, (payload: any) => {
+      this.handleMetricVolume(payload as MetricVolumeMessage);
     });
     this.observerSelectionBusId = subscribe(OBSERVER_ROBUST_SELECTION_CHANNEL, (payload: any) => {
       const conditionRaw = typeof payload?.condition === "string" ? payload.condition.toLowerCase() : "nec";
@@ -17715,6 +18037,11 @@ export class Hull3DRenderer {
       u_sigma: gl.getUniformLocation(this.resources.postProgram, "u_sigma"),
       u_beta: gl.getUniformLocation(this.resources.postProgram, "u_beta"),
       u_metricMode: gl.getUniformLocation(this.resources.postProgram, "u_metricMode"),
+      u_geoScientific: gl.getUniformLocation(this.resources.postProgram, "u_geoScientific"),
+      u_metricFieldEnabled: gl.getUniformLocation(this.resources.postProgram, "u_metricFieldEnabled"),
+      u_metricABTex: gl.getUniformLocation(this.resources.postProgram, "u_metricABTex"),
+      u_metricGammaTex: gl.getUniformLocation(this.resources.postProgram, "u_metricGammaTex"),
+      u_metricDims: gl.getUniformLocation(this.resources.postProgram, "u_metricDims"),
 
 
 
@@ -18072,9 +18399,22 @@ export class Hull3DRenderer {
     const geoShift = skyboxModeIndex === 2 ? clamp(skyboxCfg.shift_scale, 0, 4) : 0;
     const geoMaxDist = skyboxModeIndex === 2 ? clamp(skyboxCfg.max_dist, 1, 20) : 0;
     const envRotation = (skyboxCfg.rotation_deg ?? 0) * (Math.PI / 180);
-    const geoFieldMode = skyboxModeIndex === 2
-      ? (this.t00.hasData ? 1 : this.curvature.hasData ? 2 : 0)
-      : 0;
+    const metricScientificReady =
+      skyboxModeIndex === 2 &&
+      this.metricVolume.hasData &&
+      this.metricVolume.consistency !== "fail";
+    const metricDims = this.metricVolume.hasData ? this.metricVolume.dims : [1, 1, 1];
+    const metricFieldEnabled = metricScientificReady ? 1 : 0;
+    const metricABTex = metricScientificReady
+      ? this.getActiveMetricABTexture()
+      : this.ensureMetricFallbackAB();
+    const metricGammaTex = metricScientificReady
+      ? this.getActiveMetricGammaTexture()
+      : this.ensureMetricFallbackGamma();
+    const geoFieldMode =
+      skyboxModeIndex === 2 && !metricScientificReady
+        ? (this.t00.hasData ? 1 : this.curvature.hasData ? 2 : 0)
+        : 0;
     const geoFieldRange =
       geoFieldMode === 1 ? this.t00.range : geoFieldMode === 2 ? this.curvature.range : [0, 0];
     const geoFieldRangeMin = Number.isFinite(geoFieldRange[0]) ? geoFieldRange[0] : 0;
@@ -18089,6 +18429,26 @@ export class Hull3DRenderer {
       1e-3,
       Number.isFinite(state.domainScale) ? (state.domainScale as number) : this.domainScale
     );
+    const geodesicMode =
+      skyboxModeIndex === 0
+        ? "disabled"
+        : skyboxModeIndex === 1
+          ? "flat-background"
+          : metricScientificReady
+            ? "full-3+1-christoffel"
+            : "reduced-1+1-fallback";
+    this.publishGeodesicDiagnostics({
+      mode: geodesicMode,
+      scientificEnabled: metricScientificReady,
+      metricAvailable: this.metricVolume.hasData,
+      metricSource: this.metricVolume.source,
+      chart: this.metricVolume.chart,
+      dims: this.metricVolume.hasData ? this.metricVolume.dims : null,
+      consistency: this.metricVolume.consistency,
+      consistencyNote: this.metricVolume.consistencyNote,
+      steps: geoSteps,
+      stepScale_m: geoStep,
+    });
 
 
 
@@ -18438,6 +18798,9 @@ export class Hull3DRenderer {
     if (loc.u_beta) gl.uniform1f(loc.u_beta, state.beta);
 
     if (loc.u_metricMode) gl.uniform1i(loc.u_metricMode, metricMode);
+    if (loc.u_geoScientific) gl.uniform1i(loc.u_geoScientific, metricScientificReady ? 1 : 0);
+    if (loc.u_metricFieldEnabled) gl.uniform1i(loc.u_metricFieldEnabled, metricFieldEnabled);
+    if (loc.u_metricDims) gl.uniform3f(loc.u_metricDims, metricDims[0], metricDims[1], metricDims[2]);
 
     if (loc.u_spaceGridEnabled) gl.uniform1i(loc.u_spaceGridEnabled, spaceEnabled);
     if (loc.u_spaceGridMode) gl.uniform1i(loc.u_spaceGridMode, spaceMode);
@@ -18578,6 +18941,12 @@ export class Hull3DRenderer {
     gl.activeTexture(gl.TEXTURE9);
     gl.bindTexture(gl.TEXTURE_3D, geoFieldTex);
     if (loc.u_geoFieldTex) gl.uniform1i(loc.u_geoFieldTex, 9);
+    gl.activeTexture(gl.TEXTURE10);
+    gl.bindTexture(gl.TEXTURE_3D, metricABTex);
+    if (loc.u_metricABTex) gl.uniform1i(loc.u_metricABTex, 10);
+    gl.activeTexture(gl.TEXTURE11);
+    gl.bindTexture(gl.TEXTURE_3D, metricGammaTex);
+    if (loc.u_metricGammaTex) gl.uniform1i(loc.u_metricGammaTex, 11);
 
     gl.bindVertexArray(this.resources.quadVao);
 
@@ -18590,6 +18959,14 @@ export class Hull3DRenderer {
     gl.bindVertexArray(null);
 
 
+
+    gl.activeTexture(gl.TEXTURE11);
+
+    gl.bindTexture(gl.TEXTURE_3D, null);
+
+    gl.activeTexture(gl.TEXTURE10);
+
+    gl.bindTexture(gl.TEXTURE_3D, null);
 
     gl.activeTexture(gl.TEXTURE9);
 
@@ -19119,6 +19496,17 @@ export class Hull3DRenderer {
 
     }
 
+    const nowMs =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (
+      this.rayTargetFailure.failCount > 0 &&
+      this.rayTargetFailure.width === width &&
+      this.rayTargetFailure.height === height &&
+      nowMs < this.rayTargetFailure.nextRetryAtMs
+    ) {
+      return false;
+    }
+
 
 
 
@@ -19379,8 +19767,23 @@ export class Hull3DRenderer {
 
 
 
-      console.error("[Hull3DRenderer] Unable to allocate auxiliary render target");
+      const sameSize =
+        this.rayTargetFailure.width === width &&
+        this.rayTargetFailure.height === height;
+      const failCount = sameSize ? this.rayTargetFailure.failCount + 1 : 1;
+      const retryDelayMs = Math.min(10_000, 400 * Math.pow(2, failCount - 1));
+      this.rayTargetFailure = {
+        width,
+        height,
+        failCount,
+        nextRetryAtMs: nowMs + retryDelayMs,
+      };
+      console.error("[Hull3DRenderer] Unable to allocate auxiliary render target", {
+        failCount,
+        retryDelayMs,
+      });
       this.rayIdEnabled = false;
+      this.rayTargetSize = [width, height];
 
 
 
@@ -19397,6 +19800,12 @@ export class Hull3DRenderer {
 
 
     this.rayIdEnabled = idEnabled;
+    this.rayTargetFailure = {
+      width: 0,
+      height: 0,
+      nextRetryAtMs: 0,
+      failCount: 0,
+    };
 
 
     this.rayTargetSize = [width, height];
@@ -19887,6 +20296,568 @@ export class Hull3DRenderer {
     };
     this.refreshT00FieldTexture();
     this.overlayCache.fluxStreamKey = "";
+  }
+
+  private coerceFloat32Channel(dataSource: any): Float32Array | null {
+    if (dataSource instanceof Float32Array) return dataSource;
+    if (dataSource instanceof ArrayBuffer) return new Float32Array(dataSource);
+    if (Array.isArray(dataSource)) return new Float32Array(dataSource);
+    if (dataSource && ArrayBuffer.isView(dataSource) && dataSource.buffer instanceof ArrayBuffer) {
+      try {
+        const byteOffset = Number(dataSource.byteOffset ?? 0);
+        const byteLength = Number(dataSource.byteLength ?? dataSource.buffer.byteLength ?? 0);
+        const safeLength = Math.max(0, Math.floor(byteLength / 4));
+        return new Float32Array(dataSource.buffer, byteOffset, safeLength);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private createMetricTextureRGBA(): WebGLTexture {
+    const { gl } = this;
+    const tex = gl.createTexture();
+    if (!tex) {
+      throw new Error("Hull3DRenderer: failed to allocate metric texture");
+    }
+    gl.bindTexture(gl.TEXTURE_3D, tex);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage3D(
+      gl.TEXTURE_3D,
+      0,
+      gl.RGBA32F,
+      1,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.FLOAT,
+      new Float32Array([0, 0, 0, 0]),
+    );
+    gl.bindTexture(gl.TEXTURE_3D, null);
+    return tex;
+  }
+
+  private ensureMetricTextures() {
+    if (!this.metricVolume.texAB) {
+      this.metricVolume.texAB = this.createMetricTextureRGBA();
+    }
+    if (!this.metricVolume.texGamma) {
+      this.metricVolume.texGamma = this.createMetricTextureRGBA();
+    }
+  }
+
+  private ensureMetricFallbackAB(): WebGLTexture {
+    if (this.metricVolume.fallbackAB) return this.metricVolume.fallbackAB;
+    this.metricVolume.fallbackAB = this.createMetricTextureRGBA();
+    return this.metricVolume.fallbackAB;
+  }
+
+  private ensureMetricFallbackGamma(): WebGLTexture {
+    if (this.metricVolume.fallbackGamma) return this.metricVolume.fallbackGamma;
+    this.metricVolume.fallbackGamma = this.createMetricTextureRGBA();
+    return this.metricVolume.fallbackGamma;
+  }
+
+  private getActiveMetricABTexture(): WebGLTexture {
+    return this.metricVolume.texAB ?? this.ensureMetricFallbackAB();
+  }
+
+  private getActiveMetricGammaTexture(): WebGLTexture {
+    return this.metricVolume.texGamma ?? this.ensureMetricFallbackGamma();
+  }
+
+  private evaluateMetricGeodesicDiagnostics(args: {
+    dims: [number, number, number];
+    voxelSize: [number, number, number];
+    alpha: Float32Array;
+    betaX: Float32Array;
+    betaY: Float32Array;
+    betaZ: Float32Array;
+    gammaXX: Float32Array;
+    gammaYY: Float32Array;
+    gammaZZ: Float32Array;
+  }): { maxNullResidual: number; stepConvergence: number; bundleSpread: number } {
+    const dims = args.dims;
+    const nx = Math.max(1, dims[0] | 0);
+    const ny = Math.max(1, dims[1] | 0);
+    const nz = Math.max(1, dims[2] | 0);
+    const total = nx * ny * nz;
+    const alpha = args.alpha;
+    const betaX = args.betaX;
+    const betaY = args.betaY;
+    const betaZ = args.betaZ;
+    const gammaXX = args.gammaXX;
+    const gammaYY = args.gammaYY;
+    const gammaZZ = args.gammaZZ;
+    const dx = Math.max(1e-9, Number(args.voxelSize[0] ?? 1));
+    const dy = Math.max(1e-9, Number(args.voxelSize[1] ?? 1));
+    const dz = Math.max(1e-9, Number(args.voxelSize[2] ?? 1));
+    const derivScale = [0, 1 / (2 * dx), 1 / (2 * dy), 1 / (2 * dz)];
+
+    const clampi = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+    const idx = (ix: number, iy: number, iz: number) => iz * nx * ny + iy * nx + ix;
+    const comp = (vec: number[], i: number) => vec[i] ?? 0;
+    const safe = (value: number, fallback: number) =>
+      Number.isFinite(value) ? value : fallback;
+
+    const metricFromComponents = (
+      aIn: number,
+      bxIn: number,
+      byIn: number,
+      bzIn: number,
+      gxxIn: number,
+      gyyIn: number,
+      gzzIn: number,
+    ) => {
+      const a = Math.max(1e-6, safe(aIn, 1));
+      const gxx = Math.max(1e-6, safe(gxxIn, 1));
+      const gyy = Math.max(1e-6, safe(gyyIn, 1));
+      const gzz = Math.max(1e-6, safe(gzzIn, 1));
+      const bx = safe(bxIn, 0);
+      const by = safe(byIn, 0);
+      const bz = safe(bzIn, 0);
+      const g00 = -(a * a) + gxx * bx * bx + gyy * by * by + gzz * bz * bz;
+      const g01 = gxx * bx;
+      const g02 = gyy * by;
+      const g03 = gzz * bz;
+      const g = [
+        [g00, g01, g02, g03],
+        [g01, gxx, 0, 0],
+        [g02, 0, gyy, 0],
+        [g03, 0, 0, gzz],
+      ];
+      const invA2 = 1 / Math.max(a * a, 1e-12);
+      const invGxx = 1 / gxx;
+      const invGyy = 1 / gyy;
+      const invGzz = 1 / gzz;
+      const gInv = [
+        [-invA2, bx * invA2, by * invA2, bz * invA2],
+        [bx * invA2, invGxx - (bx * bx) * invA2, -(bx * by) * invA2, -(bx * bz) * invA2],
+        [by * invA2, -(by * bx) * invA2, invGyy - (by * by) * invA2, -(by * bz) * invA2],
+        [bz * invA2, -(bz * bx) * invA2, -(bz * by) * invA2, invGzz - (bz * bz) * invA2],
+      ];
+      return { g, gInv };
+    };
+
+    const sampleMetricAt = (ixIn: number, iyIn: number, izIn: number) => {
+      const ix = clampi(ixIn, 0, nx - 1);
+      const iy = clampi(iyIn, 0, ny - 1);
+      const iz = clampi(izIn, 0, nz - 1);
+      const i = idx(ix, iy, iz);
+      return metricFromComponents(
+        alpha[i] ?? 1,
+        betaX[i] ?? 0,
+        betaY[i] ?? 0,
+        betaZ[i] ?? 0,
+        gammaXX[i] ?? 1,
+        gammaYY[i] ?? 1,
+        gammaZZ[i] ?? 1,
+      );
+    };
+
+    const ic = clampi(Math.floor(nx * 0.5), 0, nx - 1);
+    const jc = clampi(Math.floor(ny * 0.5), 0, ny - 1);
+    const kc = clampi(Math.floor(nz * 0.5), 0, nz - 1);
+
+    const center = sampleMetricAt(ic, jc, kc);
+    const g = center.g;
+    const gInv = center.gInv;
+    const dG = Array.from({ length: 4 }, () =>
+      Array.from({ length: 4 }, () => new Array<number>(4).fill(0)),
+    );
+
+    for (let deriv = 1; deriv <= 3; deriv += 1) {
+      const plus =
+        deriv === 1
+          ? sampleMetricAt(ic + 1, jc, kc)
+          : deriv === 2
+            ? sampleMetricAt(ic, jc + 1, kc)
+            : sampleMetricAt(ic, jc, kc + 1);
+      const minus =
+        deriv === 1
+          ? sampleMetricAt(ic - 1, jc, kc)
+          : deriv === 2
+            ? sampleMetricAt(ic, jc - 1, kc)
+            : sampleMetricAt(ic, jc, kc - 1);
+      for (let a = 0; a < 4; a += 1) {
+        for (let b = 0; b < 4; b += 1) {
+          dG[deriv][a][b] = (plus.g[a][b] - minus.g[a][b]) * derivScale[deriv];
+        }
+      }
+    }
+
+    const christoffel = Array.from({ length: 4 }, () =>
+      Array.from({ length: 4 }, () => new Array<number>(4).fill(0)),
+    );
+    for (let mu = 0; mu < 4; mu += 1) {
+      for (let a = 0; a < 4; a += 1) {
+        for (let b = 0; b < 4; b += 1) {
+          let acc = 0;
+          for (let nu = 0; nu < 4; nu += 1) {
+            const dABNu = dG[a][b][nu];
+            const dBANu = dG[b][a][nu];
+            const dNuAB = dG[nu][a][b];
+            acc += 0.5 * gInv[mu][nu] * (dABNu + dBANu - dNuAB);
+          }
+          christoffel[mu][a][b] = acc;
+        }
+      }
+    }
+
+    const solveNullK0 = (spatial: number[]) => {
+      const sx = spatial[0];
+      const sy = spatial[1];
+      const sz = spatial[2];
+      const A = g[0][0];
+      const B = 2 * (g[0][1] * sx + g[0][2] * sy + g[0][3] * sz);
+      const C =
+        g[1][1] * sx * sx +
+        g[2][2] * sy * sy +
+        g[3][3] * sz * sz +
+        2 * (g[1][2] * sx * sy + g[1][3] * sx * sz + g[2][3] * sy * sz);
+      const disc = Math.max(0, B * B - 4 * A * C);
+      const root = Math.sqrt(disc);
+      const denom = Math.abs(2 * A) > 1e-12 ? 2 * A : A < 0 ? -2e-12 : 2e-12;
+      const r1 = (-B - root) / denom;
+      const r2 = (-B + root) / denom;
+      if (Number.isFinite(r1) && r1 > 0) return r1;
+      if (Number.isFinite(r2) && r2 > 0) return r2;
+      if (Number.isFinite(r1)) return r1;
+      if (Number.isFinite(r2)) return r2;
+      return 1;
+    };
+
+    const nullResidual = (k: number[]) => {
+      let acc = 0;
+      for (let a = 0; a < 4; a += 1) {
+        for (let b = 0; b < 4; b += 1) {
+          acc += g[a][b] * k[a] * k[b];
+        }
+      }
+      return Math.abs(acc);
+    };
+
+    const rhs = (state: { x: number[]; k: number[] }) => {
+      const dxdt = [...state.k];
+      const dkdt = [0, 0, 0, 0];
+      for (let mu = 0; mu < 4; mu += 1) {
+        let acc = 0;
+        for (let a = 0; a < 4; a += 1) {
+          for (let b = 0; b < 4; b += 1) {
+            acc += christoffel[mu][a][b] * state.k[a] * state.k[b];
+          }
+        }
+        dkdt[mu] = -acc;
+      }
+      return { dxdt, dkdt };
+    };
+
+    const rk4Step = (state: { x: number[]; k: number[] }, h: number) => {
+      const k1 = rhs(state);
+      const s2 = {
+        x: state.x.map((v, i) => v + 0.5 * h * k1.dxdt[i]),
+        k: state.k.map((v, i) => v + 0.5 * h * k1.dkdt[i]),
+      };
+      const k2 = rhs(s2);
+      const s3 = {
+        x: state.x.map((v, i) => v + 0.5 * h * k2.dxdt[i]),
+        k: state.k.map((v, i) => v + 0.5 * h * k2.dkdt[i]),
+      };
+      const k3 = rhs(s3);
+      const s4 = {
+        x: state.x.map((v, i) => v + h * k3.dxdt[i]),
+        k: state.k.map((v, i) => v + h * k3.dkdt[i]),
+      };
+      const k4 = rhs(s4);
+      const xNext = state.x.map(
+        (v, i) =>
+          v +
+          (h / 6) *
+            (k1.dxdt[i] + 2 * k2.dxdt[i] + 2 * k3.dxdt[i] + k4.dxdt[i]),
+      );
+      const kNext = state.k.map(
+        (v, i) =>
+          v +
+          (h / 6) *
+            (k1.dkdt[i] + 2 * k2.dkdt[i] + 2 * k3.dkdt[i] + k4.dkdt[i]),
+      );
+      return { x: xNext, k: kNext };
+    };
+
+    const dirs = [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+      [1, 1, 0],
+      [1, -1, 0],
+      [1, 0, 1],
+      [1, 0, -1],
+      [0, 1, 1],
+      [0, 1, -1],
+      [1, 1, 1],
+      [1, -1, 1],
+      [1, 1, -1],
+    ].map((v) => {
+      const mag = Math.hypot(v[0], v[1], v[2]) || 1;
+      return [v[0] / mag, v[1] / mag, v[2] / mag];
+    });
+
+    let maxNullResidual = 0;
+    const endpoints: Array<[number, number, number]> = [];
+    const h = Math.max(1e-4, Math.min(dx, dy, dz) * 0.5);
+    const bundleSteps = 10;
+    for (const dir of dirs) {
+      const spatial = [dir[0], dir[1], dir[2]];
+      const k0 = solveNullK0(spatial);
+      const kVec = [k0, spatial[0], spatial[1], spatial[2]];
+      const residual = nullResidual(kVec);
+      if (residual > maxNullResidual) maxNullResidual = residual;
+
+      let state = { x: [0, 0, 0, 0], k: kVec };
+      for (let step = 0; step < bundleSteps; step += 1) {
+        state = rk4Step(state, h);
+      }
+      endpoints.push([comp(state.x, 1), comp(state.x, 2), comp(state.x, 3)]);
+    }
+
+    const mean = endpoints.reduce(
+      (acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]],
+      [0, 0, 0] as [number, number, number],
+    );
+    const invN = endpoints.length > 0 ? 1 / endpoints.length : 1;
+    const meanPoint: [number, number, number] = [mean[0] * invN, mean[1] * invN, mean[2] * invN];
+    let spreadSq = 0;
+    for (const p of endpoints) {
+      const dxp = p[0] - meanPoint[0];
+      const dyp = p[1] - meanPoint[1];
+      const dzp = p[2] - meanPoint[2];
+      spreadSq += dxp * dxp + dyp * dyp + dzp * dzp;
+    }
+    const bundleSpread = endpoints.length > 0 ? Math.sqrt(spreadSq / endpoints.length) : 0;
+
+    const refDir = [1, 0.25, -0.2];
+    const refMag = Math.hypot(refDir[0], refDir[1], refDir[2]) || 1;
+    const refSpatial = [refDir[0] / refMag, refDir[1] / refMag, refDir[2] / refMag];
+    const refK0 = solveNullK0(refSpatial);
+    const refState = { x: [0, 0, 0, 0], k: [refK0, refSpatial[0], refSpatial[1], refSpatial[2]] };
+    const full = rk4Step(refState, h);
+    const halfA = rk4Step(refState, h * 0.5);
+    const halfB = rk4Step(halfA, h * 0.5);
+    const diff = Math.hypot(
+      comp(full.x, 1) - comp(halfB.x, 1),
+      comp(full.x, 2) - comp(halfB.x, 2),
+      comp(full.x, 3) - comp(halfB.x, 3),
+    );
+    const scale = Math.max(
+      1e-9,
+      Math.hypot(comp(halfB.x, 1), comp(halfB.x, 2), comp(halfB.x, 3)),
+    );
+    const stepConvergence = diff / scale;
+
+    return {
+      maxNullResidual: Number.isFinite(maxNullResidual) ? maxNullResidual : 0,
+      stepConvergence: Number.isFinite(stepConvergence) ? stepConvergence : 0,
+      bundleSpread: Number.isFinite(bundleSpread) ? bundleSpread : 0,
+    };
+  }
+
+  private publishGeodesicDiagnostics(partial?: Partial<HullGeodesicDiagnostics>, force = false) {
+    if (partial) {
+      this.geodesicDiagnostics = {
+        ...this.geodesicDiagnostics,
+        ...partial,
+      };
+    }
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (!force && now - this.geodesicDiagLastPublishMs < 400) return;
+    this.geodesicDiagLastPublishMs = now;
+    const payload: HullGeodesicDiagnostics = {
+      ...this.geodesicDiagnostics,
+      updatedAt: Date.now(),
+    };
+    publish(DEFAULT_GEODESIC_DIAGNOSTICS_CHANNEL, payload);
+    if (typeof window !== "undefined") {
+      (window as any).__hullGeodesicDiagnostics = payload;
+    }
+  }
+
+  private handleMetricVolume(payload: MetricVolumeMessage) {
+    if (!payload || typeof payload !== "object") return;
+    const versionRaw = Number(payload.version ?? 0);
+    if (!Number.isFinite(versionRaw)) return;
+    if (versionRaw <= this.metricVolume.version) return;
+
+    const dimsRaw = payload.dims;
+    if (!Array.isArray(dimsRaw) || dimsRaw.length !== 3) return;
+    const dims: [number, number, number] = [
+      Math.max(1, Number(dimsRaw[0]) | 0),
+      Math.max(1, Number(dimsRaw[1]) | 0),
+      Math.max(1, Number(dimsRaw[2]) | 0),
+    ];
+    const expected = dims[0] * dims[1] * dims[2];
+    if (!Number.isFinite(expected) || expected <= 0) return;
+
+    const channels = (payload.channels ?? {}) as Record<string, any>;
+    const decodeChannel = (key: string): { data: Float32Array; min: number; max: number } | null => {
+      const entry = channels[key];
+      if (!entry) return null;
+      const source = entry?.data ?? entry;
+      const data = this.coerceFloat32Channel(source);
+      if (!data || data.length < expected) return null;
+      const min = Number(entry?.min);
+      const max = Number(entry?.max);
+      return {
+        data: data.length === expected ? data : data.subarray(0, expected),
+        min: Number.isFinite(min) ? min : 0,
+        max: Number.isFinite(max) ? max : 0,
+      };
+    };
+
+    const alpha = decodeChannel("alpha");
+    const betaX = decodeChannel("beta_x");
+    const betaY = decodeChannel("beta_y");
+    const betaZ = decodeChannel("beta_z");
+    const gammaXX = decodeChannel("gamma_xx");
+    const gammaYY = decodeChannel("gamma_yy");
+    const gammaZZ = decodeChannel("gamma_zz");
+    if (!alpha || !betaX || !betaY || !betaZ || !gammaXX || !gammaYY || !gammaZZ) return;
+
+    const packedAB = new Float32Array(expected * 4);
+    const packedGamma = new Float32Array(expected * 4);
+    let finiteCount = 0;
+    let alphaPositive = 0;
+    let gammaPositive = 0;
+    let alphaMin = Number.POSITIVE_INFINITY;
+    let alphaMax = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < expected; i += 1) {
+      const a = alpha.data[i];
+      const bx = betaX.data[i];
+      const by = betaY.data[i];
+      const bz = betaZ.data[i];
+      const gxx = gammaXX.data[i];
+      const gyy = gammaYY.data[i];
+      const gzz = gammaZZ.data[i];
+      if (
+        Number.isFinite(a) &&
+        Number.isFinite(bx) &&
+        Number.isFinite(by) &&
+        Number.isFinite(bz) &&
+        Number.isFinite(gxx) &&
+        Number.isFinite(gyy) &&
+        Number.isFinite(gzz)
+      ) {
+        finiteCount += 1;
+      }
+      if (a > 0) alphaPositive += 1;
+      if (gxx > 0 && gyy > 0 && gzz > 0) gammaPositive += 1;
+      if (a < alphaMin) alphaMin = a;
+      if (a > alphaMax) alphaMax = a;
+      const k = i * 4;
+      packedAB[k + 0] = Number.isFinite(bx) ? bx : 0;
+      packedAB[k + 1] = Number.isFinite(by) ? by : 0;
+      packedAB[k + 2] = Number.isFinite(bz) ? bz : 0;
+      packedAB[k + 3] = Number.isFinite(a) && a > 1e-8 ? a : 1;
+      packedGamma[k + 0] = Number.isFinite(gxx) && gxx > 1e-8 ? gxx : 1;
+      packedGamma[k + 1] = Number.isFinite(gyy) && gyy > 1e-8 ? gyy : 1;
+      packedGamma[k + 2] = Number.isFinite(gzz) && gzz > 1e-8 ? gzz : 1;
+      packedGamma[k + 3] = 0;
+    }
+    const invExpected = expected > 0 ? 1 / expected : 1;
+    const finiteFrac = finiteCount * invExpected;
+    const alphaFrac = alphaPositive * invExpected;
+    const gammaFrac = gammaPositive * invExpected;
+
+    let consistency: "ok" | "warn" | "fail" = "ok";
+    if (finiteFrac < 0.9 || alphaFrac < 0.9 || gammaFrac < 0.9) consistency = "fail";
+    else if (finiteFrac < 0.995 || alphaFrac < 0.995 || gammaFrac < 0.995) consistency = "warn";
+    const consistencyNote = `finite=${(finiteFrac * 100).toFixed(2)}% alpha>0=${(alphaFrac * 100).toFixed(2)}% gamma>0=${(gammaFrac * 100).toFixed(2)}%`;
+
+    this.ensureMetricTextures();
+    if (!this.metricVolume.texAB || !this.metricVolume.texGamma) return;
+
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_3D, this.metricVolume.texAB);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage3D(
+      gl.TEXTURE_3D,
+      0,
+      gl.RGBA32F,
+      dims[0],
+      dims[1],
+      dims[2],
+      0,
+      gl.RGBA,
+      gl.FLOAT,
+      packedAB,
+    );
+    gl.bindTexture(gl.TEXTURE_3D, this.metricVolume.texGamma);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage3D(
+      gl.TEXTURE_3D,
+      0,
+      gl.RGBA32F,
+      dims[0],
+      dims[1],
+      dims[2],
+      0,
+      gl.RGBA,
+      gl.FLOAT,
+      packedGamma,
+    );
+    gl.bindTexture(gl.TEXTURE_3D, null);
+
+    const voxelRaw = payload.voxelSize_m;
+    const voxelSize: [number, number, number] = [
+      Math.max(1e-9, Number(voxelRaw?.[0] ?? 1)),
+      Math.max(1e-9, Number(voxelRaw?.[1] ?? 1)),
+      Math.max(1e-9, Number(voxelRaw?.[2] ?? 1)),
+    ];
+    const diag = this.evaluateMetricGeodesicDiagnostics({
+      dims,
+      voxelSize,
+      alpha: alpha.data,
+      betaX: betaX.data,
+      betaY: betaY.data,
+      betaZ: betaZ.data,
+      gammaXX: gammaXX.data,
+      gammaYY: gammaYY.data,
+      gammaZZ: gammaZZ.data,
+    });
+
+    this.metricVolume.hasData = consistency !== "fail";
+    this.metricVolume.dims = dims;
+    this.metricVolume.version = versionRaw;
+    this.metricVolume.updatedAt = Number(payload.updatedAt ?? Date.now());
+    this.metricVolume.source = typeof payload.source === "string" ? payload.source : "metric-volume";
+    this.metricVolume.chart = typeof payload.chart === "string" ? payload.chart : "comoving_cartesian";
+    this.metricVolume.consistency = consistency;
+    this.metricVolume.consistencyNote = consistencyNote;
+    this.metricVolume.alphaRange = [
+      Number.isFinite(alphaMin) ? alphaMin : 1,
+      Number.isFinite(alphaMax) ? alphaMax : 1,
+    ];
+
+    this.publishGeodesicDiagnostics(
+      {
+        metricAvailable: this.metricVolume.hasData,
+        metricSource: this.metricVolume.source,
+        chart: this.metricVolume.chart,
+        dims,
+        maxNullResidual: diag.maxNullResidual,
+        stepConvergence: diag.stepConvergence,
+        bundleSpread: diag.bundleSpread,
+        consistency,
+        consistencyNote,
+      },
+      true,
+    );
   }
 
   private ensureFallback2D(): WebGLTexture {
@@ -25312,6 +26283,31 @@ export class Hull3DRenderer {
       gl.deleteTexture(this.t00.fallback);
       this.t00.fallback = null;
     }
+    if (this.metricVolume.texAB) {
+      gl.deleteTexture(this.metricVolume.texAB);
+      this.metricVolume.texAB = null;
+    }
+    if (this.metricVolume.texGamma) {
+      gl.deleteTexture(this.metricVolume.texGamma);
+      this.metricVolume.texGamma = null;
+    }
+    if (this.metricVolume.fallbackAB) {
+      gl.deleteTexture(this.metricVolume.fallbackAB);
+      this.metricVolume.fallbackAB = null;
+    }
+    if (this.metricVolume.fallbackGamma) {
+      gl.deleteTexture(this.metricVolume.fallbackGamma);
+      this.metricVolume.fallbackGamma = null;
+    }
+    this.metricVolume.hasData = false;
+    this.metricVolume.dims = [1, 1, 1];
+    this.metricVolume.version = 0;
+    this.metricVolume.updatedAt = 0;
+    this.metricVolume.source = null;
+    this.metricVolume.chart = null;
+    this.metricVolume.consistency = "unknown";
+    this.metricVolume.consistencyNote = null;
+    this.metricVolume.alphaRange = [1, 1];
     this.fluxField = null;
 
 
@@ -25594,6 +26590,10 @@ export class Hull3DRenderer {
       unsubscribe(this.fluxBusId);
       this.fluxBusId = null;
     }
+    if (this.metricBusId) {
+      unsubscribe(this.metricBusId);
+      this.metricBusId = null;
+    }
     if (this.observerSelectionBusId) {
       unsubscribe(this.observerSelectionBusId);
       this.observerSelectionBusId = null;
@@ -25718,6 +26718,12 @@ export class Hull3DRenderer {
 
 
     this.rayTargetSize = [0, 0];
+    this.rayTargetFailure = {
+      width: 0,
+      height: 0,
+      nextRetryAtMs: 0,
+      failCount: 0,
+    };
     this.rayIdEnabled = false;
 
 

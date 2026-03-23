@@ -1,0 +1,82 @@
+{
+  "schema_version": "halobank.solar.metric_context/1",
+  "model_id": "halobank.solar.iau2000b1.3-weak-field-ppn-gr/1",
+  "approximation": "first_post_newtonian_weak_field",
+  "gauge": "harmonic",
+  "ppn_parameters": {
+    "gamma": 1,
+    "beta": 1,
+    "theory": "general_relativity"
+  },
+  "observer_contract": "Coordinate times are emitted by HaloBank time-core as UTC/TAI/TT/TDB/TCB; proper time remains an observer-derived quantity and is not promoted above diagnostic tier in this subsystem.",
+  "signal_contract": "Timelike and null observable proofs share the same weak-field solar metric context; route-level aberration controls remain kinematic transport options, not a separate gravity model.",
+  "standards": [
+    {
+      "id": "iau2000_b1_3",
+      "citation": "IAU 2000 Resolution B1.3, relativistic framework for BCRS and GCRS.",
+      "url": "https://syrte.obspm.fr/IAU_resolutions/Resol-UAI.htm"
+    },
+    {
+      "id": "iau2006_b3",
+      "citation": "IAU 2006 Resolution B3, TDB as a linear function of TCB.",
+      "url": "https://www.iau.org/static/resolutions/IAU2006_Resol3.pdf"
+    },
+    {
+      "id": "iers2010",
+      "citation": "IERS Conventions (2010), reference systems and relativistic time transformations.",
+      "url": "https://iers-conventions.obspm.fr/conventions/content/tn36.pdf"
+    },
+    {
+      "id": "einstein1916",
+      "citation": "Einstein (1916), weak-field light deflection and GR field-equation era foundation.",
+      "url": "https://doi.org/10.1002/andp.19163540702"
+    },
+    {
+      "id": "bertotti2003",
+      "citation": "Bertotti, Iess, Tortora (2003), Cassini PPN gamma constraint from Shapiro delay.",
+      "url": "https://doi.org/10.1038/nature01997"
+    }
+  ],
+  "source_potentials": [
+    {
+      "id": "bcrs_scalar_w",
+      "symbol": "w",
+      "kind": "scalar",
+      "frames": ["BCRS"],
+      "role": "IAU barycentric scalar potential used in the weak-field metric definition.",
+      "source_ref": "iau2000_b1_3"
+    },
+    {
+      "id": "bcrs_vector_w_i",
+      "symbol": "w^i",
+      "kind": "vector",
+      "frames": ["BCRS"],
+      "role": "IAU barycentric vector potential for first post-Newtonian terms.",
+      "source_ref": "iau2000_b1_3"
+    },
+    {
+      "id": "gcrs_scalar_W",
+      "symbol": "W",
+      "kind": "scalar",
+      "frames": ["GCRS"],
+      "role": "IAU geocentric scalar potential used when the request is expressed in GCRS.",
+      "source_ref": "iau2000_b1_3"
+    },
+    {
+      "id": "gcrs_vector_W_a",
+      "symbol": "W^a",
+      "kind": "vector",
+      "frames": ["GCRS"],
+      "role": "IAU geocentric vector potential for first post-Newtonian terms.",
+      "source_ref": "iau2000_b1_3"
+    },
+    {
+      "id": "sun_monopole",
+      "symbol": "GM_sun/r",
+      "kind": "monopole",
+      "frames": ["BCRS", "GCRS"],
+      "role": "Dominant solar weak-field source term for Mercury perihelion precession, solar light deflection, and Shapiro delay diagnostics.",
+      "source_ref": "einstein1916"
+    }
+  ]
+}

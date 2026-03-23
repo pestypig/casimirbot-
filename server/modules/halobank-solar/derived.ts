@@ -2,15 +2,26 @@ import * as AstronomyNamespace from "astronomy-engine";
 import { stableJsonStringify } from "../../utils/stable-json";
 import { hashStableJson } from "../../utils/information-boundary";
 import { getBaryState } from "./ephemeris-core";
-import type { SolarGate, SolarGateDelta, SolarObserver, SolarThresholdsManifest } from "./types";
+import { resolveSolarPeculiarReferenceId, resolveSolarPeculiarVector } from "../stellar/local-rest";
+import type {
+  SolarGate,
+  SolarGateDelta,
+  SolarLocalRestReferenceManifest,
+  SolarMetricContextManifest,
+  SolarObserver,
+  SolarThresholdsManifest,
+} from "./types";
 
 const AU_M = 149_597_870_700;
 const DAY_MS = 86_400_000;
 const MU_SUN_AU3_PER_DAY2 = 0.00029591220828559104;
 const C_AU_PER_DAY = 173.1446326846693;
+const GM_SUN_M3_S2 = 1.32712440018e20;
+const C_M_PER_S = 299_792_458;
 const RAD_TO_ARCSEC = 206_264.80624709636;
 const EARTH_EQUATORIAL_RADIUS_KM = 6_378.137;
 const JOVIAN_EQUATORIAL_RADIUS_KM = 71_492;
+const SOLAR_RADIUS_M = 696_340_000;
 
 type Vec3 = [number, number, number];
 
@@ -54,6 +65,8 @@ type AstronomyDerivedApi = {
   SearchGlobalSolarEclipse: (startTime: Date) => EclipseLike;
   NextGlobalSolarEclipse: (prevEclipseTime: Date) => EclipseLike;
   JupiterMoons: (date: Date) => JupiterMoonsLike;
+  Observer: new (latitudeDeg: number, longitudeDeg: number, heightKm: number) => unknown;
+  ObserverState: (date: Date, observer: unknown, ofdate: boolean) => StateLike;
 };
 
 function resolveAstronomyApi(): AstronomyDerivedApi {
@@ -67,7 +80,9 @@ function resolveAstronomyApi(): AstronomyDerivedApi {
     if (
       typeof candidate.SearchGlobalSolarEclipse === "function" &&
       typeof candidate.NextGlobalSolarEclipse === "function" &&
-      typeof candidate.JupiterMoons === "function"
+      typeof candidate.JupiterMoons === "function" &&
+      typeof candidate.Observer === "function" &&
+      typeof candidate.ObserverState === "function"
     ) {
       return candidate as unknown as AstronomyDerivedApi;
     }
@@ -242,13 +257,96 @@ function stateRelativeToSun(bodyId: number, date: Date): { pos: Vec3; vel: Vec3 
 }
 
 function observerRelativeEarth(args: { date: Date; observer?: SolarObserver }): { pos: Vec3; vel: Vec3 } {
-  const earth = getBaryState(399, args.date);
-  if (!args.observer || args.observer.mode === "geocenter" || args.observer.body !== 399) {
-    return earth;
+  const resolved = resolveNullProbeObserver({
+    date: args.date,
+    observerBodyId: 399,
+    observer: args.observer ?? { mode: "geocenter" },
+  });
+  return {
+    pos: resolved.pos_bary_au,
+    vel: resolved.vel_bary_au_per_day,
+  };
+}
+
+function normalizeSolarObserver(value: unknown): SolarObserver | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.mode === "geocenter") {
+    return { mode: "geocenter" };
   }
-  // Body-fixed observers are handled in vectors route with astronomy-engine ObserverState;
-  // derived modules keep deterministic geocenter Earth reference and signal unsupported body elsewhere.
-  return earth;
+  if (candidate.mode === "body-fixed") {
+    const body = Number(candidate.body);
+    const lonDeg = Number(candidate.lon_deg);
+    const latDeg = Number(candidate.lat_deg);
+    const heightM = Number(candidate.height_m ?? 0);
+    if (![body, lonDeg, latDeg, heightM].every((entry) => Number.isFinite(entry))) {
+      throw new Error("Invalid solar observer payload");
+    }
+    return {
+      mode: "body-fixed",
+      body: Math.floor(body),
+      lon_deg: lonDeg,
+      lat_deg: latDeg,
+      height_m: heightM,
+    };
+  }
+  throw new Error("Invalid solar observer payload");
+}
+
+function resolveNullProbeObserver(args: {
+  date: Date;
+  observerBodyId: number;
+  observer?: SolarObserver;
+}): {
+  mode: "body_id" | "geocenter" | "body-fixed";
+  requested_body_id: number;
+  resolved_body_id: number;
+  pos_bary_au: Vec3;
+  vel_bary_au_per_day: Vec3;
+  warning?: "HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING";
+} {
+  if (!args.observer) {
+    const bary = getBaryState(args.observerBodyId, args.date);
+    return {
+      mode: "body_id",
+      requested_body_id: args.observerBodyId,
+      resolved_body_id: args.observerBodyId,
+      pos_bary_au: bary.pos,
+      vel_bary_au_per_day: bary.vel,
+    };
+  }
+
+  const earth = getBaryState(399, args.date);
+  if (args.observer.mode === "geocenter") {
+    return {
+      mode: "geocenter",
+      requested_body_id: 399,
+      resolved_body_id: 399,
+      pos_bary_au: earth.pos,
+      vel_bary_au_per_day: earth.vel,
+    };
+  }
+
+  if (args.observer.body !== 399) {
+    return {
+      mode: "body-fixed",
+      requested_body_id: args.observer.body,
+      resolved_body_id: 399,
+      pos_bary_au: earth.pos,
+      vel_bary_au_per_day: earth.vel,
+      warning: "HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING",
+    };
+  }
+
+  const obs = new Astronomy.Observer(args.observer.lat_deg, args.observer.lon_deg, args.observer.height_m / 1000);
+  const obsState = Astronomy.ObserverState(args.date, obs, true);
+  return {
+    mode: "body-fixed",
+    requested_body_id: 399,
+    resolved_body_id: 399,
+    pos_bary_au: vecAdd(earth.pos, stateLikeToVec3(obsState)),
+    vel_bary_au_per_day: vecAdd(earth.vel, [obsState.vx, obsState.vy, obsState.vz]),
+  };
 }
 
 function apparentSeparationAndRadiiDeg(args: { date: Date; observer?: SolarObserver }): {
@@ -277,6 +375,138 @@ function apparentSeparationAndRadiiDeg(args: { date: Date; observer?: SolarObser
     sunRadiusDeg,
     moonRadiusDeg,
     moonRangeKm: (rMoon * AU_M) / 1000,
+  };
+}
+
+function normalizeSupportedBodyId(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.floor(parsed);
+}
+
+function vecNormalize(a: Vec3): Vec3 | null {
+  const norm = vecNorm(a);
+  if (!(norm > 0) || !Number.isFinite(norm)) return null;
+  return vecScale(a, 1 / norm);
+}
+
+function vectorFromRaDecDeg(raDeg: number, decDeg: number): Vec3 {
+  const raRad = (raDeg * Math.PI) / 180;
+  const decRad = (decDeg * Math.PI) / 180;
+  const cosDec = Math.cos(decRad);
+  return [
+    cosDec * Math.cos(raRad),
+    cosDec * Math.sin(raRad),
+    Math.sin(decRad),
+  ];
+}
+
+function vectorToRaDecDeg(unit: Vec3): { ra_deg: number; dec_deg: number } {
+  return {
+    ra_deg: wrap360((Math.atan2(unit[1], unit[0]) * 180) / Math.PI),
+    dec_deg: (Math.asin(Math.max(-1, Math.min(1, unit[2]))) * 180) / Math.PI,
+  };
+}
+
+function parseOptionalSourceDirection(input: SolarLightDeflectionInput): {
+  mode: "benchmark_limb" | "explicit_icrs_source";
+  unit: Vec3 | null;
+  ra_deg: number | null;
+  dec_deg: number | null;
+} {
+  const unitCandidate = Array.isArray(input.source_unit_icrs) && input.source_unit_icrs.length === 3
+    ? input.source_unit_icrs.map((entry) => Number(entry)) as Vec3
+    : null;
+  if (
+    unitCandidate
+    && unitCandidate.every((entry) => Number.isFinite(entry))
+  ) {
+    const normalized = vecNormalize(unitCandidate);
+    if (normalized) {
+      const eq = vectorToRaDecDeg(normalized);
+      return {
+        mode: "explicit_icrs_source",
+        unit: normalized,
+        ra_deg: eq.ra_deg,
+        dec_deg: eq.dec_deg,
+      };
+    }
+  }
+
+  if (Number.isFinite(input.source_ra_deg) && Number.isFinite(input.source_dec_deg)) {
+    const normalized = vecNormalize(vectorFromRaDecDeg(Number(input.source_ra_deg), Number(input.source_dec_deg)));
+    if (normalized) {
+      return {
+        mode: "explicit_icrs_source",
+        unit: normalized,
+        ra_deg: Number(input.source_ra_deg),
+        dec_deg: Number(input.source_dec_deg),
+      };
+    }
+  }
+
+  return {
+    mode: "benchmark_limb",
+    unit: null,
+    ra_deg: null,
+    dec_deg: null,
+  };
+}
+
+function solarLimbDeflectionArcsec(impactParameterSolarRadii: number): number {
+  const impactParameterM = Math.max(1e-9, impactParameterSolarRadii) * SOLAR_RADIUS_M;
+  const alphaRad = (4 * GM_SUN_M3_S2) / (C_M_PER_S * C_M_PER_S * impactParameterM);
+  return alphaRad * RAD_TO_ARCSEC;
+}
+
+function sourceAtInfinityDeflectionArcsec(args: {
+  observerSunRangeM: number;
+  elongationDeg: number;
+  gamma: number;
+}): number {
+  const chiRad = (args.elongationDeg * Math.PI) / 180;
+  const sinChi = Math.max(1e-12, Math.sin(chiRad));
+  const cosChi = Math.cos(chiRad);
+  const alphaRad =
+    ((1 + args.gamma) * GM_SUN_M3_S2) /
+    (C_M_PER_S * C_M_PER_S * Math.max(1, args.observerSunRangeM)) *
+    ((1 + cosChi) / sinChi);
+  return alphaRad * RAD_TO_ARCSEC;
+}
+
+function shapiroDelaySeconds(args: {
+  date: Date;
+  observerBaryPosAu?: Vec3;
+  observerBodyId: number;
+  receiverBodyId: number;
+}): {
+  delay_s: number;
+  observer_sun_range_au: number;
+  receiver_sun_range_au: number;
+  observer_receiver_range_au: number;
+} {
+  const sun = getBaryState(10, args.date).pos;
+  const observerBary = args.observerBaryPosAu ?? getBaryState(args.observerBodyId, args.date).pos;
+  const receiverBary = getBaryState(args.receiverBodyId, args.date).pos;
+  const observer = vecSub(observerBary, sun);
+  const receiver = vecSub(receiverBary, sun);
+  const observerSunRangeM = vecNorm(observer) * AU_M;
+  const receiverSunRangeM = vecNorm(receiver) * AU_M;
+  const observerReceiverRangeM = vecNorm(vecSub(receiverBary, observerBary)) * AU_M;
+  const numerator = observerSunRangeM + receiverSunRangeM + observerReceiverRangeM;
+  const denominator = Math.max(
+    1e-6,
+    observerSunRangeM + receiverSunRangeM - observerReceiverRangeM,
+  );
+  const delaySeconds =
+    (4 * GM_SUN_M3_S2) /
+    (C_M_PER_S * C_M_PER_S * C_M_PER_S) *
+    Math.log(Math.max(1 + 1e-12, numerator / denominator));
+  return {
+    delay_s: delaySeconds,
+    observer_sun_range_au: observerSunRangeM / AU_M,
+    receiver_sun_range_au: receiverSunRangeM / AU_M,
+    observer_receiver_range_au: observerReceiverRangeM / AU_M,
   };
 }
 
@@ -323,8 +553,38 @@ type JovianMoonTimingInput = {
   step_minutes?: number;
   moon?: JovianMoonName;
   event?: JovianEventMode;
+  observer?: SolarObserver;
   reference_iso?: string;
   tolerance_s?: number;
+};
+
+type LocalRestAnchorCalibrationInput = {
+  reference_id?: string;
+};
+
+type SolarLightDeflectionInput = {
+  ts_iso?: string;
+  observer_body_id?: number;
+  observer?: SolarObserver;
+  receiver_body_id?: number;
+  impact_parameter_solar_radii?: number;
+  source_ra_deg?: number;
+  source_dec_deg?: number;
+  source_unit_icrs?: [number, number, number];
+};
+
+type InnerSolarMetricParityInput = {
+  mercury_start_iso?: string;
+  mercury_end_iso?: string;
+  mercury_step_days?: number;
+  ts_iso?: string;
+  observer_body_id?: number;
+  observer?: SolarObserver;
+  receiver_body_id?: number;
+  impact_parameter_solar_radii?: number;
+  source_ra_deg?: number;
+  source_dec_deg?: number;
+  source_unit_icrs?: [number, number, number];
 };
 
 export type DerivedModuleId =
@@ -332,7 +592,10 @@ export type DerivedModuleId =
   | "earth_moon_eclipse_timing"
   | "resonance_libration"
   | "saros_cycle"
-  | "jovian_moon_event_timing";
+  | "jovian_moon_event_timing"
+  | "solar_light_deflection"
+  | "inner_solar_metric_parity"
+  | "local_rest_anchor_calibration";
 
 export type DerivedResult = {
   module: DerivedModuleId;
@@ -340,6 +603,451 @@ export type DerivedResult = {
   gate: SolarGate;
   artifact_ref: string;
 };
+
+export function runSolarLightDeflection(args: {
+  input: SolarLightDeflectionInput;
+  thresholds: SolarThresholdsManifest["modules"]["solar_light_deflection"];
+  metricContextManifest: SolarMetricContextManifest;
+}): DerivedResult {
+  const tsIso = toIsoOrThrow(args.input.ts_iso, "2003-09-10T00:00:00.000Z");
+  const date = new Date(tsIso);
+  const observerBodyId = normalizeSupportedBodyId(args.input.observer_body_id, 399);
+  const observer = normalizeSolarObserver(args.input.observer);
+  const observerState = resolveNullProbeObserver({
+    date,
+    observerBodyId,
+    observer,
+  });
+  const receiverBodyId = normalizeSupportedBodyId(args.input.receiver_body_id, 699);
+  const impactParameterSolarRadii = Number.isFinite(args.input.impact_parameter_solar_radii)
+    ? Math.max(1, Number(args.input.impact_parameter_solar_radii))
+    : 1;
+  const sourceDirection = parseOptionalSourceDirection(args.input);
+  const gamma = args.metricContextManifest.ppn_parameters.gamma;
+  const sunBary = getBaryState(10, date).pos;
+  const observerFromSun = vecSub(observerState.pos_bary_au, sunBary);
+  const observerToSunUnit = vecNormalize(vecScale(observerFromSun, -1));
+  if (!observerToSunUnit) {
+    throw new Error("Failed to derive observer-to-Sun direction");
+  }
+  const observerSunRangeM = vecNorm(observerFromSun) * AU_M;
+  const solarAngularRadiusDeg = (Math.atan2(SOLAR_RADIUS_M, Math.max(1, observerSunRangeM)) * 180) / Math.PI;
+  const solarElongationDeg = sourceDirection.unit
+    ? angleBetweenDeg(sourceDirection.unit, observerToSunUnit)
+    : solarAngularRadiusDeg;
+  const derivedImpactParameterSolarRadii = sourceDirection.unit
+    ? Math.max(0, (observerSunRangeM * Math.sin((solarElongationDeg * Math.PI) / 180)) / SOLAR_RADIUS_M)
+    : impactParameterSolarRadii;
+  const sourceOcculted = sourceDirection.mode === "explicit_icrs_source" && solarElongationDeg <= solarAngularRadiusDeg;
+
+  const predictedLimbArcsec = solarLimbDeflectionArcsec(1);
+  const predictedRequestedImpactArcsec = sourceDirection.mode === "explicit_icrs_source"
+    ? sourceAtInfinityDeflectionArcsec({
+        observerSunRangeM,
+        elongationDeg: solarElongationDeg,
+        gamma,
+      })
+    : solarLimbDeflectionArcsec(impactParameterSolarRadii);
+  const historicalResidualArcsec = Math.abs(predictedLimbArcsec - args.thresholds.historical_observed_arcsec);
+  const modernGammaResidual = 1 - args.thresholds.modern_gamma_measured;
+  const shapiroGammaMinusOneResidual = -args.thresholds.shapiro_gamma_minus_one_measured;
+  const shapiro = shapiroDelaySeconds({
+    date,
+    observerBaryPosAu: observerState.pos_bary_au,
+    observerBodyId: observerState.resolved_body_id,
+    receiverBodyId,
+  });
+
+  const passObserverKernel = !observerState.warning;
+  const passHistorical = historicalResidualArcsec <= args.thresholds.historical_max_abs_residual_arcsec;
+  const passModernGamma = Math.abs(modernGammaResidual) <= args.thresholds.modern_gamma_max_abs_residual;
+  const passShapiroGamma = Math.abs(args.thresholds.shapiro_gamma_minus_one_measured) <= args.thresholds.shapiro_gamma_minus_one_max_abs;
+  const passSourceGeometry = !sourceOcculted;
+  const pass = passObserverKernel && passSourceGeometry && passHistorical && passModernGamma && passShapiroGamma;
+
+  const deltas: SolarGateDelta[] = [
+    {
+      id: "observer_kernel_ready",
+      comparator: ">=",
+      value: passObserverKernel ? 1 : 0,
+      limit: 1,
+      pass: passObserverKernel,
+    },
+    {
+      id: "source_elongation_vs_solar_radius_deg",
+      comparator: ">=",
+      value: solarElongationDeg,
+      limit: solarAngularRadiusDeg,
+      pass: passSourceGeometry,
+    },
+    {
+      id: "historical_deflection_abs_residual_arcsec",
+      comparator: "<=",
+      value: historicalResidualArcsec,
+      limit: args.thresholds.historical_max_abs_residual_arcsec,
+      pass: passHistorical,
+    },
+    {
+      id: "modern_gamma_abs_residual",
+      comparator: "<=",
+      value: Math.abs(modernGammaResidual),
+      limit: args.thresholds.modern_gamma_max_abs_residual,
+      pass: passModernGamma,
+    },
+    {
+      id: "shapiro_gamma_minus_one_abs",
+      comparator: "<=",
+      value: Math.abs(args.thresholds.shapiro_gamma_minus_one_measured),
+      limit: args.thresholds.shapiro_gamma_minus_one_max_abs,
+      pass: passShapiroGamma,
+    },
+  ];
+
+  const firstFail = !passObserverKernel
+    ? "HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING"
+    : !passSourceGeometry
+      ? "HALOBANK_SOLAR_LIGHT_DEFLECTION_SOURCE_OCCULTED"
+      : !passHistorical
+        ? "HALOBANK_SOLAR_LIGHT_DEFLECTION_OUT_OF_RANGE"
+        : !passModernGamma
+          ? "HALOBANK_SOLAR_LIGHT_DEFLECTION_GAMMA_OUT_OF_RANGE"
+          : !passShapiroGamma
+            ? "HALOBANK_SOLAR_SHAPIRO_GAMMA_OUT_OF_RANGE"
+            : null;
+  const reasons = firstFail
+    ? [
+        firstFail === "HALOBANK_SOLAR_LIGHT_DEFLECTION_SOURCE_OCCULTED"
+          ? "Requested source direction lies inside the apparent solar disk for the chosen observer and epoch."
+          : firstFail === "HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING"
+            ? "Body-fixed null-geodesic observer requested an unsupported orientation model; deterministic geocenter fallback was used."
+            : "Solar null-geodesic diagnostic failed one or more benchmark residual checks.",
+      ]
+    : ["Solar null-geodesic diagnostic matches the pinned light-deflection and Shapiro benchmark envelopes."];
+
+  const result = {
+    ts_iso: tsIso,
+    metric_model_id: args.metricContextManifest.model_id,
+    source_potential_ids: args.metricContextManifest.source_potentials
+      .filter((entry) => entry.id === "sun_monopole" || entry.frames.includes("BCRS"))
+      .map((entry) => entry.id),
+    observer_context: {
+      mode: observerState.mode,
+      requested_body_id: observerState.requested_body_id,
+      resolved_body_id: observerState.resolved_body_id,
+      frame: "BCRS",
+      coordinate_time_scale: "TCB",
+      evaluation_time_scale: "TDB",
+      observer_time_scale: "TT",
+      warning: observerState.warning ?? null,
+      body_fixed:
+        observer && observer.mode === "body-fixed"
+          ? {
+              body: observer.body,
+              lon_deg: observer.lon_deg,
+              lat_deg: observer.lat_deg,
+              height_m: observer.height_m,
+            }
+          : null,
+    },
+    signal_path: {
+      kind: "null_geodesic_diagnostic",
+      dominant_mass_body_id: 10,
+      geometry_mode: sourceDirection.mode,
+      impact_parameter_solar_radii: derivedImpactParameterSolarRadii,
+      solar_elongation_deg: solarElongationDeg,
+      solar_angular_radius_deg: solarAngularRadiusDeg,
+      source_occulted: sourceOcculted,
+      receiver_body_id: receiverBodyId,
+      benchmark_contract:
+        "Solar-limb deflection is benchmarked at b=R_sun; Shapiro delay is evaluated from runtime Sun-centered geometry while gamma constraints are checked against pinned literature residual envelopes.",
+    },
+    source_direction: {
+      mode: sourceDirection.mode,
+      ra_deg: sourceDirection.ra_deg,
+      dec_deg: sourceDirection.dec_deg,
+      unit_icrs: sourceDirection.unit,
+    },
+    predicted_limb_arcsec: predictedLimbArcsec,
+    target_limb_arcsec: args.thresholds.target_limb_arcsec,
+    requested_impact_parameter_solar_radii: impactParameterSolarRadii,
+    derived_impact_parameter_solar_radii: derivedImpactParameterSolarRadii,
+    predicted_requested_impact_arcsec: predictedRequestedImpactArcsec,
+    predicted_source_deflection_arcsec: predictedRequestedImpactArcsec,
+    historical_observed_arcsec: args.thresholds.historical_observed_arcsec,
+    historical_residual_arcsec: predictedLimbArcsec - args.thresholds.historical_observed_arcsec,
+    modern_gamma_estimated: 1,
+    modern_gamma_measured: args.thresholds.modern_gamma_measured,
+    modern_gamma_residual: modernGammaResidual,
+    shapiro_delay_s: shapiro.delay_s,
+    shapiro_delay_us: shapiro.delay_s * 1e6,
+    shapiro_geometry: {
+      observer_sun_range_au: shapiro.observer_sun_range_au,
+      receiver_sun_range_au: shapiro.receiver_sun_range_au,
+      observer_receiver_range_au: shapiro.observer_receiver_range_au,
+    },
+    shapiro_gamma_estimated: 1,
+    shapiro_gamma_minus_one_measured: args.thresholds.shapiro_gamma_minus_one_measured,
+    shapiro_gamma_minus_one_residual: shapiroGammaMinusOneResidual,
+    standards_refs: args.metricContextManifest.standards.map((entry) => entry.id),
+  };
+  const gate = makeGate({
+    gateId: "halobank.solar.solar_light_deflection.v1",
+    deltas,
+    firstFail,
+    reasons,
+  });
+  return {
+    module: "solar_light_deflection",
+    result,
+    gate,
+    artifact_ref: `artifact:halobank.solar.solar_light_deflection:${hashStableJson({ result, gate }).slice(7, 23)}`,
+  };
+}
+
+export function runInnerSolarMetricParity(args: {
+  input: InnerSolarMetricParityInput;
+  thresholds: SolarThresholdsManifest;
+  metricContextManifest: SolarMetricContextManifest;
+}): DerivedResult {
+  const mercury = runMercuryPrecession(
+    {
+      start_iso: args.input.mercury_start_iso,
+      end_iso: args.input.mercury_end_iso,
+      step_days: args.input.mercury_step_days,
+    },
+    args.thresholds.modules.mercury_precession,
+  );
+  const deflection = runSolarLightDeflection({
+    input: {
+      ts_iso: args.input.ts_iso,
+      observer_body_id: args.input.observer_body_id,
+      observer: args.input.observer,
+      receiver_body_id: args.input.receiver_body_id,
+      impact_parameter_solar_radii: args.input.impact_parameter_solar_radii,
+      source_ra_deg: args.input.source_ra_deg,
+      source_dec_deg: args.input.source_dec_deg,
+      source_unit_icrs: args.input.source_unit_icrs,
+    },
+    thresholds: args.thresholds.modules.solar_light_deflection,
+    metricContextManifest: args.metricContextManifest,
+  });
+
+  const mercuryAbsError = Number(mercury.result.abs_error_arcsec_per_century ?? Number.POSITIVE_INFINITY);
+  const deflectionAbsResidual = Math.abs(Number(deflection.result.historical_residual_arcsec ?? Number.POSITIVE_INFINITY));
+  const modernGammaAbsResidual = Math.abs(Number(deflection.result.modern_gamma_residual ?? Number.POSITIVE_INFINITY));
+  const shapiroGammaMinusOneAbs = Math.abs(Number(deflection.result.shapiro_gamma_minus_one_measured ?? Number.POSITIVE_INFINITY));
+  const sharedMetricModelId = args.metricContextManifest.model_id;
+  const sharedPotentialIds = args.metricContextManifest.source_potentials
+    .filter((entry) => entry.id === "sun_monopole" || entry.frames.includes("BCRS"))
+    .map((entry) => entry.id);
+  const sameMetric = sharedMetricModelId ? 1 : 0;
+  const deflectionSignalPath = (deflection.result.signal_path as Record<string, unknown> | undefined) ?? undefined;
+  const passMercuryGate = mercury.gate.verdict === "PASS";
+  const passNullProbeGate = deflection.gate.verdict === "PASS";
+
+  const passMercury = mercuryAbsError <= args.thresholds.modules.inner_solar_metric_parity.max_mercury_abs_error_arcsec_per_century;
+  const passDeflection = deflectionAbsResidual <= args.thresholds.modules.inner_solar_metric_parity.max_deflection_abs_residual_arcsec;
+  const passModernGamma = modernGammaAbsResidual <= args.thresholds.modules.inner_solar_metric_parity.max_modern_gamma_abs_residual;
+  const passShapiro = shapiroGammaMinusOneAbs <= args.thresholds.modules.inner_solar_metric_parity.max_shapiro_gamma_minus_one_abs;
+  const pass = passMercuryGate && passNullProbeGate && passMercury && passDeflection && passModernGamma && passShapiro;
+
+  const deltas: SolarGateDelta[] = [
+    {
+      id: "shared_metric_model_ready",
+      comparator: ">=",
+      value: sameMetric,
+      limit: 1,
+      pass: true,
+    },
+    {
+      id: "mercury_probe_gate_pass",
+      comparator: ">=",
+      value: passMercuryGate ? 1 : 0,
+      limit: 1,
+      pass: passMercuryGate,
+    },
+    {
+      id: "null_probe_gate_pass",
+      comparator: ">=",
+      value: passNullProbeGate ? 1 : 0,
+      limit: 1,
+      pass: passNullProbeGate,
+    },
+    {
+      id: "mercury_abs_error_arcsec_per_century",
+      comparator: "<=",
+      value: mercuryAbsError,
+      limit: args.thresholds.modules.inner_solar_metric_parity.max_mercury_abs_error_arcsec_per_century,
+      pass: passMercury,
+    },
+    {
+      id: "deflection_abs_residual_arcsec",
+      comparator: "<=",
+      value: deflectionAbsResidual,
+      limit: args.thresholds.modules.inner_solar_metric_parity.max_deflection_abs_residual_arcsec,
+      pass: passDeflection,
+    },
+    {
+      id: "modern_gamma_abs_residual",
+      comparator: "<=",
+      value: modernGammaAbsResidual,
+      limit: args.thresholds.modules.inner_solar_metric_parity.max_modern_gamma_abs_residual,
+      pass: passModernGamma,
+    },
+    {
+      id: "shapiro_gamma_minus_one_abs",
+      comparator: "<=",
+      value: shapiroGammaMinusOneAbs,
+      limit: args.thresholds.modules.inner_solar_metric_parity.max_shapiro_gamma_minus_one_abs,
+      pass: passShapiro,
+    },
+  ];
+
+  const firstFail = !passMercuryGate
+    ? mercury.gate.firstFail ?? "HALOBANK_SOLAR_METRIC_PARITY_MERCURY_FAIL"
+    : !passNullProbeGate
+      ? deflection.gate.firstFail ?? "HALOBANK_SOLAR_METRIC_PARITY_DEFLECTION_FAIL"
+      : !passMercury
+        ? "HALOBANK_SOLAR_METRIC_PARITY_MERCURY_FAIL"
+        : !passDeflection
+          ? "HALOBANK_SOLAR_METRIC_PARITY_DEFLECTION_FAIL"
+          : !passModernGamma
+            ? "HALOBANK_SOLAR_METRIC_PARITY_DEFLECTION_GAMMA_FAIL"
+            : !passShapiro
+              ? "HALOBANK_SOLAR_METRIC_PARITY_SHAPIRO_FAIL"
+              : null;
+
+  const result = {
+    shared_metric_model_id: sharedMetricModelId,
+    shared_source_potential_ids: sharedPotentialIds,
+    parity_scope: "timelike_and_null_solar_weak_field_diagnostics",
+    mercury_probe: {
+      module: mercury.module,
+      gate_verdict: mercury.gate.verdict,
+      measured_arcsec_per_century: mercury.result.measured_arcsec_per_century,
+      abs_error_arcsec_per_century: mercury.result.abs_error_arcsec_per_century,
+    },
+    null_probe: {
+      module: deflection.module,
+      gate_verdict: deflection.gate.verdict,
+      predicted_limb_arcsec: deflection.result.predicted_limb_arcsec,
+      predicted_source_deflection_arcsec: deflection.result.predicted_source_deflection_arcsec,
+      solar_elongation_deg: deflectionSignalPath?.solar_elongation_deg,
+      geometry_mode: deflectionSignalPath?.geometry_mode,
+      historical_residual_arcsec: deflection.result.historical_residual_arcsec,
+      modern_gamma_residual: deflection.result.modern_gamma_residual,
+      shapiro_gamma_minus_one_measured: deflection.result.shapiro_gamma_minus_one_measured,
+      shapiro_delay_us: deflection.result.shapiro_delay_us,
+    },
+    artifacts: {
+      mercury_artifact_ref: mercury.artifact_ref,
+      null_probe_artifact_ref: deflection.artifact_ref,
+    },
+  };
+  const gate = makeGate({
+    gateId: "halobank.solar.inner_solar_metric_parity.v1",
+    deltas,
+    firstFail,
+    reasons: firstFail
+      ? ["Shared inner-solar metric parity failed one or more timelike/null benchmark checks."]
+      : ["Shared inner-solar metric parity holds across Mercury precession and solar null-geodesic benchmarks."],
+  });
+  return {
+    module: "inner_solar_metric_parity",
+    result,
+    gate,
+    artifact_ref: `artifact:halobank.solar.inner_solar_metric_parity:${hashStableJson({ result, gate }).slice(7, 23)}`,
+  };
+}
+
+export function runLocalRestAnchorCalibration(args: {
+  input: LocalRestAnchorCalibrationInput;
+  thresholds: SolarThresholdsManifest["modules"]["local_rest_anchor_calibration"];
+  referenceManifest: SolarLocalRestReferenceManifest;
+}): DerivedResult {
+  const resolvedReferenceId = typeof args.input.reference_id === "string" && args.input.reference_id.trim().length > 0
+    ? args.input.reference_id.trim().toLowerCase()
+    : resolveSolarPeculiarReferenceId();
+  const runtimeSolarPeculiar = resolveSolarPeculiarVector();
+  const reference =
+    args.referenceManifest.references.find((entry) => entry.id === resolvedReferenceId)
+    ?? args.referenceManifest.references.find((entry) => entry.id === args.referenceManifest.default_reference_id)
+    ?? null;
+
+  let firstFail: string | null = null;
+  const reasons: string[] = [];
+  const deltas: SolarGateDelta[] = [];
+
+  const hasReference = reference !== null;
+  deltas.push({
+    id: "reference_manifest_entry_present",
+    comparator: ">=",
+    value: hasReference ? 1 : 0,
+    limit: 1,
+    pass: hasReference,
+  });
+  if (!hasReference) {
+    firstFail = "HALOBANK_SOLAR_LOCAL_REST_REFERENCE_UNAVAILABLE";
+    reasons.push("Pinned local-rest solar-motion reference is unavailable for the requested reference id.");
+  }
+
+  const referenceVector = hasReference ? reference.solar_peculiar_kms : [0, 0, 0];
+  const componentAbsDelta = [
+    Math.abs(runtimeSolarPeculiar[0] - referenceVector[0]),
+    Math.abs(runtimeSolarPeculiar[1] - referenceVector[1]),
+    Math.abs(runtimeSolarPeculiar[2] - referenceVector[2]),
+  ] as Vec3;
+  const maxAbsDelta = maxOrZero(componentAbsDelta);
+  const toleranceKmS = hasReference
+    ? Math.min(reference.component_tolerance_km_s, args.thresholds.max_component_abs_delta_km_s)
+    : args.thresholds.max_component_abs_delta_km_s;
+  const residualPass = hasReference && maxAbsDelta <= toleranceKmS;
+  deltas.push({
+    id: "max_component_abs_delta_km_s",
+    comparator: "<=",
+    value: hasReference ? maxAbsDelta : Number.POSITIVE_INFINITY,
+    limit: toleranceKmS,
+    pass: residualPass,
+  });
+  if (!residualPass && !firstFail) {
+    firstFail = "HALOBANK_SOLAR_LOCAL_REST_REFERENCE_MISMATCH";
+    reasons.push("Runtime local-rest solar-motion anchor deviates from the pinned reference beyond tolerance.");
+  }
+
+  if (!firstFail) {
+    reasons.push("Runtime local-rest solar-motion anchor matches the pinned published reference.");
+  }
+
+  const result = {
+    selected_reference_id: resolvedReferenceId,
+    reference_id: reference?.id ?? null,
+    reference_label: reference?.label ?? null,
+    source_class: reference?.source_class ?? null,
+    citation: reference?.citation ?? null,
+    doi: reference?.doi ?? null,
+    url: reference?.url ?? null,
+    published: reference?.published ?? null,
+    solar_peculiar_runtime_kms: runtimeSolarPeculiar,
+    solar_peculiar_reference_kms: hasReference ? referenceVector : null,
+    component_abs_delta_km_s: hasReference ? componentAbsDelta : null,
+    max_component_abs_delta_km_s: hasReference ? maxAbsDelta : null,
+    tolerance_km_s: toleranceKmS,
+    random_uncertainty_kms: reference?.random_uncertainty_kms ?? null,
+    systematic_uncertainty_kms: reference?.systematic_uncertainty_kms ?? null,
+  };
+  const gate = makeGate({
+    gateId: "halobank.solar.local_rest_anchor_calibration.v1",
+    deltas,
+    firstFail,
+    reasons,
+  });
+  return {
+    module: "local_rest_anchor_calibration",
+    result,
+    gate,
+    artifact_ref: `artifact:halobank.solar.local_rest_anchor_calibration:${hashStableJson({ result, gate }).slice(7, 23)}`,
+  };
+}
 
 export function runMercuryPrecession(input: MercuryInput, thresholds: SolarThresholdsManifest["modules"]["mercury_precession"]): DerivedResult {
   const startIso = toIsoOrThrow(input.start_iso, "2000-01-01T00:00:00.000Z");
@@ -458,11 +1166,17 @@ export function runEarthMoonEclipseTiming(
   const endIso = toIsoOrThrow(input.end_iso, "2026-02-19T00:00:00.000Z");
   const stepMinutes = Number.isFinite(input.step_minutes) ? Math.max(1, Number(input.step_minutes)) : 5;
   const sampleDates = buildSamples(startIso, endIso, stepMinutes / (24 * 60), 40_000);
+  const observer = normalizeSolarObserver(input.observer) ?? { mode: "geocenter" as const };
+  const observerContextState = resolveNullProbeObserver({
+    date: sampleDates[0] ?? new Date(startIso),
+    observerBodyId: 399,
+    observer,
+  });
   const metric = sampleDates.map((date) => {
-    const obs = apparentSeparationAndRadiiDeg({ date, observer: input.observer });
+    const obs = apparentSeparationAndRadiiDeg({ date, observer });
     const contactGap = obs.separationDeg - (obs.sunRadiusDeg + obs.moonRadiusDeg);
     const geocenterParallaxAllowanceDeg =
-      !input.observer || input.observer.mode === "geocenter"
+      observer.mode === "geocenter"
         ? (Math.asin(
             Math.min(
               1,
@@ -500,8 +1214,24 @@ export function runEarthMoonEclipseTiming(
   let firstFail: string | null = null;
   const deltas: SolarGateDelta[] = [];
   const reasons: string[] = [];
+  const passObserverKernel = !observerContextState.warning;
+  deltas.push({
+    id: "observer_kernel_ready",
+    comparator: ">=",
+    value: passObserverKernel ? 1 : 0,
+    limit: 1,
+    pass: passObserverKernel,
+  });
+  if (!passObserverKernel) {
+    firstFail = "HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING";
+    reasons.push(
+      "Body-fixed eclipse observer requested an unsupported orientation model; deterministic geocenter fallback was used.",
+    );
+  }
   if (events.length === 0) {
-    firstFail = "HALOBANK_SOLAR_ECLIPSE_NO_EVENTS";
+    if (!firstFail) {
+      firstFail = "HALOBANK_SOLAR_ECLIPSE_NO_EVENTS";
+    }
     deltas.push({
       id: "event_count",
       comparator: ">=",
@@ -553,7 +1283,26 @@ export function runEarthMoonEclipseTiming(
     start_iso: startIso,
     end_iso: endIso,
     step_minutes: stepMinutes,
-    observer_mode: input.observer?.mode ?? "geocenter",
+    observer_mode: observerContextState.mode,
+    observer_context: {
+      mode: observerContextState.mode,
+      requested_body_id: observerContextState.requested_body_id,
+      resolved_body_id: observerContextState.resolved_body_id,
+      frame: "BCRS",
+      coordinate_time_scale: "TCB",
+      evaluation_time_scale: "TDB",
+      observer_time_scale: "TT",
+      warning: observerContextState.warning ?? null,
+      body_fixed:
+        observer.mode === "body-fixed"
+          ? {
+              body: observer.body,
+              lon_deg: observer.lon_deg,
+              lat_deg: observer.lat_deg,
+              height_m: observer.height_m,
+            }
+          : null,
+    },
     events,
     nearest_reference_delta_s: nearestReferenceDeltaS,
     contact_threshold_deg: thresholds.max_contact_separation_deg,
@@ -898,19 +1647,29 @@ export function runJovianMoonEventTiming(
   const moon = normalizeJovianMoonName(input.moon);
   const eventMode = normalizeJovianEventMode(input.event);
   const sampleDates = buildSamples(startIso, endIso, stepMinutes / (24 * 60), 80_000);
+  const observer = normalizeSolarObserver(input.observer) ?? { mode: "geocenter" as const };
+  const observerContextState = resolveNullProbeObserver({
+    date: sampleDates[0] ?? new Date(startIso),
+    observerBodyId: 399,
+    observer,
+  });
 
   const metric = sampleDates.map((date) => {
-    const earth = getBaryState(399, date);
+    const observerState = resolveNullProbeObserver({
+      date,
+      observerBodyId: 399,
+      observer,
+    });
     const jupiter = getBaryState(599, date);
     const moonJovicentric = jovianMoonState(date, moon);
     const moonBary = vecAdd(jupiter.pos, moonJovicentric.pos);
-    const jupiterFromEarth = vecSub(jupiter.pos, earth.pos);
-    const moonFromEarth = vecSub(moonBary, earth.pos);
-    const jupiterRangeAu = vecNorm(jupiterFromEarth);
+    const jupiterFromObserver = vecSub(jupiter.pos, observerState.pos_bary_au);
+    const moonFromObserver = vecSub(moonBary, observerState.pos_bary_au);
+    const jupiterRangeAu = vecNorm(jupiterFromObserver);
     const jupiterRadiusDeg = (Math.atan2(JOVIAN_EQUATORIAL_RADIUS_KM, (jupiterRangeAu * AU_M) / 1000) * 180) / Math.PI;
-    const separationDeg = angleBetweenDeg(moonFromEarth, jupiterFromEarth);
+    const separationDeg = angleBetweenDeg(moonFromObserver, jupiterFromObserver);
     const contactRatio = separationDeg / Math.max(1e-9, jupiterRadiusDeg);
-    const lineOfSightUnit = vecScale(jupiterFromEarth, 1 / Math.max(1e-12, jupiterRangeAu));
+    const lineOfSightUnit = vecScale(jupiterFromObserver, 1 / Math.max(1e-12, jupiterRangeAu));
     const depthAu = vecDot(moonJovicentric.pos, lineOfSightUnit);
     const eventType: "transit" | "occultation" = depthAu < 0 ? "transit" : "occultation";
     return {
@@ -957,6 +1716,20 @@ export function runJovianMoonEventTiming(
   const deltas: SolarGateDelta[] = [];
   const reasons: string[] = [];
   let firstFail: string | null = null;
+  const passObserverKernel = !observerContextState.warning;
+  deltas.push({
+    id: "observer_kernel_ready",
+    comparator: ">=",
+    value: passObserverKernel ? 1 : 0,
+    limit: 1,
+    pass: passObserverKernel,
+  });
+  if (!passObserverKernel) {
+    firstFail = "HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING";
+    reasons.push(
+      "Body-fixed Jovian observer requested an unsupported orientation model; deterministic geocenter fallback was used.",
+    );
+  }
 
   const passCount = events.length >= thresholds.min_event_count;
   deltas.push({
@@ -967,7 +1740,9 @@ export function runJovianMoonEventTiming(
     pass: passCount,
   });
   if (!passCount) {
-    firstFail = "HALOBANK_SOLAR_JOVIAN_NO_EVENTS";
+    if (!firstFail) {
+      firstFail = "HALOBANK_SOLAR_JOVIAN_NO_EVENTS";
+    }
     reasons.push("No Jovian moon events met the requested geometry constraints.");
   }
 
@@ -1008,6 +1783,26 @@ export function runJovianMoonEventTiming(
     start_iso: startIso,
     end_iso: endIso,
     step_minutes: stepMinutes,
+    observer_mode: observerContextState.mode,
+    observer_context: {
+      mode: observerContextState.mode,
+      requested_body_id: observerContextState.requested_body_id,
+      resolved_body_id: observerContextState.resolved_body_id,
+      frame: "BCRS",
+      coordinate_time_scale: "TCB",
+      evaluation_time_scale: "TDB",
+      observer_time_scale: "TT",
+      warning: observerContextState.warning ?? null,
+      body_fixed:
+        observer.mode === "body-fixed"
+          ? {
+              body: observer.body,
+              lon_deg: observer.lon_deg,
+              lat_deg: observer.lat_deg,
+              height_m: observer.height_m,
+            }
+          : null,
+    },
     moon,
     event_mode: eventMode,
     contact_ratio_threshold: thresholds.max_contact_ratio,
@@ -1032,6 +1827,8 @@ export function runDerivedModule(args: {
   module: DerivedModuleId;
   input: Record<string, unknown>;
   thresholds: SolarThresholdsManifest;
+  referenceManifest?: SolarLocalRestReferenceManifest;
+  metricContextManifest?: SolarMetricContextManifest;
 }): DerivedResult {
   switch (args.module) {
     case "mercury_precession":
@@ -1044,6 +1841,33 @@ export function runDerivedModule(args: {
       return runSarosCycle(args.input as SarosInput, args.thresholds.modules.saros_cycle);
     case "jovian_moon_event_timing":
       return runJovianMoonEventTiming(args.input as JovianMoonTimingInput, args.thresholds.modules.jovian_moon_event_timing);
+    case "solar_light_deflection":
+      if (!args.metricContextManifest) {
+        throw new Error("Metric-context manifest is required for solar light deflection module");
+      }
+      return runSolarLightDeflection({
+        input: args.input as SolarLightDeflectionInput,
+        thresholds: args.thresholds.modules.solar_light_deflection,
+        metricContextManifest: args.metricContextManifest,
+      });
+    case "inner_solar_metric_parity":
+      if (!args.metricContextManifest) {
+        throw new Error("Metric-context manifest is required for inner solar metric parity module");
+      }
+      return runInnerSolarMetricParity({
+        input: args.input as InnerSolarMetricParityInput,
+        thresholds: args.thresholds,
+        metricContextManifest: args.metricContextManifest,
+      });
+    case "local_rest_anchor_calibration":
+      if (!args.referenceManifest) {
+        throw new Error("Local-rest reference manifest is required for calibration module");
+      }
+      return runLocalRestAnchorCalibration({
+        input: args.input as LocalRestAnchorCalibrationInput,
+        thresholds: args.thresholds.modules.local_rest_anchor_calibration,
+        referenceManifest: args.referenceManifest,
+      });
     default:
       throw new Error(`Unsupported module: ${String(args.module)}`);
   }

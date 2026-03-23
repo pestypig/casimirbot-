@@ -33,6 +33,20 @@ type AskDebug = Record<string, unknown> & {
   coverage_ratio?: number;
   belief_unsupported_rate?: number;
   context_files?: string[];
+  objective_count?: number;
+  objective_loop_state?: Array<Record<string, unknown>>;
+  objective_transition_log?: Array<Record<string, unknown>>;
+  objective_retrieval_queries?: Array<Record<string, unknown>>;
+  objective_mini_answers?: Array<Record<string, unknown>>;
+  objective_mini_critic_mode?: string;
+  objective_assembly_mode?: string;
+  objective_finalize_gate_passed?: boolean;
+  objective_loop_patch_revision?: string;
+  objective_scoped_retrieval_budget_bypass_applied?: boolean;
+  objective_scoped_retrieval_budget_bypass_count?: number;
+  objective_scoped_retrieval_recovery_applied?: boolean;
+  objective_scoped_retrieval_recovery_count?: number;
+  objective_scoped_retrieval_recovery_error_count?: number;
 };
 
 type AskResponse = {
@@ -55,6 +69,19 @@ type ProbeResult = {
     coverage_ratio?: number;
     belief_unsupported_rate?: number;
     context_files_count?: number;
+    objective_count?: number;
+    objective_transition_count?: number;
+    objective_retrieval_query_count?: number;
+    objective_mini_answer_count?: number;
+    objective_mini_critic_mode?: string;
+    objective_assembly_mode?: string;
+    objective_finalize_gate_passed?: boolean;
+    objective_loop_patch_revision?: string;
+    objective_scoped_retrieval_budget_bypass_applied?: boolean;
+    objective_scoped_retrieval_budget_bypass_count?: number;
+    objective_scoped_retrieval_recovery_applied?: boolean;
+    objective_scoped_retrieval_recovery_count?: number;
+    objective_scoped_retrieval_recovery_error_count?: number;
   } | null;
 };
 
@@ -67,6 +94,9 @@ type ProbeSummary = {
   seed: number;
   sample_count: number;
   total_cases_available: number;
+  objective_loop_patch_revision_expected: string;
+  objective_loop_patch_revision_required: boolean;
+  objective_loop_patch_revision_pass_rate: number;
   pass_count: number;
   fail_count: number;
   pass_rate: number;
@@ -89,6 +119,17 @@ type ProbeSummary = {
     summary_json: string;
     report_md: string;
   };
+  objective_loop_snapshot: {
+    sampled_cases: number;
+    finalize_gate_pass_rate: number;
+    retrieval_success_rate: number;
+    assembly_success_rate: number;
+    bypass_applied_rate: number;
+    avg_bypass_count: number;
+    recovery_applied_rate: number;
+    avg_recovery_count: number;
+    avg_transition_count: number;
+  };
 };
 
 const BASE_URL =
@@ -98,24 +139,47 @@ const BASE_URL =
 const ASK_URL = new URL("/api/agi/ask", BASE_URL).toString();
 const REQUEST_TIMEOUT_MS = Math.max(
   1000,
-  Number(process.env.HELIX_ASK_PATCH_PROBE_TIMEOUT_MS ?? 45000),
+  Number(process.env.HELIX_ASK_PATCH_PROBE_TIMEOUT_MS ?? 70000),
+);
+const MAX_RETRIES = Math.max(
+  0,
+  Number(process.env.HELIX_ASK_PATCH_PROBE_MAX_RETRIES ?? 1),
+);
+const RETRY_BASE_MS = Math.max(
+  250,
+  Number(process.env.HELIX_ASK_PATCH_PROBE_RETRY_BASE_MS ?? 1000),
+);
+const RETRY_MAX_MS = Math.max(
+  RETRY_BASE_MS,
+  Number(process.env.HELIX_ASK_PATCH_PROBE_RETRY_MAX_MS ?? 8000),
 );
 const SAMPLE_COUNT = Math.max(
   1,
   Number(process.env.HELIX_ASK_PATCH_PROBE_SAMPLES ?? 10),
 );
 const FAIL_ON_MISS = process.env.HELIX_ASK_PATCH_PROBE_FAIL_ON_MISS !== "0";
+const OBJECTIVE_LOOP_EXPECTED_PATCH_REVISION =
+  process.env.HELIX_ASK_OBJECTIVE_LOOP_EXPECTED_PATCH_REVISION ??
+  "2026-03-23-objective-loop-recovery-enforce-v2";
+const REQUIRE_OBJECTIVE_LOOP_PATCH_REVISION =
+  process.env.HELIX_ASK_PATCH_PROBE_REQUIRE_OBJECTIVE_LOOP_PATCH_REVISION !== "0";
 const REQUIRE_PLAN_CONTEXT =
   process.env.HELIX_ASK_PATCH_PROBE_REQUIRE_PLAN_CONTEXT !== "0";
-const PLAN_PATH = process.env.HELIX_ASK_PATCH_PROBE_PLAN_PATH?.trim()
-  ? path.resolve(process.env.HELIX_ASK_PATCH_PROBE_PLAN_PATH)
-  : path.resolve(
-      "docs/helix-ask-retrieval-objective-resolution-plan-2026-03-03.md",
-    );
+const resolveDefaultPlanPath = (): string => {
+  const preferred = path.resolve("docs/helix-ask-reasoning-ladder-optimization-plan.md");
+  if (process.env.HELIX_ASK_PATCH_PROBE_PLAN_PATH?.trim()) {
+    return path.resolve(process.env.HELIX_ASK_PATCH_PROBE_PLAN_PATH);
+  }
+  return preferred;
+};
+const PLAN_PATH = resolveDefaultPlanPath();
 const OUTPUT_ROOT = path.resolve(
   process.env.HELIX_ASK_PATCH_PROBE_OUT_DIR ??
     "artifacts/experiments/helix-ask-patch-probe",
 );
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 const PROBE_BANK: ProbeCase[] = [
   {
@@ -336,7 +400,7 @@ const readPlanContext = async (): Promise<{
   }
 };
 
-const askOne = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => {
+const askOneAttempt = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const started = Date.now();
@@ -372,9 +436,21 @@ const askOne = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => 
     const payload = (await response.json()) as AskResponse;
     const debug = payload.debug ?? {};
     const failures: string[] = [];
+    const objectiveLoopPatchRevision =
+      typeof debug.objective_loop_patch_revision === "string"
+        ? debug.objective_loop_patch_revision.trim()
+        : "";
 
     if (!payload.text || payload.text.trim().length < 32) {
       failures.push("answer_too_short");
+    }
+    if (
+      REQUIRE_OBJECTIVE_LOOP_PATCH_REVISION &&
+      objectiveLoopPatchRevision !== OBJECTIVE_LOOP_EXPECTED_PATCH_REVISION
+    ) {
+      failures.push(
+        `objective_loop_patch_revision:${objectiveLoopPatchRevision || "missing"}!=${OBJECTIVE_LOOP_EXPECTED_PATCH_REVISION}`,
+      );
     }
 
     if (entry.expect.intent_domain) {
@@ -431,6 +507,18 @@ const askOne = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => 
       }
     }
 
+    const objectiveLoopState = Array.isArray(debug.objective_loop_state)
+      ? debug.objective_loop_state
+      : [];
+    const objectiveTransitionLog = Array.isArray(debug.objective_transition_log)
+      ? debug.objective_transition_log
+      : [];
+    const objectiveRetrievalQueries = Array.isArray(debug.objective_retrieval_queries)
+      ? debug.objective_retrieval_queries
+      : [];
+    const objectiveMiniAnswers = Array.isArray(debug.objective_mini_answers)
+      ? debug.objective_mini_answers
+      : [];
     return {
       id: entry.id,
       label: entry.label,
@@ -452,6 +540,46 @@ const askOne = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => 
         context_files_count: Array.isArray(debug.context_files)
           ? debug.context_files.length
           : 0,
+        objective_count:
+          typeof debug.objective_count === "number"
+            ? debug.objective_count
+            : objectiveLoopState.length,
+        objective_transition_count: objectiveTransitionLog.length,
+        objective_retrieval_query_count: objectiveRetrievalQueries.length,
+        objective_mini_answer_count: objectiveMiniAnswers.length,
+        objective_mini_critic_mode:
+          typeof debug.objective_mini_critic_mode === "string"
+            ? debug.objective_mini_critic_mode
+            : undefined,
+        objective_assembly_mode:
+          typeof debug.objective_assembly_mode === "string"
+            ? debug.objective_assembly_mode
+            : undefined,
+        objective_finalize_gate_passed:
+          typeof debug.objective_finalize_gate_passed === "boolean"
+            ? debug.objective_finalize_gate_passed
+            : undefined,
+        objective_loop_patch_revision: objectiveLoopPatchRevision || undefined,
+        objective_scoped_retrieval_budget_bypass_applied:
+          typeof debug.objective_scoped_retrieval_budget_bypass_applied === "boolean"
+            ? debug.objective_scoped_retrieval_budget_bypass_applied
+            : undefined,
+        objective_scoped_retrieval_budget_bypass_count:
+          typeof debug.objective_scoped_retrieval_budget_bypass_count === "number"
+            ? debug.objective_scoped_retrieval_budget_bypass_count
+            : undefined,
+        objective_scoped_retrieval_recovery_applied:
+          typeof debug.objective_scoped_retrieval_recovery_applied === "boolean"
+            ? debug.objective_scoped_retrieval_recovery_applied
+            : undefined,
+        objective_scoped_retrieval_recovery_count:
+          typeof debug.objective_scoped_retrieval_recovery_count === "number"
+            ? debug.objective_scoped_retrieval_recovery_count
+            : undefined,
+        objective_scoped_retrieval_recovery_error_count:
+          typeof debug.objective_scoped_retrieval_recovery_error_count === "number"
+            ? debug.objective_scoped_retrieval_recovery_error_count
+            : undefined,
       },
     };
   } catch (error) {
@@ -473,6 +601,44 @@ const askOne = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => 
   }
 };
 
+const isRetryableProbeFailure = (result: ProbeResult): boolean => {
+  if (result.ok) return false;
+  const joined = result.failures.join(" ").toLowerCase();
+  return (
+    joined.includes("this operation was aborted") ||
+    joined.includes("fetch_failed") ||
+    joined.includes("request_failed:0") ||
+    joined.includes("request_failed:408") ||
+    joined.includes("request_failed:429") ||
+    joined.includes("request_failed:500") ||
+    joined.includes("request_failed:502") ||
+    joined.includes("request_failed:503") ||
+    joined.includes("request_failed:504")
+  );
+};
+
+const askOne = async (entry: ProbeCase, runId: string): Promise<ProbeResult> => {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    const result = await askOneAttempt(entry, runId);
+    if (result.ok) return result;
+    if (attempt >= MAX_RETRIES || !isRetryableProbeFailure(result)) {
+      return result;
+    }
+    const delayMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** attempt);
+    await sleep(delayMs);
+  }
+  return {
+    id: entry.id,
+    label: entry.label,
+    family: entry.family,
+    question: entry.question,
+    ok: false,
+    failures: ["unexpected_retry_flow"],
+    duration_ms: 0,
+    debug: null,
+  };
+};
+
 const buildReportMarkdown = (summary: ProbeSummary, results: ProbeResult[]): string => {
   const failed = results.filter((entry) => !entry.ok);
   const lines: string[] = [
@@ -483,9 +649,21 @@ const buildReportMarkdown = (summary: ProbeSummary, results: ProbeResult[]): str
     `- base_url: ${summary.base_url}`,
     `- seed: ${summary.seed}`,
     `- sample_count: ${summary.sample_count}`,
+    `- objective_loop_patch_revision_expected: ${summary.objective_loop_patch_revision_expected}`,
+    `- objective_loop_patch_revision_required: ${String(summary.objective_loop_patch_revision_required)}`,
+    `- objective_loop_patch_revision_pass_rate: ${(summary.objective_loop_patch_revision_pass_rate * 100).toFixed(1)}%`,
     `- pass_rate: ${(summary.pass_rate * 100).toFixed(1)}%`,
     `- plan_context_loaded: ${String(summary.plan_context.loaded)}`,
     `- plan_context_sha256: ${summary.plan_context.sha256 ?? "missing"}`,
+    `- objective_sampled_cases: ${summary.objective_loop_snapshot.sampled_cases}`,
+    `- objective_finalize_gate_pass_rate: ${(summary.objective_loop_snapshot.finalize_gate_pass_rate * 100).toFixed(1)}%`,
+    `- objective_retrieval_success_rate: ${(summary.objective_loop_snapshot.retrieval_success_rate * 100).toFixed(1)}%`,
+    `- objective_assembly_success_rate: ${(summary.objective_loop_snapshot.assembly_success_rate * 100).toFixed(1)}%`,
+    `- objective_bypass_applied_rate: ${(summary.objective_loop_snapshot.bypass_applied_rate * 100).toFixed(1)}%`,
+    `- objective_avg_bypass_count: ${summary.objective_loop_snapshot.avg_bypass_count.toFixed(2)}`,
+    `- objective_recovery_applied_rate: ${(summary.objective_loop_snapshot.recovery_applied_rate * 100).toFixed(1)}%`,
+    `- objective_avg_recovery_count: ${summary.objective_loop_snapshot.avg_recovery_count.toFixed(2)}`,
+    `- objective_avg_transition_count: ${summary.objective_loop_snapshot.avg_transition_count.toFixed(2)}`,
     "",
     "## Family Stats",
     "| family | total | pass | fail | pass_rate |",
@@ -511,6 +689,29 @@ const buildReportMarkdown = (summary: ProbeSummary, results: ProbeResult[]): str
       lines.push(`- coverage_ratio: ${entry.debug?.coverage_ratio ?? "missing"}`);
       lines.push(
         `- belief_unsupported_rate: ${entry.debug?.belief_unsupported_rate ?? "missing"}`,
+      );
+      lines.push(`- objective_count: ${entry.debug?.objective_count ?? "missing"}`);
+      lines.push(`- objective_transition_count: ${entry.debug?.objective_transition_count ?? "missing"}`);
+      lines.push(`- objective_retrieval_query_count: ${entry.debug?.objective_retrieval_query_count ?? "missing"}`);
+      lines.push(`- objective_mini_answer_count: ${entry.debug?.objective_mini_answer_count ?? "missing"}`);
+      lines.push(`- objective_mini_critic_mode: ${entry.debug?.objective_mini_critic_mode ?? "missing"}`);
+      lines.push(`- objective_assembly_mode: ${entry.debug?.objective_assembly_mode ?? "missing"}`);
+      lines.push(`- objective_finalize_gate_passed: ${entry.debug?.objective_finalize_gate_passed ?? "missing"}`);
+      lines.push(`- objective_loop_patch_revision: ${entry.debug?.objective_loop_patch_revision ?? "missing"}`);
+      lines.push(
+        `- objective_scoped_retrieval_budget_bypass_applied: ${entry.debug?.objective_scoped_retrieval_budget_bypass_applied ?? "missing"}`,
+      );
+      lines.push(
+        `- objective_scoped_retrieval_budget_bypass_count: ${entry.debug?.objective_scoped_retrieval_budget_bypass_count ?? "missing"}`,
+      );
+      lines.push(
+        `- objective_scoped_retrieval_recovery_applied: ${entry.debug?.objective_scoped_retrieval_recovery_applied ?? "missing"}`,
+      );
+      lines.push(
+        `- objective_scoped_retrieval_recovery_count: ${entry.debug?.objective_scoped_retrieval_recovery_count ?? "missing"}`,
+      );
+      lines.push(
+        `- objective_scoped_retrieval_recovery_error_count: ${entry.debug?.objective_scoped_retrieval_recovery_error_count ?? "missing"}`,
       );
       lines.push("");
     }
@@ -538,6 +739,79 @@ async function main(): Promise<void> {
 
   const passCount = results.filter((entry) => entry.ok).length;
   const failCount = results.length - passCount;
+  const objectiveLoopPatchRevisionPass = results.filter((entry) => {
+    const revision = String(entry.debug?.objective_loop_patch_revision ?? "").trim();
+    return revision === OBJECTIVE_LOOP_EXPECTED_PATCH_REVISION;
+  }).length;
+  const objectiveRows = results.filter((entry) => {
+    if (!entry.debug) return false;
+    const objectiveCount = Number(entry.debug.objective_count ?? 0);
+    const transitionCount = Number(entry.debug.objective_transition_count ?? 0);
+    const miniAnswerCount = Number(entry.debug.objective_mini_answer_count ?? 0);
+    return objectiveCount > 0 || transitionCount > 0 || miniAnswerCount > 0;
+  });
+  const objectiveFinalizePass = objectiveRows.filter(
+    (entry) => entry.debug?.objective_finalize_gate_passed === true,
+  ).length;
+  const objectiveRetrievalPass = objectiveRows.filter((entry) => {
+    const objectiveCount = Math.max(0, Math.floor(Number(entry.debug?.objective_count ?? 0)));
+    const retrievalCount = Math.max(
+      0,
+      Math.floor(Number(entry.debug?.objective_retrieval_query_count ?? 0)),
+    );
+    return objectiveCount > 0 ? retrievalCount >= objectiveCount : retrievalCount > 0;
+  }).length;
+  const objectiveAssemblyPass = objectiveRows.filter((entry) => {
+    const objectiveCount = Math.max(0, Math.floor(Number(entry.debug?.objective_count ?? 0)));
+    const miniAnswerCount = Math.max(
+      0,
+      Math.floor(Number(entry.debug?.objective_mini_answer_count ?? 0)),
+    );
+    const assemblyMode = String(entry.debug?.objective_assembly_mode ?? "").trim().toLowerCase();
+    const assemblyOk = assemblyMode === "llm" || assemblyMode === "deterministic_fallback";
+    return objectiveCount > 0
+      ? assemblyOk && miniAnswerCount >= objectiveCount
+      : assemblyOk;
+  }).length;
+  const objectiveBypassApplied = objectiveRows.filter(
+    (entry) => entry.debug?.objective_scoped_retrieval_budget_bypass_applied === true,
+  ).length;
+  const avgObjectiveBypassCount = objectiveRows.length
+    ? objectiveRows.reduce(
+        (sum, entry) =>
+          sum +
+          Math.max(
+            0,
+            Math.floor(
+              Number(entry.debug?.objective_scoped_retrieval_budget_bypass_count ?? 0),
+            ),
+          ),
+        0,
+      ) / objectiveRows.length
+    : 0;
+  const objectiveRecoveryApplied = objectiveRows.filter(
+    (entry) => entry.debug?.objective_scoped_retrieval_recovery_applied === true,
+  ).length;
+  const avgObjectiveRecoveryCount = objectiveRows.length
+    ? objectiveRows.reduce(
+        (sum, entry) =>
+          sum +
+          Math.max(
+            0,
+            Math.floor(
+              Number(entry.debug?.objective_scoped_retrieval_recovery_count ?? 0),
+            ),
+          ),
+        0,
+      ) / objectiveRows.length
+    : 0;
+  const avgObjectiveTransitionCount = objectiveRows.length
+    ? objectiveRows.reduce(
+        (sum, entry) =>
+          sum + Math.max(0, Math.floor(Number(entry.debug?.objective_transition_count ?? 0))),
+        0,
+      ) / objectiveRows.length
+    : 0;
 
   const families: ProbeFamily[] = [
     "ideology_social",
@@ -573,6 +847,10 @@ async function main(): Promise<void> {
     seed,
     sample_count: sampledCases.length,
     total_cases_available: PROBE_BANK.length,
+    objective_loop_patch_revision_expected: OBJECTIVE_LOOP_EXPECTED_PATCH_REVISION,
+    objective_loop_patch_revision_required: REQUIRE_OBJECTIVE_LOOP_PATCH_REVISION,
+    objective_loop_patch_revision_pass_rate:
+      results.length > 0 ? objectiveLoopPatchRevisionPass / results.length : 0,
     pass_count: passCount,
     fail_count: failCount,
     pass_rate: sampledCases.length > 0 ? passCount / sampledCases.length : 0,
@@ -588,6 +866,22 @@ async function main(): Promise<void> {
       results_json: path.resolve(outDir, "results.json"),
       summary_json: path.resolve(outDir, "summary.json"),
       report_md: path.resolve(outDir, "report.md"),
+    },
+    objective_loop_snapshot: {
+      sampled_cases: objectiveRows.length,
+      finalize_gate_pass_rate:
+        objectiveRows.length > 0 ? objectiveFinalizePass / objectiveRows.length : 0,
+      retrieval_success_rate:
+        objectiveRows.length > 0 ? objectiveRetrievalPass / objectiveRows.length : 0,
+      assembly_success_rate:
+        objectiveRows.length > 0 ? objectiveAssemblyPass / objectiveRows.length : 0,
+      bypass_applied_rate:
+        objectiveRows.length > 0 ? objectiveBypassApplied / objectiveRows.length : 0,
+      avg_bypass_count: Number(avgObjectiveBypassCount.toFixed(2)),
+      recovery_applied_rate:
+        objectiveRows.length > 0 ? objectiveRecoveryApplied / objectiveRows.length : 0,
+      avg_recovery_count: Number(avgObjectiveRecoveryCount.toFixed(2)),
+      avg_transition_count: Number(avgObjectiveTransitionCount.toFixed(2)),
     },
   };
 

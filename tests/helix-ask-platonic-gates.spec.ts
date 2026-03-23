@@ -29,6 +29,26 @@ describe("helix ask platonic gates", () => {
     expect(sentenceCount(result.answer)).toBeLessThanOrEqual(3);
   });
 
+  it("preserves deliberate sources lines for general F0 answers", () => {
+    const answer = [
+      "Lead with the direct answer, then give one supporting sentence.",
+      "",
+      "Sources: docs/helix-ask-flow.md, docs/helix-ask-agent-policy.md",
+    ].join("\n");
+    const result = applyHelixAskPlatonicGates({
+      question: "What's a clean way to structure a short answer?",
+      answer,
+      domain: "general",
+      tier: "F0",
+      intentId: "general.conceptual_define_compare",
+      format: "compare",
+      evidenceText: "",
+    });
+    expect(result.conceptLintApplied).toBe(false);
+    expect(result.conceptLintReasons).toEqual(["sources_line_preserved"]);
+    expect(result.answer).toContain("Sources: docs/helix-ask-flow.md, docs/helix-ask-agent-policy.md");
+  });
+
   it("blocks repo answers when unsupported rate is too high", () => {
     const result = applyHelixAskPlatonicGates({
       question: "How does the Helix Ask pipeline work?",
@@ -244,6 +264,35 @@ describe("helix ask platonic gates", () => {
     });
     expect(result.coverageGateApplied).toBe(false);
     expect(result.coverageSummary.missingKeys.join(" ")).not.toMatch(/\b(using|ideology\.json)\b/i);
+  });
+
+  it("prefers ideology anchor slots over noisy structural/question slots for ideology prompts", () => {
+    const result = applyHelixAskPlatonicGates({
+      question:
+        "If a child would look forward to celebrating love, how can a society condition this vulnerability?",
+      answer:
+        "Mission ethos keeps policy tied to verified civic signals, reversible interventions, and accountable governance.",
+      domain: "repo",
+      tier: "F1",
+      intentId: "repo.ideology_reference",
+      format: "compare",
+      evidenceGateOk: true,
+      evidenceText:
+        "docs/ethos/ideology.json mission ethos ideology governance society civic signals",
+      coverageSlots: [
+        "definition",
+        "mechanism",
+        "repo-mapping",
+        "failure-modes",
+        "child",
+        "would",
+        "condition",
+      ],
+    });
+    expect(result.coverageSummary.coverageRatio).toBeGreaterThanOrEqual(0.5);
+    expect(result.coverageSummary.slots.join(" ")).not.toMatch(
+      /\b(definition|mechanism|repo[-_ ]?mapping|failure[-_ ]?modes|child|would|condition)\b/i,
+    );
   });
 
   it("flags high rattling even when some claims are supported", () => {

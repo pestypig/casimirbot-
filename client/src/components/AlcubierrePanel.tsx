@@ -33,6 +33,10 @@ import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
 import { normalizeCurvaturePalette, type CurvaturePalette } from "@/lib/curvature-directive";
 import StressOverlay from "@/components/HullViewer/StressOverlay";
+import MetricFrameLens, {
+  type SolveOrderSnapshot,
+  type SolveOrderStatus,
+} from "@/components/HullViewer/MetricFrameLens";
 import { resolveHullDimsEffective } from "@/lib/resolve-hull-dims";
 import {
   colorizeFieldProbe,
@@ -54,6 +58,22 @@ import { hashLatticeSdfDeterminism, hashLatticeVolumeDeterminism } from "@/lib/l
 import { loadWfbrickFile } from "@/lib/wfbrick";
 import { GEO_VIS_THETA_PRESET } from "@/lib/warpfield-presets";
 import { exoticMassFallback } from "@/constants/VIS";
+import {
+  DEFAULT_GEODESIC_DIAGNOSTICS_CHANNEL,
+  type HullMetricVolumeContract,
+  type HullGeodesicDiagnostics,
+} from "@/lib/metric-volume-contract";
+import { requestHullMisFrame } from "@/lib/hull-mis-render-service";
+import {
+  isAlcubierreDebugLogEnabled,
+  pushAlcubierreDebugEvent,
+  subscribeAlcubierreDebugLogConfig,
+} from "@/lib/alcubierre-debug-log";
+import type {
+  HullMisRenderRequestV1,
+  HullMisRenderResponseV1,
+  HullRendererBackendMode,
+} from "@shared/hull-render-contract";
 /**
  * TheoryRefs:
  *  - vanden-broeck-1999: UI exposes gamma_VdB with provenance
@@ -301,6 +321,555 @@ const sech2  = (x: number) => {
 function dTopHatDr(r: number, sigma: number, R: number) {
   const den = Math.max(1e-8, 2 * Math.tanh(sigma * R));
   return sigma * (sech2(sigma * (r + R)) - sech2(sigma * (r - R))) / den;
+}
+
+function topHatShape(r: number, sigma: number, R: number) {
+  const den = Math.max(1e-8, 2 * Math.tanh(sigma * R));
+  const tPlus = Math.tanh(sigma * (r + R));
+  const tMinus = Math.tanh(sigma * (r - R));
+  return (tPlus - tMinus) / den;
+}
+
+type NullGeodesicBundle = {
+  plus: Float32Array;
+  minus: Float32Array;
+  worldtube: Float32Array;
+};
+
+function buildNullGeodesicBundle1p1(opts: {
+  alpha: number;
+  beta: number;
+  sigma: number;
+  R: number;
+  axes: [number, number, number];
+  domainScale: number;
+  natarioLike: boolean;
+  flatMode: boolean;
+}): NullGeodesicBundle {
+  const alpha = Number.isFinite(opts.alpha) && opts.alpha > 1e-6 ? opts.alpha : 1;
+  const beta = Number.isFinite(opts.beta) ? opts.beta : 0;
+  const sigma = Number.isFinite(opts.sigma) && opts.sigma > 0 ? opts.sigma : 6;
+  const R = Number.isFinite(opts.R) && opts.R > 0 ? opts.R : 1;
+  const axisX = Math.max(Math.abs(opts.axes?.[0] ?? 1), 1e-4);
+  const domainScale = Number.isFinite(opts.domainScale) && opts.domainScale > 0 ? opts.domainScale : 1;
+  const span = Math.max(1.15, domainScale * axisX * 1.25);
+  const travelSpan = span * 2;
+  const seeds = 13;
+  const steps = 96;
+  const dtCoord = travelSpan / Math.max(steps - 1, 1);
+  const xSeedMin = -0.84 * span;
+  const xSeedMax = 0.84 * span;
+  const flatMode = opts.flatMode;
+  const natarioLike = opts.natarioLike;
+
+  const mapXToNdc = (x: number) => {
+    const mapped = x / Math.max(span, 1e-6);
+    return clamp(mapped, -1.25, 1.25);
+  };
+  const mapStepToNdcY = (step: number) => -1 + (2 * step) / Math.max(steps - 1, 1);
+
+  const buildFamily = (familySign: 1 | -1) => {
+    const segs: number[] = [];
+    for (let s = 0; s < seeds; s += 1) {
+      const frac = seeds <= 1 ? 0.5 : s / (seeds - 1);
+      let x = xSeedMin + (xSeedMax - xSeedMin) * frac;
+      let y = mapStepToNdcY(0);
+      for (let i = 1; i < steps; i += 1) {
+        const r = Math.abs(x);
+        const f = topHatShape(r, sigma, R);
+        const shiftDir = natarioLike ? (Math.abs(x) > 1e-8 ? Math.sign(x) : familySign) : 1;
+        const betaLocal = flatMode ? 0 : beta * f * shiftDir;
+        const c = -betaLocal + familySign * alpha;
+        const xNext = x + c * dtCoord;
+        const yNext = mapStepToNdcY(i);
+        const xNdc = mapXToNdc(x);
+        const xNdcNext = mapXToNdc(xNext);
+        if (
+          Number.isFinite(xNdc) &&
+          Number.isFinite(xNdcNext) &&
+          Number.isFinite(y) &&
+          Number.isFinite(yNext)
+        ) {
+          segs.push(xNdc, y, xNdcNext, yNext);
+        }
+        x = xNext;
+        y = yNext;
+        if (Math.abs(x) > span * 1.4) break;
+      }
+    }
+    return new Float32Array(segs);
+  };
+
+  const tubeHalf = clamp((R * axisX) / Math.max(span, 1e-6), 0.06, 0.88);
+  const worldtube = new Float32Array([
+    -tubeHalf, -1, -tubeHalf, 1,
+    0, -1, 0, 1,
+    tubeHalf, -1, tubeHalf, 1,
+  ]);
+
+  return {
+    plus: buildFamily(1),
+    minus: buildFamily(-1),
+    worldtube,
+  };
+}
+
+type MetricAxisRadiusSample = {
+  radiusM: number | null;
+  symmetryErrorM: number | null;
+  peakAbs: number | null;
+  sampleCount: number;
+};
+
+type IntegralSignalAttachmentSnapshot = {
+  source: "mis-service-remote" | "mis-service-local-fallback";
+  updatedAtMs: number;
+  width: number;
+  height: number;
+  depthM: Float32Array;
+  maskU8: Uint8Array;
+  coveragePct: number | null;
+  depthMinM: number | null;
+  depthMaxM: number | null;
+  depthMeanM: number | null;
+  sampleCount: number;
+  note: string | null;
+};
+
+type IntegralSignalComparison = {
+  status: SolveOrderStatus;
+  source: string | null;
+  updatedAtMs: number | null;
+  ageMs: number | null;
+  coveragePct: number | null;
+  depthMinM: number | null;
+  depthMaxM: number | null;
+  depthMeanM: number | null;
+  fitScalePxPerM: number | null;
+  fitZOffsetM: number | null;
+  fitSign: number | null;
+  rmsZResidualM: number | null;
+  maxAbsZResidualM: number | null;
+  hausdorffM: number | null;
+  sampleCount: number | null;
+  note: string | null;
+};
+
+const METRIC_DISPLACEMENT_CHANNEL_PRIORITY = [
+  "theta",
+  "K_trace",
+  "H_constraint",
+] as const;
+
+function sampleMetricAxisRadius(opts: {
+  data: Float32Array;
+  dims: [number, number, number];
+  spacingM: [number, number, number];
+  axis: 0 | 1 | 2;
+}): MetricAxisRadiusSample {
+  const { data, dims, spacingM, axis } = opts;
+  const nx = Math.max(1, Math.floor(Number(dims[0]) || 1));
+  const ny = Math.max(1, Math.floor(Number(dims[1]) || 1));
+  const nz = Math.max(1, Math.floor(Number(dims[2]) || 1));
+  const total = nx * ny * nz;
+  if (!(data instanceof Float32Array) || data.length < total) {
+    return { radiusM: null, symmetryErrorM: null, peakAbs: null, sampleCount: 0 };
+  }
+
+  const cx = Math.floor((nx - 1) / 2);
+  const cy = Math.floor((ny - 1) / 2);
+  const cz = Math.floor((nz - 1) / 2);
+  const spacingAxis = Math.max(1e-6, Number(spacingM[axis]) || 1);
+  const indexAt = (i: number, j: number, k: number) => i + nx * (j + ny * k);
+
+  let posPeak = -Infinity;
+  let posStep = -1;
+  let posCount = 0;
+  let negPeak = -Infinity;
+  let negStep = -1;
+  let negCount = 0;
+
+  const maxPos =
+    axis === 0 ? nx - 1 - cx :
+    axis === 1 ? ny - 1 - cy :
+    nz - 1 - cz;
+  const maxNeg =
+    axis === 0 ? cx :
+    axis === 1 ? cy :
+    cz;
+
+  for (let step = 1; step <= maxPos; step += 1) {
+    const i = axis === 0 ? cx + step : cx;
+    const j = axis === 1 ? cy + step : cy;
+    const k = axis === 2 ? cz + step : cz;
+    const idx = indexAt(i, j, k);
+    const value = Math.abs(Number(data[idx]));
+    if (!Number.isFinite(value)) continue;
+    posCount += 1;
+    if (value > posPeak) {
+      posPeak = value;
+      posStep = step;
+    }
+  }
+
+  for (let step = 1; step <= maxNeg; step += 1) {
+    const i = axis === 0 ? cx - step : cx;
+    const j = axis === 1 ? cy - step : cy;
+    const k = axis === 2 ? cz - step : cz;
+    const idx = indexAt(i, j, k);
+    const value = Math.abs(Number(data[idx]));
+    if (!Number.isFinite(value)) continue;
+    negCount += 1;
+    if (value > negPeak) {
+      negPeak = value;
+      negStep = step;
+    }
+  }
+
+  const radiusPos = posStep >= 0 ? posStep * spacingAxis : null;
+  const radiusNeg = negStep >= 0 ? negStep * spacingAxis : null;
+  const radiusM =
+    radiusPos != null && radiusNeg != null
+      ? (radiusPos + radiusNeg) * 0.5
+      : radiusPos ?? radiusNeg ?? null;
+  const symmetryErrorM =
+    radiusPos != null && radiusNeg != null
+      ? Math.abs(radiusPos - radiusNeg)
+      : null;
+  const peakAbs =
+    Number.isFinite(posPeak) || Number.isFinite(negPeak)
+      ? Math.max(Number.isFinite(posPeak) ? posPeak : 0, Number.isFinite(negPeak) ? negPeak : 0)
+      : null;
+
+  return {
+    radiusM,
+    symmetryErrorM,
+    peakAbs,
+    sampleCount: posCount + negCount,
+  };
+}
+
+function decodeBase64Bytes(raw: string): Uint8Array | null {
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  try {
+    const decode = typeof atob === "function" ? atob : null;
+    if (!decode) return null;
+    const binary = decode(raw);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i) & 0xff;
+    }
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+function extractIntegralSignalAttachmentSnapshot(
+  frame: HullMisRenderResponseV1,
+): IntegralSignalAttachmentSnapshot | null {
+  const attachments = Array.isArray(frame?.attachments) ? frame.attachments : [];
+  const depthAttachment = attachments.find(
+    (entry: any) => entry?.kind === "depth-linear-m-f32le" && entry?.encoding === "base64",
+  );
+  const maskAttachment = attachments.find(
+    (entry: any) => entry?.kind === "shell-mask-u8" && entry?.encoding === "base64",
+  );
+  if (!depthAttachment || !maskAttachment) return null;
+  const width = Math.max(1, Math.floor(Number(depthAttachment.width) || 0));
+  const height = Math.max(1, Math.floor(Number(depthAttachment.height) || 0));
+  if (
+    width !== Math.max(1, Math.floor(Number(maskAttachment.width) || 0)) ||
+    height !== Math.max(1, Math.floor(Number(maskAttachment.height) || 0))
+  ) {
+    return null;
+  }
+  const total = width * height;
+  const depthBytes = decodeBase64Bytes(String(depthAttachment.dataBase64 ?? ""));
+  const maskBytes = decodeBase64Bytes(String(maskAttachment.dataBase64 ?? ""));
+  if (!depthBytes || !maskBytes) return null;
+  if (depthBytes.length < total * 4 || maskBytes.length < total) return null;
+
+  const depthCopy = new Uint8Array(total * 4);
+  depthCopy.set(depthBytes.subarray(0, total * 4));
+  const maskCopy = new Uint8Array(total);
+  maskCopy.set(maskBytes.subarray(0, total));
+  const depthM = new Float32Array(depthCopy.buffer);
+  const maskU8 = maskCopy;
+
+  let maskCount = 0;
+  let finiteDepthCount = 0;
+  let depthMin = Number.POSITIVE_INFINITY;
+  let depthMax = Number.NEGATIVE_INFINITY;
+  let depthSum = 0;
+  for (let i = 0; i < total; i += 1) {
+    if (maskU8[i] > 0) maskCount += 1;
+    const value = Number(depthM[i]);
+    if (!Number.isFinite(value)) continue;
+    finiteDepthCount += 1;
+    depthMin = Math.min(depthMin, value);
+    depthMax = Math.max(depthMax, value);
+    depthSum += value;
+  }
+
+  return {
+    source: frame?.backend === "proxy" ? "mis-service-remote" : "mis-service-local-fallback",
+    updatedAtMs: Date.now(),
+    width,
+    height,
+    depthM,
+    maskU8,
+    coveragePct: total > 0 ? (maskCount / total) * 100 : null,
+    depthMinM: finiteDepthCount > 0 ? depthMin : null,
+    depthMaxM: finiteDepthCount > 0 ? depthMax : null,
+    depthMeanM: finiteDepthCount > 0 ? depthSum / finiteDepthCount : null,
+    sampleCount: maskCount,
+    note: "integral signal from depth-linear-m + shell-mask attachments",
+  };
+}
+
+function approximateHausdorff(
+  a: Array<[number, number, number]>,
+  b: Array<[number, number, number]>,
+): number | null {
+  if (a.length === 0 || b.length === 0) return null;
+  const sample = (points: Array<[number, number, number]>, maxN: number) => {
+    if (points.length <= maxN) return points;
+    const stride = points.length / maxN;
+    const out: Array<[number, number, number]> = [];
+    for (let i = 0; i < maxN; i += 1) {
+      out.push(points[Math.floor(i * stride)]);
+    }
+    return out;
+  };
+  const aS = sample(a, 220);
+  const bS = sample(b, 220);
+  const directed = (src: Array<[number, number, number]>, dst: Array<[number, number, number]>) => {
+    let maxMin = 0;
+    for (const p of src) {
+      let minDist = Number.POSITIVE_INFINITY;
+      for (const q of dst) {
+        const dx = p[0] - q[0];
+        const dy = p[1] - q[1];
+        const dz = p[2] - q[2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < minDist) minDist = dist;
+      }
+      if (minDist > maxMin) maxMin = minDist;
+    }
+    return maxMin;
+  };
+  return Math.max(directed(aS, bS), directed(bS, aS));
+}
+
+function compareIntegralSignalToMetric(opts: {
+  signal: IntegralSignalAttachmentSnapshot | null;
+  metricRadiusM: [number | null, number | null, number | null];
+}): IntegralSignalComparison {
+  const signal = opts.signal;
+  const rx = Number(opts.metricRadiusM[0]);
+  const ry = Number(opts.metricRadiusM[1]);
+  const rz = Number(opts.metricRadiusM[2]);
+  if (!signal) {
+    return {
+      status: "unknown",
+      source: null,
+      updatedAtMs: null,
+      ageMs: null,
+      coveragePct: null,
+      depthMinM: null,
+      depthMaxM: null,
+      depthMeanM: null,
+      fitScalePxPerM: null,
+      fitZOffsetM: null,
+      fitSign: null,
+      rmsZResidualM: null,
+      maxAbsZResidualM: null,
+      hausdorffM: null,
+      sampleCount: null,
+      note: "integral signal unavailable",
+    };
+  }
+  if (!Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(rz) || rx <= 1e-9 || ry <= 1e-9 || rz <= 1e-9) {
+    return {
+      status: "unknown",
+      source: signal.source,
+      updatedAtMs: signal.updatedAtMs,
+      ageMs: Math.max(0, Date.now() - signal.updatedAtMs),
+      coveragePct: signal.coveragePct,
+      depthMinM: signal.depthMinM,
+      depthMaxM: signal.depthMaxM,
+      depthMeanM: signal.depthMeanM,
+      fitScalePxPerM: null,
+      fitZOffsetM: null,
+      fitSign: null,
+      rmsZResidualM: null,
+      maxAbsZResidualM: null,
+      hausdorffM: null,
+      sampleCount: signal.sampleCount,
+      note: "metric radii unavailable for integral comparison",
+    };
+  }
+  const width = signal.width;
+  const height = signal.height;
+  const cx = Math.max(1, (width - 1) * 0.5);
+  const cy = Math.max(1, (height - 1) * 0.5);
+  const total = width * height;
+  const stride = Math.max(1, Math.floor(Math.sqrt(total / 2200)));
+  const observed: Array<{ xn: number; yn: number; depth: number }> = [];
+  let maxAbsX = 0;
+  let maxAbsY = 0;
+  for (let y = 0; y < height; y += stride) {
+    for (let x = 0; x < width; x += stride) {
+      const idx = y * width + x;
+      if ((signal.maskU8[idx] ?? 0) <= 0) continue;
+      const depth = Number(signal.depthM[idx]);
+      if (!Number.isFinite(depth)) continue;
+      const xn = (x - cx) / cx;
+      const yn = (y - cy) / cy;
+      observed.push({ xn, yn, depth });
+      maxAbsX = Math.max(maxAbsX, Math.abs(xn));
+      maxAbsY = Math.max(maxAbsY, Math.abs(yn));
+    }
+  }
+  if (observed.length < 80 || maxAbsX < 1e-4 || maxAbsY < 1e-4) {
+    return {
+      status: "unknown",
+      source: signal.source,
+      updatedAtMs: signal.updatedAtMs,
+      ageMs: Math.max(0, Date.now() - signal.updatedAtMs),
+      coveragePct: signal.coveragePct,
+      depthMinM: signal.depthMinM,
+      depthMaxM: signal.depthMaxM,
+      depthMeanM: signal.depthMeanM,
+      fitScalePxPerM: null,
+      fitZOffsetM: null,
+      fitSign: null,
+      rmsZResidualM: null,
+      maxAbsZResidualM: null,
+      hausdorffM: null,
+      sampleCount: observed.length,
+      note: "integral signal has insufficient mask samples",
+    };
+  }
+
+  const k0 = Math.min(rx / maxAbsX, ry / maxAbsY);
+  const kMin = Math.max(1e-4, 0.45 * k0);
+  const kMax = Math.max(kMin * 1.05, 1.55 * k0);
+  let best:
+    | {
+        rms: number;
+        maxAbs: number;
+        k: number;
+        z0: number;
+        sign: number;
+        valid: number;
+      }
+    | null = null;
+  for (let i = 0; i <= 44; i += 1) {
+    const t = i / 44;
+    const k = kMin + (kMax - kMin) * t;
+    for (const sign of [-1, 1] as const) {
+      let sumZ0 = 0;
+      let valid = 0;
+      const wCache: number[] = [];
+      const dCache: number[] = [];
+      for (const p of observed) {
+        const q = 1 - Math.pow((k * p.xn) / rx, 2) - Math.pow((k * p.yn) / ry, 2);
+        if (q < 0) continue;
+        const w = Math.sqrt(Math.max(0, q));
+        wCache.push(w);
+        dCache.push(p.depth);
+        sumZ0 += p.depth - sign * rz * w;
+        valid += 1;
+      }
+      if (valid < 60) continue;
+      const z0 = sumZ0 / valid;
+      let sq = 0;
+      let maxAbs = 0;
+      for (let j = 0; j < valid; j += 1) {
+        const residual = dCache[j] - (z0 + sign * rz * wCache[j]);
+        sq += residual * residual;
+        maxAbs = Math.max(maxAbs, Math.abs(residual));
+      }
+      const rms = Math.sqrt(sq / valid);
+      if (!best || rms < best.rms) {
+        best = { rms, maxAbs, k, z0, sign, valid };
+      }
+    }
+  }
+  if (!best) {
+    return {
+      status: "fail",
+      source: signal.source,
+      updatedAtMs: signal.updatedAtMs,
+      ageMs: Math.max(0, Date.now() - signal.updatedAtMs),
+      coveragePct: signal.coveragePct,
+      depthMinM: signal.depthMinM,
+      depthMaxM: signal.depthMaxM,
+      depthMeanM: signal.depthMeanM,
+      fitScalePxPerM: null,
+      fitZOffsetM: null,
+      fitSign: null,
+      rmsZResidualM: null,
+      maxAbsZResidualM: null,
+      hausdorffM: null,
+      sampleCount: observed.length,
+      note: "integral fit failed (no valid shell overlap)",
+    };
+  }
+
+  const obsPoints: Array<[number, number, number]> = [];
+  for (const p of observed) {
+    const q = 1 - Math.pow((best.k * p.xn) / rx, 2) - Math.pow((best.k * p.yn) / ry, 2);
+    if (q < 0) continue;
+    obsPoints.push([best.k * p.xn, best.k * p.yn, p.depth - best.z0]);
+  }
+  const expectedPoints: Array<[number, number, number]> = [];
+  for (let y = 0; y < height; y += stride) {
+    for (let x = 0; x < width; x += stride) {
+      const xn = (x - cx) / cx;
+      const yn = (y - cy) / cy;
+      const q = 1 - Math.pow((best.k * xn) / rx, 2) - Math.pow((best.k * yn) / ry, 2);
+      if (q < 0) continue;
+      expectedPoints.push([best.k * xn, best.k * yn, best.sign * rz * Math.sqrt(Math.max(0, q))]);
+    }
+  }
+  const hausdorff = approximateHausdorff(obsPoints, expectedPoints);
+  const pxPerM = ((cx + cy) * 0.5) / Math.max(best.k, 1e-9);
+  const passRms = Math.max(0.08 * rz, 0.12);
+  const warnRms = Math.max(0.24 * rz, 0.45);
+  const passHausdorff = Math.max(0.3 * rz, 0.5);
+  const warnHausdorff = Math.max(0.8 * rz, 1.25);
+  const status: SolveOrderStatus =
+    best.rms <= passRms &&
+    best.maxAbs <= passRms * 2.2 &&
+    (hausdorff == null || hausdorff <= passHausdorff)
+      ? "pass"
+      : best.rms <= warnRms &&
+          best.maxAbs <= warnRms * 2.1 &&
+          (hausdorff == null || hausdorff <= warnHausdorff)
+        ? "warn"
+        : "fail";
+
+  return {
+    status,
+    source: signal.source,
+    updatedAtMs: signal.updatedAtMs,
+    ageMs: Math.max(0, Date.now() - signal.updatedAtMs),
+    coveragePct: signal.coveragePct,
+    depthMinM: signal.depthMinM,
+    depthMaxM: signal.depthMaxM,
+    depthMeanM: signal.depthMeanM,
+    fitScalePxPerM: Number.isFinite(pxPerM) ? pxPerM : null,
+    fitZOffsetM: best.z0,
+    fitSign: best.sign,
+    rmsZResidualM: best.rms,
+    maxAbsZResidualM: best.maxAbs,
+    hausdorffM: hausdorff,
+    sampleCount: best.valid,
+    note: `${signal.note ?? "integral signal"} | fit over depth+mask only`,
+  };
 }
 
 const latticeBasisSignature = (basis?: HullBasisResolved | null) => {
@@ -738,6 +1307,23 @@ void main(){
 }
 `;
 
+const GEO_BUNDLE_VERT = `#version 300 es
+layout(location=0) in vec2 a_pos;
+void main() {
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
+
+const GEO_BUNDLE_FRAG = `#version 300 es
+precision highp float;
+uniform vec3 u_color;
+uniform float u_alpha;
+out vec4 outColor;
+void main() {
+  outColor = vec4(u_color, u_alpha);
+}
+`;
+
 type MetricTooltipBadgeProps = {
   label: string;
   value: string;
@@ -1073,6 +1659,7 @@ export default function AlcubierrePanel({
   // Hull 3D health + diagnostics UI state
   const [hullHealth, setHullHealth] = useState<null | { pass: number; fail: number; results: Record<string, { pass: boolean; luma: number; alpha: number }> }>(null);
   const [hullDiagMsg, setHullDiagMsg] = useState<string | null>(null);
+  const [geodesicDiagnostics, setGeodesicDiagnostics] = useState<HullGeodesicDiagnostics | null>(null);
   const hullQualityOverridesRef = useRef<Hull3DQualityOverrides>({});
   const hullRafRef = useRef<number>(0);
   const progRef = useRef<WebGLProgram|null>(null);
@@ -1097,8 +1684,13 @@ export default function AlcubierrePanel({
     };
   }, [onCanvasReady]);
   const lastDriveLogRef = useRef(0);
+  const lastDisplacementLogRef = useRef(0);
+  const lastIntegralSignalDecodeRef = useRef(0);
+  const integralSignalRef = useRef<IntegralSignalAttachmentSnapshot | null>(null);
+  const [integralSignalVersion, bumpIntegralSignalVersion] = useReducer((n: number) => n + 1, 0);
+  const alcubierreDebugEnabledRef = useRef<boolean>(isAlcubierreDebugLogEnabled());
 
-const [planarVizMode, setPlanarVizMode] = useState<VizMode>(3); // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 theta_Hull3D
+  const [planarVizMode, setPlanarVizMode] = useState<VizMode>(3); // 0 frame, 1 energy, 2 drive, 3 world tube
   useEffect(() => {
     onPlanarVizModeChange?.(planarVizMode);
   }, [planarVizMode, onPlanarVizModeChange]);
@@ -1137,6 +1729,37 @@ const [skyboxMode, setSkyboxMode] = useState<Hull3DSkyboxMode>(() => {
   const raw = w.__hullSkyboxMode;
   return raw === "flat" || raw === "geodesic" ? raw : "geodesic";
 });
+const HULL_SAFE_BACKEND: HullRendererBackendMode = "mis-service";
+const [allowUnsafeRendererBackends] = useState<boolean>(() => {
+  if (typeof window === "undefined") return false;
+  const w: any = window;
+  if (w.__hullAllowUnsafeAutostart === true) return true;
+  try {
+    return window.localStorage.getItem("alcubierre.hull.allowUnsafeAutostart") === "1";
+  } catch {
+    return false;
+  }
+});
+const [hullRendererBackend, setHullRendererBackend] = useState<HullRendererBackendMode>(() => {
+  if (typeof window === "undefined") return HULL_SAFE_BACKEND;
+  const w: any = window;
+  const runtime = w.__hullRendererBackend;
+  const runtimeBackend =
+    runtime === "webgl" || runtime === "webgpu" || runtime === "mis-service" ? runtime : null;
+  let storedBackend: HullRendererBackendMode | null = null;
+  try {
+    const stored = window.localStorage.getItem("alcubierre.hull.rendererBackend");
+    if (stored === "webgl" || stored === "webgpu" || stored === "mis-service") {
+      storedBackend = stored;
+    }
+  } catch {
+    // localStorage may be unavailable in hardened browser contexts.
+  }
+  const preferred = runtimeBackend ?? storedBackend ?? HULL_SAFE_BACKEND;
+  const unsafe = preferred === "webgl" || preferred === "webgpu";
+  if (unsafe && !allowUnsafeRendererBackends) return HULL_SAFE_BACKEND;
+  return preferred;
+});
 const [hullVolumeVizLive, setHullVolumeVizLive] = useState<Hull3DVolumeViz>("theta_drive");
 const [hullVolumeDomain, setHullVolumeDomain] = useState<Hull3DVolumeDomain>("wallBand");
 const [volumeSource, setVolumeSource] = useState<HullVolumeSource>(() => {
@@ -1145,6 +1768,24 @@ const [volumeSource, setVolumeSource] = useState<HullVolumeSource>(() => {
   const raw = w.__hullVolumeSource;
   return raw === "analytic" || raw === "lattice" || raw === "brick" ? raw : "lattice";
 });
+  const emitAlcubierreDebugEvent = useCallback(
+    (event: Parameters<typeof pushAlcubierreDebugEvent>[0]) => {
+      if (!alcubierreDebugEnabledRef.current) return;
+      pushAlcubierreDebugEvent({
+        ...event,
+        mode: planarVizMode,
+        rendererBackend: hullRendererBackend,
+        skyboxMode,
+      });
+    },
+    [hullRendererBackend, planarVizMode, skyboxMode],
+  );
+  useEffect(() => {
+    alcubierreDebugEnabledRef.current = isAlcubierreDebugLogEnabled();
+    return subscribeAlcubierreDebugLogConfig((enabled) => {
+      alcubierreDebugEnabledRef.current = enabled;
+    });
+  }, []);
 const [bubbleBoundsMode, setBubbleBoundsMode] = useState<"tight" | "wide">("tight");
 const [bubbleOpacityHi, setBubbleOpacityHi] = useState(0.35);
 const bubbleOpacityWindow = useMemo<[number, number]>(() => {
@@ -1262,6 +1903,16 @@ useEffect(() => {
         showQIMargin: Boolean(showMarginRaw),
       };
     });
+  });
+  return () => {
+    unsubscribe(id);
+  };
+}, []);
+
+useEffect(() => {
+  const id = subscribe(DEFAULT_GEODESIC_DIAGNOSTICS_CHANNEL, (payload: any) => {
+    if (!payload || typeof payload !== "object") return;
+    setGeodesicDiagnostics(payload as HullGeodesicDiagnostics);
   });
   return () => {
     unsubscribe(id);
@@ -1714,6 +2365,43 @@ useEffect(() => {
     (window as any).__hullSkyboxMode = skyboxMode;
   }
 }, [skyboxMode]);
+useEffect(() => {
+  if (allowUnsafeRendererBackends) return;
+  if (hullRendererBackend === HULL_SAFE_BACKEND) return;
+  setHullDiagMsg(
+    "Safe mode forced MIS service renderer. Local WebGL/WebGPU backends are blocked to prevent browser hangs.",
+  );
+  setGlError("Renderer halted for safety: local GPU renderer disabled in safe mode.");
+  setHullRendererBackend(HULL_SAFE_BACKEND);
+}, [allowUnsafeRendererBackends, hullRendererBackend]);
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  (window as any).__hullRendererBackend = hullRendererBackend;
+  try {
+    window.localStorage.setItem("alcubierre.hull.rendererBackend", hullRendererBackend);
+  } catch {
+    // Ignore persistence failures; runtime global still applies.
+  }
+}, [hullRendererBackend]);
+  useEffect(() => {
+    emitAlcubierreDebugEvent({
+      level: "info",
+      category: "viewer_state",
+      source: "alcubierre.viewer.state",
+      note: "Viewer renderer/mode state changed",
+      expected: null,
+      rendered: {
+        planarVizMode,
+      },
+      delta: null,
+      measurements: {
+        hullRendererBackend,
+        skyboxMode,
+        volumeSource,
+        hullVolumeViz: hullVolumeVizLive,
+      },
+    });
+  }, [emitAlcubierreDebugEvent, hullRendererBackend, hullVolumeVizLive, planarVizMode, skyboxMode, volumeSource]);
 useEffect(() => {
   if (typeof window !== "undefined") {
     (window as any).__hullLatticeModeEnabled = latticeModeEnabled;
@@ -2767,17 +3455,6 @@ const res = 256;
       }),
     [hullPreview, wireframeLod, previewTargetDims, totalSectors],
   );
-  const previewMeshFallback = useMemo<HullPreviewMeshPayload | null>(() => {
-    if (!hullSurfaceMesh.surface) return null;
-    return {
-      key: `surface:${hullSurfaceMesh.surface.key}`,
-      positions: hullSurfaceMesh.surface.positions,
-      indices: hullSurfaceMesh.surface.indices ?? null,
-      uvs: null,
-      texture: null,
-      color: [0.67, 0.81, 0.95, 0.6],
-    };
-  }, [hullSurfaceMesh.surface]);
   const previewMeshFromGlb = useMemo<HullPreviewMeshPayload | null>(() => {
     if (!rawPreviewMesh) return null;
     const targetDims = previewTargetDims ?? undefined;
@@ -2800,8 +3477,8 @@ const res = 256;
     };
   }, [rawPreviewMesh, hullPreview?.mesh?.basis, hullPreview?.basis, hullPreview?.scale, previewTargetDims]);
   const previewMeshForRenderer = useMemo<HullPreviewMeshPayload | null>(
-    () => previewMeshFromGlb ?? previewMeshFallback,
-    [previewMeshFromGlb, previewMeshFallback],
+    () => previewMeshFromGlb,
+    [previewMeshFromGlb],
   );
 
   // sector "boost" term (visibility of a single active arc): Ã¢Ë†Å¡(w/f)
@@ -4832,6 +5509,16 @@ const res = 256;
     return rawYMid;
   }, [planarVizMode, lockBaseline, lockedBias, centerPlane, rawYMid, rawYBias]);
 
+  const metricAlpha = useMemo(() => {
+    const alphaRaw = Number((live as any)?.warp?.metricAdapter?.alpha);
+    return Number.isFinite(alphaRaw) && alphaRaw > 1e-6 ? alphaRaw : 1;
+  }, [live]);
+
+  const natarioLike = useMemo(() => {
+    const wf = String(warpFieldType ?? "").toLowerCase();
+    return wf.includes("natario");
+  }, [warpFieldType]);
+
   // Compute MVP to fit both horizontal (domain) and vertical (curvature) extents
   const mvp = useMemo(() => {
     const fovy = 40 * Math.PI/180;
@@ -4894,8 +5581,11 @@ const res = 256;
     R: 1,
     domainScale: 1,
     beta: 0,
+    alpha: 1,
+    natarioLike: false,
     thetaSign: 1,
     planarVizMode: 0 as VizMode,
+    skyboxMode: "off" as Hull3DSkyboxMode,
     volumeViz: "theta_drive" as Hull3DVolumeViz,
     volumeSource: "lattice" as HullVolumeSource,
     ampChain: 1,
@@ -4936,8 +5626,11 @@ const res = 256;
   dynRef.current.R = R;
   dynRef.current.domainScale = hullDomainScale;
   dynRef.current.beta = beta;
+  dynRef.current.alpha = metricAlpha;
+  dynRef.current.natarioLike = natarioLike;
   dynRef.current.thetaSign = thetaSign;
   dynRef.current.planarVizMode = planarVizMode;
+  dynRef.current.skyboxMode = skyboxMode;
   dynRef.current.volumeViz = hullVolumeVizLive;
   dynRef.current.volumeSource = volumeSource;
   (dynRef.current as any).volumeDomain = hullVolumeDomain;
@@ -4986,8 +5679,11 @@ const res = 256;
     dynRef.current.sigma = sigma;
     dynRef.current.R = R;
     dynRef.current.beta = beta;
+    dynRef.current.alpha = metricAlpha;
+    dynRef.current.natarioLike = natarioLike;
     dynRef.current.thetaSign = thetaSign;
     dynRef.current.planarVizMode = planarVizMode;
+    dynRef.current.skyboxMode = skyboxMode;
     dynRef.current.volumeViz = hullVolumeVizLive;
     dynRef.current.volumeSource = volumeSource;
     dynRef.current.ampChain = ampChain;
@@ -5022,7 +5718,7 @@ const res = 256;
   dynRef.current.previewMesh = previewMeshForRenderer;
   (dynRef.current as any).splitEnabled = ds.splitEnabled ? 1 : 0;
   (dynRef.current as any).splitFrac = ds.splitFrac;
-  }, [axes, sigma, R, beta, thetaSign, planarVizMode, hullVolumeVizLive, volumeSource, ampChain, gateRaw, gateView, gateSource, latticeUseDynamicWeights, dutyFR, yGainFinal, yBias, kColor, mvp, totalSectors, liveSectors, lumpBoostExp, sectorCenter01, gaussianSigma, ds.sectorFloor, syncMode, ds.phase01, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, ds.splitEnabled, ds.splitFrac, hullGeometry, hullRadiusLUT, hullSdf, hullDimsEffective, previewMeshForRenderer]);
+  }, [axes, sigma, R, beta, metricAlpha, natarioLike, thetaSign, planarVizMode, skyboxMode, hullVolumeVizLive, volumeSource, ampChain, gateRaw, gateView, gateSource, latticeUseDynamicWeights, dutyFR, yGainFinal, yBias, kColor, mvp, totalSectors, liveSectors, lumpBoostExp, sectorCenter01, gaussianSigma, ds.sectorFloor, syncMode, ds.phase01, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, ds.splitEnabled, ds.splitFrac, hullGeometry, hullRadiusLUT, hullSdf, hullDimsEffective, previewMeshForRenderer]);
 
   useEffect(() => {
     const fActiveRenderer = gateSource === "blanket" ? 1 : fActive;
@@ -5171,6 +5867,12 @@ const res = 256;
   let fallbackBuf: WebGLBuffer | null = null;
   let fallbackVAO: WebGLVertexArrayObject | null = null;
     let prog: WebGLProgram | null = null;
+    let geoBundleProgram: WebGLProgram | null = null;
+    let geoBundleVbo: WebGLBuffer | null = null;
+    let geoBundleLoc: {
+      u_color: WebGLUniformLocation | null;
+      u_alpha: WebGLUniformLocation | null;
+    } | null = null;
     let latticeSliceTex: WebGLTexture | null = null;
     let latticeSliceVersion = 0;
 
@@ -5393,6 +6095,34 @@ const res = 256;
       u_vizFloorThetaDrive: gl.getUniformLocation(prog, "u_vizFloorThetaDrive"),
     } as const;
 
+    const geoVs = compile(gl.VERTEX_SHADER, GEO_BUNDLE_VERT);
+    const geoFs = geoVs ? compile(gl.FRAGMENT_SHADER, GEO_BUNDLE_FRAG) : null;
+    if (geoVs && geoFs) {
+      const geoProg = gl.createProgram();
+      if (geoProg) {
+        gl.attachShader(geoProg, geoVs);
+        gl.attachShader(geoProg, geoFs);
+        gl.linkProgram(geoProg);
+        const geoOk = gl.getProgramParameter(geoProg, gl.LINK_STATUS);
+        const geoInfo = (gl.getProgramInfoLog(geoProg) || "").trim();
+        if (!geoOk) {
+          console.warn(
+            `[Alcubierre][GLSL][geodesic-bundle] program link failed: ${geoInfo || "(No info log)"}`
+          );
+          gl.deleteProgram(geoProg);
+        } else {
+          geoBundleProgram = geoProg;
+          geoBundleLoc = {
+            u_color: gl.getUniformLocation(geoProg, "u_color"),
+            u_alpha: gl.getUniformLocation(geoProg, "u_alpha"),
+          };
+          geoBundleVbo = gl.createBuffer();
+        }
+      }
+      gl.deleteShader(geoVs);
+      gl.deleteShader(geoFs);
+    }
+
     markError(null);
 
     let frame = 0;
@@ -5547,6 +6277,43 @@ const res = 256;
         }
       }
 
+      const skyMode = (d as any).skyboxMode as Hull3DSkyboxMode | undefined;
+      const drawGeodesicBundle = skyMode === "geodesic" || skyMode === "flat";
+      if (drawGeodesicBundle && geoBundleProgram && geoBundleVbo && geoBundleLoc) {
+        const flatMode = skyMode === "flat";
+        const bundle = buildNullGeodesicBundle1p1({
+          alpha: s((d as any).alpha ?? 1, 1),
+          beta: s(d.beta, 0),
+          sigma: Math.max(1e-3, s(d.sigma, 6)),
+          R: Math.max(1e-3, s(d.R, 1)),
+          axes: [s(d.axes[0], 1), s(d.axes[1], 1), s(d.axes[2], 1)],
+          domainScale: Math.max(0.1, s((d as any).domainScale, 1)),
+          natarioLike: Boolean((d as any).natarioLike),
+          flatMode,
+        });
+        const drawLineSet = (verts: Float32Array, color: [number, number, number], alpha: number) => {
+          if (!verts.length) return;
+          gl.bindBuffer(gl.ARRAY_BUFFER, geoBundleVbo);
+          gl.bufferData(gl.ARRAY_BUFFER, verts, gl.DYNAMIC_DRAW);
+          gl.enableVertexAttribArray(0);
+          gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+          if (geoBundleLoc.u_color) gl.uniform3f(geoBundleLoc.u_color, color[0], color[1], color[2]);
+          if (geoBundleLoc.u_alpha) gl.uniform1f(geoBundleLoc.u_alpha, alpha);
+          gl.drawArrays(gl.LINES, 0, Math.floor(verts.length / 2));
+        };
+        gl.useProgram(geoBundleProgram);
+        gl.bindVertexArray(null);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        const familyAlpha = flatMode ? 0.22 : 0.32;
+        const tubeAlpha = flatMode ? 0.12 : 0.2;
+        drawLineSet(bundle.minus, flatMode ? [0.65, 0.75, 0.9] : [0.35, 0.82, 0.95], familyAlpha);
+        drawLineSet(bundle.plus, flatMode ? [0.9, 0.78, 0.58] : [0.98, 0.72, 0.32], familyAlpha);
+        drawLineSet(bundle.worldtube, [0.85, 0.95, 1], tubeAlpha);
+        gl.disable(gl.BLEND);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      }
+
       checkError("drawArrays");
 
       if ((frame++ % 120) === 0) {
@@ -5579,7 +6346,9 @@ const res = 256;
       if (fallbackBuf) gl.deleteBuffer(fallbackBuf);
       if (vao) gl.deleteVertexArray(vao);
       if (vbo) gl.deleteBuffer(vbo);
+      if (geoBundleVbo) gl.deleteBuffer(geoBundleVbo);
       if (latticeSliceTex) gl.deleteTexture(latticeSliceTex);
+      if (geoBundleProgram) gl.deleteProgram(geoBundleProgram);
       if (prog) gl.deleteProgram(prog);
       cv.removeEventListener("webglcontextlost", lost);
       cv.removeEventListener("webglcontextrestored", restored);
@@ -5588,6 +6357,7 @@ const res = 256;
 
   useEffect(() => {
     if (planarVizMode !== 3) {
+      integralSignalRef.current = null;
       if (hullRafRef.current) {
         cancelAnimationFrame(hullRafRef.current);
         hullRafRef.current = 0;
@@ -5606,11 +6376,25 @@ const res = 256;
     if (!cv) return;
     let disposed = false;
     let usingWebGpu = false;
+    let usingMisService = false;
     let gl: WebGL2RenderingContext | null = null;
     let ro: ResizeObserver | null = null;
     let diagTimer: number | null = null;
+    let misTimer: number | null = null;
+    let misInFlight = false;
+    let misAbort: AbortController | null = null;
+    let misSeq = 0;
     let onLost: ((event: Event) => void) | null = null;
     let onRestored: (() => void) | null = null;
+    let runtimeGuardTimer: number | null = null;
+    let runtimeGuardTripped = false;
+    let runtimeGuardLongFrames = 0;
+    let runtimeGuardLastBeat =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const RUNTIME_GUARD_LONG_FRAME_MS = 950;
+    const RUNTIME_GUARD_LONG_FRAME_LIMIT = 3;
+    const RUNTIME_GUARD_HEARTBEAT_TIMEOUT_MS = 4500;
+    let lastRenderTransportDebugMs = 0;
 
     const startDiagPoll = () => {
       if (diagTimer) return;
@@ -5637,6 +6421,91 @@ const res = 256;
         hullRendererRef.current?.dispose();
       } catch {}
       hullRendererRef.current = null;
+    };
+
+    const cleanupMisService = () => {
+      if (misTimer) {
+        clearInterval(misTimer);
+        misTimer = null;
+      }
+      if (misAbort) {
+        try {
+          misAbort.abort();
+        } catch {
+          // no-op
+        }
+        misAbort = null;
+      }
+      misInFlight = false;
+      integralSignalRef.current = null;
+    };
+
+    const stopRuntimeGuard = () => {
+      if (runtimeGuardTimer) {
+        clearInterval(runtimeGuardTimer);
+        runtimeGuardTimer = null;
+      }
+    };
+
+    const tripRuntimeGuard = (reason: string) => {
+      if (runtimeGuardTripped || disposed) return;
+      runtimeGuardTripped = true;
+      stopRuntimeGuard();
+      const message = `Renderer halted for safety: ${reason}`;
+      console.error("[Alcubierre][Hull3D][RuntimeGuard]", reason);
+      setHullDiagMsg(message);
+      setGlError(message);
+      emitAlcubierreDebugEvent({
+        level: "error",
+        category: "runtime_guard",
+        source: "alcubierre.worldtube.runtime-guard",
+        note: reason,
+        expected: null,
+        rendered: {
+          long_frame_budget_ms: RUNTIME_GUARD_LONG_FRAME_MS,
+          long_frame_limit: RUNTIME_GUARD_LONG_FRAME_LIMIT,
+          heartbeat_timeout_ms: RUNTIME_GUARD_HEARTBEAT_TIMEOUT_MS,
+        },
+        delta: null,
+        measurements: {
+          usingWebGpu,
+          usingMisService,
+          runtimeGuardLongFrames,
+        },
+      });
+      if (hullRafRef.current) {
+        cancelAnimationFrame(hullRafRef.current);
+        hullRafRef.current = 0;
+      }
+      cleanupMisService();
+      if (usingWebGpu) {
+        try {
+          hullWebGpuRef.current?.dispose();
+        } catch {}
+        hullWebGpuRef.current = null;
+      } else {
+        cleanupWebGl();
+      }
+    };
+
+    const startRuntimeGuard = () => {
+      if (runtimeGuardTimer || runtimeGuardTripped) return;
+      runtimeGuardLastBeat =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      runtimeGuardTimer = window.setInterval(() => {
+        if (disposed || runtimeGuardTripped || planarVizMode !== 3) return;
+        if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+          runtimeGuardLastBeat = performance.now();
+          return;
+        }
+        const now = performance.now();
+        const stallMs = now - runtimeGuardLastBeat;
+        if (stallMs > RUNTIME_GUARD_HEARTBEAT_TIMEOUT_MS) {
+          tripRuntimeGuard(
+            `frame heartbeat timeout (${Math.round(stallMs)} ms without frame completion)`,
+          );
+        }
+      }, 1000);
     };
 
     const initWebGl = () => {
@@ -5735,41 +6604,357 @@ const res = 256;
       }
       if (usingWebGpu) {
         hullWebGpuRef.current?.resize(w, h);
+      } else if (usingMisService) {
+        const ctx2d = cv.getContext("2d", { alpha: false, desynchronized: true });
+        if (ctx2d) {
+          ctx2d.fillStyle = "#000";
+          ctx2d.fillRect(0, 0, w, h);
+        }
       } else if (gl) {
         gl.viewport(0, 0, w, h);
       }
       setAspect(w / Math.max(1, h));
     };
 
-    const loop = () => {
-      if (disposed || planarVizMode !== 3) return;
+    const drawMisFrame = async (dataUrl: string) => {
+      await new Promise<void>((resolve, reject) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.onload = () => {
+          if (disposed) {
+            resolve();
+            return;
+          }
+          const ctx2d = cv.getContext("2d", { alpha: false, desynchronized: true });
+          if (!ctx2d) {
+            reject(new Error("MIS renderer: 2D context unavailable"));
+            return;
+          }
+          ctx2d.clearRect(0, 0, cv.width, cv.height);
+          ctx2d.drawImage(image, 0, 0, cv.width, cv.height);
+          resolve();
+        };
+        image.onerror = () => reject(new Error("MIS renderer: image decode failed"));
+        image.src = dataUrl;
+      });
+    };
+
+    const requestMisFrame = async () => {
+      if (disposed || misInFlight || hullRendererBackend !== "mis-service") return;
+      misInFlight = true;
+      const abort = new AbortController();
+      misAbort = abort;
       const base = hullStateRef.current;
-      if (base) {
-        const config = hullConfigRef.current;
-        if (usingWebGpu) {
-          hullWebGpuRef.current?.update({ ...base, blendFactor: config.blend, timeSec: performance.now() / 1000 });
-          hullWebGpuRef.current?.draw();
-        } else {
-          const active = hullRendererRef.current;
-          if (active) {
-            active.setMode(config.mode, config.blend);
-            active.update({ ...base, blendFactor: config.blend, timeSec: performance.now() / 1000 });
-            active.draw();
-            startDiagPoll();
+      const metricLatest =
+        typeof window !== "undefined" ? (window as any).__hullMetricVolumeLatest : null;
+      const geodesicLatest =
+        typeof window !== "undefined"
+          ? (window as any).__hullGeodesicDiagnostics ?? null
+          : null;
+      const rawSkybox =
+        typeof window !== "undefined" ? (window as any).__hullSkyboxMode : "off";
+      const skyboxModeCurrent: HullMisRenderRequestV1["skyboxMode"] =
+        rawSkybox === "geodesic" || rawSkybox === "flat" ? rawSkybox : "off";
+      const solvePayload: NonNullable<HullMisRenderRequestV1["solve"]> = {
+        beta: Number(base?.beta ?? 0),
+        alpha: Number((base as any)?.alpha ?? 1),
+        sigma: Number(base?.sigma ?? 6),
+        R: Number(base?.R ?? 1),
+        chart:
+          typeof metricLatest?.chart === "string"
+            ? metricLatest.chart
+            : geodesicLatest?.chart ?? "comoving_cartesian",
+      };
+      const geodesicPayload: NonNullable<HullMisRenderRequestV1["geodesicDiagnostics"]> = {
+        mode: geodesicLatest?.mode ?? null,
+        consistency: geodesicLatest?.consistency ?? "unknown",
+        maxNullResidual: geodesicLatest?.maxNullResidual ?? null,
+        stepConvergence: geodesicLatest?.stepConvergence ?? null,
+        bundleSpread: geodesicLatest?.bundleSpread ?? null,
+      };
+      const metricSummaryPayload: HullMisRenderRequestV1["metricSummary"] = metricLatest
+        ? {
+            source: metricLatest.source ?? null,
+            chart: metricLatest.chart ?? null,
+            dims: Array.isArray(metricLatest.dims)
+              ? [metricLatest.dims[0], metricLatest.dims[1], metricLatest.dims[2]]
+              : null,
+            alphaRange: Array.isArray(metricLatest?.stats?.alpha)
+              ? [metricLatest.stats.alpha[0], metricLatest.stats.alpha[1]]
+              : geodesicLatest?.consistency === "ok"
+                ? [1, 1]
+                : null,
+            consistency: geodesicLatest?.consistency ?? "unknown",
+            updatedAt: Number(metricLatest.updatedAt ?? Date.now()),
+          }
+        : undefined;
+      const payload: HullMisRenderRequestV1 = {
+        version: 1,
+        requestId: `mis-${Date.now()}-${misSeq++}`,
+        width: Math.max(1, cv.width | 0),
+        height: Math.max(1, cv.height | 0),
+        dpr: Math.min(window.devicePixelRatio || 1, READABILITY_DPR_MAX),
+        backendHint: "mis-path-tracing",
+        timestampMs: Date.now(),
+        skyboxMode: skyboxModeCurrent,
+        scienceLane: {
+          requireIntegralSignal: true,
+          attachmentDownsample: 2,
+        },
+        solve: solvePayload,
+        geodesicDiagnostics: geodesicPayload,
+        metricSummary: metricSummaryPayload,
+      };
+      try {
+        const frame = await requestHullMisFrame(payload, abort.signal);
+        if (disposed) return;
+        await drawMisFrame(frame.imageDataUrl);
+        const nowDecodeMs = Date.now();
+        if (nowDecodeMs - lastIntegralSignalDecodeRef.current >= 1300) {
+          const integral = extractIntegralSignalAttachmentSnapshot(frame);
+          if (integral) {
+            integralSignalRef.current = integral;
+            lastIntegralSignalDecodeRef.current = nowDecodeMs;
+            bumpIntegralSignalVersion();
           }
         }
+        const modeFromSkybox: HullGeodesicDiagnostics["mode"] =
+          skyboxModeCurrent === "geodesic"
+            ? "full-3+1-christoffel"
+            : skyboxModeCurrent === "flat"
+              ? "flat-background"
+              : "disabled";
+        const remoteMode = frame.diagnostics?.geodesicMode;
+        const resolvedMode: HullGeodesicDiagnostics["mode"] =
+          remoteMode === "full-3+1-christoffel" ||
+          remoteMode === "reduced-1+1-fallback" ||
+          remoteMode === "flat-background" ||
+          remoteMode === "disabled"
+            ? remoteMode
+            : modeFromSkybox;
+        setGeodesicDiagnostics({
+          mode: resolvedMode,
+          scientificEnabled: true,
+          metricAvailable: true,
+          metricSource: metricSummaryPayload?.source ?? frame.provenance?.source ?? "mis-service",
+          chart: metricSummaryPayload?.chart ?? solvePayload.chart ?? null,
+          dims: metricSummaryPayload?.dims ?? null,
+          maxNullResidual:
+            frame.diagnostics?.maxNullResidual ?? geodesicPayload.maxNullResidual ?? null,
+          stepConvergence:
+            frame.diagnostics?.stepConvergence ?? geodesicPayload.stepConvergence ?? null,
+          bundleSpread:
+            frame.diagnostics?.bundleSpread ?? geodesicPayload.bundleSpread ?? null,
+          consistency:
+            frame.diagnostics?.consistency ??
+            geodesicPayload.consistency ??
+            "unknown",
+          consistencyNote:
+            frame.diagnostics?.note ??
+            (frame.backend === "proxy"
+              ? "remote MIS service frame"
+              : "local deterministic MIS fallback frame"),
+          steps: 0,
+          stepScale_m: 0,
+          updatedAt: Date.now(),
+        });
+        setHullDiagMsg(
+          frame.backend === "proxy"
+            ? "MIS service renderer active (remote proxy)."
+            : "MIS service renderer active (local deterministic fallback).",
+        );
+        const nowLogMs = Date.now();
+        if (nowLogMs - lastRenderTransportDebugMs > 1800) {
+          lastRenderTransportDebugMs = nowLogMs;
+          emitAlcubierreDebugEvent({
+            level: "info",
+            category: "render_transport",
+            source: "alcubierre.mis-frame.success",
+            note: frame.backend === "proxy" ? "remote proxy frame" : "local deterministic fallback frame",
+            expected: {
+              beta: solvePayload.beta,
+              alpha: solvePayload.alpha,
+              sigma: solvePayload.sigma,
+              R: solvePayload.R,
+              metric_max_null_residual: geodesicPayload.maxNullResidual,
+              metric_step_convergence: geodesicPayload.stepConvergence,
+              metric_bundle_spread: geodesicPayload.bundleSpread,
+            },
+            rendered: {
+              frame_max_null_residual: frame.diagnostics?.maxNullResidual ?? null,
+              frame_step_convergence: frame.diagnostics?.stepConvergence ?? null,
+              frame_bundle_spread: frame.diagnostics?.bundleSpread ?? null,
+            },
+            delta: {
+              null_residual_delta:
+                Number.isFinite(frame.diagnostics?.maxNullResidual as number) &&
+                Number.isFinite(geodesicPayload.maxNullResidual as number)
+                  ? Number(frame.diagnostics?.maxNullResidual) -
+                    Number(geodesicPayload.maxNullResidual)
+                  : null,
+            },
+            measurements: {
+              backend: frame.backend,
+              skyboxMode: skyboxModeCurrent,
+              geodesicMode: resolvedMode,
+              consistency: frame.diagnostics?.consistency ?? geodesicPayload.consistency ?? "unknown",
+              width: payload.width,
+              height: payload.height,
+            },
+          });
+        }
+      } catch (err) {
+        if (disposed) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setHullDiagMsg(`MIS service frame failed: ${message}`);
+        const nowMs = Date.now();
+        if (nowMs - lastRenderTransportDebugMs > 1800) {
+          lastRenderTransportDebugMs = nowMs;
+          emitAlcubierreDebugEvent({
+            level: "warn",
+            category: "render_transport",
+            source: "alcubierre.mis-frame.failure",
+            note: message,
+            expected: {
+              beta: solvePayload.beta,
+              alpha: solvePayload.alpha,
+              sigma: solvePayload.sigma,
+              R: solvePayload.R,
+            },
+            rendered: null,
+            delta: null,
+            measurements: {
+              skyboxMode: skyboxModeCurrent,
+              width: payload.width,
+              height: payload.height,
+            },
+          });
+        }
+      } finally {
+        misAbort = null;
+        misInFlight = false;
       }
+    };
+
+    const loop = () => {
+      if (disposed || runtimeGuardTripped || planarVizMode !== 3) return;
+      const frameStart = performance.now();
+      runtimeGuardLastBeat = frameStart;
+      try {
+        const base = hullStateRef.current;
+        if (base) {
+          const config = hullConfigRef.current;
+          if (usingWebGpu) {
+            hullWebGpuRef.current?.update({ ...base, blendFactor: config.blend, timeSec: performance.now() / 1000 });
+            hullWebGpuRef.current?.draw();
+          } else if (usingMisService) {
+            // Frames are driven by request timer; no per-frame GPU pass in this mode.
+          } else {
+            const active = hullRendererRef.current;
+            if (active) {
+              active.setMode(config.mode, config.blend);
+              active.update({ ...base, blendFactor: config.blend, timeSec: performance.now() / 1000 });
+              active.draw();
+              startDiagPoll();
+            }
+          }
+        }
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        tripRuntimeGuard(`runtime exception (${detail})`);
+        return;
+      }
+      const frameElapsed = performance.now() - frameStart;
+      runtimeGuardLastBeat = performance.now();
+      const frameNowMs = Date.now();
+      if (frameNowMs - lastRenderTransportDebugMs > 1500) {
+        lastRenderTransportDebugMs = frameNowMs;
+        const state = hullStateRef.current;
+        const betaExpected =
+          state && Number.isFinite(state.beta) ? Number(state.beta) : null;
+        const alphaExpected =
+          state && Number.isFinite((state as any)?.alpha) ? Number((state as any).alpha) : null;
+        const sigmaExpected =
+          state && Number.isFinite(state.sigma) ? Number(state.sigma) : null;
+        const radiusExpected =
+          state && Number.isFinite(state.R) ? Number(state.R) : null;
+        emitAlcubierreDebugEvent({
+          level: frameElapsed > RUNTIME_GUARD_LONG_FRAME_MS ? "warn" : "info",
+          category: "render_transport",
+          source: "alcubierre.worldtube.frame-loop",
+          note:
+            frameElapsed > RUNTIME_GUARD_LONG_FRAME_MS
+              ? "frame exceeded long-frame safety budget"
+              : "frame rendered within safety budget",
+          expected: {
+            beta: betaExpected,
+            alpha: alphaExpected,
+            sigma: sigmaExpected,
+            R: radiusExpected,
+          },
+          rendered: {
+            frame_ms: frameElapsed,
+          },
+          delta: {
+            frame_over_budget_ms: frameElapsed - RUNTIME_GUARD_LONG_FRAME_MS,
+          },
+          measurements: {
+            usingWebGpu,
+            usingMisService,
+            runtimeGuardLongFrames,
+          },
+        });
+      }
+      if (frameElapsed > RUNTIME_GUARD_LONG_FRAME_MS) {
+        runtimeGuardLongFrames += 1;
+        if (runtimeGuardLongFrames >= RUNTIME_GUARD_LONG_FRAME_LIMIT) {
+          tripRuntimeGuard(`frame time ${Math.round(frameElapsed)} ms exceeded safety budget`);
+          return;
+        }
+      } else {
+        runtimeGuardLongFrames = Math.max(0, runtimeGuardLongFrames - 1);
+      }
+      if (runtimeGuardTripped) return;
       hullRafRef.current = requestAnimationFrame(loop);
     };
 
     (async () => {
-      usingWebGpu = await initWebGpu();
+      if (hullRendererBackend === "mis-service") {
+        usingMisService = true;
+        try {
+          hullWebGpuRef.current?.dispose();
+        } catch {}
+        hullWebGpuRef.current = null;
+        cleanupWebGl();
+        gl = null;
+        glRef.current = null;
+        setGlError(null);
+        setHullDiagMsg("MIS service renderer initializing...");
+        resize();
+        ro = new ResizeObserver(resize);
+        ro.observe(cv);
+        await requestMisFrame();
+        if (disposed) return;
+        misTimer = window.setInterval(() => {
+          void requestMisFrame();
+        }, 450);
+        startRuntimeGuard();
+        hullRafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      usingWebGpu = hullRendererBackend === "webgpu" ? await initWebGpu() : false;
       if (disposed) {
         if (usingWebGpu) {
           hullWebGpuRef.current?.dispose();
           hullWebGpuRef.current = null;
         }
         return;
+      }
+      if (hullRendererBackend === "webgpu" && !usingWebGpu) {
+        setHullDiagMsg("WebGPU path tracer unavailable; using WebGL stable renderer.");
+      } else if (hullRendererBackend === "webgl") {
+        setHullDiagMsg(null);
       }
       if (!usingWebGpu) {
         const ok = initWebGl();
@@ -5778,6 +6963,7 @@ const res = 256;
       resize();
       ro = new ResizeObserver(resize);
       ro.observe(cv);
+      startRuntimeGuard();
       hullRafRef.current = requestAnimationFrame(loop);
     })();
 
@@ -5787,15 +6973,17 @@ const res = 256;
         cancelAnimationFrame(hullRafRef.current);
         hullRafRef.current = 0;
       }
+      stopRuntimeGuard();
       if (ro) ro.disconnect();
       stopDiagPoll();
+      cleanupMisService();
       if (usingWebGpu) {
         hullWebGpuRef.current?.dispose();
         hullWebGpuRef.current = null;
       }
       cleanupWebGl();
     };
-  }, [planarVizMode]);
+  }, [planarVizMode, hullRendererBackend]);
 
   // Runtime diagnostics: warn if pipeline data absent for extended time
   useEffect(()=>{
@@ -5909,6 +7097,56 @@ const res = 256;
     if (now - lastDriveLogRef.current < 1000) return;
     lastDriveLogRef.current = now;
     const span = Number.isFinite(thetaMax) && Number.isFinite(thetaMin) ? thetaMax - thetaMin : null;
+    emitAlcubierreDebugEvent({
+      level: thetaAudit && thetaAudit.deviation > 10 ? "warn" : "info",
+      category: "calc_vs_render",
+      source: "alcubierre.theta-drive",
+      note: thetaAudit
+        ? `theta audit deviation=${thetaAudit.deviation.toFixed(2)}%`
+        : "theta audit unavailable",
+      expected: {
+        theta_expected,
+        theta_peak,
+        theta_scale_expected: thetaScaleExpected,
+        theta_drive_est: thetaDrive_est,
+      },
+      rendered: {
+        theta_tail_peak: thetaPk,
+        theta_pk_pos: thetaPkPos,
+        theta_max: thetaMax,
+        theta_min: thetaMin,
+        y_gain: yGain,
+        y_bias: yBias,
+        gate_raw: gateRaw,
+        gate_view: gate,
+      },
+      delta: {
+        drive_minus_scale_expected:
+          Number.isFinite(thetaDrive_est) && Number.isFinite(thetaScaleExpected as number)
+            ? thetaDrive_est - Number(thetaScaleExpected)
+            : null,
+        peak_minus_expected:
+          Number.isFinite(theta_peak) && Number.isFinite(theta_expected)
+            ? theta_peak - theta_expected
+            : null,
+        tail_minus_expected:
+          Number.isFinite(thetaPk) && Number.isFinite(theta_expected)
+            ? thetaPk - theta_expected
+            : null,
+        theta_span: span,
+        audit_diff_pct: thetaAudit?.diffPct ?? null,
+      },
+      measurements: {
+        beta,
+        ampChain,
+        dutyFR,
+        sectorFloor: ds.sectorFloor,
+        sigmaSectors: ds.sigmaSectors,
+        syncScheduler,
+        sectorCenter01,
+        gaussianSigma,
+      },
+    });
     console.debug("[Alcubierre ÃŽÂ¸Drive]", {
       beta,
       ampChain,
@@ -5941,7 +7179,7 @@ const res = 256;
         theta_drive_est: thetaDrive_est,
       });
     }
-  }, [planarVizMode, beta, ampChain, gate, gateRaw, dutyFR, yGain, theta_expected, theta_peak, thetaPkPos, thetaMax, thetaMin, thetaDrive_est, thetaScaleExpected, thetaAudit, ds.sectorFloor, ds.sigmaSectors, syncScheduler, sectorCenter01, gaussianSigma, ds]);
+  }, [planarVizMode, beta, ampChain, gate, gateRaw, dutyFR, yGain, yBias, theta_expected, theta_peak, thetaPk, thetaPkPos, thetaMax, thetaMin, thetaDrive_est, thetaScaleExpected, thetaAudit, ds.sectorFloor, ds.sigmaSectors, syncScheduler, sectorCenter01, gaussianSigma, ds, emitAlcubierreDebugEvent]);
 
   // --- DEBUG comparative logging: listen for helix:phys:bundle events broadcast from helix-core
   useEffect(() => {
@@ -5974,12 +7212,42 @@ const res = 256;
       const gammaPanel = Number(panelSig.gammaVdB_panel);
       const gammaCore = Number(coreSig.gammaVdB_show ?? coreSig.gammaVdB_real);
       if ((dutyPanel < 1e-6 && dutyCore > 1e-4) || (gammaPanel < 2 && gammaCore > 10)) {
+        emitAlcubierreDebugEvent({
+          level: "warn",
+          category: "metric",
+          source: "alcubierre.helix-phys-bundle",
+          note: "Panel diagnostics diverged from helix-core comparative bundle",
+          expected: {
+            duty_core: dutyCore,
+            gamma_core: gammaCore,
+          },
+          rendered: {
+            duty_panel: dutyPanel,
+            gamma_panel: gammaPanel,
+          },
+          delta: {
+            duty_delta:
+              Number.isFinite(dutyPanel) && Number.isFinite(dutyCore)
+                ? dutyPanel - dutyCore
+                : null,
+            gamma_delta:
+              Number.isFinite(gammaPanel) && Number.isFinite(gammaCore)
+                ? gammaPanel - gammaCore
+                : null,
+          },
+          measurements: {
+            ampChain_panel: Number(panelSig.ampChain_panel),
+            gate_panel: Number(panelSig.gate_panel),
+            gate_view_panel: Number(panelSig.gate_view_panel),
+            eventTs: Number(ts),
+          },
+        });
         console.warn('[AlcubierrePanelÃ¢â€ â€helix-core mismatch]', { ts, panelSig, coreSig });
       }
     };
     window.addEventListener('helix:phys:bundle' as any, handler as any);
     return () => window.removeEventListener('helix:phys:bundle' as any, handler as any);
-  }, [ampChain, gateRaw, gate, live]);
+  }, [ampChain, gateRaw, gate, live, emitAlcubierreDebugEvent]);
 
   const sectorUtilSummary = useMemo(() => {
     const totalRaw = Number(totalSectors);
@@ -6275,6 +7543,736 @@ const res = 256;
       title: `expected=${expected}, est=${estimate}, diffPct=${delta ?? "--"}, deviation=${audit.deviation ?? "--"}`,
     };
   }, [thetaScaleExpected, thetaAudit]);
+  const solveOrderSnapshot = useMemo<SolveOrderSnapshot>(() => {
+    const liveAny = (live as any) ?? {};
+    const warp = (liveAny.warp ?? {}) as Record<string, any>;
+    const nat = (liveAny.natario ?? {}) as Record<string, any>;
+    const adapter = (warp.metricAdapter ?? {}) as Record<string, any>;
+    const chart = (adapter.chart ?? {}) as Record<string, any>;
+    const betaDiag = (adapter.betaDiagnostics ?? {}) as Record<string, any>;
+    const metricStress = (warp.metricStressDiagnostics ?? {}) as Record<string, any>;
+    const metricContract = (warp.metricT00Contract ?? {}) as Record<string, any>;
+    const viability = (liveAny.warpViability ?? {}) as Record<string, any>;
+    const viabilityConstraints = Array.isArray(viability.constraints) ? viability.constraints : [];
+    const gr = (liveAny.gr ?? {}) as Record<string, any>;
+    const grConstraints = (gr.constraints ?? {}) as Record<string, any>;
+    const hConstraint = (grConstraints.H_constraint ?? {}) as Record<string, any>;
+    const mConstraint = (grConstraints.M_constraint ?? {}) as Record<string, any>;
+    const grContractLike =
+      (liveAny.grConstraintContract ?? liveAny.grConstraint ?? liveAny.grGrounding ?? {}) as Record<
+        string,
+        any
+      >;
+    const grGate = (grContractLike.gate ?? liveAny.grConstraintGate ?? {}) as Record<string, any>;
+    const gateThresholds = (grGate.thresholds ?? {}) as Record<string, any>;
+    const gatePolicy = (grGate.policy ?? {}) as Record<string, any>;
+    const viabilitySnapshot = (
+      viability.snapshot ??
+      viability.certificate?.payload?.snapshot ??
+      {}
+    ) as Record<string, any>;
+    const grGuardrails = (viabilitySnapshot.grGuardrails ?? {}) as Record<string, any>;
+    const grGuardH = (grGuardrails.H_constraint ?? {}) as Record<string, any>;
+    const grGuardM = (grGuardrails.M_constraint ?? {}) as Record<string, any>;
+
+    const pickNum = (...values: unknown[]): number | null => {
+      for (const value of values) {
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) return numeric;
+      }
+      return null;
+    };
+    const pickBool = (...values: unknown[]): boolean | null => {
+      for (const value of values) {
+        if (value === true || value === false) return value;
+      }
+      return null;
+    };
+    const pickStr = (...values: unknown[]): string | null => {
+      for (const value of values) {
+        if (typeof value === "string" && value.trim().length) return value.trim();
+      }
+      return null;
+    };
+
+    const classifyStatus = (raw: string | null): SolveOrderStatus => {
+      if (!raw) return "unknown";
+      const normalized = raw.trim().toLowerCase();
+      if (
+        normalized.includes("pass") ||
+        normalized.includes("ok") ||
+        normalized.includes("aligned") ||
+        normalized.includes("admissible")
+      ) {
+        return "pass";
+      }
+      if (
+        normalized.includes("fail") ||
+        normalized.includes("mismatch") ||
+        normalized.includes("violation") ||
+        normalized.includes("inadmissible")
+      ) {
+        return "fail";
+      }
+      if (
+        normalized.includes("warn") ||
+        normalized.includes("partial") ||
+        normalized.includes("pending") ||
+        normalized.includes("unknown")
+      ) {
+        return "warn";
+      }
+      return "warn";
+    };
+
+    const family = pickStr(adapter.family, warp.family, liveAny.warpFieldType, nat.metricMode ? "natario" : null);
+    const chartLabel = pickStr(chart.label, nat.chartLabel);
+    const chartContractStatus = pickStr(chart.contractStatus, chart.contract_status, nat.chartContractStatus);
+    const chartContractReason = pickStr(chart.contractReason, chart.contract_reason);
+    const dtGammaPolicy = pickStr(chart.dtGammaPolicy, nat.chartDtGammaPolicy);
+    const coordinateMap = pickStr(chart.coordinateMap, chart.coordinate_map);
+    const alpha = pickNum(adapter.alpha);
+    const gammaDiagRaw = Array.isArray(adapter.gammaDiag) ? adapter.gammaDiag : null;
+    const gammaDiag =
+      gammaDiagRaw && gammaDiagRaw.length >= 3
+        ? ([Number(gammaDiagRaw[0]), Number(gammaDiagRaw[1]), Number(gammaDiagRaw[2])] as [number, number, number])
+        : null;
+
+    const betaMethod = pickStr(betaDiag.method, adapter.betaSource);
+    const thetaMax = pickNum(betaDiag.thetaMax, betaDiag.theta_max);
+    const thetaRms = pickNum(betaDiag.thetaRms, betaDiag.theta_rms);
+    const curlMax = pickNum(betaDiag.curlMax, betaDiag.curl_max);
+    const curlRms = pickNum(betaDiag.curlRms, betaDiag.curl_rms);
+    const thetaConformalMax = pickNum(betaDiag.thetaConformalMax, betaDiag.theta_conformal_max);
+    const thetaConformalRms = pickNum(betaDiag.thetaConformalRms, betaDiag.theta_conformal_rms);
+    const bPrimeOverBMax = pickNum(betaDiag.bPrimeOverBMax, betaDiag.bprime_over_b_max);
+    const bDoubleOverBMax = pickNum(betaDiag.bDoubleOverBMax, betaDiag.bdouble_over_b_max);
+    const metricSampleCount = pickNum(betaDiag.sampleCount, betaDiag.sample_count);
+    const metricStepM = pickNum(betaDiag.step_m, betaDiag.stepM);
+    const betaNote = pickStr(betaDiag.note, betaDiag.notes?.[0]);
+
+    const thetaGeom = pickNum(liveAny.theta_geom, thetaMax, thetaRms);
+    const kTraceMean = pickNum(liveAny.metric_k_trace_mean, metricStress.kTraceMean, metricStress.k_trace_mean);
+    let parity: "aligned" | "mismatch" | "unknown" = "unknown";
+    let parityNote = "Need theta_geom and K_trace to verify theta = -K parity.";
+    if (thetaGeom !== null && kTraceMean !== null) {
+      if (Math.abs(thetaGeom) < 1e-12 || Math.abs(kTraceMean) < 1e-12) {
+        parity = "unknown";
+        parityNote = "Near-zero theta or K_trace; parity not stable for sign auditing.";
+      } else {
+        const signTheta = Math.sign(thetaGeom);
+        const signNegK = Math.sign(-kTraceMean);
+        parity = signTheta === signNegK ? "aligned" : "mismatch";
+        parityNote =
+          parity === "aligned"
+            ? "theta sign is consistent with theta = -K in this snapshot."
+            : "theta sign disagrees with theta = -K for this snapshot.";
+      }
+    }
+
+    const natarioConstraint = pickBool(liveAny.natarioConstraint);
+
+    const stressRef = pickStr(warp.metricT00Ref, nat.metricT00Ref, liveAny.qi_rho_source);
+    const stressSource = pickStr(warp.metricT00Source, nat.metricT00Source, nat.metricSource);
+    const stressContractStatus = pickStr(metricContract.status, metricContract.contractStatus, nat.metricT00ContractStatus);
+    const stressContractReason = pickStr(metricContract.reason, metricContract.contractReason, nat.metricT00ContractReason);
+    const stressObserver = pickStr(metricContract.observer, nat.metricT00Observer);
+    const stressNormalization = pickStr(metricContract.normalization, nat.metricT00Normalization);
+    const stressUnitSystem = pickStr(metricContract.unitSystem, nat.metricT00UnitSystem);
+    const rhoGeomMean = pickNum(metricStress.rhoGeomMean, metricStress.rho_geom_mean);
+    const rhoSiMean = pickNum(metricStress.rhoSiMean, metricStress.rho_si_mean);
+    const stressSampleCount = pickNum(metricStress.sampleCount, metricStress.sample_count);
+    const stressStepM = pickNum(metricStress.step_m, metricStress.stepM);
+    const stressScaleM = pickNum(metricStress.scale_m, metricStress.scaleM);
+
+    const tauLCms = pickNum(lightLoop?.tauLC_ms);
+    const burstMs = pickNum(lightLoop?.burst_ms);
+    const dwellMs = pickNum(lightLoop?.dwell_ms);
+    const dutyPct =
+      burstMs !== null && dwellMs !== null && burstMs + dwellMs > 0
+        ? (burstMs / (burstMs + dwellMs)) * 100
+        : null;
+
+    const zetaValue = pickNum((sharedComplianceState as any)?.zeta?.value, liveAny.zeta);
+    const zetaLimit = pickNum((sharedComplianceState as any)?.zeta?.limit);
+    const tsRatio = pickNum(liveAny.TS_ratio);
+    const fordRomanCompliance = pickBool(liveAny.fordRomanCompliance);
+    const viabilityStatus = pickStr(
+      viability.status,
+      viability.certificate?.payload?.status,
+      viability.certificate?.status,
+    );
+    const certificateHash = pickStr(viability.certificateHash, viability.certificate?.certificateHash);
+    const integrityOk = pickBool(viability.integrityOk, viability.certificate?.integrityOk);
+    const firstHardFailFromConstraint = viabilityConstraints.find((entry) => {
+      if (!entry || typeof entry !== "object") return false;
+      const status = String((entry as any).status ?? "").toLowerCase();
+      const severity = String((entry as any).severity ?? "").toUpperCase();
+      return status === "fail" && severity === "HARD";
+    });
+    const firstAnyFail = viabilityConstraints.find((entry) => {
+      if (!entry || typeof entry !== "object") return false;
+      const status = String((entry as any).status ?? "").toLowerCase();
+      return status === "fail";
+    });
+    const firstHardFail = pickStr(
+      (firstHardFailFromConstraint as any)?.id,
+      (firstAnyFail as any)?.id,
+      viability.firstFail,
+    );
+
+    const H_rms = pickNum(hConstraint.rms, grGuardH.rms);
+    const M_rms = pickNum(mConstraint.rms, grGuardM.rms);
+    const H_maxAbs = pickNum(hConstraint.maxAbs, hConstraint.max_abs, grGuardH.maxAbs);
+    const M_maxAbs = pickNum(mConstraint.maxAbs, mConstraint.max_abs, grGuardM.maxAbs);
+    const H_rms_max = pickNum(gateThresholds.H_rms_max, grGuardH.threshold, 1e-2);
+    const M_rms_max = pickNum(gateThresholds.M_rms_max, grGuardM.threshold, 1e-3);
+    const H_maxAbs_max = pickNum(gateThresholds.H_maxAbs_max, 1e-1);
+    const M_maxAbs_max = pickNum(gateThresholds.M_maxAbs_max, 1e-2);
+    const classifyGateStatus = (raw: string | null): "pass" | "fail" | "unknown" | null => {
+      if (!raw) return null;
+      const normalized = raw.trim().toLowerCase();
+      if (normalized.includes("pass") || normalized.includes("ok")) return "pass";
+      if (normalized.includes("fail") || normalized.includes("blocked")) return "fail";
+      if (normalized.includes("unknown") || normalized.includes("pending")) return "unknown";
+      return "unknown";
+    };
+    const computedGateStatus = (() => {
+      if (
+        Number.isFinite(H_rms ?? NaN) &&
+        Number.isFinite(M_rms ?? NaN) &&
+        Number.isFinite(H_rms_max ?? NaN) &&
+        Number.isFinite(M_rms_max ?? NaN)
+      ) {
+        return (H_rms as number) <= (H_rms_max as number) && (M_rms as number) <= (M_rms_max as number)
+          ? "pass"
+          : "fail";
+      }
+      return "unknown";
+    })();
+    const gateStatus =
+      classifyGateStatus(pickStr(grGate.status, viabilitySnapshot.gr_constraint_gate_status)) ?? computedGateStatus;
+    const gateMode = pickStr(gatePolicy.mode);
+    const gateUnknownAsFail = pickBool(gatePolicy.unknownAsFail);
+    const constraintSource = (() => {
+      if (
+        Number.isFinite(hConstraint.rms) ||
+        Number.isFinite(hConstraint.maxAbs) ||
+        Number.isFinite(mConstraint.rms) ||
+        Number.isFinite(mConstraint.maxAbs)
+      ) {
+        return "pipeline.gr.constraints";
+      }
+      if (
+        Number.isFinite(grGuardH.rms) ||
+        Number.isFinite(grGuardM.rms) ||
+        Number.isFinite(grGuardH.maxAbs) ||
+        Number.isFinite(grGuardM.maxAbs)
+      ) {
+        return "warpViability.snapshot.grGuardrails";
+      }
+      return "unavailable";
+    })();
+    const observationTimeIso = pickStr(viability.certificate?.header?.issuedAt);
+    const observationTimeIsoMs =
+      observationTimeIso != null ? (Number.isFinite(Date.parse(observationTimeIso)) ? Date.parse(observationTimeIso) : null) : null;
+    const observationTimeMs = pickNum(gr.updatedAt, viability.updatedAt, observationTimeIsoMs, liveAny.updatedAt);
+    const geodesicMode = geodesicDiagnostics?.mode ?? null;
+    const worldtubeModeSource = (() => {
+      if (planarVizMode === 3) {
+        if (hullRendererBackend === "mis-service") return "mis-service-path-tracer";
+        if (hullRendererBackend === "webgpu") return "webgpu-pathtracer";
+        if (skyboxMode === "geodesic") {
+          if (geodesicMode === "full-3+1-christoffel") {
+            return "webgl-hull-raymarch+null-geodesic-3p1-christoffel";
+          }
+          if (geodesicMode === "reduced-1+1-fallback") {
+            return "webgl-hull-raymarch+null-geodesic-1p1-fallback";
+          }
+          return "webgl-hull-raymarch+null-geodesic-auto";
+        }
+        if (skyboxMode === "flat") return "webgl-hull-raymarch+flat-sky";
+        return "webgl-hull-raymarch";
+      }
+      if (hullRendererBackend === "webgl" && skyboxMode === "geodesic") {
+        if (geodesicMode === "full-3+1-christoffel") return "webgl-3p1-null-geodesic-bundle";
+        if (geodesicMode === "reduced-1+1-fallback") return "webgl-1p1-null-geodesic-bundle-fallback";
+        return "webgl-null-geodesic-bundle-auto";
+      }
+      if (hullRendererBackend === "webgl" && skyboxMode === "flat") {
+        return "webgl-1p1-null-bundle-flat";
+      }
+      if (hullRendererBackend === "mis-service") {
+        return "mis-service-frame-lane";
+      }
+      return "mixed-lens-shell";
+    })();
+    const metricVolumeLatest =
+      typeof window !== "undefined"
+        ? ((window as any).__hullMetricVolumeLatest as HullMetricVolumeContract | null | undefined)
+        : null;
+    const metricVolume =
+      metricVolumeLatest &&
+      metricVolumeLatest.kind === "hull3d:metric-volume" &&
+      Array.isArray(metricVolumeLatest.dims) &&
+      metricVolumeLatest.dims.length >= 3
+        ? metricVolumeLatest
+        : null;
+    const metricDims: [number, number, number] | null = metricVolume
+      ? [
+          Math.max(1, Math.floor(Number(metricVolume.dims[0]) || 1)),
+          Math.max(1, Math.floor(Number(metricVolume.dims[1]) || 1)),
+          Math.max(1, Math.floor(Number(metricVolume.dims[2]) || 1)),
+        ]
+      : null;
+    const metricBounds = metricVolume?.bounds;
+    const metricSpacingM: [number, number, number] | null =
+      metricDims &&
+      metricBounds &&
+      Array.isArray(metricBounds.min) &&
+      Array.isArray(metricBounds.max) &&
+      metricBounds.min.length >= 3 &&
+      metricBounds.max.length >= 3
+        ? [
+            Number.isFinite(metricVolume?.voxelSize_m?.[0] as number)
+              ? Math.max(1e-6, Number(metricVolume?.voxelSize_m?.[0]))
+              : Math.max(1e-6, Math.abs(Number(metricBounds.max[0]) - Number(metricBounds.min[0])) / metricDims[0]),
+            Number.isFinite(metricVolume?.voxelSize_m?.[1] as number)
+              ? Math.max(1e-6, Number(metricVolume?.voxelSize_m?.[1]))
+              : Math.max(1e-6, Math.abs(Number(metricBounds.max[1]) - Number(metricBounds.min[1])) / metricDims[1]),
+            Number.isFinite(metricVolume?.voxelSize_m?.[2] as number)
+              ? Math.max(1e-6, Number(metricVolume?.voxelSize_m?.[2]))
+              : Math.max(1e-6, Math.abs(Number(metricBounds.max[2]) - Number(metricBounds.min[2])) / metricDims[2]),
+          ]
+        : metricDims
+          ? [1, 1, 1]
+          : null;
+    const metricCellTotal = metricDims ? metricDims[0] * metricDims[1] * metricDims[2] : 0;
+    let displacementMetricChannel: string | null = null;
+    let displacementMetricData: Float32Array | null = null;
+    if (metricVolume && metricDims && metricCellTotal > 0 && metricVolume.channels) {
+      for (const name of METRIC_DISPLACEMENT_CHANNEL_PRIORITY) {
+        const channel = metricVolume.channels[name];
+        if (
+          channel &&
+          channel.data instanceof Float32Array &&
+          channel.data.length >= metricCellTotal
+        ) {
+          displacementMetricChannel = name;
+          displacementMetricData = channel.data;
+          break;
+        }
+      }
+    }
+    const metricSampleX =
+      displacementMetricData && metricDims && metricSpacingM
+        ? sampleMetricAxisRadius({
+            data: displacementMetricData,
+            dims: metricDims,
+            spacingM: metricSpacingM,
+            axis: 0,
+          })
+        : { radiusM: null, symmetryErrorM: null, peakAbs: null, sampleCount: 0 };
+    const metricSampleY =
+      displacementMetricData && metricDims && metricSpacingM
+        ? sampleMetricAxisRadius({
+            data: displacementMetricData,
+            dims: metricDims,
+            spacingM: metricSpacingM,
+            axis: 1,
+          })
+        : { radiusM: null, symmetryErrorM: null, peakAbs: null, sampleCount: 0 };
+    const metricSampleZ =
+      displacementMetricData && metricDims && metricSpacingM
+        ? sampleMetricAxisRadius({
+            data: displacementMetricData,
+            dims: metricDims,
+            spacingM: metricSpacingM,
+            axis: 2,
+          })
+        : { radiusM: null, symmetryErrorM: null, peakAbs: null, sampleCount: 0 };
+    const metricRadiusM: [number | null, number | null, number | null] = [
+      metricSampleX.radiusM,
+      metricSampleY.radiusM,
+      metricSampleZ.radiusM,
+    ];
+    const renderedRadiusM: [number | null, number | null, number | null] = [
+      Number.isFinite(axes[0] * R) ? Math.max(0, Math.abs(axes[0] * R)) : null,
+      Number.isFinite(axes[1] * R) ? Math.max(0, Math.abs(axes[1] * R)) : null,
+      Number.isFinite(axes[2] * R) ? Math.max(0, Math.abs(axes[2] * R)) : null,
+    ];
+    const axisDeltaM: [number | null, number | null, number | null] = [
+      metricRadiusM[0] != null && renderedRadiusM[0] != null ? renderedRadiusM[0] - metricRadiusM[0] : null,
+      metricRadiusM[1] != null && renderedRadiusM[1] != null ? renderedRadiusM[1] - metricRadiusM[1] : null,
+      metricRadiusM[2] != null && renderedRadiusM[2] != null ? renderedRadiusM[2] - metricRadiusM[2] : null,
+    ];
+    const axisDeltaPct: [number | null, number | null, number | null] = [
+      axisDeltaM[0] != null && metricRadiusM[0] != null && metricRadiusM[0] > 1e-9
+        ? (axisDeltaM[0] / metricRadiusM[0]) * 100
+        : null,
+      axisDeltaM[1] != null && metricRadiusM[1] != null && metricRadiusM[1] > 1e-9
+        ? (axisDeltaM[1] / metricRadiusM[1]) * 100
+        : null,
+      axisDeltaM[2] != null && metricRadiusM[2] != null && metricRadiusM[2] > 1e-9
+        ? (axisDeltaM[2] / metricRadiusM[2]) * 100
+        : null,
+    ];
+    const finiteAxisDeltas = axisDeltaM.filter((value): value is number => Number.isFinite(value as number));
+    const finiteMetricRadii = metricRadiusM.filter((value): value is number => Number.isFinite(value as number));
+    const rmsDeltaM =
+      finiteAxisDeltas.length > 0
+        ? Math.sqrt(
+            finiteAxisDeltas.reduce((sum, value) => sum + value * value, 0) /
+              finiteAxisDeltas.length,
+          )
+        : null;
+    const maxAbsDeltaM =
+      finiteAxisDeltas.length > 0
+        ? Math.max(...finiteAxisDeltas.map((value) => Math.abs(value)))
+        : null;
+    const metricRadiusMeanM =
+      finiteMetricRadii.length > 0
+        ? finiteMetricRadii.reduce((sum, value) => sum + value, 0) / finiteMetricRadii.length
+        : null;
+    const rmsDeltaPct =
+      rmsDeltaM != null && metricRadiusMeanM != null && metricRadiusMeanM > 1e-9
+        ? (rmsDeltaM / metricRadiusMeanM) * 100
+        : null;
+    const worldtubeRadiusM =
+      renderedRadiusM[0] != null
+        ? renderedRadiusM[0]
+        : renderedRadiusM.find((value): value is number => Number.isFinite(value as number)) ?? null;
+    const worldtubeDeltaM =
+      worldtubeRadiusM != null && metricRadiusM[0] != null
+        ? worldtubeRadiusM - metricRadiusM[0]
+        : worldtubeRadiusM != null && metricRadiusMeanM != null
+          ? worldtubeRadiusM - metricRadiusMeanM
+          : null;
+    const analyticDisplacementStatus: SolveOrderStatus = (() => {
+      if (rmsDeltaPct == null || maxAbsDeltaM == null || metricRadiusMeanM == null) return "unknown";
+      const passAbs = Math.max(0.15, 0.08 * metricRadiusMeanM);
+      const warnAbs = Math.max(0.45, 0.2 * metricRadiusMeanM);
+      if (rmsDeltaPct <= 12 && maxAbsDeltaM <= passAbs) return "pass";
+      if (rmsDeltaPct <= 30 && maxAbsDeltaM <= warnAbs) return "warn";
+      return "fail";
+    })();
+    const displacementSamplingPoints =
+      metricSampleX.sampleCount + metricSampleY.sampleCount + metricSampleZ.sampleCount;
+    const integralSignalRaw = hullRendererBackend === "mis-service" ? integralSignalRef.current : null;
+    const integralSignalAgeMs =
+      integralSignalRaw ? Math.max(0, Date.now() - Number(integralSignalRaw.updatedAtMs || 0)) : null;
+    const integralSignal =
+      integralSignalRaw && integralSignalAgeMs != null && integralSignalAgeMs <= 12000
+        ? integralSignalRaw
+        : null;
+    const integralComparison = compareIntegralSignalToMetric({
+      signal: integralSignal,
+      metricRadiusM,
+    });
+    const integralDisplacementStatus = integralComparison.status;
+    const displacementStatus: SolveOrderStatus = integralDisplacementStatus;
+    const displacementNote = (() => {
+      const parts: string[] = [];
+      if (displacementMetricData) {
+        parts.push(
+          `metric shell sampled from |${displacementMetricChannel ?? "unknown"}| axis peaks`,
+        );
+      } else {
+        parts.push(
+          "metric shell channel unavailable (requires theta/K_trace/H_constraint in metric volume)",
+        );
+      }
+      parts.push(
+        `analytic render shell estimated as R*axes_i in ${coordinateMap ?? "viewer"} coordinates`,
+      );
+      if (integralSignal) {
+        const rms = integralComparison.rmsZResidualM;
+        const hausdorff = integralComparison.hausdorffM;
+        parts.push(
+          `integral signal source=${integralComparison.source ?? "unknown"} zRms=${Number.isFinite(rms as number) ? (rms as number).toFixed(3) : "--"} m hausdorff=${Number.isFinite(hausdorff as number) ? (hausdorff as number).toFixed(3) : "--"} m`,
+        );
+      } else if (hullRendererBackend === "mis-service") {
+        parts.push("integral signal unavailable (no recent depth+mask attachments)");
+      } else {
+        parts.push("integral signal comparison active on mis-service backend only");
+      }
+      return parts.join(" | ");
+    })();
+
+    const metricFormStatus = (() => {
+      const base = classifyStatus(chartContractStatus);
+      if (base === "unknown") return base;
+      if (base === "pass" && alpha !== null && Math.abs(alpha - 1) > 1e-3) return "warn";
+      return base;
+    })();
+    const shiftMappingStatus = (() => {
+      if (betaMethod && (thetaMax !== null || thetaRms !== null)) return "pass";
+      if (betaMethod) return "warn";
+      return "unknown";
+    })();
+    const yorkParityStatus: SolveOrderStatus =
+      parity === "aligned" ? "pass" : parity === "mismatch" ? "fail" : "unknown";
+    const natarioStatus: SolveOrderStatus =
+      natarioConstraint === true ? "pass" : natarioConstraint === false ? "fail" : "unknown";
+    const metricT00Status: SolveOrderStatus = (() => {
+      if (!stressRef) return "unknown";
+      const metricRef = stressRef.startsWith("warp.metric.T00");
+      const sourceMetric = stressSource?.toLowerCase().includes("metric") ?? false;
+      if (metricRef && sourceMetric) return "pass";
+      if (metricRef) return "warn";
+      return "fail";
+    })();
+
+    return {
+      checks: [
+        {
+          id: "metric_form_alignment",
+          label: "metric form",
+          status: metricFormStatus,
+          note: chartContractStatus
+            ? `chart=${chartLabel ?? "--"} status=${chartContractStatus}`
+            : "chart contract status unavailable",
+        },
+        {
+          id: "shift_mapping",
+          label: "shift mapping",
+          status: shiftMappingStatus,
+          note: betaMethod
+            ? `method=${betaMethod} thetaMax=${thetaMax != null ? thetaMax.toExponential(2) : "--"}`
+            : "beta diagnostics method unavailable",
+        },
+        {
+          id: "york_time_sign_parity",
+          label: "york parity",
+          status: yorkParityStatus,
+          note: parityNote,
+        },
+        {
+          id: "natario_control_behavior",
+          label: "natario ctrl",
+          status: natarioStatus,
+          note:
+            natarioConstraint === null
+              ? "natarioConstraint unavailable"
+              : `natarioConstraint=${natarioConstraint ? "pass" : "fail"} | curlMax=${curlMax != null ? curlMax.toExponential(2) : "--"}`,
+        },
+        {
+          id: "metric_derived_t00_path",
+          label: "metric T00 path",
+          status: metricT00Status,
+          note: `${stressRef ?? "--"} | source=${stressSource ?? "--"}`,
+        },
+      ],
+      metric: {
+        family,
+        chartLabel,
+        dtGammaPolicy,
+        contractStatus: chartContractStatus,
+        contractReason: chartContractReason,
+        coordinateMap,
+        alpha,
+        gammaDiag,
+        betaMethod,
+        thetaMax,
+        thetaRms,
+        curlMax,
+        curlRms,
+        thetaConformalMax,
+        thetaConformalRms,
+        bPrimeOverBMax,
+        bDoubleOverBMax,
+        sampleCount: metricSampleCount,
+        stepM: metricStepM,
+        note: betaNote,
+      },
+      derived: {
+        thetaGeom,
+        kTraceMean,
+        parity,
+        parityNote,
+        natarioConstraint,
+      },
+      stress: {
+        ref: stressRef,
+        source: stressSource,
+        contractStatus: stressContractStatus,
+        contractReason: stressContractReason,
+        observer: stressObserver,
+        normalization: stressNormalization,
+        unitSystem: stressUnitSystem,
+        rhoGeomMean,
+        rhoSiMean,
+        sampleCount: stressSampleCount,
+        stepM: stressStepM,
+        scaleM: stressScaleM,
+      },
+      constraints: {
+        H_rms,
+        M_rms,
+        H_maxAbs,
+        M_maxAbs,
+        H_rms_max,
+        M_rms_max,
+        H_maxAbs_max,
+        M_maxAbs_max,
+        gateStatus,
+        gateMode,
+        unknownAsFail: gateUnknownAsFail,
+      },
+      provenance: {
+        frameModeSource: "analytic-reduced-order",
+        energyModeSource: "analytic-reduced-order",
+        driveModeSource: "control-scaled-engineering",
+        worldtubeModeSource,
+        constraintSource,
+        observationTimeMs,
+      },
+      optics: {
+        geodesicMode,
+        scientificEnabled: geodesicDiagnostics?.scientificEnabled ?? false,
+        metricAvailable: geodesicDiagnostics?.metricAvailable ?? false,
+        chart: geodesicDiagnostics?.chart ?? null,
+        consistency: geodesicDiagnostics?.consistency ?? "unknown",
+        consistencyNote: geodesicDiagnostics?.consistencyNote ?? null,
+        maxNullResidual: geodesicDiagnostics?.maxNullResidual ?? null,
+        stepConvergence: geodesicDiagnostics?.stepConvergence ?? null,
+        bundleSpread: geodesicDiagnostics?.bundleSpread ?? null,
+      },
+      displacement: {
+        status: displacementStatus,
+        analyticStatus: analyticDisplacementStatus,
+        integralStatus: integralDisplacementStatus,
+        metricChannel: displacementMetricChannel,
+        chartLabel: metricVolume?.chart ?? chartLabel ?? null,
+        coordinateMap: metricVolume?.coordinateMap ?? coordinateMap ?? null,
+        metricRadiusM,
+        renderedRadiusM,
+        axisDeltaM,
+        axisDeltaPct,
+        rmsDeltaM,
+        rmsDeltaPct,
+        maxAbsDeltaM,
+        worldtubeRadiusM,
+        worldtubeDeltaM,
+        samplingPoints: displacementSamplingPoints > 0 ? displacementSamplingPoints : null,
+        symmetryErrorM: [metricSampleX.symmetryErrorM, metricSampleY.symmetryErrorM, metricSampleZ.symmetryErrorM],
+        integralSignal: {
+          source: integralComparison.source,
+          updatedAtMs: integralComparison.updatedAtMs,
+          ageMs: integralComparison.ageMs ?? integralSignalAgeMs,
+          coveragePct: integralComparison.coveragePct,
+          depthMinM: integralComparison.depthMinM,
+          depthMaxM: integralComparison.depthMaxM,
+          depthMeanM: integralComparison.depthMeanM,
+          fitScalePxPerM: integralComparison.fitScalePxPerM,
+          fitZOffsetM: integralComparison.fitZOffsetM,
+          fitSign: integralComparison.fitSign,
+          rmsZResidualM: integralComparison.rmsZResidualM,
+          maxAbsZResidualM: integralComparison.maxAbsZResidualM,
+          hausdorffM: integralComparison.hausdorffM,
+          sampleCount: integralComparison.sampleCount,
+          note: integralComparison.note,
+        },
+        note: displacementNote,
+      },
+      lightCross: {
+        tauLCms,
+        burstMs,
+        dwellMs,
+        dutyPct,
+      },
+      guardrails: {
+        zetaValue,
+        zetaLimit,
+        tsRatio,
+        fordRomanCompliance,
+        natarioConstraint,
+        viabilityStatus,
+        certificateHash,
+        integrityOk,
+        firstHardFail,
+      },
+    };
+  }, [
+    live,
+    axes,
+    R,
+    planarVizMode,
+    skyboxMode,
+    hullRendererBackend,
+    geodesicDiagnostics,
+    integralSignalVersion,
+    lightLoop?.tauLC_ms,
+    lightLoop?.burst_ms,
+    lightLoop?.dwell_ms,
+    (sharedComplianceState as any)?.zeta?.value,
+    (sharedComplianceState as any)?.zeta?.limit,
+  ]);
+  useEffect(() => {
+    if (planarVizMode !== 3) return;
+    const displacement = solveOrderSnapshot.displacement;
+    if (!displacement) return;
+    const now = performance.now();
+    if (now - lastDisplacementLogRef.current < 1500) return;
+    lastDisplacementLogRef.current = now;
+    const level =
+      displacement.status === "fail"
+        ? "warn"
+        : displacement.status === "warn"
+          ? "warn"
+          : "info";
+    emitAlcubierreDebugEvent({
+      level,
+      category: "render_vs_metric_displacement",
+      source: "alcubierre.render-vs-metric.displacement",
+      note: displacement.note ?? null,
+      expected: {
+        metric_radius_x_m: displacement.metricRadiusM?.[0] ?? null,
+        metric_radius_y_m: displacement.metricRadiusM?.[1] ?? null,
+        metric_radius_z_m: displacement.metricRadiusM?.[2] ?? null,
+      },
+      rendered: {
+        rendered_radius_x_m: displacement.renderedRadiusM?.[0] ?? null,
+        rendered_radius_y_m: displacement.renderedRadiusM?.[1] ?? null,
+        rendered_radius_z_m: displacement.renderedRadiusM?.[2] ?? null,
+        worldtube_radius_m: displacement.worldtubeRadiusM ?? null,
+        depth_min_m: displacement.integralSignal?.depthMinM ?? null,
+        depth_max_m: displacement.integralSignal?.depthMaxM ?? null,
+        depth_mean_m: displacement.integralSignal?.depthMeanM ?? null,
+      },
+      delta: {
+        delta_x_m: displacement.axisDeltaM?.[0] ?? null,
+        delta_y_m: displacement.axisDeltaM?.[1] ?? null,
+        delta_z_m: displacement.axisDeltaM?.[2] ?? null,
+        delta_x_pct: displacement.axisDeltaPct?.[0] ?? null,
+        delta_y_pct: displacement.axisDeltaPct?.[1] ?? null,
+        delta_z_pct: displacement.axisDeltaPct?.[2] ?? null,
+        rms_delta_m: displacement.rmsDeltaM ?? null,
+        rms_delta_pct: displacement.rmsDeltaPct ?? null,
+        max_abs_delta_m: displacement.maxAbsDeltaM ?? null,
+        worldtube_delta_m: displacement.worldtubeDeltaM ?? null,
+        rms_z_residual_m: displacement.integralSignal?.rmsZResidualM ?? null,
+        max_abs_z_residual_m: displacement.integralSignal?.maxAbsZResidualM ?? null,
+        hausdorff_m: displacement.integralSignal?.hausdorffM ?? null,
+        fit_z_offset_m: displacement.integralSignal?.fitZOffsetM ?? null,
+      },
+      measurements: {
+        displacementStatus: displacement.status,
+        analyticStatus: displacement.analyticStatus ?? "unknown",
+        integralStatus: displacement.integralStatus ?? "unknown",
+        metricChannel: displacement.metricChannel ?? "unknown",
+        chart: displacement.chartLabel ?? "unknown",
+        coordinateMap: displacement.coordinateMap ?? "unknown",
+        samplingPoints: displacement.samplingPoints ?? null,
+        integralSource: displacement.integralSignal?.source ?? "none",
+        integralCoveragePct: displacement.integralSignal?.coveragePct ?? null,
+        integralAgeMs: displacement.integralSignal?.ageMs ?? null,
+        fitScalePxPerM: displacement.integralSignal?.fitScalePxPerM ?? null,
+        fitSign: displacement.integralSignal?.fitSign ?? null,
+        integralSampleCount: displacement.integralSignal?.sampleCount ?? null,
+      },
+    });
+  }, [planarVizMode, solveOrderSnapshot.displacement, emitAlcubierreDebugEvent]);
   const latticeCoverageBadge = useMemo(() => {
     if (!latticeModeEnabled) {
       return {
@@ -7311,45 +9309,45 @@ const res = 256;
 
           <div className="ml-auto flex gap-1">
             <button
-              title="${GREEK_THETA} (GR) - York time (trace of extrinsic curvature) in General Relativity"
-              aria-label="York time ${GREEK_THETA} (GR)"
+              title="Reference-frame theta slice"
+              aria-label="Reference-frame theta slice"
               onClick={() => {
                 setPlanarVizMode(0);
                 setUserVizLocked(true);
               }}
             >
-              ${GREEK_THETA} (GR)
+              Frame
             </button>
             <button
-              title="${GREEK_THETA} (GR) - Energy density from the Hamiltonian constraint (approx 0 in shell), General Relativity"
-              aria-label="Energy density ${GREEK_THETA} (GR)"
+              title="Energy-density slice in the metric background"
+              aria-label="Energy-density slice"
               onClick={() => {
                 setPlanarVizMode(1);
                 setUserVizLocked(true);
               }}
             >
-              ${GREEK_THETA} (GR)
+              Energy
             </button>
             <button
-              title="${GREEK_THETA} (Drive) - York time scaled by drive chain (gamma_geo^3 * q * gamma_VdB * sqrt(d_FR)) and sector gating"
-              aria-label="Drive-scaled York time ${GREEK_THETA} (Drive)"
+              title="Drive-scaled theta slice"
+              aria-label="Drive-scaled theta slice"
               onClick={() => {
                 setPlanarVizMode(2);
                 setUserVizLocked(true);
               }}
             >
-              ${GREEK_THETA} (Drive)
+              Drive
             </button>
             <button
-              title="${GREEK_THETA} (Hull 3D) - live ellipsoidal hull volume with scheduler gating"
-              aria-label="Theta Hull 3D"
+              title="World tube and hull shell view"
+              aria-label="World tube and hull shell view"
               onClick={() => {
                 setPlanarVizMode(3);
                 setUserVizLocked(true);
               }}
               className={cn("px-2 py-1 rounded", planarVizMode === 3 ? "bg-amber-700 text-white" : "bg-slate-800")}
             >
-              ${GREEK_THETA} (Hull 3D)
+              World tube
             </button>
           </div>
           {(planarVizMode === 0 || planarVizMode === 1) && (
@@ -7361,7 +9359,7 @@ const res = 256;
                   checked={showKHeatOverlay}
                   onChange={(event) => setShowKHeatOverlay(event.target.checked)}
                 />
-                <span>K-invariant heatmap</span>
+                <span>Curvature heatmap</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -7370,7 +9368,7 @@ const res = 256;
                   checked={showThetaIsoOverlay}
                   onChange={(event) => setShowThetaIsoOverlay(event.target.checked)}
                 />
-                <span>?<sub>GR</sub> isolines</span>
+                <span>theta isolines</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -7388,7 +9386,7 @@ const res = 256;
                   checked={showSectorArcOverlay}
                   onChange={(event) => setShowSectorArcOverlay(event.target.checked)}
                 />
-                <span>Sector-weight arc</span>
+                <span>Worldline arc</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -7397,7 +9395,7 @@ const res = 256;
                   checked={showTiltOverlay}
                   onChange={(event) => setShowTiltOverlay(event.target.checked)}
                 />
-                <span>ÃŸ-tilt arrow</span>
+                <span>Shift arrow</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -7407,7 +9405,7 @@ const res = 256;
                   disabled
                   onChange={(event) => setShowGreensOverlay(event.target.checked)}
                 />
-                <span title="Publish f slices from Energy Pipeline to enable">Green's f slice</span>
+                <span title="Publish f slices from Energy Pipeline to enable">f(r) slice</span>
               </label>
             </div>
           )}
@@ -8423,6 +10421,85 @@ const res = 256;
                   Geodesic
                 </button>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.65rem] uppercase tracking-wide text-slate-400">Renderer</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!allowUnsafeRendererBackends) {
+                      setHullDiagMsg(
+                        "Safe mode is active: WebGL/WebGPU renderers are disabled. Set localStorage key alcubierre.hull.allowUnsafeAutostart=1 to unlock.",
+                      );
+                      setGlError("Renderer halted for safety: local GPU renderer disabled in safe mode.");
+                      return;
+                    }
+                    setHullRendererBackend("webgl");
+                  }}
+                  disabled={!allowUnsafeRendererBackends}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    !allowUnsafeRendererBackends
+                      ? "bg-slate-900 text-slate-500 cursor-not-allowed"
+                      : hullRendererBackend === "webgl"
+                        ? "bg-emerald-700 text-white"
+                        : "bg-slate-800 text-slate-300"
+                  )}
+                  title={
+                    allowUnsafeRendererBackends
+                      ? "Stable WebGL renderer (can still hard-hang some browser/GPU combinations)"
+                      : "Disabled by safe mode"
+                  }
+                >
+                  WebGL stable
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!allowUnsafeRendererBackends) {
+                      setHullDiagMsg(
+                        "Safe mode is active: WebGL/WebGPU renderers are disabled. Set localStorage key alcubierre.hull.allowUnsafeAutostart=1 to unlock.",
+                      );
+                      setGlError("Renderer halted for safety: local GPU renderer disabled in safe mode.");
+                      return;
+                    }
+                    setHullRendererBackend("webgpu");
+                  }}
+                  disabled={!allowUnsafeRendererBackends}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    !allowUnsafeRendererBackends
+                      ? "bg-slate-900 text-slate-500 cursor-not-allowed"
+                      : hullRendererBackend === "webgpu"
+                        ? "bg-amber-600 text-white"
+                        : "bg-slate-800 text-slate-300"
+                  )}
+                  title={
+                    allowUnsafeRendererBackends
+                      ? "Experimental WebGPU path tracer (can hard-hang unstable drivers)"
+                      : "Disabled by safe mode"
+                  }
+                >
+                  WebGPU exp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHullRendererBackend("mis-service")}
+                  className={cn(
+                    "rounded px-2 py-1 text-[0.65rem]",
+                    hullRendererBackend === "mis-service"
+                      ? "bg-cyan-600 text-white"
+                      : "bg-slate-800 text-slate-300"
+                  )}
+                  title="Safe default: external MIS renderer service (proxy + deterministic fallback)"
+                >
+                  MIS service
+                </button>
+                {!allowUnsafeRendererBackends && (
+                  <span className="text-[0.6rem] text-amber-300/90">
+                    Safe mode lock
+                  </span>
+                )}
+              </div>
               <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
                 <span>Exposure</span>
                 <input
@@ -8624,6 +10701,28 @@ const res = 256;
             }}
             aria-hidden="true"
           />
+          <MetricFrameLens
+            className="absolute left-2 top-2 z-20 max-w-[calc(100%-1rem)] sm:left-3 sm:top-3"
+            thetaExpected={theta_expected}
+            thetaPeak={theta_peak}
+            thetaTail={thetaPk}
+            beta={beta}
+            sigma={sigma}
+            R={R}
+            warpFieldType={warpFieldType}
+            solveOrder={solveOrderSnapshot}
+            lightCrossText={lightCrossSummary.text}
+            lightCrossTitle={lightCrossSummary.title}
+            hullText={hullSummary.text}
+            hullTitle={hullSummary.title}
+            driveText={driveChainSummary.text}
+            driveTitle={driveChainSummary.title}
+            activeMode={planarVizMode as 0 | 1 | 2 | 3}
+            onSelectMode={(mode) => {
+              setPlanarVizMode(mode);
+              setUserVizLocked(true);
+            }}
+          />
           {latticeModeEnabled ? (
             <div className="pointer-events-none absolute right-2 top-2 flex flex-col items-end gap-1 text-[0.65rem]">
               <div className="flex flex-wrap items-center gap-1">
@@ -8688,7 +10787,11 @@ const res = 256;
         {glError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 px-6 text-center">
             <div className="max-w-sm space-y-2">
-              <p className="text-sm font-semibold text-red-200">Shader pipeline offline</p>
+              <p className="text-sm font-semibold text-red-200">
+                {glError.toLowerCase().includes("halted for safety")
+                  ? "Renderer halted for safety"
+                  : "Shader pipeline offline"}
+              </p>
               <p className="text-xs text-slate-200">
                 {glError}
               </p>

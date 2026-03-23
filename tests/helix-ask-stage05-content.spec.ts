@@ -314,6 +314,78 @@ describe("helix ask stage0.5 content lane", () => {
     expect(result.telemetry.slot_plan?.required ?? []).not.toContain("code_path");
   });
 
+  it("prioritizes conceptual slots for relation prompts without implementation cues", async () => {
+    const docPath = writeTestFile(
+      "docs/knowledge/warp/ethos-relation-concept.md",
+      [
+        "# Warp and Ethos",
+        "## Mechanism",
+        "Mission ethos constrains warp viability claims to measurable checkpoints.",
+        "This relation links stewardship commitments with reproducible evidence.",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "How does mission ethos relate to warp viability?",
+      filePaths: [docPath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.telemetry.slot_plan?.required ?? []).toEqual(
+      expect.arrayContaining(["definition", "mechanism"]),
+    );
+    expect(result.telemetry.slot_plan?.required ?? []).not.toContain("code_path");
+    expect(result.telemetry.slot_coverage?.missing ?? []).not.toContain("code_path");
+    expect(result.telemetry.slot_coverage?.ratio).toBe(1);
+  });
+
+  it("keeps code_path required for relation prompts with explicit implementation cues", async () => {
+    const docPath = writeTestFile(
+      "docs/knowledge/warp/ethos-relation-implementation.md",
+      [
+        "# Warp and Ethos Implementation",
+        "## Mechanism",
+        "Stewardship controls are wired into viability checkpoints.",
+      ].join("\n"),
+    );
+    const codePath = writeTestFile(
+      "server/services/helix-ask/relation-implementation-cue.ts",
+      [
+        "export function mapEthosToWarpGate(policy: string): string {",
+        "  return `gate:${policy}`;",
+        "}",
+      ].join("\n"),
+    );
+
+    const result = await buildStage05EvidenceCards({
+      enabled: true,
+      llmFirst: false,
+      query: "How does mission ethos relate to warp viability in the repo module path?",
+      filePaths: [docPath, codePath],
+      maxFiles: 12,
+      maxCards: 8,
+      maxExtractChars: 24_000,
+      maxSnippetChars: 320,
+      timeoutMs: 500,
+      binaryMetadataOnly: true,
+      intentDomain: "hybrid",
+      summaryRequired: false,
+      hardFailOnSummaryError: false,
+    });
+
+    expect(result.telemetry.slot_plan?.required ?? []).toContain("code_path");
+  });
+
   it("keeps equation slot coverage when llm summaries omit equation slot hits", async () => {
     const docPath = writeTestFile(
       "docs/warp-geometry-congruence-bridge.md",

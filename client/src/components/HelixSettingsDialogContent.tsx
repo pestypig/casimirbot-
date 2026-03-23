@@ -20,6 +20,14 @@ import {
   type VoiceLaneTimelineDebugEvent,
   type VoiceCaptureWarningCode,
 } from "@/lib/helix/voice-capture-diagnostics";
+import {
+  buildAlcubierreDebugLogExport,
+  clearAlcubierreDebugEvents,
+  getAlcubierreDebugLogSnapshot,
+  subscribeAlcubierreDebugLog,
+  type AlcubierreDebugEvent,
+  type AlcubierreDebugLogSnapshot,
+} from "@/lib/alcubierre-debug-log";
 
 type Props = {
   settingsTab: SettingsTab;
@@ -151,6 +159,14 @@ export function HelixSettingsDialogContent({
             {userSettings.showHelixAskReasoningEventLog ? (
               <HelixAskReasoningEventLogPanel snapshot={voiceDiagnostics} />
             ) : null}
+            <PreferenceToggleRow
+              id="alcubierre-render-debug-log"
+              label="Alcubierre render + calc debug log"
+              description="Capture structured expected-vs-rendered warp viewer diagnostics with copy export."
+              checked={userSettings.showAlcubierreRenderDebugLog}
+              onChange={(value) => updateSettings({ showAlcubierreRenderDebugLog: value })}
+            />
+            {userSettings.showAlcubierreRenderDebugLog ? <AlcubierreRenderDebugLogPanel /> : null}
             <PreferenceToggleRow
               id="helix-voice-diagnostics"
               label="Voice capture diagnostics panel"
@@ -1090,6 +1106,194 @@ function HelixAskReasoningEventLogPanel({
   );
 }
 
+function AlcubierreRenderDebugLogPanel() {
+  const [snapshot, setSnapshot] = React.useState<AlcubierreDebugLogSnapshot>(() =>
+    getAlcubierreDebugLogSnapshot(),
+  );
+  const [copied, setCopied] = React.useState(false);
+  const [selectedCategory, setSelectedCategory] = React.useState<string>("all");
+  const categorySelectId = React.useId();
+
+  React.useEffect(() => {
+    setSnapshot(getAlcubierreDebugLogSnapshot());
+    return subscribeAlcubierreDebugLog((next) => {
+      setSnapshot(next);
+    });
+  }, []);
+
+  const categoryOptions = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    snapshot.events.forEach((event) => {
+      counts.set(event.category, (counts.get(event.category) ?? 0) + 1);
+    });
+    return [...counts.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+  }, [snapshot.events]);
+
+  React.useEffect(() => {
+    if (selectedCategory === "all") return;
+    if (categoryOptions.some((entry) => entry.category === selectedCategory)) return;
+    setSelectedCategory("all");
+  }, [categoryOptions, selectedCategory]);
+
+  const filteredEvents = React.useMemo(() => {
+    if (selectedCategory === "all") return snapshot.events;
+    return snapshot.events.filter((event) => event.category === selectedCategory);
+  }, [selectedCategory, snapshot.events]);
+
+  const exportPayload = React.useMemo(
+    () => buildAlcubierreDebugLogExport(filteredEvents),
+    [filteredEvents],
+  );
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const handleClear = () => {
+    clearAlcubierreDebugEvents();
+  };
+
+  const handleDownload = () => {
+    if (!exportPayload || typeof window === "undefined") return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `alcubierre-debug-log-${stamp}.jsonl`;
+    const blob = new Blob([exportPayload], { type: "application/x-ndjson;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">
+          Alcubierre render + calculation log
+        </p>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={snapshot.events.length === 0}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              snapshot.events.length > 0
+                ? "border-amber-300/50 bg-amber-400/15 text-amber-100 hover:bg-amber-300/20"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            clear
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!exportPayload}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              exportPayload
+                ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            {copied ? "copied" : "copy logs"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={!exportPayload}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              exportPayload
+                ? "border-emerald-300/50 bg-emerald-400/15 text-emerald-100 hover:bg-emerald-300/25"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            download .jsonl
+          </button>
+        </div>
+      </div>
+      <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] leading-5 text-slate-200">
+        <p>
+          status: {snapshot.enabled ? "enabled" : "disabled"} | events: {snapshot.total} | dropped: {snapshot.dropped}
+        </p>
+        <p>updated: {snapshot.updatedAtMs > 0 ? new Date(snapshot.updatedAtMs).toISOString() : "never"}</p>
+      </div>
+      {snapshot.events.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No Alcubierre debug events yet. Open the Alcubierre panel and interact with renderer/mode controls.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={categorySelectId} className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              Category
+            </label>
+            <select
+              id={categorySelectId}
+              value={selectedCategory}
+              onChange={(event) => setSelectedCategory(event.target.value)}
+              className="h-7 min-w-[240px] rounded-md border border-slate-600 bg-slate-900 px-2 text-[11px] text-slate-100"
+            >
+              <option value="all">All ({snapshot.events.length})</option>
+              {categoryOptions.map((entry) => (
+                <option key={entry.category} value={entry.category}>
+                  {entry.category} ({entry.count})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+              {filteredEvents.length} events shown
+            </p>
+          </div>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+            expected / rendered / delta fields are included per event for measurement-grade review
+          </p>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+            benchmark command: npm run warp:render:congruence:check -- --debug-log &lt;path-to-jsonl&gt;
+          </p>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+            command capture: npm run warp:render:capture -- --base-url http://127.0.0.1:5050 --scenario all --frames 12
+          </p>
+          <div className="max-h-[44vh] space-y-2 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {[...filteredEvents]
+              .sort((a, b) => a.atMs - b.atMs)
+              .slice(-220)
+              .map((event: AlcubierreDebugEvent) => (
+                <div key={event.id} className="rounded border border-white/10 bg-white/5 p-1.5">
+                  <p className="whitespace-pre-wrap break-words">
+                    {event.isoTime} | {event.level.toUpperCase()} | {event.category} | src={event.source} | mode=
+                    {event.mode ?? "n/a"} | backend={event.rendererBackend ?? "n/a"} | skybox={event.skyboxMode ?? "n/a"}
+                  </p>
+                  {event.note ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-amber-100">
+                      note: {clipDiagnosticsText(event.note, 240)}
+                    </p>
+                  ) : null}
+                  <details className="mt-1 rounded border border-slate-700/80 bg-slate-900/70 px-2 py-1 text-slate-300">
+                    <summary className="cursor-pointer select-none uppercase tracking-[0.14em] text-slate-400">
+                      raw event payload
+                    </summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-words">{JSON.stringify(event, null, 2)}</pre>
+                  </details>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VoiceEventTimelineDebugPanel({
   snapshot,
 }: {
@@ -1433,6 +1637,7 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
         .map((entry) => entry as Record<string, unknown>)
     : [];
   const latestLlmCall = llmCalls.length > 0 ? llmCalls[llmCalls.length - 1] : null;
+  const slotMissingEntries = readStringArray(context.slotMissing, context.slot_missing);
   const fields = [
     readString(context.intentDomain) ? `domain=${readString(context.intentDomain)}` : null,
     readString(context.intentId) ? `intent=${readString(context.intentId)}` : null,
@@ -1740,10 +1945,9 @@ function formatHelixAskDebugContextSummary(context: Record<string, unknown>): st
           Math.floor(readNumber(context.objectiveCount ?? context.objective_count) ?? 0),
         )}`
       : null,
-    Array.isArray(context.slotMissing ?? context.slot_missing) &&
-    (context.slotMissing ?? context.slot_missing)?.length
+    slotMissingEntries.length > 0
       ? `slot_missing=${clipDiagnosticsText(
-          ((context.slotMissing ?? context.slot_missing) as string[]).join(","),
+          slotMissingEntries.join(","),
           110,
         )}`
       : null,

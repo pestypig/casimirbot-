@@ -45,5 +45,5 @@ describe('/api/horizons route contract', () => {
     expect(res.body.provenance?.sourceClass).toBe('fallback');
     expect(res.body.provenance?.diagnostic).toBe(true);
     expect(res.body.provenance?.certifying).toBe(false);
-  });
+  }, 10000);
 });

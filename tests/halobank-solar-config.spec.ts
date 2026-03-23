@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   loadSolarKernelBundle,
+  loadSolarLocalRestReferenceManifest,
+  loadSolarMetricContextManifest,
   validateKernelBundleAssets,
   verifyKernelBundleSignature,
 } from "../server/modules/halobank-solar/config";
@@ -73,3 +75,23 @@ describe("halobank solar kernel manifest integrity", () => {
   });
 });
 
+describe("halobank solar local-rest reference manifest", () => {
+  it("loads a pinned published solar-motion reference set", async () => {
+    const manifest = await loadSolarLocalRestReferenceManifest();
+    expect(manifest.schema_version).toBe("halobank.solar.local_rest_reference/1");
+    expect(manifest.default_reference_id).toBe("schonrich2010");
+    expect(manifest.references.some((entry) => entry.id === "schonrich2010")).toBe(true);
+    expect(manifest.references.some((entry) => entry.id === "huang2015")).toBe(true);
+  });
+});
+
+describe("halobank solar metric-context manifest", () => {
+  it("loads the pinned weak-field solar metric model contract", async () => {
+    const manifest = await loadSolarMetricContextManifest();
+    expect(manifest.schema_version).toBe("halobank.solar.metric_context/1");
+    expect(manifest.model_id).toBe("halobank.solar.iau2000b1.3-weak-field-ppn-gr/1");
+    expect(manifest.ppn_parameters.gamma).toBe(1);
+    expect(manifest.source_potentials.some((entry) => entry.id === "sun_monopole")).toBe(true);
+    expect(manifest.standards.some((entry) => entry.id === "iau2000_b1_3")).toBe(true);
+  });
+});

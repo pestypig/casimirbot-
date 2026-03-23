@@ -11,9 +11,14 @@
       "children": [
         "halobank-solar-state-core",
         "halobank-solar-time-core",
+        "halobank-solar-metric-context",
         "halobank-solar-proof-mercury",
+        "halobank-solar-proof-null-geodesic",
+        "halobank-solar-proof-inner-parity",
         "halobank-solar-proof-eclipse",
-        "halobank-solar-proof-resonance"
+        "halobank-solar-proof-resonance",
+        "halobank-solar-proof-jovian",
+        "halobank-solar-proof-local-rest-anchor"
       ]
     },
     {
@@ -44,6 +49,21 @@
       ]
     },
     {
+      "id": "halobank-solar-metric-context",
+      "title": "Inner Solar Metric Context",
+      "tags": ["metric", "bcrs", "gcrs", "weak-field", "ppn"],
+      "bodyMD": "The vectors and derived proof routes carry a pinned weak-field BCRS/GCRS metric-context contract with explicit PN/GR model id, time-scale semantics, and source potentials used.",
+      "links": [
+        { "to": "halobank-solar-state-core", "rel": "supports" },
+        { "to": "halobank-solar-time-core", "rel": "supports" }
+      ],
+      "evidence": [
+        { "type": "config", "path": "configs/halobank-solar-metric-context.v1.json", "contains": "halobank.solar.iau2000b1.3-weak-field-ppn-gr/1" },
+        { "type": "code", "path": "server/routes/halobank-solar.ts", "contains": "metric_context" },
+        { "type": "test", "path": "tests/halobank-solar-routes.spec.ts", "contains": "metric_context" }
+      ]
+    },
+    {
       "id": "halobank-solar-proof-mercury",
       "title": "Mercury Precession Proof Node",
       "tags": ["mercury", "precession", "falsifier"],
@@ -59,6 +79,37 @@
       ]
     },
     {
+      "id": "halobank-solar-proof-null-geodesic",
+      "title": "Solar Null-Geodesic Proof Node",
+      "tags": ["light-deflection", "shapiro", "null-geodesic", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:solar_light_deflection"],
+      "validity": {
+        "equation_ref": "uncertainty_propagation"
+      },
+      "bodyMD": "Solar-limb light deflection and Shapiro-delay gamma residuals are replayed under the same pinned weak-field solar metric layer; explicit ICRS source directions and Earth body-fixed observers are supported, while unsupported body-fixed orientation models fail deterministically.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runSolarLightDeflection" },
+        { "type": "config", "path": "configs/halobank-solar-metric-context.v1.json", "contains": "sun_monopole" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "solar light-deflection module" }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-inner-parity",
+      "title": "Inner Solar Metric Parity Proof Node",
+      "tags": ["parity", "mercury", "light-deflection", "shared-metric", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:inner_solar_metric_parity"],
+      "validity": {
+        "equation_ref": "uncertainty_propagation"
+      },
+      "bodyMD": "The same pinned inner-solar weak-field metric layer must simultaneously satisfy the Mercury perihelion diagnostic and the solar null-geodesic diagnostic, or the parity node fails deterministically.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runInnerSolarMetricParity" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "inner-solar parity" }
+      ]
+    },
+    {
       "id": "halobank-solar-proof-eclipse",
       "title": "Earth-Moon Eclipse Timing Proof Node",
       "tags": ["eclipse", "observer", "falsifier"],
@@ -67,10 +118,10 @@
       "validity": {
         "equation_ref": "runtime_safety_gate"
       },
-      "bodyMD": "Event detection uses apparent Sun-Moon separation and deterministic gate thresholds for contact/timing windows.",
+      "bodyMD": "Event detection uses apparent Sun-Moon separation with geocenter or supported Earth body-fixed observers, and unsupported body-fixed observers fail deterministically with a route-matched orientation-kernel fail id.",
       "evidence": [
         { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runEarthMoonEclipseTiming" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "strict provenance fail for derived calls" }
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "supports Earth body-fixed observers for earth-moon eclipse timing geometry" }
       ]
     },
     {
@@ -87,7 +138,36 @@
         { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runResonanceLibration" },
         { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "resonance_libration" }
       ]
+    },
+    {
+      "id": "halobank-solar-proof-jovian",
+      "title": "Jovian Moon Event Timing Proof Node",
+      "tags": ["jovian", "occultation", "transit", "observer", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:jovian_moon_event_timing"],
+      "validity": {
+        "equation_ref": "line_of_sight_occultation_geometry"
+      },
+      "bodyMD": "Jovian moon transit and occultation minima are computed from an explicit Earth observer geometry; supported Earth body-fixed observers are allowed, and unsupported body-fixed observers fail deterministically with the route-matched orientation-kernel fail id.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runJovianMoonEventTiming" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "supports Earth body-fixed observers for jovian moon timing geometry" }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-local-rest-anchor",
+      "title": "Local Rest Anchor Calibration Proof Node",
+      "tags": ["local-rest", "solar-motion", "uvw", "falsifier"],
+      "nodeType": "physics_assertion",
+      "claim_ids": ["claim:halobank.solar:local_rest_anchor_calibration"],
+      "validity": {
+        "equation_ref": "uncertainty_propagation"
+      },
+      "bodyMD": "The active solar peculiar-motion anchor is compared against a pinned published reference and fails deterministically when the selected runtime vector deviates beyond configured tolerance.",
+      "evidence": [
+        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runLocalRestAnchorCalibration" },
+        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "local-rest solar-motion anchor" }
+      ]
     }
   ]
 }
-

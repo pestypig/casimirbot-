@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getHelixAskIntentProfileById,
   matchHelixAskIntent,
   STRICT_PACKAGES_PROVENANCE_FAIL_REASON,
 } from "../server/services/helix-ask/intent-directory";
@@ -153,6 +154,14 @@ const cases: IntentCase[] = [
     expectStageTags: false,
   },
   {
+    question: "What is a Needle Hull Mark 2? How does it relate to the precession of mercury?",
+    hasRepoHints: false,
+    hasFilePathHints: false,
+    expectedId: "general.conceptual_define_compare",
+    expectedDomain: "general",
+    expectedFormat: "compare",
+  },
+  {
     question: "What is the Casimir effect?",
     hasRepoHints: false,
     hasFilePathHints: false,
@@ -256,6 +265,16 @@ describe("Helix Ask intent routing", () => {
     expect(match.profile.id).toBe("repo.helix_ask_routing_explain");
   });
 
+  it("does not route non-ethos relation prompts to warp+ethos relation intent", () => {
+    const question = "How does a warp bubble relate to Mercury precession?";
+    const match = matchHelixAskIntent({
+      question,
+      hasRepoHints: false,
+      hasFilePathHints: false,
+    });
+    expect(match.profile.id).not.toBe("hybrid.warp_ethos_relation");
+  });
+
   it("keeps repo routing behavior while exposing additive packages provenance contract", () => {
     const question = "Where is the packages API route and module path?";
     const match = matchHelixAskIntent({
@@ -295,6 +314,18 @@ describe("Helix Ask intent routing", () => {
     });
     expect(match.profile.id).toBe("general.conceptual_define_compare");
     expect(match.profile.domain).toBe("general");
+  });
+
+  it("keeps warp mechanism 'solved in codebase' prompts in brief format", () => {
+    const profile = getHelixAskIntentProfileById("repo.warp_math_congruence");
+    expect(profile).toBeTruthy();
+    const resolved = resolveHelixAskFormat(
+      "How is the warp bubble solved in the codebase?",
+      profile,
+      false,
+    );
+    expect(resolved.format).toBe("brief");
+    expect(resolved.stageTags).toBe(false);
   });
 });
 

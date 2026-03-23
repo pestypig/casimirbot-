@@ -924,6 +924,9 @@ function applyConceptLint(input: HelixAskPlatonicInput): {
   if (input.tier && input.tier !== "F0") {
     return { answer: input.answer, applied: false, reasons: [] };
   }
+  if (/^\s*sources?\s*:/im.test(input.answer)) {
+    return { answer: input.answer, applied: false, reasons: ["sources_line_preserved"] };
+  }
   if (SYSTEM_TERMS.test(input.question)) {
     return { answer: input.answer, applied: false, reasons: ["system_term_question"] };
   }
@@ -1240,9 +1243,14 @@ function computeCoverageSummary(input: HelixAskPlatonicInput): HelixAskCoverageS
   let includeQuestionTokens = repoApiLookupCoverageMode
     ? true
     : !(input.coverageSlots && input.coverageSlots.length > 0);
-  if (ideologyCoverageMode && (!explicitSlots || explicitSlots.length === 0)) {
-    explicitSlots = buildIdeologyCoverageSlots(input.question, input.conceptMatch);
-    includeQuestionTokens = explicitSlots.length === 0;
+  if (ideologyCoverageMode) {
+    // Ideology social prompts can carry noisy structural slots ("mechanism",
+    // "repo-mapping", scenario terms). Prefer ideology-focused anchors.
+    const ideologySlots = buildIdeologyCoverageSlots(input.question, input.conceptMatch);
+    if (ideologySlots.length > 0) {
+      explicitSlots = ideologySlots;
+      includeQuestionTokens = false;
+    }
   }
   const referenceText = [
     input.evidenceText,

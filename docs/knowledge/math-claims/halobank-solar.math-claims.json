@@ -1,0 +1,222 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "halobank-solar-core",
+  "domain": "solar-system-diagnostics",
+  "updatedAt": "2026-03-22",
+  "claims": [
+    {
+      "claimId": "claim:halobank.solar:solar_light_deflection",
+      "statement": "HaloBank's solar null-geodesic diagnostic is only admissible at diagnostic tier when a pinned weak-field solar metric context reproduces the canonical solar-limb deflection scale and remains within configured gamma residual envelopes for historical light-deflection and Cassini-era Shapiro benchmarks.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank solar null-geodesic benchmark lane",
+        "constraints": [
+          "metric context must resolve to the pinned weak-field BCRS/GCRS manifest",
+          "solar-limb deflection uses the Sun monopole weak-field benchmark",
+          "explicit source directions must remain outside the apparent solar disk for the chosen observer and epoch",
+          "body-fixed observer support is restricted to loaded orientation models and otherwise fails deterministically",
+          "Shapiro comparison remains a gamma residual benchmark and not a spacecraft-specific replay"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "standard",
+          "citation": "IAU 2000 Resolution B1.3, relativistic framework for BCRS and GCRS.",
+          "equation": "weak-field metric written in terms of scalar/vector potentials for BCRS/GCRS",
+          "note": "Pinned metric-context reference-system source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Einstein (1916), Annalen der Physik 354(7), DOI 10.1002/andp.19163540702.",
+          "equation": "alpha_limb = 4GM_sun/(c^2 b)",
+          "note": "Solar-limb weak-field deflection anchor."
+        },
+        {
+          "kind": "paper",
+          "citation": "Bertotti, Iess, Tortora (2003), Nature 425, 374-376, DOI 10.1038/nature01997.",
+          "equation": "gamma - 1 = 2.1e-5 +/- 2.3e-5",
+          "note": "Cassini Shapiro-delay residual envelope."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-metric-context.v1.json",
+          "note": "Pinned weak-field solar metric manifest."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Deterministic solar null-geodesic proof implementation."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-metric-context.v1.json",
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This claim stays diagnostic and benchmark-oriented; it does not assert a certified light-propagation solver."
+    },
+    {
+      "claimId": "claim:halobank.solar:inner_solar_metric_parity",
+      "statement": "HaloBank's inner-solar weak-field metric parity claim is only admissible at diagnostic tier when the same pinned solar metric layer satisfies both the Mercury perihelion benchmark and the solar null-geodesic benchmark inside configured deterministic tolerance bands.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank inner-solar metric parity lane",
+        "constraints": [
+          "Mercury precession and solar light-deflection modules must share the pinned metric model id",
+          "timelike and null benchmark residuals must both pass configured thresholds",
+          "claim remains reduced-order and benchmark-driven rather than certified"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Einstein-era Mercury perihelion and light-deflection weak-field benchmark lineage.",
+          "equation": "Delta_varpi = 6*pi*GM/(a(1-e^2)c^2); alpha_limb = 4GM/(c^2 b)",
+          "note": "Timelike and null probes from the same solar weak-field source term."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-metric-context.v1.json",
+          "note": "Pinned shared metric model id and source-potential contract."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Parity aggregator implementation."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-metric-context.v1.json",
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This parity node is a falsifiable consistency check tying two observable families to one metric layer."
+    },
+    {
+      "claimId": "claim:halobank.solar:earth_moon_eclipse_timing",
+      "statement": "HaloBank's Earth-Moon eclipse timing diagnostic is only admissible at diagnostic tier when apparent Sun-Moon contact minima are computed from an explicit Earth-referenced observer model and any unsupported body-fixed observer request fails deterministically with the route-matched orientation-kernel fail id.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank Earth-Moon eclipse timing lane",
+        "constraints": [
+          "observer semantics must remain Earth geocenter or supported Earth body-fixed geometry",
+          "unsupported body-fixed observers must degrade to deterministic geocenter fallback and fail the gate",
+          "event windows remain threshold-gated contact minima rather than certified eclipse catalogs"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Deterministic eclipse timing implementation and observer fail semantics."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-thresholds.v1.json",
+          "note": "Contact and timing tolerance envelope."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/routes/halobank-solar.ts",
+          "note": "TREE/DAG claim linkage for derived solar modules."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This claim stays diagnostic and observer-contract oriented; it does not assert a certified eclipse ephemeris."
+    },
+    {
+      "claimId": "claim:halobank.solar:jovian_moon_event_timing",
+      "statement": "HaloBank's Jovian moon event timing diagnostic is only admissible at diagnostic tier when transit and occultation minima are computed from an explicit Earth-referenced observer model and any unsupported body-fixed observer request fails deterministically with the route-matched orientation-kernel fail id.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank Jovian moon timing lane",
+        "constraints": [
+          "observer semantics must remain Earth geocenter or supported Earth body-fixed geometry",
+          "unsupported body-fixed observers must degrade to deterministic geocenter fallback and fail the gate",
+          "event windows remain line-of-sight geometry minima rather than certified satellite ephemerides"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Deterministic Jovian event timing implementation and observer fail semantics."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-thresholds.v1.json",
+          "note": "Contact-ratio and timing tolerance envelope."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/routes/halobank-solar.ts",
+          "note": "TREE/DAG claim linkage for derived solar modules."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This claim stays diagnostic and observer-contract oriented; it does not assert a certified Jovian moon event catalog."
+    },
+    {
+      "claimId": "claim:halobank.solar:local_rest_anchor_calibration",
+      "statement": "The active HaloBank local-rest solar peculiar-motion anchor is only admissible as a diagnostic reference when its runtime U,V,W vector matches a pinned published reference set within configured component residual tolerance.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank solar local-rest anchor calibration",
+        "constraints": [
+          "published reference set must be pinned in repo manifest",
+          "runtime vector must resolve from configured solar-motion selector",
+          "residual check is deterministic and tolerance-gated"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Schönrich, Binney & Dehnen (2010), MNRAS 403(4):1829-1833, Local kinematics and the local standard of rest.",
+          "equation": "U,V,W = (11.1, 12.24, 7.25) km/s",
+          "note": "Pinned default solar peculiar-motion reference."
+        },
+        {
+          "kind": "paper",
+          "citation": "Huang et al. (2015), MNRAS 449(1):162-174, Determination of the local standard of rest using the LSS-GAC DR1.",
+          "equation": "U,V,W = (7.01, 10.13, 4.95) km/s",
+          "note": "Pinned alternate solar peculiar-motion reference."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Deterministic calibration gate and artifact generation."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-local-rest-reference.v1.json",
+          "note": "Pinned local-rest reference manifest."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-local-rest-reference.v1.json",
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This is a provenance and residual-consistency claim, not a certified Galactic dynamics claim."
+    }
+  ]
+}

@@ -37,6 +37,7 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const docsDir = path.resolve(__dirname, "..", "docs");
+const skyboxDir = path.resolve(__dirname, "..", "public", "skybox");
 
 let appReady = false;
 let healthReady = false;
@@ -530,6 +531,9 @@ app.use('/attached_assets', express.static('attached_assets'));
 
 // Serve static mission documentation
 app.use('/docs', express.static(docsDir));
+
+// Serve skybox assets used by the Hull renderer (JSON config + texture) from repo-level public assets.
+app.use('/skybox', express.static(skyboxDir));
 
 // Cache headers for warp engine bundles
 app.use('/warp-engine*.js', (req, res, next) => {

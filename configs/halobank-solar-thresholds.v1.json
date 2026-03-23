@@ -28,6 +28,24 @@
       "max_contact_ratio": 1.05,
       "event_time_tolerance_s": 7200,
       "min_event_count": 1
+    },
+    "solar_light_deflection": {
+      "target_limb_arcsec": 1.75,
+      "historical_observed_arcsec": 1.98,
+      "historical_max_abs_residual_arcsec": 0.5,
+      "modern_gamma_measured": 0.9998,
+      "modern_gamma_max_abs_residual": 0.001,
+      "shapiro_gamma_minus_one_measured": 0.000021,
+      "shapiro_gamma_minus_one_max_abs": 0.00007
+    },
+    "inner_solar_metric_parity": {
+      "max_mercury_abs_error_arcsec_per_century": 6.0,
+      "max_deflection_abs_residual_arcsec": 0.5,
+      "max_modern_gamma_abs_residual": 0.001,
+      "max_shapiro_gamma_minus_one_abs": 0.00007
+    },
+    "local_rest_anchor_calibration": {
+      "max_component_abs_delta_km_s": 0.001
     }
   }
 }

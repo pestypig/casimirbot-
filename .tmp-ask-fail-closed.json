@@ -1,0 +1,4 @@
+﻿{
+    "question":  "## Purpose\nReturn a minimal research-contract response.\n\n## Required Repo Inputs\n- docs/does-not-exist.md\n\n## Required Top-Level Structure\n### 1. Direct Answer\nMust cover:\n- blocked status\n\n## Fail-Closed Behavior\nIf any required repo input is missing or unreadable:\n- return `blocked=true`\n- list the missing paths\n- set `stop_reason=Fail-closed`\n- do not complete the manuscript",
+    "debug":  true
+}

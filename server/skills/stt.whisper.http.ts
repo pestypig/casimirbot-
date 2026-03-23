@@ -174,6 +174,20 @@ const inferHttpStatus = (message: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseRetryAfterMs = (value: string | null): number | undefined => {
+  const normalized = (value ?? "").trim();
+  if (!normalized) return undefined;
+  const seconds = Number(normalized);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+  const absoluteMs = Date.parse(normalized);
+  if (Number.isFinite(absoluteMs)) {
+    return Math.max(0, absoluteMs - Date.now());
+  }
+  return undefined;
+};
+
 async function callOpenAiLike(
   args: {
     audioUrl: string;
@@ -261,7 +275,20 @@ async function callOpenAiLike(
     });
     if (!response.ok) {
       const detail = await readErrorDetail(response);
-      throw new Error(detail ? `STT HTTP ${response.status}: ${detail}` : `STT HTTP ${response.status}`);
+      const retryAfterMs = response.status === 429
+        ? parseRetryAfterMs(response.headers?.get?.("retry-after") ?? null)
+        : undefined;
+      const suffix =
+        response.status === 429
+          ? [
+              retryAfterMs && retryAfterMs > 0 ? `retry_after_ms=${retryAfterMs}` : "",
+              "rate_limit_source=provider_429",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : "";
+      const baseMessage = detail ? `STT HTTP ${response.status}: ${detail}` : `STT HTTP ${response.status}`;
+      throw new Error(suffix ? `${baseMessage} ${suffix}` : baseMessage);
     }
     const payload = (await response.json()) as any;
     return { payload, modelUsed: model };

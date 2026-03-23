@@ -1,0 +1,1634 @@
+{
+    "text":  "For \"OK what is needle hull mark 2?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption. Then add one implication sentence that states what decision the evidence supports now and what new data would change it.\n\nSources: open-world best-effort (no repo citations required).",
+    "envelope":  {
+                     "mode":  "extended",
+                     "tier":  "F0",
+                     "answer":  "For \"OK what is needle hull mark 2?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption. Then add one implication sentence that states what decision the evidence supports now and what new data would change it.\n\nSources: open-world best-effort (no repo citations required).",
+                     "sections":  [
+                                      {
+                                          "title":  "Tree Walk",
+                                          "body":  "Tree Walk: Needle Hull Mark 2 Theory Directory Walk (tree-derived; source: docs/knowledge/warp/needle-hull-mark2-theory-tree.json)\nChain scaffold: root_to_leaf\n1. Hint: Needle Hull Mark 2 Theory Tree - Navigation hint only; no doc span bound. (docs/knowledge/warp/needle-hull-mark2-theory-tree.json)",
+                                          "citations":  [
+                                                            "docs/knowledge/warp/needle-hull-mark2-theory-tree.json"
+                                                        ],
+                                          "layer":  "details",
+                                          "defaultOpen":  true
+                                      }
+                                  ]
+                 },
+    "prompt_ingested":  false,
+    "concept":  {
+                    "id":  "natario-zero-expansion",
+                    "source_path":  "docs/knowledge/warp/natario-zero-expansion.md",
+                    "provenance_class":  "inferred",
+                    "claim_tier":  "diagnostic",
+                    "certifying":  false
+                },
+    "provenance_class":  "inferred",
+    "claim_tier":  "diagnostic",
+    "certifying":  false,
+    "debug":  {
+                  "two_pass":  false,
+                  "micro_pass":  true,
+                  "trace_id":  "ask:a0ae900a-e835-4cf0-9d99-861f2db388a0",
+                  "llm_route_expected_backend":  "http",
+                  "llm_runtime_env":  "http",
+                  "llm_policy_env":  "http",
+                  "llm_http_base_present":  true,
+                  "llm_http_base_host":  "api.openai.com",
+                  "llm_api_key_present":  true,
+                  "llm_api_key_source":  "OPENAI_API_KEY",
+                  "llm_api_key_fingerprint":  "02b6c3e89735",
+                  "llm_http_model_configured":  "gpt-4o-mini",
+                  "llm_invoke_attempted":  false,
+                  "llm_skip_reason":  "short_circuit_forced_answer",
+                  "llm_force_probe_requested":  false,
+                  "llm_force_probe_enabled":  false,
+                  "tuning_enabled":  false,
+                  "fast_quality_mode":  false,
+                  "arbiter_repo_ratio":  0.45,
+                  "arbiter_hybrid_ratio":  0.25,
+                  "retry_topk_bonus":  4,
+                  "format_enforcement":  "strict",
+                  "soft_expansion":  0,
+                  "scaffold_tokens":  512,
+                  "evidence_tokens":  640,
+                  "repair_tokens":  192,
+                  "hypothesis_enabled":  false,
+                  "agent_loop_enabled":  true,
+                  "agent_loop_max_steps":  3,
+                  "agent_loop_budget_ms":  120000,
+                  "agent_action_budget_ms":  20000,
+                  "clocka_tool_cap":  2,
+                  "agent_loop_steps":  0,
+                  "agent_loop_actions":  [
+                                             {
+                                                 "action":  "expand_heading_aliases",
+                                                 "reason":  "doc_heading_seed_slots",
+                                                 "expectedGain":  "seed_slot_aliases",
+                                                 "overBudget":  false,
+                                                 "ok":  true,
+                                                 "ts":  "2026-03-23T14:50:01.304Z"
+                                             }
+                                         ],
+                  "agent_action_counts":  {
+                                              "expand_heading_aliases":  1
+                                          },
+                  "agent_attempts":  [
+                                         "expand_heading_aliases"
+                                     ],
+                  "single_llm":  true,
+                  "definition_focus":  true,
+                  "capsule_dialogue_applied_count":  0,
+                  "capsule_evidence_applied_count":  0,
+                  "capsule_retry_applied":  false,
+                  "focus_guard_result":  "pass",
+                  "anchor_guard_result":  "pass",
+                  "capsule_latest_topic_shift":  false,
+                  "capsule_must_keep_terms":  [
+
+                                              ],
+                  "capsule_preferred_paths":  [
+
+                                              ],
+                  "block_scoped":  false,
+                  "slot_plan_explicit_path_focus":  false,
+                  "report_mode":  false,
+                  "report_blocks_count":  0,
+                  "slot_plan_pass_used":  false,
+                  "session_memory_used":  false,
+                  "explicit_repo_expectation":  false,
+                  "warp_proof_repo_cue":  false,
+                  "query_constraints":  {
+                                            "collapse_domain_lock":  false,
+                                            "hard_exclude_warp_family":  false,
+                                            "explicit_anchor_paths":  [
+
+                                                                      ]
+                                        },
+                  "repo_expectation_score":  0,
+                  "repo_expectation_level":  "low",
+                  "repo_expectation_signals":  [
+                                                   "term_prior_suppressed:term_hits_missing"
+                                               ],
+                  "explicit_repo_paths":  [
+
+                                          ],
+                  "term_prior_enabled":  true,
+                  "term_prior_log_only":  false,
+                  "term_prior_applied":  false,
+                  "term_prior_hard_force_general":  false,
+                  "term_prior_prefer_general":  false,
+                  "term_prior_suppressed_reason":  "term_hits_missing",
+                  "term_prior_term_hit_confidence":  0,
+                  "term_prior_pivot_confidence":  null,
+                  "term_prior_polysemy_ambiguous":  false,
+                  "term_prior_polysemy_group":  null,
+                  "term_prior_term_hits":  [
+
+                                           ],
+                  "term_prior_directory_denylist":  [
+
+                                                    ],
+                  "term_prior_directory_disabled":  [
+
+                                                    ],
+                  "topic_allowlist_tiers":  5,
+                  "topic_must_include_files":  [
+                                                   "modules/warp/warp-module.ts",
+                                                   "modules/warp/natario-warp.ts",
+                                                   "docs/warp-console-architecture.md",
+                                                   "docs/stellar-consciousness-ii.md",
+                                                   "docs/stellar-consciousness-orch-or-review.md",
+                                                   "docs/knowledge/dag-node-schema.md",
+                                                   "docs/knowledge/physics/math-tree.json",
+                                                   "docs/knowledge/physics/math-maturity-stages.md",
+                                                   "docs/knowledge/physics/physics-foundations-tree.json",
+                                                   "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
+                                                   "docs/ethos/ideology.json",
+                                                   "WARP_AGENTS.md",
+                                                   "client/src/components/needle-hull-preset.tsx",
+                                                   "docs/needle-hull-mainframe.md"
+                                               ],
+                  "ambiguity_target_span":  "needle hull mark 2",
+                  "ambiguity_cluster_count":  4,
+                  "ambiguity_cluster_top_mass":  0.7181750302284018,
+                  "ambiguity_cluster_margin":  0.8566138094373305,
+                  "ambiguity_cluster_entropy":  0.651325655888189,
+                  "ambiguity_cluster_candidates":  [
+                                                       {
+                                                           "label":  "client/src",
+                                                           "score":  0.347734,
+                                                           "mass":  0.718175,
+                                                           "count":  13
+                                                       },
+                                                       {
+                                                           "label":  "server/routes",
+                                                           "score":  0.04986,
+                                                           "mass":  0.102976,
+                                                           "count":  2
+                                                       },
+                                                       {
+                                                           "label":  "modules/warp",
+                                                           "score":  0.047165,
+                                                           "mass":  0.09741,
+                                                           "count":  2
+                                                       },
+                                                       {
+                                                           "label":  "tests",
+                                                           "score":  0.039432,
+                                                           "mass":  0.081439,
+                                                           "count":  1
+                                                       }
+                                                   ],
+                  "ambiguity_evidence_pass":  true,
+                  "ambiguity_evidence_scores":  [
+                                                    {
+                                                        "label":  "server/routes",
+                                                        "score":  0.6,
+                                                        "docShare":  0.5,
+                                                        "matchRatio":  0.5
+                                                    },
+                                                    {
+                                                        "label":  "client/src",
+                                                        "score":  0.375,
+                                                        "docShare":  0,
+                                                        "matchRatio":  0.375
+                                                    }
+                                                ],
+                  "ambiguity_selected":  "server/routes",
+                  "ambiguity_resolver_applied":  true,
+                  "ambiguity_resolver_reason":  "cluster_entropy",
+                  "ambiguity_resolver_token_count":  3,
+                  "ambiguity_resolver_short_prompt":  true,
+                  "ambiguity_resolver_top_score":  74,
+                  "ambiguity_resolver_margin":  74,
+                  "slot_dominance_margin":  0.8566138094373305,
+                  "ambiguity_resolver_candidates":  [
+                                                        "natario-zero-expansion",
+                                                        "natario",
+                                                        "zero expansion warp"
+                                                    ],
+                  "format":  "compare",
+                  "stage_tags":  false,
+                  "verbosity":  "extended",
+                  "topic_tags":  [
+                                     "materials",
+                                     "warp",
+                                     "physics"
+                                 ],
+                  "intent_id":  "general.conceptual_define_compare",
+                  "intent_domain":  "general",
+                  "intent_tier":  "F0",
+                  "intent_strategy":  "general_explain",
+                  "intent_reason":  "match:1",
+                  "frontier_theory_lens_source":  "none",
+                  "frontier_theory_lens_requested":  false,
+                  "frontier_theory_lens_active":  false,
+                  "frontier_session_lens_locked":  false,
+                  "frontier_session_followup_requested":  false,
+                  "frontier_session_reset_requested":  false,
+                  "frontier_session_lock_next":  false,
+                  "frontier_required_slots":  [
+                                                  "definitions",
+                                                  "baseline",
+                                                  "hypothesis",
+                                                  "anti_hypothesis",
+                                                  "falsifiers",
+                                                  "uncertainty_band",
+                                                  "claim_tier"
+                                              ],
+                  "is_repo_question":  false,
+                  "clarify_triggered":  true,
+                  "fallback_reason":  "ambiguity_clarify",
+                  "ambiguity_clarify_rate":  1,
+                  "concept_id":  "natario-zero-expansion",
+                  "concept_label":  "natario-zero-expansion",
+                  "concept_source":  "docs/knowledge/warp/natario-zero-expansion.md",
+                  "graph_pack_lock":  {
+                                          "requested":  [
+
+                                                        ],
+                                          "applied":  [
+                                                          "needle-hull-mark2-theory"
+                                                      ]
+                                      },
+                  "graph_congruence_region":  {
+                                                  "B_equals_1":  true,
+                                                  "qi_metric_derived_equals_true":  true,
+                                                  "qi_strict_ok_equals_true":  true,
+                                                  "theta_geom_equals_true":  true,
+                                                  "vdb_two_wall_support_equals_true":  true,
+                                                  "ts_metric_derived_equals_true":  true,
+                                                  "cl3_metric_t00_available_equals_true":  true,
+                                                  "cl3_rho_gate_equals_true":  false
+                                              },
+                  "graph_congruence_chart":  "comoving_cartesian",
+                  "graph_framework":  {
+                                          "primary":  "needle-hull-mark2-theory",
+                                          "trees":  [
+                                                        {
+                                                            "tree":  "needle-hull-mark2-theory",
+                                                            "anchors":  [
+                                                                            "needle-hull-mark2-theory-tree",
+                                                                            "nhm2-entrypoints"
+                                                                        ],
+                                                            "nodes":  [
+                                                                          "needle-hull-mark2-theory-tree"
+                                                                      ],
+                                                            "source":  "docs/knowledge/warp/needle-hull-mark2-theory-tree.json",
+                                                            "score":  341.25,
+                                                            "pathMode":  "root_to_leaf",
+                                                            "pathFallbackReason":  null,
+                                                            "congruence":  {
+                                                                               "inventory":  {
+                                                                                                 "nodesCount":  9,
+                                                                                                 "evaluatedEdges":  20,
+                                                                                                 "blockedLinkCount":  0
+                                                                                             },
+                                                                               "allowedEdges":  0,
+                                                                               "blockedEdges":  20,
+                                                                               "resolvedInTreeEdges":  0,
+                                                                               "resolvedCrossTreeEdges":  0,
+                                                                               "blockedByReason":  {
+                                                                                                       "blocked_link":  0,
+                                                                                                       "conceptual_disallowed":  20,
+                                                                                                       "proxy_disallowed":  0,
+                                                                                                       "cl_exceeds_allowed":  0,
+                                                                                                       "chart_mismatch":  0,
+                                                                                                       "condition_unsatisfied":  0,
+                                                                                                       "unresolved_target":  0,
+                                                                                                       "node_missing_equation_ref":  0,
+                                                                                                       "node_missing_claim_ids":  0
+                                                                                                   },
+                                                                               "blockedByCondition":  {
+
+                                                                                                      },
+                                                                               "strictSignals":  {
+                                                                                                     "B_equals_1":  true,
+                                                                                                     "qi_metric_derived_equals_true":  true,
+                                                                                                     "qi_strict_ok_equals_true":  true,
+                                                                                                     "theta_geom_equals_true":  true,
+                                                                                                     "vdb_two_wall_support_equals_true":  true,
+                                                                                                     "ts_metric_derived_equals_true":  true,
+                                                                                                     "cl3_metric_t00_available_equals_true":  true,
+                                                                                                     "cl3_rho_gate_equals_true":  false
+                                                                                                 }
+                                                                           }
+                                                        }
+                                                    ]
+                                      },
+                  "graph_congruence_diagnostics":  {
+                                                       "treeCount":  1,
+                                                       "allowedEdges":  0,
+                                                       "blockedEdges":  20,
+                                                       "resolvedInTreeEdges":  0,
+                                                       "resolvedCrossTreeEdges":  0,
+                                                       "blockedByReason":  {
+                                                                               "blocked_link":  0,
+                                                                               "conceptual_disallowed":  20,
+                                                                               "proxy_disallowed":  0,
+                                                                               "cl_exceeds_allowed":  0,
+                                                                               "chart_mismatch":  0,
+                                                                               "condition_unsatisfied":  0,
+                                                                               "unresolved_target":  0,
+                                                                               "node_missing_equation_ref":  0,
+                                                                               "node_missing_claim_ids":  0
+                                                                           },
+                                                       "blockedByCondition":  {
+
+                                                                              },
+                                                       "strictSignals":  {
+                                                                             "B_equals_1":  true,
+                                                                             "qi_metric_derived_equals_true":  true,
+                                                                             "qi_strict_ok_equals_true":  true,
+                                                                             "theta_geom_equals_true":  true,
+                                                                             "vdb_two_wall_support_equals_true":  true,
+                                                                             "ts_metric_derived_equals_true":  true,
+                                                                             "cl3_metric_t00_available_equals_true":  true,
+                                                                             "cl3_rho_gate_equals_true":  false
+                                                                         }
+                                                   },
+                  "tree_walk_mode":  "root_to_leaf",
+                  "tree_walk_max_steps":  0,
+                  "bridge_traversal_candidates":  [
+
+                                                  ],
+                  "bridge_traversal_budget":  {
+                                                  "maxCandidates":  12,
+                                                  "maxDepth":  2
+                                              },
+                  "verification_anchor_required":  false,
+                  "context_deferred":  false,
+                  "micro_pass_enabled":  true,
+                  "fast_quality_plan_pass_suppressed":  false,
+                  "policy_prompt_family":  "definition_overview",
+                  "policy_prompt_specificity":  "broad",
+                  "policy_requires_code_floor":  false,
+                  "policy_requires_doc_floor":  true,
+                  "policy_clarify_allowed_pre_lock":  true,
+                  "policy_lock_required":  false,
+                  "policy_budget_profile":  "fast",
+                  "policy_allow_two_pass":  false,
+                  "policy_allow_retrieval_retry":  false,
+                  "policy_retrieval_scope":  "wide",
+                  "policy_question_fingerprint":  "be6c38fa4cd97b95496a0ec34edb3b4918c01dab9219e494fd49cd4d3fa155c2",
+                  "policy_requires_repo_evidence":  false,
+                  "planner_valid":  true,
+                  "planner_mode":  "deterministic",
+                  "planner_source":  "heuristic_bootstrap",
+                  "turn_contract_hash":  "16f5881720d7726726943711f40f7806b7a42f322e298d7e4800f9b3865b09a1",
+                  "turn_contract_goal":  "OK what is needle hull mark 2?",
+                  "turn_contract_grounding_mode":  "open",
+                  "turn_contract_output_family":  "definition_overview",
+                  "objective_count":  1,
+                  "turn_contract_required_slots":  [
+                                                       "definition",
+                                                       "repo-mapping",
+                                                       "needle",
+                                                       "hull"
+                                                   ],
+                  "turn_contract_query_hints":  [
+                                                    "OK what is needle hull mark 2?",
+                                                    "needle hull mark"
+                                                ],
+                  "turn_contract_risk_flags":  [
+                                                   "open_world_allowed"
+                                               ],
+                  "turn_retrieval_plan":  {
+                                              "depth_budget":  3,
+                                              "diversity_budget":  3,
+                                              "connectivity_budget":  2,
+                                              "must_include":  [
+
+                                                               ],
+                                              "query_count":  3
+                                          },
+                  "llm_breaker_prewait_enabled":  true,
+                  "llm_breaker_open_at_start":  false,
+                  "llm_breaker_remaining_ms_at_start":  0,
+                  "llm_breaker_wait_applied_ms":  0,
+                  "llm_breaker_wait_result":  "not_applicable",
+                  "llm_rate_limit_prewait_enabled":  true,
+                  "llm_rate_limit_open_at_start":  false,
+                  "llm_rate_limit_remaining_ms_at_start":  0,
+                  "llm_rate_limit_wait_applied_ms":  0,
+                  "llm_rate_limit_wait_result":  "not_applicable",
+                  "llm_unavailable_at_turn_start":  false,
+                  "llm_unavailable_at_turn_start_reason":  null,
+                  "plan_pass_used":  true,
+                  "plan_pass_forced":  true,
+                  "micro_pass_auto":  false,
+                  "micro_pass_reason":  "general",
+                  "definition_registry_paths":  [
+                                                    "docs/knowledge/warp/natario-zero-expansion.md",
+                                                    "docs/needle-hull-mainframe.md",
+                                                    "docs/knowledge/trees/paper-ingestion-runtime-tree.md",
+                                                    "docs/knowledge/trees/panel-concepts-tree.md",
+                                                    "docs/knowledge/trees/panel-registry-tree.md"
+                                                ],
+                  "definition_registry_blocks":  5,
+                  "graph_node_acceptance_rate":  1,
+                  "graph_node_acceptance_total":  3,
+                  "graph_node_acceptance_rejected":  0,
+                  "graph_node_acceptance_missing":  [
+
+                                                    ],
+                  "graph_evidence_count":  2,
+                  "graph_evidence_doc_blocks":  2,
+                  "graph_evidence_types":  [
+                                               "doc"
+                                           ],
+                  "tree_walk":  {
+                                    "treeCount":  1,
+                                    "nodeCount":  1,
+                                    "nodesWithText":  1,
+                                    "nodesWithoutText":  0,
+                                    "stepCount":  1,
+                                    "treeIds":  [
+                                                    "needle-hull-mark2-theory"
+                                                ],
+                                    "primaryTreeId":  "needle-hull-mark2-theory",
+                                    "boundCount":  0
+                                },
+                  "tree_walk_lines":  3,
+                  "tree_walk_block_present":  true,
+                  "tree_walk_bound_nodes":  0,
+                  "tree_walk_binding_rate":  0,
+                  "code_alignment_applied":  true,
+                  "code_alignment_symbols":  [
+                                                 "Needle",
+                                                 "Hull",
+                                                 "Panel",
+                                                 "Natario",
+                                                 "Tree",
+                                                 "needle_hull_mark2_theory_directory"
+                                             ],
+                  "code_alignment_resolved":  [
+                                                  "client/src/components/needle-hull-preset.tsx",
+                                                  "tests/viability-validation.ts",
+                                                  "client/src/components/needle-hull-preset.tsx",
+                                                  "tests/viability-validation.ts",
+                                                  "client/src/components/ElectronOrbitalPanel.tsx",
+                                                  "modules/warp/natario-warp.ts"
+                                              ],
+                  "code_spans_added":  6,
+                  "prompt_items":  [
+                                       {
+                                           "type":  "intent",
+                                           "hash":  "6c7281e1098f",
+                                           "size":  63
+                                       },
+                                       {
+                                           "type":  "retrieval_summary",
+                                           "hash":  "ce30461cb76e",
+                                           "size":  380
+                                       },
+                                       {
+                                           "type":  "selected_trees",
+                                           "hash":  "d6687e0661b9",
+                                           "size":  24
+                                       },
+                                       {
+                                           "type":  "doc_spans",
+                                           "hash":  "c497a7a5470b",
+                                           "size":  782
+                                       },
+                                       {
+                                           "type":  "code_spans",
+                                           "hash":  "f41453e11393",
+                                           "size":  365
+                                       }
+                                   ],
+                  "prompt_item_count":  5,
+                  "tool_results_block":  "TOOL_RESULTS\n[retrieval_summary]\nfiles: docs/knowledge/warp/natario-zero-expansion.md, docs/needle-hull-mainframe.md, docs/knowledge/trees/paper-ingestion-runtime-tree.md, docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.json\nconfidence: 0.00\n\n[doc_spans]\n- Section: Overview (docs/knowledge/warp/natario-zero-expansion.md)\n- Section: Needle Hull Mainframe System \u003e System Layers \u003e 2. Energy pipeline + hull defaults (server) (docs/needle-hull-mainframe.md)\n- Section: Paper Ingestion Runtime Tree (docs/knowledge/trees/paper-ingestion-runtime-tree.md)\n- Section: Panel Concepts Tree \u003e Nodes \u003e Node: Hull Metrics Vis Concept \u003c-\u003e natario-zero-expansion (docs/knowledge/trees/panel-concepts-tree.md)\n- Section: Panel Registry Tree \u003e Nodes \u003e Node: Needle Ipeak Worksheet (docs/knowledge/trees/panel-registry-tree.md)\n- Section: Needle Hull Mark 2 Theory Directory (latest) \u003e Identity (docs/audits/research/needle-hull-mark2/theory-directory-latest.md)\n- Section: Overview (docs/audits/research/needle-hull-mark2/theory-directory-latest.json)\n\n[code_spans]\n- Needle Span: L1-L4 (client/src/components/needle-hull-preset.tsx)\n- Needle Span: L6-L10 (tests/viability-validation.ts)\n- Hull Span: L1-L4 (client/src/components/needle-hull-preset.tsx)\n- Hull Span: L6-L10 (tests/viability-validation.ts)\n- Panel Span: L26-L30 (client/src/components/ElectronOrbitalPanel.tsx)\n- Natario Span: L65-L69 (modules/warp/natario-warp.ts)\n\nEND_TOOL_RESULTS",
+                  "tool_results_present":  true,
+                  "tool_results_items":  [
+                                             "retrieval_summary",
+                                             "doc_spans",
+                                             "code_spans"
+                                         ],
+                  "tool_results_hash":  "1634436e6602",
+                  "synthesis_mode":  "deterministic_scaffold",
+                  "synthesis_mode_reasons":  [
+                                                 "single_llm"
+                                             ],
+                  "synthesis_reason":  "mode=deterministic_scaffold | repo=none | prompt=none | general=none | repo_scaffold=no | prompt_scaffold=no | general_scaffold=yes",
+                  "synthesis_repo_path":  "none",
+                  "synthesis_prompt_path":  "none",
+                  "synthesis_general_path":  "none",
+                  "needle_natario_relation_proof":  {
+                                                        "applicable":  false,
+                                                        "ok":  true,
+                                                        "outcome":  "not_applicable",
+                                                        "matched_edge_ids":  [
+
+                                                                             ],
+                                                        "missing_edge_ids":  [
+
+                                                                             ]
+                                                    },
+                  "evidence_cards":  "General reasoning:\n- Interpretation: \"needle hull\" is treated as natario-zero-expansion.\n- Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts.\n- Key questions: How is zero expansion computed and validated?\n- Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks. The Needle Hull Mk1 preset configures warpFieldType=\"natario\", so Needle Hull is treated as a Natario-family warp bubble profile rather than a separate metric family.\n- Scope: Natario bubble definition used in the warp modules",
+                  "evidence_packet_v2_used":  true,
+                  "evidence_packet_v2":  {
+                                             "version":  "repo_atlas_evidence_packet_v2",
+                                             "route":  "general",
+                                             "intent_id":  "general.conceptual_define_compare",
+                                             "intent_domain":  "general",
+                                             "section_ids":  [
+                                                                 "general"
+                                                             ],
+                                             "section_count":  1,
+                                             "evidence_text_chars":  747,
+                                             "evidence_cards_chars":  766,
+                                             "context_file_count":  7,
+                                             "doc_block_count":  7,
+                                             "retrieval_confidence":  0,
+                                             "retrieval_doc_share":  0,
+                                             "slot_coverage_ratio":  0,
+                                             "slot_missing_count":  0,
+                                             "doc_coverage_ratio":  0,
+                                             "doc_missing_count":  0,
+                                             "sources":  [
+                                                             "docs/knowledge/warp/natario-zero-expansion.md",
+                                                             "docs/needle-hull-mainframe.md",
+                                                             "docs/knowledge/trees/paper-ingestion-runtime-tree.md",
+                                                             "docs/knowledge/trees/panel-concepts-tree.md",
+                                                             "docs/knowledge/trees/panel-registry-tree.md",
+                                                             "docs/audits/research/needle-hull-mark2/theory-directory-latest.md",
+                                                             "docs/audits/research/needle-hull-mark2/theory-directory-latest.json"
+                                                         ]
+                                         },
+                  "llm_short_circuit_rule":  "fallback_answer_short_circuit_v1",
+                  "llm_short_circuit_reason":  "forced_answer_hard",
+                  "llm_short_circuit_bypassed":  false,
+                  "llm_skip_reason_detail":  "forcedAnswer:pre_intent_clarify",
+                  "answer_short_sentences":  4,
+                  "answer_short_tokens":  106,
+                  "answer_raw_text":  "For \"OK what is needle hull mark 2?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption. Then add one implication sentence that states what decision the evidence supports now and what new data would change it. Clarify: Do you mean \"client/src\" or \"server/routes\"? If you mean a repo concept, point me to the file or module.",
+                  "answer_preclean_mode":  "formatted",
+                  "answer_preclean_reason":  "generic_formatter",
+                  "answer_contract_applied":  false,
+                  "report_mode_mismatch":  false,
+                  "report_scaffold_guard_triggered":  false,
+                  "answer_after_format":  "For \"OK what is needle hull mark 2?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption. Then add one implication sentence that states what decision the evidence supports now and what new data would change it. Clarify: Do you mean \"client/src\" or \"server/routes\"? If you mean a repo concept, point me to the file or module.",
+                  "frontier_lens_required":  false,
+                  "frontier_lens_candidate_count":  0,
+                  "claim_ref_rate":  0,
+                  "answer_after_fallback":  "For \"OK what is needle hull mark 2?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption. Then add one implication sentence that states what decision the evidence supports now and what new data would change it.",
+                  "junk_clean_applied":  false,
+                  "junk_clean_reasons":  [
+
+                                         ],
+                  "concept_lint_applied":  true,
+                  "concept_lint_reasons":  [
+                                               "system_term_removed",
+                                               "system_term_removed"
+                                           ],
+                  "physics_lint_applied":  false,
+                  "physics_lint_reasons":  [
+
+                                           ],
+                  "drift_repair_applied":  false,
+                  "drift_repair_attempts":  0,
+                  "drift_repair_improved":  false,
+                  "coverage_token_count":  3,
+                  "coverage_key_count":  2,
+                  "coverage_missing_key_count":  1,
+                  "coverage_ratio":  0.5,
+                  "coverage_missing_keys":  [
+                                                "needle hull mark 2"
+                                            ],
+                  "coverage_gate_applied":  false,
+                  "claim_ledger":  [
+                                       {
+                                           "id":  "claim:1",
+                                           "type":  "assumption",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:1"
+                                       },
+                                       {
+                                           "id":  "claim:2",
+                                           "type":  "inference",
+                                           "supported":  false,
+                                           "evidence_refs":  [
+
+                                                             ],
+                                           "proof":  "source:missing -\u003e verify -\u003e claim:2"
+                                       }
+                                   ],
+                  "uncertainty_register":  [
+                                               {
+                                                   "id":  "claim:1",
+                                                   "type":  "assumption",
+                                                   "reason":  "missing_evidence"
+                                               },
+                                               {
+                                                   "id":  "claim:2",
+                                                   "type":  "inference",
+                                                   "reason":  "missing_evidence"
+                                               }
+                                           ],
+                  "constraint_matrix":  {
+                                            "section_count":  1,
+                                            "constraints":  [
+
+                                                            ]
+                                        },
+                  "belief_claim_count":  2,
+                  "belief_supported_count":  0,
+                  "belief_unsupported_count":  2,
+                  "belief_unsupported_rate":  1,
+                  "belief_contradictions":  0,
+                  "belief_gate_applied":  false,
+                  "belief_graph_node_count":  9,
+                  "belief_graph_edge_count":  0,
+                  "belief_graph_claim_count":  2,
+                  "belief_graph_definition_count":  1,
+                  "belief_graph_conclusion_count":  2,
+                  "belief_graph_evidence_ref_count":  7,
+                  "belief_graph_constraint_count":  0,
+                  "belief_graph_supports":  0,
+                  "belief_graph_contradicts":  0,
+                  "belief_graph_depends_on":  0,
+                  "belief_graph_maps_to":  0,
+                  "belief_graph_claim_ids":  [
+                                                 "claim:1",
+                                                 "claim:2"
+                                             ],
+                  "belief_graph_unsupported_claim_ids":  [
+                                                             "claim:1",
+                                                             "claim:2"
+                                                         ],
+                  "belief_graph_contradiction_ids":  [
+
+                                                     ],
+                  "rattling_score":  0.9647058823529412,
+                  "rattling_gate_applied":  false,
+                  "grounded_sentence_rate":  0,
+                  "tree_citation_share":  0,
+                  "tree_citation_total":  0,
+                  "tree_citation_tree":  0,
+                  "tree_citation_non_tree":  0,
+                  "clarify_precision":  1,
+                  "rattling_base_distance":  0.9647058823529412,
+                  "rattling_perturbation_distance":  0,
+                  "rattling_claim_set_count":  3,
+                  "variant_selection_applied":  false,
+                  "variant_selection_reason":  "general_domain",
+                  "variant_selection_candidate_count":  1,
+                  "gates":  {
+                                "evidence":  {
+
+                                             },
+                                "coverage":  {
+                                                 "applied":  false,
+                                                 "ratio":  0.5,
+                                                 "tokenCount":  3,
+                                                 "keyCount":  2,
+                                                 "missingKeyCount":  1,
+                                                 "missingKeys":  [
+                                                                     "needle hull mark 2"
+                                                                 ]
+                                             },
+                                "belief":  {
+                                               "applied":  false,
+                                               "unsupportedRate":  1,
+                                               "unsupportedCount":  2,
+                                               "supportedCount":  0,
+                                               "claimCount":  2,
+                                               "contradictions":  0
+                                           },
+                                "beliefGraph":  {
+                                                    "nodeCount":  9,
+                                                    "edgeCount":  0,
+                                                    "claimCount":  2,
+                                                    "definitionCount":  1,
+                                                    "conclusionCount":  2,
+                                                    "evidenceRefCount":  7,
+                                                    "constraintCount":  0,
+                                                    "supports":  0,
+                                                    "contradicts":  0,
+                                                    "dependsOn":  0,
+                                                    "mapsTo":  0
+                                                },
+                                "rattling":  {
+                                                 "applied":  false,
+                                                 "score":  0.9647058823529412,
+                                                 "baseDistance":  0.9647058823529412,
+                                                 "perturbationDistance":  0,
+                                                 "claimSetCount":  3
+                                             },
+                                "lint":  {
+                                             "conceptApplied":  true,
+                                             "conceptReasons":  [
+                                                                    "system_term_removed",
+                                                                    "system_term_removed"
+                                                                ],
+                                             "physicsApplied":  false,
+                                             "physicsReasons":  [
+
+                                                                ]
+                                         },
+                                "variant":  {
+                                                "applied":  false,
+                                                "reason":  "general_domain",
+                                                "candidateCount":  1
+                                            },
+                                "ambiguity":  {
+                                                  "resolverApplied":  true,
+                                                  "resolverReason":  "cluster_entropy",
+                                                  "resolverTokenCount":  3,
+                                                  "resolverShortPrompt":  true,
+                                                  "resolverTopScore":  74,
+                                                  "resolverMargin":  74,
+                                                  "resolverCandidates":  [
+                                                                             "natario-zero-expansion",
+                                                                             "natario",
+                                                                             "zero expansion warp"
+                                                                         ],
+                                                  "targetSpan":  "needle hull mark 2",
+                                                  "clusterCount":  4,
+                                                  "clusterTopMass":  0.7181750302284018,
+                                                  "clusterMargin":  0.8566138094373305,
+                                                  "clusterEntropy":  0.651325655888189,
+                                                  "clusterCandidates":  [
+                                                                            {
+                                                                                "label":  "client/src",
+                                                                                "score":  0.347734,
+                                                                                "mass":  0.718175,
+                                                                                "count":  13
+                                                                            },
+                                                                            {
+                                                                                "label":  "server/routes",
+                                                                                "score":  0.04986,
+                                                                                "mass":  0.102976,
+                                                                                "count":  2
+                                                                            },
+                                                                            {
+                                                                                "label":  "modules/warp",
+                                                                                "score":  0.047165,
+                                                                                "mass":  0.09741,
+                                                                                "count":  2
+                                                                            },
+                                                                            {
+                                                                                "label":  "tests",
+                                                                                "score":  0.039432,
+                                                                                "mass":  0.081439,
+                                                                                "count":  1
+                                                                            }
+                                                                        ]
+                                              }
+                            },
+                  "answer_path":  [
+                                      "intent:general.conceptual_define_compare",
+                                      "domain:general",
+                                      "strategy:general_explain",
+                                      "clarify:pre_intent_answer_floor",
+                                      "forcedAnswer:pre_intent_clarify",
+                                      "clarify:pre_intent",
+                                      "concept:natario-zero-expansion",
+                                      "answer:forced",
+                                      "citationRepair:skipped(intent)",
+                                      "platonic:gates",
+                                      "moveSelector:direct_answer",
+                                      "fallback:forced_answer_preserve",
+                                      "semanticQuality:fail:CLAIM_CITATION_LINK_MISSING,unsupported_claim_rate_high",
+                                      "citationScrub:open_world_sources_marker_forced_clarify",
+                                      "citationScrub:skipped_forced_clarify",
+                                      "policy:non_report_scaffold_guard_skipped_forced_clarify",
+                                      "composerShadow:preserve_forced_answer",
+                                      "composerShadow:schema_valid",
+                                      "composerShadow:pass"
+                                  ],
+                  "fuzzy_move_selector":  {
+                                              "selected":  "direct_answer",
+                                              "selected_move":  "direct_answer",
+                                              "move_scores":  {
+                                                                  "direct_answer":  0.7640999999999999,
+                                                                  "retrieve_more":  0.7178000000000002,
+                                                                  "fail_closed":  0.17769,
+                                                                  "relation_build":  -0.21260000000000007,
+                                                                  "clarify":  -0.37670000000000003
+                                                              },
+                                              "rejected_moves":  [
+                                                                     "retrieve_more",
+                                                                     "fail_closed",
+                                                                     "relation_build",
+                                                                     "clarify"
+                                                                 ],
+                                              "reject_reasons":  {
+                                                                     "direct_answer":  [
+
+                                                                                       ],
+                                                                     "retrieve_more":  [
+                                                                                           "lower_score"
+                                                                                       ],
+                                                                     "relation_build":  [
+                                                                                            "lower_score",
+                                                                                            "relation_intent_inactive"
+                                                                                        ],
+                                                                     "clarify":  [
+                                                                                     "lower_score"
+                                                                                 ],
+                                                                     "fail_closed":  [
+                                                                                         "lower_score",
+                                                                                         "risk_below_fail_closed_threshold"
+                                                                                     ]
+                                                                 },
+                                              "budget_pressure":  0.15,
+                                              "stop_reason":  "goal_satisfied",
+                                              "dynamic_biases":  {
+                                                                     "relationBuildBias":  0,
+                                                                     "retrieveMoreBias":  0,
+                                                                     "bridgeGap":  1,
+                                                                     "evidenceGap":  1,
+                                                                     "dualDomainGap":  0
+                                                                 },
+                                              "dynamic_bias_relation_build":  0,
+                                              "dynamic_bias_retrieve_more":  0,
+                                              "gaps":  {
+                                                           "bridge":  1,
+                                                           "evidence":  1,
+                                                           "dual_domain":  0
+                                                       },
+                                              "scores":  {
+                                                             "groundedness":  1,
+                                                             "uncertainty":  0,
+                                                             "safety":  0.3,
+                                                             "coverage":  0
+                                                         }
+                                          },
+                  "second_pass_attempted":  false,
+                  "second_pass_skipped_reason":  "move_not_eligible",
+                  "second_pass_result":  "not_run",
+                  "answer_runtime_fallback_pinned":  true,
+                  "answer_rescue_eligible":  false,
+                  "answer_rescue_trigger":  "none",
+                  "answer_rescue_quality_reasons":  [
+                                                        "citation_missing",
+                                                        "open_world_claim_floor",
+                                                        "open_world_mechanism_missing"
+                                                    ],
+                  "answer_rescue_equation_guard":  false,
+                  "answer_rescue_rate_limit_suppressed":  false,
+                  "answer_rescue_attempted":  false,
+                  "runtime_clock_a":  {
+                                          "budget_ms":  900,
+                                          "complete_contract_on_budget":  true
+                                      },
+                  "runtime_clock_b":  {
+                                          "enabled":  true,
+                                          "deep_work_queued":  true,
+                                          "bridge_expansion_candidates":  0,
+                                          "non_blocking":  true
+                                      },
+                  "equation_quote_contract":  {
+                                                  "required":  false,
+                                                  "ok":  true,
+                                                  "reason":  "not_required",
+                                                  "answer_has_equation":  false,
+                                                  "citation_matched":  false,
+                                                  "matched_needle":  false,
+                                                  "matched_citations":  [
+
+                                                                        ],
+                                                  "question_needles":  [
+
+                                                                       ],
+                                                  "equation_relevance_required":  false,
+                                                  "equation_relevance_score":  null,
+                                                  "equation_relevance_reason":  null
+                                              },
+                  "claim_citation_link_claim_count":  1,
+                  "claim_citation_link_citation_count":  20,
+                  "claim_citation_link_linked_count":  1,
+                  "claim_citation_link_ok":  true,
+                  "claim_citation_link_missing":  [
+
+                                                  ],
+                  "semantic_quality":  {
+                                           "claim_citation_link_rate":  0,
+                                           "deterministic_claim_citation_link_rate":  0,
+                                           "deterministic_claim_count":  2,
+                                           "deterministic_linked_claim_count":  0,
+                                           "unsupported_claim_rate":  1,
+                                           "repetition_penalty_fail":  false,
+                                           "contradiction_flag":  false,
+                                           "relation_completeness_required":  false,
+                                           "relation_completeness_before":  null,
+                                           "relation_completeness_after":  null,
+                                           "relation_completeness_repair_applied":  false,
+                                           "fail_reasons":  [
+                                                                "CLAIM_CITATION_LINK_MISSING",
+                                                                "unsupported_claim_rate_high"
+                                                            ]
+                                       },
+                  "composer_shadow_enabled":  true,
+                  "composer_profile_id":  "definition_overview:broad",
+                  "composer_profile_version":  "universal_composer_v2",
+                  "composer_prompt_family":  "definition_overview",
+                  "composer_prompt_specificity":  "broad",
+                  "composer_pre_validation_fail_reasons":  [
+                                                               "required_sections_missing",
+                                                               "anchor_integrity_violation"
+                                                           ],
+                  "composer_pre_sections_present":  [
+                                                        "Sources"
+                                                    ],
+                  "composer_pre_required_section_count":  5,
+                  "composer_pre_required_section_present_count":  1,
+                  "composer_pre_family_format_accuracy":  0.2,
+                  "composer_schema_valid":  true,
+                  "composer_validation_fail_reason":  null,
+                  "composer_validation_fail_reasons":  [
+
+                                                       ],
+                  "composer_sections_present":  [
+                                                    "Sources"
+                                                ],
+                  "composer_required_section_count":  5,
+                  "composer_required_section_present_count":  1,
+                  "composer_family_format_accuracy":  0.2,
+                  "composer_anchor_integrity_violations_count":  1,
+                  "composer_anchor_integrity_violations":  [
+                                                               "open-world best-effort (no repo citations required)"
+                                                           ],
+                  "composer_debug_leak_hit_count":  0,
+                  "composer_debug_leak_hits":  [
+
+                                               ],
+                  "composer_placeholder_section_count":  0,
+                  "answer_validation_failures":  [
+
+                                                 ],
+                  "prompt_research_validation_failures":  [
+
+                                                          ],
+                  "prompt_research_validation_missing_verbatim_constraints":  [
+
+                                                                              ],
+                  "prompt_research_validation_missing_required_sections":  [
+
+                                                                           ],
+                  "prompt_research_validation_missing_support_sections":  [
+
+                                                                          ],
+                  "prompt_research_validation_missing_provenance_columns":  [
+
+                                                                            ],
+                  "prompt_research_validation_placeholder_hits":  [
+
+                                                                  ],
+                  "prompt_research_validation_repair_actions":  [
+
+                                                                ],
+                  "answer_sectional_compose_used":  false,
+                  "composer_degraded":  false,
+                  "composer_degrade_reason":  null,
+                  "composer_degrade_path_id":  "definition_overview_single_path_degrade",
+                  "composer_soft_enforce_applied":  false,
+                  "composer_soft_enforce_gate_mode":  "observe",
+                  "composer_soft_enforce_effective_mode":  "observe",
+                  "composer_soft_enforce_enabled":  true,
+                  "composer_soft_enforce_deterministic_preserve_blocked":  false,
+                  "composer_soft_enforce_escalated_enforce":  false,
+                  "composer_soft_enforce_soft_section_guard_observed":  false,
+                  "composer_soft_enforce_observe_skip":  false,
+                  "composer_soft_enforce_observe_reason":  null,
+                  "composer_soft_enforce_observe_rewrite_applied":  false,
+                  "composer_soft_enforce_hard_guard_triggered":  false,
+                  "composer_soft_enforce_hard_guard_reason":  null,
+                  "composer_soft_enforce_soft_section_guard_triggered":  false,
+                  "composer_soft_enforce_reason":  null,
+                  "composer_soft_enforce_trigger_reason":  null,
+                  "composer_soft_enforce_action":  "preserve_forced_answer",
+                  "composer_v2_enabled":  false,
+                  "composer_v2_applied":  false,
+                  "composer_v2_brief_source":  null,
+                  "composer_v2_evidence_digest_source":  null,
+                  "composer_v2_evidence_digest_claim_count":  0,
+                  "composer_v2_handoff_source":  null,
+                  "composer_v2_handoff_block_count":  0,
+                  "composer_v2_handoff_chars":  0,
+                  "composer_v2_handoff_truncated":  false,
+                  "composer_v2_claim_counts":  {
+                                                   "baseline_common":  0,
+                                                   "repo_grounded":  0,
+                                                   "reasoned_inference":  0
+                                               },
+                  "composer_v2_pre_link_fail_reasons":  [
+
+                                                        ],
+                  "composer_v2_post_link_fail_reasons":  [
+
+                                                         ],
+                  "composer_v2_repair_attempted":  false,
+                  "composer_v2_fallback_reason":  null,
+                  "composer_v2_expand_char_count":  0,
+                  "composer_v2_expand_raw_preview":  null,
+                  "composer_v2_repair_char_count":  0,
+                  "composer_v2_repair_raw_preview":  null,
+                  "composer_v2_expand_attempts":  0,
+                  "composer_v2_repair_attempts":  0,
+                  "composer_v2_transient_retries":  0,
+                  "composer_v2_repair_skipped_due_to_expand_error":  false,
+                  "composer_v2_expand_error_code":  null,
+                  "composer_v2_projection_applied":  false,
+                  "composer_v2_best_attempt_stage":  null,
+                  "composer_v2_projection_guard_triggered":  false,
+                  "composer_v2_projection_guard_hard":  false,
+                  "composer_v2_projection_guard_mode":  "none",
+                  "composer_v2_projection_guard_retrieval_healthy":  false,
+                  "composer_v2_projection_guard_llm_healthy":  false,
+                  "composer_v2_projection_guard_reasons":  [
+                                                               "stage05_not_used",
+                                                               "stage05_no_cards",
+                                                               "slot_coverage_incomplete",
+                                                               "llm_not_attempted",
+                                                               "llm_provider_not_called",
+                                                               "llm_http_status_not_200",
+                                                               "composer_not_applied",
+                                                               "composer_not_projection_like"
+                                                           ],
+                  "composer_selection_lock_id":  "ask:a0ae900a-e835-4cf0-9d99-861f2db388a0",
+                  "composer_selection_locked":  false,
+                  "composer_selection_primary_key":  null,
+                  "composer_selection_family":  "generic",
+                  "composer_evidence_hash":  "39c0c3a91483f152de5f150fc88770c3a878959e7428533007cffc71e0e64bc9",
+                  "answer_obligation_count":  4,
+                  "answer_obligations":  [
+                                             {
+                                                 "id":  "definition",
+                                                 "label":  "Definition",
+                                                 "kind":  "definition",
+                                                 "required":  true,
+                                                 "required_slots":  [
+                                                                        "definition"
+                                                                    ]
+                                             },
+                                             {
+                                                 "id":  "why_matters",
+                                                 "label":  "Why it matters",
+                                                 "kind":  "direct_answer",
+                                                 "required":  true,
+                                                 "required_slots":  [
+                                                                        "mechanism"
+                                                                    ]
+                                             },
+                                             {
+                                                 "id":  "key_terms",
+                                                 "label":  "Key terms",
+                                                 "kind":  "definition",
+                                                 "required":  true,
+                                                 "required_slots":  [
+                                                                        "definition"
+                                                                    ]
+                                             },
+                                             {
+                                                 "id":  "open_gaps",
+                                                 "label":  "State what remains uncertain or under-evidenced in this turn.",
+                                                 "kind":  "uncertainty",
+                                                 "required":  true,
+                                                 "required_slots":  [
+                                                                        "failure-path"
+                                                                    ]
+                                             }
+                                         ],
+                  "slot_missing":  [
+
+                                   ],
+                  "evidence_gap":  false,
+                  "objective_support":  [
+                                            {
+                                                "objective":  "OK what is needle hull mark 2?",
+                                                "supported":  false,
+                                                "matched_slots":  [
+
+                                                                  ]
+                                            }
+                                        ],
+                  "answer_obligation_coverage":  [
+                                                     {
+                                                         "obligation_id":  "definition",
+                                                         "label":  "Definition",
+                                                         "kind":  "definition",
+                                                         "status":  "covered",
+                                                         "matched_slots":  [
+                                                                               "definition"
+                                                                           ],
+                                                         "missing_slots":  [
+
+                                                                           ],
+                                                         "evidence_refs":  [
+                                                                               "modules/warp/natario-warp.ts",
+                                                                               "modules/warp/warp-module.ts",
+                                                                               "client/src/components/needle-hull-preset.ts",
+                                                                               "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                               "docs/warp-console-architecture.md",
+                                                                               "docs/needle-hull-mainframe.md"
+                                                                           ],
+                                                         "doc_refs":  [
+                                                                          "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                          "docs/warp-console-architecture.md",
+                                                                          "docs/needle-hull-mainframe.md",
+                                                                          "docs/knowledge/trees/paper-ingestion-runtime-tree.md"
+                                                                      ],
+                                                         "code_refs":  [
+                                                                           "modules/warp/natario-warp.ts",
+                                                                           "modules/warp/warp-module.ts",
+                                                                           "client/src/components/needle-hull-preset.ts"
+                                                                       ]
+                                                     },
+                                                     {
+                                                         "obligation_id":  "why_matters",
+                                                         "label":  "Why it matters",
+                                                         "kind":  "direct_answer",
+                                                         "status":  "partial",
+                                                         "matched_slots":  [
+
+                                                                           ],
+                                                         "missing_slots":  [
+                                                                               "mechanism"
+                                                                           ],
+                                                         "evidence_refs":  [
+                                                                               "modules/warp/natario-warp.ts",
+                                                                               "modules/warp/warp-module.ts",
+                                                                               "client/src/components/needle-hull-preset.ts",
+                                                                               "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                               "docs/warp-console-architecture.md",
+                                                                               "docs/needle-hull-mainframe.md"
+                                                                           ],
+                                                         "doc_refs":  [
+                                                                          "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                          "docs/warp-console-architecture.md",
+                                                                          "docs/needle-hull-mainframe.md",
+                                                                          "docs/knowledge/trees/paper-ingestion-runtime-tree.md"
+                                                                      ],
+                                                         "code_refs":  [
+                                                                           "modules/warp/natario-warp.ts",
+                                                                           "modules/warp/warp-module.ts",
+                                                                           "client/src/components/needle-hull-preset.ts"
+                                                                       ]
+                                                     },
+                                                     {
+                                                         "obligation_id":  "key_terms",
+                                                         "label":  "Key terms",
+                                                         "kind":  "definition",
+                                                         "status":  "covered",
+                                                         "matched_slots":  [
+                                                                               "definition"
+                                                                           ],
+                                                         "missing_slots":  [
+
+                                                                           ],
+                                                         "evidence_refs":  [
+                                                                               "modules/warp/natario-warp.ts",
+                                                                               "modules/warp/warp-module.ts",
+                                                                               "client/src/components/needle-hull-preset.ts",
+                                                                               "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                               "docs/warp-console-architecture.md",
+                                                                               "docs/needle-hull-mainframe.md"
+                                                                           ],
+                                                         "doc_refs":  [
+                                                                          "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                          "docs/warp-console-architecture.md",
+                                                                          "docs/needle-hull-mainframe.md",
+                                                                          "docs/knowledge/trees/paper-ingestion-runtime-tree.md"
+                                                                      ],
+                                                         "code_refs":  [
+                                                                           "modules/warp/natario-warp.ts",
+                                                                           "modules/warp/warp-module.ts",
+                                                                           "client/src/components/needle-hull-preset.ts"
+                                                                       ]
+                                                     },
+                                                     {
+                                                         "obligation_id":  "open_gaps",
+                                                         "label":  "State what remains uncertain or under-evidenced in this turn.",
+                                                         "kind":  "uncertainty",
+                                                         "status":  "partial",
+                                                         "matched_slots":  [
+
+                                                                           ],
+                                                         "missing_slots":  [
+                                                                               "failure-path"
+                                                                           ],
+                                                         "evidence_refs":  [
+                                                                               "modules/warp/natario-warp.ts",
+                                                                               "modules/warp/warp-module.ts",
+                                                                               "client/src/components/needle-hull-preset.ts",
+                                                                               "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                               "docs/warp-console-architecture.md",
+                                                                               "docs/needle-hull-mainframe.md"
+                                                                           ],
+                                                         "doc_refs":  [
+                                                                          "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                          "docs/warp-console-architecture.md",
+                                                                          "docs/needle-hull-mainframe.md",
+                                                                          "docs/knowledge/trees/paper-ingestion-runtime-tree.md"
+                                                                      ],
+                                                         "code_refs":  [
+                                                                           "modules/warp/natario-warp.ts",
+                                                                           "modules/warp/warp-module.ts",
+                                                                           "client/src/components/needle-hull-preset.ts"
+                                                                       ]
+                                                     }
+                                                 ],
+                  "answer_obligations_missing":  [
+                                                     "Why it matters",
+                                                     "State what remains uncertain or under-evidenced in this turn."
+                                                 ],
+                  "answer_obligation_evidence":  [
+                                                     {
+                                                         "obligation_id":  "definition",
+                                                         "status":  "covered",
+                                                         "supporting_repo_paths":  [
+                                                                                       "modules/warp/natario-warp.ts",
+                                                                                       "modules/warp/warp-module.ts",
+                                                                                       "client/src/components/needle-hull-preset.ts",
+                                                                                       "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                                       "docs/warp-console-architecture.md",
+                                                                                       "docs/needle-hull-mainframe.md"
+                                                                                   ],
+                                                         "supporting_snippets":  [
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "Sources: docs/knowledge/warp/natario-zero-expansion.md, docs/needle-hull-mainframe.md, docs/knowledge/trees/paper-ingestion-runtime-tree.md, docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.json",
+                                                                                     "/** * Natário Zero-Expansion Warp Bubble Implementation * Based on \"Needle Hull\" and \"Geometry-Amplified Dynamic Casimir Effect\" papers * Implements sector-strobed Casimir lattice for warp field generation"
+                                                                                 ],
+                                                         "claim_tier":  "exploratory",
+                                                         "conflict_markers":  [
+
+                                                                              ]
+                                                     },
+                                                     {
+                                                         "obligation_id":  "why_matters",
+                                                         "status":  "partial",
+                                                         "supporting_repo_paths":  [
+                                                                                       "modules/warp/natario-warp.ts",
+                                                                                       "modules/warp/warp-module.ts",
+                                                                                       "client/src/components/needle-hull-preset.ts",
+                                                                                       "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                                       "docs/warp-console-architecture.md",
+                                                                                       "docs/needle-hull-mainframe.md"
+                                                                                   ],
+                                                         "supporting_snippets":  [
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "Sources: docs/knowledge/warp/natario-zero-expansion.md, docs/needle-hull-mainframe.md, docs/knowledge/trees/paper-ingestion-runtime-tree.md, docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.json",
+                                                                                     "/** * Natário Zero-Expansion Warp Bubble Implementation * Based on \"Needle Hull\" and \"Geometry-Amplified Dynamic Casimir Effect\" papers * Implements sector-strobed Casimir lattice for warp field generation"
+                                                                                 ],
+                                                         "claim_tier":  "exploratory",
+                                                         "conflict_markers":  [
+
+                                                                              ]
+                                                     },
+                                                     {
+                                                         "obligation_id":  "key_terms",
+                                                         "status":  "covered",
+                                                         "supporting_repo_paths":  [
+                                                                                       "modules/warp/natario-warp.ts",
+                                                                                       "modules/warp/warp-module.ts",
+                                                                                       "client/src/components/needle-hull-preset.ts",
+                                                                                       "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                                       "docs/warp-console-architecture.md",
+                                                                                       "docs/needle-hull-mainframe.md"
+                                                                                   ],
+                                                         "supporting_snippets":  [
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "Sources: docs/knowledge/warp/natario-zero-expansion.md, docs/needle-hull-mainframe.md, docs/knowledge/trees/paper-ingestion-runtime-tree.md, docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.json",
+                                                                                     "/** * Natário Zero-Expansion Warp Bubble Implementation * Based on \"Needle Hull\" and \"Geometry-Amplified Dynamic Casimir Effect\" papers * Implements sector-strobed Casimir lattice for warp field generation"
+                                                                                 ],
+                                                         "claim_tier":  "exploratory",
+                                                         "conflict_markers":  [
+
+                                                                              ]
+                                                     },
+                                                     {
+                                                         "obligation_id":  "open_gaps",
+                                                         "status":  "partial",
+                                                         "supporting_repo_paths":  [
+                                                                                       "modules/warp/natario-warp.ts",
+                                                                                       "modules/warp/warp-module.ts",
+                                                                                       "client/src/components/needle-hull-preset.ts",
+                                                                                       "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                                       "docs/warp-console-architecture.md",
+                                                                                       "docs/needle-hull-mainframe.md"
+                                                                                   ],
+                                                         "supporting_snippets":  [
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                                                     "Sources: docs/knowledge/warp/natario-zero-expansion.md, docs/needle-hull-mainframe.md, docs/knowledge/trees/paper-ingestion-runtime-tree.md, docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.json",
+                                                                                     "/** * Natário Zero-Expansion Warp Bubble Implementation * Based on \"Needle Hull\" and \"Geometry-Amplified Dynamic Casimir Effect\" papers * Implements sector-strobed Casimir lattice for warp field generation"
+                                                                                 ],
+                                                         "claim_tier":  "exploratory",
+                                                         "conflict_markers":  [
+
+                                                                              ]
+                                                     }
+                                                 ],
+                  "answer_evidence_blocks":  [
+                                                 {
+                                                     "id":  "general",
+                                                     "label":  "General reasoning",
+                                                     "content":  "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                     "citations":  [
+                                                                       "modules/warp/natario-warp.ts"
+                                                                   ]
+                                                 },
+                                                 {
+                                                     "id":  "evidence_1",
+                                                     "label":  "Evidence",
+                                                     "content":  "- Interpretation: \"needle hull\" is treated as natario-zero-expansion. - Definition: The Natario zero-expansion model defines a warp bubble with near-zero expansion scalar, implemented in natario-warp.ts. - Key questions: How is zero expansion computed and validated? - Notes: The implementation checks the divergence of the shift vector and reports validation flags. In this repo, Natario warp bubble parameters are driven by the Casimir tile energy pipeline (Casimir lattice) before guardrails and stress-energy checks....",
+                                                     "citations":  [
+                                                                       "modules/warp/natario-warp.ts"
+                                                                   ]
+                                                 },
+                                                 {
+                                                     "id":  "evidence_2",
+                                                     "label":  "Evidence",
+                                                     "content":  "Sources: docs/knowledge/warp/natario-zero-expansion.md, docs/needle-hull-mainframe.md, docs/knowledge/trees/paper-ingestion-runtime-tree.md, docs/knowledge/trees/panel-concepts-tree.md, docs/knowledge/trees/panel-registry-tree.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.md, docs/audits/research/needle-hull-mark2/theory-directory-latest.json",
+                                                     "citations":  [
+                                                                       "docs/knowledge/warp/natario-zero-expansion.md",
+                                                                       "docs/needle-hull-mainframe.md",
+                                                                       "docs/knowledge/trees/paper-ingestion-runtime-tree.md",
+                                                                       "docs/knowledge/trees/panel-concepts-tree.md",
+                                                                       "docs/knowledge/trees/panel-registry-tree.md",
+                                                                       "docs/audits/research/needle-hull-mark2/theory-directory-latest.md"
+                                                                   ]
+                                                 },
+                                                 {
+                                                     "id":  "file_1",
+                                                     "label":  "natario-warp.ts",
+                                                     "content":  "/** * Natário Zero-Expansion Warp Bubble Implementation * Based on \"Needle Hull\" and \"Geometry-Amplified Dynamic Casimir Effect\" papers * Implements sector-strobed Casimir lattice for warp field generation",
+                                                     "citations":  [
+                                                                       "modules/warp/natario-warp.ts"
+                                                                   ]
+                                                 },
+                                                 {
+                                                     "id":  "file_2",
+                                                     "label":  "warp-module.ts",
+                                                     "content":  "const calculationTime = Date.now() - startTime; debugLog(\u0027[WarpModule] Calculation completed in\u0027, calculationTime, \u0027ms\u0027); // Add debug information for shift vector field",
+                                                     "citations":  [
+                                                                       "modules/warp/warp-module.ts"
+                                                                   ]
+                                                 },
+                                                 {
+                                                     "id":  "file_4",
+                                                     "label":  "natario-zero-expansion.md",
+                                                     "content":  ", \"what is\", \"explain\"] , \"physics\"] , \"modules/warp/warp-module.ts\", \"client/src/components/needle-hull-preset.tsx\", \"docs/needle-hull-mainframe.md\"].",
+                                                     "citations":  [
+                                                                       "modules/warp/warp-module.ts",
+                                                                       "client/src/components/needle-hull-preset.tsx",
+                                                                       "docs/needle-hull-mainframe.md",
+                                                                       "client/src/components/needle-hull-preset.ts",
+                                                                       "docs/knowledge/warp/natario-zero-expansion.md"
+                                                                   ]
+                                                 }
+                                             ],
+                  "answer_plan_sections":  [
+                                               {
+                                                   "id":  "definition",
+                                                   "title":  "Definition",
+                                                   "kind":  "definition",
+                                                   "coverage_status":  "covered",
+                                                   "obligation_ids":  [
+                                                                          "definition"
+                                                                      ]
+                                               },
+                                               {
+                                                   "id":  "why_matters",
+                                                   "title":  "Why it matters",
+                                                   "kind":  "answer",
+                                                   "coverage_status":  "partial",
+                                                   "obligation_ids":  [
+                                                                          "why_matters"
+                                                                      ]
+                                               },
+                                               {
+                                                   "id":  "key_terms",
+                                                   "title":  "Key terms",
+                                                   "kind":  "definition",
+                                                   "coverage_status":  "covered",
+                                                   "obligation_ids":  [
+                                                                          "key_terms"
+                                                                      ]
+                                               },
+                                               {
+                                                   "id":  "open_gaps",
+                                                   "title":  "Open Gaps",
+                                                   "kind":  "gaps",
+                                                   "coverage_status":  "partial",
+                                                   "obligation_ids":  [
+                                                                          "why_matters",
+                                                                          "open_gaps"
+                                                                      ]
+                                               },
+                                               {
+                                                   "id":  "sources",
+                                                   "title":  "Sources",
+                                                   "kind":  "sources",
+                                                   "coverage_status":  null,
+                                                   "obligation_ids":  [
+
+                                                                      ]
+                                               }
+                                           ],
+                  "anchor_integrity_ok":  false,
+                  "answer_mode":  "general",
+                  "degrade_mode":  "preserve_forced_answer",
+                  "answer_final_text":  "For \"OK what is needle hull mark 2?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption. Then add one implication sentence that states what decision the evidence supports now and what new data would change it.\n\nSources: open-world best-effort (no repo citations required).",
+                  "answer_extension_available":  false,
+                  "answer_extension_items":  0,
+                  "answer_extension_doc_items":  0,
+                  "answer_extension_code_items":  0,
+                  "answer_extension_appended":  false,
+                  "live_events":  [
+                                      {
+                                          "ts":  "2026-03-23T14:50:03.502Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Concept card ready",
+                                          "detail":  "natario-zero-expansion",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Concept card ready - natario-zero-expansion",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      },
+                                      {
+                                          "ts":  "2026-03-23T14:50:03.986Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Generating answer",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Generating answer"
+                                      },
+                                      {
+                                          "ts":  "2026-03-23T14:50:03.986Z",
+                                          "tool":  "helix.ask.progress",
+                                          "stage":  "Answer ready",
+                                          "detail":  "concept",
+                                          "durationMs":  0,
+                                          "text":  "Helix Ask: Answer ready - concept",
+                                          "meta":  {
+                                                       "elapsedMs":  0
+                                                   }
+                                      }
+                                  ],
+                  "trace_events":  [
+                                       {
+                                           "ts":  "2026-03-23T14:50:03.502Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Concept card ready",
+                                           "detail":  "natario-zero-expansion",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Concept card ready - natario-zero-expansion",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       },
+                                       {
+                                           "ts":  "2026-03-23T14:50:03.986Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Generating answer",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Generating answer"
+                                       },
+                                       {
+                                           "ts":  "2026-03-23T14:50:03.986Z",
+                                           "tool":  "helix.ask.progress",
+                                           "stage":  "Answer ready",
+                                           "detail":  "concept",
+                                           "durationMs":  0,
+                                           "text":  "Helix Ask: Answer ready - concept",
+                                           "meta":  {
+                                                        "elapsedMs":  0
+                                                    }
+                                       }
+                                   ],
+                  "trace_summary":  [
+
+                                    ],
+                  "event_stable_fields":  {
+                                              "retrieval_route":  "graph:needle-hull-mark2-theory",
+                                              "fallback_decision":  "ambiguity_clarify",
+                                              "contract_renderer_path":  "unknown",
+                                              "gate_outcomes":  {
+                                                                    "evidence_gate_ok":  true,
+                                                                    "claim_gate_ok":  true,
+                                                                    "doc_slot_gate_ok":  true
+                                                                }
+                                          },
+                  "event_journal":  {
+                                        "version":  "quake_frame_loop_v1",
+                                        "replay_parity":  true,
+                                        "deterministic":  true,
+                                        "event_count":  3,
+                                        "event_hash":  "sha256:45686750b37fc13dc72f19b44160d84feb8f8bcc81e535f386237304d12f365e",
+                                        "stable_fields":  {
+                                                              "retrieval_route":  "graph:needle-hull-mark2-theory",
+                                                              "fallback_decision":  "ambiguity_clarify",
+                                                              "contract_renderer_path":  "unknown",
+                                                              "gate_outcomes":  {
+                                                                                    "evidence_gate_ok":  true,
+                                                                                    "claim_gate_ok":  true,
+                                                                                    "doc_slot_gate_ok":  true
+                                                                                }
+                                                          }
+                                    },
+                  "helix_ask_fail_reason":  null,
+                  "helix_ask_fail_class":  null,
+                  "fallback_reason_taxonomy":  "ambiguity_clarify",
+                  "term_prior_impact":  "neutral",
+                  "term_prior_repo_override_applied":  false,
+                  "term_prior_repo_evidence_strength":  0,
+                  "term_prior_repo_evidence_artifacts":  0,
+                  "context_capsule":  {
+                                          "version":  "v1",
+                                          "capsuleId":  "HXCAP-D2B38FA6",
+                                          "fingerprint":  "HXFP-27WR28",
+                                          "createdAtTsMs":  1774277404039,
+                                          "traceId":  "ask:a0ae900a-e835-4cf0-9d99-861f2db388a0",
+                                          "runId":  "ask:a0ae900a-e835-4cf0-9d99-861f2db388a0",
+                                          "convergence":  {
+                                                              "source":  "unknown",
+                                                              "proofPosture":  "unknown",
+                                                              "maturity":  "diagnostic",
+                                                              "phase":  "observe",
+                                                              "collapseEvent":  null
+                                                          },
+                                          "commit":  {
+                                                         "events":  [
+
+                                                                    ],
+                                                         "proof_verdict":  "UNKNOWN",
+                                                         "certificate_hash":  null,
+                                                         "certificate_integrity_ok":  null
+                                                     },
+                                          "stamp":  {
+                                                        "rulePreset":  "diagnostic",
+                                                        "tickHz":  20,
+                                                        "seed":  113790644,
+                                                        "gridW":  80,
+                                                        "gridH":  16,
+                                                        "finalBits":  "11001100010100000111001111000011111111000000110111011111100000000000000000000000000000000101000010001000111101100000000000000000000110011100000110000000000000001100110000000000111010100011100000001100010011000010000100000000100000000001100011001010000010011010100100001100000010000000000000100000000000001010000000000000000001100001110111111100100010000001000001111111011000100000000001000000000000000000001000000000010001000001001000000000000000000110011110000000000000010000000011111000001001000110001010010000000000000001111100100011000000000000001010000000101100001100010001010100100010101000000000000000001001100000000000001101100000000100111010010000010111110000101101000001000001001001011010000000001110000000000001100000010000001100000000000011111000110000010010000110010000001100000000000000011111001100000010000000001100010011111000100010011000100111000101010011010000111000000110000000100110000101000100000100010110010111110111101001010101011100001100001111000110000000000000000010000110001000000001100100000010001101000000000000000000001011011111111100010100110011000011100100000110000000000000110100111100001100001000000010000000000010000001000101000001100010000000000000000001110001000000001110000000011111111100000000011101110111110001111111010010000000000000000000"
+                                                    },
+                                          "stamp_lines":  [
+                                                              "..#.......",
+                                                              "..........",
+                                                              ".........."
+                                                          ],
+                                          "safety":  {
+                                                         "strict_core":  true,
+                                                         "replay_active":  false,
+                                                         "fail_closed":  false
+                                                     }
+                                      },
+                  "context_capsule_id":  "HXCAP-D2B38FA6"
+              },
+    "context_capsule":  {
+                            "version":  "v1",
+                            "capsuleId":  "HXCAP-D2B38FA6",
+                            "fingerprint":  "HXFP-27WR28",
+                            "createdAtTsMs":  1774277404039,
+                            "traceId":  "ask:a0ae900a-e835-4cf0-9d99-861f2db388a0",
+                            "runId":  "ask:a0ae900a-e835-4cf0-9d99-861f2db388a0",
+                            "convergence":  {
+                                                "source":  "unknown",
+                                                "proofPosture":  "unknown",
+                                                "maturity":  "diagnostic",
+                                                "phase":  "observe",
+                                                "collapseEvent":  null
+                                            },
+                            "commit":  {
+                                           "events":  [
+
+                                                      ],
+                                           "proof_verdict":  "UNKNOWN",
+                                           "certificate_hash":  null,
+                                           "certificate_integrity_ok":  null
+                                       },
+                            "stamp":  {
+                                          "rulePreset":  "diagnostic",
+                                          "tickHz":  20,
+                                          "seed":  113790644,
+                                          "gridW":  80,
+                                          "gridH":  16,
+                                          "finalBits":  "11001100010100000111001111000011111111000000110111011111100000000000000000000000000000000101000010001000111101100000000000000000000110011100000110000000000000001100110000000000111010100011100000001100010011000010000100000000100000000001100011001010000010011010100100001100000010000000000000100000000000001010000000000000000001100001110111111100100010000001000001111111011000100000000001000000000000000000001000000000010001000001001000000000000000000110011110000000000000010000000011111000001001000110001010010000000000000001111100100011000000000000001010000000101100001100010001010100100010101000000000000000001001100000000000001101100000000100111010010000010111110000101101000001000001001001011010000000001110000000000001100000010000001100000000000011111000110000010010000110010000001100000000000000011111001100000010000000001100010011111000100010011000100111000101010011010000111000000110000000100110000101000100000100010110010111110111101001010101011100001100001111000110000000000000000010000110001000000001100100000010001101000000000000000000001011011111111100010100110011000011100100000110000000000000110100111100001100001000000010000000000010000001000101000001100010000000000000000001110001000000001110000000011111111100000000011101110111110001111111010010000000000000000000"
+                                      },
+                            "stamp_lines":  [
+                                                "..#.......",
+                                                "..........",
+                                                ".........."
+                                            ],
+                            "safety":  {
+                                           "strict_core":  true,
+                                           "replay_active":  false,
+                                           "fail_closed":  false
+                                       }
+                        },
+    "report_mode":  false
+}

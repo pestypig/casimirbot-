@@ -102,4 +102,75 @@ describe("helix ask envelope practical paragraph promotion", () => {
     expect(envelope.answer).not.toMatch(/\n\s*\d+\.\s*ts\]\s+Grounded/i);
     expect(envelope.answer).not.toContain("md]");
   });
+
+  it("preserves structured deterministic section answers without summary reordering", () => {
+    const answer = [
+      "Definition:",
+      "- In this codebase, warp bubble is grounded in docs/knowledge/warp/warp-bubble.md. [docs/knowledge/warp/warp-bubble.md]",
+      "",
+      "Why it matters:",
+      "- It provides a repo-grounded definition with explicit scope for follow-up mechanism asks. [docs/knowledge/warp/warp-bubble.md]",
+      "",
+      "Key terms:",
+      "- warp",
+      "- bubble",
+      "",
+      "Repo anchors:",
+      "- docs/knowledge/warp/warp-bubble.md",
+      "",
+      "Sources: docs/knowledge/warp/warp-bubble.md, modules/warp/natario-warp.ts",
+    ].join("\n");
+
+    const envelope = buildHelixAskEnvelope({
+      answer,
+      format: "brief",
+      tier: "F1",
+      mode: "standard",
+    });
+
+    expect(envelope.answer).toMatch(/^Definition:/m);
+    expect(envelope.answer).toMatch(/^Why it matters:/m);
+    expect(envelope.answer).toMatch(/^Key terms:/m);
+    expect(envelope.answer).toMatch(/^Repo anchors:/m);
+  });
+
+  it("preserves research-contract manuscript sections in the answer card", () => {
+    const answer = [
+      "Motivation and Boundary:",
+      "This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.",
+      "",
+      "Metric Setup:",
+      "ADM notation is used with lapse, shift, and spatial metric mappings.",
+      "",
+      "Derivation Appendix:",
+      "| source_id | equation_trace_id | equation | substitutions (with units) | mapped_entry_ids | mapped_framework_variables | recompute_status | blocker_reason |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
+      "| UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |",
+      "",
+      "Provenance Table:",
+      "| source_id | equation_trace_id | equation | substitutions (with units) | mapped_entry_ids | mapped_framework_variables | recompute_status | blocker_reason |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
+      "| UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |",
+      "",
+      "Claim Discipline:",
+      "- what can be said now",
+      "",
+      "Self-Check:",
+      "- Boundary statement appears verbatim.",
+    ].join("\n");
+
+    const envelope = buildHelixAskEnvelope({
+      answer,
+      format: "brief",
+      tier: "F1",
+      mode: "standard",
+    });
+
+    expect(envelope.answer).toMatch(/^Motivation and Boundary:/m);
+    expect(envelope.answer).toMatch(/^Metric Setup:/m);
+    expect(envelope.answer).toMatch(/^Derivation Appendix:/m);
+    expect(envelope.answer).toMatch(/^Provenance Table:/m);
+    expect(envelope.answer).toMatch(/^Claim Discipline:/m);
+    expect(envelope.answer).toMatch(/^Self-Check:/m);
+  });
 });

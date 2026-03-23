@@ -11,12 +11,14 @@ type PromptCase = {
   family: PromptFamily;
   question: string;
   expected_intent_id?: string;
+  expected_intent_domain?: string;
   expected_report_mode?: boolean;
   min_text_chars?: number;
 };
 
 type AskDebug = Record<string, unknown> & {
   intent_id?: string;
+  intent_domain?: string;
   intent_strategy?: string;
   report_mode?: boolean;
   relation_packet_built?: boolean;
@@ -33,6 +35,13 @@ type AskDebug = Record<string, unknown> & {
   stage_timing_ms?: Record<string, number>;
   timeline?: Array<Record<string, unknown>>;
   answer_path?: string[];
+  objective_count?: number;
+  objective_loop_state?: Array<Record<string, unknown>>;
+  objective_retrieval_queries?: Array<Record<string, unknown>>;
+  objective_mini_answers?: Array<Record<string, unknown>>;
+  objective_mini_critic_mode?: string;
+  objective_assembly_mode?: string;
+  objective_finalize_gate_passed?: boolean;
 };
 
 type AskPayload = {
@@ -55,6 +64,7 @@ type RawRun = {
   latency_ms: number;
   timestamp: string;
   expected_intent_id?: string;
+  expected_intent_domain?: string;
   expected_report_mode?: boolean;
   response_text: string;
   debug: AskDebug | null;
@@ -103,6 +113,16 @@ type GitProvenance = {
   aheadBehind: string | null;
   hasOriginRemote: boolean;
   hasMainBranch: boolean;
+};
+
+type ProbabilitySnapshot = {
+  pass: number;
+  total: number;
+  p: number;
+  ci95: {
+    low: number;
+    high: number;
+  };
 };
 
 const BASE_URL = process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5050";
@@ -158,6 +178,10 @@ const GLOBAL_COOLDOWN_CAP_MS = Math.max(
 );
 const STUB_RE = /llm\.local stub result/i;
 const REPORT_SECTION_RE = /(Executive summary:|Coverage map:|Point-by-point:|Report covers)/i;
+const DEBUG_SCAFFOLD_LEAK_RE =
+  /\b(?:traceid=ask:|timeline:timeline:|what_is_[a-z0-9_]+\b|how_they_connect\b|constraints_and_falsifiability\b|convergence snapshot\b|capsule guards\b|context sources\b|tree walk:\b|retry:\s*not applied\b)\b/i;
+const CODE_FRAGMENT_SPILL_RE =
+  /(?:export\s+default\s+function\s+[A-Za-z0-9_]+\s*\(|useState<[^>]+>\(|use[A-Z][A-Za-z0-9_]*\(\)\s*;\s*const)/i;
 const TRACE_EXPORT_PATH = process.env.HELIX_ASK_TRACE_EXPORT_PATH?.trim() || null;
 const AB_OUTPUT_PATHS = (process.env.HELIX_ASK_AB_OUTPUT_PATHS ?? "")
   .split(",")
@@ -206,6 +230,16 @@ export const buildRunDiagnostics = (row: Pick<RawRun, "expected_report_mode" | "
   relation_dual_domain_ok:
     row.family === "relation" ? (row.debug?.relation_dual_domain_ok === true) : null,
 });
+
+const isRouteCorrect = (row: Pick<RawRun, "expected_intent_id" | "expected_intent_domain" | "debug">): boolean | null => {
+  if (row.expected_intent_id) {
+    return row.debug?.intent_id === row.expected_intent_id;
+  }
+  if (row.expected_intent_domain) {
+    return row.debug?.intent_domain === row.expected_intent_domain;
+  }
+  return null;
+};
 const execGit = async (args: string[]): Promise<string | null> =>
   new Promise((resolve) => {
     execFile("git", args, { cwd: process.cwd(), timeout: 3000 }, (error, stdout) => {
@@ -534,6 +568,7 @@ const makeRelationPrompts = (): PromptCase[] => {
     family: "relation",
     question,
     expected_intent_id: "hybrid.warp_ethos_relation",
+    expected_intent_domain: "hybrid",
     expected_report_mode: false,
     min_text_chars: MIN_TEXT_CHARS,
   }));
@@ -578,6 +613,7 @@ const makeRepoTechnicalPrompts = (): PromptCase[] => {
     id: `repo_tech_${String(index + 1).padStart(2, "0")}_${slug(question)}`,
     family: "repo_technical",
     question,
+    expected_intent_domain: "repo",
     expected_report_mode: false,
     min_text_chars: MIN_TEXT_CHARS,
   }));
@@ -620,6 +656,7 @@ const makeAmbiguousPrompts = (): PromptCase[] => {
     id: `ambiguous_${String(index + 1).padStart(2, "0")}_${slug(question)}`,
     family: "ambiguous_general",
     question,
+    expected_intent_domain: "general",
     expected_report_mode: false,
     min_text_chars: MIN_TEXT_CHARS,
   }));
@@ -766,6 +803,44 @@ const askWithRetry = async (
 const toNum = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
+const collectObjectiveLoopStates = (debug: AskDebug | null): Array<{
+  objective_id: string;
+  status: string;
+  required_slots: string[];
+}> => {
+  if (!Array.isArray(debug?.objective_loop_state)) return [];
+  return debug.objective_loop_state
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const objectiveId = String(record.objective_id ?? "").trim();
+      if (!objectiveId) return null;
+      const status = String(record.status ?? "").trim().toLowerCase();
+      const requiredSlots = Array.isArray(record.required_slots)
+        ? record.required_slots
+            .map((slot) => String(slot ?? "").trim())
+            .filter(Boolean)
+        : [];
+      return {
+        objective_id: objectiveId,
+        status,
+        required_slots: requiredSlots,
+      };
+    })
+    .filter((entry): entry is { objective_id: string; status: string; required_slots: string[] } => Boolean(entry));
+};
+
+const collectObjectiveRetrievalIds = (debug: AskDebug | null): Set<string> => {
+  const ids = new Set<string>();
+  if (!Array.isArray(debug?.objective_retrieval_queries)) return ids;
+  for (const entry of debug.objective_retrieval_queries) {
+    if (!entry || typeof entry !== "object") continue;
+    const objectiveId = String((entry as Record<string, unknown>).objective_id ?? "").trim();
+    if (objectiveId) ids.add(objectiveId);
+  }
+  return ids;
+};
+
 const collectTimings = (debug: AskDebug | null): { retrieval?: number; synthesis?: number } => {
   if (!debug) return {};
   const timeline = Array.isArray(debug.timeline) ? debug.timeline : [];
@@ -819,6 +894,9 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   if (entry.expected_intent_id && debug?.intent_id !== entry.expected_intent_id) {
     failures.push(`intent_mismatch:${debug?.intent_id ?? "missing"}`);
   }
+  if (entry.expected_intent_domain && debug?.intent_domain !== entry.expected_intent_domain) {
+    failures.push(`intent_domain_mismatch:${debug?.intent_domain ?? "missing"}`);
+  }
   if (typeof entry.expected_report_mode === "boolean" && reportMode !== entry.expected_report_mode) {
     failures.push(`report_mode_mismatch:${String(reportMode)}`);
   }
@@ -837,9 +915,37 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
     failures.push("runtime_tdz_intentProfile");
   }
   if (REPORT_SECTION_RE.test(text)) failures.push("report_scaffold_shape");
+  if (DEBUG_SCAFFOLD_LEAK_RE.test(text)) failures.push("debug_scaffold_leak");
+  if (CODE_FRAGMENT_SPILL_RE.test(text)) failures.push("code_fragment_spill");
   if (text.trim().length < (entry.min_text_chars ?? MIN_TEXT_CHARS)) failures.push(`text_too_short:${text.trim().length}`);
   const hasCitation = /\bSources?:\s+/i.test(text) || /docs\//i.test(text) || /server\//i.test(text);
   if (!hasCitation) failures.push("citation_missing");
+  const objectiveStates = collectObjectiveLoopStates(debug);
+  if (objectiveStates.length > 0) {
+    if (debug?.objective_finalize_gate_passed !== true) {
+      failures.push(`objective_finalize_gate:${String(debug?.objective_finalize_gate_passed)}`);
+    }
+    const requiredObjectiveIds = objectiveStates
+      .filter((state) => state.required_slots.length > 0)
+      .map((state) => state.objective_id);
+    if (requiredObjectiveIds.length > 0) {
+      const retrievalIds = collectObjectiveRetrievalIds(debug);
+      const missingObjectiveRetrieval = requiredObjectiveIds.filter((id) => !retrievalIds.has(id));
+      if (missingObjectiveRetrieval.length > 0) {
+        failures.push(`objective_retrieval_missing:${missingObjectiveRetrieval.slice(0, 6).join(",")}`);
+      }
+    }
+    const miniAnswerCount = Array.isArray(debug?.objective_mini_answers)
+      ? debug.objective_mini_answers.length
+      : 0;
+    if (miniAnswerCount < objectiveStates.length) {
+      failures.push(`objective_mini_answers_short:${miniAnswerCount}/${objectiveStates.length}`);
+    }
+    const assemblyMode = String(debug?.objective_assembly_mode ?? "").trim().toLowerCase();
+    if (assemblyMode !== "llm" && assemblyMode !== "deterministic_fallback") {
+      failures.push(`objective_assembly_missing:${assemblyMode || "none"}`);
+    }
+  }
   return failures;
 };
 
@@ -853,6 +959,129 @@ const percentile = (values: number[], p: number): number => {
 };
 
 const avg = (values: number[]): number => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
+
+const toWilson95 = (pass: number, total: number): ProbabilitySnapshot => {
+  if (total <= 0) {
+    return {
+      pass,
+      total,
+      p: 0,
+      ci95: {
+        low: 0,
+        high: 0,
+      },
+    };
+  }
+  const z = 1.959963984540054;
+  const phat = pass / total;
+  const z2 = z ** 2;
+  const denom = 1 + z2 / total;
+  const center =
+    (phat + z2 / (2 * total)) / denom;
+  const margin =
+    (z / denom) * Math.sqrt((phat * (1 - phat)) / total + z2 / (4 * total ** 2));
+  return {
+    pass,
+    total,
+    p: phat,
+    ci95: {
+      low: Math.max(0, center - margin),
+      high: Math.min(1, center + margin),
+    },
+  };
+};
+
+const hasFailurePrefix = (row: Pick<RawRun, "failures">, prefix: string): boolean =>
+  row.failures.some((failure) => failure.startsWith(prefix));
+
+const hasAnyFailurePrefix = (row: Pick<RawRun, "failures">, prefixes: string[]): boolean =>
+  prefixes.some((prefix) => hasFailurePrefix(row, prefix));
+
+export const buildProbabilityScorecard = (rows: RawRun[]) => {
+  const families: PromptFamily[] = ["relation", "repo_technical", "ambiguous_general"];
+  const routeCorrectByFamily = Object.fromEntries(
+    families.map((family) => {
+      const scoped = rows.filter(
+        (row) => row.family === family && (row.expected_intent_id || row.expected_intent_domain),
+      );
+      const pass = scoped.filter((row) => isRouteCorrect(row) === true).length;
+      return [family, toWilson95(pass, scoped.length)];
+    }),
+  ) as Record<PromptFamily, ProbabilitySnapshot>;
+
+  const frontierScaffoldPass = rows.filter((row) => {
+    const relationSatisfied =
+      row.family !== "relation" ||
+      (
+        row.debug?.relation_packet_built === true &&
+        row.debug?.relation_dual_domain_ok === true &&
+        toNum(row.debug?.relation_packet_bridge_count, 0) >= 2 &&
+        toNum(row.debug?.relation_packet_evidence_count, 0) >= 2
+      );
+    const noReportScaffold = !row.failures.includes("report_scaffold_shape");
+    const longEnough = !hasFailurePrefix(row, "text_too_short:");
+    return relationSatisfied && noReportScaffold && longEnough;
+  }).length;
+
+  const noDebugLeakPass = rows.filter(
+    (row) => !row.failures.includes("debug_scaffold_leak") && !row.failures.includes("code_fragment_spill"),
+  ).length;
+  const noRuntimeFallbackPass = rows.filter(
+    (row) =>
+      !hasAnyFailurePrefix(row, [
+        "runtime_fallback_answer",
+        "runtime_tdz_intentStrategy",
+        "runtime_tdz_intentProfile",
+      ]),
+  ).length;
+  const objectiveRows = rows.filter((row) => collectObjectiveLoopStates(row.debug).length > 0);
+  const objectiveCompleteBeforeFinalizePass = objectiveRows.filter((row) => {
+    const states = collectObjectiveLoopStates(row.debug);
+    const allTerminal = states.every((state) => state.status === "complete" || state.status === "blocked");
+    return row.debug?.objective_finalize_gate_passed === true && allTerminal;
+  }).length;
+  const objectiveScopedRetrievalSuccessPass = objectiveRows.filter((row) => {
+    const states = collectObjectiveLoopStates(row.debug);
+    const requiredObjectiveIds = states
+      .filter((state) => state.required_slots.length > 0)
+      .map((state) => state.objective_id);
+    if (requiredObjectiveIds.length === 0) return true;
+    const retrievalIds = collectObjectiveRetrievalIds(row.debug);
+    return requiredObjectiveIds.every((id) => retrievalIds.has(id));
+  }).length;
+  const objectiveAssemblySuccessPass = objectiveRows.filter((row) => {
+    const states = collectObjectiveLoopStates(row.debug);
+    const miniAnswerCount = Array.isArray(row.debug?.objective_mini_answers)
+      ? row.debug.objective_mini_answers.length
+      : 0;
+    const assemblyMode = String(row.debug?.objective_assembly_mode ?? "").trim().toLowerCase();
+    const assemblyOk = assemblyMode === "llm" || assemblyMode === "deterministic_fallback";
+    return assemblyOk && miniAnswerCount >= states.length;
+  }).length;
+
+  return {
+    method: "wilson_95",
+    sample_size: rows.length,
+    metrics: {
+      route_correct_by_family: routeCorrectByFamily,
+      frontier_scaffold_complete: toWilson95(frontierScaffoldPass, rows.length),
+      no_debug_leak: toWilson95(noDebugLeakPass, rows.length),
+      no_runtime_fallback: toWilson95(noRuntimeFallbackPass, rows.length),
+      objective_complete_before_finalize: toWilson95(
+        objectiveCompleteBeforeFinalizePass,
+        objectiveRows.length,
+      ),
+      objective_scoped_retrieval_success: toWilson95(
+        objectiveScopedRetrievalSuccessPass,
+        objectiveRows.length,
+      ),
+      objective_assembly_success: toWilson95(
+        objectiveAssemblySuccessPass,
+        objectiveRows.length,
+      ),
+    },
+  };
+};
 
 const main = async () => {
   const startedAt = new Date().toISOString();
@@ -990,6 +1219,7 @@ const main = async () => {
             latency_ms: response.latency_ms,
             timestamp: new Date().toISOString(),
             expected_intent_id: entry.expected_intent_id,
+            expected_intent_domain: entry.expected_intent_domain,
             expected_report_mode: entry.expected_report_mode,
             response_text: String(response.payload.text ?? ""),
             debug: response.payload.debug ?? null,
@@ -1061,7 +1291,9 @@ const main = async () => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  const expectedIntentRows = rawRuns.filter((row) => row.expected_intent_id);
+  const expectedRouteRows = rawRuns.filter(
+    (row) => row.expected_intent_id || row.expected_intent_domain,
+  );
   const reportExpectedRows = rawRuns.filter((row) => typeof row.expected_report_mode === "boolean");
   const relationRows = rawRuns.filter((row) => row.family === "relation");
 
@@ -1071,12 +1303,14 @@ const main = async () => {
   const runtimeFallbackRate = rawRuns.filter((row) => row.failures.includes("runtime_fallback_answer")).length / Math.max(1, rawRuns.length);
   const runtimeTdzIntentStrategyRate = rawRuns.filter((row) => row.failures.includes("runtime_tdz_intentStrategy")).length / Math.max(1, rawRuns.length);
   const runtimeTdzIntentProfileRate = rawRuns.filter((row) => row.failures.includes("runtime_tdz_intentProfile")).length / Math.max(1, rawRuns.length);
+  const debugScaffoldLeakRate = rawRuns.filter((row) => row.failures.includes("debug_scaffold_leak")).length / Math.max(1, rawRuns.length);
+  const codeFragmentSpillRate = rawRuns.filter((row) => row.failures.includes("code_fragment_spill")).length / Math.max(1, rawRuns.length);
 
   const relationFallbackRate = relationRows.filter((row) => row.debug?.deterministic_fallback_used_relation === true).length / Math.max(1, relationRows.length);
   const parseFailRelationRate = relationRows.filter((row) => toNum(row.debug?.contract_parse_fail_rate_relation, 0) > 0).length / Math.max(1, relationRows.length);
   const repairRate = rawRuns.filter((row) => row.debug?.citation_repair === true).length / Math.max(1, rawRuns.length);
 
-  const intentCorrectRate = expectedIntentRows.filter((row) => row.debug?.intent_id === row.expected_intent_id).length / Math.max(1, expectedIntentRows.length);
+  const intentCorrectRate = expectedRouteRows.filter((row) => isRouteCorrect(row) === true).length / Math.max(1, expectedRouteRows.length);
   const reportModeCorrectRate = reportExpectedRows.filter((row) => {
     const actual = typeof row.debug?.report_mode === "boolean" ? row.debug?.report_mode : undefined;
     return actual === row.expected_report_mode;
@@ -1084,6 +1318,26 @@ const main = async () => {
 
   const relationPacketBuiltRate = relationRows.filter((row) => row.debug?.relation_packet_built === true).length / Math.max(1, relationRows.length);
   const relationDualDomainRate = relationRows.filter((row) => row.debug?.relation_dual_domain_ok === true).length / Math.max(1, relationRows.length);
+  const probabilityScorecard = buildProbabilityScorecard(rawRuns);
+  const routeSnapshots = Object.values(probabilityScorecard.metrics.route_correct_by_family).filter(
+    (entry) => entry.total > 0,
+  );
+  const minRouteCorrectByFamily =
+    routeSnapshots.length > 0 ? Math.min(...routeSnapshots.map((entry) => entry.p)) : 1;
+  const readinessVerdict =
+    !runComplete || !provenanceGatePass
+      ? "NOT_READY"
+      : (
+          probabilityScorecard.metrics.no_debug_leak.p >= 0.99 &&
+          probabilityScorecard.metrics.no_runtime_fallback.p >= 0.99 &&
+          probabilityScorecard.metrics.frontier_scaffold_complete.p >= 0.95 &&
+          probabilityScorecard.metrics.objective_complete_before_finalize.p >= 0.99 &&
+          probabilityScorecard.metrics.objective_scoped_retrieval_success.p >= 0.95 &&
+          probabilityScorecard.metrics.objective_assembly_success.p >= 0.95 &&
+          minRouteCorrectByFamily >= 0.9
+        )
+        ? "READY"
+        : "PARTIAL_READY";
 
   const totalLatencies = rawRuns.map((row) => row.latency_ms);
   const retrievalLatencies = rawRuns.map((row) => collectTimings(row.debug).retrieval).filter((value): value is number => typeof value === "number");
@@ -1092,7 +1346,7 @@ const main = async () => {
   const familySummary = Object.fromEntries(
     Array.from(byFamily.entries()).map(([family, rows]) => {
       const passCount = rows.filter((row) => row.failures.length === 0).length;
-      const intentRows = rows.filter((row) => row.expected_intent_id);
+      const routeRows = rows.filter((row) => row.expected_intent_id || row.expected_intent_domain);
       const reportRows = rows.filter((row) => typeof row.expected_report_mode === "boolean");
       return [
         family,
@@ -1103,11 +1357,14 @@ const main = async () => {
           p50_latency_ms: percentile(rows.map((row) => row.latency_ms), 50),
           p95_latency_ms: percentile(rows.map((row) => row.latency_ms), 95),
           intent_correct_rate:
-            intentRows.filter((row) => row.debug?.intent_id === row.expected_intent_id).length /
-            Math.max(1, intentRows.length),
+            routeRows.length > 0
+              ? routeRows.filter((row) => isRouteCorrect(row) === true).length / routeRows.length
+              : null,
           report_mode_correct_rate:
-            reportRows.filter((row) => row.debug?.report_mode === row.expected_report_mode).length /
-            Math.max(1, reportRows.length),
+            reportRows.length > 0
+              ? reportRows.filter((row) => row.debug?.report_mode === row.expected_report_mode).length /
+                reportRows.length
+              : null,
           stub_rate: rows.filter((row) => row.failures.includes("stub_text_detected")).length / Math.max(1, rows.length),
         },
       ];
@@ -1134,6 +1391,7 @@ const main = async () => {
       answer: row.response_text.slice(0, 1800),
       debug: {
         intent_id: row.debug?.intent_id,
+        intent_domain: row.debug?.intent_domain,
         intent_strategy: row.debug?.intent_strategy,
         report_mode: row.debug?.report_mode,
         relation_packet_built: row.debug?.relation_packet_built,
@@ -1162,6 +1420,9 @@ const main = async () => {
             : "Tighten routing diagnostics and deterministic fallback conditions for this failure signature.",
     }));
 
+  const representativePass = rawRuns.find((row) => row.failures.length === 0);
+  const representativeFail = rawRuns.find((row) => row.failures.length > 0);
+
   const summary = {
     summary_schema_version: 2,
     run_id: runId,
@@ -1182,6 +1443,7 @@ const main = async () => {
     total_runs: rawRuns.length,
     run_complete: runComplete,
     completion_rate: rawRuns.length / Math.max(1, expectedRuns),
+    readiness_verdict: readinessVerdict,
     provenance: {
       ...gitProvenance,
       gate_pass: provenanceGatePass,
@@ -1219,12 +1481,15 @@ const main = async () => {
       runtime_fallback_answer: runtimeFallbackRate,
       runtime_tdz_intentStrategy: runtimeTdzIntentStrategyRate,
       runtime_tdz_intentProfile: runtimeTdzIntentProfileRate,
+      debug_scaffold_leak_rate: debugScaffoldLeakRate,
+      code_fragment_spill_rate: codeFragmentSpillRate,
       latency_ms: {
         total: { p50: percentile(totalLatencies, 50), p95: percentile(totalLatencies, 95) },
         retrieval: { p50: percentile(retrievalLatencies, 50), p95: percentile(retrievalLatencies, 95), samples: retrievalLatencies.length },
         synthesis: { p50: percentile(synthesisLatencies, 50), p95: percentile(synthesisLatencies, 95), samples: synthesisLatencies.length },
       },
     },
+    probability_scorecard: probabilityScorecard,
     strict_gates: {
       relation_packet_built_rate: relationPacketBuiltRate,
       relation_dual_domain_ok_rate: relationDualDomainRate,
@@ -1234,6 +1499,33 @@ const main = async () => {
       runtime_fallback_answer: runtimeFallbackRate,
       runtime_tdz_intentStrategy: runtimeTdzIntentStrategyRate,
       runtime_tdz_intentProfile: runtimeTdzIntentProfileRate,
+      no_debug_leak: probabilityScorecard.metrics.no_debug_leak.p,
+      no_runtime_fallback: probabilityScorecard.metrics.no_runtime_fallback.p,
+      frontier_scaffold_complete: probabilityScorecard.metrics.frontier_scaffold_complete.p,
+      objective_complete_before_finalize:
+        probabilityScorecard.metrics.objective_complete_before_finalize.p,
+      objective_scoped_retrieval_success:
+        probabilityScorecard.metrics.objective_scoped_retrieval_success.p,
+      objective_assembly_success:
+        probabilityScorecard.metrics.objective_assembly_success.p,
+    },
+    representative_evidence: {
+      pass: representativePass
+        ? {
+            prompt_id: representativePass.prompt_id,
+            family: representativePass.family,
+            question: representativePass.question,
+            raw_record: representativePass.artifact_bundle_paths?.raw_record ?? null,
+          }
+        : null,
+      fail: representativeFail
+        ? {
+            prompt_id: representativeFail.prompt_id,
+            family: representativeFail.family,
+            question: representativeFail.question,
+            raw_record: representativeFail.artifact_bundle_paths?.raw_record ?? null,
+          }
+        : null,
     },
     top_failure_signatures: topFailures,
     worst_examples: worst,
@@ -1244,10 +1536,13 @@ const main = async () => {
     expected_runs: expectedRuns,
     total_runs: rawRuns.length,
     run_complete: runComplete,
+    readiness_verdict: readinessVerdict,
     artifact_bundle_paths: runArtifactBundlePaths,
     diagnostics: {
       rollup: toDiagnosticRollup(rawRuns),
     },
+    probability_scorecard: probabilityScorecard,
+    representative_evidence: summary.representative_evidence,
     top_failure_signatures: topFailures,
     failed_runs: rawRuns.filter((row) => row.failures.length > 0).map((row) => ({
       prompt_id: row.prompt_id,
@@ -1256,6 +1551,7 @@ const main = async () => {
       temperature: row.temperature,
       failures: row.failures,
       intent_id: row.debug?.intent_id,
+      intent_domain: row.debug?.intent_domain,
       report_mode: row.debug?.report_mode,
       latency_ms: row.latency_ms,
       diagnostics: {
@@ -1284,7 +1580,14 @@ const main = async () => {
           relationPacketBuiltRate < 0.95 ||
           relationDualDomainRate < 0.95 ||
           reportModeCorrectRate < 0.98 ||
-          minTextPassRate < 0.9
+          minTextPassRate < 0.9 ||
+          probabilityScorecard.metrics.no_debug_leak.p < 0.99 ||
+          probabilityScorecard.metrics.no_runtime_fallback.p < 0.99 ||
+          probabilityScorecard.metrics.frontier_scaffold_complete.p < 0.95 ||
+          probabilityScorecard.metrics.objective_complete_before_finalize.p < 0.99 ||
+          probabilityScorecard.metrics.objective_scoped_retrieval_success.p < 0.95 ||
+          probabilityScorecard.metrics.objective_assembly_success.p < 0.95 ||
+          minRouteCorrectByFamily < 0.9
         ? (runComplete ? "needs_patch" : "insufficient_run_quality")
         : "ship";
   const normalizedDecision = recommendationDecision;
@@ -1314,12 +1617,18 @@ const main = async () => {
       title: "Stub environment policy split",
       why: "Separate decision-grade campaigns from stub-mode smoke runs to avoid polluted quality metrics.",
     },
+    {
+      order: 4,
+      title: "Leakage and code-spill hardening",
+      why: "Prevent debug/scaffold markers and accidental code fragments from surviving final answer cleanup.",
+    },
   ];
 
   const recommendation = {
     summary_schema_version: 2,
     run_id: runId,
     decision: normalizedDecision,
+    readiness_verdict: readinessVerdict,
     decision_grade_ready: decisionGradeReady,
     provenance_blocked: !provenanceGatePass,
     provenance_blocker_reason: provenanceBlockerReason,
@@ -1327,9 +1636,12 @@ const main = async () => {
     diagnostics: {
       rollup: toDiagnosticRollup(rawRuns),
     },
+    probability_scorecard: probabilityScorecard,
+    representative_evidence: summary.representative_evidence,
     rationale: [
       `provenance_gate_pass=${String(provenanceGatePass)}`,
       `provenance_blocker_reason=${provenanceBlockerReason ?? "none"}`,
+      `readiness_verdict=${readinessVerdict}`,
       `decision_grade_ready=${String(decisionGradeReady)}`,
       `git_branch=${gitProvenance.branch ?? "missing"}`,
       `git_head=${gitProvenance.head ?? "missing"}`,
@@ -1347,6 +1659,13 @@ const main = async () => {
       `relation_dual_domain_ok_rate=${relationDualDomainRate.toFixed(3)}`,
       `report_mode_correct_rate=${reportModeCorrectRate.toFixed(3)}`,
       `min_text_length_pass_rate=${minTextPassRate.toFixed(3)}`,
+      `no_debug_leak=${probabilityScorecard.metrics.no_debug_leak.p.toFixed(3)}`,
+      `no_runtime_fallback=${probabilityScorecard.metrics.no_runtime_fallback.p.toFixed(3)}`,
+      `frontier_scaffold_complete=${probabilityScorecard.metrics.frontier_scaffold_complete.p.toFixed(3)}`,
+      `objective_complete_before_finalize=${probabilityScorecard.metrics.objective_complete_before_finalize.p.toFixed(3)}`,
+      `objective_scoped_retrieval_success=${probabilityScorecard.metrics.objective_scoped_retrieval_success.p.toFixed(3)}`,
+      `objective_assembly_success=${probabilityScorecard.metrics.objective_assembly_success.p.toFixed(3)}`,
+      `route_correct_min_family=${minRouteCorrectByFamily.toFixed(3)}`,
     ],
     next_patches: nextPatches,
     hard_blockers: provenanceBlockerReason
@@ -1365,7 +1684,7 @@ const main = async () => {
 
   const familyLines = (Object.entries(familySummary) as Array<[string, Record<string, number>]>).map(
     ([family, stats]) =>
-      `| ${family} | ${stats.runs} | ${(stats.pass_rate * 100).toFixed(1)}% | ${(stats.intent_correct_rate * 100).toFixed(1)}% | ${(stats.report_mode_correct_rate * 100).toFixed(1)}% | ${(stats.stub_rate * 100).toFixed(1)}% | ${stats.p50_latency_ms.toFixed(0)} | ${stats.p95_latency_ms.toFixed(0)} |`,
+      `| ${family} | ${stats.runs} | ${(stats.pass_rate * 100).toFixed(1)}% | ${typeof stats.intent_correct_rate === "number" ? `${(stats.intent_correct_rate * 100).toFixed(1)}%` : "n/a"} | ${typeof stats.report_mode_correct_rate === "number" ? `${(stats.report_mode_correct_rate * 100).toFixed(1)}%` : "n/a"} | ${(stats.stub_rate * 100).toFixed(1)}% | ${stats.p50_latency_ms.toFixed(0)} | ${stats.p95_latency_ms.toFixed(0)} |`,
   );
 
   const worstSection = worst
@@ -1378,7 +1697,7 @@ const main = async () => {
         `- failures: ${entry.failures.join(", ") || "none"}`,
         `- likely_root_cause: ${entry.likely_root_cause}`,
         `- patch_suggestion: ${entry.patch_suggestion}`,
-        `- debug: intent_id=${String(debug.intent_id)} intent_strategy=${String(debug.intent_strategy)} report_mode=${String(debug.report_mode)} relation_packet_built=${String(debug.relation_packet_built)} relation_dual_domain_ok=${String(debug.relation_dual_domain_ok)} deterministic_fallback_used_relation=${String(debug.deterministic_fallback_used_relation)} contract_parse_fail_rate_relation=${String(debug.contract_parse_fail_rate_relation)} citation_repair=${String(debug.citation_repair)}`,
+        `- debug: intent_id=${String(debug.intent_id)} intent_domain=${String(debug.intent_domain)} intent_strategy=${String(debug.intent_strategy)} report_mode=${String(debug.report_mode)} relation_packet_built=${String(debug.relation_packet_built)} relation_dual_domain_ok=${String(debug.relation_dual_domain_ok)} deterministic_fallback_used_relation=${String(debug.deterministic_fallback_used_relation)} contract_parse_fail_rate_relation=${String(debug.contract_parse_fail_rate_relation)} citation_repair=${String(debug.citation_repair)}`,
         "- final_answer:",
         "```text",
         entry.answer,
@@ -1397,6 +1716,7 @@ const main = async () => {
     `- git_ahead_behind: ${gitProvenance.aheadBehind ?? "missing"}`,
     `- provenance_gate_pass: ${String(provenanceGatePass)}`,
     `- provenance_warnings: ${provenanceWarnings.length ? provenanceWarnings.join(", ") : "none"}`,
+    `- readiness_verdict: ${readinessVerdict}`,
     `- decision_grade_ready: ${String(decisionGradeReady)}`,
     `- provenance_blocked: ${String(!provenanceGatePass)}`,
     `- provenance_hard_blocker_reason: ${provenanceBlockerReason ?? "none"}`,
@@ -1444,12 +1764,30 @@ const main = async () => {
     `- citation_repair_rate: ${(repairRate * 100).toFixed(2)}%`,
     `- citation_presence_rate: ${(citationRate * 100).toFixed(2)}%`,
     `- min_text_length_pass_rate: ${(minTextPassRate * 100).toFixed(2)}%`,
+    `- debug_scaffold_leak_rate: ${(debugScaffoldLeakRate * 100).toFixed(2)}%`,
+    `- code_fragment_spill_rate: ${(codeFragmentSpillRate * 100).toFixed(2)}%`,
     `- latency_total_p50_ms: ${percentile(totalLatencies, 50).toFixed(0)}`,
     `- latency_total_p95_ms: ${percentile(totalLatencies, 95).toFixed(0)}`,
     `- latency_retrieval_p50_ms: ${percentile(retrievalLatencies, 50).toFixed(0)} (samples=${retrievalLatencies.length})`,
     `- latency_retrieval_p95_ms: ${percentile(retrievalLatencies, 95).toFixed(0)} (samples=${retrievalLatencies.length})`,
     `- latency_synthesis_p50_ms: ${percentile(synthesisLatencies, 50).toFixed(0)} (samples=${synthesisLatencies.length})`,
     `- latency_synthesis_p95_ms: ${percentile(synthesisLatencies, 95).toFixed(0)} (samples=${synthesisLatencies.length})`,
+    "",
+    "## Probability Scorecard (Wilson 95%)",
+    ...(["relation", "repo_technical", "ambiguous_general"] as const).map((family) => {
+      const score = probabilityScorecard.metrics.route_correct_by_family[family];
+      return `- route_correct|${family}: p=${score.p.toFixed(3)} ci95=[${score.ci95.low.toFixed(3)}, ${score.ci95.high.toFixed(3)}] n=${score.total}`;
+    }),
+    `- frontier_scaffold_complete: p=${probabilityScorecard.metrics.frontier_scaffold_complete.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.frontier_scaffold_complete.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.frontier_scaffold_complete.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.frontier_scaffold_complete.total}`,
+    `- no_debug_leak: p=${probabilityScorecard.metrics.no_debug_leak.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.no_debug_leak.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.no_debug_leak.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.no_debug_leak.total}`,
+    `- no_runtime_fallback: p=${probabilityScorecard.metrics.no_runtime_fallback.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.no_runtime_fallback.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.no_runtime_fallback.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.no_runtime_fallback.total}`,
+    `- objective_complete_before_finalize: p=${probabilityScorecard.metrics.objective_complete_before_finalize.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.objective_complete_before_finalize.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.objective_complete_before_finalize.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.objective_complete_before_finalize.total}`,
+    `- objective_scoped_retrieval_success: p=${probabilityScorecard.metrics.objective_scoped_retrieval_success.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.objective_scoped_retrieval_success.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.objective_scoped_retrieval_success.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.objective_scoped_retrieval_success.total}`,
+    `- objective_assembly_success: p=${probabilityScorecard.metrics.objective_assembly_success.p.toFixed(3)} ci95=[${probabilityScorecard.metrics.objective_assembly_success.ci95.low.toFixed(3)}, ${probabilityScorecard.metrics.objective_assembly_success.ci95.high.toFixed(3)}] n=${probabilityScorecard.metrics.objective_assembly_success.total}`,
+    "",
+    "## Representative Evidence Packs",
+    `- pass: ${summary.representative_evidence.pass?.raw_record ?? "none"} (${summary.representative_evidence.pass?.prompt_id ?? "n/a"})`,
+    `- fail: ${summary.representative_evidence.fail?.raw_record ?? "none"} (${summary.representative_evidence.fail?.prompt_id ?? "n/a"})`,
     "",
     "## Top Failure Signatures",
     ...topFailures.map((entry) => `- ${entry.key}: ${entry.count}`),
@@ -1463,6 +1801,7 @@ const main = async () => {
     worstSection,
     "",
     "## Recommendation",
+    `- readiness_verdict: ${readinessVerdict}`,
     `- decision: ${normalizedDecision}`,
     ...recommendation.next_patches.map((patch) => `- [${patch.order}] ${patch.title}: ${patch.why}`),
   ].join("\n");

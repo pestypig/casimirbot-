@@ -1,4 +1,5 @@
 import * as React from "react";
+import { setAlcubierreDebugLogEnabled } from "@/lib/alcubierre-debug-log";
 
 export type StartSettings = {
   settingsVersion: number;
@@ -12,6 +13,7 @@ export type StartSettings = {
   showHelixVoiceCaptureDiagnostics: boolean;
   showHelixVoiceEventTimelineDebug: boolean;
   showPowerShellDebug: boolean;
+  showAlcubierreRenderDebugLog: boolean;
   powerShellScratch: string;
   preferredResponseLanguage: string;
 };
@@ -19,7 +21,7 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 6,
+  settingsVersion: 7,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   showHelixVoiceCaptureDiagnostics: false,
   showHelixVoiceEventTimelineDebug: false,
   showPowerShellDebug: false,
+  showAlcubierreRenderDebugLog: false,
   powerShellScratch: "",
   preferredResponseLanguage: "auto",
 };
@@ -54,6 +57,7 @@ export function useHelixStartSettings() {
         merged.showHelixAskReasoningEventLog = DEFAULT_SETTINGS.showHelixAskReasoningEventLog;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
         merged.showHelixVoiceEventTimelineDebug = DEFAULT_SETTINGS.showHelixVoiceEventTimelineDebug;
+        merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;
         merged.preferredResponseLanguage =
           typeof parsed.preferredResponseLanguage === "string" && parsed.preferredResponseLanguage.trim().length > 0
             ? parsed.preferredResponseLanguage.trim()
@@ -73,6 +77,10 @@ export function useHelixStartSettings() {
       // storing user preference is best-effort
     }
   }, [userSettings]);
+
+  React.useEffect(() => {
+    setAlcubierreDebugLogEnabled(Boolean(userSettings.showAlcubierreRenderDebugLog));
+  }, [userSettings.showAlcubierreRenderDebugLog]);
 
   const updateSettings = React.useCallback((patch: Partial<StartSettings>) => {
     setUserSettings((prev) => ({ ...prev, ...patch }));

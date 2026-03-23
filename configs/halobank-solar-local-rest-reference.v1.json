@@ -1,0 +1,32 @@
+{
+  "schema_version": "halobank.solar.local_rest_reference/1",
+  "default_reference_id": "schonrich2010",
+  "references": [
+    {
+      "id": "schonrich2010",
+      "label": "Schönrich, Binney & Dehnen (2010)",
+      "source_class": "primary",
+      "citation": "Schönrich, Binney & Dehnen (2010), MNRAS 403(4):1829-1833, Local kinematics and the local standard of rest.",
+      "doi": "10.1111/j.1365-2966.2010.16253.x",
+      "url": "https://academic.oup.com/mnras/article/403/4/1829/1054839",
+      "published": "2010-04-21",
+      "solar_peculiar_kms": [11.1, 12.24, 7.25],
+      "random_uncertainty_kms": [0.75, 0.47, 0.37],
+      "systematic_uncertainty_kms": [1.0, 2.0, 0.5],
+      "component_tolerance_km_s": 0.001
+    },
+    {
+      "id": "huang2015",
+      "label": "Huang et al. (2015)",
+      "source_class": "primary",
+      "citation": "Huang et al. (2015), MNRAS 449(1):162-174, Determination of the local standard of rest using the LSS-GAC DR1.",
+      "doi": "10.1093/mnras/stv204",
+      "url": "https://academic.oup.com/mnras/article/449/1/162/1300470",
+      "published": "2015-03-21",
+      "solar_peculiar_kms": [7.01, 10.13, 4.95],
+      "random_uncertainty_kms": [0.20, 0.12, 0.09],
+      "systematic_uncertainty_kms": [0.00, 0.00, 0.00],
+      "component_tolerance_km_s": 0.001
+    }
+  ]
+}

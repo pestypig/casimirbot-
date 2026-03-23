@@ -1046,6 +1046,70 @@ describe("voice transcribe route", () => {
     expect(sttHttpHandlerMock).toHaveBeenCalledTimes(1);
   });
 
+  it("surfaces provider STT rate limits as 429 with retry metadata", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    sttHttpHandlerMock.mockRejectedValue(
+      new Error("STT HTTP 429: too many requests retry_after_ms=2500 rate_limit_source=provider_429"),
+    );
+
+    const res = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-rate-limit")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(res.status).toBe(429);
+    expect(res.body.error).toBe("voice_rate_limited");
+    expect(res.body.message).toBe("Voice transcription rate limit exceeded.");
+    expect(res.body.traceId).toBe("trace-rate-limit");
+    expect(res.body.details.retryAfterMs).toBe(2500);
+    expect(res.body.details.rateLimitSource).toBe("provider_429");
+    expect(res.body.details.attempts[0]).toMatchObject({
+      engine: "openai_transcribe",
+      status: 429,
+      retryAfterMs: 2500,
+      rateLimitSource: "provider_429",
+    });
+  });
+
+  it("opens a local cooldown after provider 429 and skips repeated openai STT hits", async () => {
+    process.env.OPENAI_API_KEY = "openai-key";
+    process.env.STT_LOCAL_EMBEDDED_ENABLED = "1";
+    sttHttpHandlerMock.mockRejectedValueOnce(
+      new Error("STT HTTP 429: too many requests retry_after_ms=2500 rate_limit_source=provider_429"),
+    );
+    sttWhisperHandlerMock.mockResolvedValue({
+      text: "Local fallback transcript",
+      language: "en",
+      duration_ms: 400,
+      segments: [],
+    });
+
+    const first = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-cooldown-1")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+    const second = await request(buildApp())
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-cooldown-2")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      });
+
+    expect(first.status).toBe(200);
+    expect(first.body.engine).toBe("faster_whisper_local");
+    expect(second.status).toBe(200);
+    expect(second.body.engine).toBe("faster_whisper_local");
+    expect(sttHttpHandlerMock).toHaveBeenCalledTimes(1);
+    expect(sttWhisperHandlerMock).toHaveBeenCalledTimes(2);
+  });
+
   it("recovers invalid-format uploads with one ffmpeg wav retry", async () => {
     process.env.OPENAI_API_KEY = "openai-key";
     sttHttpHandlerMock

@@ -296,6 +296,14 @@ const STAGE05_EXPLICIT_CODE_PATH_SIGNALS = SLOT_SIGNAL_MAP.code_path.filter(
 );
 const STAGE05_EXPLICIT_CODE_PATH_RE =
   /\b(codebase|repo|repository|source(?:\s+code)?|implementation|module|file|path|symbol|where)\b/i;
+const STAGE05_IMPLEMENTATION_CUE_RE =
+  /\b(api|route|module|file|path|code|function|class|symbol|test|debug|bug|fix|patch|stack|trace|packet|payload|json|schema|runtime|endpoint|script|server|client)\b/i;
+const CONCEPTUAL_RELATION_CONNECTOR_RE =
+  /\b(relat(?:e|ed|es|ing|ion(?:ship)?s?)|connect(?:ed|ion|ing|s)?|link(?:ed|ing|s)?|interplay|dependency|association|bridge|mapping|map(?:ping)?|versus|vs\.?)\b/i;
+const CONCEPTUAL_RELATION_PAIR_RE =
+  /(?:\bbetween\b[\s\S]{0,80}\band\b)|(?:\brelat(?:e|ion(?:ship)?)\b[\s\S]{0,80}\bto\b)|(?:\bcompare\b[\s\S]{0,80}\b(?:with|to|and)\b)|(?:\bvs\.?\b)/i;
+const CONCEPTUAL_RELATION_FRAMING_RE =
+  /\b(what(?:'s|\s+is)?|how|why|explain|describe|difference|compare|relation(?:ship)?)\b/i;
 const WARP_MATH_FOCUS_RE =
   /(?:\b(?:warp|alcubierre|natario|bubble)\b[\s\S]{0,120}\b(?:math|equation|equations|formula|metric|tensor|congruence|derive|derivation|proof|solver|solve|general relativity|gr)\b)|(?:\b(?:math|equation|equations|formula|metric|tensor|congruence|derive|derivation|proof|solver|solve|general relativity|gr)\b[\s\S]{0,120}\b(?:warp|alcubierre|natario|bubble)\b)/i;
 const EQUATION_QUOTE_RE =
@@ -827,6 +835,15 @@ const hasAnySignal = (value: string, signals: string[]): boolean => {
 const hasExplicitCodePathDemand = (value: string): boolean =>
   hasAnySignal(value, STAGE05_EXPLICIT_CODE_PATH_SIGNALS) || STAGE05_EXPLICIT_CODE_PATH_RE.test(value);
 
+const isConceptualRelationPrompt = (queryLower: string, explicitCodePathDemand: boolean): boolean => {
+  if (!queryLower || explicitCodePathDemand) return false;
+  if (STAGE05_IMPLEMENTATION_CUE_RE.test(queryLower)) return false;
+  const hasRelationSignal =
+    CONCEPTUAL_RELATION_CONNECTOR_RE.test(queryLower) || CONCEPTUAL_RELATION_PAIR_RE.test(queryLower);
+  if (!hasRelationSignal) return false;
+  return CONCEPTUAL_RELATION_FRAMING_RE.test(queryLower);
+};
+
 const hasEquationEvidenceText = (value: string): boolean => {
   if (!value) return false;
   return EQUATION_LINE_RE.test(value);
@@ -1023,12 +1040,17 @@ const deriveDynamicSlotPlan = (
   const warpMathFocused = WARP_MATH_FOCUS_RE.test(queryLower);
   const equationQuoteRequested = EQUATION_QUOTE_RE.test(queryLower);
   const explicitCodePathDemand = hasExplicitCodePathDemand(queryLower);
+  const conceptualRelationPrompt = isConceptualRelationPrompt(queryLower, explicitCodePathDemand);
   const slots = new Set<Stage05SlotId>();
   const required = new Set<Stage05SlotId>();
   slots.add("definition");
   required.add("definition");
 
   if (hasAnySignal(queryLower, SLOT_SIGNAL_MAP.mechanism)) {
+    slots.add("mechanism");
+    required.add("mechanism");
+  }
+  if (conceptualRelationPrompt) {
     slots.add("mechanism");
     required.add("mechanism");
   }
@@ -1048,7 +1070,7 @@ const deriveDynamicSlotPlan = (
       required.add("code_path");
     }
   }
-  if (explicitCodePathDemand || intentDomain === "repo" || intentDomain === "hybrid") {
+  if (explicitCodePathDemand || ((intentDomain === "repo" || intentDomain === "hybrid") && !conceptualRelationPrompt)) {
     slots.add("code_path");
   }
   if (hasAnySignal(queryLower, SLOT_SIGNAL_MAP.example)) {
@@ -1061,7 +1083,7 @@ const deriveDynamicSlotPlan = (
     slots.add("failure_path");
   }
   if (slots.has("code_path") && (intentDomain === "repo" || intentDomain === "hybrid")) {
-    if (!equationQuoteRequested || explicitCodePathDemand) {
+    if ((!equationQuoteRequested && !conceptualRelationPrompt) || explicitCodePathDemand) {
       required.add("code_path");
     }
   }

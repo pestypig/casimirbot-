@@ -6,6 +6,7 @@ import {
   rankMovesDeterministically,
   selectDeterministicMoveWithDebug,
 } from "../server/services/helix-ask/quake-frame-loop";
+import { __testHelixAskReliabilityGuards } from "../server/routes/agi.plan";
 
 describe("Helix Ask semantic quality gates", () => {
   it("computes claim-citation linkage and unsupported-claim rate", () => {
@@ -138,5 +139,59 @@ describe("AAS-style bridge reachability", () => {
     expect(out).toHaveLength(2);
     expect(out[0]?.nodeId).toBe("b1");
     expect(out[1]?.nodeId).toBe("b2");
+  });
+});
+
+describe("Helix Ask relation completeness gate", () => {
+  it("detects missing relation slots in partial relation answers", () => {
+    const completeness =
+      __testHelixAskReliabilityGuards.evaluateRelationSemanticCompleteness(
+        "Warp bubble geometry is discussed here.",
+      );
+    expect(completeness.pass).toBe(false);
+    expect(completeness.missing).toContain("entity_b");
+    expect(completeness.missing).toContain("mechanism");
+  });
+
+  it("repairs missing relation slots using relation packet anchors before sources", () => {
+    const relationPacket = {
+      definitions: {
+        warp_definition:
+          "A warp bubble is a bounded spacetime configuration under this repository's warp model.",
+        ethos_definition:
+          "Mission ethos constrains capability claims to verified, non-harmful operation.",
+      },
+      bridge_claims: [
+        "Mission ethos constrains warp deployment through audited verification checkpoints.",
+      ],
+      constraints: {
+        physics_bound: "Ford-Roman and GR bounds must pass before viability claims.",
+      },
+      falsifiability_hooks: ["Re-run verification hooks before deployment."],
+      source_map: {
+        warp: "docs/knowledge/warp/warp-bubble.md",
+        ethos: "docs/ethos/ideology.json",
+      },
+      evidence: [],
+      domains: ["warp", "ethos"],
+    } as any;
+    const original = [
+      "Direct Answer:",
+      "- Warp bubble geometry can be modeled from shift-vector fields.",
+      "",
+      "Sources: docs/knowledge/warp/warp-bubble.md",
+    ].join("\n");
+    const before = __testHelixAskReliabilityGuards.evaluateRelationSemanticCompleteness(original);
+    const repaired = __testHelixAskReliabilityGuards.repairRelationSemanticCompleteness({
+      answer: original,
+      relationPacket,
+      missing: before.missing,
+    });
+    expect(repaired.applied).toBe(true);
+    expect(repaired.text).toMatch(/^Sources:/m);
+    const after = __testHelixAskReliabilityGuards.evaluateRelationSemanticCompleteness(
+      repaired.text,
+    );
+    expect(after.pass).toBe(true);
   });
 });

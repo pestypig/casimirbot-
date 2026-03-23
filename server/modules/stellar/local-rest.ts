@@ -69,9 +69,17 @@ const SOLAR_PECULIAR_SETS: Record<string, Vec3> = {
   huang2015: [7.01, 10.13, 4.95],
 };
 
-function solarPeculiar(): Vec3 {
+export function resolveSolarPeculiarReferenceId(): string {
   const key = (process.env.LSR_SOLAR_PECULIAR || "schonrich2010").toLowerCase();
-  return SOLAR_PECULIAR_SETS[key] ?? SOLAR_PECULIAR_SETS.schonrich2010;
+  return SOLAR_PECULIAR_SETS[key] ? key : "schonrich2010";
+}
+
+export function resolveSolarPeculiarVector(): Vec3 {
+  return SOLAR_PECULIAR_SETS[resolveSolarPeculiarReferenceId()] ?? SOLAR_PECULIAR_SETS.schonrich2010;
+}
+
+function solarPeculiar(): Vec3 {
+  return resolveSolarPeculiarVector();
 }
 
 // Optional Oort constants A, B (km s^-1 kpc^-1)
@@ -177,7 +185,7 @@ function velocityICRS(
 }
 
 // ICRS -> Galactic velocity (km/s); Galactic U positive toward Galactic center, V toward rotation (l=90°), W toward NGP.
-function velocityGalacticFromICRS(v_icrs: Vec3): Vec3 {
+export function velocityGalacticFromICRS(v_icrs: Vec3): Vec3 {
   return matMulVec(R_EQ_TO_GAL as number[][], v_icrs);
 }
 

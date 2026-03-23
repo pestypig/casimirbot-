@@ -46,6 +46,8 @@ const splitParagraphs = (value: string): string[] =>
 const TREE_WALK_HEADER = /^Tree Walk:/i;
 const TREE_WALK_LINE = /^\s*\d+\.\s+/;
 const PRACTICAL_PREFIX = /^in\s+practic(?:e|al\s+terms)\b/i;
+const STRUCTURED_DETERMINISTIC_SECTION_RE =
+  /^(?:Definition|Why it matters|Key terms|Repo anchors|How it is solved in codebase|Where in repo|Call chain|What to change safely|Repo-Grounded Findings|Implementation Roadmap|Evidence Gaps|Next Anchors Needed|Definitions|Baseline|Hypothesis|Anti-hypothesis|Falsifiers|Uncertainty band|Claim tier|Motivation and Boundary|Metric Setup|Physical Interpretation|Worked Reduced-Order Solve|Guardrails, Price Tag, and Blockers|Derivation Appendix|Provenance Table|Claim Discipline|Self-Check)\s*:/im;
 
 const extractTreeWalkBlock = (
   value: string,
@@ -303,7 +305,8 @@ export const buildHelixAskEnvelope = (
   const answerText = treeWalkExtract.stripped || input.answer;
   // When tree-walk evidence is present, keep the full non-tree-walk narrative in
   // the main answer card and reserve drawer/details for the tree-walk block.
-  const preserveFullNarrative = Boolean(treeWalkBlock?.trim());
+  const preserveFullNarrative =
+    Boolean(treeWalkBlock?.trim()) || STRUCTURED_DETERMINISTIC_SECTION_RE.test(answerText);
   const summarySplit = preserveFullNarrative
     ? { summary: answerText, details: undefined }
     : splitAnswerForEnvelope(answerText, input.format);

@@ -85,6 +85,7 @@ client/public/originals/*
 /.local/
 sunpy_out/
 external/ollama/
+external/RayTracingMIS/
 # Large model weights (prevent accidental commits)
 *.gguf
 *.safetensors

@@ -143,6 +143,8 @@
     "warp:full-solve:reference:validate": "tsx scripts/warp-full-solve-reference-capsule-validate.ts",
     "warp:full-solve:reference:refresh": "npm run warp:full-solve:canonical:bundle && npm run warp:full-solve:geometry:conformance && npm run warp:external:matrix && npm run warp:shadow:qcd-analog:replay && npm run warp:full-solve:reference:capsule && npm run warp:full-solve:reference:validate -- --capsule artifacts/research/full-solve/full-solve-reference-capsule-latest.json",
     "warp:integrity:check": "tsx scripts/warp-integrity-parity-check.ts",
+    "warp:render:congruence:check": "tsx scripts/warp-render-congruence-benchmark.ts",
+    "warp:render:capture": "tsx scripts/warp-render-command-capture.ts",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",
     "warp:deliverable:bundle": "tsx scripts/warp-deliverable-bundle.ts",
@@ -238,7 +240,14 @@
     "atlas:first-divergence": "tsx scripts/repo-atlas-query.ts first-divergence",
     "atlas:bench": "tsx scripts/atlas-bench.ts",
     "atlas:bench:ci": "tsx scripts/atlas-bench.ts --ci --sample 20",
-    "helix:ask:retrieval:ablation": "tsx scripts/helix-ask-retrieval-ablation.ts"
+    "helix:ask:retrieval:ablation": "tsx scripts/helix-ask-retrieval-ablation.ts",
+    "hull:mis:clone": "tsx scripts/hull-mis-clone.ts",
+    "hull:mis:install-bridge": "tsx scripts/hull-mis-install-bridge.ts",
+    "hull:mis:service": "tsx scripts/hull-mis-service.ts",
+    "hull:optix:service": "tsx scripts/hull-optix-service.ts",
+    "hull:optix:rollout": "tsx scripts/hull-optix-rollout.ts",
+    "hull:mis:prepare": "npm run hull:mis:clone && npm run hull:mis:install-bridge",
+    "hull:mis:rollout": "tsx scripts/hull-mis-rollout.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

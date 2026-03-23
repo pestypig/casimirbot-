@@ -417,6 +417,15 @@ describe("helix ask repo search", () => {
     expect(terms).toContain("helix ask");
   });
 
+  it("prioritizes exact internal identifiers for repo-technical prompts", () => {
+    const terms = extractRepoSearchTerms(
+      "Explain how answer_path is populated and why sanitizeSourcesLine matters for diagnostics.",
+      null,
+    );
+    expect(terms[0]).toBe("answer_path");
+    expect(terms).toContain("sanitizesourcesline");
+  });
+
   it("extracts CJK terms so multilingual queries do not collapse to empty search terms", () => {
     const terms = extractRepoSearchTerms("什么是二库比叶尔扭曲炮?", null);
     expect(terms.length).toBeGreaterThan(0);

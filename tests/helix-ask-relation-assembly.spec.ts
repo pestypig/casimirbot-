@@ -8,6 +8,7 @@ import {
   ensureRelationAssemblyPacketFallback,
   ensureRelationFallbackDomainAnchors,
   evaluateRelationPacketFloors,
+  renderRelationAssemblyFallback,
   resolveRelationTopologySignal,
 } from "../server/services/helix-ask/relation-assembly";
 
@@ -369,6 +370,41 @@ describe("relation assembly packet", () => {
     expect(anchored.evidence.some((entry) => entry.domain === "warp")).toBe(true);
     expect(anchored.evidence.some((entry) => entry.domain === "ethos")).toBe(true);
     expect(Object.values(anchored.source_map)).toContain("docs/ethos/ideology.json#L1-L1");
+  });
+
+  it("renders relation fallback in natural language without artifact-style keys", () => {
+    const packet = ensureRelationAssemblyPacketFallback(
+      {
+        question: "How does warp relate to mission ethos?",
+        domains: ["ethos", "warp"],
+        definitions: {
+          warp_definition: "Warp bubble geometry is constrained by viability gates",
+          ethos_definition: "Mission ethos requires stewardship and non-harm",
+        },
+        bridge_claims: ["The ethos gate binds warp deployment to reproducible checkpoints"],
+        constraints: ["Ford-Roman quantum inequality and GR gate checks must pass"],
+        falsifiability_hooks: ["Re-run adapter verification and require PASS certificate integrity"],
+        evidence: [],
+        source_map: {
+          ev_1: "docs/knowledge/warp/warp-bubble.md#L1-L2",
+          ev_2: "docs/ethos/ideology.json#L1-L2",
+        },
+      },
+      "How does warp relate to mission ethos?",
+    );
+
+    const rendered = renderRelationAssemblyFallback(packet);
+
+    expect(rendered).not.toMatch(/\bwhat_is_[a-z0-9_]+\s*:/i);
+    expect(rendered).not.toMatch(/\bhow_they_connect\s*:/i);
+    expect(rendered).not.toMatch(/\bconstraints?_and_falsifiability\s*:/i);
+    expect(rendered).not.toMatch(/^What is warp bubble:/im);
+    expect(rendered).toMatch(/^Direct Answer:/m);
+    expect(rendered).toMatch(/^Mechanism:/m);
+    expect(rendered).toMatch(/^Constraints and Falsifiability:/m);
+    expect(rendered).toContain("Warp bubble geometry is constrained by viability gates.");
+    expect(rendered).toContain("Mission ethos requires stewardship and non-harm.");
+    expect(rendered).toContain("Sources:");
   });
 
   it("blocks over-promotion above diagnostic maturity ceiling", () => {

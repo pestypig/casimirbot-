@@ -447,6 +447,26 @@ const HIGH_SIGNAL_UNIGRAM_RANK = new Map<string, number>([
   ["intent", 11],
 ]);
 
+const REPO_SEARCH_IDENTIFIER_RE =
+  /\b(?:[a-z]+_[a-z0-9_]+|[A-Za-z][A-Za-z0-9]*(?:[A-Z][A-Za-z0-9]*)+|\/api\/[A-Za-z0-9/_-]+|[A-Za-z0-9_./-]+\.[A-Za-z0-9_./-]+)\b/g;
+
+export const extractRepoSearchIdentifiers = (question: string): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const match of question.matchAll(REPO_SEARCH_IDENTIFIER_RE)) {
+    const raw = String(match[0] ?? "").trim();
+    if (!raw) continue;
+    const normalized = sanitizeSearchTerm(raw);
+    if (!normalized) continue;
+    if (normalized.length < minRepoTermLength(normalized)) continue;
+    if (LOW_VALUE_UNIGRAM_RE.test(normalized)) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+};
+
 const isLowValueGluePhrase = (phrase: string): boolean => {
   const parts = phrase.split(" ").filter(Boolean);
   if (parts.length !== 2) return false;
@@ -470,6 +490,7 @@ export function extractRepoSearchTerms(
   const phraseTerms: string[] = [];
   const normalizedQuestion = sanitizeSearchTerm(question);
   if (/\bhelix ask\b/i.test(normalizedQuestion)) phraseTerms.push("helix ask");
+  const identifierTerms = extractRepoSearchIdentifiers(question);
   const unigramTerms: string[] = [];
   if (conceptMatch?.matchedTerm) {
     const normalized = sanitizeSearchTerm(conceptMatch.matchedTerm);
@@ -508,12 +529,17 @@ export function extractRepoSearchTerms(
   };
 
   const uniquePhrases = dedupe(phraseTerms);
+  const uniqueIdentifiers = dedupe(identifierTerms);
   const uniqueUnigrams = dedupe(unigramTerms);
 
-  const phraseCap = Math.max(1, REPO_SEARCH_MAX_TERMS - 1);
-  const selectedPhrases = uniquePhrases.slice(0, phraseCap);
+  const identifierCap = Math.min(2, REPO_SEARCH_MAX_TERMS);
+  const selectedIdentifiers = uniqueIdentifiers.slice(0, identifierCap);
+  const phraseCap = Math.max(0, REPO_SEARCH_MAX_TERMS - Math.max(1, selectedIdentifiers.length));
+  const selectedPhrases = uniquePhrases
+    .filter((phrase) => !selectedIdentifiers.includes(phrase))
+    .slice(0, phraseCap);
   const selectedPhraseTokenSet = new Set<string>();
-  for (const phrase of selectedPhrases) {
+  for (const phrase of [...selectedIdentifiers, ...selectedPhrases]) {
     for (const part of phrase.split(" ")) {
       if (part) selectedPhraseTokenSet.add(part);
     }
@@ -528,7 +554,7 @@ export function extractRepoSearchTerms(
     ...nonCoveredUnigrams,
     ...coveredUnigrams,
   ];
-  const combined = dedupe([...selectedPhrases, ...prioritizedUnigrams]);
+  const combined = dedupe([...selectedIdentifiers, ...selectedPhrases, ...prioritizedUnigrams]);
   return combined.slice(0, REPO_SEARCH_MAX_TERMS);
 }
 

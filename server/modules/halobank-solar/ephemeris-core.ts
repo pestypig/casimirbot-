@@ -1,9 +1,18 @@
 import * as AstronomyNamespace from "astronomy-engine";
-import type { SolarAberration, SolarFrame, SolarObserver } from "./types";
+import type {
+  SolarAberration,
+  SolarFrame,
+  SolarObserver,
+  SolarReferenceContext,
+  SolarReferenceOriginState,
+  SolarState,
+} from "./types";
+import { velocityGalacticFromICRS } from "../stellar/local-rest";
 
 const AU_M = 149_597_870_700;
 const C_M_PER_S = 299_792_458;
 const DAY_S = 86_400;
+const AU_PER_DAY_TO_KM_PER_S = AU_M / 1000 / DAY_S;
 
 type Vec3 = [number, number, number];
 
@@ -53,14 +62,9 @@ export type SolarVectorCompatibility = {
 };
 
 export type SolarVectorBundle = {
-  states: Array<{
-    target: number;
-    center: number;
-    frame: SolarFrame;
-    pos: Vec3;
-    vel: Vec3;
-    light_time_s: number;
-  }>;
+  states: SolarState[];
+  reference: SolarReferenceContext;
+  referenceOriginState: SolarReferenceOriginState;
   compatibility: SolarVectorCompatibility;
   warnings: string[];
 };
@@ -71,6 +75,7 @@ const vecSub = (a: Vec3, b: Vec3): Vec3 => toVec3(a[0] - b[0], a[1] - b[1], a[2]
 const vecAdd = (a: Vec3, b: Vec3): Vec3 => toVec3(a[0] + b[0], a[1] + b[1], a[2] + b[2]);
 const vecScale = (a: Vec3, s: number): Vec3 => toVec3(a[0] * s, a[1] * s, a[2] * s);
 const vecNorm = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
+const vecDot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 const wrap360 = (value: number): number => {
   const wrapped = value % 360;
@@ -237,6 +242,30 @@ function heliocentricState(id: number, date: Date): { r_AU: Vec3; v_AUperD: Vec3
   };
 }
 
+function computeRelativeKinematics(pos: Vec3, vel: Vec3) {
+  const speedAuPerDay = vecNorm(vel);
+  const rangeAu = vecNorm(pos);
+  const radialAuPerDay = rangeAu > 1e-12 ? vecDot(pos, vel) / rangeAu : 0;
+  const transverseAuPerDay = Math.sqrt(Math.max(0, speedAuPerDay * speedAuPerDay - radialAuPerDay * radialAuPerDay));
+  const speedKmS = speedAuPerDay * AU_PER_DAY_TO_KM_PER_S;
+  const galacticUvwKmS = velocityGalacticFromICRS([
+    vel[0] * AU_PER_DAY_TO_KM_PER_S,
+    vel[1] * AU_PER_DAY_TO_KM_PER_S,
+    vel[2] * AU_PER_DAY_TO_KM_PER_S,
+  ]);
+  return {
+    speed_au_per_day: speedAuPerDay,
+    speed_km_s: speedKmS,
+    speed_fraction_c: (speedKmS * 1000) / C_M_PER_S,
+    radial_velocity_au_per_day: radialAuPerDay,
+    radial_velocity_km_s: radialAuPerDay * AU_PER_DAY_TO_KM_PER_S,
+    transverse_speed_au_per_day: transverseAuPerDay,
+    transverse_speed_km_s: transverseAuPerDay * AU_PER_DAY_TO_KM_PER_S,
+    galactic_uvw_km_s: galacticUvwKmS,
+    galactic_axes: "U_toward_gc,V_rotation,W_toward_ngp",
+  } as const;
+}
+
 export function buildSolarVectorBundle(request: SolarVectorRequest): SolarVectorBundle {
   const date = new Date(request.tsIso);
   if (!Number.isFinite(date.getTime())) {
@@ -264,6 +293,7 @@ export function buildSolarVectorBundle(request: SolarVectorRequest): SolarVector
       pos: rel.pos,
       vel: rel.vel,
       light_time_s: rel.lightTimeS,
+      kinematics: computeRelativeKinematics(rel.pos, rel.vel),
     };
   });
 
@@ -302,6 +332,27 @@ export function buildSolarVectorBundle(request: SolarVectorRequest): SolarVector
 
   return {
     states,
+    reference: {
+      requested_center: request.centerId,
+      resolved_center: centerId,
+      frame: request.frame,
+      observer_mode: request.observer?.mode ?? "none",
+      relation: "target_minus_reference",
+      speed_semantics: "relative_to_resolved_reference",
+    },
+    referenceOriginState: {
+      body: centerId,
+      pos: reference.pos,
+      vel: reference.vel,
+      speed_au_per_day: vecNorm(reference.vel),
+      speed_km_s: vecNorm(reference.vel) * AU_PER_DAY_TO_KM_PER_S,
+      galactic_uvw_km_s: velocityGalacticFromICRS([
+        reference.vel[0] * AU_PER_DAY_TO_KM_PER_S,
+        reference.vel[1] * AU_PER_DAY_TO_KM_PER_S,
+        reference.vel[2] * AU_PER_DAY_TO_KM_PER_S,
+      ]),
+      galactic_axes: "U_toward_gc,V_rotation,W_toward_ngp",
+    },
     compatibility: {
       earth,
       moon,

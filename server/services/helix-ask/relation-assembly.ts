@@ -61,6 +61,21 @@ const ETHOS_ANCHOR_RE = /(^|\/)(docs\/ethos\/|docs\/knowledge\/ethos\/|server\/r
 
 const clip = (value: string, max = 260): string => value.replace(/\s+/g, " ").trim().slice(0, max).trim();
 
+const RELATION_CODE_LINE_RE =
+  /\b(?:import\s+|export\s+(?:function|const|class)|const\s+\[|const\s+[a-z_]\w*\s*=\s*(?:\(|async\b|{)|let\s+[a-z_]\w*\s*=|function\s+[a-z_]\w*\s*\(|=>|usestate|from\s+["']react["'])\b/i;
+const RELATION_PATH_ONLY_RE =
+  /^(?:[A-Za-z]:)?[A-Za-z0-9_./\\-]+\.(?:md|json|ts|tsx|js|jsx|py)(?:#[A-Za-z0-9:_-]+)?\.?$/i;
+
+const ensureSentence = (value: string, fallback: string): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return fallback;
+  if (RELATION_CODE_LINE_RE.test(normalized)) return fallback;
+  if (/\bexport\s+default\s+function\b/i.test(normalized)) return fallback;
+  if (/\bconst\s+[A-Za-z_]\w*\s*=/.test(normalized) && /[;{}()]/.test(normalized)) return fallback;
+  if (RELATION_PATH_ONLY_RE.test(normalized)) return fallback;
+  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+};
+
 const sanitizeSnippet = (value: string): string =>
   value
     .replace(/\(see\s+[^\)]*\)/gi, " ")
@@ -821,11 +836,43 @@ export function ensureRelationFallbackDomainAnchors(packet: RelationAssemblyPack
 
 export function renderRelationAssemblyFallback(packet: RelationAssemblyPacket): string {
   const sources = Object.values(packet.source_map);
+  const warpDefinition = ensureSentence(
+    packet.definitions.warp_definition,
+    "A warp bubble is a bounded spacetime configuration under this repository's warp model.",
+  );
+  const ethosDefinition = ensureSentence(
+    packet.definitions.ethos_definition,
+    "Mission ethos constrains capability claims to verified, non-harmful operation.",
+  );
+  const bridgeMechanism = ensureSentence(
+    packet.bridge_claims.slice(0, 3).join(" "),
+    "Warp development is constrained by mission-ethos checkpoints tied to reproducible evidence.",
+  );
+  const constraintsAndFalsifiability = ensureSentence(
+    [packet.constraints.join(" "), packet.falsifiability_hooks[0] ?? ""]
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .join(" "),
+    "Constraint and falsifiability hooks must pass before viability claims are accepted.",
+  );
+  const practicalEffect = ensureSentence(
+    packet.bridge_claims[0] ?? "",
+    "In practice, mission-ethos checkpoints bind warp-physics claims to reproducible verification.",
+  );
   return [
-    `What is warp bubble: ${packet.definitions.warp_definition}`,
-    `What is mission ethos: ${packet.definitions.ethos_definition}`,
-    `How they connect: ${packet.bridge_claims.slice(0, 3).join(" ")}`,
-    `Constraints and falsifiability: ${packet.constraints.join(" ")} ${packet.falsifiability_hooks[0] ?? ""}`,
+    "Direct Answer:",
+    `- ${warpDefinition}`,
+    `- ${ethosDefinition}`,
+    "",
+    "Mechanism:",
+    `- ${bridgeMechanism}`,
+    "",
+    "Constraints and Falsifiability:",
+    `- ${constraintsAndFalsifiability}`,
+    "",
+    "In Practice:",
+    `- ${practicalEffect}`,
+    "",
     sources.length > 0 ? `Sources: ${sources.slice(0, 8).join(", ")}` : "",
   ]
     .filter(Boolean)

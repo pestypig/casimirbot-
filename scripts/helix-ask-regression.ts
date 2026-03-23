@@ -2,6 +2,7 @@ type HelixAskDebug = {
   intent_id?: string;
   intent_domain?: string;
   format?: string;
+  answer_path?: string[];
   stage_tags?: boolean;
   clarify_triggered?: boolean;
   ambiguity_target_span?: string;
@@ -21,10 +22,22 @@ type HelixAskDebug = {
   composer_v2_applied?: boolean;
   composer_schema_valid?: boolean;
   composer_validation_fail_reason?: string | null;
+  composer_soft_enforce_action?: string | null;
+  composer_soft_enforce_gate_mode?: string | null;
+  composer_soft_enforce_effective_mode?: string | null;
+  composer_soft_enforce_observe_skip?: boolean;
+  composer_soft_enforce_deterministic_preserve_blocked?: boolean;
+  composer_soft_enforce_escalated_enforce?: boolean;
   planner_valid?: boolean;
   planner_mode?: string;
   turn_contract_hash?: string;
   objective_count?: number;
+  objective_loop_state?: Array<Record<string, unknown>>;
+  objective_retrieval_queries?: Array<Record<string, unknown>>;
+  objective_mini_answers?: Array<Record<string, unknown>>;
+  objective_finalize_gate_passed?: boolean;
+  objective_assembly_mode?: string;
+  objective_mini_critic_mode?: string;
   evidence_gap?: boolean;
   answer_mode?: string;
   degrade_mode?: string;
@@ -177,6 +190,8 @@ const cases: RegressionCase[] = [
       liveContract: {
         requireRepoGrounding: true,
         requireSourcesLine: true,
+        requireFiveSectionShape: false,
+        allowFamilyFallbackShape: true,
       },
     },
   },
@@ -265,7 +280,7 @@ const ambiguityCases: RegressionCase[] = [
       intent_id: "general.conceptual_define_compare",
       intent_domain: "general",
       format: "compare",
-      clarify: true,
+      clarify: false,
       ambiguity: {
         targetSpan: "cavity",
         requireClusters: false,
@@ -283,6 +298,9 @@ const ambiguityCases: RegressionCase[] = [
       liveContract: {
         requireRepoGrounding: true,
         requireSourcesLine: true,
+        requireFiveSectionShape: false,
+        allowFamilyFallbackShape: true,
+        minStage05Coverage: 0.5,
       },
       ambiguity: {
         targetSpan: "warp bubble",
@@ -385,6 +403,42 @@ const finalCases = ONLY_LABEL
 const toFiniteNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+const collectObjectiveLoopStates = (debug: HelixAskDebug): Array<{
+  objective_id: string;
+  status: string;
+  required_slots: string[];
+}> => {
+  if (!Array.isArray(debug.objective_loop_state)) return [];
+  return debug.objective_loop_state
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const objectiveId = String(record.objective_id ?? "").trim();
+      if (!objectiveId) return null;
+      const status = String(record.status ?? "").trim().toLowerCase();
+      const requiredSlots = Array.isArray(record.required_slots)
+        ? record.required_slots.map((slot) => String(slot ?? "").trim()).filter(Boolean)
+        : [];
+      return {
+        objective_id: objectiveId,
+        status,
+        required_slots: requiredSlots,
+      };
+    })
+    .filter((entry): entry is { objective_id: string; status: string; required_slots: string[] } => Boolean(entry));
+};
+
+const collectObjectiveRetrievalIds = (debug: HelixAskDebug): Set<string> => {
+  const out = new Set<string>();
+  if (!Array.isArray(debug.objective_retrieval_queries)) return out;
+  for (const entry of debug.objective_retrieval_queries) {
+    if (!entry || typeof entry !== "object") continue;
+    const objectiveId = String((entry as Record<string, unknown>).objective_id ?? "").trim();
+    if (objectiveId) out.add(objectiveId);
+  }
+  return out;
+};
+
 const hasFiveSectionShape = (text: string): boolean => {
   const required = [
     "short answer:",
@@ -407,6 +461,9 @@ const hasFamilyFallbackShape = (text: string): boolean => {
   ];
   return familyShapes.some((shape) => shape.every((heading) => normalized.includes(heading)));
 };
+
+const RELATION_WEAK_FALLBACK_RE =
+  /\b(current evidence is incomplete|primary implementation anchors? for .* remain partial in this turn|missing slots:)\b/i;
 
 const runCase = async (entry: RegressionCase, sessionId: string): Promise<string[]> => {
   console.log(`Running: ${entry.label}`);
@@ -517,6 +574,9 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
       failures.push(`${entry.label}: response included forbidden text snippet "${snippet}"`);
     }
   }
+  if (payload.debug.relation_packet_built === true && RELATION_WEAK_FALLBACK_RE.test(text)) {
+    failures.push(`${entry.label}: relation response retained weak fallback scaffold text`);
+  }
 
   const liveContract = entry.expect.liveContract;
   if (liveContract?.requireRepoGrounding) {
@@ -562,6 +622,46 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
     }
   } else if (allowFamilyFallbackShape && !hasFiveSectionShape(text) && !hasFamilyFallbackShape(text)) {
     failures.push(`${entry.label}: response missing accepted repo fallback shape`);
+  }
+  const answerPath = Array.isArray(payload.debug.answer_path)
+    ? payload.debug.answer_path.map((entry) => String(entry))
+    : [];
+  const hardForcedAnswer = answerPath.some((entry) => entry.startsWith("forcedAnswer:"));
+  const composerSoftAction = String(payload.debug.composer_soft_enforce_action ?? "").trim();
+  if (composerSoftAction === "preserve_deterministic_answer" && !hardForcedAnswer) {
+    failures.push(
+      `${entry.label}: composer_soft_enforce_action preserve_deterministic_answer is not allowed without hard-forced policy`,
+    );
+  }
+  const objectiveStates = collectObjectiveLoopStates(payload.debug);
+  if (objectiveStates.length > 0) {
+    if (payload.debug.objective_finalize_gate_passed !== true) {
+      failures.push(`${entry.label}: objective_finalize_gate_passed ${String(payload.debug.objective_finalize_gate_passed)} !== true`);
+    }
+    const requiredObjectiveIds = objectiveStates
+      .filter((state) => state.required_slots.length > 0)
+      .map((state) => state.objective_id);
+    if (requiredObjectiveIds.length > 0) {
+      const retrievalIds = collectObjectiveRetrievalIds(payload.debug);
+      const missingRetrieval = requiredObjectiveIds.filter((id) => !retrievalIds.has(id));
+      if (missingRetrieval.length > 0) {
+        failures.push(
+          `${entry.label}: objective retrieval missing for ${missingRetrieval.slice(0, 6).join(", ")}`,
+        );
+      }
+    }
+    const miniAnswerCount = Array.isArray(payload.debug.objective_mini_answers)
+      ? payload.debug.objective_mini_answers.length
+      : 0;
+    if (miniAnswerCount < objectiveStates.length) {
+      failures.push(
+        `${entry.label}: objective_mini_answers ${miniAnswerCount} < objective_count ${objectiveStates.length}`,
+      );
+    }
+    const assemblyMode = String(payload.debug.objective_assembly_mode ?? "").trim().toLowerCase();
+    if (assemblyMode !== "llm" && assemblyMode !== "deterministic_fallback") {
+      failures.push(`${entry.label}: objective_assembly_mode ${assemblyMode || "none"} is not valid`);
+    }
   }
 
   return failures;

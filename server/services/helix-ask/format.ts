@@ -8,6 +8,9 @@ const HELIX_ASK_STEP_TRIGGER =
   /(how to|how does|how do|steps?|step-by-step|procedure|process|workflow|pipeline|implement|implementation|configure|setup|set up|troubleshoot|debug|fix|resolve)/i;
 const HELIX_ASK_COMPARE_TRIGGER =
   /(compare|versus|vs\.?|difference|better|worse|more accurate|accuracy|tradeoffs|advantages|what is|what's|why is|why are|how is|how are)/i;
+const HELIX_ASK_WARP_MECHANISM_BRIEF_TRIGGER =
+  /\bhow\s+is\b[\s\S]{0,80}\bwarp\s+bubble\b[\s\S]{0,100}\b(?:solved|implemented|modeled|computed)\b/i;
+const HELIX_ASK_REPO_SCOPE_TRIGGER = /\b(codebase|repo|repository|in this repo)\b/i;
 
 const HELIX_ASK_COMPARE_QUESTION =
   /\b(compare|comparison|versus|vs\.?|difference|trade-?off|better|worse|pros|cons)\b/i;
@@ -56,6 +59,11 @@ export function resolveHelixAskFormat(
     stageTags =
       HELIX_ASK_METHOD_TRIGGER.test(normalized) ||
       (debugEnabled && (intentProfile?.tier === "F2" || intentProfile?.tier === "F3"));
+  }
+  if (HELIX_ASK_WARP_MECHANISM_BRIEF_TRIGGER.test(normalized) && HELIX_ASK_REPO_SCOPE_TRIGGER.test(normalized)) {
+    // Keep this class concise even if route heuristics drift toward "steps".
+    format = "brief";
+    stageTags = false;
   }
   return { format, stageTags };
 }

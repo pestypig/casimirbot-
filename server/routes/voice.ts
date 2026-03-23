@@ -170,6 +170,7 @@ type SttOutputMode = "original" | "english" | "dual";
 type TranscriptionEngine = "openai_transcribe" | "faster_whisper_local" | "whisper_http";
 type SttBackendKind = "openai" | "whisper_http" | "local";
 type SttBackendMode = "openai" | "generic";
+type SttRateLimitSource = "provider_429" | "local_cooldown";
 
 type ResolvedSttBackend = {
   kind: SttBackendKind;
@@ -1047,12 +1048,71 @@ type SttFailure = {
   status?: number;
   retryable: boolean;
   stage?: "primary" | "format_recovery" | "format_recovery_retry";
+  retryAfterMs?: number;
+  rateLimitSource?: SttRateLimitSource;
 };
 
 const backendEngine = (backend: ResolvedSttBackend): TranscriptionEngine => {
   if (backend.kind === "openai") return "openai_transcribe";
   if (backend.kind === "local") return "faster_whisper_local";
   return "whisper_http";
+};
+
+const DEFAULT_STT_429_COOLDOWN_MS = Math.max(
+  250,
+  Number(process.env.STT_429_COOLDOWN_MS ?? 1500),
+);
+const sttBackendCooldownUntil = new Map<string, number>();
+
+const buildSttBackendCooldownKey = (backend: ResolvedSttBackend): string =>
+  [
+    backend.kind,
+    backend.mode,
+    (backend.url ?? "embedded").trim().toLowerCase(),
+    (backend.model ?? "").trim().toLowerCase(),
+  ].join("|");
+
+const readSttRetryAfterMs = (message: string): number | undefined => {
+  const match = message.match(/\bretry_after_ms=(\d+)\b/i);
+  if (!match) return undefined;
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : undefined;
+};
+
+const readSttRateLimitSource = (message: string): SttRateLimitSource | undefined => {
+  const match = message.match(/\brate_limit_source=(provider_429|local_cooldown)\b/i);
+  if (!match) return undefined;
+  const value = match[1]?.trim().toLowerCase();
+  return value === "local_cooldown" ? "local_cooldown" : value === "provider_429" ? "provider_429" : undefined;
+};
+
+const getSttBackendCooldownRemainingMs = (
+  backend: ResolvedSttBackend,
+  nowMs: number,
+): number => {
+  const key = buildSttBackendCooldownKey(backend);
+  const until = sttBackendCooldownUntil.get(key) ?? 0;
+  if (until <= nowMs) {
+    if (until > 0) sttBackendCooldownUntil.delete(key);
+    return 0;
+  }
+  return until - nowMs;
+};
+
+const noteSttBackendCooldown = (
+  backend: ResolvedSttBackend,
+  nowMs: number,
+  retryAfterMs?: number,
+): void => {
+  const delayMs =
+    typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? retryAfterMs
+      : DEFAULT_STT_429_COOLDOWN_MS;
+  sttBackendCooldownUntil.set(buildSttBackendCooldownKey(backend), nowMs + delayMs);
+};
+
+const clearSttBackendCooldown = (backend: ResolvedSttBackend): void => {
+  sttBackendCooldownUntil.delete(buildSttBackendCooldownKey(backend));
 };
 
 const inferStatusCode = (message: string): number | undefined => {
@@ -1071,6 +1131,8 @@ const classifySttFailure = (
 ): SttFailure => {
   const message = error instanceof Error ? error.message : String(error);
   const status = inferStatusCode(message);
+  const retryAfterMs = readSttRetryAfterMs(message);
+  const rateLimitSource = readSttRateLimitSource(message);
   const retryable =
     (typeof status === "number" && (status >= 500 || status === 429 || status === 408)) ||
     /tim(e)?out|temporar|unavailable|network|fetch|ECONN|ENOTFOUND|EAI_AGAIN|WHISPER_HTTP_URL not set/i.test(message);
@@ -1081,6 +1143,8 @@ const classifySttFailure = (
     status,
     retryable,
     stage,
+    retryAfterMs,
+    rateLimitSource,
   };
 };
 
@@ -1250,6 +1314,21 @@ const runVoiceTranscription = async (args: {
   let hardFailure = false;
 
   for (const backend of backends) {
+    const cooldownNowMs = Date.now();
+    const cooldownRemainingMs = getSttBackendCooldownRemainingMs(backend, cooldownNowMs);
+    if (cooldownRemainingMs > 0) {
+      failures.push({
+        backend: backend.kind,
+        engine: backendEngine(backend),
+        message: `STT HTTP 429: local cooldown active retry_after_ms=${cooldownRemainingMs} rate_limit_source=local_cooldown`,
+        status: 429,
+        retryable: true,
+        stage: "primary",
+        retryAfterMs: cooldownRemainingMs,
+        rateLimitSource: "local_cooldown",
+      });
+      continue;
+    }
     try {
       const next = await runBackendTranscribe({
         backend,
@@ -1260,10 +1339,14 @@ const runVoiceTranscription = async (args: {
       baseResult = next;
       selectedBackend = backend;
       transcriptionFile = args.file;
+      clearSttBackendCooldown(backend);
       break;
     } catch (error) {
       const failure = classifySttFailure(backend, error, "primary");
       failures.push(failure);
+      if (failure.status === 429) {
+        noteSttBackendCooldown(backend, Date.now(), failure.retryAfterMs);
+      }
       if (isInvalidFormatSttFailure(failure)) {
         const recovery = await recoverSttInvalidFormatToPcmWav({
           buffer: args.file.buffer,
@@ -1310,6 +1393,9 @@ const runVoiceTranscription = async (args: {
         } catch (retryError) {
           const retryFailure = classifySttFailure(backend, retryError, "format_recovery_retry");
           failures.push(retryFailure);
+          if (retryFailure.status === 429) {
+            noteSttBackendCooldown(backend, Date.now(), retryFailure.retryAfterMs);
+          }
           if (!retryFailure.retryable) {
             hardFailure = true;
           }
@@ -1682,6 +1768,51 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       outputMode,
     });
     if (!result) {
+      const rateLimitedFailures = failures.filter((entry) => entry.status === 429);
+      const allFailuresRateLimited =
+        failures.length > 0 && rateLimitedFailures.length === failures.length;
+      const retryAfterMs = rateLimitedFailures.reduce((max, entry) => {
+        const value =
+          typeof entry.retryAfterMs === "number" && Number.isFinite(entry.retryAfterMs)
+            ? entry.retryAfterMs
+            : 0;
+        return Math.max(max, value);
+      }, 0);
+      const rateLimitSource =
+        rateLimitedFailures.some((entry) => entry.rateLimitSource === "provider_429")
+          ? "provider_429"
+          : rateLimitedFailures.some((entry) => entry.rateLimitSource === "local_cooldown")
+            ? "local_cooldown"
+            : null;
+      if (allFailuresRateLimited) {
+        return errorEnvelope(
+          res,
+          429,
+          "voice_rate_limited",
+          "Voice transcription rate limit exceeded.",
+          {
+            policyMode,
+            outputMode,
+            retryAfterMs: retryAfterMs > 0 ? retryAfterMs : null,
+            rateLimitSource,
+            attempts: failures.map((entry) => ({
+              backend: entry.backend,
+              engine: entry.engine,
+              stage: entry.stage ?? "primary",
+              status: entry.status ?? null,
+              retryable: entry.retryable,
+              retryAfterMs:
+                typeof entry.retryAfterMs === "number" && Number.isFinite(entry.retryAfterMs)
+                  ? entry.retryAfterMs
+                  : null,
+              rateLimitSource: entry.rateLimitSource ?? null,
+              message: entry.message,
+            })),
+            formatRecovery,
+          },
+          parsed.data.traceId,
+        );
+      }
       return errorEnvelope(
         res,
         502,
@@ -1696,6 +1827,11 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
             stage: entry.stage ?? "primary",
             status: entry.status ?? null,
             retryable: entry.retryable,
+            retryAfterMs:
+              typeof entry.retryAfterMs === "number" && Number.isFinite(entry.retryAfterMs)
+                ? entry.retryAfterMs
+                : null,
+            rateLimitSource: entry.rateLimitSource ?? null,
             message: entry.message,
           })),
           formatRecovery,
@@ -2237,6 +2373,7 @@ const resetVoiceRouteState = () => {
   missionBudgetWindow.clear();
   tenantBudgetDaily.clear();
   voiceSpeakChunkCache.clear();
+  sttBackendCooldownUntil.clear();
   circuitBreaker.openedUntil = 0;
   circuitBreaker.recentFailures = [];
 };
