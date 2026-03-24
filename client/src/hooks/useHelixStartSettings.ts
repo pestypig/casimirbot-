@@ -10,6 +10,7 @@ export type StartSettings = {
   voiceNoisyEnvironmentMode: boolean;
   showHelixAskDebug: boolean;
   showHelixAskReasoningEventLog: boolean;
+  showHelixAskMasterEventClock: boolean;
   showHelixVoiceCaptureDiagnostics: boolean;
   showHelixVoiceEventTimelineDebug: boolean;
   showPowerShellDebug: boolean;
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   voiceNoisyEnvironmentMode: false,
   showHelixAskDebug: true,
   showHelixAskReasoningEventLog: false,
+  showHelixAskMasterEventClock: false,
   showHelixVoiceCaptureDiagnostics: false,
   showHelixVoiceEventTimelineDebug: false,
   showPowerShellDebug: false,
@@ -55,6 +57,7 @@ export function useHelixStartSettings() {
         merged.voiceNoisyEnvironmentMode = DEFAULT_SETTINGS.voiceNoisyEnvironmentMode;
         merged.showHelixAskDebug = DEFAULT_SETTINGS.showHelixAskDebug;
         merged.showHelixAskReasoningEventLog = DEFAULT_SETTINGS.showHelixAskReasoningEventLog;
+        merged.showHelixAskMasterEventClock = DEFAULT_SETTINGS.showHelixAskMasterEventClock;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
         merged.showHelixVoiceEventTimelineDebug = DEFAULT_SETTINGS.showHelixVoiceEventTimelineDebug;
         merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;

@@ -174,23 +174,36 @@ const buildOptixAttachments = (
   const total = width * height;
   const depth = new Float32Array(total);
   const mask = new Uint8Array(total);
-  const beta = toFiniteNumber(payload.solve?.beta, 0);
-  const sigma = Math.max(1e-3, toFiniteNumber(payload.solve?.sigma, 6));
   const radius = Math.max(1e-3, toFiniteNumber(payload.solve?.R, 1));
-  const shellCenter = 0.34 + 0.07 * Math.tanh(beta);
-  const shellThickness = Math.max(0.012, 0.06 / Math.sqrt(1 + sigma));
+  const beta = toFiniteNumber(payload.solve?.beta, 0);
+  const nullResidual = Math.abs(
+    toFiniteNumber(payload.geodesicDiagnostics?.maxNullResidual, 0),
+  );
+  const bundleSpread = Math.abs(
+    toFiniteNumber(payload.geodesicDiagnostics?.bundleSpread, 0),
+  );
+  const depthBase = 8;
+  const perturbAmp = clamp(
+    0.004 + 2.5 * nullResidual + 0.01 * bundleSpread,
+    0,
+    0.03,
+  );
 
   for (let y = 0; y < height; y += 1) {
     const ny = height > 1 ? (y / (height - 1)) * 2 - 1 : 0;
     for (let x = 0; x < width; x += 1) {
       const nx = width > 1 ? (x / (width - 1)) * 2 - 1 : 0;
-      const r = Math.hypot(nx / Math.max(radius, 0.25), ny);
-      const shellDelta = Math.abs(r - shellCenter);
-      const shell = Math.exp(-Math.pow(r - shellCenter, 2) * (7 + sigma * 1.8));
       const idx = y * width + x;
-      const depthValue = 8 + 6 * shell + 1.25 * shellDelta;
-      depth[idx] = Number.isFinite(depthValue) ? depthValue : 8;
-      mask[idx] = shellDelta <= shellThickness ? 255 : 0;
+      const q = 1 - nx * nx - ny * ny;
+      if (q < 0) {
+        depth[idx] = depthBase;
+        mask[idx] = 0;
+        continue;
+      }
+      const perturb = perturbAmp * Math.sin(6.2 * nx + 5.1 * ny + 0.85 * beta);
+      const depthValue = depthBase + radius * Math.sqrt(Math.max(0, q)) + perturb;
+      depth[idx] = Number.isFinite(depthValue) ? depthValue : depthBase;
+      mask[idx] = 255;
     }
   }
 

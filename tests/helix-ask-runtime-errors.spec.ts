@@ -1026,8 +1026,9 @@ describe("helix ask universal answer plan shadow", () => {
       question: "What's a good way to summarize evidence?",
       clarifyLine: "Do you mean for a scientific report, a code review, or a general audience?",
     });
-    expect(answer).toMatch(/^For "What's a good way to summarize evidence\?",/);
+    expect(answer).toMatch(/^Best-effort answer for "What's a good way to summarize evidence\?":/);
     expect(answer).toContain("Clarify:");
+    expect(answer).toContain("Implication:");
     expect(answer.length).toBeGreaterThanOrEqual(220);
   });
 
@@ -1071,6 +1072,16 @@ describe("helix ask universal answer plan shadow", () => {
       ),
     ).toBe(true);
     expect(
+      __testHelixAskReliabilityGuards.hasHelixAskConcreteDefinitionTarget(
+        "What are first principles meaning in physics?",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.hasHelixAskConcreteDefinitionTarget(
+        "What does entropy mean in physics?",
+      ),
+    ).toBe(true);
+    expect(
       __testHelixAskReliabilityGuards.hasHelixAskConcreteDefinitionTarget("What is this?"),
     ).toBe(false);
     expect(
@@ -1093,6 +1104,36 @@ describe("helix ask universal answer plan shadow", () => {
         intentDomain: "general",
       }),
     ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldBypassHelixAskPreIntentClarifyForGeneralDefinitionTarget({
+        question: "What are first principles meaning in physics?",
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+        intentDomain: "general",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldBypassHelixAskPreIntentClarifyForGeneralDefinitionTarget({
+        question: "What does entropy mean in physics?",
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+        intentDomain: "general",
+      }),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldBypassHelixAskPreIntentClarifyForGeneralDefinitionTarget({
+        question: "What does entropy mean in this codebase?",
+        explicitRepoExpectation: true,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        requiresRepoEvidence: false,
+        intentDomain: "general",
+      }),
+    ).toBe(false);
     expect(
       __testHelixAskReliabilityGuards.shouldBypassHelixAskPreIntentClarifyForDefinitionTarget({
         question: "What is this?",
@@ -1126,6 +1167,17 @@ describe("helix ask universal answer plan shadow", () => {
         "What is the difference between this and that?",
       ),
     ).toBe(false);
+  });
+
+  it("keeps open-world definition prompts out of stage0 promotion and ambiguity clarify gate", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("stage0_general_definition_bypass");
+    expect(routeSource).toContain("general_definition_ambiguity_gate_bypass");
+    expect(routeSource).toContain("!generalDefinitionTargetNoRepoPromote");
+    expect(routeSource).toContain("!generalDefinitionAmbiguityGateBypass");
   });
 
   it("forces repo-grounded mode for repo api lookup under clarify pressure when evidence is strong", () => {
@@ -1900,6 +1952,77 @@ describe("helix ask universal answer plan shadow", () => {
     expect(enforced.miniAnswers[0]?.summary).toMatch(/scoped retrieval pass missing/i);
   });
 
+  it("downgrades covered mini-answers when objective evidence sufficiency is below covered threshold", () => {
+    const enforced =
+      __testHelixAskReliabilityGuards.enforceHelixAskObjectiveEvidenceSufficiency({
+        miniAnswers: [
+          {
+            objective_id: "obj_weak",
+            objective_label: "weakly evidenced objective",
+            status: "covered",
+            matched_slots: ["definition"],
+            missing_slots: [],
+            evidence_refs: ["docs/knowledge/warp/warp-bubble.md"],
+            summary: "weak objective marked covered.",
+          },
+        ],
+        states: [
+          {
+            objective_id: "obj_weak",
+            objective_label: "weakly evidenced objective",
+            required_slots: ["definition", "mechanism"],
+            matched_slots: ["definition"],
+            status: "synthesizing",
+            attempt: 1,
+            retrieval_confidence: 1,
+          },
+        ],
+      });
+    expect(enforced.miniAnswers).toHaveLength(1);
+    expect(enforced.miniAnswers[0]?.status).toBe("partial");
+    expect(enforced.miniAnswers[0]?.missing_slots).toEqual(
+      expect.arrayContaining(["evidence"]),
+    );
+    expect(enforced.scores[0]?.score).toBeLessThan(0.75);
+    expect(enforced.terminalizationReasons["obj_weak"]).toBe(
+      "objective_oes_below_covered_threshold",
+    );
+  });
+
+  it("promotes weak partial mini-answers to blocked when objective evidence sufficiency is very low", () => {
+    const enforced =
+      __testHelixAskReliabilityGuards.enforceHelixAskObjectiveEvidenceSufficiency({
+        miniAnswers: [
+          {
+            objective_id: "obj_partial",
+            objective_label: "partial objective",
+            status: "partial",
+            matched_slots: [],
+            missing_slots: ["definition", "mechanism"],
+            evidence_refs: [],
+            summary: "partial objective with weak evidence.",
+          },
+        ],
+        states: [
+          {
+            objective_id: "obj_partial",
+            objective_label: "partial objective",
+            required_slots: ["definition", "mechanism"],
+            matched_slots: [],
+            status: "synthesizing",
+            attempt: 2,
+            retrieval_confidence: 0,
+          },
+        ],
+      });
+    expect(enforced.miniAnswers).toHaveLength(1);
+    expect(enforced.miniAnswers[0]?.status).toBe("blocked");
+    expect(enforced.scores[0]?.score).toBeLessThan(0.5);
+    expect(enforced.terminalizationReasons["obj_partial"]).toBe(
+      "objective_oes_partial_below_block_threshold",
+    );
+  });
+
   it("keeps applyContextAttempt available for late objective recovery passes", () => {
     const routeSource = fs.readFileSync(
       path.join(process.cwd(), "server/routes/agi.plan.ts"),
@@ -1971,6 +2094,10 @@ describe("helix ask universal answer plan shadow", () => {
     });
     expect(assembled).toMatch(/Remaining uncertainty:/i);
     expect(assembled).toMatch(/profiles voice lane/i);
+    expect(assembled).toMatch(/Open gaps \/ UNKNOWNs:/i);
+    expect(assembled).toMatch(/UNKNOWN - profiles voice lane/i);
+    expect(assembled).toMatch(/Why:\s*missing voice-lane/i);
+    expect(assembled).toMatch(/Next retrieval:/i);
     expect(assembled).toMatch(/Main answer body\./);
   });
 
@@ -2013,6 +2140,47 @@ describe("helix ask universal answer plan shadow", () => {
     expect(fragments.some((entry: string) => /^Plan for /i.test(entry))).toBe(false);
     expect(fragments[0].toLowerCase()).toContain("what is a warp bubble");
     expect(fragments[1].toLowerCase()).toContain("how does it get a full solve");
+  });
+
+  it("does not inject literal-term slots for open-world definition objectives", () => {
+    const question = "What is a warp bubble?";
+    const queryConstraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "general",
+      requiresRepoEvidence: false,
+      queryConstraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      plannerMode: "deterministic",
+      plannerValid: true,
+      plannerSource: "heuristic_bootstrap",
+    });
+    expect(contract.objectives.length).toBeGreaterThan(0);
+    const slots = contract.objectives[0].required_slots;
+    expect(slots).toContain("definition");
+    expect(slots).not.toContain("warp");
+    expect(slots).not.toContain("bubble");
+  });
+
+  it("keeps lexical slots available for repo-anchored definition objectives", () => {
+    const question = "What is a warp bubble in docs/knowledge/warp/warp-bubble.md?";
+    const queryConstraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      plannerMode: "deterministic",
+      plannerValid: true,
+      plannerSource: "heuristic_bootstrap",
+    });
+    expect(contract.objectives.length).toBeGreaterThan(0);
+    const slots = contract.objectives[0].required_slots;
+    expect(slots).toContain("definition");
+    expect(slots).toContain("warp");
   });
 
   it("adds answer obligations and per-obligation coverage to the shadow plan", () => {
@@ -7900,6 +8068,218 @@ describe("helix ask dialogue formatting", () => {
     expect(guarded).toMatch(/Practical steps:/i);
     expect(guarded).not.toMatch(/^Sources:/im);
     expect(guarded).not.toMatch(/docs\/knowledge/i);
+  });
+
+  it("strips objective scaffold residue but preserves explicit UNKNOWN blocks in open-world rewrites", () => {
+    const raw = [
+      "Definition:",
+      "- In this codebase, are first principles is grounded in docs/knowledge/trees/paper-ingestion-runtime-tree.md.",
+      "Open Gaps:",
+      "- Current evidence is incomplete for this turn; missing slots: mechanism, failure-path.",
+      "Remaining uncertainty: What are first principles meaning in physics? (missing: first, principles).",
+      "Open gaps / UNKNOWNs:",
+      "UNKNOWN - What are first principles meaning in physics?",
+      "Why: missing first, principles",
+      "Next retrieval: Run scoped retrieval for \"What are first principles meaning in physics?\" targeting slots: first, principles.",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What are first principles meaning in physics?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/first principles/i);
+    expect(guarded).not.toMatch(/in this codebase/i);
+    expect(guarded).toMatch(/open gaps/i);
+    expect(guarded).toMatch(/unknown\s*-/i);
+    expect(guarded).toMatch(/next retrieval/i);
+  });
+
+  it("strips additional repo context appendix lines during open-world rewrite", () => {
+    const raw = [
+      "I couldn't confirm this against repo-grounded evidence, so this is an open-world best-effort answer with explicit uncertainty.",
+      "Additional Repo Context",
+      "Additional repo context:",
+      "- Code: Span: L19-L23 ## Core files.",
+      "- Definition: Section: Paper Ingestion Runtime Tree Span: L10-L10.",
+      "- Evidence: Section: Casimir Tiles Tree Span: L10-L10.",
+      "(see docs/knowledge/trees/paper-ingestion-runtime-tree.md)",
+      "In physics, \"first principles\" means deriving conclusions from fundamental laws.",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What are first principles meaning in physics?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/first principles/i);
+    expect(guarded).not.toMatch(/Additional Repo Context/i);
+    expect(guarded).not.toMatch(/Additional repo context:/i);
+    expect(guarded).not.toMatch(/Paper Ingestion Runtime Tree/i);
+    expect(guarded).not.toMatch(/Casimir Tiles Tree/i);
+  });
+
+  it("uses commonality fallback for open-world 'have in common' prompts", () => {
+    const raw = [
+      "Definition:",
+      "- In this codebase, this concept is grounded in docs/knowledge/physics/math-tree.json.",
+      "Open gaps / UNKNOWNs:",
+      "UNKNOWN - what is the electron and kinematics of the solar system have in common?",
+      "Next retrieval: Run scoped retrieval ...",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What is the electron and kinematics of the solar system have in common?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/dynamical systems/i);
+    expect(guarded).toMatch(/equations of motion|conservation laws/i);
+    expect(guarded).not.toMatch(/core meaning of the concept/i);
+  });
+
+  it("uses a non-generic conceptual fallback for 'and why does it matter' prompts", () => {
+    const raw = [
+      "Definition:",
+      "- In this codebase, epistemology is grounded in docs/knowledge/trees/physics-foundations-tree.json.",
+      "Open gaps / UNKNOWNs:",
+      "UNKNOWN - what is epistemology and why does it matter?",
+      "Next retrieval: Run scoped retrieval ...",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What is epistemology and why does it matter?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/branch of philosophy|knowledge|evidence/i);
+    expect(guarded).toMatch(/it matters/i);
+    expect(guarded).not.toMatch(/core meaning of the concept/i);
+  });
+
+  it("replaces generic core-meaning sentence with conceptual fallback in open-world rewrite", () => {
+    const raw = [
+      "I couldn't confirm this against repo-grounded evidence, so this is an open-world best-effort answer with explicit uncertainty.",
+      "\"epistemology and why does it matter\" refers to the core meaning of the concept in its domain context.",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What is epistemology and why does it matter?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/epistemology/i);
+    expect(guarded).toMatch(/knowledge|evidence|justified belief/i);
+    expect(guarded).not.toMatch(/core meaning of the concept/i);
+  });
+
+  it("strips objective leakage tails from open-world commonality answers", () => {
+    const raw = [
+      "I couldn't confirm this against repo-grounded evidence, so this is an open-world best-effort answer with explicit uncertainty.",
+      "They are both dynamical systems described by equations of motion and conservation laws.",
+      "Atomic outputs are diagnostic/reduced-order only and non-certifying for ask-time narration. (missing: kinematics, solar).",
+      "\" targeting slots: kinematics, solar.",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What is the electron and kinematics of the solar system have in common?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/dynamical systems/i);
+    expect(guarded).not.toMatch(/Atomic outputs are diagnostic\/reduced-order/i);
+    expect(guarded).not.toMatch(/\(\s*missing\s*:/i);
+    expect(guarded).not.toMatch(/targeting slots?\s*:/i);
+  });
+
+  it("preserves structured UNKNOWN blocks and removes scaffolded open-world template lines", () => {
+    const raw = [
+      "For \"What are first principles meaning in physics?\", start with one concrete claim, one strongest supporting piece of evidence, and one uncertainty line so the reader can separate fact from assumption.",
+      "Open gaps / UNKNOWNs:",
+      "UNKNOWN - first principles meaning in physics",
+      "Why: missing definition evidence in this turn.",
+      "What I checked: docs/knowledge/physics/math-tree.json, docs/knowledge/physics/physics-foundations-tree.json.",
+      "Next retrieval: run a scoped retrieval for first principles + governing equations.",
+    ].join("\n");
+    const guarded = __testHelixAskDialogueFormatting.rewriteOpenWorldBestEffortAnswer(
+      raw,
+      "What are first principles meaning in physics?",
+    );
+    expect(guarded).toMatch(/open-world best-effort/i);
+    expect(guarded).toMatch(/UNKNOWN - first principles meaning in physics/i);
+    expect(guarded).toMatch(/Why:\s*missing definition evidence/i);
+    expect(guarded).toMatch(/What I checked:/i);
+    expect(guarded).toMatch(/Next retrieval:/i);
+    expect(guarded).not.toMatch(/start with one concrete claim/i);
+    expect(guarded).not.toMatch(/core meaning of the concept/i);
+  });
+
+  it("contains suppression marker for repo context envelope extension in general open-world mode", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("answerExtension:suppressed_general_open_world");
+    expect(routeSource).toContain("answer_extension_suppressed");
+    expect(routeSource).toContain("answer_envelope_repo_context_suppressed");
+    expect(routeSource).toContain("treeWalk: suppressRepoContextEnvelope ? undefined : treeWalkBlock || undefined");
+  });
+
+  it("contains objective-loop primary composer guard markers to suppress family degrade", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toMatch(
+      /const objectiveLoopPrimaryComposerGuard =\s*intentDomain === "general"/,
+    );
+    expect(routeSource).not.toMatch(
+      /const objectiveLoopPrimaryComposerGuard =\s*objectiveLoopEnabled &&/,
+    );
+    expect(routeSource).toContain("composerSoftEnforce:skip_objective_loop_primary");
+    expect(routeSource).toContain(
+      "composerSoftEnforce:retrofit_skip_general_open_world_family_degrade",
+    );
+    expect(routeSource).toContain("objective_loop_primary_skip_family_degrade");
+    expect(routeSource).toContain("composerV2:guard_skipped_objective_loop_primary");
+    expect(routeSource).toContain("composer_family_degrade_suppressed");
+    expect(routeSource).toContain("objective_loop_primary_composer_guard");
+  });
+
+  it("contains post-composer open-world repo-leak guard markers", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("open_world_general_repo_leak_detected");
+    expect(routeSource).toContain("openWorldBypass:post_composer_repo_leak_guard");
+    expect(routeSource).toContain("finalClean:open_world_objective_tail_scrub");
+    expect(routeSource).toContain("open_world_objective_tail_scrub_applied");
+  });
+
+  it("contains routing salvage and objective assembly rescue markers", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("routing_salvage_applied");
+    expect(routeSource).toContain("routing_salvage_reason");
+    expect(routeSource).toContain("routing_salvage_retrieval_added_count");
+    expect(routeSource).toContain("general_definition_repo_anchor_zero_context");
+    expect(routeSource).toContain("objective_assembly_rescue_attempted");
+    expect(routeSource).toContain("objective_assembly_rescue_success");
+    expect(routeSource).toContain("objective_assembly_rescue_fail_reason");
+    expect(routeSource).toContain("objective_mini_critic_prompt_preview");
+    expect(routeSource).toContain("objective_assembly_prompt_preview");
+    expect(routeSource).toContain("objective_assembly_rescue_prompt_preview");
+    expect(routeSource).toContain("objectiveAssembly:llm_rescue");
+  });
+
+  it("contains reasoning sidebar debug markers and event-clock formatter", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("buildHelixAskReasoningSidebarFromDebug");
+    expect(routeSource).toContain("attachHelixAskReasoningSidebarToDebug");
+    expect(routeSource).toContain("reasoning_sidebar_enabled");
+    expect(routeSource).toContain("reasoning_sidebar_markdown");
+    expect(routeSource).toContain("reasoning_sidebar_event_count");
+    expect(routeSource).toContain("## Event Clock");
   });
 
   it("enforces ideology narrative anchors for social prompts", () => {

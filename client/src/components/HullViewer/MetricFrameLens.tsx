@@ -128,6 +128,16 @@ export type SolveOrderSnapshot = {
       rmsZResidualM: number | null;
       maxAbsZResidualM: number | null;
       hausdorffM: number | null;
+      rmsPassMaxM: number | null;
+      rmsWarnMaxM: number | null;
+      maxAbsPassMaxM: number | null;
+      maxAbsWarnMaxM: number | null;
+      hausdorffPassMaxM: number | null;
+      hausdorffWarnMaxM: number | null;
+      rmsStatus: SolveOrderStatus;
+      maxAbsStatus: SolveOrderStatus;
+      hausdorffStatus: SolveOrderStatus;
+      statusReason: string | null;
       sampleCount: number | null;
       note: string | null;
     };
@@ -216,6 +226,13 @@ const statusLabel: Record<SolveOrderStatus, string> = {
   unknown: "UNKNOWN",
 };
 
+const statusTextClass: Record<SolveOrderStatus, string> = {
+  pass: "text-emerald-100",
+  warn: "text-amber-100",
+  fail: "text-rose-100",
+  unknown: "text-slate-300",
+};
+
 const residualStatusClass: Record<"pass" | "fail" | "unknown", string> = {
   pass: "text-emerald-100",
   fail: "text-rose-100",
@@ -243,6 +260,20 @@ const formatResidual = (
   if (!vKnown && !lKnown) return "--";
   if (!lKnown) return fmt(value, digits);
   return `${fmt(value, digits)} <= ${fmt(limit, digits)}`;
+};
+
+const formatBandThreshold = (
+  value: number | null | undefined,
+  passMax: number | null | undefined,
+  warnMax: number | null | undefined,
+  unit = "",
+  digits = 3,
+) => {
+  const vKnown = Number.isFinite(value ?? NaN);
+  const pKnown = Number.isFinite(passMax ?? NaN);
+  const wKnown = Number.isFinite(warnMax ?? NaN);
+  if (!vKnown && !pKnown && !wKnown) return "--";
+  return `${fmt(value, digits)}${unit} <= ${fmt(passMax, digits)}${unit} pass | <= ${fmt(warnMax, digits)}${unit} warn`;
 };
 
 const fmtUtc = (value: number | null | undefined) => {
@@ -1025,6 +1056,49 @@ export default function MetricFrameLens({
               <DetailRow label="fit z0/sign" value={`${fmtSigned(integral?.fitZOffsetM, 3)} / ${fmtSigned(integral?.fitSign, 0)}`} />
               <DetailRow label="z rms / max" value={`${fmt(integral?.rmsZResidualM, 3)} / ${fmt(integral?.maxAbsZResidualM, 3)} m`} />
               <DetailRow label="hausdorff" value={`${fmt(integral?.hausdorffM, 3)} m`} />
+              <DetailRow
+                label="rms gate"
+                value={`${statusLabel[integral?.rmsStatus ?? "unknown"]} | ${formatBandThreshold(
+                  integral?.rmsZResidualM,
+                  integral?.rmsPassMaxM,
+                  integral?.rmsWarnMaxM,
+                  " m",
+                  3,
+                )}`}
+                valueClassName={statusTextClass[integral?.rmsStatus ?? "unknown"]}
+              />
+              <DetailRow
+                label="max abs gate"
+                value={`${statusLabel[integral?.maxAbsStatus ?? "unknown"]} | ${formatBandThreshold(
+                  integral?.maxAbsZResidualM,
+                  integral?.maxAbsPassMaxM,
+                  integral?.maxAbsWarnMaxM,
+                  " m",
+                  3,
+                )}`}
+                valueClassName={statusTextClass[integral?.maxAbsStatus ?? "unknown"]}
+              />
+              <DetailRow
+                label="hausdorff gate"
+                value={`${statusLabel[integral?.hausdorffStatus ?? "unknown"]} | ${formatBandThreshold(
+                  integral?.hausdorffM,
+                  integral?.hausdorffPassMaxM,
+                  integral?.hausdorffWarnMaxM,
+                  " m",
+                  3,
+                )}`}
+                valueClassName={statusTextClass[integral?.hausdorffStatus ?? "unknown"]}
+              />
+              <DetailRow
+                label="gate reason"
+                value={integral?.statusReason ?? "--"}
+                title={integral?.statusReason ?? undefined}
+                valueClassName={
+                  displacement?.integralStatus
+                    ? statusTextClass[displacement.integralStatus]
+                    : statusTextClass.unknown
+                }
+              />
               <DetailRow label="chart/map" value={`${displacement?.chartLabel ?? "--"} | ${displacement?.coordinateMap ?? "--"}`} />
               <DetailRow label="samples" value={fmt(displacement?.samplingPoints, 0)} />
               <DetailRow label="integral n" value={fmt(integral?.sampleCount, 0)} />

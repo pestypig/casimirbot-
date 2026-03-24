@@ -160,6 +160,13 @@ export function HelixSettingsDialogContent({
               <HelixAskReasoningEventLogPanel snapshot={voiceDiagnostics} />
             ) : null}
             <PreferenceToggleRow
+              id="helix-ask-master-event-clock"
+              label="Helix Ask master event clock"
+              description="Enable unified per-answer debug bundle copy (timeline + debug context + reasoning metadata)."
+              checked={userSettings.showHelixAskMasterEventClock}
+              onChange={(value) => updateSettings({ showHelixAskMasterEventClock: value })}
+            />
+            <PreferenceToggleRow
               id="alcubierre-render-debug-log"
               label="Alcubierre render + calc debug log"
               description="Capture structured expected-vs-rendered warp viewer diagnostics with copy export."

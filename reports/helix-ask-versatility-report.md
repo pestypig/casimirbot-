@@ -2,8 +2,8 @@
 
 - summary_schema_version: 2
 - git_branch: main
-- git_head: be2861fb
-- git_origin_main: be2861fb
+- git_head: ee50d3bd
+- git_origin_main: ee50d3bd
 - git_ahead_behind: 0	0
 - provenance_gate_pass: true
 - provenance_warnings: none
@@ -12,8 +12,8 @@
 - provenance_blocked: false
 - provenance_hard_blocker_reason: none
 - ship_recommendation_blocked_by_hard_blocker: false
-- run_id: versatility-1774280263669
-- base_url: http://localhost:5050
+- run_id: versatility-1774311544255
+- base_url: http://127.0.0.1:5050
 - prompts: 3
 - seeds: 7
 - temperatures: 0.2
@@ -21,19 +21,19 @@
 - total_runs: 3
 - run_complete: true
 - completion_rate: 100.00%
-- run_duration_ms: 104040
+- run_duration_ms: 66120
 - terminated_early_reason: none
 - global_cooldown_applied_ms: 0
 - resumed_from_latest: false
 - resumed_runs: 0
-- output_run_dir: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1774280263669
+- output_run_dir: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1774311544255
 
 ## Aggregate by Prompt Family
 | family | runs | pass_rate | intent_correct_rate | report_mode_correct_rate | stub_rate | latency_p50_ms | latency_p95_ms |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| relation | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 16173 | 16173 |
-| repo_technical | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 12993 | 12993 |
-| ambiguous_general | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 2678 | 2678 |
+| relation | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 15003 | 15003 |
+| repo_technical | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 15076 | 15076 |
+| ambiguous_general | 1 | 100.0% | 100.0% | 100.0% | 0.0% | 1405 | 1405 |
 
 ## Core Metrics
 - intent_id_correct_rate: 100.00%
@@ -50,12 +50,12 @@
 - min_text_length_pass_rate: 100.00%
 - debug_scaffold_leak_rate: 0.00%
 - code_fragment_spill_rate: 0.00%
-- latency_total_p50_ms: 12993
-- latency_total_p95_ms: 16173
-- latency_retrieval_p50_ms: 616 (samples=3)
-- latency_retrieval_p95_ms: 2444 (samples=3)
-- latency_synthesis_p50_ms: 2 (samples=2)
-- latency_synthesis_p95_ms: 8308 (samples=2)
+- latency_total_p50_ms: 15003
+- latency_total_p95_ms: 15076
+- latency_retrieval_p50_ms: 613 (samples=3)
+- latency_retrieval_p95_ms: 1054 (samples=3)
+- latency_synthesis_p50_ms: 1699 (samples=2)
+- latency_synthesis_p95_ms: 6129 (samples=2)
 
 ## Probability Scorecard (Wilson 95%)
 - route_correct|relation: p=1.000 ci95=[0.207, 1.000] n=1
@@ -64,9 +64,12 @@
 - frontier_scaffold_complete: p=1.000 ci95=[0.439, 1.000] n=3
 - no_debug_leak: p=1.000 ci95=[0.439, 1.000] n=3
 - no_runtime_fallback: p=1.000 ci95=[0.439, 1.000] n=3
+- objective_complete_before_finalize: p=1.000 ci95=[0.342, 1.000] n=2
+- objective_scoped_retrieval_success: p=1.000 ci95=[0.342, 1.000] n=2
+- objective_assembly_success: p=1.000 ci95=[0.342, 1.000] n=2
 
 ## Representative Evidence Packs
-- pass: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1774280263669\raw\versatility-1774280263669-relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th-s7-t0p2.json (relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th)
+- pass: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\artifacts\experiments\helix-ask-versatility\versatility-1774311544255\raw\versatility-1774311544255-relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th-s7-t0p2.json (relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th)
 - fail: none (n/a)
 
 ## Top Failure Signatures
@@ -77,7 +80,19 @@
 - Decision should prefer real-model reruns for release-grade quality gates whenever stub-text rate is non-zero.
 
 ## 15 Worst Examples
-### Worst #1: relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th
+### Worst #1: repo_tech_26_explain-how-answer-path-is-populated-and-useful-for-diagnostics
+- family: repo_technical
+- question: Explain how answer_path is populated and useful for diagnostics.
+- failures: none
+- likely_root_cause: mixed
+- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
+- debug: intent_id=repo.repo_api_lookup intent_domain=repo intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
+- final_answer:
+```text
+Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. Explain how answer_path is populated and useful for diagnostics is grounded in server/skills/vision.http.ts, shared/time-dilation-diagnostics.ts, modules/dynamic/dynamic-casimir.ts. Direct Answer: answer_path is anchored in server/skills/vision.http.ts with supporting flow in shared/time-dilation-diagnostics.ts. server/skills/vision.http.ts: contains implementation logic relevant to this answer. shared/time-dilation-diagnostics.ts: defines shared types/constants consumed across the pipeline. modules/dynamic/dynamic-casimir.ts: contains core module logic used by this solve path. Where in repo: Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [server/skills/vision.http.ts]. answer_path is traced through server/skills/vision.http.ts and shared/time-dilation-diagnostics.ts in this turn. Call chain: Prompt-explicit symbols in this turn include answer_path. Key structs/types: Start with writes to answer_path in server/skills/vision.http.ts before changing downstream formatting or diagnostics. For line-level edits, narrow the next pass with explicit symbol or file:line anchors. What to change safely: Explain how answer_path is populated and useful for diagnostics: Current evidence is incomplete for this turn; missing slots: answer-path, populated, code-path, definition. Open Gaps: Sources: server/skills/vision.http.ts, shared/time-dilation-diagnostics.ts, modules/dynamic/dynamic-casimir.ts, server/specialists/solvers/code.isbalanced.ts, server/services/physics/curvature-diagnostics-store.ts, server/modules/qi/diagnostics.ts, modules/gr/gr-diagnostics.ts, server/db/proposals.ts Remaining uncertainty: Explain
+```
+
+### Worst #2: relation_02_explain-the-relation-between-warp-bubble-physics-and-mission-ethos-in-th
 - family: relation
 - question: Explain the relation between warp bubble physics and mission ethos in this repo.
 - failures: none
@@ -88,58 +103,15 @@
 ```text
 Summary:
 - warp-full-solve-single-runner.ts: if (!inputPath !outputPath) , "stress-energy bridge requires SI unit lock"), provenance: z.object( class: z.enum(["diagnostic", "reduced-order", "certified"]),.
-- Explain the relation between warp bubble physics is grounded in modules/warp/natario-warp.ts, modules/warp/warp-module.ts, client/src/lib/warp-theta.ts.
-
-Evidence:
+- Explain the relation between warp bubble physics is grounded in modules/warp/natario-warp.ts, modules/warp/warp-module.ts, client/src/lib/warp-theta.ts. Evidence:
 - warp-full-solve-single-runner.ts: if (!inputPath !outputPath) , "stress-energy bridge requires SI unit lock"), provenance: z.object( class: z.enum(["diagnostic", "reduced-order", "certified"]),.
-- Explain the relation between warp bubble physics is anchored in modules/warp/natario-warp.ts, modules/warp/warp-module.ts, client/src/lib/warp-theta.ts.
-
-mission ethos in this repo:
+- Explain the relation between warp bubble physics is anchored in modules/warp/natario-warp.ts, modules/warp/warp-module.ts, client/src/lib/warp-theta.ts. mission ethos in this repo:
 - Primary implementation anchors for mission ethos in this repo are modules/warp/natario-warp.ts and modules/warp/warp-module.ts.
-- warp-full-solve-single-runner.ts: if (!inputPath !outputPath) , "stress-energy bridge requires SI unit lock"), provenance: z.object( class: z.enum(["diagnostic", "reduced-order", "certified"]),.
-
-Open Gaps:
-- Current evidence is incomplete for State what remains uncertain or under-evidenced in this turn.; missing slots: definition, mechanism, code-path, failure-path.
-
-Sources: modules/warp/natario-warp.ts, modules/warp/warp-module.ts, client/src/lib/warp-theta.ts, server/routes/ethos.ts, scripts/warp-full-solve-single-runner.ts, shared/essence-physics.ts, server/energy-pipeline.ts, client/src/hooks/use-ideology.ts
-```
-
-### Worst #2: repo_tech_26_explain-how-answer-path-is-populated-and-useful-for-diagnostics
-- family: repo_technical
-- question: Explain how answer_path is populated and useful for diagnostics.
-- failures: none
-- likely_root_cause: mixed
-- patch_suggestion: Tighten routing diagnostics and deterministic fallback conditions for this failure signature.
-- debug: intent_id=repo.repo_api_lookup intent_domain=repo intent_strategy=repo_rag report_mode=false relation_packet_built=undefined relation_dual_domain_ok=true deterministic_fallback_used_relation=undefined contract_parse_fail_rate_relation=undefined citation_repair=undefined
-- final_answer:
-```text
-Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts.
-
-Direct Answer:
-
-Primary implementation anchors for Explain how answer_path is populated and useful for diagnostics remain partial in this turn.
-
-Where in repo:
-
-Maturity (exploratory): this claim set is hypothesis-guided and not yet certified by dedicated test artifacts. [server/routes/agi.plan.ts]. Call-chain detail remains bounded to server/routes/agi.plan.ts.
-
-Call chain:
-
-Prompt-explicit symbols in this turn include answer_path.
-
-Key structs/types:
-
-Keep edits bounded to the verified implementation anchors for Explain how answer_path is populated and useful for diagnostics. For line-level edits, narrow the next pass with explicit symbol or file:line anchors.
-
-What to change safely:
-
-Explain how answer_path is populated and useful for diagnostics:
-
-Current evidence is incomplete for State what remains uncertain or under-evidenced in this turn.; missing slots: mechanism, answer-path, populated, code-path.
-
-Open Gaps:
-
-Sources: server/routes/agi.plan.ts
+- warp-full-solve-single-runner.ts: if (!inputPath !outputPath) , "stress-energy bridge requires SI unit lock"), provenance: z.object( class: z.enum(["diagnostic", "reduced-order", "certified"]),. Open Gaps:
+- Current evidence is incomplete for this turn; missing slots: definition, mechanism, code-path, failure-path. Sources: modules/warp/natario-warp.ts, modules/warp/warp-module.ts, client/src/lib/warp-theta.ts, server/routes/ethos.ts, scripts/warp-full-solve-single-runner.ts, shared/essence-physics.ts, server/energy-pipeline.ts, client/src/hooks/use-ideology.ts Remaining uncertainty: Explain the relation between warp bubble physics (missing: between). Open gaps / UNKNOWNs:
+UNKNOWN - Explain the relation between warp bubble physics
+Why: missing between
+What I checked: docs/ethos/ideology.json, docs/ethos/why.md, modules/warp/warp-module.ts, modules/warp/natario-warp.ts, docs/warp-console-architecture.md, 
 ```
 
 ### Worst #3: ambiguous_12_what-s-a-clean-way-to-structure-a-short-answer

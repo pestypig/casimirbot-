@@ -451,6 +451,16 @@ type IntegralSignalComparison = {
   rmsZResidualM: number | null;
   maxAbsZResidualM: number | null;
   hausdorffM: number | null;
+  rmsPassMaxM: number | null;
+  rmsWarnMaxM: number | null;
+  maxAbsPassMaxM: number | null;
+  maxAbsWarnMaxM: number | null;
+  hausdorffPassMaxM: number | null;
+  hausdorffWarnMaxM: number | null;
+  rmsStatus: SolveOrderStatus;
+  maxAbsStatus: SolveOrderStatus;
+  hausdorffStatus: SolveOrderStatus;
+  statusReason: string | null;
   sampleCount: number | null;
   note: string | null;
 };
@@ -666,6 +676,18 @@ function compareIntegralSignalToMetric(opts: {
   signal: IntegralSignalAttachmentSnapshot | null;
   metricRadiusM: [number | null, number | null, number | null];
 }): IntegralSignalComparison {
+  const emptyThresholds = {
+    rmsPassMaxM: null,
+    rmsWarnMaxM: null,
+    maxAbsPassMaxM: null,
+    maxAbsWarnMaxM: null,
+    hausdorffPassMaxM: null,
+    hausdorffWarnMaxM: null,
+    rmsStatus: "unknown" as SolveOrderStatus,
+    maxAbsStatus: "unknown" as SolveOrderStatus,
+    hausdorffStatus: "unknown" as SolveOrderStatus,
+    statusReason: null,
+  };
   const signal = opts.signal;
   const rx = Number(opts.metricRadiusM[0]);
   const ry = Number(opts.metricRadiusM[1]);
@@ -686,6 +708,7 @@ function compareIntegralSignalToMetric(opts: {
       rmsZResidualM: null,
       maxAbsZResidualM: null,
       hausdorffM: null,
+      ...emptyThresholds,
       sampleCount: null,
       note: "integral signal unavailable",
     };
@@ -706,6 +729,7 @@ function compareIntegralSignalToMetric(opts: {
       rmsZResidualM: null,
       maxAbsZResidualM: null,
       hausdorffM: null,
+      ...emptyThresholds,
       sampleCount: signal.sampleCount,
       note: "metric radii unavailable for integral comparison",
     };
@@ -748,6 +772,7 @@ function compareIntegralSignalToMetric(opts: {
       rmsZResidualM: null,
       maxAbsZResidualM: null,
       hausdorffM: null,
+      ...emptyThresholds,
       sampleCount: observed.length,
       note: "integral signal has insufficient mask samples",
     };
@@ -814,6 +839,7 @@ function compareIntegralSignalToMetric(opts: {
       rmsZResidualM: null,
       maxAbsZResidualM: null,
       hausdorffM: null,
+      ...emptyThresholds,
       sampleCount: observed.length,
       note: "integral fit failed (no valid shell overlap)",
     };
@@ -839,18 +865,40 @@ function compareIntegralSignalToMetric(opts: {
   const pxPerM = ((cx + cy) * 0.5) / Math.max(best.k, 1e-9);
   const passRms = Math.max(0.08 * rz, 0.12);
   const warnRms = Math.max(0.24 * rz, 0.45);
+  const passMaxAbs = passRms * 2.2;
+  const warnMaxAbs = warnRms * 2.1;
   const passHausdorff = Math.max(0.3 * rz, 0.5);
   const warnHausdorff = Math.max(0.8 * rz, 1.25);
+  const classifyThresholdStatus = (
+    value: number | null | undefined,
+    passMax: number,
+    warnMax: number,
+  ): SolveOrderStatus => {
+    if (!Number.isFinite(value ?? NaN)) return "unknown";
+    if ((value as number) <= passMax) return "pass";
+    if ((value as number) <= warnMax) return "warn";
+    return "fail";
+  };
+  const rmsStatus = classifyThresholdStatus(best.rms, passRms, warnRms);
+  const maxAbsStatus = classifyThresholdStatus(best.maxAbs, passMaxAbs, warnMaxAbs);
+  const hausdorffStatus = classifyThresholdStatus(hausdorff, passHausdorff, warnHausdorff);
   const status: SolveOrderStatus =
     best.rms <= passRms &&
-    best.maxAbs <= passRms * 2.2 &&
+    best.maxAbs <= passMaxAbs &&
     (hausdorff == null || hausdorff <= passHausdorff)
       ? "pass"
       : best.rms <= warnRms &&
-          best.maxAbs <= warnRms * 2.1 &&
+          best.maxAbs <= warnMaxAbs &&
           (hausdorff == null || hausdorff <= warnHausdorff)
         ? "warn"
         : "fail";
+  const statusReason = [
+    `rms=${best.rms.toFixed(4)}m pass<=${passRms.toFixed(4)} warn<=${warnRms.toFixed(4)} ${rmsStatus.toUpperCase()}`,
+    `maxAbs=${best.maxAbs.toFixed(4)}m pass<=${passMaxAbs.toFixed(4)} warn<=${warnMaxAbs.toFixed(4)} ${maxAbsStatus.toUpperCase()}`,
+    Number.isFinite(hausdorff as number)
+      ? `hausdorff=${(hausdorff as number).toFixed(4)}m pass<=${passHausdorff.toFixed(4)} warn<=${warnHausdorff.toFixed(4)} ${hausdorffStatus.toUpperCase()}`
+      : `hausdorff=-- pass<=${passHausdorff.toFixed(4)} warn<=${warnHausdorff.toFixed(4)} UNKNOWN`,
+  ].join(" | ");
 
   return {
     status,
@@ -867,6 +915,16 @@ function compareIntegralSignalToMetric(opts: {
     rmsZResidualM: best.rms,
     maxAbsZResidualM: best.maxAbs,
     hausdorffM: hausdorff,
+    rmsPassMaxM: passRms,
+    rmsWarnMaxM: warnRms,
+    maxAbsPassMaxM: passMaxAbs,
+    maxAbsWarnMaxM: warnMaxAbs,
+    hausdorffPassMaxM: passHausdorff,
+    hausdorffWarnMaxM: warnHausdorff,
+    rmsStatus,
+    maxAbsStatus,
+    hausdorffStatus,
+    statusReason,
     sampleCount: best.valid,
     note: `${signal.note ?? "integral signal"} | fit over depth+mask only`,
   };
@@ -8170,6 +8228,16 @@ const res = 256;
           rmsZResidualM: integralComparison.rmsZResidualM,
           maxAbsZResidualM: integralComparison.maxAbsZResidualM,
           hausdorffM: integralComparison.hausdorffM,
+          rmsPassMaxM: integralComparison.rmsPassMaxM,
+          rmsWarnMaxM: integralComparison.rmsWarnMaxM,
+          maxAbsPassMaxM: integralComparison.maxAbsPassMaxM,
+          maxAbsWarnMaxM: integralComparison.maxAbsWarnMaxM,
+          hausdorffPassMaxM: integralComparison.hausdorffPassMaxM,
+          hausdorffWarnMaxM: integralComparison.hausdorffWarnMaxM,
+          rmsStatus: integralComparison.rmsStatus,
+          maxAbsStatus: integralComparison.maxAbsStatus,
+          hausdorffStatus: integralComparison.hausdorffStatus,
+          statusReason: integralComparison.statusReason,
           sampleCount: integralComparison.sampleCount,
           note: integralComparison.note,
         },
@@ -8254,6 +8322,12 @@ const res = 256;
         rms_z_residual_m: displacement.integralSignal?.rmsZResidualM ?? null,
         max_abs_z_residual_m: displacement.integralSignal?.maxAbsZResidualM ?? null,
         hausdorff_m: displacement.integralSignal?.hausdorffM ?? null,
+        rms_z_residual_pass_max_m: displacement.integralSignal?.rmsPassMaxM ?? null,
+        rms_z_residual_warn_max_m: displacement.integralSignal?.rmsWarnMaxM ?? null,
+        max_abs_z_residual_pass_max_m: displacement.integralSignal?.maxAbsPassMaxM ?? null,
+        max_abs_z_residual_warn_max_m: displacement.integralSignal?.maxAbsWarnMaxM ?? null,
+        hausdorff_pass_max_m: displacement.integralSignal?.hausdorffPassMaxM ?? null,
+        hausdorff_warn_max_m: displacement.integralSignal?.hausdorffWarnMaxM ?? null,
         fit_z_offset_m: displacement.integralSignal?.fitZOffsetM ?? null,
       },
       measurements: {
@@ -8270,6 +8344,10 @@ const res = 256;
         fitScalePxPerM: displacement.integralSignal?.fitScalePxPerM ?? null,
         fitSign: displacement.integralSignal?.fitSign ?? null,
         integralSampleCount: displacement.integralSignal?.sampleCount ?? null,
+        integralRmsStatus: displacement.integralSignal?.rmsStatus ?? "unknown",
+        integralMaxAbsStatus: displacement.integralSignal?.maxAbsStatus ?? "unknown",
+        integralHausdorffStatus: displacement.integralSignal?.hausdorffStatus ?? "unknown",
+        integralStatusReason: displacement.integralSignal?.statusReason ?? null,
       },
     });
   }, [planarVizMode, solveOrderSnapshot.displacement, emitAlcubierreDebugEvent]);

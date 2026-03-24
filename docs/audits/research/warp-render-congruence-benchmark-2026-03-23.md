@@ -3,25 +3,25 @@
 "This benchmark checks renderer/metric congruence and GR observable parity anchors; it is not a physical warp feasibility claim."
 
 ## Overall
-- verdict: `PARTIAL`
-- note: Some lanes pass while others are warn/unknown.
-- checksum: `b1fc760ff965c7d25143ba8a7b87a5d4ad25a662c826b0b557163d65baabf1b1`
+- verdict: `PASS`
+- note: Render integral congruence and GR observable parity anchors are aligned.
+- checksum: `0da5cb9bf34623e579448cc9e53f7bf29b88f13d257009db31c3aac11bb59bfb`
 
 ## Render Lane (Integral Signal)
-- source: `artifacts/research/full-solve/alcubierre-debug-log-command-2026-03-23T19-41-20-567Z.jsonl`
-- total_events: `12`
-- displacement_events: `12` (required >= `6`)
-- verdict: `PARTIAL`
-- note: Integral displacement status is stable but includes warning events.
+- source: `artifacts/research/full-solve/alcubierre-debug-log-latest.jsonl`
+- total_events: `24`
+- displacement_events: `24` (required >= `6`)
+- verdict: `PASS`
+- note: Integral displacement status and recomputed thresholds are fully aligned (pass).
 - status_mismatch_count: `0`
-- max_rms_z_residual_m: `0.015446524842522204`
-- max_abs_z_residual_m: `0.042261518812390264`
-- max_hausdorff_m: `1.1377487686610834`
-- window: `2026-03-23T19:41:21.055Z` -> `2026-03-23T19:41:25.706Z`
+- max_rms_z_residual_m: `0.01129625685394143`
+- max_abs_z_residual_m: `0.08207591927555313`
+- max_hausdorff_m: `0.06739543253464478`
+- window: `2026-03-23T21:57:18.746Z` -> `2026-03-23T21:57:31.909Z`
 
 Integral status counts:
-- pass: `6`
-- warn: `6`
+- pass: `24`
+- warn: `0`
 - fail: `0`
 - unknown: `0`
 

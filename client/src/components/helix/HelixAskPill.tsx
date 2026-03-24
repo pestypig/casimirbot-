@@ -4825,6 +4825,7 @@ function buildHelixAskDebugContextSummary(
             : 0,
       }
     : null;
+  const debugRecord = asObjectRecord(debug as unknown);
   const normalizeReasonList = (value: string[] | string | undefined): string[] => {
     if (Array.isArray(value)) {
       return value
@@ -5044,6 +5045,34 @@ function buildHelixAskDebugContextSummary(
     shadowSymbolHitRate:
       typeof debug?.shadow_symbol_hit_rate === "number" && Number.isFinite(debug?.shadow_symbol_hit_rate)
         ? Number(debug?.shadow_symbol_hit_rate.toFixed(4))
+        : null,
+    objectiveFinalizeGateMode:
+      debugRecord && typeof debugRecord.objective_finalize_gate_mode === "string"
+        ? debugRecord.objective_finalize_gate_mode
+        : null,
+    objectiveMiniCriticMode:
+      debugRecord && typeof debugRecord.objective_mini_critic_mode === "string"
+        ? debugRecord.objective_mini_critic_mode
+        : null,
+    objectiveAssemblyMode:
+      debugRecord && typeof debugRecord.objective_assembly_mode === "string"
+        ? debugRecord.objective_assembly_mode
+        : null,
+    objectiveLoopPrimaryComposerGuard:
+      debugRecord && typeof debugRecord.objective_loop_primary_composer_guard === "boolean"
+        ? debugRecord.objective_loop_primary_composer_guard
+        : null,
+    composerFamilyDegradeSuppressed:
+      debugRecord && typeof debugRecord.composer_family_degrade_suppressed === "boolean"
+        ? debugRecord.composer_family_degrade_suppressed
+        : null,
+    composerFamilyDegradeSuppressedReason:
+      debugRecord && typeof debugRecord.composer_family_degrade_suppressed_reason === "string"
+        ? debugRecord.composer_family_degrade_suppressed_reason
+        : null,
+    openWorldObjectiveTailScrubApplied:
+      debugRecord && typeof debugRecord.open_world_objective_tail_scrub_applied === "boolean"
+        ? debugRecord.open_world_objective_tail_scrub_applied
         : null,
     composerPromptFamily:
       typeof debug?.composer_prompt_family === "string" ? debug?.composer_prompt_family : null,
@@ -5918,6 +5947,92 @@ function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
 function buildAskLiveEventLogExport(events: AskLiveEventEntry[]): string {
   if (!events.length) return "";
   return events.map((event) => formatAskLiveEventLogLine(event)).join("\n");
+}
+
+function readEventMetaString(
+  meta: Record<string, unknown> | undefined,
+  keys: string[],
+): string | null {
+  if (!meta) return null;
+  for (const key of keys) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function buildReplyMasterEventClockExport(args: {
+  reply: HelixAskReply;
+  events: AskLiveEventEntry[];
+  debugContext: Record<string, unknown> | null;
+}): string {
+  const traceIds = new Set<string>();
+  const turnKeys = new Set<string>();
+  const attemptIds = new Set<string>();
+  const debugRecord = asObjectRecord(args.reply.debug as unknown);
+
+  const timeline = args.events.map((event, index) => {
+    const meta = asObjectRecord(event.meta ?? null) ?? undefined;
+    const eventTraceId = readEventMetaString(meta, ["traceId", "trace_id"]);
+    const eventTurnKey = readEventMetaString(meta, ["turnKey", "turn_key"]);
+    const eventAttemptId = readEventMetaString(meta, ["attemptId", "attempt_id"]);
+    if (eventTraceId) traceIds.add(eventTraceId);
+    if (eventTurnKey) turnKeys.add(eventTurnKey);
+    if (eventAttemptId) attemptIds.add(eventAttemptId);
+    return {
+      index: index + 1,
+      id: event.id,
+      tsMs: resolveAskLiveEventTimestampMs(event),
+      tool: typeof event.tool === "string" ? event.tool : null,
+      seq: typeof event.seq === "number" && Number.isFinite(event.seq) ? Math.trunc(event.seq) : null,
+      durationMs:
+        typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
+          ? Math.max(0, Math.round(event.durationMs))
+          : null,
+      traceId: eventTraceId,
+      turnKey: eventTurnKey,
+      attemptId: eventAttemptId,
+      stage: meta && typeof meta.stage === "string" ? meta.stage : null,
+      detail: meta && typeof meta.detail === "string" ? meta.detail : null,
+      text: summarizeVoiceDebugText(event.text ?? "", 280),
+    };
+  });
+
+  const debugTraceId =
+    (debugRecord && typeof debugRecord.trace_id === "string" && debugRecord.trace_id.trim()
+      ? debugRecord.trace_id.trim()
+      : null) ??
+    (debugRecord && typeof debugRecord.traceId === "string" && debugRecord.traceId.trim()
+      ? debugRecord.traceId.trim()
+      : null);
+  if (debugTraceId) traceIds.add(debugTraceId);
+
+  const payload = {
+    schema: "helix.ask.master_event_clock.v1",
+    exportedAt: new Date().toISOString(),
+    reply: {
+      id: args.reply.id,
+      mode: args.reply.mode ?? null,
+      question: args.reply.question ?? null,
+      sourceCount: args.reply.sources?.length ?? 0,
+    },
+    counts: {
+      events: args.events.length,
+      timelineRows: timeline.length,
+      traceIds: traceIds.size,
+      turnKeys: turnKeys.size,
+      attemptIds: attemptIds.size,
+    },
+    trace: {
+      traceIds: [...traceIds],
+      turnKeys: [...turnKeys],
+      attemptIds: [...attemptIds],
+    },
+    debugContext: args.debugContext,
+    debug: args.reply.debug ?? null,
+    timeline,
+  };
+  return safeJsonStringify(payload);
 }
 
 function stripContextCapsuleTokensFromText(value: string): string {
@@ -6876,6 +6991,7 @@ export function HelixAskPill({
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
+  const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
   );
@@ -8703,6 +8819,24 @@ export function HelixAskPill({
         setCopiedReplyEventLogId(replyId);
         window.setTimeout(() => {
           setCopiedReplyEventLogId((current) => (current === replyId ? null : current));
+        }, 1400);
+      } catch {
+        // ignore clipboard failures
+      }
+    },
+    [],
+  );
+
+  const handleCopyReplyMasterDebug = useCallback(
+    async (replyId: string, payload: string) => {
+      if (!payload || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(payload);
+        setCopiedReplyMasterDebugId(replyId);
+        window.setTimeout(() => {
+          setCopiedReplyMasterDebugId((current) => (current === replyId ? null : current));
         }, 1400);
       } catch {
         // ignore clipboard failures
@@ -18566,6 +18700,25 @@ export function HelixAskPill({
             });
             const replyEventLogPreview = replyEventsChronological.slice(-80);
             const replyEventLogPayload = buildAskLiveEventLogExport(replyEventsChronological);
+            const replyDebugContextSummary = buildHelixAskDebugContextSummary(reply.debug, {
+              failReason:
+                typeof reply.debug?.helix_ask_fail_reason === "string"
+                  ? reply.debug.helix_ask_fail_reason
+                  : typeof reply.debug?.fail_reason === "string"
+                    ? reply.debug.fail_reason
+                    : null,
+              failClass:
+                typeof reply.debug?.helix_ask_fail_class === "string"
+                  ? reply.debug.helix_ask_fail_class
+                  : typeof reply.debug?.fail_class === "string"
+                    ? reply.debug.fail_class
+                    : null,
+            });
+            const replyMasterEventClockPayload = buildReplyMasterEventClockExport({
+              reply,
+              events: replyEventsChronological,
+              debugContext: replyDebugContextSummary,
+            });
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const expanded = Boolean(askExpandedByReply[reply.id]);
             return (
@@ -18759,6 +18912,25 @@ export function HelixAskPill({
                     aria-label="Copy response"
                   >
                     Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyReplyMasterDebug(reply.id, replyMasterEventClockPayload)}
+                    disabled={
+                      !replyMasterEventClockPayload ||
+                      typeof navigator === "undefined" ||
+                      !navigator.clipboard?.writeText
+                    }
+                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
+                      replyMasterEventClockPayload &&
+                      typeof navigator !== "undefined" &&
+                      navigator.clipboard?.writeText
+                        ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+                        : "border-slate-600 text-slate-500"
+                    }`}
+                    aria-label="Debug copy"
+                  >
+                    {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Debug Copy"}
                   </button>
                   {reply.contextCapsule ? (
                     <button
