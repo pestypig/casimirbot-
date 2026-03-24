@@ -51,6 +51,47 @@ Also show both:
 - runtime tree path + merge counts from `runtimeTree`
 ```
 
+## GPT Pro offload packet (paper -> codex-ready report)
+
+Use this when you want GPT Pro to do the heavy extraction from attached paper pages,
+while Codex enforces schema + codebase mapping before merge.
+
+1) Generate prompt + context + JSON template in this repo:
+
+```bash
+npm run papers:gpt:packet -- \
+  --title "Your Paper Title" \
+  --tags "collapse,coherence,physics" \
+  --attachment-names "paper-page-1.png,paper-page-2.png" \
+  --source-type image
+```
+
+2) Copy the generated `*.prompt.md` into GPT Pro and attach the paper files.
+
+3) Save GPT Pro JSON output in this repo (example):
+
+- `artifacts/papers/gpt-pro/<paper_id>/<stamp>.report.json`
+
+4) Validate before Codex merges any of it:
+
+```bash
+npm run papers:gpt:validate -- --report "artifacts/papers/gpt-pro/<paper_id>/<stamp>.report.json"
+```
+
+Validation enforces:
+
+- schema contract: `schemas/paper-gpt-pro-report.schema.json`
+- citation link integrity (claim/citation references must resolve)
+- canonical binding IDs against known framework nodes
+- executable mapping file paths must exist in the repo
+
+The packet generator includes file anchors from:
+
+- canonical trees (`dp-collapse`, uncertainty/coherence, stellar bridge, math, atomic systems)
+- executable model code (`shared/dp-collapse.ts`, `shared/collapse-benchmark.ts`,
+  `modules/dynamic/stress-energy-equations.ts`, DP adapter/planner services)
+- ingestion contracts (`scripts/paper-prompt-ingest.ts`, schemas, runtime tree path)
+
 ## Optional strict flags
 
 - `--require-prediction-contracts true`

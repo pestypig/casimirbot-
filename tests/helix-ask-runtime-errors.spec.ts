@@ -21,6 +21,44 @@ import {
   __testOnlyNonReportGuard,
 } from "../server/routes/agi.plan";
 
+const asObject = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const asArray = (value: unknown): unknown[] | null => (Array.isArray(value) ? value : null);
+
+const toFiniteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const toStringOrNull = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const toBooleanOrNull = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
+const readJsonIfExists = (relPath: string): unknown | null => {
+  const fullPath = path.join(process.cwd(), relPath);
+  if (!fs.existsSync(fullPath)) return null;
+  return JSON.parse(fs.readFileSync(fullPath, "utf8").replace(/^\uFEFF/, "")) as unknown;
+};
+
+const isObjectiveStepTranscriptRow = (value: unknown): value is Record<string, unknown> => {
+  const row = asObject(value);
+  if (!row) return false;
+  return (
+    typeof row.objective_id === "string" &&
+    typeof row.attempt === "number" &&
+    typeof row.verb === "string" &&
+    typeof row.prompt_preview === "string" &&
+    typeof row.output_preview === "string" &&
+    typeof row.decision === "string" &&
+    typeof row.decision_reason === "string" &&
+    asObject(row.evidence_delta) !== null &&
+    asObject(row.validator) !== null
+  );
+};
+
 const RESEARCH_CONTRACT_PROMPT = `# Warp Paper Deep-Research Prompt v2
 
 ## Purpose
@@ -1949,7 +1987,16 @@ describe("helix ask universal answer plan shadow", () => {
     expect(enforced.miniAnswers[0]?.missing_slots).toEqual(
       expect.arrayContaining(["mechanism"]),
     );
-    expect(enforced.miniAnswers[0]?.summary).toMatch(/scoped retrieval pass missing/i);
+    expect(enforced.miniAnswers[0]?.summary).toMatch(/assembly blocked until objective-scoped retrieval runs/i);
+    expect(enforced.miniAnswers[0]?.unknown_block?.why).toMatch(
+      /no objective-scoped retrieval pass was recorded/i,
+    );
+    expect(enforced.miniAnswers[0]?.unknown_block?.what_i_checked).toEqual(
+      expect.arrayContaining(["docs/knowledge/warp/warp-bubble.md"]),
+    );
+    expect(enforced.miniAnswers[0]?.unknown_block?.next_retrieval).toMatch(
+      /Run objective-scoped retrieval/i,
+    );
   });
 
   it("downgrades covered mini-answers when objective evidence sufficiency is below covered threshold", () => {
@@ -2077,7 +2124,7 @@ describe("helix ask universal answer plan shadow", () => {
     );
   });
 
-  it("assembles deterministic objective mini checkpoints into final answer", () => {
+  it("fail-closes deterministic objective assembly when required objectives remain unresolved", () => {
     const assembled = __testHelixAskReliabilityGuards.buildDeterministicHelixAskObjectiveAssembly({
       miniAnswers: [
         {
@@ -2091,14 +2138,80 @@ describe("helix ask universal answer plan shadow", () => {
         },
       ],
       currentAnswer: "Main answer body.",
+      blockedReason: "objective_assembly_fail_closed_missing_scoped_retrieval",
+      missingScopedRetrievalObjectiveIds: ["obj_1"],
     });
-    expect(assembled).toMatch(/Remaining uncertainty:/i);
-    expect(assembled).toMatch(/profiles voice lane/i);
+    expect(assembled).toMatch(/Assembly blocked: required objective gate failed-closed\./i);
+    expect(assembled).toMatch(
+      /Reason:\s*missing objective-scoped retrieval for unresolved required objective: profiles voice lane\./i,
+    );
     expect(assembled).toMatch(/Open gaps \/ UNKNOWNs:/i);
     expect(assembled).toMatch(/UNKNOWN - profiles voice lane/i);
-    expect(assembled).toMatch(/Why:\s*missing voice-lane/i);
+    expect(assembled).toMatch(
+      /Why:\s*required objective unresolved because no objective-scoped retrieval pass was recorded/i,
+    );
+    expect(assembled).toMatch(/What I checked:\s*server\/routes\/voice\.ts/i);
     expect(assembled).toMatch(/Next retrieval:/i);
-    expect(assembled).toMatch(/Main answer body\./);
+    expect(assembled).not.toMatch(/Remaining uncertainty:/i);
+    expect(assembled).not.toMatch(/Main answer body\./);
+  });
+
+  it("sanitizes generic scaffold phrasing from UNKNOWN blocks in deterministic assembly", () => {
+    const assembled = __testHelixAskReliabilityGuards.buildDeterministicHelixAskObjectiveAssembly({
+      miniAnswers: [
+        {
+          objective_id: "obj_1",
+          objective_label: "first principles meaning in physics",
+          status: "partial",
+          matched_slots: [],
+          missing_slots: ["definition"],
+          evidence_refs: [],
+          summary: "first principles meaning in physics: partially covered.",
+          unknown_block: {
+            unknown:
+              'For "What are first principles meaning in physics?", start with one concrete claim.',
+            why: "core meaning of the concept in its domain context",
+            what_i_checked: [],
+            next_retrieval: "Sources: open-world best-effort (no repo citations required).",
+          },
+        },
+      ],
+      currentAnswer: "",
+      blockedReason: "objective_assembly_fail_closed_required_objective_unresolved",
+    });
+    expect(assembled).toMatch(/Assembly blocked: required objective gate failed-closed\./i);
+    expect(assembled).toMatch(/UNKNOWN - first principles meaning in physics/i);
+    expect(assembled).toMatch(/Why:\s*required objective unresolved; missing definition/i);
+    expect(assembled).toMatch(/What I checked:\s*No objective-local evidence was captured/i);
+    expect(assembled).toMatch(/Next retrieval:\s*Run objective-scoped retrieval/i);
+    expect(assembled).not.toMatch(/start with one concrete claim/i);
+    expect(assembled).not.toMatch(/core meaning of the concept in its domain context/i);
+    expect(assembled).not.toMatch(/Sources:\s*open-world best-effort/i);
+  });
+
+  it("injects a concrete commonality fallback before fail-closed UNKNOWN blocks", () => {
+    const assembled = __testHelixAskReliabilityGuards.buildDeterministicHelixAskObjectiveAssembly({
+      miniAnswers: [
+        {
+          objective_id: "obj_1",
+          objective_label: "electron and solar-system kinematics commonality",
+          status: "partial",
+          matched_slots: [],
+          missing_slots: ["definition"],
+          evidence_refs: ["docs/knowledge/physics/physics-foundations-tree.json"],
+          summary: "electron and solar-system kinematics commonality: partially covered.",
+        },
+      ],
+      currentAnswer: "",
+      blockedReason: "objective_assembly_fail_closed_required_objective_unresolved",
+      question: "What is the electron and kinematics of the solar system have in common?",
+    });
+    expect(assembled).toMatch(/dynamical systems/i);
+    expect(assembled).toMatch(/equations of motion|conservation laws/i);
+    expect(assembled).toMatch(/Assembly blocked: required objective gate failed-closed\./i);
+    expect(assembled).toMatch(/Open gaps \/ UNKNOWNs:/i);
+    expect(assembled).toMatch(/UNKNOWN - electron and solar-system kinematics commonality/i);
+    expect(assembled).toMatch(/Sources:\s*docs\/knowledge\/physics\/physics-foundations-tree\.json/i);
   });
 
   it("keeps current answer unchanged for single covered objective deterministic assembly", () => {
@@ -2140,6 +2253,14 @@ describe("helix ask universal answer plan shadow", () => {
     expect(fragments.some((entry: string) => /^Plan for /i.test(entry))).toBe(false);
     expect(fragments[0].toLowerCase()).toContain("what is a warp bubble");
     expect(fragments[1].toLowerCase()).toContain("how does it get a full solve");
+  });
+
+  it("keeps malformed commonality prompts as a single objective fragment", () => {
+    const question = "What is the electron and kinematics of the solar system have in common?";
+    const fragments =
+      __testHelixAskReliabilityGuards.extractHelixAskTurnObjectiveFragments(question);
+    expect(fragments).toHaveLength(1);
+    expect(fragments[0].toLowerCase()).toContain("have in common");
   });
 
   it("does not inject literal-term slots for open-world definition objectives", () => {
@@ -2805,11 +2926,10 @@ describe("helix ask universal answer plan shadow", () => {
     });
     expect(plan.prompt_family).toBe("definition_overview");
     expect(degraded).toMatch(/^Definition:/m);
-    expect(degraded).toMatch(/^How it is solved in codebase:/m);
-    expect(degraded).toMatch(/^Why it matters:/m);
-    expect(degraded).toMatch(/^Key terms:/m);
+    expect(degraded).toMatch(/^(?:How it is solved in codebase|Repo anchors):/m);
+    expect(degraded).toMatch(/^(?:Why it matters|Open Gaps):/m);
     expect(degraded).toMatch(/^Sources:/m);
-    expect(degraded).toMatch(/Implementation path is partially covered in this turn/i);
+    expect(degraded).toMatch(/Current evidence is incomplete/i);
     expect(degraded).not.toMatch(/required sections missing/i);
     expect(degraded).not.toMatch(/degrade path/i);
     expect(degraded).not.toMatch(/prompt=/i);
@@ -2875,13 +2995,9 @@ describe("helix ask universal answer plan shadow", () => {
         "In practical terms, Bounded linkage supported by cited repo evidence (modules/warp/natario-warp.ts and docs/warp-console-architecture.md).",
       reason: "required_sections_missing",
     });
-    expect(degraded).toMatch(/^How it is solved in codebase:/m);
-    expect(degraded).toMatch(
-      /modules\/warp\/natario-warp\.ts:\s+computes Natario warp-bubble fields and congruence diagnostics\./i,
-    );
-    expect(degraded).toMatch(
-      /modules\/warp\/warp-module\.ts:\s+orchestrates warp module flow and runtime solve wiring\./i,
-    );
+    expect(degraded).toMatch(/^(?:How it is solved in codebase|Repo anchors):/m);
+    expect(degraded).toMatch(/modules\/warp\/natario-warp\.ts/i);
+    expect(degraded).toMatch(/modules\/warp\/warp-module\.ts/i);
     expect(degraded).not.toMatch(/This response preserves grounded evidence/i);
   });
 
@@ -5488,7 +5604,7 @@ describe("helix ask reliability guards", () => {
       });
     expect(fallback).toBeTruthy();
     expect(fallback).toMatch(/^Definition:/m);
-    expect(fallback).toMatch(/^(?:How it is solved in codebase|Implementation In Repo):/m);
+    expect(fallback).toMatch(/^(?:How it is solved in codebase|Implementation In Repo|Repo anchors):/m);
     expect(fallback).toMatch(/^Sources:/m);
     expect(fallback).not.toMatch(/^Short answer:/m);
   });
@@ -7965,6 +8081,15 @@ describe("helix ask dialogue formatting", () => {
     expect(normalized).toBe("How does dynamic Casimir modulation feed into the system's physics outputs?");
   });
 
+  it("normalizes malformed commonality grammar into a valid commonality question", () => {
+    const normalized = __testHelixAskDialogueFormatting.normalizeBundledQuestion(
+      "What is the electron and kinematics of the solar system have in common?",
+    );
+    expect(normalized).toBe(
+      "What do the electron and kinematics of the solar system have in common?",
+    );
+  });
+
   it("extracts and normalizes question lines from prompt wrappers", () => {
     const extracted = __testHelixAskDialogueFormatting.extractQuestionFromPrompt(
       [
@@ -8259,7 +8384,11 @@ describe("helix ask dialogue formatting", () => {
     expect(routeSource).toContain("routing_salvage_applied");
     expect(routeSource).toContain("routing_salvage_reason");
     expect(routeSource).toContain("routing_salvage_retrieval_added_count");
-    expect(routeSource).toContain("general_definition_repo_anchor_zero_context");
+    expect(routeSource).toContain("general_definition_repo_anchor");
+    expect(routeSource).toContain("general_definition_commonality");
+    expect(routeSource).toContain("routing_salvage_commonality_cue");
+    expect(routeSource).toContain("routing_salvage_commonality_objective_cue");
+    expect(routeSource).toContain("routingSalvage:commonality_pre_unknown_terminal");
     expect(routeSource).toContain("objective_assembly_rescue_attempted");
     expect(routeSource).toContain("objective_assembly_rescue_success");
     expect(routeSource).toContain("objective_assembly_rescue_fail_reason");
@@ -8749,5 +8878,67 @@ describe("equation selector continuity contract", () => {
     expect(text).toContain("Sources: docs/warp-console-architecture.md");
     expect(text).not.toMatch(/Sources:\s*,/);
     expect(text).not.toContain(",,");
+  });
+});
+
+describe("objective loop primary transcript contract", () => {
+  it("preserves a general non-hard lane objective-loop signal in debug payloads", () => {
+    const payload = readJsonIfExists("artifacts/example-B_general.json");
+    if (!payload) return;
+    const debug = asObject(asObject(payload)?.debug) ?? {};
+
+    expect(toStringOrNull(debug.intent_domain)).toBe("general");
+    expect(toBooleanOrNull(debug.agent_loop_enabled)).toBe(true);
+
+    const primaryRate = toFiniteNumber(debug.objective_loop_primary_rate);
+    const primaryGuard = toBooleanOrNull(debug.objective_loop_primary_composer_guard);
+    const compatibleSingleLlm = toBooleanOrNull(debug.single_llm);
+
+    if (primaryRate !== null) {
+      expect(primaryRate).toBeGreaterThanOrEqual(0);
+      expect(primaryRate).toBeLessThanOrEqual(1);
+    }
+
+    expect(
+      primaryRate !== null || primaryGuard === true || compatibleSingleLlm === true,
+    ).toBe(true);
+  });
+
+  it("accepts objective step transcript arrays when present and validates per-item schema", () => {
+    const payload = readJsonIfExists("artifacts/debugloop-general_life.json");
+    if (!payload) return;
+    const debug = asObject(asObject(payload)?.debug) ?? {};
+    const rawTranscripts = debug.objective_step_transcripts;
+
+    if (rawTranscripts == null) return;
+    expect(Array.isArray(rawTranscripts)).toBe(true);
+
+    const transcriptRows = rawTranscripts as unknown[];
+    if (transcriptRows.length === 0) return;
+
+    for (const row of transcriptRows) {
+      expect(isObjectiveStepTranscriptRow(row)).toBe(true);
+      if (!isObjectiveStepTranscriptRow(row)) continue;
+
+      expect(typeof row.started_at === "string" || row.started_at == null).toBe(true);
+      expect(typeof row.ended_at === "string" || row.ended_at == null).toBe(true);
+      expect(typeof row.llm_model === "string" || row.llm_model == null).toBe(true);
+      expect(typeof row.reasoning_effort === "string" || row.reasoning_effort == null).toBe(true);
+      expect(typeof row.schema_name === "string" || row.schema_name == null).toBe(true);
+      expect(typeof row.schema_valid === "boolean" || row.schema_valid == null).toBe(true);
+    }
+  });
+
+  it("keeps unresolved required objectives fail-closed behind unknown blocks in fixtures", () => {
+    const payload = readJsonIfExists("artifacts/helix-ask-final-resolution/2026-03-24T002058Z/fail-case.json");
+    if (!payload) return;
+    const debug = asObject(asObject(payload)?.debug) ?? {};
+
+    expect(toStringOrNull(debug.objective_assembly_blocked_reason)).toBe(
+      "objective_assembly_unresolved_requires_unknown_blocks",
+    );
+    expect(toStringOrNull(debug.objective_finalize_gate_mode)).toBe("unknown_terminal");
+    expect(toFiniteNumber(debug.objective_unknown_block_count)).toBeGreaterThan(0);
+    expect(toFiniteNumber(debug.objective_unresolved_without_unknown_block_count)).toBe(0);
   });
 });

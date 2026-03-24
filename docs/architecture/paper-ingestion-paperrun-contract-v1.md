@@ -156,6 +156,34 @@ Each published paper knowledge pack must include:
 - `paper_card.math_objects`: equations/definitions/variables/units/assumptions.
 - `paper_card.congruence_assessments`: target-level agreement/tension/conflict status.
 
+## GPT Pro extraction handoff contract (pre-ingest)
+
+For image/PDF-heavy papers, extraction can be offloaded to GPT Pro before Codex merge.
+This does not replace PaperRun contracts; it feeds them.
+
+Required workflow:
+
+1. Generate packet with repo anchors and output schema:
+   - `npm run papers:gpt:packet -- ...`
+2. Run GPT Pro with attached paper pages using generated prompt.
+3. Save GPT output JSON in repo.
+4. Validate JSON:
+   - `npm run papers:gpt:validate -- --report <report.json>`
+5. Only then use report data to drive Codex ingest/merge patches.
+
+Required pre-ingest schema:
+
+- `schemas/paper-gpt-pro-report.schema.json`
+
+Minimum payload obligations:
+
+- evidence-grounded `claims` with page/quote spans,
+- normalized `citations` + `citation_links`,
+- `paper_card` layer (concepts/systems/values/math/congruence),
+- `canonical_bindings` to existing framework IDs,
+- `executable_mappings` with real repository file paths + symbols,
+- candidate prediction/symbol/maturity artifacts for deterministic Codex merge.
+
 ## Retry and Failure Policy
 
 - Retry budget is per stage.
@@ -173,6 +201,7 @@ Each published paper knowledge pack must include:
 - Ingest request schema: `schemas/paper-ingest-request.schema.json`
 - Run record schema: `schemas/paper-run-record.schema.json`
 - Knowledge pack schema: `schemas/paper-knowledge-pack.schema.json`
+- GPT offload report schema: `schemas/paper-gpt-pro-report.schema.json`
 - Persistent framework store path:
   - `artifacts/papers/framework/paper-tree-dag-atlas.v1.json`
   - Updated on every successful per-paper merge.

@@ -1,0 +1,537 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://casimirbot/schemas/paper-gpt-pro-report.schema.json",
+  "title": "Paper GPT Pro Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "generated_at",
+    "generator",
+    "paper",
+    "claims",
+    "citations",
+    "citation_links",
+    "paper_card",
+    "canonical_bindings",
+    "executable_mappings",
+    "prediction_contract_candidates",
+    "symbol_equivalence_entries",
+    "maturity_gate_candidates",
+    "codex_patch_guidance"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9._:-]{8,256}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "model"],
+      "properties": {
+        "platform": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "notes": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "source_type", "attachment_names"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "source_type": { "type": "string", "enum": ["pdf", "image", "mixed"] },
+        "attachment_names": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "minItems": 1,
+          "maxItems": 200,
+          "uniqueItems": true
+        },
+        "topic_tags": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{2,64}$" },
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50000,
+      "items": { "$ref": "#/definitions/claim" }
+    },
+    "citations": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": { "$ref": "#/definitions/citationRecord" }
+    },
+    "citation_links": {
+      "type": "array",
+      "maxItems": 400000,
+      "items": { "$ref": "#/definitions/citationLink" }
+    },
+    "paper_card": { "$ref": "#/definitions/paperCard" },
+    "canonical_bindings": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": { "$ref": "#/definitions/canonicalBinding" }
+    },
+    "executable_mappings": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": { "$ref": "#/definitions/executableMapping" }
+    },
+    "prediction_contract_candidates": {
+      "type": "array",
+      "maxItems": 50000,
+      "items": { "$ref": "#/definitions/predictionContractCandidate" }
+    },
+    "symbol_equivalence_entries": {
+      "type": "array",
+      "maxItems": 50000,
+      "items": { "$ref": "#/definitions/symbolEquivalenceEntry" }
+    },
+    "maturity_gate_candidates": {
+      "type": "array",
+      "maxItems": 50000,
+      "items": { "$ref": "#/definitions/maturityGateCandidate" }
+    },
+    "codex_patch_guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_files", "merge_strategy", "notes"],
+      "properties": {
+        "target_files": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 },
+          "minItems": 1,
+          "maxItems": 1000,
+          "uniqueItems": true
+        },
+        "merge_strategy": {
+          "type": "string",
+          "enum": ["append_only", "merge_with_dedupe", "review_before_merge"]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 20000 }
+      }
+    }
+  },
+  "definitions": {
+    "evidenceSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page", "quote"],
+      "properties": {
+        "page": { "type": "integer", "minimum": 1 },
+        "quote": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "locator": { "type": "string", "maxLength": 512 }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "claim_type", "text", "confidence", "evidence_spans"],
+      "properties": {
+        "claim_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+        "claim_type": {
+          "type": "string",
+          "enum": ["observation", "measurement", "theory", "theoretical_congruence"]
+        },
+        "text": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_spans": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/evidenceSpan" },
+          "minItems": 1,
+          "maxItems": 128
+        }
+      }
+    },
+    "citationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["citation_id", "raw_text", "confidence", "evidence_spans"],
+      "properties": {
+        "citation_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "raw_text": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "authors": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "year": { "type": "integer", "minimum": 1000, "maximum": 2999 },
+        "title": { "type": "string", "maxLength": 1000 },
+        "venue": { "type": "string", "maxLength": 512 },
+        "doi": { "type": "string", "maxLength": 256 },
+        "arxiv_id": { "type": "string", "maxLength": 128 },
+        "url": { "type": "string", "maxLength": 4096 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_spans": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/evidenceSpan" },
+          "minItems": 1,
+          "maxItems": 128
+        }
+      }
+    },
+    "citationLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["link_id", "claim_id", "citation_id", "relation", "method", "confidence"],
+      "properties": {
+        "link_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "claim_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+        "citation_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "relation": { "type": "string", "enum": ["cites"] },
+        "method": { "type": "string", "enum": ["marker", "doi", "arxiv", "heuristic"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "equationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["equation_id", "canonical_form", "variable_ids"],
+      "properties": {
+        "equation_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "canonical_form": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "variable_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dimensionally_consistent": { "type": "boolean" }
+      }
+    },
+    "definitionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definition_id", "term", "statement"],
+      "properties": {
+        "definition_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "term": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 20000 }
+      }
+    },
+    "variableRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable_id", "symbol", "unit"],
+      "properties": {
+        "variable_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "unitRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "symbol", "quantity_kind"],
+      "properties": {
+        "unit_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "quantity_kind": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "assumptionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assumption_id", "statement", "scope"],
+      "properties": {
+        "assumption_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "scope": { "type": "string", "enum": ["local", "model", "global"] }
+      }
+    },
+    "paperCardConcept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concept_id", "term", "aliases", "confidence", "evidence_claim_ids"],
+      "properties": {
+        "concept_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "term": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "definition": { "type": "string", "maxLength": 20000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    },
+    "paperCardQuantValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_id", "label", "value", "unit", "context", "confidence", "evidence_claim_ids"],
+      "properties": {
+        "value_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "context": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    },
+    "paperCardSystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system_id", "name", "components", "interactions", "confidence", "evidence_claim_ids"],
+      "properties": {
+        "system_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "components": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "maxItems": 512,
+          "uniqueItems": true
+        },
+        "interactions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "maxItems": 512,
+          "uniqueItems": true
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    },
+    "paperCardCongruence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessment_id",
+        "target_type",
+        "target_id",
+        "status",
+        "score",
+        "rationale",
+        "evidence_claim_ids"
+      ],
+      "properties": {
+        "assessment_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "target_type": { "type": "string", "enum": ["concept", "system", "value", "equation", "model"] },
+        "target_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "status": {
+          "type": "string",
+          "enum": ["agreement", "partial_agreement", "tension", "conflict", "unknown"]
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{8,128}$" },
+          "maxItems": 128,
+          "uniqueItems": true
+        }
+      }
+    },
+    "paperCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concepts", "quantitative_values", "systems", "math_objects", "congruence_assessments"],
+      "properties": {
+        "concepts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardConcept" },
+          "maxItems": 200000
+        },
+        "quantitative_values": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardQuantValue" },
+          "maxItems": 200000
+        },
+        "systems": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardSystem" },
+          "maxItems": 200000
+        },
+        "math_objects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["equations", "definitions", "variables", "units", "assumptions"],
+          "properties": {
+            "equations": { "type": "array", "items": { "$ref": "#/definitions/equationRecord" }, "maxItems": 200000 },
+            "definitions": { "type": "array", "items": { "$ref": "#/definitions/definitionRecord" }, "maxItems": 200000 },
+            "variables": { "type": "array", "items": { "$ref": "#/definitions/variableRecord" }, "maxItems": 200000 },
+            "units": { "type": "array", "items": { "$ref": "#/definitions/unitRecord" }, "maxItems": 200000 },
+            "assumptions": { "type": "array", "items": { "$ref": "#/definitions/assumptionRecord" }, "maxItems": 200000 }
+          }
+        },
+        "congruence_assessments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/paperCardCongruence" },
+          "maxItems": 200000
+        }
+      }
+    },
+    "canonicalBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local_id", "local_type", "canonical_id", "relation", "score", "rationale"],
+      "properties": {
+        "local_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "local_type": { "type": "string", "enum": ["claim", "concept", "system", "equation", "model", "value"] },
+        "canonical_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "relation": {
+          "type": "string",
+          "enum": ["equivalent_to", "refines", "derives_from", "supports", "contradicts"]
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "source_tree": { "type": "string", "maxLength": 4096 },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "implementationCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_path", "kind", "symbol", "confidence", "rationale"],
+      "properties": {
+        "file_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "kind": { "type": "string", "enum": ["function", "type", "class", "config", "tree", "schema", "doc"] },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "line_hint": { "type": "integer", "minimum": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "executableMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonical_id", "model_kind", "implementation_candidates"],
+      "properties": {
+        "canonical_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "model_kind": { "type": "string", "enum": ["equation", "system", "model", "theory", "adapter"] },
+        "implementation_candidates": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/implementationCandidate" },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      }
+    },
+    "predictionObservable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable_id", "value", "unit"],
+      "properties": {
+        "variable_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "predictionInputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable_id", "value", "unit"],
+      "properties": {
+        "variable_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "predictionContractCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "model_node_id", "input_bindings", "predicted_observable", "measured_observable", "status"],
+      "properties": {
+        "contract_id": { "type": "string", "pattern": "^[a-z0-9._:-]{8,256}$" },
+        "model_node_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "equation_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "input_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/predictionInputBinding" },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "predicted_observable": { "$ref": "#/definitions/predictionObservable" },
+        "measured_observable": { "$ref": "#/definitions/predictionObservable" },
+        "status": { "type": "string", "enum": ["match", "tension", "conflict", "insufficient_data"] },
+        "rationale": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "symbolAliasEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["symbol", "unit"],
+      "properties": {
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "symbolEquivalenceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonical_symbol", "mapping_type", "aliases"],
+      "properties": {
+        "canonical_symbol": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "mapping_type": { "type": "string", "enum": ["exact", "scaled", "offset", "affine", "contextual"] },
+        "aliases": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/symbolAliasEntry" },
+          "minItems": 1,
+          "maxItems": 512
+        },
+        "transform": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scale": { "type": "number" },
+            "offset": { "type": "number" }
+          }
+        }
+      }
+    },
+    "maturityGateCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate_id", "target_id", "required_stage", "current_stage", "status", "blocking_reason"],
+      "properties": {
+        "gate_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "target_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+        "required_stage": { "type": "string", "enum": ["exploratory", "reduced-order", "diagnostic", "certified"] },
+        "current_stage": { "type": "string", "enum": ["exploratory", "reduced-order", "diagnostic", "certified"] },
+        "status": { "type": "string", "enum": ["pass", "warn", "fail"] },
+        "blocking_reason": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    }
+  }
+}

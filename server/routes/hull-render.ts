@@ -38,6 +38,14 @@ const readRenderBackendMode = (): "auto" | "optix" | "unity" => {
   return "auto";
 };
 
+type RemoteBackendKey = "optix" | "unity" | "generic";
+
+type RemoteEndpointCandidate = {
+  backend: RemoteBackendKey;
+  frameEndpoint: string;
+  statusEndpoint: string | null;
+};
+
 const normalizeServiceEndpointUrl = (
   value: string | null,
   kind: "frame" | "status",
@@ -85,46 +93,69 @@ const resolveServiceEndpoint = (
   return normalizeServiceEndpointUrl(base, kind);
 };
 
-const normalizeServiceFrameEndpoint = (): string | null => {
-  const backendMode = readRenderBackendMode();
-  const orderedBackends: Array<"optix" | "unity" | "generic"> =
-    backendMode === "optix"
-      ? ["optix", "generic"]
-      : backendMode === "unity"
-        ? ["unity", "generic"]
-        : ["generic", "optix", "unity"];
-
-  for (const backend of orderedBackends) {
-    const endpoint = resolveServiceEndpoint(backend, "frame");
-    if (endpoint) return endpoint;
-  }
-  return null;
-};
-
-const normalizeServiceStatusEndpoint = (): string | null => {
-  const backendMode = readRenderBackendMode();
-  const orderedBackends: Array<"optix" | "unity" | "generic"> =
-    backendMode === "optix"
-      ? ["optix", "generic"]
-      : backendMode === "unity"
-        ? ["unity", "generic"]
-        : ["generic", "optix", "unity"];
-
-  for (const backend of orderedBackends) {
-    const endpoint = resolveServiceEndpoint(backend, "status");
-    if (endpoint) return endpoint;
-  }
-  const frame = normalizeServiceFrameEndpoint();
-  if (!frame) return null;
-  return frame.replace(
+const statusEndpointFromFrameEndpoint = (frameEndpoint: string): string =>
+  frameEndpoint.replace(
     /\/api\/helix\/hull-render\/frame\/?$/i,
     "/api/helix/hull-render/status",
   );
+
+const readEndpointBackendOrder = (
+  backendMode: "auto" | "optix" | "unity",
+): RemoteBackendKey[] => {
+  if (backendMode === "optix") return ["optix", "generic"];
+  if (backendMode === "unity") return ["unity", "generic"];
+  // Prefer canonical scientific lanes before legacy generic endpoint.
+  return ["optix", "unity", "generic"];
+};
+
+const collectRemoteEndpointCandidates = (): RemoteEndpointCandidate[] => {
+  const backendMode = readRenderBackendMode();
+  const orderedBackends = readEndpointBackendOrder(backendMode);
+  const allowLegacyGenericEndpoint = readAllowLegacyGenericEndpoint();
+  const canonicalConfigured =
+    !!resolveServiceEndpoint("optix", "frame") || !!resolveServiceEndpoint("unity", "frame");
+  const seen = new Set<string>();
+  const out: RemoteEndpointCandidate[] = [];
+  for (const backend of orderedBackends) {
+    if (backend === "generic" && !allowLegacyGenericEndpoint) {
+      if (backendMode !== "auto") continue;
+      if (canonicalConfigured) continue;
+    }
+    const frameEndpoint = resolveServiceEndpoint(backend, "frame");
+    if (!frameEndpoint || seen.has(frameEndpoint)) continue;
+    seen.add(frameEndpoint);
+    const statusEndpoint =
+      resolveServiceEndpoint(backend, "status") ??
+      statusEndpointFromFrameEndpoint(frameEndpoint);
+    out.push({
+      backend,
+      frameEndpoint,
+      statusEndpoint,
+    });
+  }
+  return out;
 };
 
 const readRequiredProvenanceSourcePrefix = (): string | null =>
   readEnvText(process.env.MIS_RENDER_REQUIRED_PROVENANCE_SOURCE_PREFIX)?.toLowerCase() ??
   null;
+
+const readAllowLegacyGenericEndpoint = (): boolean =>
+  process.env.MIS_RENDER_ALLOW_LEGACY_GENERIC_ENDPOINT === "1";
+
+const readAllowConfiguredFallback = (): boolean =>
+  process.env.MIS_RENDER_ALLOW_CONFIGURED_FALLBACK === "1";
+
+const isLocalFallbackAllowed = (opts: {
+  backendMode: "auto" | "optix" | "unity";
+  strictProxy: boolean;
+  remoteConfigured: boolean;
+}): boolean => {
+  if (opts.strictProxy) return false;
+  if (opts.backendMode !== "auto") return false;
+  if (!opts.remoteConfigured) return true;
+  return readAllowConfiguredFallback();
+};
 
 const DEFAULT_MIS_SERVICE_FRAME_URL =
   "http://127.0.0.1:6061/api/helix/hull-render/frame";
@@ -563,24 +594,49 @@ const buildLocalResponse = async (
 
 router.get("/status", async (_req, res) => {
   const backendMode = readRenderBackendMode();
-  const endpoint = normalizeServiceFrameEndpoint();
-  const statusEndpoint = normalizeServiceStatusEndpoint();
+  const endpointCandidates = collectRemoteEndpointCandidates();
+  const allowLegacyGenericEndpoint = readAllowLegacyGenericEndpoint();
   const strictProxy = process.env.MIS_RENDER_PROXY_STRICT === "1";
   const requireIntegralSignal = process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL !== "0";
   const requiredProvenanceSourcePrefix = readRequiredProvenanceSourcePrefix();
-  const remoteStatus = statusEndpoint
-    ? await fetchRemoteServiceStatus(statusEndpoint)
-    : {
-        reachable: false,
-        endpoint: null,
-        kind: null,
-        readyForUnity: false,
-        readyForOptix: false,
-        readyForScientificLane: false,
-        allowSynthetic: false,
-        error: "remote_status_not_configured",
-      };
-  const remoteConfigured = !!endpoint;
+  const remoteConfigured = endpointCandidates.length > 0;
+  const localFallbackAllowed = isLocalFallbackAllowed({
+    backendMode,
+    strictProxy,
+    remoteConfigured,
+  });
+  let selectedCandidate: RemoteEndpointCandidate | null =
+    endpointCandidates.length > 0 ? endpointCandidates[0] : null;
+  let remoteStatus: RemoteServiceStatus = {
+    reachable: false,
+    endpoint: null,
+    kind: null,
+    readyForUnity: false,
+    readyForOptix: false,
+    readyForScientificLane: false,
+    allowSynthetic: false,
+    error: "remote_status_not_configured",
+  };
+  if (remoteConfigured) {
+    let firstFailure: RemoteServiceStatus | null = null;
+    for (const candidate of endpointCandidates) {
+      const statusEndpoint =
+        candidate.statusEndpoint ?? statusEndpointFromFrameEndpoint(candidate.frameEndpoint);
+      const candidateStatus = await fetchRemoteServiceStatus(statusEndpoint);
+      if (!firstFailure) {
+        firstFailure = candidateStatus;
+        selectedCandidate = candidate;
+      }
+      if (candidateStatus.reachable) {
+        selectedCandidate = candidate;
+        remoteStatus = candidateStatus;
+        break;
+      }
+    }
+    if (!remoteStatus.reachable && firstFailure) {
+      remoteStatus = firstFailure;
+    }
+  }
   const scientificLaneReady =
     remoteConfigured &&
     strictProxy &&
@@ -592,13 +648,25 @@ router.get("/status", async (_req, res) => {
     backendHint: "mis-path-tracing",
     backendMode,
     remoteConfigured,
-    remoteEndpoint: endpoint,
-    remoteStatusEndpoint: statusEndpoint,
+    remoteEndpoint: selectedCandidate?.frameEndpoint ?? null,
+    remoteStatusEndpoint:
+      selectedCandidate?.statusEndpoint ??
+      (selectedCandidate
+        ? statusEndpointFromFrameEndpoint(selectedCandidate.frameEndpoint)
+        : null),
     strictProxy,
     requireIntegralSignal,
     requiredProvenanceSourcePrefix,
+    allowLegacyGenericEndpoint,
     scientificLaneReady,
-    fallbackLaneActive: !scientificLaneReady,
+    fallbackLaneActive: !scientificLaneReady && localFallbackAllowed,
+    localFallbackAllowed,
+    endpointCandidates: endpointCandidates.map((candidate) => ({
+      backend: candidate.backend,
+      frameEndpoint: candidate.frameEndpoint,
+      statusEndpoint:
+        candidate.statusEndpoint ?? statusEndpointFromFrameEndpoint(candidate.frameEndpoint),
+    })),
     remoteStatus,
     recommendedService:
       backendMode === "optix"
@@ -615,72 +683,96 @@ router.get("/status", async (_req, res) => {
 router.post("/frame", async (req, res) => {
   const renderStartedAt = Date.now();
   const payload = parseRequest(req.body);
-  const endpoint = normalizeServiceFrameEndpoint();
   const backendMode = readRenderBackendMode();
+  const endpointCandidates = collectRemoteEndpointCandidates();
+  const allowLegacyGenericEndpoint = readAllowLegacyGenericEndpoint();
+  const remoteConfigured = endpointCandidates.length > 0;
   const strictProxy = process.env.MIS_RENDER_PROXY_STRICT === "1";
   const requireIntegralSignalByEnv = process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL !== "0";
   const requiredProvenanceSourcePrefix = readRequiredProvenanceSourcePrefix();
+  const localFallbackAllowed = isLocalFallbackAllowed({
+    backendMode,
+    strictProxy,
+    remoteConfigured,
+  });
 
-  if (endpoint) {
-    try {
-      const remote = await proxyRemoteFrame(endpoint, payload);
-      if (strictProxy && !isScientificRemoteFrame(remote)) {
-        throw new Error("remote_mis_non_scientific_response");
-      }
-      if (
-        strictProxy &&
-        !hasRequiredProvenancePrefix(remote, requiredProvenanceSourcePrefix)
-      ) {
-        throw new Error("remote_mis_provenance_source_prefix_mismatch");
-      }
-      const requireIntegralSignal =
-        payload.scienceLane?.requireIntegralSignal === true ||
-        (strictProxy && requireIntegralSignalByEnv);
-      if (requireIntegralSignal && !hasIntegralSignalAttachments(remote)) {
-        throw new Error("remote_mis_missing_integral_signal_attachments");
-      }
-      const deterministicSeed = hashSeed(payload);
-      const response: HullMisRenderResponseV1 = {
-        ...remote,
-        version: 1,
-        width: payload.width,
-        height: payload.height,
-        deterministicSeed,
-        renderMs:
-          Number.isFinite(remote.renderMs) && remote.renderMs > 0
-            ? remote.renderMs
-            : Date.now() - renderStartedAt,
-        provenance: {
-          source:
-            typeof remote.provenance?.source === "string" &&
-            remote.provenance.source.trim().length
-              ? remote.provenance.source
-              : backendMode === "optix"
-                ? "optix/cuda.scaffold"
-                : backendMode === "unity"
-                  ? "raytracingmis.unity.batch"
-                  : "casimirbot.remote.mis.proxy",
-          serviceUrl: endpoint,
-          timestampMs: Date.now(),
-        },
-      };
-      return res.json(response);
-    } catch (error) {
-      if (strictProxy) {
+  if (remoteConfigured) {
+    const attemptErrors: string[] = [];
+    for (const candidate of endpointCandidates) {
+      try {
+        const remote = await proxyRemoteFrame(candidate.frameEndpoint, payload);
+        if (strictProxy && !isScientificRemoteFrame(remote)) {
+          throw new Error("remote_mis_non_scientific_response");
+        }
+        if (
+          strictProxy &&
+          !hasRequiredProvenancePrefix(remote, requiredProvenanceSourcePrefix)
+        ) {
+          throw new Error("remote_mis_provenance_source_prefix_mismatch");
+        }
+        const requireIntegralSignal =
+          payload.scienceLane?.requireIntegralSignal === true ||
+          (strictProxy && requireIntegralSignalByEnv);
+        if (requireIntegralSignal && !hasIntegralSignalAttachments(remote)) {
+          throw new Error("remote_mis_missing_integral_signal_attachments");
+        }
+        const deterministicSeed = hashSeed(payload);
+        const response: HullMisRenderResponseV1 = {
+          ...remote,
+          version: 1,
+          width: payload.width,
+          height: payload.height,
+          deterministicSeed,
+          renderMs:
+            Number.isFinite(remote.renderMs) && remote.renderMs > 0
+              ? remote.renderMs
+              : Date.now() - renderStartedAt,
+          provenance: {
+            source:
+              typeof remote.provenance?.source === "string" &&
+              remote.provenance.source.trim().length
+                ? remote.provenance.source
+                : backendMode === "optix"
+                  ? "optix/cuda.scaffold"
+                  : backendMode === "unity"
+                    ? "raytracingmis.unity.batch"
+                    : "casimirbot.remote.mis.proxy",
+            serviceUrl: candidate.frameEndpoint,
+            timestampMs: Date.now(),
+          },
+        };
+        return res.json(response);
+      } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return res.status(502).json({
-          error: "mis_proxy_failed",
-          message,
-          endpoint,
-        });
+        attemptErrors.push(`${candidate.backend}@${candidate.frameEndpoint} :: ${message}`);
       }
-      const fallback = await buildLocalResponse(
-        payload,
-        renderStartedAt,
-        "remote_proxy_failed_fallback_local_teaching_only",
-      );
-      return res.json(fallback);
     }
+    if (!localFallbackAllowed) {
+      return res.status(502).json({
+        error: "mis_proxy_failed",
+        message: attemptErrors.join(" | "),
+        endpointCandidates: endpointCandidates.map((candidate) => candidate.frameEndpoint),
+        allowLegacyGenericEndpoint,
+      });
+    }
+    const fallback = await buildLocalResponse(
+      payload,
+      renderStartedAt,
+      "remote_proxy_failed_fallback_local_teaching_only",
+    );
+    return res.json(fallback);
+  }
+
+  if (!localFallbackAllowed) {
+    return res.status(502).json({
+      error: "mis_proxy_unconfigured",
+      message:
+        backendMode === "auto"
+          ? "no remote MIS render endpoint configured"
+          : `required remote MIS render endpoint not configured for backend=${backendMode}`,
+      backendMode,
+      allowLegacyGenericEndpoint,
+    });
   }
 
   const fallback = await buildLocalResponse(

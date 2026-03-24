@@ -79,6 +79,8 @@ const CANONICAL_TREE_FILES = [
   "docs/knowledge/physics/atomic-systems-tree.json",
 ] as const;
 
+export const PAPER_CANONICAL_TREE_FILES = [...CANONICAL_TREE_FILES] as const;
+
 const CANONICAL_RULES: CanonicalRule[] = [
   {
     canonicalId: "bridge-orch-or-to-stellar-coherence",
@@ -206,6 +208,8 @@ const CANONICAL_RULES: CanonicalRule[] = [
     priority: 0.05,
   },
 ];
+
+export const PAPER_CANONICAL_RULES: ReadonlyArray<CanonicalRule> = CANONICAL_RULES;
 
 const STOPWORDS = new Set([
   "the",
