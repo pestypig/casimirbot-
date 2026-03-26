@@ -3,8 +3,56 @@
   "schemaVersion": "1.0.0",
   "registryId": "halobank-solar-core",
   "domain": "solar-system-diagnostics",
-  "updatedAt": "2026-03-22",
+  "updatedAt": "2026-03-24",
   "claims": [
+    {
+      "claimId": "claim:halobank.solar:mercury_precession",
+      "statement": "HaloBank's Mercury perihelion diagnostic is only admissible at diagnostic tier when a pinned weak-field solar GR metric context reproduces perihelion advance from Mercury-minus-Sun relative states within configured deterministic tolerance bands and fails deterministically when the event window is undersampled.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank Mercury perihelion benchmark lane",
+        "constraints": [
+          "metric context must resolve to the pinned weak-field BCRS/GCRS manifest",
+          "perihelion estimate must use Mercury relative to the Sun rather than an absolute speed",
+          "evaluation window must stay inside the configured 1900-2100 epoch span",
+          "insufficient perihelion-event counts must fail deterministically"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "standard",
+          "citation": "IAU 2000 Resolution B1.3, relativistic framework for BCRS and GCRS.",
+          "equation": "weak-field metric written in terms of scalar/vector potentials for BCRS/GCRS",
+          "note": "Reference-system source for the pinned solar metric context."
+        },
+        {
+          "kind": "paper",
+          "citation": "Einstein (1916), Annalen der Physik 354(7), DOI 10.1002/andp.19163540702.",
+          "equation": "Delta_varpi = 6*pi*G*M_sun/(a*(1-e^2)*c^2)",
+          "note": "Weak-field perihelion-advance benchmark for timelike solar-system orbits."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-metric-context.v1.json",
+          "note": "Pinned weak-field solar metric manifest."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Deterministic Mercury perihelion proof implementation."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-metric-context.v1.json",
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/physics/physics-foundations-tree.json",
+        "docs/knowledge/physics/einstein-field-equations.md"
+      ],
+      "notes": "This remains a diagnostic weak-field benchmark claim; it does not assert a certified Solar-System ephemeris or full post-Newtonian orbit propagator."
+    },
     {
       "claimId": "claim:halobank.solar:solar_light_deflection",
       "statement": "HaloBank's solar null-geodesic diagnostic is only admissible at diagnostic tier when a pinned weak-field solar metric context reproduces the canonical solar-limb deflection scale and remains within configured gamma residual envelopes for historical light-deflection and Cassini-era Shapiro benchmarks.",
@@ -98,6 +146,373 @@
       "notes": "This parity node is a falsifiable consistency check tying two observable families to one metric layer."
     },
     {
+      "claimId": "claim:halobank.solar:mercury_cross_lane_congruence_diagnostic",
+      "statement": "HaloBank's Mercury cross-lane congruence diagnostic is only admissible at diagnostic tier when the Mercury perihelion benchmark and the Mercury figure/shape proxy are both executed against the same target body and the normalized same-body congruence score remains inside configured deterministic tolerance bands without asserting a theorem-equivalent identity between the observables.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank Mercury cross-lane congruence lane",
+        "constraints": [
+          "both submodules must resolve to Mercury as the shared target body",
+          "perihelion and figure proxies must both pass their own diagnostic gates",
+          "the wrapper compares normalized residual margins rather than collapsing the two observables into one physical quantity",
+          "the result remains diagnostic and replay-safe rather than a certified Mercury interior or relativistic theory claim"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Verma and Margot (2016), Mercury's gravity, tides, and spin from MESSENGER radio science data.",
+          "note": "Reference for the Mercury gravity/tide/spin profile used by the figure and spin-orbit congruence lane."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA / JPL Mercury fact sheet and tidal overview references.",
+          "note": "Reference for the Mercury body constants used by the executable profile."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-diagnostic-datasets.v1.json",
+          "note": "Mercury spin-orbit stress-test profile used by the figure proxy lane."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Mercury cross-lane congruence wrapper implementation."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-diagnostic-datasets.v1.json",
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/physics-equation-backbone.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "tests/halobank-solar-derived.spec.ts"
+      ],
+      "notes": "This is a same-body diagnostic congruence gate, not a theorem-equivalent identity between Mercury precession and Mercury figure closure."
+    },
+    {
+      "claimId": "claim:halobank.solar:resonance_libration",
+      "statement": "HaloBank's resonance-libration diagnostic is only admissible at diagnostic tier when a configured resonant-angle family, its mean-motion ratio, and the dominant-frequency sanity check all remain inside the deterministic tolerance envelope for the selected body pair and epoch window.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank resonance-libration lane",
+        "constraints": [
+          "resonant angle must be constructed from the selected primary and secondary body states over the requested window",
+          "libration span, mean-motion ratio error, and dominant-frequency sanity checks must all pass configured thresholds",
+          "claim remains a reduced-order resonance diagnostic rather than a certified long-term N-body stability proof"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "A. C. Quillen, mean-motion resonance lecture notes, University of Rochester astronomy course.",
+          "equation": "phi = i*lambda - j*lambda_J ; libration when the resonant angle oscillates about a fixed value rather than circulates",
+          "note": "Definition-level resonance and libration semantics used by the reduced-order diagnostic."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Deterministic resonance-angle, span, and dominant-frequency implementation."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-thresholds.v1.json",
+          "note": "Configured resonance span and ratio tolerance envelope."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This remains a deterministic resonance-screening lane; it does not claim certified secular stability."
+    },
+    {
+      "claimId": "claim:halobank.solar:gr_foundations_bridge",
+      "statement": "HaloBank's inner-solar metric context is only admissible as a diagnostic weak-field GR lane when it remains explicitly subordinate to the shared Einstein-equation baseline and stress-energy source semantics in physics foundations rather than treated as an independent gravity model.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank shared GR foundations bridge",
+        "constraints": [
+          "metric context must remain pinned to the weak-field BCRS/GCRS manifest",
+          "the bridge is definitional and benchmark-scoped, not a certified full field-equation solver",
+          "timelike and null observables remain tied to the same declared weak-field source potential set"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "standard",
+          "citation": "IAU 2000 Resolution B1.3, relativistic framework for BCRS and GCRS.",
+          "equation": "weak-field metric written in terms of scalar/vector potentials for BCRS/GCRS",
+          "note": "Reference-system and weak-field metric baseline."
+        },
+        {
+          "kind": "paper",
+          "citation": "Einstein (1916), Annalen der Physik 354(7), DOI 10.1002/andp.19163540702.",
+          "equation": "weak-field perihelion and light-deflection source-term lineage",
+          "note": "Common GR weak-field anchor for Mercury and solar null-geodesics."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/halobank-solar-metric-context.v1.json",
+          "note": "Pinned weak-field manifest with explicit GR/PPN model id and source potentials."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/physics/physics-foundations-tree.json",
+          "note": "Shared metric, field-equation, stress-energy, units, and viability definitions."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-metric-context.v1.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/physics/physics-foundations-tree.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts"
+      ],
+      "notes": "This bridge claim exists to make the GR dependency explicit in the tree/DAG; it does not raise HaloBank above diagnostic maturity."
+    },
+    {
+      "claimId": "claim:halobank.solar:terrestrial_lunisolar_forcing_bridge",
+      "statement": "HaloBank's Sun/Moon state-vector and time-scale outputs are only admissible as deterministic forcing inputs for terrestrial tide-generating-potential, eclipse, and Earth-orientation studies when the downstream tide, torque, and precession semantics remain explicitly outside the HaloBank solar lane unless separately modeled and validated.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank terrestrial lunisolar forcing bridge",
+        "constraints": [
+          "HaloBank provides forcing geometry and time-scale inputs, not a certified ocean-tide or Earth-orientation solver",
+          "equilibrium tide, dynamic tide, and axial precession must remain separate downstream concepts in the tree",
+          "any downstream precession claim must distinguish spin-axis precession from orbital perihelion precession"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "Canadian Tidal Manual, tide-raising forces and equilibrium tide framing.",
+          "note": "Reference for lunisolar forcing and equilibrium/dynamic tide separation."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Reference for Moon/Sun torque on Earth's equatorial bulge and nutation/precession distinction."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/routes/halobank-solar.ts",
+          "note": "Deterministic solar state/time output surface used as forcing input."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/physics/physics-gravitational-response-tree.json",
+          "note": "Terrestrial forcing and Earth-orientation bridge targets."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/halobank-solar.math-claims.json",
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "server/routes/halobank-solar.ts",
+        "server/modules/halobank-solar/ephemeris-core.ts"
+      ],
+      "notes": "This bridge claim is definitional and routing-scoped. It does not promote HaloBank into a tide or Earth-orientation runtime."
+    },
+    {
+      "claimId": "claim:halobank.solar:earth_orientation_precession_nutation_proxy",
+      "statement": "HaloBank's Earth-orientation proxy lane is only admissible at diagnostic tier when Sun/Moon forcing geometry is converted into explicitly labeled tide-weight and equatorial-bulge torque proxies, the lunar-to-solar forcing ratio remains within configured diagnostic bounds, and the route does not claim a certified IAU precession-nutation series.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank Earth-orientation proxy lane",
+        "constraints": [
+          "the module remains a forcing and torque proxy driven by HaloBank Sun/Moon state vectors rather than a certified Earth-orientation solver",
+          "precession and nutation outputs must remain diagnostic proxy magnitudes derived from lunisolar forcing and torque balance semantics",
+          "the lane must keep tidal forcing, equatorial-bulge torque, axial precession, and nutation distinct in the tree/DAG"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Reference for Moon/Sun torque on Earth's equatorial bulge and the precession/nutation distinction."
+        },
+        {
+          "kind": "web",
+          "citation": "Canadian Tidal Manual, tide-generating forces and equilibrium tide framing.",
+          "note": "Reference for lunisolar gravitational forcing and the tide-generating-potential semantics."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "note": "Canonical equation refs for tide-generating potential and angular-momentum torque balance."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Executable forcing and torque proxy implementation."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/physics/physics-gravitational-response-tree.json",
+          "note": "Definition-level downstream targets for forcing, torque, precession, and nutation."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/halobank-solar.math-claims.json",
+        "docs/knowledge/math-claims/gravitational-response.math-claims.json",
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts"
+      ],
+      "notes": "This claim records an executable diagnostic bridge from HaloBank forcing geometry into terrestrial Earth-orientation semantics without promoting the route to certified precession or nutation products."
+    },
+    {
+      "claimId": "claim:halobank.solar:planetary_shape_orientation_proxy",
+      "statement": "HaloBank's planetary-shape/orientation proxy lane is only admissible at diagnostic tier when Sun/Moon forcing geometry and Earth-like body constants are reduced to mean-density, hydrostatic-rounding, potato-threshold, rotational-flattening, tidal-response, J2, dynamical-ellipticity, and precession-constant proxies, and the route does not claim geodesy-grade or IERS-grade products.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank planetary-shape/orientation proxy lane",
+        "constraints": [
+          "the lane must expose shape and orientation proxies as diagnostic reductions, not certified geodesy",
+          "J2 and dynamical ellipticity must remain distinct proxy quantities even when related",
+          "the lane must keep tidal forcing, self-gravity rounding, rotational flattening, and precession separate in the tree/DAG"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/GRACE materials on Earth's oblateness and the J2 coefficient.",
+          "note": "Reference for the quadrupole/oblateness proxy and J2 terminology."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Reference for the torque-driven orientation bridge."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA / JPL Radio Science Techniques monograph, Love number values for planetary bodies.",
+          "note": "Reference for tidal response as a dimensionless gain factor."
+        },
+        {
+          "kind": "paper",
+          "citation": "Geophysical Journal International paper on inversion of gravity gradient tensor data.",
+          "note": "Reference for the tidal-tensor / gravity-gradient description as second derivatives of potential."
+        }
+      ],
+      "repoBindings": [
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/gravitational-response.math-claims.json",
+        "docs/knowledge/math-claims/self-gravity-shape.math-claims.json",
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts"
+      ],
+      "notes": "This claim keeps the new lane at diagnostic maturity and ties it to the shared gravity- and shape-response parents."
+    },
+    {
+      "claimId": "claim:halobank.solar:planetary_figure_diagnostic",
+      "statement": "HaloBank's planetary-figure diagnostic is only admissible at diagnostic tier when the shape/orientation proxy lane closes an Earth-like low-order figure over q, J2, dynamical ellipticity, effective Love-number response, and flattening without claiming certified geodesy or IERS-grade products.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank planetary figure diagnostic lane",
+        "constraints": [
+          "the route must remain an Earth-like low-order diagnostic and not a certified figure solver",
+          "q, J2, H, k2, and flattening must remain explicit and separately inspectable",
+          "the lane must preserve the gravity-rounded versus strength-supported regime distinction"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC / NSSDC Earth Fact Sheet.",
+          "note": "Reference values for Earth-like flattening and normalized shape context."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Reference for the orientation bridge driven by oblateness and lunisolar torque."
+        },
+        {
+          "kind": "web",
+          "citation": "Tatum, Precession.",
+          "note": "Reference for dynamical ellipticity and precession geometry."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "server/modules/halobank-solar/derived.ts",
+          "note": "Executable Earth-like figure diagnostic implementation."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/halobank-solar.math-claims.json",
+        "docs/knowledge/math-claims/self-gravity-shape.math-claims.json",
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts"
+      ],
+      "notes": "This claim upgrades the shape/orientation proxy output into a calibrated low-order Earth-like figure diagnostic."
+    },
+    {
+      "claimId": "claim:halobank.solar:stellar_observables_diagnostic",
+      "statement": "HaloBank's stellar-observables diagnostic is only admissible at diagnostic tier when supplied magnetic-activity and helioseismic-shift inputs show the expected positive coupling, optional flare statistics remain in a power-law-like range, and the route preserves the explicit non-consciousness guardrail.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank stellar observables diagnostic lane",
+        "constraints": [
+          "the inputs must remain solar observables and not speculative consciousness variables",
+          "the route may use flare statistics only as optional support inside the stellar-activity lane",
+          "the lane must preserve the explicit stellar-plasma-observables-not-consciousness guardrail"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Reference for solar oscillation observables and interior probing."
+        },
+        {
+          "kind": "paper",
+          "citation": "Chaplin et al., Solar p-mode frequencies over the solar cycle.",
+          "note": "Reference for activity-linked helioseismic frequency shifts."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Memorandum 111102, solar dynamo.",
+          "note": "Reference for the magnetic-cycle parent semantics."
+        },
+        {
+          "kind": "paper",
+          "citation": "Lu and Hamilton, Avalanches and the Distribution of Solar Flares.",
+          "note": "Reference for optional flare-statistics support."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/bridges/astrochemistry-prebiotic-neuro-consciousness-bridge-tree.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/halobank-solar.math-claims.json",
+        "docs/knowledge/math-claims/stellar-structure-nucleosynthesis.math-claims.json",
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts"
+      ],
+      "notes": "This claim makes the stellar-observables lane executable without allowing it to leak into the exploratory consciousness branch."
+    },
+    {
       "claimId": "claim:halobank.solar:earth_moon_eclipse_timing",
       "statement": "HaloBank's Earth-Moon eclipse timing diagnostic is only admissible at diagnostic tier when apparent Sun-Moon contact minima are computed from an explicit Earth-referenced observer model and any unsupported body-fixed observer request fails deterministically with the route-matched orientation-kernel fail id.",
       "maturity": "diagnostic",
@@ -188,7 +603,7 @@
       "sources": [
         {
           "kind": "paper",
-          "citation": "Schönrich, Binney & Dehnen (2010), MNRAS 403(4):1829-1833, Local kinematics and the local standard of rest.",
+          "citation": "Schonrich, Binney & Dehnen (2010), MNRAS 403(4):1829-1833, Local kinematics and the local standard of rest.",
           "equation": "U,V,W = (11.1, 12.24, 7.25) km/s",
           "note": "Pinned default solar peculiar-motion reference."
         },
@@ -217,6 +632,212 @@
         "docs/knowledge/halobank-solar-proof-tree.json"
       ],
       "notes": "This is a provenance and residual-consistency claim, not a certified Galactic dynamics claim."
+    },
+    {
+      "claimId": "claim:halobank.solar:granular_tidal_response_diagnostic",
+      "statement": "HaloBank's granular tidal-response diagnostic is only admissible at diagnostic tier when the low-order body profile closes granular dissipation, tidal quality factor, spin-state evolution, and angular-momentum redistribution proxies inside the configured envelope while explicitly remaining outside any consciousness or collapse interpretation.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank granular tidal-response lane",
+        "constraints": [
+          "the lane must remain a low-order diagnostic closure over granular dissipation and tidal response proxies",
+          "the diagnostic must preserve the explicit non-consciousness guardrail",
+          "the body profile may be Mercury, Mimas, Hyperion, or another supported small body"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Tanga et al. (2009), Asteroid rotation and shapes from numerical simulations of gravitational re-accumulation.",
+          "note": "Reference for granular re-accumulation, spin, and fluid-like preferred end states."
+        },
+        {
+          "kind": "paper",
+          "citation": "Goldreich & Sari, Tidal Evolution of Rubble Piles.",
+          "note": "Reference for rubble-pile tidal evolution and dissipation semantics."
+        },
+        {
+          "kind": "paper",
+          "citation": "Frouard et al., Tidal dissipation in rubble-pile asteroids.",
+          "note": "Reference for rubble-pile dissipation and Q-style scaling."
+        },
+        {
+          "kind": "paper",
+          "citation": "Efroimsky, Tidal Evolution of Asteroidal Binaries. Ruled by Viscosity. Ignorant of Rigidity.",
+          "note": "Reference for lag/dissipation scaling and viscosity-driven response."
+        },
+        {
+          "kind": "paper",
+          "citation": "Holsapple, Equilibrium configurations of solid cohesionless bodies.",
+          "note": "Reference for cohesionless-body equilibrium language."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/halobank-solar-diagnostic-datasets.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This claim keeps the granular-body lane diagnostic and explicitly non-consciousness."
+    },
+    {
+      "claimId": "claim:halobank.solar:stellar_flare_sunquake_diagnostic",
+      "statement": "HaloBank's stellar flare-to-sunquake diagnostic is only admissible at diagnostic tier when flare-energy and helioseismic-amplitude series remain positively coupled, flare-to-sunquake timing offsets stay within the replay envelope, and the route preserves the explicit non-consciousness guardrail.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank stellar flare-sunquake lane",
+        "constraints": [
+          "the lane must remain a flare-to-sunquake observability bridge",
+          "the diagnostic must preserve the explicit sunquake-not-quantum-collapse guardrail",
+          "the replay must stay within the configured timing envelope"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Reference for p-mode and helioseismic response framing."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA, Secrets Behind Sunquakes Could Lurk Beneath the Solar Surface.",
+          "note": "Reference for flare-linked sunquake observables."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kosovichev, Helioseismic response to X2.2 solar flare of February 15, 2011.",
+          "note": "Reference for flare impact and helioseismic wave generation."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA NAS, Simulating Sunquakes: The Impact of Flares on the Sun.",
+          "note": "Reference for flare-impulse / pressure-wave modeling semantics."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/halobank-solar-diagnostic-datasets.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This claim keeps flare, timing, and helioseismic response in the observable solar-plasma lane."
+    },
+    {
+      "claimId": "claim:halobank.solar:sunquake_timing_replay_diagnostic",
+      "statement": "HaloBank's sunquake timing replay diagnostic is only admissible at diagnostic tier when replayed flare and sunquake event windows stay inside the configured timing envelope and the flare-to-sunquake alignment score remains positive while explicitly excluding consciousness or collapse interpretations.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank sunquake timing replay lane",
+        "constraints": [
+          "the replay must use flare and sunquake event windows only",
+          "the lane must preserve the explicit sunquake-not-quantum-collapse guardrail",
+          "timing offsets must remain inside the deterministic replay envelope"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Reference for helioseismic observability and p-mode response."
+        },
+        {
+          "kind": "paper",
+          "citation": "Zharkov et al. (2019), Sunquake Timing and EUV Irradiance in the 2017 X9.3 Flare.",
+          "note": "Reference for flare/sunquake timing alignment."
+        },
+        {
+          "kind": "paper",
+          "citation": "He et al. (2021), Quasi-Periodic Pulsations in X-Class Solar Flares.",
+          "note": "Reference for quasi-periodic flare-envelope context."
+        }
+      ],
+      "repoBindings": [
+        "configs/halobank-solar-thresholds.v1.json",
+        "configs/halobank-solar-diagnostic-datasets.v1.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts",
+        "tests/halobank-solar-derived.spec.ts",
+        "docs/knowledge/halobank-solar-proof-tree.json"
+      ],
+      "notes": "This replay lane is a deterministic flare-to-sunquake timing diagnostic, not a consciousness or collapse claim."
+    },
+    {
+      "claimId": "claim:halobank.solar:granular_tidal_response_backbone_bridge",
+      "statement": "HaloBank's granular tidal-response diagnostic is only admissible at diagnostic tier when it remains explicitly subordinate to the shared effective-microphysics, constitutive-response, and transport-closure backbone rather than treated as a direct gravity-only or consciousness-adjacent mechanism.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank granular microphysics backbone bridge",
+        "constraints": [
+          "granular tidal diagnostics must descend through effective microphysics and constitutive closure",
+          "the lane must not bypass dissipation and transport semantics",
+          "the lane must preserve the explicit non-consciousness guardrail"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Tanga et al. (2009), Asteroid rotation and shapes from numerical simulations of gravitational re-accumulation.",
+          "note": "Reference for many-body granular evolution and aggregate response."
+        },
+        {
+          "kind": "paper",
+          "citation": "Goldreich & Sari, Tidal Evolution of Rubble Piles.",
+          "note": "Reference for dissipation and angular-momentum redistribution semantics."
+        },
+        {
+          "kind": "repo-doc",
+          "citation": "docs/architecture/microphysics-hamiltonian-transport-observables-plan.md",
+          "note": "Defines the shared parent backbone and patch surface."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/halobank-solar.math-claims.json"
+      ],
+      "notes": "This bridge claim records ontology descent from microphysics and constitutive closure into the granular tidal runtime lane."
+    },
+    {
+      "claimId": "claim:halobank.solar:stellar_flare_sunquake_backbone_bridge",
+      "statement": "HaloBank's stellar flare-to-sunquake diagnostics are only admissible at diagnostic tier when they remain explicitly subordinate to the shared effective-microphysics, kinetic-transport, and plasma-closure backbone rather than treated as direct consciousness or collapse mechanisms.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "HaloBank stellar transport backbone bridge",
+        "constraints": [
+          "stellar flare and sunquake diagnostics must descend through plasma transport closure",
+          "the lane must not bypass flare forcing, heating, and wave-response semantics",
+          "the explicit sunquake-not-quantum-collapse guardrail must remain intact"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Reference for p-mode and helioseismic observables."
+        },
+        {
+          "kind": "report",
+          "citation": "Klimchuk, Nanoflare Heating of Solar and Stellar Coronae.",
+          "note": "Reference for magnetic heating and transport semantics."
+        },
+        {
+          "kind": "repo-doc",
+          "citation": "docs/architecture/microphysics-hamiltonian-transport-observables-plan.md",
+          "note": "Defines the shared parent backbone and patch surface."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/halobank-solar-proof-tree.json",
+        "docs/knowledge/math-claims/halobank-solar.math-claims.json"
+      ],
+      "notes": "This bridge claim records ontology descent from microphysics and transport closure into the stellar flare and sunquake runtime lanes."
     }
   ]
 }

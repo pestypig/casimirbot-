@@ -84,6 +84,52 @@ describe("collapse benchmark (Phase 3): HTTP API", () => {
     expect(parsed.dp?.deltaE_J ?? 0).toBeGreaterThan(0);
   });
 
+  it("POST /api/benchmarks/collapse exposes split geometry channels when curvature inputs are provided", async () => {
+    const app = createApp();
+    const body = {
+      schema_version: "collapse_benchmark/1",
+      dt_ms: 50,
+      tau_estimator: {
+        kappa_drive_m2: 1e-3,
+        kappa_body_m2: 1e-5,
+        coherence: 0.4,
+        dispersion: 0.7,
+        residual_rms: 0.01,
+        roots_count: 12,
+        r_c_hint_m: 0.6,
+        tau_hint_ms: 1_400,
+      },
+    };
+
+    const res = await request(app).post("/api/benchmarks/collapse").send(body).expect(200);
+    const parsed = CollapseBenchmarkResult.parse(res.body);
+    expect(parsed.background_geometry?.role).toBe("background_geometry");
+    expect(parsed.background_geometry?.proxies?.canonical_channel).toBe("kappa_u");
+    expect(parsed.dynamic_forcing_geometry?.role).toBe("dynamic_forcing_geometry");
+    expect(parsed.dynamic_forcing_geometry?.proxies?.canonical_channel).toBe("kappa_drive");
+    expect(parsed.geometry_coupling?.role).toBe("background_geometry");
+  });
+
+  it("POST /api/benchmarks/collapse emits source-backed exploratory comparison replay when requested", async () => {
+    const app = createApp();
+    const body = {
+      schema_version: "collapse_benchmark/1",
+      dt_ms: 25,
+      tau_ms: 3.5,
+      r_c_m: 1e-8,
+      quantum_semiclassical_source_replay_id: "kalra_2022__zhang_2017__packet_primary",
+    };
+
+    const res = await request(app).post("/api/benchmarks/collapse").send(body).expect(200);
+    const parsed = CollapseBenchmarkResult.parse(res.body);
+    expect(parsed.quantum_semiclassical_source_replay?.profile_id).toBe("kalra_2022__zhang_2017__packet_primary");
+    expect(parsed.quantum_semiclassical_comparison?.measurement_timescale_kind).toBe(
+      "microtubule_transport_lifetime_proxy",
+    );
+    expect(parsed.quantum_semiclassical_comparison?.subharmonic_lock_ratio).toBe(2);
+    expect(parsed.quantum_semiclassical_comparison?.time_crystal_signature_pass).toBe(true);
+  });
+
   it("POST /api/benchmarks/collapse accepts dp_adapter inputs and derives tau", async () => {
     const app = createApp();
     const dims = [4, 4, 4] as const;

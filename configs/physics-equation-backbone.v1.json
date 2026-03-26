@@ -152,6 +152,1109 @@
       ]
     },
     {
+      "id": "periodicity_commensurability",
+      "name": "Periodicity commensurability",
+      "category": "periodicity",
+      "expression": "abs(N_a * P_a - N_b * P_b) <= epsilon_t",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "N_a",
+          "quantity": "first integer cycle multiplier",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "P_a",
+          "quantity": "first period",
+          "units": "s"
+        },
+        {
+          "symbol": "N_b",
+          "quantity": "second integer cycle multiplier",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "P_b",
+          "quantity": "second period",
+          "units": "s"
+        },
+        {
+          "symbol": "epsilon_t",
+          "quantity": "allowed recurrence timing residual",
+          "units": "s"
+        }
+      ]
+    },
+    {
+      "id": "line_of_sight_occultation_geometry",
+      "name": "Line-of-sight occultation geometry",
+      "category": "apparent_geometry",
+      "expression": "theta_sep <= theta_occulter + theta_target",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "theta_sep",
+          "quantity": "apparent angular separation between figure centers",
+          "units": "rad"
+        },
+        {
+          "symbol": "theta_occulter",
+          "quantity": "apparent angular radius of the occulting body",
+          "units": "rad"
+        },
+        {
+          "symbol": "theta_target",
+          "quantity": "apparent angular radius of the occulted or transiting body",
+          "units": "rad"
+        }
+      ]
+    },
+    {
+      "id": "tide_generating_potential_quadrupole",
+      "name": "Tide-generating potential quadrupole",
+      "category": "gravitational_response",
+      "expression": "p_tide = -(G * M * a^2 / (2 * r^3)) * (3 * cos(alpha)^2 - 1)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "p_tide",
+          "quantity": "tide-generating potential",
+          "units": "m^2/s^2"
+        },
+        {
+          "symbol": "G",
+          "quantity": "gravitational constant",
+          "units": "m^3/(kg*s^2)"
+        },
+        {
+          "symbol": "M",
+          "quantity": "external gravitating body mass",
+          "units": "kg"
+        },
+        {
+          "symbol": "a",
+          "quantity": "distance from Earth's center to the evaluation point",
+          "units": "m"
+        },
+        {
+          "symbol": "r",
+          "quantity": "distance from Earth's center to the external body",
+          "units": "m"
+        },
+        {
+          "symbol": "alpha",
+          "quantity": "zenith angle of the external body at the evaluation point",
+          "units": "rad"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "angular_momentum_torque_balance",
+      "name": "Angular momentum and external torque balance",
+      "category": "rigid_body_orientation",
+      "expression": "dL/dt = tau_ext",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "L",
+          "quantity": "angular momentum",
+          "units": "kg*m^2/s"
+        },
+        {
+          "symbol": "t",
+          "quantity": "time",
+          "units": "s"
+        },
+        {
+          "symbol": "tau_ext",
+          "quantity": "net external torque",
+          "units": "N*m"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "tidal_tensor_weak_field",
+      "name": "Weak-field tidal tensor",
+      "category": "gravitational_response",
+      "expression": "T_ij = partial_i partial_j U",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "T_ij",
+          "quantity": "tidal tensor component",
+          "units": "1/s^2"
+        },
+        {
+          "symbol": "U",
+          "quantity": "gravitational potential",
+          "units": "m^2/s^2"
+        },
+        {
+          "symbol": "x_i",
+          "quantity": "Cartesian coordinate i",
+          "units": "m"
+        },
+        {
+          "symbol": "x_j",
+          "quantity": "Cartesian coordinate j",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "love_number_response_scaling",
+      "name": "Love-number response scaling",
+      "category": "gravitational_response",
+      "expression": "delta_U_ind = k2 * U_tide",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "delta_U_ind",
+          "quantity": "induced potential perturbation",
+          "units": "m^2/s^2"
+        },
+        {
+          "symbol": "k2",
+          "quantity": "dimensionless Love number",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "U_tide",
+          "quantity": "applied tidal potential",
+          "units": "m^2/s^2"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "quadrupole_moment_J2_definition",
+      "name": "Quadrupole moment J2 definition",
+      "category": "self_gravity_shape",
+      "expression": "J2 = (C - A) / (M * a^2)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "J2",
+          "quantity": "dimensionless quadrupole gravity coefficient",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "C",
+          "quantity": "polar principal moment of inertia",
+          "units": "kg*m^2"
+        },
+        {
+          "symbol": "A",
+          "quantity": "equatorial principal moment of inertia",
+          "units": "kg*m^2"
+        },
+        {
+          "symbol": "M",
+          "quantity": "body mass",
+          "units": "kg"
+        },
+        {
+          "symbol": "a",
+          "quantity": "equatorial radius",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "dynamical_ellipticity_relation",
+      "name": "Dynamical ellipticity relation",
+      "category": "gravitational_response",
+      "expression": "H = (C - A) / C",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "H",
+          "quantity": "dynamical ellipticity",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "C",
+          "quantity": "polar principal moment of inertia",
+          "units": "kg*m^2"
+        },
+        {
+          "symbol": "A",
+          "quantity": "equatorial principal moment of inertia",
+          "units": "kg*m^2"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "precession_constant_lunisolar_torque",
+      "name": "Precession constant from lunisolar torque",
+      "category": "rigid_body_orientation",
+      "expression": "psi_dot = tau_LS / (C * omega)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "psi_dot",
+          "quantity": "spin-axis precession rate",
+          "units": "1/s"
+        },
+        {
+          "symbol": "tau_LS",
+          "quantity": "lunisolar torque",
+          "units": "N*m"
+        },
+        {
+          "symbol": "C",
+          "quantity": "polar principal moment of inertia",
+          "units": "kg*m^2"
+        },
+        {
+          "symbol": "omega",
+          "quantity": "spin rate",
+          "units": "rad/s"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "planetary_figure_proxy_closure",
+      "name": "Planetary figure proxy closure",
+      "category": "self_gravity_shape",
+      "expression": "f_diag ~= (3/2) * J2 + q/2; H = J2 / (C/(M*a^2)); k2_eff ~= (3/2) / (1 + 19*mu_eff/(2*rho*g*a))",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "f_diag",
+          "quantity": "diagnostic equatorial flattening proxy",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "J2",
+          "quantity": "quadrupole gravity coefficient",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "q",
+          "quantity": "rotational parameter omega^2*a^3/(G*M)",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "H",
+          "quantity": "dynamical ellipticity proxy",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "C/(M*a^2)",
+          "quantity": "normalized polar moment of inertia factor",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "k2_eff",
+          "quantity": "effective degree-2 Love-number proxy",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "mu_eff",
+          "quantity": "effective rigidity proxy",
+          "units": "Pa"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "mean density",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "g",
+          "quantity": "surface gravity",
+          "units": "m/s^2"
+        },
+        {
+          "symbol": "a",
+          "quantity": "equatorial radius",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "mercury_same_body_congruence_metric",
+      "name": "Mercury same-body congruence metric",
+      "category": "cross_lane_diagnostic",
+      "expression": "c_Mercury = max(m_precession, m_figure_component, r_figure_rms)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "m_precession",
+          "quantity": "normalized Mercury perihelion residual margin",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "m_figure_component",
+          "quantity": "normalized Mercury figure component margin",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "r_figure_rms",
+          "quantity": "normalized Mercury figure RMS residual",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "c_Mercury",
+          "quantity": "same-body congruence score",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_gravitational_response"
+    },
+    {
+      "id": "hydrostatic_equilibrium_balance",
+      "name": "Hydrostatic equilibrium balance",
+      "category": "self_gravity_shape",
+      "expression": "nabla P = rho * nabla U",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "nabla P",
+          "quantity": "pressure gradient",
+          "units": "Pa/m"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "mass density",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "nabla U",
+          "quantity": "total potential gradient",
+          "units": "m/s^2"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "self_gravity_pressure_scaling",
+      "name": "Self-gravity pressure scaling",
+      "category": "self_gravity_shape",
+      "expression": "P_self ~ G * rho^2 * R^2",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "P_self",
+          "quantity": "characteristic self-gravity pressure scale",
+          "units": "Pa"
+        },
+        {
+          "symbol": "G",
+          "quantity": "gravitational constant",
+          "units": "m^3/(kg*s^2)"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "mass density",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "R",
+          "quantity": "characteristic body radius",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "granular_dissipation_scaling",
+      "name": "Granular dissipation scaling",
+      "category": "self_gravity_shape",
+      "expression": "P_diss ~ eta_eff * dot_gamma^2 * V",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "P_diss",
+          "quantity": "bulk dissipation power",
+          "units": "W"
+        },
+        {
+          "symbol": "eta_eff",
+          "quantity": "effective granular dissipation coefficient",
+          "units": "Pa*s"
+        },
+        {
+          "symbol": "dot_gamma",
+          "quantity": "shear rate",
+          "units": "1/s"
+        },
+        {
+          "symbol": "V",
+          "quantity": "effective body volume",
+          "units": "m^3"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "tidal_quality_factor_scaling",
+      "name": "Tidal quality-factor scaling",
+      "category": "self_gravity_shape",
+      "expression": "Q_inv ~ E_diss / (2 * pi * E_store)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Q_inv",
+          "quantity": "inverse tidal quality factor",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "E_diss",
+          "quantity": "dissipated energy per cycle",
+          "units": "J"
+        },
+        {
+          "symbol": "E_store",
+          "quantity": "stored mechanical energy per cycle",
+          "units": "J"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "spin_orbit_angular_momentum_exchange",
+      "name": "Spin-orbit angular momentum exchange",
+      "category": "self_gravity_shape",
+      "expression": "dL_spin/dt = tau_tide + tau_coll",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "dL_spin/dt",
+          "quantity": "spin angular momentum time derivative",
+          "units": "kg*m^2/s^2"
+        },
+        {
+          "symbol": "tau_tide",
+          "quantity": "tidal torque",
+          "units": "N*m"
+        },
+        {
+          "symbol": "tau_coll",
+          "quantity": "collisional torque or redistribution term",
+          "units": "N*m"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "rotational_flattening_parameter",
+      "name": "Rotational flattening parameter",
+      "category": "self_gravity_shape",
+      "expression": "q_rot = omega^2 * a^3 / (G * M)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "q_rot",
+          "quantity": "dimensionless rotational forcing parameter",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "omega",
+          "quantity": "angular rotation rate",
+          "units": "rad/s"
+        },
+        {
+          "symbol": "a",
+          "quantity": "equatorial radius or characteristic radius",
+          "units": "m"
+        },
+        {
+          "symbol": "G",
+          "quantity": "gravitational constant",
+          "units": "m^3/(kg*s^2)"
+        },
+        {
+          "symbol": "M",
+          "quantity": "body mass",
+          "units": "kg"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "potato_radius_strength_balance",
+      "name": "Potato-radius strength balance",
+      "category": "self_gravity_shape",
+      "expression": "R_p ~ sqrt(sigma_y / (G * rho^2))",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "R_p",
+          "quantity": "potato-radius transition scale",
+          "units": "m"
+        },
+        {
+          "symbol": "sigma_y",
+          "quantity": "yield strength",
+          "units": "Pa"
+        },
+        {
+          "symbol": "G",
+          "quantity": "gravitational constant",
+          "units": "m^3/(kg*s^2)"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "mass density",
+          "units": "kg/m^3"
+        }
+      ],
+      "root_lane": "physics_self_gravity_shape"
+    },
+    {
+      "id": "stellar_hydrostatic_balance",
+      "name": "Stellar hydrostatic balance",
+      "category": "stellar_structure",
+      "expression": "dP/dr = -(G * M_r * rho) / r^2",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "dP/dr",
+          "quantity": "radial pressure gradient",
+          "units": "Pa/m"
+        },
+        {
+          "symbol": "G",
+          "quantity": "gravitational constant",
+          "units": "m^3/(kg*s^2)"
+        },
+        {
+          "symbol": "M_r",
+          "quantity": "enclosed mass inside radius r",
+          "units": "kg"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "mass density",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "r",
+          "quantity": "radial coordinate",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_thermal_balance",
+      "name": "Stellar thermal balance",
+      "category": "stellar_structure",
+      "expression": "dL_r/dr = 4 * pi * r^2 * rho * epsilon",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "dL_r/dr",
+          "quantity": "radial luminosity gradient",
+          "units": "W/m"
+        },
+        {
+          "symbol": "r",
+          "quantity": "radial coordinate",
+          "units": "m"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "mass density",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "epsilon",
+          "quantity": "specific energy generation rate",
+          "units": "W/kg"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "nuclear_reaction_network_rate",
+      "name": "Nuclear reaction network rate",
+      "category": "stellar_structure",
+      "expression": "r_ij = (n_i * n_j * <sigma*v>) / (1 + delta_ij)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "r_ij",
+          "quantity": "reaction rate density",
+          "units": "1/(m^3*s)"
+        },
+        {
+          "symbol": "n_i",
+          "quantity": "number density of species i",
+          "units": "1/m^3"
+        },
+        {
+          "symbol": "n_j",
+          "quantity": "number density of species j",
+          "units": "1/m^3"
+        },
+        {
+          "symbol": "<sigma*v>",
+          "quantity": "thermally averaged reaction cross section times velocity",
+          "units": "m^3/s"
+        },
+        {
+          "symbol": "delta_ij",
+          "quantity": "Kronecker delta symmetry factor",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_oscillation_mode_spectrum",
+      "name": "Stellar oscillation mode spectrum",
+      "category": "stellar_observables",
+      "expression": "nu_nl = F[c_s(r), N_BV(r), cavity_structure]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "nu_nl",
+          "quantity": "mode frequency for radial order n and degree l",
+          "units": "Hz"
+        },
+        {
+          "symbol": "c_s(r)",
+          "quantity": "radial sound-speed profile",
+          "units": "m/s"
+        },
+        {
+          "symbol": "N_BV(r)",
+          "quantity": "Brunt-Vaisala frequency profile",
+          "units": "1/s"
+        },
+        {
+          "symbol": "cavity_structure",
+          "quantity": "mode cavity boundary structure",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "helioseismic_inversion",
+      "name": "Helioseismic inversion proxy",
+      "category": "stellar_observables",
+      "expression": "delta_nu_nl -> infer[c_s(r), rho(r), Omega(r)]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "delta_nu_nl",
+          "quantity": "observed mode-frequency residual or splitting",
+          "units": "Hz"
+        },
+        {
+          "symbol": "c_s(r)",
+          "quantity": "inferred sound-speed profile",
+          "units": "m/s"
+        },
+        {
+          "symbol": "rho(r)",
+          "quantity": "inferred density profile",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "Omega(r)",
+          "quantity": "inferred internal rotation profile",
+          "units": "rad/s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "solar_dynamo_cycle",
+      "name": "Solar dynamo cycle",
+      "category": "stellar_observables",
+      "expression": "partial_t B = curl(v x B) + eta * nabla^2 B",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "B",
+          "quantity": "large-scale magnetic field",
+          "units": "T"
+        },
+        {
+          "symbol": "v",
+          "quantity": "plasma flow field",
+          "units": "m/s"
+        },
+        {
+          "symbol": "eta",
+          "quantity": "magnetic diffusivity",
+          "units": "m^2/s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "solar_activity_cycle",
+      "name": "Solar activity cycle proxy",
+      "category": "stellar_observables",
+      "expression": "A_cycle(t) = envelope(B_toroidal, polarity_reversal, emergence_rate)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "A_cycle(t)",
+          "quantity": "activity-cycle amplitude proxy",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "B_toroidal",
+          "quantity": "toroidal magnetic-field proxy",
+          "units": "T"
+        },
+        {
+          "symbol": "polarity_reversal",
+          "quantity": "global polarity-state change term",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "emergence_rate",
+          "quantity": "active-region emergence rate",
+          "units": "1/s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "magnetic_reconnection_energy_release",
+      "name": "Magnetic reconnection energy release",
+      "category": "stellar_observables",
+      "expression": "E_release ~ (B^2 / (2 * mu0)) * V_reconnected",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "E_release",
+          "quantity": "released magnetic energy",
+          "units": "J"
+        },
+        {
+          "symbol": "B",
+          "quantity": "magnetic field strength",
+          "units": "T"
+        },
+        {
+          "symbol": "mu0",
+          "quantity": "vacuum permeability",
+          "units": "N/A^2"
+        },
+        {
+          "symbol": "V_reconnected",
+          "quantity": "reconnected plasma volume",
+          "units": "m^3"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "flare_power_law_statistics",
+      "name": "Flare power-law statistics",
+      "category": "stellar_observables",
+      "expression": "N(E) ~ E^(-alpha)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "N(E)",
+          "quantity": "flare-event count density at energy E",
+          "units": "1/J"
+        },
+        {
+          "symbol": "E",
+          "quantity": "flare released energy",
+          "units": "J"
+        },
+        {
+          "symbol": "alpha",
+          "quantity": "power-law index",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "granulation_pmode_power_injection",
+      "name": "Granulation p-mode power injection",
+      "category": "stellar_observables",
+      "expression": "P_pmode ~ alpha_g * rho * v_gran^3 * A_drv",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "P_pmode",
+          "quantity": "acoustic power injected into p-modes",
+          "units": "W"
+        },
+        {
+          "symbol": "alpha_g",
+          "quantity": "granulation coupling coefficient",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "rho",
+          "quantity": "near-surface density",
+          "units": "kg/m^3"
+        },
+        {
+          "symbol": "v_gran",
+          "quantity": "granulation velocity scale",
+          "units": "m/s"
+        },
+        {
+          "symbol": "A_drv",
+          "quantity": "driving area",
+          "units": "m^2"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "nanoflare_heating_energy_injection",
+      "name": "Nanoflare heating energy injection",
+      "category": "stellar_observables",
+      "expression": "Q_nf ~ sum(E_i) / (V * Delta t)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Q_nf",
+          "quantity": "nanoflare heating rate density",
+          "units": "W/m^3"
+        },
+        {
+          "symbol": "E_i",
+          "quantity": "energy of event i",
+          "units": "J"
+        },
+        {
+          "symbol": "V",
+          "quantity": "heated volume",
+          "units": "m^3"
+        },
+        {
+          "symbol": "Delta t",
+          "quantity": "sampling interval",
+          "units": "s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "flare_particle_precipitation_coupling",
+      "name": "Flare particle precipitation coupling",
+      "category": "stellar_observables",
+      "expression": "P_precip ~ eta_p * E_flare / tau_impulse",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "P_precip",
+          "quantity": "precipitation power into lower atmosphere",
+          "units": "W"
+        },
+        {
+          "symbol": "eta_p",
+          "quantity": "particle precipitation efficiency",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "E_flare",
+          "quantity": "flare released energy",
+          "units": "J"
+        },
+        {
+          "symbol": "tau_impulse",
+          "quantity": "impulse timescale",
+          "units": "s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "sunquake_helioseismic_response",
+      "name": "Sunquake helioseismic response",
+      "category": "stellar_observables",
+      "expression": "delta_v_sq(t) = K_sq * I_flare(t - t0)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "delta_v_sq(t)",
+          "quantity": "sunquake surface velocity response",
+          "units": "m/s"
+        },
+        {
+          "symbol": "K_sq",
+          "quantity": "sunquake transfer coefficient",
+          "units": "m/(J*s)"
+        },
+        {
+          "symbol": "I_flare",
+          "quantity": "flare impulse profile",
+          "units": "J/s"
+        },
+        {
+          "symbol": "t0",
+          "quantity": "flare onset time",
+          "units": "s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "flare_sunquake_timing_correlation",
+      "name": "Flare-sunquake timing correlation",
+      "category": "stellar_observables",
+      "expression": "Delta_t_sq = t_sq - t_flare",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Delta_t_sq",
+          "quantity": "timing offset between flare and sunquake",
+          "units": "s"
+        },
+        {
+          "symbol": "t_sq",
+          "quantity": "sunquake time",
+          "units": "s"
+        },
+        {
+          "symbol": "t_flare",
+          "quantity": "flare onset time",
+          "units": "s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "quasi_periodic_flare_envelope",
+      "name": "Quasi-periodic flare envelope",
+      "category": "stellar_observables",
+      "expression": "A_env(t) = A0 * (1 + epsilon * cos(2 * pi * t / P_qpp))",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "A_env(t)",
+          "quantity": "flare envelope amplitude",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "A0",
+          "quantity": "baseline amplitude",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "epsilon",
+          "quantity": "modulation depth",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "P_qpp",
+          "quantity": "quasi-periodic pulse period",
+          "units": "s"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "magnetic_striation_hierarchy",
+      "name": "Magnetic striation hierarchy",
+      "category": "stellar_observables",
+      "expression": "lambda_n = lambda_0 * s^n",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "lambda_n",
+          "quantity": "nth striation scale",
+          "units": "m"
+        },
+        {
+          "symbol": "lambda_0",
+          "quantity": "base striation scale",
+          "units": "m"
+        },
+        {
+          "symbol": "s",
+          "quantity": "scale ratio",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "n",
+          "quantity": "hierarchy index",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "multiscale_stellar_plasma_variability",
+      "name": "Multiscale stellar plasma variability stack",
+      "category": "stellar_observables",
+      "expression": "V_star(t) = compose[p_modes, cycle_envelope, reconnection_events, flare_statistics]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "V_star(t)",
+          "quantity": "aggregate stellar variability proxy",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "p_modes",
+          "quantity": "oscillation-mode contribution",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "cycle_envelope",
+          "quantity": "magnetic-cycle modulation term",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "reconnection_events",
+          "quantity": "impulsive reconnection contribution",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "flare_statistics",
+          "quantity": "flare-population statistical term",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_observables_correlation_diagnostic",
+      "name": "Stellar observables correlation diagnostic",
+      "category": "stellar_observables",
+      "expression": "D_star = diagnose[corr(A_cycle, delta_nu), slope(A_cycle -> delta_nu), alpha_flare]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "D_star",
+          "quantity": "stellar-observables diagnostic score",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "A_cycle",
+          "quantity": "magnetic activity-cycle proxy",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "delta_nu",
+          "quantity": "helioseismic frequency-shift series",
+          "units": "nHz"
+        },
+        {
+          "symbol": "alpha_flare",
+          "quantity": "flare power-law index",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
       "id": "curvature_unit_proxy_contract",
       "name": "Curvature-unit proxy contract",
       "category": "curvature_diagnostics",
@@ -232,6 +1335,196 @@
         "diagnostic_proxy_not_tensor_lift"
       ],
       "root_lane": "physics_quantum_semiclassical"
+    },
+    {
+      "id": "effective_interaction_hamiltonian_with_external_potential",
+      "name": "Effective interaction Hamiltonian with external potential",
+      "category": "microphysics_transport",
+      "expression": "H_eff = H_int + sum_i U_ext(x_i)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "H_eff",
+          "quantity": "effective Hamiltonian",
+          "units": "J"
+        },
+        {
+          "symbol": "H_int",
+          "quantity": "internal interaction Hamiltonian",
+          "units": "J"
+        },
+        {
+          "symbol": "U_ext",
+          "quantity": "external one-body potential",
+          "units": "J"
+        },
+        {
+          "symbol": "x_i",
+          "quantity": "particle coordinate",
+          "units": "m"
+        }
+      ],
+      "root_lane": "physics_microphysics_transport"
+    },
+    {
+      "id": "many_body_partition_function_definition",
+      "name": "Many-body partition function definition",
+      "category": "microphysics_transport",
+      "expression": "Z = Tr[exp(-beta * H_eff)]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "Z",
+          "quantity": "partition function",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "beta",
+          "quantity": "inverse thermal energy 1/(k_B T)",
+          "units": "1/J"
+        },
+        {
+          "symbol": "H_eff",
+          "quantity": "effective Hamiltonian",
+          "units": "J"
+        }
+      ],
+      "root_lane": "physics_microphysics_transport"
+    },
+    {
+      "id": "kinetic_moment_closure_definition",
+      "name": "Kinetic moment closure definition",
+      "category": "microphysics_transport",
+      "expression": "partial_t M_n + nabla?F_n = C_n + S_n",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "M_n",
+          "quantity": "nth kinetic moment",
+          "units": "SI-dependent"
+        },
+        {
+          "symbol": "F_n",
+          "quantity": "flux of nth moment",
+          "units": "SI-dependent"
+        },
+        {
+          "symbol": "C_n",
+          "quantity": "collision or closure term",
+          "units": "SI-dependent"
+        },
+        {
+          "symbol": "S_n",
+          "quantity": "source term",
+          "units": "SI-dependent"
+        }
+      ],
+      "root_lane": "physics_microphysics_transport"
+    },
+    {
+      "id": "constitutive_response_closure",
+      "name": "Constitutive response closure",
+      "category": "microphysics_transport",
+      "expression": "sigma = C[state, history, microphysics]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "sigma",
+          "quantity": "stress response tensor or effective constitutive response",
+          "units": "Pa"
+        },
+        {
+          "symbol": "C",
+          "quantity": "constitutive closure operator",
+          "units": "Pa"
+        },
+        {
+          "symbol": "state",
+          "quantity": "thermodynamic or deformation state",
+          "units": "mixed"
+        },
+        {
+          "symbol": "history",
+          "quantity": "loading history",
+          "units": "mixed"
+        },
+        {
+          "symbol": "microphysics",
+          "quantity": "effective microscopic parameters",
+          "units": "mixed"
+        }
+      ],
+      "root_lane": "physics_microphysics_transport"
+    },
+    {
+      "id": "plasma_transport_energy_closure",
+      "name": "Plasma transport energy closure",
+      "category": "microphysics_transport",
+      "expression": "partial_t E + nabla?F_E = Q_heat - Q_loss",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "E",
+          "quantity": "plasma energy density",
+          "units": "J/m^3"
+        },
+        {
+          "symbol": "F_E",
+          "quantity": "energy flux",
+          "units": "W/m^2"
+        },
+        {
+          "symbol": "Q_heat",
+          "quantity": "heating source density",
+          "units": "W/m^3"
+        },
+        {
+          "symbol": "Q_loss",
+          "quantity": "cooling or loss density",
+          "units": "W/m^3"
+        }
+      ],
+      "root_lane": "physics_microphysics_transport"
+    },
+    {
+      "id": "collective_observable_response_closure",
+      "name": "Collective observable response closure",
+      "category": "microphysics_transport",
+      "expression": "O = F(C_closure, F_forcing, G_geometry, S_state)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "O",
+          "quantity": "collective observable response",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "F",
+          "quantity": "response closure operator",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "C_closure",
+          "quantity": "transport or constitutive coefficient set",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "F_forcing",
+          "quantity": "forcing terms",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "G_geometry",
+          "quantity": "geometry or field configuration",
+          "units": "context-dependent"
+        },
+        {
+          "symbol": "S_state",
+          "quantity": "state variables",
+          "units": "context-dependent"
+        }
+      ],
+      "root_lane": "physics_microphysics_transport"
     }
   ]
 }

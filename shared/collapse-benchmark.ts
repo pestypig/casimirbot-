@@ -2,6 +2,7 @@ import { z } from "zod";
 import { C, C2, HBAR, PI } from "./physics-const";
 import { DpCollapseInput, DpCollapseResultSchema, DpGridSpec, Float32VolumeB64 } from "./dp-collapse";
 import { kappa_body } from "./curvature-proxy";
+import { QuantumSemiclassicalComparisonResult, QuantumSemiclassicalSourceReplay } from "./quantum-semiclassical-comparison";
 import { DerivedArtifactInformationBoundaryAudit } from "./information-boundary-derived";
 import { InformationBoundary } from "./information-boundary";
 
@@ -243,6 +244,55 @@ export type CollapseCurvatureHeuristicResult = {
   };
 };
 
+const observableGeometrySourceQuantitySchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .catchall(z.union([z.number(), z.string()]));
+
+const observableGeometryProxiesSchema = z
+  .object({
+    canonical_channel: z.enum(["kappa_body", "kappa_drive", "kappa_u"]),
+    canonical_kappa_m2: z.number().nonnegative(),
+  })
+  .catchall(z.union([z.number(), z.null()]));
+
+const observableGeometryStressBridgeSchema = z
+  .object({
+    source: z.object({
+      channel: z.enum(["kappa_body", "kappa_drive", "kappa_u"]),
+      kappa_m2: z.number().nonnegative(),
+    }),
+    surrogate: z.object({
+      t00_J_m3: z.number(),
+      bounded: z.boolean(),
+      bound_abs_J_m3: z.number().nonnegative(),
+    }),
+    provenance: z.object({
+      class: z.enum(["diagnostic", "reduced-order", "certified"]),
+      method: z.string(),
+      reference: z.string().optional(),
+    }),
+    parity: z.object({
+      canonical_kappa_m2: z.number().nonnegative(),
+      mismatch_rel: z.number().nonnegative(),
+      mismatch_threshold_rel: z.number().nonnegative(),
+      pass: z.boolean(),
+    }),
+  })
+  .passthrough();
+
+const observableGeometryChannelSchema = z.object({
+  geometry_slot: z.literal("G_geometry"),
+  role: z.enum(["background_geometry", "dynamic_forcing_geometry"]),
+  semantics: z.literal("curvature_proxy_observable_response"),
+  equation_ref: z.literal("collective_observable_response_closure"),
+  source_quantity: observableGeometrySourceQuantitySchema,
+  proxies: observableGeometryProxiesSchema,
+  stress_energy_bridge: observableGeometryStressBridgeSchema,
+  note: z.string(),
+});
+
 const logNormalizedRatio = (value: number, reference: number, logSpan = 6): number => {
   const safeRef = Math.max(1e-30, reference);
   const ratio = Math.max(0, value) / safeRef;
@@ -365,6 +415,7 @@ export const CollapseBenchmarkInput = z.object({
   r_c_m: z.number().positive().optional(),
   lattice: LatticeSummary.optional(),
   expected_lattice_generation_hash: z.string().trim().min(1).optional(),
+  quantum_semiclassical_source_replay_id: z.string().trim().min(1).optional(),
   seed: z.string().min(1).optional(),
   c_mps: z.number().positive().optional(),
 }).superRefine((value, ctx) => {
@@ -444,6 +495,8 @@ export const CollapseBenchmarkResult = DerivedArtifactInformationBoundaryAudit.e
     })
     .optional(),
   dp: DpCollapseResultSchema.optional(),
+  quantum_semiclassical_source_replay: QuantumSemiclassicalSourceReplay.optional(),
+  quantum_semiclassical_comparison: QuantumSemiclassicalComparisonResult.optional(),
   tau_estimator: z
     .object({
       mode: z.literal("curvature_heuristic"),
@@ -457,6 +510,9 @@ export const CollapseBenchmarkResult = DerivedArtifactInformationBoundaryAudit.e
       }),
     })
     .optional(),
+  background_geometry: observableGeometryChannelSchema.optional(),
+  dynamic_forcing_geometry: observableGeometryChannelSchema.optional(),
+  geometry_coupling: observableGeometryChannelSchema.optional(),
 });
 
 export type TCollapseBenchmarkResult = z.infer<typeof CollapseBenchmarkResult>;
@@ -472,6 +528,7 @@ export const CollapseBenchmarkRunInput = z
     r_c_m: z.number().positive().optional(),
     lattice: LatticeSummary.optional(),
     expected_lattice_generation_hash: z.string().trim().min(1).optional(),
+    quantum_semiclassical_source_replay_id: z.string().trim().min(1).optional(),
     seed: z.string().min(1).optional(),
     c_mps: z.number().positive().optional(),
     histogram_bins: z.number().int().min(2).max(100).optional(),

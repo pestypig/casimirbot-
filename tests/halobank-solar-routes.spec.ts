@@ -65,6 +65,32 @@ describe("halobank solar vectors route", () => {
     );
   });
 
+  it("discloses synthetic Saturn-moon state sources on the direct vectors route for Mimas and Hyperion", async () => {
+    const app = makeApp();
+    const path =
+      "/api/horizons/vectors?ts=2026-02-17T12:00:00.000Z&targets=601,607&center=699&frame=BCRS&aberration=none";
+    const resA = await request(app).get(path).expect(200);
+    const resB = await request(app).get(path).expect(200);
+
+    expect(resA.body.reference?.resolved_center).toBe(699);
+    expect(resA.body.states).toHaveLength(2);
+    expect(resA.body.states?.map((state: { target: number }) => state.target)).toEqual([601, 607]);
+    for (const state of resA.body.states as Array<{ pos: number[]; vel: number[] }>) {
+      expect(state.pos.every((entry) => Number.isFinite(entry))).toBe(true);
+      expect(state.vel.every((entry) => Number.isFinite(entry))).toBe(true);
+    }
+    expect(resA.body.gate?.verdict).toBe("PASS");
+    expect(resA.body.provenance?.source_class).toBe("hybrid_diagnostic");
+    expect(resA.body.provenance?.note).toContain("synthetic diagnostic satellite states");
+    expect(
+      resA.body.provenance?.state_sources
+        ?.filter((entry: { source_class?: string }) => entry.source_class === "hybrid_diagnostic")
+        .map((entry: { body: number }) => entry.body),
+    ).toEqual([601, 607]);
+    expect(resA.body.provenance?.state_sources?.some((entry: { body: number; source_class?: string }) => entry.body === 699 && entry.source_class === "kernel_bundle")).toBe(true);
+    expect(resA.body).toEqual(resB.body);
+  });
+
   it("fails strict provenance gate when no canonical evidence refs are supplied", async () => {
     const app = makeApp();
     const res = await request(app)

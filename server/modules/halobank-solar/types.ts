@@ -31,9 +31,11 @@ export type SolarGate = {
   reasons: string[];
 };
 
+export type SolarEphemerisSourceClass = "kernel_bundle" | "hybrid_diagnostic" | "fallback";
+
 export type SolarProvenance = {
   kernel_bundle_id: string;
-  source_class: "kernel_bundle" | "fallback";
+  source_class: SolarEphemerisSourceClass;
   claim_tier: "diagnostic";
   certifying: false;
   evidence_refs: string[];
@@ -216,6 +218,12 @@ export type SolarThresholdsManifest = {
       warn_tolerance_arcsec_per_century: number;
       min_perihelion_events: number;
     };
+    mercury_cross_lane_congruence_diagnostic: {
+      max_precession_margin: number;
+      max_figure_component_margin: number;
+      max_figure_rms_residual: number;
+      max_combined_margin: number;
+    };
     earth_moon_eclipse_timing: {
       max_contact_separation_deg: number;
       event_time_tolerance_s: number;
@@ -233,6 +241,61 @@ export type SolarThresholdsManifest = {
       max_contact_ratio: number;
       event_time_tolerance_s: number;
       min_event_count: number;
+    };
+    earth_orientation_precession_nutation_proxy: {
+      min_sample_count: number;
+      expected_lunar_to_solar_ratio: number;
+      max_lunar_to_solar_ratio_abs_error: number;
+    };
+    planetary_shape_orientation_proxy: {
+      min_sample_count: number;
+      expected_lunar_to_solar_ratio: number;
+      max_lunar_to_solar_ratio_abs_error: number;
+    };
+    planetary_figure_diagnostic: {
+      min_sample_count: number;
+      expected_lunar_to_solar_ratio: number;
+      max_lunar_to_solar_ratio_abs_error: number;
+      reference_flattening: number;
+      reference_j2: number;
+      reference_effective_love_number: number;
+      reference_moment_of_inertia_factor: number;
+      max_flattening_abs_error: number;
+      max_j2_abs_error: number;
+      max_effective_love_number_abs_error: number;
+      max_dynamical_ellipticity_abs_error: number;
+      min_hydrostatic_rounding_proxy: number;
+      min_potato_threshold_ratio: number;
+      default_effective_rigidity_pa: number;
+    };
+    granular_tidal_response_diagnostic: {
+      min_sample_count: number;
+      min_granular_dissipation_proxy: number;
+      min_tidal_quality_factor_proxy: number;
+      min_spin_state_evolution_proxy: number;
+      min_angular_momentum_redistribution_proxy: number;
+    };
+    stellar_observables_diagnostic: {
+      min_sample_count: number;
+      min_activity_pmode_correlation: number;
+      min_pmode_slope_nhz_per_activity_unit: number;
+      min_pmode_shift_span_nhz: number;
+      min_flare_sample_count: number;
+      flare_power_law_alpha_min: number;
+      flare_power_law_alpha_max: number;
+    };
+    stellar_flare_sunquake_diagnostic: {
+      min_event_count: number;
+      min_flare_energy_helioseismic_correlation: number;
+      max_mean_timing_offset_s: number;
+      max_median_timing_offset_s: number;
+      min_coupling_score: number;
+    };
+    sunquake_timing_replay_diagnostic: {
+      min_event_count: number;
+      max_mean_timing_offset_s: number;
+      max_median_timing_offset_s: number;
+      max_max_timing_offset_s: number;
     };
     solar_light_deflection: {
       target_limb_arcsec: number;
@@ -253,6 +316,73 @@ export type SolarThresholdsManifest = {
       max_component_abs_delta_km_s: number;
     };
   };
+};
+
+export type SolarDiagnosticPlanetaryShapeOrientationProfile = {
+  id: string;
+  label: string;
+  state_source?: "astronomy-engine" | "synthetic-saturnian-satellite";
+  expected_response_regime?: "gravity-rounded" | "transition" | "strength-supported";
+  target_body_id: number;
+  primary_perturber_body_id: number;
+  secondary_perturber_body_id: number | null;
+  start_iso: string;
+  end_iso: string;
+  step_minutes: number;
+  body_mass_kg: number;
+  equatorial_radius_m: number;
+  yield_strength_pa: number;
+  effective_rigidity_pa: number;
+  rotation_rate_rad_s: number;
+  moment_of_inertia_factor: number;
+  source_refs: string[];
+  notes?: string[];
+};
+
+export type SolarDiagnosticPlanetaryFigureProfile = SolarDiagnosticPlanetaryShapeOrientationProfile & {
+  reference_flattening: number;
+  reference_j2: number;
+  reference_effective_love_number: number;
+  reference_moment_of_inertia_factor: number;
+  max_flattening_abs_error: number;
+  max_j2_abs_error: number;
+  max_effective_love_number_abs_error: number;
+  max_dynamical_ellipticity_abs_error: number;
+  min_hydrostatic_rounding_proxy: number;
+  min_potato_threshold_ratio: number;
+};
+
+export type SolarDiagnosticStellarReplaySeries = {
+  id: string;
+  label: string;
+  cadence_days: number;
+  epoch_iso_series: string[];
+  magnetic_activity_index_series: number[];
+  p_mode_frequency_shift_nhz_series: number[];
+  flare_energy_proxy_series?: number[];
+  source_refs: string[];
+  notes?: string[];
+};
+
+export type SolarDiagnosticSunquakeReplaySeries = {
+  id: string;
+  label: string;
+  cadence_days: number;
+  flare_peak_iso_series: string[];
+  sunquake_peak_iso_series: string[];
+  flare_energy_proxy_series: number[];
+  helioseismic_amplitude_proxy_series: number[];
+  magnetic_activity_index_series?: number[];
+  p_mode_frequency_shift_nhz_series?: number[];
+  source_refs: string[];
+  notes?: string[];
+};
+
+export type SolarDiagnosticDatasetsManifest = {
+  schema_version: "halobank.solar.diagnostic_datasets/1";
+  planetary_figure_profiles: SolarDiagnosticPlanetaryFigureProfile[];
+  stellar_observables_replay_series: SolarDiagnosticStellarReplaySeries[];
+  sunquake_replay_series: SolarDiagnosticSunquakeReplaySeries[];
 };
 
 export type SolarLocalRestReference = {

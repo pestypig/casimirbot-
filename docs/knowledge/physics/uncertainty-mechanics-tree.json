@@ -17,7 +17,7 @@
       "children": [
         "uncertainty-classical-stack",
         "uncertainty-statistical-stack",
-        "uncertainty-data-contracts",
+        "uncertainty-mechanics-data-contract-definition",
         "uncertainty-quantum-stochastic",
         "uncertainty-approximation-ladders",
         "uncertainty-collapse-constraints",
@@ -83,7 +83,7 @@
           "chartDependency": null,
           "proxy": null
         },
-        "uncertainty-data-contracts": {
+        "uncertainty-mechanics-data-contract-definition": {
           "edgeType": "hierarchy",
           "requiresCL": "none",
           "condition": null,
@@ -718,11 +718,11 @@
       }
     },
     {
-      "id": "uncertainty-data-contracts",
-      "slug": "uncertainty-data-contracts",
-      "title": "Uncertainty Data Contracts",
-      "excerpt": "Shared schemas for values, sigmas, and bands.",
-      "bodyMD": "Shared uncertainty fields define value, sigma, and band contracts (shared/physics.ts, shared/schema.ts, server/energy-pipeline.ts).\n\nMinimal artifact: schema field list.",
+      "id": "uncertainty-mechanics-data-contract-definition",
+      "slug": "uncertainty-mechanics-data-contract-definition",
+      "title": "Uncertainty Data Definition Contract",
+      "excerpt": "Definition-level schema contract for values, sigmas, and propagated bands.",
+      "bodyMD": "This node captures the uncertainty data contract itself so paper claims can bind directly to sigma containers, band fields, and shared payload semantics (shared/physics.ts, shared/schema.ts, server/energy-pipeline.ts).\n\nMinimal artifact: schema field list and uncertainty payload examples.",
       "tags": [
         "uncertainty",
         "schema",
@@ -740,8 +740,8 @@
           "requiresCL": "none"
         }
       ],
-      "summary": "Shared schemas for values, sigmas, and bands.",
-      "nodeType": "concept",
+      "summary": "Definition-level schema contract for values, sigmas, and propagated bands.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "code",
@@ -821,7 +821,7 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-data-contracts",
+            "to": "uncertainty-mechanics-data-contract-definition",
           "edgeType": "hierarchy",
           "requiresCL": "none"
         }
@@ -844,7 +844,7 @@
       "tolerance": null,
       "environment": null,
       "dependencies": [
-        "uncertainty-data-contracts"
+        "uncertainty-mechanics-data-contract-definition"
       ],
       "predictability": {
         "status": "partial",
@@ -879,7 +879,7 @@
       "links": [
         {
           "rel": "parent",
-          "to": "uncertainty-data-contracts",
+            "to": "uncertainty-mechanics-data-contract-definition",
           "edgeType": "hierarchy",
           "requiresCL": "none"
         }
@@ -908,7 +908,7 @@
       "tolerance": null,
       "environment": null,
       "dependencies": [
-        "uncertainty-data-contracts"
+        "uncertainty-mechanics-data-contract-definition"
       ],
       "predictability": {
         "status": "partial",
@@ -931,9 +931,9 @@
     {
       "id": "uncertainty-quantum-stochastic",
       "slug": "uncertainty-quantum-stochastic",
-      "title": "Quantum-Stochastic Bridge",
-      "excerpt": "Noise-kernel constraints for semiclassical sourcing.",
-      "bodyMD": "Quantum-stochastic uncertainty uses renormalized stress-energy with noise models and coherence windows (docs/quantum-gr-bridge.md).\n\nMinimal artifact: stochastic source contract and tau/r_c bounds.",
+      "title": "Quantum-Stochastic Definition Contract",
+      "excerpt": "Definition-level anchor for stochastic sourcing, renormalized stress-energy, and coherence windows.",
+      "bodyMD": "This node captures the quantum-stochastic contract itself so paper claims can bind directly to renormalized stress-energy, noise-kernel semantics, and coherence-window assumptions (docs/quantum-gr-bridge.md).\n\nMinimal artifact: stochastic source contract and tau/r_c bounds.",
       "tags": [
         "uncertainty",
         "quantum",
@@ -951,8 +951,8 @@
           "requiresCL": "none"
         }
       ],
-      "summary": "Noise-kernel constraints for semiclassical sourcing.",
-      "nodeType": "concept",
+      "summary": "Definition-level anchor for stochastic sourcing, renormalized stress-energy, and coherence windows.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -1066,9 +1066,9 @@
     {
       "id": "uncertainty-coherence-window",
       "slug": "uncertainty-coherence-window",
-      "title": "Coherence Window",
-      "excerpt": "Tau and r_c set the causal sampling window.",
-      "bodyMD": "Coherence windows define causal sampling and stochastic limits (docs/quantum-gr-bridge.md, docs/DP_COLLAPSE_DERIVATION.md, shared/dp-collapse.ts).\n\nMinimal artifact: tau/r_c bound note.",
+      "title": "Coherence Window Definition Contract",
+      "excerpt": "Definition-level anchor for tau and r_c causal/coherence bounds.",
+      "bodyMD": "This node captures the coherence-window contract itself so paper claims can bind directly to tau and r_c semantics, causal sampling windows, and stochastic timing bounds (docs/quantum-gr-bridge.md, docs/DP_COLLAPSE_DERIVATION.md, shared/dp-collapse.ts).\n\nMinimal artifact: tau/r_c bound note.",
       "tags": [
         "uncertainty",
         "coherence",
@@ -1083,8 +1083,8 @@
           "requiresCL": "none"
         }
       ],
-      "summary": "Tau and r_c set the causal sampling window.",
-      "nodeType": "concept",
+      "summary": "Definition-level anchor for tau and r_c causal/coherence bounds.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -1467,9 +1467,9 @@
     {
       "id": "uncertainty-collapse-constraints",
       "slug": "uncertainty-collapse-constraints",
-      "title": "Collapse Constraints",
-      "excerpt": "Causal collapse benchmarks and policy gating.",
-      "bodyMD": "Collapse benchmarks define causal tau/r_c limits and policy gates (docs/collapse-benchmark-backend-roadmap.md, shared/collapse-benchmark.ts, modules/policies/coherence-governor.ts).\n\nMinimal artifact: collapse benchmark run and causal footprint report.",
+      "title": "Collapse Constraints Definition Contract",
+      "excerpt": "Definition-level contract for causal tau/r_c bounds, benchmarks, and policy gating.",
+      "bodyMD": "This node captures the collapse-constraint contract itself so paper claims can bind directly to tau/r_c bounds, benchmark semantics, and coherence-policy gating (docs/collapse-benchmark-backend-roadmap.md, shared/collapse-benchmark.ts, modules/policies/coherence-governor.ts).\n\nMinimal artifact: collapse benchmark run and causal footprint report.",
       "tags": [
         "uncertainty",
         "collapse",
@@ -1477,7 +1477,11 @@
       ],
       "children": [
         "uncertainty-collapse-benchmark",
-        "uncertainty-coherence-policy"
+        "uncertainty-coherence-policy",
+        "uncertainty-dp-timescale-comparison-contract",
+        "uncertainty-microtubule-observable-measurement-contract",
+        "uncertainty-time-crystal-signature-contract",
+        "uncertainty-triplet-hierarchy-comparison-contract"
       ],
       "links": [
         {
@@ -1487,8 +1491,8 @@
           "requiresCL": "none"
         }
       ],
-      "summary": "Causal collapse benchmarks and policy gating.",
-      "nodeType": "concept",
+      "summary": "Definition-level contract for causal tau/r_c bounds, benchmarks, and policy gating.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -1545,6 +1549,34 @@
           "proxy": null
         },
         "uncertainty-coherence-policy": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-dp-timescale-comparison-contract": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-microtubule-observable-measurement-contract": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-time-crystal-signature-contract": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "uncertainty-triplet-hierarchy-comparison-contract": {
           "edgeType": "hierarchy",
           "requiresCL": "none",
           "condition": null,
@@ -1676,11 +1708,295 @@
       }
     },
     {
+      "id": "uncertainty-dp-timescale-comparison-contract",
+      "slug": "uncertainty-dp-timescale-comparison-contract",
+      "title": "DP Timescale Comparison Contract",
+      "excerpt": "Comparison contract for gravity-related collapse timescale predictions against measurable bounds.",
+      "bodyMD": "This node compares Penrose/Di\\u00f3si-style collapse timescales against experimental bounds and measured decoherence windows.\n\nMinimal artifact: tau comparison table and bound-margin note.",
+      "tags": [
+        "uncertainty",
+        "collapse",
+        "comparison",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-collapse-constraints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Comparison contract for gravity-related collapse timescale predictions against measurable bounds.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "uncertainty-collapse-constraints"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "uncertainty-microtubule-observable-measurement-contract",
+      "slug": "uncertainty-microtubule-observable-measurement-contract",
+      "title": "Microtubule Observable Measurement Contract",
+      "excerpt": "Comparison contract for microtubule observables against transport and vibration measurements.",
+      "bodyMD": "This node compares microtubule transport, vibrational, and perturbation observables against model-class expectations.\n\nMinimal artifact: measurement comparison note.",
+      "tags": [
+        "uncertainty",
+        "microtubule",
+        "measurement",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-collapse-constraints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Comparison contract for microtubule observables against transport and vibration measurements.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "uncertainty-collapse-constraints"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "uncertainty-time-crystal-signature-contract",
+      "slug": "uncertainty-time-crystal-signature-contract",
+      "title": "Time-Crystal Signature Contract",
+      "excerpt": "Comparison contract for time-crystal signatures, locking, and robustness windows.",
+      "bodyMD": "This node compares time-crystal claims against subharmonic locking, robustness, and no-go boundaries.\n\nMinimal artifact: signature comparison note.",
+      "tags": [
+        "uncertainty",
+        "time-crystal",
+        "signature",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-collapse-constraints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Comparison contract for time-crystal signatures, locking, and robustness windows.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "uncertainty-collapse-constraints"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "uncertainty-triplet-hierarchy-comparison-contract",
+      "slug": "uncertainty-triplet-hierarchy-comparison-contract",
+      "title": "Triplet Hierarchy Comparison Contract",
+      "excerpt": "Comparison contract for triplet-band and scale-free resonance hierarchy claims.",
+      "bodyMD": "This node compares triplet-band and scale-free resonance hierarchy claims against standard time-crystal criteria and falsifier windows.\n\nMinimal artifact: triplet comparison note.",
+      "tags": [
+        "uncertainty",
+        "triplet",
+        "comparison",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "uncertainty-collapse-constraints",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Comparison contract for triplet-band and scale-free resonance hierarchy claims.",
+      "nodeType": "concept",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:placeholder",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "uncertainty-collapse-constraints"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
       "id": "uncertainty-reality-bounds",
       "slug": "uncertainty-reality-bounds",
-      "title": "Reality Constraint Bounds",
-      "excerpt": "Energy conditions and quantum inequality limits.",
-      "bodyMD": "Reality constraints bound uncertainty handling through energy conditions and QI limits.\n\nMinimal artifact: constraint checklist and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
+      "title": "Reality Bounds Definition Contract",
+      "excerpt": "Definition-level contract for energy conditions, quantum inequalities, and sampling-window limits.",
+      "bodyMD": "This node captures the reality-bounds contract itself so paper claims can bind directly to energy-condition limits, Ford-Roman quantum inequalities, and sampling-window constraints.\n\nMinimal artifact: constraint checklist and CL4 trace map (docs/warp-geometry-cl4-guardrail-map.md, docs/warp-geometry-cl4-guardrail-map.json).",
       "tags": [
         "uncertainty",
         "constraints",
@@ -1700,8 +2016,8 @@
           "requiresCL": "none"
         }
       ],
-      "summary": "Energy conditions and quantum inequality limits.",
-      "nodeType": "concept",
+      "summary": "Definition-level contract for energy conditions, quantum inequalities, and sampling-window limits.",
+      "nodeType": "definition",
       "inputs": [],
       "outputs": [],
       "assumptions": [],

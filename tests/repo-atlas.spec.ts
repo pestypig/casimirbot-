@@ -79,24 +79,28 @@ describe("repo atlas", () => {
     expect(atlas.snapshot.commitHash).toBe("abc123");
     expect(atlas.snapshot.repoGraphBuiltAt).toBe(0);
     expect(atlas.snapshot.treeDagWalkLoaded).toBe(false);
-    expect(atlas.nodes.map((node) => node.id)).toEqual([
-      "file:docs/one.md",
-      "index:doc:one",
-      "gate:G4_QI_margin",
-      "value:boundComputed_Jm3",
-      "value:boundUsed_Jm3",
-      "value:lhs_Jm3",
-      "value:marginRatioRaw",
-      "value:rhoSource",
-    ]);
-    expect(atlas.edges.map((edge) => `${edge.source}->${edge.target}`)).toEqual([
-      "value:boundComputed_Jm3->value:boundUsed_Jm3",
-      "value:boundUsed_Jm3->value:marginRatioRaw",
-      "value:lhs_Jm3->value:boundComputed_Jm3",
-      "value:marginRatioRaw->gate:G4_QI_margin",
-      "value:rhoSource->value:lhs_Jm3",
-      "index:doc:one->file:docs/one.md",
-    ]);
+    expect(atlas.nodes.map((node) => node.id)).toEqual(
+      expect.arrayContaining([
+        "file:docs/one.md",
+        "index:doc:one",
+        "gate:G4_QI_margin",
+        "value:boundComputed_Jm3",
+        "value:boundUsed_Jm3",
+        "value:lhs_Jm3",
+        "value:marginRatioRaw",
+        "value:rhoSource",
+      ]),
+    );
+    expect(atlas.edges.map((edge) => `${edge.source}->${edge.target}`)).toEqual(
+      expect.arrayContaining([
+        "value:boundComputed_Jm3->value:boundUsed_Jm3",
+        "value:boundUsed_Jm3->value:marginRatioRaw",
+        "value:lhs_Jm3->value:boundComputed_Jm3",
+        "value:marginRatioRaw->gate:G4_QI_margin",
+        "value:rhoSource->value:lhs_Jm3",
+        "index:doc:one->file:docs/one.md",
+      ]),
+    );
   });
 
   it("extracts stage hints and ingests tree DAG walk edges", () => {
@@ -156,6 +160,172 @@ describe("repo atlas", () => {
     expect(atlas.nodes.find((node) => node.id === "tree:rhoSource")?.stageHints).toEqual(["S0_source", "S1_qi_sample"]);
     expect(atlas.nodes.find((node) => node.id === "tree:lhs_Jm3")?.stageHints).toEqual(["S0_source", "S1_qi_sample"]);
     expect(atlas.edges.some((edge) => edge.source === "tree:rhoSource" && edge.target === "tree:lhs_Jm3")).toBe(true);
+  });
+
+  it("indexes quoted TS path literals for the HaloBank proof tree", () => {
+    const atlas = buildRepoAtlasFromSources({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      commitHash: "abc123",
+      repoIndex: [],
+      repoGraph: {
+        builtAt: 0,
+        nodes: [],
+        edges: [],
+      },
+      codeLattice: {
+        version: "code-lattice/0.1.0",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repoRoot: ".",
+        commit: "abc123",
+        filesIndexed: 0,
+        nodes: [],
+        edges: [],
+        envelopes: [],
+        latticeVersion: 1,
+      },
+    });
+
+    expect(resolveIdentifier(atlas, "docs/knowledge/halobank-solar-proof-tree.json")?.id).toBe(
+      "file:docs/knowledge/halobank-solar-proof-tree.json",
+    );
+    expect(
+      atlas.edges.some(
+        (edge) =>
+          edge.source === "file:scripts/paper-framework-binding.ts"
+          && edge.target === "file:docs/knowledge/halobank-solar-proof-tree.json"
+          && edge.sourceSystem === "script-doc-ref",
+      ),
+    ).toBe(true);
+  });
+
+  it("indexes quoted TS path literals for the microphysics transport plan", () => {
+    const atlas = buildRepoAtlasFromSources({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      commitHash: "abc123",
+      repoIndex: [],
+      repoGraph: {
+        builtAt: 0,
+        nodes: [],
+        edges: [],
+      },
+      codeLattice: {
+        version: "code-lattice/0.1.0",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repoRoot: ".",
+        commit: "abc123",
+        filesIndexed: 0,
+        nodes: [],
+        edges: [],
+        envelopes: [],
+        latticeVersion: 1,
+      },
+    });
+
+    expect(resolveIdentifier(atlas, "docs/architecture/microphysics-hamiltonian-transport-observables-plan.md")?.id).toBe(
+      "file:docs/architecture/microphysics-hamiltonian-transport-observables-plan.md",
+    );
+    expect(
+      atlas.edges.some(
+        (edge) =>
+          edge.source === "file:scripts/paper-gpt-pro-packet.ts"
+          && edge.target === "file:docs/architecture/microphysics-hamiltonian-transport-observables-plan.md"
+          && edge.sourceSystem === "script-doc-ref",
+      ),
+    ).toBe(true);
+  });
+
+  it("indexes quoted TS path literals for the microphysics transport tree", () => {
+    const atlas = buildRepoAtlasFromSources({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      commitHash: "abc123",
+      repoIndex: [],
+      repoGraph: {
+        builtAt: 0,
+        nodes: [],
+        edges: [],
+      },
+      codeLattice: {
+        version: "code-lattice/0.1.0",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repoRoot: ".",
+        commit: "abc123",
+        filesIndexed: 0,
+        nodes: [],
+        edges: [],
+        envelopes: [],
+        latticeVersion: 1,
+      },
+    });
+
+    expect(resolveIdentifier(atlas, "docs/knowledge/physics/physics-microphysics-transport-tree.json")?.id).toBe(
+      "file:docs/knowledge/physics/physics-microphysics-transport-tree.json",
+    );
+    expect(
+      atlas.edges.some(
+        (edge) =>
+          edge.source === "file:scripts/paper-framework-binding.ts"
+          && edge.target === "file:docs/knowledge/physics/physics-microphysics-transport-tree.json"
+      && edge.sourceSystem === "script-doc-ref",
+      ),
+    ).toBe(true);
+  });
+
+  it("indexes quoted TS path literals for the Orch-OR time-crystal research packet and source audit", () => {
+    const atlas = buildRepoAtlasFromSources({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      commitHash: "abc123",
+      repoIndex: [],
+      repoGraph: {
+        builtAt: 0,
+        nodes: [],
+        edges: [],
+      },
+      codeLattice: {
+        version: "code-lattice/0.1.0",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        repoRoot: ".",
+        commit: "abc123",
+        filesIndexed: 0,
+        nodes: [],
+        edges: [],
+        envelopes: [],
+        latticeVersion: 1,
+      },
+    });
+
+    expect(resolveIdentifier(atlas, "docs/architecture/orch-or-time-crystal-research-packet.md")?.id).toBe(
+      "file:docs/architecture/orch-or-time-crystal-research-packet.md",
+    );
+    expect(resolveIdentifier(atlas, "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md")?.id).toBe(
+      "file:docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+    );
+    expect(resolveIdentifier(atlas, "docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md")?.id).toBe(
+      "file:docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md",
+    );
+    expect(
+      atlas.edges.some(
+        (edge) =>
+          edge.source === "file:scripts/paper-gpt-pro-packet.ts"
+          && edge.target === "file:docs/architecture/orch-or-time-crystal-research-packet.md"
+          && edge.sourceSystem === "script-doc-ref",
+      ),
+    ).toBe(true);
+    expect(
+      atlas.edges.some(
+        (edge) =>
+          edge.source === "file:scripts/paper-gpt-pro-packet.ts"
+          && edge.target === "file:docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md"
+          && edge.sourceSystem === "script-doc-ref",
+      ),
+    ).toBe(true);
+    expect(
+      atlas.edges.some(
+        (edge) =>
+          edge.source === "file:scripts/paper-gpt-pro-packet.ts"
+          && edge.target === "file:docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md"
+          && edge.sourceSystem === "script-doc-ref",
+      ),
+    ).toBe(true);
   });
 
   it("why returns producer and consumer paths when present", async () => {

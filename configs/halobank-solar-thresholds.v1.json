@@ -11,6 +11,12 @@
       "warn_tolerance_arcsec_per_century": 12.0,
       "min_perihelion_events": 20
     },
+    "mercury_cross_lane_congruence_diagnostic": {
+      "max_precession_margin": 1,
+      "max_figure_component_margin": 1,
+      "max_figure_rms_residual": 1,
+      "max_combined_margin": 1
+    },
     "earth_moon_eclipse_timing": {
       "max_contact_separation_deg": 0.15,
       "event_time_tolerance_s": 5400
@@ -28,6 +34,61 @@
       "max_contact_ratio": 1.05,
       "event_time_tolerance_s": 7200,
       "min_event_count": 1
+    },
+    "earth_orientation_precession_nutation_proxy": {
+      "min_sample_count": 32,
+      "expected_lunar_to_solar_ratio": 2.17,
+      "max_lunar_to_solar_ratio_abs_error": 1.0
+    },
+    "planetary_shape_orientation_proxy": {
+      "min_sample_count": 32,
+      "expected_lunar_to_solar_ratio": 2.17,
+      "max_lunar_to_solar_ratio_abs_error": 1.0
+    },
+    "planetary_figure_diagnostic": {
+      "min_sample_count": 32,
+      "expected_lunar_to_solar_ratio": 2.17,
+      "max_lunar_to_solar_ratio_abs_error": 1.0,
+      "reference_flattening": 0.0033528106647474805,
+      "reference_j2": 0.00108263,
+      "reference_effective_love_number": 0.3,
+      "reference_moment_of_inertia_factor": 0.3307,
+      "max_flattening_abs_error": 0.001,
+      "max_j2_abs_error": 0.0005,
+      "max_effective_love_number_abs_error": 0.35,
+      "max_dynamical_ellipticity_abs_error": 0.001,
+      "min_hydrostatic_rounding_proxy": 1.0,
+      "min_potato_threshold_ratio": 1.0,
+      "default_effective_rigidity_pa": 150000000000
+    },
+    "granular_tidal_response_diagnostic": {
+      "min_sample_count": 32,
+      "min_granular_dissipation_proxy": 0,
+      "min_tidal_quality_factor_proxy": 0,
+      "min_spin_state_evolution_proxy": 0,
+      "min_angular_momentum_redistribution_proxy": 0
+    },
+    "stellar_observables_diagnostic": {
+      "min_sample_count": 8,
+      "min_activity_pmode_correlation": 0.4,
+      "min_pmode_slope_nhz_per_activity_unit": 0.0,
+      "min_pmode_shift_span_nhz": 10.0,
+      "min_flare_sample_count": 8,
+      "flare_power_law_alpha_min": 1.1,
+      "flare_power_law_alpha_max": 3.5
+    },
+    "stellar_flare_sunquake_diagnostic": {
+      "min_event_count": 3,
+      "min_flare_energy_helioseismic_correlation": 0.25,
+      "max_mean_timing_offset_s": 600,
+      "max_median_timing_offset_s": 600,
+      "min_coupling_score": 0.001
+    },
+    "sunquake_timing_replay_diagnostic": {
+      "min_event_count": 3,
+      "max_mean_timing_offset_s": 300,
+      "max_median_timing_offset_s": 300,
+      "max_max_timing_offset_s": 600
     },
     "solar_light_deflection": {
       "target_limb_arcsec": 1.75,

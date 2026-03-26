@@ -166,6 +166,18 @@ export function HelixSettingsDialogContent({
               checked={userSettings.showHelixAskMasterEventClock}
               onChange={(value) => updateSettings({ showHelixAskMasterEventClock: value })}
             />
+            <div
+              className="rounded-md border border-cyan-400/30 bg-cyan-950/25 px-3 py-2"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">
+                Alcubierre scientific lane policy
+              </p>
+              <p className="mt-1 text-xs text-cyan-50">
+                Research-grade NHM2 frames are enforced globally. Non-scientific render fallbacks are disabled.
+              </p>
+            </div>
             <PreferenceToggleRow
               id="alcubierre-render-debug-log"
               label="Alcubierre render + calc debug log"
@@ -1037,6 +1049,28 @@ function HelixAskReasoningEventLogPanel({
     if (!targetKey) return [];
     return reasoningEvents.filter((event) => getReasoningTimelineTurnKey(event) === targetKey);
   }, [latestTurnKey, reasoningEvents, selectedTurnKey]);
+  const objectiveReasoningTrace = React.useMemo(() => {
+    const merged = new Map<string, HelixAskObjectiveReasoningTraceEntry>();
+    for (const event of [...selectedEvents].reverse()) {
+      const context = readHelixAskDebugContextRecord(event.debugContext);
+      if (!context) continue;
+      const rows = readHelixAskObjectiveReasoningTraceFromContext(context);
+      for (const row of rows) {
+        if (merged.has(row.objectiveId)) continue;
+        merged.set(row.objectiveId, row);
+      }
+    }
+    return [...merged.values()].slice(0, 12);
+  }, [selectedEvents]);
+  const objectiveTelemetry = React.useMemo(() => {
+    for (const event of [...selectedEvents].reverse()) {
+      const context = readHelixAskDebugContextRecord(event.debugContext);
+      if (!context) continue;
+      const summary = readHelixAskObjectiveTelemetryFromContext(context);
+      if (summary) return summary;
+    }
+    return null;
+  }, [selectedEvents]);
   const exportPayload = React.useMemo(() => {
     if (selectedEvents.length === 0) return "";
     return selectedEvents.map((event) => JSON.stringify(event)).join("\n");
@@ -1100,12 +1134,66 @@ function HelixAskReasoningEventLogPanel({
               {selectedEvents.length} events shown
             </p>
           </div>
-          <div className="max-h-[44vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
-            {selectedEvents.map((event) => (
-              <p key={event.id} className="whitespace-pre-wrap break-words">
-                {formatVoiceTimelineDebugEvent(event)}
+          {objectiveReasoningTrace.length > 0 ? (
+            <div className="rounded border border-indigo-400/20 bg-indigo-950/20 p-2 text-[10px] leading-5 text-indigo-100">
+              <p className="uppercase tracking-[0.14em] text-indigo-200">
+                Plain-English objective reasoning trace
               </p>
-            ))}
+              {objectiveTelemetry ? (
+                <p className="mt-1">
+                  finalize={objectiveTelemetry.finalizeGateMode ?? "n/a"} | gate_pass=
+                  {objectiveTelemetry.finalizeGatePassed === null
+                    ? "n/a"
+                    : objectiveTelemetry.finalizeGatePassed
+                      ? "true"
+                      : "false"}{" "}
+                  | coverage_unresolved={objectiveTelemetry.coverageUnresolvedCount ?? "n/a"} |
+                  unknown_blocks={objectiveTelemetry.unknownBlockCount ?? "n/a"} |
+                  unresolved_without_unknown=
+                  {objectiveTelemetry.unresolvedWithoutUnknownBlockCount ?? "n/a"} |
+                  missing_scoped_retrieval={objectiveTelemetry.missingScopedRetrievalCount ?? "n/a"}
+                </p>
+              ) : null}
+              <div className="mt-2 max-h-48 space-y-2 overflow-y-auto">
+                {objectiveReasoningTrace.map((entry) => (
+                  <details
+                    key={`objective-trace-${entry.objectiveId}`}
+                    className="rounded border border-indigo-300/20 bg-black/20 p-2"
+                  >
+                    <summary className="cursor-pointer select-none">
+                      {entry.objectiveLabel} [{entry.finalStatus}]
+                    </summary>
+                    <p className="mt-1 whitespace-pre-wrap text-indigo-50">{entry.plainReasoning}</p>
+                    {entry.transitionTail.length > 0 ? (
+                      <p className="mt-1 whitespace-pre-wrap text-indigo-100/80">
+                        Transition tail:
+                        {"\n"}
+                        {entry.transitionTail.join("\n")}
+                      </p>
+                    ) : null}
+                  </details>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="max-h-[44vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+            {selectedEvents.map((event) => {
+              const context = readHelixAskDebugContextRecord(event.debugContext);
+              const rawPayload = context
+                ? formatHelixAskDebugRawPayload(event, context)
+                : JSON.stringify(event, null, 2);
+              return (
+                <details
+                  key={event.id}
+                  className="mb-1 rounded border border-slate-700/70 bg-black/20 px-1.5 py-1 last:mb-0"
+                >
+                  <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
+                    {formatVoiceTimelineDebugEvent(event)}
+                  </summary>
+                  <pre className="mt-1 whitespace-pre-wrap break-words text-slate-300">{rawPayload}</pre>
+                </details>
+              );
+            })}
           </div>
         </>
       )}
@@ -1266,6 +1354,9 @@ function AlcubierreRenderDebugLogPanel() {
             expected / rendered / delta fields are included per event for measurement-grade review
           </p>
           <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
+            category solve_to_render_pipeline logs equation->metric->constraints->optics->render chain evidence
+          </p>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
             benchmark command: npm run warp:render:congruence:check -- --debug-log &lt;path-to-jsonl&gt;
           </p>
           <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
@@ -1419,9 +1510,17 @@ function VoiceEventTimelineDebugPanel({
           </p>
           <div className="max-h-[44vh] overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
             {selectedEvents.map((event) => (
-              <p key={event.id} className="whitespace-pre-wrap break-words">
-                {formatVoiceTimelineDebugEvent(event)}
-              </p>
+              <details
+                key={event.id}
+                className="mb-1 rounded border border-slate-700/70 bg-black/20 px-1.5 py-1 last:mb-0"
+              >
+                <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
+                  {formatVoiceTimelineDebugEvent(event)}
+                </summary>
+                <pre className="mt-1 whitespace-pre-wrap break-words text-slate-300">
+                  {JSON.stringify(event, null, 2)}
+                </pre>
+              </details>
             ))}
           </div>
         </>
@@ -1536,6 +1635,99 @@ function readHelixAskDebugStringArray(value: unknown): string[] {
     .filter((entry) => typeof entry === "string")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+type HelixAskObjectiveReasoningTraceEntry = {
+  objectiveId: string;
+  objectiveLabel: string;
+  finalStatus: string;
+  plainReasoning: string;
+  transitionTail: string[];
+};
+
+type HelixAskObjectiveTelemetrySummary = {
+  coverageUnresolvedCount: number | null;
+  unknownBlockCount: number | null;
+  unresolvedWithoutUnknownBlockCount: number | null;
+  missingScopedRetrievalCount: number | null;
+  finalizeGateMode: string | null;
+  finalizeGatePassed: boolean | null;
+};
+
+function readHelixAskObjectiveReasoningTraceFromContext(
+  context: Record<string, unknown> | null,
+): HelixAskObjectiveReasoningTraceEntry[] {
+  if (!context) return [];
+  const traceRows = Array.isArray(context.objective_reasoning_trace)
+    ? context.objective_reasoning_trace
+    : [];
+  const readString = (value: unknown): string | null =>
+    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const out: HelixAskObjectiveReasoningTraceEntry[] = [];
+  for (const row of traceRows) {
+    const record = readHelixAskDebugContextRecord(row);
+    if (!record) continue;
+    const objectiveId = readString(record.objective_id) ?? "unknown_objective";
+    out.push({
+      objectiveId,
+      objectiveLabel: readString(record.objective_label) ?? objectiveId,
+      finalStatus: readString(record.final_status) ?? "unknown",
+      plainReasoning: readString(record.plain_reasoning) ?? "No plain reasoning emitted.",
+      transitionTail: readHelixAskDebugStringArray(record.transition_tail).slice(0, 8),
+    });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+function readHelixAskObjectiveTelemetryFromContext(
+  context: Record<string, unknown> | null,
+): HelixAskObjectiveTelemetrySummary | null {
+  if (!context) return null;
+  const telemetryRecord =
+    readHelixAskDebugContextRecord(context.objective_telemetry_used) ??
+    readHelixAskDebugContextRecord(context.objectiveTelemetryUsed);
+  const readNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
+  const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+  const readString = (value: unknown): string | null =>
+    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const coverageUnresolvedCount =
+    readNumber(telemetryRecord?.objective_coverage_unresolved_count) ??
+    readNumber(context.objective_coverage_unresolved_count);
+  const unknownBlockCount =
+    readNumber(telemetryRecord?.objective_unknown_block_count) ??
+    readNumber(context.objective_unknown_block_count);
+  const unresolvedWithoutUnknownBlockCount =
+    readNumber(telemetryRecord?.objective_unresolved_without_unknown_block_count) ??
+    readNumber(context.objective_unresolved_without_unknown_block_count);
+  const missingScopedRetrievalCount = readNumber(
+    telemetryRecord?.objective_missing_scoped_retrieval_count ?? context.objective_missing_scoped_retrieval_count,
+  );
+  const finalizeGateMode =
+    readString(telemetryRecord?.objective_finalize_gate_mode) ??
+    readString(context.objective_finalize_gate_mode);
+  const finalizeGatePassed =
+    readBoolean(telemetryRecord?.objective_finalize_gate_passed) ??
+    readBoolean(context.objective_finalize_gate_passed);
+  if (
+    coverageUnresolvedCount === null &&
+    unknownBlockCount === null &&
+    unresolvedWithoutUnknownBlockCount === null &&
+    missingScopedRetrievalCount === null &&
+    finalizeGateMode === null &&
+    finalizeGatePassed === null
+  ) {
+    return null;
+  }
+  return {
+    coverageUnresolvedCount,
+    unknownBlockCount,
+    unresolvedWithoutUnknownBlockCount,
+    missingScopedRetrievalCount,
+    finalizeGateMode,
+    finalizeGatePassed,
+  };
 }
 
 function formatHelixAskDebugContextSummary(context: Record<string, unknown>): string {

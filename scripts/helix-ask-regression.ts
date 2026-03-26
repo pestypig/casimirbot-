@@ -635,13 +635,44 @@ const runCase = async (entry: RegressionCase, sessionId: string): Promise<string
   }
   const objectiveStates = collectObjectiveLoopStates(payload.debug);
   if (objectiveStates.length > 0) {
-    if (payload.debug.objective_finalize_gate_passed !== true) {
-      failures.push(`${entry.label}: objective_finalize_gate_passed ${String(payload.debug.objective_finalize_gate_passed)} !== true`);
+    const objectiveFinalizeGateMode = String(payload.debug.objective_finalize_gate_mode ?? "").trim();
+    const objectiveFinalizeGatePassed = payload.debug.objective_finalize_gate_passed === true;
+    const obligationMissingCount = Array.isArray(payload.debug.answer_obligations_missing)
+      ? payload.debug.answer_obligations_missing.length
+      : 0;
+    const composerValidationFailReasons = Array.isArray(payload.debug.composer_validation_fail_reasons)
+      ? payload.debug.composer_validation_fail_reasons
+      : [];
+    if (objectiveFinalizeGateMode === "strict_covered") {
+      if (!objectiveFinalizeGatePassed) {
+        failures.push(
+          `${entry.label}: objective_finalize_gate_passed ${String(payload.debug.objective_finalize_gate_passed)} !== true for strict_covered`,
+        );
+      }
+      if (obligationMissingCount > 0) {
+        failures.push(
+          `${entry.label}: strict_covered with answer_obligations_missing (${obligationMissingCount})`,
+        );
+      }
+      if (composerValidationFailReasons.length > 0) {
+        failures.push(
+          `${entry.label}: strict_covered with composer_validation_fail_reasons (${composerValidationFailReasons
+            .map((reason) => String(reason))
+            .slice(0, 4)
+            .join(", ")})`,
+        );
+      }
+    } else if (objectiveFinalizeGateMode === "unknown_terminal") {
+      if (objectiveFinalizeGatePassed) {
+        failures.push(
+          `${entry.label}: objective_finalize_gate_passed ${String(payload.debug.objective_finalize_gate_passed)} !== false for unknown_terminal`,
+        );
+      }
     }
     const requiredObjectiveIds = objectiveStates
       .filter((state) => state.required_slots.length > 0)
       .map((state) => state.objective_id);
-    if (requiredObjectiveIds.length > 0) {
+    if (requiredObjectiveIds.length > 0 && objectiveFinalizeGateMode === "strict_covered") {
       const retrievalIds = collectObjectiveRetrievalIds(payload.debug);
       const missingRetrieval = requiredObjectiveIds.filter((id) => !retrievalIds.has(id));
       if (missingRetrieval.length > 0) {

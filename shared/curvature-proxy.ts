@@ -46,6 +46,7 @@ export function kappa_u(u_J_m3: number): number {
 
 export type CurvatureBridgeChannel = "kappa_body" | "kappa_drive" | "kappa_u";
 export type BridgeClaimTier = "diagnostic" | "reduced-order" | "certified";
+export type ObservableGeometryRole = "background_geometry" | "dynamic_forcing_geometry";
 
 export interface CurvatureStressBridgeInput {
   channel: CurvatureBridgeChannel;
@@ -99,6 +100,35 @@ export interface CurvatureStressBridgeOutput {
     mismatch_threshold_rel: number;
     pass: boolean;
   };
+}
+
+export interface ObservableGeometryChannel {
+  geometry_slot: "G_geometry";
+  role: ObservableGeometryRole;
+  semantics: "curvature_proxy_observable_response";
+  equation_ref: "collective_observable_response_closure";
+  source_quantity: {
+    id: string;
+    density_proxy_kg_m3?: number;
+    density_equivalent_proxy_kg_m3?: number;
+    energy_density_proxy_j_m3?: number;
+    power_proxy_w?: number;
+    area_proxy_m2?: number;
+    power_flux_proxy_w_m2?: number;
+    d_eff?: number;
+    gain?: number;
+  };
+  proxies: {
+    canonical_channel: CurvatureBridgeChannel;
+    canonical_kappa_m2: number;
+    kappa_body_m2?: number | null;
+    kappa_u_m2?: number | null;
+    kappa_drive_m2?: number | null;
+    kappa_body_to_canonical_ratio?: number | null;
+    kappa_drive_to_canonical_ratio?: number | null;
+  };
+  stress_energy_bridge: CurvatureStressBridgeOutput;
+  note: string;
 }
 
 const KAPPA_TO_T00_J_M3 = C4 / (8 * PI * G);
@@ -164,5 +194,224 @@ export function bridgeCurvatureToStressEnergy(input: CurvatureStressBridgeInput)
       mismatch_threshold_rel: input.mismatch_threshold_rel,
       pass,
     },
+  };
+}
+
+function safeNonnegative(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+export function buildBackgroundGeometryFromDensity(args: {
+  densityKgM3: number;
+  sourceQuantityId: string;
+  note: string;
+}): ObservableGeometryChannel {
+  const densityKgM3 = safeNonnegative(args.densityKgM3);
+  const energyDensityProxyJm3 = densityKgM3 * C2;
+  const kappaBodyM2 = kappa_body(densityKgM3);
+  const kappaCanonicalM2 = kappa_u(energyDensityProxyJm3);
+  const stressEnergyBridge = bridgeCurvatureToStressEnergy({
+    channel: "kappa_u",
+    kappa_m2: kappaCanonicalM2,
+    bound_abs_J_m3: Math.max(1e-30, energyDensityProxyJm3),
+    mismatch_threshold_rel: 1e-12,
+    provenance: {
+      class: "diagnostic",
+      method: "density_to_energy_density_to_curvature_proxy",
+      reference: "collective_observable_response_closure",
+    },
+    uncertainty: {
+      model: "bounded",
+      relative_1sigma: 0,
+      confidence: 0.95,
+    },
+  });
+
+  return {
+    geometry_slot: "G_geometry",
+    role: "background_geometry",
+    semantics: "curvature_proxy_observable_response",
+    equation_ref: "collective_observable_response_closure",
+    source_quantity: {
+      id: args.sourceQuantityId,
+      density_proxy_kg_m3: densityKgM3,
+      energy_density_proxy_j_m3: energyDensityProxyJm3,
+    },
+    proxies: {
+      canonical_channel: "kappa_u",
+      canonical_kappa_m2: kappaCanonicalM2,
+      kappa_body_m2: kappaBodyM2,
+      kappa_u_m2: kappaCanonicalM2,
+      kappa_body_to_canonical_ratio: kappaCanonicalM2 > 0 ? kappaBodyM2 / kappaCanonicalM2 : null,
+    },
+    stress_energy_bridge: stressEnergyBridge,
+    note: args.note,
+  };
+}
+
+export function buildBackgroundGeometryFromEnergyDensity(args: {
+  energyDensityJm3: number;
+  sourceQuantityId: string;
+  note: string;
+}): ObservableGeometryChannel {
+  const energyDensityJm3 = safeNonnegative(args.energyDensityJm3);
+  const densityEquivalentKgM3 = energyDensityJm3 / C2;
+  const kappaBodyM2 = kappa_body(densityEquivalentKgM3);
+  const kappaCanonicalM2 = kappa_u(energyDensityJm3);
+  const stressEnergyBridge = bridgeCurvatureToStressEnergy({
+    channel: "kappa_u",
+    kappa_m2: kappaCanonicalM2,
+    bound_abs_J_m3: Math.max(1e-30, energyDensityJm3),
+    mismatch_threshold_rel: 1e-12,
+    provenance: {
+      class: "diagnostic",
+      method: "energy_density_to_curvature_proxy",
+      reference: "collective_observable_response_closure",
+    },
+    uncertainty: {
+      model: "bounded",
+      relative_1sigma: 0,
+      confidence: 0.95,
+    },
+  });
+
+  return {
+    geometry_slot: "G_geometry",
+    role: "background_geometry",
+    semantics: "curvature_proxy_observable_response",
+    equation_ref: "collective_observable_response_closure",
+    source_quantity: {
+      id: args.sourceQuantityId,
+      density_equivalent_proxy_kg_m3: densityEquivalentKgM3,
+      energy_density_proxy_j_m3: energyDensityJm3,
+    },
+    proxies: {
+      canonical_channel: "kappa_u",
+      canonical_kappa_m2: kappaCanonicalM2,
+      kappa_body_m2: kappaBodyM2,
+      kappa_u_m2: kappaCanonicalM2,
+      kappa_body_to_canonical_ratio: kappaCanonicalM2 > 0 ? kappaBodyM2 / kappaCanonicalM2 : null,
+    },
+    stress_energy_bridge: stressEnergyBridge,
+    note: args.note,
+  };
+}
+
+export function buildBackgroundGeometryFromBodyKappa(args: {
+  kappaBodyM2: number;
+  sourceQuantityId: string;
+  note: string;
+}): ObservableGeometryChannel {
+  const kappaBodyM2 = safeNonnegative(args.kappaBodyM2);
+  const densityKgM3 = kappaBodyM2 / curvatureProxyPrefactors.body;
+  return buildBackgroundGeometryFromDensity({
+    densityKgM3,
+    sourceQuantityId: args.sourceQuantityId,
+    note: args.note,
+  });
+}
+
+export function buildDynamicForcingGeometryFromPower(args: {
+  powerW: number;
+  areaM2: number;
+  dEff?: number;
+  gain?: number;
+  sourceQuantityId: string;
+  note: string;
+}): ObservableGeometryChannel {
+  const powerW = safeNonnegative(args.powerW);
+  const areaM2 = Number.isFinite(args.areaM2) && args.areaM2 > 0 ? args.areaM2 : 1;
+  const dEff = Number.isFinite(args.dEff) ? args.dEff ?? 1 : 1;
+  const gain = Number.isFinite(args.gain) ? args.gain ?? 1 : 1;
+  const powerFluxWm2 = powerW / areaM2;
+  const kappaDriveM2 = kappa_drive_from_power(powerW, areaM2, dEff, gain);
+  const energyDensityProxyJm3 = powerFluxWm2 * dEff * gain / C;
+  const stressEnergyBridge = bridgeCurvatureToStressEnergy({
+    channel: "kappa_drive",
+    kappa_m2: kappaDriveM2,
+    bound_abs_J_m3: Math.max(1e-30, energyDensityProxyJm3),
+    mismatch_threshold_rel: 1e-12,
+    provenance: {
+      class: "diagnostic",
+      method: "power_flux_to_curvature_proxy",
+      reference: "collective_observable_response_closure",
+    },
+    uncertainty: {
+      model: "bounded",
+      relative_1sigma: 0,
+      confidence: 0.95,
+    },
+  });
+
+  return {
+    geometry_slot: "G_geometry",
+    role: "dynamic_forcing_geometry",
+    semantics: "curvature_proxy_observable_response",
+    equation_ref: "collective_observable_response_closure",
+    source_quantity: {
+      id: args.sourceQuantityId,
+      power_proxy_w: powerW,
+      area_proxy_m2: areaM2,
+      power_flux_proxy_w_m2: powerFluxWm2,
+      d_eff: dEff,
+      gain,
+    },
+    proxies: {
+      canonical_channel: "kappa_drive",
+      canonical_kappa_m2: kappaDriveM2,
+      kappa_drive_m2: kappaDriveM2,
+      kappa_u_m2: kappa_u(energyDensityProxyJm3),
+      kappa_drive_to_canonical_ratio: 1,
+    },
+    stress_energy_bridge: stressEnergyBridge,
+    note: args.note,
+  };
+}
+
+export function buildDynamicForcingGeometryFromDriveKappa(args: {
+  kappaDriveM2: number;
+  sourceQuantityId: string;
+  note: string;
+}): ObservableGeometryChannel {
+  const kappaDriveM2 = safeNonnegative(args.kappaDriveM2);
+  const powerFluxEquivalentWm2 = kappaDriveM2 / curvatureProxyPrefactors.drive;
+  const energyDensityProxyJm3 = powerFluxEquivalentWm2 / C;
+  const stressEnergyBridge = bridgeCurvatureToStressEnergy({
+    channel: "kappa_drive",
+    kappa_m2: kappaDriveM2,
+    bound_abs_J_m3: Math.max(1e-30, energyDensityProxyJm3),
+    mismatch_threshold_rel: 1e-12,
+    provenance: {
+      class: "diagnostic",
+      method: "drive_kappa_to_curvature_proxy",
+      reference: "collective_observable_response_closure",
+    },
+    uncertainty: {
+      model: "bounded",
+      relative_1sigma: 0,
+      confidence: 0.95,
+    },
+  });
+
+  return {
+    geometry_slot: "G_geometry",
+    role: "dynamic_forcing_geometry",
+    semantics: "curvature_proxy_observable_response",
+    equation_ref: "collective_observable_response_closure",
+    source_quantity: {
+      id: args.sourceQuantityId,
+      power_flux_proxy_w_m2: powerFluxEquivalentWm2,
+      d_eff: 1,
+      gain: 1,
+    },
+    proxies: {
+      canonical_channel: "kappa_drive",
+      canonical_kappa_m2: kappaDriveM2,
+      kappa_drive_m2: kappaDriveM2,
+      kappa_u_m2: kappa_u(energyDensityProxyJm3),
+      kappa_drive_to_canonical_ratio: 1,
+    },
+    stress_energy_bridge: stressEnergyBridge,
+    note: args.note,
   };
 }

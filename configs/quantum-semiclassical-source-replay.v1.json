@@ -1,0 +1,41 @@
+{
+  "schema_version": "quantum_semiclassical_source_replay/1",
+  "profiles": [
+    {
+      "profile_id": "kalra_2022__zhang_2017__packet_primary",
+      "title": "Kalra 2022 microtubule transport with Zhang 2017 discrete time-crystal benchmark",
+      "microtubule_transport_length_m": 6.64e-9,
+      "microtubule_diffusion_coefficient_m2_s": 3.15e-9,
+      "subharmonic_lock_ratio": 2.0,
+      "time_crystal_signature_pass": true,
+      "source_refs": [
+        "https://doi.org/10.1021/acscentsci.2c01114",
+        "https://doi.org/10.1038/nature21413",
+        "https://doi.org/10.1038/nature21426",
+        "https://doi.org/10.1103/PhysRevLett.127.043602"
+      ],
+      "notes": [
+        "Microtubule transport length is source-backed from Kalra et al. (6.64 nm) and the diffusion coefficient is source-backed from the same paper (3.15e-5 cm^2 s^-1).",
+        "The transport-timescale proxy is inferred as L^2/(4D) using the reported 2D diffusion length and diffusion coefficient; it is not a direct biological decoherence measurement.",
+        "The time-crystal channel is source-backed only at the benchmark level: period-doubled subharmonic response implies subharmonic_lock_ratio = 2 and time_crystal_signature_pass = true for the discrete-time-crystal benchmark papers."
+      ]
+    },
+    {
+      "profile_id": "kalra_2022_etomidate__bruno_2015__packet_contrast",
+      "title": "Kalra 2022 etomidate-dampened microtubule transport with Bruno 2015 conservative no-go contrast",
+      "microtubule_transport_length_m": 5.6e-9,
+      "microtubule_diffusion_coefficient_m2_s": 3.15e-9,
+      "subharmonic_lock_ratio": 1.0,
+      "time_crystal_signature_pass": false,
+      "source_refs": [
+        "https://doi.org/10.1021/acscentsci.2c01114",
+        "https://doi.org/10.1007/JHEP10(2015)001"
+      ],
+      "notes": [
+        "The perturbed microtubule contrast uses the etomidate-dampened diffusion length reported by Kalra et al. (5.6 nm at 50 uM etomidate).",
+        "The replay retains the baseline source-backed diffusion coefficient from the same paper as a reference coefficient for the reduced-order transport-lifetime proxy because the packet does not extract a separate anesthetic-specific D from the main-text source.",
+        "The time-crystal channel is intentionally conservative here: Bruno's no-go boundary is encoded as subharmonic_lock_ratio = 1 and time_crystal_signature_pass = false, yielding a sourced negative contrast rather than a biological time-crystal claim."
+      ]
+    }
+  ]
+}

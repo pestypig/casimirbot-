@@ -1,0 +1,554 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "quantum-semiclassical-core",
+  "domain": "quantum-semiclassical-exploratory",
+  "updatedAt": "2026-03-25",
+  "claims": [
+    {
+      "claimId": "claim:quantum.semiclassical:gravity_related_collapse",
+      "statement": "Gravity-related collapse remains exploratory until gravitational self-energy of a superposed mass distribution predicts a decoherence or collapse timescale that is independently testable.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "quantum-semiclassical lane",
+        "constraints": [
+          "collapse scale must depend on mass distribution",
+          "the claim must be falsifiable against decoherence bounds",
+          "the node may not be used to certify consciousness or mature time-crystal order"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Penrose, On Gravity's Role in Quantum State Reduction, DOI 10.1007/BF02105068",
+          "note": "Gravity-related collapse foundation."
+        },
+        {
+          "kind": "paper",
+          "citation": "Diosi, A universal master equation for the gravitational violation of quantum mechanics, DOI 10.1016/0375-9601(87)90681-5",
+          "note": "Collapse-law foundation."
+        },
+        {
+          "kind": "paper",
+          "citation": "Donadi et al., Underground test of gravity-related wave function collapse, DOI 10.1038/s41567-020-1008-4",
+          "note": "Experimental constraint."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/gravity-related-collapse.md"
+      ],
+      "notes": "Exploratory only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:diosi_penrose_timescale",
+      "statement": "The Diosi-Penrose timescale `tau ~ hbar / E_G` is only a diagnostic estimate for gravity-related collapse and must remain tied to measurable bounds.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "quantum-semiclassical lane",
+        "constraints": [
+          "the timescale must be computed from a defined gravitational self-energy difference",
+          "the estimate must remain benchmarked against observed decoherence",
+          "the node must not be promoted to a certified collapse law"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Penrose, On Gravity's Role in Quantum State Reduction, DOI 10.1007/BF02105068",
+          "note": "Collapse-time proposal."
+        },
+        {
+          "kind": "paper",
+          "citation": "Diosi, A universal master equation for the gravitational violation of quantum mechanics, DOI 10.1016/0375-9601(87)90681-5",
+          "note": "Master-equation proposal."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/diosi-penrose-timescale.md"
+      ],
+      "notes": "Diagnostic comparator only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:gravitational_time_dilation_decoherence",
+      "statement": "Gravitational time-dilation decoherence is an exploratory benchmark in which proper-time differences produce measurable phase dispersion or decoherence in composite states.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "quantum-semiclassical lane",
+        "constraints": [
+          "the effect must be measured as proper-time-dependent phase loss",
+          "the result must remain benchmark-level rather than consciousness-level",
+          "the node must not replace the many-body Hamiltonian"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Pikovski et al., Universal decoherence due to gravitational time dilation, DOI 10.1038/nphys3366",
+          "note": "Proper-time decoherence benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Carlesso et al., collapse bounds and related experiments, Phys. Rev. D 94, 124036",
+          "note": "Constraint context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/gravitational-time-dilation-decoherence.md"
+      ],
+      "notes": "Benchmark relation only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:microtubule_mesoscopic_observables",
+      "statement": "Microtubule mesoscopic observables remain exploratory transport and perturbation measurements and do not establish Orch-OR or time-crystal order by themselves.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "microtubule exploratory lane",
+        "constraints": [
+          "observables must be reproducible",
+          "the lane must not imply consciousness by observation alone",
+          "the measurements must stay separate from mature stellar or granular diagnostics"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Hameroff and Penrose, Consciousness in the universe: a review of the Orch OR theory, DOI 10.1016/j.plrev.2013.08.002",
+          "note": "Orch-OR background."
+        },
+        {
+          "kind": "paper",
+          "citation": "Tegmark, The importance of quantum decoherence in brain processes, DOI 10.1103/PhysRevE.61.4194",
+          "note": "Decoherence critique."
+        },
+        {
+          "kind": "paper",
+          "citation": "Hagan, Hameroff, Tuszynski, Quantum computation in brain microtubules: decoherence and biological feasibility, DOI 10.1103/PhysRevE.65.061901",
+          "note": "Feasibility discussion."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/microtubule-mesoscopic-observables.md"
+      ],
+      "notes": "Observational only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:microtubule_vibrational_mode",
+      "statement": "Microtubule vibrational modes are only admissible as exploratory observables when reproducible spectral peaks, linewidths, and quality factors are measured.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "microtubule exploratory lane",
+        "constraints": [
+          "a mode must be reproducibly measured",
+          "the mode must survive controls and noise accounting",
+          "the node cannot be used as proof of consciousness or time-crystal order"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Vibrations of microtubules: Physics that has not met biology yet, DOI 10.1016/j.wavemoti.2016.12.006",
+          "note": "Vibrational-mode review."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kalra et al., Electronic Energy Migration in Microtubules, DOI 10.1021/acscentsci.2c01114",
+          "note": "Transport context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/microtubule-vibrational-mode.md"
+      ],
+      "notes": "Spectral observable only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:microtubule_energy_migration",
+      "statement": "Microtubule energy migration is an exploratory transport observable requiring measurable transport length, anisotropy, damping, and temperature dependence.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "microtubule exploratory lane",
+        "constraints": [
+          "transport length must exceed the noise floor",
+          "anisotropy must be reproducible",
+          "the effect must remain distinct from generic thermal diffusion"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Kalra et al., Electronic Energy Migration in Microtubules, DOI 10.1021/acscentsci.2c01114",
+          "note": "Energy-migration reference."
+        },
+        {
+          "kind": "paper",
+          "citation": "Engel et al., Evidence for wavelike energy transfer through quantum coherence in photosynthetic systems, DOI 10.1038/nature05678",
+          "note": "Room-temperature benchmark context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/microtubule-energy-migration.md"
+      ],
+      "notes": "Transport benchmark only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:microtubule_anesthetic_perturbation",
+      "statement": "Anesthetic perturbation is an exploratory probe of microtubule observables and must not be promoted to a consciousness proof.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "microtubule exploratory lane",
+        "constraints": [
+          "observable shifts must track binding or dose",
+          "the perturbation must be measurable in transport or vibration channels",
+          "the claim must not be inflated into Orch-OR evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Craddock et al., anesthetic-tubulin modeling and related perturbation work, DOI 10.1080/07391102.2021.1897044",
+          "note": "Perturbation source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Hameroff and Penrose, Orch OR review, DOI 10.1016/j.plrev.2013.08.002",
+          "note": "Context only."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/microtubule-anesthetic-perturbation.md"
+      ],
+      "notes": "Controlled probe only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:driven_dissipative_time_crystal",
+      "statement": "A driven-dissipative time crystal is only admissible when subharmonic order and a finite robustness window are both measured.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "time-crystal exploratory lane",
+        "constraints": [
+          "subharmonic response must be measured",
+          "the system must remain open or driven-dissipative",
+          "no-go boundaries must be respected"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Zhang et al., Observation of a discrete time crystal, DOI 10.1038/nature21413",
+          "note": "Discrete time crystal benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Choi et al., Observation of discrete time-crystalline order in a disordered dipolar many-body system, DOI 10.1038/nature21426",
+          "note": "Robustness benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kessler et al., Observation of a Dissipative Time Crystal, DOI 10.1103/PhysRevLett.127.043602",
+          "note": "Dissipative benchmark."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/driven-dissipative-time-crystal.md"
+      ],
+      "notes": "Time-crystal diagnostics only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:time_crystal_subharmonic_locking",
+      "statement": "Subharmonic locking is the minimal time-crystal observable: the response period must be an integer multiple of the drive period and remain stable under perturbation.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "time-crystal exploratory lane",
+        "constraints": [
+          "the response must show period multiplication",
+          "the lock must survive repeated runs",
+          "periodicity alone is not sufficient"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Zhang et al., Observation of a discrete time crystal, DOI 10.1038/nature21413",
+          "note": "Period-multiplication benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kessler et al., Observation of a Dissipative Time Crystal, DOI 10.1103/PhysRevLett.127.043602",
+          "note": "Open-system locking benchmark."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/time-crystal-subharmonic-locking.md"
+      ],
+      "notes": "Minimal observable only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:time_crystal_robustness_window",
+      "statement": "Time-crystal order requires a finite robustness window against disorder, dissipation, and drive changes.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "time-crystal exploratory lane",
+        "constraints": [
+          "small perturbations must not destroy the response",
+          "the window must be finite and reproducible",
+          "the claim must remain distinct from transient resonance"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Choi et al., Observation of discrete time-crystalline order in a disordered dipolar many-body system, DOI 10.1038/nature21426",
+          "note": "Robustness benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kessler et al., Observation of a Dissipative Time Crystal, DOI 10.1103/PhysRevLett.127.043602",
+          "note": "Open-system robustness context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/time-crystal-robustness-window.md"
+      ],
+      "notes": "Perturbation window only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:time_crystal_no_go_boundary",
+      "statement": "Time-crystal claims must respect published no-go boundaries and cannot rely on periodicity alone.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "time-crystal exploratory lane",
+        "constraints": [
+          "equilibrium or finite-size no-go results must be checked",
+          "analogies do not bypass the no-go boundary",
+          "the lane must fail when the no-go conditions are violated"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Bruno, impossibility of spontaneously rotating time crystals, DOI 10.1007/JHEP10(2015)001",
+          "note": "No-go boundary."
+        },
+        {
+          "kind": "paper",
+          "citation": "Zhang et al., Observation of a discrete time crystal, DOI 10.1038/nature21413",
+          "note": "Admissible exception context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/time-crystal-no-go-boundary.md"
+      ],
+      "notes": "Hard filter only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:room_temperature_quantum_benchmark",
+      "statement": "Room-temperature quantum coherence is treated as a benchmark problem before any microtubule claim is promoted.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "benchmark lane",
+        "constraints": [
+          "the benchmark must compare coherence time and damping against known room-temperature examples",
+          "the lane must not treat microtubule claims as already validated",
+          "the benchmark may remain negative"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Engel et al., Evidence for wavelike energy transfer through quantum coherence in photosynthetic systems, DOI 10.1038/nature05678",
+          "note": "Warm quantum benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kalra et al., Electronic Energy Migration in Microtubules, DOI 10.1021/acscentsci.2c01114",
+          "note": "Candidate comparison."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/room-temperature-quantum-coherence-benchmark.md"
+      ],
+      "notes": "Benchmark only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:triplet_band_resonance_observable",
+      "statement": "Triplet-band resonance is an exploratory observable and only counts when the triplet pattern is directly measured and independently reproduced.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Bandyopadhyay exploratory lane",
+        "constraints": [
+          "repeatable triplet bands must be measured",
+          "band spacing must survive independent calibration",
+          "the observable cannot be promoted into a geometry law without a geometry observable"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., scale-free resonant multiscale behavior, DOI 10.3390/fractalfract4020011",
+          "note": "Resonance hierarchy source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., polyatomic time crystal report, DOI 10.1063/5.0130618",
+          "note": "Polyatomic context."
+        },
+        {
+          "kind": "paper",
+          "citation": "Ghosh et al., coherence and resonance hierarchy work, DOI 10.1080/19420889.2022.2071101",
+          "note": "Hierarchy context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/triplet-band-resonance-observable.md"
+      ],
+      "notes": "Observable only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:scale_free_resonance_hierarchy_hypothesis",
+      "statement": "Scale-free resonance hierarchy remains an exploratory hypothesis until nested frequency clusters obey a reproducible scaling law.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Bandyopadhyay exploratory lane",
+        "constraints": [
+          "the scaling exponent must be reproducible",
+          "the hierarchy must survive control analysis",
+          "the hypothesis must stay separate from mature stellar observables"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., Scale-free resonant multiscale behavior, DOI 10.3390/fractalfract4020011",
+          "note": "Scale-free source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., polyatomic time crystal report, DOI 10.1063/5.0130618",
+          "note": "Hierarchy context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/scale-free-resonance-hierarchy-hypothesis.md"
+      ],
+      "notes": "Exploratory hypothesis only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:polyatomic_time_crystal_hypothesis",
+      "statement": "The polyatomic time crystal is only a hypothesis until subharmonic order and robustness are measured in a coupled resonant system.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Bandyopadhyay exploratory lane",
+        "constraints": [
+          "subharmonic locking must be observed",
+          "robustness must be measured",
+          "the claim must not be confused with a certified biological time crystal"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., polyatomic time crystal report, DOI 10.1063/5.0130618",
+          "note": "Polyatomic time-crystal source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Zhang et al., Observation of a discrete time crystal, DOI 10.1038/nature21413",
+          "note": "Time-crystal benchmark."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kessler et al., Observation of a Dissipative Time Crystal, DOI 10.1103/PhysRevLett.127.043602",
+          "note": "Open-system benchmark."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/polyatomic-time-crystal-hypothesis.md"
+      ],
+      "notes": "Hypothesis only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:triplet_of_triplets_hypothesis",
+      "statement": "The triplets-of-triplets pattern is an exploratory nested-resonance hypothesis and requires independent reproduction across scale.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Bandyopadhyay exploratory lane",
+        "constraints": [
+          "triplet nesting must be reproducible",
+          "instrument artifacts must be excluded",
+          "the hypothesis must not be used as a mature geometry claim"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Ghosh et al., coherence and resonance hierarchy work, DOI 10.1080/19420889.2022.2071101",
+          "note": "Nested hierarchy context."
+        },
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., Scale-free resonant multiscale behavior, DOI 10.3390/fractalfract4020011",
+          "note": "Scale-free context."
+        },
+        {
+          "kind": "paper",
+          "citation": "Saxena et al., polyatomic time crystal report, DOI 10.1063/5.0130618",
+          "note": "Polyatomic context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/triplet-of-triplets-hypothesis.md"
+      ],
+      "notes": "Nested resonance only."
+    },
+    {
+      "claimId": "claim:quantum.semiclassical:spacetime_triplet_geometry_hypothesis",
+      "statement": "The spacetime-triplet-geometry idea remains speculative until a direct geometry observable exists and the triplet structure survives comparison against collapse, time-crystal, and microtubule benchmarks.",
+      "maturity": "exploratory",
+      "validityDomain": {
+        "system": "Bandyopadhyay exploratory lane",
+        "constraints": [
+          "a direct geometry observable must be defined",
+          "the pattern must survive cross-checks against collapse and time-crystal bounds",
+          "the hypothesis may not be used to certify a mature spacetime law"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Penrose, On Gravity's Role in Quantum State Reduction, DOI 10.1007/BF02105068",
+          "note": "Gravity/collapse comparison."
+        },
+        {
+          "kind": "paper",
+          "citation": "Diosi, A universal master equation for the gravitational violation of quantum mechanics, DOI 10.1016/0375-9601(87)90681-5",
+          "note": "Collapse comparison."
+        },
+        {
+          "kind": "paper",
+          "citation": "Zhang et al., Observation of a discrete time crystal, DOI 10.1038/nature21413",
+          "note": "Time-crystal comparison."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-quantum-semiclassical-tree.json",
+        "docs/knowledge/physics/spacetime-triplet-geometry-hypothesis.md"
+      ],
+      "notes": "Speculative only."
+    }
+  ]
+}

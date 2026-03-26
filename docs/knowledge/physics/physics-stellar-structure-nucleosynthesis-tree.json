@@ -1,0 +1,1564 @@
+{
+  "version": 1,
+  "rootId": "physics-stellar-structure-nucleosynthesis-tree",
+  "nodes": [
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-tree",
+      "slug": "physics-stellar-structure-nucleosynthesis-tree",
+      "title": "Physics Stellar Structure Nucleosynthesis Tree",
+      "excerpt": "Dedicated lane for hydrostatic balance, transport, burning, element creation, and stellar observables in stars.",
+      "bodyMD": "This lane separates stellar hydrostatic and thermal support from planetary shape physics. It tracks the EOS, opacity, reaction rates, burning stages, nucleosynthesis, composition feedback, and the observable oscillation, granulation, sunquake, and magnetic-activity substructure that govern stellar evolution. Its stellar-observable descendants now sit explicitly under the shared microphysics, transport, and collective-response backbone.",
+      "tags": [
+        "physics",
+        "stellar",
+        "nucleosynthesis",
+        "astro"
+      ],
+      "children": [
+        "physics-stellar-structure-nucleosynthesis-stellar-hydrostatic-equilibrium-definition",
+        "physics-stellar-structure-nucleosynthesis-stellar-thermal-equilibrium-definition",
+        "physics-stellar-structure-nucleosynthesis-stellar-equation-of-state-definition",
+        "physics-stellar-structure-nucleosynthesis-stellar-opacity-definition",
+        "physics-stellar-structure-nucleosynthesis-nuclear-reaction-rate-definition",
+        "physics-stellar-structure-nucleosynthesis-hydrogen-burning-definition",
+        "physics-stellar-structure-nucleosynthesis-helium-burning-definition",
+        "physics-stellar-structure-nucleosynthesis-advanced-burning-stages-definition",
+        "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+        "physics-stellar-structure-nucleosynthesis-composition-feedback-definition",
+        "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
+        "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+        "physics-stellar-structure-nucleosynthesis-granulation-driven-pmode-pumping-definition",
+        "physics-stellar-structure-nucleosynthesis-solar-dynamo-definition",
+        "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+        "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+        "physics-stellar-structure-nucleosynthesis-nanoflare-heating-definition",
+        "physics-stellar-structure-nucleosynthesis-flare-particle-precipitation-definition",
+        "physics-stellar-structure-nucleosynthesis-sunquake-definition",
+        "physics-stellar-structure-nucleosynthesis-flare-sunquake-timing-correlation-definition",
+        "physics-stellar-structure-nucleosynthesis-quasi-periodic-flare-envelope-definition",
+        "physics-stellar-structure-nucleosynthesis-magnetic-striation-hierarchy-definition",
+        "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+        "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+        "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic",
+        "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
+        "physics-stellar-structure-nucleosynthesis-equation-residual"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-prebiotic-chemistry-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-microphysics-transport-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Dedicated lane for hydrostatic balance, transport, burning, and element creation in stars.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-hydrostatic-equilibrium-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-hydrostatic-equilibrium-definition",
+      "title": "Stellar Hydrostatic Equilibrium Definition",
+      "excerpt": "Definition-level anchor for pressure balance against gravity inside a star.",
+      "bodyMD": "This node anchors the force balance inside a star: gravity is countered by outward pressure gradients.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "hydrostatic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-thermal-equilibrium-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for pressure balance against gravity inside a star.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_hydrostatic_balance",
+        "claim_ids": [
+          "claim:stellar.structure:hydrostatic_equilibrium"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-hydrostatic-equilibrium.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-thermal-equilibrium-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-thermal-equilibrium-definition",
+      "title": "Stellar Thermal Equilibrium Definition",
+      "excerpt": "Definition-level anchor for quasi-steady energy balance in stars.",
+      "bodyMD": "This node anchors the transport balance between energy generation, radiative/convective flow, and surface loss.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "thermal"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-opacity-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-nuclear-reaction-rate-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for quasi-steady energy balance in stars.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_thermal_balance",
+        "claim_ids": [
+          "claim:stellar.structure:thermal_equilibrium"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-thermal-equilibrium.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-equation-of-state-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-equation-of-state-definition",
+      "title": "Stellar Equation of State Definition",
+      "excerpt": "Definition-level anchor for the plasma EOS in stars.",
+      "bodyMD": "This node anchors the thermodynamic relation among pressure, density, temperature, and composition in stellar matter.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "equation-of-state"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-hydrostatic-equilibrium-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-effective-microphysics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the plasma EOS in stars.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_hydrostatic_balance",
+        "claim_ids": [
+          "claim:stellar.structure:equation_of_state"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-equation-of-state.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-opacity-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-opacity-definition",
+      "title": "Stellar Opacity Definition",
+      "excerpt": "Definition-level anchor for radiative transport resistance in stars.",
+      "bodyMD": "This node anchors the material opacity term that controls radiative transport and feeds back into stellar structure.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "opacity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-plasma-transport-closure-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for radiative transport resistance in stars.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_thermal_balance",
+        "claim_ids": [
+          "claim:stellar.structure:opacity_transport"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-opacity.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-nuclear-reaction-rate-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-nuclear-reaction-rate-definition",
+      "title": "Nuclear Reaction Rate Definition",
+      "excerpt": "Definition-level anchor for fusion and capture rates in stellar matter.",
+      "bodyMD": "This node anchors the temperature-, density-, and composition-dependent rate at which stellar nuclei fuse or capture particles.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "nuclear",
+        "reaction-rate"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-hydrogen-burning-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for fusion and capture rates in stellar matter.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "nuclear_reaction_network_rate",
+        "claim_ids": [
+          "claim:stellar.structure:nuclear_reaction_rate"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/nuclear-reaction-rate.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-hydrogen-burning-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-hydrogen-burning-definition",
+      "title": "Hydrogen Burning Definition",
+      "excerpt": "Definition-level anchor for the main hydrogen-fusion stage of stellar evolution.",
+      "bodyMD": "This node anchors the stage in which hydrogen nuclei fuse into helium and power the early stellar lifetime.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "hydrogen-burning"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the main hydrogen-fusion stage of stellar evolution.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "nuclear_reaction_network_rate",
+        "claim_ids": [
+          "claim:stellar.structure:hydrogen_burning"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/hydrogen-burning.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-helium-burning-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-helium-burning-definition",
+      "title": "Helium Burning Definition",
+      "excerpt": "Definition-level anchor for the helium-fusion stage of stellar evolution.",
+      "bodyMD": "This node anchors the post-main-sequence stage in which helium fuses into heavier nuclei.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "helium-burning"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the helium-fusion stage of stellar evolution.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "nuclear_reaction_network_rate",
+        "claim_ids": [
+          "claim:stellar.structure:helium_burning"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/helium-burning.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-advanced-burning-stages-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-advanced-burning-stages-definition",
+      "title": "Advanced Burning Stages Definition",
+      "excerpt": "Definition-level anchor for late stellar burning stages.",
+      "bodyMD": "This node anchors the late burning ladder that produces progressively heavier nuclei before the end stages of stellar evolution.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "advanced-burning"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for late stellar burning stages.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "nuclear_reaction_network_rate",
+        "claim_ids": [
+          "claim:stellar.structure:advanced_burning_stages"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/advanced-burning-stages.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+      "title": "Stellar Nucleosynthesis Definition",
+      "excerpt": "Definition-level anchor for element creation in stellar interiors.",
+      "bodyMD": "This node anchors the production of new nuclei through stellar burning and late-stage nuclear processing.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "nucleosynthesis"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-prebiotic-chemistry-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-composition-feedback-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for element creation in stellar interiors.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "nuclear_reaction_network_rate",
+        "claim_ids": [
+          "claim:stellar.structure:stellar_nucleosynthesis"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-composition-feedback-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-composition-feedback-definition",
+      "title": "Composition Feedback Definition",
+      "excerpt": "Definition-level anchor for abundance feedback into stellar structure.",
+      "bodyMD": "This node anchors the loop in which newly produced elements and changing abundances alter opacity, equation of state, and later evolution.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "composition"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for abundance feedback into stellar structure.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_thermal_balance",
+        "claim_ids": [
+          "claim:stellar.structure:composition_feedback"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/composition-feedback.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
+      "title": "Stellar Oscillation Definition",
+      "excerpt": "Definition-level anchor for global stellar oscillation modes.",
+      "bodyMD": "This node anchors the standing acoustic and gravity-mode variability of a star. It is the dynamical substrate that helioseismology probes and it remains a stellar observable, not a consciousness claim.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "oscillation",
+        "helioseismology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for global stellar oscillation modes.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_oscillation_mode_spectrum",
+        "claim_ids": [
+          "claim:stellar.structure:stellar_oscillation"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+      "title": "Helioseismology Definition",
+      "excerpt": "Definition-level anchor for using solar oscillations to probe the interior.",
+      "bodyMD": "This node anchors the inversion of observed solar oscillation modes into temperature, density, composition, and rotational structure. It is a diagnostic observational lane, not a speculative consciousness bridge.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "helioseismology",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for using solar oscillations to probe the interior.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "helioseismic_inversion",
+        "claim_ids": [
+          "claim:stellar.structure:helioseismology"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-granulation-driven-pmode-pumping-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-granulation-driven-pmode-pumping-definition",
+      "title": "Granulation-Driven P-Mode Pumping Definition",
+      "excerpt": "Definition-level anchor for granulation and convection injecting power into the five-minute acoustic band.",
+      "bodyMD": "This node anchors the granulation and convection channel that injects power into the solar p-mode band. It keeps the five-minute oscillation clock observationally grounded and separate from any collapse or consciousness semantics.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "granulation",
+        "p-mode"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for granulation and convection injecting power into the solar p-mode band.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "granulation_pmode_power_injection",
+        "claim_ids": [
+          "claim:stellar.structure:granulation_driven_pmode_pumping"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/granulation-driven-pmode-pumping.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-solar-dynamo-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-solar-dynamo-definition",
+      "title": "Solar Dynamo Definition",
+      "excerpt": "Definition-level anchor for magnetic-field generation by convection and rotation.",
+      "bodyMD": "This node anchors the field-generation process that converts rotational and convective flow into large-scale solar magnetism. It is the parent of magnetic-cycle observables and a separate lane from element production.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "solar-dynamo",
+        "magnetism"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for magnetic-field generation by convection and rotation.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "solar_dynamo_cycle",
+        "claim_ids": [
+          "claim:stellar.structure:solar_dynamo"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+      "title": "Magnetic Cycle Definition",
+      "excerpt": "Definition-level anchor for quasi-periodic solar activity cycle structure.",
+      "bodyMD": "This node anchors the cyclic reversal and modulation of the solar magnetic field, including the sunspot cycle and its large-scale polarity changes.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "magnetic-cycle",
+        "activity-cycle"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-solar-dynamo-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for quasi-periodic solar activity cycle structure.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "solar_activity_cycle",
+        "claim_ids": [
+          "claim:stellar.structure:magnetic_cycle"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+      "title": "Magnetic Reconnection Definition",
+      "excerpt": "Definition-level anchor for topological magnetic-field reconfiguration and energy release.",
+      "bodyMD": "This node anchors reconnection as the mechanism that converts magnetic free energy into heat, particles, and impulsive release in the stellar atmosphere.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "magnetic-reconnection",
+        "flare-physics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for topological magnetic-field reconfiguration and energy release.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "magnetic_reconnection_energy_release",
+        "claim_ids": [
+          "claim:stellar.structure:magnetic_reconnection"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-nanoflare-heating-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-nanoflare-heating-definition",
+      "title": "Nanoflare Heating Definition",
+      "excerpt": "Definition-level anchor for impulsive magnetic heating by many small reconnection events.",
+      "bodyMD": "This node anchors the impulsive magnetic-heating interpretation in which many small reconnection events contribute to coronal energy input. It is an observational and transport node, not a consciousness or collapse node.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "nanoflare",
+        "heating"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-particle-precipitation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-plasma-transport-closure-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for impulsive magnetic heating by many small reconnection events.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "nanoflare_heating_energy_injection",
+        "claim_ids": [
+          "claim:stellar.structure:nanoflare_heating"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/nanoflare-heating.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-flare-particle-precipitation-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-flare-particle-precipitation-definition",
+      "title": "Flare Particle Precipitation Definition",
+      "excerpt": "Definition-level anchor for accelerated particles depositing energy into the lower atmosphere.",
+      "bodyMD": "This node anchors the precipitation of flare-accelerated particles into the lower atmosphere where they can drive pressure transients and local heating. It is the bridge from flare energetics into sunquake forcing.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "flare",
+        "particle-precipitation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-nanoflare-heating-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-sunquake-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-plasma-transport-closure-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for accelerated particles depositing energy into the lower atmosphere.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "flare_particle_precipitation_coupling",
+        "claim_ids": [
+          "claim:stellar.structure:flare_particle_precipitation"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/flare-particle-precipitation.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-sunquake-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-sunquake-definition",
+      "title": "Sunquake Definition",
+      "excerpt": "Definition-level anchor for flare-driven helioseismic surface waves.",
+      "bodyMD": "This node anchors the helioseismic response observed when flare forcing excites acoustic waves that propagate through the solar interior and surface. It is a measurable response lane, not a quantum-collapse claim.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "sunquake",
+        "helioseismic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-particle-precipitation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-sunquake-timing-correlation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for flare-driven helioseismic surface waves.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "sunquake_helioseismic_response",
+        "claim_ids": [
+          "claim:stellar.structure:sunquake"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sunquake.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-flare-sunquake-timing-correlation-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-flare-sunquake-timing-correlation-definition",
+      "title": "Flare-Sunquake Timing Correlation Definition",
+      "excerpt": "Definition-level anchor for timing and morphology correlation between flare onset and sunquake response.",
+      "bodyMD": "This node anchors the observable timing relationship between flare onset, EUV/continuum signatures, and sunquake response. It stays at the level of replayable correlation and does not claim a collapse mechanism.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "timing",
+        "sunquake",
+        "flare"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-sunquake-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-quasi-periodic-flare-envelope-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for timing and morphology correlation between flare onset and sunquake response.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "flare_sunquake_timing_correlation",
+        "claim_ids": [
+          "claim:stellar.structure:flare_sunquake_timing_correlation"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/flare-sunquake-timing-correlation.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-quasi-periodic-flare-envelope-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-quasi-periodic-flare-envelope-definition",
+      "title": "Quasi-Periodic Flare Envelope Definition",
+      "excerpt": "Definition-level anchor for burst-envelope structure and quasi-periodic pulsations in flare series.",
+      "bodyMD": "This node anchors quasi-periodic and burst-envelope structure in flare observables. It is an activity-envelope node that can inform timing diagnostics without implying a collapse clock.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "flare",
+        "quasi-periodic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-sunquake-timing-correlation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for burst-envelope structure and quasi-periodic pulsations in flare series.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "quasi_periodic_flare_envelope",
+        "claim_ids": [
+          "claim:stellar.structure:quasi_periodic_flare_envelope"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quasi-periodic-flare-envelope.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-magnetic-striation-hierarchy-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-magnetic-striation-hierarchy-definition",
+      "title": "Magnetic Striation Hierarchy Definition",
+      "excerpt": "Definition-level anchor for multiscale magnetic texture as morphology context.",
+      "bodyMD": "This node anchors the observed hierarchy of fine magnetic striations as morphology and topology context for flare and sunquake environments. It is a weak observational prior, not evidence for a collapse hierarchy.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "magnetic",
+        "striations"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for multiscale magnetic texture as morphology context.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "magnetic_striation_hierarchy",
+        "claim_ids": [
+          "claim:stellar.structure:magnetic_striation_hierarchy"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/magnetic-striation-hierarchy.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+      "title": "Flare Avalanche Definition",
+      "excerpt": "Definition-level anchor for flare statistics treated as cascade dynamics in driven magnetic systems.",
+      "bodyMD": "This node anchors the avalanche/statistical-physics reading of flare populations and keeps that reading inside the stellar activity lane rather than the consciousness lane.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "flare",
+        "avalanche",
+        "statistics"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for flare statistics treated as cascade dynamics in driven magnetic systems.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "flare_power_law_statistics",
+        "claim_ids": [
+          "claim:stellar.structure:flare_avalanche"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
+      "title": "Multiscale Plasma Variability Definition",
+      "excerpt": "Definition-level anchor for combined oscillatory, dynamo, and reconnection variability across scales.",
+      "bodyMD": "This node anchors the aggregate variability language that spans stellar oscillations, magnetic cycling, reconnection, and flare statistics. It is an observational summary node and explicitly not a consciousness upgrade path.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "plasma",
+        "variability",
+        "multiscale"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-solar-dynamo-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-reconnection-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-plasma-transport-closure-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for combined oscillatory, dynamo, and reconnection variability across scales.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "multiscale_stellar_plasma_variability",
+        "claim_ids": [
+          "claim:stellar.structure:multiscale_plasma_variability"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic",
+      "slug": "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic",
+      "title": "Sunquake Timing Replay Diagnostic",
+      "excerpt": "Derived diagnostic lane for replaying flare onset, EUV response, and sunquake timing against real series.",
+      "bodyMD": "This node anchors the executable replay diagnostic that checks whether flare onset, EUV/continuum activity, granulation-pumped p-mode power, and sunquake timing remain mutually consistent in source-backed event windows. The diagnostic stays observational and does not invoke CSL, Orch-OR, or collapse semantics.",
+      "tags": [
+        "physics",
+        "stellar",
+        "derived",
+        "sunquake",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-granulation-driven-pmode-pumping-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-sunquake-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-sunquake-timing-correlation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-plasma-observables-not-consciousness",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-collective-observable-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived diagnostic lane for replaying flare onset, EUV response, and sunquake timing against real series.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "sunquake_helioseismic_response",
+        "residual_symbol": "R_sunquake",
+        "tolerance": {
+          "metric": "rms",
+          "max": 1,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "diagnostic_reference_band",
+          "sigma": 0.15,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/sunquake-timing-replay-diagnostic.md"
+        }
+      ],
+      "validity": {
+        "equation_ref": "sunquake_helioseismic_response",
+        "claim_ids": [
+          "claim:stellar.structure:sunquake_timing_replay_diagnostic"
+        ]
+      }
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
+      "slug": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
+      "title": "Stellar Observables Diagnostic",
+      "excerpt": "Derived diagnostic lane for activity-cycle, helioseismic-shift, and optional flare-statistics coupling.",
+      "bodyMD": "This node anchors the executable observational diagnostic that checks whether magnetic activity and helioseismic shifts move together in the expected stellar-observables direction, with optional flare-statistics support. It remains explicitly separated from the consciousness bridge by the non-consciousness guardrail.",
+      "tags": [
+        "physics",
+        "stellar",
+        "derived",
+        "diagnostic",
+        "observables"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-magnetic-cycle-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-flare-avalanche-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-plasma-observables-not-consciousness",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-collective-observable-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived diagnostic lane for activity-cycle, helioseismic-shift, and optional flare-statistics coupling.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "stellar_observables_correlation_diagnostic",
+        "residual_symbol": "R_obs",
+        "tolerance": {
+          "metric": "rms",
+          "max": 1,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "diagnostic_reference_band",
+          "sigma": 0.15,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-observables-diagnostic.md"
+        }
+      ],
+      "validity": {
+        "equation_ref": "stellar_observables_correlation_diagnostic",
+        "claim_ids": [
+          "claim:stellar.structure:stellar_observables_diagnostic"
+        ]
+      }
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-equation-residual",
+      "slug": "physics-stellar-structure-nucleosynthesis-equation-residual",
+      "title": "Physics Stellar Structure Nucleosynthesis Equation Residual",
+      "excerpt": "Derived residual contract for stellar structure equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate stellar structure lane mismatch under declared uncertainty assumptions for hydrostatic and thermal balance.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for stellar structure equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "stellar_hydrostatic_balance",
+        "residual_symbol": "R_stellar",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.03,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.008,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [],
+      "validity": {
+        "equation_ref": "stellar_hydrostatic_balance",
+        "claim_ids": [
+          "claim:stellar.structure:hydrostatic_equilibrium",
+          "claim:stellar.structure:stellar_nucleosynthesis"
+        ]
+      }
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

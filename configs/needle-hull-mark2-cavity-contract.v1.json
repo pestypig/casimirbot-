@@ -1,0 +1,108 @@
+{
+  "solutionCategory": "Needle Hull Mark 2",
+  "profileVersion": "NHM2-2026-03-01",
+  "generator_version": "0.2.0",
+  "status": "geometry_freeze",
+  "provenance": {
+    "promotedProfileAuthority": [
+      "shared/warp-promoted-profile.ts",
+      "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md",
+      "artifacts/research/full-solve/full-solve-reference-capsule-latest.json"
+    ],
+    "engineeringFreezeAssumptions": [
+      "Tile-scale cavity dimensions below are an engineering freeze for layout congruence and render/export determinism.",
+      "These dimensions are not a fabrication-readiness claim and are not a physical-feasibility claim.",
+      "Mk1 UI geometry values are intentionally excluded from this contract."
+    ]
+  },
+  "geometry": {
+    "warpFieldType": "natario_sdf",
+    "shipRadius_m": 2,
+    "sectorCount": 80,
+    "concurrentSectors": 2,
+    "gammaGeo": 1,
+    "gammaVanDenBroeck": 500,
+    "gap_nm": 8,
+    "pocketDiameter_um": 6000,
+    "sag_nm": 16,
+    "tileWidth_mm": 10,
+    "tileHeight_mm": 10,
+    "topMirrorThickness_um": 1.5,
+    "bottomMirrorThickness_um": 1.5,
+    "rimWidth_um": 400,
+    "sectorIndex": 0
+  },
+  "boundary": {
+    "material": "Au-SiN-AlN engineering-freeze stack",
+    "model": "reduced_order_geometry_freeze",
+    "statement": "NHM2 cavity geometry is frozen here for layout congruence, package determinism, and render/export reproducibility. This contract does not certify fabrication readiness or physical viability."
+  },
+  "thermal": {
+    "temperature_K": 4.0,
+    "stabilityBand_mK": 25
+  },
+  "loss": {
+    "qCavity": 100000,
+    "qSpoilingFactor": 3,
+    "dutyCycle": 0.12,
+    "dutyShip": 0.12
+  },
+  "drive": {
+    "driveLaw": "nhm2_geometry_freeze",
+    "modulationFreq_GHz": 15
+  },
+  "readout": {
+    "zeta": 5,
+    "metricT00Source": "reduced_order_reference_capsule"
+  },
+  "layout": {
+    "tileArea_mm2": 100,
+    "margin_um": 500,
+    "sealRing": {
+      "inset_um": 350,
+      "width_um": 120
+    },
+    "anchorPosts": {
+      "count": 16,
+      "radius_um": 55,
+      "ringRadius_um": 2200
+    },
+    "releaseHoles": {
+      "diameter_um": 100,
+      "pitch_um": 450,
+      "rows": 3,
+      "columns": 6
+    },
+    "padArray": {
+      "count": 4,
+      "width_um": 350,
+      "height_um": 350,
+      "edgeInset_um": 650
+    },
+    "alignmentMarks": {
+      "size_um": 180,
+      "edgeInset_um": 450
+    },
+    "witnessZone": {
+      "spacing_um": 200,
+      "centerOffsetFromBottom_um": 1300
+    },
+    "witnessCoupons": [
+      {
+        "name": "nanogap_metrology",
+        "width_um": 650,
+        "height_um": 220
+      },
+      {
+        "name": "q_spoil_monitor",
+        "width_um": 650,
+        "height_um": 220
+      },
+      {
+        "name": "sign_control_coupon",
+        "width_um": 650,
+        "height_um": 220
+      }
+    ]
+  }
+}

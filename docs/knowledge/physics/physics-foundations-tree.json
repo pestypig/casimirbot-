@@ -28,6 +28,11 @@
         "uncertainty-mechanics",
         "brick-lattice-dataflow",
         "simulation-systems",
+        "physics-foundations-metric-definition",
+        "physics-foundations-field-equation-definition",
+        "physics-foundations-stress-energy-definition",
+        "physics-foundations-units-definition",
+        "physics-foundations-viability-definition",
         "bridge-field-equations-stack-stress-energy-stack"
       ],
       "links": [
@@ -172,6 +177,41 @@
           "chartDependency": null,
           "proxy": null
         },
+        "physics-foundations-metric-definition": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "physics-foundations-field-equation-definition": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "physics-foundations-stress-energy-definition": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "physics-foundations-units-definition": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
+        "physics-foundations-viability-definition": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
+        },
         "bridge-field-equations-stack-stress-energy-stack": {
           "edgeType": "hierarchy",
           "requiresCL": "none",
@@ -179,6 +219,445 @@
           "chartDependency": null,
           "proxy": null
         }
+      }
+    },
+    {
+      "id": "physics-foundations-metric-definition",
+      "slug": "physics-foundations-metric-definition",
+      "title": "Metric Definition Contract",
+      "excerpt": "Definition-level anchor for the spacetime metric as the primitive geometry object.",
+      "bodyMD": "This node captures the metric definition itself so papers can bind to intervals, signatures, and chart semantics directly rather than only to the surrounding geometry stack.\n\nMinimal artifact: metric definition + sign convention + chart contract.",
+      "tags": [
+        "definition",
+        "metric",
+        "spacetime",
+        "geometry",
+        "chart"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "geometry-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "spacetime-metric-basics",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "field-equations-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the spacetime metric as the primitive geometry object.",
+      "nodeType": "definition",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/spacetime-metric-basics.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:4ab3cf6d8319b9fee249c3240e77ffd62ca2651a6642ce17ffd73dcfc4f2ce17"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "physics-foundations-tree",
+        "geometry-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "metric_family",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "physics-foundations-field-equation-definition",
+      "slug": "physics-foundations-field-equation-definition",
+      "title": "Field Equation Definition Contract",
+      "excerpt": "Definition-level anchor for Einstein equations and the ADM constraint/evolution split.",
+      "bodyMD": "This node captures the field-equation definition layer itself so papers can bind to sourced curvature, lapse/shift semantics, and the 3+1 split without collapsing those definitions into a broad concept stack.\n\nMinimal artifact: Einstein equation statement + 3+1 split definitions.",
+      "tags": [
+        "definition",
+        "equations",
+        "einstein",
+        "adm",
+        "constraints"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "field-equations-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "einstein-field-equations",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "adm-3plus1",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-field-equations-stack-stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for Einstein equations and the ADM constraint/evolution split.",
+      "nodeType": "definition",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b3fa4a3bdb5b8600a6821dc6cde1599d8993c379c7d48a0c8d2bc8d7b63cd525"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/adm-3plus1.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:d535d77287658eb17eca83a253aa2ef10251c2bde79d05e55f47dfdef589c6f3"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {
+        "equation_ref": "efe_baseline"
+      },
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "physics-foundations-tree",
+        "field-equations-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "adm_fields",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "physics-foundations-stress-energy-definition",
+      "slug": "physics-foundations-stress-energy-definition",
+      "title": "Stress-Energy Definition Contract",
+      "excerpt": "Definition-level anchor for the stress-energy tensor as the matter source term.",
+      "bodyMD": "This node captures the stress-energy definition itself so papers can bind to the source term that couples matter and energy into curvature instead of only to a broad source stack.\n\nMinimal artifact: stress-energy tensor definition + source term interpretation.",
+      "tags": [
+        "definition",
+        "stress-energy",
+        "tensor",
+        "matter",
+        "source"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "stress-energy-tensor",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-field-equations-stack-stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the stress-energy tensor as the matter source term.",
+      "nodeType": "definition",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {
+        "equation_ref": "efe_baseline"
+      },
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "physics-foundations-tree",
+        "stress-energy-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "physics-foundations-units-definition",
+      "slug": "physics-foundations-units-definition",
+      "title": "Units and Scaling Definition Contract",
+      "excerpt": "Definition-level anchor for SI/geometric unit transforms and dimensional consistency.",
+      "bodyMD": "This node captures the units-and-scaling contract itself so cross-paper matches can bind to conversion and dimensional semantics directly.\n\nMinimal artifact: SI/geometric conversion + dimensional analysis rules.",
+      "tags": [
+        "definition",
+        "units",
+        "scaling",
+        "dimensional-analysis",
+        "constants"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "units-and-scaling",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "units-systems",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "gr-units-conversion",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "dimensional-analysis",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for SI/geometric unit transforms and dimensional consistency.",
+      "nodeType": "definition",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/units-systems.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+            "content_hash": "sha256:317c2f0124a0fc42707110081ffedc44c98e2a18c393acaaf7443ba84a7c93a4"
+        },
+        {
+          "type": "code",
+          "path": "shared/gr-units.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:3301a3202c67c93541d477ead9629fdefdafac7bf19f164e5c532d8a5ad6b432"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "physics-foundations-tree",
+        "units-and-scaling"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
+      "id": "physics-foundations-viability-definition",
+      "slug": "physics-foundations-viability-definition",
+      "title": "Viability Definition Contract",
+      "excerpt": "Definition-level anchor for maturity, evidence, and claim posture.",
+      "bodyMD": "This node captures the viability definition itself so papers can bind to maturity gates, evidence posture, and no-feasibility-claim semantics directly.\n\nMinimal artifact: viability statement + certificate/integrity conditions.",
+      "tags": [
+        "definition",
+        "viability",
+        "claims",
+        "maturity",
+        "certificate"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-foundations-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "viability-and-claims",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "viability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "no-feasibility-claims",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "certificate-integrity",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for maturity, evidence, and claim posture.",
+      "nodeType": "definition",
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/viability-definition.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:409025ccc5f7268d4112bdc21c3d1fd716bbf0bcbd15bbcee1c403fa500b950b"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/no-feasibility-claims.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:76858aa3d49b270ed303e68306d5a9bb51b47c2b5ff01b5aace0c7fa61e8e33c"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/certificate-integrity.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:15f0af7ebbc8cb6535b3fd5fbbcb8e2d47a0d983f8454ad7f8d3d45b6e876842"
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "physics-foundations-tree",
+        "viability-and-claims"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "other",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {

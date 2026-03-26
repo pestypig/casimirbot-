@@ -250,6 +250,7 @@
     "hull:mis:service": "tsx scripts/hull-mis-service.ts",
     "hull:optix:service": "tsx scripts/hull-optix-service.ts",
     "hull:optix:rollout": "tsx scripts/hull-optix-rollout.ts",
+    "render:toolchain:doctor": "tsx scripts/render-scientific-toolchain-doctor.ts",
     "hull:mis:prepare": "npm run hull:mis:clone && npm run hull:mis:install-bridge",
     "hull:mis:rollout": "tsx scripts/hull-mis-rollout.ts"
   },

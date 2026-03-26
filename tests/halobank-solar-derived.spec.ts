@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { getBaryState } from "../server/modules/halobank-solar/ephemeris-core";
+import { getBaryState, resolveSupportedBody } from "../server/modules/halobank-solar/ephemeris-core";
 import { halobankSolarRouter } from "../server/routes/halobank-solar";
 
 function makeApp() {
@@ -37,6 +37,7 @@ describe("halobank solar derived route", () => {
     expect(resA.body.gate?.verdict).toBe("PASS");
     expect(resA.body.artifacts?.length).toBeGreaterThan(0);
     expect(resA.body.tree_dag?.claim_id).toBe("claim:halobank.solar:mercury_precession");
+    expect(resA.body.tree_dag?.equation_refs).toContain("efe_baseline");
     expect(resA.body).toEqual(resB.body);
   });
 
@@ -155,6 +156,492 @@ describe("halobank solar derived route", () => {
     expect(res.body.result?.observer_context?.requested_body_id).toBe(599);
     expect(res.body.result?.observer_context?.resolved_body_id).toBe(399);
     expect(res.body.result?.observer_context?.warning).toBe("HALOBANK_SOLAR_ORIENTATION_KERNEL_MISSING");
+  });
+
+  it("runs the earth-orientation precession/nutation proxy from HaloBank lunisolar forcing", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "earth_orientation_precession_nutation_proxy",
+        input: {
+          start_iso: "2026-01-01T00:00:00.000Z",
+          end_iso: "2026-03-01T00:00:00.000Z",
+          step_minutes: 360,
+        },
+        evidence_refs: ["artifact:halobank.solar.test:earth-orientation-fixture"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("earth_orientation_precession_nutation_proxy");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.dominant_driver).toBe("moon");
+    expect(res.body.result?.lunar_to_solar_ratio).toBeGreaterThan(1);
+    expect(res.body.result?.precession_driver_proxy_per_s2).toBeGreaterThan(0);
+    expect(res.body.result?.nutation_driver_proxy_rms_per_s2).toBeGreaterThan(0);
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:earth_orientation_precession_nutation_proxy");
+    expect(res.body.tree_dag?.equation_refs).toContain("tide_generating_potential_quadrupole");
+    expect(res.body.tree_dag?.equation_refs).toContain("angular_momentum_torque_balance");
+  });
+
+  it("runs the planetary-shape/orientation proxy from HaloBank lunisolar forcing", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "planetary_shape_orientation_proxy",
+        input: {
+          start_iso: "2026-01-01T00:00:00.000Z",
+          end_iso: "2026-03-01T00:00:00.000Z",
+          step_minutes: 360,
+        },
+        evidence_refs: ["artifact:halobank.solar.test:planetary-shape-orientation-fixture"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("planetary_shape_orientation_proxy");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.mean_density_proxy_kg_m3).toBeGreaterThan(0);
+    expect(res.body.result?.hydrostatic_rounding_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.potato_threshold_ratio).toBeGreaterThan(0);
+    expect(res.body.result?.rotational_flattening_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.tidal_tensor_proxy_per_s2).toBeGreaterThan(0);
+    expect(res.body.result?.love_number_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.j2_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.dynamical_ellipticity_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.precession_constant_proxy_per_s).toBeGreaterThan(0);
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:planetary_shape_orientation_proxy");
+    expect(res.body.tree_dag?.equation_refs).toContain("tidal_tensor_weak_field");
+    expect(res.body.tree_dag?.equation_refs).toContain("love_number_response_scaling");
+    expect(res.body.tree_dag?.equation_refs).toContain("quadrupole_moment_J2_definition");
+    expect(res.body.tree_dag?.equation_refs).toContain("dynamical_ellipticity_relation");
+    expect(res.body.tree_dag?.equation_refs).toContain("precession_constant_lunisolar_torque");
+  });
+
+  it("runs the planetary figure diagnostic over q, J2, love-number, and flattening closure", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "planetary_figure_diagnostic",
+        input: {
+          start_iso: "2026-01-01T00:00:00.000Z",
+          end_iso: "2026-03-01T00:00:00.000Z",
+          step_minutes: 360,
+        },
+        evidence_refs: ["artifact:halobank.solar.test:planetary-figure-diagnostic-fixture"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("planetary_figure_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.shape_regime).toBe("gravity-rounded");
+    expect(res.body.result?.flattening_from_j2_q_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.love_number_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.background_geometry?.role).toBe("background_geometry");
+    expect(res.body.result?.dynamic_forcing_geometry).toBe(null);
+    expect(res.body.result?.background_geometry?.proxies?.canonical_channel).toBe("kappa_u");
+    expect(res.body.result?.geometry_coupling?.geometry_slot).toBe("G_geometry");
+    expect(res.body.result?.geometry_coupling?.proxies?.kappa_body_m2).toBeGreaterThan(0);
+    expect(res.body.result?.geometry_coupling?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(res.body.result?.j2_abs_error).toBeGreaterThanOrEqual(0);
+    expect(res.body.result?.normalized_rms_figure_residual).toBeGreaterThanOrEqual(0);
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:planetary_figure_diagnostic");
+    expect(res.body.tree_dag?.equation_refs).toContain("planetary_figure_proxy_closure");
+    expect(res.body.tree_dag?.equation_refs).toContain("collective_observable_response_closure");
+  });
+
+  it("runs the granular tidal-response diagnostic against the Mercury compatibility surface", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "granular_tidal_response_diagnostic",
+        input: {
+          calibration_profile_id: "mercury-spin-orbit-stress-test",
+          start_iso: "2026-01-01T00:00:00.000Z",
+          end_iso: "2026-03-01T00:00:00.000Z",
+          step_minutes: 360,
+        },
+        evidence_refs: ["artifact:halobank.solar.test:granular-tidal-mercury-fixture"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("granular_tidal_response_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.target_body_id).toBe(199);
+    expect(res.body.result?.target_body_label).toBe("Mercury");
+    expect(res.body.result?.response_regime).toBe("gravity-rounded");
+    expect(res.body.result?.granular_dissipation_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.tidal_quality_factor_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.spin_state_evolution_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.angular_momentum_redistribution_proxy).toBeGreaterThan(0);
+    expect(res.body.result?.background_geometry?.role).toBe("background_geometry");
+    expect(res.body.result?.dynamic_forcing_geometry).toBe(null);
+    expect(res.body.result?.geometry_coupling?.source_quantity?.id).toBe("mean_density_proxy_kg_m3");
+    expect(res.body.result?.geometry_coupling?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(res.body.result?.observables_guardrail_id).toBe("granular-matter-response-not-consciousness");
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:granular_tidal_response_diagnostic");
+    expect(res.body.tree_dag?.equation_refs).toContain("collective_observable_response_closure");
+    expect(res.body.tree_dag?.equation_refs).toContain("granular_dissipation_scaling");
+    expect(res.body.tree_dag?.equation_refs).toContain("tidal_quality_factor_scaling");
+    expect(res.body.tree_dag?.equation_refs).toContain("spin_orbit_angular_momentum_exchange");
+  });
+
+  it("fails the granular tidal-response diagnostic deterministically when the expected regime is forced away from the calibration body", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "granular_tidal_response_diagnostic",
+        input: {
+          calibration_profile_id: "hyperion-potato-counterexample",
+          expected_response_regime: "gravity-rounded",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("granular_tidal_response_diagnostic");
+    expect(res.body.result?.target_body_id).toBe(607);
+    expect(res.body.result?.response_regime).toBe("strength-supported");
+    expect(res.body.result?.expected_response_regime).toBe("gravity-rounded");
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_GRANULAR_TIDAL_RESPONSE_REGIME_MISMATCH");
+  });
+
+  it("keeps the Mars profile as the secondary static solid-body calibration", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "planetary_figure_diagnostic",
+        input: {
+          calibration_profile_id: "mars-solid-body",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:planetary-figure-diagnostic-mars-profile"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("planetary_figure_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.calibration_profile_id).toBe("mars-solid-body");
+    expect(res.body.result?.target_body_id).toBe(499);
+    expect(res.body.result?.target_body_label).toBe("Mars");
+    expect(res.body.result?.shape_regime).toBe("gravity-rounded");
+    expect(res.body.result?.source_refs).toContain("https://doi.org/10.1029/2020GL090568");
+  });
+
+  it("uses Mercury as the primary non-Earth congruence profile and fails hard against the pinned MESSENGER gravity/tide target", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "planetary_figure_diagnostic",
+        input: {
+          calibration_profile_id: "mercury-spin-orbit-stress-test",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:planetary-figure-diagnostic-mercury-profile"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("planetary_figure_diagnostic");
+    expect(res.body.result?.calibration_profile_id).toBe("mercury-spin-orbit-stress-test");
+    expect(res.body.result?.target_body_id).toBe(199);
+    expect(res.body.result?.target_body_label).toBe("Mercury");
+    expect(res.body.result?.shape_regime).toBe("gravity-rounded");
+    expect(res.body.result?.flattening_abs_error).toBeLessThanOrEqual(0.001);
+    expect(res.body.result?.j2_abs_error).toBeGreaterThan(res.body.result?.max_j2_abs_error ?? Number.POSITIVE_INFINITY);
+    expect(res.body.result?.effective_love_number_abs_error).toBeGreaterThan(
+      res.body.result?.max_effective_love_number_abs_error ?? Number.POSITIVE_INFINITY,
+    );
+    expect(res.body.result?.normalized_rms_figure_residual).toBeGreaterThan(1);
+    expect(res.body.result?.source_refs).toContain("https://arxiv.org/abs/1608.01360");
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_PLANETARY_FIGURE_J2_MISFIT");
+  });
+
+  it("runs the Mercury cross-lane congruence diagnostic against the same-body precession and figure surfaces", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "mercury_cross_lane_congruence_diagnostic",
+        input: {
+          start_iso: "2000-01-01T00:00:00.000Z",
+          end_iso: "2030-01-01T00:00:00.000Z",
+          step_days: 5,
+        },
+        evidence_refs: ["artifact:halobank.solar.test:mercury-cross-lane-congruence-fixture"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("mercury_cross_lane_congruence_diagnostic");
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_PLANETARY_FIGURE_J2_MISFIT");
+    expect(res.body.result?.same_body_target_body_id).toBe(199);
+    expect(res.body.result?.same_body_target_body_label).toBe("Mercury");
+    expect(res.body.result?.precession_probe?.gate_verdict).toBe("PASS");
+    expect(res.body.result?.figure_probe?.gate_verdict).toBe("FAIL");
+    expect(res.body.result?.figure_probe?.target_body_id).toBe(199);
+    expect(res.body.result?.same_body_congruence_score).toBeGreaterThan(res.body.result?.thresholds?.max_combined_margin ?? 0);
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:mercury_cross_lane_congruence_diagnostic");
+    expect(res.body.tree_dag?.equation_refs).toContain("mercury_same_body_congruence_metric");
+    expect(res.body.tree_dag?.equation_refs).toContain("planetary_figure_proxy_closure");
+  });
+
+  it("exposes synthetic Saturn-moon state sources for Mimas and uses the executable diagnostic profile", async () => {
+    const app = makeApp();
+    const date = new Date("2026-01-01T00:00:00.000Z");
+    const mimasA = getBaryState(601, date);
+    const mimasB = getBaryState(601, date);
+
+    expect(resolveSupportedBody(601)?.name).toBe("Mimas");
+    expect(resolveSupportedBody(601)?.stateSource).toBe("synthetic-saturnian-satellite");
+    expect(mimasA).toEqual(mimasB);
+    expect(mimasA.pos.every((entry) => Number.isFinite(entry))).toBe(true);
+    expect(mimasA.vel.every((entry) => Number.isFinite(entry))).toBe(true);
+
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "planetary_figure_diagnostic",
+        input: {
+          calibration_profile_id: "mimas-potato-threshold",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:mimas-potato-profile"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("planetary_figure_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.calibration_profile_id).toBe("mimas-potato-threshold");
+    expect(res.body.result?.target_body_id).toBe(601);
+    expect(res.body.result?.target_body_label).toBe("Mimas");
+    expect(res.body.result?.target_body_state_source).toBe("synthetic-saturnian-satellite");
+    expect(res.body.result?.target_body_state_source_label).toContain("synthetic");
+    expect(res.body.provenance?.source_class).toBe("hybrid_diagnostic");
+    expect(res.body.result?.source_refs).toContain("https://ssd.jpl.nasa.gov/sats/phys_par/sep.html");
+  });
+
+  it("exposes synthetic Saturn-moon state sources for Hyperion and keeps the counterexample profile executable", async () => {
+    const app = makeApp();
+    const date = new Date("2026-01-01T00:00:00.000Z");
+    const hyperionA = getBaryState(607, date);
+    const hyperionB = getBaryState(607, date);
+
+    expect(resolveSupportedBody(607)?.name).toBe("Hyperion");
+    expect(resolveSupportedBody(607)?.stateSource).toBe("synthetic-saturnian-satellite");
+    expect(hyperionA).toEqual(hyperionB);
+    expect(hyperionA.pos.every((entry) => Number.isFinite(entry))).toBe(true);
+    expect(hyperionA.vel.every((entry) => Number.isFinite(entry))).toBe(true);
+
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "planetary_figure_diagnostic",
+        input: {
+          calibration_profile_id: "hyperion-potato-counterexample",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:hyperion-potato-profile"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("planetary_figure_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.calibration_profile_id).toBe("hyperion-potato-counterexample");
+    expect(res.body.result?.target_body_id).toBe(607);
+    expect(res.body.result?.target_body_label).toBe("Hyperion");
+    expect(res.body.result?.target_body_state_source).toBe("synthetic-saturnian-satellite");
+    expect(res.body.result?.target_body_state_source_label).toContain("synthetic");
+    expect(res.body.provenance?.source_class).toBe("hybrid_diagnostic");
+    expect(res.body.result?.source_refs).toContain("https://science.nasa.gov/saturn/moons/hyperion/");
+  });
+
+  it("runs the stellar observables diagnostic from the sourced GONG+SILSO replay without leaking into consciousness claims", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "stellar_observables_diagnostic",
+        input: {
+          replay_series_id: "gong-silso-cycle23-radial-band",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:stellar-observables-diagnostic-replay"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("stellar_observables_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.activity_pmode_correlation).toBeGreaterThan(0.4);
+    expect(res.body.result?.p_mode_slope_nhz_per_activity_unit).toBeGreaterThan(0);
+    expect(res.body.result?.observables_guardrail_id).toBe("stellar-plasma-observables-not-consciousness");
+    expect(res.body.result?.replay_series_id).toBe("gong-silso-cycle23-radial-band");
+    expect(res.body.result?.sample_count).toBeGreaterThanOrEqual(8);
+    expect(res.body.result?.epoch_iso_series?.length).toBe(res.body.result?.sample_count);
+    expect(res.body.result?.background_geometry?.role).toBe("background_geometry");
+    expect(res.body.result?.dynamic_forcing_geometry).toBe(null);
+    expect(res.body.result?.geometry_coupling?.source_quantity?.id).toBe("solar_mean_density_proxy_kg_m3");
+    expect(res.body.result?.geometry_coupling?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(res.body.result?.source_refs).toContain("https://www.sidc.be/SILSO/DATA/SN_m_tot_V2.0.txt");
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:stellar_observables_diagnostic");
+    expect(res.body.tree_dag?.equation_refs).toContain("collective_observable_response_closure");
+    expect(res.body.tree_dag?.equation_refs).toContain("stellar_observables_correlation_diagnostic");
+  });
+
+  it("runs the stellar flare-to-sunquake diagnostic against the replayed flare timing windows", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "stellar_flare_sunquake_diagnostic",
+        input: {
+          replay_series_id: "flare-sunquake-timing-replay",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:stellar-flare-sunquake-replay"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("stellar_flare_sunquake_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.flare_energy_helioseismic_correlation).toBeGreaterThan(0.25);
+    expect(res.body.result?.mean_timing_offset_s).toBeGreaterThan(0);
+    expect(res.body.result?.coupling_score).toBeGreaterThan(0);
+    expect(res.body.result?.solar_mean_density_proxy_kg_m3).toBeGreaterThan(0);
+    expect(res.body.result?.background_geometry?.role).toBe("background_geometry");
+    expect(res.body.result?.dynamic_forcing_geometry).toBe(null);
+    expect(res.body.result?.geometry_coupling?.source_quantity?.id).toBe("solar_mean_density_proxy_kg_m3");
+    expect(res.body.result?.geometry_coupling?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(res.body.result?.observables_guardrail_id).toBe("sunquake-not-quantum-collapse");
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:stellar_flare_sunquake_diagnostic");
+    expect(res.body.tree_dag?.equation_refs).toContain("collective_observable_response_closure");
+    expect(res.body.tree_dag?.equation_refs).toContain("flare_pressure_impulse_coupling");
+    expect(res.body.tree_dag?.equation_refs).toContain("flare_sunquake_timing_correlation");
+    expect(res.body.tree_dag?.equation_refs).toContain("sunquake_helioseismic_response");
+  });
+
+  it("runs the sunquake timing replay diagnostic with deterministic flare-to-sunquake offsets", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "sunquake_timing_replay_diagnostic",
+        input: {
+          replay_series_id: "flare-sunquake-timing-replay",
+        },
+        evidence_refs: ["artifact:halobank.solar.test:sunquake-timing-replay"],
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("sunquake_timing_replay_diagnostic");
+    expect(res.body.gate?.verdict).toBe("PASS");
+    expect(res.body.result?.sample_count).toBeGreaterThanOrEqual(3);
+    expect(res.body.result?.timing_alignment_score).toBeGreaterThan(0);
+    expect(res.body.result?.max_timing_offset_s).toBeLessThanOrEqual(600);
+    expect(res.body.result?.solar_mean_density_proxy_kg_m3).toBeGreaterThan(0);
+    expect(res.body.result?.background_geometry?.role).toBe("background_geometry");
+    expect(res.body.result?.dynamic_forcing_geometry).toBe(null);
+    expect(res.body.result?.geometry_coupling?.source_quantity?.id).toBe("solar_mean_density_proxy_kg_m3");
+    expect(res.body.result?.geometry_coupling?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(res.body.result?.observables_guardrail_id).toBe("sunquake-not-quantum-collapse");
+    expect(res.body.tree_dag?.claim_id).toBe("claim:halobank.solar:sunquake_timing_replay_diagnostic");
+    expect(res.body.tree_dag?.equation_refs).toContain("collective_observable_response_closure");
+    expect(res.body.tree_dag?.equation_refs).toContain("flare_sunquake_timing_correlation");
+    expect(res.body.tree_dag?.equation_refs).toContain("sunquake_helioseismic_response");
+  });
+
+  it("fails the stellar flare-to-sunquake diagnostic deterministically when the timing envelope is blown", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "stellar_flare_sunquake_diagnostic",
+        input: {
+          flare_peak_iso_series: [
+            "2017-09-06T12:00:00.000Z",
+            "2017-09-06T12:10:00.000Z",
+            "2017-09-06T12:20:00.000Z",
+          ],
+          sunquake_peak_iso_series: [
+            "2017-09-06T13:00:00.000Z",
+            "2017-09-06T13:10:00.000Z",
+            "2017-09-06T13:20:00.000Z",
+          ],
+          flare_energy_proxy_series: [1.0, 1.4, 2.1],
+          helioseismic_amplitude_proxy_series: [0.9, 1.3, 2.0],
+        },
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("stellar_flare_sunquake_diagnostic");
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_STELLAR_FLARE_SUNQUAKE_MEAN_TIMING_OFFSET_HIGH");
+    expect(res.body.result?.mean_timing_offset_s).toBeGreaterThan(600);
+    expect(res.body.result?.observables_guardrail_id).toBe("sunquake-not-quantum-collapse");
+  });
+
+  it("fails the sunquake timing replay diagnostic deterministically when flare and sunquake peaks drift too far apart", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "sunquake_timing_replay_diagnostic",
+        input: {
+          flare_peak_iso_series: [
+            "2011-02-15T01:44:00.000Z",
+            "2011-09-06T22:33:00.000Z",
+            "2017-09-06T12:02:00.000Z",
+          ],
+          sunquake_peak_iso_series: [
+            "2011-02-15T02:44:00.000Z",
+            "2011-09-06T23:33:00.000Z",
+            "2017-09-06T13:02:00.000Z",
+          ],
+          flare_energy_proxy_series: [1.0, 1.3, 2.2],
+          helioseismic_amplitude_proxy_series: [0.9, 1.1, 2.4],
+        },
+      })
+      .expect(200);
+
+    expect(res.body.module).toBe("sunquake_timing_replay_diagnostic");
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_SUNQUAKE_TIMING_MEAN_OFFSET_HIGH");
+    expect(res.body.result?.mean_timing_offset_s).toBeGreaterThan(300);
+    expect(res.body.result?.observables_guardrail_id).toBe("sunquake-not-quantum-collapse");
+  });
+
+  it("fails the stellar observables diagnostic deterministically when activity and p-mode shifts anti-correlate", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "stellar_observables_diagnostic",
+        input: {
+          magnetic_activity_index_series: [80, 95, 110, 130, 145, 135, 120, 100],
+          p_mode_frequency_shift_nhz_series: [78, 64, 52, 39, 28, 35, 44, 57],
+        },
+      })
+      .expect(200);
+
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_STELLAR_OBSERVABLES_ACTIVITY_MODE_CORRELATION_LOW");
+  });
+
+  it("fails the earth-orientation proxy deterministically when the sample window is underspecified", async () => {
+    const app = makeApp();
+    const res = await request(app)
+      .post("/api/halobank/derived")
+      .send({
+        module: "earth_orientation_precession_nutation_proxy",
+        input: {
+          start_iso: "2026-01-01T00:00:00.000Z",
+          end_iso: "2026-01-01T06:00:00.000Z",
+          step_minutes: 360,
+        },
+      })
+      .expect(200);
+
+    expect(res.body.gate?.verdict).toBe("FAIL");
+    expect(res.body.gate?.firstFail).toBe("HALOBANK_SOLAR_EARTH_ORIENTATION_INSUFFICIENT_SAMPLES");
   });
 
   it("detects Saros recurrence pairs in a long global eclipse window", async () => {

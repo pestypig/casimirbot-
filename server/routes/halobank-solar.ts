@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   buildSolarMetricContext,
+  loadSolarDiagnosticDatasetsManifest,
   loadSolarKernelBundle,
   loadSolarLocalRestReferenceManifest,
   loadSolarMetricContextManifest,
@@ -10,7 +11,13 @@ import {
   isCanonicalEvidenceRef,
   validateKernelBundleAssets,
 } from "../modules/halobank-solar/config";
-import { buildSolarVectorBundle, DEFAULT_VECTOR_TARGETS, getBaryState, resolveSupportedBody } from "../modules/halobank-solar/ephemeris-core";
+import {
+  buildSolarVectorBundle,
+  DEFAULT_VECTOR_TARGETS,
+  getBaryState,
+  getBodyStateSource,
+  resolveSupportedBody,
+} from "../modules/halobank-solar/ephemeris-core";
 import { runDerivedModule, runLocalRestAnchorCalibration, type DerivedModuleId } from "../modules/halobank-solar/derived";
 import { computeSolarTimeScales } from "../modules/halobank-solar/time-core";
 import { buildLocalRestSnapshot, velocityGalacticFromICRS } from "../modules/stellar/local-rest";
@@ -90,10 +97,18 @@ const DerivedBody = z
   .object({
     module: z.enum([
       "mercury_precession",
+      "mercury_cross_lane_congruence_diagnostic",
       "earth_moon_eclipse_timing",
       "resonance_libration",
       "saros_cycle",
       "jovian_moon_event_timing",
+      "earth_orientation_precession_nutation_proxy",
+      "planetary_shape_orientation_proxy",
+      "planetary_figure_diagnostic",
+      "granular_tidal_response_diagnostic",
+      "stellar_observables_diagnostic",
+      "stellar_flare_sunquake_diagnostic",
+      "sunquake_timing_replay_diagnostic",
       "solar_light_deflection",
       "inner_solar_metric_parity",
       "local_rest_anchor_calibration",
@@ -311,6 +326,29 @@ halobankSolarRouter.get("/horizons/vectors", async (req, res) => {
       aberration,
       observer,
     });
+    const vectorStateSources = Array.from(
+      new Map(
+        [...targetIds, bundle.reference.resolved_center]
+          .filter((id) => id !== 0 && Boolean(resolveSupportedBody(id)))
+          .map((id) => {
+            const body = resolveSupportedBody(id)!;
+            const source = getBodyStateSource(id);
+            return [
+              id,
+              {
+                body: id,
+                body_name: body.name,
+                source_class: source.source_class,
+                source_model: source.source_model,
+                synthetic: source.synthetic,
+                source_refs: source.source_refs,
+                note: source.note,
+              },
+            ] as const;
+          }),
+      ).values(),
+    );
+    const hasHybridVectorStateSource = vectorStateSources.some((entry) => entry.source_class === "hybrid_diagnostic");
 
     const canonicalEvidenceRefs = evidenceRefs.filter((entry) => isCanonicalEvidenceRef(entry));
     const inEpochWindow = isWithinWindow(timeScales.utc, bundleManifest.epoch_range.start_iso, bundleManifest.epoch_range.end_iso);
@@ -624,7 +662,8 @@ halobankSolarRouter.get("/horizons/vectors", async (req, res) => {
       : null;
     const provenance = {
       kernel_bundle_id: bundleManifest.bundle_id,
-      source_class: signature.ok && assets.ok ? "kernel_bundle" : "fallback",
+      source_class:
+        !signature.ok || !assets.ok ? "fallback" : hasHybridVectorStateSource ? "hybrid_diagnostic" : "kernel_bundle",
       claim_tier: "diagnostic" as const,
       certifying: false as const,
       evidence_refs: Array.from(
@@ -635,14 +674,18 @@ halobankSolarRouter.get("/horizons/vectors", async (req, res) => {
           ...(localRestCalibration ? [localRestCalibration.artifact_ref] : []),
         ]),
       ),
+      state_sources: vectorStateSources,
       signature_ok: signature.ok,
       epoch_window: {
         start_iso: bundleManifest.epoch_range.start_iso,
         end_iso: bundleManifest.epoch_range.end_iso,
       },
-      note: signature.ok && assets.ok
-        ? "Pinned kernel bundle path; diagnostic claim tier."
-        : "Kernel bundle integrity checks failed; fallback diagnostic posture.",
+      note:
+        !signature.ok || !assets.ok
+          ? "Kernel bundle integrity checks failed; fallback diagnostic posture."
+          : hasHybridVectorStateSource
+          ? "Pinned kernel bundle path with disclosed synthetic diagnostic satellite states; diagnostic claim tier."
+          : "Pinned kernel bundle path; diagnostic claim tier.",
     };
 
     return res.json({
@@ -728,6 +771,16 @@ halobankSolarRouter.post("/halobank/derived", async (req, res) => {
     const bundleManifest = await loadSolarKernelBundle();
     const metricContextManifest = await loadSolarMetricContextManifest();
     const thresholds = await loadSolarThresholds();
+    const diagnosticDatasetsManifest =
+      body.module === "planetary_shape_orientation_proxy"
+      || body.module === "planetary_figure_diagnostic"
+      || body.module === "granular_tidal_response_diagnostic"
+      || body.module === "mercury_cross_lane_congruence_diagnostic"
+      || body.module === "stellar_observables_diagnostic"
+      || body.module === "stellar_flare_sunquake_diagnostic"
+      || body.module === "sunquake_timing_replay_diagnostic"
+        ? await loadSolarDiagnosticDatasetsManifest()
+        : undefined;
     const localRestReferenceManifest = body.module === "local_rest_anchor_calibration"
       ? await loadSolarLocalRestReferenceManifest()
       : undefined;
@@ -740,6 +793,7 @@ halobankSolarRouter.post("/halobank/derived", async (req, res) => {
       thresholds,
       referenceManifest: localRestReferenceManifest,
       metricContextManifest,
+      diagnosticDatasetsManifest,
     });
 
     const startIso = typeof result.result.start_iso === "string" ? result.result.start_iso : thresholds.epoch_window.start_iso;
@@ -767,18 +821,79 @@ halobankSolarRouter.post("/halobank/derived", async (req, res) => {
     const metricContextHash = hashStableJson(metricContext);
     const metricContextArtifactRef = `artifact:halobank.solar.metric_context:${metricContextHash.slice(7, 23)}`;
     const equationRefsByModule: Record<DerivedModuleId, string[]> = {
-      mercury_precession: ["uncertainty_propagation"],
+      mercury_precession: ["efe_baseline", "uncertainty_propagation"],
+      mercury_cross_lane_congruence_diagnostic: [
+        "efe_baseline",
+        "planetary_figure_proxy_closure",
+        "mercury_same_body_congruence_metric",
+      ],
       earth_moon_eclipse_timing: ["runtime_safety_gate"],
       resonance_libration: ["uncertainty_propagation"],
       saros_cycle: ["periodicity_commensurability"],
       jovian_moon_event_timing: ["line_of_sight_occultation_geometry"],
-      solar_light_deflection: ["uncertainty_propagation"],
-      inner_solar_metric_parity: ["uncertainty_propagation"],
+      earth_orientation_precession_nutation_proxy: [
+        "tide_generating_potential_quadrupole",
+        "angular_momentum_torque_balance",
+      ],
+      planetary_shape_orientation_proxy: [
+        "collective_observable_response_closure",
+        "tidal_tensor_weak_field",
+        "love_number_response_scaling",
+        "quadrupole_moment_J2_definition",
+        "dynamical_ellipticity_relation",
+        "precession_constant_lunisolar_torque",
+        "angular_momentum_torque_balance",
+      ],
+      planetary_figure_diagnostic: [
+        "collective_observable_response_closure",
+        "planetary_figure_proxy_closure",
+        "love_number_response_scaling",
+        "quadrupole_moment_J2_definition",
+        "precession_constant_lunisolar_torque",
+      ],
+      granular_tidal_response_diagnostic: [
+        "collective_observable_response_closure",
+        "granular_dissipation_scaling",
+        "tidal_quality_factor_scaling",
+        "spin_orbit_angular_momentum_exchange",
+      ],
+      stellar_observables_diagnostic: [
+        "collective_observable_response_closure",
+        "helioseismic_inversion",
+        "solar_activity_cycle",
+        "stellar_observables_correlation_diagnostic",
+        "flare_power_law_statistics",
+        "multiscale_stellar_plasma_variability",
+      ],
+      stellar_flare_sunquake_diagnostic: [
+        "collective_observable_response_closure",
+        "flare_pressure_impulse_coupling",
+        "flare_sunquake_timing_correlation",
+        "sunquake_helioseismic_response",
+      ],
+      sunquake_timing_replay_diagnostic: [
+        "collective_observable_response_closure",
+        "flare_sunquake_timing_correlation",
+        "sunquake_helioseismic_response",
+      ],
+      solar_light_deflection: ["efe_baseline", "uncertainty_propagation"],
+      inner_solar_metric_parity: ["efe_baseline", "uncertainty_propagation"],
       local_rest_anchor_calibration: ["uncertainty_propagation"],
     };
+    const derivedStateSourceClass =
+      typeof result.result.state_source_class === "string"
+        ? result.result.state_source_class
+        : typeof result.result.same_body_target_body_state_source_class === "string"
+        ? result.result.same_body_target_body_state_source_class
+        : null;
     const provenance = {
       kernel_bundle_id: bundleManifest.bundle_id,
-      source_class: signature.ok && assets.ok ? "kernel_bundle" : "fallback",
+      source_class:
+        derivedStateSourceClass === "hybrid_diagnostic"
+          ? "hybrid_diagnostic"
+          : signature.ok && assets.ok
+          ? "kernel_bundle"
+          : "fallback",
       claim_tier: "diagnostic" as const,
       certifying: false as const,
       evidence_refs: Array.from(
@@ -791,7 +906,14 @@ halobankSolarRouter.post("/halobank/derived", async (req, res) => {
       ),
       signature_ok: signature.ok,
       epoch_window: thresholds.epoch_window,
-      note: gate.verdict === "PASS" ? "Derived module passed deterministic diagnostic gate." : "Derived module failed deterministic diagnostic gate.",
+      note:
+        derivedStateSourceClass === "hybrid_diagnostic"
+          ? gate.verdict === "PASS"
+            ? "Derived module passed deterministic diagnostic gate with synthetic satellite support disclosed in the result payload."
+            : "Derived module failed deterministic diagnostic gate with synthetic satellite support disclosed in the result payload."
+          : gate.verdict === "PASS"
+          ? "Derived module passed deterministic diagnostic gate."
+          : "Derived module failed deterministic diagnostic gate.",
     };
 
     return res.json({

@@ -3,6 +3,11 @@ import { C } from "@shared/physics-const";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  buildBackgroundGeometryFromBodyKappa,
+  buildDynamicForcingGeometryFromDriveKappa,
+} from "@shared/curvature-proxy";
+import { buildQuantumSemiclassicalComparisonResult } from "@shared/quantum-semiclassical-comparison";
+import {
   CollapseBenchmarkInput,
   CollapseBenchmarkResult,
   CollapseBenchmarkRunInput,
@@ -25,6 +30,7 @@ import { type CardLatticeMetadata } from "@shared/schema";
 import { withDerivedArtifactInformationBoundary } from "@shared/information-boundary-derived";
 import { buildInformationBoundary } from "../utils/information-boundary";
 import { buildDpInputFromAdapter } from "./dp-adapters";
+import { resolveQuantumSemiclassicalSourceReplay } from "./quantum-semiclassical-source-replay";
 
 const coerceQueryString = (v: unknown) => {
   if (typeof v === "string") return v;
@@ -130,6 +136,34 @@ export type ResolvedCollapseParams = {
 type CollapseInputLike = (TCollapseBenchmarkInput | TCollapseBenchmarkRunInput) & {
   expected_lattice_generation_hash?: string;
 };
+
+function buildCollapseGeometryChannels(input: CollapseInputLike) {
+  const backgroundGeometry =
+    typeof input.tau_estimator?.kappa_body_m2 === "number" && Number.isFinite(input.tau_estimator.kappa_body_m2)
+      ? buildBackgroundGeometryFromBodyKappa({
+          kappaBodyM2: input.tau_estimator.kappa_body_m2,
+          sourceQuantityId: "tau_estimator.kappa_body_m2",
+          note:
+            "Background geometry for the curvature-coupled collapse benchmark. The body channel remains separate from any drive channel.",
+        })
+      : null;
+
+  const dynamicForcingGeometry =
+    typeof input.tau_estimator?.kappa_drive_m2 === "number" && Number.isFinite(input.tau_estimator.kappa_drive_m2)
+      ? buildDynamicForcingGeometryFromDriveKappa({
+          kappaDriveM2: input.tau_estimator.kappa_drive_m2,
+          sourceQuantityId: "tau_estimator.kappa_drive_m2",
+          note:
+            "Dynamic forcing geometry for the curvature-coupled collapse benchmark. This remains separate from the background body channel.",
+        })
+      : null;
+
+  return {
+    backgroundGeometry,
+    dynamicForcingGeometry,
+    geometryCoupling: backgroundGeometry,
+  };
+}
 
 export function resolveCollapseParams(input: CollapseInputLike, opts: CollapseResolveOptions = {}): ResolvedCollapseParams {
   const c_mps = input.c_mps ?? C;
@@ -237,6 +271,26 @@ export function buildCollapseBenchmarkResult(
   const p_trigger = hazardProbability(resolved.dt_ms, resolved.tau_ms);
   const estimator = resolved.estimator ?? undefined;
   const dpResult = resolved.dp_result ?? undefined;
+  const geometry = buildCollapseGeometryChannels(input);
+  const quantumSourceReplay = resolveQuantumSemiclassicalSourceReplay(input.quantum_semiclassical_source_replay_id);
+  if (input.quantum_semiclassical_source_replay_id && !quantumSourceReplay) {
+    throw new Error(`unknown quantum_semiclassical_source_replay_id: ${input.quantum_semiclassical_source_replay_id}`);
+  }
+  const quantumComparison = quantumSourceReplay
+    ? buildQuantumSemiclassicalComparisonResult({
+        schema_version: "quantum_semiclassical_comparison/1",
+        tau_or_predicted_s: diagnostics.tau_s,
+        tau_measurement_proxy_s: quantumSourceReplay.tau_measurement_proxy_s,
+        measurement_timescale_kind: quantumSourceReplay.measurement_timescale_kind,
+        microtubule_transport_length_m: quantumSourceReplay.microtubule_transport_length_m,
+        subharmonic_lock_ratio: quantumSourceReplay.subharmonic_lock_ratio,
+        time_crystal_signature_pass: quantumSourceReplay.time_crystal_signature_pass,
+        notes: [
+          `source_replay_profile=${quantumSourceReplay.profile_id}`,
+          ...quantumSourceReplay.notes,
+        ],
+      })
+    : null;
 
   const rawArtifact = {
     schema_version: "collapse_benchmark/1" as const,
@@ -252,6 +306,11 @@ export function buildCollapseBenchmarkResult(
     L_present_m: diagnostics.L_present_m,
     kappa_present_m2: diagnostics.kappa_present_m2,
     diagnostics,
+    ...(geometry.backgroundGeometry ? { background_geometry: geometry.backgroundGeometry } : {}),
+    ...(geometry.dynamicForcingGeometry ? { dynamic_forcing_geometry: geometry.dynamicForcingGeometry } : {}),
+    ...(geometry.geometryCoupling ? { geometry_coupling: geometry.geometryCoupling } : {}),
+    ...(quantumSourceReplay ? { quantum_semiclassical_source_replay: quantumSourceReplay } : {}),
+    ...(quantumComparison ? { quantum_semiclassical_comparison: quantumComparison } : {}),
     ...(dpResult ? { dp: dpResult } : {}),
     ...(estimator ? { tau_estimator: { ...estimator } } : {}),
   };
@@ -285,6 +344,8 @@ export function buildCollapseBenchmarkResult(
         p_trigger,
         L_present_m: diagnostics.L_present_m,
         kappa_present_m2: diagnostics.kappa_present_m2,
+        ...(quantumSourceReplay ? { quantum_semiclassical_source_replay: quantumSourceReplay } : {}),
+        ...(quantumComparison ? { quantum_semiclassical_comparison: quantumComparison } : {}),
         ...(dpResult ? { dp: dpResult } : {}),
         ...(estimator ? { estimator } : {}),
       },
@@ -309,6 +370,7 @@ export function buildCollapseBenchmarkExplain(
   const p_trigger = hazardProbability(resolved.dt_ms, resolved.tau_ms);
   const estimator = resolved.estimator ?? undefined;
   const dpResult = resolved.dp_result ?? undefined;
+  const geometry = buildCollapseGeometryChannels(input);
 
   const informationBoundary = buildInformationBoundary({
     data_cutoff_iso,
@@ -360,6 +422,9 @@ export function buildCollapseBenchmarkExplain(
       L_present_m: diagnostics.L_present_m,
       kappa_present_m2: diagnostics.kappa_present_m2,
     },
+    ...(geometry.backgroundGeometry ? { background_geometry: geometry.backgroundGeometry } : {}),
+    ...(geometry.dynamicForcingGeometry ? { dynamic_forcing_geometry: geometry.dynamicForcingGeometry } : {}),
+    ...(geometry.geometryCoupling ? { geometry_coupling: geometry.geometryCoupling } : {}),
     ...(dpResult ? { dp: dpResult } : {}),
     ...(estimator ? { tau_estimator: estimator } : {}),
   };
@@ -379,6 +444,7 @@ export function executeCollapseRun(
   const c_mps = resolved.c_mps ?? C;
   const estimator = resolved.estimator ?? undefined;
   const dpResult = resolved.dp_result ?? undefined;
+  const geometry = buildCollapseGeometryChannels(input);
 
   const histogram_u_counts = Array.from({ length: bins }, () => 0);
   let trigger_count = 0;
@@ -468,6 +534,9 @@ export function executeCollapseRun(
     p_trigger,
     L_present_m: diagnostics.L_present_m,
     kappa_present_m2: diagnostics.kappa_present_m2,
+    ...(geometry.backgroundGeometry ? { background_geometry: geometry.backgroundGeometry } : {}),
+    ...(geometry.dynamicForcingGeometry ? { dynamic_forcing_geometry: geometry.dynamicForcingGeometry } : {}),
+    ...(geometry.geometryCoupling ? { geometry_coupling: geometry.geometryCoupling } : {}),
     trigger_count,
     trigger_rate,
     u: { mean: mean_u, min: u_min, max: u_max },

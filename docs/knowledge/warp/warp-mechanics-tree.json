@@ -16,9 +16,11 @@
       ],
       "children": [
         "warp-geometry-stack",
+        "bridge-warp-geometry-foundations-gr",
         "warp-proxy-stack",
         "warp-control-stack",
-        "warp-implementation-stack"
+        "warp-implementation-stack",
+        "bridge-warp-gr-foundations"
       ],
       "links": [
         {
@@ -130,7 +132,131 @@
           "condition": null,
           "chartDependency": null,
           "proxy": null
+        },
+        "bridge-warp-gr-foundations": {
+          "edgeType": "hierarchy",
+          "requiresCL": "none",
+          "condition": null,
+          "chartDependency": null,
+          "proxy": null
         }
+      }
+    },
+    {
+      "id": "bridge-warp-gr-foundations",
+      "title": "Warp Geometry <-> GR Foundations Bridge",
+      "excerpt": "Bridge between warp geometry definitions and shared GR foundations.",
+      "bodyMD": "Connects the warp geometry stack to the repo's shared GR foundations. This makes the Alcubierre, Natario, shift-vector, and Van Den Broeck definition anchors explicitly subordinate to the common metric / field-equation / stress-energy baseline instead of remaining isolated warp-only concepts.",
+      "tags": [
+        "bridge",
+        "warp",
+        "gr",
+        "metric",
+        "adm",
+        "foundations"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-geometry-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-units-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-viability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-field-equations-stack-stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "bridge": {
+        "left": "warp-geometry-stack",
+        "right": "physics-foundations-field-equation-definition",
+        "relation": "Warp geometry families in this repo descend from the shared GR metric, field-equation, and stress-energy foundation layer."
+      },
+      "validity": {
+        "claim_ids": [
+          "claim:warp.metric:gr_foundations_bridge"
+        ],
+        "equation_ref": "efe_baseline"
+      },
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/alcubierre-metric.md",
+          "contains": "Alcubierre metric"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/warp/natario-zero-expansion.md",
+          "contains": "zero-expansion"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "contains": "Einstein field equations"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "contains": "stress-energy tensor"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
       }
     },
     {
@@ -163,6 +289,24 @@
           "rel": "parent",
           "to": "warp-mechanics-tree",
           "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-warp-geometry-foundations-gr",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
           "requiresCL": "none"
         },
         {
@@ -311,6 +455,125 @@
       }
     },
     {
+      "id": "bridge-warp-geometry-foundations-gr",
+      "slug": "bridge-warp-geometry-foundations-gr",
+      "title": "Warp Geometry <-> GR Foundations Bridge",
+      "excerpt": "Bridge tying warp geometry definitions to shared GR metric, field-equation, and stress-energy foundations.",
+      "bodyMD": "Cross-lane bridge between warp geometry and the repo's GR foundations. Warp metrics are not a separate gravity framework; they are metric-level descendants of the shared Einstein/ADM/stress-energy foundation, with guardrail and viability layers applied downstream.",
+      "tags": [
+        "bridge",
+        "warp",
+        "general-relativity",
+        "einstein",
+        "adm",
+        "stress-energy"
+      ],
+      "nodeType": "bridge",
+      "links": [
+        {
+          "rel": "parent",
+          "to": "warp-mechanics-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-geometry-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-units-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-viability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-field-equations-stack-stress-energy-stack",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "bridge": {
+        "left": "warp-geometry-stack",
+        "right": "physics-foundations-field-equation-definition",
+        "relation": "Warp geometry is a metric-level descendant of the repo's shared GR field-equation and stress-energy foundation."
+      },
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {
+        "equation_ref": "efe_baseline"
+      },
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "warp-geometry-stack"
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:b3fa4a3bdb5b8600a6821dc6cde1599d8993c379c7d48a0c8d2bc8d7b63cd525"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:19cff33aa85b85791c4069def797748b931dd812da9dc3dabb1bf263f084de7a"
+        },
+        {
+          "type": "code",
+          "path": "modules/warp/warp-module.ts",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f1e6fcc7da193d8ee71a535447865a2afb515785e20eea4ed110e72b20556a30"
+        }
+      ],
+      "congruence": {
+        "class": "bridge",
+        "chart": null,
+        "congruenceLevel": null
+      }
+    },
+    {
       "id": "warp-bubble",
       "slug": "warp-bubble",
       "title": "Warp Bubble",
@@ -394,6 +657,7 @@
       "excerpt": "Classic warp metric with expansion and contraction regions.",
       "bodyMD": "Alcubierre metric defines a warp bubble with expansion/contraction (docs/knowledge/warp/alcubierre-metric.md).\n\nMinimal artifact: metric form and assumptions.",
       "tags": [
+        "definition",
         "alcubierre",
         "metric",
         "warp"
@@ -405,6 +669,39 @@
           "to": "warp-geometry-stack",
           "edgeType": "hierarchy",
           "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-warp-geometry-foundations-gr",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "cl3-rho-delta-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "cl3_metric_t00_available=true",
+          "note": "Metric-family claims only graduate when constraint-derived rho is tied to geometry-derived T00."
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint gate is the executable falsifier lane for metric-derived warp geometry."
         },
         {
           "rel": "congruence",
@@ -471,10 +768,28 @@
           "condition": "B(r)=1",
           "chartDependency": "lab_cartesian",
           "note": "VdB reduces to Alcubierre where B=1; region-conditional congruence."
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-units-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-viability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
-      "summary": "Classic warp metric with expansion and contraction regions.",
-      "nodeType": "concept",
+      "summary": "Definition-level anchor for the Alcubierre warp metric family.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -498,7 +813,12 @@
       "inputs": [],
       "outputs": [],
       "assumptions": [],
-      "validity": {},
+      "validity": {
+        "equation_ref": "efe_baseline",
+        "claim_ids": [
+          "claim:warp.metric:gr_definition_anchor"
+        ]
+      },
       "deterministic": null,
       "tolerance": null,
       "environment": null,
@@ -539,6 +859,7 @@
       "excerpt": "Zero-expansion warp metric variants.",
       "bodyMD": "Natario metrics focus on zero expansion scalars (docs/knowledge/warp/natario-zero-expansion.md).\n\nMinimal artifact: zero-expansion condition summary.",
       "tags": [
+        "definition",
         "natario",
         "expansion",
         "warp"
@@ -550,10 +871,54 @@
           "to": "warp-geometry-stack",
           "edgeType": "hierarchy",
           "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-warp-geometry-foundations-gr",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-audit-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "theta_contract_available=true",
+          "note": "Zero-expansion claims stay executable only when theta semantics are explicitly audited."
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-units-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-viability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
-      "summary": "Zero-expansion warp metric variants.",
-      "nodeType": "concept",
+      "summary": "Definition-level anchor for Natario-family zero-expansion warp metrics.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -577,7 +942,12 @@
       "inputs": [],
       "outputs": [],
       "assumptions": [],
-      "validity": {},
+      "validity": {
+        "equation_ref": "efe_baseline",
+        "claim_ids": [
+          "claim:warp.metric:gr_definition_anchor"
+        ]
+      },
       "deterministic": null,
       "tolerance": null,
       "environment": null,
@@ -625,6 +995,7 @@
       "excerpt": "Shift vector choices drive expansion properties.",
       "bodyMD": "Shift vectors control expansion scalars (docs/knowledge/warp/shift-vector-expansion-scalar.md).\n\nMinimal artifact: shift vector definition and expansion relation.",
       "tags": [
+        "definition",
         "shift",
         "expansion",
         "warp"
@@ -636,10 +1007,48 @@
           "to": "warp-geometry-stack",
           "edgeType": "hierarchy",
           "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-warp-geometry-foundations-gr",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "theta-audit-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "theta_contract_available=true",
+          "note": "Shift-vector and expansion semantics require theta audit evidence before promotion."
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-units-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
-      "summary": "Shift vector choices drive expansion properties.",
-      "nodeType": "concept",
+      "summary": "Definition-level anchor for shift-vector and expansion-scalar semantics in warp ADM fields.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -663,7 +1072,12 @@
       "inputs": [],
       "outputs": [],
       "assumptions": [],
-      "validity": {},
+      "validity": {
+        "equation_ref": "efe_baseline",
+        "claim_ids": [
+          "claim:warp.metric:gr_definition_anchor"
+        ]
+      },
       "deterministic": null,
       "tolerance": null,
       "environment": null,
@@ -707,6 +1121,39 @@
           "to": "warp-geometry-stack",
           "edgeType": "hierarchy",
           "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "bridge-warp-geometry-foundations-gr",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "ford-roman-qi-guardrail",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "condition": "qi_metric_derived=true",
+          "note": "VdB compression claims remain bounded by the Ford-Roman QI lane when geometry-derived sources are available."
+        },
+        {
+          "rel": "see-also",
+          "to": "pipeline-constraint-gate",
+          "edgeType": "guardrail_congruent",
+          "requiresCL": "CL4",
+          "note": "Constraint gate remains the executable falsifier lane for compressed metric geometry."
         }
       ],
       "summary": "Wall thickness controls gradients and energy needs.",
@@ -734,7 +1181,9 @@
       "inputs": [],
       "outputs": [],
       "assumptions": [],
-      "validity": {},
+      "validity": {
+        "equation_ref": "efe_baseline"
+      },
       "deterministic": null,
       "tolerance": null,
       "environment": null,
@@ -766,6 +1215,7 @@
       "excerpt": "Compression factor trades bubble interior for reduced energy.",
       "bodyMD": "VdB compression changes volume/energy tradeoffs (docs/knowledge/warp/vdb-compression-factor.md).\n\nMinimal artifact: compression factor band.",
       "tags": [
+        "definition",
         "vdb",
         "compression",
         "warp"
@@ -777,10 +1227,40 @@
           "to": "warp-geometry-stack",
           "edgeType": "hierarchy",
           "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-metric-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-field-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-stress-energy-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-units-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-foundations-viability-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
-      "summary": "Compression factor trades bubble interior for reduced energy.",
-      "nodeType": "concept",
+      "summary": "Definition-level anchor for Van Den Broeck family geometry compression semantics.",
+      "nodeType": "definition",
       "evidence": [
         {
           "type": "doc",
@@ -832,7 +1312,12 @@
       "assumptions": [
         "gamma_VdB is a scalar proxy until B(r) derivatives are modeled for CL2/CL3."
       ],
-      "validity": {},
+      "validity": {
+        "equation_ref": "efe_baseline",
+        "claim_ids": [
+          "claim:warp.metric:gr_definition_anchor"
+        ]
+      },
       "deterministic": null,
       "tolerance": null,
       "environment": null,

@@ -96,7 +96,16 @@
     "physics-foundations": {
       "status": "covered_core"
     },
+    "physics-gravitational-response": {
+      "status": "covered_extension"
+    },
     "physics_biology_life": {
+      "status": "covered_extension"
+    },
+    "physics_self_gravity_shape": {
+      "status": "covered_extension"
+    },
+    "physics_stellar_structure_nucleosynthesis": {
       "status": "covered_extension"
     },
     "physics_information_dynamics": {
@@ -115,6 +124,9 @@
       "status": "covered_extension"
     },
     "physics_thermodynamics_entropy": {
+      "status": "covered_extension"
+    },
+    "microphysics_hamiltonian_transport": {
       "status": "covered_extension"
     },
     "pipeline-ledger": {
@@ -145,6 +157,9 @@
       "status": "covered_extension"
     },
     "stellar-ps1-bridges": {
+      "status": "covered_extension"
+    },
+    "astrochemistry-prebiotic-neuro-consciousness-bridges": {
       "status": "covered_extension"
     },
     "stellar-restoration": {

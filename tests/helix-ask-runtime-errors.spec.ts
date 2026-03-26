@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as ts from "typescript";
+import * as vm from "node:vm";
 import {
   buildPromptResearchRetrievalContract,
   parsePromptResearchContract,
@@ -36,6 +38,77 @@ const toStringOrNull = (value: unknown): string | null =>
 
 const toBooleanOrNull = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
+
+const readHelixAskRouteSource = (): string =>
+  fs.readFileSync(path.join(process.cwd(), "server/routes/agi.plan.ts"), "utf8");
+
+const buildHelixAskObjectiveMiniSynthParser = (): (
+  raw: string,
+  options?: {
+    objectiveHints?: Array<{
+      objective_id: string;
+      objective_label?: string;
+      required_slots?: string[];
+    }>;
+  },
+) => unknown => {
+  const routeSource = readHelixAskRouteSource();
+  const startMarker = "const parseHelixAskObjectiveMiniSynth = (";
+  const endMarker = "\nconst applyHelixAskObjectiveMiniSynth = (";
+  const startIndex = routeSource.indexOf(startMarker);
+  const endIndex = routeSource.indexOf(endMarker, startIndex);
+  if (startIndex < 0 || endIndex < 0) {
+    throw new Error("parseHelixAskObjectiveMiniSynth source block was not found");
+  }
+
+  const miniSynthSource = routeSource.slice(startIndex, endIndex);
+  const wrappedSource = [
+    'const collectHelixAskJsonParseCandidates = () => [];',
+    `const normalizeHelixAskObjectiveSlotArray = (value) => Array.isArray(value)
+      ? Array.from(
+          new Set(
+            value
+              .map((slot) => String(slot ?? "").trim().toLowerCase().replace(/\\s+/g, "-"))
+              .filter(Boolean),
+          ),
+        )
+      : [];`,
+    'const normalizeHelixAskTurnContractText = (value, max) => String(value ?? "").trim().slice(0, max);',
+    'const normalizeSlotId = (value) => String(value ?? "").trim().toLowerCase().replace(/\\s+/g, "-");',
+    'const sanitizeHelixAskObjectiveUnknownBlock = ({ block }) => block;',
+    miniSynthSource,
+    "module.exports = parseHelixAskObjectiveMiniSynth;",
+  ].join("\n");
+
+  const transpiled = ts.transpileModule(wrappedSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+    },
+  }).outputText;
+
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+  } as {
+    module: { exports: unknown };
+    exports: unknown;
+  };
+  sandbox.exports = sandbox.module.exports;
+  vm.runInNewContext(transpiled, sandbox, {
+    filename: "parseHelixAskObjectiveMiniSynth.test.js",
+  });
+  return sandbox.module.exports as (
+    raw: string,
+    options?: {
+      objectiveHints?: Array<{
+        objective_id: string;
+        objective_label?: string;
+        required_slots?: string[];
+      }>;
+    },
+  ) => unknown;
+};
 
 const readJsonIfExists = (relPath: string): unknown | null => {
   const fullPath = path.join(process.cwd(), relPath);
@@ -1527,6 +1600,29 @@ describe("helix ask universal answer plan shadow", () => {
     expect(__testHelixAskReliabilityGuards.hashHelixAskTurnContract(contract)).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("overrides planner definition family for relation repo-anchor prompts", () => {
+    const question = "What is Needle Hull Mark 2 and how does it relate to Mercury precession?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "general",
+      requiresRepoEvidence: false,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      plannerMode: "llm",
+      plannerValid: true,
+      plannerSource: "planner_single_llm",
+      plannerPass: {
+        goal: question,
+        grounding_mode: "open",
+        output_family: "definition_overview",
+        objectives: [{ label: question }],
+      },
+    });
+    expect(contract.output_family).toBe("mechanism_process");
+  });
+
   it("builds turn-contract objective support from covered slots", () => {
     const question =
       "Plan future work for profiles, voice lane, and translation in this repo.";
@@ -1822,6 +1918,51 @@ describe("helix ask universal answer plan shadow", () => {
     );
   });
 
+  it("infers mechanism from deeper objective evidence while keeping mini evidence concise", () => {
+    const miniAnswers = __testHelixAskReliabilityGuards.buildHelixAskObjectiveMiniAnswers({
+      states: [
+        {
+          objective_id: "obj_casimir_es",
+          objective_label:
+            "que es un casimir tile en full solve congruence? responde en espanol e incluye code paths",
+          required_slots: ["mechanism", "code-path", "casimir", "tile"],
+          matched_slots: ["code-path", "casimir", "tile"],
+          status: "synthesizing",
+          attempt: 1,
+        },
+      ],
+      support: [],
+      obligationCoverage: [],
+      objectiveRetrievalSelectedFiles: [
+        {
+          objective_id: "obj_casimir_es",
+          pass_index: 1,
+          files: [
+            "docs/guarded-casimir-tile-code-mapped.md",
+            "modules/sim_core/static-casimir.ts",
+            "server/services/code-lattice/__tests__/resonance.casimir.spec.ts",
+            "modules/dynamic/dynamic-casimir.ts",
+            "docs/knowledge/physics/casimir-force-energy.md",
+            "docs/casimir-tile-roadmap.md",
+            "docs/specs/templates/casimir-tile-sem-ellipsometry-paired-run-evidence-template.v1.json",
+            "docs/audits/ticket-results/TOE-027-casimir-tiles-resonance-contract.20260218T032655Z.json",
+            "server/services/casimir/telemetry.ts",
+            "docs/casimir-tile-mechanism.md",
+            "docs/casimir-tile-schematic-roadmap.md",
+            "docs/knowledge/trees/casimir-tiles-tree.md",
+          ],
+        },
+      ],
+      fallbackEvidenceRefs: [],
+    });
+    expect(miniAnswers).toHaveLength(1);
+    expect(miniAnswers[0]?.status).toBe("covered");
+    expect(miniAnswers[0]?.matched_slots).toEqual(
+      expect.arrayContaining(["mechanism", "code-path", "casimir", "tile"]),
+    );
+    expect(miniAnswers[0]?.evidence_refs.length).toBe(8);
+  });
+
   it("can disable heuristic slot inference for objective mini answers", () => {
     const miniAnswers = __testHelixAskReliabilityGuards.buildHelixAskObjectiveMiniAnswers({
       states: [
@@ -1849,6 +1990,32 @@ describe("helix ask universal answer plan shadow", () => {
     expect(miniAnswers).toHaveLength(1);
     expect(miniAnswers[0]?.status).toBe("partial");
     expect(miniAnswers[0]?.missing_slots).toEqual(expect.arrayContaining(["voice-lane"]));
+  });
+
+  it("builds retrieval context from stage05 cards when selected previews are empty", () => {
+    const contextResult = __testHelixAskReliabilityGuards.buildAskContextFromCandidates({
+      selected: [],
+      stage05Cards: [
+        {
+          path: "docs/casimir-tile-mechanism.md",
+          kind: "doc",
+          summary: "Casimir tile mechanism uses coupled constraints and feedback loops.",
+          symbolsOrKeys: ["casimir", "mechanism", "feedback"],
+          snippets: [
+            {
+              start: 22,
+              end: 24,
+              text: "Mechanism: coupled constraints drive pressure feedback.",
+            },
+          ],
+          confidence: 0.84,
+          slotHits: ["definition", "mechanism"],
+        },
+      ],
+    });
+    expect(contextResult.files).toContain("docs/casimir-tile-mechanism.md");
+    expect(contextResult.context).toContain("docs/casimir-tile-mechanism.md");
+    expect(contextResult.context).toMatch(/Mechanism/i);
   });
 
   it("allows exactly one baseline objective retrieval attempt when agent gate is blocked", () => {
@@ -1917,6 +2084,66 @@ describe("helix ask universal answer plan shadow", () => {
     expect(targets.map((entry: { objective_id: string }) => entry.objective_id)).toEqual([
       "obj_1",
     ]);
+  });
+
+  it("expands recovery attempt budget for mechanism-like unresolved slots", () => {
+    const escalated =
+      __testHelixAskReliabilityGuards.computeHelixAskObjectiveScopedRecoveryMaxAttempts({
+        missingSlots: ["mechanism", "code-path"],
+        routingSalvageEligible: false,
+      });
+    const baseline =
+      __testHelixAskReliabilityGuards.computeHelixAskObjectiveScopedRecoveryMaxAttempts({
+        missingSlots: ["definition"],
+        routingSalvageEligible: false,
+      });
+    const salvageEscalated =
+      __testHelixAskReliabilityGuards.computeHelixAskObjectiveScopedRecoveryMaxAttempts({
+        missingSlots: ["definition"],
+        routingSalvageEligible: true,
+      });
+    expect(escalated).toBe(3);
+    expect(baseline).toBe(2);
+    expect(salvageEscalated).toBe(3);
+  });
+
+  it("builds bounded recovery escalation hints from slots and prior evidence", () => {
+    const hints =
+      __testHelixAskReliabilityGuards.buildHelixAskObjectiveScopedRecoveryEscalationHints({
+        objectiveLabel: "casimir tile mechanism in full solve congruence",
+        missingSlots: ["mechanism", "code-path"],
+        priorEvidenceRefs: [
+          "docs/casimir-tile-mechanism.md",
+          "modules/warp/warp-module.ts",
+        ],
+        maxHints: 6,
+    });
+    expect(hints.length).toBeLessThanOrEqual(6);
+    expect(hints.join(" ").toLowerCase()).toContain("mechanism");
+    expect(
+      hints.some((entry: string) => /casimir[-_/ ]tile[-_/ ]mechanism/i.test(entry)),
+    ).toBe(true);
+  });
+
+  it("builds bounded recovery query variants for parallel diversification", () => {
+    const variants =
+      __testHelixAskReliabilityGuards.buildHelixAskObjectiveScopedRecoveryQueryVariants({
+        baseQuestion: "what is a casimir tile in the full solve congruence",
+        primaryQueries: [
+          "what is a casimir tile in the full solve congruence",
+          "casimir tile mechanism",
+        ],
+        objectiveLabel: "casimir tile in full solve congruence",
+        missingSlots: ["mechanism", "code-path"],
+        maxQueries: 8,
+        maxVariants: 2,
+      });
+    expect(variants.length).toBeGreaterThanOrEqual(1);
+    expect(variants.length).toBeLessThanOrEqual(2);
+    expect(variants[0]?.length ?? 0).toBeGreaterThan(0);
+    if (variants.length > 1) {
+      expect(variants[1]).not.toEqual(variants[0]);
+    }
   });
 
   it("collects unresolved objective ids missing scoped retrieval passes", () => {
@@ -2124,6 +2351,89 @@ describe("helix ask universal answer plan shadow", () => {
     );
   });
 
+  it("parses plain-text single-objective mini synth fallbacks with status, missing slots, and evidence refs", () => {
+    const parseMiniSynth = buildHelixAskObjectiveMiniSynthParser();
+    const parsed = parseMiniSynth(
+      [
+        "status: partial",
+        "Missing slots: definition and implementation.",
+        "Evidence refs: docs/helix-ask-flow.md and server/routes/agi.plan.ts.",
+        "This mini synth is intentionally plain text.",
+      ].join("\n"),
+      {
+        objectiveHints: [
+          {
+            objective_id: "obj_mini_synth",
+            required_slots: ["definition", "implementation", "evidence"],
+          },
+        ],
+      },
+    );
+
+    const objective = asArray(asObject(parsed)?.objectives)?.[0];
+    expect(objective).toBeDefined();
+    expect(asObject(objective)?.objective_id).toBe("obj_mini_synth");
+    expect(asObject(objective)?.status).toBe("partial");
+    expect(asArray(asObject(objective)?.missing_slots)).toEqual(["definition", "implementation"]);
+    expect(asArray(asObject(objective)?.matched_slots)).toEqual(["evidence"]);
+    expect(asArray(asObject(objective)?.evidence_refs)).toEqual(
+      expect.arrayContaining(["docs/helix-ask-flow.md", "server/routes/agi.plan.ts"]),
+    );
+  });
+
+  it("normalizes complete plain-text mini synth fallbacks into covered objectives", () => {
+    const parseMiniSynth = buildHelixAskObjectiveMiniSynthParser();
+    const parsed = parseMiniSynth(
+      [
+        "Complete objective synthesis for the turn.",
+        "Missing slots: none.",
+        "Evidence refs: docs/helix-ask-flow.md, docs/helix-ask-home-stretch-plan.md.",
+      ].join("\n"),
+      {
+        objectiveHints: [
+          {
+            objective_id: "obj_mini_synth",
+            required_slots: ["definition", "implementation", "evidence"],
+          },
+        ],
+      },
+    );
+
+    const objective = asArray(asObject(parsed)?.objectives)?.[0];
+    expect(objective).toBeDefined();
+    expect(asObject(objective)?.status).toBe("covered");
+    expect(asArray(asObject(objective)?.missing_slots)).toEqual([]);
+    expect(asArray(asObject(objective)?.matched_slots)).toEqual(
+      expect.arrayContaining(["definition", "implementation", "evidence"]),
+    );
+    expect(asArray(asObject(objective)?.evidence_refs)).toEqual(
+      expect.arrayContaining([
+        "docs/helix-ask-flow.md",
+        "docs/helix-ask-home-stretch-plan.md",
+      ]),
+    );
+  });
+
+  it("keeps the current objective rewrite directive and deterministic mini-synth mode flags in source", () => {
+    const routeSource = readHelixAskRouteSource();
+    expect(routeSource).toContain(
+      "If the current draft contains blocked/unknown scaffolds, rewrite it into a direct covered answer using objective summaries and evidence.",
+    );
+    expect(routeSource).toContain("objective_mini_synth_mode");
+    expect(routeSource).toContain("objective_mini_synth_attempted");
+    expect(routeSource).toContain("objective_mini_synth_fail_reason");
+    expect(routeSource).toContain("objective_mini_synth_prompt_preview");
+    expect(routeSource).toContain("objective_mini_critic_prompt_preview");
+    expect(routeSource).toContain('objectiveMiniSynthMode = "none"');
+    expect(routeSource).toContain('objectiveMiniSynthMode = "heuristic_fallback"');
+    expect(routeSource).toContain('objectiveMiniSynthMode = "llm"');
+    expect(routeSource).toContain('reasoning_effort: objectiveMiniSynthMode === "llm" ? "medium" : null');
+    expect(routeSource).toContain('schema_valid: objectiveMiniSynthMode === "llm"');
+    expect(routeSource).toMatch(/decision:\s*objectiveMiniSynthMode\s*===\s*"llm"/);
+    expect(routeSource).toContain('answerPath.push("objectiveMiniSynth:llm")');
+    expect(routeSource).toContain('answerPath.push("objectiveMiniSynth:fallback")');
+  });
+
   it("fail-closes deterministic objective assembly when required objectives remain unresolved", () => {
     const assembled = __testHelixAskReliabilityGuards.buildDeterministicHelixAskObjectiveAssembly({
       miniAnswers: [
@@ -2261,6 +2571,36 @@ describe("helix ask universal answer plan shadow", () => {
       __testHelixAskReliabilityGuards.extractHelixAskTurnObjectiveFragments(question);
     expect(fragments).toHaveLength(1);
     expect(fragments[0].toLowerCase()).toContain("have in common");
+  });
+
+  it("preserves the primary objective when include-list tails split into multiple fragments", () => {
+    const question =
+      "give the casimir tile mechanism in full solve congruence, include exact repo code paths and explicit open gaps only";
+    const fragments =
+      __testHelixAskReliabilityGuards.extractHelixAskTurnObjectiveFragments(question);
+    expect(fragments.length).toBeGreaterThanOrEqual(3);
+    expect(fragments[0].toLowerCase()).toContain("casimir tile mechanism");
+    expect(fragments.some((entry: string) => /exact repo code paths/i.test(entry))).toBe(true);
+    expect(fragments.some((entry: string) => /explicit open gaps only/i.test(entry))).toBe(true);
+  });
+
+  it("keeps mechanism slot on the primary objective for include-list prompts", () => {
+    const question =
+      "give the casimir tile mechanism in full solve congruence, include exact repo code paths and explicit open gaps only";
+    const queryConstraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const contract = __testHelixAskReliabilityGuards.buildHelixAskTurnContract({
+      question,
+      intentDomain: "hybrid",
+      requiresRepoEvidence: false,
+      queryConstraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      plannerMode: "deterministic",
+      plannerValid: true,
+      plannerSource: "heuristic_bootstrap",
+    });
+    expect(contract.objectives.length).toBeGreaterThan(0);
+    expect(contract.objectives[0]?.required_slots).toContain("mechanism");
   });
 
   it("does not inject literal-term slots for open-world definition objectives", () => {
@@ -2940,6 +3280,22 @@ describe("helix ask universal answer plan shadow", () => {
     });
     expect(validation.fail_reasons).not.toContain("required_sections_missing");
     expect(validation.family_format_accuracy).toBe(1);
+  });
+
+  it("routes definition-plus-relation repo-anchor prompts to mechanism family", () => {
+    const question = "What is Needle Hull Mark 2 and how does it relate to Mercury precession?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: true,
+      allowedCitations: [],
+      contextFileCount: 0,
+      lockIdSeed: "ask:definition-relation-repo-anchor",
+    });
+    expect(plan.prompt_family).toBe("mechanism_process");
   });
 
   it("replaces low-signal bounded-linkage definition sentence with deterministic summary", () => {
@@ -5344,6 +5700,12 @@ describe("helix ask reliability guards", () => {
           "Implementation Roadmap:",
           "1. Add profiles.",
           "",
+          "Evidence Gaps:",
+          "- Need tighter section-level grounding on unresolved mechanisms.",
+          "",
+          "Next Anchors Needed:",
+          "- docs/helix-ask-readiness-debug-loop.md",
+          "",
           "Sources: server/routes/agi.plan.ts",
         ].join("\n"),
         promptFamily: "roadmap_planning",
@@ -5353,6 +5715,27 @@ describe("helix ask reliability guards", () => {
         compositeEnabled: false,
       });
     expect(directUse).toBe(true);
+  });
+
+  it("does not direct-use deterministic roadmap fallback when required roadmap sections are missing", () => {
+    const directUse =
+      __testHelixAskReliabilityGuards.shouldDirectUseDeterministicRepoRuntimeFallback({
+        fallbackText: [
+          "Repo-Grounded Findings:",
+          "- Current repo grounding is anchored in server/routes/agi.plan.ts.",
+          "",
+          "Implementation Roadmap:",
+          "1. Add profiles.",
+          "",
+          "Sources: server/routes/agi.plan.ts",
+        ].join("\n"),
+        promptFamily: "roadmap_planning",
+        repoGrounded: true,
+        relationIntentActive: false,
+        forceLlmProbe: false,
+        compositeEnabled: false,
+      });
+    expect(directUse).toBe(false);
   });
 
   it("direct-uses deterministic repo runtime fallback for troubleshooting answers when family sections are present", () => {
@@ -8350,7 +8733,7 @@ describe("helix ask dialogue formatting", () => {
       "utf8",
     );
     expect(routeSource).toMatch(
-      /const objectiveLoopPrimaryComposerGuard =\s*intentDomain === "general"/,
+      /const objectiveLoopPrimaryComposerGuard =\s*computeObjectiveLoopPrimaryActive\(\)\s*\|\|/,
     );
     expect(routeSource).not.toMatch(
       /const objectiveLoopPrimaryComposerGuard =\s*objectiveLoopEnabled &&/,
@@ -8398,6 +8781,33 @@ describe("helix ask dialogue formatting", () => {
     expect(routeSource).toContain("objectiveAssembly:llm_rescue");
   });
 
+  it("contains objective recovery retryability and terminal-validator markers", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("parallel_variant_applied");
+    expect(routeSource).toContain("objective_scoped_retrieval_recovery_parallel_variant_count");
+    expect(routeSource).toContain("objective_scoped_retrieval_recovery_parallel_applied_count");
+    expect(routeSource).toContain("Objective gate consistency");
+    expect(routeSource).toContain("objective_gate_consistency_blocked");
+    expect(routeSource).toContain("global_terminal_validator_applied");
+    expect(routeSource).toContain("globalTerminalValidator:rewrite");
+    expect(routeSource).toContain("global_terminal_validator_required_sections");
+    expect(routeSource).toContain("final_mode_gate_consistency_blocked");
+    expect(routeSource).toContain("objective_obligations_missing");
+    expect(routeSource).toContain("answer_obligations_missing");
+    expect(routeSource).toContain("frontier_required_headings_missing");
+    expect(routeSource).toContain("buildDeterministicFrontierDryRunContract()");
+    expect(routeSource).toContain("frontier:terminal_heading_repair");
+    expect(routeSource).toContain("frontier_terminal_heading_repair_applied");
+    expect(routeSource).toContain("roadmap_repo_grounded_findings_missing");
+    expect(routeSource).toContain("roadmap_implementation_roadmap_missing");
+    expect(routeSource).toContain("const objectivePrimaryPromise = buildAskContextFromQueries");
+    expect(routeSource).toContain("const objectiveVariantPromise =");
+    expect(routeSource).toContain("Promise.allSettled([");
+  });
+
   it("contains reasoning sidebar debug markers and event-clock formatter", () => {
     const routeSource = fs.readFileSync(
       path.join(process.cwd(), "server/routes/agi.plan.ts"),
@@ -8409,6 +8819,18 @@ describe("helix ask dialogue formatting", () => {
     expect(routeSource).toContain("reasoning_sidebar_markdown");
     expect(routeSource).toContain("reasoning_sidebar_event_count");
     expect(routeSource).toContain("## Event Clock");
+  });
+
+  it("contains objective plain-reasoning telemetry markers", () => {
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/routes/agi.plan.ts"),
+      "utf8",
+    );
+    expect(routeSource).toContain("objective_coverage_unresolved_count");
+    expect(routeSource).toContain("objective_reasoning_trace");
+    expect(routeSource).toContain("objective_telemetry_used");
+    expect(routeSource).toContain("Objective Reasoning");
+    expect(routeSource).toContain("buildHelixAskObjectivePlainReasoningTrace");
   });
 
   it("enforces ideology narrative anchors for social prompts", () => {
@@ -8937,8 +9359,37 @@ describe("objective loop primary transcript contract", () => {
     expect(toStringOrNull(debug.objective_assembly_blocked_reason)).toBe(
       "objective_assembly_unresolved_requires_unknown_blocks",
     );
+    expect(toBooleanOrNull(debug.objective_finalize_gate_passed)).toBe(false);
     expect(toStringOrNull(debug.objective_finalize_gate_mode)).toBe("unknown_terminal");
     expect(toFiniteNumber(debug.objective_unknown_block_count)).toBeGreaterThan(0);
     expect(toFiniteNumber(debug.objective_unresolved_without_unknown_block_count)).toBe(0);
+
+    const coverageUnresolvedCount = toFiniteNumber(debug.objective_coverage_unresolved_count);
+    if (coverageUnresolvedCount != null) {
+      expect(coverageUnresolvedCount).toBeGreaterThan(0);
+    }
+
+    const objectiveReasoningTrace = asArray(debug.objective_reasoning_trace);
+    if (objectiveReasoningTrace && objectiveReasoningTrace.length > 0) {
+      const first = asObject(objectiveReasoningTrace[0]);
+      expect(first).not.toBeNull();
+      if (first) {
+        expect(typeof first.objective_id).toBe("string");
+        expect(typeof first.final_status).toBe("string");
+        expect(typeof first.plain_reasoning).toBe("string");
+        expect(asObject(first.used_telemetry)).not.toBeNull();
+      }
+    }
+
+    const telemetryUsed = asObject(debug.objective_telemetry_used);
+    if (telemetryUsed) {
+      expect(toStringOrNull(telemetryUsed.version)).toBe("v1");
+      const telemetryCoverageUnresolved = toFiniteNumber(
+        telemetryUsed.objective_coverage_unresolved_count,
+      );
+      if (telemetryCoverageUnresolved != null) {
+        expect(telemetryCoverageUnresolved).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });

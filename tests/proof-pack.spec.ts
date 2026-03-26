@@ -115,6 +115,14 @@ describe("proof pack contract", () => {
       expect(kappa).toBeCloseTo(expectedKappa, 12);
     }
 
+    expect(pack.background_geometry?.role).toBe("background_geometry");
+    expect(pack.background_geometry?.proxies?.canonical_channel).toBe("kappa_u");
+    expect(pack.background_geometry?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(pack.dynamic_forcing_geometry?.role).toBe("dynamic_forcing_geometry");
+    expect(pack.dynamic_forcing_geometry?.proxies?.canonical_channel).toBe("kappa_drive");
+    expect(pack.dynamic_forcing_geometry?.stress_energy_bridge?.parity?.pass).toBe(true);
+    expect(pack.geometry_coupling?.role).toBe("background_geometry");
+
     const natario = pack.values.natario_ok.value;
     if (typeof snapshot.natarioConstraint === "boolean") {
       expect(natario).toBe(snapshot.natarioConstraint);
@@ -192,6 +200,34 @@ describe("proof pack contract", () => {
       "warp.metric.T00.natario_sdf.shift",
     );
     expect((pack.values.gr_cl3_rho_delta_metric_mean?.value as number) > 0).toBe(true);
+  });
+
+  it("emits the exploratory quantum semiclassical replay/comparison side by side with proof-pack geometry", async () => {
+    const { initializePipelineState, calculateEnergyPipeline, buildProofPack } =
+      await loadPipelineModules();
+
+    const state = initializePipelineState();
+    const snapshot = await calculateEnergyPipeline(state);
+    (snapshot as any).quantum_semiclassical_source_replay_id =
+      "kalra_2022_etomidate__bruno_2015__packet_contrast";
+    (snapshot as any).quantum_semiclassical_tau_or_predicted_s = 3.5e-3;
+    (snapshot as any).quantum_semiclassical_collapse_bound_margin = -0.1;
+
+    const pack = buildProofPack(snapshot);
+    const parsed = proofPackSchema.safeParse(pack);
+    expect(parsed.success).toBe(true);
+    expect(pack.background_geometry?.role).toBe("background_geometry");
+    expect(pack.dynamic_forcing_geometry?.role).toBe("dynamic_forcing_geometry");
+    expect(pack.quantum_semiclassical_source_replay?.profile_id).toBe(
+      "kalra_2022_etomidate__bruno_2015__packet_contrast",
+    );
+    expect(pack.quantum_semiclassical_comparison?.measurement_timescale_kind).toBe(
+      "microtubule_transport_lifetime_proxy",
+    );
+    expect(pack.quantum_semiclassical_comparison?.time_crystal_signature_pass).toBe(false);
+    expect(pack.quantum_semiclassical_comparison?.falsifiers_triggered).toContain(
+      "gravity_related_collapse_not_validated_in_biology",
+    );
   });
 
   it("does not treat VdB region II as metric source when derivative evidence is missing", async () => {

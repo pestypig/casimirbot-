@@ -1,0 +1,1048 @@
+{
+  "version": 1,
+  "rootId": "physics-self-gravity-shape-tree",
+  "nodes": [
+    {
+      "id": "physics-self-gravity-shape-tree",
+      "slug": "physics-self-gravity-shape-tree",
+      "title": "Physics Self-Gravity Shape Tree",
+      "excerpt": "Dedicated lane for self-gravity, pressure, strength, hydrostatic figures, and shape thresholds.",
+      "bodyMD": "This lane separates body-shape relaxation from external-tide and Earth-orientation response. It tracks the competition between self-gravity, internal pressure, constitutive response, granular dissipation, porous-rubble rheology, material strength, rotation, J2 quadrupole structure, and external tidal forcing. Its granular and tidal descendants now sit explicitly under the shared microphysics-to-constitutive-response backbone.",
+      "tags": [
+        "physics",
+        "gravity",
+        "planetary",
+        "shape"
+      ],
+      "children": [
+        "physics-self-gravity-shape-self-gravity-definition",
+        "physics-self-gravity-shape-internal-pressure-definition",
+        "physics-self-gravity-shape-constitutive-response-definition",
+        "physics-self-gravity-shape-material-strength-definition",
+        "physics-self-gravity-shape-granular-collision-dissipation-definition",
+        "physics-self-gravity-shape-porous-rubble-pile-rheology-definition",
+        "physics-self-gravity-shape-tidal-quality-factor-definition",
+        "physics-self-gravity-shape-spin-state-evolution-definition",
+        "physics-self-gravity-shape-angular-momentum-redistribution-definition",
+        "physics-self-gravity-shape-hydrostatic-equilibrium-shape-definition",
+        "physics-self-gravity-shape-rotational-flattening-definition",
+        "physics-self-gravity-shape-J2-definition",
+        "physics-self-gravity-shape-tidal-bulge-response-definition",
+        "physics-self-gravity-shape-potato-radius-transition-definition",
+        "physics-self-gravity-shape-granular-tidal-response-diagnostic",
+        "physics-self-gravity-shape-planetary-figure-diagnostic",
+        "physics-self-gravity-shape-equation-residual"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-microphysics-transport-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Dedicated lane for self-gravity, pressure, strength, hydrostatic figures, and shape thresholds.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/self-gravity-shape.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/potato-radius-transition.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-self-gravity-definition",
+      "slug": "physics-self-gravity-shape-self-gravity-definition",
+      "title": "Self-Gravity Definition",
+      "excerpt": "Definition-level anchor for a body's own gravitational self-attraction.",
+      "bodyMD": "This node anchors the inward gravity term produced by the body's own mass distribution. It is the load term that competes with pressure support and material strength.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "self-gravity"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-hydrostatic-equilibrium-shape-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for a body's own gravitational self-attraction.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "self_gravity_pressure_scaling",
+        "claim_ids": [
+          "claim:self.gravity_shape:self_gravity_strength_balance"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/self-gravity.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-internal-pressure-definition",
+      "slug": "physics-self-gravity-shape-internal-pressure-definition",
+      "title": "Internal Pressure Definition",
+      "excerpt": "Definition-level anchor for pressure support inside a self-gravitating body.",
+      "bodyMD": "This node anchors the continuum pressure term that balances gravity in hydrostatic equilibrium. It is shared between planets and stars, but the constitutive law differs by regime.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "pressure"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-hydrostatic-equilibrium-shape-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for pressure support inside a self-gravitating body.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "hydrostatic_equilibrium_balance",
+        "claim_ids": [
+          "claim:self.gravity_shape:internal_pressure_support"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/internal-pressure.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-constitutive-response-definition",
+      "slug": "physics-self-gravity-shape-constitutive-response-definition",
+      "title": "Constitutive Response Definition",
+      "excerpt": "Definition-level anchor for the material closure relating stress, strain, pressure, and rheology.",
+      "bodyMD": "This node anchors the constitutive closure that converts self-gravity loading into deformation response through the body's material law. It is the split point where density and pressure stop being enough on their own and the deformation law becomes explicit.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "constitutive",
+        "rheology",
+        "deformation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-tidal-tensor-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-love-number-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-hydrostatic-equilibrium-shape-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-material-strength-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-tidal-bulge-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-constitutive-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the material closure relating stress, strain, pressure, and rheology.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "claim_ids": [
+          "claim:self.gravity_shape:constitutive_response_bridge"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/self-gravity-shape.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/material-strength.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-material-strength-definition",
+      "slug": "physics-self-gravity-shape-material-strength-definition",
+      "title": "Material Strength Definition",
+      "excerpt": "Definition-level anchor for rigidity and yield resistance against rounding.",
+      "bodyMD": "This node anchors the material-strength term that delays rounding and preserves irregular shapes against self-gravity, rotation, and tidal forcing.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "strength",
+        "rheology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-potato-radius-transition-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for rigidity and yield resistance against rounding.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "potato_radius_strength_balance",
+        "claim_ids": [
+          "claim:self.gravity_shape:material_strength_threshold"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/material-strength.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-hydrostatic-equilibrium-shape-definition",
+      "slug": "physics-self-gravity-shape-hydrostatic-equilibrium-shape-definition",
+      "title": "Hydrostatic Equilibrium Shape Definition",
+      "excerpt": "Definition-level anchor for the rounded equilibrium figure of a self-gravitating body.",
+      "bodyMD": "This node anchors the rounded figure approached when self-gravity and pressure dominate material strength. It is the shape limit shared by dwarf planets and stellar interiors.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "hydrostatic",
+        "shape"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-rotational-flattening-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-tidal-bulge-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the rounded equilibrium figure of a self-gravitating body.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "hydrostatic_equilibrium_balance",
+        "claim_ids": [
+          "claim:self.gravity_shape:hydrostatic_shape_rounding"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/hydrostatic-equilibrium-shape.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-rotational-flattening-definition",
+      "slug": "physics-self-gravity-shape-rotational-flattening-definition",
+      "title": "Rotational Flattening Definition",
+      "excerpt": "Definition-level anchor for rotation-driven oblateness in a self-gravitating body.",
+      "bodyMD": "This node anchors the equatorial flattening created when centrifugal support modifies the hydrostatic balance. It is separate from the external-tide response.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "rotation",
+        "flattening"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for rotation-driven oblateness in a self-gravitating body.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "rotational_flattening_parameter",
+        "claim_ids": [
+          "claim:self.gravity_shape:rotational_flattening"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/rotational-flattening.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-J2-definition",
+      "slug": "physics-self-gravity-shape-J2-definition",
+      "title": "J2 Definition",
+      "excerpt": "Definition-level anchor for the quadrupole gravity coefficient of oblateness.",
+      "bodyMD": "This node anchors the J2 quadrupole coefficient used to summarize rotational oblateness and gravity-field asymmetry. It is the shape-side quantity that feeds orientation-response diagnostics but is not itself a full rotation model.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "J2",
+        "quadrupole",
+        "oblateness"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-self-gravity-shape-rotational-flattening-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-dynamical-ellipticity-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-precession-constant-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the quadrupole gravity coefficient of oblateness.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "quadrupole_moment_J2_definition",
+        "claim_ids": [
+          "claim:self.gravity_shape:J2_quadrupole_coefficient"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/rotational-flattening.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-axial-precession.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-tidal-bulge-response-definition",
+      "slug": "physics-self-gravity-shape-tidal-bulge-response-definition",
+      "title": "Tidal Bulge Response Definition",
+      "excerpt": "Definition-level anchor for deformation under an external tidal field.",
+      "bodyMD": "This node anchors the deformation created when an external tidal potential acts on a self-gravitating body whose interior structure sets the response amplitude and phase. It bridges into the gravitational-response lane.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "tides",
+        "bulge"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for deformation under an external tidal field.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "tide_generating_potential_quadrupole",
+        "claim_ids": [
+          "claim:self.gravity_shape:tidal_bulge_response"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/tidal-bulge-response.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-potato-radius-transition-definition",
+      "slug": "physics-self-gravity-shape-potato-radius-transition-definition",
+      "title": "Potato Radius Transition Definition",
+      "excerpt": "Definition-level anchor for the threshold where self-gravity beats material strength.",
+      "bodyMD": "This node anchors the size threshold at which self-gravity overcomes material strength and a body transitions from a strongly irregular shape toward a rounded one.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "potato-radius",
+        "threshold"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the threshold where self-gravity beats material strength.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "potato_radius_strength_balance",
+        "claim_ids": [
+          "claim:self.gravity_shape:potato_radius_transition"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/potato-radius-transition.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-granular-collision-dissipation-definition",
+      "slug": "physics-self-gravity-shape-granular-collision-dissipation-definition",
+      "title": "Granular Collision Dissipation Definition",
+      "excerpt": "Definition-level anchor for inelastic contact loss, frictional heating, and rearrangement dissipation in rubble-pile bodies.",
+      "bodyMD": "This node anchors the granular-contact dissipation channel that turns collisions, friction, and contact rearrangements into bulk energy loss inside small self-gravitating bodies. It is the bridge from multiparticle contact physics into effective rubble-pile evolution.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "granular",
+        "dissipation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-porous-rubble-pile-rheology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-tidal-quality-factor-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-effective-microphysics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for inelastic contact loss, frictional heating, and rearrangement dissipation in rubble-pile bodies.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "granular_dissipation_scaling",
+        "claim_ids": [
+          "claim:self.gravity_shape:granular_collision_dissipation"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/granular-collision-dissipation.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-porous-rubble-pile-rheology-definition",
+      "slug": "physics-self-gravity-shape-porous-rubble-pile-rheology-definition",
+      "title": "Porous Rubble-Pile Rheology Definition",
+      "excerpt": "Definition-level anchor for effective rheology in porous, frictional, viscoelastic rubble piles.",
+      "bodyMD": "This node anchors the effective bulk rheology of porous rubble piles, where void fraction, contact friction, cohesion, and rearrangement determine how the aggregate responds to tides and spin-up. The node remains a diagnostic closure, not a full contact-dynamics solver.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "rubble-pile",
+        "rheology"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-granular-collision-dissipation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-tidal-quality-factor-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-spin-state-evolution-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-constitutive-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for effective rheology in porous, frictional, viscoelastic rubble piles.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "granular_dissipation_scaling",
+        "claim_ids": [
+          "claim:self.gravity_shape:porous_rubble_pile_rheology"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/porous-rubble-pile-rheology.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-tidal-quality-factor-definition",
+      "slug": "physics-self-gravity-shape-tidal-quality-factor-definition",
+      "title": "Tidal Quality Factor Definition",
+      "excerpt": "Definition-level anchor for dissipation per cycle in a tidally forced self-gravitating body.",
+      "bodyMD": "This node anchors the quality-factor description of tidal dissipation in a small body. It packages the strength, porosity, and frictional loss properties into a diagnostic energy-loss-per-cycle quantity.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "tidal",
+        "quality-factor"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-granular-collision-dissipation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-porous-rubble-pile-rheology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-spin-state-evolution-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-kinetic-transport-closure-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for dissipation per cycle in a tidally forced self-gravitating body.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "tidal_quality_factor_scaling",
+        "claim_ids": [
+          "claim:self.gravity_shape:tidal_quality_factor"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/tidal-quality-factor.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-spin-state-evolution-definition",
+      "slug": "physics-self-gravity-shape-spin-state-evolution-definition",
+      "title": "Spin-State Evolution Definition",
+      "excerpt": "Definition-level anchor for tidal torque and collisional redistribution changing spin rate and obliquity.",
+      "bodyMD": "This node anchors the evolution of spin rate, obliquity, and spin-orbit phase under external torques and internal dissipation. It is the bridge from granular dissipation into observable spin-state change.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "spin",
+        "evolution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-tidal-quality-factor-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-angular-momentum-redistribution-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-granular-tidal-response-diagnostic",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for tidal torque and collisional redistribution changing spin rate and obliquity.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "spin_orbit_angular_momentum_exchange",
+        "claim_ids": [
+          "claim:self.gravity_shape:spin_state_evolution"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/spin-state-evolution.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-angular-momentum-redistribution-definition",
+      "slug": "physics-self-gravity-shape-angular-momentum-redistribution-definition",
+      "title": "Angular Momentum Redistribution Definition",
+      "excerpt": "Definition-level anchor for exchanges among spin, orbit, and internal granular motion.",
+      "bodyMD": "This node anchors the redistribution of angular momentum between spin, orbit, and internal motion in a granular or viscoelastic body. It is the formal place where tidal torque and collisional dissipation meet.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "angular-momentum",
+        "redistribution"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-spin-state-evolution-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for exchanges among spin, orbit, and internal motion.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "validity": {
+        "equation_ref": "spin_orbit_angular_momentum_exchange",
+        "claim_ids": [
+          "claim:self.gravity_shape:angular_momentum_redistribution"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/angular-momentum-redistribution.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-self-gravity-shape-granular-tidal-response-diagnostic",
+      "slug": "physics-self-gravity-shape-granular-tidal-response-diagnostic",
+      "title": "Granular Tidal Response Diagnostic",
+      "excerpt": "Derived diagnostic closure over granular dissipation, tidal quality factor, and spin-state evolution.",
+      "bodyMD": "This node anchors the executable diagnostic that checks whether granular dissipation, porous-rubble rheology, tidal Q, and spin-state evolution remain mutually consistent for a rubble-pile body. It is a low-order diagnostic and not a full N-body contact solver.",
+      "tags": [
+        "physics",
+        "gravity",
+        "derived",
+        "granular",
+        "tidal",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-granular-collision-dissipation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-porous-rubble-pile-rheology-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-tidal-quality-factor-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-spin-state-evolution-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-angular-momentum-redistribution-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-microphysics-transport-collective-observable-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived diagnostic closure over granular dissipation, tidal quality factor, and spin-state evolution.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "spin_orbit_angular_momentum_exchange",
+        "residual_symbol": "R_granular_tide",
+        "tolerance": {
+          "metric": "rms",
+          "max": 1,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "diagnostic_reference_band",
+          "sigma": 0.15,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/granular-tidal-response-diagnostic.md"
+        }
+      ],
+      "validity": {
+        "equation_ref": "spin_orbit_angular_momentum_exchange",
+        "claim_ids": [
+          "claim:self.gravity_shape:granular_tidal_response_diagnostic"
+        ]
+      }
+    },
+    {
+      "id": "physics-self-gravity-shape-planetary-figure-diagnostic",
+      "slug": "physics-self-gravity-shape-planetary-figure-diagnostic",
+      "title": "Planetary Figure Diagnostic",
+      "excerpt": "Derived diagnostic closure over q, J2, H, k2, flattening, and hydrostatic-shape regime.",
+      "bodyMD": "This node anchors the executable low-order diagnostic that checks whether rotational parameter, J2, dynamical ellipticity, Love-number response, and flattening stay mutually consistent for an Earth-like self-gravitating body. It remains diagnostic and does not claim certified geodesy.",
+      "tags": [
+        "physics",
+        "gravity",
+        "derived",
+        "planetary-figure",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-rotational-flattening-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-J2-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-self-gravity-shape-tidal-bulge-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-gravitational-response-dynamical-ellipticity-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-gravitational-response-precession-constant-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived diagnostic closure over q, J2, H, k2, flattening, and hydrostatic-shape regime.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "planetary_figure_proxy_closure",
+        "residual_symbol": "R_figure",
+        "tolerance": {
+          "metric": "rms",
+          "max": 1,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "diagnostic_reference_band",
+          "sigma": 0.15,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/planetary-figure-diagnostic.md"
+        }
+      ],
+      "validity": {
+        "equation_ref": "planetary_figure_proxy_closure",
+        "claim_ids": [
+          "claim:self.gravity_shape:planetary_figure_diagnostic"
+        ]
+      }
+    },
+    {
+      "id": "physics-self-gravity-shape-equation-residual",
+      "slug": "physics-self-gravity-shape-equation-residual",
+      "title": "Physics Self-Gravity Shape Equation Residual",
+      "excerpt": "Derived residual contract for self-gravity shape equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate self-gravity shape lane mismatch under declared uncertainty assumptions and approximate threshold scaling.",
+      "tags": [
+        "physics",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-self-gravity-shape-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for self-gravity shape equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-self-gravity-shape-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "hydrostatic_equilibrium_balance",
+        "residual_symbol": "R_shape",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.03,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.008,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [],
+      "validity": {
+        "equation_ref": "hydrostatic_equilibrium_balance",
+        "claim_ids": [
+          "claim:self.gravity_shape:hydrostatic_shape_rounding",
+          "claim:self.gravity_shape:potato_radius_transition"
+        ]
+      }
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

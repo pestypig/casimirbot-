@@ -1,0 +1,314 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "gravitational-response-core",
+  "domain": "gravitational-response-diagnostics",
+  "updatedAt": "2026-03-25",
+  "claims": [
+    {
+      "claimId": "claim:gravitational.response:lunisolar_tide_potential",
+      "statement": "The terrestrial lunisolar forcing anchor is only admissible at diagnostic tier when it remains explicitly tied to the conservative quadrupolar tide-generating potential and the inverse-cube Moon/Sun forcing relation, rather than being treated as a full ocean-tide solution.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response lunisolar forcing lane",
+        "constraints": [
+          "Moon and Sun forcing must remain differential forcing relative to Earth's center",
+          "the quadrupolar tide-generating-potential form must scale with inverse cube distance",
+          "the forcing definition does not by itself certify equilibrium or dynamic tide prediction"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "Canadian Tidal Manual, sections 2.2-2.4, tide-raising force and tidal potential equations.",
+          "equation": "F_tide ~ 2 G M e / r^3 ; p_tide = -(G M a^2 / (2 r^3)) (3 cos^2(alpha) - 1)",
+          "note": "Primary source for inverse-cube tide-raising forcing and quadrupole tidal potential."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "tide_generating_potential_quadrupole",
+          "note": "Canonical equation binding for the lane."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "docs/knowledge/physics/lunisolar-tide-generating-potential.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "This claim is the forcing-side definition anchor only. It does not claim a certified tide solver."
+    },
+    {
+      "claimId": "claim:gravitational.response:dynamic_tide_separation",
+      "statement": "The dynamic-tide anchor is only admissible at diagnostic tier when it remains explicitly distinct from the hydrostatic equilibrium-tide limit and is not promoted without a separate rotating, forced-dissipative ocean model.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response dynamic tide lane",
+        "constraints": [
+          "dynamic tide must remain distinct from the equilibrium tide reference state",
+          "the same lunisolar forcing input may be shared without collapsing the solution semantics",
+          "no certified dynamic-tide prediction may be claimed without separate hydrodynamic modeling"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "Canadian Tidal Manual, dynamic tide discussion and equilibrium-tide limitations.",
+          "note": "Primary tide reference for equilibrium-vs-dynamic separation."
+        },
+        {
+          "kind": "web",
+          "citation": "NOAA tides references, practical distinction between equilibrium tide and real tides.",
+          "note": "Operational reinforcement that real tides require dynamics beyond the equilibrium limit."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "docs/knowledge/physics/dynamic-tide.md",
+        "docs/knowledge/physics/equilibrium-tide.md"
+      ],
+      "notes": "This claim exists to keep the DAG honest about maturity and model class."
+    },
+    {
+      "claimId": "claim:gravitational.response:tidal_tensor_definition",
+      "statement": "The tidal-tensor anchor is only admissible at diagnostic tier when differential forcing is treated as the Hessian of the weak-field gravitational potential and not collapsed into the full hydrodynamic tide solution.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response tidal tensor lane",
+        "constraints": [
+          "the tidal tensor must be expressed as second derivatives of the potential",
+          "the node remains a local forcing descriptor rather than a full ocean-tide solver",
+          "the lane must stay distinct from constitutive deformation response"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Geophysical Journal International paper on inversion of gravity gradient tensor data.",
+          "equation": "T_ij = d2U/dx_i dx_j",
+          "note": "Defines the gravity-gradient/tidal tensor as second derivatives of the potential."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "tidal_tensor_weak_field",
+          "note": "Canonical diagnostic equation binding."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "This is the local forcing descriptor that feeds the response lane."
+    },
+    {
+      "claimId": "claim:gravitational.response:love_number_response",
+      "statement": "The Love-number anchor is only admissible at diagnostic tier when tidal response remains a dimensionless gain factor linking applied tidal potential to induced deformation or induced potential and is not treated as a certified interior inversion.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response Love-number lane",
+        "constraints": [
+          "Love numbers must be treated as response coefficients, not direct mass-profile reconstructions",
+          "the response remains dimensionless and frequency-dependent in general",
+          "the node must stay separate from the dynamic tide and precession solver semantics"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA / JPL Radio Science Techniques monograph, Love number values for planetary bodies.",
+          "note": "Love numbers are response coefficients and may be frequency dependent."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "love_number_response_scaling",
+          "note": "Canonical diagnostic equation binding."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/tidal-bulge-response.md"
+      ],
+      "notes": "This claim closes the tidal-response gain factor without over-promising a full interior inversion."
+    },
+    {
+      "claimId": "claim:gravitational.response:equatorial_bulge_torque",
+      "statement": "The equatorial-bulge torque anchor is only admissible at diagnostic tier when Earth-orientation response remains tied to external Moon/Sun torque on rotational oblateness and to the angular-momentum balance relation dL/dt = tau_ext.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response Earth-orientation torque lane",
+        "constraints": [
+          "external torque and angular momentum must be referenced about the same axis or point",
+          "the torque anchor remains a rigid-body-orientation definition rather than a full Earth-orientation series model",
+          "Moon and Sun forcing must stay distinct from fluid tide claims"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Primary Earth-science reference for Moon/Sun torque on Earth's equatorial bulge."
+        },
+        {
+          "kind": "web",
+          "citation": "Physics LibreTexts, Angular Momentum.",
+          "equation": "dL/dt = tau_ext",
+          "note": "Generic angular-momentum balance used by the diagnostic lane."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "angular_momentum_torque_balance",
+          "note": "Canonical equation binding for the torque lane."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "docs/knowledge/physics/equatorial-bulge-torque.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "This is a definitional torque anchor. It does not claim a certified precession-rate model."
+    },
+    {
+      "claimId": "claim:gravitational.response:earth_axial_precession",
+      "statement": "Earth axial precession is only admissible at diagnostic tier in this lane when it is treated as spin-axis response to Moon/Sun torque on Earth's equatorial bulge and is kept explicitly distinct from orbital perihelion precession.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response Earth axial precession lane",
+        "constraints": [
+          "the claim must distinguish spin-axis precession from orbital precession",
+          "the precession lane remains downstream of the equatorial-bulge torque definition",
+          "no certified IAU Earth-orientation series may be implied by the definition anchor alone"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Primary source for Moon/Sun torque on Earth's bulge and axial precession."
+        },
+        {
+          "kind": "web",
+          "citation": "Encyclopaedia Britannica, Precession of the Equinoxes.",
+          "note": "Concise reference for the precession-of-the-equinoxes mechanism."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "docs/knowledge/physics/earth-axial-precession.md"
+      ],
+      "notes": "This claim remains diagnostic and definitional. It is not a certified Earth-orientation time series."
+    },
+    {
+      "claimId": "claim:gravitational.response:earth_nutation",
+      "statement": "Earth nutation is only admissible at diagnostic tier in this lane when it is treated as the shorter-period modulation of the same Moon/Sun torque-on-oblateness mechanism that drives long-term axial precession.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response Earth nutation lane",
+        "constraints": [
+          "nutation must remain subordinate to the same torque-on-oblateness mechanism as axial precession",
+          "the shorter-period modulation must remain conceptually distinct from the long-period precession envelope",
+          "no certified Earth-orientation series or parameter solution may be implied by the definition anchor alone"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Primary source for the precession/nutation distinction."
+        },
+        {
+          "kind": "web",
+          "citation": "Physics LibreTexts, Angular Momentum.",
+          "equation": "dL/dt = tau_ext",
+          "note": "Shared rigid-body orientation balance used by the diagnostic lane."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "docs/knowledge/physics/earth-nutation.md",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "This claim remains diagnostic and mechanism-level."
+    },
+    {
+      "claimId": "claim:gravitational.response:dynamical_ellipticity",
+      "statement": "The dynamical-ellipticity anchor is only admissible at diagnostic tier when H is kept distinct from J2 and is used as the orientation-relevant oblateness parameter in precession and nutation models.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response dynamical-ellipticity lane",
+        "constraints": [
+          "H must remain the moment-of-inertia based oblateness parameter",
+          "H must be distinct from the J2 quadrupole coefficient even when the two are related",
+          "the lane remains a reduced-order orientation diagnostic rather than a full Earth-rotation model"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Precession and nutation of the Earth depend on the Earth's dynamical flattening, H, closely related to J2 of the geopotential.",
+          "note": "Orientation models use H as the oblateness parameter."
+        },
+        {
+          "kind": "paper",
+          "citation": "A&A 2017, dynamical adjustments in IAU 2000A nutation arising from IAU 2006 precession.",
+          "equation": "H_d = (2C - (A + B)) / (2C)",
+          "note": "Shows the dynamical-ellipticity form used in precession/nutation adjustments."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "dynamical_ellipticity_relation",
+          "note": "Canonical diagnostic equation binding."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/earth-axial-precession.md",
+        "docs/knowledge/physics/rotational-flattening.md"
+      ],
+      "notes": "This claim keeps dynamical ellipticity as an explicit bridge quantity rather than a hidden constant."
+    },
+    {
+      "claimId": "claim:gravitational.response:precession_constant",
+      "statement": "The precession-constant anchor is only admissible at diagnostic tier when lunisolar torque on Earth's equatorial bulge is mediated through dynamical ellipticity and remains separate from a certified IAU precession-nutation series.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "gravitational-response precession-constant lane",
+        "constraints": [
+          "the precession constant must be expressed as a torque-over-spin-angular-momentum diagnostic quantity",
+          "the node remains downstream of dynamical ellipticity and equatorial-bulge torque",
+          "the lane does not assert a certified precession-nutation time series"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Primary Earth-orientation reference for the torque-driven precession lane."
+        },
+        {
+          "kind": "paper",
+          "citation": "Precession and nutation of the Earth depend on the Earth's dynamical flattening, H, closely related to J2 of the geopotential.",
+          "note": "Precession-rate models use dynamical ellipticity as the bridge variable."
+        },
+        {
+          "kind": "repo-config",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "precession_constant_lunisolar_torque",
+          "note": "Canonical diagnostic equation binding."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-gravitational-response-tree.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/earth-axial-precession.md",
+        "docs/knowledge/physics/earth-nutation.md"
+      ],
+      "notes": "This claim records the reduced-order precession-rate bridge without elevating it to certified Earth orientation."
+    }
+  ]
+}

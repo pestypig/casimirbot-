@@ -87,7 +87,7 @@ const COMMAND_TARGET_REGEX = /(?:^|\s)(?:tsx|node|python|bash)\s+([./A-Za-z0-9_\
 const NPM_RUN_REGEX = /npm\s+run\s+([A-Za-z0-9:_-]+)/gim;
 const MARKDOWN_LINK_REGEX = /\[[^\]]+\]\(([^)]+)\)/gm;
 const GENERIC_PATH_REF_REGEX =
-  /(?:^|[\s(])((?:\.{1,2}\/|\/)?(?:docs|scripts|server|client|modules|configs|shared)\/[A-Za-z0-9._\/-]+\.[A-Za-z0-9]+)(?:[#?)\s]|$)/gm;
+  /(?:^|[\s("'`])((?:\.{1,2}\/|\/)?(?:docs|scripts|server|client|modules|configs|shared)\/[A-Za-z0-9._\/-]+\.[A-Za-z0-9]+)(?:[#?)\s"',:;]|$)/gm;
 
 let packageScriptCommandMapCache: Map<string, string[]> | null = null;
 

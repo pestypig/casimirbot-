@@ -1,0 +1,92 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "warp-metric-family",
+  "domain": "warp-geometry-diagnostics",
+  "updatedAt": "2026-03-24",
+  "claims": [
+    {
+      "claimId": "claim:warp.metric:gr_definition_anchor",
+      "statement": "Warp metric-family definition anchors are only admissible at diagnostic tier when they remain explicitly subordinate to the shared Einstein-equation baseline and stress-energy source semantics, rather than being treated as standalone viability claims.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "warp geometry definition anchors",
+        "constraints": [
+          "definition anchors remain below certified viability posture",
+          "equation binding must remain the shared Einstein-equation baseline",
+          "source-backed family anchors do not imply runtime admissibility without downstream guardrail and residual evidence"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Alcubierre (1994), Class. Quantum Grav. 11(5), DOI 10.1088/0264-9381/11/5/001.",
+          "equation": "warp metric family baseline",
+          "note": "Canonical warp metric-family source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Natario (2002), Class. Quantum Grav. 19(6), DOI 10.1088/0264-9381/19/6/308.",
+          "equation": "zero-expansion warp constructions",
+          "note": "Canonical zero-expansion and ADM-shift family source."
+        },
+        {
+          "kind": "paper",
+          "citation": "Van Den Broeck (1999), Class. Quantum Grav. 16(12), DOI 10.1088/0264-9381/16/12/314.",
+          "equation": "geometry compression factor family",
+          "note": "Canonical compressed-geometry family source."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/physics/physics-foundations-tree.json",
+          "note": "Shared GR metric / field-equation / stress-energy / units / viability foundation lane."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/warp/warp-mechanics-tree.json",
+        "docs/knowledge/physics/physics-foundations-tree.json",
+        "configs/physics-equation-backbone.v1.json"
+      ],
+      "notes": "This claim intentionally stops at definition-anchor maturity. It does not certify a warp solution or physical admissibility."
+    },
+    {
+      "claimId": "claim:warp.metric:gr_foundations_bridge",
+      "statement": "The warp geometry stack is only admissible as a diagnostic GR bridge when its metric-family anchors are explicitly linked to the shared metric, Einstein-equation, stress-energy, units, and viability foundations used elsewhere in the repo.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "warp to physics-foundations GR bridge",
+        "constraints": [
+          "bridge node must bind to the Einstein-equation baseline",
+          "bridge remains definitional until downstream residual and guardrail lanes are attached",
+          "proxy-only lanes such as Ford-Roman remain distinct from theorem-equivalent geometry anchors"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/warp/warp-mechanics-tree.json",
+          "note": "Warp geometry definition anchors and bridge node."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/knowledge/physics/physics-foundations-tree.json",
+          "equation": "efe_baseline",
+          "note": "Shared GR baseline and stress-energy bridge."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "configs/physics-equation-backbone.v1.json",
+          "equation": "G_mu_nu + Lambda * g_mu_nu = (8 * pi * G / c^4) * T_mu_nu",
+          "note": "Canonical equation binding used by the bridge."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/warp/warp-mechanics-tree.json",
+        "docs/knowledge/physics/physics-foundations-tree.json",
+        "configs/physics-equation-backbone.v1.json",
+        "configs/math-congruence-matrix.v1.json"
+      ],
+      "notes": "This claim exists so warp-tree bridge nodes satisfy the repo's claim/equation rails without pretending that definition-level geometry anchors are already runtime-certified."
+    }
+  ]
+}

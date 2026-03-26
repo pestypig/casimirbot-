@@ -4,6 +4,7 @@ export type AlcubierreDebugCategory =
   | "viewer_state"
   | "calc_vs_render"
   | "render_transport"
+  | "solve_to_render_pipeline"
   | "render_vs_metric_displacement"
   | "runtime_guard"
   | "metric";

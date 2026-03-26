@@ -1,15 +1,21 @@
 import React from 'react';
 import CavitySideView from './CavitySideView';
 import { useGlobalPhase } from '../hooks/useGlobalPhase';
+import {
+  NHM2_CAVITY_CONTRACT,
+  resolveNeedleHullMark2CavityViewGeometry,
+  type NeedleHullMark2CavityContract,
+} from "@shared/needle-hull-mark2-cavity-contract";
 
 export interface CavityFrameViewProps {
-  pocketDiameter_um: number;
-  sag_nm: number;
-  gap_nm: number;
-  topMirror_thick_um: number;
-  botMirror_thick_um: number;
-  alnRim_width_um: number;
-  tileWidth_mm: number;
+  contract?: NeedleHullMark2CavityContract | null;
+  pocketDiameter_um?: number;
+  sag_nm?: number;
+  gap_nm?: number;
+  topMirror_thick_um?: number;
+  botMirror_thick_um?: number;
+  alnRim_width_um?: number;
+  tileWidth_mm?: number;
   onWindow: boolean;
   modulationFreq_Hz?: number;
   verticalExaggeration?: number;
@@ -58,16 +64,37 @@ export interface CavityFrameViewProps {
  *  - Renders overlay cards (legend, scaling, inset, geometry) OUTSIDE of the SVG to avoid overlap
  */
 export const CavityFrameView: React.FC<CavityFrameViewProps> = (props) => {
+  const resolvedGeometry = React.useMemo(
+    () =>
+      resolveNeedleHullMark2CavityViewGeometry(
+        props.contract ?? NHM2_CAVITY_CONTRACT,
+        {
+          pocketDiameter_um: props.pocketDiameter_um,
+          sag_nm: props.sag_nm,
+          gap_nm: props.gap_nm,
+          topMirror_thick_um: props.topMirror_thick_um,
+          botMirror_thick_um: props.botMirror_thick_um,
+          alnRim_width_um: props.alnRim_width_um,
+          tileWidth_mm: props.tileWidth_mm,
+          modulationFreq_Hz: props.modulationFreq_Hz,
+          diaphragm_thick_um: props.diaphragm_thick_um,
+        },
+      ),
+    [
+      props.contract,
+      props.pocketDiameter_um,
+      props.sag_nm,
+      props.gap_nm,
+      props.topMirror_thick_um,
+      props.botMirror_thick_um,
+      props.alnRim_width_um,
+      props.tileWidth_mm,
+      props.modulationFreq_Hz,
+      props.diaphragm_thick_um,
+    ],
+  );
   const {
-    pocketDiameter_um,
-    sag_nm,
-    gap_nm,
-    topMirror_thick_um,
-    botMirror_thick_um,
-    alnRim_width_um,
-    tileWidth_mm,
     onWindow,
-    modulationFreq_Hz,
     verticalExaggeration = 8000,
     gapTargetPxFor1nm,
     mirrorCompression,
@@ -78,6 +105,17 @@ export const CavityFrameView: React.FC<CavityFrameViewProps> = (props) => {
     sagPhaseSource = 'global',
     className = ''
   } = props;
+  const {
+    pocketDiameter_um,
+    sag_nm,
+    gap_nm,
+    topMirror_thick_um,
+    botMirror_thick_um,
+    alnRim_width_um,
+    tileWidth_mm,
+    modulationFreq_Hz,
+    diaphragm_thick_um,
+  } = resolvedGeometry;
 
   // Global phase (smooth scroll/time hybrid)
   const phase = useGlobalPhase({ mode: 'auto', periodMs: 10000, damp: 0.12, publishBus: false });
@@ -137,7 +175,7 @@ export const CavityFrameView: React.FC<CavityFrameViewProps> = (props) => {
           omega_rad_s={props.omega_rad_s}
           f_Hz={props.f_Hz ?? modulationFreq_Hz}
           stroke_pm={props.stroke_pm}
-          diaphragm_thick_um={props.diaphragm_thick_um}
+          diaphragm_thick_um={diaphragm_thick_um}
           showRelationsLegend={props.showRelationsLegend}
           tauCurv_ms={props.tauCurv_ms}
           geometryFactor_Ohm={props.geometryFactor_Ohm}

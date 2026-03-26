@@ -6,20 +6,35 @@
       "id": "physics-thermodynamics-entropy-tree",
       "slug": "physics-thermodynamics-entropy-tree",
       "title": "Physics Thermodynamics Entropy Tree",
-      "excerpt": "Dedicated lane for thermodynamic irreversibility and entropy-gradient constraints.",
-      "bodyMD": "This lane anchors entropy-first route determinism for life-emergence manifest paths.",
+      "excerpt": "Dedicated lane for statistical mechanics, external-potential response, and entropy-gradient constraints.",
+      "bodyMD": "This lane anchors equilibrium statistical mechanics, external-potential response, and entropy-first route determinism. The shared parent for downstream granular and plasma transport descendants is the microphysics-to-closure backbone rather than a direct entropy-only shortcut.",
       "tags": [
         "physics",
         "thermodynamics",
-        "entropy"
+        "entropy",
+        "statistical-mechanics"
       ],
       "children": [
         "entropy-gradient",
         "arrow-of-time",
+        "physics-thermodynamics-many-body-hamiltonian-definition",
+        "physics-thermodynamics-intermolecular-potential-definition",
+        "physics-thermodynamics-structure-response-definition",
+        "physics-thermodynamics-virial-equation-of-state-definition",
+        "physics-thermodynamics-classical-density-functional-response-definition",
+        "physics-thermodynamics-equilibrium-tide-definition",
+        "physics-thermodynamics-optical-trapping-definition",
         "physics-thermodynamics-entropy-equation-residual"
       ],
-      "links": [],
-      "summary": "Dedicated lane for thermodynamic irreversibility and entropy-gradient constraints.",
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-microphysics-transport-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Dedicated lane for statistical mechanics, external-potential response, and entropy-gradient constraints.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
@@ -94,6 +109,344 @@
         {
           "type": "doc",
           "path": "docs/knowledge/physics/arrow-of-time.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-many-body-hamiltonian-definition",
+      "slug": "physics-thermodynamics-many-body-hamiltonian-definition",
+      "title": "Many-Body Hamiltonian Definition",
+      "excerpt": "Definition-level anchor for equilibrium many-body statistical mechanics with external potentials.",
+      "bodyMD": "This node anchors the common starting point used by the source text: a many-body Hamiltonian with interparticle interactions and one-body external potentials, from which partition functions, free energies, and response kernels are derived. Within the broader repo this node feeds the shared many-body Hamiltonian and closure backbone instead of directly producing dissipative observables.",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "many-body",
+        "statistical-mechanics",
+        "partition-function",
+        "external-potential"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-intermolecular-potential-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-structure-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-classical-density-functional-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-microphysics-transport-many-body-hamiltonian-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-microphysics-transport-constitutive-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for equilibrium many-body statistical mechanics with external potentials.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/many-body-statistical-mechanics.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-intermolecular-potential-definition",
+      "slug": "physics-thermodynamics-intermolecular-potential-definition",
+      "title": "Intermolecular Potential Definition",
+      "excerpt": "Definition-level anchor for Born-Oppenheimer surfaces and effective intermolecular potentials u(r).",
+      "bodyMD": "This node anchors the electronic-structure-to-u(r) step: Born-Oppenheimer separation produces nuclear-coordinate energy surfaces that are represented as effective intermolecular potentials, with pair, anisotropic, and many-body terms when needed.",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "born-oppenheimer",
+        "intermolecular-potential",
+        "sapt",
+        "lennard-jones"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-structure-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-virial-equation-of-state-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-microphysics-transport-effective-microphysics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for Born-Oppenheimer surfaces and effective intermolecular potentials u(r).",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/intermolecular-potentials.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-structure-response-definition",
+      "slug": "physics-thermodynamics-structure-response-definition",
+      "title": "Structure and Response Definition",
+      "excerpt": "Definition-level anchor for g(r), h(r), S(k), compressibility, and static density response.",
+      "bodyMD": "This node anchors the correlation/response step: pair correlation g(r), total correlation h(r)=g(r)-1, and static structure factor S(k) connect scattering observables, compressibility, and linear response delta n(k) = - beta n S(k) delta U_ext(k).",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "pair-correlation",
+        "structure-factor",
+        "compressibility",
+        "linear-response"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-classical-density-functional-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for g(r), h(r), S(k), compressibility, and static density response.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/pair-correlation-structure-factor.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-virial-equation-of-state-definition",
+      "slug": "physics-thermodynamics-virial-equation-of-state-definition",
+      "title": "Virial Equation of State Definition",
+      "excerpt": "Definition-level anchor for virial coefficients, compressibility factor Z, and low-density equations of state.",
+      "bodyMD": "This node anchors the low-density route from u(r) to B_n(T) and Z, including the Mayer f-function statement of B_2(T) for isotropic pair potentials.",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "virial",
+        "equation-of-state",
+        "mayer-f-function",
+        "compressibility-factor"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-lunisolar-tide-potential-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-dynamic-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for virial coefficients, compressibility factor Z, and low-density equations of state.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/virial-equation-of-state.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-classical-density-functional-response-definition",
+      "slug": "physics-thermodynamics-classical-density-functional-response-definition",
+      "title": "Classical Density Functional Response Definition",
+      "excerpt": "Definition-level anchor for Helmholtz and grand-potential minimization in external fields.",
+      "bodyMD": "This node anchors the equilibrium response step: partition functions and free energies produce F, mu, and P, while classical density functional theory uses delta F/delta n + U_ext = mu and related linear-response forms to compute nonuniform equilibrium profiles.",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "cdft",
+        "external-potential",
+        "free-energy",
+        "chemical-potential",
+        "linear-response"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-equilibrium-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-optical-trapping-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-microphysics-transport-collective-observable-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for Helmholtz and grand-potential minimization in external fields.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/classical-density-functional-theory.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-equilibrium-tide-definition",
+      "slug": "physics-thermodynamics-equilibrium-tide-definition",
+      "title": "Equilibrium Tide Definition",
+      "excerpt": "Definition-level anchor for the hydrostatic equilibrium-tide limit.",
+      "bodyMD": "This node anchors the hydrostatic limit of tidal response: pressure gradients balance gravity or tidal potentials, free surfaces follow equipotentials, and the equilibrium tide is the no-inertia, no-dissipation reference state rather than the full forced-dissipative ocean problem.",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "equilibrium-tide",
+        "tidal-potential",
+        "hydrostatic",
+        "equipotential"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the hydrostatic equilibrium-tide limit.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/equilibrium-tide.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-thermodynamics-optical-trapping-definition",
+      "slug": "physics-thermodynamics-optical-trapping-definition",
+      "title": "Optical Trapping Definition",
+      "excerpt": "Definition-level anchor for optical dipole potentials and trapped-particle redistribution.",
+      "bodyMD": "This node anchors optical trapping as an external-potential response problem: induced-dipole or gradient forces generate U_opt, dilute ensembles relax toward Boltzmann weights, and interacting suspensions can be treated through the same free-energy minimization structure.",
+      "tags": [
+        "physics",
+        "thermodynamics",
+        "definition",
+        "optical-trapping",
+        "optical-potential",
+        "dipole-potential",
+        "gradient-force",
+        "boltzmann"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-thermodynamics-entropy-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for optical dipole potentials and trapped-particle redistribution.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-thermodynamics-entropy-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/optical-trapping.md"
         }
       ]
     },

@@ -86,6 +86,7 @@ type ScenarioContext = {
   width: number;
   height: number;
   attachmentDownsample: number;
+  baseUrl: string;
 };
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
@@ -238,11 +239,40 @@ const buildScenarioPayload = (
   scenarioId: ScenarioId,
   context: ScenarioContext,
 ): HullMisRenderRequestV1 => {
+  const metricRefFor = (
+    dims: [number, number, number],
+    time_s: number,
+    dt_s: number,
+    source: string,
+    chart: string,
+  ): NonNullable<HullMisRenderRequestV1["metricVolumeRef"]> => {
+    const params = new URLSearchParams();
+    params.set("dims", `${dims[0]}x${dims[1]}x${dims[2]}`);
+    params.set("time_s", String(time_s));
+    params.set("dt_s", String(dt_s));
+    params.set("includeExtra", "1");
+    params.set("includeKij", "1");
+    params.set("includeMatter", "0");
+    params.set("format", "raw");
+    const url = `${normalizeBaseUrl(context.baseUrl)}/api/helix/gr-evolve-brick?${params.toString()}`;
+    return {
+      kind: "gr-evolve-brick",
+      url,
+      source,
+      chart,
+      dims,
+      updatedAt: Date.now(),
+      hash: `${source}|${chart}|${dims.join("x")}|${time_s}|${dt_s}`,
+    };
+  };
   const progress = context.frameCount <= 1 ? 0 : context.frameIndex / (context.frameCount - 1);
   if (scenarioId === "nhm2") {
     const beta = 0.05 + 0.32 * progress;
     const sigma = 5.8 + 0.8 * Math.sin(Math.PI * progress);
     const radius = 1.0 + 0.09 * Math.cos(Math.PI * progress * 2);
+    const dims: [number, number, number] = [96, 96, 96];
+    const time_s = progress;
+    const dt_s = 0.01;
     return {
       version: 1,
       requestId: `capture-${scenarioId}-${context.frameIndex + 1}`,
@@ -273,16 +303,26 @@ const buildScenarioPayload = (
       metricSummary: {
         source: "warp.nhm2.command.capture",
         chart: "comoving_cartesian",
-        dims: [96, 96, 96],
+        dims,
         alphaRange: [1, 1],
         consistency: "ok",
         updatedAt: Date.now(),
       },
+      metricVolumeRef: metricRefFor(
+        dims,
+        time_s,
+        dt_s,
+        "warp.nhm2.command.capture",
+        "comoving_cartesian",
+      ),
     };
   }
 
   const beta = 0.0014 + 0.0009 * Math.sin(Math.PI * 2 * progress);
   const radius = 0.42 + 0.03 * Math.cos(Math.PI * 2 * progress);
+  const dims: [number, number, number] = [96, 96, 48];
+  const time_s = progress;
+  const dt_s = 0.01;
   return {
     version: 1,
     requestId: `capture-${scenarioId}-${context.frameIndex + 1}`,
@@ -313,11 +353,18 @@ const buildScenarioPayload = (
     metricSummary: {
       source: "gr.mercury.teaching.capture",
       chart: "schwarzschild_teaching",
-      dims: [96, 96, 48],
+      dims,
       alphaRange: [1, 1],
       consistency: "ok",
       updatedAt: Date.now(),
     },
+    metricVolumeRef: metricRefFor(
+      dims,
+      time_s,
+      dt_s,
+      "gr.mercury.teaching.capture",
+      "schwarzschild_teaching",
+    ),
   };
 };
 
@@ -870,6 +917,7 @@ const runCapture = async (options: CaptureOptions) => {
         width: options.width,
         height: options.height,
         attachmentDownsample: options.attachmentDownsample,
+        baseUrl,
       });
       const frame = await requestFrame(baseUrl, payload, options.timeoutMs);
       if (options.requireProxy && frame.backend !== "proxy") {

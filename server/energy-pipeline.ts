@@ -1241,6 +1241,9 @@ export interface EnergyPipelineState {
   experimental?: {
     casimirForce?: CasimirForceDataset;
   };
+  quantum_semiclassical_source_replay_id?: string | null;
+  quantum_semiclassical_tau_or_predicted_s?: number | null;
+  quantum_semiclassical_collapse_bound_margin?: number | null;
 
   // Hull geometry
   hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic stack ~1 m; default auto-tunes to modulation dwell

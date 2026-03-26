@@ -1,15 +1,21 @@
 import React from 'react';
 import CavitySideView from './CavitySideView';
 import { computeCavityScaling } from './cavityScaling';
+import {
+  NHM2_CAVITY_CONTRACT,
+  resolveNeedleHullMark2CavityViewGeometry,
+  type NeedleHullMark2CavityContract,
+} from "@shared/needle-hull-mark2-cavity-contract";
 
 export interface CavityCrossSectionSplitProps {
-  pocketDiameter_um: number;
-  sag_nm: number;
-  gap_nm: number;
-  topMirror_thick_um: number;
-  botMirror_thick_um: number;
-  alnRim_width_um: number;
-  tileWidth_mm: number;
+  contract?: NeedleHullMark2CavityContract | null;
+  pocketDiameter_um?: number;
+  sag_nm?: number;
+  gap_nm?: number;
+  topMirror_thick_um?: number;
+  botMirror_thick_um?: number;
+  alnRim_width_um?: number;
+  tileWidth_mm?: number;
   onWindow: boolean;
   verticalExaggeration?: number;
   gapTargetPxFor1nm?: number;
@@ -34,6 +40,44 @@ export interface CavityCrossSectionSplitProps {
  * right = info panel (geometry, scaling, legend, inset stack) for clarity.
  */
 export function CavityCrossSectionSplit(props: CavityCrossSectionSplitProps) {
+  const resolvedGeometry = React.useMemo(
+    () =>
+      resolveNeedleHullMark2CavityViewGeometry(
+        props.contract ?? NHM2_CAVITY_CONTRACT,
+        {
+          pocketDiameter_um: props.pocketDiameter_um,
+          sag_nm: props.sag_nm,
+          gap_nm: props.gap_nm,
+          topMirror_thick_um: props.topMirror_thick_um,
+          botMirror_thick_um: props.botMirror_thick_um,
+          alnRim_width_um: props.alnRim_width_um,
+          tileWidth_mm: props.tileWidth_mm,
+          modulationFreq_Hz: props.modulationFreq_Hz,
+          diaphragm_thick_um: props.diaphragm_thick_um,
+        },
+      ),
+    [
+      props.contract,
+      props.pocketDiameter_um,
+      props.sag_nm,
+      props.gap_nm,
+      props.topMirror_thick_um,
+      props.botMirror_thick_um,
+      props.alnRim_width_um,
+      props.tileWidth_mm,
+      props.modulationFreq_Hz,
+      props.diaphragm_thick_um,
+    ],
+  );
+  const {
+    verticalExaggeration = 8000,
+    gapTargetPxFor1nm,
+    mirrorCompression,
+    animateSag = true,
+    sagOscillationFraction = 0.3,
+    height = 360,
+    onWindow,
+  } = props;
   const {
     pocketDiameter_um,
     sag_nm,
@@ -41,15 +85,10 @@ export function CavityCrossSectionSplit(props: CavityCrossSectionSplitProps) {
     topMirror_thick_um,
     botMirror_thick_um,
     tileWidth_mm,
-    verticalExaggeration = 8000,
-    gapTargetPxFor1nm,
-    mirrorCompression,
-    animateSag = true,
-    sagOscillationFraction = 0.3,
+    alnRim_width_um,
     modulationFreq_Hz,
-    height = 360,
-    onWindow,
-  } = props;
+    diaphragm_thick_um,
+  } = resolvedGeometry;
 
   // Safe fallback for standalone usage (align with Amplifier default): 2.9 nm
   const sag_nm_eff = (Number.isFinite(sag_nm as number) && (sag_nm as number) > 0) ? (sag_nm as number) : 2.9;
@@ -76,10 +115,10 @@ export function CavityCrossSectionSplit(props: CavityCrossSectionSplitProps) {
         <CavitySideView
           pocketDiameter_um={pocketDiameter_um}
           sag_nm={sag_nm_eff}
-            gap_nm={gap_nm}
+          gap_nm={gap_nm}
           topMirror_thick_um={topMirror_thick_um}
           botMirror_thick_um={botMirror_thick_um}
-          alnRim_width_um={props.alnRim_width_um}
+          alnRim_width_um={alnRim_width_um}
           tileWidth_mm={tileWidth_mm}
           onWindow={onWindow}
           height={height}
@@ -96,7 +135,7 @@ export function CavityCrossSectionSplit(props: CavityCrossSectionSplitProps) {
           omega_rad_s={props.omega_rad_s}
           f_Hz={modulationFreq_Hz}
           stroke_pm={props.stroke_pm}
-          diaphragm_thick_um={props.diaphragm_thick_um}
+          diaphragm_thick_um={diaphragm_thick_um}
           showRelationsLegend={props.showRelationsLegend}
         />
       </div>

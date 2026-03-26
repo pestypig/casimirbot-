@@ -4196,6 +4196,48 @@ type AskLiveEventEntry = {
   meta?: Record<string, unknown>;
 };
 
+type HelixAskObjectiveUnknownBlockTrace = {
+  unknown: string;
+  why: string;
+  whatIChecked: string[];
+  nextRetrieval: string;
+};
+
+type HelixAskObjectiveReasoningTrace = {
+  objectiveId: string;
+  objectiveLabel: string;
+  finalStatus: string;
+  plainReasoning: string;
+  transitionTail: string[];
+  unknownBlock: HelixAskObjectiveUnknownBlockTrace | null;
+  usedTelemetry: {
+    requiredSlots: string[];
+    matchedSlots: string[];
+    missingSlots: string[];
+    retrievalConfidence: number | null;
+    evidenceRefs: string[];
+    evidenceRefCount: number | null;
+    retrievalPassCount: number | null;
+    scopedRetrievalObserved: boolean | null;
+    objectiveOesScore: number | null;
+    objectiveOesThreshold: number | null;
+    objectiveOesPass: boolean | null;
+    miniCriticReason: string | null;
+    terminalizationReason: string | null;
+    blockedReason: string | null;
+  };
+};
+
+type HelixAskObjectiveTelemetryUsedSummary = {
+  coverageUnresolvedCount: number | null;
+  coverageUnresolvedObjectiveIds: string[];
+  unknownBlockCount: number | null;
+  unresolvedWithoutUnknownBlockCount: number | null;
+  missingScopedRetrievalCount: number | null;
+  finalizeGateMode: string | null;
+  finalizeGatePassed: boolean | null;
+};
+
 type ContextCapsulePreview = {
   id: string;
   loading: boolean;
@@ -5947,6 +5989,189 @@ function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
 function buildAskLiveEventLogExport(events: AskLiveEventEntry[]): string {
   if (!events.length) return "";
   return events.map((event) => formatAskLiveEventLogLine(event)).join("\n");
+}
+
+function resolveObjectiveReasoningTrace(
+  debug: HelixAskReply["debug"] | undefined,
+): HelixAskObjectiveReasoningTrace[] {
+  const debugRecord = asObjectRecord(debug as unknown);
+  if (!debugRecord) return [];
+  const traceRows = Array.isArray(debugRecord.objective_reasoning_trace)
+    ? debugRecord.objective_reasoning_trace
+    : [];
+  const out: HelixAskObjectiveReasoningTrace[] = [];
+  const readString = (value: unknown): string | null =>
+    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const readNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+  const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+  for (const row of traceRows) {
+    const record = asObjectRecord(row);
+    if (!record) continue;
+    const objectiveId = readString(record.objective_id) ?? "unknown_objective";
+    const objectiveLabel = readString(record.objective_label) ?? objectiveId;
+    const finalStatus = readString(record.final_status) ?? "unknown";
+    const plainReasoning = readString(record.plain_reasoning) ?? `Status ${finalStatus}.`;
+    const transitionTail = asStringArray(record.transition_tail).slice(0, 8);
+    const unknownBlockRecord = asObjectRecord(record.unknown_block);
+    const unknownBlock = unknownBlockRecord
+      ? {
+          unknown: readString(unknownBlockRecord.unknown) ?? "unknown",
+          why: readString(unknownBlockRecord.why) ?? "unknown",
+          whatIChecked: asStringArray(unknownBlockRecord.what_i_checked).slice(0, 16),
+          nextRetrieval: readString(unknownBlockRecord.next_retrieval) ?? "n/a",
+        }
+      : null;
+    const telemetryRecord = asObjectRecord(record.used_telemetry);
+    out.push({
+      objectiveId,
+      objectiveLabel,
+      finalStatus,
+      plainReasoning,
+      transitionTail,
+      unknownBlock,
+      usedTelemetry: {
+        requiredSlots: asStringArray(telemetryRecord?.required_slots).slice(0, 16),
+        matchedSlots: asStringArray(telemetryRecord?.matched_slots).slice(0, 16),
+        missingSlots: asStringArray(telemetryRecord?.missing_slots).slice(0, 16),
+        retrievalConfidence: readNumber(telemetryRecord?.retrieval_confidence),
+        evidenceRefs: asStringArray(telemetryRecord?.evidence_refs).slice(0, 16),
+        evidenceRefCount: readNumber(telemetryRecord?.evidence_ref_count),
+        retrievalPassCount: readNumber(telemetryRecord?.retrieval_pass_count),
+        scopedRetrievalObserved: readBoolean(telemetryRecord?.scoped_retrieval_observed),
+        objectiveOesScore: readNumber(telemetryRecord?.objective_oes_score),
+        objectiveOesThreshold: readNumber(telemetryRecord?.objective_oes_threshold),
+        objectiveOesPass: readBoolean(telemetryRecord?.objective_oes_pass),
+        miniCriticReason: readString(telemetryRecord?.mini_critic_reason),
+        terminalizationReason: readString(telemetryRecord?.terminalization_reason),
+        blockedReason: readString(telemetryRecord?.blocked_reason),
+      },
+    });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+function resolveObjectiveTelemetryUsedSummary(
+  debug: HelixAskReply["debug"] | undefined,
+): HelixAskObjectiveTelemetryUsedSummary | null {
+  const debugRecord = asObjectRecord(debug as unknown);
+  if (!debugRecord) return null;
+  const telemetryRecord =
+    asObjectRecord(debugRecord.objective_telemetry_used) ??
+    asObjectRecord(debugRecord.objectiveTelemetryUsed);
+  const readNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : null;
+  const readBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+  const readString = (value: unknown): string | null =>
+    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const coverageUnresolvedCount =
+    readNumber(telemetryRecord?.objective_coverage_unresolved_count) ??
+    readNumber(debugRecord.objective_coverage_unresolved_count);
+  const coverageUnresolvedObjectiveIds = dedupeStrings(
+    [
+      ...asStringArray(telemetryRecord?.objective_coverage_unresolved_objective_ids),
+      ...asStringArray(debugRecord.objective_coverage_unresolved_objective_ids),
+    ].filter(Boolean),
+  ).slice(0, 16);
+  const unknownBlockCount =
+    readNumber(telemetryRecord?.objective_unknown_block_count) ??
+    readNumber(debugRecord.objective_unknown_block_count);
+  const unresolvedWithoutUnknownBlockCount =
+    readNumber(telemetryRecord?.objective_unresolved_without_unknown_block_count) ??
+    readNumber(debugRecord.objective_unresolved_without_unknown_block_count);
+  const missingScopedRetrievalCount = readNumber(
+    telemetryRecord?.objective_missing_scoped_retrieval_count ?? debugRecord.objective_missing_scoped_retrieval_count,
+  );
+  const finalizeGateMode =
+    readString(telemetryRecord?.objective_finalize_gate_mode) ??
+    readString(debugRecord.objective_finalize_gate_mode);
+  const finalizeGatePassed =
+    readBoolean(telemetryRecord?.objective_finalize_gate_passed) ??
+    readBoolean(debugRecord.objective_finalize_gate_passed);
+  if (
+    coverageUnresolvedCount === null &&
+    unknownBlockCount === null &&
+    unresolvedWithoutUnknownBlockCount === null &&
+    missingScopedRetrievalCount === null &&
+    finalizeGateMode === null &&
+    finalizeGatePassed === null &&
+    coverageUnresolvedObjectiveIds.length === 0
+  ) {
+    return null;
+  }
+  return {
+    coverageUnresolvedCount,
+    coverageUnresolvedObjectiveIds,
+    unknownBlockCount,
+    unresolvedWithoutUnknownBlockCount,
+    missingScopedRetrievalCount,
+    finalizeGateMode,
+    finalizeGatePassed,
+  };
+}
+
+function buildAskLiveEventLogDetailPayload(event: AskLiveEventEntry): string {
+  const payload = {
+    id: event.id,
+    ts: event.ts ?? null,
+    tsMs: resolveAskLiveEventTimestampMs(event),
+    tool: typeof event.tool === "string" ? event.tool : null,
+    seq: typeof event.seq === "number" && Number.isFinite(event.seq) ? event.seq : null,
+    durationMs:
+      typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
+        ? Math.max(0, Math.round(event.durationMs))
+        : null,
+    text: typeof event.text === "string" ? event.text : "",
+    meta: event.meta ?? null,
+  };
+  return safeJsonStringify(payload);
+}
+
+const ASK_LIVE_FALLBACK_SIGNAL_RULES: Array<{
+  id: string;
+  pattern: RegExp;
+}> = [
+  { id: "objective_loop_primary_suppressed", pattern: /objective[_\s-]?loop[_\s-]?primary[_\s-]?(suppressed|execution)/i },
+  { id: "objective_unresolved", pattern: /objective[_\s-]?(mini[_\s-]?validation[_\s-]?unresolved|unresolved)/i },
+  { id: "unknown_terminal", pattern: /unknown[_\s-]?terminal/i },
+  { id: "retrieval_no_context", pattern: /retrieval[_\s-]?objective[-\s]?recovery.*error|no[_\s-]?context/i },
+  { id: "assembly_fail_closed", pattern: /objective_assembly_fail_closed_required_objective_unresolved|assembly[_\s-]?fail[_\s-]?closed/i },
+  { id: "stage0_empty_candidates", pattern: /stage0.*empty[_\s-]?candidates|empty[_\s-]?candidates/i },
+  { id: "deterministic_fallback", pattern: /deterministic[_\s-]?fallback/i },
+];
+
+function isAskLiveEventWarning(event: AskLiveEventEntry): boolean {
+  const metaRecord = asObjectRecord(event.meta);
+  const metaOk = typeof metaRecord?.ok === "boolean" ? metaRecord.ok : null;
+  if (metaOk === false) return true;
+  const haystackParts = [event.text ?? "", event.tool ?? ""];
+  if (metaRecord) {
+    haystackParts.push(safeJsonStringify(metaRecord));
+  }
+  const haystack = haystackParts.join(" ");
+  return /\b(error|fail|failed|blocked|fallback|suppressed|unknown_terminal|no_context|unresolved)\b/i.test(
+    haystack,
+  );
+}
+
+function collectAskLiveFallbackSignals(events: AskLiveEventEntry[]): string[] {
+  if (!events.length) return [];
+  const matched: string[] = [];
+  events.forEach((event) => {
+    const metaRecord = asObjectRecord(event.meta);
+    const haystackParts = [event.text ?? "", event.tool ?? ""];
+    if (metaRecord) {
+      haystackParts.push(safeJsonStringify(metaRecord));
+    }
+    const haystack = haystackParts.join(" ");
+    ASK_LIVE_FALLBACK_SIGNAL_RULES.forEach((rule) => {
+      if (rule.pattern.test(haystack)) {
+        matched.push(rule.id);
+      }
+    });
+  });
+  return dedupeStrings(matched).slice(0, 8);
 }
 
 function readEventMetaString(
@@ -16636,6 +16861,11 @@ export function HelixAskPill({
     return statusTrimmed || null;
   }, [askBusy, askLiveDraft, askLiveEvents, askStatus]);
 
+  const askLiveFallbackSignals = useMemo(
+    () => collectAskLiveFallbackSignals(askLiveEvents),
+    [askLiveEvents],
+  );
+
   const buildConvergenceSnapshot = useCallback(
     (args: {
       events: AskLiveEventEntry[];
@@ -18642,19 +18872,36 @@ export function HelixAskPill({
                       : ""}
                   </p>
                 ) : null}
+                {askLiveFallbackSignals.length > 0 ? (
+                  <p className="mt-2 whitespace-pre-wrap text-[10px] leading-5 text-amber-200/90">
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-amber-300">
+                      Fallback Signals
+                    </span>
+                    {"\n"}
+                    {askLiveFallbackSignals.join(" | ")}
+                  </p>
+                ) : null}
                 {askLiveEvents.length > 0 ? (
-                  <div className="mt-2 max-h-40 space-y-2 overflow-hidden pr-1 text-[11px] text-slate-300">
+                  <div className="mt-2 max-h-44 overflow-y-auto rounded border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
                     {askLiveEvents.map((entry) => {
-                      const label = entry.tool?.startsWith("helix.ask.")
-                        ? entry.tool.replace("helix.ask.", "").replace(/\./g, " ")
-                        : entry.tool ?? "event";
+                      const warning = isAskLiveEventWarning(entry);
                       return (
-                        <div key={entry.id} className="px-1 py-0.5">
-                          <div className="text-[9px] uppercase tracking-[0.22em] text-slate-500">
-                            {label}
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap text-slate-300">{entry.text}</p>
-                        </div>
+                        <details
+                          key={entry.id}
+                          className={`mb-1 rounded border px-1.5 py-1 last:mb-0 ${
+                            warning
+                              ? "border-amber-400/40 bg-amber-950/15"
+                              : "border-slate-700/70 bg-black/20"
+                          }`}
+                        >
+                          <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
+                            {formatAskLiveEventLogLine(entry)}
+                          </summary>
+                          <p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{entry.text}</p>
+                          <pre className="mt-1 whitespace-pre-wrap break-words text-slate-400">
+                            {buildAskLiveEventLogDetailPayload(entry)}
+                          </pre>
+                        </details>
                       );
                     })}
                   </div>
@@ -18700,6 +18947,8 @@ export function HelixAskPill({
             });
             const replyEventLogPreview = replyEventsChronological.slice(-80);
             const replyEventLogPayload = buildAskLiveEventLogExport(replyEventsChronological);
+            const objectiveReasoningTrace = resolveObjectiveReasoningTrace(reply.debug);
+            const objectiveTelemetryUsed = resolveObjectiveTelemetryUsedSummary(reply.debug);
             const replyDebugContextSummary = buildHelixAskDebugContextSummary(reply.debug, {
               failReason:
                 typeof reply.debug?.helix_ask_fail_reason === "string"
@@ -18864,7 +19113,7 @@ export function HelixAskPill({
               ) : null}
               {userSettings.showHelixAskDebug &&
               userSettings.showHelixAskReasoningEventLog &&
-              replyEventLogPreview.length > 0 ? (
+              (replyEventLogPreview.length > 0 || objectiveReasoningTrace.length > 0) ? (
                 <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
@@ -18892,11 +19141,138 @@ export function HelixAskPill({
                   <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-slate-500">
                     {replyEventsChronological.length} events | chronological
                   </p>
-                  <div className="mt-2 max-h-48 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
-                    {replyEventLogPreview.map((event) => (
-                      <p key={`${reply.id}-reasoning-log-${event.id}`}>{formatAskLiveEventLogLine(event)}</p>
-                    ))}
-                  </div>
+                  {objectiveReasoningTrace.length > 0 ? (
+                    <div className="mt-2 rounded border border-indigo-400/25 bg-indigo-950/20 p-2">
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-indigo-200">
+                        Plain-English objective reasoning trace
+                      </p>
+                      {objectiveTelemetryUsed ? (
+                        <p className="mt-1 text-[10px] leading-5 text-indigo-100/90">
+                          finalize={objectiveTelemetryUsed.finalizeGateMode ?? "n/a"} | gate_pass=
+                          {objectiveTelemetryUsed.finalizeGatePassed === null
+                            ? "n/a"
+                            : objectiveTelemetryUsed.finalizeGatePassed
+                              ? "true"
+                              : "false"}{" "}
+                          | coverage_unresolved={objectiveTelemetryUsed.coverageUnresolvedCount ?? "n/a"} |
+                          unknown_blocks={objectiveTelemetryUsed.unknownBlockCount ?? "n/a"} |
+                          unresolved_without_unknown=
+                          {objectiveTelemetryUsed.unresolvedWithoutUnknownBlockCount ?? "n/a"} |
+                          missing_scoped_retrieval=
+                          {objectiveTelemetryUsed.missingScopedRetrievalCount ?? "n/a"}
+                        </p>
+                      ) : null}
+                      {objectiveTelemetryUsed?.coverageUnresolvedObjectiveIds.length ? (
+                        <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/85">
+                          coverage_unresolved_objective_ids:{" "}
+                          {objectiveTelemetryUsed.coverageUnresolvedObjectiveIds.join(", ")}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
+                        {objectiveReasoningTrace.map((entry) => {
+                          const requiredCount = entry.usedTelemetry.requiredSlots.length;
+                          const matchedCount = entry.usedTelemetry.matchedSlots.length;
+                          const missingCount = entry.usedTelemetry.missingSlots.length;
+                          const evidenceCount =
+                            entry.usedTelemetry.evidenceRefCount ?? entry.usedTelemetry.evidenceRefs.length;
+                          return (
+                            <details
+                              key={`${reply.id}-objective-trace-${entry.objectiveId}`}
+                              className="rounded border border-indigo-300/20 bg-black/20 p-2"
+                            >
+                              <summary className="cursor-pointer select-none text-[10px] leading-5 text-indigo-100">
+                                {entry.objectiveLabel} [{entry.finalStatus}] | slots {matchedCount}/{Math.max(requiredCount, matchedCount + missingCount)} | evidence={evidenceCount}
+                              </summary>
+                              <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-50">
+                                {entry.plainReasoning}
+                              </p>
+                              <p className="mt-1 text-[10px] leading-5 text-indigo-100/85">
+                                required={requiredCount} | matched={matchedCount} | missing={missingCount} | retrieval_confidence=
+                                {entry.usedTelemetry.retrievalConfidence === null
+                                  ? "n/a"
+                                  : entry.usedTelemetry.retrievalConfidence.toFixed(2)}{" "}
+                                | retrieval_passes={entry.usedTelemetry.retrievalPassCount ?? "n/a"} | scoped_retrieval=
+                                {entry.usedTelemetry.scopedRetrievalObserved === null
+                                  ? "n/a"
+                                  : entry.usedTelemetry.scopedRetrievalObserved
+                                    ? "true"
+                                    : "false"}{" "}
+                                | OES=
+                                {entry.usedTelemetry.objectiveOesScore === null
+                                  ? "n/a"
+                                  : entry.usedTelemetry.objectiveOesScore.toFixed(2)}
+                                /
+                                {entry.usedTelemetry.objectiveOesThreshold === null
+                                  ? "n/a"
+                                  : entry.usedTelemetry.objectiveOesThreshold.toFixed(2)}{" "}
+                                ({entry.usedTelemetry.objectiveOesPass === null
+                                  ? "n/a"
+                                  : entry.usedTelemetry.objectiveOesPass
+                                    ? "pass"
+                                    : "fail"})
+                              </p>
+                              {entry.transitionTail.length > 0 ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
+                                  Transition tail:
+                                  {"\n"}
+                                  {entry.transitionTail.join("\n")}
+                                </p>
+                              ) : null}
+                              {entry.usedTelemetry.evidenceRefs.length > 0 ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
+                                  Evidence refs:
+                                  {"\n"}
+                                  {entry.usedTelemetry.evidenceRefs.join("\n")}
+                                </p>
+                              ) : null}
+                              {entry.usedTelemetry.miniCriticReason ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
+                                  Mini-critic reason: {entry.usedTelemetry.miniCriticReason}
+                                </p>
+                              ) : null}
+                              {entry.usedTelemetry.terminalizationReason ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
+                                  Terminalization reason: {entry.usedTelemetry.terminalizationReason}
+                                </p>
+                              ) : null}
+                              {entry.usedTelemetry.blockedReason ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
+                                  Blocked reason: {entry.usedTelemetry.blockedReason}
+                                </p>
+                              ) : null}
+                              {entry.unknownBlock ? (
+                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
+                                  Unknown: {entry.unknownBlock.unknown}
+                                  {"\n"}Why: {entry.unknownBlock.why}
+                                  {entry.unknownBlock.whatIChecked.length > 0
+                                    ? `\nWhat I checked:\n${entry.unknownBlock.whatIChecked.join("\n")}`
+                                    : ""}
+                                  {"\n"}Next retrieval: {entry.unknownBlock.nextRetrieval}
+                                </p>
+                              ) : null}
+                            </details>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                  {replyEventLogPreview.length > 0 ? (
+                    <div className="mt-2 max-h-56 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+                      {replyEventLogPreview.map((event) => (
+                        <details
+                          key={`${reply.id}-reasoning-log-${event.id}`}
+                          className="mb-1 rounded border border-slate-700/70 bg-black/20 px-1.5 py-1 last:mb-0"
+                        >
+                          <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
+                            {formatAskLiveEventLogLine(event)}
+                          </summary>
+                          <pre className="mt-1 whitespace-pre-wrap break-words text-slate-300">
+                            {buildAskLiveEventLogDetailPayload(event)}
+                          </pre>
+                        </details>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">

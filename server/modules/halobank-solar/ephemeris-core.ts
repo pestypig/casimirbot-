@@ -1,6 +1,7 @@
 import * as AstronomyNamespace from "astronomy-engine";
 import type {
   SolarAberration,
+  SolarEphemerisSourceClass,
   SolarFrame,
   SolarObserver,
   SolarReferenceContext,
@@ -21,10 +22,21 @@ type BodyDef = {
   name: string;
   astronomyName: string;
   mu?: number;
+  stateSource?: "astronomy-engine" | "synthetic-saturnian-satellite";
+  syntheticOrbit?: {
+    parentBodyId: number;
+    semiMajorAxisKm: number;
+    orbitalPeriodDays: number;
+    inclinationDeg: number;
+    phaseAtEpochDeg: number;
+    epochIso: string;
+    source_refs: string[];
+    note: string;
+  };
 };
 
 const BODY_BY_ID = new Map<number, BodyDef>([
-  [10, { id: 10, name: "Sun", astronomyName: "Sun" }],
+  [10, { id: 10, name: "Sun", astronomyName: "Sun", mu: 1.32712440018e20 }],
   [199, { id: 199, name: "Mercury", astronomyName: "Mercury", mu: 2.2032e13 }],
   [299, { id: 299, name: "Venus", astronomyName: "Venus", mu: 3.24859e14 }],
   [301, { id: 301, name: "Moon", astronomyName: "Moon", mu: 4.9048695e12 }],
@@ -34,6 +46,52 @@ const BODY_BY_ID = new Map<number, BodyDef>([
   [699, { id: 699, name: "Saturn", astronomyName: "Saturn", mu: 3.7931187e16 }],
   [799, { id: 799, name: "Uranus", astronomyName: "Uranus", mu: 5.793939e15 }],
   [899, { id: 899, name: "Neptune", astronomyName: "Neptune", mu: 6.836529e15 }],
+  [
+    601,
+    {
+      id: 601,
+      name: "Mimas",
+      astronomyName: "Mimas",
+      mu: 2.50349e9,
+      stateSource: "synthetic-saturnian-satellite",
+      syntheticOrbit: {
+        parentBodyId: 699,
+        semiMajorAxisKm: 185_520,
+        orbitalPeriodDays: 0.9424218,
+        inclinationDeg: 1.57,
+        phaseAtEpochDeg: 0,
+        epochIso: "2000-01-01T12:00:00.000Z",
+        source_refs: [
+          "https://science.nasa.gov/saturn/moons/mimas/",
+          "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+        ],
+        note: "Deterministic circular-orbit diagnostic state around Saturn used until a satellite state kernel is added.",
+      },
+    },
+  ],
+  [
+    607,
+    {
+      id: 607,
+      name: "Hyperion",
+      astronomyName: "Hyperion",
+      mu: 3.7049e8,
+      stateSource: "synthetic-saturnian-satellite",
+      syntheticOrbit: {
+        parentBodyId: 699,
+        semiMajorAxisKm: 1_500_930,
+        orbitalPeriodDays: 21.276609,
+        inclinationDeg: 0.43,
+        phaseAtEpochDeg: 180,
+        epochIso: "2000-01-01T12:00:00.000Z",
+        source_refs: [
+          "https://science.nasa.gov/saturn/moons/hyperion/",
+          "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturniansatfact.html",
+        ],
+        note: "Deterministic circular-orbit diagnostic state around Saturn used until a satellite state kernel is added.",
+      },
+    },
+  ],
 ]);
 
 export const DEFAULT_VECTOR_TARGETS = [10, 399, 301] as const;
@@ -132,12 +190,77 @@ function getBody(id: number): BodyDef {
   return body;
 }
 
+function getSyntheticSatelliteState(body: BodyDef, date: Date): BaryState {
+  if (!body.syntheticOrbit) {
+    throw new Error(`Body ${body.id} is not configured with a synthetic satellite orbit`);
+  }
+  const parent = getBaryState(body.syntheticOrbit.parentBodyId, date);
+  const epochMs = Date.parse(body.syntheticOrbit.epochIso);
+  if (!Number.isFinite(epochMs)) {
+    throw new Error(`Invalid synthetic satellite epoch for body ${body.id}`);
+  }
+  const daysSinceEpoch = (date.getTime() - epochMs) / (DAY_S * 1000);
+  const meanMotionRadPerDay = (2 * Math.PI) / body.syntheticOrbit.orbitalPeriodDays;
+  const meanAnomalyRad =
+    ((((body.syntheticOrbit.phaseAtEpochDeg + (daysSinceEpoch * 360) / body.syntheticOrbit.orbitalPeriodDays) % 360) + 360) % 360) *
+    (Math.PI / 180);
+  const inclinationRad = (body.syntheticOrbit.inclinationDeg * Math.PI) / 180;
+  const semiMajorAxisAu = (body.syntheticOrbit.semiMajorAxisKm * 1000) / AU_M;
+  const cosM = Math.cos(meanAnomalyRad);
+  const sinM = Math.sin(meanAnomalyRad);
+  const cosI = Math.cos(inclinationRad);
+  const sinI = Math.sin(inclinationRad);
+  const relativePos: Vec3 = toVec3(
+    semiMajorAxisAu * cosM,
+    semiMajorAxisAu * sinM * cosI,
+    semiMajorAxisAu * sinM * sinI,
+  );
+  const relativeVel: Vec3 = toVec3(
+    -semiMajorAxisAu * meanMotionRadPerDay * sinM,
+    semiMajorAxisAu * meanMotionRadPerDay * cosM * cosI,
+    semiMajorAxisAu * meanMotionRadPerDay * cosM * sinI,
+  );
+  return {
+    pos: vecAdd(parent.pos, relativePos),
+    vel: vecAdd(parent.vel, relativeVel),
+  };
+}
+
 export function resolveSupportedBody(id: number): BodyDef | null {
   return BODY_BY_ID.get(id) ?? null;
 }
 
+export function getBodyStateSource(id: number): {
+  source_class: SolarEphemerisSourceClass;
+  source_model: string;
+  synthetic: boolean;
+  source_refs: string[];
+  note: string;
+} {
+  const body = getBody(id);
+  if (body.stateSource === "synthetic-saturnian-satellite" && body.syntheticOrbit) {
+    return {
+      source_class: "hybrid_diagnostic",
+      source_model: "synthetic-saturnian-satellite/1",
+      synthetic: true,
+      source_refs: body.syntheticOrbit.source_refs,
+      note: body.syntheticOrbit.note,
+    };
+  }
+  return {
+    source_class: "kernel_bundle",
+    source_model: "astronomy-engine-barycentric/1",
+    synthetic: false,
+    source_refs: [],
+    note: "Barycentric state resolved through the standard astronomy-engine body model.",
+  };
+}
+
 export function getBaryState(id: number, date: Date): BaryState {
   const body = getBody(id);
+  if (body.stateSource === "synthetic-saturnian-satellite") {
+    return getSyntheticSatelliteState(body, date);
+  }
   const st = Astronomy.BaryState(body.astronomyName as any, date);
   return {
     pos: toVec3(st.x, st.y, st.z),

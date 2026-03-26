@@ -1,0 +1,508 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "self-gravity-shape-core",
+  "domain": "self-gravity-body-shape-diagnostics",
+  "updatedAt": "2026-03-25",
+  "claims": [
+    {
+      "claimId": "claim:self.gravity_shape:self_gravity_strength_balance",
+      "statement": "The self-gravity anchor is only admissible at diagnostic tier when the lane keeps the body's own gravitational load distinct from external tides and treats pressure and material strength as the counterbalancing support terms.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "the self-gravity term must be the body's own mass attraction",
+          "external tides must remain a separate forcing term",
+          "strength and pressure are the balancing descendants, not alternative names for gravity"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Lineweaver and Norman, The Potato Radius (arXiv 1004.1091).",
+          "equation": "R_p ~ sqrt(sigma_y / (G * rho^2))",
+          "note": "Shows the self-gravity versus yield-strength balance at the threshold."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/self-gravity.md",
+        "docs/knowledge/physics/self-gravity-shape.md"
+      ],
+      "notes": "This is the branch-level load/support distinction."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:internal_pressure_support",
+      "statement": "The internal-pressure anchor is only admissible at diagnostic tier when it is treated as the support term in hydrostatic balance and not as a generic thermodynamic scalar divorced from gravity.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "pressure must oppose the self-gravity load in equilibrium",
+          "hydrostatic support must remain continuum-level, not molecular-scale",
+          "the same support concept may later be reused in stellar structure"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "NASA Technical Report 19730016688, Hydrostatic figure of the earth: Theory and results.",
+          "equation": "nabla P = rho nabla U",
+          "note": "Hydrostatic balance for a self-gravitating body."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/internal-pressure.md"
+      ],
+      "notes": "Pressure is the support term, not the rounding criterion by itself."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:constitutive_response_bridge",
+      "statement": "The constitutive-response anchor is only admissible at diagnostic tier when the lane keeps the material law explicit: stress, pressure, density, and rheology determine deformation response, and the node remains a split point between self-gravity shape and external tidal response.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape constitutive response lane",
+        "constraints": [
+          "the constitutive law must stay explicit rather than hidden inside a shape threshold",
+          "the node must remain a split point between load and response",
+          "the same closure concept can be reused in tidal response and stellar structure only as a bridge, not as a certified solver"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "NASA Technical Report 19730016688, Hydrostatic figure of the earth: Theory and results.",
+          "note": "Hydrostatic balance and material response must be treated explicitly in the figure problem."
+        },
+        {
+          "kind": "paper",
+          "citation": "Wahl, Hubbard, and Militzer, Concentric Maclaurin Spheroid method with tides and rotational enhancement.",
+          "note": "Coupled response problem where the constitutive closure matters for shape and tides."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/self-gravity-shape.md",
+        "docs/knowledge/physics/tidal-bulge-response.md",
+        "docs/knowledge/physics/physics-gravitational-response-tree.json"
+      ],
+      "notes": "This claim makes the material closure explicit at the split point."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:material_strength_threshold",
+      "statement": "The material-strength anchor is only admissible at diagnostic tier when it controls whether a body can preserve irregular shape against self-gravity and rotation.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "yield behavior must delay rounding in small bodies",
+          "strength is a threshold property, not a substitute for gravity",
+          "the same concept may vary with composition and thermal state"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Lineweaver and Norman, The Potato Radius (arXiv 1004.1091).",
+          "equation": "R_p ~ sqrt(sigma_y / (G * rho^2))",
+          "note": "Minimum size for self-gravity to overcome strength."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Report 19880067580, Internal structure and shape of Mimas.",
+          "note": "Example of nonhydrostatic support by strong outer layers."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/material-strength.md"
+      ],
+      "notes": "Strength is the material limit that protects irregular shapes."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:hydrostatic_shape_rounding",
+      "statement": "The hydrostatic-equilibrium-shape anchor is only admissible at diagnostic tier when the body is treated as approaching the rounded equilibrium figure of a self-gravitating continuum under pressure support.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "equilibrium shape must be a balance of gravity and pressure",
+          "the rounded figure may be hydrostatic even when the body's composition is heterogeneous",
+          "the concept does not assert perfect sphericity"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Park et al., A partially differentiated interior for Ceres deduced from its gravity field and shape (Nature 2016).",
+          "note": "Ceres close to hydrostatic equilibrium from gravity+shape data."
+        },
+        {
+          "kind": "paper",
+          "citation": "NASA Technical Report 19730016688, Hydrostatic figure of the earth: Theory and results.",
+          "note": "Classic hydrostatic figure construction."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/hydrostatic-equilibrium-shape.md"
+      ],
+      "notes": "Hydrostatic rounding is the shared shape limit behind dwarf planets and other large bodies."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:rotational_flattening",
+      "statement": "The rotational-flattening anchor is only admissible at diagnostic tier when centrifugal support modifies the hydrostatic balance and produces equatorial oblateness.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "flattening must be tied to rotation-driven centrifugal support",
+          "the response must remain distinct from external tide forcing",
+          "flattening is mediated by mass distribution and not just mean density"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA Technical Report 19730016688, Hydrostatic figure of the earth: Theory and results.",
+          "note": "Hydrostatic figure and flattening theory."
+        },
+        {
+          "kind": "paper",
+          "citation": "Park et al., Ceres gravity and shape (Nature 2016).",
+          "note": "Uses gravity+shape to constrain flattening and interior structure."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/rotational-flattening.md"
+      ],
+      "notes": "Rotation-induced flattening is a descendant of hydrostatic balance, not a separate gravity law."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:J2_quadrupole_coefficient",
+      "statement": "The J2 anchor is only admissible at diagnostic tier when the lane treats J2 as the quadrupole gravity coefficient of oblateness and keeps it distinct from dynamical ellipticity and precession rate.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "J2 must remain a quadrupole coefficient, not a generic flattening name",
+          "the coefficient can support orientation models but is not itself the precession rate",
+          "the lane must keep J2 distinct from H even when the two are related"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "NASA/GRACE materials on Earth's oblateness and the J2 coefficient.",
+          "equation": "J2 = -C20 * sqrt(5)",
+          "note": "Quadrupole gravity coefficient used in Earth-shape diagnostics."
+        },
+        {
+          "kind": "paper",
+          "citation": "Precession and nutation of the Earth depend on the Earth's dynamical flattening, H, closely related to J2 of the geopotential.",
+          "note": "Shows the bridge from J2 to orientation models."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/rotational-flattening.md",
+        "docs/knowledge/physics/earth-axial-precession.md"
+      ],
+      "notes": "J2 is the shape-side quadrupole bridge into orientation diagnostics."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:tidal_bulge_response",
+      "statement": "The tidal-bulge-response anchor is only admissible at diagnostic tier when the external tidal potential deforms a self-gravitating body whose interior structure sets the response amplitude and phase.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "tides must remain external forcing, not self-gravity itself",
+          "the response can be shared with the gravitational-response lane",
+          "tidal response depends on structure and rheology"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Wahl, Hubbard, and Militzer, Concentric Maclaurin Spheroid method with tides and rotational enhancement.",
+          "note": "Shows coupled rotational and tidal response in a self-gravitating body."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Report 19880067580, Internal structure and shape of Mimas.",
+          "note": "Example of tidal loading and shape support."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/tidal-bulge-response.md",
+        "docs/knowledge/physics/physics-gravitational-response-tree.json"
+      ],
+      "notes": "This is the bridge node from shape relaxation to external lunisolar forcing."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:potato_radius_transition",
+      "statement": "The potato-radius transition is only admissible at diagnostic tier when it marks the size threshold at which self-gravity defeats material strength and a strongly irregular body can relax toward a rounded figure.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape lane",
+        "constraints": [
+          "the threshold is approximate and composition-dependent",
+          "self-gravity must dominate over yield strength at the transition",
+          "the lane must not claim a universal constant radius"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Lineweaver and Norman, The Potato Radius (arXiv 1004.1091).",
+          "equation": "R_p ~ sqrt(sigma_y / (G * rho^2))",
+          "note": "Threshold scaling for rounding."
+        },
+        {
+          "kind": "web",
+          "citation": "ANU Research School of Astronomy and Astrophysics, Pluto and the potatoes.",
+          "note": "Accessible summary of the potato-radius idea."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/potato-radius-transition.md"
+      ],
+      "notes": "This claim keeps the threshold approximate and regime-bound."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:granular_collision_dissipation",
+      "statement": "The granular-collision-dissipation anchor is only admissible at diagnostic tier when collisions, friction, and rearrangements are treated as the bulk dissipation channel for rubble-pile bodies.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape granular lane",
+        "constraints": [
+          "granular dissipation must remain a bulk loss term, not a universal gravity law",
+          "inelastic contact and frictional rearrangement must remain explicit",
+          "the node may inform tidal damping and spin evolution but not replace them"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Tanga et al., gravitational re-accumulation / shapes, spins, and granular aggregate behavior.",
+          "note": "Granular re-accumulation and dissipative contact dynamics in small bodies."
+        },
+        {
+          "kind": "paper",
+          "citation": "Frouard et al., tidal dissipation in rubble-pile asteroids.",
+          "note": "Granular dissipation and tidal damping in rubble-pile bodies."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/granular-collision-dissipation.md"
+      ],
+      "notes": "This claim isolates the multiparticle dissipation channel."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:porous_rubble_pile_rheology",
+      "statement": "The porous-rubble-pile-rheology anchor is only admissible at diagnostic tier when porosity, friction, contact cohesion, and rearrangement are treated as the effective bulk law for a rubble-pile aggregate.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape granular lane",
+        "constraints": [
+          "effective rheology must remain aggregate-level",
+          "void fraction and contact friction must remain explicit",
+          "the lane should not collapse into a pure fluid or pure rigid-body description"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Holsapple, equilibrium figures of cohesionless bodies.",
+          "note": "Shows how strengthless aggregates still develop nontrivial equilibrium figures."
+        },
+        {
+          "kind": "paper",
+          "citation": "Tanga et al., rubble-pile shapes and spins.",
+          "note": "Granular aggregate behavior as an effective rheology problem."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/porous-rubble-pile-rheology.md"
+      ],
+      "notes": "This claim keeps rubble-pile rheology distinct from continuum fluid closure."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:tidal_quality_factor",
+      "statement": "The tidal-quality-factor anchor is only admissible at diagnostic tier when dissipation per cycle is treated as the observable summary of granular, viscoelastic, and frictional loss under periodic tidal forcing.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape tidal damping lane",
+        "constraints": [
+          "Q must remain a dissipation summary, not a replacement for detailed contact physics",
+          "tidal forcing must remain external",
+          "the lane may vary with porosity, temperature, and internal structure"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Efroimsky, tidal evolution and viscosity scaling.",
+          "note": "Quality-factor scaling in tidal evolution."
+        },
+        {
+          "kind": "paper",
+          "citation": "Frouard et al., tidal dissipation in rubble-pile asteroids.",
+          "note": "Granular damping and tidal dissipation in rubble aggregates."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/tidal-quality-factor.md"
+      ],
+      "notes": "Quality factor packages the dissipation per tidal cycle."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:spin_state_evolution",
+      "statement": "The spin-state-evolution anchor is only admissible at diagnostic tier when tidal torques and internal dissipation jointly evolve rotation rate, obliquity, and spin-orbit phase.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape spin lane",
+        "constraints": [
+          "spin evolution must be driven by torque and dissipation",
+          "spin-state changes must stay distinct from shape-only rounding",
+          "the lane may include collisional redistribution as a dissipation term"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Tanga et al., gravitational re-accumulation / shapes, spins, and granular aggregate behavior.",
+          "note": "Spin-state response in granular aggregates."
+        },
+        {
+          "kind": "paper",
+          "citation": "Efroimsky, tidal evolution and viscosity scaling.",
+          "note": "Spin and tidal evolution under dissipation."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/spin-state-evolution.md"
+      ],
+      "notes": "Spin evolution is the response side of tidal torque."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:angular_momentum_redistribution",
+      "statement": "The angular-momentum-redistribution anchor is only admissible at diagnostic tier when spin, orbit, and internal motion are treated as coupled reservoirs exchanging angular momentum through tides and collisions.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape angular-momentum lane",
+        "constraints": [
+          "the exchange must conserve total angular momentum at the closed-system level",
+          "internal granular motion may act as a sink or source of redistribution",
+          "the node must stay below certified body-specific spin-state solvers"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Goldreich and Sari, tidal evolution of rubble piles.",
+          "note": "Angular momentum exchange and tidal evolution in granular aggregates."
+        },
+        {
+          "kind": "paper",
+          "citation": "Tanga et al., gravitational re-accumulation / shapes, spins, and granular aggregate behavior.",
+          "note": "Coupled spin and granular dynamics."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/angular-momentum-redistribution.md"
+      ],
+      "notes": "This claim makes the exchange reservoirs explicit."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:granular_tidal_response_diagnostic",
+      "statement": "The granular-tidal-response-diagnostic anchor is only admissible at diagnostic tier when granular dissipation, porous-rubble rheology, tidal Q, and spin-state evolution remain a coupled low-order closure over rubble-pile response.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape diagnostic lane",
+        "constraints": [
+          "the diagnostic must remain low-order and proxy-based",
+          "the lane may compare different small bodies but not claim a full contact-dynamics proof",
+          "the diagnostic should stay distinct from the planetary-figure and Earth-orientation lanes"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Tanga et al., gravitational re-accumulation / shapes, spins, and granular aggregate behavior.",
+          "note": "Granular aggregate behavior as a coupled response problem."
+        },
+        {
+          "kind": "paper",
+          "citation": "Frouard et al., tidal dissipation in rubble-pile asteroids.",
+          "note": "Diagnostic support for tidal damping in rubble piles."
+        },
+        {
+          "kind": "paper",
+          "citation": "Holsapple, equilibrium figures of cohesionless bodies.",
+          "note": "Rubble-pile equilibrium as a nontrivial closure problem."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/granular-tidal-response-diagnostic.md"
+      ],
+      "notes": "This claim keeps the rubble-pile diagnostic explicitly low-order."
+    },
+    {
+      "claimId": "claim:self.gravity_shape:planetary_figure_diagnostic",
+      "statement": "The planetary-figure diagnostic is only admissible at diagnostic tier when q, J2, dynamical ellipticity, effective Love-number response, flattening closure, and hydrostatic-regime classification remain explicit low-order proxies and are not promoted to certified geodesy products.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "self-gravity-shape planetary figure diagnostic lane",
+        "constraints": [
+          "q, J2, H, k2, and flattening must remain distinct diagnostic quantities even when coupled",
+          "the lane must be explicit about Earth-like reference assumptions when using Earth constants",
+          "the result must remain lower maturity than certified IERS or geodesy products"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA GSFC / NSSDC Earth Fact Sheet.",
+          "note": "Reference values for Earth radius, flattening, and normalized moment-of-inertia context."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA GSFC, Nutation and Precession.",
+          "note": "Reference for torque-coupled orientation semantics."
+        },
+        {
+          "kind": "web",
+          "citation": "Tatum, Precession.",
+          "note": "Reference for dynamical ellipticity and precession geometry."
+        },
+        {
+          "kind": "paper",
+          "citation": "Wahl, Hubbard, and Militzer, Concentric Maclaurin Spheroid method with tides and rotational enhancement.",
+          "note": "Reference for low-order rotational and tidal figure response semantics."
+        }
+      ],
+      "repoBindings": [
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+        "docs/knowledge/physics/planetary-figure-diagnostic.md",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts"
+      ],
+      "notes": "This claim records the explicit diagnostic closure over q, J2, H, k2, and flattening for an Earth-like figure lane."
+    }
+  ]
+}

@@ -1,7 +1,13 @@
-import { kappa_drive_from_power } from "../shared/curvature-proxy.js";
+import {
+  buildBackgroundGeometryFromEnergyDensity,
+  buildDynamicForcingGeometryFromPower,
+  kappa_drive_from_power,
+} from "../shared/curvature-proxy.js";
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
+import { buildQuantumSemiclassicalComparisonResult } from "../shared/quantum-semiclassical-comparison.js";
 import type { ProofPack, ProofValue } from "../shared/schema.js";
 import { PAPER_GEO, type EnergyPipelineState } from "./energy-pipeline.js";
+import { resolveQuantumSemiclassicalSourceReplay } from "./services/quantum-semiclassical-source-replay.js";
 
 type NumberCandidate = {
   value: unknown;
@@ -2060,6 +2066,63 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     gammaGeo.proxy,
   );
 
+  const rhoAvgJm3 = values.rho_avg_J_m3.value;
+  const backgroundGeometry =
+    typeof rhoAvgJm3 === "number"
+      ? buildBackgroundGeometryFromEnergyDensity({
+          energyDensityJm3: rhoAvgJm3,
+          sourceQuantityId: "rho_avg_J_m3",
+          note:
+            "Background geometry channel derived from the proof-pack average energy-density surface. This remains separate from the drive-power forcing channel.",
+        })
+      : null;
+  const dynamicForcingGeometry =
+    typeof power.value === "number" &&
+    typeof hullArea.value === "number" &&
+    hullArea.value > 0 &&
+    typeof dutyEffective.value === "number" &&
+    typeof gain === "number"
+      ? buildDynamicForcingGeometryFromPower({
+          powerW: power.value,
+          areaM2: hullArea.value,
+          dEff: dutyEffective.value,
+          gain,
+          sourceQuantityId: "power_avg_W",
+          note:
+            "Dynamic forcing geometry channel derived from average drive power over hull area, with duty and geometric gain preserved explicitly.",
+        })
+      : null;
+  const quantumSourceReplayId =
+    typeof state.quantum_semiclassical_source_replay_id === "string" &&
+    state.quantum_semiclassical_source_replay_id.trim().length > 0
+      ? state.quantum_semiclassical_source_replay_id.trim()
+      : null;
+  const quantumTauOrPredictedS = toFiniteNumber(state.quantum_semiclassical_tau_or_predicted_s);
+  const quantumCollapseBoundMargin = toFiniteNumber(state.quantum_semiclassical_collapse_bound_margin);
+  const quantumSourceReplay = resolveQuantumSemiclassicalSourceReplay(quantumSourceReplayId);
+  if (quantumSourceReplayId && !quantumSourceReplay) {
+    throw new Error(`unknown quantum_semiclassical_source_replay_id: ${quantumSourceReplayId}`);
+  }
+  const quantumComparison =
+    quantumSourceReplay && quantumTauOrPredictedS != null && quantumTauOrPredictedS > 0
+      ? buildQuantumSemiclassicalComparisonResult({
+          schema_version: "quantum_semiclassical_comparison/1",
+          tau_or_predicted_s: quantumTauOrPredictedS,
+          ...(quantumCollapseBoundMargin != null
+            ? { collapse_bound_margin: quantumCollapseBoundMargin }
+            : {}),
+          tau_measurement_proxy_s: quantumSourceReplay.tau_measurement_proxy_s,
+          measurement_timescale_kind: quantumSourceReplay.measurement_timescale_kind,
+          microtubule_transport_length_m: quantumSourceReplay.microtubule_transport_length_m,
+          subharmonic_lock_ratio: quantumSourceReplay.subharmonic_lock_ratio,
+          time_crystal_signature_pass: quantumSourceReplay.time_crystal_signature_pass,
+          notes: [
+            `source_replay_profile=${quantumSourceReplay.profile_id}`,
+            ...quantumSourceReplay.notes,
+          ],
+        })
+      : null;
+
 
   const sectorGuardrails = (state as any).sectorControl?.constraints as Record<string, unknown> | undefined;
   values.sector_control_ts_ratio = makeValue(
@@ -2117,6 +2180,10 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     values,
     equations,
     sources,
+    ...(backgroundGeometry ? { background_geometry: backgroundGeometry, geometry_coupling: backgroundGeometry } : {}),
+    ...(dynamicForcingGeometry ? { dynamic_forcing_geometry: dynamicForcingGeometry } : {}),
+    ...(quantumSourceReplay ? { quantum_semiclassical_source_replay: quantumSourceReplay } : {}),
+    ...(quantumComparison ? { quantum_semiclassical_comparison: quantumComparison } : {}),
     notes: notes.length ? notes : undefined,
   };
 }

@@ -6,20 +6,52 @@
       "id": "physics-quantum-semiclassical-tree",
       "slug": "physics-quantum-semiclassical-tree",
       "title": "Physics Quantum Semiclassical Tree",
-      "excerpt": "Dedicated lane for semiclassical quantum stress-energy coupling.",
-      "bodyMD": "This lane isolates curved-spacetime quantum expectations used in root-to-leaf paths.",
+      "excerpt": "Dedicated lane for quantum statistics, decoherence, and semiclassical stress-energy coupling.",
+      "bodyMD": "This lane isolates quantum-statistics and decoherence definitions alongside curved-spacetime expectation-value routes used in root-to-leaf paths.",
       "tags": [
         "physics",
         "quantum",
-        "semiclassical"
+        "semiclassical",
+        "statistics",
+        "decoherence"
       ],
       "children": [
         "vacuum-fluctuations",
         "stress-energy-tensor",
+        "physics-quantum-semiclassical-quantum-statistics-definition",
+        "physics-quantum-semiclassical-decoherence-classicality-definition",
+        "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+        "physics-quantum-semiclassical-stochastic-schrodinger-equation-definition",
+        "physics-quantum-semiclassical-csl-definition",
+        "physics-quantum-semiclassical-colored-noise-collapse-hypothesis",
+        "physics-quantum-semiclassical-gravity-related-collapse-definition",
+        "physics-quantum-semiclassical-diosi-penrose-timescale-definition",
+        "physics-quantum-semiclassical-gravitational-time-dilation-decoherence-definition",
+        "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+        "physics-quantum-semiclassical-microtubule-vibrational-mode-definition",
+        "physics-quantum-semiclassical-microtubule-energy-migration-definition",
+        "physics-quantum-semiclassical-microtubule-anesthetic-perturbation-definition",
+        "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+        "physics-quantum-semiclassical-time-crystal-subharmonic-locking-definition",
+        "physics-quantum-semiclassical-time-crystal-robustness-window-definition",
+        "physics-quantum-semiclassical-time-crystal-no-go-boundary-definition",
+        "physics-quantum-semiclassical-room-temperature-quantum-benchmark-definition",
+        "physics-quantum-semiclassical-triplet-band-resonance-observable",
+        "physics-quantum-semiclassical-scale-free-resonance-hierarchy-hypothesis",
+        "physics-quantum-semiclassical-polyatomic-time-crystal-hypothesis",
+        "physics-quantum-semiclassical-triplet-of-triplets-hypothesis",
+        "physics-quantum-semiclassical-spacetime-triplet-geometry-hypothesis",
         "physics-quantum-semiclassical-equation-residual"
       ],
-      "links": [],
-      "summary": "Dedicated lane for semiclassical quantum stress-energy coupling.",
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "physics-microphysics-transport-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Dedicated lane for quantum statistics, decoherence, and semiclassical stress-energy coupling.",
       "nodeType": "concept",
       "dependencies": [],
       "evidence": [
@@ -94,6 +126,1164 @@
         {
           "type": "doc",
           "path": "docs/knowledge/physics/stress-energy-tensor.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-quantum-statistics-definition",
+      "slug": "physics-quantum-semiclassical-quantum-statistics-definition",
+      "title": "Quantum Statistics Definition",
+      "excerpt": "Definition-level anchor for thermal de Broglie crossover, Bose/Fermi statistics, and quantum-liquid limits.",
+      "bodyMD": "This node anchors the direct quantum-statistics branch of the source text: when the thermal de Broglie wavelength becomes comparable to particle spacing, Bose or Fermi statistics change thermodynamics, degeneracy effects appear, and special liquids such as superfluid helium require explicitly quantum macroscopic descriptions.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "quantum-statistics",
+        "de-broglie",
+        "bose",
+        "fermi",
+        "superfluid"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for thermal de Broglie crossover, Bose/Fermi statistics, and quantum-liquid limits.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-statistics.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-decoherence-classicality-definition",
+      "slug": "physics-quantum-semiclassical-decoherence-classicality-definition",
+      "title": "Decoherence Classicality Definition",
+      "excerpt": "Definition-level anchor for environment-induced decoherence and classical bulk observables.",
+      "bodyMD": "This node anchors the quantum-to-classical limit used in the source text: environmental coupling suppresses interference between macroscopically distinct states, selects pointer states, and explains why bulk density, pressure, and hydrostatic observables are usually described by classical effective variables.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "decoherence",
+        "classical-limit",
+        "pointer-states",
+        "einselection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for environment-induced decoherence and classical bulk observables.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/decoherence-classical-limit.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+      "slug": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+      "title": "Stochastic Open Quantum Dynamics Definition",
+      "excerpt": "Definition-level anchor for stochastic open-system evolution in quantum mechanics.",
+      "bodyMD": "This node anchors the family of stochastic unravelings, collapse models, and noisy open-system descriptions that are mathematically adjacent to the consciousness literature but remain exploratory model classes rather than evidence of consciousness. It does not replace constitutive or plasma-transport closure in the mature macroscopic observable lanes.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "open-system",
+        "stochastic",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-quantum-semiclassical-stochastic-schrodinger-equation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-quantum-semiclassical-csl-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-quantum-semiclassical-colored-noise-collapse-hypothesis",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "constrains",
+          "to": "physics-microphysics-transport-collective-observable-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for stochastic open-system evolution in quantum mechanics.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_empirical_bridge_from_collapse_math_to_consciousness",
+        "no_stellar_plasma_leak_into_consciousness",
+        "hamiltonian_microdynamics_not_sufficient_for_observable_dissipation"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-consciousness-hypothesis.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/orch-or-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-stochastic-schrodinger-equation-definition",
+      "slug": "physics-quantum-semiclassical-stochastic-schrodinger-equation-definition",
+      "title": "Stochastic Schrödinger Equation Definition",
+      "excerpt": "Definition-level anchor for stochastic pure-state evolution in open quantum systems.",
+      "bodyMD": "This node anchors the stochastic Schrödinger equation family as an unraveling of open-system quantum dynamics. It is a mathematical model class, not a certified consciousness mechanism.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "stochastic-schrodinger",
+        "open-system",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for stochastic pure-state evolution in open quantum systems.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_empirical_bridge_from_sse_to_consciousness",
+        "no_stellar_plasma_leak_into_consciousness",
+        "hamiltonian_microdynamics_not_sufficient_for_observable_dissipation"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-consciousness-hypothesis.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/orch-or-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-csl-definition",
+      "slug": "physics-quantum-semiclassical-csl-definition",
+      "title": "Continuous Spontaneous Localization Definition",
+      "excerpt": "Definition-level anchor for the CSL family of collapse models.",
+      "bodyMD": "This node anchors the continuous spontaneous localization family as an exploratory collapse-model lane. It is mathematically adjacent to the consciousness literature but remains non-certifying.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "csl",
+        "collapse-model",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the CSL family of collapse models.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_empirical_bridge_from_csl_to_consciousness",
+        "no_stellar_plasma_leak_into_consciousness",
+        "hamiltonian_microdynamics_not_sufficient_for_observable_dissipation"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-consciousness-hypothesis.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/orch-or-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-colored-noise-collapse-hypothesis",
+      "slug": "physics-quantum-semiclassical-colored-noise-collapse-hypothesis",
+      "title": "Colored Noise Collapse Hypothesis",
+      "excerpt": "Exploratory hypothesis node for colored-noise collapse proposals.",
+      "bodyMD": "This node keeps colored-noise collapse proposals visible as an exploratory hypothesis family. It is a boundary node for the stochastic open-system branch, not a proof of biological consciousness.",
+      "tags": [
+        "physics",
+        "quantum",
+        "hypothesis",
+        "colored-noise",
+        "collapse",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "constrains",
+          "to": "physics-quantum-semiclassical-decoherence-classicality-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory hypothesis node for colored-noise collapse proposals.",
+      "nodeType": "concept",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_empirical_bridge_from_colored_noise_collapse_to_consciousness",
+        "no_stellar_plasma_leak_into_consciousness",
+        "hamiltonian_microdynamics_not_sufficient_for_observable_dissipation"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-consciousness-hypothesis.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/orch-or-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-gravity-related-collapse-definition",
+      "slug": "physics-quantum-semiclassical-gravity-related-collapse-definition",
+      "title": "Gravity Related Collapse Definition",
+      "excerpt": "Exploratory comparison anchor for gravity-related collapse proposals.",
+      "bodyMD": "This node compares gravity-related collapse proposals as exploratory timescale models. It stays at the level of E_G and tau estimates, not consciousness evidence, and not a stellar-observable lane.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "collapse",
+        "gravity-related",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-quantum-semiclassical-diosi-penrose-timescale-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory comparison anchor for gravity-related collapse proposals.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_empirical_bridge_from_collapse_math_to_consciousness",
+        "no_stellar_plasma_leak_into_consciousness",
+        "collapse_timescale_not_comparable_to_measured_bounds"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/gravity-related-collapse.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-diosi-penrose-timescale-definition",
+      "slug": "physics-quantum-semiclassical-diosi-penrose-timescale-definition",
+      "title": "Diosi Penrose Timescale Definition",
+      "excerpt": "Exploratory timescale anchor for the E_G over hbar collapse proposal.",
+      "bodyMD": "This node anchors the tau ~ hbar / E_G proposal as a comparison law. It is only an exploratory estimator until matched against measured bounds, and it does not certify any biological or stellar mechanism.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "diosi-penrose",
+        "timescale",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-gravity-related-collapse-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory timescale anchor for the E_G over hbar collapse proposal.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "tau_or_predicted_s_unbounded_or_inconsistent",
+        "no_mass_distribution_energy_gap_definition",
+        "no_empirical_bridge_from_tau_to_consciousness"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/diosi-penrose-timescale.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-gravitational-time-dilation-decoherence-definition",
+      "slug": "physics-quantum-semiclassical-gravitational-time-dilation-decoherence-definition",
+      "title": "Gravitational Time Dilation Decoherence Definition",
+      "excerpt": "Exploratory comparison anchor for gravity-linked decoherence.",
+      "bodyMD": "This node anchors gravity-linked decoherence by time dilation as a comparison model. It is distinct from Orch-OR and distinct from certified biological evidence, and it does not replace standard decoherence or transport closure.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "decoherence",
+        "gravity",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-decoherence-classicality-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory comparison anchor for gravity-linked decoherence.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_experimental_decoherence_signal",
+        "no_biological_bridge_from_time_dilation_to_consciousness",
+        "no_validated_bridge_to_stellar_observables"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/gravitational-time-dilation-decoherence.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+      "slug": "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+      "title": "Microtubule Mesoscopic Observables Definition",
+      "excerpt": "Exploratory anchor for microtubule transport, spectral, and perturbation observables.",
+      "bodyMD": "This node groups measured microtubule transport, vibrational, and perturbation observables without promoting them into consciousness evidence. It is the correct place to compare mesoscopic observables against open-system model classes.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "microtubule",
+        "observables",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "orch-or-hypothesis",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-decoherence-classicality-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for microtubule transport, spectral, and perturbation observables.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_transport_or_vibrational_signal",
+        "no_anesthetic_sensitivity",
+        "no_microtubule_bridge_to_consciousness"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/microtubule-mesoscopic-observables.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-microtubule-vibrational-mode-definition",
+      "slug": "physics-quantum-semiclassical-microtubule-vibrational-mode-definition",
+      "title": "Microtubule Vibrational Mode Definition",
+      "excerpt": "Exploratory anchor for microtubule spectral and damping structure.",
+      "bodyMD": "This node anchors the vibrational-spectrum side of the microtubule observable lane. It should be compared against measured spectral peaks, damping, and mode lifetimes, not treated as proof of Orch-OR.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "microtubule",
+        "vibrational-mode",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for microtubule spectral and damping structure.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_resolved_vibrational_modes",
+        "no_mode_lifetime_signal",
+        "no_validated_bridge_from_modes_to_consciousness"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/microtubule-vibrational-mode.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-microtubule-energy-migration-definition",
+      "slug": "physics-quantum-semiclassical-microtubule-energy-migration-definition",
+      "title": "Microtubule Energy Migration Definition",
+      "excerpt": "Exploratory anchor for microtubule transport-length observables.",
+      "bodyMD": "This node anchors measured microtubule energy migration as a transport observable. It can be compared against Hamiltonian or open-system models, but it is not itself consciousness evidence.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "microtubule",
+        "transport",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for microtubule transport-length observables.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_transport_length_signal",
+        "no_energy_migration_mechanism",
+        "no_validated_bridge_to_time_crystal_claims"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/microtubule-energy-migration.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-microtubule-anesthetic-perturbation-definition",
+      "slug": "physics-quantum-semiclassical-microtubule-anesthetic-perturbation-definition",
+      "title": "Microtubule Anesthetic Perturbation Definition",
+      "excerpt": "Exploratory anchor for anesthetic sensitivity of microtubule observables.",
+      "bodyMD": "This node anchors perturbation of microtubule observables by anesthetics or similar agents. It is a measurement node for sensitivity, not a proof of consciousness or collapse.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "microtubule",
+        "anesthetic",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for anesthetic sensitivity of microtubule observables.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_anesthetic_perturbation_signal",
+        "no_measurable_binding_delta",
+        "no_validated_bridge_to_orch_or"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/microtubule-anesthetic-perturbation.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+      "slug": "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+      "title": "Driven Dissipative Time Crystal Definition",
+      "excerpt": "Exploratory anchor for driven-dissipative many-body time-crystal criteria.",
+      "bodyMD": "This node anchors driven-dissipative time-crystal criteria in the mainstream many-body sense. It requires subharmonic response and robustness, and it does not reduce to generic periodicity or a consciousness story.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "time-crystal",
+        "dissipative",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-stochastic-open-quantum-dynamics-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-quantum-semiclassical-time-crystal-subharmonic-locking-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for driven-dissipative many-body time-crystal criteria.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_subharmonic_response",
+        "no_robustness_window",
+        "no_time_crystal_signature"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/driven-dissipative-time-crystal.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-time-crystal-subharmonic-locking-definition",
+      "slug": "physics-quantum-semiclassical-time-crystal-subharmonic-locking-definition",
+      "title": "Time Crystal Subharmonic Locking Definition",
+      "excerpt": "Exploratory anchor for period-doubled or fractionally locked response.",
+      "bodyMD": "This node anchors subharmonic locking as the first necessary signature for a time-crystal comparison. It is not satisfied by arbitrary oscillation or by a triplet-band metaphor alone.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "time-crystal",
+        "subharmonic",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for period-doubled or fractionally locked response.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_subharmonic_locking",
+        "lock_ratio_not_reproducible",
+        "no_validated_bridge_to_biological_observables"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/time-crystal-subharmonic-locking.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-time-crystal-robustness-window-definition",
+      "slug": "physics-quantum-semiclassical-time-crystal-robustness-window-definition",
+      "title": "Time Crystal Robustness Window Definition",
+      "excerpt": "Exploratory anchor for disorder and dissipation robustness.",
+      "bodyMD": "This node anchors the robustness window that distinguishes a genuine time-crystal-like response from a narrow resonance or accidental periodicity. The claim remains exploratory until the stability window is measured and reproducible.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "time-crystal",
+        "robustness",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory anchor for disorder and dissipation robustness.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_robustness_window",
+        "robustness_window_not_reproducible",
+        "no_validated_bridge_to_spacetime_geometry"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/time-crystal-robustness-window.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-time-crystal-no-go-boundary-definition",
+      "slug": "physics-quantum-semiclassical-time-crystal-no-go-boundary-definition",
+      "title": "Time Crystal No Go Boundary Definition",
+      "excerpt": "Exploratory boundary anchor for no-go theorems and exclusions.",
+      "bodyMD": "This node records the no-go boundary so the packet can distinguish allowed driven-dissipative time-crystal comparisons from equilibrium claims that are ruled out. It is a boundary object, not an affirmative mechanism.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "time-crystal",
+        "no-go",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory boundary anchor for no-go theorems and exclusions.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_go_boundary_ignored",
+        "equilibrium_time_crystal_claim_made",
+        "no_validated_bridge_from_no_go_to_consciousness"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/time-crystal-no-go-boundary.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-room-temperature-quantum-benchmark-definition",
+      "slug": "physics-quantum-semiclassical-room-temperature-quantum-benchmark-definition",
+      "title": "Room Temperature Quantum Benchmark Definition",
+      "excerpt": "Exploratory benchmark for biologically relevant coherence comparisons.",
+      "bodyMD": "This node anchors room-temperature quantum-coherence benchmarks such as photosynthetic transport comparisons. It is a benchmark surface for comparison, not a claim that any microtubule or neural system already satisfies those criteria.",
+      "tags": [
+        "physics",
+        "quantum",
+        "definition",
+        "benchmark",
+        "coherence",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-microtubule-energy-migration-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory benchmark for biologically relevant coherence comparisons.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_comparable_coherence_benchmark",
+        "benchmark_used_as_consciousness_proof",
+        "no_validated_bridge_to_microtubule_observables"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/room-temperature-quantum-coherence-benchmark.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-triplet-band-resonance-observable",
+      "slug": "physics-quantum-semiclassical-triplet-band-resonance-observable",
+      "title": "Triplet Band Resonance Observable",
+      "excerpt": "Exploratory observable for reported triplet-band microtubule resonance patterns.",
+      "bodyMD": "This node tracks reported triplet-band resonance patterns as an observable family. It stays exploratory and must be compared against mainstream time-crystal criteria before any stronger interpretation is allowed.",
+      "tags": [
+        "physics",
+        "quantum",
+        "observable",
+        "microtubule",
+        "triplet",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-microtubule-mesoscopic-observables-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-quantum-semiclassical-scale-free-resonance-hierarchy-hypothesis",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory observable for reported triplet-band microtubule resonance patterns.",
+      "nodeType": "concept",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "triplet_band_pattern_not_time_crystal_without_subharmonic_locking",
+        "triplet_band_pattern_not_time_crystal_without_robustness_window",
+        "no_validated_bridge_from_triplet_hierarchy_to_stellar_observables"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/triplet-band-resonance-observable.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-scale-free-resonance-hierarchy-hypothesis",
+      "slug": "physics-quantum-semiclassical-scale-free-resonance-hierarchy-hypothesis",
+      "title": "Scale Free Resonance Hierarchy Hypothesis",
+      "excerpt": "Exploratory hypothesis for scale-free resonance across microtubule and neuron scales.",
+      "bodyMD": "This node records a scale-free resonance hierarchy as a hypothesis, not a geometric fact. It is only meaningful if the reported scaling is measured, reproducible, and distinct from generic noise or simple periodicity.",
+      "tags": [
+        "physics",
+        "quantum",
+        "hypothesis",
+        "scale-free",
+        "resonance",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-triplet-band-resonance-observable",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory hypothesis for scale-free resonance across microtubule and neuron scales.",
+      "nodeType": "hypothesis",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "scale_free_resonance_not_spacetime_geometry_without_geometry_observable",
+        "no_scale_invariance_exponent",
+        "no_validated_bridge_to_consciousness"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/scale-free-resonance-hierarchy-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-polyatomic-time-crystal-hypothesis",
+      "slug": "physics-quantum-semiclassical-polyatomic-time-crystal-hypothesis",
+      "title": "Polyatomic Time Crystal Hypothesis",
+      "excerpt": "Exploratory hypothesis for polyatomic or multiband time-crystal language in microtubule claims.",
+      "bodyMD": "This node records the polyatomic time-crystal language as an exploratory hypothesis family. It must be measured against subharmonic locking, robustness, and replication criteria before it can move beyond hypothesis status.",
+      "tags": [
+        "physics",
+        "quantum",
+        "hypothesis",
+        "time-crystal",
+        "polyatomic",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-triplet-band-resonance-observable",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-driven-dissipative-time-crystal-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory hypothesis for polyatomic or multiband time-crystal language in microtubule claims.",
+      "nodeType": "hypothesis",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "polyatomic_time_crystal_claim_requires_independent_replication",
+        "no_subharmonic_locking",
+        "no_robustness_window"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/polyatomic-time-crystal-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-triplet-of-triplets-hypothesis",
+      "slug": "physics-quantum-semiclassical-triplet-of-triplets-hypothesis",
+      "title": "Triplet Of Triplets Hypothesis",
+      "excerpt": "Exploratory hypothesis for nested triplet-band hierarchy claims.",
+      "bodyMD": "This node records the nested triplet-of-triplets claim family as an exploratory hypothesis. It requires real spectral structure and cross-scale reproducibility before it can be treated as more than a speculative pattern claim.",
+      "tags": [
+        "physics",
+        "quantum",
+        "hypothesis",
+        "triplet",
+        "nested",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-scale-free-resonance-hierarchy-hypothesis",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory hypothesis for nested triplet-band hierarchy claims.",
+      "nodeType": "hypothesis",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "triplet_hierarchy_not_time_crystal_without_subharmonic_locking",
+        "triplet_hierarchy_not_consciousness_evidence",
+        "triplet_hierarchy_not_spacetime_evidence_without_geometry_observable"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/triplet-of-triplets-hypothesis.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-quantum-semiclassical-spacetime-triplet-geometry-hypothesis",
+      "slug": "physics-quantum-semiclassical-spacetime-triplet-geometry-hypothesis",
+      "title": "Spacetime Triplet Geometry Hypothesis",
+      "excerpt": "Exploratory hypothesis for a spacetime-geometry interpretation of triplet-band claims.",
+      "bodyMD": "This node records the strongest speculative version of the triplet family as a spacetime-geometry hypothesis. It remains exploratory until there is a direct geometry observable and a reproducible bridge to the measured band structure.",
+      "tags": [
+        "physics",
+        "quantum",
+        "hypothesis",
+        "spacetime",
+        "geometry",
+        "triplet",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-quantum-semiclassical-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-triplet-of-triplets-hypothesis",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-quantum-semiclassical-gravity-related-collapse-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Exploratory hypothesis for a spacetime-geometry interpretation of triplet-band claims.",
+      "nodeType": "hypothesis",
+      "dependencies": [
+        "physics-quantum-semiclassical-tree"
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "scale_free_resonance_not_spacetime_geometry_without_geometry_observable",
+        "no_validated_geometry_observable",
+        "no_validated_bridge_from_triplet_hierarchy_to_stellar_observables"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/spacetime-triplet-geometry-hypothesis.md"
         }
       ]
     },

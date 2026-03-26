@@ -8,6 +8,8 @@ describe("hull-render router", () => {
   const prevBase = process.env.MIS_RENDER_SERVICE_URL;
   const prevBackend = process.env.MIS_RENDER_BACKEND;
   const prevStrict = process.env.MIS_RENDER_PROXY_STRICT;
+  const prevRequireScientificFrame =
+    process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME;
   const prevRequireIntegral = process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL;
   const prevProvenancePrefix =
     process.env.MIS_RENDER_REQUIRED_PROVENANCE_SOURCE_PREFIX;
@@ -21,12 +23,15 @@ describe("hull-render router", () => {
   const prevUnityUrl = process.env.UNITY_RENDER_SERVICE_URL;
   const prevUnityFrame = process.env.UNITY_RENDER_SERVICE_FRAME_URL;
   const prevUnityStatus = process.env.UNITY_RENDER_SERVICE_STATUS_URL;
+  const prevDisableDefaultEndpoint = process.env.MIS_RENDER_DISABLE_DEFAULT_ENDPOINT;
+  const prevAutoStartOptix = process.env.MIS_RENDER_AUTOSTART_OPTIX;
 
   beforeEach(() => {
     delete process.env.MIS_RENDER_SERVICE_FRAME_URL;
     delete process.env.MIS_RENDER_SERVICE_URL;
     delete process.env.MIS_RENDER_BACKEND;
     delete process.env.MIS_RENDER_PROXY_STRICT;
+    delete process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME;
     delete process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL;
     delete process.env.MIS_RENDER_REQUIRED_PROVENANCE_SOURCE_PREFIX;
     delete process.env.MIS_RENDER_ALLOW_CONFIGURED_FALLBACK;
@@ -37,6 +42,8 @@ describe("hull-render router", () => {
     delete process.env.UNITY_RENDER_SERVICE_URL;
     delete process.env.UNITY_RENDER_SERVICE_FRAME_URL;
     delete process.env.UNITY_RENDER_SERVICE_STATUS_URL;
+    process.env.MIS_RENDER_DISABLE_DEFAULT_ENDPOINT = "1";
+    process.env.MIS_RENDER_AUTOSTART_OPTIX = "0";
   });
 
   afterEach(() => {
@@ -48,6 +55,11 @@ describe("hull-render router", () => {
     else process.env.MIS_RENDER_BACKEND = prevBackend;
     if (prevStrict === undefined) delete process.env.MIS_RENDER_PROXY_STRICT;
     else process.env.MIS_RENDER_PROXY_STRICT = prevStrict;
+    if (prevRequireScientificFrame === undefined) {
+      delete process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME;
+    } else {
+      process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME = prevRequireScientificFrame;
+    }
     if (prevRequireIntegral === undefined) delete process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL;
     else process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = prevRequireIntegral;
     if (prevProvenancePrefix === undefined) {
@@ -77,6 +89,16 @@ describe("hull-render router", () => {
     else process.env.UNITY_RENDER_SERVICE_FRAME_URL = prevUnityFrame;
     if (prevUnityStatus === undefined) delete process.env.UNITY_RENDER_SERVICE_STATUS_URL;
     else process.env.UNITY_RENDER_SERVICE_STATUS_URL = prevUnityStatus;
+    if (prevDisableDefaultEndpoint === undefined) {
+      delete process.env.MIS_RENDER_DISABLE_DEFAULT_ENDPOINT;
+    } else {
+      process.env.MIS_RENDER_DISABLE_DEFAULT_ENDPOINT = prevDisableDefaultEndpoint;
+    }
+    if (prevAutoStartOptix === undefined) {
+      delete process.env.MIS_RENDER_AUTOSTART_OPTIX;
+    } else {
+      process.env.MIS_RENDER_AUTOSTART_OPTIX = prevAutoStartOptix;
+    }
   });
 
   it("reports status", async () => {
@@ -94,7 +116,7 @@ describe("hull-render router", () => {
     expect(typeof res.body.requireIntegralSignal).toBe("boolean");
   });
 
-  it("returns deterministic local PNG frame when remote is not configured", async () => {
+  it("fails closed by default when remote scientific endpoint is not configured", async () => {
     const app = express();
     app.use(express.json({ limit: "2mb" }));
     app.use("/api/helix/hull-render", hullRenderRouter);
@@ -109,16 +131,9 @@ describe("hull-render router", () => {
         solve: { beta: 0.03, alpha: 1, sigma: 6, R: 1.2 },
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body.version).toBe(1);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.backend).toBe("local-deterministic");
-    expect(res.body.imageMime).toBe("image/png");
-    expect(typeof res.body.imageDataUrl).toBe("string");
-    expect(res.body.imageDataUrl.startsWith("data:image/png;base64,")).toBe(true);
-    expect(res.body.width).toBe(640);
-    expect(res.body.height).toBe(360);
-    expect(typeof res.body.renderMs).toBe("number");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("mis_proxy_unconfigured");
+    expect(String(res.body.message ?? "")).toContain("scientific frame requested");
   });
 
   it("fails closed with strict proxy when remote endpoint is down", async () => {
@@ -169,7 +184,12 @@ describe("hull-render router", () => {
         height: 360,
         deterministicSeed: 1,
         renderMs: 1,
-        diagnostics: { note: "optix_cuda_scaffold_render", consistency: "ok" },
+        diagnostics: {
+          note: "optix_cuda_research_render",
+          consistency: "ok",
+          geodesicMode: "full-3+1-christoffel",
+          scientificTier: "research-grade",
+        },
         attachments: [
           {
             kind: "depth-linear-m-f32le",
@@ -186,7 +206,12 @@ describe("hull-render router", () => {
             dataBase64: "/////w==",
           },
         ],
-        provenance: { source: "optix/cuda.scaffold", timestampMs: Date.now() },
+        provenance: {
+          source: "optix/cuda.research",
+          timestampMs: Date.now(),
+          researchGrade: true,
+          scientificTier: "research-grade",
+        },
       });
     });
     const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
@@ -209,7 +234,7 @@ describe("hull-render router", () => {
     try {
       const status = await request(app).get("/api/helix/hull-render/status");
       expect(status.status).toBe(200);
-      expect(status.body.backendMode).toBe("auto");
+      expect(status.body.backendMode).toBe("optix");
       expect(status.body.remoteEndpoint).toBe(
         `http://127.0.0.1:${port}/api/helix/hull-render/frame`,
       );
@@ -331,6 +356,8 @@ describe("hull-render router", () => {
     process.env.OPTIX_RENDER_SERVICE_URL = "http://127.0.0.1:1";
     process.env.MIS_RENDER_SERVICE_URL = `http://127.0.0.1:${genericPort}`;
     process.env.MIS_RENDER_ALLOW_LEGACY_GENERIC_ENDPOINT = "1";
+    process.env.MIS_RENDER_PROXY_STRICT = "0";
+    process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME = "0";
 
     const app = express();
     app.use(express.json({ limit: "2mb" }));
@@ -401,7 +428,7 @@ describe("hull-render router", () => {
     try {
       const status = await request(app).get("/api/helix/hull-render/status");
       expect(status.status).toBe(200);
-      expect(status.body.backendMode).toBe("auto");
+      expect(status.body.backendMode).toBe("optix");
       expect(Array.isArray(status.body.endpointCandidates)).toBe(true);
       expect(status.body.endpointCandidates).toHaveLength(1);
       expect(status.body.endpointCandidates[0]?.backend).toBe("optix");
@@ -467,7 +494,10 @@ describe("hull-render router", () => {
   });
 
   it("can opt-in to configured-endpoint local fallback via env override", async () => {
+    process.env.MIS_RENDER_BACKEND = "auto";
     process.env.MIS_RENDER_SERVICE_URL = "http://127.0.0.1:1";
+    process.env.MIS_RENDER_PROXY_STRICT = "0";
+    process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME = "0";
     process.env.MIS_RENDER_ALLOW_CONFIGURED_FALLBACK = "1";
 
     const app = express();
@@ -556,7 +586,12 @@ describe("hull-render router", () => {
         height: 360,
         deterministicSeed: 1,
         renderMs: 1,
-        diagnostics: { note: "optix_cuda_scaffold_render", consistency: "ok" },
+        diagnostics: {
+          note: "optix_cuda_research_render",
+          consistency: "ok",
+          geodesicMode: "full-3+1-christoffel",
+          scientificTier: "research-grade",
+        },
         attachments: [
           {
             kind: "depth-linear-m-f32le",
@@ -635,7 +670,12 @@ describe("hull-render router", () => {
         height: 360,
         deterministicSeed: 1,
         renderMs: 1,
-        diagnostics: { note: "optix_cuda_scaffold_render", consistency: "ok" },
+        diagnostics: {
+          note: "optix_cuda_research_render",
+          consistency: "ok",
+          geodesicMode: "full-3+1-christoffel",
+          scientificTier: "research-grade",
+        },
         attachments: [
           {
             kind: "depth-linear-m-f32le",
@@ -653,8 +693,10 @@ describe("hull-render router", () => {
           },
         ],
         provenance: {
-          source: "optix/cuda.scaffold",
+          source: "optix/cuda.research",
           timestampMs: Date.now(),
+          researchGrade: true,
+          scientificTier: "research-grade",
         },
       });
     });
@@ -701,6 +743,93 @@ describe("hull-render router", () => {
     }
   });
 
+  it("fails closed when scientific frame is requested but remote frame is scaffold tier", async () => {
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json({
+        version: 1,
+        ok: true,
+        backend: "proxy",
+        imageMime: "image/png",
+        imageDataUrl:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
+        width: 640,
+        height: 360,
+        deterministicSeed: 1,
+        renderMs: 1,
+        diagnostics: {
+          note: "raytracingmis_unity_batch",
+          consistency: "ok",
+          geodesicMode: "full-3+1-christoffel",
+          scientificTier: "scaffold",
+        },
+        attachments: [
+          {
+            kind: "depth-linear-m-f32le",
+            width: 640,
+            height: 360,
+            encoding: "base64",
+            dataBase64: "AQEBAQ==",
+          },
+          {
+            kind: "shell-mask-u8",
+            width: 640,
+            height: 360,
+            encoding: "base64",
+            dataBase64: "/////w==",
+          },
+        ],
+        provenance: {
+          source: "optix/cuda.batch",
+          timestampMs: Date.now(),
+          researchGrade: false,
+          scientificTier: "scaffold",
+        },
+      });
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app)
+        .post("/api/helix/hull-render/frame")
+        .send({
+          version: 1,
+          width: 640,
+          height: 360,
+          solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+          scienceLane: {
+            requireIntegralSignal: true,
+            requireScientificFrame: true,
+          },
+        });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_non_research_grade_frame",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
   it("fails closed when strict scientific lane is missing integral attachments", async () => {
     const remote = express();
     remote.use(express.json({ limit: "2mb" }));
@@ -716,8 +845,18 @@ describe("hull-render router", () => {
         height: 360,
         deterministicSeed: 1,
         renderMs: 1,
-        diagnostics: { note: "raytracingmis_unity_batch" },
-        provenance: { source: "raytracingmis.unity.batch", timestampMs: Date.now() },
+        diagnostics: {
+          note: "optix_cuda_research_render",
+          geodesicMode: "full-3+1-christoffel",
+          consistency: "ok",
+          scientificTier: "research-grade",
+        },
+        provenance: {
+          source: "optix/cuda.research",
+          timestampMs: Date.now(),
+          researchGrade: true,
+          scientificTier: "research-grade",
+        },
       });
     });
     const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
@@ -790,6 +929,7 @@ describe("hull-render router", () => {
     process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
     process.env.MIS_RENDER_PROXY_STRICT = "1";
     process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "0";
+    process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME = "0";
 
     const app = express();
     app.use(express.json({ limit: "2mb" }));

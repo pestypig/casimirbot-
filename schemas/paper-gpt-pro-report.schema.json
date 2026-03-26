@@ -18,6 +18,7 @@
     "executable_mappings",
     "prediction_contract_candidates",
     "symbol_equivalence_entries",
+    "derivation_lineage",
     "maturity_gate_candidates",
     "codex_patch_guidance"
   ],
@@ -103,6 +104,7 @@
       "maxItems": 50000,
       "items": { "$ref": "#/definitions/symbolEquivalenceEntry" }
     },
+    "derivation_lineage": { "$ref": "#/definitions/derivationLineage" },
     "maturity_gate_candidates": {
       "type": "array",
       "maxItems": 50000,
@@ -516,6 +518,44 @@
           "properties": {
             "scale": { "type": "number" },
             "offset": { "type": "number" }
+          }
+        }
+      }
+    },
+    "derivationLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lineage_version", "lineage_hash", "steps"],
+      "properties": {
+        "lineage_version": { "type": "integer", "minimum": 1 },
+        "lineage_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "replay_seed": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step_id", "version", "operation", "at"],
+            "properties": {
+              "step_id": { "type": "string", "pattern": "^[a-z0-9._:-]{3,256}$" },
+              "version": { "type": "integer", "minimum": 1 },
+              "operation": {
+                "type": "string",
+                "enum": ["define", "derive", "substitute", "normalize", "fit", "compare", "merge", "validate"]
+              },
+              "at": { "type": "string", "format": "date-time" },
+              "input_hashes": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "uniqueItems": true
+              },
+              "output_hashes": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "uniqueItems": true
+              }
+            }
           }
         }
       }

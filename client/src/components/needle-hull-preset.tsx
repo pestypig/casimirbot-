@@ -1,14 +1,19 @@
 /**
  * Needle Hull Preset Component
- * Applies theoretical warp bubble parameters based on research papers
+ * Applies the NHM2 cavity contract to the legacy simulation form.
  */
 
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Rocket } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { SimulationParameters } from "@shared/schema";
-import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import { NHM2_CAVITY_CONTRACT } from "@shared/needle-hull-mark2-cavity-contract";
+
+const NHM2_TILE_RADIUS_UM = NHM2_CAVITY_CONTRACT.geometry.pocketDiameter_um / 2;
+const NHM2_TILE_AREA_CM2 = NHM2_CAVITY_CONTRACT.layout.tileArea_mm2 / 100;
+const NHM2_LIGHT_CROSSING_TIME_NS = 3.34;
 
 interface NeedleHullPresetProps {
   form: UseFormReturn<SimulationParameters>;
@@ -17,78 +22,64 @@ interface NeedleHullPresetProps {
   onApplyPreset?: () => void;
 }
 
-export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, onApplyPreset }: NeedleHullPresetProps) {
+export function NeedleHullPreset({
+  form,
+  onTileAreaChange,
+  onShipRadiusChange,
+  onApplyPreset,
+}: NeedleHullPresetProps) {
   const applyNeedleHullPreset = () => {
-    // Based on "Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator"
-    // and "time-sliced sector strobing functions as a GR-valid proxy"
-
-    // Core geometry: concave pocket (bowl), 25 mm curvature radius (50 mm diameter)
     form.setValue("geometry", "bowl");
-    form.setValue("radius", 25000); // units: micrometers → 25,000 µm = 25 mm
-    form.setValue("sagDepth", 16);  // 16 nm sag depth ⇒ γ_geo ≈ 25–26
-    form.setValue("gap", 1);        // 1 nm vacuum gap
+    form.setValue("radius", NHM2_TILE_RADIUS_UM);
+    form.setValue("sagDepth", NHM2_CAVITY_CONTRACT.geometry.sag_nm);
+    form.setValue("gap", NHM2_CAVITY_CONTRACT.geometry.gap_nm);
 
-    // Material: Superconducting Nb₃Sn
     form.setValue("material", "custom");
-    form.setValue("temperature", 20); // 20 K operating temperature
+    form.setValue("temperature", NHM2_CAVITY_CONTRACT.thermal.temperature_K);
 
-    // Natário Warp Bubble configuration
     form.setValue("moduleType", "warp");
     form.setValue("dynamicConfig", {
-      // 15 GHz modulation with ±50 pm stroke amplitude
-      modulationFreqGHz: 15,
+      modulationFreqGHz: NHM2_CAVITY_CONTRACT.drive.modulationFreq_GHz,
       strokeAmplitudePm: 50,
-
-      // Sector strobing: 10 μs burst, 1 ms cycle (local duty = 0.01)
       burstLengthUs: 10,
       cycleLengthUs: 1000,
-
-      // Superconducting cavity Q ≈ 10⁹
-      cavityQ: PROMOTED_WARP_PROFILE.qCavity,
-
-      // Needle Hull sector strobing parameters from papers
-      sectorCount: PROMOTED_WARP_PROFILE.sectorCount,        // 400 azimuthal sectors
-      sectorDuty: PROMOTED_WARP_PROFILE.dutyShip / PROMOTED_WARP_PROFILE.sectorCount,      // ship-wide duty d_eff = 0.01 × (1/400)
-      pulseFrequencyGHz: 15,   // 15 GHz pulse frequency
-
-      // Light-crossing time for ~1 m wall thickness (server recomputes too)
-      lightCrossingTimeNs: 3.34, // ~3.34 ns (1.0 m / c)
-
-      // Warp field parameters
-      shiftAmplitude: 50e-12,       // 50 pm shift amplitude for β(r) field
-      expansionTolerance: 1e-12,    // Zero-expansion tolerance
-      warpFieldType: PROMOTED_WARP_PROFILE.warpFieldType      // Natário zero-expansion type
+      dutyCycle: NHM2_CAVITY_CONTRACT.loss.dutyCycle,
+      cavityQ: NHM2_CAVITY_CONTRACT.loss.qCavity,
+      sectorCount: NHM2_CAVITY_CONTRACT.geometry.sectorCount,
+      sectorDuty: NHM2_CAVITY_CONTRACT.loss.dutyShip,
+      pulseFrequencyGHz: NHM2_CAVITY_CONTRACT.drive.modulationFreq_GHz,
+      lightCrossingTimeNs: NHM2_LIGHT_CROSSING_TIME_NS,
+      shiftAmplitude: 50e-12,
+      expansionTolerance: 1e-12,
+      warpFieldType: NHM2_CAVITY_CONTRACT.geometry.warpFieldType,
+      gap_nm: NHM2_CAVITY_CONTRACT.geometry.gap_nm,
     });
 
-    // Advanced computational parameters for high precision
     form.setValue("advanced", {
-      xiMin: 0.0001,    // Tighter tolerance for exotic mass calculations
-      maxXiPoints: 25000, // Higher precision for warp bubble conditions
+      xiMin: 0.0001,
+      maxXiPoints: 25000,
       intervals: 100,
       absTol: 0,
-      relTol: 0.005     // 0.5% tolerance for Van-den-Broeck amplification
+      relTol: 0.005,
     });
 
-    // Phase diagram parameters - Needle Hull research specifications
-    onTileAreaChange?.(25);   // 25 cm² tile area (5 cm × 5 cm tiles)
-    onShipRadiusChange?.(86.5); // **Canonical** ship radius (m) for needle hull (Lz/2 = 173/2)
-
-    // Apply all dynamic parameters for real-time phase diagram integration
+    onTileAreaChange?.(NHM2_TILE_AREA_CM2);
+    onShipRadiusChange?.(NHM2_CAVITY_CONTRACT.geometry.shipRadius_m);
     onApplyPreset?.();
   };
 
   return (
     <div className="space-y-2">
-      <Button 
-        type="button" 
+      <Button
+        type="button"
         onClick={() => {
           applyNeedleHullPreset();
           zenLongToast("sim:create", {
-            gammaGeo: 26,
-            qFactor: PROMOTED_WARP_PROFILE.qCavity,
-            duty: PROMOTED_WARP_PROFILE.dutyCycle,
-            shipRadiusM: 86.5, // keep toast aligned with canonical radius
-            gapNm: 1.0
+            gammaGeo: NHM2_CAVITY_CONTRACT.geometry.gammaGeo,
+            qFactor: NHM2_CAVITY_CONTRACT.loss.qCavity,
+            duty: NHM2_CAVITY_CONTRACT.loss.dutyShip,
+            shipRadiusM: NHM2_CAVITY_CONTRACT.geometry.shipRadius_m,
+            gapNm: NHM2_CAVITY_CONTRACT.geometry.gap_nm,
           });
         }}
         className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
@@ -102,4 +93,3 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, o
     </div>
   );
 }
-

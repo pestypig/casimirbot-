@@ -1,0 +1,783 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "stellar-structure-nucleosynthesis-core",
+  "domain": "stellar-structure-diagnostics",
+  "updatedAt": "2026-03-25",
+  "claims": [
+    {
+      "claimId": "claim:stellar.structure:hydrostatic_equilibrium",
+      "statement": "The stellar hydrostatic-equilibrium anchor is only admissible at diagnostic tier when inward gravity is balanced by outward pressure gradients inside the star.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "hydrostatic support must be internal to the star",
+          "the balance is structural, not a planetary shape threshold",
+          "the same balance feeds later thermal and compositional stages"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA Technical Reports Server, Stellar evolution: A survey with analytic.",
+          "note": "Hydrostatic equilibrium as one of the fundamental stellar-structure equations."
+        },
+        {
+          "kind": "web",
+          "citation": "ESA Science & Technology, Stellar Processes and Evolution.",
+          "note": "Star formation and collapse toward hydrostatic support."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-hydrostatic-equilibrium.md"
+      ],
+      "notes": "This is the structural backbone of the stellar lane."
+    },
+    {
+      "claimId": "claim:stellar.structure:thermal_equilibrium",
+      "statement": "The stellar thermal-equilibrium anchor is only admissible at diagnostic tier when energy generation and transport remain in quasi-steady balance over the relevant stellar timescale.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "energy generation and transport must both be represented",
+          "thermal balance is coupled to hydrostatic balance but not identical to it",
+          "the lane should not claim exact steady state for every epoch"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "ESA Science & Technology, Stellar Processes and Evolution.",
+          "note": "Quasi-steady stellar evolution with energy flow."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Reports Server, Stellar evolution: A survey with analytic.",
+          "note": "Thermal and structural balance in analytic stellar models."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-thermal-equilibrium.md"
+      ],
+      "notes": "Thermal balance is the transport/energy side of the stellar lane."
+    },
+    {
+      "claimId": "claim:stellar.structure:equation_of_state",
+      "statement": "The stellar equation-of-state anchor is only admissible at diagnostic tier when pressure is treated as a function of density, temperature, and composition in stellar plasma.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "the EOS must be plasma-based rather than planetary-rubble-based",
+          "composition dependence must remain explicit",
+          "degeneracy support or ideal-gas limits may appear depending on regime"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA Technical Reports Server, Stellar evolution: A survey with analytic.",
+          "note": "Stellar structure equations and state relations."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Reports Server, Primordial stellar evolution - The pre-main-sequence phase.",
+          "note": "EOS and early stellar contraction."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-equation-of-state.md"
+      ],
+      "notes": "The EOS is the support law used by the star lane."
+    },
+    {
+      "claimId": "claim:stellar.structure:opacity_transport",
+      "statement": "The stellar opacity anchor is only admissible at diagnostic tier when radiative transport resistance is treated as a composition-dependent material property that feeds back into structure.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "opacity must affect radiative transport, not hydrostatic force balance directly",
+          "composition changes are allowed to alter opacity",
+          "the lane should not collapse radiative and convective transport into one undifferentiated term"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA Technical Reports Server, Iron and molecular opacities and the evolution of Population I stars.",
+          "note": "Opacity dependence in stellar evolution."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Reports Server, The effect of Livermore OPAL opacities on the evolutionary masses of RR Lyrae stars.",
+          "note": "Opacity changes feeding back into stellar tracks."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-opacity.md"
+      ],
+      "notes": "Opacity is one of the main stellar transport controls."
+    },
+    {
+      "claimId": "claim:stellar.structure:nuclear_reaction_rate",
+      "statement": "The nuclear-reaction-rate anchor is only admissible at diagnostic tier when the lane treats fusion and capture rates as temperature-, density-, and composition-dependent microphysics inputs.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "reaction rates must be inside the stellar interior, not the planetary lane",
+          "rate dependence on stellar conditions must stay explicit",
+          "reaction rates feed burning stages and nucleosynthesis"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA Cosmicopia, Nucleosynthesis.",
+          "note": "Overview of stellar fusion and element creation."
+        },
+        {
+          "kind": "paper",
+          "citation": "NASA/CP-2006-21454, Nucleosynthesis: Stellar and Solar Abundances and Atomic Data.",
+          "note": "Reaction-rate and abundance context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/nuclear-reaction-rate.md"
+      ],
+      "notes": "Reaction rates are the microphysics input for the burning ladder."
+    },
+    {
+      "claimId": "claim:stellar.structure:hydrogen_burning",
+      "statement": "The hydrogen-burning anchor is only admissible at diagnostic tier when it is treated as the main hydrogen-fusion stage of stellar evolution.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "hydrogen burning must precede later fusion stages in the lane order",
+          "the claim must remain about stellar fusion, not planetary chemistry",
+          "the stage may be proton-proton chain or CNO dominated depending on stellar mass"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA APOD, Hydrogen, Helium, and the Stars of M10.",
+          "note": "Accessible overview of the hydrogen-fusion stage."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA Cosmicopia, Nucleosynthesis.",
+          "note": "Fusion stage overview."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/hydrogen-burning.md"
+      ],
+      "notes": "Hydrogen burning is the primary early stellar power source."
+    },
+    {
+      "claimId": "claim:stellar.structure:helium_burning",
+      "statement": "The helium-burning anchor is only admissible at diagnostic tier when it is treated as the post-main-sequence fusion stage that produces heavier nuclei from helium fuel.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "helium burning must follow hydrogen burning in the stage ladder",
+          "the claim must remain about stellar interior burning",
+          "heavier-nucleus production must remain explicit"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA Cosmicopia, Nucleosynthesis.",
+          "note": "Stellar burning ladder overview."
+        },
+        {
+          "kind": "paper",
+          "citation": "NASA/CP-2006-21454, Nucleosynthesis: Stellar and Solar Abundances and Atomic Data.",
+          "note": "Abundance and stage context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/helium-burning.md"
+      ],
+      "notes": "Helium burning is the next composition-changing stage."
+    },
+    {
+      "claimId": "claim:stellar.structure:advanced_burning_stages",
+      "statement": "The advanced-burning-stages anchor is only admissible at diagnostic tier when the lane includes the late fusion ladder that produces progressively heavier nuclei before final collapse or dispersal.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "advanced burning must stay later than helium burning",
+          "the stage ladder should remain distinct from the generic nucleosynthesis umbrella",
+          "the lane should not assert a universal final product for every stellar mass"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA Cosmicopia, Nucleosynthesis.",
+          "note": "Late-stage burning overview."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA APOD, Hydrogen, Helium, and the Stars of M10.",
+          "note": "Accessible stage narrative."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/advanced-burning-stages.md"
+      ],
+      "notes": "This node keeps the late-stage ladder separate from the generic nucleosynthesis umbrella."
+    },
+    {
+      "claimId": "claim:stellar.structure:stellar_nucleosynthesis",
+      "statement": "The stellar-nucleosynthesis anchor is only admissible at diagnostic tier when the lane treats stars as element-producing engines whose burning stages and reaction networks alter the abundance pattern of the matter they eject.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "nucleosynthesis must be inside stellar evolution",
+          "the claim must not collapse into prebiotic chemistry or biology",
+          "element creation should remain stage-ordered and composition-aware"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA Cosmicopia, Nucleosynthesis.",
+          "note": "General stellar nucleosynthesis overview."
+        },
+        {
+          "kind": "paper",
+          "citation": "NASA/CP-2006-21454, Nucleosynthesis: Stellar and Solar Abundances and Atomic Data.",
+          "note": "Stellar and solar abundance context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-nucleosynthesis.md"
+      ],
+      "notes": "This is the element-creation anchor for the stellar branch."
+    },
+    {
+      "claimId": "claim:stellar.structure:composition_feedback",
+      "statement": "The composition-feedback anchor is only admissible at diagnostic tier when newly produced elements are allowed to feed back into opacity, equation of state, and later stellar evolution.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane",
+        "constraints": [
+          "composition feedback must stay within the stellar lane",
+          "feedback should affect opacity and EOS explicitly",
+          "the lane may bridge onward to chemistry but should not claim that bridge as a finished biology result"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA/CP-2006-21454, Nucleosynthesis: Stellar and Solar Abundances and Atomic Data.",
+          "note": "Abundance evolution context."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA Science, Hubble Rocks with a Heavy-Metal Home.",
+          "note": "Accessible composition and enrichment story."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/composition-feedback.md"
+      ],
+      "notes": "This is the abundance-feedback loop back into structure."
+    },
+    {
+      "claimId": "claim:stellar.structure:stellar_oscillation",
+      "statement": "The stellar-oscillation anchor is only admissible at diagnostic tier when the lane treats standing acoustic and gravity modes as observable stellar variability rather than as a consciousness mechanism.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "oscillations must remain stellar observables",
+          "the mode language should not be upgraded to consciousness",
+          "the lane may feed helioseismology and multiscale variability"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Solar oscillations and interior probing."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "Oscillation is the dynamic observable used by helioseismology."
+    },
+    {
+      "claimId": "claim:stellar.structure:helioseismology",
+      "statement": "The helioseismology anchor is only admissible at diagnostic tier when oscillation spectra are used to infer interior temperature, density, composition, and rotation structure.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "the inference must remain about the solar interior",
+          "the lane should not become a consciousness bridge",
+          "oscillation inversions may inform multiscale variability"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Helioseismic inversions of the solar interior."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "Helioseismology is the interior-diagnostic use of oscillations."
+    },
+    {
+      "claimId": "claim:stellar.structure:solar_dynamo",
+      "statement": "The solar-dynamo anchor is only admissible at diagnostic tier when convection and rotation are treated as the source of large-scale magnetic-field generation in the Sun.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "the dynamo must remain a magnetic-field-generation mechanism",
+          "the lane should not collapse into flare statistics alone",
+          "rotation-convection coupling must remain explicit"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA Technical Memorandum, solar dynamo.",
+          "note": "Convection/rotation and magnetic-cycle generation."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "Solar dynamo is the parent of the activity cycle."
+    },
+    {
+      "claimId": "claim:stellar.structure:magnetic_cycle",
+      "statement": "The magnetic-cycle anchor is only admissible at diagnostic tier when the quasi-periodic solar activity cycle is treated as a large-scale modulation of magnetic polarity and sunspot activity.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "cycle modulation must remain a magnetic-activity observable",
+          "the lane may support reconnection and flare statistics",
+          "the cycle is downstream of dynamo action"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "NASA Technical Memorandum, solar dynamo.",
+          "note": "Cycle-level modulation from dynamo processes."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "Magnetic cycle is the observable activity band."
+    },
+    {
+      "claimId": "claim:stellar.structure:magnetic_reconnection",
+      "statement": "The magnetic-reconnection anchor is only admissible at diagnostic tier when field-line topology changes are allowed to release magnetic free energy in the stellar atmosphere.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "reconnection must remain an atmospheric/plasma process",
+          "the lane may feed flare statistics and plasma variability",
+          "the claim should not be repurposed as a consciousness mechanism"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Lu and Hamilton / solar flare avalanche literature.",
+          "note": "Reconnection-driven flare release and power-law activity."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "Magnetic reconnection is the impulsive-release channel."
+    },
+    {
+      "claimId": "claim:stellar.structure:flare_avalanche",
+      "statement": "The flare-avalanche anchor is only admissible at diagnostic tier when flare populations are modeled as cascades or self-organized criticality style statistics in a driven magnetic system.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "flare statistics must remain an activity observable",
+          "the lane may use power-law or cascade language only as a model class",
+          "the claim should not be promoted to consciousness or OR"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Lu and Hamilton, solar flare avalanche model literature.",
+          "note": "SOC-style flare statistics and cascading release."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "Flare avalanches stay in the stellar activity lane."
+    },
+    {
+      "claimId": "claim:stellar.structure:granulation_driven_pmode_pumping",
+      "statement": "The granulation-driven-pmode-pumping anchor is only admissible at diagnostic tier when granulation and convection are treated as the observable energy-injection source for the five-minute p-mode band.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "granulation must remain the source term, not a consciousness proxy",
+          "the p-mode band must remain a helioseismic observable",
+          "the node may support helioseismology but not replace it"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Goldreich, Murray, and Kumar, Excitation of solar p-modes.",
+          "note": "Granulation and convection as the physical driver of the five-minute band."
+        },
+        {
+          "kind": "paper",
+          "citation": "Christensen-Dalsgaard et al., Solar Oscillations and the Solar Interior.",
+          "note": "The five-minute band as a solar-interior diagnostic."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/granulation-driven-pmode-pumping.md"
+      ],
+      "notes": "This is the granulation-to-p-mode source term."
+    },
+    {
+      "claimId": "claim:stellar.structure:nanoflare_heating",
+      "statement": "The nanoflare-heating anchor is only admissible at diagnostic tier when many impulsive magnetic-release events are treated as a coronal heating and energy-transport channel.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "nanoflares must stay in the magnetic-heating lane",
+          "the claim may support multiscale plasma variability but not consciousness",
+          "the node should remain compatible with reconnection-based flare physics"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "report",
+          "citation": "Klimchuk, Nanoflare heating of the corona.",
+          "note": "Canonical nanoflare heating semantics."
+        },
+        {
+          "kind": "paper",
+          "citation": "PIC-to-MHD solar flare bridge literature.",
+          "note": "Supports a multi-scale heating and reconnection interpretation."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/nanoflare-heating.md"
+      ],
+      "notes": "This claim keeps nanoflares in the stellar heating lane."
+    },
+    {
+      "claimId": "claim:stellar.structure:flare_particle_precipitation",
+      "statement": "The flare-particle-precipitation anchor is only admissible at diagnostic tier when flare-accelerated particles are allowed to precipitate into the lower atmosphere and drive pressure transients and heating.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "particle precipitation must remain a flare-transport phenomenon",
+          "the lane may feed sunquake forcing but not consciousness",
+          "the claim should remain compatible with reconnection and nanoflare heating"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "NASA sunquake overview and flare-linked helioseismic response summaries.",
+          "note": "Flare forcing and surface response semantics."
+        },
+        {
+          "kind": "paper",
+          "citation": "PIC-to-MHD solar flare bridge literature.",
+          "note": "Particle precipitation in flare energetics and lower-atmosphere coupling."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/flare-particle-precipitation.md"
+      ],
+      "notes": "This claim is the forcing bridge into sunquake response."
+    },
+    {
+      "claimId": "claim:stellar.structure:sunquake",
+      "statement": "The sunquake anchor is only admissible at diagnostic tier when flare forcing is treated as a helioseismic response that launches acoustic waves through the solar interior and surface.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "sunquakes must remain observable helioseismic responses",
+          "the claim may use flare timing and EUV morphology but not collapse language",
+          "the lane should remain distinct from quantum-consciousness hypotheses"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Zharkov et al., Sunquake Timing and EUV Irradiance in the 2017 X9.3 Flare.",
+          "note": "Observed timing correlation between flare signatures and sunquakes."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA, secrets behind sunquakes could lurk beneath the solar surface.",
+          "note": "Accessible summary of flare-linked sunquake response."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/sunquake.md"
+      ],
+      "notes": "Sunquakes are the helioseismic response to flare forcing."
+    },
+    {
+      "claimId": "claim:stellar.structure:flare_sunquake_timing_correlation",
+      "statement": "The flare-sunquake-timing-correlation anchor is only admissible at diagnostic tier when the temporal alignment between flare onset, EUV/continuum signatures, and sunquake response is replayable against real data.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-timing lane",
+        "constraints": [
+          "timing must remain observational and replayable",
+          "the lane may include quasi-periodic flare envelopes but not objective reduction",
+          "the node should remain a correlation diagnostic rather than a causal theorem"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Zharkov et al., Sunquake Timing and EUV Irradiance in the 2017 X9.3 Flare.",
+          "note": "Timing correlation between flare signatures and sunquakes."
+        },
+        {
+          "kind": "paper",
+          "citation": "Lamy et al. / flare and sunquake observational literature.",
+          "note": "Sunquake timing and EUV response semantics."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/flare-sunquake-timing-correlation.md"
+      ],
+      "notes": "This claim is the replayable timing-correlation bridge."
+    },
+    {
+      "claimId": "claim:stellar.structure:quasi_periodic_flare_envelope",
+      "statement": "The quasi-periodic-flare-envelope anchor is only admissible at diagnostic tier when burst-envelope modulation and quasi-periodic pulsations are treated as flare observables, not as a collapse clock.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "quasi-periodicity must remain a flare observable",
+          "the envelope may support timing diagnostics but not consciousness claims",
+          "the node should remain compatible with avalanche statistics and magnetic-cycle modulation"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "He et al., Quasi-Periodic Pulsations in X-class Solar Flares.",
+          "note": "Quasi-periodic flare modulation semantics."
+        },
+        {
+          "kind": "paper",
+          "citation": "Quasi-periodic pulsations in EUV brightenings.",
+          "note": "Burst-envelope structure in solar flare observables."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/quasi-periodic-flare-envelope.md"
+      ],
+      "notes": "This claim keeps the flare envelope in the observables lane."
+    },
+    {
+      "claimId": "claim:stellar.structure:magnetic_striation_hierarchy",
+      "statement": "The magnetic-striation-hierarchy anchor is only admissible at diagnostic tier when fine magnetic striations are treated as morphology or topology context for flare and sunquake environments, not as evidence for a collapse hierarchy.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "striations must remain weak observational prior",
+          "the node may support morphology context for flare forcing",
+          "the claim must not be promoted into a quantum-collapse ladder"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NSO, Magnetic curtains on the Sun.",
+          "note": "Ultra-fine magnetic striations as morphology context."
+        },
+        {
+          "kind": "paper",
+          "citation": "Kuridze et al., The striated solar photosphere observed at 0.03'' resolution.",
+          "note": "Fine striation morphology at high resolution."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/magnetic-striation-hierarchy.md"
+      ],
+      "notes": "This claim keeps striation context observational and weak."
+    },
+    {
+      "claimId": "claim:stellar.structure:sunquake_timing_replay_diagnostic",
+      "statement": "The sunquake-timing-replay-diagnostic anchor is only admissible at diagnostic tier when real event windows replay flare onset, granulation-pumped p-mode power, EUV response, and sunquake timing within declared tolerances.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar replay lane",
+        "constraints": [
+          "the replay must use real event windows or literature-backed timing series",
+          "sunquake timing must remain observable and replayable",
+          "the lane must explicitly fence off CSL, Orch-OR, and collapse semantics"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Zharkov et al., Sunquake Timing and EUV Irradiance in the 2017 X9.3 Flare.",
+          "note": "Timing replay reference."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Helioseismic response and interior-probing reference."
+        },
+        {
+          "kind": "paper",
+          "citation": "Goldreich, Murray, and Kumar, Excitation of solar p-modes.",
+          "note": "Granulation-pumped p-mode source reference."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/sunquake-timing-replay-diagnostic.md"
+      ],
+      "notes": "This claim keeps the replay lane observational and non-exploratory."
+    },
+    {
+      "claimId": "claim:stellar.structure:multiscale_plasma_variability",
+      "statement": "The multiscale-plasma-variability anchor is only admissible at diagnostic tier when oscillation, dynamo, reconnection, and flare observables are treated as a coupled stellar variability stack.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables lane",
+        "constraints": [
+          "the stack must stay observationally anchored",
+          "the lane must not imply a consciousness mechanism",
+          "the observable stack may span from minutes to the activity cycle"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Oscillatory component."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Memorandum, solar dynamo.",
+          "note": "Magnetic-cycle component."
+        },
+        {
+          "kind": "paper",
+          "citation": "Lu and Hamilton, solar flare avalanche model literature.",
+          "note": "Reconnection/flare cascade component."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-structure-nucleosynthesis.md"
+      ],
+      "notes": "This is the aggregate stellar-observables summary node."
+    },
+    {
+      "claimId": "claim:stellar.structure:stellar_observables_diagnostic",
+      "statement": "The stellar-observables diagnostic is only admissible at diagnostic tier when supplied magnetic-activity and helioseismic-shift series show the expected positive coupling, optional flare statistics remain in a power-law-like band, and the lane preserves the explicit non-consciousness guardrail.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-observables diagnostic lane",
+        "constraints": [
+          "activity-cycle and helioseismic inputs must remain observable series rather than speculative consciousness measures",
+          "the diagnostic may use flare statistics as optional support but not as a required consciousness bridge",
+          "the lane must remain explicitly guarded against direct consciousness inference"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Reference for solar oscillation observables and interior probing."
+        },
+        {
+          "kind": "paper",
+          "citation": "Chaplin et al., Solar p-mode frequencies over the solar cycle.",
+          "note": "Reference for p-mode frequency shifts tracking solar activity."
+        },
+        {
+          "kind": "report",
+          "citation": "NASA Technical Memorandum 111102, solar dynamo.",
+          "note": "Reference for the magnetic-cycle parent semantics."
+        },
+        {
+          "kind": "paper",
+          "citation": "Lu and Hamilton, Avalanches and the Distribution of Solar Flares.",
+          "note": "Reference for optional flare-statistics support."
+        }
+      ],
+      "repoBindings": [
+        "configs/physics-equation-backbone.v1.json",
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-observables-diagnostic.md",
+        "docs/knowledge/bridges/astrochemistry-prebiotic-neuro-consciousness-bridge-tree.json",
+        "server/modules/halobank-solar/derived.ts",
+        "server/routes/halobank-solar.ts"
+      ],
+      "notes": "This claim records the executable stellar-observables lane while keeping the explicit non-consciousness boundary."
+    }
+  ]
+}

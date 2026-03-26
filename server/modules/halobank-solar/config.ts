@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { hashStableJson, sha256Prefixed } from "../../utils/information-boundary";
 import type {
+  SolarDiagnosticDatasetsManifest,
   SolarKernelBundleManifest,
   SolarMetricContext,
   SolarMetricContextManifest,
@@ -14,11 +15,13 @@ const KERNEL_BUNDLE_PATH = "configs/halobank-solar-kernel-bundle.v1.json";
 const THRESHOLDS_PATH = "configs/halobank-solar-thresholds.v1.json";
 const LOCAL_REST_REFERENCE_PATH = "configs/halobank-solar-local-rest-reference.v1.json";
 const METRIC_CONTEXT_PATH = "configs/halobank-solar-metric-context.v1.json";
+const DIAGNOSTIC_DATASETS_PATH = "configs/halobank-solar-diagnostic-datasets.v1.json";
 
 let cachedKernelBundle: SolarKernelBundleManifest | null = null;
 let cachedThresholds: SolarThresholdsManifest | null = null;
 let cachedLocalRestReferences: SolarLocalRestReferenceManifest | null = null;
 let cachedMetricContext: SolarMetricContextManifest | null = null;
+let cachedDiagnosticDatasets: SolarDiagnosticDatasetsManifest | null = null;
 
 function parseJson<T>(raw: string, label: string): T {
   try {
@@ -77,6 +80,20 @@ function ensureMetricContextManifest(
   return manifest;
 }
 
+function ensureDiagnosticDatasetsManifest(
+  manifest: SolarDiagnosticDatasetsManifest,
+): SolarDiagnosticDatasetsManifest {
+  if (manifest.schema_version !== "halobank.solar.diagnostic_datasets/1") {
+    throw new Error("Invalid solar diagnostic-datasets schema_version");
+  }
+  const hasPlanetaryProfiles = Object.prototype.hasOwnProperty.call(manifest, "planetary_figure_profiles");
+  const hasStellarReplaySeries = Object.prototype.hasOwnProperty.call(manifest, "stellar_observables_replay_series");
+  if (!hasPlanetaryProfiles || !hasStellarReplaySeries) {
+    throw new Error("Solar diagnostic-datasets manifest is missing required arrays");
+  }
+  return manifest;
+}
+
 export async function loadSolarKernelBundle(): Promise<SolarKernelBundleManifest> {
   if (cachedKernelBundle) return cachedKernelBundle;
   const filePath = path.join(process.cwd(), KERNEL_BUNDLE_PATH);
@@ -111,6 +128,15 @@ export async function loadSolarMetricContextManifest(): Promise<SolarMetricConte
   const parsed = parseJson<SolarMetricContextManifest>(raw, METRIC_CONTEXT_PATH);
   cachedMetricContext = ensureMetricContextManifest(parsed);
   return cachedMetricContext;
+}
+
+export async function loadSolarDiagnosticDatasetsManifest(): Promise<SolarDiagnosticDatasetsManifest> {
+  if (cachedDiagnosticDatasets) return cachedDiagnosticDatasets;
+  const filePath = path.join(process.cwd(), DIAGNOSTIC_DATASETS_PATH);
+  const raw = await fs.readFile(filePath, "utf8");
+  const parsed = parseJson<SolarDiagnosticDatasetsManifest>(raw, DIAGNOSTIC_DATASETS_PATH);
+  cachedDiagnosticDatasets = ensureDiagnosticDatasetsManifest(parsed);
+  return cachedDiagnosticDatasets;
 }
 
 export function verifyKernelBundleSignature(manifest: SolarKernelBundleManifest): {

@@ -74,6 +74,46 @@
       "weight": 1.2
     },
     {
+      "id": "astrochemistry-prebiotic-neuro-consciousness-bridges",
+      "label": "Astrochemistry Prebiotic Neuro Consciousness Bridges",
+      "path": "docs/knowledge/bridges/astrochemistry-prebiotic-neuro-consciousness-bridge-tree.json",
+      "pathMode": "root_to_leaf",
+      "topicTags": [
+        "physics",
+        "astrochemistry",
+        "prebiotic",
+        "biology",
+        "consciousness"
+      ],
+      "matchers": [
+        "astrochemistry",
+        "prebiotic organics",
+        "meteorite organics",
+        "dopamine",
+        "catecholamine",
+        "orch or",
+        "quantum consciousness",
+        "stellar carbon",
+        "pah chemistry",
+        "stellar plasma observables not consciousness"
+      ],
+      "maxAnchors": 4,
+      "maxDepth": 3,
+      "maxNodes": 10,
+      "minAnchorScore": 2,
+      "preferGraph": true,
+      "edgePriority": {
+        "enables": 3,
+        "constrains": 3,
+        "depends_on": 2,
+        "escalates_to": 2,
+        "child": 1,
+        "parent": 1,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
       "id": "ideology-physics-bridge",
       "label": "Ideology \u2194 Physics Bridge Walk",
       "path": "docs/knowledge/bridges/ideology-physics-bridge-tree.json",
@@ -187,7 +227,36 @@
         "semiclassical",
         "qft in curved spacetime",
         "renormalized stress-energy",
-        "quantum fields"
+        "quantum fields",
+        "stochastic schrodinger",
+        "open quantum system",
+        "collapse model",
+        "continuous spontaneous localization",
+        "csl",
+        "colored noise collapse",
+        "objective reduction",
+        "microtubule",
+        "microtubules",
+        "microtubule time crystal",
+        "time crystal",
+        "time crystals",
+        "triplet of triplets",
+        "triplets of triplets",
+        "triplet hierarchy",
+        "polyatomic time crystal",
+        "scale free resonance hierarchy",
+        "scale-free resonance hierarchy",
+        "bandyopadhyay",
+        "anirban bandyopadhyay",
+        "anirban",
+        "saxena",
+        "microtubule vibrational mode",
+        "microtubule energy migration",
+        "objective reduction",
+        "gravitational time dilation decoherence",
+        "gravity related collapse",
+        "driven dissipative time crystal",
+        "subharmonic locking"
       ],
       "maxAnchors": 3,
       "maxDepth": 2,
@@ -251,6 +320,39 @@
       "minAnchorScore": 4,
       "preferGraph": true,
       "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "microphysics_hamiltonian_transport",
+      "label": "Microphysics Hamiltonian Transport Backbone",
+      "path": "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+      "topicTags": [
+        "physics",
+        "microphysics",
+        "hamiltonian",
+        "transport"
+      ],
+      "matchers": [
+        "effective microphysics",
+        "effective interaction hamiltonian",
+        "many-body hamiltonian",
+        "kinetic transport closure",
+        "transport closure",
+        "constitutive closure",
+        "plasma transport closure",
+        "collective observable response"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "supports": 3,
         "child": 3,
         "parent": 2,
         "see-also": 1
@@ -333,6 +435,122 @@
       "minAnchorScore": 4,
       "preferGraph": true,
       "edgePriority": {
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics-gravitational-response",
+      "label": "Physics Gravitational Response Lane",
+      "path": "docs/knowledge/physics/physics-gravitational-response-tree.json",
+      "topicTags": [
+        "physics",
+        "gravity",
+        "tides",
+        "precession",
+        "nutation"
+      ],
+      "matchers": [
+        "lunisolar tide",
+        "tide generating potential",
+        "tidal tensor",
+        "love number",
+        "equatorial bulge torque",
+        "dynamical ellipticity",
+        "precession constant",
+        "earth nutation",
+        "axial precession"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "supports": 3,
+        "depends_on": 2,
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_self_gravity_shape",
+      "label": "Physics Self-Gravity Shape Lane",
+      "path": "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+      "topicTags": [
+        "physics",
+        "gravity",
+        "planetary",
+        "shape"
+      ],
+      "matchers": [
+        "self gravity",
+        "hydrostatic equilibrium shape",
+        "hydrostatic figure",
+        "potato radius",
+        "rotational flattening",
+        "constitutive response",
+        "J2",
+        "quadrupole coefficient",
+        "planetary figure diagnostic",
+        "j2 flattening diagnostic",
+        "tidal bulge",
+        "material strength",
+        "rounding threshold"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "supports": 3,
+        "child": 3,
+        "parent": 2,
+        "see-also": 1
+      },
+      "weight": 1.15
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis",
+      "label": "Physics Stellar Structure Nucleosynthesis Lane",
+      "path": "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+      "topicTags": [
+        "physics",
+        "stellar",
+        "nucleosynthesis"
+      ],
+      "matchers": [
+        "stellar hydrostatic equilibrium",
+        "stellar equation of state",
+        "stellar opacity",
+        "nuclear reaction rate",
+        "hydrogen burning",
+        "helium burning",
+        "stellar nucleosynthesis",
+        "stellar evolution",
+        "stellar oscillation",
+        "helioseismology",
+        "solar dynamo",
+        "magnetic cycle",
+        "magnetic reconnection",
+        "flare avalanche",
+        "multiscale plasma variability",
+        "stellar observables diagnostic",
+        "helioseismic activity correlation",
+        "p mode frequency shift activity relation"
+      ],
+      "maxAnchors": 3,
+      "maxDepth": 2,
+      "maxNodes": 8,
+      "minAnchorScore": 4,
+      "preferGraph": true,
+      "edgePriority": {
+        "supports": 3,
         "child": 3,
         "parent": 2,
         "see-also": 1

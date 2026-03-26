@@ -1,0 +1,639 @@
+{
+  "version": 1,
+  "rootId": "physics-gravitational-response-tree",
+  "nodes": [
+    {
+      "id": "physics-gravitational-response-tree",
+      "slug": "physics-gravitational-response-tree",
+      "title": "Physics Gravitational Response Tree",
+      "excerpt": "Dedicated lane for lunisolar forcing, dynamic tides, and Earth-orientation response.",
+      "bodyMD": "This lane separates gravitational forcing and orientation response from the thermodynamic equilibrium-tide limit. It connects Moon/Sun tide-generating potentials to tidal tensors, Love-number response, dynamic tides, rigid-body torque on Earth's equatorial bulge, dynamical ellipticity, precession constants, axial precession, and nutation.",
+      "tags": [
+        "physics",
+        "gravity",
+        "tides",
+        "precession",
+        "nutation"
+      ],
+      "children": [
+        "physics-gravitational-response-lunisolar-tide-potential-definition",
+        "physics-gravitational-response-tidal-tensor-definition",
+        "physics-gravitational-response-love-number-definition",
+        "physics-gravitational-response-dynamic-tide-definition",
+        "physics-gravitational-response-equatorial-bulge-torque-definition",
+        "physics-gravitational-response-dynamical-ellipticity-definition",
+        "physics-gravitational-response-precession-constant-definition",
+        "physics-gravitational-response-earth-axial-precession-definition",
+        "physics-gravitational-response-earth-nutation-definition",
+        "physics-gravitational-response-equation-residual"
+      ],
+      "links": [],
+      "summary": "Dedicated lane for lunisolar forcing, dynamic tides, and Earth-orientation response.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/lunisolar-tide-generating-potential.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-axial-precession.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-nutation.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-lunisolar-tide-potential-definition",
+      "slug": "physics-gravitational-response-lunisolar-tide-potential-definition",
+      "title": "Lunisolar Tide-Generating Potential Definition",
+      "excerpt": "Definition-level anchor for the Moon/Sun differential forcing that produces terrestrial tides.",
+      "bodyMD": "This node anchors the tide-generating potential itself: the Moon's and Sun's differential gravitational forcing, after subtraction of the orbital centripetal balance at Earth's center, produces the tractive and vertical components that drive terrestrial tidal response.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "tide-generating-potential",
+        "lunisolar",
+        "tractive-force",
+        "inverse-cube"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-thermodynamics-equilibrium-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-dynamic-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-equatorial-bulge-torque-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "bridge-halobank-solar-terrestrial-forcing",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the Moon/Sun differential forcing that produces terrestrial tides.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "tide_generating_potential_quadrupole",
+        "claim_ids": [
+          "claim:gravitational.response:lunisolar_tide_potential"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/lunisolar-tide-generating-potential.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-tidal-tensor-definition",
+      "slug": "physics-gravitational-response-tidal-tensor-definition",
+      "title": "Tidal Tensor Definition",
+      "excerpt": "Definition-level anchor for the weak-field tidal tensor as the second derivative of the potential.",
+      "bodyMD": "This node anchors the tidal tensor, the Hessian of the weak-field gravitational potential that captures differential forcing. It is the observable split point between gravity as geometry and material deformation as response.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "tidal-tensor",
+        "gravity-gradient",
+        "weak-field"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-lunisolar-tide-potential-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-self-gravity-shape-constitutive-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-love-number-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-dynamic-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the weak-field tidal tensor as the second derivative of the potential.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "tidal_tensor_weak_field",
+        "claim_ids": [
+          "claim:gravitational.response:tidal_tensor_definition"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/lunisolar-tide-generating-potential.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-love-number-definition",
+      "slug": "physics-gravitational-response-love-number-definition",
+      "title": "Love Number Definition",
+      "excerpt": "Definition-level anchor for dimensionless tidal response gain.",
+      "bodyMD": "This node anchors the Love-number response coefficient that closes the tidal-response chain: an applied tidal potential produces an induced deformation or induced potential scaled by a dimensionless response factor. It remains a diagnostic closure, not a full interior inversion.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "love-number",
+        "tidal-response",
+        "deformation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-tidal-tensor-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-self-gravity-shape-constitutive-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-dynamic-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-self-gravity-shape-tidal-bulge-response-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for dimensionless tidal response gain.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "love_number_response_scaling",
+        "claim_ids": [
+          "claim:gravitational.response:love_number_response"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/tidal-bulge-response.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-dynamic-tide-definition",
+      "slug": "physics-gravitational-response-dynamic-tide-definition",
+      "title": "Dynamic Tide Definition",
+      "excerpt": "Definition-level anchor for the real forced-dissipative ocean-tide problem.",
+      "bodyMD": "This node anchors the dynamic tide as the actual rotating, basin-shaped, resonant, and dissipative response of the ocean to the lunisolar tide-generating potential. It is intentionally separate from the hydrostatic equilibrium-tide limit.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "dynamic-tide",
+        "forced-dissipative",
+        "rotating-shallow-water",
+        "resonance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-thermodynamics-equilibrium-tide-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-lunisolar-tide-potential-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the real forced-dissipative ocean-tide problem.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "tide_generating_potential_quadrupole",
+        "claim_ids": [
+          "claim:gravitational.response:dynamic_tide_separation"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dynamic-tide.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-equatorial-bulge-torque-definition",
+      "slug": "physics-gravitational-response-equatorial-bulge-torque-definition",
+      "title": "Equatorial Bulge Torque Definition",
+      "excerpt": "Definition-level anchor for luni-solar torque on Earth's rotational oblateness.",
+      "bodyMD": "This node anchors the rigid-body orientation response: the Moon and Sun exert torque on Earth's equatorial bulge, coupling external gravitational forcing to changes in the spin-axis orientation.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "equatorial-bulge",
+        "torque",
+        "earth-orientation",
+        "oblateness"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-lunisolar-tide-potential-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-earth-axial-precession-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-earth-nutation-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for luni-solar torque on Earth's rotational oblateness.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "angular_momentum_torque_balance",
+        "claim_ids": [
+          "claim:gravitational.response:equatorial_bulge_torque"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/equatorial-bulge-torque.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-dynamical-ellipticity-definition",
+      "slug": "physics-gravitational-response-dynamical-ellipticity-definition",
+      "title": "Dynamical Ellipticity Definition",
+      "excerpt": "Definition-level anchor for the orientation-relevant oblateness parameter H.",
+      "bodyMD": "This node anchors dynamical ellipticity H = (C - A) / C, the orientation-relevant measure of rotational oblateness that mediates how a body's mass distribution couples into precession and nutation.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "dynamical-ellipticity",
+        "oblateness",
+        "precession"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-self-gravity-shape-J2-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-precession-constant-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the orientation-relevant oblateness parameter H.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "dynamical_ellipticity_relation",
+        "claim_ids": [
+          "claim:gravitational.response:dynamical_ellipticity"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/rotational-flattening.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-axial-precession.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-precession-constant-definition",
+      "slug": "physics-gravitational-response-precession-constant-definition",
+      "title": "Precession Constant Definition",
+      "excerpt": "Definition-level anchor for lunisolar torque-driven spin-axis precession rate.",
+      "bodyMD": "This node anchors the lunisolar precession constant: the diagnostic spin-axis response rate obtained from external torque divided by spin angular momentum. It remains a reduced-order orientation lane, not a certified Earth-orientation series.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "precession-constant",
+        "torque",
+        "earth-orientation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-dynamical-ellipticity-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-equatorial-bulge-torque-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-gravitational-response-earth-axial-precession-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for lunisolar torque-driven spin-axis precession rate.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "precession_constant_lunisolar_torque",
+        "claim_ids": [
+          "claim:gravitational.response:precession_constant"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-axial-precession.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-earth-axial-precession-definition",
+      "slug": "physics-gravitational-response-earth-axial-precession-definition",
+      "title": "Earth Axial Precession Definition",
+      "excerpt": "Definition-level anchor for the long-period conical motion of Earth's spin axis.",
+      "bodyMD": "This node anchors axial precession of Earth's rotation axis, including the precession of the equinoxes. It is driven mainly by luni-solar torque on Earth's equatorial bulge and is intentionally distinct from orbital perihelion precession.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "axial-precession",
+        "precession-of-the-equinoxes",
+        "spin-axis",
+        "earth"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-equatorial-bulge-torque-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-precession-constant-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the long-period conical motion of Earth's spin axis.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "angular_momentum_torque_balance",
+        "claim_ids": [
+          "claim:gravitational.response:earth_axial_precession"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-axial-precession.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-earth-nutation-definition",
+      "slug": "physics-gravitational-response-earth-nutation-definition",
+      "title": "Earth Nutation Definition",
+      "excerpt": "Definition-level anchor for the shorter-period modulation of Earth's spin-axis motion.",
+      "bodyMD": "This node anchors nutation as the shorter-timescale modulation of Earth's spin-axis orientation, driven by the changing geometry of the Moon's orbit acting through the same torque-on-oblateness mechanism that produces long-term precession.",
+      "tags": [
+        "physics",
+        "gravity",
+        "definition",
+        "nutation",
+        "spin-axis",
+        "moon",
+        "earth"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-equatorial-bulge-torque-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "physics-gravitational-response-earth-axial-precession-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the shorter-period modulation of Earth's spin-axis motion.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "validity": {
+        "equation_ref": "angular_momentum_torque_balance",
+        "claim_ids": [
+          "claim:gravitational.response:earth_nutation"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-nutation.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-gravitational-response-equation-residual",
+      "slug": "physics-gravitational-response-equation-residual",
+      "title": "Physics Gravitational Response Equation Residual",
+      "excerpt": "Derived residual contract for forcing and orientation equations with explicit tolerance and uncertainty declarations.",
+      "bodyMD": "Defines the derived residual schema used to evaluate lane-level tide-forcing and Earth-orientation proxy mismatch under declared uncertainty assumptions.",
+      "tags": [
+        "physics",
+        "gravity",
+        "residual",
+        "derived"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-gravitational-response-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Derived residual contract for forcing and orientation equations with explicit tolerance and uncertainty declarations.",
+      "nodeType": "derived_metric",
+      "dependencies": [
+        "physics-gravitational-response-tree"
+      ],
+      "derived_residual": {
+        "schema": "equation_residual/v1",
+        "equation_ref": "angular_momentum_torque_balance",
+        "residual_symbol": "R_grav_response",
+        "tolerance": {
+          "metric": "rms",
+          "max": 0.05,
+          "units": "normalized"
+        },
+        "uncertainty": {
+          "model": "bounded_gaussian",
+          "sigma": 0.01,
+          "coverage": 0.95
+        }
+      },
+      "evidence": [],
+      "validity": {
+        "equation_ref": "angular_momentum_torque_balance",
+        "claim_ids": [
+          "claim:gravitational.response:equatorial_bulge_torque",
+          "claim:gravitational.response:earth_axial_precession",
+          "claim:gravitational.response:earth_nutation"
+        ]
+      }
+    }
+  ],
+  "schema": {
+    "name": "helix-ask-dag-node",
+    "version": 1
+  }
+}

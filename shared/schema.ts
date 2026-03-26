@@ -6,6 +6,10 @@ import {
   agiTrajectorySchema,
 } from "./agi-refinery";
 import { InformationBoundary } from "./information-boundary";
+import {
+  QuantumSemiclassicalComparisonResult,
+  QuantumSemiclassicalSourceReplay,
+} from "./quantum-semiclassical-comparison";
 
 export const sweepGeometrySchema = z.enum(["parallel_plate", "cpw"]);
 export type SweepGeometry = z.infer<typeof sweepGeometrySchema>;
@@ -1697,6 +1701,55 @@ export const proofValueSchema = z.object({
 });
 export type ProofValue = z.infer<typeof proofValueSchema>;
 
+const proofPackGeometrySourceQuantitySchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .catchall(z.union([z.number(), z.string()]));
+
+const proofPackGeometryProxiesSchema = z
+  .object({
+    canonical_channel: z.enum(["kappa_body", "kappa_drive", "kappa_u"]),
+    canonical_kappa_m2: z.number().nonnegative(),
+  })
+  .catchall(z.union([z.number(), z.null()]));
+
+const proofPackGeometryStressBridgeSchema = z
+  .object({
+    source: z.object({
+      channel: z.enum(["kappa_body", "kappa_drive", "kappa_u"]),
+      kappa_m2: z.number().nonnegative(),
+    }),
+    surrogate: z.object({
+      t00_J_m3: z.number(),
+      bounded: z.boolean(),
+      bound_abs_J_m3: z.number().nonnegative(),
+    }),
+    provenance: z.object({
+      class: z.enum(["diagnostic", "reduced-order", "certified"]),
+      method: z.string(),
+      reference: z.string().optional(),
+    }),
+    parity: z.object({
+      canonical_kappa_m2: z.number().nonnegative(),
+      mismatch_rel: z.number().nonnegative(),
+      mismatch_threshold_rel: z.number().nonnegative(),
+      pass: z.boolean(),
+    }),
+  })
+  .passthrough();
+
+const proofPackGeometrySchema = z.object({
+  geometry_slot: z.literal("G_geometry"),
+  role: z.enum(["background_geometry", "dynamic_forcing_geometry"]),
+  semantics: z.literal("curvature_proxy_observable_response"),
+  equation_ref: z.literal("collective_observable_response_closure"),
+  source_quantity: proofPackGeometrySourceQuantitySchema,
+  proxies: proofPackGeometryProxiesSchema,
+  stress_energy_bridge: proofPackGeometryStressBridgeSchema,
+  note: z.string(),
+});
+
 export const proofPackSchema = z.object({
   kind: z.literal("proof-pack"),
   version: z.number().int().positive(),
@@ -1711,6 +1764,11 @@ export const proofPackSchema = z.object({
   values: z.record(proofValueSchema),
   equations: z.record(z.string()).optional(),
   sources: z.record(z.string()).optional(),
+  background_geometry: proofPackGeometrySchema.optional(),
+  dynamic_forcing_geometry: proofPackGeometrySchema.optional(),
+  geometry_coupling: proofPackGeometrySchema.optional(),
+  quantum_semiclassical_source_replay: QuantumSemiclassicalSourceReplay.optional(),
+  quantum_semiclassical_comparison: QuantumSemiclassicalComparisonResult.optional(),
   notes: z.array(z.string()).optional(),
 });
 export type ProofPack = z.infer<typeof proofPackSchema>;

@@ -59,6 +59,7 @@ import { loadWfbrickFile } from "@/lib/wfbrick";
 import { GEO_VIS_THETA_PRESET } from "@/lib/warpfield-presets";
 import { exoticMassFallback } from "@/constants/VIS";
 import {
+  DEFAULT_METRIC_VOLUME_CHANNEL,
   DEFAULT_GEODESIC_DIAGNOSTICS_CHANNEL,
   type HullMetricVolumeContract,
   type HullGeodesicDiagnostics,
@@ -464,6 +465,71 @@ type IntegralSignalComparison = {
   sampleCount: number | null;
   note: string | null;
 };
+
+type MisServiceErrorInfo = {
+  status: number | null;
+  code: string | null;
+  detail: string | null;
+  raw: string;
+};
+
+const SCIENTIFIC_RENDER_ERROR_CODES = new Set([
+  "mis_proxy_unconfigured",
+  "mis_proxy_failed",
+  "remote_mis_non_research_grade_frame",
+]);
+
+function parseMisServiceErrorInfo(rawMessage: string): MisServiceErrorInfo {
+  const raw = String(rawMessage ?? "").trim();
+  let status: number | null = null;
+  let code: string | null = null;
+  let detail: string | null = null;
+  const match = raw.match(/^(\d{3})\s*:\s*([\s\S]+)$/);
+  if (match) {
+    status = Number(match[1]);
+    const body = match[2].trim();
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const rec = parsed as Record<string, unknown>;
+        code = typeof rec.error === "string" ? rec.error : null;
+        detail = typeof rec.message === "string" ? rec.message : null;
+      }
+    } catch {
+      detail = body;
+    }
+  }
+  if (!detail) detail = raw;
+  return { status, code, detail, raw };
+}
+
+function isStrictScientificRenderFailure(info: MisServiceErrorInfo): boolean {
+  if (info.code && SCIENTIFIC_RENDER_ERROR_CODES.has(info.code)) return true;
+  const body = `${info.detail ?? ""} ${info.raw}`.toLowerCase();
+  return (
+    body.includes("remote_mis_non_scientific_response") ||
+    body.includes("remote_mis_non_3p1_geodesic_mode") ||
+    body.includes("remote_mis_non_research_grade_frame") ||
+    body.includes("scientific frame requested")
+  );
+}
+
+function formatStrictScientificRenderFailure(info: MisServiceErrorInfo): string {
+  let detail = info.detail?.trim() || "Scientific renderer not reachable.";
+  if (
+    `${info.detail ?? ""} ${info.raw}`
+      .toLowerCase()
+      .includes("remote_mis_non_research_grade_frame")
+  ) {
+    detail =
+      "Remote renderer responded with scaffold/teaching frame metadata; research-grade frame required.";
+  }
+  return [
+    "Scientific renderer unavailable.",
+    detail,
+    "Start strict OptiX/Unity render service and re-open panel.",
+  ].join(" ");
+}
 
 const METRIC_DISPLACEMENT_CHANNEL_PRIORITY = [
   "theta",
@@ -1728,6 +1794,7 @@ export default function AlcubierrePanel({
     width: number;
     height: number;
     version: number;
+    source?: string | null;
   } | null>(null);
   const latticeSliceVersionRef = useRef(0);
 
@@ -1743,9 +1810,11 @@ export default function AlcubierrePanel({
   }, [onCanvasReady]);
   const lastDriveLogRef = useRef(0);
   const lastDisplacementLogRef = useRef(0);
+  const lastSolvePipelineSummaryLogRef = useRef(0);
   const lastIntegralSignalDecodeRef = useRef(0);
   const integralSignalRef = useRef<IntegralSignalAttachmentSnapshot | null>(null);
   const [integralSignalVersion, bumpIntegralSignalVersion] = useReducer((n: number) => n + 1, 0);
+  const [metricVolumeVersion, bumpMetricVolumeVersion] = useReducer((n: number) => n + 1, 0);
   const alcubierreDebugEnabledRef = useRef<boolean>(isAlcubierreDebugLogEnabled());
 
   const [planarVizMode, setPlanarVizMode] = useState<VizMode>(3); // 0 frame, 1 energy, 2 drive, 3 world tube
@@ -1971,6 +2040,20 @@ useEffect(() => {
   const id = subscribe(DEFAULT_GEODESIC_DIAGNOSTICS_CHANNEL, (payload: any) => {
     if (!payload || typeof payload !== "object") return;
     setGeodesicDiagnostics(payload as HullGeodesicDiagnostics);
+  });
+  return () => {
+    unsubscribe(id);
+  };
+}, []);
+
+useEffect(() => {
+  const id = subscribe(DEFAULT_METRIC_VOLUME_CHANNEL, (payload: any) => {
+    if (!payload || typeof payload !== "object") return;
+    if ((payload as any).kind !== "hull3d:metric-volume") return;
+    if (typeof window !== "undefined") {
+      (window as any).__hullMetricVolumeLatest = payload;
+    }
+    bumpMetricVolumeVersion();
   });
   return () => {
     unsubscribe(id);
@@ -5100,6 +5183,97 @@ const res = 256;
     };
   }, [latticeSdfForRenderer, latticeSdfWeights, sharedLatticeState?.frame]);
 
+  const metricThetaSlice = useMemo(() => {
+    if (planarVizMode !== 0) return null;
+    const metricLatest =
+      typeof window !== "undefined"
+        ? ((window as any).__hullMetricVolumeLatest as HullMetricVolumeContract | null | undefined)
+        : null;
+    if (!metricLatest || metricLatest.kind !== "hull3d:metric-volume") return null;
+    const dimsRaw = metricLatest.dims;
+    if (!Array.isArray(dimsRaw) || dimsRaw.length < 3) return null;
+    const dims: Vec3 = [
+      Math.max(1, Math.floor(Number(dimsRaw[0]) || 1)),
+      Math.max(1, Math.floor(Number(dimsRaw[1]) || 1)),
+      Math.max(1, Math.floor(Number(dimsRaw[2]) || 1)),
+    ];
+    const expected = dims[0] * dims[1] * dims[2];
+    if (!(expected > 0)) return null;
+    const thetaChannel = (metricLatest.channels as any)?.theta ?? null;
+    const thetaRaw = thetaChannel?.data;
+    const thetaData =
+      thetaRaw instanceof Float32Array
+        ? thetaRaw
+        : thetaRaw instanceof ArrayBuffer
+          ? new Float32Array(thetaRaw)
+          : ArrayBuffer.isView(thetaRaw)
+            ? new Float32Array(
+                thetaRaw.buffer,
+                thetaRaw.byteOffset,
+                Math.floor(thetaRaw.byteLength / Float32Array.BYTES_PER_ELEMENT),
+              )
+            : Array.isArray(thetaRaw)
+              ? Float32Array.from(thetaRaw)
+              : null;
+    if (!(thetaData instanceof Float32Array) || thetaData.length < expected) return null;
+    const bounds = metricLatest.bounds;
+    const min = Array.isArray(bounds?.min) ? bounds.min : null;
+    const max = Array.isArray(bounds?.max) ? bounds.max : null;
+    if (!min || !max || min.length < 3 || max.length < 3) return null;
+    const minMetric: Vec3 = [
+      Number.isFinite(Number(min[0])) ? Number(min[0]) : -1,
+      Number.isFinite(Number(min[1])) ? Number(min[1]) : -1,
+      Number.isFinite(Number(min[2])) ? Number(min[2]) : -1,
+    ];
+    const sizeMetric: Vec3 = [
+      Math.max(1e-9, Number(max[0]) - minMetric[0]),
+      Math.max(1e-9, Number(max[1]) - minMetric[1]),
+      Math.max(1e-9, Number(max[2]) - minMetric[2]),
+    ];
+    const nx = res;
+    const ny = res;
+    const data = new Float32Array(nx * ny * 4);
+    const domainScale = hullDomainScale;
+    const samplePoint: Vec3 = [0, 0, 0];
+    let insideCount = 0;
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const gx = -1 + 2 * (i / (nx - 1));
+        const gz = -1 + 2 * (j / (ny - 1));
+        samplePoint[0] = gx * domainScale * axes[0];
+        samplePoint[1] = 0;
+        samplePoint[2] = gz * domainScale * axes[2];
+        const ux = (samplePoint[0] - minMetric[0]) / sizeMetric[0];
+        const uy = (samplePoint[1] - minMetric[1]) / sizeMetric[1];
+        const uz = (samplePoint[2] - minMetric[2]) / sizeMetric[2];
+        const inside =
+          ux >= 0 &&
+          ux <= 1 &&
+          uy >= 0 &&
+          uy <= 1 &&
+          uz >= 0 &&
+          uz <= 1;
+        if (inside) insideCount += 1;
+        const v = worldToVoxelCoord(samplePoint, null, minMetric, sizeMetric, dims);
+        const thetaValue = trilerpScalar(thetaData, dims, v, 0);
+        const idx = (j * nx + i) * 4;
+        data[idx] = Number.isFinite(thetaValue) ? thetaValue : 0;
+        data[idx + 1] = 0;
+        data[idx + 2] = 0;
+        data[idx + 3] = inside ? 1 : 0;
+      }
+    }
+    const coverage = insideCount / Math.max(1, nx * ny);
+    if (coverage < 0.08) return null;
+    return {
+      data,
+      width: nx,
+      height: ny,
+      hasSdf: false,
+      source: "metric-volume.theta-channel",
+    };
+  }, [planarVizMode, res, hullDomainScale, axes, metricVolumeVersion]);
+
   const latticeSlice = useMemo(() => {
     if (!latticeFieldSampler || planarVizMode === 3 || volumeSource !== "lattice") return null;
     const nx = res;
@@ -5149,8 +5323,13 @@ const res = 256;
     return { data, width: nx, height: ny, hasSdf: Boolean(latticeSdfSampler) };
   }, [axes, hullDomainScale, latticeFieldSampler, latticeSdfSampler, planarVizMode, res, volumeSource]);
 
+  const activePlanarSlice = useMemo(() => {
+    if (planarVizMode === 0 && metricThetaSlice) return metricThetaSlice;
+    return latticeSlice;
+  }, [planarVizMode, metricThetaSlice, latticeSlice]);
+
   useEffect(() => {
-    if (!latticeSlice) {
+    if (!activePlanarSlice) {
       latticeSliceRef.current = null;
       latticeSliceVersionRef.current = 0;
       return;
@@ -5158,12 +5337,13 @@ const res = 256;
     const nextVersion = latticeSliceVersionRef.current + 1;
     latticeSliceVersionRef.current = nextVersion;
     latticeSliceRef.current = {
-      data: latticeSlice.data,
-      width: latticeSlice.width,
-      height: latticeSlice.height,
+      data: activePlanarSlice.data,
+      width: activePlanarSlice.width,
+      height: activePlanarSlice.height,
       version: nextVersion,
+      source: activePlanarSlice.source ?? null,
     };
-  }, [latticeSlice]);
+  }, [activePlanarSlice]);
 
   useEffect(() => {
     if (!wireframeOverlay.overlay || !showWireframeOverlay) {
@@ -5221,9 +5401,15 @@ const res = 256;
     const nx = res, ny = res;
     const field = new Float32Array(nx * ny);
     const domainScale = hullDomainScale;
+    const useMetricTheta = !!metricThetaSlice;
     const useLatticeDfdr = volumeSource === "lattice" && !!latticeSlice;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
+        if (useMetricTheta && metricThetaSlice) {
+          const idx = j * nx + i;
+          field[idx] = thetaSign * metricThetaSlice.data[idx * 4];
+          continue;
+        }
         if (useLatticeDfdr && latticeSlice) {
           const idx = j * nx + i;
           field[idx] = thetaSign * latticeSlice.data[idx * 4];
@@ -5244,7 +5430,7 @@ const res = 256;
       }
     }
     return field;
-  }, [planarVizMode, beta, thetaSign, sigma, R, axes, res, hullDomainScale, latticeSlice, volumeSource]);
+  }, [planarVizMode, beta, thetaSign, sigma, R, axes, res, hullDomainScale, latticeSlice, metricThetaSlice, volumeSource]);
 
   const rhoField_GR = useMemo(() => {
     if (planarVizMode !== 1) return null;
@@ -6453,6 +6639,8 @@ const res = 256;
     const RUNTIME_GUARD_LONG_FRAME_LIMIT = 3;
     const RUNTIME_GUARD_HEARTBEAT_TIMEOUT_MS = 4500;
     let lastRenderTransportDebugMs = 0;
+    let lastSolvePipelineRequestDebugMs = 0;
+    let lastSolvePipelineResponseDebugMs = 0;
 
     const startDiagPoll = () => {
       if (diagTimer) return;
@@ -6713,6 +6901,9 @@ const res = 256;
         typeof window !== "undefined" ? (window as any).__hullSkyboxMode : "off";
       const skyboxModeCurrent: HullMisRenderRequestV1["skyboxMode"] =
         rawSkybox === "geodesic" || rawSkybox === "flat" ? rawSkybox : "off";
+      const scientificFrameRequired = true;
+      const skyboxModeRequest: HullMisRenderRequestV1["skyboxMode"] =
+        scientificFrameRequired ? "geodesic" : skyboxModeCurrent;
       const solvePayload: NonNullable<HullMisRenderRequestV1["solve"]> = {
         beta: Number(base?.beta ?? 0),
         alpha: Number((base as any)?.alpha ?? 1),
@@ -6723,8 +6914,14 @@ const res = 256;
             ? metricLatest.chart
             : geodesicLatest?.chart ?? "comoving_cartesian",
       };
+      const requestedModeFromSkybox: HullGeodesicDiagnostics["mode"] =
+        skyboxModeRequest === "geodesic"
+          ? "full-3+1-christoffel"
+          : skyboxModeRequest === "flat"
+            ? "flat-background"
+            : "disabled";
       const geodesicPayload: NonNullable<HullMisRenderRequestV1["geodesicDiagnostics"]> = {
-        mode: geodesicLatest?.mode ?? null,
+        mode: geodesicLatest?.mode ?? requestedModeFromSkybox,
         consistency: geodesicLatest?.consistency ?? "unknown",
         maxNullResidual: geodesicLatest?.maxNullResidual ?? null,
         stepConvergence: geodesicLatest?.stepConvergence ?? null,
@@ -6746,6 +6943,45 @@ const res = 256;
             updatedAt: Number(metricLatest.updatedAt ?? Date.now()),
           }
         : undefined;
+      const metricVolumeRefPayload: HullMisRenderRequestV1["metricVolumeRef"] = (() => {
+        if (!metricLatest || metricLatest.kind !== "hull3d:metric-volume") return null;
+        if (typeof window === "undefined") return null;
+        const dims = Array.isArray(metricLatest.dims)
+          ? [
+              Math.max(1, Math.floor(Number(metricLatest.dims[0]) || 1)),
+              Math.max(1, Math.floor(Number(metricLatest.dims[1]) || 1)),
+              Math.max(1, Math.floor(Number(metricLatest.dims[2]) || 1)),
+            ]
+          : null;
+        const params = new URLSearchParams();
+        if (dims) params.set("dims", `${dims[0]}x${dims[1]}x${dims[2]}`);
+        if (Number.isFinite(metricLatest.time_s)) {
+          params.set("time_s", String(metricLatest.time_s));
+        }
+        if (Number.isFinite(metricLatest.dt_s)) {
+          params.set("dt_s", String(metricLatest.dt_s));
+        }
+        params.set("includeExtra", "1");
+        params.set("includeKij", "1");
+        params.set("includeMatter", "0");
+        params.set("format", "raw");
+        const url = `${window.location.origin}/api/helix/gr-evolve-brick?${params.toString()}`;
+        const hash = [
+          metricLatest.source ?? "gr-evolve-brick",
+          metricLatest.chart ?? "comoving_cartesian",
+          dims ? dims.join("x") : "1x1x1",
+          Number(metricLatest.updatedAt ?? 0).toString(10),
+        ].join("|");
+        return {
+          kind: "gr-evolve-brick",
+          url,
+          source: metricLatest.source ?? null,
+          chart: metricLatest.chart ?? null,
+          dims,
+          updatedAt: Number(metricLatest.updatedAt ?? Date.now()),
+          hash,
+        };
+      })();
       const payload: HullMisRenderRequestV1 = {
         version: 1,
         requestId: `mis-${Date.now()}-${misSeq++}`,
@@ -6754,19 +6990,84 @@ const res = 256;
         dpr: Math.min(window.devicePixelRatio || 1, READABILITY_DPR_MAX),
         backendHint: "mis-path-tracing",
         timestampMs: Date.now(),
-        skyboxMode: skyboxModeCurrent,
+        skyboxMode: skyboxModeRequest,
         scienceLane: {
           requireIntegralSignal: true,
+          requireScientificFrame: scientificFrameRequired,
           attachmentDownsample: 2,
         },
         solve: solvePayload,
         geodesicDiagnostics: geodesicPayload,
         metricSummary: metricSummaryPayload,
+        metricVolumeRef: metricVolumeRefPayload,
       };
+      const metricRefDimsText = metricVolumeRefPayload?.dims
+        ? `${metricVolumeRefPayload.dims[0]}x${metricVolumeRefPayload.dims[1]}x${metricVolumeRefPayload.dims[2]}`
+        : "none";
+      const metricRefCellCount =
+        metricVolumeRefPayload?.dims
+          ? metricVolumeRefPayload.dims[0] *
+            metricVolumeRefPayload.dims[1] *
+            metricVolumeRefPayload.dims[2]
+          : null;
+      const requestDebugNowMs = Date.now();
+      if (requestDebugNowMs - lastSolvePipelineRequestDebugMs > 1200) {
+        lastSolvePipelineRequestDebugMs = requestDebugNowMs;
+        emitAlcubierreDebugEvent({
+          level: metricVolumeRefPayload ? "info" : "warn",
+          category: "solve_to_render_pipeline",
+          source: "alcubierre.solve-render-chain.request",
+          note: metricVolumeRefPayload
+            ? "equation->metric->render request dispatched (strict scientific lane)"
+            : "request missing metricVolumeRef; strict scientific lane may fail closed",
+          expected: {
+            beta: solvePayload.beta,
+            alpha: solvePayload.alpha,
+            sigma: solvePayload.sigma,
+            R: solvePayload.R,
+            request_metric_max_null_residual: geodesicPayload.maxNullResidual,
+            request_metric_step_convergence: geodesicPayload.stepConvergence,
+            request_metric_bundle_spread: geodesicPayload.bundleSpread,
+            metric_volume_updated_at_ms: metricVolumeRefPayload?.updatedAt ?? null,
+            metric_volume_cells: metricRefCellCount,
+          },
+          rendered: null,
+          delta: null,
+          measurements: {
+            stage: "request",
+            requestId: payload.requestId ?? null,
+            strictScientificFrame: scientificFrameRequired,
+            requireIntegralSignal: payload.scienceLane?.requireIntegralSignal === true,
+            geodesicModeRequested: geodesicPayload.mode ?? "unknown",
+            chart: solvePayload.chart ?? "unknown",
+            metricSource: metricVolumeRefPayload?.source ?? metricSummaryPayload?.source ?? "none",
+            metricChart: metricVolumeRefPayload?.chart ?? metricSummaryPayload?.chart ?? "none",
+            metricDims: metricRefDimsText,
+            metricRefKind: metricVolumeRefPayload?.kind ?? "none",
+            metricRefHash: metricVolumeRefPayload?.hash ?? "none",
+            metricRefUrl: metricVolumeRefPayload?.url ?? "none",
+          },
+        });
+      }
       try {
         const frame = await requestHullMisFrame(payload, abort.signal);
         if (disposed) return;
+        if (scientificFrameRequired && frame.backend !== "proxy") {
+          throw new Error("scientific_renderer_requires_remote_proxy");
+        }
+        const remoteMode = frame.diagnostics?.geodesicMode;
+        if (
+          scientificFrameRequired &&
+          remoteMode !== "full-3+1-christoffel"
+        ) {
+          throw new Error(
+            `scientific_renderer_requires_full_3p1_mode:${String(
+              remoteMode ?? "unknown",
+            )}`,
+          );
+        }
         await drawMisFrame(frame.imageDataUrl);
+        setGlError(null);
         const nowDecodeMs = Date.now();
         if (nowDecodeMs - lastIntegralSignalDecodeRef.current >= 1300) {
           const integral = extractIntegralSignalAttachmentSnapshot(frame);
@@ -6777,12 +7078,11 @@ const res = 256;
           }
         }
         const modeFromSkybox: HullGeodesicDiagnostics["mode"] =
-          skyboxModeCurrent === "geodesic"
+          skyboxModeRequest === "geodesic"
             ? "full-3+1-christoffel"
-            : skyboxModeCurrent === "flat"
+            : skyboxModeRequest === "flat"
               ? "flat-background"
               : "disabled";
-        const remoteMode = frame.diagnostics?.geodesicMode;
         const resolvedMode: HullGeodesicDiagnostics["mode"] =
           remoteMode === "full-3+1-christoffel" ||
           remoteMode === "reduced-1+1-fallback" ||
@@ -6816,11 +7116,83 @@ const res = 256;
           stepScale_m: 0,
           updatedAt: Date.now(),
         });
-        setHullDiagMsg(
-          frame.backend === "proxy"
-            ? "MIS service renderer active (remote proxy)."
-            : "MIS service renderer active (local deterministic fallback).",
-        );
+        setHullDiagMsg("MIS service renderer active (strict scientific remote).");
+        const hasDepthAttachment = Array.isArray(frame.attachments)
+          ? frame.attachments.some((entry) => entry.kind === "depth-linear-m-f32le")
+          : false;
+        const hasMaskAttachment = Array.isArray(frame.attachments)
+          ? frame.attachments.some((entry) => entry.kind === "shell-mask-u8")
+          : false;
+        const frameScientificTier =
+          frame.provenance?.scientificTier ?? frame.diagnostics?.scientificTier ?? null;
+        const responseDebugNowMs = Date.now();
+        if (responseDebugNowMs - lastSolvePipelineResponseDebugMs > 1200) {
+          lastSolvePipelineResponseDebugMs = responseDebugNowMs;
+          emitAlcubierreDebugEvent({
+            level:
+              frame.diagnostics?.consistency === "fail"
+                ? "warn"
+                : frameScientificTier === "research-grade"
+                  ? "info"
+                  : "warn",
+            category: "solve_to_render_pipeline",
+            source: "alcubierre.solve-render-chain.response",
+            note: "equation->metric->render response received",
+            expected: {
+              beta: solvePayload.beta,
+              alpha: solvePayload.alpha,
+              sigma: solvePayload.sigma,
+              R: solvePayload.R,
+              request_metric_max_null_residual: geodesicPayload.maxNullResidual,
+              request_metric_step_convergence: geodesicPayload.stepConvergence,
+              request_metric_bundle_spread: geodesicPayload.bundleSpread,
+            },
+            rendered: {
+              frame_render_ms: frame.renderMs,
+              frame_max_null_residual: frame.diagnostics?.maxNullResidual ?? null,
+              frame_step_convergence: frame.diagnostics?.stepConvergence ?? null,
+              frame_bundle_spread: frame.diagnostics?.bundleSpread ?? null,
+            },
+            delta: {
+              frame_minus_request_null_residual:
+                Number.isFinite(frame.diagnostics?.maxNullResidual as number) &&
+                Number.isFinite(geodesicPayload.maxNullResidual as number)
+                  ? Number(frame.diagnostics?.maxNullResidual) -
+                    Number(geodesicPayload.maxNullResidual)
+                  : null,
+              frame_minus_request_step_convergence:
+                Number.isFinite(frame.diagnostics?.stepConvergence as number) &&
+                Number.isFinite(geodesicPayload.stepConvergence as number)
+                  ? Number(frame.diagnostics?.stepConvergence) -
+                    Number(geodesicPayload.stepConvergence)
+                  : null,
+              frame_minus_request_bundle_spread:
+                Number.isFinite(frame.diagnostics?.bundleSpread as number) &&
+                Number.isFinite(geodesicPayload.bundleSpread as number)
+                  ? Number(frame.diagnostics?.bundleSpread) -
+                    Number(geodesicPayload.bundleSpread)
+                  : null,
+            },
+            measurements: {
+              stage: "response",
+              requestId: payload.requestId ?? null,
+              backend: frame.backend,
+              geodesicModeResolved: resolvedMode,
+              geodesicModeRemote: remoteMode ?? "unknown",
+              chart: solvePayload.chart ?? "unknown",
+              consistency: frame.diagnostics?.consistency ?? "unknown",
+              scientificTier: frameScientificTier ?? "unknown",
+              researchGrade: frame.provenance?.researchGrade === true,
+              provenanceSource: frame.provenance?.source ?? "unknown",
+              hasDepthAttachment,
+              hasMaskAttachment,
+              width: payload.width,
+              height: payload.height,
+              metricRefHash: metricVolumeRefPayload?.hash ?? "none",
+              metricRefDims: metricRefDimsText,
+            },
+          });
+        }
         const nowLogMs = Date.now();
         if (nowLogMs - lastRenderTransportDebugMs > 1800) {
           lastRenderTransportDebugMs = nowLogMs;
@@ -6828,7 +7200,7 @@ const res = 256;
             level: "info",
             category: "render_transport",
             source: "alcubierre.mis-frame.success",
-            note: frame.backend === "proxy" ? "remote proxy frame" : "local deterministic fallback frame",
+            note: "strict scientific remote proxy frame",
             expected: {
               beta: solvePayload.beta,
               alpha: solvePayload.alpha,
@@ -6853,7 +7225,7 @@ const res = 256;
             },
             measurements: {
               backend: frame.backend,
-              skyboxMode: skyboxModeCurrent,
+              skyboxMode: skyboxModeRequest,
               geodesicMode: resolvedMode,
               consistency: frame.diagnostics?.consistency ?? geodesicPayload.consistency ?? "unknown",
               width: payload.width,
@@ -6864,7 +7236,66 @@ const res = 256;
       } catch (err) {
         if (disposed) return;
         const message = err instanceof Error ? err.message : String(err);
-        setHullDiagMsg(`MIS service frame failed: ${message}`);
+        const errorInfo = parseMisServiceErrorInfo(message);
+        const strictScientificFailure =
+          scientificFrameRequired && isStrictScientificRenderFailure(errorInfo);
+        const uiMessage = strictScientificFailure
+          ? formatStrictScientificRenderFailure(errorInfo)
+          : `MIS service frame failed: ${message}`;
+        const responseDebugNowMs = Date.now();
+        if (responseDebugNowMs - lastSolvePipelineResponseDebugMs > 1200) {
+          lastSolvePipelineResponseDebugMs = responseDebugNowMs;
+          emitAlcubierreDebugEvent({
+            level: "warn",
+            category: "solve_to_render_pipeline",
+            source: "alcubierre.solve-render-chain.failure",
+            note: uiMessage,
+            expected: {
+              beta: solvePayload.beta,
+              alpha: solvePayload.alpha,
+              sigma: solvePayload.sigma,
+              R: solvePayload.R,
+              request_metric_max_null_residual: geodesicPayload.maxNullResidual,
+              request_metric_step_convergence: geodesicPayload.stepConvergence,
+              request_metric_bundle_spread: geodesicPayload.bundleSpread,
+            },
+            rendered: null,
+            delta: null,
+            measurements: {
+              stage: "failure",
+              requestId: payload.requestId ?? null,
+              strictScientificFailure,
+              errorStatus: errorInfo.status,
+              errorCode: errorInfo.code ?? "none",
+              errorDetail: errorInfo.detail ?? message,
+              chart: solvePayload.chart ?? "unknown",
+              geodesicModeRequested: geodesicPayload.mode ?? "unknown",
+              metricRefHash: metricVolumeRefPayload?.hash ?? "none",
+              metricRefKind: metricVolumeRefPayload?.kind ?? "none",
+              metricRefSource: metricVolumeRefPayload?.source ?? metricSummaryPayload?.source ?? "none",
+            },
+          });
+        }
+        setHullDiagMsg(uiMessage);
+        if (strictScientificFailure) {
+          setGlError(`Scientific renderer unavailable: ${uiMessage}`);
+          setGeodesicDiagnostics({
+            mode: "disabled",
+            scientificEnabled: true,
+            metricAvailable: false,
+            metricSource: metricSummaryPayload?.source ?? "mis-service",
+            chart: metricSummaryPayload?.chart ?? solvePayload.chart ?? null,
+            dims: metricSummaryPayload?.dims ?? null,
+            maxNullResidual: null,
+            stepConvergence: null,
+            bundleSpread: null,
+            consistency: "fail",
+            consistencyNote: uiMessage,
+            steps: 0,
+            stepScale_m: 0,
+            updatedAt: Date.now(),
+          });
+        }
         const nowMs = Date.now();
         if (nowMs - lastRenderTransportDebugMs > 1800) {
           lastRenderTransportDebugMs = nowMs;
@@ -6872,7 +7303,7 @@ const res = 256;
             level: "warn",
             category: "render_transport",
             source: "alcubierre.mis-frame.failure",
-            note: message,
+            note: uiMessage,
             expected: {
               beta: solvePayload.beta,
               alpha: solvePayload.alpha,
@@ -6882,7 +7313,7 @@ const res = 256;
             rendered: null,
             delta: null,
             measurements: {
-              skyboxMode: skyboxModeCurrent,
+              skyboxMode: skyboxModeRequest,
               width: payload.width,
               height: payload.height,
             },
@@ -7865,6 +8296,11 @@ const res = 256;
       }
       return "mixed-lens-shell";
     })();
+    const frameModeSource = metricThetaSlice
+      ? "metric-volume.theta-channel"
+      : volumeSource === "lattice" && latticeSlice
+        ? "lattice-dfdr-slice"
+        : "analytic-reduced-order";
     const metricVolumeLatest =
       typeof window !== "undefined"
         ? ((window as any).__hullMetricVolumeLatest as HullMetricVolumeContract | null | undefined)
@@ -8178,7 +8614,7 @@ const res = 256;
         unknownAsFail: gateUnknownAsFail,
       },
       provenance: {
-        frameModeSource: "analytic-reduced-order",
+        frameModeSource,
         energyModeSource: "analytic-reduced-order",
         driveModeSource: "control-scaled-engineering",
         worldtubeModeSource,
@@ -8268,7 +8704,10 @@ const res = 256;
     planarVizMode,
     skyboxMode,
     hullRendererBackend,
+    volumeSource,
     geodesicDiagnostics,
+    latticeSlice,
+    metricThetaSlice,
     integralSignalVersion,
     lightLoop?.tauLC_ms,
     lightLoop?.burst_ms,
@@ -8276,6 +8715,95 @@ const res = 256;
     (sharedComplianceState as any)?.zeta?.value,
     (sharedComplianceState as any)?.zeta?.limit,
   ]);
+  const safeSub = (lhs: number | null | undefined, rhs: number | null | undefined): number | null => {
+    if (!Number.isFinite(lhs ?? NaN) || !Number.isFinite(rhs ?? NaN)) return null;
+    return Number(lhs) - Number(rhs);
+  };
+  useEffect(() => {
+    if (planarVizMode !== 3) return;
+    const now = performance.now();
+    if (now - lastSolvePipelineSummaryLogRef.current < 1700) return;
+    lastSolvePipelineSummaryLogRef.current = now;
+
+    const checks = Array.isArray(solveOrderSnapshot.checks) ? solveOrderSnapshot.checks : [];
+    const checksPass = checks.filter((entry) => entry.status === "pass").length;
+    const checksWarn = checks.filter((entry) => entry.status === "warn").length;
+    const checksFail = checks.filter((entry) => entry.status === "fail").length;
+    const checksUnknown = checks.filter((entry) => entry.status === "unknown").length;
+    const displacement = solveOrderSnapshot.displacement;
+    const optics = solveOrderSnapshot.optics;
+    const constraints = solveOrderSnapshot.constraints;
+    const guardrails = solveOrderSnapshot.guardrails;
+    const level =
+      checksFail > 0 ||
+      constraints.gateStatus === "fail" ||
+      displacement?.status === "fail" ||
+      optics?.consistency === "fail"
+        ? "warn"
+        : "info";
+    emitAlcubierreDebugEvent({
+      level,
+      category: "solve_to_render_pipeline",
+      source: "alcubierre.solve-render-chain.summary",
+      note: "equation->metric->constraints->optics->render displacement summary",
+      expected: {
+        H_rms_max: constraints.H_rms_max,
+        M_rms_max: constraints.M_rms_max,
+        H_maxAbs_max: constraints.H_maxAbs_max,
+        M_maxAbs_max: constraints.M_maxAbs_max,
+        guardrail_zeta_limit: guardrails.zetaLimit,
+      },
+      rendered: {
+        H_rms: constraints.H_rms,
+        M_rms: constraints.M_rms,
+        H_maxAbs: constraints.H_maxAbs,
+        M_maxAbs: constraints.M_maxAbs,
+        optics_max_null_residual: optics?.maxNullResidual ?? null,
+        optics_step_convergence: optics?.stepConvergence ?? null,
+        optics_bundle_spread: optics?.bundleSpread ?? null,
+        displacement_rms_delta_m: displacement?.rmsDeltaM ?? null,
+        displacement_max_abs_delta_m: displacement?.maxAbsDeltaM ?? null,
+        displacement_rms_z_residual_m: displacement?.integralSignal?.rmsZResidualM ?? null,
+        displacement_hausdorff_m: displacement?.integralSignal?.hausdorffM ?? null,
+        guardrail_zeta_value: guardrails.zetaValue,
+        guardrail_ts_ratio: guardrails.tsRatio,
+      },
+      delta: {
+        H_rms_margin: safeSub(constraints.H_rms_max, constraints.H_rms),
+        M_rms_margin: safeSub(constraints.M_rms_max, constraints.M_rms),
+        H_maxAbs_margin: safeSub(constraints.H_maxAbs_max, constraints.H_maxAbs),
+        M_maxAbs_margin: safeSub(constraints.M_maxAbs_max, constraints.M_maxAbs),
+      },
+      measurements: {
+        stage: "summary",
+        family: solveOrderSnapshot.metric.family ?? "unknown",
+        chart: solveOrderSnapshot.metric.chartLabel ?? "unknown",
+        betaMethod: solveOrderSnapshot.metric.betaMethod ?? "unknown",
+        geodesicMode: optics?.geodesicMode ?? "unknown",
+        opticsConsistency: optics?.consistency ?? "unknown",
+        gateStatus: constraints.gateStatus ?? "unknown",
+        gateMode: constraints.gateMode ?? "unknown",
+        unknownAsFail: constraints.unknownAsFail,
+        worldtubeModeSource: solveOrderSnapshot.provenance.worldtubeModeSource ?? "unknown",
+        frameModeSource: solveOrderSnapshot.provenance.frameModeSource ?? "unknown",
+        displacementStatus: displacement?.status ?? "unknown",
+        displacementAnalyticStatus: displacement?.analyticStatus ?? "unknown",
+        displacementIntegralStatus: displacement?.integralStatus ?? "unknown",
+        displacementMetricChannel: displacement?.metricChannel ?? "unknown",
+        integralSource: displacement?.integralSignal?.source ?? "none",
+        integralCoveragePct: displacement?.integralSignal?.coveragePct ?? null,
+        integralAgeMs: displacement?.integralSignal?.ageMs ?? null,
+        viabilityStatus: guardrails.viabilityStatus ?? "unknown",
+        firstHardFail: guardrails.firstHardFail ?? "none",
+        certificateHash: guardrails.certificateHash ?? "none",
+        certificateIntegrityOk: guardrails.integrityOk,
+        checksPass,
+        checksWarn,
+        checksFail,
+        checksUnknown,
+      },
+    });
+  }, [planarVizMode, solveOrderSnapshot, emitAlcubierreDebugEvent]);
   useEffect(() => {
     if (planarVizMode !== 3) return;
     const displacement = solveOrderSnapshot.displacement;
@@ -10568,7 +11096,7 @@ const res = 256;
                       ? "bg-cyan-600 text-white"
                       : "bg-slate-800 text-slate-300"
                   )}
-                  title="Safe default: external MIS renderer service (proxy + deterministic fallback)"
+                  title="Scientific default: external MIS renderer service (strict remote proxy, no local deterministic fallback)"
                 >
                   MIS service
                 </button>
@@ -10863,18 +11391,25 @@ const res = 256;
           </div>
         )}
         {glError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 px-6 text-center">
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/85 px-6 text-center"
+            role="alert"
+            aria-live="assertive"
+          >
             <div className="max-w-sm space-y-2">
               <p className="text-sm font-semibold text-red-200">
-                {glError.toLowerCase().includes("halted for safety")
-                  ? "Renderer halted for safety"
-                  : "Shader pipeline offline"}
+                {glError.toLowerCase().includes("scientific renderer unavailable")
+                  ? "Scientific render lane unavailable"
+                  : glError.toLowerCase().includes("halted for safety")
+                    ? "Renderer halted for safety"
+                    : "Shader pipeline offline"}
               </p>
               <p className="text-xs text-slate-200">
                 {glError}
               </p>
               <p className="text-[0.65rem] text-slate-400">
-                Check the console for detailed GLSL compile/link logs. Toggle Ã¢â‚¬Å“Safe shaderÃ¢â‚¬Â to keep the viewer responsive while investigating.
+                NHM2 viewer policy is strict scientific only: configure the research render service and
+                metric-volume feed. The panel stays responsive and shows this error instead of freezing.
               </p>
             </div>
           </div>

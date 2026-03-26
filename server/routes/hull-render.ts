@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { spawn, type ChildProcess } from "node:child_process";
+import { Router, type Request } from "express";
 import sharp from "sharp";
 import type {
   HullMisRenderAttachmentV1,
@@ -30,12 +31,24 @@ const readEnvText = (value: unknown): string | null => {
   return text.length ? text : null;
 };
 
+const DEFAULT_OPTIX_SERVICE_FRAME_URL =
+  "http://127.0.0.1:6062/api/helix/hull-render/frame";
+const DEFAULT_OPTIX_SERVICE_STATUS_URL =
+  "http://127.0.0.1:6062/api/helix/hull-render/status";
+const DEFAULT_UNITY_SERVICE_FRAME_URL =
+  "http://127.0.0.1:6061/api/helix/hull-render/frame";
+const DEFAULT_UNITY_SERVICE_STATUS_URL =
+  "http://127.0.0.1:6061/api/helix/hull-render/status";
+const AUTO_START_OPTIX_COOLDOWN_MS = 3_000;
+const AUTO_START_OPTIX_WAIT_INTERVAL_MS = 250;
+
 const readRenderBackendMode = (): "auto" | "optix" | "unity" => {
   const value = readEnvText(
     process.env.MIS_RENDER_BACKEND ?? process.env.MIS_RENDER_SERVICE_BACKEND,
   );
-  if (value === "optix" || value === "unity") return value;
-  return "auto";
+  if (value === "auto" || value === "optix" || value === "unity") return value;
+  // Default to OptiX-first scientific lane.
+  return "optix";
 };
 
 type RemoteBackendKey = "optix" | "unity" | "generic";
@@ -90,7 +103,37 @@ const resolveServiceEndpoint = (
   if (explicitSpecific) return normalizeServiceEndpointUrl(explicitSpecific, kind);
 
   const base = readEnvText(process.env[`${prefix}_RENDER_SERVICE_URL`]);
-  return normalizeServiceEndpointUrl(base, kind);
+  if (base) return normalizeServiceEndpointUrl(base, kind);
+
+  // Compatibility bridge: allow MIS_* endpoint vars to drive canonical backends
+  // when backend-specific vars are not set.
+  if (backend !== "generic") {
+    const genericSpecific =
+      kind === "frame"
+        ? readEnvText(process.env.MIS_RENDER_SERVICE_FRAME_URL)
+        : readEnvText(process.env.MIS_RENDER_SERVICE_STATUS_URL);
+    if (genericSpecific) {
+      return normalizeServiceEndpointUrl(genericSpecific, kind);
+    }
+    const genericBase = readEnvText(process.env.MIS_RENDER_SERVICE_URL);
+    if (genericBase) return normalizeServiceEndpointUrl(genericBase, kind);
+  }
+
+  // Scientific lane default endpoints (optix/unity) unless explicitly disabled.
+  if (process.env.MIS_RENDER_DISABLE_DEFAULT_ENDPOINT !== "1") {
+    if (backend === "optix") {
+      return kind === "frame"
+        ? DEFAULT_OPTIX_SERVICE_FRAME_URL
+        : DEFAULT_OPTIX_SERVICE_STATUS_URL;
+    }
+    if (backend === "unity") {
+      return kind === "frame"
+        ? DEFAULT_UNITY_SERVICE_FRAME_URL
+        : DEFAULT_UNITY_SERVICE_STATUS_URL;
+    }
+  }
+
+  return null;
 };
 
 const statusEndpointFromFrameEndpoint = (frameEndpoint: string): string =>
@@ -146,21 +189,136 @@ const readAllowLegacyGenericEndpoint = (): boolean =>
 const readAllowConfiguredFallback = (): boolean =>
   process.env.MIS_RENDER_ALLOW_CONFIGURED_FALLBACK === "1";
 
+const readStrictProxy = (): boolean =>
+  process.env.MIS_RENDER_PROXY_STRICT !== "0";
+
+const readRequireIntegralSignal = (): boolean =>
+  process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL !== "0";
+
+const readRequireScientificFrameByDefault = (): boolean =>
+  process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME !== "0";
+
+const readAutoStartOptixEnabled = (): boolean => {
+  const value = readEnvText(process.env.MIS_RENDER_AUTOSTART_OPTIX);
+  if (value != null) {
+    const normalized = value.toLowerCase();
+    return normalized !== "0" && normalized !== "false";
+  }
+  if (process.env.NODE_ENV === "test" || !!process.env.VITEST) return false;
+  return true;
+};
+
+type LoopbackEndpoint = {
+  host: string;
+  port: number;
+};
+
+const parseLoopbackServiceEndpoint = (endpoint: string): LoopbackEndpoint | null => {
+  try {
+    const url = new URL(endpoint);
+    if (url.protocol !== "http:") return null;
+    const hostname = url.hostname.toLowerCase();
+    if (hostname !== "127.0.0.1" && hostname !== "localhost") return null;
+    const port = Number(url.port || "80");
+    if (!Number.isFinite(port) || port <= 0) return null;
+    return {
+      host: hostname === "localhost" ? "127.0.0.1" : hostname,
+      port,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const findAutoStartOptixCandidate = (
+  candidates: RemoteEndpointCandidate[],
+): RemoteEndpointCandidate | null => {
+  for (const candidate of candidates) {
+    if (candidate.backend !== "optix") continue;
+    if (parseLoopbackServiceEndpoint(candidate.frameEndpoint)) return candidate;
+  }
+  return null;
+};
+
+const buildRequestBaseUrl = (req: Request): string => {
+  const forwardedProtoRaw = req.headers["x-forwarded-proto"];
+  const forwardedProto = Array.isArray(forwardedProtoRaw)
+    ? forwardedProtoRaw[0]
+    : forwardedProtoRaw;
+  const forwarded = readEnvText(forwardedProto)?.split(",")[0]?.trim().toLowerCase();
+  const protocol = forwarded || req.protocol || "http";
+  const host = req.get("host") || "127.0.0.1:5050";
+  return `${protocol}://${host}`;
+};
+
+const sleepMs = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const npmExecPath = readEnvText(process.env.npm_execpath);
+const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+
+const spawnDetachedOptixService = (args: {
+  host: string;
+  port: number;
+  appBaseUrl: string;
+}): ChildProcess => {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    OPTIX_RENDER_SERVICE_HOST: args.host,
+    OPTIX_RENDER_SERVICE_PORT: String(args.port),
+    OPTIX_RENDER_APP_BASE_URL: args.appBaseUrl,
+    OPTIX_RENDER_METRIC_REF_BASE_URL: args.appBaseUrl,
+    OPTIX_RENDER_ALLOW_SYNTHETIC:
+      process.env.OPTIX_RENDER_ALLOW_SYNTHETIC ?? "0",
+  };
+  const child = npmExecPath
+    ? spawn(process.execPath, [npmExecPath, "run", "-s", "hull:optix:service"], {
+        env,
+        shell: false,
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      })
+    : spawn(npmCmd, ["run", "-s", "hull:optix:service"], {
+        env,
+        shell: false,
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+      });
+  child.unref();
+  return child;
+};
+
+const isChildProcessRunning = (child: ChildProcess | null): boolean =>
+  !!child && child.exitCode == null && child.signalCode == null && child.killed !== true;
+
+const optixAutoStartState: {
+  child: ChildProcess | null;
+  inFlight: Promise<boolean> | null;
+  lastAttemptAtMs: number;
+  lastError: string | null;
+} = {
+  child: null,
+  inFlight: null,
+  lastAttemptAtMs: 0,
+  lastError: null,
+};
+
 const isLocalFallbackAllowed = (opts: {
   backendMode: "auto" | "optix" | "unity";
   strictProxy: boolean;
   remoteConfigured: boolean;
+  requireScientificFrame: boolean;
 }): boolean => {
+  if (opts.requireScientificFrame) return false;
   if (opts.strictProxy) return false;
   if (opts.backendMode !== "auto") return false;
   if (!opts.remoteConfigured) return true;
   return readAllowConfiguredFallback();
 };
-
-const DEFAULT_MIS_SERVICE_FRAME_URL =
-  "http://127.0.0.1:6061/api/helix/hull-render/frame";
-const DEFAULT_MIS_SERVICE_STATUS_URL =
-  "http://127.0.0.1:6061/api/helix/hull-render/status";
 
 const hashSeed = (payload: HullMisRenderRequestV1): number => {
   const text = JSON.stringify({
@@ -209,6 +367,7 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
   const solve = isRecord(src.solve) ? src.solve : {};
   const diag = isRecord(src.geodesicDiagnostics) ? src.geodesicDiagnostics : {};
   const metric = isRecord(src.metricSummary) ? src.metricSummary : {};
+  const metricVolumeRef = isRecord(src.metricVolumeRef) ? src.metricVolumeRef : {};
   const scienceLane = isRecord(src.scienceLane) ? src.scienceLane : {};
 
   return {
@@ -226,6 +385,7 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
         : "off",
     scienceLane: {
       requireIntegralSignal: scienceLane.requireIntegralSignal === true,
+      requireScientificFrame: scienceLane.requireScientificFrame === true,
       attachmentDownsample: toInt(scienceLane.attachmentDownsample, 1, 1, 8),
     },
     solve: {
@@ -271,6 +431,34 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
       updatedAt:
         metric.updatedAt == null ? null : toFiniteNumber(metric.updatedAt, Date.now()),
     },
+    metricVolumeRef:
+      metricVolumeRef.kind === "gr-evolve-brick" &&
+      typeof metricVolumeRef.url === "string" &&
+      metricVolumeRef.url.trim().length > 0
+        ? {
+            kind: "gr-evolve-brick",
+            url: metricVolumeRef.url.trim(),
+            source:
+              typeof metricVolumeRef.source === "string"
+                ? metricVolumeRef.source
+                : null,
+            chart:
+              typeof metricVolumeRef.chart === "string"
+                ? metricVolumeRef.chart
+                : null,
+            dims: Array.isArray(metricVolumeRef.dims)
+              ? readTuple3(metricVolumeRef.dims, [1, 1, 1])
+              : null,
+            updatedAt:
+              metricVolumeRef.updatedAt == null
+                ? null
+                : toFiniteNumber(metricVolumeRef.updatedAt, Date.now()),
+            hash:
+              typeof metricVolumeRef.hash === "string"
+                ? metricVolumeRef.hash
+                : null,
+          }
+        : null,
   };
 };
 
@@ -470,14 +658,148 @@ const fetchRemoteServiceStatus = async (
   }
 };
 
+const waitForRemoteServiceReady = async (
+  statusEndpoint: string,
+  timeoutMs: number,
+): Promise<RemoteServiceStatus> => {
+  let latest = await fetchRemoteServiceStatus(statusEndpoint);
+  if (latest.reachable || timeoutMs <= 0) return latest;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await sleepMs(AUTO_START_OPTIX_WAIT_INTERVAL_MS);
+    latest = await fetchRemoteServiceStatus(statusEndpoint);
+    if (latest.reachable) return latest;
+  }
+  return latest;
+};
+
+const ensureAutoStartOptixForCandidate = async (args: {
+  candidate: RemoteEndpointCandidate | null;
+  appBaseUrl: string;
+  waitMs: number;
+}): Promise<{ attempted: boolean; ready: boolean; error: string | null }> => {
+  const { candidate, appBaseUrl, waitMs } = args;
+  if (!readAutoStartOptixEnabled()) {
+    return { attempted: false, ready: false, error: null };
+  }
+  if (!candidate || candidate.backend !== "optix") {
+    return { attempted: false, ready: false, error: null };
+  }
+  const loopback = parseLoopbackServiceEndpoint(candidate.frameEndpoint);
+  if (!loopback) {
+    return { attempted: false, ready: false, error: null };
+  }
+
+  const statusEndpoint =
+    candidate.statusEndpoint ?? statusEndpointFromFrameEndpoint(candidate.frameEndpoint);
+  const currentStatus = await fetchRemoteServiceStatus(statusEndpoint);
+  if (currentStatus.reachable) {
+    return { attempted: false, ready: true, error: null };
+  }
+
+  if (optixAutoStartState.inFlight) {
+    const ready = await optixAutoStartState.inFlight;
+    const statusAfter = await waitForRemoteServiceReady(statusEndpoint, Math.min(waitMs, 1200));
+    return {
+      attempted: true,
+      ready: ready || statusAfter.reachable,
+      error: statusAfter.reachable ? null : statusAfter.error ?? optixAutoStartState.lastError,
+    };
+  }
+
+  const inFlight = (async (): Promise<boolean> => {
+    const now = Date.now();
+    if (
+      !isChildProcessRunning(optixAutoStartState.child) &&
+      now - optixAutoStartState.lastAttemptAtMs >= AUTO_START_OPTIX_COOLDOWN_MS
+    ) {
+      try {
+        const child = spawnDetachedOptixService({
+          host: loopback.host,
+          port: loopback.port,
+          appBaseUrl,
+        });
+        optixAutoStartState.child = child;
+        child.once("exit", () => {
+          if (optixAutoStartState.child === child) {
+            optixAutoStartState.child = null;
+          }
+        });
+        optixAutoStartState.lastAttemptAtMs = now;
+        optixAutoStartState.lastError = null;
+      } catch (error) {
+        optixAutoStartState.lastAttemptAtMs = now;
+        optixAutoStartState.lastError =
+          error instanceof Error ? error.message : String(error);
+        return false;
+      }
+    }
+    const statusAfter = await waitForRemoteServiceReady(statusEndpoint, waitMs);
+    if (!statusAfter.reachable) {
+      optixAutoStartState.lastError = statusAfter.error ?? "autostart_not_ready";
+    } else {
+      optixAutoStartState.lastError = null;
+    }
+    return statusAfter.reachable;
+  })();
+
+  optixAutoStartState.inFlight = inFlight;
+  try {
+    const ready = await inFlight;
+    return {
+      attempted: true,
+      ready,
+      error: ready ? null : optixAutoStartState.lastError,
+    };
+  } finally {
+    if (optixAutoStartState.inFlight === inFlight) {
+      optixAutoStartState.inFlight = null;
+    }
+  }
+};
+
 const isScientificRemoteFrame = (frame: HullMisRenderResponseV1): boolean => {
   if (frame.backend !== "proxy") return false;
   const note = String(frame.diagnostics?.note ?? "").toLowerCase();
   const provenance = String(frame.provenance?.source ?? "").toLowerCase();
-  if (note.includes("synthetic") || note.includes("fallback")) return false;
-  if (provenance.includes("synthetic")) return false;
+  if (
+    note.includes("synthetic") ||
+    note.includes("fallback") ||
+    note.includes("scaffold") ||
+    note.includes("teaching")
+  ) {
+    return false;
+  }
+  if (
+    provenance.includes("synthetic") ||
+    provenance.includes("scaffold") ||
+    provenance.includes("teaching")
+  ) {
+    return false;
+  }
   return true;
 };
+
+const isResearchGradeRemoteFrame = (frame: HullMisRenderResponseV1): boolean => {
+  if (!isScientificRemoteFrame(frame)) return false;
+  const provenanceSource = String(frame.provenance?.source ?? "").toLowerCase();
+  const note = String(frame.diagnostics?.note ?? "").toLowerCase();
+  const provenanceTier = String(frame.provenance?.scientificTier ?? "").toLowerCase();
+  const diagnosticsTier = String(frame.diagnostics?.scientificTier ?? "").toLowerCase();
+  const explicitResearch =
+    frame.provenance?.researchGrade === true ||
+    provenanceTier === "research-grade" ||
+    diagnosticsTier === "research-grade";
+  if (explicitResearch) return true;
+  if (provenanceSource.includes("research") || note.includes("research")) return true;
+  return false;
+};
+
+const isFullThreePlusOneGeodesicFrame = (
+  frame: HullMisRenderResponseV1,
+): boolean =>
+  String(frame.diagnostics?.geodesicMode ?? "").toLowerCase() ===
+  "full-3+1-christoffel";
 
 const hasRequiredProvenancePrefix = (
   frame: HullMisRenderResponseV1,
@@ -582,28 +904,40 @@ const buildLocalResponse = async (
       maxNullResidual: payload.geodesicDiagnostics?.maxNullResidual ?? null,
       stepConvergence: payload.geodesicDiagnostics?.stepConvergence ?? null,
       bundleSpread: payload.geodesicDiagnostics?.bundleSpread ?? null,
+      scientificTier: "teaching",
     },
     attachments: buildLocalIntegralAttachments(payload),
     provenance: {
       source: "casimirbot.local.deterministic",
       serviceUrl: null,
       timestampMs: Date.now(),
+      researchGrade: false,
+      scientificTier: "teaching",
     },
   };
 };
 
-router.get("/status", async (_req, res) => {
+router.get("/status", async (req, res) => {
   const backendMode = readRenderBackendMode();
   const endpointCandidates = collectRemoteEndpointCandidates();
+  const autoStartOptixEnabled = readAutoStartOptixEnabled();
+  const autoStartCandidate = findAutoStartOptixCandidate(endpointCandidates);
+  const autoStartResult = await ensureAutoStartOptixForCandidate({
+    candidate: autoStartCandidate,
+    appBaseUrl: buildRequestBaseUrl(req),
+    waitMs: 1200,
+  });
   const allowLegacyGenericEndpoint = readAllowLegacyGenericEndpoint();
-  const strictProxy = process.env.MIS_RENDER_PROXY_STRICT === "1";
-  const requireIntegralSignal = process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL !== "0";
+  const strictProxy = readStrictProxy();
+  const requireIntegralSignal = readRequireIntegralSignal();
+  const requireScientificFrame = readRequireScientificFrameByDefault();
   const requiredProvenanceSourcePrefix = readRequiredProvenanceSourcePrefix();
   const remoteConfigured = endpointCandidates.length > 0;
   const localFallbackAllowed = isLocalFallbackAllowed({
     backendMode,
     strictProxy,
     remoteConfigured,
+    requireScientificFrame,
   });
   let selectedCandidate: RemoteEndpointCandidate | null =
     endpointCandidates.length > 0 ? endpointCandidates[0] : null;
@@ -643,6 +977,18 @@ router.get("/status", async (_req, res) => {
     remoteStatus.reachable &&
     remoteStatus.readyForScientificLane &&
     !remoteStatus.allowSynthetic;
+  const recommendedFrameEndpoint =
+    backendMode === "optix"
+      ? DEFAULT_OPTIX_SERVICE_FRAME_URL
+      : backendMode === "unity"
+        ? DEFAULT_UNITY_SERVICE_FRAME_URL
+        : DEFAULT_OPTIX_SERVICE_FRAME_URL;
+  const recommendedStatusEndpoint =
+    backendMode === "optix"
+      ? DEFAULT_OPTIX_SERVICE_STATUS_URL
+      : backendMode === "unity"
+        ? DEFAULT_UNITY_SERVICE_STATUS_URL
+        : DEFAULT_OPTIX_SERVICE_STATUS_URL;
   res.json({
     kind: "hull-render-status",
     backendHint: "mis-path-tracing",
@@ -656,8 +1002,13 @@ router.get("/status", async (_req, res) => {
         : null),
     strictProxy,
     requireIntegralSignal,
+    requireScientificFrame,
     requiredProvenanceSourcePrefix,
     allowLegacyGenericEndpoint,
+    autoStartOptixEnabled,
+    autoStartOptixAttempted: autoStartResult.attempted,
+    autoStartOptixReady: autoStartResult.ready,
+    autoStartOptixError: autoStartResult.error,
     scientificLaneReady,
     fallbackLaneActive: !scientificLaneReady && localFallbackAllowed,
     localFallbackAllowed,
@@ -674,8 +1025,8 @@ router.get("/status", async (_req, res) => {
         : backendMode === "unity"
           ? "RayTracingMIS Unity batch service"
           : "RayTracingMIS Unity batch service",
-    recommendedFrameEndpoint: DEFAULT_MIS_SERVICE_FRAME_URL,
-    recommendedStatusEndpoint: DEFAULT_MIS_SERVICE_STATUS_URL,
+    recommendedFrameEndpoint,
+    recommendedStatusEndpoint,
     timestampMs: Date.now(),
   });
 });
@@ -687,32 +1038,50 @@ router.post("/frame", async (req, res) => {
   const endpointCandidates = collectRemoteEndpointCandidates();
   const allowLegacyGenericEndpoint = readAllowLegacyGenericEndpoint();
   const remoteConfigured = endpointCandidates.length > 0;
-  const strictProxy = process.env.MIS_RENDER_PROXY_STRICT === "1";
-  const requireIntegralSignalByEnv = process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL !== "0";
+  const strictProxy = readStrictProxy();
+  const requireIntegralSignalByEnv = readRequireIntegralSignal();
+  const requireScientificFrameByEnv = readRequireScientificFrameByDefault();
   const requiredProvenanceSourcePrefix = readRequiredProvenanceSourcePrefix();
+  const requireScientificFrame =
+    requireScientificFrameByEnv || payload.scienceLane?.requireScientificFrame === true;
+  const enforceScientificFrame = strictProxy || requireScientificFrame;
   const localFallbackAllowed = isLocalFallbackAllowed({
     backendMode,
-    strictProxy,
+    strictProxy: enforceScientificFrame,
     remoteConfigured,
+    requireScientificFrame,
   });
 
   if (remoteConfigured) {
+    const autoStartCandidate = findAutoStartOptixCandidate(endpointCandidates);
+    await ensureAutoStartOptixForCandidate({
+      candidate: autoStartCandidate,
+      appBaseUrl: buildRequestBaseUrl(req),
+      waitMs: 7_000,
+    });
     const attemptErrors: string[] = [];
     for (const candidate of endpointCandidates) {
       try {
         const remote = await proxyRemoteFrame(candidate.frameEndpoint, payload);
-        if (strictProxy && !isScientificRemoteFrame(remote)) {
+        if (enforceScientificFrame && !isScientificRemoteFrame(remote)) {
           throw new Error("remote_mis_non_scientific_response");
         }
+        if (requireScientificFrame && !isFullThreePlusOneGeodesicFrame(remote)) {
+          throw new Error("remote_mis_non_3p1_geodesic_mode");
+        }
+        if (requireScientificFrame && !isResearchGradeRemoteFrame(remote)) {
+          throw new Error("remote_mis_non_research_grade_frame");
+        }
         if (
-          strictProxy &&
+          enforceScientificFrame &&
           !hasRequiredProvenancePrefix(remote, requiredProvenanceSourcePrefix)
         ) {
           throw new Error("remote_mis_provenance_source_prefix_mismatch");
         }
         const requireIntegralSignal =
           payload.scienceLane?.requireIntegralSignal === true ||
-          (strictProxy && requireIntegralSignalByEnv);
+          (strictProxy && requireIntegralSignalByEnv) ||
+          requireScientificFrame;
         if (requireIntegralSignal && !hasIntegralSignalAttachments(remote)) {
           throw new Error("remote_mis_missing_integral_signal_attachments");
         }
@@ -739,6 +1108,11 @@ router.post("/frame", async (req, res) => {
                     : "casimirbot.remote.mis.proxy",
             serviceUrl: candidate.frameEndpoint,
             timestampMs: Date.now(),
+            researchGrade: remote.provenance?.researchGrade === true,
+            scientificTier:
+              remote.provenance?.scientificTier ??
+              remote.diagnostics?.scientificTier ??
+              null,
           },
         };
         return res.json(response);
@@ -767,10 +1141,13 @@ router.post("/frame", async (req, res) => {
     return res.status(502).json({
       error: "mis_proxy_unconfigured",
       message:
-        backendMode === "auto"
-          ? "no remote MIS render endpoint configured"
-          : `required remote MIS render endpoint not configured for backend=${backendMode}`,
+        requireScientificFrame
+          ? "scientific frame requested, but no remote scientific MIS endpoint is configured"
+          : backendMode === "auto"
+            ? "no remote MIS render endpoint configured"
+            : `required remote MIS render endpoint not configured for backend=${backendMode}`,
       backendMode,
+      requireScientificFrame,
       allowLegacyGenericEndpoint,
     });
   }

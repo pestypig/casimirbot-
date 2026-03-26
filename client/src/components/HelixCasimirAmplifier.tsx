@@ -1,4 +1,8 @@
 import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import {
+  NHM2_CAVITY_CONTRACT,
+  resolveNeedleHullMark2CavityViewGeometry,
+} from "@shared/needle-hull-mark2-cavity-contract";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -602,6 +606,24 @@ export default function HelixCasimirAmplifier({
   const sweepRuntime = (pipelineSnapshot as any)?.sweep as SweepRuntime | undefined;
   const sweepActive = !!sweepRuntime?.active;
   const sweepCancelRequested = !!sweepRuntime?.cancelRequested;
+  const cavityViewGeometry = useMemo(
+    () =>
+      resolveNeedleHullMark2CavityViewGeometry(NHM2_CAVITY_CONTRACT, {
+        pocketDiameter_um: Number.isFinite((state as any)?.pocketDiameter_um)
+          ? Number((state as any).pocketDiameter_um)
+          : undefined,
+        sag_nm: Number.isFinite(state?.sag_nm)
+          ? Number(state?.sag_nm)
+          : undefined,
+        gap_nm: Number.isFinite(state?.gap_nm)
+          ? Number(state?.gap_nm)
+          : undefined,
+        diaphragm_thick_um: Number.isFinite((state as any)?.diaphragm_thick_um)
+          ? Number((state as any).diaphragm_thick_um)
+          : undefined,
+      }),
+    [state],
+  );
   const vacuumContract = useVacuumContract({
     id: "helix-casimir",
     label: "Helix Casimir Vacuum",
@@ -1006,7 +1028,10 @@ export default function HelixCasimirAmplifier({
     }
 
     // casimir foundation (unchanged)
-    const gap_m       = Math.max(1e-12, (state.gap_nm ?? 16) * 1e-9);
+    const gap_m = Math.max(
+      1e-12,
+      (state.gap_nm ?? cavityViewGeometry.gap_nm) * 1e-9,
+    );
     const tileA_m2    = (state.tileArea_cm2 ?? 25) * 1e-4;
     const casimir_theory   = -(PI * PI / 720) * HBAR_C / Math.pow(gap_m, 4);
     const casimir_per_tile = casimir_theory * tileA_m2 * gap_m;
@@ -1021,8 +1046,10 @@ export default function HelixCasimirAmplifier({
   const tauCurvBackend = (state as any)?.tauCurv_ms as number | undefined;
     const R_curv_backend_m = (state as any)?.curvatureRadius_m as number | undefined;
     // Geometry estimate from diaphragm aperture (µm) and sag (nm)
-  const D_geom_um = (state as any)?.pocketDiameter_um ?? 2000; // match visual default for geometry estimate
-    const h_nm = (state as any)?.sag_nm ?? 2.9;
+  const D_geom_um = cavityViewGeometry.pocketDiameter_um;
+    const h_nm = Number.isFinite((state as any)?.sag_nm)
+      ? Number((state as any).sag_nm)
+      : cavityViewGeometry.sag_nm;
   const D_m = D_geom_um * 1e-6;
     const h_m = h_nm * 1e-9;
     const R_geom_m = h_m > 0 ? (((D_m / 2) ** 2 + h_m ** 2) / (2 * h_m)) : undefined;
@@ -1093,7 +1120,9 @@ export default function HelixCasimirAmplifier({
   // ───────────────── Experiment-readiness derived values ─────────────────
   // Aperture geometry (bench) — default to 40 µm if not provided, mark as estimate
   const D_um_raw = (state as any)?.pocketDiameter_um;
-  const D_um = Number.isFinite(D_um_raw) ? Number(D_um_raw) : 40; // µm (est default)
+  const D_um = Number.isFinite(D_um_raw)
+    ? Number(D_um_raw)
+    : cavityViewGeometry.pocketDiameter_um;
   const A_ap_m2 = Math.PI * Math.pow((D_um*1e-6)/2, 2);
   const A_ap_is_est = !Number.isFinite(D_um_raw);
   const A_tile_m2 = tileA_m2;
@@ -1185,10 +1214,9 @@ export default function HelixCasimirAmplifier({
     const I_rms = (state as any)?.piezo_Irms_max;
 
   // τ_curv: lock to geometry by default so Timing pill is self-consistent locally
-  const D_um_geo = (state as any)?.pocketDiameter_um ?? 2000;
-  // Use 2.9 nm by default for τ_curv geometry so R ≈ 173 m when D = 2000 µm,
-  // regardless of upstream sag; this keeps the timing pill anchored to the target
-  const h_nm_geo = 2.9;
+  const D_um_geo = cavityViewGeometry.pocketDiameter_um;
+  // Keep local timing geometry aligned with the shared NHM2 cavity contract.
+  const h_nm_geo = cavityViewGeometry.sag_nm;
   const D_m_geo  = D_um_geo * 1e-6;
   const h_m_geo  = h_nm_geo * 1e-9;
   const R_geom_local_m = h_m_geo > 0 ? (((D_m_geo/2)**2 + h_m_geo**2) / (2*h_m_geo)) : undefined;
@@ -2121,13 +2149,10 @@ export default function HelixCasimirAmplifier({
             <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-slate-100"><ScanSearch className="w-4 h-4"/> Pipeline-Driven Cavity Cross-Section</CardTitle></CardHeader>
             <CardContent>
               <CavityFrameView
-                pocketDiameter_um={2000}
-                sag_nm={state.sag_nm ?? 2.9}
-                gap_nm={state.gap_nm ?? 1}
-                topMirror_thick_um={1.5}
-                botMirror_thick_um={1.5}
-                alnRim_width_um={20}
-                tileWidth_mm={Math.max(1, Math.sqrt(Math.max(0, (state.tileArea_cm2 ?? 25))) * 10)}
+                contract={NHM2_CAVITY_CONTRACT}
+                pocketDiameter_um={Number.isFinite((state as any)?.pocketDiameter_um) ? Number((state as any).pocketDiameter_um) : undefined}
+                sag_nm={Number.isFinite(state.sag_nm) ? Number(state.sag_nm) : undefined}
+                gap_nm={Number.isFinite(state.gap_nm) ? Number(state.gap_nm) : undefined}
                 onWindow={!!lc?.onWindow}
                 verticalExaggeration={6000}
                 gapTargetPxFor1nm={10}
@@ -2138,7 +2163,7 @@ export default function HelixCasimirAmplifier({
                 height={220}
                 showChrome={false}
                 sagPhaseSource="modulation"
-                diaphragm_thick_um={(state as any)?.diaphragm_thick_um ?? 1.0}
+                diaphragm_thick_um={Number.isFinite((state as any)?.diaphragm_thick_um) ? Number((state as any).diaphragm_thick_um) : undefined}
                 showRelationsLegend={true}
                 // Physics overlays for explanatory panels
                 gammaGeo={derived.gammaGeo}

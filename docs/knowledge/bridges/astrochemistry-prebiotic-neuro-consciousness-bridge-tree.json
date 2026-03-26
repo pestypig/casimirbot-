@@ -1,0 +1,1341 @@
+{
+  "version": 1,
+  "rootId": "astrochemistry-prebiotic-neuro-consciousness-bridge-root",
+  "claim_tier_policy": {
+    "minimum": "exploratory",
+    "recommended": "diagnostic",
+    "strict_certifying_requires": {
+      "provenance_class": "measured",
+      "claim_tier": "certified"
+    }
+  },
+  "nodes": [
+    {
+      "id": "astrochemistry-prebiotic-neuro-consciousness-bridge-root",
+      "title": "Astrochemistry, Prebiotic Organics, Neurochemistry, And Consciousness Bridge",
+      "summary": "Exploratory bridge inventory connecting stellar carbon chemistry, prebiotic organics, dopamine biology, and speculative consciousness models with explicit maturity separation.",
+      "tags": [
+        "bridge",
+        "astrochemistry",
+        "prebiotic",
+        "neurochemistry",
+        "consciousness",
+        "exploratory"
+      ],
+      "children": [
+        "stellar-carbon-synthesis",
+        "interstellar-aromatic-carbon-chemistry",
+        "interstellar-pah-chemistry",
+        "meteoritic-prebiotic-organic-delivery",
+        "prebiotic-organic-inventory",
+        "terrestrial-catecholamine-biosynthesis",
+        "dopamine-reward-signaling",
+        "quantum-consciousness-hypothesis",
+        "orch-or-hypothesis",
+        "conscious-experience-mapping",
+        "bridge-stellar-carbon-to-astrochemistry",
+        "bridge-astrochemistry-to-prebiotic-organics",
+        "bridge-prebiotic-organics-to-terrestrial-biochemistry",
+        "bridge-terrestrial-biochemistry-to-neural-reward-signaling",
+        "bridge-neural-signaling-to-consciousness-hypotheses",
+        "stellar-plasma-observables-not-consciousness",
+        "sunquake_not_quantum_collapse",
+        "microtubule_time_crystal_status_not_established",
+        "gravity_related_collapse_not_validated_in_biology",
+        "no_validated_bridge_from_stellar_observables_to_orch_or",
+        "orch_or_requires_direct_measurement_contract",
+        "triplet_hierarchy_not_consciousness_evidence",
+        "microtubule_time_crystal_status_not_established_by_standard_criteria",
+        "no_validated_bridge_from_triplet_hierarchy_to_stellar_observables"
+      ],
+      "links": [],
+      "claim_tier": "exploratory",
+      "maturity": "mixed",
+      "falsifiers": [
+        "dopamine_is_not_pah",
+        "no_direct_extraterrestrial_dopamine_evidence",
+        "no_direct_dopamine_orch_or_evidence",
+        "no_teleological_pleasure_optimization_law",
+        "orch_or_not_certified_neuroscience"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/astrochemistry-prebiotic-neuro-consciousness-bridge-plan.md",
+          "scope": "whole",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/astrochemistry-prebiotic-neuro-consciousness-source-catalog-2026-03-25.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "stellar-carbon-synthesis",
+      "nodeType": "concept",
+      "title": "Stellar Carbon Synthesis",
+      "summary": "Carbon production in stellar interiors and enrichment of circumstellar and interstellar material.",
+      "tags": [
+        "astrochemistry",
+        "stellar",
+        "carbon",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "enables",
+          "to": "interstellar-aromatic-carbon-chemistry"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "no_stellar_carbon_production",
+        "no_red_giant_carbon_enrichment"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-carbon-synthesis.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "interstellar-aromatic-carbon-chemistry",
+      "nodeType": "concept",
+      "title": "Interstellar Aromatic Carbon Chemistry",
+      "summary": "Aromatic carbon species in circumstellar and interstellar environments, including benzene and related ring chemistry.",
+      "tags": [
+        "astrochemistry",
+        "aromatic",
+        "interstellar",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "stellar-carbon-synthesis"
+        },
+        {
+          "rel": "enables",
+          "to": "interstellar-pah-chemistry"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "no_interstellar_aromatic_signatures",
+        "no_benzene_in_carbon_rich_evolved_stars"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/interstellar-aromatic-carbon-chemistry.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "interstellar-pah-chemistry",
+      "nodeType": "concept",
+      "title": "Interstellar PAH Chemistry",
+      "summary": "Polycyclic aromatic hydrocarbon families inferred from infrared bands and aromatic-carbon signatures in carbon-rich environments.",
+      "tags": [
+        "astrochemistry",
+        "pah",
+        "aromatic",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "interstellar-aromatic-carbon-chemistry"
+        },
+        {
+          "rel": "constrains",
+          "to": "meteoritic-prebiotic-organic-delivery"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "no_pah_fingerprints_in_uibs",
+        "no_aromatic_hydrocarbon_family_detection"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/interstellar-pah-chemistry.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "meteoritic-prebiotic-organic-delivery",
+      "nodeType": "concept",
+      "title": "Meteoritic Prebiotic Organic Delivery",
+      "summary": "Extraterrestrial delivery of stable prebiotic organic molecules from meteorites and related bodies.",
+      "tags": [
+        "prebiotic",
+        "meteorites",
+        "organic-chemistry",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "interstellar-pah-chemistry"
+        },
+        {
+          "rel": "enables",
+          "to": "prebiotic-organic-inventory"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "no_extraterrestrial_organic_molecules_in_meteorites",
+        "meteorite_organics_explained_by_contamination_only"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/meteoritic-prebiotic-organic-delivery.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "prebiotic-organic-inventory",
+      "nodeType": "concept",
+      "title": "Prebiotic Organic Inventory",
+      "summary": "Catalog of organics plausibly available before biology, including delivered organics and local synthesis products.",
+      "tags": [
+        "prebiotic",
+        "inventory",
+        "chemistry",
+        "reduced-order"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "meteoritic-prebiotic-organic-delivery"
+        },
+        {
+          "rel": "enables",
+          "to": "terrestrial-catecholamine-biosynthesis"
+        }
+      ],
+      "claim_tier": "reduced-order",
+      "maturity": "reduced-order",
+      "falsifiers": [
+        "no_prebiotic_inventory_from_delivered_organics",
+        "inventory_requires_direct_dopamine_inheritance"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/prebiotic-organic-inventory.md",
+          "scope": "whole",
+          "provenance_class": "inferred",
+          "claim_tier": "reduced-order",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "terrestrial-catecholamine-biosynthesis",
+      "nodeType": "concept",
+      "title": "Terrestrial Catecholamine Biosynthesis",
+      "summary": "Tyrosine-to-L-DOPA-to-dopamine biosynthesis in terrestrial biochemistry.",
+      "tags": [
+        "biology",
+        "neurochemistry",
+        "dopamine",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "prebiotic-organic-inventory"
+        },
+        {
+          "rel": "enables",
+          "to": "dopamine-reward-signaling"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "dopamine_not_derived_from_tyrosine",
+        "no_catecholamine_synthesis_path"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/terrestrial-catecholamine-biosynthesis.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "dopamine-reward-signaling",
+      "nodeType": "concept",
+      "title": "Dopamine Reward Signaling",
+      "summary": "Dopamine pathways associated with reward-seeking, motivation, reinforcement, and action selection.",
+      "tags": [
+        "neurochemistry",
+        "reward",
+        "dopamine",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "terrestrial-catecholamine-biosynthesis"
+        },
+        {
+          "rel": "escalates_to",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "dopamine_not_implicated_in_reward_seeking",
+        "reward_signaling_reducible_to_teleological_pleasure_optimization"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dopamine-reward-signaling.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "quantum-consciousness-hypothesis",
+      "nodeType": "concept",
+      "title": "Quantum Consciousness Hypothesis",
+      "summary": "Exploratory family of hypotheses that attempt to relate quantum processes to consciousness.",
+      "tags": [
+        "consciousness",
+        "quantum",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "dopamine-reward-signaling"
+        },
+        {
+          "rel": "escalates_to",
+          "to": "orch-or-hypothesis"
+        }
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_testable_quantum_consciousness_bridge",
+        "no_empirical_support_for_microtubule_coherence_as_consciousness"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-consciousness-hypothesis.md",
+          "scope": "whole",
+          "provenance_class": "inferred",
+          "claim_tier": "exploratory",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "orch-or-hypothesis",
+      "nodeType": "concept",
+      "title": "Orch-OR Hypothesis",
+      "summary": "Specific orchestrated objective reduction proposal by Penrose and Hameroff, retained only as an exploratory consciousness hypothesis.",
+      "tags": [
+        "consciousness",
+        "orch-or",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "quantum-consciousness-hypothesis"
+        }
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "orch_or_supported_as_certified_neuroscience",
+        "microtubule_quantum_computation_not_tested_or_supported"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/orch-or-hypothesis.md",
+          "scope": "whole",
+          "provenance_class": "inferred",
+          "claim_tier": "exploratory",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "conscious-experience-mapping",
+      "nodeType": "concept",
+      "title": "Conscious Experience Mapping",
+      "summary": "Exploratory mapping between physical processes and subjective experience, with no certified identification in the repo.",
+      "tags": [
+        "consciousness",
+        "mapping",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "orch-or-hypothesis"
+        }
+      ],
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "no_reproducible_mapping_between_physical_state_and_phenomenal_report",
+        "phenomenology_routed_as_certified_physics"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/conscious-experience-mapping.md",
+          "scope": "whole",
+          "provenance_class": "inferred",
+          "claim_tier": "exploratory",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "bridge-stellar-carbon-to-astrochemistry",
+      "nodeType": "bridge",
+      "title": "Bridge Stellar Carbon To Astrochemistry",
+      "summary": "Diagnostic bridge from stellar carbon synthesis into aromatic astrochemistry.",
+      "tags": [
+        "bridge",
+        "stellar",
+        "astrochemistry",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "stellar-carbon-synthesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "interstellar-aromatic-carbon-chemistry"
+        },
+        {
+          "rel": "enables",
+          "to": "interstellar-aromatic-carbon-chemistry"
+        }
+      ],
+      "bridge": {
+        "left": "stellar-carbon-synthesis",
+        "right": "interstellar-aromatic-carbon-chemistry",
+        "relation": "enables"
+      },
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "bridge_left_invalid",
+        "bridge_right_invalid"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-carbon-synthesis.md",
+          "scope": "left",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/interstellar-aromatic-carbon-chemistry.md",
+          "scope": "right",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "bridge-astrochemistry-to-prebiotic-organics",
+      "nodeType": "bridge",
+      "title": "Bridge Astrochemistry To Prebiotic Organics",
+      "summary": "Diagnostic bridge from aromatic astrochemistry into the prebiotic organic inventory.",
+      "tags": [
+        "bridge",
+        "astrochemistry",
+        "prebiotic",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "interstellar-pah-chemistry"
+        },
+        {
+          "rel": "see-also",
+          "to": "prebiotic-organic-inventory"
+        },
+        {
+          "rel": "constrains",
+          "to": "prebiotic-organic-inventory"
+        }
+      ],
+      "bridge": {
+        "left": "interstellar-pah-chemistry",
+        "right": "prebiotic-organic-inventory",
+        "relation": "constrains"
+      },
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "bridge_left_invalid",
+        "bridge_right_invalid"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/interstellar-pah-chemistry.md",
+          "scope": "left",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/prebiotic-organic-inventory.md",
+          "scope": "right",
+          "provenance_class": "inferred",
+          "claim_tier": "reduced-order",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "bridge-prebiotic-organics-to-terrestrial-biochemistry",
+      "nodeType": "bridge",
+      "title": "Bridge Prebiotic Organics To Terrestrial Biochemistry",
+      "summary": "Bridge from organic inventories to terrestrial biosynthetic chemistry.",
+      "tags": [
+        "bridge",
+        "prebiotic",
+        "biology",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "prebiotic-organic-inventory"
+        },
+        {
+          "rel": "see-also",
+          "to": "terrestrial-catecholamine-biosynthesis"
+        },
+        {
+          "rel": "enables",
+          "to": "terrestrial-catecholamine-biosynthesis"
+        }
+      ],
+      "bridge": {
+        "left": "prebiotic-organic-inventory",
+        "right": "terrestrial-catecholamine-biosynthesis",
+        "relation": "enables"
+      },
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "bridge_left_invalid",
+        "bridge_right_invalid"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/prebiotic-organic-inventory.md",
+          "scope": "left",
+          "provenance_class": "inferred",
+          "claim_tier": "reduced-order",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/terrestrial-catecholamine-biosynthesis.md",
+          "scope": "right",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "bridge-terrestrial-biochemistry-to-neural-reward-signaling",
+      "nodeType": "bridge",
+      "title": "Bridge Terrestrial Biochemistry To Neural Reward Signaling",
+      "summary": "Diagnostic bridge from dopamine biosynthesis to reward-seeking neural signaling.",
+      "tags": [
+        "bridge",
+        "biology",
+        "neurochemistry",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "terrestrial-catecholamine-biosynthesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "dopamine-reward-signaling"
+        },
+        {
+          "rel": "enables",
+          "to": "dopamine-reward-signaling"
+        }
+      ],
+      "bridge": {
+        "left": "terrestrial-catecholamine-biosynthesis",
+        "right": "dopamine-reward-signaling",
+        "relation": "enables"
+      },
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "bridge_left_invalid",
+        "bridge_right_invalid"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/terrestrial-catecholamine-biosynthesis.md",
+          "scope": "left",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dopamine-reward-signaling.md",
+          "scope": "right",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "bridge-neural-signaling-to-consciousness-hypotheses",
+      "nodeType": "bridge",
+      "title": "Bridge Neural Signaling To Consciousness Hypotheses",
+      "summary": "Exploratory bridge from reward-signaling neuroscience into speculative consciousness hypotheses.",
+      "tags": [
+        "bridge",
+        "neurochemistry",
+        "consciousness",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "dopamine-reward-signaling"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "escalates_to",
+          "to": "quantum-consciousness-hypothesis"
+        }
+      ],
+      "bridge": {
+        "left": "dopamine-reward-signaling",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "escalates_to"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "bridge_left_invalid",
+        "bridge_right_invalid",
+        "no_empirical_path_from_reward_signaling_to_consciousness_model"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/dopamine-reward-signaling.md",
+          "scope": "left",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/quantum-consciousness-hypothesis.md",
+          "scope": "right",
+          "provenance_class": "inferred",
+          "claim_tier": "exploratory",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "stellar-plasma-observables-not-consciousness",
+      "nodeType": "bridge",
+      "title": "Stellar Plasma Observables Not Consciousness",
+      "summary": "Boundary node that keeps stellar oscillation, dynamo, reconnection, and flare observables inside the stellar-observables lane rather than upgrading them into consciousness evidence.",
+      "tags": [
+        "bridge",
+        "stellar",
+        "guardrail",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "stellar-structure-nucleosynthesis",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "stellar_plasma_observables_upgrade_to_consciousness",
+        "no_stellar_plasma_to_certified_consciousness_bridge"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/gravitating-matter-observables-overlap-implementation-plan.md",
+          "scope": "stellar-observables-boundary",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/astrochemistry-prebiotic-neuro-consciousness-source-catalog-2026-03-25.md",
+          "scope": "stellar-observables-addendum",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "sunquake_not_quantum_collapse",
+      "nodeType": "bridge",
+      "title": "Sunquake Not Quantum Collapse",
+      "summary": "Boundary node that keeps sunquake, granulation, quasi-periodic flare, and magnetic-striation observables inside the stellar-observables lane rather than upgrading them into collapse evidence.",
+      "tags": [
+        "bridge",
+        "stellar",
+        "guardrail",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "stellar-plasma-observables-not-consciousness"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "physics-stellar-structure-nucleosynthesis-tree",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "sunquake_promoted_to_quantum_collapse",
+        "flare_timing_promoted_to_consciousness",
+        "no_stellar_observable_to_collapse_bridge"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/granular-tidal-sunquake-bridge-plan.md",
+          "scope": "sunquake-guardrail",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/stellar-consciousness-ii-method-review-2026-03-25.md",
+          "scope": "sunquake-method-triage",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "microtubule_time_crystal_status_not_established",
+      "nodeType": "bridge",
+      "title": "Microtubule Time-Crystal Status Not Established",
+      "summary": "Boundary node that keeps microtubule resonance, triplet-band, and polyatomic time-crystal claims in the exploratory lane until standard time-crystal criteria and independent replication are satisfied.",
+      "tags": [
+        "bridge",
+        "microtubule",
+        "time-crystal",
+        "guardrail",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "orch-or-hypothesis",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "microtubule_time_crystal_claim_requires_standard_criteria",
+        "microtubule_time_crystal_claim_requires_independent_replication",
+        "microtubule_triplet_pattern_not_experimental_time_crystal"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "microtubule-time-crystal-boundary",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+          "scope": "microtubule-time-crystal-source-packet",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "gravity_related_collapse_not_validated_in_biology",
+      "nodeType": "bridge",
+      "title": "Gravity Related Collapse Not Validated In Biology",
+      "summary": "Boundary node that keeps Penrose-style and Diósi-style collapse models exploratory when mapped onto biological observables.",
+      "tags": [
+        "bridge",
+        "gravity",
+        "collapse",
+        "biology",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "orch-or-hypothesis",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "gravity_related_collapse_claim_requires_experimental_bounds",
+        "no_direct_biological_validation_of_gravity_collapse",
+        "collapse_timescale_not_established_in_microtubule_systems"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "gravity-collapse-boundary",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+          "scope": "gravity-collapse-source-packet",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "no_validated_bridge_from_stellar_observables_to_orch_or",
+      "nodeType": "bridge",
+      "title": "No Validated Bridge From Stellar Observables To Orch-OR",
+      "summary": "Boundary node that prevents solar flare, sunquake, and granulation observables from being upgraded into Orch-OR or consciousness evidence.",
+      "tags": [
+        "bridge",
+        "stellar",
+        "orch-or",
+        "guardrail",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "stellar-plasma-observables-not-consciousness"
+        },
+        {
+          "rel": "see-also",
+          "to": "sunquake_not_quantum_collapse"
+        },
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "stellar-plasma-observables-not-consciousness",
+        "right": "orch-or-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "stellar_observables_to_orch_or_bridge_requires_direct_measurement",
+        "sunquake_promoted_to_consciousness_evidence",
+        "no_validated_solar_bridge_to_orch_or"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "stellar-to-orchor-boundary",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/stellar-consciousness-ii-method-review-2026-03-25.md",
+          "scope": "stellar-method-triage",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "orch_or_requires_direct_measurement_contract",
+      "nodeType": "bridge",
+      "title": "Orch-OR Requires Direct Measurement Contract",
+      "summary": "Boundary node that keeps Orch-OR claims tied to explicit measurement contracts instead of analogy or narrative alignment.",
+      "tags": [
+        "bridge",
+        "orch-or",
+        "measurement",
+        "guardrail",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "orch-or-hypothesis",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "requires_measurement"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "orch_or_claim_without_direct_measurement_contract",
+        "orch_or_requires_replayable_observables",
+        "no_direct_microtubule_measurement_no_promotion"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "orch-or-measurement-contract",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/orch-or-time-crystal-source-packet-2026-03-25.md",
+          "scope": "orch-or-core-and-critique",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "triplet_hierarchy_not_consciousness_evidence",
+      "nodeType": "bridge",
+      "title": "Triplet Hierarchy Not Consciousness Evidence",
+      "summary": "Boundary node that keeps triplet-band and scale-free resonance claims from being promoted into consciousness evidence.",
+      "tags": [
+        "bridge",
+        "triplet",
+        "microtubule",
+        "consciousness",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "orch-or-hypothesis",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "triplet_hierarchy_not_consciousness_evidence",
+        "triplet_band_pattern_not_experimental_time_crystal",
+        "no_validated_bridge_from_triplet_hierarchy_to_stellar_observables"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "triplet-hierarchy-boundary",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md",
+          "scope": "triplet-hierarchy-triage",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "microtubule_time_crystal_status_not_established_by_standard_criteria",
+      "nodeType": "bridge",
+      "title": "Microtubule Time-Crystal Status Not Established By Standard Criteria",
+      "summary": "Boundary node that requires strict time-crystal criteria and replication before microtubule resonance claims can be treated as more than an exploratory hypothesis.",
+      "tags": [
+        "bridge",
+        "microtubule",
+        "time-crystal",
+        "criteria",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "see-also",
+          "to": "quantum-consciousness-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "orch-or-hypothesis",
+        "right": "quantum-consciousness-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "microtubule_time_crystal_claim_requires_standard_criteria",
+        "microtubule_time_crystal_claim_requires_independent_replication",
+        "microtubule_time_crystal_status_not_established"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "microtubule-time-crystal-criteria",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md",
+          "scope": "microtubule-time-crystal-triage",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "no_validated_bridge_from_triplet_hierarchy_to_stellar_observables",
+      "nodeType": "bridge",
+      "title": "No Validated Bridge From Triplet Hierarchy To Stellar Observables",
+      "summary": "Boundary node that blocks any leap from triplet-band microtubule resonance to stellar-observable or sunquake evidence.",
+      "tags": [
+        "bridge",
+        "triplet",
+        "stellar",
+        "guardrail",
+        "exploratory"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "stellar-plasma-observables-not-consciousness"
+        },
+        {
+          "rel": "see-also",
+          "to": "sunquake_not_quantum_collapse"
+        },
+        {
+          "rel": "see-also",
+          "to": "orch-or-hypothesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "conscious-experience-mapping"
+        }
+      ],
+      "bridge": {
+        "left": "stellar-plasma-observables-not-consciousness",
+        "right": "orch-or-hypothesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "exploratory",
+      "maturity": "exploratory",
+      "falsifiers": [
+        "triplet_hierarchy_promoted_to_stellar_observables",
+        "no_validated_bridge_from_triplet_hierarchy_to_stellar_observables",
+        "stellar_observables_not_reinterpretable_as_microtubule_triplet_evidence"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/orch-or-time-crystal-research-packet.md",
+          "scope": "triplet-to-stellar-boundary",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/stellar-consciousness-ii-method-review-2026-03-25.md",
+          "scope": "triplet-to-stellar-triage",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/audits/research/bandyopadhyay-triplet-hierarchy-triage-2026-03-25.md",
+          "scope": "triplet-to-stellar-triage",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    }
+  ]
+}

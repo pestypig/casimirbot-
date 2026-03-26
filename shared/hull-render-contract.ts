@@ -2,6 +2,16 @@ export type HullRendererBackendMode = "webgl" | "webgpu" | "mis-service";
 
 export type HullRenderSkyboxMode = "off" | "flat" | "geodesic";
 
+export type HullMetricVolumeRefV1 = {
+  kind: "gr-evolve-brick";
+  url: string;
+  source?: string | null;
+  chart?: string | null;
+  dims?: [number, number, number] | null;
+  updatedAt?: number | null;
+  hash?: string | null;
+};
+
 export type HullMisRenderRequestV1 = {
   version: 1;
   requestId?: string;
@@ -13,6 +23,7 @@ export type HullMisRenderRequestV1 = {
   skyboxMode?: HullRenderSkyboxMode;
   scienceLane?: {
     requireIntegralSignal?: boolean;
+    requireScientificFrame?: boolean;
     attachmentDownsample?: number;
   };
   solve?: {
@@ -37,6 +48,7 @@ export type HullMisRenderRequestV1 = {
     consistency?: "ok" | "warn" | "fail" | "unknown";
     updatedAt?: number | null;
   };
+  metricVolumeRef?: HullMetricVolumeRefV1 | null;
 };
 
 export type HullMisRenderAttachmentKind =
@@ -69,10 +81,13 @@ export type HullMisRenderResponseV1 = {
     maxNullResidual?: number | null;
     stepConvergence?: number | null;
     bundleSpread?: number | null;
+    scientificTier?: "research-grade" | "teaching" | "scaffold" | "unknown" | null;
   };
   provenance?: {
     source: string;
     serviceUrl?: string | null;
     timestampMs: number;
+    researchGrade?: boolean;
+    scientificTier?: "research-grade" | "teaching" | "scaffold" | "unknown" | null;
   };
 };

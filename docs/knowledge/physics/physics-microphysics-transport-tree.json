@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "rootId": "physics-microphysics-transport-tree",
+  "nodes": [
+    {
+      "id": "physics-microphysics-transport-tree",
+      "slug": "physics-microphysics-transport-tree",
+      "title": "Physics Microphysics Transport Tree",
+      "excerpt": "Shared parent lane for effective microphysics, Hamiltonian formalisms, kinetic closure, constitutive response, and collective observables.",
+      "bodyMD": "This lane captures the shared parent backbone that connects particle physics, effective microphysics, interaction Hamiltonians, many-body and kinetic descriptions, transport or constitutive closure, and observable-scale response. It is the parent surface for the granular-tidal and stellar flare-to-sunquake branches.",
+      "tags": ["physics", "microphysics", "transport", "hamiltonian"],
+      "children": [
+        "physics-microphysics-transport-effective-microphysics-definition",
+        "physics-microphysics-transport-effective-interaction-hamiltonian-definition",
+        "physics-microphysics-transport-many-body-hamiltonian-definition",
+        "physics-microphysics-transport-kinetic-theory-definition",
+        "physics-microphysics-transport-kinetic-transport-closure-definition",
+        "physics-microphysics-transport-constitutive-response-definition",
+        "physics-microphysics-transport-plasma-transport-closure-definition",
+        "physics-microphysics-transport-collective-observable-response-definition"
+      ],
+      "links": [
+        { "rel": "see-also", "to": "physics-thermodynamics-entropy-tree", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "see-also", "to": "physics-self-gravity-shape-tree", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "see-also", "to": "physics-stellar-structure-nucleosynthesis-tree", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "see-also", "to": "physics-quantum-semiclassical-tree", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Shared parent lane for effective microphysics, Hamiltonian formalisms, kinetic closure, constitutive response, and collective observables.",
+      "nodeType": "concept",
+      "dependencies": [],
+      "evidence": [
+        { "type": "doc", "path": "docs/knowledge/physics/effective-microphysics.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/effective-interaction-hamiltonian.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/kinetic-theory-closure.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/constitutive-response.md" },
+        { "type": "doc", "path": "docs/knowledge/physics/plasma-transport-closure.md" }
+      ]
+    },
+    {
+      "id": "physics-microphysics-transport-effective-microphysics-definition",
+      "slug": "physics-microphysics-transport-effective-microphysics-definition",
+      "title": "Effective Microphysics Definition",
+      "excerpt": "Definition-level anchor for reduced microphysical parameters such as potentials, rates, and transport coefficients.",
+      "bodyMD": "This node anchors the reduction from particle-level physics to effective parameters such as interaction potentials, collision rates, opacity, conductivity, elasticity, and friction. It is the entry point for turning microscopic interactions into usable bulk coefficients.",
+      "tags": ["physics", "microphysics", "definition", "effective", "transport"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-effective-interaction-hamiltonian-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for reduced microphysical parameters and transport coefficients.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "effective_microphysics_from_interactions",
+        "claim_ids": ["claim:microphysics.transport:effective_microphysics"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/effective-microphysics.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-effective-interaction-hamiltonian-definition",
+      "slug": "physics-microphysics-transport-effective-interaction-hamiltonian-definition",
+      "title": "Effective Interaction Hamiltonian Definition",
+      "excerpt": "Definition-level anchor for the reduced Hamiltonian describing interactions after microscopic elimination.",
+      "bodyMD": "This node anchors the effective Hamiltonian that packages conservative interactions at the coarse-grained level. It is the reduced interaction backbone for fluids, solids, granular aggregates, and plasmas before dissipation and closure are added.",
+      "tags": ["physics", "hamiltonian", "definition", "effective", "interactions"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "depends_on", "to": "physics-microphysics-transport-effective-microphysics-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-many-body-hamiltonian-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for the reduced Hamiltonian describing interactions after microscopic elimination.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "effective_interaction_hamiltonian_with_external_potential",
+        "claim_ids": ["claim:microphysics.transport:effective_interaction_hamiltonian"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/effective-interaction-hamiltonian.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-many-body-hamiltonian-definition",
+      "slug": "physics-microphysics-transport-many-body-hamiltonian-definition",
+      "title": "Many-Body Hamiltonian Definition",
+      "excerpt": "Definition-level anchor for the N-body Hamiltonian with internal and external potentials.",
+      "bodyMD": "This node anchors the many-body Hamiltonian description used by statistical mechanics and kinetic theory. It is the bridge where pair interactions and external potentials become a tractable ensemble-level model.",
+      "tags": ["physics", "hamiltonian", "definition", "many-body", "ensemble"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "depends_on", "to": "physics-microphysics-transport-effective-interaction-hamiltonian-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-kinetic-theory-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-constitutive-response-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for the N-body Hamiltonian with internal and external potentials.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "many_body_partition_function_definition",
+        "claim_ids": ["claim:microphysics.transport:many_body_hamiltonian"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/kinetic-theory-closure.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-kinetic-theory-definition",
+      "slug": "physics-microphysics-transport-kinetic-theory-definition",
+      "title": "Kinetic Theory Definition",
+      "excerpt": "Definition-level anchor for distribution-function dynamics and collision hierarchies.",
+      "bodyMD": "This node anchors the kinetic-theory representation of many-body systems, where one-particle distributions, collision terms, and hierarchy truncations replace the full microscopic state. It is the route into transport closure and non-equilibrium response.",
+      "tags": ["physics", "kinetic-theory", "definition", "distribution", "transport"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "depends_on", "to": "physics-microphysics-transport-many-body-hamiltonian-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-kinetic-transport-closure-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-plasma-transport-closure-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for distribution-function dynamics and collision hierarchies.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "kinetic_moment_closure_definition",
+        "claim_ids": ["claim:microphysics.transport:kinetic_theory"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/kinetic-theory-closure.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-kinetic-transport-closure-definition",
+      "slug": "physics-microphysics-transport-kinetic-transport-closure-definition",
+      "title": "Kinetic Transport Closure Definition",
+      "excerpt": "Definition-level anchor for closing kinetic hierarchies into transport coefficients and source terms.",
+      "bodyMD": "This node anchors the step where kinetic hierarchies are closed into practical transport coefficients, damping terms, diffusion, or source terms. It is the generic non-equilibrium closure used before the lane becomes granular or plasma specific.",
+      "tags": ["physics", "transport", "definition", "kinetic", "closure"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "depends_on", "to": "physics-microphysics-transport-kinetic-theory-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-plasma-transport-closure-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-collective-observable-response-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for closing kinetic hierarchies into transport coefficients and source terms.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "kinetic_transport_closure_equation",
+        "claim_ids": ["claim:microphysics.transport:kinetic_transport_closure"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/kinetic-theory-closure.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-constitutive-response-definition",
+      "slug": "physics-microphysics-transport-constitutive-response-definition",
+      "title": "Constitutive Response Definition",
+      "excerpt": "Definition-level anchor for material closure such as equation of state, strength, viscosity, and friction.",
+      "bodyMD": "This node anchors the constitutive closure that turns microphysical interactions into bulk material response. It includes equation of state, compressibility, yield strength, viscosity, elasticity, and friction where those are the relevant reduced variables.",
+      "tags": ["physics", "constitutive", "definition", "response", "material"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "depends_on", "to": "physics-microphysics-transport-many-body-hamiltonian-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-collective-observable-response-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for bulk material response closure.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "constitutive_response_closure",
+        "claim_ids": ["claim:microphysics.transport:constitutive_response"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/constitutive-response.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-plasma-transport-closure-definition",
+      "slug": "physics-microphysics-transport-plasma-transport-closure-definition",
+      "title": "Plasma Transport Closure Definition",
+      "excerpt": "Definition-level anchor for plasma transport, resistivity, opacity, and MHD closure.",
+      "bodyMD": "This node anchors the transport closure used in plasma systems, including conductivity, resistivity, opacity, diffusion, and MHD-to-fluid reduction. It is the bridge into stellar flare, nanoflare, and sunquake observables.",
+      "tags": ["physics", "plasma", "definition", "transport", "closure"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "depends_on", "to": "physics-microphysics-transport-kinetic-transport-closure-definition", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-microphysics-transport-collective-observable-response-definition", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for plasma transport and MHD closure.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "plasma_transport_energy_closure",
+        "claim_ids": ["claim:microphysics.transport:plasma_transport_closure"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/plasma-transport-closure.md" }]
+    },
+    {
+      "id": "physics-microphysics-transport-collective-observable-response-definition",
+      "slug": "physics-microphysics-transport-collective-observable-response-definition",
+      "title": "Collective Observable Response Definition",
+      "excerpt": "Definition-level anchor for observable-scale response from closed microphysical and transport models.",
+      "bodyMD": "This node anchors the final step where closure-level physics produces observable response in shape, spin, tidal lag, flare power, wave excitation, or other measurable outputs. It is the shared endpoint used by the granular-tidal and stellar flare-to-sunquake branches.",
+      "tags": ["physics", "observables", "definition", "response", "collective"],
+      "children": [],
+      "links": [
+        { "rel": "parent", "to": "physics-microphysics-transport-tree", "edgeType": "hierarchy", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-self-gravity-shape-granular-tidal-response-diagnostic", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic", "edgeType": "association", "requiresCL": "none" },
+        { "rel": "supports", "to": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic", "edgeType": "association", "requiresCL": "none" }
+      ],
+      "summary": "Definition-level anchor for observable-scale response from closed microphysical and transport models.",
+      "nodeType": "definition",
+      "dependencies": ["physics-microphysics-transport-tree"],
+      "validity": {
+        "equation_ref": "collective_observable_response_closure",
+        "claim_ids": ["claim:microphysics.transport:collective_observable_response"]
+      },
+      "evidence": [{ "type": "doc", "path": "docs/knowledge/physics/effective-microphysics.md" }]
+    }
+  ],
+  "schema": { "name": "helix-ask-dag-node", "version": 1 }
+}

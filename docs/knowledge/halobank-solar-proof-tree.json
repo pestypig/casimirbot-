@@ -6,167 +6,1387 @@
     {
       "id": "halobank-solar-proof-root",
       "title": "HaloBank Relativistic Solar Proof Lane",
-      "tags": ["halobank", "solar", "ephemeris", "proof", "determinism"],
+      "tags": [
+        "halobank",
+        "solar",
+        "ephemeris",
+        "proof",
+        "determinism"
+      ],
       "bodyMD": "Deterministic evidence-gated lane for vectors/time-scales and derived solar proofs.",
       "children": [
         "halobank-solar-state-core",
         "halobank-solar-time-core",
         "halobank-solar-metric-context",
+        "halobank-solar-reference-frame",
+        "halobank-solar-time-scale",
+        "halobank-solar-observer-context",
+        "halobank-solar-signal-path",
+        "bridge-halobank-solar-foundations-gr",
+        "bridge-halobank-solar-terrestrial-forcing",
         "halobank-solar-proof-mercury",
         "halobank-solar-proof-null-geodesic",
         "halobank-solar-proof-inner-parity",
+        "halobank-solar-proof-mercury-congruence",
+        "halobank-solar-proof-earth-orientation",
         "halobank-solar-proof-eclipse",
         "halobank-solar-proof-resonance",
         "halobank-solar-proof-jovian",
-        "halobank-solar-proof-local-rest-anchor"
+        "halobank-solar-proof-local-rest-anchor",
+        "bridge-halobank-solar-granular-microphysics-backbone",
+        "bridge-halobank-solar-stellar-transport-backbone"
       ]
     },
     {
       "id": "halobank-solar-state-core",
       "title": "State Core Contract",
-      "tags": ["ephemeris", "bcrs", "gcrs", "state-core"],
+      "tags": [
+        "ephemeris",
+        "bcrs",
+        "gcrs",
+        "state-core"
+      ],
       "bodyMD": "Vectors endpoint returns deterministic states, provenance, gate verdict, and artifact refs under strict provenance semantics.",
       "links": [
-        { "to": "halobank-solar-time-core", "rel": "supports" }
+        {
+          "to": "halobank-solar-time-core",
+          "rel": "supports"
+        }
       ],
       "evidence": [
-        { "type": "code", "path": "server/routes/halobank-solar.ts", "contains": "/horizons/vectors" },
-        { "type": "code", "path": "server/modules/halobank-solar/ephemeris-core.ts", "contains": "buildSolarVectorBundle" },
-        { "type": "test", "path": "tests/halobank-solar-routes.spec.ts", "contains": "halobank solar vectors route" }
+        {
+          "type": "code",
+          "path": "server/routes/halobank-solar.ts",
+          "contains": "/horizons/vectors"
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/ephemeris-core.ts",
+          "contains": "buildSolarVectorBundle"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-routes.spec.ts",
+          "contains": "halobank solar vectors route"
+        }
       ]
     },
     {
       "id": "halobank-solar-time-core",
       "title": "Time Core Contract",
-      "tags": ["time-scale", "utc", "tt", "tdb", "tcb"],
+      "tags": [
+        "time-scale",
+        "utc",
+        "tt",
+        "tdb",
+        "tcb"
+      ],
       "bodyMD": "Time-scale outputs explicitly include UTC/TAI/TT/TDB/TCB offsets with deterministic conversions.",
       "links": [
-        { "to": "halobank-solar-state-core", "rel": "parent" }
+        {
+          "to": "halobank-solar-state-core",
+          "rel": "parent"
+        }
       ],
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/time-core.ts", "contains": "computeSolarTimeScales" },
-        { "type": "test", "path": "tests/halobank-solar-routes.spec.ts", "contains": "time_scales" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/time-core.ts",
+          "contains": "computeSolarTimeScales"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-routes.spec.ts",
+          "contains": "time_scales"
+        }
       ]
     },
     {
       "id": "halobank-solar-metric-context",
       "title": "Inner Solar Metric Context",
-      "tags": ["metric", "bcrs", "gcrs", "weak-field", "ppn"],
+      "tags": [
+        "metric",
+        "bcrs",
+        "gcrs",
+        "weak-field",
+        "ppn"
+      ],
       "bodyMD": "The vectors and derived proof routes carry a pinned weak-field BCRS/GCRS metric-context contract with explicit PN/GR model id, time-scale semantics, and source potentials used.",
       "links": [
-        { "to": "halobank-solar-state-core", "rel": "supports" },
-        { "to": "halobank-solar-time-core", "rel": "supports" }
+        {
+          "to": "halobank-solar-state-core",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-time-core",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-reference-frame",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-time-scale",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-observer-context",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-signal-path",
+          "rel": "supports"
+        },
+        {
+          "to": "bridge-halobank-solar-foundations-gr",
+          "rel": "supports"
+        },
+        {
+          "to": "physics-foundations-metric-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-field-equation-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-stress-energy-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "halobank-solar-proof-null-geodesic",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-inner-parity",
+          "rel": "supports"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-foundations-metric-definition"
+        }
       ],
       "evidence": [
-        { "type": "config", "path": "configs/halobank-solar-metric-context.v1.json", "contains": "halobank.solar.iau2000b1.3-weak-field-ppn-gr/1" },
-        { "type": "code", "path": "server/routes/halobank-solar.ts", "contains": "metric_context" },
-        { "type": "test", "path": "tests/halobank-solar-routes.spec.ts", "contains": "metric_context" }
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-metric-context.v1.json",
+          "contains": "halobank.solar.iau2000b1.3-weak-field-ppn-gr/1"
+        },
+        {
+          "type": "code",
+          "path": "server/routes/halobank-solar.ts",
+          "contains": "metric_context"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-routes.spec.ts",
+          "contains": "metric_context"
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-reference-frame",
+      "title": "Reference Frame Definition",
+      "tags": [
+        "definition",
+        "reference-frame",
+        "bcrs",
+        "gcrs",
+        "icrs"
+      ],
+      "bodyMD": "HaloBank solar states are expressed in explicit BCRS/GCRS reference frames with declared target-minus-reference semantics; resolved-center provenance prevents accidental treatment of reported speeds as absolute motion.",
+      "links": [
+        {
+          "to": "halobank-solar-state-core",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-metric-context",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-mercury",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-null-geodesic",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-eclipse",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-resonance",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-jovian",
+          "rel": "supports"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-foundations-metric-definition"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/types.ts",
+          "contains": "export type SolarFrame = \"BCRS\" | \"GCRS\";"
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/types.ts",
+          "contains": "relation: \"target_minus_reference\";"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-routes.spec.ts",
+          "contains": "reference?.relation"
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-time-scale",
+      "title": "Time Scale Definition",
+      "tags": [
+        "definition",
+        "time-scale",
+        "utc",
+        "tai",
+        "tt",
+        "tdb",
+        "tcb",
+        "tcg"
+      ],
+      "bodyMD": "HaloBank separates civil, terrestrial, geocentric, and barycentric time scales explicitly so every state, observer, and proof result can be replayed against a declared temporal contract rather than an implicit clock.",
+      "links": [
+        {
+          "to": "halobank-solar-time-core",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-metric-context",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-mercury",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-null-geodesic",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-eclipse",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-resonance",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-jovian",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-local-rest-anchor",
+          "rel": "supports"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-foundations-units-definition"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/time-core.ts",
+          "contains": "computeSolarTimeScales"
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/types.ts",
+          "contains": "export type SolarTimeScales = {"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-routes.spec.ts",
+          "contains": "time_scales?.utc"
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-observer-context",
+      "title": "Observer Context Definition",
+      "tags": [
+        "definition",
+        "observer",
+        "proper-time",
+        "geocenter",
+        "body-fixed"
+      ],
+      "bodyMD": "Observer context is an explicit runtime contract: geocenter and supported Earth body-fixed observers are resolved into a declared observer state, while unsupported orientation models fail deterministically with a replay-safe warning code.",
+      "links": [
+        {
+          "to": "halobank-solar-state-core",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-metric-context",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-signal-path",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-null-geodesic",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-eclipse",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-jovian",
+          "rel": "supports"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/types.ts",
+          "contains": "export type SolarObserver ="
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "resolveNullProbeObserver"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "observer_context?.mode"
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-signal-path",
+      "title": "Signal Path Definition",
+      "tags": [
+        "definition",
+        "signal-path",
+        "light-time",
+        "aberration",
+        "null-geodesic",
+        "line-of-sight"
+      ],
+      "bodyMD": "Light propagation is treated as a first-class derived contract. Null-geodesic and line-of-sight observables record the evaluated signal path, allowing source occultation, light-time, Shapiro-delay, and apparent-geometry checks to share one auditable path definition.",
+      "links": [
+        {
+          "to": "halobank-solar-observer-context",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-metric-context",
+          "rel": "supports"
+        },
+        {
+          "to": "bridge-halobank-solar-foundations-gr",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-null-geodesic",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-eclipse",
+          "rel": "supports"
+        },
+        {
+          "to": "halobank-solar-proof-jovian",
+          "rel": "supports"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-foundations-field-equation-definition"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-foundations-stress-energy-definition"
+        }
+      ],
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "signal_path: {"
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runSolarLightDeflection"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "signal_path?.geometry_mode"
+        }
+      ]
+    },
+    {
+      "id": "bridge-halobank-solar-foundations-gr",
+      "title": "HaloBank Solar <-> GR Foundations Bridge",
+      "tags": [
+        "bridge",
+        "general-relativity",
+        "weak-field",
+        "solar",
+        "foundations"
+      ],
+      "nodeType": "bridge",
+      "bodyMD": "Bridge linking HaloBank's pinned weak-field solar metric context to the shared GR foundations lane. The solar Mercury and null-geodesic diagnostics are reduced-order descendants of the repo's metric, field-equation, and stress-energy definitions rather than a separate gravity framework.",
+      "links": [
+        {
+          "to": "halobank-solar-proof-root",
+          "rel": "parent"
+        },
+        {
+          "to": "halobank-solar-metric-context",
+          "rel": "see-also"
+        },
+        {
+          "to": "halobank-solar-proof-mercury",
+          "rel": "see-also"
+        },
+        {
+          "to": "halobank-solar-proof-null-geodesic",
+          "rel": "see-also"
+        },
+        {
+          "to": "halobank-solar-proof-inner-parity",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-metric-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-field-equation-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-stress-energy-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-units-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-foundations-viability-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "bridge-field-equations-stack-stress-energy-stack",
+          "rel": "see-also"
+        }
+      ],
+      "bridge": {
+        "left": "halobank-solar-metric-context",
+        "right": "physics-foundations-field-equation-definition",
+        "relation": "HaloBank's solar weak-field metric lane is a reduced-order descendant of the shared GR field-equation and stress-energy foundation."
+      },
+      "validity": {
+        "claim_ids": [
+          "claim:halobank.solar:gr_foundations_bridge"
+        ],
+        "equation_ref": "efe_baseline"
+      },
+      "evidence": [
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-metric-context.v1.json",
+          "contains": "\"theory\": \"general_relativity\""
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/einstein-field-equations.md",
+          "contains": "Definition: The Einstein field equations relate curvature"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stress-energy-tensor.md",
+          "contains": "Definition: The stress-energy tensor"
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "relativisticMercuryPrecessionArcsecPerCentury"
+        }
+      ]
+    },
+    {
+      "id": "bridge-halobank-solar-terrestrial-forcing",
+      "title": "HaloBank Solar <-> Terrestrial Forcing Bridge",
+      "tags": [
+        "bridge",
+        "solar",
+        "moon",
+        "tides",
+        "precession"
+      ],
+      "nodeType": "bridge",
+      "bodyMD": "Bridge linking HaloBank's deterministic Sun/Moon state and time-scale outputs to the terrestrial gravitational-response lane. HaloBank provides forcing geometry and timing inputs for tide-generating-potential, eclipse, and Earth-orientation studies, but it is not by itself a hydrodynamic tide solver or a certified Earth-orientation model.",
+      "links": [
+        {
+          "to": "halobank-solar-proof-root",
+          "rel": "parent"
+        },
+        {
+          "to": "halobank-solar-state-core",
+          "rel": "see-also"
+        },
+        {
+          "to": "halobank-solar-time-core",
+          "rel": "see-also"
+        },
+        {
+          "to": "halobank-solar-proof-eclipse",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-gravitational-response-lunisolar-tide-potential-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-gravitational-response-dynamic-tide-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-gravitational-response-equatorial-bulge-torque-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-gravitational-response-earth-axial-precession-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-gravitational-response-earth-nutation-definition",
+          "rel": "see-also"
+        }
+      ],
+      "bridge": {
+        "left": "halobank-solar-state-core",
+        "right": "physics-gravitational-response-lunisolar-tide-potential-definition",
+        "relation": "HaloBank's Sun/Moon geometry and time scales provide deterministic forcing inputs for terrestrial tide and Earth-orientation studies without claiming the downstream fluid or rigid-body solver."
+      },
+      "validity": {
+        "claim_ids": [
+          "claim:halobank.solar:terrestrial_lunisolar_forcing_bridge"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/routes/halobank-solar.ts",
+          "contains": "/horizons/vectors"
+        },
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/ephemeris-core.ts",
+          "contains": "buildSolarVectorBundle"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/lunisolar-tide-generating-potential.md",
+          "contains": "Definition: The lunisolar tide-generating potential"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/earth-axial-precession.md",
+          "contains": "Definition: Earth axial precession"
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-mercury",
       "title": "Mercury Precession Proof Node",
-      "tags": ["mercury", "precession", "falsifier"],
+      "tags": [
+        "mercury",
+        "precession",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:mercury_precession"],
+      "claim_ids": [
+        "claim:halobank.solar:mercury_precession"
+      ],
       "validity": {
-        "equation_ref": "uncertainty_propagation"
+        "equation_ref": "efe_baseline"
       },
       "bodyMD": "Perihelion drift is computed over a time window and fails deterministically when tolerance or sample constraints are violated.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runMercuryPrecession" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "mercury precession module" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runMercuryPrecession"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "mercury precession module"
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-null-geodesic",
       "title": "Solar Null-Geodesic Proof Node",
-      "tags": ["light-deflection", "shapiro", "null-geodesic", "falsifier"],
+      "tags": [
+        "light-deflection",
+        "shapiro",
+        "null-geodesic",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:solar_light_deflection"],
+      "claim_ids": [
+        "claim:halobank.solar:solar_light_deflection"
+      ],
       "validity": {
-        "equation_ref": "uncertainty_propagation"
+        "equation_ref": "efe_baseline"
       },
       "bodyMD": "Solar-limb light deflection and Shapiro-delay gamma residuals are replayed under the same pinned weak-field solar metric layer; explicit ICRS source directions and Earth body-fixed observers are supported, while unsupported body-fixed orientation models fail deterministically.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runSolarLightDeflection" },
-        { "type": "config", "path": "configs/halobank-solar-metric-context.v1.json", "contains": "sun_monopole" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "solar light-deflection module" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runSolarLightDeflection"
+        },
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-metric-context.v1.json",
+          "contains": "sun_monopole"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "solar light-deflection module"
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-inner-parity",
       "title": "Inner Solar Metric Parity Proof Node",
-      "tags": ["parity", "mercury", "light-deflection", "shared-metric", "falsifier"],
+      "tags": [
+        "parity",
+        "mercury",
+        "light-deflection",
+        "shared-metric",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:inner_solar_metric_parity"],
+      "claim_ids": [
+        "claim:halobank.solar:inner_solar_metric_parity"
+      ],
       "validity": {
-        "equation_ref": "uncertainty_propagation"
+        "equation_ref": "efe_baseline"
       },
       "bodyMD": "The same pinned inner-solar weak-field metric layer must simultaneously satisfy the Mercury perihelion diagnostic and the solar null-geodesic diagnostic, or the parity node fails deterministically.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runInnerSolarMetricParity" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "inner-solar parity" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runInnerSolarMetricParity"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "inner-solar parity"
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-mercury-congruence",
+      "title": "Mercury Cross-Lane Congruence Proof Node",
+      "tags": [
+        "mercury",
+        "precession",
+        "figure",
+        "congruence",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:mercury_cross_lane_congruence_diagnostic"
+      ],
+      "validity": {
+        "equation_ref": "mercury_same_body_congruence_metric"
+      },
+      "bodyMD": "Mercury perihelion precession and Mercury figure/shape diagnostics are both replayed on the same target body, and the normalized same-body congruence score must remain within band. The node compares the two observable families without collapsing them into a theorem-equivalent identity.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runMercuryCrossLaneCongruenceDiagnostic"
+        },
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-diagnostic-datasets.v1.json",
+          "contains": "mercury-spin-orbit-stress-test"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "Mercury as the primary non-Earth congruence profile"
+        }
+      ],
+      "links": [
+        {
+          "type": "depends_on",
+          "to": "halobank-solar-proof-mercury",
+          "relation": "The congruence lane reuses the Mercury precession benchmark."
+        },
+        {
+          "type": "depends_on",
+          "to": "halobank-solar-proof-planetary-figure-diagnostic",
+          "relation": "The congruence lane reuses the Mercury figure/shape diagnostic surface."
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-earth-orientation",
+      "title": "Earth Orientation Proxy Proof Node",
+      "tags": [
+        "earth-orientation",
+        "precession",
+        "nutation",
+        "forcing",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:earth_orientation_precession_nutation_proxy"
+      ],
+      "validity": {
+        "equation_ref": "angular_momentum_torque_balance"
+      },
+      "bodyMD": "HaloBank's Earth-orientation lane consumes deterministic Sun/Moon forcing geometry and converts it into explicitly labeled tide-weight and equatorial-bulge torque proxies. The lane remains diagnostic and fails deterministically when sampling, forcing-ratio, or proxy-variation checks do not hold.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runEarthOrientationPrecessionNutationProxy"
+        },
+        {
+          "type": "config",
+          "path": "configs/physics-equation-backbone.v1.json",
+          "contains": "angular_momentum_torque_balance"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-gravitational-response-tree.json",
+          "contains": "physics-gravitational-response-earth-axial-precession-definition"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "earth-orientation precession/nutation proxy"
+        }
+      ],
+      "links": [
+        {
+          "type": "depends_on",
+          "to": "bridge-halobank-solar-terrestrial-forcing",
+          "relation": "HaloBank provides deterministic Sun/Moon forcing geometry and time-scale inputs."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-gravitational-response-lunisolar-tide-potential-definition",
+          "relation": "The proxy is driven by the tide-generating-potential semantics."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-gravitational-response-equatorial-bulge-torque-definition",
+          "relation": "Torque proxy follows the equatorial-bulge torque lane."
+        },
+        {
+          "type": "supports",
+          "to": "physics-gravitational-response-earth-axial-precession-definition",
+          "relation": "Mean torque proxy is used as the diagnostic precession driver."
+        },
+        {
+          "type": "supports",
+          "to": "physics-gravitational-response-earth-nutation-definition",
+          "relation": "Torque-proxy variability is used as the diagnostic nutation driver."
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-planetary-shape-orientation",
+      "title": "Planetary Shape and Orientation Proxy Proof Node",
+      "tags": [
+        "planetary-shape",
+        "orientation",
+        "j2",
+        "love-number",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:planetary_shape_orientation_proxy"
+      ],
+      "validity": {
+        "equation_ref": "precession_constant_lunisolar_torque"
+      },
+      "bodyMD": "HaloBank's planetary-shape lane converts deterministic Sun/Moon forcing geometry and Earth-like body constants into explicit mean-density, hydrostatic-rounding, potato-threshold, rotational-flattening, tidal-response, J2, dynamical-ellipticity, and precession-constant proxies. The lane remains diagnostic and fails deterministically when the sampled forcing window, proxy closure, or torque response checks do not hold.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runPlanetaryShapeOrientationProxy"
+        },
+        {
+          "type": "config",
+          "path": "configs/physics-equation-backbone.v1.json",
+          "contains": "quadrupole_moment_J2_definition"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+          "contains": "physics-self-gravity-shape-J2-definition"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-gravitational-response-tree.json",
+          "contains": "physics-gravitational-response-precession-constant-definition"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "planetary-shape/orientation proxy"
+        }
+      ],
+      "links": [
+        {
+          "type": "depends_on",
+          "to": "bridge-halobank-solar-terrestrial-forcing",
+          "relation": "HaloBank provides deterministic Sun/Moon forcing geometry and time-scale inputs."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-self-gravity-shape-constitutive-response-definition",
+          "relation": "The proxy lane separates material closure from the forcing inputs."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-self-gravity-shape-J2-definition",
+          "relation": "The shape proxy uses the quadrupole-coefficient bridge."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-gravitational-response-tidal-tensor-definition",
+          "relation": "The response lane starts from the tidal tensor and its local forcing semantics."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-gravitational-response-love-number-definition",
+          "relation": "The proxy lane uses a dimensionless tidal-response gain bridge."
+        },
+        {
+          "type": "supports",
+          "to": "physics-gravitational-response-dynamical-ellipticity-definition",
+          "relation": "J2 and moment-of-inertia structure are collapsed into a diagnostic dynamical-ellipticity proxy."
+        },
+        {
+          "type": "supports",
+          "to": "physics-gravitational-response-precession-constant-definition",
+          "relation": "The torque and inertia proxies are reduced to a diagnostic precession-constant proxy."
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-planetary-figure-diagnostic",
+      "title": "Planetary Figure Diagnostic Proof Node",
+      "tags": [
+        "planetary-figure",
+        "flattening",
+        "j2",
+        "love-number",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:planetary_figure_diagnostic"
+      ],
+      "validity": {
+        "equation_ref": "planetary_figure_proxy_closure"
+      },
+      "bodyMD": "HaloBank's planetary-figure diagnostic collapses the low-order Earth-like shape lane into explicit q, J2, dynamical-ellipticity, Love-number, and flattening closure metrics. The lane remains diagnostic and fails deterministically when the inherited proxy lane fails or when the Earth-like figure closure drifts out of band.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runPlanetaryFigureDiagnostic"
+        },
+        {
+          "type": "config",
+          "path": "configs/physics-equation-backbone.v1.json",
+          "contains": "planetary_figure_proxy_closure"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+          "contains": "physics-self-gravity-shape-planetary-figure-diagnostic"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "planetary figure diagnostic"
+        }
+      ],
+      "links": [
+        {
+          "type": "depends_on",
+          "to": "halobank-solar-proof-planetary-shape-orientation",
+          "relation": "The diagnostic closes the lower-order proxy lane rather than bypassing it."
+        },
+        {
+          "type": "depends_on",
+          "to": "physics-self-gravity-shape-planetary-figure-diagnostic",
+          "relation": "The proof node lands on the explicit planetary-figure diagnostic in the shape tree."
+        },
+        {
+          "type": "supports",
+          "to": "physics-gravitational-response-precession-constant-definition",
+          "relation": "Low-order figure closure constrains the orientation-response bridge."
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-stellar-observables",
+      "title": "Stellar Observables Diagnostic Proof Node",
+      "tags": [
+        "stellar",
+        "helioseismology",
+        "magnetic-cycle",
+        "flare",
+        "guardrail",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:stellar_observables_diagnostic"
+      ],
+      "validity": {
+        "equation_ref": "stellar_observables_correlation_diagnostic"
+      },
+      "bodyMD": "HaloBank's stellar-observables lane consumes supplied magnetic-activity and helioseismic-shift series, optionally flare-statistics support, and computes a deterministic observables coupling diagnostic. The lane remains explicitly guarded against any direct consciousness inference.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runStellarObservablesDiagnostic"
+        },
+        {
+          "type": "config",
+          "path": "configs/physics-equation-backbone.v1.json",
+          "contains": "stellar_observables_correlation_diagnostic"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+          "contains": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/bridges/astrochemistry-prebiotic-neuro-consciousness-bridge-tree.json",
+          "contains": "stellar-plasma-observables-not-consciousness"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "stellar observables diagnostic"
+        }
+      ],
+      "links": [
+        {
+          "type": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
+          "relation": "The route lands on the explicit stellar-observables diagnostic lane."
+        },
+        {
+          "type": "depends_on",
+          "to": "stellar-plasma-observables-not-consciousness",
+          "relation": "The guardrail explicitly blocks promotion into consciousness claims."
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-eclipse",
       "title": "Earth-Moon Eclipse Timing Proof Node",
-      "tags": ["eclipse", "observer", "falsifier"],
+      "tags": [
+        "eclipse",
+        "observer",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:earth_moon_eclipse_timing"],
+      "claim_ids": [
+        "claim:halobank.solar:earth_moon_eclipse_timing"
+      ],
       "validity": {
         "equation_ref": "runtime_safety_gate"
       },
       "bodyMD": "Event detection uses apparent Sun-Moon separation with geocenter or supported Earth body-fixed observers, and unsupported body-fixed observers fail deterministically with a route-matched orientation-kernel fail id.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runEarthMoonEclipseTiming" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "supports Earth body-fixed observers for earth-moon eclipse timing geometry" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runEarthMoonEclipseTiming"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "supports Earth body-fixed observers for earth-moon eclipse timing geometry"
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-resonance",
       "title": "Resonance Libration Proof Node",
-      "tags": ["resonance", "libration", "frequency", "falsifier"],
+      "tags": [
+        "resonance",
+        "libration",
+        "frequency",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:resonance_libration"],
+      "claim_ids": [
+        "claim:halobank.solar:resonance_libration"
+      ],
       "validity": {
         "equation_ref": "uncertainty_propagation"
       },
       "bodyMD": "Resonance gate requires libration-angle span and mean-motion ratio error to satisfy configured limits.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runResonanceLibration" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "resonance_libration" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runResonanceLibration"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "resonance_libration"
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-jovian",
       "title": "Jovian Moon Event Timing Proof Node",
-      "tags": ["jovian", "occultation", "transit", "observer", "falsifier"],
+      "tags": [
+        "jovian",
+        "occultation",
+        "transit",
+        "observer",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:jovian_moon_event_timing"],
+      "claim_ids": [
+        "claim:halobank.solar:jovian_moon_event_timing"
+      ],
       "validity": {
         "equation_ref": "line_of_sight_occultation_geometry"
       },
       "bodyMD": "Jovian moon transit and occultation minima are computed from an explicit Earth observer geometry; supported Earth body-fixed observers are allowed, and unsupported body-fixed observers fail deterministically with the route-matched orientation-kernel fail id.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runJovianMoonEventTiming" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "supports Earth body-fixed observers for jovian moon timing geometry" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runJovianMoonEventTiming"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "supports Earth body-fixed observers for jovian moon timing geometry"
+        }
       ]
     },
     {
       "id": "halobank-solar-proof-local-rest-anchor",
       "title": "Local Rest Anchor Calibration Proof Node",
-      "tags": ["local-rest", "solar-motion", "uvw", "falsifier"],
+      "tags": [
+        "local-rest",
+        "solar-motion",
+        "uvw",
+        "falsifier"
+      ],
       "nodeType": "physics_assertion",
-      "claim_ids": ["claim:halobank.solar:local_rest_anchor_calibration"],
+      "claim_ids": [
+        "claim:halobank.solar:local_rest_anchor_calibration"
+      ],
       "validity": {
         "equation_ref": "uncertainty_propagation"
       },
       "bodyMD": "The active solar peculiar-motion anchor is compared against a pinned published reference and fails deterministically when the selected runtime vector deviates beyond configured tolerance.",
       "evidence": [
-        { "type": "code", "path": "server/modules/halobank-solar/derived.ts", "contains": "runLocalRestAnchorCalibration" },
-        { "type": "test", "path": "tests/halobank-solar-derived.spec.ts", "contains": "local-rest solar-motion anchor" }
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runLocalRestAnchorCalibration"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "local-rest solar-motion anchor"
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-granular-tidal-response",
+      "title": "Granular Tidal Response Diagnostic Proof Node",
+      "tags": [
+        "granular",
+        "tidal",
+        "rubble-pile",
+        "q",
+        "spin-evolution",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:granular_tidal_response_diagnostic"
+      ],
+      "validity": {
+        "equation_ref": "granular_dissipation_scaling"
+      },
+      "bodyMD": "HaloBank's granular tidal-response lane collapses multiparticle dissipation, effective rheology, tidal quality factor, spin-state evolution, and angular-momentum redistribution into a deterministic diagnostic that remains explicitly non-consciousness.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runGranularTidalResponseDiagnostic"
+        },
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-thresholds.v1.json",
+          "contains": "granular_tidal_response_diagnostic"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "granular tidal response diagnostic"
+        },
+        {
+          "type": "doc",
+          "path": "docs/architecture/granular-tidal-sunquake-bridge-plan.md",
+          "contains": "granular_tidal_response_diagnostic"
+        },
+        {
+          "type": "depends_on",
+          "to": "bridge-halobank-solar-granular-microphysics-backbone",
+          "relation": "The diagnostic remains subordinate to the shared microphysics and constitutive-response backbone."
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-stellar-flare-sunquake",
+      "title": "Stellar Flare Sunquake Diagnostic Proof Node",
+      "tags": [
+        "flare",
+        "sunquake",
+        "helioseismology",
+        "timing",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:stellar_flare_sunquake_diagnostic"
+      ],
+      "validity": {
+        "equation_ref": "flare_sunquake_timing_correlation"
+      },
+      "bodyMD": "HaloBank's stellar flare-to-sunquake lane treats flare energy, helioseismic amplitude, and timing offsets as an observable coupling diagnostic and keeps the lane explicitly non-consciousness.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runStellarFlareSunquakeDiagnostic"
+        },
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-diagnostic-datasets.v1.json",
+          "contains": "sunquake_replay_series"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "stellar flare sunquake diagnostic"
+        },
+        {
+          "type": "doc",
+          "path": "docs/architecture/granular-tidal-sunquake-bridge-plan.md",
+          "contains": "stellar_flare_sunquake_diagnostic"
+        },
+        {
+          "type": "depends_on",
+          "to": "bridge-halobank-solar-stellar-transport-backbone",
+          "relation": "The diagnostic remains subordinate to the shared microphysics, transport, and plasma-closure backbone."
+        }
+      ]
+    },
+    {
+      "id": "halobank-solar-proof-sunquake-timing-replay",
+      "title": "Sunquake Timing Replay Proof Node",
+      "tags": [
+        "sunquake",
+        "replay",
+        "timing",
+        "helioseismology",
+        "falsifier"
+      ],
+      "nodeType": "physics_assertion",
+      "claim_ids": [
+        "claim:halobank.solar:sunquake_timing_replay_diagnostic"
+      ],
+      "validity": {
+        "equation_ref": "sunquake_helioseismic_response"
+      },
+      "bodyMD": "HaloBank's sunquake timing replay lane checks flare-to-sunquake event windows against a deterministic replay envelope and preserves the explicit sunquake-not-quantum-collapse guardrail.",
+      "evidence": [
+        {
+          "type": "code",
+          "path": "server/modules/halobank-solar/derived.ts",
+          "contains": "runSunquakeTimingReplayDiagnostic"
+        },
+        {
+          "type": "config",
+          "path": "configs/halobank-solar-diagnostic-datasets.v1.json",
+          "contains": "flare-sunquake-timing-replay"
+        },
+        {
+          "type": "test",
+          "path": "tests/halobank-solar-derived.spec.ts",
+          "contains": "sunquake timing replay diagnostic"
+        },
+        {
+          "type": "doc",
+          "path": "docs/architecture/granular-tidal-sunquake-bridge-plan.md",
+          "contains": "sunquake_timing_replay_diagnostic"
+        },
+        {
+          "type": "depends_on",
+          "to": "bridge-halobank-solar-stellar-transport-backbone",
+          "relation": "The replay lane inherits the same stellar transport backbone and guardrail posture."
+        }
+      ]
+    },
+    {
+      "id": "bridge-halobank-solar-granular-microphysics-backbone",
+      "title": "HaloBank Solar <-> Granular Microphysics Backbone Bridge",
+      "tags": [
+        "bridge",
+        "granular",
+        "microphysics",
+        "transport",
+        "solar"
+      ],
+      "nodeType": "bridge",
+      "bodyMD": "Bridge linking HaloBank's granular tidal-response runtime lane to the shared effective-microphysics and constitutive-response backbone. The lane remains a diagnostic descendant of contact physics, dissipation, rheology, and closure semantics rather than a gravity-only shortcut.",
+      "links": [
+        {
+          "to": "halobank-solar-proof-root",
+          "rel": "parent"
+        },
+        {
+          "to": "physics-microphysics-transport-effective-microphysics-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-microphysics-transport-constitutive-response-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-self-gravity-shape-granular-tidal-response-diagnostic",
+          "rel": "supports"
+        }
+      ],
+      "bridge": {
+        "left": "halobank-solar-proof-granular-tidal-response",
+        "right": "physics-microphysics-transport-constitutive-response-definition",
+        "relation": "HaloBank granular tidal diagnostics are downstream of effective microphysics, constitutive response, and dissipative closure rather than a direct gravity-only mechanism."
+      },
+      "validity": {
+        "claim_ids": [
+          "claim:halobank.solar:granular_tidal_response_backbone_bridge"
+        ],
+        "equation_ref": "constitutive_response_closure"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/microphysics-hamiltonian-transport-observables-plan.md",
+          "contains": "granular and self-gravitating body lane"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-self-gravity-shape-tree.json",
+          "contains": "physics-self-gravity-shape-granular-tidal-response-diagnostic"
+        }
+      ]
+    },
+    {
+      "id": "bridge-halobank-solar-stellar-transport-backbone",
+      "title": "HaloBank Solar <-> Stellar Transport Backbone Bridge",
+      "tags": [
+        "bridge",
+        "stellar",
+        "transport",
+        "plasma",
+        "solar"
+      ],
+      "nodeType": "bridge",
+      "bodyMD": "Bridge linking HaloBank's stellar flare-to-sunquake runtime lanes to the shared effective-microphysics, kinetic-transport, and plasma-closure backbone. The lane remains a diagnostic descendant of stellar transport and flare forcing semantics rather than a consciousness or collapse mechanism.",
+      "links": [
+        {
+          "to": "halobank-solar-proof-root",
+          "rel": "parent"
+        },
+        {
+          "to": "physics-microphysics-transport-plasma-transport-closure-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-microphysics-transport-collective-observable-response-definition",
+          "rel": "see-also"
+        },
+        {
+          "to": "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic",
+          "rel": "supports"
+        }
+      ],
+      "bridge": {
+        "left": "halobank-solar-proof-stellar-flare-sunquake",
+        "right": "physics-microphysics-transport-plasma-transport-closure-definition",
+        "relation": "HaloBank stellar flare and sunquake diagnostics are downstream of plasma transport closure, heating, and wave-response semantics rather than direct collapse models."
+      },
+      "validity": {
+        "claim_ids": [
+          "claim:halobank.solar:stellar_flare_sunquake_backbone_bridge"
+        ],
+        "equation_ref": "plasma_transport_energy_closure"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/architecture/microphysics-hamiltonian-transport-observables-plan.md",
+          "contains": "stellar magnetized plasma lane"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+          "contains": "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic"
+        }
       ]
     }
   ]

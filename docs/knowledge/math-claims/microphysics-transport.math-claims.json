@@ -1,0 +1,285 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "microphysics-transport-core",
+  "domain": "microphysics-transport-observables",
+  "updatedAt": "2026-03-25",
+  "claims": [
+    {
+      "claimId": "claim:microphysics.transport:effective_microphysics",
+      "statement": "Effective microphysics is the reduced parameter layer that turns particle-level interactions into usable potentials, collision rates, opacity, conductivity, friction, and elastic response coefficients.",
+      "maturity": "definition",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "the reduction is coefficient-level, not a certified solver",
+          "particle physics contributes through effective parameters rather than direct macroscopic observables",
+          "the claim remains subordinate to the parent transport tree"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Born and Oppenheimer (1927), Zur Quantentheorie der Molekeln, DOI 10.1002/andp.19273892002.",
+          "note": "Source for the microscopic-to-effective-potential reduction step."
+        },
+        {
+          "kind": "paper",
+          "citation": "McDaniels and Schmidt (2016), Next-Generation Force Fields from Symmetry-Adapted Perturbation Theory, DOI 10.1146/annurev-physchem-040215-112047.",
+          "note": "Source for effective interaction decomposition and force-field construction."
+        },
+        {
+          "kind": "notes",
+          "citation": "Interacting classical systems lecture notes.",
+          "note": "Source for pair interactions, external potentials, and many-body reduction."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/effective-microphysics.md",
+        "docs/knowledge/physics/effective-interaction-hamiltonian.md",
+        "docs/knowledge/physics/kinetic-theory-closure.md"
+      ],
+      "notes": "This is the shared reduced-microphysics entry point for the new parent tree."
+    },
+    {
+      "claimId": "claim:microphysics.transport:effective_interaction_hamiltonian",
+      "statement": "An effective interaction Hamiltonian captures conservative reduced interactions after microscopic degrees of freedom are eliminated, including pair potentials and explicit coupling to external fields or potentials.",
+      "maturity": "definition",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "the Hamiltonian must remain reduced and effective",
+          "external potentials are allowed only as explicit terms in the reduced model",
+          "dissipative response is not yet closed at this layer"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Born and Oppenheimer (1927), DOI 10.1002/andp.19273892002.",
+          "note": "Microscopic reduction to effective molecular energies."
+        },
+        {
+          "kind": "paper",
+          "citation": "Evans (1979), The nature of the liquid-vapour interface and other topics in the statistical mechanics of non-uniform, classical fluids, DOI 10.1080/00018737900101365.",
+          "note": "External-potential and free-energy response context."
+        },
+        {
+          "kind": "notes",
+          "citation": "Interacting classical systems lecture notes.",
+          "note": "Many-body Hamiltonian with external potential framing."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/effective-interaction-hamiltonian.md",
+        "docs/knowledge/physics/kinetic-theory-closure.md"
+      ],
+      "notes": "This claim keeps the reduced Hamiltonian explicit before coarse-graining and dissipation."
+    },
+    {
+      "claimId": "claim:microphysics.transport:many_body_hamiltonian",
+      "statement": "The many-body Hamiltonian is the ensemble-level conservative description from which partition functions, correlation functions, and response formulas are derived before closure is imposed.",
+      "maturity": "definition",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "pair or effective interactions must be explicit in the reduced model",
+          "ensemble-level observables are derived before transport closure",
+          "this layer is not yet a dissipative constitutive law"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "notes",
+          "citation": "Interacting classical systems lecture notes.",
+          "note": "Many-body Hamiltonian, hierarchy, and external potential reduction."
+        },
+        {
+          "kind": "paper",
+          "citation": "Evans (1979), DOI 10.1080/00018737900101365.",
+          "note": "Nonuniform fluid response and free-energy methods."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/kinetic-theory-closure.md",
+        "docs/knowledge/physics/constitutive-response.md"
+      ],
+      "notes": "This is the shared conservative ensemble backbone for the new parent tree."
+    },
+    {
+      "claimId": "claim:microphysics.transport:kinetic_theory",
+      "statement": "Kinetic theory is the reduced distribution-function description that replaces the full many-body state with evolution equations for occupancies, collision terms, and hierarchy truncations.",
+      "maturity": "definition",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "distribution functions or equivalent reduced moments must be explicit",
+          "collision operators or source terms must remain visible",
+          "the claim does not assert a closed transport coefficient until closure is added"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "notes",
+          "citation": "Interacting classical systems lecture notes.",
+          "note": "Kinetic and hierarchy semantics for many-body reduction."
+        },
+        {
+          "kind": "paper",
+          "citation": "Evans (1979), DOI 10.1080/00018737900101365.",
+          "note": "Linear-response bridge into reduced transport descriptions."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/kinetic-theory-closure.md",
+        "docs/knowledge/physics/plasma-transport-closure.md"
+      ],
+      "notes": "This claim is the parent for kinetic truncation and transport closure."
+    },
+    {
+      "claimId": "claim:microphysics.transport:kinetic_transport_closure",
+      "statement": "Kinetic transport closure is the step that turns hierarchy equations into usable damping, diffusion, source, and transport coefficients for reduced macroscopic models.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "the closure must expose a reduced transport coefficient set",
+          "dissipation and source terms must be explicit",
+          "the claim remains diagnostic rather than a certified kinetic solver"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Evans (1979), DOI 10.1080/00018737900101365.",
+          "note": "Reduced response and closure context."
+        },
+        {
+          "kind": "paper",
+          "citation": "PIC-to-MHD solar flare bridge paper, 2025.",
+          "note": "Kinetic-to-fluid closure semantics for plasma transport."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/kinetic-theory-closure.md",
+        "docs/knowledge/physics/plasma-transport-closure.md"
+      ],
+      "notes": "This claim is the practical closure layer used by both granular and plasma branches."
+    },
+    {
+      "claimId": "claim:microphysics.transport:constitutive_response",
+      "statement": "Constitutive response is the reduced bulk relation between stress, strain, pressure, strength, viscosity, friction, and other material closure variables that follows from the effective microphysics layer.",
+      "maturity": "definition",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "the closure must be bulk-level rather than microscopic",
+          "equation-of-state and strength terms may coexist as separate regime variables",
+          "the claim remains a closure relation, not a certified material model"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Evans (1979), DOI 10.1080/00018737900101365.",
+          "note": "External-potential and free-energy response context."
+        },
+        {
+          "kind": "paper",
+          "citation": "Tanga et al. (2009), DOI 10.1016/j.pss.2008.06.016.",
+          "note": "Granular aggregate response and effective material behavior."
+        },
+        {
+          "kind": "paper",
+          "citation": "Holsapple, equilibrium configurations of solid cohesionless bodies.",
+          "note": "Cohesionless-body closure and strength-versus-self-gravity context."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/constitutive-response.md",
+        "docs/knowledge/physics/effective-microphysics.md"
+      ],
+      "notes": "This is the shared closure node for strength, elasticity, viscosity, and friction."
+    },
+    {
+      "claimId": "claim:microphysics.transport:plasma_transport_closure",
+      "statement": "Plasma transport closure is the reduced description that packages collision frequency, conductivity, resistivity, opacity, and source or damping terms into a usable continuum or MHD-level model.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "the closure must remain a reduced plasma transport model",
+          "collisional and kinetic ingredients must be visible in the reduction",
+          "the claim remains diagnostic and not a certified flare or coronal solver"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Observable context for solar plasma transport and waves."
+        },
+        {
+          "kind": "paper",
+          "citation": "Klimchuk, Nanoflare Heating of Solar and Stellar Coronae.",
+          "note": "Heating and transport semantics in stellar coronae."
+        },
+        {
+          "kind": "paper",
+          "citation": "PIC-to-MHD solar flare bridge paper, 2025.",
+          "note": "Kinetic-to-fluid plasma closure semantics."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/plasma-transport-closure.md",
+        "docs/knowledge/physics/kinetic-theory-closure.md",
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json"
+      ],
+      "notes": "This is the plasma-specific closure node for the shared parent tree."
+    },
+    {
+      "claimId": "claim:microphysics.transport:collective_observable_response",
+      "statement": "Collective observable response is the endpoint where closure-level microphysics produces measurable shape, spin, tidal, wave, flare, or helioseismic outputs.",
+      "maturity": "definition",
+      "validityDomain": {
+        "system": "microphysics transport parent lane",
+        "constraints": [
+          "the response must be derived from a closed or reduced closure model",
+          "the output remains regime-specific and not a universal solver claim",
+          "the claim is a bridge into observable lanes rather than a final certified product"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Evans (1979), DOI 10.1080/00018737900101365.",
+          "note": "Nonuniform fluid response and external-potential minimization."
+        },
+        {
+          "kind": "web",
+          "citation": "NASA/MSFC, Helioseismology.",
+          "note": "Observable context for wave response in the solar branch."
+        },
+        {
+          "kind": "paper",
+          "citation": "Tanga et al. (2009), DOI 10.1016/j.pss.2008.06.016.",
+          "note": "Observable shape response in the granular branch."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-microphysics-transport-tree.json",
+        "docs/knowledge/physics/effective-microphysics.md",
+        "docs/knowledge/physics/constitutive-response.md",
+        "docs/knowledge/physics/plasma-transport-closure.md"
+      ],
+      "notes": "This is the shared endpoint for the new parent tree and its downstream branches."
+    }
+  ]
+}

@@ -67,7 +67,64 @@ describe("collapse benchmark (Phase 4): curvature-coupled estimator", () => {
     expect(result.tau_source).toBe("field_estimator");
     expect(result.r_c_source).toBe("field_estimator");
     expect(result.tau_estimator?.mode).toBe("curvature_heuristic");
+    expect(result.background_geometry?.role).toBe("background_geometry");
+    expect(result.background_geometry?.proxies?.canonical_channel).toBe("kappa_u");
+    expect(result.dynamic_forcing_geometry?.role).toBe("dynamic_forcing_geometry");
+    expect(result.dynamic_forcing_geometry?.proxies?.canonical_channel).toBe("kappa_drive");
+    expect(result.geometry_coupling?.role).toBe("background_geometry");
     expect(result.tau_ms).toBeLessThan(1_400);
     expect(result.r_c_m).toBeGreaterThan(0);
+  });
+
+  it("emits source-backed quantum semiclassical replay and comparison when a replay profile is selected", () => {
+    const input = CollapseBenchmarkInput.parse({
+      schema_version: "collapse_benchmark/1",
+      dt_ms: 25,
+      tau_ms: 3.5,
+      r_c_m: 1e-8,
+      quantum_semiclassical_source_replay_id: "kalra_2022__zhang_2017__packet_primary",
+    });
+
+    const result = buildCollapseBenchmarkResult(input, "2025-01-01T00:00:00.000Z");
+    expect(result.quantum_semiclassical_source_replay?.profile_id).toBe("kalra_2022__zhang_2017__packet_primary");
+    expect(result.quantum_semiclassical_source_replay?.measurement_timescale_kind).toBe(
+      "microtubule_transport_lifetime_proxy",
+    );
+    expect(result.quantum_semiclassical_source_replay?.microtubule_transport_length_m).toBeCloseTo(6.64e-9, 12);
+    expect(result.quantum_semiclassical_comparison?.measurement_timescale_kind).toBe(
+      "microtubule_transport_lifetime_proxy",
+    );
+    expect(result.quantum_semiclassical_comparison?.subharmonic_lock_ratio).toBe(2);
+    expect(result.quantum_semiclassical_comparison?.time_crystal_signature_pass).toBe(true);
+    expect(result.quantum_semiclassical_comparison?.notes).toContain(
+      "source_replay_profile=kalra_2022__zhang_2017__packet_primary",
+    );
+  });
+
+  it("accepts a sourced negative contrast replay profile and lowers the exploratory comparison", () => {
+    const input = CollapseBenchmarkInput.parse({
+      schema_version: "collapse_benchmark/1",
+      dt_ms: 25,
+      tau_ms: 3.5,
+      r_c_m: 1e-8,
+      quantum_semiclassical_source_replay_id: "kalra_2022_etomidate__bruno_2015__packet_contrast",
+    });
+
+    const result = buildCollapseBenchmarkResult(input, "2025-01-01T00:00:00.000Z");
+    expect(result.quantum_semiclassical_source_replay?.profile_id).toBe(
+      "kalra_2022_etomidate__bruno_2015__packet_contrast",
+    );
+    expect(result.quantum_semiclassical_source_replay?.microtubule_transport_length_m).toBeCloseTo(
+      5.6e-9,
+      12,
+    );
+    expect(result.quantum_semiclassical_comparison?.subharmonic_lock_ratio).toBe(1);
+    expect(result.quantum_semiclassical_comparison?.time_crystal_signature_pass).toBe(false);
+    expect(result.quantum_semiclassical_comparison?.falsifiers_triggered).toContain(
+      "no_time_crystal_signature",
+    );
+    expect((result.quantum_semiclassical_comparison?.orch_or_measurement_support_score ?? 1)).toBeLessThan(
+      0.5,
+    );
   });
 });
