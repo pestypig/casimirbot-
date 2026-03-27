@@ -48,7 +48,7 @@ const guardSummary = (contract: VacuumContract) => {
 const tooltipSpecLines = (contract: VacuumContract) => {
   const { spec, exports: exportsData } = contract;
   return [
-    `Geometry | gap ${formatNumber(spec.geometry?.gap_nm, 1, " nm")} | sectors ${formatInt(spec.geometry?.sectorsConcurrent)}/${formatInt(spec.geometry?.sectorCount)}`,
+    `Geometry | gap ${formatNumber(spec.geometry?.gap_nm, 1, " nm")} | hull ref ${formatNumber(spec.geometry?.hullReferenceRadius_m, 2, " m")} | bubble ${formatNumber(spec.geometry?.bubbleRadius_m, 2, " m")} | sectors ${formatInt(spec.geometry?.sectorsConcurrent)}/${formatInt(spec.geometry?.sectorCount)}`,
     `Boundary | ${spec.boundary?.material ?? "--"} | model ${spec.boundary?.model ?? "--"} | surface ${spec.boundary?.surface ?? "--"}`,
     `Thermal | cavity ${formatNumber(spec.thermal?.cavity_K, 2, " K")} | environment ${formatNumber(spec.thermal?.environment_K, 2, " K")} | gradient ${formatNumber(spec.thermal?.gradient_K, 2, " K")}`,
     `Loss | Q_L ${formatInt(spec.loss?.qCavity)} | q_mech ${formatInt(spec.loss?.qMechanical)} | zeta ${formatNumber(spec.loss?.zeta, 3)}`,
@@ -72,6 +72,12 @@ const summaryChunks = (contract: VacuumContract) => {
   const { spec, exports: exportsData } = contract;
   return [
     spec.geometry?.gap_nm != null ? `gap ${formatNumber(spec.geometry.gap_nm, 1, " nm")}` : null,
+    spec.geometry?.hullReferenceRadius_m != null
+      ? `hull ref ${formatNumber(spec.geometry.hullReferenceRadius_m, 2, " m")}`
+      : null,
+    spec.geometry?.bubbleRadius_m != null
+      ? `bubble ${formatNumber(spec.geometry.bubbleRadius_m, 2, " m")}`
+      : null,
     spec.geometry?.sectorsConcurrent != null && spec.geometry?.sectorCount != null
       ? `sectors ${formatInt(spec.geometry.sectorsConcurrent)}/${formatInt(spec.geometry.sectorCount)}`
       : null,
@@ -161,4 +167,3 @@ const VacuumContractBadge: React.FC<VacuumContractBadgeProps> = ({ contract, cla
 };
 
 export default VacuumContractBadge;
-

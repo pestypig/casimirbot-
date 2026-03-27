@@ -30,10 +30,10 @@ CONST = {
 # ---------- Pipeline-owned reference targets ----------
 # These can be overridden by:
 #  - JSON file path in HELIX_PHASE_CALIB_JSON
-#  - or discrete env vars: HELIX_PHASE_REF_TILE_CM2, _R_M, _P_W, _M_KG, _ZETA
+#  - or discrete env vars: HELIX_PHASE_REF_TILE_CM2, _HULL_REFERENCE_R_M, _R_M, _P_W, _M_KG, _ZETA
 REF_DEFAULT = {
     "tile_area_cm2": 2500.0,   # 0.25 m²
-    "ship_radius_m": 5.0,      # 5 m
+    "hull_reference_radius_m": 5.0,  # 5 m reference radius
     "P_target_W": 100e6,       # ~100 MW target
     "M_target_kg": 1400.0,     # ~1.4e3 kg target
     "zeta_target": 0.5,        # comfortably < 1
@@ -45,6 +45,8 @@ def _load_ref() -> Dict[str, float]:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            if "hull_reference_radius_m" not in data and "ship_radius_m" in data:
+                data["hull_reference_radius_m"] = data["ship_radius_m"]
             # allow partial override
             merged = {**REF_DEFAULT, **{k: float(v) for k, v in data.items() if k in REF_DEFAULT}}
             return merged
@@ -54,6 +56,7 @@ def _load_ref() -> Dict[str, float]:
     env = {}
     for key, envkey in [
         ("tile_area_cm2", "HELIX_PHASE_REF_TILE_CM2"),
+        ("hull_reference_radius_m", "HELIX_PHASE_REF_HULL_REFERENCE_R_M"),
         ("ship_radius_m", "HELIX_PHASE_REF_R_M"),
         ("P_target_W", "HELIX_PHASE_REF_P_W"),
         ("M_target_kg", "HELIX_PHASE_REF_M_KG"),
@@ -62,7 +65,7 @@ def _load_ref() -> Dict[str, float]:
         val = os.getenv(envkey)
         if val is not None:
             try:
-                env[key] = float(val)
+                env["hull_reference_radius_m" if key == "ship_radius_m" else key] = float(val)
             except ValueError:
                 pass
     return {**REF_DEFAULT, **env}
@@ -98,7 +101,7 @@ def _nominals(A_cm2: float, R_m: float) -> Dict[str, float]:
                 N_tiles=N_tiles, A_hull=A_hull, U_static=U_static)
 
 # ---------- Calibration (computed once from pipeline reference) ----------
-_ref_nom = _nominals(REF["tile_area_cm2"], REF["ship_radius_m"])
+_ref_nom = _nominals(REF["tile_area_cm2"], REF["hull_reference_radius_m"])
 KAPPA = {
     "P": REF["P_target_W"] / max(_ref_nom["P_nom_W"], 1e-40),
     "M": REF["M_target_kg"] / max(_ref_nom["M_nom_kg"], 1e-40),
@@ -112,7 +115,9 @@ def reload_calibration(ref_override: Optional[Dict[str, float]] = None) -> None:
         REF = _load_ref()
     else:
         REF = {**REF_DEFAULT, **{k: float(v) for k, v in ref_override.items() if k in REF_DEFAULT}}
-    _ref_nom = _nominals(REF["tile_area_cm2"], REF["ship_radius_m"])
+    if "hull_reference_radius_m" not in REF and "ship_radius_m" in REF:
+        REF["hull_reference_radius_m"] = float(REF["ship_radius_m"])
+    _ref_nom = _nominals(REF["tile_area_cm2"], REF["hull_reference_radius_m"])
     KAPPA = {
         "P": REF["P_target_W"] / max(_ref_nom["P_nom_W"], 1e-40),
         "M": REF["M_target_kg"] / max(_ref_nom["M_nom_kg"], 1e-40),

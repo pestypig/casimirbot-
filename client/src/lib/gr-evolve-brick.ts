@@ -38,6 +38,12 @@ export interface GrEvolveBrickRequest {
   invariantSampleMax?: number;
   invariantPercentile?: number;
   driveDir?: [number, number, number] | null;
+  dutyFR?: number;
+  q?: number;
+  gammaGeo?: number;
+  gammaVdB?: number;
+  zeta?: number;
+  phase01?: number;
 }
 
 export interface GrEvolveBrickChannel {
@@ -639,6 +645,26 @@ const buildQuery = (request: GrEvolveBrickRequest) => {
     if (parts.every((value) => Number.isFinite(value))) {
       params.set("driveDir", parts.join(","));
     }
+  }
+  if (Number.isFinite(request.dutyFR ?? NaN)) {
+    params.set("dutyFR", String(Math.max(1e-8, request.dutyFR as number)));
+  }
+  if (Number.isFinite(request.q ?? NaN)) {
+    params.set("q", String(Math.max(1e-6, request.q as number)));
+  }
+  if (Number.isFinite(request.gammaGeo ?? NaN)) {
+    params.set("gammaGeo", String(Math.max(1e-6, request.gammaGeo as number)));
+  }
+  if (Number.isFinite(request.gammaVdB ?? NaN)) {
+    params.set("gammaVdB", String(Math.max(1e-6, request.gammaVdB as number)));
+  }
+  if (Number.isFinite(request.zeta ?? NaN)) {
+    params.set("zeta", String(Math.max(0, request.zeta as number)));
+  }
+  if (Number.isFinite(request.phase01 ?? NaN)) {
+    const phase = request.phase01 as number;
+    const wrapped = ((phase % 1) + 1) % 1;
+    params.set("phase01", String(wrapped));
   }
   params.set("format", BRICK_FORMAT);
   return params.toString();

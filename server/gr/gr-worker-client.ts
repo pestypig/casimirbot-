@@ -32,11 +32,20 @@ const resolveTsExecArgv = () => {
 
 const resolveWorkerEntry = () => {
   const root = process.cwd();
-  const candidates = [
+  const preferSource =
+    process.env.GR_WORKER_PREFER_SOURCE === "1" ||
+    process.env.GR_WORKER_PREFER_SOURCE == null;
+  const sourceFirst = [
+    { path: path.join(root, "server", "gr", "gr-worker.ts"), isTs: true },
+    { path: path.join(root, "server", "gr", "gr-worker.js"), isTs: false },
+    { path: path.join(root, "dist", "gr", "gr-worker.js"), isTs: false },
+  ];
+  const distFirst = [
     { path: path.join(root, "dist", "gr", "gr-worker.js"), isTs: false },
     { path: path.join(root, "server", "gr", "gr-worker.js"), isTs: false },
     { path: path.join(root, "server", "gr", "gr-worker.ts"), isTs: true },
   ];
+  const candidates = preferSource ? sourceFirst : distFirst;
   for (const candidate of candidates) {
     if (fs.existsSync(candidate.path)) {
       return {

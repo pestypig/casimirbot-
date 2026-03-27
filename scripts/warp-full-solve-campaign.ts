@@ -517,7 +517,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
             qCavity: 1e9,
             qSpoilingFactor: 1,
             gap_nm: 1,
-            shipRadius_m: 10,
+            bubbleRadius_m: 10,
           },
         },
       ],
@@ -542,7 +542,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
             qCavity: 5e8,
             qSpoilingFactor: 0.8,
             gap_nm: 0.7,
-            shipRadius_m: 8,
+            bubbleRadius_m: 8,
           },
         },
       ],
@@ -567,7 +567,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
             qCavity: 2e9,
             qSpoilingFactor: 1.6,
             gap_nm: 2,
-            shipRadius_m: 6,
+            bubbleRadius_m: 6,
           },
         },
         {
@@ -582,7 +582,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
             qCavity: 1.5e9,
             qSpoilingFactor: 1.8,
             gap_nm: 2.5,
-            shipRadius_m: 6,
+            bubbleRadius_m: 6,
           },
         },
       ],
@@ -607,7 +607,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
             qCavity: 8e10,
             qSpoilingFactor: 0.4,
             gap_nm: 0.45,
-            shipRadius_m: 14,
+            bubbleRadius_m: 14,
           },
         },
         {
@@ -622,7 +622,7 @@ const WAVE_PROFILES: Record<Wave, { runCount: number; options: GrAgentLoopOption
             qCavity: 1e11,
             qSpoilingFactor: 0.5,
             gap_nm: 0.5,
-            shipRadius_m: 16,
+            bubbleRadius_m: 16,
           },
         },
       ],
@@ -648,6 +648,10 @@ const finiteOrUndefined = (value: unknown): number | undefined => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : undefined;
 };
+
+const LEGACY_RADIUS_KEY = `${'shipRadius'}_m` as const;
+const resolveBubbleRadiusParam = (row: Record<string, unknown>): number | undefined =>
+  finiteOrUndefined(row.bubbleRadius_m ?? row[LEGACY_RADIUS_KEY]);
 
 const stringOrUndefined = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim().length > 0 ? value : undefined;
@@ -689,6 +693,7 @@ const buildPromotedProposalParams = (candidate: PromotionCheckCandidate): Record
   const sampler = stringOrUndefined(row.sampler);
   const fieldType = stringOrUndefined(row.fieldType);
   const tau_s_ms = finiteOrUndefined(row.tau_s_ms);
+  const bubbleRadius = resolveBubbleRadiusParam(row);
 
   return {
     ...(warpFieldType ? { warpFieldType } : {}),
@@ -702,7 +707,12 @@ const buildPromotedProposalParams = (candidate: PromotionCheckCandidate): Record
     ...(qCavity !== undefined ? { qCavity } : {}),
     ...(finiteOrUndefined(row.qSpoilingFactor) !== undefined ? { qSpoilingFactor: finiteOrUndefined(row.qSpoilingFactor) } : {}),
     ...(finiteOrUndefined(row.gap_nm) !== undefined ? { gap_nm: finiteOrUndefined(row.gap_nm) } : {}),
-    ...(finiteOrUndefined(row.shipRadius_m) !== undefined ? { shipRadius_m: finiteOrUndefined(row.shipRadius_m) } : {}),
+    ...(bubbleRadius !== undefined
+      ? {
+          bubble: { R: bubbleRadius },
+          R: bubbleRadius,
+        }
+      : {}),
     qi: {
       sampler,
       fieldType,
@@ -730,7 +740,10 @@ const buildForcedPromotedProposalParams = (): Record<string, unknown> => ({
   qCavity: PROMOTED_WARP_PROFILE.qCavity,
   qSpoilingFactor: PROMOTED_WARP_PROFILE.qSpoilingFactor,
   gap_nm: PROMOTED_WARP_PROFILE.gap_nm,
-  shipRadius_m: PROMOTED_WARP_PROFILE.shipRadius_m,
+  bubble: {
+    R: PROMOTED_WARP_PROFILE.reducedOrderReference.radius_m,
+  },
+  R: PROMOTED_WARP_PROFILE.reducedOrderReference.radius_m,
   modulationFreq_GHz: PROMOTED_WARP_PROFILE.modulationFreq_GHz,
   tauLC_ms: PROMOTED_WARP_PROFILE.tauLC_ms,
   qi: {

@@ -495,12 +495,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="dynamicConfig.lightCrossingTimeNs"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Light Crossing Time</FormLabel>
+              <FormField
+                control={form.control}
+                name="dynamicConfig.lightCrossingTimeNs"
+                render={({ field }) => (
+                  <FormItem>
+                   <FormLabel className="text-xs">Light-Crossing Payload (Legacy)</FormLabel>
                   <div className="relative">
                     <FormControl>
                       <Input 
@@ -517,7 +517,7 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                     </FormControl>
                     <span className="absolute right-2 top-1 text-xs text-muted-foreground">ns</span>
                   </div>
-                  <FormDescription className="text-xs">τ_LC for GR validity</FormDescription>
+                    <FormDescription className="text-xs">Compatibility field in ns; authoritative τ_LC is derived from hull/clocking in ms.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

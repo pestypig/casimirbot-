@@ -24,7 +24,8 @@ Authoritative promoted-profile values:
 - `solutionCategory`
 - `profileVersion`
 - `warpFieldType`
-- `shipRadius_m`
+- `geometry.fullHull.{Lx_m,Ly_m,Lz_m}`
+- `geometry.reducedOrderReference.radius_m`
 - `sectorCount`
 - `concurrentSectors`
 - `gammaGeo`
@@ -47,6 +48,17 @@ Engineering-freeze layout values:
 - witness coupon placement
 
 Those engineering-freeze dimensions exist so the installed layout tools can produce congruent exports from one stable contract. They should be revised only by an NHM2 geometry-freeze update, not ad hoc in the renderer or UI.
+
+## Geometry Semantics
+
+The contract now carries two distinct geometry references so the repo stops conflating full-hull warp geometry with reduced-order metadata.
+
+- `geometry.fullHull`
+  - canonical NHM2 hull dimensions used by the full warp solve and hull-derived timing
+  - current values: `1007 m x 264 m x 173 m`
+- `geometry.reducedOrderReference`
+  - reduced-order metadata retained for proxy/control workflows
+  - current radius: `2 m`
 
 ## Contract Use
 

@@ -4,7 +4,7 @@ import type { VacuumGapSweepRow } from "../../shared/schema.js";
 
 export interface PhaseCalibrationConfig {
   tile_area_cm2: number;
-  ship_radius_m: number;
+  hull_reference_radius_m: number;
   P_target_W: number;   // e.g. pipeline P_avg_W
   M_target_kg: number;  // e.g. 1400
   zeta_target: number;  // e.g. 0.5
@@ -13,7 +13,47 @@ export interface PhaseCalibrationConfig {
   source: string;       // "energy_pipeline" | "mode_change" | "manual"
 }
 
-export async function writePhaseCalibration(config: Omit<PhaseCalibrationConfig, 'timestamp' | 'source'>, source = 'energy_pipeline'): Promise<void> {
+type PhaseCalibrationWrite = Omit<PhaseCalibrationConfig, "timestamp" | "source">;
+
+const normalizePhaseCalibrationConfig = (
+  value: unknown,
+): PhaseCalibrationConfig | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const hullReferenceRadius = Number(
+    raw.hull_reference_radius_m ?? raw.ship_radius_m,
+  );
+  const tileArea = Number(raw.tile_area_cm2);
+  const targetPower = Number(raw.P_target_W);
+  const targetMass = Number(raw.M_target_kg);
+  const zetaTarget = Number(raw.zeta_target);
+  if (
+    !Number.isFinite(tileArea) ||
+    !Number.isFinite(hullReferenceRadius) ||
+    !Number.isFinite(targetPower) ||
+    !Number.isFinite(targetMass) ||
+    !Number.isFinite(zetaTarget)
+  ) {
+    return null;
+  }
+  return {
+    tile_area_cm2: tileArea,
+    hull_reference_radius_m: hullReferenceRadius,
+    P_target_W: targetPower,
+    M_target_kg: targetMass,
+    zeta_target: zetaTarget,
+    timestamp:
+      typeof raw.timestamp === "string" && raw.timestamp.length > 0
+        ? raw.timestamp
+        : new Date(0).toISOString(),
+    source:
+      typeof raw.source === "string" && raw.source.length > 0
+        ? raw.source
+        : "energy_pipeline",
+  };
+};
+
+export async function writePhaseCalibration(config: PhaseCalibrationWrite, source = 'energy_pipeline'): Promise<void> {
   const calibPath = process.env.HELIX_PHASE_CALIB_JSON ?? path.join(process.cwd(), "sim_core", "phase_calibration.json");
   
   const calibData: PhaseCalibrationConfig = {
@@ -36,7 +76,7 @@ export async function readPhaseCalibration(): Promise<PhaseCalibrationConfig | n
   
   try {
     const data = await fs.readFile(calibPath, "utf8");
-    return JSON.parse(data) as PhaseCalibrationConfig;
+    return normalizePhaseCalibrationConfig(JSON.parse(data));
   } catch (error) {
     // File doesn't exist or is invalid - that's OK, use defaults
     return null;

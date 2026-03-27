@@ -363,7 +363,6 @@
           qSpoilingFactor: qSpoil,
           sag_nm: num(parameters.sagDepth_nm, 16),
           hull: parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
-          shipRadius_m: parameters.hull?.c ?? 86.5,
           modelMode: parity ? 'raw' : 'calibrated',
         }
         const liveState = driveWarpFromPipeline(engineRef.current, pipelineState)

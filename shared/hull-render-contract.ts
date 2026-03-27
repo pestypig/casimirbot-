@@ -1,6 +1,76 @@
 export type HullRendererBackendMode = "webgl" | "webgpu" | "mis-service";
 
 export type HullRenderSkyboxMode = "off" | "flat" | "geodesic";
+export type HullScientificSamplingMode = "nearest" | "trilinear";
+export type HullScientificRenderView =
+  | "diagnostic-quad"
+  | "paper-rho"
+  | "transport-3p1"
+  | "york-time-3p1"
+  | "york-surface-3p1"
+  | "shift-shell-3p1"
+  | "full-atlas";
+
+export const HULL_SCIENTIFIC_ATLAS_PANES = [
+  "hull",
+  "adm",
+  "derived",
+  "causal",
+  "optical",
+] as const;
+
+export type HullScientificAtlasPaneId =
+  (typeof HULL_SCIENTIFIC_ATLAS_PANES)[number];
+
+export type HullScientificAtlasPaneStatus = "ok" | "missing" | "error";
+
+export const HULL_RENDER_CERTIFICATE_SCHEMA_VERSION = "nhm2.render-certificate.v1";
+
+export const HULL_CANONICAL_REQUIRED_CHANNELS_BASE = [
+  "alpha",
+  "beta_x",
+  "beta_y",
+  "beta_z",
+  "gamma_xx",
+  "gamma_yy",
+  "gamma_zz",
+  "K_xx",
+  "K_xy",
+  "K_xz",
+  "K_yy",
+  "K_yz",
+  "K_zz",
+  "K_trace",
+  "theta",
+  "rho",
+  "Sx",
+  "Sy",
+  "Sz",
+  "S_xx",
+  "S_xy",
+  "S_xz",
+  "S_yy",
+  "S_yz",
+  "S_zz",
+  "H_constraint",
+  "M_constraint_x",
+  "M_constraint_y",
+  "M_constraint_z",
+] as const;
+
+export const HULL_CANONICAL_GAMMA_OFFDIAGONAL_CHANNELS = [
+  "gamma_xy",
+  "gamma_xz",
+  "gamma_yz",
+] as const;
+
+export type HullSupportMaskKind =
+  | "hull_sdf"
+  | "tile_support_mask"
+  | "region_class"
+  | "combined"
+  | "analytic"
+  | "missing";
 
 export type HullMetricVolumeRefV1 = {
   kind: "gr-evolve-brick";
@@ -24,6 +94,13 @@ export type HullMisRenderRequestV1 = {
   scienceLane?: {
     requireIntegralSignal?: boolean;
     requireScientificFrame?: boolean;
+    requireCanonicalTensorVolume?: boolean;
+    requireCongruentNhm2FullSolve?: boolean;
+    requireHullSupportChannels?: boolean;
+    requireOffDiagonalGamma?: boolean;
+    minVolumeDims?: [number, number, number] | null;
+    samplingMode?: HullScientificSamplingMode;
+    renderView?: HullScientificRenderView;
     attachmentDownsample?: number;
   };
   solve?: {
@@ -63,6 +140,93 @@ export type HullMisRenderAttachmentV1 = {
   dataBase64: string;
 };
 
+export type HullRenderCertificateV1 = {
+  certificate_schema_version: string;
+  certificate_hash: string;
+  metric_ref_hash: string | null;
+  channel_hashes: Record<string, string>;
+  support_mask_hash: string | null;
+  chart: string | null;
+  observer: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  unit_system: string;
+  camera: {
+    pose: string;
+    proj: string;
+  } | null;
+  render: {
+    view: HullScientificRenderView;
+    integrator: string;
+    steps: number;
+    field_key?: string | null;
+    slice_plane?: string | null;
+    normalization?: string | null;
+    surface_height?: string | null;
+    support_overlay?: string | null;
+    vector_context?: string | null;
+  };
+  diagnostics: {
+    null_residual_max: number;
+    step_convergence: number;
+    bundle_spread: number;
+    constraint_rms: number | null;
+    support_coverage_pct: number | null;
+    theta_min?: number | null;
+    theta_max?: number | null;
+    theta_abs_max?: number | null;
+    near_zero_theta?: boolean | null;
+    zero_contour_segments?: number | null;
+    display_gain?: number | null;
+    height_scale?: number | null;
+    sampling_choice?: string | null;
+    peak_theta_cell?: [number, number, number] | null;
+    peak_theta_in_supported_region?: boolean | null;
+    beta_min?: number | null;
+    beta_max?: number | null;
+    beta_abs_max?: number | null;
+    slice_support_pct?: number | null;
+    support_overlap_pct?: number | null;
+    shell_contour_segments?: number | null;
+    peak_beta_cell?: [number, number, number] | null;
+    peak_beta_in_supported_region?: boolean | null;
+  };
+  frame_hash: string;
+  timestamp_ms: number;
+};
+
+export type HullScientificAtlasPaneMetaV1 = {
+  status: HullScientificAtlasPaneStatus;
+  metric_ref_hash: string | null;
+  chart: string | null;
+  observer: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  unit_system: string;
+  timestamp_ms: number;
+  channels: string[];
+  channel_hashes: Record<string, string>;
+  integrator: string | null;
+  geodesic_mode: string | null;
+};
+
+export type HullScientificAtlasSidecarV1 = {
+  atlas_view: "full-atlas";
+  certificate_schema_version: string;
+  certificate_hash: string;
+  metric_ref_hash: string | null;
+  pane_ids: HullScientificAtlasPaneId[];
+  pane_status: Record<HullScientificAtlasPaneId, HullScientificAtlasPaneStatus>;
+  pane_channel_sets: Record<HullScientificAtlasPaneId, string[]>;
+  pane_meta: Record<HullScientificAtlasPaneId, HullScientificAtlasPaneMetaV1>;
+  chart: string | null;
+  observer: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  unit_system: string;
+  timestamp_ms: number;
+};
+
 export type HullMisRenderResponseV1 = {
   version: 1;
   ok: boolean;
@@ -74,6 +238,8 @@ export type HullMisRenderResponseV1 = {
   deterministicSeed: number;
   renderMs: number;
   attachments?: HullMisRenderAttachmentV1[];
+  renderCertificate?: HullRenderCertificateV1;
+  scientificAtlas?: HullScientificAtlasSidecarV1;
   diagnostics?: {
     note?: string;
     geodesicMode?: string | null;
@@ -82,6 +248,28 @@ export type HullMisRenderResponseV1 = {
     stepConvergence?: number | null;
     bundleSpread?: number | null;
     scientificTier?: "research-grade" | "teaching" | "scaffold" | "unknown" | null;
+    samplingMode?: HullScientificSamplingMode | null;
+    supportCoveragePct?: number | null;
+    maskedOutPct?: number | null;
+    supportMaskKind?: HullSupportMaskKind | null;
+    thetaMin?: number | null;
+    thetaMax?: number | null;
+    thetaAbsMax?: number | null;
+    nearZeroTheta?: boolean | null;
+    zeroContourSegments?: number | null;
+    displayGain?: number | null;
+    heightScale?: number | null;
+    samplingChoice?: string | null;
+    peakThetaCell?: [number, number, number] | null;
+    peakThetaInSupportedRegion?: boolean | null;
+    betaMin?: number | null;
+    betaMax?: number | null;
+    betaAbsMax?: number | null;
+    sliceSupportPct?: number | null;
+    supportOverlapPct?: number | null;
+    shellContourSegments?: number | null;
+    peakBetaCell?: [number, number, number] | null;
+    peakBetaInSupportedRegion?: boolean | null;
   };
   provenance?: {
     source: string;

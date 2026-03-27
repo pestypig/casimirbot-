@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
+import { resolvePipelineTauLcMs } from "@/lib/pipeline-geometry";
 import { TheoryBadge } from "./common/TheoryBadge";
 
 // ---------- Green's helpers (local, no new deps) ----------
@@ -90,8 +91,6 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   });
 
   // Helper type guards
-  const C_M_PER_S = 299_792_458;
-  const ms = (s: number) => s * 1000;
   const isFiniteNum = (x: any): x is number => typeof x === 'number' && Number.isFinite(x);
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
@@ -162,7 +161,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const tauLCSeconds = useMemo(() => {
     const metricsTau = Number((systemMetrics as any)?.lightCrossing?.tauLC_ms);
     if (Number.isFinite(metricsTau)) return metricsTau / 1000;
-    const liveTau = Number((live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms);
+    const liveTau = resolvePipelineTauLcMs(live as any);
     if (Number.isFinite(liveTau)) return liveTau / 1000;
     return undefined;
   }, [systemMetrics, live]);
@@ -298,14 +297,10 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     const lightCrossing = (systemMetrics as any)?.lightCrossing ?? {};
 
     const tau_LC_ms = (() => {
-      const liveTau = Number((live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms);
-      if (Number.isFinite(liveTau)) return liveTau;
       const metricsTau = Number(lightCrossing?.tauLC_ms);
       if (Number.isFinite(metricsTau)) return metricsTau;
-      if (Number.isFinite((live as any)?.shipRadius_m)) {
-        return ms((2 * Number((live as any)?.shipRadius_m)) / C_M_PER_S);
-      }
-      return undefined;
+      const liveTau = resolvePipelineTauLcMs(live as any);
+      return Number.isFinite(liveTau) ? liveTau : undefined;
     })();
 
     const dwell_ms = (() => {
@@ -438,7 +433,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   // Publisher for renderer: exposes a canonical query cache + fires a window event
   const publishGreens = useCallback(() => {
     // Pull timing to assess reciprocity (instant snapshot vs cycle-avg)
-    const tauLC_ms = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
+    const tauLC_ms = resolvePipelineTauLcMs(live as any);
     const burst_ms = Number((live as any)?.burst_ms);
     const reciprocity =
       Number.isFinite(burst_ms) && Number.isFinite(tauLC_ms)
@@ -677,7 +672,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                   <div className="text-muted-foreground">Reciprocity</div>
                   <div className="font-mono">
                     {(() => {
-                      const tauLC = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
+                      const tauLC = resolvePipelineTauLcMs(live as any);
                       const burst  = Number((live as any)?.burst_ms);
                       if (!Number.isFinite(burst) || !Number.isFinite(tauLC)) return "—";
                       return burst < tauLC ? "BROKEN (inst.)" : "PASS (avg.)";

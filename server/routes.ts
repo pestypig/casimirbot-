@@ -47,6 +47,7 @@ import { vectorizerRouter } from "./routes/vectorizer";
 import { removeBgEdgesRouter } from "./routes/remove-bg-edges";
 import { hullPreviewRouter } from "./routes/hull-preview";
 import { hullRenderRouter } from "./routes/hull-render";
+import { hullExportRouter } from "./routes/hull-export";
 import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
 import { codeLatticeRouter } from "./routes/code-lattice";
@@ -1233,6 +1234,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix", helixReasoningTheaterRouter);
   app.use("/api/helix/hull-preview", hullPreviewRouter);
   app.use("/api/helix/hull-render", hullRenderRouter);
+  app.use("/api/helix/hull-export", hullExportRouter);
   app.use("/api/helix", grAgentRouter);
   app.use("/api/helix", trainingTraceRouter);
   app.use("/api/helix", constraintPacksRouter);

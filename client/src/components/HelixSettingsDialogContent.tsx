@@ -1354,7 +1354,7 @@ function AlcubierreRenderDebugLogPanel() {
             expected / rendered / delta fields are included per event for measurement-grade review
           </p>
           <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
-            category solve_to_render_pipeline logs equation->metric->constraints->optics->render chain evidence
+            category solve_to_render_pipeline logs equation-&gt;metric-&gt;constraints-&gt;optics-&gt;render chain evidence
           </p>
           <p className="text-[10px] uppercase tracking-[0.14em] text-slate-400">
             benchmark command: npm run warp:render:congruence:check -- --debug-log &lt;path-to-jsonl&gt;

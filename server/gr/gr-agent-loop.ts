@@ -2,6 +2,7 @@ import {
   buildGrRequestPayload,
   evaluateQiGuardrail,
   getGlobalPipelineState,
+  resolveBubbleRadiusM,
   setGlobalPipelineState,
   updateParameters,
   type EnergyPipelineState,
@@ -296,10 +297,7 @@ const resolveWarpConfig = (
   override?: WarpConfig,
 ): WarpConfig => {
   const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
-  const bubbleRadius =
-    Number.isFinite(state.shipRadius_m) && (state.shipRadius_m as number) > 0
-      ? (state.shipRadius_m as number)
-      : hull.Lz_m / 2;
+  const bubbleRadius = resolveBubbleRadiusM(state, hull.Lz_m / 2);
   return {
     bubbleRadius_m: bubbleRadius,
     wallThickness_m: hull.wallThickness_m ?? 0.45,

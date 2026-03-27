@@ -1,7 +1,11 @@
 import { Buffer } from "node:buffer";
 import { performance } from "node:perf_hooks";
 import { getGlobalPipelineState } from "./energy-pipeline.ts";
-import type { Vec3 } from "./curvature-brick.ts";
+import {
+  resolveHullRadius,
+  type HullRadialMap,
+  type Vec3,
+} from "./curvature-brick.ts";
 import {
   buildEvolutionBrick,
   runInitialDataSolve,
@@ -17,7 +21,7 @@ import {
   type StressEnergyFieldSet,
   type StressEnergyBuildOptions,
 } from "./gr/evolution/index.js";
-import { toGeometricTime, toSiTime, type GrUnitSystem } from "../shared/gr-units.js";
+import { toGeometricTime, toSiTime, type GrUnitSystem } from "../shared/gr-units.ts";
 import type { GrPipelineDiagnostics } from "./energy-pipeline.ts";
 import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
 import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick.ts";
@@ -227,6 +231,9 @@ const GR_EVOLVE_CHANNEL_ORDER = [
   "gamma_xx",
   "gamma_yy",
   "gamma_zz",
+  "gamma_xy",
+  "gamma_xz",
+  "gamma_yz",
   "K_trace",
   "g_tt",
   "clockRate_static",
@@ -242,6 +249,9 @@ const GR_EVOLVE_CHANNEL_ORDER = [
   "M_constraint_x",
   "M_constraint_y",
   "M_constraint_z",
+  "hull_sdf",
+  "tile_support_mask",
+  "region_class",
 ] as const;
 
 const GR_EVOLVE_KIJ_CHANNELS = [
@@ -353,6 +363,156 @@ const buildChannelFromArray = (data: Float32Array): GrEvolveBrickChannel => {
   if (!Number.isFinite(min)) min = 0;
   if (!Number.isFinite(max)) max = 0;
   return { data, min, max };
+};
+
+const buildRegionClassChannel = (
+  theta: GrEvolveBrickChannel,
+  supportMask: GrEvolveBrickChannel | null,
+  neutralEps = 1e-12,
+): GrEvolveBrickChannel => {
+  const len = theta.data.length;
+  const data = new Float32Array(len);
+  const eps = Math.max(0, neutralEps);
+  const supportData = supportMask?.data;
+  for (let i = 0; i < len; i += 1) {
+    if (supportData && (supportData[i] ?? 0) <= 0.5) {
+      data[i] = 0;
+      continue;
+    }
+    const value = theta.data[i];
+    data[i] = value > eps ? 1 : value < -eps ? -1 : 0;
+  }
+  return buildChannelFromArray(data);
+};
+
+const appendBrickMetaReason = (meta: GrBrickMeta | undefined, reason: string): GrBrickMeta => {
+  const reasons = meta?.reasons ? [...meta.reasons] : [];
+  if (!reasons.includes(reason)) {
+    reasons.push(reason);
+  }
+  return { status: "NOT_CERTIFIED", reasons };
+};
+
+const resolveHullAxes = (
+  bounds: { min: Vec3; max: Vec3 },
+  sourceParams: Partial<StressEnergyBrickParams> | undefined,
+  state: ReturnType<typeof getGlobalPipelineState>,
+): Vec3 => {
+  const src = sourceParams?.hullAxes;
+  if (
+    Array.isArray(src) &&
+    src.length >= 3 &&
+    Number.isFinite(src[0]) &&
+    Number.isFinite(src[1]) &&
+    Number.isFinite(src[2]) &&
+    src[0] > 0 &&
+    src[1] > 0 &&
+    src[2] > 0
+  ) {
+    return [Number(src[0]), Number(src[1]), Number(src[2])];
+  }
+  const stateHull = (state as any)?.hull;
+  if (
+    stateHull &&
+    Number.isFinite(stateHull.Lx_m) &&
+    Number.isFinite(stateHull.Ly_m) &&
+    Number.isFinite(stateHull.Lz_m)
+  ) {
+    return [
+      Math.max(1e-6, Number(stateHull.Lx_m) * 0.5),
+      Math.max(1e-6, Number(stateHull.Ly_m) * 0.5),
+      Math.max(1e-6, Number(stateHull.Lz_m) * 0.5),
+    ];
+  }
+  return [
+    Math.max(1e-6, Math.abs(bounds.max[0] - bounds.min[0]) * 0.5),
+    Math.max(1e-6, Math.abs(bounds.max[1] - bounds.min[1]) * 0.5),
+    Math.max(1e-6, Math.abs(bounds.max[2] - bounds.min[2]) * 0.5),
+  ];
+};
+
+const resolveHullSupportChannels = (
+  state: ReturnType<typeof getGlobalPipelineState>,
+  dims: [number, number, number],
+  bounds: { min: Vec3; max: Vec3 },
+  sourceParams: Partial<StressEnergyBrickParams> | undefined,
+  theta: GrEvolveBrickChannel | undefined,
+  neutralEps: number,
+) => {
+  const reasons: string[] = [];
+  const total = Math.max(0, dims[0] * dims[1] * dims[2]);
+  if (total <= 0) {
+    reasons.push("hull_support_dims_invalid");
+    return {
+      hullSdf: null,
+      tileSupportMask: null,
+      regionClass: null,
+      reasons,
+    };
+  }
+
+  const hullAxes = resolveHullAxes(bounds, sourceParams, state);
+  const radialMap = (sourceParams?.radialMap as HullRadialMap | null | undefined) ?? null;
+  const spacing = resolveVoxelSize(dims, bounds);
+  const dx = Math.max(1e-6, spacing[0]);
+  const dy = Math.max(1e-6, spacing[1]);
+  const dz = Math.max(1e-6, spacing[2]);
+  const rawHullWall = Number(
+    sourceParams?.hullWall ??
+      (state as any)?.hull?.wallThickness_m ??
+      Math.min(dx, dy, dz),
+  );
+  const hullWall = Number.isFinite(rawHullWall)
+    ? Math.max(rawHullWall, 0.5 * Math.min(dx, dy, dz))
+    : 0.5 * Math.min(dx, dy, dz);
+  if (!Number.isFinite(rawHullWall)) {
+    reasons.push("hull_support_hull_wall_missing");
+  }
+
+  const sdfData = new Float32Array(total);
+  const supportData = new Float32Array(total);
+  const nx = dims[0];
+  const ny = dims[1];
+  const nz = dims[2];
+  let idx = 0;
+  for (let z = 0; z < nz; z += 1) {
+    const pz = bounds.min[2] + (z + 0.5) * dz;
+    for (let y = 0; y < ny; y += 1) {
+      const py = bounds.min[1] + (y + 0.5) * dy;
+      for (let x = 0; x < nx; x += 1) {
+        const px = bounds.min[0] + (x + 0.5) * dx;
+        const pLen = Math.hypot(px, py, pz);
+        const dir: Vec3 =
+          pLen > 1e-9
+            ? [px / pLen, py / pLen, pz / pLen]
+            : [1, 0, 0];
+        const radius = resolveHullRadius(dir, hullAxes, radialMap);
+        const signedDistance = pLen - radius;
+        sdfData[idx] = Number.isFinite(signedDistance) ? signedDistance : 0;
+        supportData[idx] = Math.abs(signedDistance) <= hullWall ? 1 : 0;
+        idx += 1;
+      }
+    }
+  }
+
+  const hullSdf = buildChannelFromArray(sdfData);
+  const tileSupportMask = buildChannelFromArray(supportData);
+  const regionClass = theta
+    ? buildRegionClassChannel(theta, tileSupportMask, neutralEps)
+    : null;
+  if (!theta) {
+    reasons.push("hull_support_theta_missing");
+  }
+  if (tileSupportMask.max <= 0) {
+    reasons.push("hull_support_empty");
+  }
+
+  return {
+    hullSdf,
+    tileSupportMask,
+    regionClass,
+    reasons,
+  };
 };
 
 const rmsFromChannel = (channel: GrEvolveBrickChannel) => {
@@ -869,6 +1029,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     stiffness.stabilizersApplied = evolution.stabilizersApplied;
   }
 
+  const pipelineState = getGlobalPipelineState();
   const includeMatterChannels = includeMatter && !!evolution.matter;
   const brickStart = nowMs();
   const evolutionBrick = buildEvolutionBrick({
@@ -886,6 +1047,15 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   });
   const brickMs = nowMs() - brickStart;
   const evolutionChannels = evolutionBrick.channels;
+  const theta = evolutionChannels.theta;
+  const hullSupport = resolveHullSupportChannels(
+    pipelineState,
+    dims,
+    bounds,
+    input.sourceParams,
+    theta,
+    Math.max(1e-12, tolerance),
+  );
 
   const alpha = evolutionChannels.alpha ?? buildChannelFromArray(evolution.state.alpha);
   const beta_x = evolutionChannels.beta_x ?? buildChannelFromArray(evolution.state.beta_x);
@@ -894,10 +1064,12 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const gamma_xx = evolutionChannels.gamma_xx ?? buildChannelFromArray(evolution.state.gamma_xx);
   const gamma_yy = evolutionChannels.gamma_yy ?? buildChannelFromArray(evolution.state.gamma_yy);
   const gamma_zz = evolutionChannels.gamma_zz ?? buildChannelFromArray(evolution.state.gamma_zz);
+  const gamma_xy = evolutionChannels.gamma_xy ?? buildChannelFromArray(evolution.state.gamma_xy);
+  const gamma_xz = evolutionChannels.gamma_xz ?? buildChannelFromArray(evolution.state.gamma_xz);
+  const gamma_yz = evolutionChannels.gamma_yz ?? buildChannelFromArray(evolution.state.gamma_yz);
   const K_trace = evolutionChannels.K ?? buildChannelFromArray(evolution.state.K);
   const g_tt = evolutionChannels.g_tt;
   const clockRate_static = evolutionChannels.clockRate_static;
-  const theta = evolutionChannels.theta;
   const det_gamma = evolutionChannels.det_gamma;
   const ricci3 = evolutionChannels.ricci3;
   const KijKij = evolutionChannels.KijKij;
@@ -914,6 +1086,9 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     evolutionChannels.M_constraint_y ?? buildChannelFromArray(evolution.constraints.My);
   const M_constraint_z =
     evolutionChannels.M_constraint_z ?? buildChannelFromArray(evolution.constraints.Mz);
+  const hull_sdf = hullSupport.hullSdf;
+  const tile_support_mask = hullSupport.tileSupportMask;
+  const region_class = hullSupport.regionClass ?? undefined;
 
   const channelOrder: string[] = [...GR_EVOLVE_CHANNEL_ORDER];
   const channels: GrEvolveBrick["channels"] = {
@@ -924,12 +1099,25 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     gamma_xx,
     gamma_yy,
     gamma_zz,
+    gamma_xy,
+    gamma_xz,
+    gamma_yz,
     K_trace,
     H_constraint,
     M_constraint_x,
     M_constraint_y,
     M_constraint_z,
   };
+
+  if (hull_sdf) {
+    channels.hull_sdf = hull_sdf;
+  }
+  if (tile_support_mask) {
+    channels.tile_support_mask = tile_support_mask;
+  }
+  if (region_class) {
+    channels.region_class = region_class;
+  }
 
   if (g_tt) channels.g_tt = g_tt;
   if (clockRate_static) channels.clockRate_static = clockRate_static;
@@ -985,6 +1173,10 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     dtGeom: dt_geom,
     minSpacing,
   });
+  let resolvedBrickMeta = brickMeta;
+  for (const reason of hullSupport.reasons) {
+    resolvedBrickMeta = appendBrickMetaReason(resolvedBrickMeta, reason);
+  }
   const kretschmannStats = includeInvariants
     ? buildInvariantStats(kretschmann, {
         wallFraction: invariantWallFraction,
@@ -1053,10 +1245,9 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     channelOrder: resolvedChannelOrder,
     channels,
     stats,
-    meta: brickMeta,
+    meta: resolvedBrickMeta,
   };
 
-  const pipelineState = getGlobalPipelineState();
   if (pipelineState?.grEnabled === true) {
     const metricAdapter = (pipelineState as any)?.warp?.metricAdapter ?? null;
     const diagnostics = buildGrDiagnostics(brick, { metricAdapter });

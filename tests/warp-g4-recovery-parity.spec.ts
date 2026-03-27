@@ -34,7 +34,7 @@ describe('warp g4 recovery parity', () => {
                 qSpoilingFactor: 1,
                 tau_s_ms: 5,
                 gap_nm: 0.4,
-                shipRadius_m: 2,
+                bubbleRadius_m: 2,
               },
               applicabilityStatus: 'PASS',
               marginRatioRaw: 1.2,
@@ -104,7 +104,7 @@ describe('warp g4 recovery parity', () => {
                 qSpoilingFactor: 3,
                 tau_s_ms: 0.02,
                 gap_nm: 8,
-                shipRadius_m: 2,
+                bubbleRadius_m: 2,
               },
               applicabilityStatus: 'PASS',
               marginRatioRaw: 0.12890679702998561,
@@ -377,7 +377,7 @@ describe('warp g4 recovery parity', () => {
       qSpoilingFactor: 1,
       tau_s_ms: 5,
       gap_nm: 0.4,
-      shipRadius_m: 2,
+      bubbleRadius_m: 2,
     };
 
     fs.writeFileSync(
@@ -452,3 +452,4 @@ describe('warp g4 recovery parity', () => {
     expect(driftPayload.candidates[0].mismatchReason).toBe('none');
   });
 });
+

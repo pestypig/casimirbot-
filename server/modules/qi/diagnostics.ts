@@ -1,4 +1,7 @@
-import type { EnergyPipelineState } from "../../energy-pipeline";
+import {
+  resolveHullGeometry,
+  type EnergyPipelineState,
+} from "../../energy-pipeline";
 import type {
   QiDiagnosticsPayload,
   QiDiagnosticsRequest,
@@ -37,10 +40,10 @@ const downsampleTiles = (tiles: TileDatum[]): TileDatum[] => {
 
 const fallbackTiles = (state: EnergyPipelineState, count = 512): TileDatum[] => {
   const tiles: TileDatum[] = [];
-  const hull = (state.hull ?? {}) as Partial<{ Lx_m: number; Ly_m: number; Lz_m: number }>;
-  const a = Number(hull.Lx_m ?? (state.shipRadius_m ? state.shipRadius_m * 2 : 1007)) / 2;
-  const b = Number(hull.Ly_m ?? (state.shipRadius_m ? state.shipRadius_m * 2 : 264)) / 2;
-  const c = Number(hull.Lz_m ?? (state.shipRadius_m ? state.shipRadius_m * 2 : 173)) / 2;
+  const hull = resolveHullGeometry(state, { Lx_m: 1007, Ly_m: 264, Lz_m: 173 });
+  const a = hull.Lx_m / 2;
+  const b = hull.Ly_m / 2;
+  const c = hull.Lz_m / 2;
   const t00Base = Number((state as any)?.stressEnergy?.T00 ?? -2.5e13);
   for (let i = 0; i < count; i++) {
     const theta = Math.random() * 2 * Math.PI;

@@ -23,6 +23,8 @@ import {
   computeTauLcMsFromHull,
   TAU_LC_UNIT_DRIFT_LIMIT,
   DEFAULT_PULSED_CURRENT_LIMITS_A,
+  resolveHullGeometry,
+  resolveHullReferenceRadiusM,
 } from "./energy-pipeline";
 // Import the type on a separate line to avoid esbuild/tsx parse grief
 import type { EnergyPipelineState, FieldSampleBuffer, ScheduleSweepRequest, WarpGeometrySpec } from "./energy-pipeline";
@@ -2524,11 +2526,7 @@ export async function updatePipelineParams(req: Request, res: Response) {
       }
       if (hullPartial) {
         paramsTyped.hull = {
-          ...(curr.hull ?? {
-            Lx_m: curr.shipRadius_m * 2,
-            Ly_m: curr.shipRadius_m * 2,
-            Lz_m: curr.shipRadius_m * 2,
-          }),
+          ...resolveHullGeometry(curr),
           ...hullPartial,
         } as EnergyPipelineState["hull"];
       }
@@ -2602,7 +2600,11 @@ export async function updatePipelineParams(req: Request, res: Response) {
     // Write calibration for phase diagram integration
     await writePhaseCalibration({
       tile_area_cm2: newState.tileArea_cm2,
-      ship_radius_m: newState.shipRadius_m || 86.5,
+      hull_reference_radius_m: resolveHullReferenceRadiusM(newState, {
+        Lx_m: 173,
+        Ly_m: 173,
+        Lz_m: 173,
+      }),
       P_target_W: (newState as any).P_avg_W || 100e6, 
       M_target_kg: newState.exoticMassTarget_kg || 1400,
       zeta_target: 0.5
@@ -2714,7 +2716,11 @@ export async function switchOperationalMode(req: Request, res: Response) {
     // Write calibration for phase diagram integration  
     await writePhaseCalibration({
       tile_area_cm2: newState.tileArea_cm2,
-      ship_radius_m: newState.shipRadius_m || 86.5,
+      hull_reference_radius_m: resolveHullReferenceRadiusM(newState, {
+        Lx_m: 173,
+        Ly_m: 173,
+        Lz_m: 173,
+      }),
       P_target_W: 100e6, // Use fixed target power for now
       M_target_kg: newState.exoticMassTarget_kg || 1400,
       zeta_target: 0.5
@@ -7232,6 +7238,38 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
     };
 
     const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+    const requireCongruentSolve = parseBooleanParam(
+      (query as any).requireCongruentSolve,
+      parseBooleanParam((query as any).requireNhm2CongruentFullSolve, false),
+    );
+    if (requireCongruentSolve) {
+      const congruentRaw = (state as any)?.congruentSolve;
+      const congruent = congruentRaw && typeof congruentRaw === "object" ? congruentRaw : null;
+      const failReasons = Array.isArray(congruent?.failReasons)
+        ? congruent.failReasons
+            .map((reason: unknown) => String(reason))
+            .filter((reason: string) => reason.length > 0)
+        : [];
+      const pass = congruent?.pass === true;
+      if (!pass) {
+        res.status(422).json({
+          error: "nhm2_congruent_full_solve_required",
+          message:
+            "gr-evolve-brick requires congruent NHM2 full-solve pass before emitting renderable metric volume",
+          congruentSolve: {
+            pass,
+            policyMarginPass: congruent?.policyMarginPass === true,
+            computedMarginPass: congruent?.computedMarginPass === true,
+            applicabilityPass: congruent?.applicabilityPass === true,
+            metricPass: congruent?.metricPass === true,
+            semanticPass: congruent?.semanticPass === true,
+            strictMode: congruent?.strictMode === true,
+            failReasons,
+          },
+        });
+        return;
+      }
+    }
     const wantsBinary = wantsBinaryResponse(req, query as Record<string, unknown>);
     const quality = typeof query.quality === "string" ? query.quality : undefined;
     const qualityDims = dimsForQuality(quality);
@@ -7330,8 +7368,79 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
     const pipelineInputs = resolvePipelineMatterInputs(state);
     const hullAxes: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
     const hullWall = state.hull?.wallThickness_m ?? 0.45;
-    const dutyFRValue = Math.max(pipelineInputs.dutyFR, 1e-8);
-    const qValue = Math.max(pipelineInputs.q, 1e-6);
+    const dutyFROverride = parseNumberParam(
+      query.dutyFR,
+      parseNumberParam(query.duty_fr, Number.NaN),
+    );
+    const qOverride = parseNumberParam(
+      query.q,
+      parseNumberParam(query.qSpoilingFactor, Number.NaN),
+    );
+    const gammaGeoOverride = parseNumberParam(
+      query.gammaGeo,
+      parseNumberParam(query.gamma_geo, Number.NaN),
+    );
+    const gammaVdBOverride = parseNumberParam(
+      query.gammaVdB,
+      parseNumberParam(query.gamma_vdb, Number.NaN),
+    );
+    const zetaOverride = parseNumberParam(query.zeta, Number.NaN);
+    const phaseOverride = parseNumberParam(query.phase01, Number.NaN);
+    const metricT00Override = parseNumberParam(
+      (query as any).metricT00,
+      parseNumberParam((query as any).metric_t00, Number.NaN),
+    );
+    const stateMetricT00 = parseNumberParam((state as any)?.warp?.metricT00, Number.NaN);
+    const sourceMetricT00 = Number.isFinite(metricT00Override)
+      ? metricT00Override
+      : Number.isFinite(stateMetricT00)
+        ? stateMetricT00
+        : Number.NaN;
+    const metricT00SourceOverride =
+      typeof (query as any).metricT00Source === "string"
+        ? String((query as any).metricT00Source)
+        : typeof (query as any).metric_t00_source === "string"
+          ? String((query as any).metric_t00_source)
+          : null;
+    const stateMetricT00Source =
+      typeof (state as any)?.warp?.metricT00Source === "string"
+        ? String((state as any).warp.metricT00Source)
+        : typeof (state as any)?.warp?.stressEnergySource === "string"
+          ? String((state as any).warp.stressEnergySource)
+          : null;
+    const sourceMetricT00Source =
+      metricT00SourceOverride ??
+      stateMetricT00Source ??
+      (Number.isFinite(sourceMetricT00) ? "metric" : null);
+    const metricT00RefOverride =
+      typeof (query as any).metricT00Ref === "string"
+        ? String((query as any).metricT00Ref)
+        : typeof (query as any).metric_t00_ref === "string"
+          ? String((query as any).metric_t00_ref)
+          : null;
+    const stateMetricT00Ref =
+      typeof (state as any)?.warp?.metricT00Ref === "string"
+        ? String((state as any).warp.metricT00Ref)
+        : null;
+    const sourceMetricT00Ref = metricT00RefOverride ?? stateMetricT00Ref;
+    const sourceDutyFR = Number.isFinite(dutyFROverride)
+      ? Math.max(dutyFROverride, 1e-8)
+      : Math.max(pipelineInputs.dutyFR, 1e-8);
+    const sourceQ = Number.isFinite(qOverride)
+      ? Math.max(qOverride, 1e-6)
+      : Math.max(pipelineInputs.q, 1e-6);
+    const sourceGammaGeo = Number.isFinite(gammaGeoOverride)
+      ? Math.max(gammaGeoOverride, 1e-6)
+      : pipelineInputs.gammaGeo;
+    const sourceGammaVdB = Number.isFinite(gammaVdBOverride)
+      ? Math.max(gammaVdBOverride, 1e-6)
+      : pipelineInputs.gammaVdB;
+    const sourceZeta = Number.isFinite(zetaOverride)
+      ? Math.max(0, zetaOverride)
+      : pipelineInputs.zeta;
+    const sourcePhase01 = Number.isFinite(phaseOverride)
+      ? wrap01(phaseOverride)
+      : wrap01(pipelineInputs.phase01);
     const pressureFactor = resolveStressEnergyPressureFactor(state);
     const sourceOptions =
       pressureFactor !== undefined ? { pressureFactor } : undefined;
@@ -7339,25 +7448,42 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       bounds,
       hullAxes,
       hullWall,
-      dutyFR: dutyFRValue,
-      q: qValue,
-      gammaGeo: pipelineInputs.gammaGeo,
-      gammaVdB: pipelineInputs.gammaVdB,
-      zeta: pipelineInputs.zeta,
-      phase01: pipelineInputs.phase01,
+      dutyFR: sourceDutyFR,
+      q: sourceQ,
+      gammaGeo: sourceGammaGeo,
+      gammaVdB: sourceGammaVdB,
+      zeta: sourceZeta,
+      phase01: sourcePhase01,
       driveDir: driveDir ?? undefined,
+      metricT00: Number.isFinite(sourceMetricT00) ? sourceMetricT00 : undefined,
+      metricT00Source: sourceMetricT00Source ?? undefined,
+      metricT00Ref: sourceMetricT00Ref ?? undefined,
     };
     const sourceCacheKey = {
-      dutyFR: dutyFRValue,
-      q: qValue,
-      gammaGeo: pipelineInputs.gammaGeo,
-      gammaVdB: pipelineInputs.gammaVdB,
-      zeta: pipelineInputs.zeta,
-      phase01: pipelineInputs.phase01,
+      dutyFR: sourceDutyFR,
+      q: sourceQ,
+      gammaGeo: sourceGammaGeo,
+      gammaVdB: sourceGammaVdB,
+      zeta: sourceZeta,
+      phase01: sourcePhase01,
+      metricT00: Number.isFinite(sourceMetricT00) ? sourceMetricT00 : null,
+      metricT00Source: sourceMetricT00Source,
+      metricT00Ref: sourceMetricT00Ref,
       pressureFactor: pressureFactor ?? null,
       driveDir: driveDir ?? null,
       hullAxes,
       hullWall,
+      overrides: {
+        dutyFR: Number.isFinite(dutyFROverride) ? dutyFROverride : null,
+        q: Number.isFinite(qOverride) ? qOverride : null,
+        gammaGeo: Number.isFinite(gammaGeoOverride) ? gammaGeoOverride : null,
+        gammaVdB: Number.isFinite(gammaVdBOverride) ? gammaVdBOverride : null,
+        zeta: Number.isFinite(zetaOverride) ? zetaOverride : null,
+        phase01: Number.isFinite(phaseOverride) ? wrap01(phaseOverride) : null,
+        metricT00: Number.isFinite(metricT00Override) ? metricT00Override : null,
+        metricT00Source: metricT00SourceOverride,
+        metricT00Ref: metricT00RefOverride,
+      },
     };
     const geometrySig = buildGrGeometrySignature(
       resolved,

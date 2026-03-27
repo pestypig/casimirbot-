@@ -13,20 +13,20 @@ export default function Home() {
   const updatePipeline = useUpdatePipeline();
 
   // Shared phase diagram state - Needle Hull Mk 1 defaults
-  const [tileArea, setTileArea] = useState(25); // cm² (Needle Hull: 25 cm²)
-  const [shipRadius, setShipRadius] = useState(503.5); // m (Needle Hull: 503.5 m ellipsoid scale)
+  const [tileArea, setTileArea] = useState(25); // cmÂ² (Needle Hull: 25 cmÂ²)
+  const [hullReferenceRadius, setHullReferenceRadius] = useState(503.5); // m (Needle Hull: 503.5 m ellipsoid scale)
 
   // Constraint configuration state (exact Needle Hull defaults)
-  const [massTolPct, setMassTolPct] = useState(5); // ±5% mass tolerance (1340-1470 kg range)
+  const [massTolPct, setMassTolPct] = useState(5); // Â±5% mass tolerance (1340-1470 kg range)
   const [maxPower, setMaxPower] = useState(100); // 100 MW max power (headroom above 83 MW target)
-  const [maxZeta, setMaxZeta] = useState(1.0); // ζ ≤ 1.0 Ford-Roman bound
-  const [minGamma, setMinGamma] = useState(25); // γ ≥ 25 geometric amplification
+  const [maxZeta, setMaxZeta] = useState(1.0); // Î¶ â‰¤ 1.0 Ford-Roman bound
+  const [minGamma, setMinGamma] = useState(25); // Î³ â‰¥ 25 geometric amplification
 
   // Dynamic simulation parameters - Needle Hull Mk 1 defaults
-  const [gammaGeo, setGammaGeo] = useState(26); // γ_geo = 26 (Needle Hull research value)
+  const [gammaGeo, setGammaGeo] = useState(26); // Î³_geo = 26 (Needle Hull research value)
   const [qFactor, setQFactor] = useState(1e9); // Q_cavity default for research sketch
   const [duty, setDuty] = useState(0.14); // 14% burst duty cycle (HOVER MODE default)
-  const [sagDepth, setSagDepth] = useState(16); // 16 nm sag depth for Ω profiling
+  const [sagDepth, setSagDepth] = useState(16); // 16 nm sag depth for Î© profiling
   const [temperature, setTemperature] = useState(20);
   const [exoticMassTarget, setExoticMassTarget] = useState(1405); // Default to research paper target
 
@@ -53,13 +53,13 @@ export default function Home() {
   // Mode-aware constraint calculation (kept explicit; can diverge from MODE_CONFIGS if needed)
   const getModeAwareConstraints = (mode: ModeKey) => {
     switch (mode) {
-      case "hover": // 14% duty → ~83 MW
+      case "hover": // 14% duty â†’ ~83 MW
         return { maxPower: 120, maxZeta: 0.1, massTolPct: 5 };
-      case "cruise": // 0.5% duty → ~0.007 MW
+      case "cruise": // 0.5% duty â†’ ~0.007 MW
         return { maxPower: 20, maxZeta: 1.5, massTolPct: 5 };
-      case "emergency": // 50% duty → ~297 MW
+      case "emergency": // 50% duty â†’ ~297 MW
         return { maxPower: 400, maxZeta: 0.05, massTolPct: 5 };
-      case "standby": // 0% duty → 0 MW
+      case "standby": // 0% duty â†’ 0 MW
         return { maxPower: 10, maxZeta: 10, massTolPct: 5 };
       default:
         return { maxPower: 100, maxZeta: 1.0, massTolPct: 5 };
@@ -142,7 +142,7 @@ export default function Home() {
                 sagDepth={sagDepth}
                 temperature={temperature}
                 tileArea={tileArea}
-                shipRadius={shipRadius}
+                hullReferenceRadius={hullReferenceRadius}
                 gapDistance={1.0}
                 sectorCount={400}
                 exoticMassTarget={exoticMassTarget}
@@ -175,7 +175,7 @@ export default function Home() {
                   // Update backend pipeline with new parameters
                   updatePipeline.mutate({
                     dutyCycle: newDuty ?? duty,
-                    // ⬇️ map UI qFactor → pipeline qCavity (not qMechanical)
+                    // â¬‡ï¸ map UI qFactor â†’ pipeline qCavity (not qMechanical)
                     qCavity: newQ ?? qFactor,
                     gammaGeo: newGamma ?? gammaGeo,
                     exoticMassTarget_kg: newM ?? exoticMassTarget,
@@ -199,8 +199,8 @@ export default function Home() {
               <PhaseDiagram
                 tileArea={tileArea}
                 onTileAreaChange={setTileArea}
-                shipRadius={shipRadius}
-                onShipRadiusChange={setShipRadius}
+                hullReferenceRadius={hullReferenceRadius}
+                onHullReferenceRadiusChange={setHullReferenceRadius}
                 massTolPct={massTolPct}
                 onMassTolPctChange={setMassTolPct}
                 maxPower={maxPower}
@@ -261,7 +261,7 @@ export default function Home() {
 
         {/* Footer Information */}
         <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>Natário Zero-Expansion Warp Bubble Research Platform • Needle Hull Mk 1 Configuration</p>
+          <p>NatÃ¡rio Zero-Expansion Warp Bubble Research Platform â€¢ Needle Hull Mk 1 Configuration</p>
           <p>Real-time energy pipeline calculations with authentic Casimir physics</p>
         </div>
       </div>

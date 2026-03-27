@@ -15,7 +15,6 @@ const strictCongruenceEnv = process.env.WARP_STRICT_CONGRUENCE;
 
 const baseState: EnergyPipelineState = {
   tileArea_cm2: 1,
-  shipRadius_m: 1,
   gap_nm: 1,
   sag_nm: 0,
   temperature_K: 300,

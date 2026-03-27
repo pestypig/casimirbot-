@@ -35,7 +35,7 @@ export type ZenVals = Partial<{
   tsRatio: number;       // T_s / T_LC (timescale separation)
   powerMW: number;       // current raw or average power
   exoticKg: number;      // computed exotic-mass equivalent
-  shipRadiusM: number;   // hull radius
+  hullReferenceRadiusM: number; // full-hull reference radius used by UI approximations
   gapNm: number;         // cavity gap
   frOk: boolean;
   natarioOk: boolean;
@@ -53,6 +53,8 @@ type Entry = {
   zen:    (v: ZenVals)=>string;
 };
 
+const hullReferenceRadius = (v: ZenVals) => v.hullReferenceRadiusM;
+
 const ZEN_MAP: Record<ZenCtx, Entry> = {
   // --- GLOBAL / MODE ---
   "mode:switch": {
@@ -64,7 +66,7 @@ const ZEN_MAP: Record<ZenCtx, Entry> = {
   // --- GEOMETRY ---
   "geom:gamma": {
     title: "Geometry Amplification Adjusted (γ₍geo₎)",
-    theory: v => `Geometric amplification set to γ_geo=${fmt(v.gammaGeo)} for hull radius ${fmt(v.shipRadiusM)} m and gap ${fmt(v.gapNm)} nm. This scales cycle-averaged cavity energy and therefore raw power and exotic-mass estimates under current constraints.`,
+    theory: v => `Geometric amplification set to γ_geo=${fmt(v.gammaGeo)} for full-hull reference radius ${fmt(hullReferenceRadius(v))} m and gap ${fmt(v.gapNm)} nm. This scales cycle-averaged cavity energy and therefore raw power and exotic-mass estimates under current constraints.`,
     zen:   v => `Stance before strike: arrange form for inevitability. Correct posture makes quiet outcomes.`,
   },
   "geom:qfactor": {
@@ -130,7 +132,7 @@ const ZEN_MAP: Record<ZenCtx, Entry> = {
   },
   "mesh:export": {
     title: "Mesh / .scuffgeo Exported",
-    theory: v => `Discretization emitted (R=${fmt(v.shipRadiusM)} m, gap=${fmt(v.gapNm)} nm). Mesh fidelity now gates solver accuracy for field interactions.`,
+    theory: v => `Discretization emitted (R=${fmt(hullReferenceRadius(v))} m, gap=${fmt(v.gapNm)} nm). Mesh fidelity now gates solver accuracy for field interactions.`,
     zen:   v => `Rake clean lines. The mesh is posture for the solver.`,
   },
 

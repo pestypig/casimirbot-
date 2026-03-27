@@ -339,7 +339,6 @@ export interface EnergyPipelineState {
   provenanceClass?: string;
   // Input parameters
   tileArea_cm2: number;
-  shipRadius_m: number;
   gap_nm: number;
   sag_nm?: number;
   temperature_K: number;

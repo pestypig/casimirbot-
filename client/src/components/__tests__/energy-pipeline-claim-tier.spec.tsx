@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import React from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,7 +36,7 @@ describe("LiveEnergyPipeline claim tier / provenance surfacing", () => {
     sagDepth: 0,
     temperature: 300,
     tileArea: 1,
-    shipRadius: 82,
+    hullReferenceRadius: 82,
   };
 
   it("renders backend claim tier + provenance and avoids certified wording at diagnostic tier", () => {
@@ -94,13 +94,13 @@ describe("LiveEnergyPipeline claim tier / provenance surfacing", () => {
     });
 
     render(<TooltipProvider><LiveEnergyPipeline {...baseProps} /></TooltipProvider>);
-    expect(screen.getByText(/OK · metric claim unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/OK \| metric claim unavailable/)).toBeInTheDocument();
 
     const audienceControl = screen.getByTestId("audience-mode-control");
     fireEvent.click(within(audienceControl).getByRole("combobox"));
     fireEvent.click(screen.getByText("Academic"));
 
-    expect(screen.getByText(/OK · metric claim unavailable \(contract missing\)/)).toBeInTheDocument();
+    expect(screen.getByText(/OK \| metric claim unavailable \(contract missing\)/)).toBeInTheDocument();
   });
 
   it("switches QI derivation labels between Public and Academic audience modes", () => {
@@ -120,12 +120,12 @@ describe("LiveEnergyPipeline claim tier / provenance surfacing", () => {
 
     render(<TooltipProvider><LiveEnergyPipeline {...baseProps} /></TooltipProvider>);
 
-    expect(screen.getByText(/OK · operational estimate/)).toBeInTheDocument();
+    expect(screen.getByText(/OK \| operational estimate/)).toBeInTheDocument();
 
     const audienceControl = screen.getByTestId("audience-mode-control");
     fireEvent.click(within(audienceControl).getByRole("combobox"));
     fireEvent.click(screen.getByText("Academic"));
 
-    expect(screen.getByText(/OK · proxy-derived \(pipeline\)/)).toBeInTheDocument();
+    expect(screen.getByText(/OK \| proxy-derived \(pipeline\)/)).toBeInTheDocument();
   });
 });

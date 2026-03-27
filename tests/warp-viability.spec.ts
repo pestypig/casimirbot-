@@ -7,9 +7,10 @@ const runtime = vi.hoisted(() => ({
 const mocks = vi.hoisted(() => ({
   calculateEnergyPipeline: vi.fn(async (state: any) => ({ ...state, ...runtime.pipeline })),
   initializePipelineState: vi.fn(() => ({
-    shipRadius_m: 1,
     dutyCycle: 0.1,
     hull: { Lx_m: 2, Ly_m: 2, Lz_m: 2, wallThickness_m: 0.1 },
+    bubble: { R: 1, sigma: 0.1 },
+    R: 1,
     tileArea_cm2: 1,
     gammaGeo: 1,
   })),

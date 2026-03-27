@@ -31,13 +31,13 @@ type CaseResult = {
 type InfluenceCase = {
   id: string;
   family: string;
-  changed: Record<string, string | number | boolean>;
+  changed: Record<string, unknown>;
 };
 
 type InfluenceResult = {
   id: string;
   family: string;
-  changed: Record<string, string | number | boolean>;
+  changed: Record<string, unknown>;
   lhs_Jm3: number | null;
   bound_Jm3: number | null;
   marginRatioRaw: number | null;
@@ -245,8 +245,8 @@ const influenceCases: InfluenceCase[] = [
   { id: 'qSpoiling_high', family: 'qSpoilingFactor', changed: { qSpoilingFactor: 4 } },
   { id: 'gap_tight_nm', family: 'gap_nm', changed: { gap_nm: 0.4 } },
   { id: 'gap_wide_nm', family: 'gap_nm', changed: { gap_nm: 8 } },
-  { id: 'shipRadius_small', family: 'shipRadius_m', changed: { shipRadius_m: 2 } },
-  { id: 'shipRadius_large', family: 'shipRadius_m', changed: { shipRadius_m: 40 } },
+  { id: 'bubbleRadius_small', family: 'bubbleRadius_m', changed: { bubble: { R: 2 }, R: 2 } },
+  { id: 'bubbleRadius_large', family: 'bubbleRadius_m', changed: { bubble: { R: 40 }, R: 40 } },
 ];
 
 export async function runInfluenceScan(): Promise<{ baseline: InfluenceResult; rankedEffects: InfluenceResult[] }> {
@@ -254,7 +254,7 @@ export async function runInfluenceScan(): Promise<{ baseline: InfluenceResult; r
   const baselineGuard = evaluateQiGuardrail(baselineState);
   const baselineAbs = Math.abs(numberOrNull(baselineGuard.lhs_Jm3) ?? 0);
 
-  const toResult = (id: string, family: string, changed: Record<string, string | number | boolean>, state: any, guard: any): InfluenceResult => {
+  const toResult = (id: string, family: string, changed: Record<string, unknown>, state: any, guard: any): InfluenceResult => {
     const lhs = numberOrNull(guard.lhs_Jm3);
     const absLhs = lhs == null ? null : Math.abs(lhs);
     return {

@@ -808,7 +808,7 @@ describe('warp-full-solve-campaign runner', () => {
               qCavity: 100000,
               qSpoilingFactor: 3,
               gap_nm: 8,
-              shipRadius_m: 2,
+              bubbleRadius_m: 2,
               sampler: 'hann',
               fieldType: 'em',
               tau_s_ms: 0.02,
@@ -859,7 +859,7 @@ describe('warp-full-solve-campaign runner', () => {
               qCavity: 100000,
               qSpoilingFactor: 3,
               gap_nm: 8,
-              shipRadius_m: 2,
+              bubbleRadius_m: 2,
               sampler: 'hann',
               fieldType: 'em',
               tau_s_ms: 0.02,
@@ -981,7 +981,7 @@ describe('warp-full-solve-campaign runner', () => {
               qCavity: 100000,
               qSpoilingFactor: 3,
               gap_nm: 8,
-              shipRadius_m: 2,
+              bubbleRadius_m: 2,
               sampler: 'hann',
               fieldType: 'em',
               tau_s_ms: 0.02,
@@ -1444,3 +1444,4 @@ describe('warp-full-solve-campaign runner', () => {
   }, 100_000);
 
 });
+

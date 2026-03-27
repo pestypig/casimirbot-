@@ -6105,6 +6105,7 @@ describe("helix ask reliability guards", () => {
         hasFilePathHints: false,
         endpointHintCount: 0,
         relationHeuristicPrompt: true,
+        initialIntentProfileId: "general.conceptual_define_compare",
       }),
     ).toBe(false);
     expect(
@@ -6116,8 +6117,21 @@ describe("helix ask reliability guards", () => {
         hasFilePathHints: false,
         endpointHintCount: 0,
         relationHeuristicPrompt: false,
+        initialIntentProfileId: "general.conceptual_define_compare",
       }),
     ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.shouldApplyTermPriorPhysicsRelationGeneralRoute({
+        termPriorApplied: true,
+        termPriorPreferGeneralRouting: true,
+        termPriorRelationCue: true,
+        explicitRepoExpectation: false,
+        hasFilePathHints: false,
+        endpointHintCount: 0,
+        relationHeuristicPrompt: false,
+        initialIntentProfileId: "repo.warp_definition_docs_first",
+      }),
+    ).toBe(false);
   });
 
   it("preserves deterministic direct answers across composer when no llm call occurred", () => {

@@ -1127,7 +1127,7 @@ export const dynamicConfigSchema = z.object({
   pulseFrequencyGHz: z.number().positive().min(0.1).max(100).default(15),
   // Measured pulse frequency (GHz); overrides pulseFrequencyGHz.
   measuredPulseFrequencyGHz: z.number().positive().min(0.1).max(100).optional(),
-  lightCrossingTimeNs: z.number().positive().min(1).max(1000).default(100), // Light crossing time
+  lightCrossingTimeNs: z.number().positive().min(1).max(10_000_000).default(100), // Legacy compatibility payload in ns; authoritative tau_LC is tracked elsewhere in ms
   // Warp field parameters
   shiftAmplitude: z.number().positive().min(1e-15).max(1e-9).default(50e-12), // m (shift amplitude)
   expansionTolerance: z.number().positive().min(1e-15).max(1e-6).default(1e-12), // Zero-expansion tolerance
@@ -1293,7 +1293,8 @@ export interface VacuumContractSpec {
   geometry: {
     gap_nm: number | null;
     tileArea_cm2: number | null;
-    shipRadius_m: number | null;
+    hullReferenceRadius_m?: number | null;
+    bubbleRadius_m?: number | null;
     sectorCount: number | null;
     sectorsConcurrent: number | null;
     curvatureRadius_m?: number | null;

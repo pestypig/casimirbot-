@@ -5,10 +5,12 @@ This directory contains the NHM2 cavity layout scaffold for geometry freeze, con
 ## Files
 
 - `emit_layout.py`: validates the NHM2 cavity contract and emits smoke, tile, array, die, layer-map, and export-manifest artifacts
+- `render_previews.py`: renders deterministic SVG and PNG plan-view previews for smoke, tile, array, and die packages
 - `validate_contract.py`: validates geometry-freeze contract invariants before emission
 - `run_drc.py`: runs the KLayout batch DRC wrapper against the emitted layout
 - `klayout/nhm2_smoke_drc.py`: KLayout DRC rule deck for the NHM2 scaffold
 - `test_emit_layout.py`: emitter self-test
+- `test_render_previews.py`: preview renderer coverage
 - `test_validate_contract.py`: validator coverage
 - `test_run_drc.py`: DRC wrapper coverage
 
@@ -26,6 +28,8 @@ Validate the same contract through the shared TS schema:
 ```powershell
 npx tsx scripts/validate-needle-hull-mark2-cavity-contract.ts `
   --contract configs/needle-hull-mark2-cavity-contract.v1.json
+npm run validate:needle-hull-mark2:cavity-contract -- `
+  --contract configs/needle-hull-mark2-cavity-contract.v1.json
 ```
 
 Emit the layout:
@@ -34,6 +38,15 @@ Emit the layout:
 .\.venv-layout\Scripts\python.exe tools/cavity-layout/emit_layout.py `
   --contract configs/needle-hull-mark2-cavity-contract.v1.json `
   --out-dir artifacts/layout/nhm2
+```
+
+Render or re-render the deterministic preview pack:
+
+```powershell
+.\.venv-layout\Scripts\python.exe tools/cavity-layout/render_previews.py `
+  --out-dir artifacts/layout/nhm2 `
+  --manifest artifacts/layout/nhm2/nhm2-layout-export-manifest.json `
+  --preview-dir artifacts/layout/nhm2/previews
 ```
 
 Run batch DRC:
@@ -79,6 +92,7 @@ This scaffold keeps NHM2 cavity geometry centralized in one contract and makes t
 - layer-map export
 - split tile/array/die package export
 - export manifest pairing each package with the contract hash and DRC artifacts
+- deterministic SVG and PNG review previews for smoke/tile/array/die
 - batch DRC
 - plan-view review in KLayout
 

@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { NeedleHullPreset } from "../needle-hull-preset";
 import type { SimulationParameters } from "@shared/schema";
-import { NHM2_CAVITY_CONTRACT } from "@shared/needle-hull-mark2-cavity-contract";
+import {
+  NHM2_CAVITY_CONTRACT,
+  NHM2_SIMULATION_CONTROL_DEFAULTS,
+} from "@shared/needle-hull-mark2-cavity-contract";
 
 const { zenLongToastMock } = vi.hoisted(() => ({
   zenLongToastMock: vi.fn(),
@@ -25,7 +28,7 @@ describe("NeedleHullPreset NHM2 contract wiring", () => {
   it("applies NHM2 contract geometry and callback values", () => {
     let latestForm: UseFormReturn<SimulationParameters> | null = null;
     const onTileAreaChange = vi.fn();
-    const onShipRadiusChange = vi.fn();
+    const onHullReferenceRadiusChange = vi.fn();
     const onApplyPreset = vi.fn();
 
     function Harness() {
@@ -45,7 +48,7 @@ describe("NeedleHullPreset NHM2 contract wiring", () => {
         <NeedleHullPreset
           form={form}
           onTileAreaChange={onTileAreaChange}
-          onShipRadiusChange={onShipRadiusChange}
+          onHullReferenceRadiusChange={onHullReferenceRadiusChange}
           onApplyPreset={onApplyPreset}
         />
       );
@@ -60,8 +63,8 @@ describe("NeedleHullPreset NHM2 contract wiring", () => {
     expect(onTileAreaChange).toHaveBeenCalledWith(
       NHM2_CAVITY_CONTRACT.layout.tileArea_mm2 / 100,
     );
-    expect(onShipRadiusChange).toHaveBeenCalledWith(
-      NHM2_CAVITY_CONTRACT.geometry.shipRadius_m,
+    expect(onHullReferenceRadiusChange).toHaveBeenCalledWith(
+      NHM2_SIMULATION_CONTROL_DEFAULTS.hullReferenceRadiusM,
     );
 
     const values = latestForm?.getValues();
@@ -88,7 +91,7 @@ describe("NeedleHullPreset NHM2 contract wiring", () => {
       gammaGeo: NHM2_CAVITY_CONTRACT.geometry.gammaGeo,
       qFactor: NHM2_CAVITY_CONTRACT.loss.qCavity,
       duty: NHM2_CAVITY_CONTRACT.loss.dutyShip,
-      shipRadiusM: NHM2_CAVITY_CONTRACT.geometry.shipRadius_m,
+      hullReferenceRadiusM: NHM2_SIMULATION_CONTROL_DEFAULTS.hullReferenceRadiusM,
       gapNm: NHM2_CAVITY_CONTRACT.geometry.gap_nm,
     });
   });

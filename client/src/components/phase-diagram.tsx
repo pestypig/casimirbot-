@@ -11,7 +11,7 @@ import { PROMOTED_WARP_PROFILE } from '@shared/warp-promoted-profile';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
-  currentShipRadius: number;
+  currentHullReferenceRadius: number;
   viabilityParams: any;
   constraintConfig?: any;
   currentSimulation?: any;
@@ -19,7 +19,6 @@ interface InteractiveHeatMapProps {
   selectedMode?: string;
   onModeChange?: (mode: string) => void;
 }
-
 // Telemetry-aligned fallback when pipeline has not emitted gamma yet.
 const DEFAULT_GAMMA_VDB = PROMOTED_WARP_PROFILE.gammaVanDenBroeck;
 
@@ -48,7 +47,6 @@ function resolveModeNumbers(mode: string, pipeline?: any) {
 
   return { dutyCycle, sectorStrobing, qSpoilingFactor, qCavity, P_avg, gammaVanDenBroeck };
 }
-
 // Build a lightweight preset for a mode using live values / MODE_CONFIGS
 function buildModePreset(modeKey: string, pipeline?: any) {
   const resolved = resolveModeNumbers(modeKey, pipeline);
@@ -72,7 +70,7 @@ function buildModePreset(modeKey: string, pipeline?: any) {
 
 function InteractiveHeatMap({
   currentTileArea,
-  currentShipRadius,
+  currentHullReferenceRadius,
   viabilityParams,
   constraintConfig,
   currentSimulation,
@@ -108,9 +106,9 @@ function InteractiveHeatMap({
     return (Number.isFinite(n) ? (n as T) : d);
   };
 
-  // Mode constraint defaults (Ford–Roman & homogenization)
+  // Mode constraint defaults (FordÃ¢â‚¬â€œRoman & homogenization)
   const getModeConstraintDefaults = (mode: string) => {
-    const universalMinTimescale = 100; // TS_ratio ≥ 100
+    const universalMinTimescale = 100; // TS_ratio Ã¢â€°Â¥ 100
     switch (mode) {
       case 'hover':     return { maxPower: 120, massTolerance: 5,  maxZeta: 1.0, minTimescale: universalMinTimescale };
       case 'cruise':    return { maxPower: 20,  massTolerance: 10, maxZeta: 1.0, minTimescale: universalMinTimescale };
@@ -140,9 +138,9 @@ function InteractiveHeatMap({
   // Format Q-Factor for better readability
   const formatQFactor = (q: unknown) => {
     const n = Number(q);
-    if (!Number.isFinite(n) || n <= 0) return '—';
-    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}×10⁹`;
-    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}×10⁶`;
+    if (!Number.isFinite(n) || n <= 0) return 'Ã¢â‚¬â€';
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}Ãƒâ€”10Ã¢ÂÂ¹`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}Ãƒâ€”10Ã¢ÂÂ¶`;
     return n.toExponential(1);
   };
 
@@ -165,7 +163,7 @@ function InteractiveHeatMap({
       onParameterChange(newParams);
     }
 
-    console.log(`🎯 Applied ${mode} mode preset: Q=${preset.qCavity}, duty=${preset.dutyCycle}`);
+    console.log(`Ã°Å¸Å½Â¯ Applied ${mode} mode preset: Q=${preset.qCavity}, duty=${preset.dutyCycle}`);
   };
 
   // React to mode changes from parent component
@@ -241,7 +239,7 @@ function InteractiveHeatMap({
         const hoverText = R_vals.map((R: number, rIdx: number) =>
           A_vals.map((A: number, aIdx: number) => {
             const viable = Z[rIdx][aIdx] === 1;
-            return `Tile: ${A.toFixed(1)} cm²\nRadius: ${R.toFixed(1)} m\n${viable ? '✅ Viable' : '❌ Failed'}`;
+            return `Tile: ${A.toFixed(1)} cmÃ‚Â²\nRadius: ${R.toFixed(1)} m\n${viable ? 'Ã¢Å“â€¦ Viable' : 'Ã¢ÂÅ’ Failed'}`;
           })
         );
 
@@ -255,7 +253,7 @@ function InteractiveHeatMap({
     };
 
     loadGrid();
-  }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig, currentSimulation?.status, localParams]);
+  }, [currentTileArea, currentHullReferenceRadius, viabilityParams, constraintConfig, currentSimulation?.status, localParams]);
 
   if (!gridData || isLoading) {
     return (
@@ -321,14 +319,14 @@ function InteractiveHeatMap({
             </Select>
             <p className="text-xs text-muted-foreground">
               Current: {(currentModePreset.dutyCycle * 100).toFixed(1)}% duty, {currentModePreset.sectorStrobing === 1 ? 'no' : `${currentModePreset.sectorStrobing}-sector`} strobing,
-              Q-spoiling ×{currentModePreset.qSpoilingFactor}
+              Q-spoiling Ãƒâ€”{currentModePreset.qSpoilingFactor}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Geometric Amplification */}
             <div className="space-y-2">
-              <Label>γ_geo: {localParams.gammaGeo}</Label>
+              <Label>ÃŽÂ³_geo: {localParams.gammaGeo}</Label>
               <div onDoubleClick={() => handleSliderDoubleClick('gammaGeo')}>
                 <Slider
                   value={[localParams.gammaGeo]}
@@ -336,7 +334,7 @@ function InteractiveHeatMap({
                     updateParameter('gammaGeo', value);
                     zenLongToast("geom:gamma", {
                       gammaGeo: value,
-                      shipRadiusM: currentShipRadius,
+                      hullReferenceRadiusM: currentHullReferenceRadius,
                       gapNm: 1.0
                     });
                   }}
@@ -347,7 +345,7 @@ function InteractiveHeatMap({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Geometric amplification factor • Double-click to apply {selectedMode} mode value (26)
+                Geometric amplification factor Ã¢â‚¬Â¢ Double-click to apply {selectedMode} mode value (26)
               </p>
             </div>
 
@@ -379,7 +377,7 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentModePreset.qCavity)})
+                  Electromagnetic cavity Q for power loss P = U_geoÃƒâ€”Ãâ€°/Q_cavity Ã¢â‚¬Â¢ Double-click to apply {selectedMode} mode value ({formatQFactor(currentModePreset.qCavity)})
                 </p>
               </div>
 
@@ -388,7 +386,7 @@ function InteractiveHeatMap({
                   Mechanical Q-Factor: {formatQFactor(currentModePreset.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span>
                 </Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Parametric resonator Q for energy boost U_Q = Q_mech × U_geo (mode-invariant)
+                  Parametric resonator Q for energy boost U_Q = Q_mech Ãƒâ€” U_geo (mode-invariant)
                 </p>
               </div>
             </div>
@@ -407,7 +405,7 @@ function InteractiveHeatMap({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Set by operational mode ({currentModePreset.name}) • Double-click to reset to mode default ({(currentModePreset.dutyCycle * 100).toFixed(1)}%)
+                Set by operational mode ({currentModePreset.name}) Ã¢â‚¬Â¢ Double-click to reset to mode default ({(currentModePreset.dutyCycle * 100).toFixed(1)}%)
               </p>
             </div>
 
@@ -425,7 +423,7 @@ function InteractiveHeatMap({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Bowl curvature depth • Double-click to apply research value (16 nm)
+                Bowl curvature depth Ã¢â‚¬Â¢ Double-click to apply research value (16 nm)
               </p>
             </div>
           </div>
@@ -450,13 +448,13 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Maximum allowable power • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxPower', selectedMode)} MW)
+                  Maximum allowable power Ã¢â‚¬Â¢ Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxPower', selectedMode)} MW)
                 </p>
               </div>
 
               {/* Mass Tolerance */}
               <div className="space-y-2">
-                <Label>Mass Tolerance: ±{localParams.massTolerance}%</Label>
+                <Label>Mass Tolerance: Ã‚Â±{localParams.massTolerance}%</Label>
                 <div onDoubleClick={() => handleSliderDoubleClick('massTolerance')}>
                   <Slider
                     value={[localParams.massTolerance]}
@@ -468,13 +466,13 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Exotic mass target tolerance • Double-click to apply {selectedMode} mode value (±{getModeSpecificValue('massTolerance', selectedMode)}%)
+                  Exotic mass target tolerance Ã¢â‚¬Â¢ Double-click to apply {selectedMode} mode value (Ã‚Â±{getModeSpecificValue('massTolerance', selectedMode)}%)
                 </p>
               </div>
 
               {/* Quantum Safety */}
               <div className="space-y-2">
-                <Label>Max ζ: {localParams.maxZeta.toFixed(2)}</Label>
+                <Label>Max ÃŽÂ¶: {localParams.maxZeta.toFixed(2)}</Label>
                 <div onDoubleClick={() => handleSliderDoubleClick('maxZeta')}>
                   <Slider
                     value={[localParams.maxZeta]}
@@ -486,7 +484,7 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Quantum inequality limit • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxZeta', selectedMode)?.toFixed(2)})
+                  Quantum inequality limit Ã¢â‚¬Â¢ Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxZeta', selectedMode)?.toFixed(2)})
                 </p>
               </div>
 
@@ -504,7 +502,7 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Universal homogenization threshold (TS_ratio ≥ 100) • Double-click to apply research value (100)
+                  Universal homogenization threshold (TS_ratio Ã¢â€°Â¥ 100) Ã¢â‚¬Â¢ Double-click to apply research value (100)
                 </p>
               </div>
             </div>
@@ -534,10 +532,24 @@ function InteractiveHeatMap({
   );
 }
 
-export default function PhaseDiagram(props: any) {
+interface PhaseDiagramProps {
+  tileArea: number;
+  hullReferenceRadius: number;
+  [key: string]: any;
+}
+
+export default function PhaseDiagram({
+  tileArea,
+  hullReferenceRadius,
+  ...props
+}: PhaseDiagramProps) {
   return (
     <div className="space-y-4">
-      <InteractiveHeatMap {...props} />
+      <InteractiveHeatMap
+        currentTileArea={tileArea}
+        currentHullReferenceRadius={hullReferenceRadius}
+        {...props}
+      />
     </div>
   );
 }

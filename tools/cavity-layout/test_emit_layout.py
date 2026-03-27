@@ -16,7 +16,7 @@ PYTHON = REPO_ROOT / ".venv-layout" / "Scripts" / "python.exe"
 
 
 class EmitLayoutTest(unittest.TestCase):
-    def test_emits_gds_oas_summary_layer_map_and_packages(self) -> None:
+    def test_emits_gds_oas_summary_layer_map_packages_and_previews(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             out_dir = Path(temp_dir)
             completed = subprocess.run(
@@ -39,9 +39,16 @@ class EmitLayoutTest(unittest.TestCase):
             summary_path = out_dir / "nhm2-layout-smoke-summary.json"
             layer_map_path = out_dir / "nhm2-layer-map.json"
             manifest_path = out_dir / "nhm2-layout-export-manifest.json"
+            preview_dir = out_dir / "previews"
             tile_gds_path = out_dir / "nhm2-tile.gds"
             array_gds_path = out_dir / "nhm2-array-2x2.gds"
             die_gds_path = out_dir / "nhm2-die.gds"
+            smoke_svg_path = preview_dir / "nhm2-smoke-preview.svg"
+            smoke_png_path = preview_dir / "nhm2-smoke-preview.png"
+            tile_svg_path = preview_dir / "nhm2-tile-preview.svg"
+            tile_png_path = preview_dir / "nhm2-tile-preview.png"
+            array_svg_path = preview_dir / "nhm2-array-2x2-preview.svg"
+            die_png_path = preview_dir / "nhm2-die-preview.png"
 
             self.assertTrue(gds_path.exists(), completed.stdout)
             self.assertTrue(oas_path.exists(), completed.stdout)
@@ -51,6 +58,12 @@ class EmitLayoutTest(unittest.TestCase):
             self.assertTrue(tile_gds_path.exists(), completed.stdout)
             self.assertTrue(array_gds_path.exists(), completed.stdout)
             self.assertTrue(die_gds_path.exists(), completed.stdout)
+            self.assertTrue(smoke_svg_path.exists(), completed.stdout)
+            self.assertTrue(smoke_png_path.exists(), completed.stdout)
+            self.assertTrue(tile_svg_path.exists(), completed.stdout)
+            self.assertTrue(tile_png_path.exists(), completed.stdout)
+            self.assertTrue(array_svg_path.exists(), completed.stdout)
+            self.assertTrue(die_png_path.exists(), completed.stdout)
 
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
             self.assertEqual(
@@ -71,6 +84,14 @@ class EmitLayoutTest(unittest.TestCase):
                 die_gds_path.as_posix(),
             )
             self.assertEqual(summary["files"]["manifest"], manifest_path.as_posix())
+            self.assertEqual(
+                summary["files"]["previews"]["tile"]["svg"],
+                tile_svg_path.as_posix(),
+            )
+            self.assertEqual(
+                summary["files"]["previews"]["smoke"]["png"],
+                smoke_png_path.as_posix(),
+            )
 
             layer_map = json.loads(layer_map_path.read_text(encoding="utf-8"))
             self.assertEqual(layer_map["seal_ring"]["gds"], "60/0")
@@ -86,6 +107,15 @@ class EmitLayoutTest(unittest.TestCase):
                 (out_dir / "klayout-drc-report.rdb").as_posix(),
             )
             self.assertEqual(manifest["drc"]["status"], "pending")
+            self.assertEqual(
+                manifest["packages"]["array"]["preview"]["svg"]["path"],
+                array_svg_path.as_posix(),
+            )
+            self.assertEqual(
+                manifest["smoke"]["preview"]["png"]["path"],
+                smoke_png_path.as_posix(),
+            )
+            self.assertGreater(manifest["packages"]["tile"]["preview"]["png"]["size_bytes"], 0)
 
             library = gdstk.read_gds(gds_path)
             cell_names = sorted(cell.name for cell in library.cells)

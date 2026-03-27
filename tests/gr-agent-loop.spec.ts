@@ -15,6 +15,7 @@ const {
   mockBuildGrRequestPayload,
   mockEvaluateQiGuardrail,
   mockGetGlobalPipelineState,
+  mockResolveBubbleRadiusM,
   mockSetGlobalPipelineState,
   mockUpdateParameters,
   mockRunInitialDataSolve,
@@ -31,6 +32,11 @@ const {
     rhoSource: "warp.metric.T00.natario.shift",
   })),
   mockGetGlobalPipelineState: vi.fn(),
+  mockResolveBubbleRadiusM: vi.fn((state: any, fallback?: number) => {
+    const bubbleRadius = Number(state?.bubble?.R ?? state?.R);
+    if (Number.isFinite(bubbleRadius) && bubbleRadius > 0) return bubbleRadius;
+    return fallback ?? 1;
+  }),
   mockSetGlobalPipelineState: vi.fn(),
   mockUpdateParameters: vi.fn(async (state: any, params: any) => ({
     ...state,
@@ -46,6 +52,7 @@ vi.mock("../server/energy-pipeline.js", () => ({
   buildGrRequestPayload: mockBuildGrRequestPayload,
   evaluateQiGuardrail: mockEvaluateQiGuardrail,
   getGlobalPipelineState: mockGetGlobalPipelineState,
+  resolveBubbleRadiusM: mockResolveBubbleRadiusM,
   setGlobalPipelineState: mockSetGlobalPipelineState,
   updateParameters: mockUpdateParameters,
 }));

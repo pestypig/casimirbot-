@@ -107,7 +107,7 @@ type LeverFamily =
   | 'qSpoilingFactor'
   | 'tau_s_ms'
   | 'gap_nm'
-  | 'shipRadius_m';
+  | 'bubbleRadius_m';
 
 type StepBSeed = {
   topComparableCandidates?: Array<{ id?: string; params?: Record<string, unknown> }>;
@@ -154,6 +154,10 @@ type StepASummary = {
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
 const stringOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : null);
+const LEGACY_RADIUS_FAMILY = `${'shipRadius'}_m` as const;
+const resolveBubbleRadiusParam = (row: Record<string, unknown>): number | null =>
+  finiteOrNull(row.bubbleRadius_m ?? row[LEGACY_RADIUS_FAMILY]);
+
 const ensureRecoveryCurvatureSignals = <T extends Record<string, unknown>>(state: T): T => {
   const next = state as any;
   const gr = ((next.gr ??= {}) as Record<string, unknown>);
@@ -252,7 +256,7 @@ const leverFamilies: Record<LeverFamily, Array<string | number>> = {
   qSpoilingFactor: [1, 1.5, 3],
   tau_s_ms: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 8, 10, 20, 35, 50],
   gap_nm: [0.4, 1, 5, 8],
-  shipRadius_m: [2, 10, 40],
+  bubbleRadius_m: [2, 10, 40],
 };
 
 const LEVER_ORDER: readonly LeverFamily[] = [
@@ -268,7 +272,7 @@ const LEVER_ORDER: readonly LeverFamily[] = [
   'qSpoilingFactor',
   'tau_s_ms',
   'gap_nm',
-  'shipRadius_m',
+  'bubbleRadius_m',
 ];
 
 const gcd = (a: number, b: number): number => {
@@ -326,7 +330,7 @@ const readJsonObject = (filePath: string): Record<string, unknown> | null => {
 const DEFAULT_FAMILY_PRIORITY: LeverFamily[] = [
   'warpFieldType',
   'gammaGeo',
-  'shipRadius_m',
+  'bubbleRadius_m',
   'gap_nm',
   'tau_s_ms',
   'qCavity',
@@ -340,24 +344,29 @@ const DEFAULT_FAMILY_PRIORITY: LeverFamily[] = [
 ];
 
 const TERM_TO_FAMILIES: Record<string, LeverFamily[]> = {
-  rhoMetric_Jm3: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
+  rhoMetric_Jm3: ['warpFieldType', 'gammaGeo', 'bubbleRadius_m', 'gap_nm'],
   rhoProxy_Jm3: ['qCavity', 'qSpoilingFactor', 'fieldType', 'sampler', 'tau_s_ms'],
   rhoCoupledShadow_Jm3: ['gammaVanDenBroeck', 'dutyCycle', 'sectorCount', 'concurrentSectors'],
   couplingResidualRel: ['gammaVanDenBroeck', 'dutyCycle', 'sectorCount', 'concurrentSectors'],
-  metricT00Si_Jm3: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
-  metricT00Geom: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
-  metricT00SiFromGeom: ['warpFieldType', 'gammaGeo', 'shipRadius_m', 'gap_nm'],
+  metricT00Si_Jm3: ['warpFieldType', 'gammaGeo', 'bubbleRadius_m', 'gap_nm'],
+  metricT00Geom: ['warpFieldType', 'gammaGeo', 'bubbleRadius_m', 'gap_nm'],
+  metricT00SiFromGeom: ['warpFieldType', 'gammaGeo', 'bubbleRadius_m', 'gap_nm'],
   metricT00SiRelError: ['sampler', 'fieldType', 'tau_s_ms'],
-  metricStressRhoSiMean_Jm3: ['warpFieldType', 'gammaGeo', 'shipRadius_m'],
-  metricStressRhoGeomMean_Geom: ['warpFieldType', 'gammaGeo', 'shipRadius_m'],
-  metricStressKTraceMean: ['gammaGeo', 'shipRadius_m'],
-  metricStressKSquaredMean: ['gammaGeo', 'shipRadius_m'],
-  metricStressStep_m: ['shipRadius_m'],
-  metricStressScale_m: ['shipRadius_m', 'gap_nm'],
+  metricStressRhoSiMean_Jm3: ['warpFieldType', 'gammaGeo', 'bubbleRadius_m'],
+  metricStressRhoGeomMean_Geom: ['warpFieldType', 'gammaGeo', 'bubbleRadius_m'],
+  metricStressKTraceMean: ['gammaGeo', 'bubbleRadius_m'],
+  metricStressKSquaredMean: ['gammaGeo', 'bubbleRadius_m'],
+  metricStressStep_m: ['bubbleRadius_m'],
+  metricStressScale_m: ['bubbleRadius_m', 'gap_nm'],
 };
 
 const isLeverFamily = (value: unknown): value is LeverFamily =>
   typeof value === 'string' && (LEVER_ORDER as readonly string[]).includes(value);
+
+const normalizeLeverFamily = (value: unknown): LeverFamily | null => {
+  if (value === LEGACY_RADIUS_FAMILY) return 'bubbleRadius_m';
+  return isLeverFamily(value) ? value : null;
+};
 
 const setDutyAliases = (row: Record<string, unknown>): Record<string, unknown> => ({
   ...row,
@@ -372,7 +381,10 @@ const sanitizeLeverRow = (
   const row: Record<string, unknown> = {};
   for (const family of LEVER_ORDER) {
     const allowed = leverFamilies[family];
-    const candidateValue = candidate?.[family];
+    const candidateValue =
+      family === 'bubbleRadius_m'
+        ? candidate?.bubbleRadius_m ?? candidate?.[LEGACY_RADIUS_FAMILY]
+        : candidate?.[family];
     const fallbackValue = fallback[family];
     const accepted = allowed.some((entry) => Object.is(entry, candidateValue));
     row[family] = accepted ? candidateValue : fallbackValue;
@@ -403,9 +415,9 @@ const derivePrioritizedFamilies = (
     scoreByFamily.set(family, current + score);
   };
   for (const row of stepBSeed?.leverInfluenceRanking ?? []) {
-    const family = row?.family;
+    const family = normalizeLeverFamily(row?.family);
     const noOp = row?.noOpByAbsLhsDelta === true;
-    if (!isLeverFamily(family) || noOp) continue;
+    if (!family || noOp) continue;
     const measured = finiteOrNull(row?.measuredImpactAbsLhsDelta) ?? 1;
     addScore(family, Math.max(measured, 1e-9));
   }
@@ -760,7 +772,7 @@ export async function runRecoverySearch(opts: {
       params: {
         warpFieldType: 'natario', gammaGeo: 1, dutyCycle: 0.02, dutyShip: 0.02, dutyEffective_FR: 0.02,
         sectorCount: 80, concurrentSectors: 1, gammaVanDenBroeck: 0.8,
-        qCavity: 1e5, qSpoilingFactor: 1, gap_nm: 0.4, shipRadius_m: 2,
+        qCavity: 1e5, qSpoilingFactor: 1, gap_nm: 0.4, bubbleRadius_m: 2,
         qi: { ...(baseline.qi ?? {}), sampler: 'gaussian', fieldType: 'em', tau_s_ms: 5 },
       },
     },
@@ -877,6 +889,7 @@ export async function runRecoverySearch(opts: {
     if (results.length >= maxCases) break;
     if (Date.now() - startedAt > runtimeCapMs) break;
     evaluated += 1;
+    const bubbleRadius = resolveBubbleRadiusParam(row);
     const next = await updateParameters(structuredClone(baseline), {
       warpFieldType: row.warpFieldType,
       gammaGeo: row.gammaGeo,
@@ -889,7 +902,12 @@ export async function runRecoverySearch(opts: {
       qCavity: row.qCavity,
       qSpoilingFactor: row.qSpoilingFactor,
       gap_nm: row.gap_nm,
-      shipRadius_m: row.shipRadius_m,
+      ...(bubbleRadius != null
+        ? {
+            bubble: { R: bubbleRadius },
+            R: bubbleRadius,
+          }
+        : {}),
       qi: {
         ...(baseline.qi ?? {}),
         sampler: row.sampler,

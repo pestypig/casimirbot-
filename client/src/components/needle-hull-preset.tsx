@@ -9,62 +9,31 @@ import { Rocket } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { SimulationParameters } from "@shared/schema";
-import { NHM2_CAVITY_CONTRACT } from "@shared/needle-hull-mark2-cavity-contract";
-
-const NHM2_TILE_RADIUS_UM = NHM2_CAVITY_CONTRACT.geometry.pocketDiameter_um / 2;
-const NHM2_TILE_AREA_CM2 = NHM2_CAVITY_CONTRACT.layout.tileArea_mm2 / 100;
-const NHM2_LIGHT_CROSSING_TIME_NS = 3.34;
+import {
+  buildNeedleHullMark2SimulationParameters,
+  NHM2_CAVITY_CONTRACT,
+  NHM2_SIMULATION_CONTROL_DEFAULTS,
+} from "@shared/needle-hull-mark2-cavity-contract";
 
 interface NeedleHullPresetProps {
   form: UseFormReturn<SimulationParameters>;
   onTileAreaChange?: (value: number) => void;
-  onShipRadiusChange?: (value: number) => void;
+  onHullReferenceRadiusChange?: (value: number) => void;
   onApplyPreset?: () => void;
 }
-
 export function NeedleHullPreset({
   form,
   onTileAreaChange,
-  onShipRadiusChange,
+  onHullReferenceRadiusChange,
   onApplyPreset,
 }: NeedleHullPresetProps) {
   const applyNeedleHullPreset = () => {
-    form.setValue("geometry", "bowl");
-    form.setValue("radius", NHM2_TILE_RADIUS_UM);
-    form.setValue("sagDepth", NHM2_CAVITY_CONTRACT.geometry.sag_nm);
-    form.setValue("gap", NHM2_CAVITY_CONTRACT.geometry.gap_nm);
+    form.reset(buildNeedleHullMark2SimulationParameters());
 
-    form.setValue("material", "custom");
-    form.setValue("temperature", NHM2_CAVITY_CONTRACT.thermal.temperature_K);
-
-    form.setValue("moduleType", "warp");
-    form.setValue("dynamicConfig", {
-      modulationFreqGHz: NHM2_CAVITY_CONTRACT.drive.modulationFreq_GHz,
-      strokeAmplitudePm: 50,
-      burstLengthUs: 10,
-      cycleLengthUs: 1000,
-      dutyCycle: NHM2_CAVITY_CONTRACT.loss.dutyCycle,
-      cavityQ: NHM2_CAVITY_CONTRACT.loss.qCavity,
-      sectorCount: NHM2_CAVITY_CONTRACT.geometry.sectorCount,
-      sectorDuty: NHM2_CAVITY_CONTRACT.loss.dutyShip,
-      pulseFrequencyGHz: NHM2_CAVITY_CONTRACT.drive.modulationFreq_GHz,
-      lightCrossingTimeNs: NHM2_LIGHT_CROSSING_TIME_NS,
-      shiftAmplitude: 50e-12,
-      expansionTolerance: 1e-12,
-      warpFieldType: NHM2_CAVITY_CONTRACT.geometry.warpFieldType,
-      gap_nm: NHM2_CAVITY_CONTRACT.geometry.gap_nm,
-    });
-
-    form.setValue("advanced", {
-      xiMin: 0.0001,
-      maxXiPoints: 25000,
-      intervals: 100,
-      absTol: 0,
-      relTol: 0.005,
-    });
-
-    onTileAreaChange?.(NHM2_TILE_AREA_CM2);
-    onShipRadiusChange?.(NHM2_CAVITY_CONTRACT.geometry.shipRadius_m);
+    onTileAreaChange?.(NHM2_SIMULATION_CONTROL_DEFAULTS.tileAreaCm2);
+    onHullReferenceRadiusChange?.(
+      NHM2_SIMULATION_CONTROL_DEFAULTS.hullReferenceRadiusM,
+    );
     onApplyPreset?.();
   };
 
@@ -78,7 +47,8 @@ export function NeedleHullPreset({
             gammaGeo: NHM2_CAVITY_CONTRACT.geometry.gammaGeo,
             qFactor: NHM2_CAVITY_CONTRACT.loss.qCavity,
             duty: NHM2_CAVITY_CONTRACT.loss.dutyShip,
-            shipRadiusM: NHM2_CAVITY_CONTRACT.geometry.shipRadius_m,
+            hullReferenceRadiusM:
+              NHM2_SIMULATION_CONTROL_DEFAULTS.hullReferenceRadiusM,
             gapNm: NHM2_CAVITY_CONTRACT.geometry.gap_nm,
           });
         }}

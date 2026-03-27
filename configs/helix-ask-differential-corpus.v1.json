@@ -1,0 +1,74 @@
+{
+  "version": "helix.ask.differential.corpus.v1",
+  "prompts": [
+    {
+      "id": "casimir_tile_full_solve_congruence",
+      "question": "what is a casimir tile in the full solve congruence",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "tags": ["objective-loop", "fallback-sensitive", "casimir"]
+    },
+    {
+      "id": "helix_pipeline_repo",
+      "question": "How does the Helix Ask pipeline work in this repo?",
+      "expect": {
+        "intent_domain": "repo",
+        "require_sources": true
+      },
+      "tags": ["repo", "pipeline", "grounding"]
+    },
+    {
+      "id": "repo_change_request",
+      "question": "Update this repo to add a new API endpoint.",
+      "expect": {
+        "intent_domain": "repo",
+        "require_sources": true
+      },
+      "tags": ["repo", "change-request", "contract"]
+    },
+    {
+      "id": "composite_synthesis",
+      "question": "Using the repo, synthesize how the save-the-Sun plan, warp-bubble viability, ideology/ledger gates, and the wavefunction business model fit together.",
+      "expect": {
+        "intent_domain": "hybrid",
+        "require_sources": true
+      },
+      "tags": ["hybrid", "synthesis", "multi-domain"]
+    },
+    {
+      "id": "epistemology_general",
+      "question": "What is epistemology and why does it matter?",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "tags": ["general", "conceptual"]
+    },
+    {
+      "id": "warp_bubble_repo",
+      "question": "What is a warp bubble in this codebase?",
+      "expect": {
+        "intent_domain": "repo",
+        "require_sources": true
+      },
+      "tags": ["repo", "warp", "mechanism"]
+    },
+    {
+      "id": "first_principles_physics",
+      "question": "What are first principles meaning in physics?",
+      "expect": {
+        "intent_domain": "general"
+      },
+      "tags": ["general", "physics", "definition"]
+    },
+    {
+      "id": "feedback_hygiene_society",
+      "question": "How does Feedback Loop Hygiene affect society?",
+      "expect": {
+        "intent_domain": "repo",
+        "require_sources": true
+      },
+      "tags": ["ideology", "social", "repo-grounding"]
+    }
+  ]
+}

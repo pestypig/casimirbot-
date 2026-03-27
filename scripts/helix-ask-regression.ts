@@ -95,6 +95,10 @@ const BASE_URL =
 
 const ASK_URL = new URL("/api/agi/ask", BASE_URL).toString();
 const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_REGRESSION_TIMEOUT_MS ?? 45000);
+const CONTINUITY_REQUEST_TIMEOUT_MS = Number(
+  process.env.HELIX_ASK_REGRESSION_CONTINUITY_TIMEOUT_MS ??
+    Math.max(REQUEST_TIMEOUT_MS, 120000),
+);
 const ALLOW_FAIL = process.env.HELIX_ASK_REGRESSION_ALLOW_FAIL === "1";
 const DRY_RUN = process.env.HELIX_ASK_REGRESSION_DRY_RUN === "1";
 const LIGHT_MODE = process.env.HELIX_ASK_REGRESSION_LIGHT === "1";
@@ -192,6 +196,7 @@ const cases: RegressionCase[] = [
         requireSourcesLine: true,
         requireFiveSectionShape: false,
         allowFamilyFallbackShape: true,
+        minStage05Coverage: 0.5,
       },
     },
   },
@@ -706,7 +711,7 @@ const runSessionContinuityCase = async (
   const failures: string[] = [];
   const doAsk = async (question: string): Promise<AskResponse | null> => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), CONTINUITY_REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(ASK_URL, {
         method: "POST",

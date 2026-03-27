@@ -1,4 +1,4 @@
-import { useState, startTransition } from "react";
+import { useEffect, useState, startTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap, Activity, Rocket } from "lucide-react";
@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { simulationParametersSchema, SimulationParameters, type DynamicConfig } from "@shared/schema";
+import { buildNeedleHullMark2SimulationParameters } from "@shared/needle-hull-mark2-cavity-contract";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 interface ParameterPanelProps {
@@ -21,7 +22,7 @@ interface ParameterPanelProps {
   isLoading: boolean;
   // Phase diagram state
   onTileAreaChange?: (value: number) => void;
-  onShipRadiusChange?: (value: number) => void;
+  onHullReferenceRadiusChange?: (value: number) => void;
   // Apply preset callback
   onApplyPreset?: () => void;
   // Dynamic parameter values for preset application
@@ -55,7 +56,7 @@ export default function ParameterPanel({
   onGenerateOnly, 
   isLoading, 
   onTileAreaChange, 
-  onShipRadiusChange,
+  onHullReferenceRadiusChange,
   onApplyPreset,
   parameterValues,
   onParameterChange
@@ -76,35 +77,60 @@ export default function ParameterPanel({
 
   const form = useForm<SimulationParameters>({
     resolver: zodResolver(simulationParametersSchema),
-    defaultValues: {
-      geometry: "parallel_plate",
-      gap: 1.0,
-      radius: 25000,
-      sagDepth: 100.0,
-      material: "PEC",
-      temperature: 20,
-      moduleType: "static",
-      dynamicConfig: {
-        modulationFreqGHz: 15,
-        strokeAmplitudePm: 50,
-        burstLengthUs: 10,
-        cycleLengthUs: 1000,
-        cavityQ: 1e9
-      },
-      arrayConfig: {
-        size: 1,
-        spacing: 1000,
-        coherence: true
-      },
-      advanced: {
-        xiMin: 0.001,
-        maxXiPoints: 10000,
-        intervals: 50,
-        absTol: 0,
-        relTol: 0.01
-      }
-    }
+    defaultValues: buildNeedleHullMark2SimulationParameters(),
   });
+
+  useEffect(() => {
+    if (!onParameterChange) {
+      return;
+    }
+
+    const syncParameterState = (values: SimulationParameters) => {
+      const dynamicConfig = values.dynamicConfig;
+      const advanced = values.advanced;
+
+      if (typeof values.sagDepth === "number") {
+        onParameterChange.setSagDepth(values.sagDepth);
+      }
+
+      if (typeof values.temperature === "number") {
+        onParameterChange.setTemperature(values.temperature);
+      }
+
+      if (typeof dynamicConfig?.cavityQ === "number") {
+        onParameterChange.setQFactor(dynamicConfig.cavityQ);
+      }
+
+      if (typeof dynamicConfig?.sectorDuty === "number") {
+        onParameterChange.setDuty(dynamicConfig.sectorDuty);
+      }
+
+      if (typeof dynamicConfig?.strokeAmplitudePm === "number") {
+        onParameterChange.setStrokeAmplitude(dynamicConfig.strokeAmplitudePm);
+      }
+
+      if (typeof dynamicConfig?.burstLengthUs === "number") {
+        onParameterChange.setBurstTime(dynamicConfig.burstLengthUs);
+      }
+
+      if (typeof dynamicConfig?.cycleLengthUs === "number") {
+        onParameterChange.setCycleTime(dynamicConfig.cycleLengthUs);
+      }
+
+      if (typeof advanced?.maxXiPoints === "number") {
+        onParameterChange.setXiPoints(advanced.maxXiPoints);
+      }
+    };
+
+    syncParameterState(form.getValues());
+    const subscription = form.watch((values) => {
+      syncParameterState(values as SimulationParameters);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [form, onParameterChange]);
 
   const handleSubmit = (data: SimulationParameters) => {
     onSubmit(data);
@@ -231,7 +257,7 @@ export default function ParameterPanel({
             <NeedleHullPreset 
               form={form} 
               onTileAreaChange={onTileAreaChange}
-              onShipRadiusChange={onShipRadiusChange}
+              onHullReferenceRadiusChange={onHullReferenceRadiusChange}
               onApplyPreset={onApplyPreset}
             />
 

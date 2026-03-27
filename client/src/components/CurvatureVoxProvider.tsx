@@ -1,8 +1,12 @@
 import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { publish } from "@/lib/luma-bus";
 import { useCurvatureBrick, type UseCurvatureBrickOptions } from "@/hooks/useCurvatureBrick";
 import { useStressEnergyBrick } from "@/hooks/useStressEnergyBrick";
 import { useGrBrick } from "@/hooks/useGrBrick";
+import type { EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import {
   DEFAULT_METRIC_VOLUME_CHANNEL,
   type HullMetricChannelMap,
@@ -20,6 +24,9 @@ export const DEFAULT_CURVATURE_CHANNEL = "hull3d:curvature";
 export const DEFAULT_T00_CHANNEL = "hull3d:t00-volume";
 export const DEFAULT_FLUX_CHANNEL = "hull3d:flux";
 
+const pickPipelineNumber = (value: unknown, fallback: number) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
 export function CurvatureVoxProvider({
   channel = DEFAULT_CURVATURE_CHANNEL,
   t00Channel = DEFAULT_T00_CHANNEL,
@@ -32,16 +39,68 @@ export function CurvatureVoxProvider({
   const stampRef = React.useRef<number>(0);
   const stressStampRef = React.useRef<number>(0);
   const metricStampRef = React.useRef<number>(0);
+  const queryClient = useQueryClient();
+  const pipeline = queryClient.getQueryData<EnergyPipelineState>(["/api/helix/pipeline"]);
+  const phase01 = useDriveSyncStore((s) => s.phase01);
+  const qSpoil = useDriveSyncStore((s) => s.q);
+  const zetaDrive = useDriveSyncStore((s) => s.zeta);
+  const dutyFR = Math.max(
+    1e-8,
+    sample?.dutyFR ??
+      pickPipelineNumber(
+        (pipeline as any)?.dutyEffectiveFR ?? pipeline?.dutyCycle,
+        PROMOTED_WARP_PROFILE.dutyShip,
+      ),
+  );
+  const gammaGeo = Math.max(
+    1e-6,
+    pickPipelineNumber((pipeline as any)?.gammaGeo, PROMOTED_WARP_PROFILE.gammaGeo),
+  );
+  const gammaVdB = Math.max(
+    1e-6,
+    pickPipelineNumber(
+      (pipeline as any)?.gammaVanDenBroeck_mass ??
+        (pipeline as any)?.gammaVanDenBroeck ??
+        (pipeline as any)?.gammaVdB ??
+        (pipeline as any)?.gammaVanDenBroeck_vis,
+      PROMOTED_WARP_PROFILE.gammaVanDenBroeck,
+    ),
+  );
+  const scientificRefetchMs = Math.max(500, options.refetchMs ?? 1000);
   const stressQuery = useStressEnergyBrick({
-    quality: options.quality,
-    refetchMs: options.refetchMs,
+    quality: "low",
+    refetchMs: scientificRefetchMs,
   });
+  const metricT00Raw = Number(
+    (pipeline as any)?.warp?.metricT00 ??
+      (pipeline as any)?.metricT00 ??
+      (pipeline as any)?.stressEnergy?.T00,
+  );
+  const metricT00 = Number.isFinite(metricT00Raw) ? metricT00Raw : null;
+  const metricT00Source =
+    typeof (pipeline as any)?.warp?.metricT00Source === "string"
+      ? String((pipeline as any).warp.metricT00Source)
+      : typeof (pipeline as any)?.warp?.stressEnergySource === "string"
+        ? String((pipeline as any).warp.stressEnergySource)
+        : null;
+  const metricT00Ref =
+    typeof (pipeline as any)?.warp?.metricT00Ref === "string"
+      ? String((pipeline as any).warp.metricT00Ref)
+      : null;
   const grQuery = useGrBrick({
-    quality: options.quality,
+    quality: "low",
+    dims: [24, 24, 24],
+    steps: 1,
     includeExtra: true,
     includeKij: true,
-    includeMatter: false,
-    refetchMs: Math.max(250, options.refetchMs ?? 250),
+    includeMatter: true,
+    dutyFR,
+    q: Math.max(1e-6, qSpoil),
+    gammaGeo,
+    gammaVdB,
+    zeta: Math.max(0, zetaDrive),
+    phase01,
+    refetchMs: scientificRefetchMs,
   });
 
   React.useEffect(() => {
@@ -115,6 +174,9 @@ export function CurvatureVoxProvider({
       "ricci4",
       "ricci2",
       "weylI",
+      "hull_sdf",
+      "tile_support_mask",
+      "region_class",
     ] as const;
     for (const key of optional) {
       const channel = gr.extraChannels?.[key];
@@ -128,6 +190,7 @@ export function CurvatureVoxProvider({
       updatedAt,
       source: "gr-evolve-brick",
       chart: "comoving_cartesian",
+      hullSupportRequired: true,
       coordinateMap: "bubble-centered coordinates",
       provenance: {
         endpoint: "/api/helix/gr-evolve-brick",
@@ -136,7 +199,18 @@ export function CurvatureVoxProvider({
         reasons: gr.meta?.reasons ?? [],
         includeExtra: true,
         includeKij: true,
-        includeMatter: false,
+        includeMatter: true,
+        sourceParams: {
+          dutyFR,
+          q: Math.max(1e-6, qSpoil),
+          gammaGeo,
+          gammaVdB,
+          zeta: Math.max(0, zetaDrive),
+          phase01,
+          metricT00,
+          metricT00Source,
+          metricT00Ref,
+        },
       },
       dims: gr.dims,
       bounds: gr.bounds,

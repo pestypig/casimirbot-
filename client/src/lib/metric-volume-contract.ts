@@ -15,6 +15,7 @@ export interface HullMetricVolumeContract {
   updatedAt: number;
   source: string;
   chart: string;
+  hullSupportRequired?: boolean;
   coordinateMap?: string | null;
   provenance?: {
     endpoint?: string;

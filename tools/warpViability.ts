@@ -564,7 +564,8 @@ const constraint = (
 
 function buildPipelineState(config: WarpConfig): EnergyPipelineState {
   const base = initializePipelineState();
-  const radius = toNumber(config.bubbleRadius_m, base.shipRadius_m);
+  const baseRadius = toNumber(base.bubble?.R, base.R);
+  const radius = toNumber(config.bubbleRadius_m, baseRadius);
   const wall = config.wallThickness_m ?? base.hull?.wallThickness_m;
   const dutyCycle = clamp01(config.dutyCycle) ?? base.dutyCycle;
 
@@ -589,7 +590,11 @@ function buildPipelineState(config: WarpConfig): EnergyPipelineState {
   return {
     ...base,
     hull,
-    shipRadius_m: radius,
+    bubble: {
+      ...(base.bubble ?? {}),
+      R: radius,
+    },
+    R: radius,
     dutyCycle,
     dutyShip: dutyCycle,
     tileArea_cm2,
@@ -1011,7 +1016,7 @@ export async function evaluateWarpViability(
   const warpMechanicsClaimTier = promotionDecision.tier;
 
   const snapshot: WarpViabilitySnapshot = {
-    bubbleRadius_m: config.bubbleRadius_m ?? pipeline.shipRadius_m,
+    bubbleRadius_m: config.bubbleRadius_m ?? pipeline.bubble?.R ?? pipeline.R,
     wallThickness_m: config.wallThickness_m ?? pipeline.hull?.wallThickness_m,
     targetVelocity_c: config.targetVelocity_c,
     tileCount: pipeline.N_tiles,

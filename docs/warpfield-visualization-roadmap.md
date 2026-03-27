@@ -18,6 +18,8 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
 
 - Default to the needle-hull GLB voxel lattice (when present) as the pipeline geometry; fall back to analytic ellipsoid with a logged clamp reason.
 
+- Add a single-snapshot certified York-time view (`york-time-3p1`) sourced from NHM2 `theta` channel so York/energy/causal/optical comparisons stay locked to one simultaneous metric snapshot identity.
+
 
 
 ## Golden-path checklist (canonical fields + visible fallbacks)

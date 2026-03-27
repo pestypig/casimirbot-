@@ -226,6 +226,26 @@ export const buildStressEnergySourceFromPipeline = (
   const defaults = defaultHullBounds();
   const bounds = overrides.bounds ?? grid.bounds ?? { min: defaults.min, max: defaults.max };
   const state = getGlobalPipelineState();
+  const stateMetricT00Raw = Number((state as any)?.warp?.metricT00);
+  const metricT00 = Number.isFinite(Number(overrides.metricT00))
+    ? Number(overrides.metricT00)
+    : Number.isFinite(stateMetricT00Raw)
+      ? stateMetricT00Raw
+      : undefined;
+  const metricT00Source =
+    typeof overrides.metricT00Source === "string"
+      ? overrides.metricT00Source
+      : typeof (state as any)?.warp?.metricT00Source === "string"
+        ? String((state as any).warp.metricT00Source)
+        : typeof (state as any)?.warp?.stressEnergySource === "string"
+          ? String((state as any).warp.stressEnergySource)
+          : undefined;
+  const metricT00Ref =
+    typeof overrides.metricT00Ref === "string"
+      ? overrides.metricT00Ref
+      : typeof (state as any)?.warp?.metricT00Ref === "string"
+        ? String((state as any).warp.metricT00Ref)
+        : undefined;
   const params: Partial<StressEnergyBrickParams> = {
     dims: grid.dims,
     bounds,
@@ -246,6 +266,9 @@ export const buildStressEnergySourceFromPipeline = (
     ampBase: clampNumber(overrides.ampBase ?? 0, 0),
     zeta: clampNumber(overrides.zeta ?? state?.zeta ?? 0.84, 0.84),
     driveDir: overrides.driveDir ?? null,
+    metricT00,
+    metricT00Source,
+    metricT00Ref,
   };
 
   const brick = buildStressEnergyBrick(params);

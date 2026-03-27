@@ -98,6 +98,8 @@
     "helix:ask:multilang:golden-gate": "tsx scripts/helix-ask-multilang-golden-gate.ts",
     "helix:ask:patch-probe": "tsx scripts/helix-ask-patch-probe.ts",
     "helix:ask:patch-probe:strict": "cross-env HELIX_ASK_PATCH_PROBE_FAIL_ON_MISS=1 HELIX_ASK_PATCH_PROBE_REQUIRE_PLAN_CONTEXT=1 tsx scripts/helix-ask-patch-probe.ts",
+    "helix:ask:differential": "tsx scripts/helix-ask-differential-mode.ts",
+    "helix:ask:test-type": "tsx scripts/helix-ask-test-type-runner.ts",
     "helix:dottie:situational:report": "tsx scripts/helix-dottie-situational-report.ts",
     "helix:ask:versatility": "tsx scripts/helix-ask-versatility-record.ts",
     "helix:ask:capsule:ab": "tsx scripts/helix-ask-capsule-ab.ts",
@@ -120,6 +122,7 @@
     "helix:ask:fast-quality:gate": "tsx scripts/helix-ask-fast-quality-promotion-gate.ts",
     "robotics:benchmark": "tsx scripts/robotics-benchmark-report.ts",
     "validate:toe:research-gates": "tsx scripts/validate-toe-research-gate-policy.ts",
+    "validate:needle-hull-mark2:cavity-contract": "tsx scripts/validate-needle-hull-mark2-cavity-contract.ts",
     "validate:physics:root-leaf": "tsx scripts/validate-physics-root-leaf-manifest.ts",
     "validate:curvature:collapse:contract": "tsx scripts/validate-curvature-collapse-contract.ts",
     "helix:decision:package": "tsx scripts/helix-decision-package.ts",
@@ -252,7 +255,8 @@
     "hull:optix:rollout": "tsx scripts/hull-optix-rollout.ts",
     "render:toolchain:doctor": "tsx scripts/render-scientific-toolchain-doctor.ts",
     "hull:mis:prepare": "npm run hull:mis:clone && npm run hull:mis:install-bridge",
-    "hull:mis:rollout": "tsx scripts/hull-mis-rollout.ts"
+    "hull:mis:rollout": "tsx scripts/hull-mis-rollout.ts",
+    "hull:export:smoke": "tsx scripts/hull-export-dataset-smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

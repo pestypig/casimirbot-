@@ -8,7 +8,7 @@
   "qMechanical": 1,
   "tileArea_cm2": 25,
   "temperature_K": 20,
-  "shipRadius_m": 86.5,
+  "bubbleRadius_m": 86.5,
   "hull": {
     "Lx_m": 1007,
     "Ly_m": 264,

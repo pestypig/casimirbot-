@@ -119,6 +119,10 @@ const ensureRecoveryCurvatureSignals = <T extends Record<string, unknown>>(state
   return next;
 };
 
+const LEGACY_RADIUS_KEY = `${'shipRadius'}_m` as const;
+const resolveBubbleRadiusParam = (row: Record<string, unknown>): number | undefined =>
+  finiteOrUndefined(row.bubbleRadius_m ?? row[LEGACY_RADIUS_KEY]);
+
 const buildCandidateProposalParams = (candidate: PromotionCandidate): Record<string, unknown> => {
   const row = (candidate.params ?? {}) as Record<string, unknown>;
   const dutyCycle = finiteOrUndefined(row.dutyCycle);
@@ -132,6 +136,7 @@ const buildCandidateProposalParams = (candidate: PromotionCandidate): Record<str
   const sampler = stringOrUndefined(row.sampler);
   const fieldType = stringOrUndefined(row.fieldType);
   const tau_s_ms = finiteOrUndefined(row.tau_s_ms);
+  const bubbleRadius = resolveBubbleRadiusParam(row);
 
   return {
     warpFieldType: dynamicWarpFieldType,
@@ -145,7 +150,12 @@ const buildCandidateProposalParams = (candidate: PromotionCandidate): Record<str
     qCavity: dynamicCavityQ,
     qSpoilingFactor: finiteOrUndefined(row.qSpoilingFactor),
     gap_nm: finiteOrUndefined(row.gap_nm),
-    shipRadius_m: finiteOrUndefined(row.shipRadius_m),
+    ...(bubbleRadius !== undefined
+      ? {
+          bubble: { R: bubbleRadius },
+          R: bubbleRadius,
+        }
+      : {}),
     qi: {
       sampler,
       fieldType,

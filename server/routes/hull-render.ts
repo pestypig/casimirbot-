@@ -1,11 +1,20 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
 import { Router, type Request } from "express";
 import sharp from "sharp";
 import type {
+  HullRenderCertificateV1,
   HullMisRenderAttachmentV1,
   HullMisRenderRequestV1,
   HullMisRenderResponseV1,
 } from "@shared/hull-render-contract";
+import {
+  HULL_CANONICAL_GAMMA_OFFDIAGONAL_CHANNELS,
+  HULL_CANONICAL_REQUIRED_CHANNELS_BASE,
+  HULL_RENDER_CERTIFICATE_SCHEMA_VERSION,
+} from "@shared/hull-render-contract";
+import { getGlobalPipelineState } from "../energy-pipeline.ts";
+import { validateScientificAtlasAgainstCertificate } from "../lib/hull-scientific-atlas-validation.ts";
 
 const router = Router();
 
@@ -41,7 +50,6 @@ const DEFAULT_UNITY_SERVICE_STATUS_URL =
   "http://127.0.0.1:6061/api/helix/hull-render/status";
 const AUTO_START_OPTIX_COOLDOWN_MS = 3_000;
 const AUTO_START_OPTIX_WAIT_INTERVAL_MS = 250;
-
 const readRenderBackendMode = (): "auto" | "optix" | "unity" => {
   const value = readEnvText(
     process.env.MIS_RENDER_BACKEND ?? process.env.MIS_RENDER_SERVICE_BACKEND,
@@ -198,6 +206,49 @@ const readRequireIntegralSignal = (): boolean =>
 const readRequireScientificFrameByDefault = (): boolean =>
   process.env.MIS_RENDER_REQUIRE_SCIENTIFIC_FRAME !== "0";
 
+const readRequireCongruentNhm2FullSolveByDefault = (): boolean =>
+  process.env.MIS_RENDER_REQUIRE_CONGRUENT_NHM2_FULL_SOLVE !== "0";
+
+type CongruentSolveSnapshot = {
+  pass: boolean;
+  policyMarginPass: boolean;
+  computedMarginPass: boolean;
+  applicabilityPass: boolean;
+  metricPass: boolean;
+  semanticPass: boolean;
+  strictMode: boolean;
+  failReasons: string[];
+};
+
+type CongruentSolveGateResult = {
+  ok: boolean;
+  snapshot: CongruentSolveSnapshot;
+};
+
+const readCongruentSolveGate = (): CongruentSolveGateResult => {
+  const state = getGlobalPipelineState() as unknown as Record<string, unknown> | null;
+  const raw = state && isRecord(state.congruentSolve) ? state.congruentSolve : null;
+  const failReasons = Array.isArray(raw?.failReasons)
+    ? raw.failReasons
+        .map((reason: unknown) => String(reason))
+        .filter((reason: string) => reason.length > 0)
+    : [];
+  const snapshot: CongruentSolveSnapshot = {
+    pass: raw?.pass === true,
+    policyMarginPass: raw?.policyMarginPass === true,
+    computedMarginPass: raw?.computedMarginPass === true,
+    applicabilityPass: raw?.applicabilityPass === true,
+    metricPass: raw?.metricPass === true,
+    semanticPass: raw?.semanticPass === true,
+    strictMode: raw?.strictMode === true,
+    failReasons,
+  };
+  return {
+    ok: snapshot.pass,
+    snapshot,
+  };
+};
+
 const readAutoStartOptixEnabled = (): boolean => {
   const value = readEnvText(process.env.MIS_RENDER_AUTOSTART_OPTIX);
   if (value != null) {
@@ -312,8 +363,10 @@ const isLocalFallbackAllowed = (opts: {
   strictProxy: boolean;
   remoteConfigured: boolean;
   requireScientificFrame: boolean;
+  requireHullSupportChannels: boolean;
 }): boolean => {
   if (opts.requireScientificFrame) return false;
+  if (opts.requireHullSupportChannels) return false;
   if (opts.strictProxy) return false;
   if (opts.backendMode !== "auto") return false;
   if (!opts.remoteConfigured) return true;
@@ -362,6 +415,15 @@ const readTuple3 = (
   ];
 };
 
+const parseMinVolumeDims = (value: unknown): [number, number, number] | null => {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const dims = readTuple3(value, [0, 0, 0]).map((entry) =>
+    clamp(Math.floor(Math.max(0, toFiniteNumber(entry, 0))), 0, 512),
+  ) as [number, number, number];
+  if (dims[0] <= 0 && dims[1] <= 0 && dims[2] <= 0) return null;
+  return dims;
+};
+
 const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
   const src = isRecord(body) ? body : {};
   const solve = isRecord(src.solve) ? src.solve : {};
@@ -386,6 +448,32 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
     scienceLane: {
       requireIntegralSignal: scienceLane.requireIntegralSignal === true,
       requireScientificFrame: scienceLane.requireScientificFrame === true,
+      requireCanonicalTensorVolume:
+        scienceLane.requireCanonicalTensorVolume === true ||
+        scienceLane.requireScientificFrame === true,
+      requireCongruentNhm2FullSolve:
+        scienceLane.requireCongruentNhm2FullSolve === true,
+      requireHullSupportChannels:
+        scienceLane.requireHullSupportChannels === true,
+      requireOffDiagonalGamma:
+        scienceLane.requireOffDiagonalGamma === true ||
+        scienceLane.requireScientificFrame === true,
+      minVolumeDims: parseMinVolumeDims(scienceLane.minVolumeDims),
+      samplingMode: scienceLane.samplingMode === "nearest" ? "nearest" : "trilinear",
+      renderView:
+        scienceLane.renderView === "paper-rho"
+          ? "paper-rho"
+          : scienceLane.renderView === "transport-3p1"
+            ? "transport-3p1"
+            : scienceLane.renderView === "york-time-3p1"
+              ? "york-time-3p1"
+            : scienceLane.renderView === "york-surface-3p1"
+              ? "york-surface-3p1"
+            : scienceLane.renderView === "shift-shell-3p1"
+              ? "shift-shell-3p1"
+            : scienceLane.renderView === "full-atlas"
+              ? "full-atlas"
+              : "diagnostic-quad",
       attachmentDownsample: toInt(scienceLane.attachmentDownsample, 1, 1, 8),
     },
     solve: {
@@ -568,8 +656,24 @@ const proxyRemoteFrame = async (
   endpoint: string,
   payload: HullMisRenderRequestV1,
 ): Promise<HullMisRenderResponseV1> => {
+  const dims = payload.metricVolumeRef?.dims ?? payload.metricSummary?.dims ?? null;
+  const cellCount =
+    dims && dims.length >= 3
+      ? Math.max(1, Math.floor(Number(dims[0]) || 1)) *
+        Math.max(1, Math.floor(Number(dims[1]) || 1)) *
+        Math.max(1, Math.floor(Number(dims[2]) || 1))
+      : 0;
+  const requiresScientificLatency =
+    payload.scienceLane?.requireScientificFrame === true ||
+    payload.scienceLane?.requireCanonicalTensorVolume === true;
+  const timeoutMs =
+    requiresScientificLatency && cellCount >= 48 * 48 * 48
+      ? 45_000
+      : requiresScientificLatency
+        ? 30_000
+        : 10_000;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -821,6 +925,229 @@ const hasIntegralSignalAttachments = (frame: HullMisRenderResponseV1): boolean =
   return hasDepth && hasMask;
 };
 
+const stableStringify = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    return `{${entries
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const sha256Hex = (value: string): string =>
+  createHash("sha256").update(value).digest("hex");
+
+const isValidRenderCertificate = (
+  value: unknown,
+): value is HullRenderCertificateV1 => {
+  if (!isRecord(value)) return false;
+  if (typeof value.certificate_schema_version !== "string") return false;
+  if (typeof value.certificate_hash !== "string" || value.certificate_hash.length === 0) {
+    return false;
+  }
+  if (typeof value.channel_hashes !== "object" || value.channel_hashes == null) {
+    return false;
+  }
+  if (!isRecord(value.render) || !isRecord(value.diagnostics)) return false;
+  if (typeof value.frame_hash !== "string" || value.frame_hash.length === 0) return false;
+  return true;
+};
+
+const validateRenderCertificateForRequest = (
+  frame: HullMisRenderResponseV1,
+  payload: HullMisRenderRequestV1,
+): { ok: true } | { ok: false; reason: string } => {
+  const cert = frame.renderCertificate;
+  if (!isValidRenderCertificate(cert)) {
+    return { ok: false, reason: "remote_mis_missing_or_invalid_render_certificate" };
+  }
+  if (cert.certificate_schema_version !== HULL_RENDER_CERTIFICATE_SCHEMA_VERSION) {
+    return { ok: false, reason: "remote_mis_render_certificate_schema_mismatch" };
+  }
+  const { certificate_hash, ...certificateBody } = cert;
+  const expectedHash = sha256Hex(stableStringify(certificateBody));
+  if (certificate_hash !== expectedHash) {
+    return { ok: false, reason: "remote_mis_render_certificate_hash_mismatch" };
+  }
+
+  const requiredChannels = [
+    ...HULL_CANONICAL_REQUIRED_CHANNELS_BASE,
+    ...((payload.scienceLane?.requireOffDiagonalGamma === true ||
+    payload.scienceLane?.requireScientificFrame === true)
+      ? HULL_CANONICAL_GAMMA_OFFDIAGONAL_CHANNELS
+      : []),
+  ];
+  const missingChannels = requiredChannels.filter((channelId) => {
+    const hash = cert.channel_hashes[channelId];
+    return typeof hash !== "string" || hash.trim().length === 0;
+  });
+  if (missingChannels.length > 0) {
+    return { ok: false, reason: "remote_mis_render_certificate_missing_channel_hashes" };
+  }
+
+  const expectedMetricRefHash = payload.metricVolumeRef?.hash?.trim();
+  if (expectedMetricRefHash && cert.metric_ref_hash !== expectedMetricRefHash) {
+    return { ok: false, reason: "remote_mis_render_certificate_metric_ref_hash_mismatch" };
+  }
+  if (
+    payload.scienceLane?.requireHullSupportChannels === true &&
+    (typeof cert.support_mask_hash !== "string" || cert.support_mask_hash.trim().length === 0)
+  ) {
+    return { ok: false, reason: "remote_mis_render_certificate_missing_support_mask_hash" };
+  }
+
+  const requestedView = payload.scienceLane?.renderView ?? "diagnostic-quad";
+  if (cert.render.view !== requestedView) {
+    return { ok: false, reason: "remote_mis_render_certificate_view_mismatch" };
+  }
+  if (requestedView === "york-time-3p1") {
+    if (cert.render.field_key !== "theta") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_field_key_mismatch",
+      };
+    }
+    if (cert.render.slice_plane !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_slice_plane_mismatch",
+      };
+    }
+    if (cert.render.normalization !== "symmetric-about-zero") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_normalization_mismatch",
+      };
+    }
+    const yorkDiagnosticsValid =
+      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
+      typeof cert.diagnostics.near_zero_theta === "boolean";
+    if (!yorkDiagnosticsValid) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_diagnostics_missing",
+      };
+    }
+    if (cert.diagnostics.sampling_choice !== "x-z midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_sampling_choice_mismatch",
+      };
+    }
+  }
+  if (requestedView === "york-surface-3p1") {
+    if (cert.render.field_key !== "theta") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_field_key_mismatch",
+      };
+    }
+    if (cert.render.slice_plane !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_slice_plane_mismatch",
+      };
+    }
+    if (cert.render.normalization !== "symmetric-about-zero") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_normalization_mismatch",
+      };
+    }
+    if (cert.render.surface_height !== "theta") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_height_mismatch",
+      };
+    }
+    const yorkSurfaceDiagnosticsValid =
+      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
+      typeof cert.diagnostics.near_zero_theta === "boolean";
+    if (!yorkSurfaceDiagnosticsValid) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_diagnostics_missing",
+      };
+    }
+    if (cert.diagnostics.sampling_choice !== "x-z midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_sampling_choice_mismatch",
+      };
+    }
+  }
+  if (requestedView === "shift-shell-3p1") {
+    if (cert.render.field_key !== "beta_x") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_shift_shell_field_key_mismatch",
+      };
+    }
+    if (cert.render.slice_plane !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_shift_shell_slice_plane_mismatch",
+      };
+    }
+    if (cert.render.normalization !== "symmetric-about-zero") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_shift_shell_normalization_mismatch",
+      };
+    }
+    if (cert.render.support_overlay !== "hull_sdf+tile_support_mask") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_shift_shell_support_overlay_mismatch",
+      };
+    }
+  }
+  if (
+    payload.solve?.chart &&
+    cert.chart &&
+    cert.chart.trim().length > 0 &&
+    cert.chart !== payload.solve.chart
+  ) {
+    return { ok: false, reason: "remote_mis_render_certificate_chart_mismatch" };
+  }
+  if (
+    typeof cert.certificate_hash !== "string" ||
+    cert.certificate_hash.trim().length === 0
+  ) {
+    return { ok: false, reason: "remote_mis_render_certificate_hash_missing" };
+  }
+  return { ok: true };
+};
+
+const validateScientificAtlasForRequest = (
+  frame: HullMisRenderResponseV1,
+  payload: HullMisRenderRequestV1,
+): { ok: true } | { ok: false; reason: string } => {
+  const requestedView = payload.scienceLane?.renderView ?? "diagnostic-quad";
+  if (requestedView !== "full-atlas") return { ok: true };
+  const cert = frame.renderCertificate;
+  if (!isValidRenderCertificate(cert)) {
+    return { ok: false, reason: "scientific_atlas_certificate_mismatch" };
+  }
+  return validateScientificAtlasAgainstCertificate(frame.scientificAtlas, cert);
+};
+
 const buildLocalIntegralAttachments = (
   payload: HullMisRenderRequestV1,
 ): HullMisRenderAttachmentV1[] => {
@@ -931,6 +1258,9 @@ router.get("/status", async (req, res) => {
   const strictProxy = readStrictProxy();
   const requireIntegralSignal = readRequireIntegralSignal();
   const requireScientificFrame = readRequireScientificFrameByDefault();
+  const requireCongruentNhm2FullSolve =
+    readRequireCongruentNhm2FullSolveByDefault();
+  const congruentSolveGate = readCongruentSolveGate();
   const requiredProvenanceSourcePrefix = readRequiredProvenanceSourcePrefix();
   const remoteConfigured = endpointCandidates.length > 0;
   const localFallbackAllowed = isLocalFallbackAllowed({
@@ -938,6 +1268,7 @@ router.get("/status", async (req, res) => {
     strictProxy,
     remoteConfigured,
     requireScientificFrame,
+    requireHullSupportChannels: false,
   });
   let selectedCandidate: RemoteEndpointCandidate | null =
     endpointCandidates.length > 0 ? endpointCandidates[0] : null;
@@ -1003,6 +1334,9 @@ router.get("/status", async (req, res) => {
     strictProxy,
     requireIntegralSignal,
     requireScientificFrame,
+    requireCongruentNhm2FullSolve,
+    congruentNhm2FullSolveReady: congruentSolveGate.ok,
+    congruentNhm2FullSolve: congruentSolveGate.snapshot,
     requiredProvenanceSourcePrefix,
     allowLegacyGenericEndpoint,
     autoStartOptixEnabled,
@@ -1041,16 +1375,35 @@ router.post("/frame", async (req, res) => {
   const strictProxy = readStrictProxy();
   const requireIntegralSignalByEnv = readRequireIntegralSignal();
   const requireScientificFrameByEnv = readRequireScientificFrameByDefault();
+  const requireCongruentNhm2FullSolveByEnv =
+    readRequireCongruentNhm2FullSolveByDefault();
   const requiredProvenanceSourcePrefix = readRequiredProvenanceSourcePrefix();
   const requireScientificFrame =
     requireScientificFrameByEnv || payload.scienceLane?.requireScientificFrame === true;
+  const requireCongruentNhm2FullSolve =
+    requireCongruentNhm2FullSolveByEnv ||
+    payload.scienceLane?.requireCongruentNhm2FullSolve === true;
+  const requireHullSupportChannels =
+    payload.scienceLane?.requireHullSupportChannels === true;
   const enforceScientificFrame = strictProxy || requireScientificFrame;
   const localFallbackAllowed = isLocalFallbackAllowed({
     backendMode,
     strictProxy: enforceScientificFrame,
     remoteConfigured,
     requireScientificFrame,
+    requireHullSupportChannels,
   });
+  if (requireCongruentNhm2FullSolve) {
+    const congruentSolveGate = readCongruentSolveGate();
+    if (!congruentSolveGate.ok) {
+      return res.status(422).json({
+        error: "nhm2_congruent_full_solve_required",
+        message:
+          "render frame rejected: congruent NHM2 full-solve gate is not PASS",
+        congruentSolve: congruentSolveGate.snapshot,
+      });
+    }
+  }
 
   if (remoteConfigured) {
     const autoStartCandidate = findAutoStartOptixCandidate(endpointCandidates);
@@ -1084,6 +1437,19 @@ router.post("/frame", async (req, res) => {
           requireScientificFrame;
         if (requireIntegralSignal && !hasIntegralSignalAttachments(remote)) {
           throw new Error("remote_mis_missing_integral_signal_attachments");
+        }
+        if (enforceScientificFrame) {
+          const certificateValidation = validateRenderCertificateForRequest(
+            remote,
+            payload,
+          );
+          if (!certificateValidation.ok) {
+            throw new Error(certificateValidation.reason);
+          }
+          const atlasValidation = validateScientificAtlasForRequest(remote, payload);
+          if (!atlasValidation.ok) {
+            throw new Error(atlasValidation.reason);
+          }
         }
         const deterministicSeed = hashSeed(payload);
         const response: HullMisRenderResponseV1 = {

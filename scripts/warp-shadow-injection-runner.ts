@@ -243,7 +243,10 @@ const buildPromotedBaseParams = (): Partial<EnergyPipelineState> => {
     qCavity: PROMOTED_WARP_PROFILE.qCavity as any,
     gammaVanDenBroeck: PROMOTED_WARP_PROFILE.gammaVanDenBroeck as any,
     gap_nm: PROMOTED_WARP_PROFILE.gap_nm as any,
-    shipRadius_m: PROMOTED_WARP_PROFILE.shipRadius_m as any,
+    bubble: {
+      R: PROMOTED_WARP_PROFILE.reducedOrderReference.radius_m,
+    } as any,
+    R: PROMOTED_WARP_PROFILE.reducedOrderReference.radius_m as any,
     qi: {
       sampler: promotedSampler as any,
       fieldType: promotedField as any,

@@ -1,9 +1,9 @@
 {
   "tile_area_cm2": 25,
-  "ship_radius_m": 2,
+  "hull_reference_radius_m": 503.5,
   "P_target_W": 1702.6173539290805,
   "M_target_kg": 1405,
   "zeta_target": 0.5,
-  "timestamp": "2026-03-18T07:41:48.439Z",
+  "timestamp": "2026-03-26T23:34:03.914Z",
   "source": "pipeline_update"
 }

@@ -221,7 +221,7 @@ const parseOptions = (): CaptureOptions => {
     frames: toInt(readArgValue("--frames", argv), 12, 1, 180),
     width: toInt(readArgValue("--width", argv), 1280, 320, 4096),
     height: toInt(readArgValue("--height", argv), 720, 180, 4096),
-    timeoutMs: toInt(readArgValue("--timeout-ms", argv), 20_000, 2_000, 300_000),
+    timeoutMs: toInt(readArgValue("--timeout-ms", argv), 45_000, 2_000, 300_000),
     outJsonlPath: readArgValue("--out-jsonl", argv) ?? DEFAULT_OUT_JSONL,
     latestJsonlPath: readArgValue("--latest-jsonl", argv) ?? DEFAULT_LATEST_JSONL,
     summaryJsonPath: readArgValue("--summary-json", argv) ?? DEFAULT_SUMMARY_JSON,
@@ -239,22 +239,69 @@ const buildScenarioPayload = (
   scenarioId: ScenarioId,
   context: ScenarioContext,
 ): HullMisRenderRequestV1 => {
+  type MetricRefSourceParams = {
+    dutyFR?: number;
+    q?: number;
+    gammaGeo?: number;
+    gammaVdB?: number;
+    zeta?: number;
+    phase01?: number;
+    metricT00?: number;
+    metricT00Source?: string;
+    metricT00Ref?: string;
+  };
   const metricRefFor = (
     dims: [number, number, number],
     time_s: number,
     dt_s: number,
     source: string,
     chart: string,
+    requireCongruentSolve: boolean,
+    sourceParams?: MetricRefSourceParams,
   ): NonNullable<HullMisRenderRequestV1["metricVolumeRef"]> => {
     const params = new URLSearchParams();
     params.set("dims", `${dims[0]}x${dims[1]}x${dims[2]}`);
     params.set("time_s", String(time_s));
     params.set("dt_s", String(dt_s));
+    params.set("steps", "1");
     params.set("includeExtra", "1");
     params.set("includeKij", "1");
-    params.set("includeMatter", "0");
+    params.set("includeMatter", "1");
+    if (requireCongruentSolve) {
+      params.set("requireCongruentSolve", "1");
+      params.set("requireNhm2CongruentFullSolve", "1");
+    }
+    if (sourceParams) {
+      if (Number.isFinite(sourceParams.dutyFR)) params.set("dutyFR", String(sourceParams.dutyFR));
+      if (Number.isFinite(sourceParams.q)) params.set("q", String(sourceParams.q));
+      if (Number.isFinite(sourceParams.gammaGeo)) params.set("gammaGeo", String(sourceParams.gammaGeo));
+      if (Number.isFinite(sourceParams.gammaVdB)) params.set("gammaVdB", String(sourceParams.gammaVdB));
+      if (Number.isFinite(sourceParams.zeta)) params.set("zeta", String(sourceParams.zeta));
+      if (Number.isFinite(sourceParams.phase01)) params.set("phase01", String(sourceParams.phase01));
+      if (Number.isFinite(sourceParams.metricT00)) params.set("metricT00", String(sourceParams.metricT00));
+      if (typeof sourceParams.metricT00Source === "string" && sourceParams.metricT00Source.length > 0) {
+        params.set("metricT00Source", sourceParams.metricT00Source);
+      }
+      if (typeof sourceParams.metricT00Ref === "string" && sourceParams.metricT00Ref.length > 0) {
+        params.set("metricT00Ref", sourceParams.metricT00Ref);
+      }
+    }
     params.set("format", "raw");
     const url = `${normalizeBaseUrl(context.baseUrl)}/api/helix/gr-evolve-brick?${params.toString()}`;
+    const sourceSig =
+      sourceParams != null
+        ? [
+            Number.isFinite(sourceParams.dutyFR) ? `duty=${sourceParams.dutyFR}` : "duty=none",
+            Number.isFinite(sourceParams.q) ? `q=${sourceParams.q}` : "q=none",
+            Number.isFinite(sourceParams.gammaGeo) ? `gammaGeo=${sourceParams.gammaGeo}` : "gammaGeo=none",
+            Number.isFinite(sourceParams.gammaVdB) ? `gammaVdB=${sourceParams.gammaVdB}` : "gammaVdB=none",
+            Number.isFinite(sourceParams.zeta) ? `zeta=${sourceParams.zeta}` : "zeta=none",
+            Number.isFinite(sourceParams.phase01) ? `phase01=${sourceParams.phase01}` : "phase01=none",
+            Number.isFinite(sourceParams.metricT00) ? `metricT00=${sourceParams.metricT00}` : "metricT00=none",
+            sourceParams.metricT00Source ? `metricT00Source=${sourceParams.metricT00Source}` : "metricT00Source=none",
+            sourceParams.metricT00Ref ? `metricT00Ref=${sourceParams.metricT00Ref}` : "metricT00Ref=none",
+          ].join(",")
+        : "source=none";
     return {
       kind: "gr-evolve-brick",
       url,
@@ -262,7 +309,7 @@ const buildScenarioPayload = (
       chart,
       dims,
       updatedAt: Date.now(),
-      hash: `${source}|${chart}|${dims.join("x")}|${time_s}|${dt_s}`,
+      hash: `${source}|${chart}|${dims.join("x")}|${time_s}|${dt_s}|${sourceSig}`,
     };
   };
   const progress = context.frameCount <= 1 ? 0 : context.frameIndex / (context.frameCount - 1);
@@ -270,9 +317,19 @@ const buildScenarioPayload = (
     const beta = 0.05 + 0.32 * progress;
     const sigma = 5.8 + 0.8 * Math.sin(Math.PI * progress);
     const radius = 1.0 + 0.09 * Math.cos(Math.PI * progress * 2);
-    const dims: [number, number, number] = [96, 96, 96];
+    const dims: [number, number, number] = [48, 48, 48];
     const time_s = progress;
     const dt_s = 0.01;
+    const sourceParams: MetricRefSourceParams = {
+      dutyFR: 0.0015 + 0.0002 * Math.sin(Math.PI * 2 * progress),
+      q: 3,
+      gammaGeo: 26,
+      gammaVdB: 500,
+      zeta: 0.84,
+      phase01: progress,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    };
     return {
       version: 1,
       requestId: `capture-${scenarioId}-${context.frameIndex + 1}`,
@@ -284,6 +341,11 @@ const buildScenarioPayload = (
       skyboxMode: "geodesic",
       scienceLane: {
         requireIntegralSignal: true,
+        requireScientificFrame: true,
+        requireCanonicalTensorVolume: true,
+        minVolumeDims: [32, 32, 32],
+        samplingMode: "trilinear",
+        renderView: "transport-3p1",
         attachmentDownsample: context.attachmentDownsample,
       },
       solve: {
@@ -314,15 +376,27 @@ const buildScenarioPayload = (
         dt_s,
         "warp.nhm2.command.capture",
         "comoving_cartesian",
+        true,
+        sourceParams,
       ),
     };
   }
 
   const beta = 0.0014 + 0.0009 * Math.sin(Math.PI * 2 * progress);
   const radius = 0.42 + 0.03 * Math.cos(Math.PI * 2 * progress);
-  const dims: [number, number, number] = [96, 96, 48];
+  const dims: [number, number, number] = [36, 36, 36];
   const time_s = progress;
   const dt_s = 0.01;
+  const sourceParams: MetricRefSourceParams = {
+    dutyFR: 0.0012,
+    q: 1.2,
+    gammaGeo: 8,
+    gammaVdB: 12,
+    zeta: 0.82,
+    phase01: progress,
+    metricT00Source: "teaching_proxy",
+    metricT00Ref: "mercury.precession.teaching.proxy",
+  };
   return {
     version: 1,
     requestId: `capture-${scenarioId}-${context.frameIndex + 1}`,
@@ -334,6 +408,10 @@ const buildScenarioPayload = (
     skyboxMode: "flat",
     scienceLane: {
       requireIntegralSignal: true,
+      requireCanonicalTensorVolume: false,
+      minVolumeDims: [24, 24, 24],
+      samplingMode: "trilinear",
+      renderView: "diagnostic-quad",
       attachmentDownsample: context.attachmentDownsample,
     },
     solve: {
@@ -364,6 +442,8 @@ const buildScenarioPayload = (
       dt_s,
       "gr.mercury.teaching.capture",
       "schwarzschild_teaching",
+      false,
+      sourceParams,
     ),
   };
 };

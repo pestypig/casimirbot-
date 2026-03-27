@@ -1,5 +1,5 @@
 import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp, Zap, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,10 @@ import { EnergyPipeline } from "./energy-pipeline";
 import PhaseDiagram from "./phase-diagram";
 import type { SimulationResult } from "@shared/schema";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import {
+  resolvePipelineBubbleRadiusM,
+  resolvePipelineHullReferenceRadiusM,
+} from "@/lib/pipeline-geometry";
 
 interface ResultsPanelProps {
   simulation: SimulationResult | null;
@@ -21,9 +25,9 @@ interface ResultsPanelProps {
   onDownloadAll: () => void;
   // Phase diagram state
   tileArea: number;
-  shipRadius: number;
+  hullReferenceRadius: number;
   onTileAreaChange: (value: number) => void;
-  onShipRadiusChange: (value: number) => void;
+  onHullReferenceRadiusChange: (value: number) => void;
   // Dynamic simulation parameters
   gammaGeo: number;
   qFactor: number;
@@ -56,9 +60,9 @@ export default function ResultsPanel({
   onDownloadFile,
   onDownloadAll,
   tileArea,
-  shipRadius,
+  hullReferenceRadius,
   onTileAreaChange,
-  onShipRadiusChange,
+  onHullReferenceRadiusChange,
   gammaGeo,
   qFactor,
   duty,
@@ -106,16 +110,16 @@ export default function ResultsPanel({
   const { results, generatedFiles, logs } = simulation;
 
   const formatScientificNotation = (value: number) => {
-    if (!Number.isFinite(value)) return "—";
+    if (!Number.isFinite(value)) return "â€”";
     if (Math.abs(value) === 0) return "0";
     const exp = Math.floor(Math.log10(Math.abs(value)));
     const mantissa = (value / Math.pow(10, exp)).toFixed(3);
-    return `${mantissa} × 10^${exp}`;
+    return `${mantissa} Ã— 10^${exp}`;
   };
 
   const safeToFixed = (v: unknown, digits = 1) => {
     if (typeof v === "number" && Number.isFinite(v)) return v.toFixed(digits);
-    return "—";
+    return "â€”";
   };
 
   const getFileIcon = (type: string) => {
@@ -174,6 +178,10 @@ export default function ResultsPanel({
   const pipelineUCycle = pipeline?.U_cycle;
   const energyPerTileCycleAvg =
     isFiniteNumber(pipelineUCycle) ? pipelineUCycle : undefined;
+  const hullReferenceRadiusDisplay =
+    resolvePipelineHullReferenceRadiusM(pipeline) ??
+    (isFiniteNumber(hullReferenceRadius) ? hullReferenceRadius : undefined);
+  const bubbleRadiusDisplay = resolvePipelineBubbleRadiusM(pipeline);
 
   return (
     <Card>
@@ -230,14 +238,14 @@ export default function ResultsPanel({
                     <div className="text-2xl font-mono font-semibold">
                       {safeToFixed(gammaGeoDisplay, 1)}
                     </div>
-                    <div className="text-sm text-muted-foreground">γ_geo (Geometric Amplification)</div>
+                    <div className="text-sm text-muted-foreground">Î³_geo (Geometric Amplification)</div>
                   </div>
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
                       {Number.isFinite(results.totalExoticMass ?? massFromPipeline)
                         ? formatScientificNotation((results.totalExoticMass ?? massFromPipeline) as number)
-                        : "—"}
+                        : "â€”"}
                     </div>
                     <div className="text-sm text-muted-foreground">kg (Total Exotic Mass)</div>
                   </div>
@@ -246,9 +254,23 @@ export default function ResultsPanel({
                     <div className="text-2xl font-mono font-semibold">
                       {Number.isFinite(results.powerDraw ?? powerWFromPipeline)
                         ? formatScientificNotation((results.powerDraw ?? powerWFromPipeline) as number)
-                        : "—"}
+                        : "â€”"}
                     </div>
                     <div className="text-sm text-muted-foreground">W (Power Draw)</div>
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {safeToFixed(hullReferenceRadiusDisplay, 1)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">m (Hull Reference Radius)</div>
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {safeToFixed(bubbleRadiusDisplay, 1)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">m (Bubble Radius)</div>
                   </div>
                 </div>
               </div>
@@ -260,16 +282,16 @@ export default function ResultsPanel({
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-lg font-semibold">
                       <Badge variant={results.isZeroExpansion ? "default" : "destructive"}>
-                        {results.isZeroExpansion ? "✓ Zero Expansion" : "✗ Non-Zero Expansion"}
+                        {results.isZeroExpansion ? "âœ“ Zero Expansion" : "âœ— Non-Zero Expansion"}
                       </Badge>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">Natário Field Geometry</div>
+                    <div className="text-sm text-muted-foreground mt-1">NatÃ¡rio Field Geometry</div>
                   </div>
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-lg font-semibold">
                       <Badge variant={isStrictQiSafe ? "default" : "destructive"}>
-                        {results.quantumSafetyStatus ?? (zetaFromPipeline != null ? (zetaFromPipeline < 1 ? "✓ Quantum Safe" : "⚠ Quantum Violation") : "Unknown")}
+                        {results.quantumSafetyStatus ?? (zetaFromPipeline != null ? (zetaFromPipeline < 1 ? "âœ“ Quantum Safe" : "âš  Quantum Violation") : "Unknown")}
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">Ford-Roman Limit Compliance</div>
@@ -278,7 +300,7 @@ export default function ResultsPanel({
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-lg font-semibold">
                       <Badge variant="default">
-                        ✓ Optimal
+                        âœ“ Optimal
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">Overall System Status</div>
@@ -297,21 +319,21 @@ export default function ResultsPanel({
                 <div className="space-y-4">
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(results?.totalEnergy) ? formatScientificNotation(results!.totalEnergy as number) : "—"}
+                      {Number.isFinite(results?.totalEnergy) ? formatScientificNotation(results!.totalEnergy as number) : "â€”"}
                     </div>
                     <div className="text-sm text-muted-foreground">Joules (Total Energy)</div>
                   </div>
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(results?.energyPerArea) ? formatScientificNotation(results!.energyPerArea as number) : "—"}
+                      {Number.isFinite(results?.energyPerArea) ? formatScientificNotation(results!.energyPerArea as number) : "â€”"}
                     </div>
-                    <div className="text-sm text-muted-foreground">J/m² (Energy per unit area)</div>
+                    <div className="text-sm text-muted-foreground">J/mÂ² (Energy per unit area)</div>
                   </div>
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(results?.force) ? formatScientificNotation(results!.force as number) : "—"}
+                      {Number.isFinite(results?.force) ? formatScientificNotation(results!.force as number) : "â€”"}
                     </div>
                     <div className="text-sm text-muted-foreground">N (Casimir Force)</div>
                   </div>
@@ -346,7 +368,7 @@ export default function ResultsPanel({
                     </div>
                     <div>
                       <div className="text-muted-foreground">Computation Time</div>
-                      <div className="font-medium">{results.computeTime || "—"}</div>
+                      <div className="font-medium">{results.computeTime || "â€”"}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Quantum Safety</div>
@@ -370,15 +392,15 @@ export default function ResultsPanel({
                     </div>
                     <div>
                       <div className="text-muted-foreground">Xi Points</div>
-                      <div className="font-medium">{results.xiPoints?.toLocaleString() || "—"}</div>
+                      <div className="font-medium">{results.xiPoints?.toLocaleString() || "â€”"}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Computation Time</div>
-                      <div className="font-medium">{results.computeTime || "—"}</div>
+                      <div className="font-medium">{results.computeTime || "â€”"}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Error Estimate</div>
-                      <div className="font-medium">{results.errorEstimate || "—"}</div>
+                      <div className="font-medium">{results.errorEstimate || "â€”"}</div>
                     </div>
                   </div>
                 )}
@@ -394,7 +416,7 @@ export default function ResultsPanel({
                       <div className="flex items-center justify-between">
                         <span className="text-amber-700 dark:text-amber-200">Power Target:</span>
                         <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-                          ✓ PASS
+                          âœ“ PASS
                         </span>
                       </div>
 
@@ -405,7 +427,7 @@ export default function ResultsPanel({
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                         }`}>
-                          {isStrictQiSafe ? '✓ SAFE' : '⚠ VIOLATION'}
+                          {isStrictQiSafe ? 'âœ“ SAFE' : 'âš  VIOLATION'}
                         </span>
                       </div>
 
@@ -416,7 +438,7 @@ export default function ResultsPanel({
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                         }`}>
-                          {results.isZeroExpansion ? '✓ PASS' : '✗ FAIL'}
+                          {results.isZeroExpansion ? 'âœ“ PASS' : 'âœ— FAIL'}
                         </span>
                       </div>
                     </>
@@ -432,12 +454,12 @@ export default function ResultsPanel({
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                         }`}>
                           {results.xiPoints && simulation?.parameters.gap &&
-                           results.xiPoints >= (simulation.parameters.gap <= 1 ? 5000 : 3000) ? '✓ PASS' : '✗ FAIL'}
+                           results.xiPoints >= (simulation.parameters.gap <= 1 ? 5000 : 3000) ? 'âœ“ PASS' : 'âœ— FAIL'}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-amber-700 dark:text-amber-200">Error ≤ 5%:</span>
+                        <span className="text-amber-700 dark:text-amber-200">Error â‰¤ 5%:</span>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           results.errorEstimate && results.errorEstimate.includes('%') &&
                           parseFloat(results.errorEstimate.replace('%', '')) <= 5.0
@@ -445,7 +467,7 @@ export default function ResultsPanel({
                             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                         }`}>
                           {results.errorEstimate && results.errorEstimate.includes('%') &&
-                           parseFloat(results.errorEstimate.replace('%', '')) <= 5.0 ? '✓ PASS' : '✗ FAIL'}
+                           parseFloat(results.errorEstimate.replace('%', '')) <= 5.0 ? 'âœ“ PASS' : 'âœ— FAIL'}
                         </span>
                       </div>
 
@@ -460,8 +482,8 @@ export default function ResultsPanel({
                               ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
                               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                           }`}>
-                            {results.quantumSafetyStatus === 'safe' ? '✓ SAFE' :
-                             results.quantumSafetyStatus === 'warning' ? '⚠ WARN' : '✗ VIOLATION'}
+                            {results.quantumSafetyStatus === 'safe' ? 'âœ“ SAFE' :
+                             results.quantumSafetyStatus === 'warning' ? 'âš  WARN' : 'âœ— VIOLATION'}
                           </span>
                         </div>
                       )}
@@ -497,14 +519,14 @@ export default function ResultsPanel({
         </TabsContent>
 
         <TabsContent value="energy-pipeline" className="p-6">
-          {/* Energy Pipeline - Complete T_μν → Metric Calculations */}
+          {/* Energy Pipeline - Complete T_Î¼Î½ â†’ Metric Calculations */}
           {simulation.status === 'completed' && results ? (
             <EnergyPipeline results={results} />
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Energy pipeline calculations will appear here</p>
-              <p className="text-sm">Complete a simulation to see the complete T_μν → metric equations</p>
+              <p className="text-sm">Complete a simulation to see the complete T_Î¼Î½ â†’ metric equations</p>
             </div>
           )}
         </TabsContent>
@@ -574,9 +596,9 @@ export default function ResultsPanel({
           {/* Phase Diagram - Design Space Exploration */}
           <PhaseDiagram
             tileArea={tileArea}
-            shipRadius={shipRadius}
+            hullReferenceRadius={hullReferenceRadius}
             onTileAreaChange={onTileAreaChange}
-            onShipRadiusChange={onShipRadiusChange}
+            onHullReferenceRadiusChange={onHullReferenceRadiusChange}
             currentSimulation={simulation}
             gammaGeo={gammaGeo}
             qFactor={qFactor}
@@ -667,7 +689,7 @@ export default function ResultsPanel({
                   </div>
                 ))}
                 {simulation.status !== "completed" && simulation.status !== "failed" && (
-                  <div className="animate-pulse">█</div>
+                  <div className="animate-pulse">â–ˆ</div>
                 )}
               </div>
             )}
@@ -677,4 +699,5 @@ export default function ResultsPanel({
     </Card>
   );
 }
+
 

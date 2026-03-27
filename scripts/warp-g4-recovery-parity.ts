@@ -12,6 +12,9 @@ const BOUNDARY_STATEMENT =
   'This campaign defines falsifiable reduced-order full-solve gates and reproducible evidence requirements; it is not a physical warp feasibility claim.';
 
 const finiteOrNull = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+const LEGACY_RADIUS_KEY = `${'shipRadius'}_m` as const;
+const resolveBubbleRadiusParam = (params: Record<string, unknown>): number | null =>
+  finiteOrNull(params.bubbleRadius_m ?? params[LEGACY_RADIUS_KEY]);
 const str = (value: unknown): string => (typeof value === 'string' ? value : String(value ?? 'UNKNOWN'));
 const boolOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
 const ensureRecoveryCurvatureSignals = <T extends Record<string, unknown>>(state: T): T => {
@@ -183,6 +186,7 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
 
   for (const entry of selected) {
     const params = entry?.params ?? {};
+    const bubbleRadius = resolveBubbleRadiusParam(params);
     const next = await updateParameters(structuredClone(baseline), {
       warpFieldType: params.warpFieldType,
       gammaGeo: params.gammaGeo,
@@ -195,7 +199,12 @@ export async function runRecoveryParity(opts: { topN?: number; recoveryPath?: st
       qCavity: params.qCavity,
       qSpoilingFactor: params.qSpoilingFactor,
       gap_nm: params.gap_nm,
-      shipRadius_m: params.shipRadius_m,
+      ...(bubbleRadius != null
+        ? {
+            bubble: { R: bubbleRadius },
+            R: bubbleRadius,
+          }
+        : {}),
       qi: {
         ...(baseline.qi ?? {}),
         sampler: params.sampler,

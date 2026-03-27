@@ -12,12 +12,21 @@
     "engineeringFreezeAssumptions": [
       "Tile-scale cavity dimensions below are an engineering freeze for layout congruence and render/export determinism.",
       "These dimensions are not a fabrication-readiness claim and are not a physical-feasibility claim.",
-      "Mk1 UI geometry values are intentionally excluded from this contract."
+      "Mk1 UI geometry values are intentionally excluded from this contract.",
+      "geometry.fullHull controls full-hull congruence and geometry.reducedOrderReference controls reduced-order proxy metadata."
     ]
   },
   "geometry": {
     "warpFieldType": "natario_sdf",
-    "shipRadius_m": 2,
+    "reducedOrderReference": {
+      "radius_m": 2,
+      "tauLC_ms": 3.34
+    },
+    "fullHull": {
+      "Lx_m": 1007,
+      "Ly_m": 264,
+      "Lz_m": 173
+    },
     "sectorCount": 80,
     "concurrentSectors": 2,
     "gammaGeo": 1,

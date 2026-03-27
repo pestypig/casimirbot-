@@ -31,7 +31,7 @@ import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
-import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
+import { NHM2_FULL_HULL_DIMENSIONS_M, PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 import type { StressEnergyStats } from "./stress-energy-brick";
 import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
 import type { CongruenceMeta } from "../types/pipeline";
@@ -204,6 +204,77 @@ type TsMetricDerivedStatus = {
 
 const hasPositiveFinite = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
+
+type HullGeometrySnapshot = NonNullable<EnergyPipelineState["hull"]>;
+type HullGeometryFallback = Partial<HullGeometrySnapshot>;
+type HullRadiusState = Pick<EnergyPipelineState, "hull" | "bubble" | "R">;
+
+export const resolveBubbleRadiusM = (
+  state: Pick<EnergyPipelineState, "bubble" | "R">,
+  fallback = 1,
+): number => {
+  const bubbleRadius = Number(state.bubble?.R);
+  if (hasPositiveFinite(bubbleRadius)) return bubbleRadius;
+
+  const topLevelBubbleRadius = Number(state.R);
+  if (hasPositiveFinite(topLevelBubbleRadius)) return topLevelBubbleRadius;
+
+  return fallback;
+};
+
+const buildIsotropicHullGeometry = (
+  radiusM: number,
+  wallThicknessM?: number,
+): HullGeometrySnapshot => ({
+  Lx_m: radiusM * 2,
+  Ly_m: radiusM * 2,
+  Lz_m: radiusM * 2,
+  ...(hasPositiveFinite(wallThicknessM)
+    ? { wallThickness_m: wallThicknessM }
+    : {}),
+});
+
+export const resolveHullGeometry = (
+  state: HullRadiusState,
+  fallback?: HullGeometryFallback,
+): HullGeometrySnapshot => {
+  const fallbackHull =
+    fallback && hasPositiveFinite(fallback.Lx_m) && hasPositiveFinite(fallback.Ly_m) && hasPositiveFinite(fallback.Lz_m)
+      ? fallback
+      : buildIsotropicHullGeometry(resolveBubbleRadiusM(state));
+  const hullRaw = (state.hull ?? {}) as Partial<HullGeometrySnapshot>;
+
+  return {
+    Lx_m: hasPositiveFinite(hullRaw.Lx_m)
+      ? hullRaw.Lx_m
+      : hasPositiveFinite(fallbackHull.Lx_m)
+        ? fallbackHull.Lx_m
+        : 2,
+    Ly_m: hasPositiveFinite(hullRaw.Ly_m)
+      ? hullRaw.Ly_m
+      : hasPositiveFinite(fallbackHull.Ly_m)
+        ? fallbackHull.Ly_m
+        : 2,
+    Lz_m: hasPositiveFinite(hullRaw.Lz_m)
+      ? hullRaw.Lz_m
+      : hasPositiveFinite(fallbackHull.Lz_m)
+        ? fallbackHull.Lz_m
+        : 2,
+    ...(hasPositiveFinite(hullRaw.wallThickness_m)
+      ? { wallThickness_m: hullRaw.wallThickness_m }
+      : hasPositiveFinite(fallbackHull.wallThickness_m)
+        ? { wallThickness_m: fallbackHull.wallThickness_m }
+        : {}),
+  };
+};
+
+export const resolveHullReferenceRadiusM = (
+  state: HullRadiusState,
+  fallback?: HullGeometryFallback,
+): number => {
+  const hull = resolveHullGeometry(state, fallback);
+  return Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / 2;
+};
 
 const resolveTsMetricDerivedStatus = (
   state: EnergyPipelineState,
@@ -1229,7 +1300,6 @@ export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
   tilePitch_m?: number;
-  shipRadius_m: number;        // Legacy fallback for field sampler when hull geometry unavailable
   gap_nm: number;
   sag_nm: number;
   temperature_K: number;
@@ -1504,17 +1574,7 @@ export interface EnergyPipelineState {
 }
 
 export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayload => {
-  const shipRadius = Number.isFinite(state.shipRadius_m) ? state.shipRadius_m : 1;
-  const fallbackDim = shipRadius * 2;
-  const hullRaw = state.hull ?? { Lx_m: fallbackDim, Ly_m: fallbackDim, Lz_m: fallbackDim };
-  const hull = {
-    Lx_m: Number.isFinite(hullRaw.Lx_m) && hullRaw.Lx_m > 0 ? hullRaw.Lx_m : fallbackDim,
-    Ly_m: Number.isFinite(hullRaw.Ly_m) && hullRaw.Ly_m > 0 ? hullRaw.Ly_m : fallbackDim,
-    Lz_m: Number.isFinite(hullRaw.Lz_m) && hullRaw.Lz_m > 0 ? hullRaw.Lz_m : fallbackDim,
-    ...(Number.isFinite(hullRaw.wallThickness_m) && (hullRaw.wallThickness_m as number) > 0
-      ? { wallThickness_m: hullRaw.wallThickness_m as number }
-      : {}),
-  };
+  const hull = resolveHullGeometry(state);
 
   const pAvgRaw = (state as any).P_avg_W;
   const P_avg_W = Number.isFinite(pAvgRaw)
@@ -1602,22 +1662,7 @@ export function buildCardRecipeFromPipeline(state: EnergyPipelineState): CardRec
     return [nx, ny, nz];
   };
 
-  const shipRadius = Number.isFinite(state.shipRadius_m) && (state.shipRadius_m as number) > 0
-    ? (state.shipRadius_m as number)
-    : 1;
-  const hullRaw = state.hull ?? {
-    Lx_m: shipRadius * 2,
-    Ly_m: shipRadius * 2,
-    Lz_m: shipRadius * 2,
-  };
-  const hull: CardRecipe["hull"] = {
-    Lx_m: Number.isFinite(hullRaw.Lx_m) && (hullRaw.Lx_m as number) > 0 ? (hullRaw.Lx_m as number) : shipRadius * 2,
-    Ly_m: Number.isFinite(hullRaw.Ly_m) && (hullRaw.Ly_m as number) > 0 ? (hullRaw.Ly_m as number) : shipRadius * 2,
-    Lz_m: Number.isFinite(hullRaw.Lz_m) && (hullRaw.Lz_m as number) > 0 ? (hullRaw.Lz_m as number) : shipRadius * 2,
-    ...(Number.isFinite((hullRaw as any).wallThickness_m) && (hullRaw as any).wallThickness_m > 0
-      ? { wallThickness_m: (hullRaw as any).wallThickness_m as number }
-      : {}),
-  };
+  const hull: CardRecipe["hull"] = resolveHullGeometry(state);
 
   const overrideArea = Number.isFinite(state.hullAreaOverride_m2) && (state.hullAreaOverride_m2 as number) > 0
     ? (state.hullAreaOverride_m2 as number)
@@ -2122,13 +2167,12 @@ const buildVdbConformalDiagnostics = (
 
 const resolveBubbleWallParams = (state: EnergyPipelineState): { R: number; sigma: number } | null => {
   const bubble = (state as any)?.bubble ?? {};
-  const rawR = Number.isFinite(bubble.R)
-    ? Number(bubble.R)
-    : Number.isFinite((state as any).R)
-      ? Number((state as any).R)
-      : Number.isFinite((state as any).radius)
-        ? Number((state as any).radius)
-        : Number.NaN;
+  const explicitBubbleRadius = resolveBubbleRadiusM(state, Number.NaN);
+  const rawR = Number.isFinite(explicitBubbleRadius)
+    ? explicitBubbleRadius
+    : Number.isFinite((state as any).radius)
+      ? Number((state as any).radius)
+      : Number.NaN;
   const rawSigma = Number.isFinite(bubble.sigma)
     ? Number(bubble.sigma)
     : Number.isFinite((state as any).sigma)
@@ -3629,7 +3673,6 @@ export function initializePipelineState(): EnergyPipelineState {
     // Needle Hull full scale defaults for HELIX-CORE (paper-authentic)
     tileArea_cm2: 25,  // 5+├╣5 cm tiles (was 5 cm-┬ª, now 25 cm-┬ª)
     tilePitch_m: Math.sqrt((25 * CM2_TO_M2) / PAPER_GEO.PACKING),
-    shipRadius_m: PROMOTED_WARP_PROFILE.shipRadius_m,
     gap_nm: PROMOTED_WARP_PROFILE.gap_nm,
     sag_nm: 16,
     temperature_K: 20,
@@ -3641,9 +3684,9 @@ export function initializePipelineState(): EnergyPipelineState {
 
     // Hull geometry (actual 1.007 km needle dimensions)
     hull: {
-      Lx_m: 1007,  // length (needle axis)
-      Ly_m: 264,   // width  
-      Lz_m: 173,   // height
+      Lx_m: NHM2_FULL_HULL_DIMENSIONS_M.Lx_m,  // length (needle axis)
+      Ly_m: NHM2_FULL_HULL_DIMENSIONS_M.Ly_m,  // width
+      Lz_m: NHM2_FULL_HULL_DIMENSIONS_M.Lz_m,  // height
       wallThickness_m: DEFAULT_WALL_THICKNESS_M  // Matches 15 GHz dwell (~0.02 m); override for paper 1 m stack
     },
     warpFieldType: PROMOTED_WARP_PROFILE.warpFieldType,
@@ -3857,11 +3900,7 @@ export async function calculateEnergyPipeline(
 
   // If a full rectangular needle + rounded caps is added later, we can refine this.
   // For now, the ellipsoid (a=Lx/2, b=Ly/2, c=Lz/2) is an excellent approximation.
-  const hullDims = state.hull ?? {
-    Lx_m: state.shipRadius_m * 2,
-    Ly_m: state.shipRadius_m * 2,
-    Lz_m: state.shipRadius_m * 2,
-  };
+  const hullDims = resolveHullGeometry(state);
   // Proper surface area from induced metric (ellipsoid shell)
   const hullArea = surfaceAreaEllipsoidMetric(
     hullDims.Lx_m,
@@ -5618,7 +5657,7 @@ export async function calculateEnergyPipeline(
 
   // Calculate stress-energy tensor from pipeline parameters
   try {
-    const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+    const hullGeom = resolveHullGeometry(state);
     const a = hullGeom.Lx_m / 2;
     const b = hullGeom.Ly_m / 2;
     const c = hullGeom.Lz_m / 2;
@@ -5646,7 +5685,7 @@ export async function calculateEnergyPipeline(
 
   // Calculate Nat+├¡rio warp bubble results (now pipeline-true)
   try {
-    const hullGeomWarp = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+    const hullGeomWarp = resolveHullGeometry(state);
     const a_warp = hullGeomWarp.Lx_m / 2;
     const b_warp = hullGeomWarp.Ly_m / 2;
     const c_warp = hullGeomWarp.Lz_m / 2;
@@ -6645,10 +6684,12 @@ function buildQiTilesFromState(
   const temperature = Number.isFinite(state.temperature_K)
     ? (state.temperature_K as number)
     : undefined;
-  const shipRadius = Number.isFinite(state.shipRadius_m)
-    ? Math.max(1, state.shipRadius_m as number)
-    : 100;
-  const span = Math.max(1, shipRadius * 2);
+  const hullReferenceRadius = resolveHullReferenceRadiusM(state, {
+    Lx_m: 200,
+    Ly_m: 200,
+    Lz_m: 200,
+  });
+  const span = Math.max(1, hullReferenceRadius * 2);
   const spacing = span / Math.max(cols, rows);
   const origin = -span / 2;
   const diagNorm = Math.max(1, Math.hypot(cols, rows));
@@ -7090,24 +7131,73 @@ function pickInvariantScalar(
   return 0;
 }
 
+function resolveMetricStressCurvatureFallback(
+  state: EnergyPipelineState,
+): { scalar: number; source: string; note: string } | null {
+  const warp = (state as any)?.warp;
+  if (!warp || typeof warp !== "object") return null;
+  const metricSource = String(
+    (warp as any)?.metricT00Source ?? (warp as any)?.stressEnergySource ?? "",
+  ).toLowerCase();
+  if (metricSource !== "metric") return null;
+  const diagnostics = (warp as any)?.metricStressDiagnostics;
+  if (!diagnostics || typeof diagnostics !== "object") return null;
+
+  const kSquaredRaw = Number((diagnostics as any)?.kSquaredMean);
+  const kTraceRaw = Number((diagnostics as any)?.kTraceMean);
+  const kSquaredAbs = Number.isFinite(kSquaredRaw) ? Math.max(0, Math.abs(kSquaredRaw)) : null;
+  const kTraceAbs = Number.isFinite(kTraceRaw) ? Math.abs(kTraceRaw) : null;
+  if (kSquaredAbs == null && kTraceAbs == null) return null;
+
+  const scalarFromKSquared =
+    kSquaredAbs != null ? Math.pow(kSquaredAbs, 2) : Number.NaN;
+  const scalarFromKTrace =
+    kTraceAbs != null ? Math.pow(kTraceAbs, 4) : Number.NaN;
+  const scalar = Math.max(
+    Number.isFinite(scalarFromKSquared) ? scalarFromKSquared : 0,
+    Number.isFinite(scalarFromKTrace) ? scalarFromKTrace : 0,
+  );
+  if (!Number.isFinite(scalar)) return null;
+
+  const source =
+    Number.isFinite(scalarFromKSquared) &&
+    scalarFromKSquared >=
+      (Number.isFinite(scalarFromKTrace) ? scalarFromKTrace : -Infinity)
+      ? "warp.metricStressDiagnostics.kSquaredMean^2"
+      : "warp.metricStressDiagnostics.kTraceMean^4";
+
+  return {
+    scalar,
+    source,
+    note: "curvature proxy from metric stress diagnostics",
+  };
+}
+
 function resolveQiCurvature(
   state: EnergyPipelineState,
   tau_ms: number,
 ): QiCurvatureInfo {
   const invariants = state.gr?.invariants;
-  if (!invariants) return { signalState: "missing", reasonCode: "G4_QI_SIGNAL_MISSING", note: "missing curvature invariants" };
-
-  const kretschmann = pickInvariantScalar(invariants.kretschmann);
-  const ricci4 = pickInvariantScalar(invariants.ricci4);
-  const scalar = kretschmann ?? ricci4;
+  const fallback = resolveMetricStressCurvatureFallback(state);
+  const kretschmann = invariants
+    ? pickInvariantScalar(invariants.kretschmann)
+    : null;
+  const ricci4 = invariants ? pickInvariantScalar(invariants.ricci4) : null;
+  const scalar = kretschmann ?? ricci4 ?? fallback?.scalar;
   const source = kretschmann != null
     ? "gr.invariants.kretschmann"
     : ricci4 != null
       ? "gr.invariants.ricci4"
-      : undefined;
+      : fallback?.source;
+  const fallbackSourceUsed = fallback != null && source === fallback.source;
 
   if (scalar == null) {
-    return { source, signalState: "missing", reasonCode: "G4_QI_SIGNAL_MISSING", note: "missing curvature invariants" };
+    return {
+      source,
+      signalState: "missing",
+      reasonCode: "G4_QI_SIGNAL_MISSING",
+      note: "missing curvature invariants",
+    };
   }
   if (scalar === 0) {
     return {
@@ -7117,7 +7207,7 @@ function resolveQiCurvature(
       ok: true,
       flatSpaceEquivalent: true,
       signalState: "available",
-      note: "zero curvature scalar",
+      note: fallbackSourceUsed ? fallback.note : "zero curvature scalar",
     };
   }
   if (!(scalar > 0)) {
@@ -7150,6 +7240,7 @@ function resolveQiCurvature(
     source,
     scalar,
     signalState: "available",
+    ...(fallbackSourceUsed ? { note: fallback?.note } : {}),
     ...(ok ? {} : { reasonCode: "G4_QI_CURVATURE_WINDOW_FAIL" as const }),
   };
 }
@@ -8643,6 +8734,20 @@ export async function updateParameters(
     nextParams.negativeFraction = Math.max(0, Math.min(1, nextParams.negativeFraction));
   }
 
+  if (nextParams.hull) {
+    nextParams.hull = {
+      ...(state.hull ?? {}),
+      ...(nextParams.hull ?? {}),
+    };
+  }
+
+  if (nextParams.bubble) {
+    nextParams.bubble = {
+      ...(state.bubble ?? {}),
+      ...(nextParams.bubble ?? {}),
+    };
+  }
+
   if ("iPeakMaxMidi_A" in nextParams) {
     nextParams.iPeakMaxMidi_A = clampPulseCap(
       nextParams.iPeakMaxMidi_A,
@@ -9074,7 +9179,7 @@ export async function computeEnergySnapshot(sim: any) {
  */
 export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSampleBuffer {
   // Hull geometry: convert from Needle Hull format to ellipsoid axes
-  const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 }; // fallback only
+  const hullGeom = resolveHullGeometry(state); // fallback only
   const a = hullGeom.Lx_m / 2;  // Semi-axis X (length/2)
   const b = hullGeom.Ly_m / 2;  // Semi-axis Y (width/2)
   const c = hullGeom.Lz_m / 2;  // Semi-axis Z (height/2)
@@ -9193,7 +9298,7 @@ export function sampleDisplacementFieldGeometry(state: EnergyPipelineState, req:
     return sampleDisplacementField(state, req);
   }
 
-  const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+  const hullGeom = resolveHullGeometry(state);
   const a = hullGeom.Lx_m / 2;
   const b = hullGeom.Ly_m / 2;
   const c = hullGeom.Lz_m / 2;

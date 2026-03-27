@@ -16,65 +16,81 @@ import {
   createWebSocketConnection,
 } from "@/lib/simulation-api";
 import { SimulationParameters, SimulationResult } from "@shared/schema";
-import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+import {
+  NHM2_SIMULATION_CONTROL_DEFAULTS,
+  NHM2_SIMULATION_PARAMETERS,
+} from "@shared/needle-hull-mark2-cavity-contract";
 
 export default function Simulation() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [currentSimulation, setCurrentSimulation] = useState<SimulationResult | null>(null);
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [currentSimulation, setCurrentSimulation] =
+    useState<SimulationResult | null>(null);
   const [currentStep, setCurrentStep] = useState<string>("");
 
-  // Shared phase diagram state - Needle Hull Mk 1 defaults
-  const [tileArea, setTileArea] = useState(5); // cm²
-  const [shipRadius, setShipRadius] = useState(82.0); // m
+  const [tileArea, setTileArea] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.tileAreaCm2,
+  );
+  const [hullReferenceRadius, setHullReferenceRadius] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.hullReferenceRadiusM,
+  );
+  const [gammaGeo, setGammaGeo] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.gammaGeo,
+  );
+  const [qFactor, setQFactor] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.qFactor,
+  );
+  const [duty, setDuty] = useState(NHM2_SIMULATION_CONTROL_DEFAULTS.duty);
+  const [sagDepth, setSagDepth] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.sagDepthNm,
+  );
+  const [temperature, setTemperature] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.temperatureK,
+  );
+  const [strokeAmplitude, setStrokeAmplitude] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.strokeAmplitudePm,
+  );
+  const [burstTime, setBurstTime] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.burstTimeUs,
+  );
+  const [cycleTime, setCycleTime] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.cycleTimeUs,
+  );
+  const [xiPoints, setXiPoints] = useState(
+    NHM2_SIMULATION_CONTROL_DEFAULTS.xiPoints,
+  );
 
-  // Dynamic sim params - Needle Hull Mk 1 defaults
-  const [gammaGeo, setGammaGeo] = useState(26);        // UI only
-  const [qFactor, setQFactor] = useState(1.6e6);       // cavity Q
-  const [duty, setDuty] = useState(0.002);             // ship-wide duty (fraction)
-  const [sagDepth, setSagDepth] = useState(16);        // nm
-  const [temperature, setTemperature] = useState(20);  // K
-  const [strokeAmplitude, setStrokeAmplitude] = useState(50); // pm
-  const [burstTime, setBurstTime] = useState(10);      // µs
-  const [cycleTime, setCycleTime] = useState(1000);    // µs
-  const [xiPoints, setXiPoints] = useState(5000);
-
-  // Apply Needle Hull Preset
   const applyNeedleHullPreset = () => {
-    setTileArea(5);
-    setShipRadius(82.0);
-    setGammaGeo(26);
-    setQFactor(1.6e6);
-    setDuty(0.002);
-    setSagDepth(16);
-    setTemperature(20);
-    setStrokeAmplitude(50);
-    setBurstTime(10);
-    setCycleTime(1000);
-    setXiPoints(5000);
+    setTileArea(NHM2_SIMULATION_CONTROL_DEFAULTS.tileAreaCm2);
+    setHullReferenceRadius(NHM2_SIMULATION_CONTROL_DEFAULTS.hullReferenceRadiusM);
+    setGammaGeo(NHM2_SIMULATION_CONTROL_DEFAULTS.gammaGeo);
+    setQFactor(NHM2_SIMULATION_CONTROL_DEFAULTS.qFactor);
+    setDuty(NHM2_SIMULATION_CONTROL_DEFAULTS.duty);
+    setSagDepth(NHM2_SIMULATION_CONTROL_DEFAULTS.sagDepthNm);
+    setTemperature(NHM2_SIMULATION_CONTROL_DEFAULTS.temperatureK);
+    setStrokeAmplitude(NHM2_SIMULATION_CONTROL_DEFAULTS.strokeAmplitudePm);
+    setBurstTime(NHM2_SIMULATION_CONTROL_DEFAULTS.burstTimeUs);
+    setCycleTime(NHM2_SIMULATION_CONTROL_DEFAULTS.cycleTimeUs);
+    setXiPoints(NHM2_SIMULATION_CONTROL_DEFAULTS.xiPoints);
   };
 
-  // Fetch a single simulation by id (needed queryFn)
   const fetchSimulation = async (id: string): Promise<SimulationResult> => {
     const res = await fetch(`/api/simulations/${id}`);
     if (!res.ok) throw new Error("Failed to fetch simulation");
     return res.json();
   };
 
-  // Query for simulation data
   const { data: simulation } = useQuery<SimulationResult>({
     queryKey: ["/api/simulations", currentSimulation?.id],
     enabled: !!currentSimulation?.id,
-    // Poll while running
     refetchInterval:
-      currentSimulation?.status && !["completed", "failed"].includes(currentSimulation.status)
+      currentSimulation?.status &&
+      !["completed", "failed"].includes(currentSimulation.status)
         ? 2000
         : false,
     queryFn: () => fetchSimulation(currentSimulation!.id),
   });
 
-  // Create simulation
   const createSimulationMutation = useMutation({
     mutationFn: createSimulation,
     onSuccess: (newSimulation: SimulationResult) => {
@@ -95,7 +111,6 @@ export default function Simulation() {
     },
   });
 
-  // Start simulation
   const startSimulationMutation = useMutation({
     mutationFn: startSimulation,
     onSuccess: () => {
@@ -115,7 +130,6 @@ export default function Simulation() {
     },
   });
 
-  // Generate SCUFF-EM geometry file
   const generateScuffgeoMutation = useMutation({
     mutationFn: generateScuffgeo,
     onSuccess: () => {
@@ -134,7 +148,6 @@ export default function Simulation() {
     },
   });
 
-  // Real-time updates via WebSocket
   useEffect(() => {
     if (!currentSimulation?.id) return;
 
@@ -142,67 +155,44 @@ export default function Simulation() {
     websocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === "progress") {
-        // server sends { type: 'progress', message: string }
         setCurrentStep(data.message);
         setCurrentSimulation((prev) =>
-          prev ? { ...prev, status: "calculating", logs: [...(prev.logs ?? []), data.message] } : prev
+          prev
+            ? {
+                ...prev,
+                status: "calculating",
+                logs: [...(prev.logs ?? []), data.message],
+              }
+            : prev,
         );
       } else if (data.type === "completed") {
-        // server sends { type: 'completed', results: {...} }
         setCurrentSimulation((prev) =>
-          prev ? { ...prev, status: "completed", results: data.results } : prev
+          prev ? { ...prev, status: "completed", results: data.results } : prev,
         );
-        queryClient.invalidateQueries({ queryKey: ["/api/simulations", currentSimulation.id] });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/simulations", currentSimulation.id],
+        });
       } else if (data.type === "error") {
-        // server sends { type: 'error', error: string }
-        setCurrentSimulation((prev) => (prev ? { ...prev, status: "failed", error: data.error } : prev));
-        toast({ title: "Simulation Error", description: data.error, variant: "destructive" });
+        setCurrentSimulation((prev) =>
+          prev ? { ...prev, status: "failed", error: data.error } : prev,
+        );
+        toast({
+          title: "Simulation Error",
+          description: data.error,
+          variant: "destructive",
+        });
       }
     };
 
-    setWs(websocket);
     return () => {
       websocket.close();
-      setWs(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSimulation?.id]);
+  }, [currentSimulation?.id, queryClient, toast]);
 
-  const handleRunSimulation = () => {
-    // Map UI -> backend schema
-    const params: SimulationParameters = {
-      geometry: "bowl",
-      gap: 1.0, // nm
-      radius: 25000, // µm (25 mm tile radius)
-      sagDepth, // nm
-      material: "PEC",
-      materialModel: "ideal_retarded",
-      temperature, // K
-      moduleType: "dynamic",
-      dynamicConfig: {
-        modulationFreqGHz: 15,
-        strokeAmplitudePm: strokeAmplitude, // pm
-        burstLengthUs: burstTime, // µs
-        cycleLengthUs: cycleTime, // µs
-        cavityQ: qFactor,
-        sectorCount: PROMOTED_WARP_PROFILE.sectorCount,
-        sectorDuty: duty, // fraction
-        pulseFrequencyGHz: 15,
-        lightCrossingTimeNs: 100,
-        shiftAmplitude: strokeAmplitude * 1e-12, // meters from pm
-        expansionTolerance: 1e-12,
-        warpFieldType: "natario",
-      },
-      advanced: {
-        xiMin: 1e-3,
-        maxXiPoints: xiPoints,
-        intervals: 50,
-        absTol: 0,
-        relTol: 0.01,
-      },
-    };
-
-    createSimulationMutation.mutate(params);
+  const handleRunSimulation = (
+    parameters: SimulationParameters = NHM2_SIMULATION_PARAMETERS,
+  ) => {
+    createSimulationMutation.mutate(parameters);
   };
 
   const handleStartSimulation = () => {
@@ -214,6 +204,18 @@ export default function Simulation() {
   const handleGenerateGeometry = () => {
     if (currentSimulation?.id) {
       generateScuffgeoMutation.mutate(currentSimulation.id);
+    }
+  };
+
+  const handleGenerateOnly = async (
+    parameters: SimulationParameters = NHM2_SIMULATION_PARAMETERS,
+  ) => {
+    try {
+      const createdSimulation =
+        await createSimulationMutation.mutateAsync(parameters);
+      await generateScuffgeoMutation.mutateAsync(createdSimulation.id);
+    } catch {
+      // Mutation-level error handling already reports the failure.
     }
   };
 
@@ -229,44 +231,52 @@ export default function Simulation() {
     }
   };
 
+  const displayedSimulation = simulation ?? currentSimulation;
+  const simulationStatus = displayedSimulation?.status ?? "idle";
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4">
-        <div className="flex items-center gap-2 mb-6">
-          <Settings className="w-6 h-6" />
+        <div className="mb-6 flex items-center gap-2">
+          <Settings className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Simulation Configuration</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Parameters and Controls */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="space-y-6">
-            <ParameterPanel {...({
-              tileArea,
-              setTileArea,
-              shipRadius,
-              setShipRadius,
-              gammaGeo,
-              setGammaGeo,
-              qFactor,
-              setQFactor,
-              duty,
-              setDuty,
-              sagDepth,
-              setSagDepth,
-              temperature,
-              setTemperature,
-              strokeAmplitude,
-              setStrokeAmplitude,
-              burstTime,
-              setBurstTime,
-              cycleTime,
-              setCycleTime,
-              xiPoints,
-              setXiPoints,
-              onApplyNeedleHullPreset: applyNeedleHullPreset,
-              onRunSimulation: handleRunSimulation,
-              isRunning: createSimulationMutation.isPending,
-            } as any)} />
+            <ParameterPanel
+              onSubmit={handleRunSimulation}
+              onGenerateOnly={handleGenerateOnly}
+              isLoading={
+                createSimulationMutation.isPending ||
+                generateScuffgeoMutation.isPending
+              }
+              onTileAreaChange={setTileArea}
+              onHullReferenceRadiusChange={setHullReferenceRadius}
+              onApplyPreset={applyNeedleHullPreset}
+              parameterValues={{
+                gammaGeo,
+                qFactor,
+                duty,
+                sagDepth,
+                temperature,
+                strokeAmplitude,
+                burstTime,
+                cycleTime,
+                xiPoints,
+              }}
+              onParameterChange={{
+                setGammaGeo,
+                setQFactor,
+                setDuty,
+                setSagDepth,
+                setTemperature,
+                setStrokeAmplitude,
+                setBurstTime,
+                setCycleTime,
+                setXiPoints,
+              }}
+            />
 
             <div className="flex gap-2">
               <Button
@@ -274,16 +284,18 @@ export default function Simulation() {
                 disabled={!currentSimulation || startSimulationMutation.isPending}
                 className="flex items-center gap-2"
               >
-                <Play className="w-4 h-4" />
+                <Play className="h-4 w-4" />
                 Start Simulation
               </Button>
               <Button
                 onClick={handleGenerateGeometry}
-                disabled={!currentSimulation || generateScuffgeoMutation.isPending}
+                disabled={
+                  !currentSimulation || generateScuffgeoMutation.isPending
+                }
                 variant="outline"
                 className="flex items-center gap-2"
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="h-4 w-4" />
                 Generate Geometry
               </Button>
               <Button
@@ -292,21 +304,42 @@ export default function Simulation() {
                 variant="outline"
                 className="flex items-center gap-2"
               >
-                <Download className="w-4 h-4" />
+                <Download className="h-4 w-4" />
                 Download All
               </Button>
             </div>
           </div>
 
-          {/* Right Column - Status and Visualization */}
           <div className="space-y-6">
-            <SimulationStatus {...( { simulation: currentSimulation, currentStep, onDownload: handleDownload } as any)} />
+            <SimulationStatus
+              status={simulationStatus}
+              currentStep={currentStep}
+            />
 
-            <MeshVisualization {...({ sagDepth1: 0, sagDepth2: sagDepth, radius: 25 } as any)} />
+            <MeshVisualization />
 
-            {simulation && (
+            {displayedSimulation && (
               <ResultsPanel
-                {...({ simulation, onDownload: handleDownload, showVisualProof: true, showVerification: true, showPhaseDiagram: false, tileArea, shipRadius } as any)}
+                simulation={displayedSimulation}
+                onDownloadFile={handleDownload}
+                onDownloadAll={handleDownloadAll}
+                tileArea={tileArea}
+                hullReferenceRadius={hullReferenceRadius}
+                onTileAreaChange={setTileArea}
+                onHullReferenceRadiusChange={setHullReferenceRadius}
+                gammaGeo={gammaGeo}
+                qFactor={qFactor}
+                duty={duty}
+                sagDepth={sagDepth}
+                temperature={temperature}
+                strokeAmplitude={strokeAmplitude}
+                burstTime={burstTime}
+                cycleTime={cycleTime}
+                xiPoints={xiPoints}
+                onGammaGeoChange={setGammaGeo}
+                onQFactorChange={setQFactor}
+                onDutyChange={setDuty}
+                onSagDepthChange={setSagDepth}
               />
             )}
           </div>

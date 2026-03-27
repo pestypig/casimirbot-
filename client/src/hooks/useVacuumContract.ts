@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef } from "react";
 import { useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 import { publishVacuumContract } from "@/lib/vacuum-contract";
+import {
+  resolvePipelineBubbleRadiusM,
+  resolvePipelineHullReferenceRadiusM,
+} from "@/lib/pipeline-geometry";
 import type {
   VacuumContract,
   VacuumContractSpec,
@@ -169,6 +173,8 @@ const buildSpec = (state: EnergyPipelineState, pumpPhaseDeg: number | null): Vac
   const pumpPhase = round(pumpPhaseDeg ?? state.pumpPhase_deg ?? null, 3);
   const modulationFreq = round(state.modulationFreq_GHz, 6);
   const zetaSource = state.zeta ?? state.deltaAOverA ?? null;
+  const hullReferenceRadiusM = round(resolvePipelineHullReferenceRadiusM(state), 3);
+  const bubbleRadiusM = round(resolvePipelineBubbleRadiusM(state), 3);
 
   const driveLawParts: string[] = ["sector-strobe"];
   if (Number.isFinite(sectorsConcurrentRaw) && Number.isFinite(sectorsTotalRaw) && sectorsTotalRaw > 0) {
@@ -183,7 +189,8 @@ const buildSpec = (state: EnergyPipelineState, pumpPhaseDeg: number | null): Vac
     geometry: {
       gap_nm: round(state.gap_nm, 3),
       tileArea_cm2: round(state.tileArea_cm2, 3),
-      shipRadius_m: round(state.shipRadius_m, 3),
+      hullReferenceRadius_m: hullReferenceRadiusM,
+      bubbleRadius_m: bubbleRadiusM,
       sectorCount: round(sectorsTotalRaw, 0),
       sectorsConcurrent: round(sectorsConcurrentRaw, 0),
       curvatureRadius_m: round(extended.curvatureRadius_m, 3),

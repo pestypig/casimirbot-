@@ -70,7 +70,12 @@ import {
   pushAlcubierreDebugEvent,
   subscribeAlcubierreDebugLogConfig,
 } from "@/lib/alcubierre-debug-log";
+import { HULL_SCIENTIFIC_ATLAS_PANES } from "@shared/hull-render-contract";
 import type {
+  HullScientificAtlasPaneId,
+  HullScientificAtlasSidecarV1,
+  HullRenderCertificateV1,
+  HullScientificRenderView,
   HullMisRenderRequestV1,
   HullMisRenderResponseV1,
   HullRendererBackendMode,
@@ -477,7 +482,41 @@ const SCIENTIFIC_RENDER_ERROR_CODES = new Set([
   "mis_proxy_unconfigured",
   "mis_proxy_failed",
   "remote_mis_non_research_grade_frame",
+  "remote_mis_missing_or_invalid_render_certificate",
+  "remote_mis_render_certificate_schema_mismatch",
+  "remote_mis_render_certificate_hash_mismatch",
+  "remote_mis_render_certificate_missing_channel_hashes",
+  "remote_mis_render_certificate_metric_ref_hash_mismatch",
+  "remote_mis_render_certificate_missing_support_mask_hash",
+  "remote_mis_render_certificate_view_mismatch",
+  "remote_mis_render_certificate_chart_mismatch",
+  "remote_mis_render_certificate_hash_missing",
+  "scientific_atlas_pane_missing",
+  "scientific_atlas_certificate_mismatch",
+  "scientific_atlas_channel_contract_missing",
+  "scientific_atlas_convention_mismatch",
+  "scientific_atlas_optical_causal_desync",
+  "scientific_atlas_timestamp_mismatch",
+  "scientific_york_theta_missing",
+  "scientific_york_chart_unsupported",
+  "scientific_york_certificate_mismatch",
+  "scientific_york_convention_mismatch",
 ]);
+const SCIENTIFIC_ATLAS_PANE_ORDER = [
+  ...HULL_SCIENTIFIC_ATLAS_PANES,
+] as const satisfies readonly HullScientificAtlasPaneId[];
+
+function findScientificAtlasPaneFailure(
+  atlas: HullScientificAtlasSidecarV1 | null | undefined,
+): HullScientificAtlasPaneId | null {
+  if (!atlas) return null;
+  for (const paneId of SCIENTIFIC_ATLAS_PANE_ORDER) {
+    if (!atlas.pane_ids.includes(paneId)) return paneId;
+    const status = atlas.pane_status[paneId];
+    if (status !== "ok") return paneId;
+  }
+  return null;
+}
 
 function parseMisServiceErrorInfo(rawMessage: string): MisServiceErrorInfo {
   const raw = String(rawMessage ?? "").trim();
@@ -500,6 +539,14 @@ function parseMisServiceErrorInfo(rawMessage: string): MisServiceErrorInfo {
     }
   }
   if (!detail) detail = raw;
+  if (!code) {
+    const yorkCodeMatch = `${detail} ${raw}`.match(
+      /\b(scientific_york_(?:theta_missing|chart_unsupported|certificate_mismatch|convention_mismatch))\b/i,
+    );
+    if (yorkCodeMatch) {
+      code = yorkCodeMatch[1]?.toLowerCase() ?? null;
+    }
+  }
   return { status, code, detail, raw };
 }
 
@@ -510,6 +557,10 @@ function isStrictScientificRenderFailure(info: MisServiceErrorInfo): boolean {
     body.includes("remote_mis_non_scientific_response") ||
     body.includes("remote_mis_non_3p1_geodesic_mode") ||
     body.includes("remote_mis_non_research_grade_frame") ||
+    body.includes("remote_mis_render_certificate") ||
+    body.includes("scientific_atlas_") ||
+    body.includes("scientific_york_") ||
+    body.includes("missing_or_invalid_render_certificate") ||
     body.includes("scientific frame requested")
   );
 }
@@ -524,8 +575,24 @@ function formatStrictScientificRenderFailure(info: MisServiceErrorInfo): string 
     detail =
       "Remote renderer responded with scaffold/teaching frame metadata; research-grade frame required.";
   }
+  if (
+    `${info.detail ?? ""} ${info.raw}`
+      .toLowerCase()
+      .includes("render_certificate")
+  ) {
+    detail =
+      "Remote renderer failed scientific certificate validation (schema/hash/channel or metric-ref mismatch).";
+  }
+  if (`${info.detail ?? ""} ${info.raw}`.toLowerCase().includes("scientific_atlas_")) {
+    detail =
+      "Remote renderer failed full-atlas synchronization validation (pane/channel/convention/timestamp mismatch).";
+  }
+  if (`${info.detail ?? ""} ${info.raw}`.toLowerCase().includes("scientific_york_")) {
+    detail =
+      "Remote renderer failed York strict validation (theta channel/chart/convention/snapshot identity mismatch).";
+  }
   return [
-    "Scientific renderer unavailable.",
+    "Masked hull-configured scientific renderer unavailable.",
     detail,
     "Start strict OptiX/Unity render service and re-open panel.",
   ].join(" ");
@@ -1170,8 +1237,82 @@ function resolveSigmaSectors(live: any): number {
   }
 }
 
-type VizMode = 0 | 1 | 2 | 3; // 0=thetaGR, 1=rhoGR, 2=thetaDrive, 3=thetaHull3D
+type VizMode = 0 | 1 | 2 | 3 | 4 | 5; // 0=shift-shell, 1=paper-rho, 2=drive, 3=full-atlas/worldtube, 4=york-slice, 5=york-surface
 type ShaderMode = "main" | "safe";
+
+type ScientificSnapshotIdentity = {
+  metric_ref_hash: string | null;
+  chart: string | null;
+  observer: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  unit_system: string;
+  timestamp_ms: number;
+};
+
+const resolveScientificModeLabel = (planarVizMode: VizMode): string =>
+  planarVizMode === 1
+    ? "Energy"
+  : planarVizMode === 0
+      ? "Shift Shell"
+    : planarVizMode === 4
+        ? "York Slice"
+      : planarVizMode === 5
+        ? "York Surface"
+        : "Scientific";
+
+const resolveScientificRenderView = (
+  planarVizMode: VizMode,
+): HullScientificRenderView =>
+  planarVizMode === 1
+    ? "paper-rho"
+  : planarVizMode === 0
+      ? "shift-shell-3p1"
+    : planarVizMode === 4
+        ? "york-time-3p1"
+      : planarVizMode === 5
+        ? "york-surface-3p1"
+        : "full-atlas";
+
+const buildScientificSnapshotIdentity = (
+  certificate: HullRenderCertificateV1 | null | undefined,
+): ScientificSnapshotIdentity | null => {
+  if (!certificate) return null;
+  if (
+    typeof certificate.observer !== "string" ||
+    typeof certificate.theta_definition !== "string" ||
+    typeof certificate.kij_sign_convention !== "string" ||
+    typeof certificate.unit_system !== "string" ||
+    !Number.isFinite(Number(certificate.timestamp_ms))
+  ) {
+    return null;
+  }
+  return {
+    metric_ref_hash: certificate.metric_ref_hash ?? null,
+    chart: certificate.chart ?? null,
+    observer: certificate.observer,
+    theta_definition: certificate.theta_definition,
+    kij_sign_convention: certificate.kij_sign_convention,
+    unit_system: certificate.unit_system,
+    timestamp_ms: Number(certificate.timestamp_ms),
+  };
+};
+
+const scientificIdentityMatches = (
+  left: ScientificSnapshotIdentity | null,
+  right: ScientificSnapshotIdentity | null,
+): boolean => {
+  if (!left || !right) return false;
+  return (
+    left.metric_ref_hash === right.metric_ref_hash &&
+    left.chart === right.chart &&
+    left.observer === right.observer &&
+    left.theta_definition === right.theta_definition &&
+    left.kij_sign_convention === right.kij_sign_convention &&
+    left.unit_system === right.unit_system &&
+    left.timestamp_ms === right.timestamp_ms
+  );
+};
 
 function fnum(x: any, d=0) { const n = Number(x); return Number.isFinite(n) ? n : d; }
 
@@ -1599,7 +1740,7 @@ function Hull3DDebugToggles({
     if (typeof window !== "undefined") (window as any).__hullRingOverlayField = ringField;
   }, [ringField]);
   return (
-    <CurvatureVoxProvider quality="medium" refetchMs={80}>
+    <CurvatureVoxProvider quality="low" refetchMs={1000}>
       <div className="flex items-center gap-1 text-[0.65rem] text-slate-200">
       <span className="uppercase tracking-wide text-slate-400">Debug</span>
       <button
@@ -1764,6 +1905,12 @@ function makeGrid(res: number) {
   return new Float32Array(verts);
 }
 
+type StrictHullMisRenderRequestV1 = HullMisRenderRequestV1 & {
+  scienceLane: NonNullable<HullMisRenderRequestV1["scienceLane"]> & {
+    requireHullSupportChannels?: boolean;
+  };
+};
+
 export default function AlcubierrePanel({
   className,
   onCanvasReady,
@@ -1783,6 +1930,11 @@ export default function AlcubierrePanel({
   // Hull 3D health + diagnostics UI state
   const [hullHealth, setHullHealth] = useState<null | { pass: number; fail: number; results: Record<string, { pass: boolean; luma: number; alpha: number }> }>(null);
   const [hullDiagMsg, setHullDiagMsg] = useState<string | null>(null);
+  const [scientificAtlasState, setScientificAtlasState] =
+    useState<HullScientificAtlasSidecarV1 | null>(null);
+  const [scientificCertificateState, setScientificCertificateState] =
+    useState<HullRenderCertificateV1 | null>(null);
+  const scientificSnapshotIdentityRef = useRef<ScientificSnapshotIdentity | null>(null);
   const [geodesicDiagnostics, setGeodesicDiagnostics] = useState<HullGeodesicDiagnostics | null>(null);
   const hullQualityOverridesRef = useRef<Hull3DQualityOverrides>({});
   const hullRafRef = useRef<number>(0);
@@ -6073,7 +6225,7 @@ const res = 256;
 
   // === WebGL init effect (runs once unless resolution changes) ===
   useEffect(() => {
-    if (planarVizMode === 3) return;
+    if (hullRendererBackend === "mis-service" || planarVizMode === 3) return;
     const cv = canvasRef.current;
     if (!cv) return;
     const gl = cv.getContext("webgl2", { antialias: true, preserveDrawingBuffer: true });
@@ -6597,10 +6749,19 @@ const res = 256;
       cv.removeEventListener("webglcontextlost", lost);
       cv.removeEventListener("webglcontextrestored", restored);
     };
-  }, [planarVizMode, res, shaderSources]);
+  }, [planarVizMode, res, shaderSources, hullRendererBackend]);
 
   useEffect(() => {
-    if (planarVizMode !== 3) {
+    const modeSupportsScientificMis =
+      planarVizMode === 0 ||
+      planarVizMode === 1 ||
+      planarVizMode === 2 ||
+      planarVizMode === 3 ||
+      planarVizMode === 4 ||
+      planarVizMode === 5;
+    const useScientificMisService =
+      hullRendererBackend === "mis-service" && modeSupportsScientificMis;
+    if (!useScientificMisService && planarVizMode !== 3) {
       integralSignalRef.current = null;
       if (hullRafRef.current) {
         cancelAnimationFrame(hullRafRef.current);
@@ -6638,6 +6799,7 @@ const res = 256;
     const RUNTIME_GUARD_LONG_FRAME_MS = 950;
     const RUNTIME_GUARD_LONG_FRAME_LIMIT = 3;
     const RUNTIME_GUARD_HEARTBEAT_TIMEOUT_MS = 4500;
+    let adaptiveScientificDimsTarget = 40;
     let lastRenderTransportDebugMs = 0;
     let lastSolvePipelineRequestDebugMs = 0;
     let lastSolvePipelineResponseDebugMs = 0;
@@ -6902,6 +7064,14 @@ const res = 256;
       const skyboxModeCurrent: HullMisRenderRequestV1["skyboxMode"] =
         rawSkybox === "geodesic" || rawSkybox === "flat" ? rawSkybox : "off";
       const scientificFrameRequired = true;
+      const hullSupportRequired =
+        typeof metricLatest?.hullSupportRequired === "boolean"
+          ? metricLatest.hullSupportRequired
+          : true;
+      const scientificModeLabel = resolveScientificModeLabel(planarVizMode);
+      const scientificRenderView: NonNullable<
+        NonNullable<HullMisRenderRequestV1["scienceLane"]>["renderView"]
+      > = resolveScientificRenderView(planarVizMode);
       const skyboxModeRequest: HullMisRenderRequestV1["skyboxMode"] =
         scientificFrameRequired ? "geodesic" : skyboxModeCurrent;
       const solvePayload: NonNullable<HullMisRenderRequestV1["solve"]> = {
@@ -6946,13 +7116,32 @@ const res = 256;
       const metricVolumeRefPayload: HullMisRenderRequestV1["metricVolumeRef"] = (() => {
         if (!metricLatest || metricLatest.kind !== "hull3d:metric-volume") return null;
         if (typeof window === "undefined") return null;
-        const dims = Array.isArray(metricLatest.dims)
+        const dimsRaw = Array.isArray(metricLatest.dims)
           ? [
               Math.max(1, Math.floor(Number(metricLatest.dims[0]) || 1)),
               Math.max(1, Math.floor(Number(metricLatest.dims[1]) || 1)),
               Math.max(1, Math.floor(Number(metricLatest.dims[2]) || 1)),
             ]
           : null;
+        const scientificDimsTarget = Math.max(32, Math.min(64, adaptiveScientificDimsTarget));
+        const scientificDimsMin = 32;
+        const scientificDimsMax = 96;
+        const dims = dimsRaw
+          ? ([
+              Math.max(
+                scientificDimsMin,
+                Math.min(scientificDimsMax, Math.max(scientificDimsTarget, dimsRaw[0])),
+              ),
+              Math.max(
+                scientificDimsMin,
+                Math.min(scientificDimsMax, Math.max(scientificDimsTarget, dimsRaw[1])),
+              ),
+              Math.max(
+                scientificDimsMin,
+                Math.min(scientificDimsMax, Math.max(scientificDimsTarget, dimsRaw[2])),
+              ),
+            ] as [number, number, number])
+          : ([scientificDimsTarget, scientificDimsTarget, scientificDimsTarget] as [number, number, number]);
         const params = new URLSearchParams();
         if (dims) params.set("dims", `${dims[0]}x${dims[1]}x${dims[2]}`);
         if (Number.isFinite(metricLatest.time_s)) {
@@ -6961,9 +7150,55 @@ const res = 256;
         if (Number.isFinite(metricLatest.dt_s)) {
           params.set("dt_s", String(metricLatest.dt_s));
         }
+        const sourceParams = (() => {
+          const raw = (metricLatest as any)?.provenance?.sourceParams;
+          return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+        })();
+        const finiteOr = (value: unknown, fallback: number) => {
+          const n = Number(value);
+          return Number.isFinite(n) ? n : fallback;
+        };
+        const dutyForMetricRef = Math.max(
+          1e-8,
+          finiteOr(sourceParams?.dutyFR, Number(base?.duty ?? 0.0015)),
+        );
+        const qForMetricRef = Math.max(1e-6, finiteOr(sourceParams?.q, 1));
+        const gammaGeoForMetricRef = Math.max(1e-6, finiteOr(sourceParams?.gammaGeo, 26));
+        const gammaVdBForMetricRef = Math.max(1e-6, finiteOr(sourceParams?.gammaVdB, 1));
+        const zetaForMetricRef = Math.max(0, finiteOr(sourceParams?.zeta, 0.84));
+        const phaseForMetricRef = wrap01(
+          finiteOr(sourceParams?.phase01, Number((base as any)?.phase01)),
+        );
+        const metricT00ForMetricRef = finiteOr(sourceParams?.metricT00, Number.NaN);
+        const metricT00SourceForMetricRef =
+          typeof sourceParams?.metricT00Source === "string"
+            ? sourceParams.metricT00Source
+            : null;
+        const metricT00RefForMetricRef =
+          typeof sourceParams?.metricT00Ref === "string"
+            ? sourceParams.metricT00Ref
+            : null;
+        params.set("steps", "1");
         params.set("includeExtra", "1");
         params.set("includeKij", "1");
-        params.set("includeMatter", "0");
+        params.set("includeMatter", "1");
+        params.set("dutyFR", String(dutyForMetricRef));
+        params.set("q", String(qForMetricRef));
+        params.set("gammaGeo", String(gammaGeoForMetricRef));
+        params.set("gammaVdB", String(gammaVdBForMetricRef));
+        params.set("zeta", String(zetaForMetricRef));
+        params.set("phase01", String(phaseForMetricRef));
+        if (Number.isFinite(metricT00ForMetricRef)) {
+          params.set("metricT00", String(metricT00ForMetricRef));
+        }
+        if (metricT00SourceForMetricRef) {
+          params.set("metricT00Source", metricT00SourceForMetricRef);
+        }
+        if (metricT00RefForMetricRef) {
+          params.set("metricT00Ref", metricT00RefForMetricRef);
+        }
+        params.set("requireCongruentSolve", "1");
+        params.set("requireNhm2CongruentFullSolve", "1");
         params.set("format", "raw");
         const url = `${window.location.origin}/api/helix/gr-evolve-brick?${params.toString()}`;
         const hash = [
@@ -6971,6 +7206,19 @@ const res = 256;
           metricLatest.chart ?? "comoving_cartesian",
           dims ? dims.join("x") : "1x1x1",
           Number(metricLatest.updatedAt ?? 0).toString(10),
+          "steps=1",
+          `duty=${dutyForMetricRef.toExponential(3)}`,
+          `q=${qForMetricRef.toExponential(3)}`,
+          `gammaGeo=${gammaGeoForMetricRef.toExponential(3)}`,
+          `gammaVdB=${gammaVdBForMetricRef.toExponential(3)}`,
+          `zeta=${zetaForMetricRef.toFixed(4)}`,
+          `phase=${phaseForMetricRef.toFixed(4)}`,
+          Number.isFinite(metricT00ForMetricRef)
+            ? `metricT00=${metricT00ForMetricRef.toExponential(3)}`
+            : "metricT00=none",
+          `metricT00Source=${metricT00SourceForMetricRef ?? "none"}`,
+          `metricT00Ref=${metricT00RefForMetricRef ?? "none"}`,
+          "requireCongruentSolve=1",
         ].join("|");
         return {
           kind: "gr-evolve-brick",
@@ -6982,7 +7230,7 @@ const res = 256;
           hash,
         };
       })();
-      const payload: HullMisRenderRequestV1 = {
+      const payload: StrictHullMisRenderRequestV1 = {
         version: 1,
         requestId: `mis-${Date.now()}-${misSeq++}`,
         width: Math.max(1, cv.width | 0),
@@ -6994,6 +7242,13 @@ const res = 256;
         scienceLane: {
           requireIntegralSignal: true,
           requireScientificFrame: scientificFrameRequired,
+          requireCanonicalTensorVolume: true,
+          requireCongruentNhm2FullSolve: true,
+          requireHullSupportChannels: hullSupportRequired,
+          requireOffDiagonalGamma: true,
+          minVolumeDims: [32, 32, 32],
+          samplingMode: "trilinear",
+          renderView: scientificRenderView,
           attachmentDownsample: 2,
         },
         solve: solvePayload,
@@ -7010,6 +7265,53 @@ const res = 256;
             metricVolumeRefPayload.dims[1] *
             metricVolumeRefPayload.dims[2]
           : null;
+      const metricRefUrlParams = (() => {
+        if (!metricVolumeRefPayload?.url) return null;
+        try {
+          return new URL(metricVolumeRefPayload.url).searchParams;
+        } catch {
+          return null;
+        }
+      })();
+      const metricRefDuty =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("dutyFR")))
+          ? Number(metricRefUrlParams.get("dutyFR"))
+          : null;
+      const metricRefQ =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("q")))
+          ? Number(metricRefUrlParams.get("q"))
+          : null;
+      const metricRefGammaGeo =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("gammaGeo")))
+          ? Number(metricRefUrlParams.get("gammaGeo"))
+          : null;
+      const metricRefGammaVdB =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("gammaVdB")))
+          ? Number(metricRefUrlParams.get("gammaVdB"))
+          : null;
+      const metricRefZeta =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("zeta")))
+          ? Number(metricRefUrlParams.get("zeta"))
+          : null;
+      const metricRefPhase01 =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("phase01")))
+          ? Number(metricRefUrlParams.get("phase01"))
+          : null;
+      const metricRefMetricT00 =
+        metricRefUrlParams && Number.isFinite(Number(metricRefUrlParams.get("metricT00")))
+          ? Number(metricRefUrlParams.get("metricT00"))
+          : null;
+      const metricRefMetricT00Source = metricRefUrlParams?.get("metricT00Source") ?? null;
+      const metricRefMetricT00Ref = metricRefUrlParams?.get("metricT00Ref") ?? null;
+      const metricRefRequireCongruentSolve = (() => {
+        if (!metricRefUrlParams) return false;
+        const raw =
+          metricRefUrlParams.get("requireCongruentSolve") ??
+          metricRefUrlParams.get("requireNhm2CongruentFullSolve");
+        if (raw == null) return false;
+        const normalized = raw.trim().toLowerCase();
+        return normalized === "1" || normalized === "true";
+      })();
       const requestDebugNowMs = Date.now();
       if (requestDebugNowMs - lastSolvePipelineRequestDebugMs > 1200) {
         lastSolvePipelineRequestDebugMs = requestDebugNowMs;
@@ -7018,8 +7320,8 @@ const res = 256;
           category: "solve_to_render_pipeline",
           source: "alcubierre.solve-render-chain.request",
           note: metricVolumeRefPayload
-            ? "equation->metric->render request dispatched (strict scientific lane)"
-            : "request missing metricVolumeRef; strict scientific lane may fail closed",
+            ? "equation->metric->render request dispatched (masked hull-configured scientific lane)"
+            : "request missing metricVolumeRef; masked hull-configured scientific lane may fail closed",
           expected: {
             beta: solvePayload.beta,
             alpha: solvePayload.alpha,
@@ -7030,6 +7332,15 @@ const res = 256;
             request_metric_bundle_spread: geodesicPayload.bundleSpread,
             metric_volume_updated_at_ms: metricVolumeRefPayload?.updatedAt ?? null,
             metric_volume_cells: metricRefCellCount,
+            metric_source_hull_support_required: hullSupportRequired,
+            metric_source_duty_fr: metricRefDuty,
+            metric_source_q: metricRefQ,
+            metric_source_gamma_geo: metricRefGammaGeo,
+            metric_source_gamma_vdb: metricRefGammaVdB,
+            metric_source_zeta: metricRefZeta,
+            metric_source_phase01: metricRefPhase01,
+            metric_source_metric_t00: metricRefMetricT00,
+            metric_source_require_congruent_solve: metricRefRequireCongruentSolve,
           },
           rendered: null,
           delta: null,
@@ -7037,6 +7348,8 @@ const res = 256;
             stage: "request",
             requestId: payload.requestId ?? null,
             strictScientificFrame: scientificFrameRequired,
+            renderView: scientificRenderView,
+            hullSupportRequired,
             requireIntegralSignal: payload.scienceLane?.requireIntegralSignal === true,
             geodesicModeRequested: geodesicPayload.mode ?? "unknown",
             chart: solvePayload.chart ?? "unknown",
@@ -7046,6 +7359,17 @@ const res = 256;
             metricRefKind: metricVolumeRefPayload?.kind ?? "none",
             metricRefHash: metricVolumeRefPayload?.hash ?? "none",
             metricRefUrl: metricVolumeRefPayload?.url ?? "none",
+            metricRefHullSupportRequired: hullSupportRequired,
+            metricRefDutyFR: metricRefDuty,
+            metricRefQ: metricRefQ,
+            metricRefGammaGeo: metricRefGammaGeo,
+            metricRefGammaVdB: metricRefGammaVdB,
+            metricRefZeta: metricRefZeta,
+            metricRefPhase01: metricRefPhase01,
+            metricRefMetricT00: metricRefMetricT00,
+            metricRefMetricT00Source: metricRefMetricT00Source ?? "none",
+            metricRefMetricT00Ref: metricRefMetricT00Ref ?? "none",
+            metricRefRequireCongruentSolve: metricRefRequireCongruentSolve,
           },
         });
       }
@@ -7066,8 +7390,86 @@ const res = 256;
             )}`,
           );
         }
+        const frameCertificate = frame.renderCertificate;
+        const frameAtlas = frame.scientificAtlas ?? null;
+        const frameIdentity = buildScientificSnapshotIdentity(frameCertificate);
+        if (scientificRenderView === "full-atlas") {
+          if (!frameAtlas) {
+            throw new Error("scientific_atlas_pane_missing");
+          }
+          if (
+            frameCertificate?.certificate_hash &&
+            frameAtlas.certificate_hash !== frameCertificate.certificate_hash
+          ) {
+            throw new Error("scientific_atlas_certificate_mismatch");
+          }
+          const failingPane = findScientificAtlasPaneFailure(frameAtlas);
+          if (failingPane) {
+            throw new Error(`scientific_atlas_pane_missing:${failingPane}`);
+          }
+          if (frameIdentity) {
+            scientificSnapshotIdentityRef.current = frameIdentity;
+          }
+        } else if (
+          scientificRenderView === "york-time-3p1" ||
+          scientificRenderView === "york-surface-3p1"
+        ) {
+          if (!frameCertificate) {
+            throw new Error("scientific_york_certificate_mismatch");
+          }
+          const yorkSurfaceRequested =
+            scientificRenderView === "york-surface-3p1";
+          if (
+            frameCertificate.render?.field_key !== "theta" ||
+            frameCertificate.render?.slice_plane !== "x-z-midplane" ||
+            frameCertificate.render?.normalization !== "symmetric-about-zero" ||
+            (yorkSurfaceRequested &&
+              frameCertificate.render?.surface_height !== "theta")
+          ) {
+            throw new Error("scientific_york_convention_mismatch");
+          }
+          if (
+            typeof frameCertificate.theta_definition !== "string" ||
+            frameCertificate.theta_definition.trim().length === 0
+          ) {
+            throw new Error("scientific_york_convention_mismatch");
+          }
+          if (
+            scientificSnapshotIdentityRef.current &&
+            !scientificIdentityMatches(scientificSnapshotIdentityRef.current, frameIdentity)
+          ) {
+            throw new Error("scientific_york_certificate_mismatch");
+          }
+        } else if (scientificRenderView === "shift-shell-3p1") {
+          if (!frameCertificate) {
+            throw new Error("scientific_shift_shell_certificate_mismatch");
+          }
+          if (
+            frameCertificate.render?.field_key !== "beta_x" ||
+            frameCertificate.render?.slice_plane !== "x-z-midplane" ||
+            frameCertificate.render?.normalization !== "symmetric-about-zero" ||
+            frameCertificate.render?.support_overlay !== "hull_sdf+tile_support_mask"
+          ) {
+            throw new Error("scientific_shift_shell_convention_mismatch");
+          }
+          if (
+            scientificSnapshotIdentityRef.current &&
+            !scientificIdentityMatches(scientificSnapshotIdentityRef.current, frameIdentity)
+          ) {
+            throw new Error("scientific_shift_shell_certificate_mismatch");
+          }
+        }
         await drawMisFrame(frame.imageDataUrl);
         setGlError(null);
+        setScientificAtlasState((prev) =>
+          scientificRenderView === "full-atlas" ? frameAtlas : prev,
+        );
+        setScientificCertificateState(frameCertificate ?? null);
+        if (scientificFrameRequired) {
+          if (frame.renderMs > 22_000) adaptiveScientificDimsTarget = 32;
+          else if (frame.renderMs > 15_000) adaptiveScientificDimsTarget = 40;
+          else if (frame.renderMs < 8_000) adaptiveScientificDimsTarget = 48;
+        }
         const nowDecodeMs = Date.now();
         if (nowDecodeMs - lastIntegralSignalDecodeRef.current >= 1300) {
           const integral = extractIntegralSignalAttachmentSnapshot(frame);
@@ -7116,7 +7518,9 @@ const res = 256;
           stepScale_m: 0,
           updatedAt: Date.now(),
         });
-        setHullDiagMsg("MIS service renderer active (strict scientific remote).");
+        setHullDiagMsg(
+          `${scientificModeLabel} uses masked hull-configured scientific rendering (${scientificRenderView}) via MIS service.`,
+        );
         const hasDepthAttachment = Array.isArray(frame.attachments)
           ? frame.attachments.some((entry) => entry.kind === "depth-linear-m-f32le")
           : false;
@@ -7137,7 +7541,7 @@ const res = 256;
                   : "warn",
             category: "solve_to_render_pipeline",
             source: "alcubierre.solve-render-chain.response",
-            note: "equation->metric->render response received",
+            note: `equation->metric->render response received (masked hull-configured scientific ${scientificRenderView})`,
             expected: {
               beta: solvePayload.beta,
               alpha: solvePayload.alpha,
@@ -7179,17 +7583,36 @@ const res = 256;
               backend: frame.backend,
               geodesicModeResolved: resolvedMode,
               geodesicModeRemote: remoteMode ?? "unknown",
+              renderViewRequested: scientificRenderView,
               chart: solvePayload.chart ?? "unknown",
               consistency: frame.diagnostics?.consistency ?? "unknown",
               scientificTier: frameScientificTier ?? "unknown",
               researchGrade: frame.provenance?.researchGrade === true,
               provenanceSource: frame.provenance?.source ?? "unknown",
+              certificateSchemaVersion:
+                frameCertificate?.certificate_schema_version ?? "none",
+              certificateHash: frameCertificate?.certificate_hash ?? "none",
+              certificateMetricRefHash: frameCertificate?.metric_ref_hash ?? "none",
+              certificateFrameHash: frameCertificate?.frame_hash ?? "none",
+              certificateRenderView: frameCertificate?.render?.view ?? "none",
+              certificateNullResidualMax:
+                frameCertificate?.diagnostics?.null_residual_max ?? null,
+              certificateConstraintRms:
+                frameCertificate?.diagnostics?.constraint_rms ?? null,
               hasDepthAttachment,
               hasMaskAttachment,
               width: payload.width,
               height: payload.height,
               metricRefHash: metricVolumeRefPayload?.hash ?? "none",
               metricRefDims: metricRefDimsText,
+              atlasCertificateHash: frame.scientificAtlas?.certificate_hash ?? "none",
+              atlasMetricRefHash: frame.scientificAtlas?.metric_ref_hash ?? "none",
+              atlasPaneStatus:
+                frame.scientificAtlas == null
+                  ? "none"
+                  : SCIENTIFIC_ATLAS_PANE_ORDER
+                      .map((paneId) => `${paneId}:${frame.scientificAtlas?.pane_status[paneId] ?? "missing"}`)
+                      .join("|"),
             },
           });
         }
@@ -7200,7 +7623,7 @@ const res = 256;
             level: "info",
             category: "render_transport",
             source: "alcubierre.mis-frame.success",
-            note: "strict scientific remote proxy frame",
+            note: `masked hull-configured scientific remote proxy frame (${scientificRenderView})`,
             expected: {
               beta: solvePayload.beta,
               alpha: solvePayload.alpha,
@@ -7226,6 +7649,7 @@ const res = 256;
             measurements: {
               backend: frame.backend,
               skyboxMode: skyboxModeRequest,
+              renderView: scientificRenderView,
               geodesicMode: resolvedMode,
               consistency: frame.diagnostics?.consistency ?? geodesicPayload.consistency ?? "unknown",
               width: payload.width,
@@ -7237,6 +7661,7 @@ const res = 256;
         if (disposed) return;
         const message = err instanceof Error ? err.message : String(err);
         const errorInfo = parseMisServiceErrorInfo(message);
+        setScientificAtlasState(null);
         const strictScientificFailure =
           scientificFrameRequired && isStrictScientificRenderFailure(errorInfo);
         const uiMessage = strictScientificFailure
@@ -7265,6 +7690,7 @@ const res = 256;
               stage: "failure",
               requestId: payload.requestId ?? null,
               strictScientificFailure,
+              hullSupportRequired,
               errorStatus: errorInfo.status,
               errorCode: errorInfo.code ?? "none",
               errorDetail: errorInfo.detail ?? message,
@@ -7272,6 +7698,7 @@ const res = 256;
               geodesicModeRequested: geodesicPayload.mode ?? "unknown",
               metricRefHash: metricVolumeRefPayload?.hash ?? "none",
               metricRefKind: metricVolumeRefPayload?.kind ?? "none",
+              metricRefHullSupportRequired: hullSupportRequired,
               metricRefSource: metricVolumeRefPayload?.source ?? metricSummaryPayload?.source ?? "none",
             },
           });
@@ -7279,6 +7706,7 @@ const res = 256;
         setHullDiagMsg(uiMessage);
         if (strictScientificFailure) {
           setGlError(`Scientific renderer unavailable: ${uiMessage}`);
+          setScientificAtlasState(null);
           setGeodesicDiagnostics({
             mode: "disabled",
             scientificEnabled: true,
@@ -7326,7 +7754,13 @@ const res = 256;
     };
 
     const loop = () => {
-      if (disposed || runtimeGuardTripped || planarVizMode !== 3) return;
+      if (
+        disposed ||
+        runtimeGuardTripped ||
+        (!useScientificMisService && planarVizMode !== 3)
+      ) {
+        return;
+      }
       const frameStart = performance.now();
       runtimeGuardLastBeat = frameStart;
       try {
@@ -9524,9 +9958,14 @@ const res = 256;
     voxelSlicesEnabled,
     (latticeRuntime as any)?.backend,
   ]);
+  const scientificAtlasPaneFailure = findScientificAtlasPaneFailure(scientificAtlasState);
+  const scientificSnapshotIdentity = useMemo(
+    () => buildScientificSnapshotIdentity(scientificCertificateState),
+    [scientificCertificateState],
+  );
 
   return (
-    <CurvatureVoxProvider quality="medium" refetchMs={80}>
+    <CurvatureVoxProvider quality="low" refetchMs={1000}>
       <div className={cn("w-full", className)}>      {/* Fixed-height wrapper so the panel does not resize during live updates */}
       <div className="flex flex-col h-[560px] md:h-[620px] lg:h-[680px]">
         <TooltipProvider delayDuration={120} skipDelayDuration={250}>
@@ -9915,24 +10354,27 @@ const res = 256;
 
           <div className="ml-auto flex gap-1">
             <button
-              title="Reference-frame theta slice"
-              aria-label="Reference-frame theta slice"
+              title="Primary NHM2 shell geometry view: shift-shell-3p1"
+              aria-label="Shift Shell, single-snapshot scientific rendering, shift-shell-3p1"
               onClick={() => {
                 setPlanarVizMode(0);
                 setUserVizLocked(true);
               }}
             >
-              Frame
+              <span className="flex flex-col leading-tight">
+                <span>Shift Shell</span>
+                <span className="text-[0.6rem] text-slate-300">single-snapshot</span>
+              </span>
             </button>
             <button
-              title="Energy-density slice in the metric background"
-              aria-label="Energy-density slice"
+              title="Masked hull-configured scientific rendering: paper-rho"
+              aria-label="Energy, masked hull-configured scientific rendering, paper-rho"
               onClick={() => {
                 setPlanarVizMode(1);
                 setUserVizLocked(true);
               }}
             >
-              Energy
+              Energy / paper-rho
             </button>
             <button
               title="Drive-scaled theta slice"
@@ -9944,6 +10386,39 @@ const res = 256;
             >
               Drive
             </button>
+            <button
+              title="Single-snapshot York Slice scientific rendering: york-time-3p1"
+              aria-label="York Slice, single-snapshot scientific rendering, york-time-3p1"
+              onClick={() => {
+                setPlanarVizMode(4);
+                setUserVizLocked(true);
+              }}
+            >
+              <span className="flex flex-col leading-tight">
+                <span>York Slice</span>
+                <span className="text-[0.6rem] text-slate-300">single-snapshot</span>
+              </span>
+            </button>
+            <button
+              title="Single-snapshot York Surface scientific rendering: york-surface-3p1"
+              aria-label="York Surface, single-snapshot scientific rendering, york-surface-3p1"
+              onClick={() => {
+                setPlanarVizMode(5);
+                setUserVizLocked(true);
+              }}
+            >
+              <span className="flex flex-col leading-tight">
+                <span>York Surface</span>
+                <span className="text-[0.6rem] text-slate-300">single-snapshot</span>
+              </span>
+            </button>
+            <span
+              className="rounded bg-slate-900 px-2 py-1 text-[0.62rem] leading-tight text-slate-400"
+              title="York Sigma Family is a parameter-family export lane (not one simultaneous snapshot)"
+            >
+              York Sigma Family
+              <span className="block text-[0.58rem] text-slate-500">parameter family</span>
+            </span>
             <button
               title="World tube and hull shell view"
               aria-label="World tube and hull shell view"
@@ -11371,6 +11846,68 @@ const res = 256;
                     {latticeFallbackStatus.label}
                   </span>
                 ) : null}
+              </div>
+            </div>
+          ) : null}
+          {scientificAtlasState ? (
+            <div className="pointer-events-none absolute right-2 bottom-2 z-20 max-w-[min(32rem,calc(100%-1rem))] rounded border border-slate-600/80 bg-slate-950/80 px-2 py-2 text-[0.62rem] text-slate-100 shadow-md shadow-black/40">
+              <div className="font-semibold uppercase tracking-wide text-cyan-200">
+                NHM2 Full Atlas (single snapshot)
+              </div>
+              <div className="mt-1 text-slate-300">
+                metric {String(scientificAtlasState.metric_ref_hash ?? "none").slice(0, 16)} | cert {String(
+                  scientificAtlasState.certificate_hash ?? "none",
+                ).slice(0, 16)} | chart {scientificAtlasState.chart ?? "unknown"} | observer{" "}
+                {scientificAtlasState.observer ?? "unknown"} | units {scientificAtlasState.unit_system ?? "unknown"}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {SCIENTIFIC_ATLAS_PANE_ORDER.map((paneId) => {
+                  const status = scientificAtlasState.pane_status[paneId] ?? "missing";
+                  const className =
+                    status === "ok"
+                      ? "bg-emerald-700/60 text-emerald-100 border-emerald-300/50"
+                      : status === "missing"
+                        ? "bg-red-700/60 text-red-100 border-red-300/50"
+                        : "bg-amber-700/60 text-amber-100 border-amber-300/50";
+                  return (
+                    <span
+                      key={`atlas-pane-${paneId}`}
+                      className={cn("rounded border px-1.5 py-0.5 uppercase tracking-wide", className)}
+                      title={`pane=${paneId} status=${status}`}
+                    >
+                      {paneId}:{status}
+                    </span>
+                  );
+                })}
+              </div>
+              {scientificAtlasPaneFailure ? (
+                <div className="mt-1 rounded border border-red-400/60 bg-red-950/70 px-1.5 py-1 text-red-100">
+                  Atlas pane mismatch: {scientificAtlasPaneFailure}. Strict mode should fail closed for this frame.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {scientificCertificateState && !scientificAtlasState ? (
+            <div className="pointer-events-none absolute right-2 bottom-2 z-20 max-w-[min(32rem,calc(100%-1rem))] rounded border border-cyan-600/70 bg-slate-950/80 px-2 py-2 text-[0.62rem] text-slate-100 shadow-md shadow-black/40">
+              <div className="font-semibold uppercase tracking-wide text-cyan-200">
+                Scientific Frame Certificate
+              </div>
+              <div className="mt-1 text-slate-300">
+                view {scientificCertificateState.render?.view ?? "unknown"} | field{" "}
+                {scientificCertificateState.render?.field_key ?? "n/a"} | plane{" "}
+                {scientificCertificateState.render?.slice_plane ?? "n/a"}
+              </div>
+              <div className="mt-1 text-slate-300">
+                metric {String(scientificSnapshotIdentity?.metric_ref_hash ?? "none").slice(0, 16)} | cert{" "}
+                {String(scientificCertificateState.certificate_hash ?? "none").slice(0, 16)} | chart{" "}
+                {scientificSnapshotIdentity?.chart ?? "unknown"} | observer{" "}
+                {scientificSnapshotIdentity?.observer ?? "unknown"}
+              </div>
+              <div className="mt-1 text-slate-400">
+                theta {scientificSnapshotIdentity?.theta_definition ?? "unknown"} | K sign{" "}
+                {scientificSnapshotIdentity?.kij_sign_convention ?? "unknown"} | units{" "}
+                {scientificSnapshotIdentity?.unit_system ?? "unknown"} | t{" "}
+                {scientificSnapshotIdentity?.timestamp_ms ?? "none"}
               </div>
             </div>
           ) : null}

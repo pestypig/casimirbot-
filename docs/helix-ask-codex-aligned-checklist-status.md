@@ -150,7 +150,7 @@ Helix evidence:
 
 Current divergence:
 - Runtime patch now enforces a final mode/gate consistency pass (required sections + roadmap headings + `Sources`) and downgrades objective finalize gate from `strict_covered` to `blocked` when obligations remain missing.
-- Pending: verify the same behavior on the operator keyed runtime (`:5050`) and re-run regression/versatility batteries there.
+- Operator keyed runtime (`:5050`) now reflects this behavior in live probes (2026-03-26).
 
 ## 6) Safe parallelization model
 
@@ -163,6 +163,7 @@ Status: **Partial**
 Current behavior:
 - Objective recovery now starts `primary + variant` retrieval promises concurrently and picks the stronger retrieval result.
 - Objective state mutation and final assembly remain serialized.
+- Parallel variant counters and `answer_path` markers are now aligned in live probes (`parallel_variant_selected:vN` appears with matching parallel counts).
 
 ## 7) Deterministic UI-facing event mapping
 
@@ -186,20 +187,22 @@ Current divergence:
 | 2) Plan stream vs answer stream separation | `external/openai-codex/codex-rs/app-server/tests/suite/v2/plan_item.rs:39`, `external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs:4888`, `external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs:5008` | `server/routes/agi.plan.ts:63783`, `server/routes/agi.plan.ts:63786`, `server/routes/agi.plan.ts:64022`, `server/routes/agi.plan.ts:64035` | Guard/scrub architecture in place; no separate stream engine refactor yet. |
 | 3) Schema-first handlers + repair retries | `external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs:5875`, `external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:26` | `server/routes/agi.plan.ts:61481`, `server/routes/agi.plan.ts:62125`, `server/routes/agi.plan.ts:62350`, `server/routes/agi.plan.ts:62836`, `server/routes/agi.plan.ts:63136` | Implemented; remaining risk is semantic weakness after schema-valid repair. |
 | 4) Retryable vs terminal recovery semantics | `external/openai-codex/codex-rs/app-server/src/server_request_error.rs:5`, `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:3032` | `server/routes/agi.plan.ts:61753`, `server/routes/agi.plan.ts:61773`, `server/routes/agi.plan.ts:61792`, `server/routes/agi.plan.ts:61877`, `server/routes/agi.plan.ts:61955` | Implemented: early no-context-with-files is retryable; terminalization requires repeated no-context/no-gain streaks. |
-| 5) Mode/gate consistency | `external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:60`, `external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs:3942` | `server/routes/agi.plan.ts:45571`, `server/routes/agi.plan.ts:64361`, `server/routes/agi.plan.ts:64463`, `server/routes/agi.plan.ts:64517` | Patched to include final section/obligation consistency gating and strict-covered override to blocked when unresolved headings/sources persist; awaiting live reload validation. |
-| 6) Safe parallelization model | `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:281`, `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:540`, `external/openai-codex/codex-rs/app-server/src/codex_message_processor.rs:2945` | `server/routes/agi.plan.ts:61727`, `server/routes/agi.plan.ts:61754`, `server/routes/agi.plan.ts:61805` | Improved: `primary + variant` retrieval launches concurrently while state mutation/final assembly remain serialized; broader scheduler still sequential. |
+| 5) Mode/gate consistency | `external/openai-codex/codex-rs/app-server/tests/suite/v2/request_user_input.rs:60`, `external/openai-codex/codex-rs/app-server-protocol/src/protocol/v2.rs:3942` | `server/routes/agi.plan.ts:45571`, `server/routes/agi.plan.ts:64361`, `server/routes/agi.plan.ts:64463`, `server/routes/agi.plan.ts:64517` | Live `:5050` validation now shows strict-covered answers with both mode blocks false on tested prompts; keep battery coverage for broader families. |
+| 6) Safe parallelization model | `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:281`, `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:540`, `external/openai-codex/codex-rs/app-server/src/codex_message_processor.rs:2945` | `server/routes/agi.plan.ts:61727`, `server/routes/agi.plan.ts:61754`, `server/routes/agi.plan.ts:61805` | Improved: `primary + variant` retrieval launches concurrently while state mutation/final assembly remain serialized; marker/counter parity now validated in live traces. |
 | 7) Deterministic UI event mapping | `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:256`, `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:289`, `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:1289`, `external/openai-codex/codex-rs/app-server/src/bespoke_event_handling.rs:1956` | `server/routes/agi.plan.ts:61792`, `server/routes/agi.plan.ts:61876`, `server/routes/agi.plan.ts:61885`, `server/routes/agi.plan.ts:62580` | Implemented in live runtime: retry classifications and objective gate-consistency events are emitted deterministically. |
 
-## Current Metrics Snapshot (2026-03-25)
+## Current Metrics Snapshot (2026-03-26)
 
 - Patch probe strict: `10/10` pass (`100.0%`) on `artifacts/experiments/helix-ask-patch-probe/2026-03-25T164300167Z`.
 - Contract battery (light regression on rebuilt local runtime): fails only frontier continuity required headings (`Baseline/Hypothesis/Anti-hypothesis/Falsifiers/Uncertainty band/Claim tier`); prior strict-covered + missing-obligations failures no longer reproduce on local rebuilt runtime.
 - Variety battery (reduced versatility): completed with probability scorecard at `artifacts/experiments/helix-ask-versatility/versatility-1774457478766` (`PARTIAL_READY`, primary remaining issue: citation persistence).
 - Post-patch unit verification: `tests/helix-ask-runtime-errors.spec.ts` `303/303` pass (2026-03-25).
-- Keyed-runtime (`:5050`) still appears to be serving older process/build in operator runs (runtime fallback strings from stale scope leaks persist); restart validation on keyed runtime remains required.
+- Keyed-runtime (`:5050`) now reflects latest process in live probes (2026-03-26).
+- CAP comparison prompt no longer leaks internal procedural text (`keep existing draft as-is` / `deterministic family compose guard` removed); output remains user-facing comparison structure.
+- Casimir prompt remains `strict_covered` with no fallback and explicit parallel variant selection markers in `answer_path`.
 - Casimir verify gate: `PASS`
-  - `traceId=adapter:a9ee5a6f-67c1-4228-9fab-3190b1fcce5c`
-  - `runId=36797`
+  - `traceId=adapter:c56871d0-ad56-43d2-af94-d8a823d053a9`
+  - `runId=36931`
   - `certificateHash=6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`
   - `integrityOk=true`
 

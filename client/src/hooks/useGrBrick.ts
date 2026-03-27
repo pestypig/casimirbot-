@@ -30,6 +30,12 @@ export interface UseGrBrickOptions {
   includeMatter?: boolean;
   includeKij?: boolean;
   driveDir?: [number, number, number] | null;
+  dutyFR?: number;
+  q?: number;
+  gammaGeo?: number;
+  gammaVdB?: number;
+  zeta?: number;
+  phase01?: number;
   refetchMs?: number;
   enabled?: boolean;
 }
@@ -57,6 +63,12 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
     includeMatter,
     includeKij,
     driveDir,
+    dutyFR,
+    q,
+    gammaGeo,
+    gammaVdB,
+    zeta,
+    phase01,
     refetchMs = 2000,
     enabled,
   } = options;
@@ -86,6 +98,12 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
       includeMatter,
       includeKij,
       driveDir,
+      dutyFR,
+      q,
+      gammaGeo,
+      gammaVdB,
+      zeta,
+      phase01,
     }),
     [
       quality,
@@ -109,6 +127,12 @@ export function useGrBrick(options: UseGrBrickOptions = {}) {
       includeMatter,
       includeKij,
       driveDir,
+      dutyFR,
+      q,
+      gammaGeo,
+      gammaVdB,
+      zeta,
+      phase01,
     ],
   );
 

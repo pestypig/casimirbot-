@@ -346,7 +346,7 @@ describe('warp-g4-recovery-search', () => {
             qSpoilingFactor: 1.5,
             tau_s_ms: 35,
             gap_nm: 5,
-            shipRadius_m: 10,
+            bubbleRadius_m: 10,
           },
         },
       ],
@@ -429,3 +429,4 @@ describe('warp-g4-recovery-search', () => {
 
 
 });
+

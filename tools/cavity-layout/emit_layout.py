@@ -32,6 +32,16 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for direct embedding
             "metrics": {},
         }
 
+try:
+    from render_previews import render_preview_set
+except ModuleNotFoundError:  # pragma: no cover - fallback for direct embedding
+    def render_preview_set(
+        out_dir: Path,
+        manifest_path: Path,
+        preview_dir: Path,
+    ) -> dict[str, dict[str, Any]]:
+        return {}
+
 
 LAYER_MAP = {
     "bottom_mirror": 10,
@@ -48,6 +58,7 @@ LAYER_MAP = {
 DEFAULT_DRC_REPORT = Path("klayout-drc-report.rdb")
 DEFAULT_DRC_SUMMARY = Path("klayout-drc-summary.md")
 DEFAULT_EXPORT_MANIFEST = Path("nhm2-layout-export-manifest.json")
+DEFAULT_PREVIEW_DIR = Path("previews")
 
 
 def parse_args() -> argparse.Namespace:
@@ -399,6 +410,7 @@ def write_outputs(
     manifest_path = out_dir / DEFAULT_EXPORT_MANIFEST
     drc_report_path = out_dir / DEFAULT_DRC_REPORT
     drc_summary_path = out_dir / DEFAULT_DRC_SUMMARY
+    preview_dir = out_dir / DEFAULT_PREVIEW_DIR
     package_outputs = {
         "tile": write_library_outputs(
             libraries["tile"],
@@ -439,6 +451,7 @@ def write_outputs(
             "summary": str(summary_path.as_posix()),
             "layer_map": str(layer_map_path.as_posix()),
             "manifest": str(manifest_path.as_posix()),
+            "previews": {},
             "packages": package_outputs,
         },
         "layer_map": {name: spec["gds"] for name, spec in layer_map.items()},
@@ -500,12 +513,27 @@ def write_outputs(
                 "paired_drc": {
                     "status": "pending",
                     "report": artifact_entry(drc_report_path),
-                    "summary": artifact_entry(drc_summary_path),
+                "summary": artifact_entry(drc_summary_path),
                 },
             },
         },
+        "previews": {},
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    previews = render_preview_set(out_dir=out_dir, manifest_path=manifest_path, preview_dir=preview_dir)
+    if previews:
+        preview_files = {
+            key: {
+                "svg": preview["svg"]["path"],
+                "png": preview["png"]["path"],
+            }
+            for key, preview in previews.items()
+        }
+        summary["files"]["previews"] = preview_files
+        summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["summary"] = artifact_entry(summary_path)
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return summary["files"]
 
 
