@@ -1403,6 +1403,16 @@ describe("helix ask universal answer plan shadow", () => {
     ).toBe(true);
     expect(
       __testHelixAskReliabilityGuards.hasHelixAskRepoTechnicalCue(
+        "How does deterministic fallback guard relation-mode contract parse failures?",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.hasHelixAskRepoTechnicalCue(
+        "How does goal-zone harness evaluate pass/fail across seeds?",
+      ),
+    ).toBe(true);
+    expect(
+      __testHelixAskReliabilityGuards.hasHelixAskRepoTechnicalCue(
         "What is a practical debug payload used for?",
       ),
     ).toBe(false);

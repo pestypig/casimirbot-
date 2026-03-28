@@ -42,6 +42,8 @@ type AskDebug = Record<string, unknown> & {
   objective_mini_critic_mode?: string;
   objective_assembly_mode?: string;
   objective_finalize_gate_passed?: boolean;
+  objective_finalize_gate_mode?: "strict_covered" | "unknown_terminal" | "blocked";
+  objective_finalize_gate_unknown_terminal_eligible?: boolean;
 };
 
 type AskPayload = {
@@ -146,7 +148,7 @@ const SERVER_COMMAND = process.env.HELIX_ASK_VERSATILITY_SERVER_CMD ?? "npm";
 const DEFAULT_SERVER_ARGS = ["run", "dev:agi:5050"];
 const SERVER_ARGS =
   process.env.HELIX_ASK_VERSATILITY_SERVER_ARGS?.split(/\s+/).filter(Boolean) ?? DEFAULT_SERVER_ARGS;
-const REQUEST_TIMEOUT_MS = Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 15000);
+const REQUEST_TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_VERSATILITY_TIMEOUT_MS ?? 45000));
 const PRECHECK_TIMEOUT_MS = Math.max(
   1000,
   Number(process.env.HELIX_ASK_VERSATILITY_PRECHECK_TIMEOUT_MS ?? Math.min(10000, REQUEST_TIMEOUT_MS)),
@@ -157,9 +159,11 @@ const RETRY_BASE_MS = Math.max(100, Number(process.env.HELIX_ASK_VERSATILITY_RET
 const RETRY_MAX_MS = Math.max(RETRY_BASE_MS, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_MAX_MS ?? 12000));
 const RETRY_AFTER_CAP_MS = Math.max(250, Number(process.env.HELIX_ASK_VERSATILITY_RETRY_AFTER_CAP_MS ?? 5000));
 const RETRY_STUB = (process.env.HELIX_ASK_VERSATILITY_RETRY_STUB ?? "1") !== "0";
+const DEFAULT_MAX_CASE_WALL_MS =
+  REQUEST_TIMEOUT_MS * Math.max(1, Math.min(MAX_RETRIES + 1, 3)) + RETRY_MAX_MS;
 const MAX_CASE_WALL_MS = Math.max(
   REQUEST_TIMEOUT_MS,
-  Number(process.env.HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS ?? 25000),
+  Number(process.env.HELIX_ASK_VERSATILITY_MAX_CASE_WALL_MS ?? DEFAULT_MAX_CASE_WALL_MS),
 );
 const MAX_RUN_MS = Math.max(0, Number(process.env.HELIX_ASK_VERSATILITY_MAX_RUN_MS ?? 0));
 const CHECKPOINT_EVERY = Math.max(1, Number(process.env.HELIX_ASK_VERSATILITY_CHECKPOINT_EVERY ?? 10));
@@ -721,7 +725,8 @@ const retryDelayMs = (
   attempt: number,
 ): number => {
   const requestedRetry = Math.min(RETRY_AFTER_CAP_MS, Math.max(0, toNum(response.payload.retryAfterMs, 0)));
-  const backoff = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.max(1, 2 ** attempt));
+  const jitter = 0.9 + Math.random() * 0.2;
+  const backoff = Math.min(RETRY_MAX_MS, Math.round(RETRY_BASE_MS * Math.max(1, 2 ** attempt) * jitter));
   return Math.max(requestedRetry, backoff);
 };
 
@@ -922,7 +927,13 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   if (!hasCitation) failures.push("citation_missing");
   const objectiveStates = collectObjectiveLoopStates(debug);
   if (objectiveStates.length > 0) {
-    if (debug?.objective_finalize_gate_passed !== true) {
+    const objectiveFinalizeMode = String(debug?.objective_finalize_gate_mode ?? "").trim().toLowerCase();
+    const objectiveUnknownTerminalAccepted =
+      objectiveFinalizeMode === "unknown_terminal" &&
+      debug?.objective_finalize_gate_unknown_terminal_eligible === true;
+    const objectiveFinalizeAccepted =
+      debug?.objective_finalize_gate_passed === true || objectiveUnknownTerminalAccepted;
+    if (!objectiveFinalizeAccepted) {
       failures.push(`objective_finalize_gate:${String(debug?.objective_finalize_gate_passed)}`);
     }
     const requiredObjectiveIds = objectiveStates
@@ -1038,7 +1049,11 @@ export const buildProbabilityScorecard = (rows: RawRun[]) => {
   const objectiveCompleteBeforeFinalizePass = objectiveRows.filter((row) => {
     const states = collectObjectiveLoopStates(row.debug);
     const allTerminal = states.every((state) => state.status === "complete" || state.status === "blocked");
-    return row.debug?.objective_finalize_gate_passed === true && allTerminal;
+    const mode = String(row.debug?.objective_finalize_gate_mode ?? "").trim().toLowerCase();
+    const unknownTerminalAccepted =
+      mode === "unknown_terminal" &&
+      row.debug?.objective_finalize_gate_unknown_terminal_eligible === true;
+    return (row.debug?.objective_finalize_gate_passed === true || unknownTerminalAccepted) && allTerminal;
   }).length;
   const objectiveScopedRetrievalSuccessPass = objectiveRows.filter((row) => {
     const states = collectObjectiveLoopStates(row.debug);

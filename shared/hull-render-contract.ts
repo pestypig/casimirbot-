@@ -8,6 +8,9 @@ export type HullScientificRenderView =
   | "transport-3p1"
   | "york-time-3p1"
   | "york-surface-3p1"
+  | "york-surface-rho-3p1"
+  | "york-topology-normalized-3p1"
+  | "york-shell-map-3p1"
   | "shift-shell-3p1"
   | "full-atlas";
 
@@ -161,7 +164,9 @@ export type HullRenderCertificateV1 = {
     steps: number;
     field_key?: string | null;
     slice_plane?: string | null;
+    coordinate_mode?: string | null;
     normalization?: string | null;
+    magnitude_mode?: string | null;
     surface_height?: string | null;
     support_overlay?: string | null;
     vector_context?: string | null;
@@ -172,6 +177,9 @@ export type HullRenderCertificateV1 = {
     bundle_spread: number;
     constraint_rms: number | null;
     support_coverage_pct: number | null;
+    metric_ref_hash?: string | null;
+    timestamp_ms?: number | null;
+    theta_definition?: string | null;
     theta_min?: number | null;
     theta_max?: number | null;
     theta_abs_max?: number | null;
@@ -180,6 +188,9 @@ export type HullRenderCertificateV1 = {
     display_gain?: number | null;
     height_scale?: number | null;
     sampling_choice?: string | null;
+    coordinate_mode?: string | null;
+    supported_theta_fraction?: number | null;
+    shell_theta_overlap_pct?: number | null;
     peak_theta_cell?: [number, number, number] | null;
     peak_theta_in_supported_region?: boolean | null;
     beta_min?: number | null;
@@ -252,6 +263,19 @@ export type HullMisRenderResponseV1 = {
     supportCoveragePct?: number | null;
     maskedOutPct?: number | null;
     supportMaskKind?: HullSupportMaskKind | null;
+    metric_ref_hash?: string | null;
+    timestamp_ms?: number | null;
+    theta_definition?: string | null;
+    theta_min?: number | null;
+    theta_max?: number | null;
+    theta_abs_max?: number | null;
+    near_zero_theta?: boolean | null;
+    zero_contour_segments?: number | null;
+    display_gain?: number | null;
+    height_scale?: number | null;
+    sampling_choice?: string | null;
+    coordinate_mode?: string | null;
+    peak_theta_in_supported_region?: boolean | null;
     thetaMin?: number | null;
     thetaMax?: number | null;
     thetaAbsMax?: number | null;
@@ -260,6 +284,7 @@ export type HullMisRenderResponseV1 = {
     displayGain?: number | null;
     heightScale?: number | null;
     samplingChoice?: string | null;
+    coordinateMode?: string | null;
     peakThetaCell?: [number, number, number] | null;
     peakThetaInSupportedRegion?: boolean | null;
     betaMin?: number | null;

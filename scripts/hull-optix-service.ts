@@ -293,6 +293,12 @@ const parseScientificRenderView = (
         ? "york-time-3p1"
       : value === "york-surface-3p1"
         ? "york-surface-3p1"
+      : value === "york-surface-rho-3p1"
+        ? "york-surface-rho-3p1"
+      : value === "york-topology-normalized-3p1"
+        ? "york-topology-normalized-3p1"
+      : value === "york-shell-map-3p1"
+        ? "york-shell-map-3p1"
       : value === "shift-shell-3p1"
         ? "shift-shell-3p1"
       : value === "full-atlas"
@@ -667,14 +673,20 @@ const validateScientificMetricVolume = (
   const violations: ScientificContractViolation[] = [];
   const yorkRequested =
     payload.scienceLane?.renderView === "york-time-3p1" ||
-    payload.scienceLane?.renderView === "york-surface-3p1";
+    payload.scienceLane?.renderView === "york-surface-3p1" ||
+    payload.scienceLane?.renderView === "york-surface-rho-3p1" ||
+    payload.scienceLane?.renderView === "york-topology-normalized-3p1";
+  const yorkShellMapRequested = payload.scienceLane?.renderView === "york-shell-map-3p1";
   const fullAtlasRequested = payload.scienceLane?.renderView === "full-atlas";
   const requireCanonical =
     payload.scienceLane?.requireCanonicalTensorVolume === true ||
     fullAtlasRequested ||
-    yorkRequested;
+    yorkRequested ||
+    yorkShellMapRequested;
   const requireHullSupportChannels =
-    payload.scienceLane?.requireHullSupportChannels === true || fullAtlasRequested;
+    payload.scienceLane?.requireHullSupportChannels === true ||
+    fullAtlasRequested ||
+    yorkShellMapRequested;
   const requireOffDiagonalGamma =
     payload.scienceLane?.requireOffDiagonalGamma === true ||
     payload.scienceLane?.requireScientificFrame === true;
@@ -728,7 +740,10 @@ const validateScientificMetricVolume = (
         },
       });
     }
-    if (yorkRequested && (!brick.channels.theta || !(brick.channels.theta.data instanceof Float32Array))) {
+    if (
+      (yorkRequested || yorkShellMapRequested) &&
+      (!brick.channels.theta || !(brick.channels.theta.data instanceof Float32Array))
+    ) {
       const requestedYorkView = payload.scienceLane?.renderView ?? "york-time-3p1";
       violations.push({
         code: "scientific_york_theta_missing",
@@ -1532,7 +1547,8 @@ type ScientificSlice = {
   sampling:
     | "x-z midplane"
     | "x-z max-|value| projection"
-    | "x-z y-integral projection";
+    | "x-z y-integral projection"
+    | "x-rho cylindrical remap";
   supportPct: number;
   annotation?: string | null;
 };
@@ -1582,6 +1598,7 @@ type YorkSurfaceRenderStats = {
   displayGain: number;
   heightScale: number;
   samplingChoice: ScientificSlice["sampling"];
+  coordinateMode: "x-z-midplane" | "x-rho";
   nx: number;
   nz: number;
 };
@@ -1595,8 +1612,11 @@ type YorkFrameDiagnosticStats = {
   displayGain: number;
   heightScale: number;
   samplingChoice: ScientificSlice["sampling"];
+  coordinateMode: "x-z-midplane" | "x-rho";
+  supportedThetaFraction: number;
+  shellThetaOverlapPct: number;
   peakThetaCell: [number, number, number] | null;
-  peakThetaInSupportedRegion: boolean | null;
+  peakThetaInSupportedRegion: boolean;
   nx: number;
   nz: number;
 };
@@ -2334,6 +2354,7 @@ const renderYorkSurfacePanel = (
     displayGain,
     heightScale,
     samplingChoice: slice.sampling,
+    coordinateMode: scientificSamplingChoiceToCoordinateMode(slice.sampling),
     nx,
     nz,
   };
@@ -2432,6 +2453,54 @@ const extractChannelSliceXZProjection = (
   return out;
 };
 
+const extractChannelSliceXRho = (
+  brick: GrBrickDecoded,
+  channelName: string,
+): Float32Array | null => {
+  const channel = brick.channels[channelName];
+  if (!channel) return null;
+  const src = channel.data;
+  const dims = brick.dims;
+  const nx = dims[0];
+  const ny = dims[1];
+  const nz = dims[2];
+  if (nx <= 0 || ny <= 0 || nz <= 0) return null;
+  if (src.length < nx * ny * nz) return null;
+
+  // Coordinate policy follows Alcubierre + White plotting conventions.
+  // Warp-bubble York plots are shown on a fixed-time slice with motion along x;
+  // the transverse plotting coordinate is either cylindrical rho or a fixed
+  // Cartesian midplane surrogate.
+  const rhoBins = Math.max(2, nz);
+  const yCenter = (ny - 1) * 0.5;
+  const zCenter = (nz - 1) * 0.5;
+  const maxRho = Math.max(1e-9, Math.hypot(Math.max(yCenter, 1), Math.max(zCenter, 1)));
+
+  const out = new Float32Array(nx * rhoBins);
+  const sum = new Float64Array(rhoBins);
+  const count = new Uint32Array(rhoBins);
+  for (let x = 0; x < nx; x += 1) {
+    sum.fill(0);
+    count.fill(0);
+    for (let y = 0; y < ny; y += 1) {
+      const dy = y - yCenter;
+      for (let z = 0; z < nz; z += 1) {
+        const dz = z - zCenter;
+        const rhoNorm = Math.hypot(dy, dz) / maxRho;
+        const rhoBin = clampi(Math.round(rhoNorm * (rhoBins - 1)), 0, rhoBins - 1);
+        const value = src[idx3(x, y, z, dims)] ?? 0;
+        sum[rhoBin] += value;
+        count[rhoBin] += 1;
+      }
+    }
+    for (let rho = 0; rho < rhoBins; rho += 1) {
+      const n = count[rho];
+      out[rho * nx + x] = n > 0 ? Number(sum[rho] / n) : 0;
+    }
+  }
+  return out;
+};
+
 const computeSliceSupportPct = (data: Float32Array): number => {
   if (data.length === 0) return 0;
   let absMax = 0;
@@ -2506,13 +2575,39 @@ const selectFixedSliceXZMidplane = (
   };
 };
 
+const selectFixedSliceXRho = (
+  brick: GrBrickDecoded,
+  channelName: string,
+): { data: Float32Array; sampling: ScientificSlice["sampling"]; supportPct: number } | null => {
+  const rho = extractChannelSliceXRho(brick, channelName);
+  if (!(rho instanceof Float32Array)) return null;
+  return {
+    data: rho,
+    sampling: "x-rho cylindrical remap",
+    supportPct: computeSliceSupportPct(rho),
+  };
+};
+
+const scientificSamplingChoiceToCoordinateMode = (
+  sampling: ScientificSlice["sampling"],
+): "x-z-midplane" | "x-rho" =>
+  sampling === "x-rho cylindrical remap" ? "x-rho" : "x-z-midplane";
+
 const computeYorkFrameDiagnostics = (
   brick: GrBrickDecoded,
+  samplingPolicy: "midplane" | "x-rho" = "midplane",
 ): YorkFrameDiagnosticStats => {
   const nx = Math.max(1, brick.dims[0]);
-  const nz = Math.max(1, brick.dims[2]);
-  const thetaMid = extractChannelSliceXZMidplane(brick, "theta");
-  if (!(thetaMid instanceof Float32Array)) {
+  const selectedSlice =
+    samplingPolicy === "x-rho"
+      ? selectFixedSliceXRho(brick, "theta")
+      : selectFixedSliceXZMidplane(brick, "theta");
+  const thetaSlice = selectedSlice?.data ?? null;
+  const sliceHeight =
+    selectedSlice?.sampling === "x-rho cylindrical remap"
+      ? Math.max(1, thetaSlice?.length ? Math.floor(thetaSlice.length / nx) : 1)
+      : Math.max(1, brick.dims[2]);
+  if (!(thetaSlice instanceof Float32Array)) {
     return {
       thetaMin: 0,
       thetaMax: 0,
@@ -2521,14 +2616,18 @@ const computeYorkFrameDiagnostics = (
       zeroContourSegments: 0,
       displayGain: 1,
       heightScale: 0,
-      samplingChoice: "x-z midplane",
+      samplingChoice:
+        samplingPolicy === "x-rho" ? "x-rho cylindrical remap" : "x-z midplane",
+      coordinateMode: samplingPolicy === "x-rho" ? "x-rho" : "x-z-midplane",
+      supportedThetaFraction: 0,
+      shellThetaOverlapPct: 0,
       peakThetaCell: null,
-      peakThetaInSupportedRegion: null,
+      peakThetaInSupportedRegion: false,
       nx,
-      nz,
+      nz: sliceHeight,
     };
   }
-  const [thetaMin, thetaMax] = computeSliceRange(thetaMid, "diverging");
+  const [thetaMin, thetaMax] = computeSliceRange(thetaSlice, "diverging");
   const thetaAbsMax = Math.max(Math.abs(thetaMin), Math.abs(thetaMax), 1e-45);
   const nearZeroTheta =
     thetaAbsMax <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
@@ -2537,11 +2636,11 @@ const computeYorkFrameDiagnostics = (
   const heightScale = nearZeroTheta ? 0 : 0.9 * displayGain;
 
   const contourStepX = Math.max(1, Math.floor(nx / 90));
-  const contourStepZ = Math.max(1, Math.floor(nz / 90));
+  const contourStepZ = Math.max(1, Math.floor(sliceHeight / 90));
   const zeroContourSegments = extractThresholdContourSegments(
-    thetaMid,
+    thetaSlice,
     nx,
-    nz,
+    sliceHeight,
     0,
     contourStepX,
     contourStepZ,
@@ -2552,14 +2651,48 @@ const computeYorkFrameDiagnostics = (
   const support3 = brick.channels.tile_support_mask?.data;
   const region3 = brick.channels.region_class?.data;
   const total = brick.dims[0] * brick.dims[1] * brick.dims[2];
+  const supportChannelsAvailable =
+    (hull3 instanceof Float32Array && hull3.length >= total) ||
+    (support3 instanceof Float32Array && support3.length >= total) ||
+    (region3 instanceof Float32Array && region3.length >= total);
+  const inSupportAt = (idx: number): boolean => {
+    if (!supportChannelsAvailable) return false;
+    const hullOn =
+      hull3 instanceof Float32Array && hull3.length >= total
+        ? (hull3[idx] ?? Number.POSITIVE_INFINITY) <= 0
+        : false;
+    const supportOn =
+      support3 instanceof Float32Array && support3.length >= total
+        ? (support3[idx] ?? 0) > 0.5
+        : false;
+    const regionOn =
+      region3 instanceof Float32Array && region3.length >= total
+        ? (region3[idx] ?? 0) !== 0
+        : false;
+    return hullOn || supportOn || regionOn;
+  };
+  const thetaSupportThreshold = Math.max(thetaAbsMax * 1e-6, 1e-45);
   let peakThetaCell: [number, number, number] | null = null;
-  let peakThetaInSupportedRegion: boolean | null = null;
+  let peakThetaInSupportedRegion = false;
+  let supportCellCount = 0;
+  let significantThetaCount = 0;
+  let significantThetaSupportedCount = 0;
+  let supportWithThetaCount = 0;
   if (theta3 instanceof Float32Array && theta3.length >= total) {
     let bestAbs = -1;
     let bestIdx = -1;
     for (let i = 0; i < total; i += 1) {
       const value = theta3[i];
       if (!Number.isFinite(value)) continue;
+      const inSupport = inSupportAt(i);
+      if (inSupport) supportCellCount += 1;
+      if (Math.abs(value) >= thetaSupportThreshold) {
+        significantThetaCount += 1;
+        if (inSupport) {
+          significantThetaSupportedCount += 1;
+          supportWithThetaCount += 1;
+        }
+      }
       const absValue = Math.abs(value);
       if (absValue > bestAbs) {
         bestAbs = absValue;
@@ -2573,27 +2706,17 @@ const computeYorkFrameDiagnostics = (
       const y = Math.floor(rem / nx3);
       const x = rem - y * nx3;
       peakThetaCell = [x, y, z];
-      const hasAnySupport =
-        (hull3 instanceof Float32Array && hull3.length >= total) ||
-        (support3 instanceof Float32Array && support3.length >= total) ||
-        (region3 instanceof Float32Array && region3.length >= total);
-      if (hasAnySupport) {
-        const hullOn =
-          hull3 instanceof Float32Array && hull3.length >= total
-            ? (hull3[bestIdx] ?? Number.POSITIVE_INFINITY) <= 0
-            : false;
-        const supportOn =
-          support3 instanceof Float32Array && support3.length >= total
-            ? (support3[bestIdx] ?? 0) > 0.5
-            : false;
-        const regionOn =
-          region3 instanceof Float32Array && region3.length >= total
-            ? (region3[bestIdx] ?? 0) !== 0
-            : false;
-        peakThetaInSupportedRegion = hullOn || supportOn || regionOn;
+      if (supportChannelsAvailable) {
+        peakThetaInSupportedRegion = inSupportAt(bestIdx);
       }
     }
   }
+  const supportedThetaFraction =
+    significantThetaCount > 0
+      ? significantThetaSupportedCount / significantThetaCount
+      : 0;
+  const shellThetaOverlapPct =
+    supportCellCount > 0 ? (100 * supportWithThetaCount) / supportCellCount : 0;
 
   return {
     thetaMin,
@@ -2603,11 +2726,14 @@ const computeYorkFrameDiagnostics = (
     zeroContourSegments,
     displayGain,
     heightScale,
-    samplingChoice: "x-z midplane",
+    samplingChoice: selectedSlice.sampling,
+    coordinateMode: scientificSamplingChoiceToCoordinateMode(selectedSlice.sampling),
+    supportedThetaFraction,
+    shellThetaOverlapPct,
     peakThetaCell,
     peakThetaInSupportedRegion,
     nx,
-    nz,
+    nz: sliceHeight,
   };
 };
 
@@ -4255,6 +4381,12 @@ const buildYorkTimeTransportOverlaySvg = (
 </svg>`;
 };
 
+// This view follows the York-time surface plotting convention used in White's NASA
+// warp-field figures: fixed-time slice, motion axis on x, transverse axis on rho
+// or a Cartesian midplane, scalar theta as height/color.
+// White uses York-time surface plots as the scalar visualization. This repo
+// preserves the same scalar/axis convention while binding the frame to a
+// certified NHM2 snapshot identity.
 const buildYorkSurfaceOverlaySvg = (
   width: number,
   height: number,
@@ -4265,11 +4397,15 @@ const buildYorkSurfaceOverlaySvg = (
   stats: YorkSurfaceRenderStats,
 ): string => {
   const timestamp = new Date().toISOString();
+  const transverseAxisLabel = stats.coordinateMode === "x-rho" ? "rho" : "z";
+  const slicePlane = stats.coordinateMode === "x-rho" ? "x-rho" : "x-z-midplane";
   const sourceParams = parseMetricRefSourceParams(payload);
   const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
   const subtitleParts = [
     "single-snapshot York surface",
-    "x-z plane, height=theta=-trK",
+    `motion axis x, transverse ${transverseAxisLabel}, height=theta=-trK`,
+    "White/NASA scalar York-time surface convention",
+    "certified NHM2 snapshot lock",
     `chart=${ctx.chart ?? payload.solve?.chart ?? "unknown"}`,
     `source=${ctx.metricSource ?? "unknown"}`,
     `dims=${brick.dims.join("x")}`,
@@ -4278,15 +4414,16 @@ const buildYorkSurfaceOverlaySvg = (
   if (sourceSummary) subtitleParts.push(`solve(${sourceSummary})`);
   if (stats.nearZeroTheta) subtitleParts.push("theta regime=near-zero");
   const subtitle = subtitleParts.join(" | ");
+  const coordinateSummary = `coordinate_mode=${stats.coordinateMode}`;
   const rangeSummary = `theta range ${fmtScientific(stats.minTheta, 3)} .. ${fmtScientific(
     stats.maxTheta,
     3,
   )} | normalization=symmetric-about-zero | display_gain=${fmtScientific(
     stats.displayGain,
     2,
-  )} (display-only) | height_scale=${fmtScientific(stats.heightScale, 3)}`;
+  )} (none; raw theta) | height_scale=${fmtScientific(stats.heightScale, 3)}`;
   const contourSummary = `zero-contour segments=${stats.zeroContourSegments} | grid=${stats.nx}x${stats.nz} | surface_height=theta`;
-  const certSummary = `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | theta_definition=theta=-trK | slice_plane=x-z-midplane | sampling=${stats.samplingChoice}`;
+  const certSummary = `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | theta_definition=theta=-trK | slice_plane=${slicePlane} | ${coordinateSummary} | sampling=${stats.samplingChoice}`;
   const diag = `null residual=${fmtScientific(
     ctx.diagnostics.maxNullResidual,
     4,
@@ -4301,13 +4438,149 @@ const buildYorkSurfaceOverlaySvg = (
 
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="${width}" height="40" fill="#050a14"/>
-  <text x="16" y="22" fill="#e8f3ff" font-size="16" font-weight="700">NHM2 York Surface 3+1 (single certified snapshot)</text>
+  <text x="16" y="22" fill="#e8f3ff" font-size="16" font-weight="700">NHM2 York Surface 3+1 (paper-style scalar surface)</text>
   <text x="16" y="36" fill="#9fb3ca" font-size="10">${escapeXml(subtitle)}</text>
-  <text x="${panel.x + 8}" y="${panel.y + 16}" fill="#cfe5ff" font-size="11" font-weight="600">York Surface: x-z plane, height(theta), signed diverging color</text>
+  <text x="${panel.x + 8}" y="${panel.y + 16}" fill="#cfe5ff" font-size="11" font-weight="600">${escapeXml(`York Surface: motion axis x, transverse ${transverseAxisLabel}, height(theta), signed diverging color`)}</text>
   ${nearZeroBadge}
   <text x="${panel.x + 8}" y="${panel.y + panel.height - 34}" fill="#9fb3ca" font-size="10">${escapeXml(rangeSummary)}</text>
   <text x="${panel.x + 8}" y="${panel.y + panel.height - 22}" fill="#8ec6ff" font-size="10">fore(+x) contraction(theta&lt;0) | aft(-x) expansion(theta&gt;0) | zero contour overlay</text>
   <text x="${panel.x + 8}" y="${panel.y + panel.height - 10}" fill="#7f93ac" font-size="10">${escapeXml(`${contourSummary} | ${certSummary}`)}</text>
+  <rect x="0" y="${height - 24}" width="${width}" height="24" fill="#050a14"/>
+  <text x="16" y="${height - 8}" fill="#9fb3ca" font-size="10">${escapeXml(diag)} | generated=${escapeXml(timestamp)}</text>
+</svg>`;
+};
+
+// "This normalized York view is topology-only and is not the raw-magnitude
+// figure used in the primary scientific paper convention."
+// NHM2 inspection aid: this companion panel is used when certified raw York
+// magnitude is near-zero and topology visibility would otherwise be poor.
+const buildYorkTopologyNormalizedOverlaySvg = (
+  width: number,
+  height: number,
+  payload: HullMisRenderRequestV1,
+  ctx: TensorRenderContext,
+  brick: GrBrickDecoded,
+  panel: ScientificRect,
+  stats: YorkSurfaceRenderStats,
+  rawYorkStats: YorkFrameDiagnosticStats,
+): string => {
+  const timestamp = new Date().toISOString();
+  const sourceParams = parseMetricRefSourceParams(payload);
+  const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
+  const subtitleParts = [
+    "single-snapshot NHM2 York topology companion",
+    "x-z midplane, height=theta_norm, signed diverging color",
+    "normalized topology only (not raw magnitude)",
+    `chart=${ctx.chart ?? payload.solve?.chart ?? "unknown"}`,
+    `source=${ctx.metricSource ?? "unknown"}`,
+    `dims=${brick.dims.join("x")}`,
+    formatSupportSummary(ctx),
+  ];
+  if (sourceSummary) subtitleParts.push(`solve(${sourceSummary})`);
+  if (rawYorkStats.nearZeroTheta) subtitleParts.push("raw theta regime=near-zero");
+  const subtitle = subtitleParts.join(" | ");
+  const normSummary = `theta_norm range ${fmtScientific(
+    stats.minTheta,
+    3,
+  )} .. ${fmtScientific(stats.maxTheta, 3)} | normalization=topology-only-unit-max | magnitude_mode=normalized-topology-only | surface_height=theta_norm`;
+  const rawSummary = `raw theta range ${fmtScientific(
+    rawYorkStats.thetaMin,
+    3,
+  )} .. ${fmtScientific(rawYorkStats.thetaMax, 3)} | theta_abs_max=${fmtScientific(
+    rawYorkStats.thetaAbsMax,
+    3,
+  )} | near_zero_theta=${String(rawYorkStats.nearZeroTheta)}`;
+  const contourSummary = `zero contour segments=${stats.zeroContourSegments} | sampling=${stats.samplingChoice} | display_gain=${fmtScientific(
+    rawYorkStats.displayGain,
+    2,
+  )} | height_scale=${fmtScientific(rawYorkStats.heightScale, 3)}`;
+  const certSummary = `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | field_key=theta | slice_plane=x-z-midplane`;
+  const diag = `null residual=${fmtScientific(
+    ctx.diagnostics.maxNullResidual,
+    4,
+  )} | convergence=${fmtScientific(ctx.diagnostics.stepConvergence, 4)} | bundle spread=${fmtScientific(
+    ctx.diagnostics.bundleSpread,
+    4,
+  )} | consistency=${ctx.diagnostics.consistency} | ${formatSupportSummary(ctx)}`;
+  const disclosureBadge = `<rect x="${panel.x + 8}" y="${panel.y + 34}" width="282" height="18" rx="3" fill="#1f3650" stroke="#7dc4ff" stroke-width="1"/>
+  <text x="${panel.x + 16}" y="${panel.y + 47}" fill="#d9f0ff" font-size="10" font-weight="700">normalized topology only (not raw-magnitude paper figure)</text>`;
+
+  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${width}" height="40" fill="#050a14"/>
+  <text x="16" y="22" fill="#e8f3ff" font-size="16" font-weight="700">NHM2 York Topology Normalized 3+1 (companion panel)</text>
+  <text x="16" y="36" fill="#9fb3ca" font-size="10">${escapeXml(subtitle)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + 16}" fill="#cfe5ff" font-size="11" font-weight="600">York topology surface: x-z midplane, height(theta_norm), signed diverging color</text>
+  ${disclosureBadge}
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 46}" fill="#9fb3ca" font-size="10">${escapeXml(normSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 34}" fill="#8ec6ff" font-size="10">${escapeXml(rawSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 22}" fill="#8ec6ff" font-size="10">${escapeXml(contourSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 10}" fill="#7f93ac" font-size="10">${escapeXml(certSummary)}</text>
+  <rect x="0" y="${height - 24}" width="${width}" height="24" fill="#050a14"/>
+  <text x="16" y="${height - 8}" fill="#9fb3ca" font-size="10">${escapeXml(diag)} | generated=${escapeXml(timestamp)}</text>
+</svg>`;
+};
+
+const buildYorkShellMapOverlaySvg = (
+  width: number,
+  height: number,
+  payload: HullMisRenderRequestV1,
+  ctx: TensorRenderContext,
+  brick: GrBrickDecoded,
+  panel: ScientificRect,
+  stats: YorkSurfaceRenderStats,
+  shellSupportPct: number,
+  yorkDiag: YorkFrameDiagnosticStats,
+): string => {
+  const timestamp = new Date().toISOString();
+  const sourceParams = parseMetricRefSourceParams(payload);
+  const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
+  const subtitleParts = [
+    "single-snapshot NHM2 York shell map",
+    "shell-localized theta on hull_sdf + tile_support_mask geometry",
+    "Natario low-expansion + Alcubierre/White fore-aft geometry interpretation",
+    `chart=${ctx.chart ?? payload.solve?.chart ?? "unknown"}`,
+    `source=${ctx.metricSource ?? "unknown"}`,
+    `dims=${brick.dims.join("x")}`,
+    formatSupportSummary(ctx),
+  ];
+  if (sourceSummary) subtitleParts.push(`solve(${sourceSummary})`);
+  if (stats.nearZeroTheta) subtitleParts.push("theta regime=near-zero");
+  const subtitle = subtitleParts.join(" | ");
+  const rangeSummary = `theta(shell) range ${fmtScientific(
+    stats.minTheta,
+    3,
+  )} .. ${fmtScientific(stats.maxTheta, 3)} | normalization=symmetric-about-zero | display_gain=${fmtScientific(
+    stats.displayGain,
+    2,
+  )} (none; raw theta) | height_scale=${fmtScientific(stats.heightScale, 3)}`;
+  const shellSummary = `shell support=${fmtScientific(
+    shellSupportPct,
+    1,
+  )}% | supported_theta_fraction=${fmtScientific(
+    yorkDiag.supportedThetaFraction,
+    4,
+  )} | shell_theta_overlap_pct=${fmtScientific(yorkDiag.shellThetaOverlapPct, 2)}%`;
+  const certSummary = `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | field_key=theta | slice_plane=x-z-midplane | support_overlay=hull_sdf+tile_support_mask | sampling=${stats.samplingChoice}`;
+  const diag = `null residual=${fmtScientific(
+    ctx.diagnostics.maxNullResidual,
+    4,
+  )} | convergence=${fmtScientific(ctx.diagnostics.stepConvergence, 4)} | bundle spread=${fmtScientific(
+    ctx.diagnostics.bundleSpread,
+    4,
+  )} | consistency=${ctx.diagnostics.consistency} | ${formatSupportSummary(ctx)}`;
+  const nearZeroBadge = stats.nearZeroTheta
+    ? `<rect x="${panel.x + 8}" y="${panel.y + 34}" width="206" height="18" rx="3" fill="#7a4f0f" stroke="#f0b95f" stroke-width="1"/>
+  <text x="${panel.x + 16}" y="${panel.y + 47}" fill="#ffe2aa" font-size="10" font-weight="700">near-zero theta (geometry remains nontrivial)</text>`
+    : "";
+  return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="${width}" height="40" fill="#050a14"/>
+  <text x="16" y="22" fill="#e8f3ff" font-size="16" font-weight="700">NHM2 York Shell Map 3+1 (Natario-localized interpretation)</text>
+  <text x="16" y="36" fill="#9fb3ca" font-size="10">${escapeXml(subtitle)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + 16}" fill="#cfe5ff" font-size="11" font-weight="600">Shell-localized York map: signed theta color over hull/support geometry</text>
+  ${nearZeroBadge}
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 34}" fill="#9fb3ca" font-size="10">${escapeXml(rangeSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 22}" fill="#8ec6ff" font-size="10">${escapeXml(shellSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 10}" fill="#7f93ac" font-size="10">${escapeXml(certSummary)}</text>
   <rect x="0" y="${height - 24}" width="${width}" height="24" fill="#050a14"/>
   <text x="16" y="${height - 8}" fill="#9fb3ca" font-size="10">${escapeXml(diag)} | generated=${escapeXml(timestamp)}</text>
 </svg>`;
@@ -4895,13 +5168,20 @@ const renderTensorFrameYorkSurface3p1 = async (
     width: Math.max(120, width - outerPadX * 2),
     height: Math.max(96, height - topPad - bottomPad),
   };
+  // Warp-bubble York plots are shown on a fixed-time slice with motion along x;
+  // the transverse plotting coordinate is either cylindrical rho or a fixed
+  // Cartesian midplane surrogate.
+  const yorkSurfaceRhoView = payload.scienceLane?.renderView === "york-surface-rho-3p1";
+  const samplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
+    ? "x-rho"
+    : "midplane";
   const yorkSlice = buildScientificSliceFromChannel(
     brick,
     "theta",
     "York-Time theta = -trK",
     "1/m",
     "diverging",
-    "midplane",
+    samplingPolicy,
   );
   const surfaceStats = renderYorkSurfacePanel(
     image,
@@ -4921,6 +5201,192 @@ const renderTensorFrameYorkSurface3p1 = async (
     brick,
     panelRect,
     surfaceStats,
+  );
+  return sharp(base)
+    .composite([{ input: Buffer.from(overlaySvg), blend: "over" }])
+    .png({ compressionLevel: 7, adaptiveFiltering: true })
+    .toBuffer();
+};
+
+// "Natário's zero-expansion warp framing means York may be small while the
+// geometry remains nontrivial; this view localizes York on the NHM2 shell/support
+// geometry instead of treating York alone as the entire warp picture."
+// NHM2-specific extension: this is not a historical paper plotting convention.
+// It is justified by Natário-type low-expansion solutions, where geometry-
+// localized interpretation (hull/support) is required even when York is small.
+// This normalized York view is topology-only and is not the raw-magnitude
+// figure used in the primary scientific paper convention.
+const renderTensorFrameYorkTopologyNormalized3p1 = async (
+  payload: HullMisRenderRequestV1,
+  _deterministicSeed: number,
+  ctx: TensorRenderContext,
+  brick: GrBrickDecoded,
+): Promise<Buffer> => {
+  const thetaChannel = brick.channels.theta?.data;
+  if (!(thetaChannel instanceof Float32Array)) {
+    throw new Error("scientific_york_theta_missing");
+  }
+
+  const width = payload.width;
+  const height = payload.height;
+  const image = Buffer.alloc(width * height * 4, 0);
+  fillRect(image, width, height, 0, 0, width, height, [6, 10, 18]);
+
+  const outerPadX = Math.max(12, Math.floor(width * 0.02));
+  const topPad = 44;
+  const bottomPad = 30;
+  const panelRect: ScientificRect = {
+    x: outerPadX,
+    y: topPad,
+    width: Math.max(120, width - outerPadX * 2),
+    height: Math.max(96, height - topPad - bottomPad),
+  };
+
+  const yorkSlice = buildScientificSliceFromChannel(
+    brick,
+    "theta",
+    "York-Time theta = -trK",
+    "1/m",
+    "diverging",
+    "midplane",
+  );
+  const thetaAbsMax = Math.max(Math.abs(yorkSlice.min), Math.abs(yorkSlice.max), 0);
+  const normalizedTheta = new Float32Array(yorkSlice.data.length);
+  if (thetaAbsMax > 0) {
+    const invAbsMax = 1 / thetaAbsMax;
+    for (let i = 0; i < yorkSlice.data.length; i += 1) {
+      normalizedTheta[i] = (yorkSlice.data[i] ?? 0) * invAbsMax;
+    }
+  }
+  const [normMin, normMax] = computeSliceRange(normalizedTheta, "diverging");
+  const topologySlice: ScientificSlice = {
+    key: "theta_norm",
+    label: "York topology normalized (theta / max|theta|)",
+    unit: "unitless",
+    mode: "diverging",
+    width: yorkSlice.width,
+    height: yorkSlice.height,
+    data: normalizedTheta,
+    min: normMin,
+    max: normMax,
+    sampling: yorkSlice.sampling,
+    supportPct: yorkSlice.supportPct,
+    annotation:
+      "normalized topology only; not raw magnitude | zero contour overlay",
+  };
+  const topologyStats = renderYorkSurfacePanel(
+    image,
+    width,
+    height,
+    panelRect,
+    topologySlice,
+  );
+  const rawYorkStats = computeYorkFrameDiagnostics(brick);
+  const base = await sharp(image, { raw: { width, height, channels: 4 } })
+    .png({ compressionLevel: 7, adaptiveFiltering: true })
+    .toBuffer();
+  const overlaySvg = buildYorkTopologyNormalizedOverlaySvg(
+    width,
+    height,
+    payload,
+    ctx,
+    brick,
+    panelRect,
+    topologyStats,
+    rawYorkStats,
+  );
+  return sharp(base)
+    .composite([{ input: Buffer.from(overlaySvg), blend: "over" }])
+    .png({ compressionLevel: 7, adaptiveFiltering: true })
+    .toBuffer();
+};
+
+// "Natario's zero-expansion warp framing means York may be small while the
+// geometry remains nontrivial; this view localizes York on the NHM2 shell/support
+// geometry instead of treating York alone as the entire warp picture."
+// NHM2-specific extension: this is not a historical paper plotting convention.
+// It is justified by Natario-type low-expansion solutions, where geometry-
+// localized interpretation (hull/support) is required even when York is small.
+const renderTensorFrameYorkShellMap3p1 = async (
+  payload: HullMisRenderRequestV1,
+  _deterministicSeed: number,
+  ctx: TensorRenderContext,
+  brick: GrBrickDecoded,
+): Promise<Buffer> => {
+  const thetaMid = extractChannelSliceXZMidplane(brick, "theta");
+  if (!(thetaMid instanceof Float32Array)) {
+    throw new Error("scientific_york_theta_missing");
+  }
+  const hullMid = extractChannelSliceXZMidplane(brick, "hull_sdf");
+  const supportMid = extractChannelSliceXZMidplane(brick, "tile_support_mask");
+  if (!(hullMid instanceof Float32Array) || !(supportMid instanceof Float32Array)) {
+    throw new Error("scientific_york_shell_support_missing");
+  }
+
+  const shellTheta = new Float32Array(thetaMid.length);
+  let shellSupportCount = 0;
+  for (let i = 0; i < thetaMid.length; i += 1) {
+    const inShell = (hullMid[i] ?? Number.POSITIVE_INFINITY) <= 0 || (supportMid[i] ?? 0) > 0.5;
+    if (inShell) {
+      shellSupportCount += 1;
+      shellTheta[i] = thetaMid[i] ?? 0;
+    } else {
+      shellTheta[i] = 0;
+    }
+  }
+  const shellSupportPct =
+    shellTheta.length > 0 ? (100 * shellSupportCount) / shellTheta.length : 0;
+  const [shellThetaMin, shellThetaMax] = computeSliceRange(shellTheta, "diverging");
+  const width = payload.width;
+  const height = payload.height;
+  const image = Buffer.alloc(width * height * 4, 0);
+  fillRect(image, width, height, 0, 0, width, height, [6, 10, 18]);
+
+  const outerPadX = Math.max(12, Math.floor(width * 0.02));
+  const topPad = 44;
+  const bottomPad = 30;
+  const panelRect: ScientificRect = {
+    x: outerPadX,
+    y: topPad,
+    width: Math.max(120, width - outerPadX * 2),
+    height: Math.max(96, height - topPad - bottomPad),
+  };
+  const yorkShellSlice: ScientificSlice = {
+    key: "theta_shell_localized",
+    label: "York theta localized to hull/support shell",
+    unit: "1/m",
+    mode: "diverging",
+    width: brick.dims[0],
+    height: brick.dims[2],
+    data: shellTheta,
+    min: shellThetaMin,
+    max: shellThetaMax,
+    sampling: "x-z midplane",
+    supportPct: shellSupportPct,
+    annotation:
+      "shell-localized theta from hull_sdf + tile_support_mask | signed diverging map",
+  };
+  const shellStats = renderYorkSurfacePanel(
+    image,
+    width,
+    height,
+    panelRect,
+    yorkShellSlice,
+  );
+  const yorkDiag = computeYorkFrameDiagnostics(brick);
+  const base = await sharp(image, { raw: { width, height, channels: 4 } })
+    .png({ compressionLevel: 7, adaptiveFiltering: true })
+    .toBuffer();
+  const overlaySvg = buildYorkShellMapOverlaySvg(
+    width,
+    height,
+    payload,
+    ctx,
+    brick,
+    panelRect,
+    shellStats,
+    shellSupportPct,
+    yorkDiag,
   );
   return sharp(base)
     .composite([{ input: Buffer.from(overlaySvg), blend: "over" }])
@@ -5050,12 +5516,14 @@ const buildScientificSliceFromChannel = (
   label: string,
   unit: string,
   mode: ScientificSliceMode,
-  samplingPolicy: "adaptive" | "midplane" = "adaptive",
+  samplingPolicy: "adaptive" | "midplane" | "x-rho" = "adaptive",
 ): ScientificSlice => {
   const selected =
     samplingPolicy === "midplane"
       ? selectFixedSliceXZMidplane(brick, key)
-      : selectAdaptiveSliceXZ(brick, key);
+      : samplingPolicy === "x-rho"
+        ? selectFixedSliceXRho(brick, key)
+        : selectAdaptiveSliceXZ(brick, key);
   if (!selected) {
     return buildMissingScientificSlice(
       brick,
@@ -5066,13 +5534,17 @@ const buildScientificSliceFromChannel = (
     );
   }
   const [min, max] = computeSliceRange(selected.data, mode);
+  const sliceHeight =
+    selected.sampling === "x-rho cylindrical remap"
+      ? Math.max(1, Math.floor(selected.data.length / Math.max(1, brick.dims[0])))
+      : brick.dims[2];
   return {
     key,
     label,
     unit,
     mode,
     width: brick.dims[0],
-    height: brick.dims[2],
+    height: sliceHeight,
     data: selected.data,
     min,
     max,
@@ -5423,8 +5895,19 @@ const renderTensorFrame = async (
   if (renderView === "york-time-3p1") {
     return renderTensorFrameYorkTime3p1(payload, deterministicSeed, ctx, brick);
   }
-  if (renderView === "york-surface-3p1") {
+  if (renderView === "york-surface-3p1" || renderView === "york-surface-rho-3p1") {
     return renderTensorFrameYorkSurface3p1(payload, deterministicSeed, ctx, brick);
+  }
+  if (renderView === "york-topology-normalized-3p1") {
+    return renderTensorFrameYorkTopologyNormalized3p1(
+      payload,
+      deterministicSeed,
+      ctx,
+      brick,
+    );
+  }
+  if (renderView === "york-shell-map-3p1") {
+    return renderTensorFrameYorkShellMap3p1(payload, deterministicSeed, ctx, brick);
   }
   if (renderView === "shift-shell-3p1") {
     return renderTensorFrameShiftShell3p1(payload, deterministicSeed, ctx, brick);
@@ -5504,10 +5987,26 @@ const buildRenderCertificate = (args: {
   const { payload, ctx, brick, png } = args;
   const renderView = payload.scienceLane?.renderView ?? "diagnostic-quad";
   const yorkTimeView = renderView === "york-time-3p1";
-  const yorkSurfaceView = renderView === "york-surface-3p1";
+  const yorkSurfaceView =
+    renderView === "york-surface-3p1" || renderView === "york-surface-rho-3p1";
+  const yorkSurfaceRhoView = renderView === "york-surface-rho-3p1";
+  const yorkTopologyNormalizedView =
+    renderView === "york-topology-normalized-3p1";
+  const yorkShellMapView = renderView === "york-shell-map-3p1";
   const shiftShellView = renderView === "shift-shell-3p1";
-  const yorkView = yorkTimeView || yorkSurfaceView;
-  const yorkFrameStats = yorkView ? computeYorkFrameDiagnostics(brick) : null;
+  const yorkView =
+    yorkTimeView ||
+    yorkSurfaceView ||
+    yorkTopologyNormalizedView ||
+    yorkShellMapView;
+  const yorkSamplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
+    ? "x-rho"
+    : "midplane";
+  const yorkFrameStats = yorkView
+    ? computeYorkFrameDiagnostics(brick, yorkSamplingPolicy)
+    : null;
+  const yorkSlicePlane = yorkSurfaceRhoView ? "x-rho" : "x-z-midplane";
+  const yorkCoordinateMode = yorkSurfaceRhoView ? "x-rho" : "x-z-midplane";
   const shiftShellStats = shiftShellView ? computeShiftShellStats(brick) : null;
   const metricRefHashRaw = payload.metricVolumeRef?.hash?.trim();
   const metricRefHash =
@@ -5545,11 +6044,28 @@ const buildRenderCertificate = (args: {
       integrator: "christoffel-rk4",
       steps: 0,
       field_key: yorkView ? "theta" : shiftShellView ? "beta_x" : null,
-      slice_plane: yorkView || shiftShellView ? "x-z-midplane" : null,
+      slice_plane: yorkView ? yorkSlicePlane : shiftShellView ? "x-z-midplane" : null,
+      coordinate_mode: yorkView
+        ? yorkCoordinateMode
+        : shiftShellView
+          ? "x-z-midplane"
+          : null,
       normalization:
-        yorkView || shiftShellView ? "symmetric-about-zero" : null,
-      surface_height: yorkSurfaceView ? "theta" : null,
-      support_overlay: shiftShellView ? "hull_sdf+tile_support_mask" : null,
+        yorkTopologyNormalizedView
+          ? "topology-only-unit-max"
+          : yorkView || shiftShellView
+            ? "symmetric-about-zero"
+            : null,
+      magnitude_mode: yorkTopologyNormalizedView
+        ? "normalized-topology-only"
+        : null,
+      surface_height: yorkTopologyNormalizedView
+        ? "theta_norm"
+        : yorkSurfaceView || yorkShellMapView
+          ? "theta"
+          : null,
+      support_overlay:
+        shiftShellView || yorkShellMapView ? "hull_sdf+tile_support_mask" : null,
       vector_context: shiftShellView ? "|beta|" : null,
     },
     diagnostics: {
@@ -5558,6 +6074,9 @@ const buildRenderCertificate = (args: {
       bundle_spread: ctx.diagnostics.bundleSpread,
       constraint_rms: computeConstraintRms(brick),
       support_coverage_pct: ctx.supportCoveragePct,
+      metric_ref_hash: yorkView ? metricRefHash : null,
+      timestamp_ms: yorkView ? certificateTimestampMs : null,
+      theta_definition: yorkView ? "theta=-trK" : null,
       theta_min: yorkFrameStats?.thetaMin ?? null,
       theta_max: yorkFrameStats?.thetaMax ?? null,
       theta_abs_max: yorkFrameStats?.thetaAbsMax ?? null,
@@ -5566,6 +6085,9 @@ const buildRenderCertificate = (args: {
       display_gain: yorkFrameStats?.displayGain ?? null,
       height_scale: yorkFrameStats?.heightScale ?? null,
       sampling_choice: yorkFrameStats?.samplingChoice ?? null,
+      coordinate_mode: yorkFrameStats?.coordinateMode ?? null,
+      supported_theta_fraction: yorkFrameStats?.supportedThetaFraction ?? null,
+      shell_theta_overlap_pct: yorkFrameStats?.shellThetaOverlapPct ?? null,
       peak_theta_cell: yorkFrameStats?.peakThetaCell ?? null,
       peak_theta_in_supported_region:
         yorkFrameStats?.peakThetaInSupportedRegion ?? null,
@@ -5810,9 +6332,18 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
   const deterministicSeed = hashSeed(payload);
   const renderView = payload.scienceLane?.renderView ?? "diagnostic-quad";
   const yorkTimeRequested = renderView === "york-time-3p1";
-  const yorkSurfaceRequested = renderView === "york-surface-3p1";
+  const yorkSurfaceRhoRequested = renderView === "york-surface-rho-3p1";
+  const yorkSurfaceRequested =
+    renderView === "york-surface-3p1" || yorkSurfaceRhoRequested;
+  const yorkTopologyNormalizedRequested =
+    renderView === "york-topology-normalized-3p1";
+  const yorkShellMapRequested = renderView === "york-shell-map-3p1";
   const shiftShellRequested = renderView === "shift-shell-3p1";
-  const yorkRequested = yorkTimeRequested || yorkSurfaceRequested;
+  const yorkRequested =
+    yorkTimeRequested ||
+    yorkSurfaceRequested ||
+    yorkTopologyNormalizedRequested ||
+    yorkShellMapRequested;
   const certificateIdentityRequested = yorkRequested || shiftShellRequested;
   const requireCongruentNhm2FullSolve =
     payload.scienceLane?.requireCongruentNhm2FullSolve === true ||
@@ -5910,6 +6441,19 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
       });
     }
   }
+  if (useTensorPath && yorkShellMapRequested) {
+    const hullSdfData = metricBrick!.channels.hull_sdf?.data;
+    const supportMaskData = metricBrick!.channels.tile_support_mask?.data;
+    if (
+      !(hullSdfData instanceof Float32Array) ||
+      !(supportMaskData instanceof Float32Array)
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_shell_support_missing",
+        message: `${renderView} requires hull_sdf and tile_support_mask channels in metric volume`,
+      });
+    }
+  }
   if (useTensorPath && shiftShellRequested) {
     const betaXData = metricBrick!.channels.beta_x?.data;
     if (!(betaXData instanceof Float32Array)) {
@@ -5978,26 +6522,129 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
         message: `${renderView} requires render.field_key=theta in render certificate`,
       });
     }
-    if (renderCertificate.render.slice_plane !== "x-z-midplane") {
+    const expectedYorkSlicePlane = yorkSurfaceRhoRequested
+      ? "x-rho"
+      : "x-z-midplane";
+    const expectedYorkCoordinateMode = yorkSurfaceRhoRequested
+      ? "x-rho"
+      : "x-z-midplane";
+    const expectedYorkSamplingChoice = yorkSurfaceRhoRequested
+      ? "x-rho cylindrical remap"
+      : "x-z midplane";
+    if (renderCertificate.render.slice_plane !== expectedYorkSlicePlane) {
       return res.status(422).json({
         error: "scientific_york_convention_mismatch",
-        message: `${renderView} requires render.slice_plane=x-z-midplane in render certificate`,
+        message: `${renderView} requires render.slice_plane=${expectedYorkSlicePlane} in render certificate`,
       });
     }
-    if (renderCertificate.render.normalization !== "symmetric-about-zero") {
+    if (renderCertificate.render.coordinate_mode !== expectedYorkCoordinateMode) {
       return res.status(422).json({
         error: "scientific_york_convention_mismatch",
-        message: `${renderView} requires render.normalization=symmetric-about-zero in render certificate`,
+        message: `${renderView} requires render.coordinate_mode=${expectedYorkCoordinateMode} in render certificate`,
+      });
+    }
+    const expectedYorkNormalization = yorkTopologyNormalizedRequested
+      ? "topology-only-unit-max"
+      : "symmetric-about-zero";
+    if (renderCertificate.render.normalization !== expectedYorkNormalization) {
+      return res.status(422).json({
+        error: "scientific_york_convention_mismatch",
+        message: `${renderView} requires render.normalization=${expectedYorkNormalization} in render certificate`,
       });
     }
     if (
-      yorkSurfaceRequested &&
+      yorkTopologyNormalizedRequested &&
+      renderCertificate.render.magnitude_mode !== "normalized-topology-only"
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_convention_mismatch",
+        message:
+          "york-topology-normalized-3p1 requires render.magnitude_mode=normalized-topology-only in render certificate",
+      });
+    }
+    const yorkAuditIdentityValid =
+      renderCertificate.diagnostics.metric_ref_hash ===
+        renderCertificate.metric_ref_hash &&
+      Number.isFinite(renderCertificate.diagnostics.timestamp_ms ?? Number.NaN) &&
+      Number(renderCertificate.diagnostics.timestamp_ms) ===
+        renderCertificate.timestamp_ms &&
+      typeof renderCertificate.diagnostics.theta_definition === "string" &&
+      renderCertificate.diagnostics.theta_definition.trim().length > 0 &&
+      renderCertificate.diagnostics.theta_definition ===
+        renderCertificate.theta_definition;
+    const yorkAuditCoreValid =
+      Number.isFinite(renderCertificate.diagnostics.theta_min ?? Number.NaN) &&
+      Number.isFinite(renderCertificate.diagnostics.theta_max ?? Number.NaN) &&
+      Number.isFinite(renderCertificate.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof renderCertificate.diagnostics.near_zero_theta === "boolean" &&
+      Number.isFinite(
+        renderCertificate.diagnostics.zero_contour_segments ?? Number.NaN,
+      ) &&
+      renderCertificate.diagnostics.sampling_choice === expectedYorkSamplingChoice &&
+      Number.isFinite(renderCertificate.diagnostics.display_gain ?? Number.NaN) &&
+      Number.isFinite(renderCertificate.diagnostics.height_scale ?? Number.NaN) &&
+      renderCertificate.diagnostics.coordinate_mode === expectedYorkCoordinateMode &&
+      typeof renderCertificate.diagnostics.peak_theta_in_supported_region ===
+        "boolean";
+    if (!yorkAuditIdentityValid || !yorkAuditCoreValid) {
+      return res.status(422).json({
+        error: "scientific_york_diagnostics_missing",
+        message:
+          `${renderView} requires metric_ref_hash/timestamp_ms/theta_definition and raw theta extrema diagnostics in render certificate`,
+      });
+    }
+    if (
+      (yorkSurfaceRequested || yorkShellMapRequested) &&
       renderCertificate.render.surface_height !== "theta"
     ) {
       return res.status(422).json({
-        error: "scientific_york_surface_convention_mismatch",
-        message: "york-surface-3p1 requires render.surface_height=theta in render certificate",
+        error: yorkShellMapRequested
+          ? "scientific_york_shell_map_convention_mismatch"
+          : "scientific_york_surface_convention_mismatch",
+        message: `${renderView} requires render.surface_height=theta in render certificate`,
       });
+    }
+    if (
+      yorkTopologyNormalizedRequested &&
+      renderCertificate.render.surface_height !== "theta_norm"
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_topology_convention_mismatch",
+        message:
+          "york-topology-normalized-3p1 requires render.surface_height=theta_norm in render certificate",
+      });
+    }
+    if (
+      yorkShellMapRequested &&
+      renderCertificate.render.support_overlay !== "hull_sdf+tile_support_mask"
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_shell_map_convention_mismatch",
+        message:
+          "york-shell-map-3p1 requires render.support_overlay=hull_sdf+tile_support_mask in render certificate",
+      });
+    }
+    if (yorkShellMapRequested) {
+      const shellMapDiagnosticsValid =
+        Number.isFinite(renderCertificate.diagnostics.theta_min ?? Number.NaN) &&
+        Number.isFinite(renderCertificate.diagnostics.theta_max ?? Number.NaN) &&
+        Number.isFinite(renderCertificate.diagnostics.theta_abs_max ?? Number.NaN) &&
+        typeof renderCertificate.diagnostics.near_zero_theta === "boolean" &&
+        Number.isFinite(
+          renderCertificate.diagnostics.supported_theta_fraction ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.shell_theta_overlap_pct ?? Number.NaN,
+        ) &&
+        typeof renderCertificate.diagnostics.peak_theta_in_supported_region ===
+          "boolean";
+      if (!shellMapDiagnosticsValid) {
+        return res.status(422).json({
+          error: "scientific_york_shell_map_diagnostics_missing",
+          message:
+            "york-shell-map-3p1 requires theta_min/theta_max/theta_abs_max/near_zero_theta/supported_theta_fraction/shell_theta_overlap_pct/peak_theta_in_supported_region diagnostics",
+        });
+      }
     }
     const requestedHash = payload.metricVolumeRef?.hash?.trim();
     if (requestedHash && renderCertificate.metric_ref_hash !== requestedHash) {
@@ -6098,9 +6745,38 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
           supportCoveragePct: tensorContext!.supportCoveragePct,
           maskedOutPct: tensorContext!.maskedOutPct,
           supportMaskKind: tensorContext!.supportMaskKind,
-          ...((renderView === "york-time-3p1" || renderView === "york-surface-3p1") &&
+          ...((renderView === "york-time-3p1" ||
+            renderView === "york-surface-3p1" ||
+            renderView === "york-surface-rho-3p1" ||
+            renderView === "york-topology-normalized-3p1" ||
+            renderView === "york-shell-map-3p1") &&
           renderCertificate
             ? {
+                // Following invariant-first visualization discipline, the York
+                // figure must expose raw numeric extrema and snapshot identity so
+                // a near-flat field is read as a physical result, not as an
+                // ambiguous render artifact. Mattingly-style fixed-coordinate,
+                // auditable scientific visualization.
+                metric_ref_hash: renderCertificate.diagnostics.metric_ref_hash ?? null,
+                timestamp_ms: renderCertificate.diagnostics.timestamp_ms ?? null,
+                theta_definition:
+                  renderCertificate.diagnostics.theta_definition ?? null,
+                theta_min: renderCertificate.diagnostics.theta_min ?? null,
+                theta_max: renderCertificate.diagnostics.theta_max ?? null,
+                theta_abs_max: renderCertificate.diagnostics.theta_abs_max ?? null,
+                near_zero_theta:
+                  renderCertificate.diagnostics.near_zero_theta ?? null,
+                zero_contour_segments:
+                  renderCertificate.diagnostics.zero_contour_segments ?? null,
+                sampling_choice:
+                  renderCertificate.diagnostics.sampling_choice ?? null,
+                coordinate_mode:
+                  renderCertificate.diagnostics.coordinate_mode ?? null,
+                display_gain: renderCertificate.diagnostics.display_gain ?? null,
+                height_scale: renderCertificate.diagnostics.height_scale ?? null,
+                peak_theta_in_supported_region:
+                  renderCertificate.diagnostics.peak_theta_in_supported_region ??
+                  null,
                 thetaMin: renderCertificate.diagnostics.theta_min ?? null,
                 thetaMax: renderCertificate.diagnostics.theta_max ?? null,
                 thetaAbsMax: renderCertificate.diagnostics.theta_abs_max ?? null,
@@ -6112,6 +6788,12 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
                 heightScale: renderCertificate.diagnostics.height_scale ?? null,
                 samplingChoice:
                   renderCertificate.diagnostics.sampling_choice ?? null,
+                coordinateMode:
+                  renderCertificate.diagnostics.coordinate_mode ?? null,
+                supportedThetaFraction:
+                  renderCertificate.diagnostics.supported_theta_fraction ?? null,
+                shellThetaOverlapPct:
+                  renderCertificate.diagnostics.shell_theta_overlap_pct ?? null,
                 peakThetaCell:
                   renderCertificate.diagnostics.peak_theta_cell ?? null,
                 peakThetaInSupportedRegion:

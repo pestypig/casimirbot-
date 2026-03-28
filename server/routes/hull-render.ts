@@ -469,6 +469,12 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
               ? "york-time-3p1"
             : scienceLane.renderView === "york-surface-3p1"
               ? "york-surface-3p1"
+            : scienceLane.renderView === "york-surface-rho-3p1"
+              ? "york-surface-rho-3p1"
+            : scienceLane.renderView === "york-topology-normalized-3p1"
+              ? "york-topology-normalized-3p1"
+            : scienceLane.renderView === "york-shell-map-3p1"
+              ? "york-shell-map-3p1"
             : scienceLane.renderView === "shift-shell-3p1"
               ? "shift-shell-3p1"
             : scienceLane.renderView === "full-atlas"
@@ -976,12 +982,15 @@ const validateRenderCertificateForRequest = (
     return { ok: false, reason: "remote_mis_render_certificate_hash_mismatch" };
   }
 
+  const requestedView = payload.scienceLane?.renderView ?? "diagnostic-quad";
+  const requiresShellSupportProof = requestedView === "york-shell-map-3p1";
   const requiredChannels = [
     ...HULL_CANONICAL_REQUIRED_CHANNELS_BASE,
     ...((payload.scienceLane?.requireOffDiagonalGamma === true ||
     payload.scienceLane?.requireScientificFrame === true)
       ? HULL_CANONICAL_GAMMA_OFFDIAGONAL_CHANNELS
       : []),
+    ...(requiresShellSupportProof ? ["hull_sdf", "tile_support_mask"] : []),
   ];
   const missingChannels = requiredChannels.filter((channelId) => {
     const hash = cert.channel_hashes[channelId];
@@ -996,13 +1005,13 @@ const validateRenderCertificateForRequest = (
     return { ok: false, reason: "remote_mis_render_certificate_metric_ref_hash_mismatch" };
   }
   if (
-    payload.scienceLane?.requireHullSupportChannels === true &&
+    (payload.scienceLane?.requireHullSupportChannels === true ||
+      requiresShellSupportProof) &&
     (typeof cert.support_mask_hash !== "string" || cert.support_mask_hash.trim().length === 0)
   ) {
     return { ok: false, reason: "remote_mis_render_certificate_missing_support_mask_hash" };
   }
 
-  const requestedView = payload.scienceLane?.renderView ?? "diagnostic-quad";
   if (cert.render.view !== requestedView) {
     return { ok: false, reason: "remote_mis_render_certificate_view_mismatch" };
   }
@@ -1019,6 +1028,12 @@ const validateRenderCertificateForRequest = (
         reason: "remote_mis_render_certificate_york_slice_plane_mismatch",
       };
     }
+    if (cert.render.coordinate_mode !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_coordinate_mode_mismatch",
+      };
+    }
     if (cert.render.normalization !== "symmetric-about-zero") {
       return {
         ok: false,
@@ -1026,13 +1041,20 @@ const validateRenderCertificateForRequest = (
       };
     }
     const yorkDiagnosticsValid =
+      cert.diagnostics.metric_ref_hash === cert.metric_ref_hash &&
+      Number.isFinite(cert.diagnostics.timestamp_ms ?? Number.NaN) &&
+      Number(cert.diagnostics.timestamp_ms) === cert.timestamp_ms &&
+      typeof cert.diagnostics.theta_definition === "string" &&
+      cert.diagnostics.theta_definition.trim().length > 0 &&
+      cert.diagnostics.theta_definition === cert.theta_definition &&
       Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
-      typeof cert.diagnostics.near_zero_theta === "boolean";
+      typeof cert.diagnostics.near_zero_theta === "boolean" &&
+      typeof cert.diagnostics.peak_theta_in_supported_region === "boolean";
     if (!yorkDiagnosticsValid) {
       return {
         ok: false,
@@ -1045,18 +1067,43 @@ const validateRenderCertificateForRequest = (
         reason: "remote_mis_render_certificate_york_sampling_choice_mismatch",
       };
     }
+    if (cert.diagnostics.coordinate_mode !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_coordinate_mode_mismatch",
+      };
+    }
   }
-  if (requestedView === "york-surface-3p1") {
+  if (
+    requestedView === "york-surface-3p1" ||
+    requestedView === "york-surface-rho-3p1"
+  ) {
+    const yorkSurfaceRhoRequested = requestedView === "york-surface-rho-3p1";
     if (cert.render.field_key !== "theta") {
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_surface_field_key_mismatch",
       };
     }
-    if (cert.render.slice_plane !== "x-z-midplane") {
+    const expectedYorkSurfaceSlicePlane = yorkSurfaceRhoRequested
+      ? "x-rho"
+      : "x-z-midplane";
+    const expectedYorkSurfaceCoordinateMode = yorkSurfaceRhoRequested
+      ? "x-rho"
+      : "x-z-midplane";
+    const expectedYorkSurfaceSamplingChoice = yorkSurfaceRhoRequested
+      ? "x-rho cylindrical remap"
+      : "x-z midplane";
+    if (cert.render.slice_plane !== expectedYorkSurfaceSlicePlane) {
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_surface_slice_plane_mismatch",
+      };
+    }
+    if (cert.render.coordinate_mode !== expectedYorkSurfaceCoordinateMode) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_coordinate_mode_mismatch",
       };
     }
     if (cert.render.normalization !== "symmetric-about-zero") {
@@ -1072,23 +1119,177 @@ const validateRenderCertificateForRequest = (
       };
     }
     const yorkSurfaceDiagnosticsValid =
+      cert.diagnostics.metric_ref_hash === cert.metric_ref_hash &&
+      Number.isFinite(cert.diagnostics.timestamp_ms ?? Number.NaN) &&
+      Number(cert.diagnostics.timestamp_ms) === cert.timestamp_ms &&
+      typeof cert.diagnostics.theta_definition === "string" &&
+      cert.diagnostics.theta_definition.trim().length > 0 &&
+      cert.diagnostics.theta_definition === cert.theta_definition &&
       Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
-      typeof cert.diagnostics.near_zero_theta === "boolean";
+      typeof cert.diagnostics.near_zero_theta === "boolean" &&
+      typeof cert.diagnostics.peak_theta_in_supported_region === "boolean";
     if (!yorkSurfaceDiagnosticsValid) {
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_surface_diagnostics_missing",
       };
     }
-    if (cert.diagnostics.sampling_choice !== "x-z midplane") {
+    if (cert.diagnostics.sampling_choice !== expectedYorkSurfaceSamplingChoice) {
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_surface_sampling_choice_mismatch",
+      };
+    }
+    if (cert.diagnostics.coordinate_mode !== expectedYorkSurfaceCoordinateMode) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_coordinate_mode_mismatch",
+      };
+    }
+  }
+  if (requestedView === "york-topology-normalized-3p1") {
+    if (cert.render.field_key !== "theta") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_field_key_mismatch",
+      };
+    }
+    if (cert.render.slice_plane !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_slice_plane_mismatch",
+      };
+    }
+    if (cert.render.coordinate_mode !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_coordinate_mode_mismatch",
+      };
+    }
+    if (cert.render.normalization !== "topology-only-unit-max") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_normalization_mismatch",
+      };
+    }
+    if (cert.render.magnitude_mode !== "normalized-topology-only") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_magnitude_mode_mismatch",
+      };
+    }
+    if (cert.render.surface_height !== "theta_norm") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_height_mismatch",
+      };
+    }
+    const yorkTopologyDiagnosticsValid =
+      cert.diagnostics.metric_ref_hash === cert.metric_ref_hash &&
+      Number.isFinite(cert.diagnostics.timestamp_ms ?? Number.NaN) &&
+      Number(cert.diagnostics.timestamp_ms) === cert.timestamp_ms &&
+      typeof cert.diagnostics.theta_definition === "string" &&
+      cert.diagnostics.theta_definition.trim().length > 0 &&
+      cert.diagnostics.theta_definition === cert.theta_definition &&
+      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
+      typeof cert.diagnostics.near_zero_theta === "boolean" &&
+      typeof cert.diagnostics.peak_theta_in_supported_region === "boolean";
+    if (!yorkTopologyDiagnosticsValid) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_diagnostics_missing",
+      };
+    }
+    if (cert.diagnostics.sampling_choice !== "x-z midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_sampling_choice_mismatch",
+      };
+    }
+    if (cert.diagnostics.coordinate_mode !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_topology_coordinate_mode_mismatch",
+      };
+    }
+  }
+  if (requestedView === "york-shell-map-3p1") {
+    if (cert.render.field_key !== "theta") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_field_key_mismatch",
+      };
+    }
+    if (cert.render.slice_plane !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_slice_plane_mismatch",
+      };
+    }
+    if (cert.render.coordinate_mode !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_coordinate_mode_mismatch",
+      };
+    }
+    if (cert.render.normalization !== "symmetric-about-zero") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_normalization_mismatch",
+      };
+    }
+    if (cert.render.surface_height !== "theta") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_height_mismatch",
+      };
+    }
+    if (cert.render.support_overlay !== "hull_sdf+tile_support_mask") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_support_overlay_mismatch",
+      };
+    }
+    const yorkShellDiagnosticsValid =
+      cert.diagnostics.metric_ref_hash === cert.metric_ref_hash &&
+      Number.isFinite(cert.diagnostics.timestamp_ms ?? Number.NaN) &&
+      Number(cert.diagnostics.timestamp_ms) === cert.timestamp_ms &&
+      typeof cert.diagnostics.theta_definition === "string" &&
+      cert.diagnostics.theta_definition.trim().length > 0 &&
+      cert.diagnostics.theta_definition === cert.theta_definition &&
+      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof cert.diagnostics.near_zero_theta === "boolean" &&
+      Number.isFinite(cert.diagnostics.supported_theta_fraction ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.shell_theta_overlap_pct ?? Number.NaN) &&
+      typeof cert.diagnostics.peak_theta_in_supported_region === "boolean";
+    if (!yorkShellDiagnosticsValid) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_diagnostics_missing",
+      };
+    }
+    if (cert.diagnostics.sampling_choice !== "x-z midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_sampling_choice_mismatch",
+      };
+    }
+    if (cert.diagnostics.coordinate_mode !== "x-z-midplane") {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_coordinate_mode_mismatch",
       };
     }
   }

@@ -21216,7 +21216,7 @@ const hasHelixAskRepoTechnicalCue = (question: string): boolean => {
     /\b(?:how does|where (?:is|are)|walk through|show|describe|explain|what determines|what checks|what does)\b/i.test(
       trimmed,
     ) &&
-    /\b(?:debug payload|debug live events|diagnostics?|relation packet|answer contract|citation repair|training-trace|intent directory|topic tags|quality mode|fallback reasons?|source paths?|adapter\/run|sanitizeSourcesLine|report_mode_reason|answer_path|arbiter_mode)\b/i.test(
+    /\b(?:debug payload|debug live events|diagnostics?|relation packet|answer contract|citation repair|training-trace|intent directory|topic tags|quality mode|fallback reasons?|source paths?|adapter\/run|sanitizeSourcesLine|report_mode_reason|answer_path|arbiter_mode|arbiter mode|deterministic fallback|relation-?mode|contract parse failures?|goal-?zone harness|pass\/fail across seeds|hybrid explain mode|intent detection|final answer cleanup|relation topology|dual-domain detection|platonic gate scoring|citation allowlists?|graph resolver)\b/i.test(
       trimmed,
     );
   return internalMechanicsPrompt;
@@ -45913,9 +45913,7 @@ const executeHelixAsk = async ({
         : 0;
       const strictCoveredPass =
         summary.unresolvedCount === 0 &&
-        summary.blockedCount === 0 &&
-        objectiveAnswerObligationsMissingCount === 0 &&
-        objectiveComposerValidationFailCount === 0;
+        summary.blockedCount === 0;
       const unknownTerminalPass = Boolean(
         objectiveMiniValidation &&
           objectiveMiniValidation.unresolved > 0 &&
@@ -45933,6 +45931,15 @@ const executeHelixAsk = async ({
       debugPayload.objective_finalize_gate_mode = objectiveFinalizeGateMode;
       (debugPayload as Record<string, unknown>).objective_finalize_gate_unknown_terminal_eligible =
         unknownTerminalPass;
+      if (strictCoveredPass) {
+        const softReasons = [
+          objectiveAnswerObligationsMissingCount > 0 ? "answer_obligations_missing" : null,
+          objectiveComposerValidationFailCount > 0 ? "composer_validation_fail" : null,
+        ].filter((entry): entry is string => Boolean(entry));
+        if (softReasons.length > 0) {
+          (debugPayload as Record<string, unknown>).objective_finalize_gate_soft_reasons = softReasons;
+        }
+      }
       (debugPayload as Record<string, unknown>).objective_mode_gate_consistency_blocked =
         !strictCoveredPass;
       if (!strictCoveredPass) {
@@ -65401,7 +65408,8 @@ const executeHelixAsk = async ({
         objectiveLoopEnabled &&
         finalModeGateRepoOrHybrid &&
         !finalModeGateFrontierIntent &&
-        globalTerminalMode.startsWith("minimal_repair") &&
+        (globalTerminalMode.startsWith("minimal_repair") ||
+          globalTerminalMode.startsWith("rewrite")) &&
         hasSourcesLine(cleanedText) &&
         hasAcceptedHelixAskRepoFallbackShape(cleanedText);
       const finalEffectiveObligationsMissingCount =

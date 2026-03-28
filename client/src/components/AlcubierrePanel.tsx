@@ -33,6 +33,7 @@ import { smoothSectorWeights } from "@/lib/sector-weights";
 import { TheoryBadge } from "./common/TheoryBadge";
 import { normalizeCurvaturePalette, type CurvaturePalette } from "@/lib/curvature-directive";
 import StressOverlay from "@/components/HullViewer/StressOverlay";
+import { YorkAuditBox } from "@/components/HullViewer/YorkAuditBox";
 import MetricFrameLens, {
   type SolveOrderSnapshot,
   type SolveOrderStatus,
@@ -1237,7 +1238,7 @@ function resolveSigmaSectors(live: any): number {
   }
 }
 
-type VizMode = 0 | 1 | 2 | 3 | 4 | 5; // 0=shift-shell, 1=paper-rho, 2=drive, 3=full-atlas/worldtube, 4=york-slice, 5=york-surface
+type VizMode = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0=shift-shell, 1=paper-rho, 2=drive, 3=full-atlas/worldtube, 4=york-slice, 5=york-shell-map, 6=york-topology-normalized
 type ShaderMode = "main" | "safe";
 
 type ScientificSnapshotIdentity = {
@@ -1255,10 +1256,12 @@ const resolveScientificModeLabel = (planarVizMode: VizMode): string =>
     ? "Energy"
   : planarVizMode === 0
       ? "Shift Shell"
-    : planarVizMode === 4
-        ? "York Slice"
-      : planarVizMode === 5
-        ? "York Surface"
+  : planarVizMode === 4
+      ? "York Slice"
+    : planarVizMode === 5
+        ? "York Shell Map"
+      : planarVizMode === 6
+        ? "York Topology"
         : "Scientific";
 
 const resolveScientificRenderView = (
@@ -1268,10 +1271,12 @@ const resolveScientificRenderView = (
     ? "paper-rho"
   : planarVizMode === 0
       ? "shift-shell-3p1"
-    : planarVizMode === 4
+  : planarVizMode === 4
         ? "york-time-3p1"
       : planarVizMode === 5
-        ? "york-surface-3p1"
+        ? "york-shell-map-3p1"
+      : planarVizMode === 6
+        ? "york-topology-normalized-3p1"
         : "full-atlas";
 
 const buildScientificSnapshotIdentity = (
@@ -6758,7 +6763,8 @@ const res = 256;
       planarVizMode === 2 ||
       planarVizMode === 3 ||
       planarVizMode === 4 ||
-      planarVizMode === 5;
+      planarVizMode === 5 ||
+      planarVizMode === 6;
     const useScientificMisService =
       hullRendererBackend === "mis-service" && modeSupportsScientificMis;
     if (!useScientificMisService && planarVizMode !== 3) {
@@ -7412,21 +7418,75 @@ const res = 256;
           }
         } else if (
           scientificRenderView === "york-time-3p1" ||
-          scientificRenderView === "york-surface-3p1"
+          scientificRenderView === "york-surface-3p1" ||
+          scientificRenderView === "york-surface-rho-3p1" ||
+          scientificRenderView === "york-topology-normalized-3p1" ||
+          scientificRenderView === "york-shell-map-3p1"
         ) {
           if (!frameCertificate) {
             throw new Error("scientific_york_certificate_mismatch");
           }
           const yorkSurfaceRequested =
-            scientificRenderView === "york-surface-3p1";
+            scientificRenderView === "york-surface-3p1" ||
+            scientificRenderView === "york-surface-rho-3p1";
+          const yorkSurfaceRhoRequested =
+            scientificRenderView === "york-surface-rho-3p1";
+          const yorkTopologyNormalizedRequested =
+            scientificRenderView === "york-topology-normalized-3p1";
+          const yorkShellMapRequested =
+            scientificRenderView === "york-shell-map-3p1";
+          const expectedYorkSlicePlane = yorkSurfaceRhoRequested
+            ? "x-rho"
+            : "x-z-midplane";
+          const expectedYorkCoordinateMode = yorkSurfaceRhoRequested
+            ? "x-rho"
+            : "x-z-midplane";
+          const expectedYorkSamplingChoice = yorkSurfaceRhoRequested
+            ? "x-rho cylindrical remap"
+            : "x-z midplane";
+          const expectedYorkNormalization = yorkTopologyNormalizedRequested
+            ? "topology-only-unit-max"
+            : "symmetric-about-zero";
           if (
             frameCertificate.render?.field_key !== "theta" ||
-            frameCertificate.render?.slice_plane !== "x-z-midplane" ||
-            frameCertificate.render?.normalization !== "symmetric-about-zero" ||
+            frameCertificate.render?.slice_plane !== expectedYorkSlicePlane ||
+            frameCertificate.render?.coordinate_mode !== expectedYorkCoordinateMode ||
+            frameCertificate.render?.normalization !== expectedYorkNormalization ||
+            frameCertificate.diagnostics?.sampling_choice !== expectedYorkSamplingChoice ||
+            frameCertificate.diagnostics?.coordinate_mode !== expectedYorkCoordinateMode ||
             (yorkSurfaceRequested &&
               frameCertificate.render?.surface_height !== "theta")
           ) {
             throw new Error("scientific_york_convention_mismatch");
+          }
+          if (
+            yorkTopologyNormalizedRequested &&
+            (frameCertificate.render?.magnitude_mode !==
+              "normalized-topology-only" ||
+              frameCertificate.render?.surface_height !== "theta_norm")
+          ) {
+            throw new Error("scientific_york_convention_mismatch");
+          }
+          if (
+            yorkShellMapRequested &&
+            frameCertificate.render?.support_overlay !==
+              "hull_sdf+tile_support_mask"
+          ) {
+            throw new Error("scientific_york_shell_map_convention_mismatch");
+          }
+          if (yorkShellMapRequested) {
+            if (
+              !Number.isFinite(
+                frameCertificate.diagnostics?.supported_theta_fraction ?? Number.NaN,
+              ) ||
+              !Number.isFinite(
+                frameCertificate.diagnostics?.shell_theta_overlap_pct ?? Number.NaN,
+              ) ||
+              typeof frameCertificate.diagnostics?.peak_theta_in_supported_region !==
+                "boolean"
+            ) {
+              throw new Error("scientific_york_shell_map_diagnostics_missing");
+            }
           }
           if (
             typeof frameCertificate.theta_definition !== "string" ||
@@ -10400,16 +10460,29 @@ const res = 256;
               </span>
             </button>
             <button
-              title="Single-snapshot York Surface scientific rendering: york-surface-3p1"
-              aria-label="York Surface, single-snapshot scientific rendering, york-surface-3p1"
+              title="Single-snapshot NHM2 York Shell Map scientific rendering: york-shell-map-3p1"
+              aria-label="York Shell Map, single-snapshot scientific rendering, york-shell-map-3p1"
               onClick={() => {
                 setPlanarVizMode(5);
                 setUserVizLocked(true);
               }}
             >
               <span className="flex flex-col leading-tight">
-                <span>York Surface</span>
+                <span>York Shell Map</span>
                 <span className="text-[0.6rem] text-slate-300">single-snapshot</span>
+              </span>
+            </button>
+            <button
+              title="Single-snapshot NHM2 York topology companion (normalized, non-raw): york-topology-normalized-3p1"
+              aria-label="York Topology, single-snapshot normalized topology-only scientific rendering, york-topology-normalized-3p1"
+              onClick={() => {
+                setPlanarVizMode(6);
+                setUserVizLocked(true);
+              }}
+            >
+              <span className="flex flex-col leading-tight">
+                <span>York Topology</span>
+                <span className="text-[0.6rem] text-slate-300">normalized-only</span>
               </span>
             </button>
             <span
@@ -11909,6 +11982,12 @@ const res = 256;
                 {scientificSnapshotIdentity?.unit_system ?? "unknown"} | t{" "}
                 {scientificSnapshotIdentity?.timestamp_ms ?? "none"}
               </div>
+              <YorkAuditBox
+                certificate={scientificCertificateState}
+                metricRefHashFallback={scientificSnapshotIdentity?.metric_ref_hash ?? null}
+                timestampMsFallback={scientificSnapshotIdentity?.timestamp_ms ?? null}
+                thetaDefinitionFallback={scientificSnapshotIdentity?.theta_definition ?? null}
+              />
             </div>
           ) : null}
         {planarVizMode === 2 && (
