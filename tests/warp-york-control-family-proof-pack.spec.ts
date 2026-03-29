@@ -5,6 +5,7 @@ import {
   buildControlDebug,
   decideControlFamilyVerdict,
   evaluateProofPackPreconditions,
+  readSourceFamilyEvidence,
 } from "../scripts/warp-york-control-family-proof-pack";
 
 const REQUIRED_VIEWS: HullScientificRenderView[] = [
@@ -270,6 +271,58 @@ describe("warp york control-family proof pack", () => {
     expect(alc?.shape_function_id).toBe("alcubierre_longitudinal_shell_v1");
     expect(alc?.thetaHash).toBe("theta-hash-alc");
     expect(alc?.kTraceHash).toBe("ktrace-hash");
+  });
+
+  it("prefers stats stress-energy mapping evidence when present", () => {
+    const sourceFamily = readSourceFamilyEvidence({
+      stats: {
+        stressEnergy: {
+          mapping: {
+            family_id: "stats-family",
+            metricT00Ref: "warp.metric.T00.stats",
+            warpFieldType: "stats-field",
+            source_branch: "stats_branch",
+            shape_function_id: "stats_shape",
+          },
+        },
+      },
+      meta: {
+        stressEnergy: {
+          mapping: {
+            family_id: "meta-family",
+            metricT00Ref: "warp.metric.T00.meta",
+            warpFieldType: "meta-field",
+            source_branch: "meta_branch",
+            shape_function_id: "meta_shape",
+          },
+        },
+      },
+    });
+
+    expect(sourceFamily.family_id).toBe("stats-family");
+    expect(sourceFamily.warpFieldType).toBe("stats-field");
+    expect(sourceFamily.source_branch).toBe("stats_branch");
+  });
+
+  it("falls back to snapshot meta mapping when stats mapping is empty", () => {
+    const sourceFamily = readSourceFamilyEvidence({
+      stats: { stressEnergy: { mapping: {} } },
+      meta: {
+        stressEnergy: {
+          mapping: {
+            family_id: "meta-family",
+            metricT00Ref: "warp.metric.T00.meta",
+            warpFieldType: "meta-field",
+            source_branch: "meta_branch",
+            shape_function_id: "meta_shape",
+          },
+        },
+      },
+    });
+
+    expect(sourceFamily.family_id).toBe("meta-family");
+    expect(sourceFamily.warpFieldType).toBe("meta-field");
+    expect(sourceFamily.source_branch).toBe("meta_branch");
   });
 
   it("flags missing control mapping fields even when control hashes exist", () => {
