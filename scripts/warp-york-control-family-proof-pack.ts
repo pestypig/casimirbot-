@@ -1339,16 +1339,42 @@ export const evaluateProofPackPreconditions = (args: {
     alcUrl !== natUrl;
   const alcThetaHash = alc?.snapshotMetrics?.channelHashes.theta ?? null;
   const natThetaHash = nat?.snapshotMetrics?.channelHashes.theta ?? null;
+  const alcKTraceHash = alc?.snapshotMetrics?.channelHashes.K_trace ?? null;
+  const natKTraceHash = nat?.snapshotMetrics?.channelHashes.K_trace ?? null;
   const controlThetaHashesEqual =
     typeof alcThetaHash === "string" &&
     alcThetaHash.trim().length > 0 &&
     typeof natThetaHash === "string" &&
     natThetaHash.trim().length > 0 &&
     alcThetaHash === natThetaHash;
-  if (controlRequestUrlsDiffer && controlThetaHashesEqual) {
+  const controlKTraceHashesEqual =
+    typeof alcKTraceHash === "string" &&
+    alcKTraceHash.trim().length > 0 &&
+    typeof natKTraceHash === "string" &&
+    natKTraceHash.trim().length > 0 &&
+    alcKTraceHash === natKTraceHash;
+  const controlSourceMappingVisible = [alc, nat].every((entry) => {
+    const source = asText(entry?.snapshotMetrics?.source ?? null);
+    const family = entry?.snapshotMetrics?.sourceFamily;
+    return (
+      typeof source === "string" &&
+      source.trim().length > 0 &&
+      typeof family?.family_id === "string" &&
+      family.family_id.trim().length > 0 &&
+      typeof family.metricT00Ref === "string" &&
+      family.metricT00Ref.trim().length > 0 &&
+      typeof family.warpFieldType === "string" &&
+      family.warpFieldType.trim().length > 0 &&
+      typeof family.source_branch === "string" &&
+      family.source_branch.trim().length > 0 &&
+      typeof family.shape_function_id === "string" &&
+      family.shape_function_id.trim().length > 0
+    );
+  });
+  if (controlRequestUrlsDiffer && controlThetaHashesEqual && controlKTraceHashesEqual) {
     guardFailures.push({
       code: "proof_pack_control_theta_hash_collision",
-      detail: `alc_url=${alcUrl} nat_url=${natUrl} theta_hash=${alcThetaHash}`,
+      detail: `alc_url=${alcUrl} nat_url=${natUrl} theta_hash=${alcThetaHash} K_trace_hash=${alcKTraceHash}`,
     });
   }
   if (!controlRequestUrlsDiffer) {
@@ -1359,16 +1385,36 @@ export const evaluateProofPackPreconditions = (args: {
   }
   const controlsIndependent =
     controlRequestUrlsDiffer &&
-    typeof alcThetaHash === "string" &&
-    alcThetaHash.trim().length > 0 &&
-    typeof natThetaHash === "string" &&
-    natThetaHash.trim().length > 0 &&
-    alcThetaHash !== natThetaHash;
+    controlSourceMappingVisible &&
+    (
+      (typeof alcThetaHash === "string" &&
+        alcThetaHash.trim().length > 0 &&
+        typeof natThetaHash === "string" &&
+        natThetaHash.trim().length > 0 &&
+        alcThetaHash !== natThetaHash) ||
+      (typeof alcKTraceHash === "string" &&
+        alcKTraceHash.trim().length > 0 &&
+        typeof natKTraceHash === "string" &&
+        natKTraceHash.trim().length > 0 &&
+        alcKTraceHash !== natKTraceHash)
+    );
+  if (!controlSourceMappingVisible) {
+    guardFailures.push({
+      code: "proof_pack_controls_collapsed_source_branch_missing",
+      detail: `alc_source=${alc?.snapshotMetrics?.source ?? "null"} nat_source=${nat?.snapshotMetrics?.source ?? "null"} alc_source_branch=${alc?.snapshotMetrics?.sourceFamily.source_branch ?? "null"} nat_source_branch=${nat?.snapshotMetrics?.sourceFamily.source_branch ?? "null"}`,
+    });
+  }
   if (!controlsIndependent) {
     guardFailures.push({
       code: "proof_pack_controls_not_independent",
-      detail: `alc_theta_hash=${alcThetaHash ?? "null"} nat_theta_hash=${natThetaHash ?? "null"}`,
+      detail: `alc_theta_hash=${alcThetaHash ?? "null"} nat_theta_hash=${natThetaHash ?? "null"} alc_k_trace_hash=${alcKTraceHash ?? "null"} nat_k_trace_hash=${natKTraceHash ?? "null"}`,
     });
+    if (controlSourceMappingVisible && controlRequestUrlsDiffer) {
+      guardFailures.push({
+        code: "proof_pack_controls_diverged_upstream_but_collapsed_later",
+        detail: `alc_theta_hash=${alcThetaHash ?? "null"} nat_theta_hash=${natThetaHash ?? "null"} alc_k_trace_hash=${alcKTraceHash ?? "null"} nat_k_trace_hash=${natKTraceHash ?? "null"}`,
+      });
+    }
   }
 
   const allRequiredViewsRendered = !guardFailures.some((failure) =>

@@ -233,6 +233,10 @@ export const buildStressEnergyFieldSetFromPipeline = (
     hullAxes,
     hullWall,
     radialMap: params.radialMap ?? null,
+    metricT00: params.metricT00,
+    metricT00Source: params.metricT00Source,
+    metricT00Ref: params.metricT00Ref,
+    warpFieldType: params.warpFieldType,
   });
   if (brick.stats.mapping) {
     brick.stats.mapping.pressureFactor = pressureFactor;

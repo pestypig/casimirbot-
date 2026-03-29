@@ -147,6 +147,7 @@ export interface GrEvolveBrick {
   voxelSize_m: Vec3;
   time_s: number;
   dt_s: number;
+  source?: "pipeline" | "metric" | "unknown";
   channelOrder?: string[];
   channels: {
     alpha: GrEvolveBrickChannel;
@@ -182,6 +183,7 @@ export interface GrEvolveBrickResponse {
   voxelSize_m: Vec3;
   time_s: number;
   dt_s: number;
+  source?: "pipeline" | "metric" | "unknown";
   channelOrder?: string[];
   channels: {
     alpha: GrEvolveBrickResponseChannel;
@@ -212,6 +214,7 @@ export interface GrEvolveBrickBinaryHeader {
   voxelSize_m: Vec3;
   time_s: number;
   dt_s: number;
+  source?: "pipeline" | "metric" | "unknown";
   channelOrder: readonly string[];
   channels: Record<string, { min: number; max: number; bytes: number }>;
   stats: GrEvolveBrickStats;
@@ -1242,6 +1245,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     voxelSize_m,
     time_s: time_s_end,
     dt_s,
+    source: evolution.sourceBrick?.source,
     channelOrder: resolvedChannelOrder,
     channels,
     stats,
@@ -1281,6 +1285,7 @@ export const serializeGrEvolveBrick = (brick: GrEvolveBrick): GrEvolveBrickRespo
     voxelSize_m: brick.voxelSize_m,
     time_s: brick.time_s,
     dt_s: brick.dt_s,
+    ...(brick.source ? { source: brick.source } : {}),
     channelOrder,
     channels: channels as GrEvolveBrickResponse["channels"],
     stats: brick.stats,
@@ -1316,6 +1321,7 @@ export const serializeGrEvolveBrickBinary = (brick: GrEvolveBrick): GrEvolveBric
       voxelSize_m: brick.voxelSize_m,
       time_s: brick.time_s,
       dt_s: brick.dt_s,
+      ...(brick.source ? { source: brick.source } : {}),
       channelOrder,
       channels: headerChannels,
       stats: brick.stats,

@@ -168,6 +168,7 @@ export interface GrEvolveBrickDecoded {
   voxelSize_m: [number, number, number];
   time_s: number;
   dt_s: number;
+  source?: "pipeline" | "metric" | "unknown";
   channelOrder?: string[];
   channels: {
     alpha: GrEvolveBrickChannel;
@@ -534,6 +535,10 @@ const decodeGrEvolveBrickBinary = (buffer: ArrayBuffer): GrEvolveBrickDecoded | 
     voxelSize_m: header.voxelSize_m,
     time_s: Number(header.time_s ?? 0),
     dt_s: Number(header.dt_s ?? 0),
+    source:
+      header.source === "pipeline" || header.source === "metric" || header.source === "unknown"
+        ? header.source
+        : undefined,
     channelOrder,
     channels: {
       alpha,
@@ -719,6 +724,10 @@ export async function fetchGrEvolveBrick(
     voxelSize_m: json.voxelSize_m,
     time_s: Number(json.time_s ?? 0),
     dt_s: Number(json.dt_s ?? 0),
+    source:
+      json.source === "pipeline" || json.source === "metric" || json.source === "unknown"
+        ? json.source
+        : undefined,
     channelOrder,
     channels: {
       alpha: decodeChannel(json.channels?.alpha, "alpha"),

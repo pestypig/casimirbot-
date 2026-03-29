@@ -94,6 +94,7 @@ const makeCase = (
   },
   snapshotMetrics: {
     dims: [48, 48, 48],
+    source: "metric",
     chart: "comoving_cartesian",
     channelHashes: { theta: thetaHash, K_trace: "ktrace-hash" },
     sourceFamily: {
@@ -243,6 +244,12 @@ describe("warp york control-family proof pack", () => {
     expect(
       evaluated.guardFailures.some(
         (failure) => failure.code === "proof_pack_control_theta_hash_collision",
+      ),
+    ).toBe(true);
+    expect(
+      evaluated.guardFailures.some(
+        (failure) =>
+          failure.code === "proof_pack_controls_diverged_upstream_but_collapsed_later",
       ),
     ).toBe(true);
   });
