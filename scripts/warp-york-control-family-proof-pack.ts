@@ -1068,16 +1068,30 @@ const computeThetaPlusKTraceConsistency = (theta: Float32Array, kTrace: Float32A
   };
 };
 
-const readSourceFamilyEvidence = (snapshot: {
+export const readSourceFamilyEvidence = (snapshot: {
   stats: Record<string, unknown> | null;
   meta: Record<string, unknown> | null;
 }): SourceFamilyEvidence => {
+  const hasSourceFamilyEvidence = (mapping: Record<string, unknown> | null): boolean => {
+    if (!mapping) return false;
+    return (
+      asText(mapping.family_id) !== null ||
+      asText(mapping.metricT00Ref) !== null ||
+      asText(mapping.warpFieldType) !== null ||
+      asText(mapping.source_branch) !== null ||
+      asText(mapping.shape_function_id) !== null
+    );
+  };
   const statsRoot = asRecord(snapshot.stats);
   const stressEnergyStats = asRecord(statsRoot?.stressEnergy);
   const preferredMapping = asRecord(stressEnergyStats?.mapping);
   const fallbackStressEnergy = asRecord(snapshot.meta?.stressEnergy);
   const fallbackMapping = asRecord(fallbackStressEnergy?.mapping);
-  const selectedMapping = preferredMapping ?? fallbackMapping;
+  const selectedMapping = hasSourceFamilyEvidence(preferredMapping)
+    ? preferredMapping
+    : hasSourceFamilyEvidence(fallbackMapping)
+      ? fallbackMapping
+      : null;
   return {
     family_id: asText(selectedMapping?.family_id),
     metricT00Ref: asText(selectedMapping?.metricT00Ref),
