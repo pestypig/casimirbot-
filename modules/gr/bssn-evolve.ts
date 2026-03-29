@@ -5,7 +5,7 @@ import {
   clearBssnFieldSet,
   type BssnRhs,
   type BssnState,
-} from "./bssn-state";
+} from "./bssn-state.ts";
 import {
   diff1,
   diff1Upwind,
@@ -14,12 +14,12 @@ import {
   koDissipationAt,
   type BoundaryMode,
   type StencilOrder,
-} from "./stencils";
-import { rk4Step, type Rk4Scratch } from "./rk4";
+} from "./stencils.ts";
+import { rk4Step, type Rk4Scratch } from "./rk4.ts";
 import {
   stressEnergyMatchesGrid,
   type StressEnergyFieldSet,
-} from "./stress-energy";
+} from "./stress-energy.ts";
 
 export interface GaugeParams {
   lapseKappa?: number;

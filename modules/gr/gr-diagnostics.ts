@@ -1,6 +1,6 @@
-import type { BssnState } from "./bssn-state";
+import type { BssnState } from "./bssn-state.ts";
 import type { StencilParams } from "./bssn-evolve";
-import { diff1 } from "./stencils";
+import { diff1 } from "./stencils.ts";
 
 export type ShiftStiffnessMetrics = {
   betaMaxAbs: number;

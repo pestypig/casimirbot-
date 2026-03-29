@@ -1,4 +1,4 @@
-import type { GridSpec } from "./bssn-state";
+import type { GridSpec } from "./bssn-state.ts";
 
 export type BoundaryMode = "clamp" | "periodic" | "outflow" | "sommerfeld";
 export type StencilOrder = 2 | 4;

@@ -6,7 +6,7 @@ import {
   createBssnState,
   type BssnRhs,
   type BssnState,
-} from "./bssn-state";
+} from "./bssn-state.ts";
 
 export type RhsFn = (state: BssnState, out: BssnRhs) => void;
 

@@ -1,4 +1,4 @@
-import { fieldCount, type GridSpec } from "./bssn-state";
+import { fieldCount, type GridSpec } from "./bssn-state.ts";
 
 export type StressEnergyField = Float32Array;
 

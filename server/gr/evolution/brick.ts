@@ -4,16 +4,16 @@ import {
   createBssnRhs,
   type BssnState,
   type GridSpec,
-} from "../../../modules/gr/bssn-state.js";
-import type { StressEnergyFieldSet } from "../../../modules/gr/stress-energy.js";
+} from "../../../modules/gr/bssn-state.ts";
+import type { StressEnergyFieldSet } from "../../../modules/gr/stress-energy.ts";
 import {
   buildBssnRhs,
   type ConstraintFields,
   type GaugeParams,
   type StencilParams,
-} from "../../../modules/gr/bssn-evolve.js";
-import { diff1, diff2, index3D, type BoundaryMode } from "../../../modules/gr/stencils.js";
-import type { Vec3 } from "../../curvature-brick";
+} from "../../../modules/gr/bssn-evolve.ts";
+import { diff1, diff2, index3D, type BoundaryMode } from "../../../modules/gr/stencils.ts";
+import type { Vec3 } from "../../curvature-brick.ts";
 
 export interface GrEvolutionBrickChannel {
   data: Float32Array;

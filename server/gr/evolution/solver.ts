@@ -3,7 +3,7 @@ import {
   gridFromBounds,
   type BssnState,
   type GridSpec,
-} from "../../../modules/gr/bssn-state.js";
+} from "../../../modules/gr/bssn-state.ts";
 import {
   computeBssnConstraints,
   evolveBssn,
@@ -15,17 +15,17 @@ import {
   type GaugeParams,
   type StencilParams,
   type ConstraintFields,
-} from "../../../modules/gr/bssn-evolve.js";
-import { computeShiftStiffnessMetrics } from "../../../modules/gr/gr-diagnostics.js";
-import type { StressEnergyFieldSet } from "../../../modules/gr/stress-energy.js";
-import type { StressEnergyBrick } from "../../stress-energy-brick";
-import type { StressEnergyBrickParams } from "../../stress-energy-brick";
-import type { Vec3 } from "../../curvature-brick";
+} from "../../../modules/gr/bssn-evolve.ts";
+import { computeShiftStiffnessMetrics } from "../../../modules/gr/gr-diagnostics.ts";
+import type { StressEnergyFieldSet } from "../../../modules/gr/stress-energy.ts";
+import type { StressEnergyBrick } from "../../stress-energy-brick.ts";
+import type { StressEnergyBrickParams } from "../../stress-energy-brick.ts";
+import type { Vec3 } from "../../curvature-brick.ts";
 import {
   buildStressEnergyFieldSetFromPipeline,
   type StressEnergyBuildOptions,
-} from "./stress-energy";
-import { toGeometricTime, type GrUnitSystem } from "../../../shared/gr-units.js";
+} from "./stress-energy.ts";
+import { toGeometricTime, type GrUnitSystem } from "../../../shared/gr-units.ts";
 
 type Bounds = { min: Vec3; max: Vec3 };
 
