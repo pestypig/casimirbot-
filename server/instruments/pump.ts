@@ -43,19 +43,22 @@ class NoopPumpDriver implements PumpDriver {
 
 let driver: PumpDriver = new NoopPumpDriver();
 
-const resolvePumpMockModuleSpecifier = (): string => {
+const resolvePumpMockModuleSpecifier = (): string | null => {
   const root = process.cwd();
+  const moduleDir = path.dirname(new URL(import.meta.url).pathname);
   const candidates = [
-    path.join(root, "server", "instruments", "pump-mock.ts"),
-    path.join(root, "server", "instruments", "pump-mock.js"),
     path.join(root, "dist", "server", "instruments", "pump-mock.js"),
+    path.join(root, "server", "instruments", "pump-mock.js"),
+    path.join(root, "server", "instruments", "pump-mock.ts"),
+    path.join(moduleDir, "pump-mock.js"),
+    path.join(moduleDir, "pump-mock.ts"),
   ];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       return pathToFileURL(candidate).href;
     }
   }
-  return new URL("./pump-mock.ts", import.meta.url).href;
+  return null;
 };
 
 export function attachPumpDriver(drv: PumpDriver) {
@@ -107,7 +110,11 @@ export async function slewPump(target: {
 void (async () => {
   if (!process.env.PUMP_DRIVER || process.env.PUMP_DRIVER === "mock") {
     try {
-      const { MockCasimirPumpDriver } = await import(resolvePumpMockModuleSpecifier());
+      const moduleSpecifier = resolvePumpMockModuleSpecifier();
+      if (!moduleSpecifier) {
+        return;
+      }
+      const { MockCasimirPumpDriver } = await import(moduleSpecifier);
       const settleEnv = Number(process.env.PUMP_MOCK_SETTLE_MS);
       const jitterEnv = Number(process.env.PUMP_MOCK_JITTER_MS);
       const settleMs = Number.isFinite(settleEnv) ? settleEnv : undefined;
@@ -115,6 +122,9 @@ void (async () => {
       attachPumpDriver(new MockCasimirPumpDriver({ settleMs, jitterMs }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (/pump-mock\.(ts|js)|Cannot find module|ERR_MODULE_NOT_FOUND/i.test(msg)) {
+        return;
+      }
       console.warn(`[pump] mock driver init failed: ${msg}`);
     }
   }
