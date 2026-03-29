@@ -6,13 +6,13 @@ import type {
   GrConstraintThresholds,
 } from "../../shared/schema.js";
 import type { GrPipelineDiagnostics } from "../energy-pipeline.js";
-import type { BssnState } from "../../modules/gr/bssn-state.js";
-import type { StressEnergyFieldSet } from "../../modules/gr/stress-energy.js";
+import type { BssnState } from "../../modules/gr/bssn-state.ts";
+import type { StressEnergyFieldSet } from "../../modules/gr/stress-energy.ts";
 import {
   computeBssnConstraints,
   type ConstraintFields,
   type StencilParams,
-} from "../../modules/gr/bssn-evolve.js";
+} from "../../modules/gr/bssn-evolve.ts";
 
 export type SemiclassicalResiduals = {
   G_mu_nu_rms?: number;

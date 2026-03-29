@@ -13,7 +13,7 @@ import { toGeometricTime } from "../../shared/gr-units.js";
 import type { Vec3 } from "../curvature-brick.js";
 import type { StressEnergyBrickParams } from "../stress-energy-brick.js";
 import type { StressEnergyBuildOptions } from "./evolution/stress-energy.js";
-import type { StressEnergyFieldSet } from "../../modules/gr/stress-energy.js";
+import type { StressEnergyFieldSet } from "../../modules/gr/stress-energy.ts";
 import type {
   GrConstraintGateStatus,
   GrConstraintMetrics,

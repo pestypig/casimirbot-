@@ -1,16 +1,16 @@
 import {
   createStressEnergyFieldSet,
   type StressEnergyFieldSet,
-} from "../../../modules/gr/stress-energy.js";
-import type { GridSpec } from "../../../modules/gr/bssn-state.js";
+} from "../../../modules/gr/stress-energy.ts";
+import type { GridSpec } from "../../../modules/gr/bssn-state.ts";
 import {
   buildStressEnergyBrick,
   type StressEnergyBrick,
   type StressEnergyBrickParams,
-} from "../../stress-energy-brick";
-import { getGlobalPipelineState } from "../../energy-pipeline";
-import type { HullRadialMap, Vec3 } from "../../curvature-brick";
-import { resolveStressScale, type GrUnitSystem } from "../../../shared/gr-units.js";
+} from "../../stress-energy-brick.ts";
+import { getGlobalPipelineState } from "../../energy-pipeline.ts";
+import type { HullRadialMap, Vec3 } from "../../curvature-brick.ts";
+import { resolveStressScale, type GrUnitSystem } from "../../../shared/gr-units.ts";
 
 export interface StressEnergyBuildOptions {
   densityScale?: number;

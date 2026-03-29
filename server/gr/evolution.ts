@@ -1,11 +1,11 @@
 import { Buffer } from "node:buffer";
-import { getGlobalPipelineState } from "../energy-pipeline";
-import type { Vec3 } from "../curvature-brick";
+import { getGlobalPipelineState } from "../energy-pipeline.ts";
+import type { Vec3 } from "../curvature-brick.ts";
 import {
   buildStressEnergyBrick,
   type StressEnergyBrickParams,
-} from "../stress-energy-brick";
-import { C, G } from "../../shared/physics-const.js";
+} from "../stress-energy-brick.ts";
+import { C, G } from "../../shared/physics-const.ts";
 import {
   BSSN_FIELD_KEYS,
   createMinkowskiState,
@@ -13,17 +13,17 @@ import {
   type BssnFieldKey,
   type BssnState,
   type GridSpec,
-} from "../../modules/gr/bssn-state.js";
+} from "../../modules/gr/bssn-state.ts";
 import {
   computeBssnConstraints,
   evolveBssn,
   type GaugeParams,
   type StencilParams,
-} from "../../modules/gr/bssn-evolve.js";
+} from "../../modules/gr/bssn-evolve.ts";
 import {
   createStressEnergyFieldSet,
   type StressEnergyFieldSet,
-} from "../../modules/gr/stress-energy.js";
+} from "../../modules/gr/stress-energy.ts";
 
 export type GrFieldState = BssnState;
 export type GrStressEnergySource = StressEnergyFieldSet;

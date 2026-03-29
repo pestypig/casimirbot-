@@ -1,9 +1,9 @@
 import { Buffer } from "node:buffer";
-import { resolveHullRadius, type HullRadialMap, type Vec3 } from "./curvature-brick";
-import { getGlobalPipelineState } from "./energy-pipeline";
-import { enhancedAvgEnergyDensity, natarioShiftFromDensity } from "../modules/dynamic/stress-energy-equations.js";
-import { computeInvariantMassFromFluxTotals } from "../modules/gr/stress-energy-integrals.js";
-import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
+import { resolveHullRadius, type HullRadialMap, type Vec3 } from "./curvature-brick.ts";
+import { getGlobalPipelineState } from "./energy-pipeline.ts";
+import { enhancedAvgEnergyDensity, natarioShiftFromDensity } from "../modules/dynamic/stress-energy-equations.ts";
+import { computeInvariantMassFromFluxTotals } from "../modules/gr/stress-energy-integrals.ts";
+import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.ts";
 
 export interface StressEnergyBrickParams {
   dims: [number, number, number];

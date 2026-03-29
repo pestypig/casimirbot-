@@ -2,23 +2,23 @@ import {
   createMinkowskiState,
   gridFromBounds,
   type GridSpec,
-} from "../../../modules/gr/bssn-state.js";
+} from "../../../modules/gr/bssn-state.ts";
 import {
   computeBssnConstraints,
   type ConstraintFields,
   type StencilParams,
-} from "../../../modules/gr/bssn-evolve.js";
+} from "../../../modules/gr/bssn-evolve.ts";
 import {
   stressEnergyMatchesGrid,
   type StressEnergyFieldSet,
-} from "../../../modules/gr/stress-energy.js";
-import type { StressEnergyBrick, StressEnergyBrickParams } from "../../stress-energy-brick";
-import type { Vec3 } from "../../curvature-brick";
+} from "../../../modules/gr/stress-energy.ts";
+import type { StressEnergyBrick, StressEnergyBrickParams } from "../../stress-energy-brick.ts";
+import type { Vec3 } from "../../curvature-brick.ts";
 import {
   buildStressEnergyFieldSetFromPipeline,
   type StressEnergyBuildOptions,
-} from "./stress-energy";
-import type { GrUnitSystem } from "../../../shared/gr-units.js";
+} from "./stress-energy.ts";
+import type { GrUnitSystem } from "../../../shared/gr-units.ts";
 
 type Bounds = { min: Vec3; max: Vec3 };
 
