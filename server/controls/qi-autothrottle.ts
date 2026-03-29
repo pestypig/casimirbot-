@@ -5,7 +5,7 @@ import {
   QI_AUTOTHROTTLE_HYST,
   QI_AUTOTHROTTLE_MIN,
   QI_AUTOTHROTTLE_TARGET,
-} from "../config/env.js";
+} from "../config/env.ts";
 import type { GatePulse, PumpCommand, PumpTone } from "../../shared/schema.js";
 import type { QiAutoscaleClampReason } from "./qi-autoscale.js";
 

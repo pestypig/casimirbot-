@@ -5,7 +5,7 @@ import type { ConsoleTelemetryBundle } from "./desktop";
 import { ToolRisk } from "./skills";
 import type { ToolManifestEntry } from "./skills";
 import type { GroundingReport } from "./grounding";
-import { agiRefineryRequestSchema } from "./agi-refinery";
+import { agiRefineryRequestSchema } from "./agi-refinery.ts";
 
 export const PersonaProfile = z.object({
   id: z.string(),

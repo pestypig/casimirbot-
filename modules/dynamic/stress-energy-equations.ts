@@ -8,7 +8,7 @@
  * No magic constants; reads γ_geo, Q, q_spoil, γ_VdB, duty from pipeline.
  */
 
-import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
+import { PHYSICS_CONSTANTS } from '../core/physics-constants.ts';
 
 export type Vec3 = readonly [number, number, number];
 

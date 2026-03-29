@@ -1,5 +1,5 @@
-import type { RawTileInput } from "./qi-saturation";
-import { setQiTelemetrySource, startQiSnapStream } from "./qi-snap-source";
+import type { RawTileInput } from "./qi-saturation.ts";
+import { setQiTelemetrySource, startQiSnapStream } from "./qi-snap-source.ts";
 
 type TelemetrySource = "synthetic" | "controller" | "hardware";
 
