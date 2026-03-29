@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
-import { C } from "./utils/physics-const-safe";
-import { getGlobalPipelineState } from "./energy-pipeline";
-import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
+import { C } from "./utils/physics-const-safe.ts";
+import { getGlobalPipelineState } from "./energy-pipeline.ts";
+import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.ts";
 
 export type Vec3 = [number, number, number];
 

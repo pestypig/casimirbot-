@@ -6,7 +6,7 @@
  * curves (1D), surfaces (2D), volumes (3D), graph forms, and spherical ↔ Cartesian maps.
  */
 // ------------------------ Constants / Types ---------------------------------
-import { PHYSICS_CONSTANTS } from '../core/physics-constants';
+import { PHYSICS_CONSTANTS } from '../core/physics-constants.ts';
 const C = PHYSICS_CONSTANTS.C;                    // m/s
 const NM_TO_M = 1e-9;
 const G = 6.67430e-11;                  // m³/(kg·s²)

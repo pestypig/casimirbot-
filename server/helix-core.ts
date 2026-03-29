@@ -37,7 +37,7 @@ import {
 import { omega0_from_gap, domega0_dd } from "../modules/sim_core/static-casimir.js";
 import { writePhaseCalibration, reducePhaseCalLogToLookup } from "./utils/phase-calibration.js";
 // ROBUST speed of light import: handle named/default or missing module gracefully
-import { C } from './utils/physics-const-safe';
+import { C } from './utils/physics-const-safe.ts';
 import { computeClocking } from "../shared/clocking.js";
 import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 import {
@@ -9689,7 +9689,6 @@ export async function getEnergySnapshot(req: Request, res: Response) {
 export const VERSION = "helix-core-debug-0";
 export function noop() { /* noop for debug */ }
 export default { VERSION, noop };
-
 
 
 
