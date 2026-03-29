@@ -27,8 +27,8 @@ const resolveMassMode = (value: unknown): MassMode => {
 };
 
 // G├╢├çG├╢├ç Physics Constants (centralized) G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
-import { HBAR } from "./physics-const.js";
-import { C } from "./utils/physics-const-safe";
+import { HBAR } from "./physics-const.ts";
+import { C } from "./utils/physics-const-safe.ts";
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
 import { NHM2_FULL_HULL_DIMENSIONS_M, PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
