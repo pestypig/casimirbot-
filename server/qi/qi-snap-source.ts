@@ -1,6 +1,6 @@
 import type { SamplingKind } from "@shared/schema";
-import { qiSnapHub } from "./qi-snap-broadcaster";
-import { reduceTilesToSample, type RawTileInput } from "./qi-saturation";
+import { qiSnapHub } from "./qi-snap-broadcaster.ts";
+import { reduceTilesToSample, type RawTileInput } from "./qi-saturation.ts";
 
 type TelemetryFn = () => RawTileInput[] | null | undefined;
 

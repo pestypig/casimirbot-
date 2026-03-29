@@ -7,16 +7,16 @@
  * and the NatÃ¡rio sqrt-duty diagnostic (thetaScaleCore_sqrtDuty).
  */
 
-import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
-import { GEOM_TO_SI_STRESS } from '../../shared/gr-units.js';
-import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.js';
+import { PHYSICS_CONSTANTS } from '../core/physics-constants.ts';
+import { GEOM_TO_SI_STRESS } from '../../shared/gr-units.ts';
+import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.ts';
 import type { SimulationParameters, WarpGeometry, WarpGeometryKind } from '../../shared/schema.js';
 import {
   buildWarpMetricAdapterSnapshot,
   type WarpMetricAdapterSnapshot,
   type WarpChartLabel,
   type WarpMetricFamily,
-} from './warp-metric-adapter.js';
+} from './warp-metric-adapter.ts';
 
 export type MassMode = "MODEL_DERIVED" | "TARGET_CALIBRATED" | "MEASURED_FORCE_INFERRED";
 export type StressEnergySource = "metric" | "pipeline" | "proxy";

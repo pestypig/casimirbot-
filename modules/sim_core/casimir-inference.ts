@@ -1,4 +1,4 @@
-import { PHYSICS_CONSTANTS } from "../core/physics-constants.js";
+import { PHYSICS_CONSTANTS } from "../core/physics-constants.ts";
 import type { CasimirForceDataset } from "../../shared/schema.js";
 
 type ForceSample = {

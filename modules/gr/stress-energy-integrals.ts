@@ -1,6 +1,6 @@
 import type { GridSpec, Vec3 } from "./bssn-state.js";
 import type { StressEnergyFieldSet } from "./stress-energy.js";
-import { PHYSICS_CONSTANTS } from "../core/physics-constants.js";
+import { PHYSICS_CONSTANTS } from "../core/physics-constants.ts";
 
 export type StressEnergyFluxFields = Pick<
   StressEnergyFieldSet,

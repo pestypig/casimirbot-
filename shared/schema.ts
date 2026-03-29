@@ -4,12 +4,12 @@ import {
   agiGateReportSchema,
   agiRefinerySummarySchema,
   agiTrajectorySchema,
-} from "./agi-refinery";
-import { InformationBoundary } from "./information-boundary";
+} from "./agi-refinery.ts";
+import { InformationBoundary } from "./information-boundary.ts";
 import {
   QuantumSemiclassicalComparisonResult,
   QuantumSemiclassicalSourceReplay,
-} from "./quantum-semiclassical-comparison";
+} from "./quantum-semiclassical-comparison.ts";
 
 export const sweepGeometrySchema = z.enum(["parallel_plate", "cpw"]);
 export type SweepGeometry = z.infer<typeof sweepGeometrySchema>;

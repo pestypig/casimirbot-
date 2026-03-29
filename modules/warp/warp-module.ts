@@ -10,7 +10,7 @@
 
 import type { CasimirModule } from '../core/module-registry.js';
 import type { SimulationParameters } from '../../shared/schema.js';
-import { calculateNatarioWarpBubble, type NatarioWarpParams, type NatarioWarpResult } from './natario-warp.js';
+import { calculateNatarioWarpBubble, type NatarioWarpParams, type NatarioWarpResult } from './natario-warp.ts';
 
 const DEBUG_WARP =
   typeof process !== 'undefined' &&

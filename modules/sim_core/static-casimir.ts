@@ -3,7 +3,7 @@
  * Implements scientifically accurate SCUFF-EM FSC method
  */
 
-import { PHYSICS_CONSTANTS, thermalLength } from '../core/physics-constants.js';
+import { PHYSICS_CONSTANTS, thermalLength } from '../core/physics-constants.ts';
 import type { CasimirModule } from '../core/module-registry.js';
 import type { SimulationParameters } from '../../shared/schema.js';
 

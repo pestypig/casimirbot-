@@ -8,11 +8,11 @@ export {
   type BssnState,
   type GridSpec,
   type Vec3,
-} from "../../../modules/gr/bssn-state.js";
+} from "../../../modules/gr/bssn-state.ts";
 export {
   createStressEnergyFieldSet,
   type StressEnergyFieldSet,
-} from "../../../modules/gr/stress-energy.js";
+} from "../../../modules/gr/stress-energy.ts";
 export {
   buildBssnRhs,
   computeBssnConstraints,
@@ -27,16 +27,16 @@ export {
   type FixupStepStats,
   type GaugeParams,
   type StencilParams,
-} from "../../../modules/gr/bssn-evolve.js";
+} from "../../../modules/gr/bssn-evolve.ts";
 export {
   computeShiftStiffnessMetrics,
   type ShiftStiffnessMetrics,
-} from "../../../modules/gr/gr-diagnostics.js";
+} from "../../../modules/gr/gr-diagnostics.ts";
 export {
   buildStressEnergyFieldSetFromBrick,
   buildStressEnergyFieldSetFromPipeline,
   type StressEnergyBuildOptions,
-} from "./stress-energy";
+} from "./stress-energy.ts";
 export {
   buildEvolutionBrick,
   serializeEvolutionBrick,
@@ -45,15 +45,15 @@ export {
   type GrEvolutionBrickBinaryPayload,
   type GrEvolutionBrickResponse,
   type GrEvolutionStats,
-} from "./brick";
+} from "./brick.ts";
 export {
   runInitialDataSolve,
   type InitialDataSolveParams,
   type InitialDataSolveResult,
   type InitialDataStatus,
-} from "./initial-data";
+} from "./initial-data.ts";
 export {
   runBssnEvolution,
   type GrEvolutionRunParams,
   type GrEvolutionRunResult,
-} from "./solver";
+} from "./solver.ts";

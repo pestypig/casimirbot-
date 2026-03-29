@@ -8,10 +8,10 @@
  *  - ford-roman-qi-1995: negative-energy burst windowing respects QI
  */
 
-import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric.js';
-import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
-import { omega0_from_gap, domega0_dd } from '../sim_core/static-casimir.js';
-import { Qint_nb3sn } from './stress-energy-equations.js';
+import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric.ts';
+import { PHYSICS_CONSTANTS } from '../core/physics-constants.ts';
+import { omega0_from_gap, domega0_dd } from '../sim_core/static-casimir.ts';
+import { Qint_nb3sn } from './stress-energy-equations.ts';
 import type { CasimirModule } from '../core/module-registry.js';
 import type {
   SimulationParameters,
@@ -27,7 +27,7 @@ import type {
   PumpTone,
   QiStats,
 } from '../../shared/schema.js';
-import { assignGateSummaries, type GateEvaluationOptions } from './gates/index.js';
+import { assignGateSummaries, type GateEvaluationOptions } from './gates/index.ts';
 
 export type DynamicConfigLike = Partial<Omit<DynamicConfig, "sweep">> & {
   sweep?: Partial<DynamicCasimirSweepConfig>;
@@ -404,7 +404,7 @@ export const dynamicCasimirModule: CasimirModule = {
 
   async calculate(params: SimulationParameters): Promise<DynamicCasimirResult> {
     // First get static baseline from static module
-    const { calculateCasimirEnergy } = await import('../sim_core/static-casimir.js');
+    const { calculateCasimirEnergy } = await import('../sim_core/static-casimir.ts');
     const staticResult = calculateCasimirEnergy(params);
 
     // Extract dynamic parameters with defaults
