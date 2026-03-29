@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
   buildControlMetricVolumeRef,
+  buildControlDebug,
   decideControlFamilyVerdict,
   evaluateProofPackPreconditions,
 } from "../scripts/warp-york-control-family-proof-pack";
@@ -250,6 +251,53 @@ describe("warp york control-family proof pack", () => {
       evaluated.guardFailures.some(
         (failure) =>
           failure.code === "proof_pack_controls_diverged_upstream_but_collapsed_later",
+      ),
+    ).toBe(true);
+  });
+
+  it("propagates control source-family evidence into controlDebug", () => {
+    const controlDebug = buildControlDebug([
+      makeCase("alcubierre_control", "theta-hash-alc"),
+      makeCase("natario_control", "theta-hash-nat"),
+      makeCase("nhm2_certified", "theta-hash-nhm2"),
+    ] as any);
+
+    const alc = controlDebug.find((entry) => entry.caseId === "alcubierre_control");
+    expect(alc?.family_id).toBe("alcubierre_control");
+    expect(alc?.warpFieldType).toBe("alcubierre");
+    expect(alc?.source_branch).toBe("metric_t00_ref");
+    expect(alc?.metricT00Ref).toBe("warp.metric.T00.alcubierre.analytic");
+    expect(alc?.shape_function_id).toBe("alcubierre_longitudinal_shell_v1");
+    expect(alc?.thetaHash).toBe("theta-hash-alc");
+    expect(alc?.kTraceHash).toBe("ktrace-hash");
+  });
+
+  it("flags missing control mapping fields even when control hashes exist", () => {
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc");
+    const alcSourceFamily = (alcCase.snapshotMetrics as any).sourceFamily;
+    alcSourceFamily.family_id = null;
+    alcSourceFamily.warpFieldType = null;
+    alcSourceFamily.source_branch = null;
+    const natCase = makeCase("natario_control", "theta-hash-nat");
+    const nhm2Case = makeCase("nhm2_certified", "theta-hash-nhm2");
+
+    const evaluated = evaluateProofPackPreconditions({
+      yorkViews: [...REQUIRED_VIEWS],
+      cases: [alcCase, natCase, nhm2Case] as any,
+      runtimeStatus: {
+        statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+        serviceVersion: "v1",
+        buildHash: "build",
+        commitSha: "commit",
+        processStartedAtMs: 1,
+        runtimeInstanceId: "runtime",
+        reachable: true,
+      },
+    });
+
+    expect(
+      evaluated.guardFailures.some(
+        (failure) => failure.code === "proof_pack_control_mapping_evidence_missing_in_payload",
       ),
     ).toBe(true);
   });

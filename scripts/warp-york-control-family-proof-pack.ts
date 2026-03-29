@@ -176,6 +176,8 @@ type CaseSnapshotMetrics = {
   };
 };
 
+type SourceFamilyEvidence = CaseSnapshotMetrics["sourceFamily"];
+
 type CaseResult = {
   caseId: CaseId;
   label: string;
@@ -1066,6 +1068,25 @@ const computeThetaPlusKTraceConsistency = (theta: Float32Array, kTrace: Float32A
   };
 };
 
+const readSourceFamilyEvidence = (snapshot: {
+  stats: Record<string, unknown> | null;
+  meta: Record<string, unknown> | null;
+}): SourceFamilyEvidence => {
+  const statsRoot = asRecord(snapshot.stats);
+  const stressEnergyStats = asRecord(statsRoot?.stressEnergy);
+  const preferredMapping = asRecord(stressEnergyStats?.mapping);
+  const fallbackStressEnergy = asRecord(snapshot.meta?.stressEnergy);
+  const fallbackMapping = asRecord(fallbackStressEnergy?.mapping);
+  const selectedMapping = preferredMapping ?? fallbackMapping;
+  return {
+    family_id: asText(selectedMapping?.family_id),
+    metricT00Ref: asText(selectedMapping?.metricT00Ref),
+    warpFieldType: asText(selectedMapping?.warpFieldType),
+    source_branch: asText(selectedMapping?.source_branch),
+    shape_function_id: asText(selectedMapping?.shape_function_id),
+  };
+};
+
 const runCase = async (args: {
   caseId: CaseId;
   label: string;
@@ -1135,9 +1156,7 @@ const runCase = async (args: {
     });
     const theta = snapshot.channels.theta?.data;
     const kTrace = snapshot.channels.K_trace?.data;
-    const snapshotStats = asRecord(snapshot.stats);
-    const stressEnergyStats = asRecord(snapshotStats?.stressEnergy);
-    const stressMapping = asRecord(stressEnergyStats?.mapping);
+    const sourceFamily = readSourceFamilyEvidence(snapshot);
     snapshotMetrics = {
       dims: snapshot.dims,
       resolvedUrl: snapshot.resolvedUrl,
@@ -1149,13 +1168,7 @@ const runCase = async (args: {
         theta: theta instanceof Float32Array ? hashFloat32(theta) : null,
         K_trace: kTrace instanceof Float32Array ? hashFloat32(kTrace) : null,
       },
-      sourceFamily: {
-        family_id: asText(stressMapping?.family_id),
-        metricT00Ref: asText(stressMapping?.metricT00Ref),
-        warpFieldType: asText(stressMapping?.warpFieldType),
-        source_branch: asText(stressMapping?.source_branch),
-        shape_function_id: asText(stressMapping?.shape_function_id),
-      },
+      sourceFamily,
       thetaPlusKTrace:
         theta instanceof Float32Array && kTrace instanceof Float32Array
           ? computeThetaPlusKTraceConsistency(theta, kTrace)
@@ -1194,7 +1207,7 @@ const runCase = async (args: {
   };
 };
 
-const buildControlDebug = (cases: CaseResult[]): ControlDebugEntry[] =>
+export const buildControlDebug = (cases: CaseResult[]): ControlDebugEntry[] =>
   cases.map((entry) => {
     const requestUrl = asText(entry.metricVolumeRef.url);
     const selectors = readControlRequestSelectors(requestUrl);
@@ -1371,6 +1384,26 @@ export const evaluateProofPackPreconditions = (args: {
       family.shape_function_id.trim().length > 0
     );
   });
+  for (const controlCase of [alc, nat]) {
+    if (!controlCase) continue;
+    const thetaHash = asText(controlCase.snapshotMetrics?.channelHashes.theta ?? null);
+    const kTraceHash = asText(controlCase.snapshotMetrics?.channelHashes.K_trace ?? null);
+    const hasProvenanceHash =
+      (typeof thetaHash === "string" && thetaHash.length > 0) ||
+      (typeof kTraceHash === "string" && kTraceHash.length > 0);
+    if (!hasProvenanceHash) continue;
+    const family = controlCase.snapshotMetrics?.sourceFamily;
+    const missingFields: string[] = [];
+    if (!asText(family?.family_id ?? null)) missingFields.push("family_id");
+    if (!asText(family?.warpFieldType ?? null)) missingFields.push("warpFieldType");
+    if (!asText(family?.source_branch ?? null)) missingFields.push("source_branch");
+    if (missingFields.length > 0) {
+      guardFailures.push({
+        code: "proof_pack_control_mapping_evidence_missing_in_payload",
+        detail: `${controlCase.caseId}:missing=${missingFields.join(",")}:thetaHash=${thetaHash ?? "null"}:kTraceHash=${kTraceHash ?? "null"}`,
+      });
+    }
+  }
   if (controlRequestUrlsDiffer && controlThetaHashesEqual && controlKTraceHashesEqual) {
     guardFailures.push({
       code: "proof_pack_control_theta_hash_collision",
