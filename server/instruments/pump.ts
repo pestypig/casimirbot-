@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
 // Pump driver shim with optional hardware attachment.
 // Defaults to a no-op driver that simply logs target updates when PUMP_LOG=1.
 
@@ -38,6 +42,21 @@ class NoopPumpDriver implements PumpDriver {
 }
 
 let driver: PumpDriver = new NoopPumpDriver();
+
+const resolvePumpMockModuleSpecifier = (): string => {
+  const root = process.cwd();
+  const candidates = [
+    path.join(root, "server", "instruments", "pump-mock.ts"),
+    path.join(root, "server", "instruments", "pump-mock.js"),
+    path.join(root, "dist", "server", "instruments", "pump-mock.js"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return pathToFileURL(candidate).href;
+    }
+  }
+  return new URL("./pump-mock.ts", import.meta.url).href;
+};
 
 export function attachPumpDriver(drv: PumpDriver) {
   driver = drv;
@@ -88,7 +107,7 @@ export async function slewPump(target: {
 void (async () => {
   if (!process.env.PUMP_DRIVER || process.env.PUMP_DRIVER === "mock") {
     try {
-      const { MockCasimirPumpDriver } = await import("./pump-mock.js");
+      const { MockCasimirPumpDriver } = await import(resolvePumpMockModuleSpecifier());
       const settleEnv = Number(process.env.PUMP_MOCK_SETTLE_MS);
       const jitterEnv = Number(process.env.PUMP_MOCK_JITTER_MS);
       const settleMs = Number.isFinite(settleEnv) ? settleEnv : undefined;
