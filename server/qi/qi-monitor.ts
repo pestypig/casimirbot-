@@ -1,5 +1,5 @@
-import type { QiSettings, QiStats, SamplingKind } from "../../shared/schema.js";
-import { fordRomanBound } from "./qi-bounds.js";
+import type { QiSettings, QiStats, SamplingKind } from "../../shared/schema.ts";
+import { fordRomanBound } from "./qi-bounds.ts";
 
 type Kernel = {
   weights: Float64Array;
@@ -14,12 +14,12 @@ export class QiMonitor {
   private buf: Float64Array;
   private idx = 0;
   private filled = 0;
+  private settings: QiSettings;
+  private boundScalar: number;
 
-  constructor(
-    private settings: QiSettings,
-    dt_ms: number,
-    private boundScalar: number,
-  ) {
+  constructor(settings: QiSettings, dt_ms: number, boundScalar: number) {
+    this.settings = settings;
+    this.boundScalar = boundScalar;
     this.kernel = makeKernel(settings.sampler, settings.tau_s_ms, dt_ms);
     this.buf = new Float64Array(this.kernel.weights.length);
   }

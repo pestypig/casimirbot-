@@ -1,4 +1,4 @@
-import { C, G } from "./physics-const";
+import { C, G } from "./physics-const.ts";
 
 export type GrUnitSystem = "SI" | "geometric";
 

@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { gmshService } from './gmsh';
 import { moduleRegistry } from '../../modules/core/module-registry.js';
-import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe';
+import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe.ts';
 
 export class ScuffemService {
   private workingDir: string;

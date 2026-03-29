@@ -5,7 +5,7 @@
  */
 
 import { calculateNatarioWarpBubble, type NatarioWarpParams } from '../../modules/warp/natario-warp.js';
-import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe';
+import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe.ts';
 import { fordRomanBound } from '../qi/qi-bounds.js';
 
 export interface TargetValidationParams {
@@ -235,4 +235,3 @@ export const DEFAULT_TARGET_PARAMS: TargetValidationParams = {
   t_cycle: 1e-3,      // 1 ms
   S: 400              // 400 sectors
 };
-

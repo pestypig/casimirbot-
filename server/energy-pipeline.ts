@@ -29,13 +29,13 @@ const resolveMassMode = (value: unknown): MassMode => {
 // G├╢├çG├╢├ç Physics Constants (centralized) G├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├çG├╢├ç
 import { HBAR } from "./physics-const.ts";
 import { C } from "./utils/physics-const-safe.ts";
-import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
-import { computeClocking, type ClockingSnapshot } from "../shared/clocking.js";
-import { NHM2_FULL_HULL_DIMENSIONS_M, PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
+import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.ts";
+import { computeClocking, type ClockingSnapshot } from "../shared/clocking.ts";
+import { NHM2_FULL_HULL_DIMENSIONS_M, PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.ts";
 import type { StressEnergyStats } from "./stress-energy-brick";
-import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
+import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.ts";
 import type { CongruenceMeta } from "../types/pipeline";
-import type { SectorControlLiveEvent } from "../shared/schema.js";
+import type { SectorControlLiveEvent } from "../shared/schema.ts";
 
 // Keep tau_LC (wall / c) aligned with modulation dwell unless overridden
 const DEFAULT_MODULATION_FREQ_GHZ = 15;
@@ -56,7 +56,7 @@ const QI_GUARD_LOG_MIN_INTERVAL_MS = Number.isFinite(Number(process.env.QI_GUARD
   : 5000;
 let lastQiGuardLogAt = 0;
 let lastQiGuardLogMode: "breach" | "debug" | null = null;
-import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
+import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.ts';
 import {
   calculateDynamicCasimirWithNatario,
   runVacuumGapSweep,
@@ -65,48 +65,48 @@ import {
   detectPlateau,
   getPumpCommandForQi,
   type DynamicConfigLike,
-} from '../modules/dynamic/dynamic-casimir.js';
-import { assignGateSummaries } from "../modules/dynamic/gates/index.js";
-import { calculateCasimirEnergy, omega0_from_gap } from '../modules/sim_core/static-casimir.js';
+} from '../modules/dynamic/dynamic-casimir.ts';
+import { assignGateSummaries } from "../modules/dynamic/gates/index.ts";
+import { calculateCasimirEnergy, omega0_from_gap } from '../modules/sim_core/static-casimir.ts';
 import {
   inferCasimirForceScale,
   inferEnergyFromForceSeries,
-} from "../modules/sim_core/casimir-inference.js";
+} from "../modules/sim_core/casimir-inference.ts";
 import {
   toPipelineStressEnergy,
   enhancedAvgEnergyDensity,
   computeLaplaceRungeLenz,
   type Vec3,
-} from '../modules/dynamic/stress-energy-equations.js';
-import warpBubbleModule from '../modules/warp/warp-module.js';
-import { buildWarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
-import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.js";
+} from '../modules/dynamic/stress-energy-equations.ts';
+import warpBubbleModule from '../modules/warp/warp-module.ts';
+import { buildWarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.ts";
+import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.ts";
 import type {
   CardRecipe,
   CardMeshMetadata,
   CardLatticeMetadata,
   HullPreviewPayload,
-} from "../shared/schema.js";
+} from "../shared/schema.ts";
 import type {
   WarpViabilityCertificate,
   ViabilityConstraint,
   ViabilityStatus,
   WarpSnapshot,
 } from "../types/warpViability";
-import { CARD_RECIPE_SCHEMA_VERSION } from "../shared/schema.js";
+import { CARD_RECIPE_SCHEMA_VERSION } from "../shared/schema.ts";
 import {
   applyQiAutothrottleStep,
   applyScaleToGatePulses,
   applyScaleToPumpCommand,
   initQiAutothrottle,
   type QiAutothrottleState,
-} from "./controls/qi-autothrottle.js";
+} from "./controls/qi-autothrottle.ts";
 import {
   initQiAutoscaleState,
   stepQiAutoscale,
   type QiAutoscaleClampReason,
   type QiAutoscaleState,
-} from "./controls/qi-autoscale.js";
+} from "./controls/qi-autoscale.ts";
 import {
   QI_AUTOSCALE_ENABLE,
   QI_AUTOSCALE_MIN_SCALE,
@@ -114,7 +114,7 @@ import {
   QI_AUTOSCALE_TARGET,
   QI_AUTOSCALE_WINDOW_TOL,
   QI_AUTOSCALE_SOURCE,
-} from "./config/env.js";
+} from "./config/env.ts";
 import type {
   DynamicCasimirSweepConfig,
   DynamicConfig,
@@ -136,16 +136,16 @@ import type {
   CasimirForceDataset,
   MaterialModel,
   MaterialProps,
-} from "../shared/schema.js";
-import { appendPhaseCalibrationLog } from "./utils/phase-calibration.js";
-import { slewPump } from "./instruments/pump.js";
-import { slewPumpMultiTone } from "./instruments/pump-multitone.js";
-import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses, type PhaseSchedule } from "./energy/phase-scheduler.js";
-import { QiMonitor } from "./qi/qi-monitor.js";
-import { configuredQiScalarBound, qiBound_Jm3 } from "./qi/qi-bounds.js";
-import { buildWindow, type RawTileInput } from "./qi/qi-saturation.js";
-import { updatePipelineQiTiles, getLatestQiTileStats } from "./qi/pipeline-qi-stream.js";
-import { stepTsAutoscale, type TsAutoscaleState } from "./ts/ts-autoscale.js";
+} from "../shared/schema.ts";
+import { appendPhaseCalibrationLog } from "./utils/phase-calibration.ts";
+import { slewPump } from "./instruments/pump.ts";
+import { slewPumpMultiTone } from "./instruments/pump-multitone.ts";
+import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses, type PhaseSchedule } from "./energy/phase-scheduler.ts";
+import { QiMonitor } from "./qi/qi-monitor.ts";
+import { configuredQiScalarBound, qiBound_Jm3 } from "./qi/qi-bounds.ts";
+import { buildWindow, type RawTileInput } from "./qi/qi-saturation.ts";
+import { updatePipelineQiTiles, getLatestQiTileStats } from "./qi/pipeline-qi-stream.ts";
+import { stepTsAutoscale, type TsAutoscaleState } from "./ts/ts-autoscale.ts";
 
 export type MutableDynamicConfig = DynamicConfigLike;
 
@@ -3446,7 +3446,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
 }
 
 // G├╢├çG├╢├ç Metric imports (induced surface metric on hull)
-import { firstFundamentalForm } from "../src/metric.js";
+import { firstFundamentalForm } from "../src/metric.ts";
 
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and +┬ª_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).

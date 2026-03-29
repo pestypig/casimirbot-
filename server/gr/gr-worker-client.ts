@@ -36,13 +36,15 @@ const resolveWorkerEntry = () => {
     process.env.GR_WORKER_PREFER_SOURCE === "1" ||
     process.env.GR_WORKER_PREFER_SOURCE == null;
   const sourceFirst = [
+    { path: path.join(root, "server", "gr", "gr-worker-bootstrap.mjs"), isTs: true },
     { path: path.join(root, "server", "gr", "gr-worker.ts"), isTs: true },
-    { path: path.join(root, "server", "gr", "gr-worker.js"), isTs: false },
-    { path: path.join(root, "dist", "gr", "gr-worker.js"), isTs: false },
+    { path: path.join(root, "server", "gr", "gr-worker.ts"), isTs: false },
+    { path: path.join(root, "dist", "gr", "gr-worker.ts"), isTs: false },
   ];
   const distFirst = [
-    { path: path.join(root, "dist", "gr", "gr-worker.js"), isTs: false },
-    { path: path.join(root, "server", "gr", "gr-worker.js"), isTs: false },
+    { path: path.join(root, "dist", "gr", "gr-worker.ts"), isTs: false },
+    { path: path.join(root, "server", "gr", "gr-worker.ts"), isTs: false },
+    { path: path.join(root, "server", "gr", "gr-worker-bootstrap.mjs"), isTs: true },
     { path: path.join(root, "server", "gr", "gr-worker.ts"), isTs: true },
   ];
   const candidates = preferSource ? sourceFirst : distFirst;
@@ -55,7 +57,7 @@ const resolveWorkerEntry = () => {
     }
   }
   return {
-    url: new URL("./gr-worker.ts", import.meta.url),
+    url: new URL("./gr-worker-bootstrap.mjs", import.meta.url),
     isTs: true,
   };
 };
@@ -86,6 +88,7 @@ const createWorker = () => {
   const entry = resolveWorkerEntry();
   const worker = new Worker(entry.url, {
     execArgv: entry.isTs ? resolveTsExecArgv() : [],
+    type: "module",
   });
   worker.on("message", handleWorkerMessage);
   worker.on("error", (err) => {
