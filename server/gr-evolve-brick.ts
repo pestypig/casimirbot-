@@ -968,6 +968,8 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   }
   let initialState = input.initialState;
   let matter = input.matter ?? null;
+  let sourceBrickFromInitialData: StressEnergyStats | undefined;
+  let sourceKindFromInitialData: GrEvolveBrick["source"] | undefined;
 
   if (useInitialData && !initialState) {
     const initial = runInitialDataSolve({
@@ -989,6 +991,8 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     }
     initialState = initial.state;
     matter = initial.matter ?? null;
+    sourceBrickFromInitialData = initial.sourceBrick?.stats;
+    sourceKindFromInitialData = initial.sourceBrick?.source;
   }
 
   const perfStart = nowMs();
@@ -1225,7 +1229,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     solverHealth,
     ...(rhoConstraint ? { rhoConstraint } : {}),
     ...(invariantStats ? { invariants: invariantStats } : {}),
-    stressEnergy: evolution.sourceBrick?.stats,
+    stressEnergy: evolution.sourceBrick?.stats ?? sourceBrickFromInitialData,
     perf: {
       totalMs: Number.isFinite(totalMs) ? totalMs : 0,
       evolveMs: Number.isFinite(evolveMs) ? evolveMs : 0,
@@ -1245,7 +1249,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     voxelSize_m,
     time_s: time_s_end,
     dt_s,
-    source: evolution.sourceBrick?.source,
+    source: evolution.sourceBrick?.source ?? sourceKindFromInitialData,
     channelOrder: resolvedChannelOrder,
     channels,
     stats,
