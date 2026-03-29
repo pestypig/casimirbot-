@@ -1,5 +1,8 @@
 import express from "express";
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import sharp from "sharp";
 import type {
   HullScientificAtlasPaneId,
@@ -52,6 +55,11 @@ type RuntimeStatus = {
   optixSdkPath: string | null;
   cudaPath: string | null;
   metricRefBaseUrl: string | null;
+  serviceVersion: string | null;
+  buildHash: string | null;
+  commitSha: string | null;
+  processStartedAtMs: number;
+  runtimeInstanceId: string;
 };
 
 type GrBrickChannel = {
@@ -66,6 +74,11 @@ type GrBrickDecoded = {
   channels: Record<string, GrBrickChannel>;
   source: string | null;
   chart: string | null;
+};
+
+type MetricBrickCacheEntry = {
+  brick: GrBrickDecoded;
+  expiresAtMs: number;
 };
 
 type TensorGeodesicDiagnostics = {
@@ -181,6 +194,7 @@ type TemporalHistorySnapshot = {
 };
 
 const temporalSignalHistoryByKey = new Map<string, TemporalSignalSample[]>();
+const metricBrickCacheByRef = new Map<string, MetricBrickCacheEntry>();
 
 const clamp = (value: number, min: number, max: number) =>
   value < min ? min : value > max ? max : value;
@@ -207,11 +221,96 @@ const readEnv = (name: string): string | null => {
   return value.length ? value : null;
 };
 
+const readFirstEnv = (...values: Array<string | null>): string | null => {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const text = value.trim();
+    if (text.length > 0) return text;
+  }
+  return null;
+};
+
+const readGitCommitShaBestEffort = (): string | null => {
+  try {
+    const raw = execSync("git rev-parse HEAD", {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return /^[0-9a-f]{7,64}$/i.test(raw) ? raw.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+};
+
+const readPackageFingerprintBestEffort = (): string | null => {
+  try {
+    const packageJsonPath = path.join(process.cwd(), "package.json");
+    const raw = readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as { name?: unknown; version?: unknown };
+    const name =
+      typeof parsed.name === "string" && parsed.name.trim().length > 0
+        ? parsed.name.trim()
+        : "casimirbot";
+    const version =
+      typeof parsed.version === "string" && parsed.version.trim().length > 0
+        ? parsed.version.trim()
+        : "dev";
+    return createHash("sha256")
+      .update(`${name}@${version}:${raw}`)
+      .digest("hex");
+  } catch {
+    return null;
+  }
+};
+
+const resolveRuntimeFingerprint = (): string =>
+  readPackageFingerprintBestEffort() ??
+  createHash("sha256")
+    .update(`${process.cwd()}:${process.platform}:${process.arch}`)
+    .digest("hex");
+
 const readEnvFlag = (name: string, fallback = false): boolean => {
   const value = readEnv(name);
   if (!value) return fallback;
   return value === "1" || value.toLowerCase() === "true";
 };
+
+const HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS = Date.now();
+const HULL_OPTIX_SERVICE_RUNTIME_INSTANCE_ID = createHash("sha256")
+  .update(
+    `${process.pid}:${HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS}:${process.cwd()}`,
+  )
+  .digest("hex")
+  .slice(0, 16);
+const HULL_OPTIX_SERVICE_VERSION = readFirstEnv(
+  readEnv("CASIMIRBOT_OPTIX_SERVICE_VERSION"),
+  readEnv("HULL_OPTIX_SERVICE_VERSION"),
+  process.env.npm_package_version
+    ? `casimirbot.hull-optix-service@${process.env.npm_package_version}`
+    : null,
+  "casimirbot.hull-optix-service@dev",
+);
+const HULL_OPTIX_RUNTIME_FINGERPRINT = resolveRuntimeFingerprint();
+const HULL_OPTIX_GIT_COMMIT_SHA_FALLBACK = readGitCommitShaBestEffort();
+const HULL_OPTIX_COMMIT_SHA = readFirstEnv(
+  readEnv("GIT_COMMIT"),
+  readEnv("COMMIT_SHA"),
+  readEnv("SOURCE_VERSION"),
+  HULL_OPTIX_GIT_COMMIT_SHA_FALLBACK,
+  HULL_OPTIX_RUNTIME_FINGERPRINT.slice(0, 40),
+);
+const HULL_OPTIX_BUILD_HASH = readFirstEnv(
+  readEnv("CASIMIRBOT_BUILD_HASH"),
+  readEnv("BUILD_HASH"),
+  readEnv("SOURCE_VERSION"),
+  readEnv("GIT_COMMIT"),
+  readEnv("COMMIT_SHA"),
+  HULL_OPTIX_GIT_COMMIT_SHA_FALLBACK
+    ? `git-${HULL_OPTIX_GIT_COMMIT_SHA_FALLBACK.slice(0, 12)}`
+    : null,
+  HULL_OPTIX_RUNTIME_FINGERPRINT.slice(0, 16),
+);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -579,33 +678,164 @@ const metricRefEnforcesCongruentSolve = (
   }
 };
 
-const fetchMetricBrick = async (
+const parseDimsTuple = (value: unknown): [number, number, number] | null => {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const x = Math.max(1, Math.floor(Number(value[0]) || 0));
+  const y = Math.max(1, Math.floor(Number(value[1]) || 0));
+  const z = Math.max(1, Math.floor(Number(value[2]) || 0));
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  return [x, y, z];
+};
+
+const parseDimsQuery = (urlRaw: string): [number, number, number] | null => {
+  try {
+    const parsed = new URL(urlRaw, "http://127.0.0.1");
+    const dimsRaw = parsed.searchParams.get("dims");
+    if (!dimsRaw || dimsRaw.trim().length === 0) return null;
+    const match = dimsRaw.trim().match(/^(\d+)x(\d+)x(\d+)$/i);
+    if (!match) return null;
+    const x = Math.max(1, Math.floor(Number(match[1]) || 0));
+    const y = Math.max(1, Math.floor(Number(match[2]) || 0));
+    const z = Math.max(1, Math.floor(Number(match[3]) || 0));
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+    return [x, y, z];
+  } catch {
+    return null;
+  }
+};
+
+const resolveMetricRefDims = (
+  payload: HullMisRenderRequestV1,
   ref: HullMetricVolumeRefV1,
-): Promise<GrBrickDecoded | null> => {
-  const url = resolveMetricRefUrl(ref);
-  if (!url) return null;
-  const metricFetchTimeoutMs = toInt(
+): [number, number, number] | null =>
+  parseDimsTuple(ref.dims) ?? parseDimsQuery(ref.url) ?? parseDimsTuple(payload.metricSummary?.dims);
+
+const resolveMetricBrickCacheKey = (ref: HullMetricVolumeRefV1, resolvedUrl: string): string => {
+  const metricRefHash = typeof ref.hash === "string" ? ref.hash.trim() : "";
+  if (metricRefHash.length > 0) return `hash:${metricRefHash}`;
+  return `url:${resolvedUrl}`;
+};
+
+const readMetricBrickCache = (key: string): GrBrickDecoded | null => {
+  const now = Date.now();
+  const entry = metricBrickCacheByRef.get(key);
+  if (!entry) return null;
+  if (!Number.isFinite(entry.expiresAtMs) || entry.expiresAtMs <= now) {
+    metricBrickCacheByRef.delete(key);
+    return null;
+  }
+  return entry.brick;
+};
+
+const writeMetricBrickCache = (key: string, brick: GrBrickDecoded): void => {
+  const cacheTtlMs = toInt(
+    readEnv("OPTIX_RENDER_METRIC_CACHE_TTL_MS"),
+    90_000,
+    5_000,
+    600_000,
+  );
+  const maxEntries = toInt(readEnv("OPTIX_RENDER_METRIC_CACHE_MAX_ENTRIES"), 6, 1, 64);
+  const now = Date.now();
+  const expiresAtMs = now + cacheTtlMs;
+  metricBrickCacheByRef.set(key, { brick, expiresAtMs });
+  while (metricBrickCacheByRef.size > maxEntries) {
+    const oldest = metricBrickCacheByRef.keys().next();
+    if (oldest.done) break;
+    metricBrickCacheByRef.delete(oldest.value);
+  }
+};
+
+const resolveMetricFetchTimeoutMs = (
+  payload: HullMisRenderRequestV1,
+  ref: HullMetricVolumeRefV1,
+): number => {
+  const configuredTimeoutMs = toInt(
     readEnv("OPTIX_RENDER_METRIC_FETCH_TIMEOUT_MS"),
     45_000,
     5_000,
     300_000,
   );
-  const response = await withTimeoutFetch(
-    url,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/octet-stream, application/x-helix-brick, application/json",
-      },
-    },
-    metricFetchTimeoutMs,
+  const renderView = payload.scienceLane?.renderView ?? "diagnostic-quad";
+  const yorkOrAtlasView = renderView === "full-atlas" || renderView.startsWith("york-");
+  const requiresScientificLatency =
+    payload.scienceLane?.requireScientificFrame === true ||
+    payload.scienceLane?.requireCanonicalTensorVolume === true ||
+    payload.scienceLane?.requireHullSupportChannels === true ||
+    yorkOrAtlasView;
+  if (!requiresScientificLatency) return configuredTimeoutMs;
+
+  const dims = resolveMetricRefDims(payload, ref);
+  const cellCount =
+    dims && dims.length >= 3
+      ? Math.max(1, Math.floor(Number(dims[0]) || 1)) *
+        Math.max(1, Math.floor(Number(dims[1]) || 1)) *
+        Math.max(1, Math.floor(Number(dims[2]) || 1))
+      : 0;
+  const adaptiveFloorMs =
+    cellCount >= 64 * 64 * 64
+      ? 180_000
+      : yorkOrAtlasView && cellCount >= 48 * 48 * 48
+        ? 120_000
+        : cellCount >= 48 * 48 * 48
+          ? 60_000
+          : 30_000;
+  return Math.max(configuredTimeoutMs, adaptiveFloorMs);
+};
+
+const fetchMetricBrick = async (
+  ref: HullMetricVolumeRefV1,
+  options?: { timeoutMs?: number },
+): Promise<GrBrickDecoded | null> => {
+  const url = resolveMetricRefUrl(ref);
+  if (!url) return null;
+  const cacheKey = resolveMetricBrickCacheKey(ref, url);
+  const cached = readMetricBrickCache(cacheKey);
+  if (cached) return cached;
+  const configuredTimeoutMs = toInt(
+    readEnv("OPTIX_RENDER_METRIC_FETCH_TIMEOUT_MS"),
+    45_000,
+    5_000,
+    300_000,
   );
-  if (!response.ok) {
+  const metricFetchTimeoutMs = clampi(
+    Math.round(toFiniteNumber(options?.timeoutMs, configuredTimeoutMs)),
+    5_000,
+    300_000,
+  );
+  let response: Response | null = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      response = await withTimeoutFetch(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/octet-stream, application/x-helix-brick, application/json",
+          },
+        },
+        metricFetchTimeoutMs,
+      );
+      if (response.ok) break;
+      const retryableHttp = response.status >= 500 && response.status <= 599;
+      if (retryableHttp && attempt < 2) continue;
+      break;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        if (attempt < 2) continue;
+        throw new Error(`metric_ref_fetch_timeout_${metricFetchTimeoutMs}`);
+      }
+      if (error instanceof Error && error.message.toLowerCase().includes("fetch failed")) {
+        if (attempt < 2) continue;
+      }
+      throw error;
+    }
+  }
+  if (!response || !response.ok) {
     let detail: string | null = null;
     try {
-      const body = await response.text();
+      const body = response ? await response.text() : "";
       if (body && body.trim().length > 0) {
-        const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+        const contentType = (response?.headers.get("content-type") ?? "").toLowerCase();
         if (contentType.includes("application/json")) {
           try {
             const parsed = JSON.parse(body) as unknown;
@@ -645,7 +875,9 @@ const fetchMetricBrick = async (
       // ignore body parse/read failures and preserve HTTP status
     }
     throw new Error(
-      detail ? `metric_ref_http_${response.status}:${detail}` : `metric_ref_http_${response.status}`,
+      detail
+        ? `metric_ref_http_${response?.status ?? 0}:${detail}`
+        : `metric_ref_http_${response?.status ?? 0}`,
     );
   }
   const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
@@ -654,10 +886,14 @@ const fetchMetricBrick = async (
     contentType.includes("application/x-helix-brick")
   ) {
     const buffer = await response.arrayBuffer();
-    return decodeGrEvolveBrickBinary(buffer);
+    const decoded = decodeGrEvolveBrickBinary(buffer);
+    if (decoded) writeMetricBrickCache(cacheKey, decoded);
+    return decoded;
   }
   const json = (await response.json()) as unknown;
-  return decodeGrEvolveBrickJson(json);
+  const decoded = decodeGrEvolveBrickJson(json);
+  if (decoded) writeMetricBrickCache(cacheKey, decoded);
+  return decoded;
 };
 
 type ScientificContractViolation = {
@@ -1604,9 +1840,13 @@ type YorkSurfaceRenderStats = {
 };
 
 type YorkFrameDiagnosticStats = {
-  thetaMin: number;
-  thetaMax: number;
-  thetaAbsMax: number;
+  thetaMinRaw: number;
+  thetaMaxRaw: number;
+  thetaAbsMaxRaw: number;
+  thetaMinDisplay: number;
+  thetaMaxDisplay: number;
+  thetaAbsMaxDisplay: number;
+  displayRangeMethod: string;
   nearZeroTheta: boolean;
   zeroContourSegments: number;
   displayGain: number;
@@ -1619,6 +1859,21 @@ type YorkFrameDiagnosticStats = {
   peakThetaInSupportedRegion: boolean;
   nx: number;
   nz: number;
+};
+
+type YorkShellLocalizedSliceStats = {
+  shellThetaDisplaySlice: Float32Array;
+  shellThetaMaskedSlice: Float32Array;
+  shellMaskSlice: Float32Array;
+  thetaShellMinRaw: number;
+  thetaShellMaxRaw: number;
+  thetaShellAbsMaxRaw: number;
+  thetaShellMinDisplay: number;
+  thetaShellMaxDisplay: number;
+  thetaShellAbsMaxDisplay: number;
+  shellSupportCount: number;
+  shellActiveCount: number;
+  shellSupportPct: number;
 };
 
 type ShiftShellRenderStats = {
@@ -1734,6 +1989,19 @@ const sampleFinite = (data: Float32Array, maxSamples = 4096): number[] => {
     if (Number.isFinite(v)) out.push(v);
   }
   return out;
+};
+
+const computeSliceRawFiniteRange = (data: Float32Array): [number, number] => {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < data.length; i += 1) {
+    const v = data[i];
+    if (!Number.isFinite(v)) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [0, 0];
+  return [min, max];
 };
 
 const percentile = (values: number[], q: number): number => {
@@ -2609,9 +2877,13 @@ const computeYorkFrameDiagnostics = (
       : Math.max(1, brick.dims[2]);
   if (!(thetaSlice instanceof Float32Array)) {
     return {
-      thetaMin: 0,
-      thetaMax: 0,
-      thetaAbsMax: 0,
+      thetaMinRaw: 0,
+      thetaMaxRaw: 0,
+      thetaAbsMaxRaw: 0,
+      thetaMinDisplay: 0,
+      thetaMaxDisplay: 0,
+      thetaAbsMaxDisplay: 0,
+      displayRangeMethod: "computeSliceRange:diverging:p98-abs-symmetric",
       nearZeroTheta: true,
       zeroContourSegments: 0,
       displayGain: 1,
@@ -2627,11 +2899,18 @@ const computeYorkFrameDiagnostics = (
       nz: sliceHeight,
     };
   }
-  const [thetaMin, thetaMax] = computeSliceRange(thetaSlice, "diverging");
-  const thetaAbsMax = Math.max(Math.abs(thetaMin), Math.abs(thetaMax), 1e-45);
+  const [thetaMinRaw, thetaMaxRaw] = computeSliceRawFiniteRange(thetaSlice);
+  const thetaAbsMaxRaw = Math.max(Math.abs(thetaMinRaw), Math.abs(thetaMaxRaw), 1e-45);
+  const [thetaMinDisplay, thetaMaxDisplay] = computeSliceRange(thetaSlice, "diverging");
+  const thetaAbsMaxDisplay = Math.max(
+    Math.abs(thetaMinDisplay),
+    Math.abs(thetaMaxDisplay),
+    1e-45,
+  );
+  const displayRangeMethod = "computeSliceRange:diverging:p98-abs-symmetric";
   const nearZeroTheta =
-    thetaAbsMax <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
-    Math.abs(thetaMax - thetaMin) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD;
+    thetaAbsMaxRaw <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
+    Math.abs(thetaMaxRaw - thetaMinRaw) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD;
   const displayGain = 1;
   const heightScale = nearZeroTheta ? 0 : 0.9 * displayGain;
 
@@ -2671,7 +2950,7 @@ const computeYorkFrameDiagnostics = (
         : false;
     return hullOn || supportOn || regionOn;
   };
-  const thetaSupportThreshold = Math.max(thetaAbsMax * 1e-6, 1e-45);
+  const thetaSupportThreshold = Math.max(thetaAbsMaxRaw * 1e-6, 1e-45);
   let peakThetaCell: [number, number, number] | null = null;
   let peakThetaInSupportedRegion = false;
   let supportCellCount = 0;
@@ -2719,9 +2998,13 @@ const computeYorkFrameDiagnostics = (
     supportCellCount > 0 ? (100 * supportWithThetaCount) / supportCellCount : 0;
 
   return {
-    thetaMin,
-    thetaMax,
-    thetaAbsMax,
+    thetaMinRaw,
+    thetaMaxRaw,
+    thetaAbsMaxRaw,
+    thetaMinDisplay,
+    thetaMaxDisplay,
+    thetaAbsMaxDisplay,
+    displayRangeMethod,
     nearZeroTheta,
     zeroContourSegments,
     displayGain,
@@ -2734,6 +3017,94 @@ const computeYorkFrameDiagnostics = (
     peakThetaInSupportedRegion,
     nx,
     nz: sliceHeight,
+  };
+};
+
+const computeYorkShellLocalizedSliceStats = (args: {
+  thetaSlice: Float32Array;
+  supportSlice: Float32Array;
+  regionSlice: Float32Array | null;
+}): YorkShellLocalizedSliceStats => {
+  const { thetaSlice, supportSlice, regionSlice } = args;
+  const n = Math.min(thetaSlice.length, supportSlice.length);
+  const shellThetaDisplaySlice = new Float32Array(n);
+  const shellThetaMaskedSlice = new Float32Array(n);
+  const shellMaskSlice = new Float32Array(n);
+  for (let i = 0; i < n; i += 1) {
+    shellThetaMaskedSlice[i] = Number.NaN;
+  }
+
+  let useRegionQualifier = false;
+  if (regionSlice instanceof Float32Array) {
+    const regionN = Math.min(n, regionSlice.length);
+    for (let i = 0; i < regionN; i += 1) {
+      if (Math.abs(regionSlice[i] ?? 0) > 0.5) {
+        useRegionQualifier = true;
+        break;
+      }
+    }
+  }
+
+  let shellSupportCount = 0;
+  for (let i = 0; i < n; i += 1) {
+    const supportActive = (supportSlice[i] ?? 0) > 0.5;
+    const regionActive =
+      !useRegionQualifier || Math.abs(regionSlice?.[i] ?? 0) > 0.5;
+    const inShell = supportActive && regionActive;
+    shellMaskSlice[i] = inShell ? 1 : 0;
+    if (!inShell) {
+      shellThetaDisplaySlice[i] = 0;
+      continue;
+    }
+    shellSupportCount += 1;
+    const thetaValue = thetaSlice[i];
+    if (Number.isFinite(thetaValue)) {
+      shellThetaDisplaySlice[i] = Number(thetaValue);
+      shellThetaMaskedSlice[i] = Number(thetaValue);
+    } else {
+      shellThetaDisplaySlice[i] = 0;
+      shellThetaMaskedSlice[i] = Number.NaN;
+    }
+  }
+
+  const [thetaShellMinRaw, thetaShellMaxRaw] =
+    shellSupportCount > 0 ? computeSliceRawFiniteRange(shellThetaMaskedSlice) : [0, 0];
+  const thetaShellAbsMaxRaw = Math.max(
+    Math.abs(thetaShellMinRaw),
+    Math.abs(thetaShellMaxRaw),
+    1e-45,
+  );
+  const [thetaShellMinDisplay, thetaShellMaxDisplay] =
+    shellSupportCount > 0 ? computeSliceRange(shellThetaMaskedSlice, "diverging") : [0, 0];
+  const thetaShellAbsMaxDisplay = Math.max(
+    Math.abs(thetaShellMinDisplay),
+    Math.abs(thetaShellMaxDisplay),
+    1e-45,
+  );
+
+  const shellActivityThreshold = Math.max(thetaShellAbsMaxRaw * 1e-6, 1e-45);
+  let shellActiveCount = 0;
+  for (let i = 0; i < n; i += 1) {
+    const value = shellThetaMaskedSlice[i];
+    if (!Number.isFinite(value)) continue;
+    if (Math.abs(value) >= shellActivityThreshold) {
+      shellActiveCount += 1;
+    }
+  }
+
+  return {
+    shellThetaDisplaySlice,
+    shellThetaMaskedSlice,
+    shellMaskSlice,
+    thetaShellMinRaw,
+    thetaShellMaxRaw,
+    thetaShellAbsMaxRaw,
+    thetaShellMinDisplay,
+    thetaShellMaxDisplay,
+    thetaShellAbsMaxDisplay,
+    shellSupportCount,
+    shellActiveCount,
+    shellSupportPct: n > 0 ? (100 * shellSupportCount) / n : 0,
   };
 };
 
@@ -4484,12 +4855,19 @@ const buildYorkTopologyNormalizedOverlaySvg = (
     3,
   )} .. ${fmtScientific(stats.maxTheta, 3)} | normalization=topology-only-unit-max | magnitude_mode=normalized-topology-only | surface_height=theta_norm`;
   const rawSummary = `raw theta range ${fmtScientific(
-    rawYorkStats.thetaMin,
+    rawYorkStats.thetaMinRaw,
     3,
-  )} .. ${fmtScientific(rawYorkStats.thetaMax, 3)} | theta_abs_max=${fmtScientific(
-    rawYorkStats.thetaAbsMax,
+  )} .. ${fmtScientific(rawYorkStats.thetaMaxRaw, 3)} | theta_abs_max_raw=${fmtScientific(
+    rawYorkStats.thetaAbsMaxRaw,
     3,
   )} | near_zero_theta=${String(rawYorkStats.nearZeroTheta)}`;
+  const displaySummary = `display theta range ${fmtScientific(
+    rawYorkStats.thetaMinDisplay,
+    3,
+  )} .. ${fmtScientific(rawYorkStats.thetaMaxDisplay, 3)} | theta_abs_max_display=${fmtScientific(
+    rawYorkStats.thetaAbsMaxDisplay,
+    3,
+  )} | display_range_method=${rawYorkStats.displayRangeMethod}`;
   const contourSummary = `zero contour segments=${stats.zeroContourSegments} | sampling=${stats.samplingChoice} | display_gain=${fmtScientific(
     rawYorkStats.displayGain,
     2,
@@ -4511,8 +4889,9 @@ const buildYorkTopologyNormalizedOverlaySvg = (
   <text x="16" y="36" fill="#9fb3ca" font-size="10">${escapeXml(subtitle)}</text>
   <text x="${panel.x + 8}" y="${panel.y + 16}" fill="#cfe5ff" font-size="11" font-weight="600">York topology surface: x-z midplane, height(theta_norm), signed diverging color</text>
   ${disclosureBadge}
-  <text x="${panel.x + 8}" y="${panel.y + panel.height - 46}" fill="#9fb3ca" font-size="10">${escapeXml(normSummary)}</text>
-  <text x="${panel.x + 8}" y="${panel.y + panel.height - 34}" fill="#8ec6ff" font-size="10">${escapeXml(rawSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 58}" fill="#9fb3ca" font-size="10">${escapeXml(normSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 46}" fill="#8ec6ff" font-size="10">${escapeXml(rawSummary)}</text>
+  <text x="${panel.x + 8}" y="${panel.y + panel.height - 34}" fill="#8ec6ff" font-size="10">${escapeXml(displaySummary)}</text>
   <text x="${panel.x + 8}" y="${panel.y + panel.height - 22}" fill="#8ec6ff" font-size="10">${escapeXml(contourSummary)}</text>
   <text x="${panel.x + 8}" y="${panel.y + panel.height - 10}" fill="#7f93ac" font-size="10">${escapeXml(certSummary)}</text>
   <rect x="0" y="${height - 24}" width="${width}" height="24" fill="#050a14"/>
@@ -4536,7 +4915,7 @@ const buildYorkShellMapOverlaySvg = (
   const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
   const subtitleParts = [
     "single-snapshot NHM2 York shell map",
-    "shell-localized theta on hull_sdf + tile_support_mask geometry",
+    "shell-localized theta on tile_support_mask shell band (hull_sdf contour overlay)",
     "Natario low-expansion + Alcubierre/White fore-aft geometry interpretation",
     `chart=${ctx.chart ?? payload.solve?.chart ?? "unknown"}`,
     `source=${ctx.metricSource ?? "unknown"}`,
@@ -5080,6 +5459,7 @@ const renderTensorFrameYorkTime3p1 = async (
     y: topPad,
     width: sliceWidth,
     height: mainHeight,
+    // Raw York audit lane is fixed-slice only; adaptive projection is forbidden.
     slice: buildScientificSliceFromChannel(
       brick,
       "theta",
@@ -5171,6 +5551,8 @@ const renderTensorFrameYorkSurface3p1 = async (
   // Warp-bubble York plots are shown on a fixed-time slice with motion along x;
   // the transverse plotting coordinate is either cylindrical rho or a fixed
   // Cartesian midplane surrogate.
+  // Raw York views do not permit adaptive projection. Coordinate mode is explicit
+  // (`x-z-midplane` or `x-rho`) and serialized in certificate metadata.
   const yorkSurfaceRhoView = payload.scienceLane?.renderView === "york-surface-rho-3p1";
   const samplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
     ? "x-rho"
@@ -5322,21 +5704,13 @@ const renderTensorFrameYorkShellMap3p1 = async (
   if (!(hullMid instanceof Float32Array) || !(supportMid instanceof Float32Array)) {
     throw new Error("scientific_york_shell_support_missing");
   }
-
-  const shellTheta = new Float32Array(thetaMid.length);
-  let shellSupportCount = 0;
-  for (let i = 0; i < thetaMid.length; i += 1) {
-    const inShell = (hullMid[i] ?? Number.POSITIVE_INFINITY) <= 0 || (supportMid[i] ?? 0) > 0.5;
-    if (inShell) {
-      shellSupportCount += 1;
-      shellTheta[i] = thetaMid[i] ?? 0;
-    } else {
-      shellTheta[i] = 0;
-    }
-  }
-  const shellSupportPct =
-    shellTheta.length > 0 ? (100 * shellSupportCount) / shellTheta.length : 0;
-  const [shellThetaMin, shellThetaMax] = computeSliceRange(shellTheta, "diverging");
+  const regionMidRaw = extractChannelSliceXZMidplane(brick, "region_class");
+  const regionMid = regionMidRaw instanceof Float32Array ? regionMidRaw : null;
+  const shellLocalized = computeYorkShellLocalizedSliceStats({
+    thetaSlice: thetaMid,
+    supportSlice: supportMid,
+    regionSlice: regionMid,
+  });
   const width = payload.width;
   const height = payload.height;
   const image = Buffer.alloc(width * height * 4, 0);
@@ -5358,15 +5732,15 @@ const renderTensorFrameYorkShellMap3p1 = async (
     mode: "diverging",
     width: brick.dims[0],
     height: brick.dims[2],
-    data: shellTheta,
-    min: shellThetaMin,
-    max: shellThetaMax,
+    data: shellLocalized.shellThetaDisplaySlice,
+    min: shellLocalized.thetaShellMinDisplay,
+    max: shellLocalized.thetaShellMaxDisplay,
     sampling: "x-z midplane",
-    supportPct: shellSupportPct,
+    supportPct: shellLocalized.shellSupportPct,
     annotation:
-      "shell-localized theta from hull_sdf + tile_support_mask | signed diverging map",
+      "shell-localized theta from tile_support_mask shell band | hull_sdf contour overlay",
   };
-  const shellStats = renderYorkSurfacePanel(
+  const shellPanelStats = renderYorkSurfacePanel(
     image,
     width,
     height,
@@ -5384,8 +5758,8 @@ const renderTensorFrameYorkShellMap3p1 = async (
     ctx,
     brick,
     panelRect,
-    shellStats,
-    shellSupportPct,
+    shellPanelStats,
+    shellLocalized.shellSupportPct,
     yorkDiag,
   );
   return sharp(base)
@@ -6002,9 +6376,71 @@ const buildRenderCertificate = (args: {
   const yorkSamplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
     ? "x-rho"
     : "midplane";
+  const yorkSelectedSlice = yorkView
+    ? yorkSamplingPolicy === "x-rho"
+      ? selectFixedSliceXRho(brick, "theta")
+      : selectFixedSliceXZMidplane(brick, "theta")
+    : null;
+  const yorkSliceArrayHash =
+    yorkSelectedSlice?.data instanceof Float32Array
+      ? hashFloat32(yorkSelectedSlice.data)
+      : null;
   const yorkFrameStats = yorkView
     ? computeYorkFrameDiagnostics(brick, yorkSamplingPolicy)
     : null;
+  const yorkShellThetaMid = yorkShellMapView
+    ? extractChannelSliceXZMidplane(brick, "theta")
+    : null;
+  const yorkShellSupportMid = yorkShellMapView
+    ? extractChannelSliceXZMidplane(brick, "tile_support_mask")
+    : null;
+  const yorkShellRegionMidRaw = yorkShellMapView
+    ? extractChannelSliceXZMidplane(brick, "region_class")
+    : null;
+  const yorkShellLocalizedStats =
+    yorkShellMapView &&
+    yorkShellThetaMid instanceof Float32Array &&
+    yorkShellSupportMid instanceof Float32Array
+      ? computeYorkShellLocalizedSliceStats({
+          thetaSlice: yorkShellThetaMid,
+          supportSlice: yorkShellSupportMid,
+          regionSlice:
+            yorkShellRegionMidRaw instanceof Float32Array ? yorkShellRegionMidRaw : null,
+        })
+      : null;
+  let yorkNormalizedSliceHash: string | null = null;
+  if (
+    yorkTopologyNormalizedView &&
+    yorkSelectedSlice?.data instanceof Float32Array
+  ) {
+    const sourceSlice = yorkSelectedSlice.data;
+    const [thetaDisplayMin, thetaDisplayMax] = computeSliceRange(
+      sourceSlice,
+      "diverging",
+    );
+    const thetaAbsMax = Math.max(
+      Math.abs(thetaDisplayMin),
+      Math.abs(thetaDisplayMax),
+      0,
+    );
+    const normalizedTheta = new Float32Array(sourceSlice.length);
+    if (thetaAbsMax > 0) {
+      const invThetaAbsMax = 1 / thetaAbsMax;
+      for (let i = 0; i < sourceSlice.length; i += 1) {
+        normalizedTheta[i] = (sourceSlice[i] ?? 0) * invThetaAbsMax;
+      }
+    }
+    yorkNormalizedSliceHash = hashFloat32(normalizedTheta);
+  }
+  const yorkSupportMaskSliceHash =
+    yorkShellMapView && yorkShellSupportMid instanceof Float32Array
+      ? hashFloat32(yorkShellSupportMid)
+      : null;
+  const yorkShellMaskedSliceHash =
+    yorkShellMapView &&
+    yorkShellLocalizedStats?.shellThetaMaskedSlice instanceof Float32Array
+      ? hashFloat32(yorkShellLocalizedStats.shellThetaMaskedSlice)
+      : null;
   const yorkSlicePlane = yorkSurfaceRhoView ? "x-rho" : "x-z-midplane";
   const yorkCoordinateMode = yorkSurfaceRhoView ? "x-rho" : "x-z-midplane";
   const shiftShellStats = shiftShellView ? computeShiftShellStats(brick) : null;
@@ -6077,15 +6513,45 @@ const buildRenderCertificate = (args: {
       metric_ref_hash: yorkView ? metricRefHash : null,
       timestamp_ms: yorkView ? certificateTimestampMs : null,
       theta_definition: yorkView ? "theta=-trK" : null,
-      theta_min: yorkFrameStats?.thetaMin ?? null,
-      theta_max: yorkFrameStats?.thetaMax ?? null,
-      theta_abs_max: yorkFrameStats?.thetaAbsMax ?? null,
+      theta_channel_hash: yorkView ? channelHashes.theta ?? null : null,
+      slice_array_hash: yorkView ? yorkSliceArrayHash : null,
+      normalized_slice_hash: yorkTopologyNormalizedView
+        ? yorkNormalizedSliceHash
+        : null,
+      support_mask_slice_hash: yorkShellMapView ? yorkSupportMaskSliceHash : null,
+      shell_masked_slice_hash: yorkShellMapView ? yorkShellMaskedSliceHash : null,
+      theta_min_raw: yorkFrameStats?.thetaMinRaw ?? null,
+      theta_max_raw: yorkFrameStats?.thetaMaxRaw ?? null,
+      theta_abs_max_raw: yorkFrameStats?.thetaAbsMaxRaw ?? null,
+      theta_min_display: yorkFrameStats?.thetaMinDisplay ?? null,
+      theta_max_display: yorkFrameStats?.thetaMaxDisplay ?? null,
+      theta_abs_max_display: yorkFrameStats?.thetaAbsMaxDisplay ?? null,
+      display_range_method: yorkFrameStats?.displayRangeMethod ?? null,
+      // Legacy aliases preserved for compatibility; these map to display range.
+      theta_min: yorkFrameStats?.thetaMinDisplay ?? null,
+      theta_max: yorkFrameStats?.thetaMaxDisplay ?? null,
+      theta_abs_max: yorkFrameStats?.thetaAbsMaxDisplay ?? null,
       near_zero_theta: yorkFrameStats?.nearZeroTheta ?? null,
       zero_contour_segments: yorkFrameStats?.zeroContourSegments ?? null,
       display_gain: yorkFrameStats?.displayGain ?? null,
       height_scale: yorkFrameStats?.heightScale ?? null,
       sampling_choice: yorkFrameStats?.samplingChoice ?? null,
       coordinate_mode: yorkFrameStats?.coordinateMode ?? null,
+      theta_shell_min_raw: yorkShellLocalizedStats?.thetaShellMinRaw ?? null,
+      theta_shell_max_raw: yorkShellLocalizedStats?.thetaShellMaxRaw ?? null,
+      theta_shell_abs_max_raw: yorkShellLocalizedStats?.thetaShellAbsMaxRaw ?? null,
+      theta_shell_min_display:
+        yorkShellLocalizedStats?.thetaShellMinDisplay ?? null,
+      theta_shell_max_display:
+        yorkShellLocalizedStats?.thetaShellMaxDisplay ?? null,
+      theta_shell_abs_max_display:
+        yorkShellLocalizedStats?.thetaShellAbsMaxDisplay ?? null,
+      shell_support_count: yorkShellLocalizedStats?.shellSupportCount ?? null,
+      shell_active_count: yorkShellLocalizedStats?.shellActiveCount ?? null,
+      shell_mask_slice_hash:
+        yorkShellLocalizedStats?.shellMaskSlice != null
+          ? hashFloat32(yorkShellLocalizedStats.shellMaskSlice)
+          : null,
       supported_theta_fraction: yorkFrameStats?.supportedThetaFraction ?? null,
       shell_theta_overlap_pct: yorkFrameStats?.shellThetaOverlapPct ?? null,
       peak_theta_cell: yorkFrameStats?.peakThetaCell ?? null,
@@ -6309,6 +6775,11 @@ const getRuntimeStatus = (): RuntimeStatus => {
     optixSdkPath,
     cudaPath,
     metricRefBaseUrl,
+    serviceVersion: HULL_OPTIX_SERVICE_VERSION,
+    buildHash: HULL_OPTIX_BUILD_HASH,
+    commitSha: HULL_OPTIX_COMMIT_SHA,
+    processStartedAtMs: HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS,
+    runtimeInstanceId: HULL_OPTIX_SERVICE_RUNTIME_INSTANCE_ID,
   };
 };
 
@@ -6322,6 +6793,14 @@ app.get("/api/helix/hull-render/status", (_req, res) => {
     backendHint: "mis-path-tracing",
     service: "OptiX-CUDA-TensorPass1",
     runtime,
+    provenance: {
+      source: "optix/cuda.research.pass2",
+      serviceVersion: HULL_OPTIX_SERVICE_VERSION,
+      buildHash: HULL_OPTIX_BUILD_HASH,
+      commitSha: HULL_OPTIX_COMMIT_SHA,
+      processStartedAtMs: HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS,
+      runtimeInstanceId: HULL_OPTIX_SERVICE_RUNTIME_INSTANCE_ID,
+    },
     timestampMs: Date.now(),
   });
 });
@@ -6381,8 +6860,11 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
   let tensorFetchError: string | null = null;
   let scientificContractViolations: ScientificContractViolation[] = [];
   if (payload.metricVolumeRef?.kind === "gr-evolve-brick") {
+    const metricFetchTimeoutMs = resolveMetricFetchTimeoutMs(payload, payload.metricVolumeRef);
     try {
-      metricBrick = await fetchMetricBrick(payload.metricVolumeRef);
+      metricBrick = await fetchMetricBrick(payload.metricVolumeRef, {
+        timeoutMs: metricFetchTimeoutMs,
+      });
       if (metricBrick) {
         const contract = validateScientificMetricVolume(payload, metricBrick);
         scientificContractViolations = contract.violations;
@@ -6573,9 +7055,26 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
       renderCertificate.diagnostics.theta_definition ===
         renderCertificate.theta_definition;
     const yorkAuditCoreValid =
-      Number.isFinite(renderCertificate.diagnostics.theta_min ?? Number.NaN) &&
-      Number.isFinite(renderCertificate.diagnostics.theta_max ?? Number.NaN) &&
-      Number.isFinite(renderCertificate.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof renderCertificate.diagnostics.theta_channel_hash === "string" &&
+      renderCertificate.diagnostics.theta_channel_hash.trim().length > 0 &&
+      typeof renderCertificate.diagnostics.slice_array_hash === "string" &&
+      renderCertificate.diagnostics.slice_array_hash.trim().length > 0 &&
+      Number.isFinite(renderCertificate.diagnostics.theta_min_raw ?? Number.NaN) &&
+      Number.isFinite(renderCertificate.diagnostics.theta_max_raw ?? Number.NaN) &&
+      Number.isFinite(
+        renderCertificate.diagnostics.theta_abs_max_raw ?? Number.NaN,
+      ) &&
+      Number.isFinite(
+        renderCertificate.diagnostics.theta_min_display ?? Number.NaN,
+      ) &&
+      Number.isFinite(
+        renderCertificate.diagnostics.theta_max_display ?? Number.NaN,
+      ) &&
+      Number.isFinite(
+        renderCertificate.diagnostics.theta_abs_max_display ?? Number.NaN,
+      ) &&
+      typeof renderCertificate.diagnostics.display_range_method === "string" &&
+      renderCertificate.diagnostics.display_range_method.trim().length > 0 &&
       typeof renderCertificate.diagnostics.near_zero_theta === "boolean" &&
       Number.isFinite(
         renderCertificate.diagnostics.zero_contour_segments ?? Number.NaN,
@@ -6590,7 +7089,27 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
       return res.status(422).json({
         error: "scientific_york_diagnostics_missing",
         message:
-          `${renderView} requires metric_ref_hash/timestamp_ms/theta_definition and raw theta extrema diagnostics in render certificate`,
+          `${renderView} requires metric_ref_hash/timestamp_ms/theta_definition/theta_channel_hash/slice_array_hash and both raw/display York extrema diagnostics in render certificate`,
+      });
+    }
+    const rawYorkView =
+      yorkTimeRequested || yorkSurfaceRequested || yorkShellMapRequested;
+    if (rawYorkView && renderCertificate.render.magnitude_mode != null) {
+      return res.status(422).json({
+        error: "scientific_york_convention_mismatch",
+        message:
+          `${renderView} is a same-snapshot raw York view and requires render.magnitude_mode=null`,
+      });
+    }
+    // A near-flat York plot is a legitimate result for low-expansion warp configurations; the renderer must not inject hidden gain or alternate sampling in a way that impersonates a stronger expansion field.
+    const yorkDisplayGain = Number(renderCertificate.diagnostics.display_gain ?? Number.NaN);
+    if (
+      rawYorkView &&
+      (!Number.isFinite(yorkDisplayGain) || Math.abs(yorkDisplayGain - 1) > 1e-12)
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_convention_mismatch",
+        message: `${renderView} raw York views require diagnostics.display_gain=1`,
       });
     }
     if (
@@ -6615,6 +7134,17 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
       });
     }
     if (
+      yorkTopologyNormalizedRequested &&
+      (typeof renderCertificate.diagnostics.normalized_slice_hash !== "string" ||
+        renderCertificate.diagnostics.normalized_slice_hash.trim().length === 0)
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_topology_diagnostics_missing",
+        message:
+          "york-topology-normalized-3p1 requires diagnostics.normalized_slice_hash in render certificate",
+      });
+    }
+    if (
       yorkShellMapRequested &&
       renderCertificate.render.support_overlay !== "hull_sdf+tile_support_mask"
     ) {
@@ -6626,9 +7156,22 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
     }
     if (yorkShellMapRequested) {
       const shellMapDiagnosticsValid =
-        Number.isFinite(renderCertificate.diagnostics.theta_min ?? Number.NaN) &&
-        Number.isFinite(renderCertificate.diagnostics.theta_max ?? Number.NaN) &&
-        Number.isFinite(renderCertificate.diagnostics.theta_abs_max ?? Number.NaN) &&
+        Number.isFinite(renderCertificate.diagnostics.theta_min_raw ?? Number.NaN) &&
+        Number.isFinite(renderCertificate.diagnostics.theta_max_raw ?? Number.NaN) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_abs_max_raw ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_min_display ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_max_display ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_abs_max_display ?? Number.NaN,
+        ) &&
+        typeof renderCertificate.diagnostics.display_range_method === "string" &&
+        renderCertificate.diagnostics.display_range_method.trim().length > 0 &&
         typeof renderCertificate.diagnostics.near_zero_theta === "boolean" &&
         Number.isFinite(
           renderCertificate.diagnostics.supported_theta_fraction ?? Number.NaN,
@@ -6636,13 +7179,45 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
         Number.isFinite(
           renderCertificate.diagnostics.shell_theta_overlap_pct ?? Number.NaN,
         ) &&
+        typeof renderCertificate.diagnostics.support_mask_slice_hash === "string" &&
+        renderCertificate.diagnostics.support_mask_slice_hash.trim().length > 0 &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_shell_min_raw ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_shell_max_raw ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_shell_abs_max_raw ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_shell_min_display ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_shell_max_display ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.theta_shell_abs_max_display ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.shell_support_count ?? Number.NaN,
+        ) &&
+        Number.isFinite(
+          renderCertificate.diagnostics.shell_active_count ?? Number.NaN,
+        ) &&
+        typeof renderCertificate.diagnostics.shell_masked_slice_hash === "string" &&
+        renderCertificate.diagnostics.shell_masked_slice_hash.trim().length > 0 &&
+        typeof renderCertificate.diagnostics.shell_mask_slice_hash === "string" &&
+        renderCertificate.diagnostics.shell_mask_slice_hash.trim().length > 0 &&
+        Number(renderCertificate.diagnostics.shell_active_count ?? Number.NaN) <=
+          Number(renderCertificate.diagnostics.shell_support_count ?? Number.NaN) &&
         typeof renderCertificate.diagnostics.peak_theta_in_supported_region ===
           "boolean";
       if (!shellMapDiagnosticsValid) {
         return res.status(422).json({
           error: "scientific_york_shell_map_diagnostics_missing",
           message:
-            "york-shell-map-3p1 requires theta_min/theta_max/theta_abs_max/near_zero_theta/supported_theta_fraction/shell_theta_overlap_pct/peak_theta_in_supported_region diagnostics",
+            "york-shell-map-3p1 requires theta_channel_hash/slice_array_hash/support_mask_slice_hash/shell_masked_slice_hash/theta_min_raw/theta_max_raw/theta_abs_max_raw/theta_min_display/theta_max_display/theta_abs_max_display/display_range_method/near_zero_theta/supported_theta_fraction/shell_theta_overlap_pct/theta_shell_min_raw/theta_shell_max_raw/theta_shell_abs_max_raw/theta_shell_min_display/theta_shell_max_display/theta_shell_abs_max_display/shell_support_count/shell_active_count/shell_mask_slice_hash/peak_theta_in_supported_region diagnostics",
         });
       }
     }
@@ -6651,6 +7226,53 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
       return res.status(422).json({
         error: "scientific_york_certificate_mismatch",
         message: `${renderView} render certificate metric_ref_hash does not match requested snapshot`,
+      });
+    }
+    // "These York views are same-snapshot congruent renderings of one NHM2 solution.
+    // Parameter-family comparisons are separate products and must not be represented
+    // as a single simultaneous system."
+    const yorkIdentityFieldsPresent =
+      typeof renderCertificate.metric_ref_hash === "string" &&
+      renderCertificate.metric_ref_hash.trim().length > 0 &&
+      typeof renderCertificate.chart === "string" &&
+      renderCertificate.chart.trim().length > 0 &&
+      typeof renderCertificate.observer === "string" &&
+      renderCertificate.observer.trim().length > 0 &&
+      typeof renderCertificate.theta_definition === "string" &&
+      renderCertificate.theta_definition.trim().length > 0 &&
+      typeof renderCertificate.kij_sign_convention === "string" &&
+      renderCertificate.kij_sign_convention.trim().length > 0 &&
+      typeof renderCertificate.unit_system === "string" &&
+      renderCertificate.unit_system.trim().length > 0 &&
+      Number.isFinite(renderCertificate.timestamp_ms);
+    if (!yorkIdentityFieldsPresent) {
+      return res.status(422).json({
+        error: "scientific_york_certificate_mismatch",
+        message:
+          `${renderView} requires metric_ref_hash/timestamp_ms/chart/observer/theta_definition/kij_sign_convention/unit_system in render certificate`,
+      });
+    }
+    const requestedMetricChart = payload.metricVolumeRef?.chart?.trim();
+    if (
+      requestedMetricChart &&
+      renderCertificate.chart !== requestedMetricChart
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_certificate_mismatch",
+        message: `${renderView} render certificate chart does not match requested snapshot chart`,
+      });
+    }
+    const requestedTimestampMs = toFiniteNumber(
+      payload.metricVolumeRef?.updatedAt,
+      Number.NaN,
+    );
+    if (
+      Number.isFinite(requestedTimestampMs) &&
+      renderCertificate.timestamp_ms !== requestedTimestampMs
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_certificate_mismatch",
+        message: `${renderView} render certificate timestamp_ms does not match requested snapshot timestamp`,
       });
     }
   }
@@ -6761,6 +7383,48 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
                 timestamp_ms: renderCertificate.diagnostics.timestamp_ms ?? null,
                 theta_definition:
                   renderCertificate.diagnostics.theta_definition ?? null,
+                theta_channel_hash:
+                  renderCertificate.diagnostics.theta_channel_hash ?? null,
+                slice_array_hash:
+                  renderCertificate.diagnostics.slice_array_hash ?? null,
+                normalized_slice_hash:
+                  renderCertificate.diagnostics.normalized_slice_hash ?? null,
+                support_mask_slice_hash:
+                  renderCertificate.diagnostics.support_mask_slice_hash ?? null,
+                shell_masked_slice_hash:
+                  renderCertificate.diagnostics.shell_masked_slice_hash ?? null,
+                theta_min_raw:
+                  renderCertificate.diagnostics.theta_min_raw ?? null,
+                theta_max_raw:
+                  renderCertificate.diagnostics.theta_max_raw ?? null,
+                theta_abs_max_raw:
+                  renderCertificate.diagnostics.theta_abs_max_raw ?? null,
+                theta_min_display:
+                  renderCertificate.diagnostics.theta_min_display ?? null,
+                theta_max_display:
+                  renderCertificate.diagnostics.theta_max_display ?? null,
+                theta_abs_max_display:
+                  renderCertificate.diagnostics.theta_abs_max_display ?? null,
+                display_range_method:
+                  renderCertificate.diagnostics.display_range_method ?? null,
+                theta_shell_min_raw:
+                  renderCertificate.diagnostics.theta_shell_min_raw ?? null,
+                theta_shell_max_raw:
+                  renderCertificate.diagnostics.theta_shell_max_raw ?? null,
+                theta_shell_abs_max_raw:
+                  renderCertificate.diagnostics.theta_shell_abs_max_raw ?? null,
+                theta_shell_min_display:
+                  renderCertificate.diagnostics.theta_shell_min_display ?? null,
+                theta_shell_max_display:
+                  renderCertificate.diagnostics.theta_shell_max_display ?? null,
+                theta_shell_abs_max_display:
+                  renderCertificate.diagnostics.theta_shell_abs_max_display ?? null,
+                shell_support_count:
+                  renderCertificate.diagnostics.shell_support_count ?? null,
+                shell_active_count:
+                  renderCertificate.diagnostics.shell_active_count ?? null,
+                shell_mask_slice_hash:
+                  renderCertificate.diagnostics.shell_mask_slice_hash ?? null,
                 theta_min: renderCertificate.diagnostics.theta_min ?? null,
                 theta_max: renderCertificate.diagnostics.theta_max ?? null,
                 theta_abs_max: renderCertificate.diagnostics.theta_abs_max ?? null,
@@ -6780,6 +7444,48 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
                 thetaMin: renderCertificate.diagnostics.theta_min ?? null,
                 thetaMax: renderCertificate.diagnostics.theta_max ?? null,
                 thetaAbsMax: renderCertificate.diagnostics.theta_abs_max ?? null,
+                thetaMinRaw:
+                  renderCertificate.diagnostics.theta_min_raw ?? null,
+                thetaMaxRaw:
+                  renderCertificate.diagnostics.theta_max_raw ?? null,
+                thetaAbsMaxRaw:
+                  renderCertificate.diagnostics.theta_abs_max_raw ?? null,
+                thetaMinDisplay:
+                  renderCertificate.diagnostics.theta_min_display ?? null,
+                thetaMaxDisplay:
+                  renderCertificate.diagnostics.theta_max_display ?? null,
+                thetaAbsMaxDisplay:
+                  renderCertificate.diagnostics.theta_abs_max_display ?? null,
+                displayRangeMethod:
+                  renderCertificate.diagnostics.display_range_method ?? null,
+                thetaShellMinRaw:
+                  renderCertificate.diagnostics.theta_shell_min_raw ?? null,
+                thetaShellMaxRaw:
+                  renderCertificate.diagnostics.theta_shell_max_raw ?? null,
+                thetaShellAbsMaxRaw:
+                  renderCertificate.diagnostics.theta_shell_abs_max_raw ?? null,
+                thetaShellMinDisplay:
+                  renderCertificate.diagnostics.theta_shell_min_display ?? null,
+                thetaShellMaxDisplay:
+                  renderCertificate.diagnostics.theta_shell_max_display ?? null,
+                thetaShellAbsMaxDisplay:
+                  renderCertificate.diagnostics.theta_shell_abs_max_display ?? null,
+                shellSupportCount:
+                  renderCertificate.diagnostics.shell_support_count ?? null,
+                shellActiveCount:
+                  renderCertificate.diagnostics.shell_active_count ?? null,
+                shellMaskSliceHash:
+                  renderCertificate.diagnostics.shell_mask_slice_hash ?? null,
+                thetaChannelHash:
+                  renderCertificate.diagnostics.theta_channel_hash ?? null,
+                sliceArrayHash:
+                  renderCertificate.diagnostics.slice_array_hash ?? null,
+                normalizedSliceHash:
+                  renderCertificate.diagnostics.normalized_slice_hash ?? null,
+                supportMaskSliceHash:
+                  renderCertificate.diagnostics.support_mask_slice_hash ?? null,
+                shellMaskedSliceHash:
+                  renderCertificate.diagnostics.shell_masked_slice_hash ?? null,
                 nearZeroTheta:
                   renderCertificate.diagnostics.near_zero_theta ?? null,
                 zeroContourSegments:
@@ -6827,6 +7533,11 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
           timestampMs: Date.now(),
           researchGrade: true,
           scientificTier: "research-grade",
+          serviceVersion: HULL_OPTIX_SERVICE_VERSION,
+          buildHash: HULL_OPTIX_BUILD_HASH,
+          commitSha: HULL_OPTIX_COMMIT_SHA,
+          processStartedAtMs: HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS,
+          runtimeInstanceId: HULL_OPTIX_SERVICE_RUNTIME_INSTANCE_ID,
         },
       }
     : {
@@ -6860,6 +7571,11 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
           timestampMs: Date.now(),
           researchGrade: false,
           scientificTier: "scaffold",
+          serviceVersion: HULL_OPTIX_SERVICE_VERSION,
+          buildHash: HULL_OPTIX_BUILD_HASH,
+          commitSha: HULL_OPTIX_COMMIT_SHA,
+          processStartedAtMs: HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS,
+          runtimeInstanceId: HULL_OPTIX_SERVICE_RUNTIME_INSTANCE_ID,
         },
       };
   return res.json(response);
@@ -6877,6 +7593,11 @@ app.listen(port, host, () => {
         port,
         statusEndpoint: `http://${host}:${port}/api/helix/hull-render/status`,
         frameEndpoint: `http://${host}:${port}/api/helix/hull-render/frame`,
+        serviceVersion: HULL_OPTIX_SERVICE_VERSION,
+        buildHash: HULL_OPTIX_BUILD_HASH,
+        commitSha: HULL_OPTIX_COMMIT_SHA,
+        processStartedAtMs: HULL_OPTIX_SERVICE_PROCESS_STARTED_AT_MS,
+        runtimeInstanceId: HULL_OPTIX_SERVICE_RUNTIME_INSTANCE_ID,
       },
       null,
       2,

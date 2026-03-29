@@ -58,9 +58,23 @@ export function YorkAuditBox(props: YorkAuditBoxProps) {
         <span className="break-all">
           theta_definition: {String(thetaDefinition ?? "none")}
         </span>
-        <span>theta_min: {formatYorkAuditNumber(diagnostics.theta_min)}</span>
-        <span>theta_max: {formatYorkAuditNumber(diagnostics.theta_max)}</span>
-        <span>theta_abs_max: {formatYorkAuditNumber(diagnostics.theta_abs_max)}</span>
+        <span>theta_min_raw: {formatYorkAuditNumber(diagnostics.theta_min_raw)}</span>
+        <span>theta_max_raw: {formatYorkAuditNumber(diagnostics.theta_max_raw)}</span>
+        <span>
+          theta_abs_max_raw: {formatYorkAuditNumber(diagnostics.theta_abs_max_raw)}
+        </span>
+        <span>
+          theta_min_display: {formatYorkAuditNumber(diagnostics.theta_min_display)}
+        </span>
+        <span>
+          theta_max_display: {formatYorkAuditNumber(diagnostics.theta_max_display)}
+        </span>
+        <span>
+          theta_abs_max_display: {formatYorkAuditNumber(diagnostics.theta_abs_max_display)}
+        </span>
+        <span className="break-all">
+          display_range_method: {String(diagnostics.display_range_method ?? "none")}
+        </span>
         <span>near_zero_theta: {formatYorkAuditBool(diagnostics.near_zero_theta)}</span>
         <span>
           zero_contour_segments:{" "}

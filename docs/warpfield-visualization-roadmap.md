@@ -22,6 +22,32 @@ Use this as a working outline for Codex to ship a card-ready view that shows the
 
 
 
+## York plotting framework references (scientific lane)
+
+- Alcubierre-class motion-axis interpretation:
+  - Use motion along `x` and preserve fore/aft expansion-sign interpretation from Alcubierre-family literature.
+  - Source: Alcubierre and Lobo, *Introduction to warp drive spacetime* (`https://arxiv.org/abs/gr-qc/0009013`).
+
+- White/NASA York plotting convention:
+  - York-time is plotted on a fixed-time slice as a signed scalar surface (motion axis plus transverse coordinate).
+  - Sources:
+    - White (NASA 2011), *Warp Field Mechanics 101* (`https://ntrs.nasa.gov/api/citations/20110015936/downloads/20110015936.pdf`).
+    - White (NASA 2014), Eagleworks deck (`https://ntrs.nasa.gov/api/citations/20140006496/downloads/20140006496.pdf`).
+
+- Natario low-expansion interpretation:
+  - Near-zero expansion (`theta ~ 0`) is physically admissible in Natario-class constructions and must not be treated as renderer failure by itself.
+  - Source: Natario, *Warp Drive with Zero Expansion* (`https://arxiv.org/abs/gr-qc/0110086`).
+
+- Mattingly-style auditable visualization discipline:
+  - Fixed-coordinate plots plus explicit diagnostics/provenance are required for scientific reading.
+  - Source: Mattingly et al., *Curvature invariants for the Alcubierre warp drive spacetime* (`https://arxiv.org/abs/2010.13693`).
+  - Implementation policy spec: `docs/specs/hull-york-visualization-policy-v1.md`.
+
+- York audit field semantics (raw vs display):
+  - Scientific lane York views carry separate raw extrema (`theta_*_raw`) and display extrema (`theta_*_display`) plus `display_range_method`.
+  - Legacy `theta_min/theta_max/theta_abs_max` remain compatibility aliases mapped to display extrema and are not raw-magnitude fields.
+  - This prevents physical-magnitude interpretation from being conflated with display clipping policy.
+
 ## Golden-path checklist (canonical fields + visible fallbacks)
 
 - [x] Canonical field source is the lattice volume (`drive3D`/`dfdr3D`/`gate3D`) when available; analytic formulas are used only as fallback.

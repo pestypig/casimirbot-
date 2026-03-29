@@ -1,5 +1,5 @@
 import type { Buffer } from "node:buffer";
-import { getGlobalPipelineState } from "./energy-pipeline";
+import { getGlobalPipelineState } from "./energy-pipeline.ts";
 import type { Vec3 } from "./curvature-brick";
 import type { StressEnergyBrickParams } from "./stress-energy-brick";
 import {

@@ -152,6 +152,7 @@
     "warp:integrity:check": "tsx scripts/warp-integrity-parity-check.ts",
     "warp:render:congruence:check": "tsx scripts/warp-render-congruence-benchmark.ts",
     "warp:render:capture": "tsx scripts/warp-render-command-capture.ts",
+    "warp:full-solve:york-control-family:proof-pack": "tsx scripts/warp-york-control-family-proof-pack.ts",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",
     "warp:deliverable:bundle": "tsx scripts/warp-deliverable-bundle.ts",

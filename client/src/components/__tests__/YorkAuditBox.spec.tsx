@@ -41,9 +41,16 @@ const buildCertificate = (
     metric_ref_hash: "metric-hash-123",
     timestamp_ms: 1700000000000,
     theta_definition: "theta=-trK",
-    theta_min: -1e-9,
-    theta_max: 2e-9,
-    theta_abs_max: 2e-9,
+    theta_min_raw: -1e-9,
+    theta_max_raw: 2e-9,
+    theta_abs_max_raw: 2e-9,
+    theta_min_display: -1e-12,
+    theta_max_display: 1e-12,
+    theta_abs_max_display: 1e-12,
+    display_range_method: "computeSliceRange:diverging:p98-abs-symmetric",
+    theta_min: -1e-12,
+    theta_max: 1e-12,
+    theta_abs_max: 1e-12,
     near_zero_theta: false,
     zero_contour_segments: 42,
     sampling_choice: "x-z midplane",
@@ -72,9 +79,13 @@ describe("YorkAuditBox", () => {
     expect(screen.getByText(/metric_ref_hash:/i)).toBeDefined();
     expect(screen.getByText(/timestamp_ms:/i)).toBeDefined();
     expect(screen.getByText(/theta_definition:/i)).toBeDefined();
-    expect(screen.getByText(/theta_min:/i)).toBeDefined();
-    expect(screen.getByText(/theta_max:/i)).toBeDefined();
-    expect(screen.getByText(/theta_abs_max:/i)).toBeDefined();
+    expect(screen.getByText(/theta_min_raw:/i)).toBeDefined();
+    expect(screen.getByText(/theta_max_raw:/i)).toBeDefined();
+    expect(screen.getByText(/theta_abs_max_raw:/i)).toBeDefined();
+    expect(screen.getByText(/theta_min_display:/i)).toBeDefined();
+    expect(screen.getByText(/theta_max_display:/i)).toBeDefined();
+    expect(screen.getByText(/theta_abs_max_display:/i)).toBeDefined();
+    expect(screen.getByText(/display_range_method:/i)).toBeDefined();
     expect(screen.getByText(/near_zero_theta:/i)).toBeDefined();
     expect(screen.getByText(/zero_contour_segments:/i)).toBeDefined();
     expect(screen.getByText(/sampling_choice:/i)).toBeDefined();

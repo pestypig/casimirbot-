@@ -25,6 +25,7 @@ export interface StressEnergyBrickParams {
   metricT00?: number;
   metricT00Source?: string;
   metricT00Ref?: string;
+  warpFieldType?: "natario" | "natario_sdf" | "alcubierre" | "irrotational";
   observerRapidityCap?: number;
   observerTypeITolerance?: number;
 }
@@ -99,6 +100,11 @@ export interface StressEnergyMappingStats {
   conservationScale?: number;
   source?: "pipeline" | "defaults" | "metric";
   proxy: boolean;
+  family_id?: string;
+  source_branch?: string;
+  shape_function_id?: string;
+  warpFieldType?: string;
+  metricT00Ref?: string;
 }
 
 export type ObserverMarginSource = "algebraic_type_i" | "capped_search";
@@ -152,6 +158,10 @@ export interface StressEnergyBrick {
   congruence?: "proxy-only" | "geometry-derived" | "conditional";
   metricT00Ref?: string;
   metricT00Source?: string;
+  family_id?: string;
+  source_branch?: string;
+  shape_function_id?: string;
+  warpFieldType?: string;
   channels: {
     t00: StressEnergyChannel;
     Sx: StressEnergyChannel;
@@ -169,6 +179,23 @@ const ALCUBIERRE_K_TOL = 1e-4;
 const DEFAULT_OBSERVER_RAPIDITY_CAP = 2.5;
 const DEFAULT_HAWKING_ELLIS_TYPE_I_TOL = 1e-9;
 const STRESS_ENERGY_CHANNEL_ORDER = ["t00", "Sx", "Sy", "Sz", "divS"] as const;
+
+type StressEnergyFamilyId =
+  | "alcubierre_control"
+  | "natario_control"
+  | "nhm2_certified"
+  | "irrotational_control"
+  | "vdb_control"
+  | "unknown";
+
+type StressEnergySourceBranch = "metric_t00_ref" | "warp_field_type" | "pipeline_default";
+
+type StressEnergyFamilyContext = {
+  familyId: StressEnergyFamilyId;
+  sourceBranch: StressEnergySourceBranch;
+  warpFieldType: "natario" | "natario_sdf" | "alcubierre" | "irrotational";
+  shapeFunctionId: string;
+};
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const wrap01 = (value: number) => {
@@ -240,6 +267,118 @@ const blendDirections = (a: Vec3, b: Vec3 | null, weight: number): Vec3 => {
     a[1] * (1 - t) + b[1] * t,
     a[2] * (1 - t) + b[2] * t,
   ]);
+};
+
+const normalizeWarpFieldType = (value: unknown): "natario" | "natario_sdf" | "alcubierre" | "irrotational" | null => {
+  if (value === "natario" || value === "natario_sdf" || value === "alcubierre" || value === "irrotational") {
+    return value;
+  }
+  return null;
+};
+
+const resolveFamilyFromMetricRef = (metricT00Ref: string | undefined): StressEnergyFamilyContext | null => {
+  if (!metricT00Ref) return null;
+  const lower = metricT00Ref.toLowerCase();
+  if (lower.includes(".alcubierre.")) {
+    return {
+      familyId: "alcubierre_control",
+      sourceBranch: "metric_t00_ref",
+      warpFieldType: "alcubierre",
+      shapeFunctionId: "alcubierre_longitudinal_shell_v1",
+    };
+  }
+  if (lower.includes(".natario_sdf.")) {
+    return {
+      familyId: "nhm2_certified",
+      sourceBranch: "metric_t00_ref",
+      warpFieldType: "natario_sdf",
+      shapeFunctionId: "nhm2_natario_sdf_shell_v1",
+    };
+  }
+  if (lower.includes(".natario.")) {
+    return {
+      familyId: "natario_control",
+      sourceBranch: "metric_t00_ref",
+      warpFieldType: "natario",
+      shapeFunctionId: "natario_shift_shell_v1",
+    };
+  }
+  if (lower.includes(".irrotational.")) {
+    return {
+      familyId: "irrotational_control",
+      sourceBranch: "metric_t00_ref",
+      warpFieldType: "irrotational",
+      shapeFunctionId: "irrotational_shell_v1",
+    };
+  }
+  if (lower.includes(".vdb.")) {
+    return {
+      familyId: "vdb_control",
+      sourceBranch: "metric_t00_ref",
+      warpFieldType: "natario",
+      shapeFunctionId: "vdb_regionii_shell_v1",
+    };
+  }
+  return null;
+};
+
+const resolveFamilyFromWarpFieldType = (
+  warpFieldType: "natario" | "natario_sdf" | "alcubierre" | "irrotational",
+  sourceBranch: StressEnergySourceBranch,
+): StressEnergyFamilyContext => {
+  if (warpFieldType === "alcubierre") {
+    return {
+      familyId: "alcubierre_control",
+      sourceBranch,
+      warpFieldType,
+      shapeFunctionId: "alcubierre_longitudinal_shell_v1",
+    };
+  }
+  if (warpFieldType === "natario_sdf") {
+    return {
+      familyId: "nhm2_certified",
+      sourceBranch,
+      warpFieldType,
+      shapeFunctionId: "nhm2_natario_sdf_shell_v1",
+    };
+  }
+  if (warpFieldType === "irrotational") {
+    return {
+      familyId: "irrotational_control",
+      sourceBranch,
+      warpFieldType,
+      shapeFunctionId: "irrotational_shell_v1",
+    };
+  }
+  return {
+    familyId: "natario_control",
+    sourceBranch,
+    warpFieldType: "natario",
+    shapeFunctionId: "natario_shift_shell_v1",
+  };
+};
+
+const resolveStressEnergyFamilyContext = (args: {
+  metricT00Ref?: string;
+  inputWarpFieldType?: string | null;
+  stateWarpFieldType?: string | null;
+}): StressEnergyFamilyContext => {
+  const fromRef = resolveFamilyFromMetricRef(args.metricT00Ref);
+  if (fromRef) return fromRef;
+  const fromInputWarp = normalizeWarpFieldType(args.inputWarpFieldType);
+  if (fromInputWarp) {
+    return resolveFamilyFromWarpFieldType(fromInputWarp, "warp_field_type");
+  }
+  const fromStateWarp = normalizeWarpFieldType(args.stateWarpFieldType);
+  if (fromStateWarp) {
+    return resolveFamilyFromWarpFieldType(fromStateWarp, "pipeline_default");
+  }
+  return {
+    familyId: "unknown",
+    sourceBranch: "pipeline_default",
+    warpFieldType: "natario",
+    shapeFunctionId: "natario_shift_shell_v1",
+  };
 };
 
 const encodeFloat32 = (payload: Float32Array) =>
@@ -912,6 +1051,11 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const metricMode =
     metricSource === "metric" && Number.isFinite(metricT00Raw);
   const metricT00Source = metricMode ? (typeof metricSource === "string" ? metricSource : "metric") : undefined;
+  const familyContext = resolveStressEnergyFamilyContext({
+    metricT00Ref,
+    inputWarpFieldType: input.warpFieldType ?? null,
+    stateWarpFieldType: (state as any)?.warpFieldType ?? null,
+  });
 
   const { rho_avg: rhoAvgPipeline, rho_inst: rhoInstPipeline } = enhancedAvgEnergyDensity({
     gap_m,
@@ -954,6 +1098,22 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const strobeHz = Number.isFinite(state?.strobeHz) ? Number(state!.strobeHz) : 1000;
   const strobePhase = wrap01((nowSeconds * strobeHz) % 1);
   const driveGain = q * (0.85 + 0.15 * zeta) * (1 + 0.25 * ampBase);
+  const familyDirectionBlend =
+    familyContext.familyId === "alcubierre_control"
+      ? 0.78
+      : familyContext.familyId === "nhm2_certified"
+        ? 0.46
+        : familyContext.familyId === "irrotational_control"
+          ? 0.12
+          : 0.32;
+  const familyShiftScale =
+    familyContext.familyId === "alcubierre_control"
+      ? 1.14
+      : familyContext.familyId === "nhm2_certified"
+        ? 0.94
+        : familyContext.familyId === "vdb_control"
+          ? 1.08
+          : 1.0;
 
   let idx = 0;
   for (let z = 0; z < nz; z++) {
@@ -962,7 +1122,6 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
       const py = bounds.min[1] + (y + 0.5) * dy;
       for (let x = 0; x < nx; x++) {
         const px = bounds.min[0] + (x + 0.5) * dx;
-        const pos: Vec3 = [px, py, pz];
         const pLen = Math.hypot(px, py, pz);
         const dir = pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : ([0, 0, 0] as Vec3);
         const radius = resolveHullRadius(dir, axes, radialMap);
@@ -972,7 +1131,25 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const sectorEnvelope = computeSectorEnvelope(theta, phase01, { sigma: sigmaSector, splitEnabled, splitFrac });
         const phaseDelta = shortestPhaseDelta(theta, phase01);
         const strobeEnvelope = 0.5 + 0.5 * Math.cos(TWO_PI * wrap01(strobePhase - phaseDelta));
-        const value = wallEnvelope * sectorEnvelope * driveGain * (0.65 + 0.35 * strobeEnvelope);
+        const xNorm = px / Math.max(axes[0], 1e-6);
+        const axialBias = 0.5 + 0.5 * Math.tanh(xNorm / 0.25);
+        const shellSharpen = Math.exp(-0.5 * Math.pow(centerDist / Math.max(wallSigma * 0.72, 1e-6), 2));
+        const familyEnvelope =
+          familyContext.familyId === "alcubierre_control"
+            ? 0.68 + 0.64 * axialBias
+            : familyContext.familyId === "nhm2_certified"
+              ? 0.82 + 0.18 * shellSharpen
+              : familyContext.familyId === "irrotational_control"
+                ? 0.9 + 0.1 * Math.sin(TWO_PI * theta)
+                : familyContext.familyId === "vdb_control"
+                  ? 0.75 + 0.25 / (1 + Math.abs(centerDist) / Math.max(wallSigma, 1e-6))
+                  : 0.95 + 0.05 * Math.cos(TWO_PI * phaseDelta);
+        const value =
+          wallEnvelope *
+          sectorEnvelope *
+          driveGain *
+          (0.65 + 0.35 * strobeEnvelope) *
+          familyEnvelope;
         envelope[idx] = value;
         envelopeSum += value;
         idx += 1;
@@ -1008,8 +1185,19 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const dir = pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : ([0, 0, 0] as Vec3);
         const radius = resolveHullRadius(dir, axes, radialMap);
         const normal = radialMap ? dir : ellipsoidNormal(pos, axesSq);
-        const betaDir = blendDirections(normal, driveDirUnit, 0.32);
-        const betaAmp = natarioShiftFromDensity(Math.abs(density), Math.max(radius, 1e-3));
+        const betaDir = blendDirections(normal, driveDirUnit, familyDirectionBlend);
+        const xNorm = px / Math.max(axes[0], 1e-6);
+        const axialBias = 0.5 + 0.5 * Math.tanh(xNorm / 0.25);
+        const familyAxialScale =
+          familyContext.familyId === "alcubierre_control"
+            ? 0.72 + 0.56 * axialBias
+            : familyContext.familyId === "nhm2_certified"
+              ? 0.9 + 0.1 * Math.abs(axialBias - 0.5) * 2
+              : 1.0;
+        const betaAmp =
+          natarioShiftFromDensity(Math.abs(density), Math.max(radius, 1e-3)) *
+          familyShiftScale *
+          familyAxialScale;
         const sign = density >= 0 ? 1 : -1;
         const vecX = betaDir[0] * betaAmp * sign;
         const vecY = betaDir[1] * betaAmp * sign;
@@ -1051,7 +1239,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     dy,
     dz,
   );
-  const warpFieldType = state?.warpFieldType ?? "natario";
+  const warpFieldType = familyContext.warpFieldType;
   const isNatarioField = warpFieldType === "natario" || warpFieldType === "natario_sdf";
   const clampLimit = isNatarioField ? NATARIO_K_TOL : ALCUBIERRE_K_TOL;
   const clampMode = isNatarioField ? "natario" : "stability";
@@ -1081,6 +1269,9 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         clampActivationRate,
         dutyFR,
         phase01,
+        family_id: familyContext.familyId,
+        source_branch: familyContext.sourceBranch,
+        shape_function_id: familyContext.shapeFunctionId,
         warpFieldType,
       },
     );
@@ -1251,6 +1442,11 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
       pressureSource: "proxy",
       source: mappingSource,
       proxy: !metricMode,
+      family_id: familyContext.familyId,
+      source_branch: familyContext.sourceBranch,
+      shape_function_id: familyContext.shapeFunctionId,
+      warpFieldType: familyContext.warpFieldType,
+      metricT00Ref,
     },
     observerRobust,
   };
@@ -1264,6 +1460,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     congruence: brickCongruence,
     metricT00Ref,
     metricT00Source,
+    family_id: familyContext.familyId,
+    source_branch: familyContext.sourceBranch,
+    shape_function_id: familyContext.shapeFunctionId,
+    warpFieldType: familyContext.warpFieldType,
     channels: {
       t00: { data: t00, min: t00Min, max: t00Max },
       Sx: { data: Sx, min: SxMin, max: SxMax },
@@ -1290,6 +1490,10 @@ export interface StressEnergyBrickResponse {
   congruence?: "proxy-only" | "geometry-derived" | "conditional";
   metricT00Ref?: string;
   metricT00Source?: string;
+  family_id?: string;
+  source_branch?: string;
+  shape_function_id?: string;
+  warpFieldType?: string;
   channels: {
     t00: StressEnergyBrickResponseChannel;
     Sx: StressEnergyBrickResponseChannel;
@@ -1311,6 +1515,10 @@ export interface StressEnergyBrickBinaryHeader {
   congruence?: "proxy-only" | "geometry-derived" | "conditional";
   metricT00Ref?: string;
   metricT00Source?: string;
+  family_id?: string;
+  source_branch?: string;
+  shape_function_id?: string;
+  warpFieldType?: string;
   channelOrder: typeof STRESS_ENERGY_CHANNEL_ORDER;
   channels: {
     t00: { min: number; max: number; bytes: number };
@@ -1336,6 +1544,10 @@ export const serializeStressEnergyBrick = (brick: StressEnergyBrick): StressEner
   congruence: brick.congruence ?? "proxy-only",
   metricT00Ref: brick.metricT00Ref,
   metricT00Source: brick.metricT00Source,
+  family_id: brick.family_id,
+  source_branch: brick.source_branch,
+  shape_function_id: brick.shape_function_id,
+  warpFieldType: brick.warpFieldType,
   channels: {
     t00: { data: encodeFloat32(brick.channels.t00.data), min: brick.channels.t00.min, max: brick.channels.t00.max },
     Sx: { data: encodeFloat32(brick.channels.Sx.data), min: brick.channels.Sx.min, max: brick.channels.Sx.max },
@@ -1364,6 +1576,10 @@ export const serializeStressEnergyBrickBinary = (brick: StressEnergyBrick): Stre
       congruence: brick.congruence ?? "proxy-only",
       metricT00Ref: brick.metricT00Ref,
       metricT00Source: brick.metricT00Source,
+      family_id: brick.family_id,
+      source_branch: brick.source_branch,
+      shape_function_id: brick.shape_function_id,
+      warpFieldType: brick.warpFieldType,
       channelOrder: STRESS_ENERGY_CHANNEL_ORDER,
       channels: {
         t00: { min: t00.min, max: t00.max, bytes: t00.data.byteLength },

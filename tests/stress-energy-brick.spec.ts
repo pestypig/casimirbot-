@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
 import { buildStressEnergyBrick } from "../server/stress-energy-brick";
 
 const baseParams = {
@@ -14,6 +15,11 @@ const baseParams = {
   ampBase: 0.15,
   zeta: 0.82,
 };
+
+const hashFloat32 = (value: Float32Array) =>
+  createHash("sha256")
+    .update(Buffer.from(value.buffer, value.byteOffset, value.byteLength))
+    .digest("hex");
 
 describe("stress-energy brick builder", () => {
   it("preserves average density after normalization", () => {
@@ -65,5 +71,42 @@ describe("stress-energy brick builder", () => {
     expect((robust?.sec.robustMin ?? 0) <= (robust?.sec.eulerianMin ?? 0) + 1e-8).toBe(true);
     expect((robust?.dec.robustMin ?? 0) <= (robust?.dec.eulerianMin ?? 0) + 1e-8).toBe(true);
     expect(robust?.consistency.robustNotGreaterThanEulerian).toBe(true);
+  });
+
+  it("branches source families by metricT00Ref and emits branch metadata", () => {
+    const shared = {
+      ...baseParams,
+      metricT00: -2.5e5,
+      metricT00Source: "metric",
+      q: 3,
+      gammaVdB: 500,
+      zeta: 0.84,
+      phase01: 0,
+      splitEnabled: false,
+      splitFrac: 0.6,
+      dutyFR: 0.0015,
+    };
+    const alcubierre = buildStressEnergyBrick({
+      ...shared,
+      metricT00Ref: "warp.metric.T00.alcubierre.analytic",
+    });
+    const natario = buildStressEnergyBrick({
+      ...shared,
+      metricT00Ref: "warp.metric.T00.natario.shift",
+    });
+
+    const alcT00Hash = hashFloat32(alcubierre.channels.t00.data);
+    const natT00Hash = hashFloat32(natario.channels.t00.data);
+    expect(alcT00Hash).not.toBe(natT00Hash);
+    expect(alcubierre.family_id).toBe("alcubierre_control");
+    expect(natario.family_id).toBe("natario_control");
+    expect(alcubierre.source_branch).toBe("metric_t00_ref");
+    expect(natario.source_branch).toBe("metric_t00_ref");
+    expect(alcubierre.shape_function_id).toBe("alcubierre_longitudinal_shell_v1");
+    expect(natario.shape_function_id).toBe("natario_shift_shell_v1");
+    expect(alcubierre.stats.mapping?.family_id).toBe("alcubierre_control");
+    expect(natario.stats.mapping?.family_id).toBe("natario_control");
+    expect(alcubierre.stats.mapping?.metricT00Ref).toBe("warp.metric.T00.alcubierre.analytic");
+    expect(natario.stats.mapping?.metricT00Ref).toBe("warp.metric.T00.natario.shift");
   });
 });

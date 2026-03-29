@@ -21,6 +21,8 @@ export type HullScientificSnapshot = {
   channels: Record<string, HullScientificSnapshotChannel>;
   source: string | null;
   chart: string | null;
+  stats: Record<string, unknown> | null;
+  meta: Record<string, unknown> | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -105,6 +107,8 @@ const decodeJsonBrick = (
     channels,
     source: typeof root.source === "string" ? root.source : metricVolumeRef.source ?? null,
     chart: typeof root.chart === "string" ? root.chart : metricVolumeRef.chart ?? null,
+    stats: isRecord(root.stats) ? root.stats : null,
+    meta: isRecord(root.meta) ? root.meta : null,
   };
 };
 
@@ -184,6 +188,8 @@ const decodeBinaryBrick = (
     channels,
     source: typeof header.source === "string" ? header.source : metricVolumeRef.source ?? null,
     chart: typeof header.chart === "string" ? header.chart : metricVolumeRef.chart ?? null,
+    stats: isRecord(header.stats) ? header.stats : null,
+    meta: isRecord(header.meta) ? header.meta : null,
   };
 };
 
@@ -328,4 +334,3 @@ export const computeSnapshotSupportCoveragePct = (
   }
   return (covered / hullSdf.length) * 100;
 };
-

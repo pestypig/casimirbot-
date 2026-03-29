@@ -4945,6 +4945,13 @@ export async function getLatticeProbe(req: Request, res: Response) {
       zeta: pipelineInputs.zeta,
       phase01: pipelineInputs.phase01,
       driveDir: driveDir ?? undefined,
+      warpFieldType:
+        warpFieldType === "alcubierre" ||
+        warpFieldType === "natario" ||
+        warpFieldType === "natario_sdf" ||
+        warpFieldType === "irrotational"
+          ? (warpFieldType as StressEnergyBrickParams["warpFieldType"])
+          : undefined,
     };
 
     const grEnabled = parseBooleanParam((query as any).grEnabled, state.grEnabled === true);
@@ -4962,6 +4969,7 @@ export async function getLatticeProbe(req: Request, res: Response) {
       phase01: pipelineInputs.phase01,
       pressureFactor: pressureFactor ?? null,
       driveDir: driveDir ?? null,
+      warpFieldType,
       hullAxes: axes,
       hullWall,
     };
@@ -7102,6 +7110,19 @@ export async function getGrInitialBrick(req: Request, res: Response) {
     const pressureFactor = resolveStressEnergyPressureFactor(state);
     const sourceOptions =
       pressureFactor !== undefined ? { pressureFactor } : undefined;
+    const sourceWarpFieldTypeRaw =
+      typeof (state as any)?.warpFieldType === "string"
+        ? String((state as any).warpFieldType).toLowerCase()
+        : typeof (state as any)?.dynamicConfig?.warpFieldType === "string"
+          ? String((state as any).dynamicConfig.warpFieldType).toLowerCase()
+          : null;
+    const sourceWarpFieldType =
+      sourceWarpFieldTypeRaw === "natario" ||
+      sourceWarpFieldTypeRaw === "natario_sdf" ||
+      sourceWarpFieldTypeRaw === "alcubierre" ||
+      sourceWarpFieldTypeRaw === "irrotational"
+        ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
+        : undefined;
 
     const sourceParams: Partial<StressEnergyBrickParams> = {
       dims,
@@ -7120,6 +7141,7 @@ export async function getGrInitialBrick(req: Request, res: Response) {
       ampBase,
       zeta,
       driveDir: driveDir ?? undefined,
+      warpFieldType: sourceWarpFieldType,
     };
 
     const geometrySig = buildGrGeometrySignature(resolved, state, geometryKindRaw);
@@ -7136,6 +7158,7 @@ export async function getGrInitialBrick(req: Request, res: Response) {
       zeta,
       pressureFactor: pressureFactor ?? null,
       driveDir: driveDir ?? null,
+      warpFieldType: sourceWarpFieldType ?? null,
       hullAxes,
       hullWall,
     };
@@ -7423,6 +7446,26 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
         ? String((state as any).warp.metricT00Ref)
         : null;
     const sourceMetricT00Ref = metricT00RefOverride ?? stateMetricT00Ref;
+    const warpFieldTypeOverrideRaw =
+      typeof (query as any).warpFieldType === "string"
+        ? String((query as any).warpFieldType).toLowerCase()
+        : typeof (query as any).warp_field_type === "string"
+          ? String((query as any).warp_field_type).toLowerCase()
+          : null;
+    const stateWarpFieldTypeRaw =
+      typeof (state as any)?.warpFieldType === "string"
+        ? String((state as any).warpFieldType).toLowerCase()
+        : typeof (state as any)?.dynamicConfig?.warpFieldType === "string"
+          ? String((state as any).dynamicConfig.warpFieldType).toLowerCase()
+          : null;
+    const sourceWarpFieldTypeRaw = warpFieldTypeOverrideRaw ?? stateWarpFieldTypeRaw;
+    const sourceWarpFieldType =
+      sourceWarpFieldTypeRaw === "natario" ||
+      sourceWarpFieldTypeRaw === "natario_sdf" ||
+      sourceWarpFieldTypeRaw === "alcubierre" ||
+      sourceWarpFieldTypeRaw === "irrotational"
+        ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
+        : undefined;
     const sourceDutyFR = Number.isFinite(dutyFROverride)
       ? Math.max(dutyFROverride, 1e-8)
       : Math.max(pipelineInputs.dutyFR, 1e-8);
@@ -7458,6 +7501,7 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       metricT00: Number.isFinite(sourceMetricT00) ? sourceMetricT00 : undefined,
       metricT00Source: sourceMetricT00Source ?? undefined,
       metricT00Ref: sourceMetricT00Ref ?? undefined,
+      warpFieldType: sourceWarpFieldType,
     };
     const sourceCacheKey = {
       dutyFR: sourceDutyFR,
@@ -7471,6 +7515,7 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       metricT00Ref: sourceMetricT00Ref,
       pressureFactor: pressureFactor ?? null,
       driveDir: driveDir ?? null,
+      warpFieldType: sourceWarpFieldType ?? null,
       hullAxes,
       hullWall,
       overrides: {
@@ -7483,6 +7528,7 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
         metricT00: Number.isFinite(metricT00Override) ? metricT00Override : null,
         metricT00Source: metricT00SourceOverride,
         metricT00Ref: metricT00RefOverride,
+        warpFieldType: warpFieldTypeOverrideRaw,
       },
     };
     const geometrySig = buildGrGeometrySignature(
@@ -7790,6 +7836,19 @@ export async function getGrRegionStats(req: Request, res: Response) {
         const pressureFactor = resolveStressEnergyPressureFactor(state);
         const sourceOptions =
           pressureFactor !== undefined ? { pressureFactor } : undefined;
+        const sourceWarpFieldTypeRaw =
+          typeof (state as any)?.warpFieldType === "string"
+            ? String((state as any).warpFieldType).toLowerCase()
+            : typeof (state as any)?.dynamicConfig?.warpFieldType === "string"
+              ? String((state as any).dynamicConfig.warpFieldType).toLowerCase()
+              : null;
+        const sourceWarpFieldType =
+          sourceWarpFieldTypeRaw === "natario" ||
+          sourceWarpFieldTypeRaw === "natario_sdf" ||
+          sourceWarpFieldTypeRaw === "alcubierre" ||
+          sourceWarpFieldTypeRaw === "irrotational"
+            ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
+            : undefined;
         const sourceParams: Partial<StressEnergyBrickParams> = {
           bounds,
           hullAxes,
@@ -7801,6 +7860,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
           zeta: pipelineInputs.zeta,
           phase01: phase01Value,
           driveDir: driveDir ?? undefined,
+          warpFieldType: sourceWarpFieldType,
         };
         const sourceCacheKey = {
           dutyFR: dutyFRValue,
@@ -7811,6 +7871,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
           phase01: phase01Value,
           pressureFactor: pressureFactor ?? null,
           driveDir: driveDir ?? null,
+          warpFieldType: sourceWarpFieldType ?? null,
           hullAxes,
           hullWall,
         };
@@ -8136,6 +8197,19 @@ export async function getGrConstraintNetwork4d(req: Request, res: Response) {
     const pressureFactor = resolveStressEnergyPressureFactor(state);
     const sourceOptions =
       pressureFactor !== undefined ? { pressureFactor } : undefined;
+    const sourceWarpFieldTypeRaw =
+      typeof (state as any)?.warpFieldType === "string"
+        ? String((state as any).warpFieldType).toLowerCase()
+        : typeof (state as any)?.dynamicConfig?.warpFieldType === "string"
+          ? String((state as any).dynamicConfig.warpFieldType).toLowerCase()
+          : null;
+    const sourceWarpFieldType =
+      sourceWarpFieldTypeRaw === "natario" ||
+      sourceWarpFieldTypeRaw === "natario_sdf" ||
+      sourceWarpFieldTypeRaw === "alcubierre" ||
+      sourceWarpFieldTypeRaw === "irrotational"
+        ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
+        : undefined;
     const sourceParams: Partial<StressEnergyBrickParams> = {
       bounds,
       hullAxes,
@@ -8147,6 +8221,7 @@ export async function getGrConstraintNetwork4d(req: Request, res: Response) {
       zeta: pipelineInputs.zeta,
       phase01: pipelineInputs.phase01,
       driveDir: driveDir ?? undefined,
+      warpFieldType: sourceWarpFieldType,
     };
 
     const result = runGrConstraintNetwork4d({

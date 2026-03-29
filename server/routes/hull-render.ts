@@ -1,5 +1,7 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess, execSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { Router, type Request } from "express";
 import sharp from "sharp";
 import type {
@@ -39,6 +41,62 @@ const readEnvText = (value: unknown): string | null => {
   const text = value.trim();
   return text.length ? text : null;
 };
+
+const readFirstEnvText = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const text = readEnvText(value);
+    if (text) return text;
+  }
+  return null;
+};
+
+const readFirstFiniteNumber = (...values: unknown[]): number | null => {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+};
+
+const readGitCommitShaBestEffort = (): string | null => {
+  try {
+    const raw = execSync("git rev-parse HEAD", {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return /^[0-9a-f]{7,64}$/i.test(raw) ? raw.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+};
+
+const readPackageFingerprintBestEffort = (): string | null => {
+  try {
+    const packageJsonPath = path.join(process.cwd(), "package.json");
+    const raw = readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as { name?: unknown; version?: unknown };
+    const name =
+      typeof parsed.name === "string" && parsed.name.trim().length > 0
+        ? parsed.name.trim()
+        : "casimirbot";
+    const version =
+      typeof parsed.version === "string" && parsed.version.trim().length > 0
+        ? parsed.version.trim()
+        : "dev";
+    return createHash("sha256")
+      .update(`${name}@${version}:${raw}`)
+      .digest("hex");
+  } catch {
+    return null;
+  }
+};
+
+const resolveRuntimeFingerprint = (): string =>
+  readPackageFingerprintBestEffort() ??
+  createHash("sha256")
+    .update(`${process.cwd()}:${process.platform}:${process.arch}`)
+    .digest("hex");
 
 const DEFAULT_OPTIX_SERVICE_FRAME_URL =
   "http://127.0.0.1:6062/api/helix/hull-render/frame";
@@ -208,6 +266,40 @@ const readRequireScientificFrameByDefault = (): boolean =>
 
 const readRequireCongruentNhm2FullSolveByDefault = (): boolean =>
   process.env.MIS_RENDER_REQUIRE_CONGRUENT_NHM2_FULL_SOLVE !== "0";
+
+const HULL_RENDER_PROXY_PROCESS_STARTED_AT_MS = Date.now();
+const HULL_RENDER_PROXY_INSTANCE_ID = createHash("sha256")
+  .update(`${process.pid}:${HULL_RENDER_PROXY_PROCESS_STARTED_AT_MS}:${process.cwd()}`)
+  .digest("hex")
+  .slice(0, 16);
+const HULL_RENDER_PROXY_SERVICE_VERSION = readFirstEnvText(
+  process.env.CASIMIRBOT_RENDER_PROXY_VERSION,
+  process.env.HULL_RENDER_PROXY_VERSION,
+  process.env.npm_package_version
+    ? `casimirbot.hull-render.proxy@${process.env.npm_package_version}`
+    : null,
+  "casimirbot.hull-render.proxy@dev",
+);
+const HULL_RENDER_PROXY_RUNTIME_FINGERPRINT = resolveRuntimeFingerprint();
+const HULL_RENDER_PROXY_GIT_COMMIT_SHA_FALLBACK = readGitCommitShaBestEffort();
+const HULL_RENDER_PROXY_COMMIT_SHA = readFirstEnvText(
+  process.env.GIT_COMMIT,
+  process.env.COMMIT_SHA,
+  process.env.SOURCE_VERSION,
+  HULL_RENDER_PROXY_GIT_COMMIT_SHA_FALLBACK,
+  HULL_RENDER_PROXY_RUNTIME_FINGERPRINT.slice(0, 40),
+);
+const HULL_RENDER_PROXY_BUILD_HASH = readFirstEnvText(
+  process.env.CASIMIRBOT_BUILD_HASH,
+  process.env.BUILD_HASH,
+  process.env.SOURCE_VERSION,
+  process.env.GIT_COMMIT,
+  process.env.COMMIT_SHA,
+  HULL_RENDER_PROXY_GIT_COMMIT_SHA_FALLBACK
+    ? `git-${HULL_RENDER_PROXY_GIT_COMMIT_SHA_FALLBACK.slice(0, 12)}`
+    : null,
+  HULL_RENDER_PROXY_RUNTIME_FINGERPRINT.slice(0, 16),
+);
 
 type CongruentSolveSnapshot = {
   pass: boolean;
@@ -672,12 +764,21 @@ const proxyRemoteFrame = async (
   const requiresScientificLatency =
     payload.scienceLane?.requireScientificFrame === true ||
     payload.scienceLane?.requireCanonicalTensorVolume === true;
+  const renderView = payload.scienceLane?.renderView ?? "diagnostic-quad";
+  const yorkOrAtlasView =
+    renderView === "full-atlas" || renderView.startsWith("york-");
   const timeoutMs =
-    requiresScientificLatency && cellCount >= 48 * 48 * 48
-      ? 45_000
-      : requiresScientificLatency
-        ? 30_000
-        : 10_000;
+    requiresScientificLatency && cellCount >= 64 * 64 * 64
+      ? 180_000
+      : requiresScientificLatency &&
+          yorkOrAtlasView &&
+          cellCount >= 48 * 48 * 48
+        ? 120_000
+        : requiresScientificLatency && cellCount >= 48 * 48 * 48
+          ? 45_000
+          : requiresScientificLatency
+            ? 30_000
+            : 10_000;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -709,6 +810,11 @@ type RemoteServiceStatus = {
   readyForOptix: boolean;
   readyForScientificLane: boolean;
   allowSynthetic: boolean;
+  serviceVersion: string | null;
+  buildHash: string | null;
+  commitSha: string | null;
+  processStartedAtMs: number | null;
+  runtimeInstanceId: string | null;
   error: string | null;
 };
 
@@ -732,12 +838,18 @@ const fetchRemoteServiceStatus = async (
         readyForOptix: false,
         readyForScientificLane: false,
         allowSynthetic: false,
+        serviceVersion: null,
+        buildHash: null,
+        commitSha: null,
+        processStartedAtMs: null,
+        runtimeInstanceId: null,
         error: `remote_status_http_${response.status}`,
       };
     }
     const body = (await response.json()) as unknown;
     const root = isRecord(body) ? body : {};
     const runtime = isRecord(root.runtime) ? root.runtime : {};
+    const provenance = isRecord(root.provenance) ? root.provenance : {};
     const readyForUnity = runtime.readyForUnity === true;
     const readyForOptix = runtime.readyForOptix === true;
     const readyForScientificLane =
@@ -750,6 +862,31 @@ const fetchRemoteServiceStatus = async (
       readyForOptix,
       readyForScientificLane,
       allowSynthetic: runtime.allowSynthetic === true,
+      serviceVersion: readFirstEnvText(
+        runtime.serviceVersion,
+        root.serviceVersion,
+        provenance.serviceVersion,
+      ),
+      buildHash: readFirstEnvText(
+        runtime.buildHash,
+        root.buildHash,
+        provenance.buildHash,
+      ),
+      commitSha: readFirstEnvText(
+        runtime.commitSha,
+        root.commitSha,
+        provenance.commitSha,
+      ),
+      processStartedAtMs: readFirstFiniteNumber(
+        runtime.processStartedAtMs,
+        root.processStartedAtMs,
+        provenance.processStartedAtMs,
+      ),
+      runtimeInstanceId: readFirstEnvText(
+        runtime.runtimeInstanceId,
+        root.runtimeInstanceId,
+        provenance.runtimeInstanceId,
+      ),
       error: null,
     };
   } catch (error) {
@@ -761,6 +898,11 @@ const fetchRemoteServiceStatus = async (
       readyForOptix: false,
       readyForScientificLane: false,
       allowSynthetic: false,
+      serviceVersion: null,
+      buildHash: null,
+      commitSha: null,
+      processStartedAtMs: null,
+      runtimeInstanceId: null,
       error: error instanceof Error ? error.message : String(error),
     };
   } finally {
@@ -965,6 +1107,67 @@ const isValidRenderCertificate = (
   return true;
 };
 
+const isYorkRenderView = (
+  view: HullRenderCertificateV1["render"]["view"] | null | undefined,
+): view is
+  | "york-time-3p1"
+  | "york-surface-3p1"
+  | "york-surface-rho-3p1"
+  | "york-topology-normalized-3p1"
+  | "york-shell-map-3p1" =>
+  view === "york-time-3p1" ||
+  view === "york-surface-3p1" ||
+  view === "york-surface-rho-3p1" ||
+  view === "york-topology-normalized-3p1" ||
+  view === "york-shell-map-3p1";
+
+const validateYorkSnapshotIdentity = (
+  cert: HullRenderCertificateV1,
+  payload: HullMisRenderRequestV1,
+): { ok: true } | { ok: false; reason: string } => {
+  // "These York views are same-snapshot congruent renderings of one NHM2 solution.
+  // Parameter-family comparisons are separate products and must not be represented
+  // as a single simultaneous system."
+  const hasMetricRefHash =
+    typeof cert.metric_ref_hash === "string" && cert.metric_ref_hash.trim().length > 0;
+  const hasChart = typeof cert.chart === "string" && cert.chart.trim().length > 0;
+  const hasObserver =
+    typeof cert.observer === "string" && cert.observer.trim().length > 0;
+  const hasThetaDefinition =
+    typeof cert.theta_definition === "string" &&
+    cert.theta_definition.trim().length > 0;
+  const hasKijConvention =
+    typeof cert.kij_sign_convention === "string" &&
+    cert.kij_sign_convention.trim().length > 0;
+  const hasUnitSystem =
+    typeof cert.unit_system === "string" && cert.unit_system.trim().length > 0;
+  const hasTimestamp = Number.isFinite(cert.timestamp_ms);
+  if (
+    !hasMetricRefHash ||
+    !hasChart ||
+    !hasObserver ||
+    !hasThetaDefinition ||
+    !hasKijConvention ||
+    !hasUnitSystem ||
+    !hasTimestamp
+  ) {
+    return { ok: false, reason: "remote_mis_render_certificate_york_snapshot_identity_mismatch" };
+  }
+
+  const metricRefChart = payload.metricVolumeRef?.chart?.trim();
+  if (metricRefChart && cert.chart !== metricRefChart) {
+    return { ok: false, reason: "remote_mis_render_certificate_chart_mismatch" };
+  }
+  const metricRefUpdatedAt = payload.metricVolumeRef?.updatedAt;
+  if (Number.isFinite(metricRefUpdatedAt ?? Number.NaN)) {
+    const expectedTimestampMs = Number(metricRefUpdatedAt);
+    if (cert.timestamp_ms !== expectedTimestampMs) {
+      return { ok: false, reason: "remote_mis_render_certificate_york_snapshot_identity_mismatch" };
+    }
+  }
+  return { ok: true };
+};
+
 const validateRenderCertificateForRequest = (
   frame: HullMisRenderResponseV1,
   payload: HullMisRenderRequestV1,
@@ -1015,6 +1218,10 @@ const validateRenderCertificateForRequest = (
   if (cert.render.view !== requestedView) {
     return { ok: false, reason: "remote_mis_render_certificate_view_mismatch" };
   }
+  if (isYorkRenderView(requestedView)) {
+    const yorkSnapshotIdentity = validateYorkSnapshotIdentity(cert, payload);
+    if (!yorkSnapshotIdentity.ok) return yorkSnapshotIdentity;
+  }
   if (requestedView === "york-time-3p1") {
     if (cert.render.field_key !== "theta") {
       return {
@@ -1040,6 +1247,12 @@ const validateRenderCertificateForRequest = (
         reason: "remote_mis_render_certificate_york_normalization_mismatch",
       };
     }
+    if (cert.render.magnitude_mode != null) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_raw_magnitude_mode_mismatch",
+      };
+    }
     const yorkDiagnosticsValid =
       cert.diagnostics.metric_ref_hash === cert.metric_ref_hash &&
       Number.isFinite(cert.diagnostics.timestamp_ms ?? Number.NaN) &&
@@ -1047,9 +1260,18 @@ const validateRenderCertificateForRequest = (
       typeof cert.diagnostics.theta_definition === "string" &&
       cert.diagnostics.theta_definition.trim().length > 0 &&
       cert.diagnostics.theta_definition === cert.theta_definition &&
-      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof cert.diagnostics.theta_channel_hash === "string" &&
+      cert.diagnostics.theta_channel_hash.trim().length > 0 &&
+      typeof cert.diagnostics.slice_array_hash === "string" &&
+      cert.diagnostics.slice_array_hash.trim().length > 0 &&
+      Number.isFinite(cert.diagnostics.theta_min_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_min_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_display ?? Number.NaN) &&
+      typeof cert.diagnostics.display_range_method === "string" &&
+      cert.diagnostics.display_range_method.trim().length > 0 &&
       Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
@@ -1059,6 +1281,14 @@ const validateRenderCertificateForRequest = (
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_diagnostics_missing",
+      };
+    }
+    // A near-flat York plot is a legitimate result for low-expansion warp configurations; the renderer must not inject hidden gain or alternate sampling in a way that impersonates a stronger expansion field.
+    const yorkDisplayGain = Number(cert.diagnostics.display_gain ?? Number.NaN);
+    if (!Number.isFinite(yorkDisplayGain) || Math.abs(yorkDisplayGain - 1) > 1e-12) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_raw_hidden_gain_detected",
       };
     }
     if (cert.diagnostics.sampling_choice !== "x-z midplane") {
@@ -1112,6 +1342,12 @@ const validateRenderCertificateForRequest = (
         reason: "remote_mis_render_certificate_york_surface_normalization_mismatch",
       };
     }
+    if (cert.render.magnitude_mode != null) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_raw_magnitude_mode_mismatch",
+      };
+    }
     if (cert.render.surface_height !== "theta") {
       return {
         ok: false,
@@ -1125,9 +1361,18 @@ const validateRenderCertificateForRequest = (
       typeof cert.diagnostics.theta_definition === "string" &&
       cert.diagnostics.theta_definition.trim().length > 0 &&
       cert.diagnostics.theta_definition === cert.theta_definition &&
-      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof cert.diagnostics.theta_channel_hash === "string" &&
+      cert.diagnostics.theta_channel_hash.trim().length > 0 &&
+      typeof cert.diagnostics.slice_array_hash === "string" &&
+      cert.diagnostics.slice_array_hash.trim().length > 0 &&
+      Number.isFinite(cert.diagnostics.theta_min_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_min_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_display ?? Number.NaN) &&
+      typeof cert.diagnostics.display_range_method === "string" &&
+      cert.diagnostics.display_range_method.trim().length > 0 &&
       Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
@@ -1137,6 +1382,17 @@ const validateRenderCertificateForRequest = (
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_surface_diagnostics_missing",
+      };
+    }
+    // Raw York views are fail-closed against hidden display amplification.
+    const yorkSurfaceDisplayGain = Number(cert.diagnostics.display_gain ?? Number.NaN);
+    if (
+      !Number.isFinite(yorkSurfaceDisplayGain) ||
+      Math.abs(yorkSurfaceDisplayGain - 1) > 1e-12
+    ) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_surface_hidden_gain_detected",
       };
     }
     if (cert.diagnostics.sampling_choice !== expectedYorkSurfaceSamplingChoice) {
@@ -1196,9 +1452,20 @@ const validateRenderCertificateForRequest = (
       typeof cert.diagnostics.theta_definition === "string" &&
       cert.diagnostics.theta_definition.trim().length > 0 &&
       cert.diagnostics.theta_definition === cert.theta_definition &&
-      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof cert.diagnostics.theta_channel_hash === "string" &&
+      cert.diagnostics.theta_channel_hash.trim().length > 0 &&
+      typeof cert.diagnostics.slice_array_hash === "string" &&
+      cert.diagnostics.slice_array_hash.trim().length > 0 &&
+      typeof cert.diagnostics.normalized_slice_hash === "string" &&
+      cert.diagnostics.normalized_slice_hash.trim().length > 0 &&
+      Number.isFinite(cert.diagnostics.theta_min_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_min_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_display ?? Number.NaN) &&
+      typeof cert.diagnostics.display_range_method === "string" &&
+      cert.diagnostics.display_range_method.trim().length > 0 &&
       Number.isFinite(cert.diagnostics.zero_contour_segments ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.display_gain ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.height_scale ?? Number.NaN) &&
@@ -1248,6 +1515,12 @@ const validateRenderCertificateForRequest = (
         reason: "remote_mis_render_certificate_york_shell_map_normalization_mismatch",
       };
     }
+    if (cert.render.magnitude_mode != null) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_raw_magnitude_mode_mismatch",
+      };
+    }
     if (cert.render.surface_height !== "theta") {
       return {
         ok: false,
@@ -1267,17 +1540,54 @@ const validateRenderCertificateForRequest = (
       typeof cert.diagnostics.theta_definition === "string" &&
       cert.diagnostics.theta_definition.trim().length > 0 &&
       cert.diagnostics.theta_definition === cert.theta_definition &&
-      Number.isFinite(cert.diagnostics.theta_min ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_max ?? Number.NaN) &&
-      Number.isFinite(cert.diagnostics.theta_abs_max ?? Number.NaN) &&
+      typeof cert.diagnostics.theta_channel_hash === "string" &&
+      cert.diagnostics.theta_channel_hash.trim().length > 0 &&
+      typeof cert.diagnostics.slice_array_hash === "string" &&
+      cert.diagnostics.slice_array_hash.trim().length > 0 &&
+      typeof cert.diagnostics.support_mask_slice_hash === "string" &&
+      cert.diagnostics.support_mask_slice_hash.trim().length > 0 &&
+      typeof cert.diagnostics.shell_masked_slice_hash === "string" &&
+      cert.diagnostics.shell_masked_slice_hash.trim().length > 0 &&
+      Number.isFinite(cert.diagnostics.theta_min_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_min_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_max_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_abs_max_display ?? Number.NaN) &&
+      typeof cert.diagnostics.display_range_method === "string" &&
+      cert.diagnostics.display_range_method.trim().length > 0 &&
       typeof cert.diagnostics.near_zero_theta === "boolean" &&
       Number.isFinite(cert.diagnostics.supported_theta_fraction ?? Number.NaN) &&
       Number.isFinite(cert.diagnostics.shell_theta_overlap_pct ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_shell_min_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_shell_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_shell_abs_max_raw ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_shell_min_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_shell_max_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.theta_shell_abs_max_display ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.shell_support_count ?? Number.NaN) &&
+      Number.isFinite(cert.diagnostics.shell_active_count ?? Number.NaN) &&
+      Number(cert.diagnostics.shell_active_count ?? Number.NaN) >= 0 &&
+      Number(cert.diagnostics.shell_support_count ?? Number.NaN) >= 0 &&
+      Number(cert.diagnostics.shell_active_count ?? Number.NaN) <=
+        Number(cert.diagnostics.shell_support_count ?? Number.NaN) &&
+      typeof cert.diagnostics.shell_mask_slice_hash === "string" &&
+      cert.diagnostics.shell_mask_slice_hash.trim().length > 0 &&
       typeof cert.diagnostics.peak_theta_in_supported_region === "boolean";
     if (!yorkShellDiagnosticsValid) {
       return {
         ok: false,
         reason: "remote_mis_render_certificate_york_shell_map_diagnostics_missing",
+      };
+    }
+    const yorkShellMapDisplayGain = Number(cert.diagnostics.display_gain ?? Number.NaN);
+    if (
+      !Number.isFinite(yorkShellMapDisplayGain) ||
+      Math.abs(yorkShellMapDisplayGain - 1) > 1e-12
+    ) {
+      return {
+        ok: false,
+        reason: "remote_mis_render_certificate_york_shell_map_hidden_gain_detected",
       };
     }
     if (cert.diagnostics.sampling_choice !== "x-z midplane") {
@@ -1441,6 +1751,11 @@ const buildLocalResponse = async (
       timestampMs: Date.now(),
       researchGrade: false,
       scientificTier: "teaching",
+      serviceVersion: HULL_RENDER_PROXY_SERVICE_VERSION,
+      buildHash: HULL_RENDER_PROXY_BUILD_HASH,
+      commitSha: HULL_RENDER_PROXY_COMMIT_SHA,
+      processStartedAtMs: HULL_RENDER_PROXY_PROCESS_STARTED_AT_MS,
+      runtimeInstanceId: HULL_RENDER_PROXY_INSTANCE_ID,
     },
   };
 };
@@ -1481,6 +1796,11 @@ router.get("/status", async (req, res) => {
     readyForOptix: false,
     readyForScientificLane: false,
     allowSynthetic: false,
+    serviceVersion: null,
+    buildHash: null,
+    commitSha: null,
+    processStartedAtMs: null,
+    runtimeInstanceId: null,
     error: "remote_status_not_configured",
   };
   if (remoteConfigured) {
@@ -1521,6 +1841,7 @@ router.get("/status", async (req, res) => {
       : backendMode === "unity"
         ? DEFAULT_UNITY_SERVICE_STATUS_URL
         : DEFAULT_OPTIX_SERVICE_STATUS_URL;
+  const statusTimestampMs = Date.now();
   res.json({
     kind: "hull-render-status",
     backendHint: "mis-path-tracing",
@@ -1562,7 +1883,21 @@ router.get("/status", async (req, res) => {
           : "RayTracingMIS Unity batch service",
     recommendedFrameEndpoint,
     recommendedStatusEndpoint,
-    timestampMs: Date.now(),
+    provenance: {
+      source: "casimirbot.hull-render.proxy.status",
+      serviceVersion: HULL_RENDER_PROXY_SERVICE_VERSION,
+      buildHash: HULL_RENDER_PROXY_BUILD_HASH,
+      commitSha: HULL_RENDER_PROXY_COMMIT_SHA,
+      processStartedAtMs: HULL_RENDER_PROXY_PROCESS_STARTED_AT_MS,
+      runtimeInstanceId: HULL_RENDER_PROXY_INSTANCE_ID,
+      timestampMs: statusTimestampMs,
+    },
+    serviceVersion: HULL_RENDER_PROXY_SERVICE_VERSION,
+    buildHash: HULL_RENDER_PROXY_BUILD_HASH,
+    commitSha: HULL_RENDER_PROXY_COMMIT_SHA,
+    processStartedAtMs: HULL_RENDER_PROXY_PROCESS_STARTED_AT_MS,
+    runtimeInstanceId: HULL_RENDER_PROXY_INSTANCE_ID,
+    timestampMs: statusTimestampMs,
   });
 });
 
@@ -1680,6 +2015,23 @@ router.post("/frame", async (req, res) => {
               remote.provenance?.scientificTier ??
               remote.diagnostics?.scientificTier ??
               null,
+            serviceVersion:
+              readEnvText(remote.provenance?.serviceVersion) ??
+              HULL_RENDER_PROXY_SERVICE_VERSION,
+            buildHash:
+              readEnvText(remote.provenance?.buildHash) ??
+              HULL_RENDER_PROXY_BUILD_HASH,
+            commitSha:
+              readEnvText(remote.provenance?.commitSha) ??
+              HULL_RENDER_PROXY_COMMIT_SHA,
+            processStartedAtMs: Number.isFinite(
+              remote.provenance?.processStartedAtMs ?? Number.NaN,
+            )
+              ? Number(remote.provenance?.processStartedAtMs)
+              : HULL_RENDER_PROXY_PROCESS_STARTED_AT_MS,
+            runtimeInstanceId:
+              readEnvText(remote.provenance?.runtimeInstanceId) ??
+              `${candidate.backend}-proxy-${HULL_RENDER_PROXY_INSTANCE_ID}`,
           },
         };
         return res.json(response);

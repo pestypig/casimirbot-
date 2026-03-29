@@ -66,10 +66,10 @@ const buildValidRenderCertificate = (
   }
   const certificateBody = {
     certificate_schema_version: HULL_RENDER_CERTIFICATE_SCHEMA_VERSION,
-    metric_ref_hash: null,
+    metric_ref_hash: "metric-ref-hash",
     channel_hashes,
     support_mask_hash: "h-support",
-    chart: null,
+    chart: "comoving_cartesian",
     observer: "eulerian_n",
     theta_definition: "theta=-trK",
     kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
@@ -114,9 +114,27 @@ const buildValidRenderCertificate = (
       bundle_spread: 0,
       constraint_rms: 0,
       support_coverage_pct: 100,
-      metric_ref_hash: null,
+      metric_ref_hash: yorkView ? "metric-ref-hash" : null,
       timestamp_ms: yorkView ? 1 : null,
       theta_definition: yorkView ? "theta=-trK" : null,
+      theta_channel_hash: yorkView ? "h-theta" : null,
+      slice_array_hash: yorkView
+        ? yorkSurfaceRhoView
+          ? "h-york-slice-rho"
+          : "h-york-slice-midplane"
+        : null,
+      normalized_slice_hash: yorkTopologyView ? "h-york-slice-normalized" : null,
+      support_mask_slice_hash: yorkShellMapView ? "h-support-slice-midplane" : null,
+      shell_masked_slice_hash: yorkShellMapView ? "h-shell-masked-slice-midplane" : null,
+      theta_min_raw: yorkView ? -1e-9 : null,
+      theta_max_raw: yorkView ? 1e-9 : null,
+      theta_abs_max_raw: yorkView ? 1e-9 : null,
+      theta_min_display: yorkView ? -1e-12 : null,
+      theta_max_display: yorkView ? 1e-12 : null,
+      theta_abs_max_display: yorkView ? 1e-12 : null,
+      display_range_method: yorkView
+        ? "computeSliceRange:diverging:p98-abs-symmetric"
+        : null,
       theta_min: yorkView ? -1e-9 : null,
       theta_max: yorkView ? 1e-9 : null,
       theta_abs_max: yorkView ? 1e-9 : null,
@@ -134,6 +152,15 @@ const buildValidRenderCertificate = (
           ? "x-rho"
           : "x-z-midplane"
         : null,
+      theta_shell_min_raw: yorkShellMapView ? -5e-10 : null,
+      theta_shell_max_raw: yorkShellMapView ? 4e-10 : null,
+      theta_shell_abs_max_raw: yorkShellMapView ? 5e-10 : null,
+      theta_shell_min_display: yorkShellMapView ? -5e-10 : null,
+      theta_shell_max_display: yorkShellMapView ? 4e-10 : null,
+      theta_shell_abs_max_display: yorkShellMapView ? 5e-10 : null,
+      shell_support_count: yorkShellMapView ? 512 : null,
+      shell_active_count: yorkShellMapView ? 321 : null,
+      shell_mask_slice_hash: yorkShellMapView ? "h-shell-mask-slice" : null,
       supported_theta_fraction: yorkShellMapView ? 0.7 : null,
       shell_theta_overlap_pct: yorkShellMapView ? 42 : null,
       peak_theta_cell: yorkView ? [24, 24, 24] : null,
@@ -566,6 +593,18 @@ describe("hull-render router", () => {
     expect(typeof res.body.scientificLaneReady).toBe("boolean");
     expect(typeof res.body.fallbackLaneActive).toBe("boolean");
     expect(typeof res.body.requireIntegralSignal).toBe("boolean");
+    expect(typeof res.body.serviceVersion).toBe("string");
+    expect(String(res.body.serviceVersion).length).toBeGreaterThan(0);
+    expect(typeof res.body.buildHash).toBe("string");
+    expect(String(res.body.buildHash).length).toBeGreaterThan(0);
+    expect(typeof res.body.commitSha).toBe("string");
+    expect(String(res.body.commitSha).length).toBeGreaterThan(0);
+    expect(typeof res.body.processStartedAtMs).toBe("number");
+    expect(typeof res.body.runtimeInstanceId).toBe("string");
+    expect(String(res.body.runtimeInstanceId).length).toBeGreaterThan(0);
+    expect(String(res.body.provenance?.serviceVersion ?? "").length).toBeGreaterThan(0);
+    expect(String(res.body.provenance?.buildHash ?? "").length).toBeGreaterThan(0);
+    expect(String(res.body.provenance?.commitSha ?? "").length).toBeGreaterThan(0);
   });
 
   it("accepts strict full-atlas when atlas sidecar is coherent", async () => {
@@ -1107,12 +1146,131 @@ describe("hull-render router", () => {
     }
   });
 
+  it("fails strict york-time-3p1 when raw York display_gain is not 1", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        display_gain: 3.5,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_raw_hidden_gain_detected",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 when raw York is mislabeled with magnitude_mode", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      render: {
+        ...baseCertificate.render,
+        magnitude_mode: "normalized-topology-only",
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_raw_magnitude_mode_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
   it("fails strict york-time-3p1 when York diagnostics are missing", async () => {
     const baseCertificate = buildValidRenderCertificate("york-time-3p1");
     const certificate = withRehashedCertificate({
       ...baseCertificate,
       diagnostics: {
         ...baseCertificate.diagnostics,
+        theta_min_raw: null,
+        theta_max_raw: null,
+        theta_abs_max_raw: null,
+        theta_min_display: null,
+        theta_max_display: null,
+        theta_abs_max_display: null,
+        display_range_method: null,
         theta_min: null,
         theta_max: null,
         theta_abs_max: null,
@@ -1120,6 +1278,120 @@ describe("hull-render router", () => {
         display_gain: null,
         height_scale: null,
         near_zero_theta: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_diagnostics_missing",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 when raw York extrema diagnostics are missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        theta_min_raw: null,
+        theta_max_raw: null,
+        theta_abs_max_raw: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_diagnostics_missing",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 when slice_array_hash provenance is missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        slice_array_hash: null,
       },
     });
     const remote = express();
@@ -1270,6 +1542,123 @@ describe("hull-render router", () => {
       expect(res.body.error).toBe("mis_proxy_failed");
       expect(String(res.body.message ?? "")).toContain(
         "remote_mis_render_certificate_york_coordinate_mode_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 when certificate timestamp_ms drifts from requested snapshot timestamp", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      timestamp_ms: 1234,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        timestamp_ms: 1234,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1, chart: "comoving_cartesian" },
+        metricVolumeRef: {
+          kind: "gr-evolve-brick",
+          url: "http://127.0.0.1:5050/api/helix/gr-evolve-brick",
+          hash: "metric-ref-hash",
+          chart: "comoving_cartesian",
+          updatedAt: 2222,
+        },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_snapshot_identity_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 when required same-snapshot identity fields are missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      chart: null,
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_snapshot_identity_mismatch",
       );
     } finally {
       await new Promise<void>((resolve, reject) => {
@@ -1502,12 +1891,131 @@ describe("hull-render router", () => {
     }
   });
 
+  it("fails strict york-surface-3p1 when raw York display_gain is not 1", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-surface-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        display_gain: 2.25,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-surface-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_surface_hidden_gain_detected",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-surface-3p1 when raw York is mislabeled with magnitude_mode", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-surface-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      render: {
+        ...baseCertificate.render,
+        magnitude_mode: "normalized-topology-only",
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-surface-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_surface_raw_magnitude_mode_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
   it("fails strict york-surface-3p1 when York diagnostics are missing", async () => {
     const baseCertificate = buildValidRenderCertificate("york-surface-3p1");
     const certificate = withRehashedCertificate({
       ...baseCertificate,
       diagnostics: {
         ...baseCertificate.diagnostics,
+        theta_min_raw: null,
+        theta_max_raw: null,
+        theta_abs_max_raw: null,
+        theta_min_display: null,
+        theta_max_display: null,
+        theta_abs_max_display: null,
+        display_range_method: null,
         theta_min: null,
         theta_max: null,
         theta_abs_max: null,
@@ -1916,6 +2424,177 @@ describe("hull-render router", () => {
     }
   });
 
+  it("fails strict york-surface-rho-3p1 when display York extrema diagnostics are missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-surface-rho-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        theta_min_display: null,
+        theta_max_display: null,
+        theta_abs_max_display: null,
+        display_range_method: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-surface-rho-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_surface_diagnostics_missing",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-surface-rho-3p1 when raw York display_gain is not 1", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-surface-rho-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        display_gain: 2.5,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-surface-rho-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_surface_hidden_gain_detected",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-surface-rho-3p1 when raw York is mislabeled with magnitude_mode", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-surface-rho-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      render: {
+        ...baseCertificate.render,
+        magnitude_mode: "normalized-topology-only",
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-surface-rho-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_surface_raw_magnitude_mode_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
   it("accepts strict york-topology-normalized-3p1 with normalized topology metadata", async () => {
     const certificate = buildValidRenderCertificate("york-topology-normalized-3p1");
     const remote = express();
@@ -2084,6 +2763,62 @@ describe("hull-render router", () => {
     }
   });
 
+  it("fails strict york-topology-normalized-3p1 when normalized_slice_hash provenance is missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-topology-normalized-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        normalized_slice_hash: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-topology-normalized-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_topology_diagnostics_missing",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
   it("accepts strict york-shell-map-3p1 with shell-localized theta metadata", async () => {
     const certificate = buildValidRenderCertificate("york-shell-map-3p1");
     const remote = express();
@@ -2130,6 +2865,23 @@ describe("hull-render router", () => {
       );
       expect(res.body.renderCertificate?.diagnostics?.shell_theta_overlap_pct).toBeCloseTo(
         42,
+      );
+      expect(res.body.renderCertificate?.diagnostics?.theta_channel_hash).toBe("h-theta");
+      expect(res.body.renderCertificate?.diagnostics?.slice_array_hash).toBe(
+        "h-york-slice-midplane",
+      );
+      expect(res.body.renderCertificate?.diagnostics?.support_mask_slice_hash).toBe(
+        "h-support-slice-midplane",
+      );
+      expect(res.body.renderCertificate?.diagnostics?.shell_masked_slice_hash).toBe(
+        "h-shell-masked-slice-midplane",
+      );
+      expect(res.body.renderCertificate?.diagnostics?.theta_shell_abs_max_raw).toBeCloseTo(
+        5e-10,
+      );
+      expect(res.body.renderCertificate?.diagnostics?.shell_support_count).toBe(512);
+      expect(res.body.renderCertificate?.diagnostics?.shell_mask_slice_hash).toBe(
+        "h-shell-mask-slice",
       );
     } finally {
       await new Promise<void>((resolve, reject) => {
@@ -2186,6 +2938,118 @@ describe("hull-render router", () => {
       expect(res.body.error).toBe("mis_proxy_failed");
       expect(String(res.body.message ?? "")).toContain(
         "remote_mis_render_certificate_york_shell_map_support_overlay_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-shell-map-3p1 when raw York display_gain is not 1", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-shell-map-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        display_gain: 5,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-shell-map-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_shell_map_hidden_gain_detected",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-shell-map-3p1 when raw York is mislabeled with magnitude_mode", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-shell-map-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      render: {
+        ...baseCertificate.render,
+        magnitude_mode: "normalized-topology-only",
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-shell-map-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_shell_map_raw_magnitude_mode_mismatch",
       );
     } finally {
       await new Promise<void>((resolve, reject) => {
@@ -2369,6 +3233,127 @@ describe("hull-render router", () => {
       diagnostics: {
         ...baseCertificate.diagnostics,
         supported_theta_fraction: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-shell-map-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_shell_map_diagnostics_missing",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-shell-map-3p1 when shell-localized diagnostics are missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-shell-map-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        theta_shell_min_raw: null,
+        theta_shell_max_raw: null,
+        theta_shell_abs_max_raw: null,
+        theta_shell_min_display: null,
+        theta_shell_max_display: null,
+        theta_shell_abs_max_display: null,
+        shell_support_count: null,
+        shell_active_count: null,
+        shell_mask_slice_hash: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-shell-map-3p1",
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_york_shell_map_diagnostics_missing",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-shell-map-3p1 when shell provenance hashes are missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-shell-map-3p1");
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        support_mask_slice_hash: null,
+        shell_masked_slice_hash: null,
       },
     });
     const remote = express();
@@ -3147,6 +4132,11 @@ describe("hull-render router", () => {
   });
 
   it("in auto mode, fails over endpoint order to OptiX when generic endpoint is stale", async () => {
+    const remoteServiceVersion = "casimirbot.hull-optix-service@test";
+    const remoteBuildHash = "git-0123456789ab";
+    const remoteCommitSha = "0123456789abcdef0123456789abcdef01234567";
+    const remoteProcessStartedAtMs = 1700000000000;
+    const remoteRuntimeInstanceId = "remote-runtime-abc123";
     const remote = express();
     remote.use(express.json({ limit: "2mb" }));
     remote.get("/api/helix/hull-render/status", (_req, res) => {
@@ -3157,6 +4147,11 @@ describe("hull-render router", () => {
           readyForOptix: true,
           readyForScientificLane: true,
           allowSynthetic: false,
+          serviceVersion: remoteServiceVersion,
+          buildHash: remoteBuildHash,
+          commitSha: remoteCommitSha,
+          processStartedAtMs: remoteProcessStartedAtMs,
+          runtimeInstanceId: remoteRuntimeInstanceId,
         },
       });
     });
@@ -3230,6 +4225,11 @@ describe("hull-render router", () => {
       expect(status.body.remoteStatus?.reachable).toBe(true);
       expect(status.body.scientificLaneReady).toBe(true);
       expect(status.body.fallbackLaneActive).toBe(false);
+      expect(status.body.remoteStatus?.serviceVersion).toBe(remoteServiceVersion);
+      expect(status.body.remoteStatus?.buildHash).toBe(remoteBuildHash);
+      expect(status.body.remoteStatus?.commitSha).toBe(remoteCommitSha);
+      expect(status.body.remoteStatus?.processStartedAtMs).toBe(remoteProcessStartedAtMs);
+      expect(status.body.remoteStatus?.runtimeInstanceId).toBe(remoteRuntimeInstanceId);
 
       const frame = await request(app)
         .post("/api/helix/hull-render/frame")

@@ -7467,6 +7467,19 @@ const res = 256;
           ) {
             throw new Error("scientific_york_convention_mismatch");
           }
+          const yorkDiagnostics = frameCertificate.diagnostics ?? {};
+          const hasYorkRawAndDisplayExtrema =
+            Number.isFinite(yorkDiagnostics.theta_min_raw ?? Number.NaN) &&
+            Number.isFinite(yorkDiagnostics.theta_max_raw ?? Number.NaN) &&
+            Number.isFinite(yorkDiagnostics.theta_abs_max_raw ?? Number.NaN) &&
+            Number.isFinite(yorkDiagnostics.theta_min_display ?? Number.NaN) &&
+            Number.isFinite(yorkDiagnostics.theta_max_display ?? Number.NaN) &&
+            Number.isFinite(yorkDiagnostics.theta_abs_max_display ?? Number.NaN) &&
+            typeof yorkDiagnostics.display_range_method === "string" &&
+            yorkDiagnostics.display_range_method.trim().length > 0;
+          if (!hasYorkRawAndDisplayExtrema) {
+            throw new Error("scientific_york_convention_mismatch");
+          }
           if (
             yorkShellMapRequested &&
             frameCertificate.render?.support_overlay !==
@@ -7493,6 +7506,15 @@ const res = 256;
             frameCertificate.theta_definition.trim().length === 0
           ) {
             throw new Error("scientific_york_convention_mismatch");
+          }
+          // "These York views are same-snapshot congruent renderings of one NHM2 solution.
+          // Parameter-family comparisons are separate products and must not be represented
+          // as a single simultaneous system."
+          if (!frameIdentity) {
+            throw new Error("scientific_york_certificate_mismatch");
+          }
+          if (!scientificSnapshotIdentityRef.current) {
+            scientificSnapshotIdentityRef.current = frameIdentity;
           }
           if (
             scientificSnapshotIdentityRef.current &&
