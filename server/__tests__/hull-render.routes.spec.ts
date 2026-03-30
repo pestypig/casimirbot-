@@ -12,6 +12,12 @@ import {
   type HullScientificAtlasSidecarV1,
   type HullRenderCertificateV1,
 } from "../../shared/hull-render-contract";
+import {
+  YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+  YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+  YORK_DIAGNOSTIC_LANE_CONVENTIONS,
+  isYorkDiagnosticLaneId,
+} from "../../shared/york-diagnostic-lanes";
 
 const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) {
@@ -40,6 +46,9 @@ const buildValidRenderCertificate = (
     | "york-shell-map-3p1"
     | "shift-shell-3p1"
     | "full-atlas" = "diagnostic-quad",
+  options?: {
+    diagnosticLaneId?: string | null;
+  },
 ): HullRenderCertificateV1 => {
   const yorkSurfaceView =
     view === "york-surface-3p1" || view === "york-surface-rho-3p1";
@@ -51,6 +60,15 @@ const buildValidRenderCertificate = (
     yorkSurfaceView ||
     yorkTopologyView ||
     yorkShellMapView;
+  const requestedLaneId =
+    yorkView && typeof options?.diagnosticLaneId === "string" && options.diagnosticLaneId.trim().length > 0
+      ? options.diagnosticLaneId.trim()
+      : YORK_DIAGNOSTIC_BASELINE_LANE_ID;
+  const laneId =
+    yorkView && isYorkDiagnosticLaneId(requestedLaneId)
+      ? requestedLaneId
+      : YORK_DIAGNOSTIC_BASELINE_LANE_ID;
+  const laneConvention = YORK_DIAGNOSTIC_LANE_CONVENTIONS[laneId];
   const shiftShellView = view === "shift-shell-3p1";
 
   const channel_hashes: Record<string, string> = {};
@@ -70,9 +88,11 @@ const buildValidRenderCertificate = (
     channel_hashes,
     support_mask_hash: "h-support",
     chart: "comoving_cartesian",
-    observer: "eulerian_n",
-    theta_definition: "theta=-trK",
-    kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+    observer: yorkView ? laneConvention.observer : "eulerian_n",
+    theta_definition: yorkView ? laneConvention.theta_definition : "theta=-trK",
+    kij_sign_convention: yorkView
+      ? laneConvention.kij_sign_convention
+      : "K_ij=-1/2*L_n(gamma_ij)",
     unit_system: "SI",
     camera: { pose: "test_pose", proj: "test_proj" },
     render: {
@@ -80,7 +100,7 @@ const buildValidRenderCertificate = (
       integrator: "christoffel-rk4",
       steps: 0,
       field_key: yorkView ? "theta" : shiftShellView ? "beta_x" : null,
-      lane_id: yorkView ? "lane_a_eulerian_comoving_theta_minus_trk" : null,
+      lane_id: yorkView ? laneId : null,
       slice_plane:
         yorkView || shiftShellView
           ? yorkSurfaceRhoView
@@ -115,10 +135,45 @@ const buildValidRenderCertificate = (
       bundle_spread: 0,
       constraint_rms: 0,
       support_coverage_pct: 100,
-      lane_id: yorkView ? "lane_a_eulerian_comoving_theta_minus_trk" : null,
+      lane_id: yorkView ? laneId : null,
+      observer_definition_id: yorkView
+        ? laneConvention.observer_definition_id
+        : null,
+      observer_inputs_required: yorkView
+        ? laneConvention.observer_inputs_required
+        : null,
+      observer_construction_inputs: yorkView
+        ? laneConvention.observer_construction_inputs
+        : null,
+      observer_construction_formula: yorkView
+        ? laneConvention.observer_construction_formula
+        : null,
+      observer_normalized: yorkView ? laneConvention.observer_normalized : null,
+      observer_approximation: yorkView
+        ? laneConvention.observer_approximation
+        : null,
+      observer_inputs_present: yorkView ? true : null,
+      lane_b_semantic_mode: yorkView
+        ? laneConvention.lane_semantic_mode
+        : null,
+      lane_b_tensor_inputs_hash: yorkView ? "h-lane-b-inputs" : null,
+      lane_b_geometry_ready: yorkView ? true : null,
+      lane_b_semantics_closed: yorkView
+        ? laneConvention.semantics_closed
+        : null,
+      requires_gamma_metric: yorkView
+        ? laneConvention.requires_gamma_metric
+        : null,
+      semantics_closed: yorkView ? laneConvention.semantics_closed : null,
+      cross_lane_claim_ready: yorkView
+        ? laneConvention.cross_lane_claim_ready
+        : null,
+      cross_lane_claim_block_reason: yorkView
+        ? laneConvention.cross_lane_claim_block_reason
+        : null,
       metric_ref_hash: yorkView ? "metric-ref-hash" : null,
       timestamp_ms: yorkView ? 1 : null,
-      theta_definition: yorkView ? "theta=-trK" : null,
+      theta_definition: yorkView ? laneConvention.theta_definition : null,
       theta_channel_hash: yorkView ? "h-theta" : null,
       slice_array_hash: yorkView
         ? yorkSurfaceRhoView
@@ -834,6 +889,301 @@ describe("hull-render router", () => {
       );
       expect(res.body.renderCertificate?.diagnostics?.lane_id).toBe(
         "lane_a_eulerian_comoving_theta_minus_trk",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("accepts strict york-time-3p1 for Lane B when certificate lane conventions match", async () => {
+    const certificate = buildValidRenderCertificate("york-time-3p1", {
+      diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+          diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.renderCertificate?.render?.lane_id).toBe(
+        YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      );
+      expect(res.body.renderCertificate?.observer).toBe(
+        YORK_DIAGNOSTIC_LANE_CONVENTIONS[YORK_DIAGNOSTIC_ALTERNATE_LANE_ID].observer,
+      );
+      expect(res.body.renderCertificate?.theta_definition).toBe(
+        YORK_DIAGNOSTIC_LANE_CONVENTIONS[YORK_DIAGNOSTIC_ALTERNATE_LANE_ID].theta_definition,
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 for Lane B when certificate keeps Lane A conventions", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1", {
+      diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    });
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      observer: YORK_DIAGNOSTIC_LANE_CONVENTIONS[YORK_DIAGNOSTIC_BASELINE_LANE_ID].observer,
+      theta_definition:
+        YORK_DIAGNOSTIC_LANE_CONVENTIONS[YORK_DIAGNOSTIC_BASELINE_LANE_ID].theta_definition,
+      kij_sign_convention:
+        YORK_DIAGNOSTIC_LANE_CONVENTIONS[YORK_DIAGNOSTIC_BASELINE_LANE_ID]
+          .kij_sign_convention,
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+          diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_lane_convention_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 for Lane B when observer metadata drift is present", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1", {
+      diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    });
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        observer_definition_id: "obs.drifted_fake_lane_b",
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+          diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_lane_observer_metadata_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 for Lane B when semantic evidence hash is missing", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1", {
+      diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    });
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        lane_b_tensor_inputs_hash: null,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+          diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_lane_b_semantic_evidence_mismatch",
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        remoteServer.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
+  it("fails strict york-time-3p1 for Lane B when cross-lane claim readiness drifts", async () => {
+    const baseCertificate = buildValidRenderCertificate("york-time-3p1", {
+      diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    });
+    const certificate = withRehashedCertificate({
+      ...baseCertificate,
+      diagnostics: {
+        ...baseCertificate.diagnostics,
+        cross_lane_claim_ready: false,
+      },
+    });
+    const remote = express();
+    remote.use(express.json({ limit: "2mb" }));
+    remote.post("/api/helix/hull-render/frame", (_req, res) => {
+      res.json(buildResearchProxyFrame(certificate));
+    });
+    const remoteServer = await new Promise<import("node:http").Server>((resolve) => {
+      const server = remote.listen(0, "127.0.0.1", () => resolve(server));
+    });
+    const remoteAddress = remoteServer.address();
+    const port =
+      typeof remoteAddress === "object" && remoteAddress ? remoteAddress.port : 0;
+    process.env.MIS_RENDER_SERVICE_FRAME_URL = `http://127.0.0.1:${port}/api/helix/hull-render/frame`;
+    process.env.MIS_RENDER_PROXY_STRICT = "1";
+    process.env.MIS_RENDER_REQUIRE_INTEGRAL_SIGNAL = "1";
+
+    const app = express();
+    app.use(express.json({ limit: "2mb" }));
+    app.use("/api/helix/hull-render", hullRenderRouter);
+
+    try {
+      const res = await request(app).post("/api/helix/hull-render/frame").send({
+        version: 1,
+        width: 640,
+        height: 360,
+        solve: { beta: 0.02, alpha: 1, sigma: 6, R: 1.1 },
+        scienceLane: {
+          requireScientificFrame: true,
+          requireIntegralSignal: true,
+          renderView: "york-time-3p1",
+          diagnosticLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        },
+      });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("mis_proxy_failed");
+      expect(String(res.body.message ?? "")).toContain(
+        "remote_mis_render_certificate_lane_observer_metadata_mismatch",
       );
     } finally {
       await new Promise<void>((resolve, reject) => {

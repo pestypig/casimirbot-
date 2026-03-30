@@ -12,6 +12,10 @@
     "claims"
   ],
   "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 3
+    },
     "schemaVersion": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$"
@@ -144,6 +148,54 @@
         }
       }
     },
+    "contractBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version",
+        "laneId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "laneId": {
+          "type": "string",
+          "minLength": 2
+        },
+        "classificationScope": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "falsifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "evidence"
+      ],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "minLength": 4
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 3
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
     "claim": {
       "type": "object",
       "additionalProperties": false,
@@ -188,6 +240,47 @@
             "type": "string",
             "minLength": 3
           }
+        },
+        "clCeiling": {
+          "type": "string",
+          "enum": [
+            "CL0",
+            "CL1",
+            "CL2",
+            "CL3",
+            "CL4"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "congruent",
+            "distinct",
+            "marginal",
+            "unstable",
+            "inconclusive"
+          ]
+        },
+        "contract": {
+          "$ref": "#/$defs/contractBinding"
+        },
+        "baselines": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "evidencePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "falsifier": {
+          "$ref": "#/$defs/falsifier"
         },
         "notes": {
           "type": "string"

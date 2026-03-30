@@ -22,6 +22,15 @@ import {
   HULL_RENDER_CERTIFICATE_SCHEMA_VERSION,
   HULL_SCIENTIFIC_ATLAS_PANES,
 } from "../shared/hull-render-contract";
+import {
+  YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+  YORK_DIAGNOSTIC_LANE_CONVENTIONS,
+  computeYorkDiagnosticLaneField,
+  isYorkDiagnosticLaneId,
+  normalizeYorkDiagnosticLaneId,
+  type YorkDiagnosticLaneId,
+  type YorkDiagnosticObserverConstructionInfo,
+} from "../shared/york-diagnostic-lanes";
 
 type HullSupportChannelName = "hull_sdf" | "tile_support_mask" | "region_class";
 
@@ -311,7 +320,54 @@ const HULL_OPTIX_BUILD_HASH = readFirstEnv(
     : null,
   HULL_OPTIX_RUNTIME_FINGERPRINT.slice(0, 16),
 );
-const YORK_DIAGNOSTIC_BASELINE_LANE_ID = "lane_a_eulerian_comoving_theta_minus_trk";
+
+const resolveRequestedYorkLaneId = (
+  payload: HullMisRenderRequestV1,
+): YorkDiagnosticLaneId =>
+  normalizeYorkDiagnosticLaneId(
+    typeof payload.scienceLane?.diagnosticLaneId === "string" &&
+      payload.scienceLane.diagnosticLaneId.trim().length > 0
+      ? payload.scienceLane.diagnosticLaneId.trim()
+      : null,
+  );
+
+const resolveYorkLaneConvention = (laneId: YorkDiagnosticLaneId) =>
+  YORK_DIAGNOSTIC_LANE_CONVENTIONS[laneId];
+
+const computeChannelExtrema = (data: Float32Array): { min: number; max: number } => {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < data.length; i += 1) {
+    const value = data[i];
+    if (!Number.isFinite(value)) continue;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return { min: 0, max: 0 };
+  }
+  return { min, max };
+};
+
+const withYorkThetaChannel = (
+  brick: GrBrickDecoded,
+  thetaData: Float32Array,
+): GrBrickDecoded => {
+  const existing = brick.channels.theta?.data;
+  if (existing === thetaData) return brick;
+  const extrema = computeChannelExtrema(thetaData);
+  return {
+    ...brick,
+    channels: {
+      ...brick.channels,
+      theta: {
+        data: thetaData,
+        min: extrema.min,
+        max: extrema.max,
+      },
+    },
+  };
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -4648,12 +4704,13 @@ const buildYorkTimeOverlaySvg = (
   brick: GrBrickDecoded,
   samplingMode: ScientificRenderSamplingMode,
 ) => {
+  const yorkLane = resolveYorkLaneConvention(resolveRequestedYorkLaneId(payload));
   const timestamp = new Date().toISOString();
   const sourceParams = parseMetricRefSourceParams(payload);
   const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
   const subtitleParts = [
     "single-snapshot York-time frame",
-    "theta = -trK (Eulerian congruence expansion)",
+    `${yorkLane.theta_definition} (${yorkLane.observer})`,
     `unit=${panel.slice.unit}`,
     `chart=${ctx.chart ?? payload.solve?.chart ?? "unknown"}`,
     `source=${ctx.metricSource ?? "unknown"}`,
@@ -4682,7 +4739,7 @@ const buildYorkTimeOverlaySvg = (
     : "fore(+x) contraction(theta<0) / aft(-x) expansion(theta>0) sign map";
   const certSummary = [
     `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"}`,
-    `theta_definition=theta=-trK`,
+    `theta_definition=${yorkLane.theta_definition}`,
     `slice_plane=x-z-midplane`,
   ].join(" | ");
 
@@ -4713,6 +4770,7 @@ const buildYorkTimeTransportOverlaySvg = (
   temporalHistory: TemporalHistorySnapshot,
   thetaFlat: boolean,
 ) => {
+  const yorkLane = resolveYorkLaneConvention(resolveRequestedYorkLaneId(payload));
   const timestamp = new Date().toISOString();
   const sourceParams = parseMetricRefSourceParams(payload);
   const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
@@ -4778,7 +4836,7 @@ const buildYorkTimeTransportOverlaySvg = (
   <text x="${yorkPanel.x + 8}" y="${yorkPanel.y + 16}" fill="#cfe5ff" font-size="11" font-weight="600">${escapeXml(yorkPanel.slice.label)}</text>
   <text x="${yorkPanel.x + 8}" y="${yorkPanel.y + 30}" fill="#9fb3ca" font-size="10">${escapeXml(yorkRange)}</text>
   <text x="${yorkPanel.x + 8}" y="${yorkPanel.y + yorkPanel.height - 22}" fill="#8ec6ff" font-size="10">${escapeXml(`${yorkAnnotation} | ${yorkPanel.slice.sampling}`)}</text>
-  <text x="${yorkPanel.x + 8}" y="${yorkPanel.y + yorkPanel.height - 10}" fill="#7f93ac" font-size="10">${escapeXml(`metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | theta_definition=theta=-trK | slice_plane=x-z-midplane`)}</text>
+  <text x="${yorkPanel.x + 8}" y="${yorkPanel.y + yorkPanel.height - 10}" fill="#7f93ac" font-size="10">${escapeXml(`metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | theta_definition=${yorkLane.theta_definition} | slice_plane=x-z-midplane`)}</text>
   <text x="${temporalRect.x + 8}" y="${temporalRect.y + 14}" fill="#cfe5ff" font-size="11" font-weight="600">Temporal RMS History (|theta|, |H|, |rho|)</text>
   <text x="${temporalRect.x + 8}" y="${temporalRect.y + temporalRect.height - 8}" fill="#7f93ac" font-size="10">${escapeXml(temporalSummary)}</text>
   <rect x="0" y="${height - 24}" width="${width}" height="24" fill="#050a14"/>
@@ -4801,6 +4859,7 @@ const buildYorkSurfaceOverlaySvg = (
   panel: ScientificRect,
   stats: YorkSurfaceRenderStats,
 ): string => {
+  const yorkLane = resolveYorkLaneConvention(resolveRequestedYorkLaneId(payload));
   const timestamp = new Date().toISOString();
   const transverseAxisLabel = stats.coordinateMode === "x-rho" ? "rho" : "z";
   const slicePlane = stats.coordinateMode === "x-rho" ? "x-rho" : "x-z-midplane";
@@ -4808,7 +4867,7 @@ const buildYorkSurfaceOverlaySvg = (
   const sourceSummary = summarizeMetricRefSourceParams(sourceParams);
   const subtitleParts = [
     "single-snapshot York surface",
-    `motion axis x, transverse ${transverseAxisLabel}, height=theta=-trK`,
+    `motion axis x, transverse ${transverseAxisLabel}, height=${yorkLane.theta_definition}`,
     "White/NASA scalar York-time surface convention",
     "certified NHM2 snapshot lock",
     `chart=${ctx.chart ?? payload.solve?.chart ?? "unknown"}`,
@@ -4828,7 +4887,7 @@ const buildYorkSurfaceOverlaySvg = (
     2,
   )} (none; raw theta) | height_scale=${fmtScientific(stats.heightScale, 3)}`;
   const contourSummary = `zero-contour segments=${stats.zeroContourSegments} | grid=${stats.nx}x${stats.nz} | surface_height=theta`;
-  const certSummary = `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | theta_definition=theta=-trK | slice_plane=${slicePlane} | ${coordinateSummary} | sampling=${stats.samplingChoice}`;
+  const certSummary = `metric_ref_hash=${payload.metricVolumeRef?.hash ?? "none"} | theta_definition=${yorkLane.theta_definition} | slice_plane=${slicePlane} | ${coordinateSummary} | sampling=${stats.samplingChoice}`;
   const diag = `null residual=${fmtScientific(
     ctx.diagnostics.maxNullResidual,
     4,
@@ -5454,6 +5513,7 @@ const renderTensorFrameYorkTime3p1 = async (
   ctx: TensorRenderContext,
   brick: GrBrickDecoded,
 ): Promise<Buffer> => {
+  const yorkLane = resolveYorkLaneConvention(resolveRequestedYorkLaneId(payload));
   const thetaChannel = brick.channels.theta?.data;
   if (!(thetaChannel instanceof Float32Array)) {
     throw new Error("scientific_york_theta_missing");
@@ -5497,7 +5557,7 @@ const renderTensorFrameYorkTime3p1 = async (
     slice: buildScientificSliceFromChannel(
       brick,
       "theta",
-      "York-Time theta = -trK",
+      `York-Time ${yorkLane.theta_definition}`,
       "1/m",
       "diverging",
       "midplane",
@@ -5564,6 +5624,7 @@ const renderTensorFrameYorkSurface3p1 = async (
   ctx: TensorRenderContext,
   brick: GrBrickDecoded,
 ): Promise<Buffer> => {
+  const yorkLane = resolveYorkLaneConvention(resolveRequestedYorkLaneId(payload));
   const thetaChannel = brick.channels.theta?.data;
   if (!(thetaChannel instanceof Float32Array)) {
     throw new Error("scientific_york_theta_missing");
@@ -5594,7 +5655,7 @@ const renderTensorFrameYorkSurface3p1 = async (
   const yorkSlice = buildScientificSliceFromChannel(
     brick,
     "theta",
-    "York-Time theta = -trK",
+    `York-Time ${yorkLane.theta_definition}`,
     "1/m",
     "diverging",
     samplingPolicy,
@@ -5638,6 +5699,7 @@ const renderTensorFrameYorkTopologyNormalized3p1 = async (
   ctx: TensorRenderContext,
   brick: GrBrickDecoded,
 ): Promise<Buffer> => {
+  const yorkLane = resolveYorkLaneConvention(resolveRequestedYorkLaneId(payload));
   const thetaChannel = brick.channels.theta?.data;
   if (!(thetaChannel instanceof Float32Array)) {
     throw new Error("scientific_york_theta_missing");
@@ -5661,7 +5723,7 @@ const renderTensorFrameYorkTopologyNormalized3p1 = async (
   const yorkSlice = buildScientificSliceFromChannel(
     brick,
     "theta",
-    "York-Time theta = -trK",
+    `York-Time ${yorkLane.theta_definition}`,
     "1/m",
     "diverging",
     "midplane",
@@ -6391,6 +6453,7 @@ const buildRenderCertificate = (args: {
   ctx: TensorRenderContext;
   brick: GrBrickDecoded;
   png: Buffer;
+  yorkObserverConstruction: YorkDiagnosticObserverConstructionInfo | null;
 }): HullRenderCertificateV1 => {
   const { payload, ctx, brick, png } = args;
   const renderView = payload.scienceLane?.renderView ?? "diagnostic-quad";
@@ -6413,8 +6476,10 @@ const buildRenderCertificate = (args: {
       ? payload.scienceLane.diagnosticLaneId.trim()
       : null;
   const laneId = yorkView
-    ? requestedLaneId ?? YORK_DIAGNOSTIC_BASELINE_LANE_ID
+    ? normalizeYorkDiagnosticLaneId(requestedLaneId)
     : null;
+  const laneConvention =
+    laneId != null ? resolveYorkLaneConvention(laneId) : null;
   const yorkSamplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
     ? "x-rho"
     : "midplane";
@@ -6503,15 +6568,38 @@ const buildRenderCertificate = (args: {
   const certificateTimestampMs = Number.isFinite(snapshotTimestampMs)
     ? snapshotTimestampMs
     : Date.now();
+  const observerConstruction = yorkView ? args.yorkObserverConstruction : null;
+  const observerInputsRequired =
+    yorkView && laneConvention
+      ? observerConstruction?.observer_inputs_required ??
+        laneConvention.observer_inputs_required ??
+        laneConvention.observer_construction_inputs
+      : null;
+  const observerInputsPresentByHash =
+    observerInputsRequired == null
+      ? null
+      : observerInputsRequired.every((channelId) => {
+          const hash = channelHashes[channelId];
+          return typeof hash === "string" && hash.trim().length > 0;
+        });
+  const laneTensorInputsHash =
+    yorkView && observerInputsRequired && observerInputsPresentByHash
+      ? sha256Hex(
+          observerInputsRequired
+            .map((channelId) => `${channelId}:${channelHashes[channelId]}`)
+            .join("|"),
+        )
+      : null;
   const certificateBase: Omit<HullRenderCertificateV1, "certificate_hash"> = {
     certificate_schema_version: HULL_RENDER_CERTIFICATE_SCHEMA_VERSION,
     metric_ref_hash: metricRefHash,
     channel_hashes: channelHashes,
     support_mask_hash: supportMaskHash,
     chart: brick.chart ?? payload.solve?.chart ?? null,
-    observer: "eulerian_n",
-    theta_definition: "theta=-trK",
-    kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+    observer: laneConvention?.observer ?? "eulerian_n",
+    theta_definition: laneConvention?.theta_definition ?? "theta=-trK",
+    kij_sign_convention:
+      laneConvention?.kij_sign_convention ?? "K_ij=-1/2*L_n(gamma_ij)",
     unit_system: "SI",
     camera: {
       pose: "ui_default_orbit",
@@ -6554,9 +6642,76 @@ const buildRenderCertificate = (args: {
       constraint_rms: computeConstraintRms(brick),
       support_coverage_pct: ctx.supportCoveragePct,
       lane_id: laneId,
+      observer_definition_id: yorkView
+        ? observerConstruction?.observer_definition_id ??
+          laneConvention?.observer_definition_id ??
+          null
+        : null,
+      observer_inputs_required: yorkView
+        ? observerInputsRequired ?? null
+        : null,
+      observer_construction_inputs: yorkView
+        ? observerConstruction?.observer_construction_inputs ??
+          laneConvention?.observer_construction_inputs ??
+          null
+        : null,
+      observer_construction_formula: yorkView
+        ? observerConstruction?.observer_construction_formula ??
+          laneConvention?.observer_construction_formula ??
+          null
+        : null,
+      observer_normalized: yorkView
+        ? observerConstruction?.observer_normalized ??
+          laneConvention?.observer_normalized ??
+          null
+        : null,
+      observer_approximation: yorkView
+        ? observerConstruction?.observer_approximation ??
+          laneConvention?.observer_approximation ??
+          null
+        : null,
+      observer_inputs_present: yorkView
+        ? observerConstruction?.observer_inputs_present ??
+          observerInputsPresentByHash
+        : null,
+      lane_b_semantic_mode: yorkView
+        ? observerConstruction?.lane_b_semantic_mode ??
+          laneConvention?.lane_semantic_mode ??
+          null
+        : null,
+      lane_b_tensor_inputs_hash: yorkView ? laneTensorInputsHash : null,
+      lane_b_geometry_ready: yorkView
+        ? observerConstruction?.lane_b_geometry_ready ??
+          observerInputsPresentByHash
+        : null,
+      lane_b_semantics_closed: yorkView
+        ? observerConstruction?.semantics_closed ??
+          laneConvention?.semantics_closed ??
+          null
+        : null,
+      requires_gamma_metric: yorkView
+        ? observerConstruction?.requires_gamma_metric ??
+          laneConvention?.requires_gamma_metric ??
+          null
+        : null,
+      semantics_closed: yorkView
+        ? observerConstruction?.semantics_closed ??
+          laneConvention?.semantics_closed ??
+          null
+        : null,
+      cross_lane_claim_ready: yorkView
+        ? observerConstruction?.cross_lane_claim_ready ??
+          laneConvention?.cross_lane_claim_ready ??
+          null
+        : null,
+      cross_lane_claim_block_reason: yorkView
+        ? observerConstruction?.cross_lane_claim_block_reason ??
+          laneConvention?.cross_lane_claim_block_reason ??
+          null
+        : null,
       metric_ref_hash: yorkView ? metricRefHash : null,
       timestamp_ms: yorkView ? certificateTimestampMs : null,
-      theta_definition: yorkView ? "theta=-trK" : null,
+      theta_definition: yorkView ? laneConvention?.theta_definition ?? null : null,
       theta_channel_hash: yorkView ? channelHashes.theta ?? null : null,
       slice_array_hash: yorkView ? yorkSliceArrayHash : null,
       normalized_slice_hash: yorkTopologyNormalizedView
@@ -6872,6 +7027,10 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
     payload.scienceLane.diagnosticLaneId.trim().length > 0
       ? payload.scienceLane.diagnosticLaneId.trim()
       : null;
+  let resolvedYorkLaneId: YorkDiagnosticLaneId | null = null;
+  let yorkMetricBrick: GrBrickDecoded | null = null;
+  let yorkObserverConstructionInfo: YorkDiagnosticObserverConstructionInfo | null =
+    null;
   const certificateIdentityRequested = yorkRequested || shiftShellRequested;
   const requireCongruentNhm2FullSolve =
     payload.scienceLane?.requireCongruentNhm2FullSolve === true ||
@@ -6957,23 +7116,45 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
     });
   }
   if (useTensorPath && yorkRequested) {
-    if (
-      requestedDiagnosticLaneId &&
-      requestedDiagnosticLaneId !== YORK_DIAGNOSTIC_BASELINE_LANE_ID
-    ) {
+    if (requestedDiagnosticLaneId && !isYorkDiagnosticLaneId(requestedDiagnosticLaneId)) {
       return res.status(422).json({
         error: "scientific_york_lane_unsupported",
         message:
-          `${renderView} supports only ${YORK_DIAGNOSTIC_BASELINE_LANE_ID} in this service`,
+          `${renderView} supports only ${Object.keys(YORK_DIAGNOSTIC_LANE_CONVENTIONS).join(", ")} in this service`,
       });
     }
-    const thetaData = metricBrick!.channels.theta?.data;
-    if (!(thetaData instanceof Float32Array)) {
+    resolvedYorkLaneId = resolveRequestedYorkLaneId(payload);
+    const laneField = computeYorkDiagnosticLaneField({
+      laneId: resolvedYorkLaneId,
+      dims: metricBrick!.dims,
+      voxelSizeM: metricBrick!.voxelSize_m,
+      theta: metricBrick!.channels.theta?.data ?? null,
+      kTrace: metricBrick!.channels.K_trace?.data ?? null,
+      betaX: metricBrick!.channels.beta_x?.data ?? null,
+      betaY: metricBrick!.channels.beta_y?.data ?? null,
+      betaZ: metricBrick!.channels.beta_z?.data ?? null,
+      alpha: metricBrick!.channels.alpha?.data ?? null,
+      gammaXX: metricBrick!.channels.gamma_xx?.data ?? null,
+      gammaXY: metricBrick!.channels.gamma_xy?.data ?? null,
+      gammaXZ: metricBrick!.channels.gamma_xz?.data ?? null,
+      gammaYY: metricBrick!.channels.gamma_yy?.data ?? null,
+      gammaYZ: metricBrick!.channels.gamma_yz?.data ?? null,
+      gammaZZ: metricBrick!.channels.gamma_zz?.data ?? null,
+    });
+    if (!laneField.ok && laneField.error === "scientific_york_theta_missing") {
       return res.status(422).json({
         error: "scientific_york_theta_missing",
         message: `${renderView} requires canonical theta channel in metric volume`,
       });
     }
+    if (!laneField.ok) {
+      return res.status(422).json({
+        error: "scientific_york_lane_tensor_missing",
+        message: `${renderView} requires lane tensors for ${resolvedYorkLaneId}: missing ${laneField.missingChannels.join(", ")}`,
+      });
+    }
+    yorkObserverConstructionInfo = laneField.observerConstruction;
+    yorkMetricBrick = withYorkThetaChannel(metricBrick!, laneField.theta);
     const chartNow = (metricBrick!.chart ?? payload.solve?.chart ?? "").trim().toLowerCase();
     if (chartNow.length > 0 && chartNow !== "comoving_cartesian") {
       return res.status(422).json({
@@ -7022,8 +7203,10 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
       });
     }
   }
+  const activeMetricBrick =
+    useTensorPath && yorkRequested && yorkMetricBrick ? yorkMetricBrick : metricBrick;
   const png = useTensorPath
-    ? await renderTensorFrame(payload, deterministicSeed, tensorContext!, metricBrick!)
+    ? await renderTensorFrame(payload, deterministicSeed, tensorContext!, activeMetricBrick!)
     : await renderOptixScaffoldFrame(payload, deterministicSeed);
   const transportFieldForNote =
     useTensorPath && renderView === "transport-3p1"
@@ -7038,12 +7221,13 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
         )}`
       : "";
   const renderCertificate =
-    useTensorPath && metricBrick && tensorContext
+    useTensorPath && activeMetricBrick && tensorContext
       ? buildRenderCertificate({
           payload,
           ctx: tensorContext,
-          brick: metricBrick,
+          brick: activeMetricBrick,
           png,
+          yorkObserverConstruction: yorkObserverConstructionInfo,
         })
       : undefined;
   if (useTensorPath && yorkRequested) {
@@ -7349,6 +7533,73 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
             `${renderView} requires diagnostics.lane_id=${requestedDiagnosticLaneId} in render certificate`,
         });
       }
+      const laneConvention = isYorkDiagnosticLaneId(requestedDiagnosticLaneId)
+        ? resolveYorkLaneConvention(requestedDiagnosticLaneId)
+        : null;
+      if (
+        !laneConvention ||
+        renderCertificate.observer !== laneConvention.observer ||
+        renderCertificate.theta_definition !== laneConvention.theta_definition ||
+        renderCertificate.kij_sign_convention !== laneConvention.kij_sign_convention
+      ) {
+        return res.status(422).json({
+          error: "scientific_york_lane_mismatch",
+          message:
+            `${renderView} requires observer/theta_definition/kij_sign_convention to match lane ${requestedDiagnosticLaneId}`,
+        });
+      }
+      if (requestedDiagnosticLaneId === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID) {
+        const observerInputsRequired = Array.isArray(
+          renderCertificate.diagnostics.observer_inputs_required,
+        )
+          ? renderCertificate.diagnostics.observer_inputs_required
+              .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+              .filter((entry) => entry.length > 0)
+              .sort()
+          : [];
+        const expectedObserverInputsRequired = [
+          ...laneConvention.observer_inputs_required,
+        ]
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+          .sort();
+        const observerInputsRequiredMatch =
+          observerInputsRequired.length === expectedObserverInputsRequired.length &&
+          observerInputsRequired.every(
+            (entry, index) => entry === expectedObserverInputsRequired[index],
+          );
+        if (
+          renderCertificate.diagnostics.observer_definition_id !==
+            laneConvention.observer_definition_id ||
+          renderCertificate.diagnostics.observer_construction_formula !==
+            laneConvention.observer_construction_formula ||
+          renderCertificate.diagnostics.observer_normalized !==
+            laneConvention.observer_normalized ||
+          (renderCertificate.diagnostics.observer_approximation ?? null) !==
+            (laneConvention.observer_approximation ?? null) ||
+          renderCertificate.diagnostics.cross_lane_claim_ready !==
+            laneConvention.cross_lane_claim_ready ||
+          renderCertificate.diagnostics.observer_inputs_present !== true ||
+          renderCertificate.diagnostics.lane_b_geometry_ready !== true ||
+          typeof renderCertificate.diagnostics.lane_b_semantic_mode !== "string" ||
+          renderCertificate.diagnostics.lane_b_semantic_mode.trim().length === 0 ||
+          renderCertificate.diagnostics.lane_b_semantic_mode !==
+            laneConvention.lane_semantic_mode ||
+          typeof renderCertificate.diagnostics.lane_b_tensor_inputs_hash !==
+            "string" ||
+          renderCertificate.diagnostics.lane_b_tensor_inputs_hash.trim().length ===
+            0 ||
+          renderCertificate.diagnostics.lane_b_semantics_closed !==
+            laneConvention.semantics_closed ||
+          !observerInputsRequiredMatch
+        ) {
+          return res.status(422).json({
+            error: "scientific_york_lane_mismatch",
+            message:
+              `${renderView} requires Lane B semantic evidence (observer_definition_id/observer_construction_formula/observer_normalized/observer_approximation/cross_lane_claim_ready/observer_inputs_required/observer_inputs_present/lane_b_semantic_mode/lane_b_tensor_inputs_hash/lane_b_geometry_ready/lane_b_semantics_closed) to match lane ${requestedDiagnosticLaneId}`,
+          });
+        }
+      }
     }
   }
   if (useTensorPath && shiftShellRequested) {
@@ -7456,6 +7707,36 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
                 // auditable scientific visualization.
                 lane_id: renderCertificate.diagnostics.lane_id ?? null,
                 laneId: renderCertificate.diagnostics.lane_id ?? null,
+                observer_definition_id:
+                  renderCertificate.diagnostics.observer_definition_id ?? null,
+                observer_inputs_required:
+                  renderCertificate.diagnostics.observer_inputs_required ?? null,
+                observer_construction_inputs:
+                  renderCertificate.diagnostics.observer_construction_inputs ?? null,
+                observer_construction_formula:
+                  renderCertificate.diagnostics.observer_construction_formula ?? null,
+                observer_normalized:
+                  renderCertificate.diagnostics.observer_normalized ?? null,
+                observer_approximation:
+                  renderCertificate.diagnostics.observer_approximation ?? null,
+                observer_inputs_present:
+                  renderCertificate.diagnostics.observer_inputs_present ?? null,
+                lane_b_semantic_mode:
+                  renderCertificate.diagnostics.lane_b_semantic_mode ?? null,
+                lane_b_tensor_inputs_hash:
+                  renderCertificate.diagnostics.lane_b_tensor_inputs_hash ?? null,
+                lane_b_geometry_ready:
+                  renderCertificate.diagnostics.lane_b_geometry_ready ?? null,
+                lane_b_semantics_closed:
+                  renderCertificate.diagnostics.lane_b_semantics_closed ?? null,
+                requires_gamma_metric:
+                  renderCertificate.diagnostics.requires_gamma_metric ?? null,
+                semantics_closed:
+                  renderCertificate.diagnostics.semantics_closed ?? null,
+                cross_lane_claim_ready:
+                  renderCertificate.diagnostics.cross_lane_claim_ready ?? null,
+                cross_lane_claim_block_reason:
+                  renderCertificate.diagnostics.cross_lane_claim_block_reason ?? null,
                 metric_ref_hash: renderCertificate.diagnostics.metric_ref_hash ?? null,
                 timestamp_ms: renderCertificate.diagnostics.timestamp_ms ?? null,
                 theta_definition:

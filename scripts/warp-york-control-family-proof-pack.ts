@@ -10,10 +10,24 @@ import type {
   HullScientificRenderView,
 } from "../shared/hull-render-contract";
 import {
+  computeWarpRodcChecksum,
+  WARP_RODC_SNAPSHOT_SCHEMA_VERSION,
+  type WarpRodcSnapshotV1,
+  type WarpRodcStability,
+  type WarpRodcVerdictStatus,
+} from "../shared/warp-rodc-contract";
+import {
   hashFloat32,
   loadHullScientificSnapshot,
   resolveMetricRefHash,
 } from "../server/lib/hull-scientific-snapshot";
+import {
+  computeYorkDiagnosticLaneField,
+  isYorkDiagnosticLaneId,
+  YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+  YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+  type YorkDiagnosticLaneId,
+} from "../shared/york-diagnostic-lanes";
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
 const FULL_SOLVE_DIR = path.join("artifacts", "research", "full-solve");
@@ -36,6 +50,14 @@ const DEFAULT_OUT_MD = path.join(
 const DEFAULT_LATEST_JSON = path.join(
   FULL_SOLVE_DIR,
   "warp-york-control-family-proof-pack-latest.json",
+);
+const DEFAULT_RODC_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `warp-york-control-family-rodc-${DATE_STAMP}.json`,
+);
+const DEFAULT_RODC_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "warp-york-control-family-rodc-latest.json",
 );
 const DEFAULT_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
@@ -64,6 +86,20 @@ type CaseId = "alcubierre_control" | "natario_control" | "nhm2_certified";
 type DecisionRowStatus = "true" | "false";
 type Nhm2DiagnosticOutcome = (typeof NHM2_DIAGNOSTIC_OUTCOME)[keyof typeof NHM2_DIAGNOSTIC_OUTCOME];
 type DecisionVerdict = Nhm2DiagnosticOutcome | "inconclusive";
+type SharedLaneCauseCode =
+  | "render_parity_failure"
+  | "theta_ktrace_contract_failure"
+  | "snapshot_identity_failure"
+  | "missing_required_view"
+  | "missing_required_hash";
+type LaneFamilyCauseCode =
+  | "lane_a_family_congruent"
+  | "lane_a_family_distinct"
+  | "lane_a_family_inconclusive"
+  | "lane_b_family_congruent"
+  | "lane_b_family_distinct"
+  | "lane_b_family_inconclusive";
+type LaneCauseCode = SharedLaneCauseCode | LaneFamilyCauseCode;
 
 type GuardFailure = {
   code: string;
@@ -75,6 +111,12 @@ type ProofPackPreconditions = {
   allRequiredViewsRendered: boolean;
   provenanceHashesPresent: boolean;
   runtimeStatusProvenancePresent: boolean;
+  offlineRenderParityComputed?: boolean;
+  thetaKTraceParityComputed?: boolean;
+  snapshotIdentityComplete?: boolean;
+  diagnosticParityClosed?: boolean;
+  // Legacy alias kept for compatibility with existing artifacts/tests.
+  laneAParityClosed?: boolean;
   readyForFamilyVerdict: boolean;
 };
 
@@ -156,6 +198,15 @@ type YorkViewSummary = {
     support_mask_slice_hash: string | null;
     shell_masked_slice_hash: string | null;
   };
+  laneEvidence: {
+    observer_definition_id: string | null;
+    observer_inputs_required: string[] | null;
+    observer_inputs_present: boolean | null;
+    lane_b_semantic_mode: string | null;
+    lane_b_tensor_inputs_hash: string | null;
+    lane_b_geometry_ready: boolean | null;
+    lane_b_semantics_closed: boolean | null;
+  };
 };
 
 type CaseSnapshotMetrics = {
@@ -168,6 +219,27 @@ type CaseSnapshotMetrics = {
   channelHashes: {
     theta: string | null;
     K_trace: string | null;
+    theta_canonical?: string | null;
+    lane_contract?: string | null;
+  };
+  laneComputation?: {
+    lane_id: string | null;
+    theta_source: string | null;
+    contract_source: string | null;
+    observer_definition_id?: string | null;
+    observer_inputs_required?: string[];
+    observer_construction_inputs?: string[];
+    observer_construction_formula?: string | null;
+    observer_normalized?: boolean;
+    observer_approximation?: string | null;
+    observer_inputs_present?: boolean;
+    lane_b_semantic_mode?: string | null;
+    lane_b_tensor_inputs_hash?: string | null;
+    lane_b_geometry_ready?: boolean;
+    lane_b_semantics_closed?: boolean;
+    requires_gamma_metric?: boolean;
+    semantics_closed?: boolean;
+    cross_lane_claim_ready?: boolean;
   };
   sourceFamily: {
     family_id: string | null;
@@ -204,6 +276,7 @@ type CaseResult = {
   };
   snapshotMetrics: CaseSnapshotMetrics | null;
   offlineYorkAudit: CaseOfflineYorkAudit | null;
+  parity: CaseLaneAParityAudit | null;
   classificationFeatures: CaseClassificationFeatures;
 };
 
@@ -319,15 +392,103 @@ type YorkRobustnessChecks = {
   };
 };
 
+type YorkParityViewAudit = {
+  view: HullScientificRenderView;
+  coordinateMode: "x-z-midplane" | "x-rho" | null;
+  samplingChoice: string | null;
+  offlineThetaSliceHash: string | null;
+  offlineNegKTraceSliceHash: string | null;
+  renderThetaSliceHash: string | null;
+  thetaVsRenderMaxAbsResidual: number | null;
+  thetaVsKTraceMaxAbsResidual: number | null;
+  signCountDelta: {
+    thetaVsRender: {
+      positive: number | null;
+      negative: number | null;
+      zeroOrNearZero: number | null;
+      total: number | null;
+    };
+    thetaVsKTrace: {
+      positive: number | null;
+      negative: number | null;
+      zeroOrNearZero: number | null;
+      total: number | null;
+    };
+  };
+  supportOverlapPct: {
+    offline: number | null;
+    render: number | null;
+    delta: number | null;
+  };
+  extremaDelta: {
+    thetaVsRender: {
+      minRaw: number | null;
+      maxRaw: number | null;
+      absMaxRaw: number | null;
+    };
+    thetaVsKTrace: {
+      minRaw: number | null;
+      maxRaw: number | null;
+      absMaxRaw: number | null;
+    };
+  };
+  identity: {
+    complete: boolean;
+    laneMatches: boolean;
+    metricRefMatches: boolean;
+    chartMatches: boolean;
+    observerMatches: boolean;
+    thetaDefinitionMatches: boolean;
+    kijSignConventionMatches: boolean;
+    thetaHashMatches: boolean;
+    timestampPresent: boolean;
+  };
+  status: "pass" | "fail";
+  causeCode: LaneCauseCode | null;
+};
+
+type CaseLaneAParityAudit = {
+  caseId: CaseId;
+  parityComputed: boolean;
+  thetaKTraceParityComputed: boolean;
+  snapshotIdentityComplete: boolean;
+  renderParityPass: boolean;
+  thetaKTraceContractPass: boolean;
+  byView: YorkParityViewAudit[];
+  status: "pass" | "fail";
+  causeCode: LaneCauseCode | null;
+};
+
+type LaneAParitySummary = {
+  status: "closed" | "failed";
+  causeCode: LaneCauseCode | null;
+  caseSummaries: Array<{
+    caseId: CaseId;
+    status: "pass" | "fail";
+    causeCode: LaneCauseCode | null;
+  }>;
+};
+
 type YorkDiagnosticLane = {
   lane_id: string;
   active: boolean;
   supported: boolean;
   unsupported_reason: string | null;
   observer: string;
+  observer_definition_id: string | null;
+  observer_inputs_required: string[];
+  observer_construction_inputs: string[];
+  observer_construction_formula: string | null;
+  observer_normalized: boolean;
+  observer_approximation: string | null;
+  lane_semantic_mode: string;
   foliation: string;
   theta_definition: string;
   kij_sign_convention: string;
+  requires_gamma_metric: boolean;
+  semantics_closed: boolean;
+  cross_lane_claim_ready: boolean;
+  cross_lane_claim_block_reason: string | null;
   coordinate_views: Record<string, string>;
   remap_rules: Record<string, string>;
   normalization_rules: Record<string, string>;
@@ -454,14 +615,37 @@ type LaneProofPackEvaluation = {
   supported: boolean;
   unsupported_reason: string | null;
   observer: string;
+  observer_definition_id?: string | null;
+  observer_inputs_required?: string[];
+  observer_construction_inputs?: string[];
+  observer_construction_formula?: string | null;
+  observer_normalized?: boolean;
+  observer_approximation?: string | null;
+  lane_semantic_mode?: string | null;
   foliation: string;
   theta_definition: string;
   kij_sign_convention: string;
+  requires_gamma_metric?: boolean;
+  semantics_closed?: boolean;
+  cross_lane_claim_ready?: boolean;
+  cross_lane_claim_block_reason?: string | null;
   classification_scope: string;
   cases: CaseResult[];
   controlDebug: ControlDebugEntry[];
   preconditions: ProofPackPreconditions;
   controlsCalibratedByReferences: boolean;
+  laneReadiness?: {
+    laneBSemanticsClosed: boolean;
+    laneBObserverDefined: boolean;
+    laneBTensorInputsPresent: boolean;
+    laneBGeometryReady: boolean;
+    laneBControlsCalibrated: boolean;
+    laneBParityClosed: boolean;
+    laneBCrossLaneClaimReady: boolean;
+    readyForCrossLaneComparison: boolean;
+  };
+  laneAParity?: LaneAParitySummary;
+  causeCode?: LaneCauseCode;
   guardFailures: GuardFailure[];
   decisionTable: DecisionRow[];
   classificationScoring: Nhm2ReferenceScoring | null;
@@ -491,11 +675,18 @@ type CrossLaneComparison = {
     alternate_controls_calibrated: boolean;
     baseline_supported: boolean;
     alternate_supported: boolean;
+    lane_b_semantics_closed: boolean;
+    lane_b_observer_defined: boolean;
+    lane_b_tensor_inputs_present: boolean;
+    lane_b_geometry_ready: boolean;
+    lane_b_controls_calibrated: boolean;
+    lane_b_parity_closed: boolean;
+    lane_b_cross_lane_claim_ready: boolean;
   };
   notes: string[];
 };
 
-type ProofPackPayload = {
+export type ProofPackPayload = {
   artifactType: "warp_york_control_family_proof_pack/v1";
   generatedOn: string;
   generatedAt: string;
@@ -517,6 +708,8 @@ type ProofPackPayload = {
   cases: CaseResult[];
   controlDebug: ControlDebugEntry[];
   preconditions: ProofPackPreconditions;
+  laneAParity?: LaneAParitySummary;
+  causeCode?: LaneCauseCode;
   guardFailures: GuardFailure[];
   decisionTable: DecisionRow[];
   classificationScoring: Nhm2ReferenceScoring | null;
@@ -552,6 +745,10 @@ const VALID_YORK_VIEW_SET = new Set<HullScientificRenderView>([
 ]);
 const YORK_NEAR_ZERO_THETA_ABS_THRESHOLD = 1e-20;
 const YORK_SIGN_STRUCTURE_EPS = 1e-45;
+const LANE_A_RENDER_PARITY_ABS_TOL = 1e-12;
+const LANE_A_RENDER_PARITY_REL_TOL = 1e-6;
+const LANE_A_THETA_KTRACE_ABS_TOL = 1e-12;
+const LANE_A_THETA_KTRACE_REL_TOL = 1e-6;
 
 const ensureRequiredYorkViews = (
   views: HullScientificRenderView[],
@@ -704,9 +901,20 @@ const parseYorkLane = (
   fallback: {
     lane_id: string;
     observer: string;
+    observer_definition_id: string | null;
+    observer_inputs_required: string[];
+    observer_construction_inputs: string[];
+    observer_construction_formula: string | null;
+    observer_normalized: boolean;
+    observer_approximation: string | null;
+    lane_semantic_mode: string;
     foliation: string;
     theta_definition: string;
     kij_sign_convention: string;
+    requires_gamma_metric: boolean;
+    semantics_closed: boolean;
+    cross_lane_claim_ready: boolean;
+    cross_lane_claim_block_reason: string | null;
     coordinate_views: Record<string, string>;
     remap_rules: Record<string, string>;
     normalization_rules: Record<string, string>;
@@ -725,10 +933,54 @@ const parseYorkLane = (
     supported,
     unsupported_reason: asText(record.unsupported_reason),
     observer: asText(record.observer) ?? fallback.observer,
+    observer_definition_id:
+      asText(record.observer_definition_id) ?? fallback.observer_definition_id,
+    observer_inputs_required: Array.isArray(record.observer_inputs_required)
+      ? Array.from(
+          new Set(
+            record.observer_inputs_required
+              .map((entry) => asText(entry))
+              .filter((entry): entry is string => !!entry),
+          ),
+        )
+      : [...fallback.observer_inputs_required],
+    observer_construction_inputs: Array.isArray(record.observer_construction_inputs)
+      ? Array.from(
+          new Set(
+            record.observer_construction_inputs
+              .map((entry) => asText(entry))
+              .filter((entry): entry is string => !!entry),
+          ),
+        )
+      : [...fallback.observer_construction_inputs],
+    observer_construction_formula:
+      asText(record.observer_construction_formula) ?? fallback.observer_construction_formula,
+    observer_normalized:
+      typeof record.observer_normalized === "boolean"
+        ? record.observer_normalized
+        : fallback.observer_normalized,
+    observer_approximation:
+      asText(record.observer_approximation) ?? fallback.observer_approximation,
+    lane_semantic_mode:
+      asText(record.lane_semantic_mode) ?? fallback.lane_semantic_mode,
     foliation: asText(record.foliation) ?? fallback.foliation,
     theta_definition: asText(record.theta_definition) ?? fallback.theta_definition,
     kij_sign_convention:
       asText(record.kij_sign_convention) ?? fallback.kij_sign_convention,
+    requires_gamma_metric:
+      typeof record.requires_gamma_metric === "boolean"
+        ? record.requires_gamma_metric
+        : fallback.requires_gamma_metric,
+    semantics_closed:
+      typeof record.semantics_closed === "boolean"
+        ? record.semantics_closed
+        : fallback.semantics_closed,
+    cross_lane_claim_ready:
+      typeof record.cross_lane_claim_ready === "boolean"
+        ? record.cross_lane_claim_ready
+        : fallback.cross_lane_claim_ready,
+    cross_lane_claim_block_reason:
+      asText(record.cross_lane_claim_block_reason) ?? fallback.cross_lane_claim_block_reason,
     coordinate_views:
       Object.keys(asRecord(record.coordinate_views)).length > 0
         ? (asRecord(record.coordinate_views) as Record<string, string>)
@@ -751,9 +1003,20 @@ const normalizeDiagnosticLanes = (
   fallbackLane: {
     lane_id: string;
     observer: string;
+    observer_definition_id: string | null;
+    observer_inputs_required: string[];
+    observer_construction_inputs: string[];
+    observer_construction_formula: string | null;
+    observer_normalized: boolean;
+    observer_approximation: string | null;
+    lane_semantic_mode: string;
     foliation: string;
     theta_definition: string;
     kij_sign_convention: string;
+    requires_gamma_metric: boolean;
+    semantics_closed: boolean;
+    cross_lane_claim_ready: boolean;
+    cross_lane_claim_block_reason: string | null;
     coordinate_views: Record<string, string>;
     remap_rules: Record<string, string>;
     normalization_rules: Record<string, string>;
@@ -886,9 +1149,45 @@ export const loadYorkDiagnosticContract = (
       asText(raw.baseline_lane_id) ??
       "lane_a_eulerian_comoving_theta_minus_trk",
     observer: asText(raw.observer) ?? "eulerian_n",
+    observer_definition_id:
+      asText(raw.observer_definition_id) ?? "obs.eulerian_n",
+    observer_inputs_required: Array.isArray(raw.observer_inputs_required)
+      ? Array.from(
+          new Set(
+            raw.observer_inputs_required
+              .map((entry) => asText(entry))
+              .filter((entry): entry is string => !!entry),
+          ),
+        )
+      : ["alpha"],
+    observer_construction_inputs: Array.isArray(raw.observer_construction_inputs)
+      ? Array.from(
+          new Set(
+            raw.observer_construction_inputs
+              .map((entry) => asText(entry))
+              .filter((entry): entry is string => !!entry),
+          ),
+        )
+      : ["alpha"],
+    observer_construction_formula:
+      asText(raw.observer_construction_formula) ?? "u^a = n^a (Eulerian normal observer)",
+    observer_normalized:
+      typeof raw.observer_normalized === "boolean" ? raw.observer_normalized : true,
+    observer_approximation: asText(raw.observer_approximation),
+    lane_semantic_mode:
+      asText(raw.lane_semantic_mode) ?? "baseline-eulerian-theta-minus-trk",
     foliation: asText(raw.foliation) ?? "comoving_cartesian_3p1",
     theta_definition: asText(raw.theta_definition) ?? "theta=-trK",
     kij_sign_convention: asText(raw.kij_sign_convention) ?? "ADM",
+    requires_gamma_metric:
+      typeof raw.requires_gamma_metric === "boolean" ? raw.requires_gamma_metric : false,
+    semantics_closed:
+      typeof raw.semantics_closed === "boolean" ? raw.semantics_closed : true,
+    cross_lane_claim_ready:
+      typeof raw.cross_lane_claim_ready === "boolean"
+        ? raw.cross_lane_claim_ready
+        : true,
+    cross_lane_claim_block_reason: asText(raw.cross_lane_claim_block_reason),
     coordinate_views: asRecord(raw.coordinate_views) as Record<string, string>,
     remap_rules: asRecord(raw.remap_rules) as Record<string, string>,
     normalization_rules: asRecord(raw.normalization_rules) as Record<string, string>,
@@ -1121,6 +1420,150 @@ const computeChecksum = (payload: ProofPackPayload): string => {
   return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
 };
 
+const toWarpRodcVerdictStatus = (
+  verdict: DecisionVerdict,
+): WarpRodcVerdictStatus => {
+  if (verdict === "inconclusive") return "inconclusive";
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY) return "distinct";
+  return "congruent";
+};
+
+const toWarpRodcStability = (
+  robustness: ClassificationRobustnessSummary | null,
+): WarpRodcStability => {
+  if (!robustness) return "not_evaluated";
+  if (robustness.stabilityStatus.startsWith("stable_")) return "stable";
+  if (robustness.stabilityStatus.startsWith("marginal_")) return "marginal";
+  return "unstable";
+};
+
+export const buildWarpRodcSnapshot = (args: {
+  payload: ProofPackPayload;
+  sourceAuditArtifact?: string | null;
+}): WarpRodcSnapshotV1 => {
+  const lane =
+    args.payload.diagnosticLanes.find(
+      (entry) => entry.lane_id === args.payload.diagnosticContract.baseline_lane_id,
+    ) ?? args.payload.diagnosticLanes[0];
+  const nhm2Case =
+    lane?.cases.find((entry) => entry.caseId === "nhm2_certified") ??
+    args.payload.cases.find((entry) => entry.caseId === "nhm2_certified") ??
+    null;
+  const firstView = nhm2Case?.perView[0] ?? null;
+  const sliceHashesByView = Object.fromEntries(
+    (nhm2Case?.perView ?? []).map((entry) => [
+      entry.view,
+      entry.hashes.slice_array_hash ?? null,
+    ]),
+  );
+  const toOtherBaselines: Record<string, number | null> = {};
+  const scoring = args.payload.classificationScoring;
+  const robustness = args.payload.classificationRobustness;
+  const payloadBase: WarpRodcSnapshotV1 = {
+    artifactType: WARP_RODC_SNAPSHOT_SCHEMA_VERSION,
+    artifactFamily: "warp-york-control-family",
+    generatedOn: args.payload.generatedOn,
+    generatedAt: args.payload.generatedAt,
+    boundaryStatement: args.payload.boundaryStatement,
+    contract: {
+      id: args.payload.diagnosticContract.contract_id,
+      version: args.payload.diagnosticContract.version,
+      lane_id:
+        lane?.lane_id ?? args.payload.diagnosticContract.baseline_lane_id,
+      classification_scope: args.payload.classificationScope,
+    },
+    inputs: {
+      metricT00Ref: nhm2Case?.snapshotMetrics?.sourceFamily.metricT00Ref ?? null,
+      metricT00Source: nhm2Case?.snapshotMetrics?.source ?? null,
+      shape_function_id:
+        nhm2Case?.snapshotMetrics?.sourceFamily.shape_function_id ?? null,
+      warpFieldType: nhm2Case?.snapshotMetrics?.sourceFamily.warpFieldType ?? null,
+      dims: nhm2Case?.snapshotMetrics?.dims ?? null,
+      source_case_id: nhm2Case?.caseId ?? "nhm2_certified",
+    },
+    provenance: {
+      repo_commit_sha: args.payload.provenance.commitHash,
+      serviceVersion: args.payload.provenance.runtimeStatus.serviceVersion,
+      buildHash: args.payload.provenance.runtimeStatus.buildHash,
+      runtimeInstanceId: args.payload.provenance.runtimeStatus.runtimeInstanceId,
+      timestamp_ms:
+        firstView?.identity.timestamp_ms ??
+        args.payload.provenance.runtimeStatus.processStartedAtMs,
+      sourceAuditArtifact: args.sourceAuditArtifact ?? null,
+    },
+    evidence_hashes: {
+      metric_ref_hash:
+        nhm2Case?.snapshotMetrics?.metricRefHash ??
+        firstView?.identity.metric_ref_hash ??
+        null,
+      theta_channel_hash:
+        nhm2Case?.snapshotMetrics?.channelHashes.theta ??
+        firstView?.hashes.theta_channel_hash ??
+        null,
+      k_trace_hash: nhm2Case?.snapshotMetrics?.channelHashes.K_trace ?? null,
+      slice_hashes_by_view: sliceHashesByView,
+    },
+    feature_vector: { ...(nhm2Case?.classificationFeatures ?? {}) },
+    distance: {
+      to_alcubierre: scoring?.distance_to_alcubierre_reference ?? null,
+      to_natario: scoring?.distance_to_low_expansion_reference ?? null,
+      to_other_baselines: toOtherBaselines,
+      winning_reference: scoring?.winning_reference ?? null,
+      reference_margin: scoring?.reference_margin ?? null,
+    },
+    policy: {
+      distance_metric: args.payload.diagnosticContract.decision_policy.distance_metric,
+      normalization_method:
+        args.payload.diagnosticContract.decision_policy.normalization_method,
+      reference_margin_min:
+        args.payload.diagnosticContract.decision_policy.reference_margin_min,
+      reference_match_threshold:
+        args.payload.diagnosticContract.decision_policy.reference_match_threshold,
+      distinctness_threshold:
+        args.payload.diagnosticContract.decision_policy.distinctness_threshold,
+      feature_weights: {
+        ...args.payload.diagnosticContract.decision_policy.feature_weights,
+      },
+    },
+    robustness: {
+      enabled: robustness?.enabled ?? false,
+      totalVariants: robustness?.totalVariants ?? 0,
+      evaluatedVariants: robustness?.evaluatedVariants ?? 0,
+      dominantFraction: robustness?.dominantFraction ?? 0,
+      dominantVerdict: robustness?.dominantVerdict ?? null,
+      stableVerdict: robustness?.stableVerdict ?? null,
+      stabilityStatus: robustness?.stabilityStatus ?? "inconclusive",
+      stable_fraction_min:
+        robustness?.stabilityPolicy.stable_fraction_min ??
+        args.payload.diagnosticContract.robustness_checks.stability_policy
+          .stable_fraction_min,
+      marginal_fraction_min:
+        robustness?.stabilityPolicy.marginal_fraction_min ??
+        args.payload.diagnosticContract.robustness_checks.stability_policy
+          .marginal_fraction_min,
+      verdictCounts: robustness?.verdictCounts ?? {
+        inconclusive: 0,
+      },
+    },
+    preconditions: { ...args.payload.preconditions },
+    cross_lane: {
+      baseline_lane_id: args.payload.crossLaneComparison.baseline_lane_id,
+      alternate_lane_id: args.payload.crossLaneComparison.alternate_lane_id,
+      cross_lane_status: args.payload.crossLaneComparison.cross_lane_status,
+    },
+    verdict: {
+      family_label: args.payload.verdict,
+      status: toWarpRodcVerdictStatus(args.payload.verdict),
+      stability: toWarpRodcStability(robustness),
+    },
+    notes: [...args.payload.notes],
+  };
+  return {
+    ...payloadBase,
+    checksum: computeWarpRodcChecksum(payloadBase as unknown as Record<string, unknown>),
+  };
+};
+
 const getHeadCommit = (): string | null => {
   try {
     return execSync("git rev-parse HEAD", {
@@ -1308,6 +1751,424 @@ export const computeOfflineYorkAudit = (args: {
       aftHalfNegativeTotal,
       signedLobeSummary,
     },
+  };
+};
+
+const resolveYorkSliceCoordinateMode = (
+  view: HullScientificRenderView,
+): "x-z-midplane" | "x-rho" =>
+  view === "york-surface-rho-3p1" ? "x-rho" : "x-z-midplane";
+
+const resolveYorkSliceSamplingChoice = (
+  view: HullScientificRenderView,
+): "x-z midplane" | "x-rho cylindrical remap" =>
+  view === "york-surface-rho-3p1" ? "x-rho cylindrical remap" : "x-z midplane";
+
+const extractYorkSliceForView = (
+  field: Float32Array | null,
+  dims: [number, number, number],
+  view: HullScientificRenderView,
+): Float32Array | null => {
+  if (!(field instanceof Float32Array)) return null;
+  if (view === "york-surface-rho-3p1") {
+    return extractThetaSliceXRho(field, dims);
+  }
+  return extractThetaSliceXZMidplane(field, dims);
+};
+
+const buildSupportMaskFromHullSdf = (
+  hullSdf: Float32Array | null,
+): Float32Array | null => {
+  if (!(hullSdf instanceof Float32Array)) return null;
+  const out = new Float32Array(hullSdf.length);
+  for (let i = 0; i < hullSdf.length; i += 1) {
+    const value = hullSdf[i] ?? Number.POSITIVE_INFINITY;
+    out[i] = Number.isFinite(value) && value <= 0 ? 1 : 0;
+  }
+  return out;
+};
+
+const computeMaxAbsResidual = (
+  lhs: Float32Array | null,
+  rhs: Float32Array | null,
+): number | null => {
+  if (!(lhs instanceof Float32Array) || !(rhs instanceof Float32Array)) return null;
+  const n = Math.min(lhs.length, rhs.length);
+  if (n <= 0) return null;
+  let maxAbs = 0;
+  let sampleCount = 0;
+  for (let i = 0; i < n; i += 1) {
+    const lv = lhs[i];
+    const rv = rhs[i];
+    if (!Number.isFinite(lv) || !Number.isFinite(rv)) continue;
+    maxAbs = Math.max(maxAbs, Math.abs(lv - rv));
+    sampleCount += 1;
+  }
+  return sampleCount > 0 ? maxAbs : null;
+};
+
+const computeSignCountDelta = (
+  lhs: OfflineYorkViewAudit["counts"] | null,
+  rhs: OfflineYorkViewAudit["counts"] | null,
+): {
+  positive: number | null;
+  negative: number | null;
+  zeroOrNearZero: number | null;
+  total: number | null;
+} => {
+  if (!lhs || !rhs) {
+    return {
+      positive: null,
+      negative: null,
+      zeroOrNearZero: null,
+      total: null,
+    };
+  }
+  return {
+    positive: Math.abs(lhs.positive - rhs.positive),
+    negative: Math.abs(lhs.negative - rhs.negative),
+    zeroOrNearZero: Math.abs(lhs.zeroOrNearZero - rhs.zeroOrNearZero),
+    total: Math.abs(lhs.total - rhs.total),
+  };
+};
+
+const computeSupportOverlapPctFromSlices = (
+  thetaSlice: Float32Array | null,
+  supportSlice: Float32Array | null,
+): number | null => {
+  if (!(thetaSlice instanceof Float32Array) || !(supportSlice instanceof Float32Array)) {
+    return null;
+  }
+  const n = Math.min(thetaSlice.length, supportSlice.length);
+  if (n <= 0) return null;
+  const raw = computeRawSliceExtrema(thetaSlice);
+  const thetaAbsMax = raw.absMax ?? 0;
+  const threshold = Math.max(thetaAbsMax * 1e-6, 1e-45);
+  let supportCount = 0;
+  let supportWithThetaCount = 0;
+  for (let i = 0; i < n; i += 1) {
+    const supportValue = supportSlice[i] ?? 0;
+    if (!Number.isFinite(supportValue) || supportValue <= 0.5) continue;
+    supportCount += 1;
+    const thetaValue = thetaSlice[i] ?? 0;
+    if (Number.isFinite(thetaValue) && Math.abs(thetaValue) >= threshold) {
+      supportWithThetaCount += 1;
+    }
+  }
+  if (supportCount <= 0) return 0;
+  return (100 * supportWithThetaCount) / supportCount;
+};
+
+const computeRawExtremaDelta = (
+  offlineRaw: OfflineYorkViewAudit["rawExtrema"] | null,
+  renderedRaw: YorkViewSummary["rawExtrema"] | null,
+): {
+  minRaw: number | null;
+  maxRaw: number | null;
+  absMaxRaw: number | null;
+} => ({
+  minRaw:
+    offlineRaw?.min != null && renderedRaw?.min != null
+      ? Math.abs(offlineRaw.min - renderedRaw.min)
+      : null,
+  maxRaw:
+    offlineRaw?.max != null && renderedRaw?.max != null
+      ? Math.abs(offlineRaw.max - renderedRaw.max)
+      : null,
+  absMaxRaw:
+    offlineRaw?.absMax != null && renderedRaw?.absMax != null
+      ? Math.abs(offlineRaw.absMax - renderedRaw.absMax)
+      : null,
+});
+
+const normalizeIdentityString = (value: string | null): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const KIJ_SIGN_CONVENTION_ALIAS_TABLE: Record<string, string> = {
+  adm: "adm",
+  "k_ij=-1/2*l_n(gamma_ij)": "adm",
+  "kij=-1/2*l_n(gamma_ij)": "adm",
+};
+
+export const normalizeKijSignConventionIdentity = (
+  value: string | null,
+): string | null => {
+  const normalized = normalizeIdentityString(value);
+  if (!normalized) return null;
+  const aliasKey = normalized.toLowerCase().replace(/\s+/g, "");
+  return KIJ_SIGN_CONVENTION_ALIAS_TABLE[aliasKey] ?? normalized;
+};
+
+const approxIdentityEquals = (
+  actual: string | null,
+  expected: string | null,
+  canonicalize?: (value: string | null) => string | null,
+): boolean => {
+  const canonicalizer = canonicalize ?? normalizeIdentityString;
+  const expectedNormalized = canonicalizer(expected);
+  if (!expectedNormalized) return false;
+  const actualNormalized = canonicalizer(actual);
+  if (!actualNormalized) return false;
+  return actualNormalized === expectedNormalized;
+};
+
+export const evaluateLaneASnapshotIdentity = (args: {
+  rendered: YorkViewSummary | null;
+  lane: Pick<
+    YorkDiagnosticLane,
+    "lane_id" | "observer" | "theta_definition" | "kij_sign_convention"
+  >;
+  expectedMetricRefHash: string | null;
+  expectedThetaHash: string | null;
+  expectedChart: string;
+}): YorkParityViewAudit["identity"] => {
+  const laneId = args.rendered?.identity.lane_id ?? args.rendered?.render.lane_id ?? null;
+  const metricRefMatches = approxIdentityEquals(
+    args.rendered?.identity.metric_ref_hash ?? null,
+    args.expectedMetricRefHash,
+  );
+  const laneMatches = approxIdentityEquals(laneId, args.lane.lane_id);
+  const chartMatches = approxIdentityEquals(
+    args.rendered?.identity.chart ?? null,
+    args.expectedChart,
+  );
+  const observerMatches = approxIdentityEquals(
+    args.rendered?.identity.observer ?? null,
+    args.lane.observer,
+  );
+  const thetaDefinitionMatches = approxIdentityEquals(
+    args.rendered?.identity.theta_definition ?? null,
+    args.lane.theta_definition,
+  );
+  const kijSignConventionMatches = approxIdentityEquals(
+    args.rendered?.identity.kij_sign_convention ?? null,
+    args.lane.kij_sign_convention,
+    normalizeKijSignConventionIdentity,
+  );
+  const thetaHashMatches = approxIdentityEquals(
+    args.rendered?.hashes.theta_channel_hash ?? null,
+    args.expectedThetaHash,
+  );
+  const timestampPresent = Number.isFinite(args.rendered?.identity.timestamp_ms ?? Number.NaN);
+  return {
+    complete:
+      laneMatches &&
+      metricRefMatches &&
+      chartMatches &&
+      observerMatches &&
+      thetaDefinitionMatches &&
+      kijSignConventionMatches &&
+      thetaHashMatches &&
+      timestampPresent,
+    laneMatches,
+    metricRefMatches,
+    chartMatches,
+    observerMatches,
+    thetaDefinitionMatches,
+    kijSignConventionMatches,
+    thetaHashMatches,
+    timestampPresent,
+  };
+};
+
+const computeCaseLaneAParityAudit = (args: {
+  lane: YorkDiagnosticLane;
+  caseId: CaseId;
+  views: HullScientificRenderView[];
+  perView: YorkViewSummary[];
+  snapshotMetrics: CaseSnapshotMetrics | null;
+  theta: Float32Array | null;
+  contractField: Float32Array | null;
+  supportMask: Float32Array | null;
+  hullSdf: Float32Array | null;
+  dims: [number, number, number];
+}): CaseLaneAParityAudit => {
+  const viewAudits: YorkParityViewAudit[] = [];
+  const fallbackSupport = args.supportMask ?? buildSupportMaskFromHullSdf(args.hullSdf);
+
+  for (const view of args.views) {
+    const rendered = args.perView.find((entry) => entry.view === view) ?? null;
+    const coordinateMode = resolveYorkSliceCoordinateMode(view);
+    const samplingChoice = resolveYorkSliceSamplingChoice(view);
+    const thetaSlice = extractYorkSliceForView(args.theta, args.dims, view);
+    const contractSlice = extractYorkSliceForView(args.contractField, args.dims, view);
+    const supportSlice = extractYorkSliceForView(fallbackSupport, args.dims, view);
+    const offlineThetaHash = thetaSlice instanceof Float32Array ? hashFloat32(thetaSlice) : null;
+    const offlineNegKTraceHash =
+      contractSlice instanceof Float32Array ? hashFloat32(contractSlice) : null;
+    const renderThetaHash = rendered?.hashes.slice_array_hash ?? null;
+
+    const thetaCounts =
+      thetaSlice instanceof Float32Array ? computeSliceSignCounts(thetaSlice) : null;
+    const negKTraceCounts =
+      contractSlice instanceof Float32Array ? computeSliceSignCounts(contractSlice) : null;
+    const signCountDeltaThetaVsKTrace = computeSignCountDelta(thetaCounts, negKTraceCounts);
+    const signCountDeltaThetaVsRender =
+      offlineThetaHash && renderThetaHash && offlineThetaHash === renderThetaHash
+        ? {
+            positive: 0,
+            negative: 0,
+            zeroOrNearZero: 0,
+            total: 0,
+          }
+        : {
+            positive: null,
+            negative: null,
+            zeroOrNearZero: null,
+            total: null,
+          };
+
+    const offlineThetaRaw =
+      thetaSlice instanceof Float32Array ? computeRawSliceExtrema(thetaSlice) : null;
+    const offlineNegKTraceRaw =
+      contractSlice instanceof Float32Array ? computeRawSliceExtrema(contractSlice) : null;
+    const thetaVsRenderExtremaDelta = computeRawExtremaDelta(
+      offlineThetaRaw,
+      rendered?.rawExtrema ?? null,
+    );
+    const thetaVsKTraceExtremaDelta = computeRawExtremaDelta(
+      offlineThetaRaw,
+      offlineNegKTraceRaw,
+    );
+    const thetaVsRenderMaxAbsResidual =
+      offlineThetaHash && renderThetaHash && offlineThetaHash === renderThetaHash
+        ? 0
+        : Math.max(
+            thetaVsRenderExtremaDelta.minRaw ?? 0,
+            thetaVsRenderExtremaDelta.maxRaw ?? 0,
+            thetaVsRenderExtremaDelta.absMaxRaw ?? 0,
+          );
+    const thetaVsKTraceMaxAbsResidual = computeMaxAbsResidual(thetaSlice, contractSlice);
+
+    const expectedMetricRefHash =
+      args.snapshotMetrics?.metricRefHash ?? args.snapshotMetrics?.requestMetricRefHash ?? null;
+    const expectedThetaHash = args.snapshotMetrics?.channelHashes.theta ?? null;
+    const expectedChart = args.snapshotMetrics?.chart ?? "comoving_cartesian";
+    const identity = evaluateLaneASnapshotIdentity({
+      rendered,
+      lane: args.lane,
+      expectedMetricRefHash,
+      expectedThetaHash,
+      expectedChart,
+    });
+    const identityComplete = identity.complete;
+
+    const offlineSupportOverlapPct = computeSupportOverlapPctFromSlices(thetaSlice, supportSlice);
+    const renderSupportOverlapPct = rendered?.supportOverlapPct ?? null;
+    const supportOverlapDelta =
+      offlineSupportOverlapPct != null && Number.isFinite(renderSupportOverlapPct ?? Number.NaN)
+        ? Math.abs(offlineSupportOverlapPct - (renderSupportOverlapPct ?? 0))
+        : null;
+
+    const thetaAbsMax = offlineThetaRaw?.absMax ?? 0;
+    const thetaKTraceAbsMax = Math.max(thetaAbsMax, offlineNegKTraceRaw?.absMax ?? 0);
+    const renderResidualTolerance = Math.max(
+      LANE_A_RENDER_PARITY_ABS_TOL,
+      thetaAbsMax * LANE_A_RENDER_PARITY_REL_TOL,
+    );
+    const thetaKTraceTolerance = Math.max(
+      LANE_A_THETA_KTRACE_ABS_TOL,
+      thetaKTraceAbsMax * LANE_A_THETA_KTRACE_REL_TOL,
+    );
+
+    let causeCode: SharedLaneCauseCode | null = null;
+    if (!rendered) {
+      causeCode = "missing_required_view";
+    } else if (!identityComplete) {
+      causeCode = "snapshot_identity_failure";
+    } else if (
+      !(offlineThetaHash && offlineNegKTraceHash && renderThetaHash) ||
+      !(thetaSlice instanceof Float32Array) ||
+      !(contractSlice instanceof Float32Array)
+    ) {
+      causeCode = "missing_required_hash";
+    } else if (
+      !Number.isFinite(thetaVsKTraceMaxAbsResidual ?? Number.NaN) ||
+      (thetaVsKTraceMaxAbsResidual ?? 0) > thetaKTraceTolerance
+    ) {
+      causeCode = "theta_ktrace_contract_failure";
+    } else if (
+      offlineThetaHash !== renderThetaHash ||
+      (thetaVsRenderMaxAbsResidual ?? 0) > renderResidualTolerance
+    ) {
+      causeCode = "render_parity_failure";
+    }
+
+    viewAudits.push({
+      view,
+      coordinateMode,
+      samplingChoice,
+      offlineThetaSliceHash: offlineThetaHash,
+      offlineNegKTraceSliceHash: offlineNegKTraceHash,
+      renderThetaSliceHash: renderThetaHash,
+      thetaVsRenderMaxAbsResidual,
+      thetaVsKTraceMaxAbsResidual,
+      signCountDelta: {
+        thetaVsRender: signCountDeltaThetaVsRender,
+        thetaVsKTrace: signCountDeltaThetaVsKTrace,
+      },
+      supportOverlapPct: {
+        offline: offlineSupportOverlapPct,
+        render: renderSupportOverlapPct,
+        delta: supportOverlapDelta,
+      },
+      extremaDelta: {
+        thetaVsRender: thetaVsRenderExtremaDelta,
+        thetaVsKTrace: thetaVsKTraceExtremaDelta,
+      },
+      identity,
+      status: causeCode ? "fail" : "pass",
+      causeCode,
+    });
+  }
+
+  const firstFailure = viewAudits.find((entry) => entry.status === "fail") ?? null;
+  const parityComputed = viewAudits.length > 0 && viewAudits.every((entry) => entry.offlineThetaSliceHash !== null);
+  const thetaKTraceParityComputed =
+    viewAudits.length > 0 &&
+    viewAudits.every((entry) => entry.offlineNegKTraceSliceHash !== null);
+  const snapshotIdentityComplete = viewAudits.length > 0 && viewAudits.every((entry) => entry.identity.complete);
+  const renderParityPass = viewAudits.every(
+    (entry) => entry.causeCode !== "render_parity_failure",
+  );
+  const thetaKTraceContractPass = viewAudits.every(
+    (entry) => entry.causeCode !== "theta_ktrace_contract_failure",
+  );
+
+  return {
+    caseId: args.caseId,
+    parityComputed,
+    thetaKTraceParityComputed,
+    snapshotIdentityComplete,
+    renderParityPass,
+    thetaKTraceContractPass,
+    byView: viewAudits,
+    status: firstFailure ? "fail" : "pass",
+    causeCode: firstFailure?.causeCode ?? null,
+  };
+};
+
+export const summarizeLaneAParity = (cases: CaseResult[]): LaneAParitySummary => {
+  const caseSummaries = cases.map((entry) => {
+    const status = entry.parity?.status ?? "fail";
+    const parityCauseCode = entry.parity?.causeCode ?? null;
+    return {
+      caseId: entry.caseId,
+      status,
+      causeCode:
+        status === "pass"
+          ? null
+          : parityCauseCode ?? "snapshot_identity_failure",
+    };
+  });
+  const firstFailure = caseSummaries.find((entry) => entry.status === "fail") ?? null;
+  return {
+    status: firstFailure ? "failed" : "closed",
+    causeCode: firstFailure?.causeCode ?? null,
+    caseSummaries,
   };
 };
 
@@ -1641,6 +2502,28 @@ const parseYorkViewSummary = (
       support_mask_slice_hash: asText(diagnostics.support_mask_slice_hash),
       shell_masked_slice_hash: asText(diagnostics.shell_masked_slice_hash),
     },
+    laneEvidence: {
+      observer_definition_id: asText(diagnostics.observer_definition_id),
+      observer_inputs_required: Array.isArray(diagnostics.observer_inputs_required)
+        ? diagnostics.observer_inputs_required
+            .map((entry) => asText(entry))
+            .filter((entry): entry is string => !!entry)
+        : null,
+      observer_inputs_present:
+        typeof diagnostics.observer_inputs_present === "boolean"
+          ? diagnostics.observer_inputs_present
+          : null,
+      lane_b_semantic_mode: asText(diagnostics.lane_b_semantic_mode),
+      lane_b_tensor_inputs_hash: asText(diagnostics.lane_b_tensor_inputs_hash),
+      lane_b_geometry_ready:
+        typeof diagnostics.lane_b_geometry_ready === "boolean"
+          ? diagnostics.lane_b_geometry_ready
+          : null,
+      lane_b_semantics_closed:
+        typeof diagnostics.lane_b_semantics_closed === "boolean"
+          ? diagnostics.lane_b_semantics_closed
+          : null,
+    },
   };
 };
 
@@ -1808,6 +2691,15 @@ const buildErrorYorkViewSummary = (
     support_mask_slice_hash: null,
     shell_masked_slice_hash: null,
   },
+  laneEvidence: {
+    observer_definition_id: null,
+    observer_inputs_required: null,
+    observer_inputs_present: null,
+    lane_b_semantic_mode: null,
+    lane_b_tensor_inputs_hash: null,
+    lane_b_geometry_ready: null,
+    lane_b_semantics_closed: null,
+  },
 });
 
 const computeThetaPlusKTraceConsistency = (theta: Float32Array, kTrace: Float32Array) => {
@@ -1879,6 +2771,25 @@ export const readSourceFamilyEvidence = (snapshot: {
   };
 };
 
+const computeLaneTensorInputsHashFromSnapshot = (args: {
+  snapshot: {
+    channels: Record<string, { data: Float32Array } | undefined>;
+  };
+  requiredInputs: string[];
+}): string | null => {
+  if (args.requiredInputs.length === 0) return null;
+  const pairs: string[] = [];
+  for (const channelId of args.requiredInputs) {
+    const data = args.snapshot.channels[channelId]?.data;
+    if (!(data instanceof Float32Array) || data.length === 0) return null;
+    pairs.push(`${channelId}:${hashFloat32(data)}`);
+  }
+  return crypto
+    .createHash("sha256")
+    .update(pairs.join("|"))
+    .digest("hex");
+};
+
 const runCase = async (args: {
   diagnosticLane: YorkDiagnosticLane;
   caseId: CaseId;
@@ -1944,13 +2855,86 @@ const runCase = async (args: {
 
   let snapshotMetrics: CaseSnapshotMetrics | null = null;
   let offlineYorkAudit: CaseOfflineYorkAudit | null = null;
+  let parity: CaseLaneAParityAudit | null = null;
   try {
     const snapshot = await loadHullScientificSnapshot(args.metricVolumeRef, {
       baseUrl: null,
       timeoutMs: 120_000,
     });
-    const theta = snapshot.channels.theta?.data;
+    const thetaCanonical = snapshot.channels.theta?.data;
     const kTrace = snapshot.channels.K_trace?.data;
+    const laneId: YorkDiagnosticLaneId | null = isYorkDiagnosticLaneId(
+      args.diagnosticLane.lane_id,
+    )
+      ? args.diagnosticLane.lane_id
+      : null;
+    const laneField =
+      laneId != null
+        ? computeYorkDiagnosticLaneField({
+            laneId,
+            dims: snapshot.dims,
+            voxelSizeM: snapshot.voxelSize_m,
+            theta: thetaCanonical instanceof Float32Array ? thetaCanonical : null,
+            kTrace: kTrace instanceof Float32Array ? kTrace : null,
+            betaX:
+              snapshot.channels.beta_x?.data instanceof Float32Array
+                ? snapshot.channels.beta_x.data
+                : null,
+            betaY:
+              snapshot.channels.beta_y?.data instanceof Float32Array
+                ? snapshot.channels.beta_y.data
+                : null,
+            betaZ:
+              snapshot.channels.beta_z?.data instanceof Float32Array
+                ? snapshot.channels.beta_z.data
+                : null,
+            alpha:
+              snapshot.channels.alpha?.data instanceof Float32Array
+                ? snapshot.channels.alpha.data
+                : null,
+            gammaXX:
+              snapshot.channels.gamma_xx?.data instanceof Float32Array
+                ? snapshot.channels.gamma_xx.data
+                : null,
+            gammaXY:
+              snapshot.channels.gamma_xy?.data instanceof Float32Array
+                ? snapshot.channels.gamma_xy.data
+                : null,
+            gammaXZ:
+              snapshot.channels.gamma_xz?.data instanceof Float32Array
+                ? snapshot.channels.gamma_xz.data
+                : null,
+            gammaYY:
+              snapshot.channels.gamma_yy?.data instanceof Float32Array
+                ? snapshot.channels.gamma_yy.data
+                : null,
+            gammaYZ:
+              snapshot.channels.gamma_yz?.data instanceof Float32Array
+                ? snapshot.channels.gamma_yz.data
+                : null,
+            gammaZZ:
+              snapshot.channels.gamma_zz?.data instanceof Float32Array
+                ? snapshot.channels.gamma_zz.data
+                : null,
+          })
+        : {
+            ok: false as const,
+            error: "scientific_york_lane_tensor_missing" as const,
+            missingChannels: ["diagnostic_lane_id"],
+          };
+    const thetaLane = laneField.ok ? laneField.theta : null;
+    const contractField = laneField.ok ? laneField.contractField : null;
+    const runtimeLaneEvidence =
+      perView.find(
+        (entry) =>
+          entry.ok === true && entry.identity.lane_id === args.diagnosticLane.lane_id,
+      )?.laneEvidence ?? null;
+    const laneTensorInputsHash = laneField.ok
+      ? computeLaneTensorInputsHashFromSnapshot({
+          snapshot,
+          requiredInputs: laneField.observerConstruction.observer_inputs_required,
+        })
+      : null;
     const sourceFamily = readSourceFamilyEvidence(snapshot);
     snapshotMetrics = {
       dims: snapshot.dims,
@@ -1960,13 +2944,64 @@ const runCase = async (args: {
       source: snapshot.source,
       chart: snapshot.chart,
       channelHashes: {
-        theta: theta instanceof Float32Array ? hashFloat32(theta) : null,
+        theta: thetaLane instanceof Float32Array ? hashFloat32(thetaLane) : null,
         K_trace: kTrace instanceof Float32Array ? hashFloat32(kTrace) : null,
+        theta_canonical:
+          thetaCanonical instanceof Float32Array ? hashFloat32(thetaCanonical) : null,
+        lane_contract:
+          contractField instanceof Float32Array ? hashFloat32(contractField) : null,
+      },
+      laneComputation: {
+        lane_id: laneId,
+        theta_source: laneField.ok ? laneField.source : laneField.error,
+        contract_source: laneField.ok ? laneField.contractSource : laneField.error,
+        observer_definition_id:
+          laneField.ok ? laneField.observerConstruction.observer_definition_id : null,
+        observer_inputs_required:
+          laneField.ok ? [...laneField.observerConstruction.observer_inputs_required] : [],
+        observer_construction_inputs:
+          laneField.ok ? [...laneField.observerConstruction.observer_construction_inputs] : [],
+        observer_construction_formula:
+          laneField.ok ? laneField.observerConstruction.observer_construction_formula : null,
+        observer_normalized:
+          laneField.ok ? laneField.observerConstruction.observer_normalized : false,
+        observer_approximation:
+          laneField.ok ? laneField.observerConstruction.observer_approximation : null,
+        observer_inputs_present:
+          laneField.ok
+            ? runtimeLaneEvidence?.observer_inputs_present ??
+              laneField.observerConstruction.observer_inputs_present
+            : false,
+        lane_b_semantic_mode:
+          laneField.ok
+            ? runtimeLaneEvidence?.lane_b_semantic_mode ??
+              laneField.observerConstruction.lane_b_semantic_mode
+            : null,
+        lane_b_tensor_inputs_hash:
+          laneField.ok
+            ? runtimeLaneEvidence?.lane_b_tensor_inputs_hash ?? laneTensorInputsHash
+            : null,
+        lane_b_geometry_ready:
+          laneField.ok
+            ? runtimeLaneEvidence?.lane_b_geometry_ready ??
+              laneField.observerConstruction.lane_b_geometry_ready
+            : false,
+        lane_b_semantics_closed:
+          laneField.ok
+            ? runtimeLaneEvidence?.lane_b_semantics_closed ??
+              laneField.observerConstruction.semantics_closed
+            : false,
+        requires_gamma_metric:
+          laneField.ok ? laneField.observerConstruction.requires_gamma_metric : false,
+        semantics_closed:
+          laneField.ok ? laneField.observerConstruction.semantics_closed : false,
+        cross_lane_claim_ready:
+          laneField.ok ? laneField.observerConstruction.cross_lane_claim_ready : false,
       },
       sourceFamily,
       thetaPlusKTrace:
-        theta instanceof Float32Array && kTrace instanceof Float32Array
-          ? computeThetaPlusKTraceConsistency(theta, kTrace)
+        thetaLane instanceof Float32Array && contractField instanceof Float32Array
+          ? computeThetaPlusKTraceConsistency(thetaLane, contractField)
           : {
               rms: null,
               maxAbs: null,
@@ -1977,12 +3012,31 @@ const runCase = async (args: {
     };
     offlineYorkAudit = computeOfflineYorkAudit({
       caseId: args.caseId,
-      theta: theta instanceof Float32Array ? theta : null,
+      theta: thetaLane instanceof Float32Array ? thetaLane : null,
+      dims: snapshot.dims,
+    });
+    parity = computeCaseLaneAParityAudit({
+      lane: args.diagnosticLane,
+      caseId: args.caseId,
+      views: args.yorkViews,
+      perView,
+      snapshotMetrics,
+      theta: thetaLane instanceof Float32Array ? thetaLane : null,
+      contractField: contractField instanceof Float32Array ? contractField : null,
+      supportMask:
+        snapshot.channels.tile_support_mask?.data instanceof Float32Array
+          ? snapshot.channels.tile_support_mask.data
+          : null,
+      hullSdf:
+        snapshot.channels.hull_sdf?.data instanceof Float32Array
+          ? snapshot.channels.hull_sdf.data
+          : null,
       dims: snapshot.dims,
     });
   } catch {
     snapshotMetrics = null;
     offlineYorkAudit = null;
+    parity = null;
   }
 
   const primaryViewId = args.yorkViews.includes("york-surface-rho-3p1")
@@ -2006,6 +3060,7 @@ const runCase = async (args: {
     },
     snapshotMetrics,
     offlineYorkAudit,
+    parity,
   };
   return {
     ...caseCore,
@@ -2144,6 +3199,37 @@ export const evaluateProofPackPreconditions = (args: {
         }
       }
     }
+    if (!entry.parity) {
+      guardFailures.push({
+        code: "proof_pack_lane_a_parity_missing",
+        detail: `${entry.caseId}:parity_unavailable`,
+      });
+      continue;
+    }
+    if (!entry.parity.parityComputed) {
+      guardFailures.push({
+        code: "proof_pack_lane_a_offline_render_parity_missing",
+        detail: `${entry.caseId}:offline_render_parity_not_computed`,
+      });
+    }
+    if (!entry.parity.thetaKTraceParityComputed) {
+      guardFailures.push({
+        code: "proof_pack_lane_a_theta_ktrace_parity_missing",
+        detail: `${entry.caseId}:theta_ktrace_parity_not_computed`,
+      });
+    }
+    if (!entry.parity.snapshotIdentityComplete) {
+      guardFailures.push({
+        code: "proof_pack_lane_a_snapshot_identity_incomplete",
+        detail: `${entry.caseId}:snapshot_identity_incomplete`,
+      });
+    }
+    if (entry.parity.status !== "pass") {
+      guardFailures.push({
+        code: "proof_pack_lane_a_parity_failed",
+        detail: `${entry.caseId}:cause=${entry.parity.causeCode ?? "unknown"}`,
+      });
+    }
   }
 
   const alc = args.cases.find((entry) => entry.caseId === "alcubierre_control") ?? null;
@@ -2262,6 +3348,20 @@ export const evaluateProofPackPreconditions = (args: {
   const provenanceHashesPresent = !guardFailures.some(
     (failure) => failure.code === "proof_pack_required_view_missing_provenance_hash",
   );
+  const offlineRenderParityComputed = !guardFailures.some(
+    (failure) =>
+      failure.code === "proof_pack_lane_a_parity_missing" ||
+      failure.code === "proof_pack_lane_a_offline_render_parity_missing",
+  );
+  const thetaKTraceParityComputed = !guardFailures.some(
+    (failure) => failure.code === "proof_pack_lane_a_theta_ktrace_parity_missing",
+  );
+  const snapshotIdentityComplete = !guardFailures.some(
+    (failure) => failure.code === "proof_pack_lane_a_snapshot_identity_incomplete",
+  );
+  const diagnosticParityClosed = !guardFailures.some(
+    (failure) => failure.code === "proof_pack_lane_a_parity_failed",
+  );
   const runtimeStatusProvenancePresent =
     args.runtimeStatus.reachable &&
     typeof args.runtimeStatus.serviceVersion === "string" &&
@@ -2293,11 +3393,21 @@ export const evaluateProofPackPreconditions = (args: {
     allRequiredViewsRendered,
     provenanceHashesPresent,
     runtimeStatusProvenancePresent,
+    offlineRenderParityComputed,
+    thetaKTraceParityComputed,
+    snapshotIdentityComplete,
+    diagnosticParityClosed,
+    // Legacy alias for compatibility with existing consumers.
+    laneAParityClosed: diagnosticParityClosed,
     readyForFamilyVerdict:
       controlsIndependent &&
       allRequiredViewsRendered &&
       provenanceHashesPresent &&
-      runtimeStatusProvenancePresent,
+      runtimeStatusProvenancePresent &&
+      offlineRenderParityComputed &&
+      thetaKTraceParityComputed &&
+      snapshotIdentityComplete &&
+      diagnosticParityClosed,
   };
   return { preconditions, guardFailures };
 };
@@ -2963,12 +4073,17 @@ export const evaluateClassificationRobustness = (args: {
 };
 
 const buildLaneDecisionTable = (args: {
+  laneId: string;
   preconditions: ProofPackPreconditions;
   controlsCalibratedByReferences: boolean;
   classificationScoring: Nhm2ReferenceScoring | null;
   classificationRobustness: ClassificationRobustnessSummary | null;
   yorkCongruence: YorkCongruenceEvaluation;
 }): DecisionRow[] => {
+  const laneParityClosed =
+    args.preconditions.diagnosticParityClosed ?? args.preconditions.laneAParityClosed;
+  const laneParityLabel =
+    args.laneId === YORK_DIAGNOSTIC_BASELINE_LANE_ID ? "Lane A" : args.laneId;
   const scoring = args.classificationScoring;
   const robustness = args.classificationRobustness;
   const hasDistanceToAlcubierre = Number.isFinite(
@@ -2982,11 +4097,47 @@ const buildLaneDecisionTable = (args: {
     {
       id: "preconditions_ready_for_family_verdict",
       condition:
-        "Controls independent, required views rendered, provenance hashes present, and runtime status provenance present",
+        "Controls independent, required views rendered, provenance hashes present, runtime status provenance present, diagnostic-lane parity computed/closed, and snapshot identity complete",
       status: args.preconditions.readyForFamilyVerdict.toString() as DecisionRowStatus,
       interpretation: args.preconditions.readyForFamilyVerdict
         ? "Evidence integrity prerequisites satisfied."
         : "Evidence prerequisites failed; verdict must remain inconclusive.",
+    },
+    {
+      id: "offline_render_parity_computed",
+      condition:
+        "Offline-vs-render York parity metrics are computed for all required views",
+      status: Boolean(args.preconditions.offlineRenderParityComputed).toString() as DecisionRowStatus,
+      interpretation: args.preconditions.offlineRenderParityComputed === true
+        ? "Offline/render parity metrics are present."
+        : "Offline/render parity metrics are missing for at least one required view.",
+    },
+    {
+      id: "theta_ktrace_parity_computed",
+      condition:
+        "Offline theta vs -K_trace parity metrics are computed for all required views",
+      status: Boolean(args.preconditions.thetaKTraceParityComputed).toString() as DecisionRowStatus,
+      interpretation: args.preconditions.thetaKTraceParityComputed === true
+        ? "Theta/K-trace parity metrics are present."
+        : "Theta/K-trace parity metrics are missing for at least one required view.",
+    },
+    {
+      id: "snapshot_identity_complete",
+      condition:
+        "Solve->brick->render identity fields are complete and consistent for required views",
+      status: Boolean(args.preconditions.snapshotIdentityComplete).toString() as DecisionRowStatus,
+      interpretation: args.preconditions.snapshotIdentityComplete === true
+        ? "Snapshot identity closure is complete."
+        : "Snapshot identity closure failed for at least one required view.",
+    },
+    {
+      id: "diagnostic_parity_closed",
+      condition:
+        `${laneParityLabel} parity checks pass (render parity + theta_ktrace contract) for required views`,
+      status: Boolean(laneParityClosed).toString() as DecisionRowStatus,
+      interpretation: laneParityClosed === true
+        ? `${laneParityLabel} parity is closed.`
+        : `${laneParityLabel} parity failed; family verdict is blocked.`,
     },
     {
       id: "renderer_calibrated_by_controls",
@@ -3107,6 +4258,69 @@ const buildLaneDecisionTable = (args: {
   ];
 };
 
+const mapGuardFailuresToLaneCauseCode = (
+  guardFailures: GuardFailure[],
+): SharedLaneCauseCode | null => {
+  for (const failure of guardFailures) {
+    if (
+      failure.code === "proof_pack_required_view_missing" ||
+      failure.code === "proof_pack_required_view_render_failed" ||
+      failure.code === "proof_pack_required_view_fell_back_to_diagnostic_quad" ||
+      failure.code === "proof_pack_required_view_mismatch"
+    ) {
+      return "missing_required_view";
+    }
+    if (
+      failure.code === "proof_pack_required_view_missing_provenance_hash" ||
+      failure.code === "proof_pack_lane_a_parity_missing" ||
+      failure.code === "proof_pack_lane_a_offline_render_parity_missing" ||
+      failure.code === "proof_pack_lane_a_theta_ktrace_parity_missing"
+    ) {
+      return "missing_required_hash";
+    }
+    if (failure.code === "proof_pack_lane_a_snapshot_identity_incomplete") {
+      return "snapshot_identity_failure";
+    }
+    if (
+      failure.code === "proof_pack_lane_a_parity_failed" &&
+      failure.detail.includes("theta_ktrace_contract_failure")
+    ) {
+      return "theta_ktrace_contract_failure";
+    }
+    if (
+      failure.code === "proof_pack_lane_a_parity_failed" &&
+      failure.detail.includes("render_parity_failure")
+    ) {
+      return "render_parity_failure";
+    }
+    if (
+      failure.code === "proof_pack_york_slice_hash_mismatch" ||
+      failure.code === "proof_pack_york_rho_remap_mismatch" ||
+      failure.code === "proof_pack_york_near_zero_suppression_mismatch"
+    ) {
+      return "render_parity_failure";
+    }
+  }
+  return null;
+};
+
+export const resolveLaneACauseCode = (args: {
+  guardFailures: GuardFailure[];
+  verdict: DecisionVerdict;
+  laneId?: string;
+}): LaneCauseCode => {
+  const guardCause = mapGuardFailuresToLaneCauseCode(args.guardFailures);
+  if (guardCause) return guardCause;
+  const laneIsAlternate = args.laneId === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID;
+  if (args.verdict === "inconclusive") {
+    return laneIsAlternate ? "lane_b_family_inconclusive" : "lane_a_family_inconclusive";
+  }
+  if (args.verdict === NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY) {
+    return laneIsAlternate ? "lane_b_family_distinct" : "lane_a_family_distinct";
+  }
+  return laneIsAlternate ? "lane_b_family_congruent" : "lane_a_family_congruent";
+};
+
 const evaluateDiagnosticLane = (args: {
   lane: YorkDiagnosticLane;
   contract: YorkDiagnosticContract;
@@ -3123,6 +4337,11 @@ const evaluateDiagnosticLane = (args: {
     allRequiredViewsRendered: false,
     provenanceHashesPresent: false,
     runtimeStatusProvenancePresent: false,
+    offlineRenderParityComputed: false,
+    thetaKTraceParityComputed: false,
+    snapshotIdentityComplete: false,
+    diagnosticParityClosed: false,
+    laneAParityClosed: false,
     readyForFamilyVerdict: false,
   };
   if (!alc || !nat || !nhm2) {
@@ -3138,14 +4357,41 @@ const evaluateDiagnosticLane = (args: {
       supported: args.lane.supported,
       unsupported_reason: args.lane.unsupported_reason,
       observer: args.lane.observer,
+      observer_definition_id: args.lane.observer_definition_id,
+      observer_inputs_required: [...args.lane.observer_inputs_required],
+      observer_construction_inputs: [...args.lane.observer_construction_inputs],
+      observer_construction_formula: args.lane.observer_construction_formula,
+      observer_normalized: args.lane.observer_normalized,
+      observer_approximation: args.lane.observer_approximation,
+      lane_semantic_mode: args.lane.lane_semantic_mode,
       foliation: args.lane.foliation,
       theta_definition: args.lane.theta_definition,
       kij_sign_convention: args.lane.kij_sign_convention,
+      requires_gamma_metric: args.lane.requires_gamma_metric,
+      semantics_closed: args.lane.semantics_closed,
+      cross_lane_claim_ready: args.lane.cross_lane_claim_ready,
+      cross_lane_claim_block_reason: args.lane.cross_lane_claim_block_reason,
       classification_scope: args.lane.classification_scope,
       cases: args.cases,
       controlDebug: buildControlDebug(args.cases),
       preconditions: fallbackPreconditions,
       controlsCalibratedByReferences: false,
+      laneReadiness: {
+        laneBSemanticsClosed: false,
+        laneBObserverDefined: false,
+        laneBTensorInputsPresent: false,
+        laneBGeometryReady: false,
+        laneBControlsCalibrated: false,
+        laneBParityClosed: false,
+        laneBCrossLaneClaimReady: false,
+        readyForCrossLaneComparison: false,
+      },
+      laneAParity: {
+        status: "failed",
+        causeCode: "missing_required_view",
+        caseSummaries: [],
+      },
+      causeCode: "missing_required_view",
       guardFailures,
       decisionTable: [],
       classificationScoring: null,
@@ -3160,6 +4406,7 @@ const evaluateDiagnosticLane = (args: {
     cases: args.cases,
     runtimeStatus: args.runtimeStatus,
   });
+  const laneAParity = summarizeLaneAParity(args.cases);
   const yorkCongruence = evaluateYorkSliceCongruence(args.cases);
   guardFailures.push(...yorkCongruence.guardFailures);
 
@@ -3177,6 +4424,118 @@ const evaluateDiagnosticLane = (args: {
     alcSignalSufficient &&
     alcStrong &&
     natLow;
+  const laneIsAlternate =
+    args.lane.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID;
+  const normalizeObserverInputs = (values: string[] | null | undefined): string[] =>
+    Array.from(
+      new Set(
+        (values ?? [])
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter((value) => value.length > 0),
+      ),
+    ).sort();
+  const laneObserverInputsRequired = normalizeObserverInputs(
+    args.lane.observer_inputs_required,
+  );
+  const laneObserverConstructionInputs = normalizeObserverInputs(
+    args.lane.observer_construction_inputs,
+  );
+  const laneBObserverMetadataConsistent =
+    !laneIsAlternate ||
+    args.cases.every((entry) => {
+      const computation = entry.snapshotMetrics?.laneComputation;
+      if (computation == null) return false;
+      const computationObserverInputsRequired = normalizeObserverInputs(
+        computation.observer_inputs_required,
+      );
+      const observerInputsRequiredMatch =
+        computationObserverInputsRequired.length === laneObserverInputsRequired.length &&
+        computationObserverInputsRequired.every(
+          (value, index) => value === laneObserverInputsRequired[index],
+        );
+      const computationObserverConstructionInputs = normalizeObserverInputs(
+        computation.observer_construction_inputs,
+      );
+      const observerConstructionInputsMatch =
+        computationObserverConstructionInputs.length ===
+          laneObserverConstructionInputs.length &&
+        computationObserverConstructionInputs.every(
+          (value, index) => value === laneObserverConstructionInputs[index],
+        );
+      const computationObserverApproximation = computation.observer_approximation ?? null;
+      const laneObserverApproximation = args.lane.observer_approximation ?? null;
+      return (
+        computation.observer_definition_id === args.lane.observer_definition_id &&
+        computation.observer_construction_formula ===
+          args.lane.observer_construction_formula &&
+        computation.observer_normalized === args.lane.observer_normalized &&
+        computationObserverApproximation === laneObserverApproximation &&
+        observerInputsRequiredMatch &&
+        observerConstructionInputsMatch &&
+        computation.lane_b_semantic_mode === args.lane.lane_semantic_mode
+      );
+    });
+  const laneBObserverDefined =
+    !laneIsAlternate ||
+    (!!args.lane.observer_definition_id &&
+      !!args.lane.observer_construction_formula &&
+      args.lane.observer_inputs_required.length > 0 &&
+      args.lane.observer_construction_inputs.length > 0 &&
+      laneBObserverMetadataConsistent);
+  const laneBTensorInputsPresent =
+    !laneIsAlternate ||
+    args.cases.every((entry) => {
+      const computation = entry.snapshotMetrics?.laneComputation;
+      return (
+        computation != null &&
+        computation.observer_inputs_present === true &&
+        typeof computation.lane_b_tensor_inputs_hash === "string" &&
+        computation.lane_b_tensor_inputs_hash.trim().length > 0
+      );
+    });
+  const laneBGeometryReady =
+    !laneIsAlternate ||
+    args.cases.every(
+      (entry) => entry.snapshotMetrics?.laneComputation?.lane_b_geometry_ready === true,
+    );
+  const laneBSemanticsClosed =
+    !laneIsAlternate ||
+    (args.lane.semantics_closed === true &&
+      args.cases.every(
+        (entry) =>
+          entry.snapshotMetrics?.laneComputation?.lane_b_semantics_closed === true,
+      ));
+  const laneBControlsCalibrated =
+    !laneIsAlternate || controlsCalibratedByReferences;
+  const laneParityClosed =
+    preconditions.diagnosticParityClosed ?? (preconditions.laneAParityClosed === true);
+  const laneBParityClosed =
+    !laneIsAlternate || laneParityClosed;
+  const laneBCrossLaneClaimReady =
+    !laneIsAlternate ||
+    (args.lane.cross_lane_claim_ready === true &&
+      args.cases.every(
+        (entry) => entry.snapshotMetrics?.laneComputation?.cross_lane_claim_ready === true,
+      ));
+  const laneReadiness = {
+    laneBSemanticsClosed,
+    laneBObserverDefined,
+    laneBTensorInputsPresent,
+    laneBGeometryReady,
+    laneBControlsCalibrated,
+    laneBParityClosed,
+    laneBCrossLaneClaimReady,
+    readyForCrossLaneComparison:
+      args.lane.supported &&
+      preconditions.readyForFamilyVerdict &&
+      controlsCalibratedByReferences &&
+      laneParityClosed &&
+      laneBSemanticsClosed &&
+      laneBObserverDefined &&
+      laneBTensorInputsPresent &&
+      laneBGeometryReady &&
+      laneBCrossLaneClaimReady,
+  };
 
   const classificationScoring = scoreNhm2AgainstReferenceControls({
     contract: args.contract,
@@ -3202,11 +4561,17 @@ const evaluateDiagnosticLane = (args: {
     baselineScoring: classificationScoring,
   });
   const decisionTable = buildLaneDecisionTable({
+    laneId: args.lane.lane_id,
     preconditions,
     controlsCalibratedByReferences,
     classificationScoring,
     classificationRobustness,
     yorkCongruence,
+  });
+  const causeCode = resolveLaneACauseCode({
+    guardFailures,
+    verdict,
+    laneId: args.lane.lane_id,
   });
 
   const notes: string[] = [];
@@ -3242,6 +4607,21 @@ const evaluateDiagnosticLane = (args: {
   notes.push(
     `Robustness status=${classificationRobustness.stabilityStatus} dominant=${classificationRobustness.dominantVerdict ?? "null"} fraction=${classificationRobustness.dominantFraction}.`,
   );
+  notes.push(
+    `${args.lane.lane_id} parity status=${laneAParity.status} cause=${laneAParity.causeCode ?? "null"}.`,
+  );
+  if (laneIsAlternate && !laneReadiness.readyForCrossLaneComparison) {
+    notes.push(
+      `lane_b_cross_lane_readiness=false semantics_closed=${laneReadiness.laneBSemanticsClosed} observer_defined=${laneReadiness.laneBObserverDefined} tensor_inputs_present=${laneReadiness.laneBTensorInputsPresent} geometry_ready=${laneReadiness.laneBGeometryReady} controls_calibrated=${laneReadiness.laneBControlsCalibrated} parity_closed=${laneReadiness.laneBParityClosed} claim_ready=${laneReadiness.laneBCrossLaneClaimReady}`,
+    );
+    if (args.lane.cross_lane_claim_block_reason) {
+      notes.push(`lane_b_block_reason=${args.lane.cross_lane_claim_block_reason}`);
+    }
+  }
+  notes.push(
+    "Support-overlap parity deltas are currently advisory diagnostics and do not gate Lane A pass/fail.",
+  );
+  notes.push(formatLaneCauseCodeNote(args.lane.lane_id, causeCode));
 
   return {
     lane_id: args.lane.lane_id,
@@ -3249,14 +4629,28 @@ const evaluateDiagnosticLane = (args: {
     supported: args.lane.supported,
     unsupported_reason: args.lane.unsupported_reason,
     observer: args.lane.observer,
+    observer_definition_id: args.lane.observer_definition_id,
+    observer_inputs_required: [...args.lane.observer_inputs_required],
+    observer_construction_inputs: [...args.lane.observer_construction_inputs],
+    observer_construction_formula: args.lane.observer_construction_formula,
+    observer_normalized: args.lane.observer_normalized,
+    observer_approximation: args.lane.observer_approximation,
+    lane_semantic_mode: args.lane.lane_semantic_mode,
     foliation: args.lane.foliation,
     theta_definition: args.lane.theta_definition,
     kij_sign_convention: args.lane.kij_sign_convention,
+    requires_gamma_metric: args.lane.requires_gamma_metric,
+    semantics_closed: args.lane.semantics_closed,
+    cross_lane_claim_ready: args.lane.cross_lane_claim_ready,
+    cross_lane_claim_block_reason: args.lane.cross_lane_claim_block_reason,
     classification_scope: args.lane.classification_scope,
     cases: args.cases,
     controlDebug: buildControlDebug(args.cases),
     preconditions,
     controlsCalibratedByReferences,
+    laneReadiness,
+    laneAParity,
+    causeCode,
     guardFailures,
     decisionTable,
     classificationScoring,
@@ -3272,6 +4666,11 @@ const buildUnsupportedLaneEvaluation = (lane: YorkDiagnosticLane): LaneProofPack
     allRequiredViewsRendered: false,
     provenanceHashesPresent: false,
     runtimeStatusProvenancePresent: false,
+    offlineRenderParityComputed: false,
+    thetaKTraceParityComputed: false,
+    snapshotIdentityComplete: false,
+    diagnosticParityClosed: false,
+    laneAParityClosed: false,
     readyForFamilyVerdict: false,
   };
   const unsupportedReason =
@@ -3289,14 +4688,49 @@ const buildUnsupportedLaneEvaluation = (lane: YorkDiagnosticLane): LaneProofPack
     supported: false,
     unsupported_reason: unsupportedReason,
     observer: lane.observer,
+    observer_definition_id: lane.observer_definition_id,
+    observer_inputs_required: [...lane.observer_inputs_required],
+    observer_construction_inputs: [...lane.observer_construction_inputs],
+    observer_construction_formula: lane.observer_construction_formula,
+    observer_normalized: lane.observer_normalized,
+    observer_approximation: lane.observer_approximation,
+    lane_semantic_mode: lane.lane_semantic_mode,
     foliation: lane.foliation,
     theta_definition: lane.theta_definition,
     kij_sign_convention: lane.kij_sign_convention,
+    requires_gamma_metric: lane.requires_gamma_metric,
+    semantics_closed: lane.semantics_closed,
+    cross_lane_claim_ready: lane.cross_lane_claim_ready,
+    cross_lane_claim_block_reason: lane.cross_lane_claim_block_reason,
     classification_scope: lane.classification_scope,
     cases: [],
     controlDebug: [],
     preconditions,
     controlsCalibratedByReferences: false,
+    laneReadiness: {
+      laneBSemanticsClosed: false,
+      laneBObserverDefined: false,
+      laneBTensorInputsPresent: false,
+      laneBGeometryReady: false,
+      laneBControlsCalibrated: false,
+      laneBParityClosed: false,
+      laneBCrossLaneClaimReady: false,
+      readyForCrossLaneComparison: false,
+    },
+    laneAParity: {
+      status: "failed",
+      causeCode: resolveLaneACauseCode({
+        guardFailures,
+        verdict: "inconclusive",
+        laneId: lane.lane_id,
+      }),
+      caseSummaries: [],
+    },
+    causeCode: resolveLaneACauseCode({
+      guardFailures,
+      verdict: "inconclusive",
+      laneId: lane.lane_id,
+    }),
     guardFailures,
     decisionTable: [
       {
@@ -3357,6 +4791,22 @@ const compareLaneVerdictPair = (
   return "lane_comparison_inconclusive";
 };
 
+const laneDefaultInconclusiveCauseCode = (laneId: string): LaneCauseCode =>
+  laneId === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID
+    ? "lane_b_family_inconclusive"
+    : "lane_a_family_inconclusive";
+
+const laneRoleLabel = (laneId: string): string => {
+  if (laneId === YORK_DIAGNOSTIC_BASELINE_LANE_ID) return "Baseline lane";
+  if (laneId === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID) return "Alternate lane";
+  return `Lane ${laneId}`;
+};
+
+export const formatLaneCauseCodeNote = (
+  laneId: string,
+  causeCode: LaneCauseCode,
+): string => `${laneRoleLabel(laneId)} cause code=${causeCode}.`;
+
 export const buildCrossLaneComparison = (args: {
   baseline: LaneProofPackEvaluation | null;
   alternate: LaneProofPackEvaluation | null;
@@ -3373,6 +4823,46 @@ export const buildCrossLaneComparison = (args: {
   const alternateCalibrated =
     !!alternate?.preconditions.readyForFamilyVerdict &&
     alternate?.controlsCalibratedByReferences === true;
+  const laneB =
+    baseline?.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID
+      ? baseline
+      : alternate?.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID
+        ? alternate
+        : null;
+  const laneBDeclaredSemanticsClosed =
+    laneB == null ? true : laneB.semantics_closed === true;
+  const laneBDeclaredObserverDefined =
+    laneB == null
+      ? true
+      : !!laneB.observer_definition_id && !!laneB.observer_construction_formula;
+  const laneBDeclaredCrossLaneClaimReady =
+    laneB == null ? true : laneB.cross_lane_claim_ready === true;
+  const laneBSemanticsClosed =
+    laneB == null
+      ? true
+      : laneBDeclaredSemanticsClosed &&
+        laneB.laneReadiness?.laneBSemanticsClosed === true;
+  const laneBObserverDefined =
+    laneB == null
+      ? true
+      : laneBDeclaredObserverDefined &&
+        laneB.laneReadiness?.laneBObserverDefined === true;
+  const laneBTensorInputsPresent =
+    laneB == null ? true : laneB.laneReadiness?.laneBTensorInputsPresent === true;
+  const laneBGeometryReady =
+    laneB == null ? true : laneB.laneReadiness?.laneBGeometryReady === true;
+  const laneBControlsCalibrated =
+    laneB == null
+      ? true
+      : laneB.controlsCalibratedByReferences === true &&
+        laneB.laneReadiness?.laneBControlsCalibrated === true;
+  const laneBParityClosed =
+    laneB == null ? true : laneB.laneReadiness?.laneBParityClosed === true;
+  const laneBCrossLaneClaimReady =
+    laneB == null
+      ? true
+      : laneBDeclaredCrossLaneClaimReady &&
+        laneB.laneReadiness?.laneBCrossLaneClaimReady === true;
 
   const baselineVerdict = baseline?.verdict ?? null;
   const alternateVerdict = alternate?.verdict ?? null;
@@ -3389,6 +4879,21 @@ export const buildCrossLaneComparison = (args: {
     notes.push("Missing baseline or alternate lane evaluation.");
   } else if (!baselineSupported || !alternateSupported) {
     notes.push("At least one lane is unsupported; cross-lane comparison remains inconclusive.");
+  } else if (
+    !laneBSemanticsClosed ||
+    !laneBObserverDefined ||
+    !laneBTensorInputsPresent ||
+    !laneBGeometryReady ||
+    !laneBControlsCalibrated ||
+    !laneBParityClosed ||
+    !laneBCrossLaneClaimReady
+  ) {
+    notes.push(
+      `Lane B readiness gate not satisfied: semantics_closed=${laneBSemanticsClosed} observer_defined=${laneBObserverDefined} tensor_inputs_present=${laneBTensorInputsPresent} geometry_ready=${laneBGeometryReady} controls_calibrated=${laneBControlsCalibrated} parity_closed=${laneBParityClosed} claim_ready=${laneBCrossLaneClaimReady}.`,
+    );
+    if (laneB?.cross_lane_claim_block_reason) {
+      notes.push(`Lane B block reason: ${laneB.cross_lane_claim_block_reason}`);
+    }
   } else if (!baselineCalibrated || !alternateCalibrated) {
     notes.push("At least one lane failed control calibration; cross-lane verdict comparison is blocked.");
   } else if (baselineVerdict === "inconclusive" || alternateVerdict === "inconclusive") {
@@ -3413,16 +4918,23 @@ export const buildCrossLaneComparison = (args: {
       alternate_controls_calibrated: alternateCalibrated,
       baseline_supported: baselineSupported,
       alternate_supported: alternateSupported,
+      lane_b_semantics_closed: laneBSemanticsClosed,
+      lane_b_observer_defined: laneBObserverDefined,
+      lane_b_tensor_inputs_present: laneBTensorInputsPresent,
+      lane_b_geometry_ready: laneBGeometryReady,
+      lane_b_controls_calibrated: laneBControlsCalibrated,
+      lane_b_parity_closed: laneBParityClosed,
+      lane_b_cross_lane_claim_ready: laneBCrossLaneClaimReady,
     },
     notes,
   };
 };
 
-const renderMarkdown = (payload: ProofPackPayload): string => {
+export const renderMarkdown = (payload: ProofPackPayload): string => {
   const laneRowsSummary = payload.diagnosticLanes
     .map(
       (lane) =>
-        `| ${lane.lane_id} | ${lane.active} | ${lane.supported} | ${lane.observer} | ${lane.foliation} | ${lane.theta_definition} | ${lane.kij_sign_convention} | ${lane.preconditions.readyForFamilyVerdict} | ${lane.controlsCalibratedByReferences} | ${lane.verdict} |`,
+        `| ${lane.lane_id} | ${lane.active} | ${lane.supported} | ${lane.observer} | ${lane.foliation} | ${lane.theta_definition} | ${lane.kij_sign_convention} | ${lane.semantics_closed ?? false} | ${lane.cross_lane_claim_ready ?? false} | ${lane.laneReadiness?.readyForCrossLaneComparison ?? false} | ${lane.preconditions.readyForFamilyVerdict} | ${lane.controlsCalibratedByReferences} | ${lane.verdict} | ${lane.causeCode ?? laneDefaultInconclusiveCauseCode(lane.lane_id)} |`,
     )
     .join("\n");
   const laneGuardRows = payload.diagnosticLanes
@@ -3444,10 +4956,50 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
     `| alternate_controls_calibrated | ${payload.crossLaneComparison.falsifiers.alternate_controls_calibrated} |`,
     `| baseline_supported | ${payload.crossLaneComparison.falsifiers.baseline_supported} |`,
     `| alternate_supported | ${payload.crossLaneComparison.falsifiers.alternate_supported} |`,
+    `| lane_b_semantics_closed | ${payload.crossLaneComparison.falsifiers.lane_b_semantics_closed} |`,
+    `| lane_b_observer_defined | ${payload.crossLaneComparison.falsifiers.lane_b_observer_defined} |`,
+    `| lane_b_tensor_inputs_present | ${payload.crossLaneComparison.falsifiers.lane_b_tensor_inputs_present} |`,
+    `| lane_b_geometry_ready | ${payload.crossLaneComparison.falsifiers.lane_b_geometry_ready} |`,
+    `| lane_b_controls_calibrated | ${payload.crossLaneComparison.falsifiers.lane_b_controls_calibrated} |`,
+    `| lane_b_parity_closed | ${payload.crossLaneComparison.falsifiers.lane_b_parity_closed} |`,
+    `| lane_b_cross_lane_claim_ready | ${payload.crossLaneComparison.falsifiers.lane_b_cross_lane_claim_ready} |`,
   ].join("\n");
   const crossLaneNotes = payload.crossLaneComparison.notes.length
     ? payload.crossLaneComparison.notes.map((entry) => `- ${entry}`).join("\n")
     : "- none";
+  const baselineLaneForSummary =
+    payload.diagnosticLanes.find(
+      (lane) => lane.lane_id === (payload.crossLaneComparison.baseline_lane_id ?? ""),
+    ) ??
+    payload.diagnosticLanes.find(
+      (lane) => lane.lane_id === payload.diagnosticContract.baseline_lane_id,
+    ) ??
+    payload.diagnosticLanes[0] ??
+    null;
+  const alternateLaneForSummary =
+    payload.crossLaneComparison.alternate_lane_id == null
+      ? null
+      : payload.diagnosticLanes.find(
+          (lane) => lane.lane_id === payload.crossLaneComparison.alternate_lane_id,
+        ) ?? null;
+  const baselineCauseCode =
+    baselineLaneForSummary?.causeCode ??
+    (baselineLaneForSummary
+      ? laneDefaultInconclusiveCauseCode(baselineLaneForSummary.lane_id)
+      : "lane_a_family_inconclusive");
+  const alternateCauseCode =
+    alternateLaneForSummary?.causeCode ??
+    (alternateLaneForSummary
+      ? laneDefaultInconclusiveCauseCode(alternateLaneForSummary.lane_id)
+      : "null");
+  const baselineParityStatus =
+    baselineLaneForSummary?.laneAParity?.status ??
+    payload.laneAParity?.status ??
+    "failed";
+  const baselineParityCause =
+    baselineLaneForSummary?.laneAParity?.causeCode ??
+    payload.laneAParity?.causeCode ??
+    "null";
   const primaryViewLabel = payload.cases[0]?.primaryYork.view ?? "n/a";
   const laneRows = payload.cases
     .flatMap((entry) =>
@@ -3512,6 +5064,26 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
       }),
     )
     .join("\n");
+  const parityRows = payload.cases
+    .flatMap((entry) =>
+      (entry.parity?.byView ?? []).map((audit) => {
+        return `| ${entry.caseId} | ${audit.view} | ${audit.offlineThetaSliceHash ?? "null"} | ${audit.offlineNegKTraceSliceHash ?? "null"} | ${audit.renderThetaSliceHash ?? "null"} | ${audit.thetaVsRenderMaxAbsResidual ?? "null"} | ${audit.thetaVsKTraceMaxAbsResidual ?? "null"} | ${audit.signCountDelta.thetaVsRender.positive ?? "null"} | ${audit.signCountDelta.thetaVsRender.negative ?? "null"} | ${audit.signCountDelta.thetaVsKTrace.positive ?? "null"} | ${audit.signCountDelta.thetaVsKTrace.negative ?? "null"} | ${audit.supportOverlapPct.offline ?? "null"} | ${audit.supportOverlapPct.render ?? "null"} | ${audit.supportOverlapPct.delta ?? "null"} | ${audit.extremaDelta.thetaVsRender.absMaxRaw ?? "null"} | ${audit.extremaDelta.thetaVsKTrace.absMaxRaw ?? "null"} | ${audit.identity.complete} | ${audit.status} | ${audit.causeCode ?? "null"} |`;
+      }),
+    )
+    .join("\n");
+  const parityCaseRows =
+    payload.cases
+      .map((entry) => {
+        const parity = entry.parity;
+        const parityStatus = parity?.status ?? "fail";
+        const parityCauseCode =
+          parity == null
+            ? "snapshot_identity_failure"
+            : parity.causeCode ??
+              (parityStatus === "pass" ? "null" : "snapshot_identity_failure");
+        return `| ${entry.caseId} | ${parity?.parityComputed ?? false} | ${parity?.thetaKTraceParityComputed ?? false} | ${parity?.snapshotIdentityComplete ?? false} | ${parity?.renderParityPass ?? false} | ${parity?.thetaKTraceContractPass ?? false} | ${parityStatus} | ${parityCauseCode} |`;
+      })
+      .join("\n") || "| none | false | false | false | false | false | fail | snapshot_identity_failure |";
   const decisionRows = payload.decisionTable
     .map((row) => `| ${row.id} | ${row.condition} | ${row.status} | ${row.interpretation} |`)
     .join("\n");
@@ -3535,6 +5107,26 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
       "runtimeStatusProvenancePresent",
       payload.preconditions.runtimeStatusProvenancePresent,
       "runtime status endpoint must expose serviceVersion/buildHash/commitSha/processStartedAtMs/runtimeInstanceId",
+    ],
+    [
+      "offlineRenderParityComputed",
+      payload.preconditions.offlineRenderParityComputed,
+      "offline vs rendered parity metrics must be computed on the same snapshot",
+    ],
+    [
+      "thetaKTraceParityComputed",
+      payload.preconditions.thetaKTraceParityComputed,
+      "offline theta vs offline -K_trace parity metrics must be computed on the same snapshot",
+    ],
+    [
+      "snapshotIdentityComplete",
+      payload.preconditions.snapshotIdentityComplete,
+      "metric_ref_hash/theta hash/K_trace hash/chart/observer/theta_definition/kij_sign_convention/lane_id/timestamp identity must be complete",
+    ],
+    [
+      "diagnosticParityClosed",
+      payload.preconditions.diagnosticParityClosed ?? payload.preconditions.laneAParityClosed,
+      "Diagnostic-lane parity must pass before family verdict is allowed",
     ],
     [
       "readyForFamilyVerdict",
@@ -3586,9 +5178,22 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
 - robustness.stability_policy: \`stable>=${payload.diagnosticContract.robustness_checks.stability_policy.stable_fraction_min}, marginal>=${payload.diagnosticContract.robustness_checks.stability_policy.marginal_fraction_min}\`
 
 ## Diagnostic Lanes
-| lane_id | active | supported | observer | foliation | theta_definition | kij_sign_convention | ready_for_verdict | controls_calibrated | verdict |
-|---|---|---|---|---|---|---|---|---|---|
-${laneRowsSummary || "| none | none | none | none | none | none | none | none | none | none |"}
+| lane_id | active | supported | observer | foliation | theta_definition | kij_sign_convention | semantics_closed | cross_lane_claim_ready | lane_ready_for_cross_lane | ready_for_verdict | controls_calibrated | verdict | cause_code |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+${laneRowsSummary || "| none | none | none | none | none | none | none | false | false | false | none | none | none | lane_a_family_inconclusive |"}
+
+## Lane Causes
+- baselineLaneId: \`${baselineLaneForSummary?.lane_id ?? payload.crossLaneComparison.baseline_lane_id ?? "null"}\`
+- baselineLaneCauseCode: \`${baselineCauseCode}\`
+- alternateLaneId: \`${alternateLaneForSummary?.lane_id ?? payload.crossLaneComparison.alternate_lane_id ?? "null"}\`
+- alternateLaneCauseCode: \`${alternateCauseCode}\`
+- baselineLaneParityStatus: \`${baselineParityStatus}\`
+- baselineLaneParityCause: \`${baselineParityCause}\`
+
+## Lane A Parity (Case Summary)
+| case | parity_computed | theta_ktrace_parity_computed | snapshot_identity_complete | render_parity_pass | theta_ktrace_contract_pass | status | cause_code |
+|---|---|---|---|---|---|---|---|
+${parityCaseRows}
 
 ## Per-Lane Guard Failures
 | lane_id | code | detail |
@@ -3631,6 +5236,11 @@ ${viewRows}
 | case | view | coordinate_mode | sampling_choice | theta_min_raw | theta_max_raw | theta_abs_max_raw | positive_cells | negative_cells | zero_or_near_zero_cells | offline_slice_hash | fore_pos_total | fore_neg_total | aft_pos_total | aft_neg_total | signed_lobe_summary |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---|
 ${offlineRows}
+
+## Lane A Offline-vs-Render Parity
+| case | view | offline_theta_hash | offline_neg_ktrace_hash | render_theta_hash | theta_vs_render_max_abs_residual | theta_vs_ktrace_max_abs_residual | sign_delta_render_pos | sign_delta_render_neg | sign_delta_ktrace_pos | sign_delta_ktrace_neg | support_overlap_offline_pct | support_overlap_render_pct | support_overlap_delta_pct | extrema_delta_theta_render_absmax | extrema_delta_theta_ktrace_absmax | identity_complete | status | cause_code |
+|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|
+${parityRows || "| none | none | null | null | null | null | null | null | null | null | null | null | null | null | null | null | false | fail | snapshot_identity_failure |"}
 
 ## Case Summary (primary York = ${primaryViewLabel})
 | case | expectation | theta_min_raw | theta_max_raw | theta_abs_max_raw | theta_min_display | theta_max_display | theta_abs_max_display | coordinate_mode | sampling_choice | support_overlap_pct | theta+K maxAbs | theta+K rms | theta+K consistent |
@@ -3691,6 +5301,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   outMdPath?: string;
   latestJsonPath?: string;
   latestMdPath?: string;
+  rodcOutJsonPath?: string;
+  rodcLatestJsonPath?: string;
   yorkViews?: HullScientificRenderView[];
   frameSize?: { width: number; height: number };
 }) => {
@@ -3710,6 +5322,9 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const outMdPath = options?.outMdPath ?? DEFAULT_OUT_MD;
   const latestJsonPath = options?.latestJsonPath ?? DEFAULT_LATEST_JSON;
   const latestMdPath = options?.latestMdPath ?? DEFAULT_LATEST_MD;
+  const rodcOutJsonPath = options?.rodcOutJsonPath ?? DEFAULT_RODC_OUT_JSON;
+  const rodcLatestJsonPath =
+    options?.rodcLatestJsonPath ?? DEFAULT_RODC_LATEST_JSON;
   const yorkViews = ensureRequiredYorkViews(
     options?.yorkViews?.length ? [...options.yorkViews] : [...DEFAULT_YORK_VIEWS],
   );
@@ -3851,6 +5466,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const cases = baselineEvaluation.cases;
   const controlDebug = baselineEvaluation.controlDebug;
   const preconditions = baselineEvaluation.preconditions;
+  const laneAParity = baselineEvaluation.laneAParity;
+  const causeCode = baselineEvaluation.causeCode;
   const guardFailures = baselineEvaluation.guardFailures;
   const decisionTable = baselineEvaluation.decisionTable;
   const classificationScoring = baselineEvaluation.classificationScoring;
@@ -3863,6 +5480,11 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   notes.push(
     `cross-lane status=${crossLaneComparison.cross_lane_status} baseline=${crossLaneComparison.baseline_verdict ?? "null"} alternate=${crossLaneComparison.alternate_verdict ?? "null"}`,
   );
+  if (alternateEvaluation?.causeCode) {
+    notes.push(
+      formatLaneCauseCodeNote(alternateEvaluation.lane_id, alternateEvaluation.causeCode),
+    );
+  }
   notes.push(...crossLaneComparison.notes);
 
   const payloadBase: ProofPackPayload = {
@@ -3887,6 +5509,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     cases,
     controlDebug,
     preconditions,
+    laneAParity,
+    causeCode,
     guardFailures,
     decisionTable,
     classificationScoring,
@@ -3902,13 +5526,21 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     ...payloadBase,
     checksum: computeChecksum(payloadBase),
   };
+  const rodcArtifact = buildWarpRodcSnapshot({
+    payload,
+    sourceAuditArtifact: normalizePath(latestJsonPath),
+  });
 
   ensureDirForFile(outJsonPath);
   ensureDirForFile(outMdPath);
   ensureDirForFile(latestJsonPath);
   ensureDirForFile(latestMdPath);
+  ensureDirForFile(rodcOutJsonPath);
+  ensureDirForFile(rodcLatestJsonPath);
   fs.writeFileSync(outJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
+  fs.writeFileSync(rodcOutJsonPath, `${JSON.stringify(rodcArtifact, null, 2)}\n`);
+  fs.writeFileSync(rodcLatestJsonPath, `${JSON.stringify(rodcArtifact, null, 2)}\n`);
   const markdown = renderMarkdown(payload);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
@@ -3918,7 +5550,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     outMdPath,
     latestJsonPath,
     latestMdPath,
+    rodcOutJsonPath,
+    rodcLatestJsonPath,
     payload,
+    rodcArtifact,
   };
 };
 
@@ -3949,6 +5584,8 @@ if (isEntryPoint) {
     outMdPath: readArgValue("--out-md"),
     latestJsonPath: readArgValue("--latest-json"),
     latestMdPath: readArgValue("--latest-md"),
+    rodcOutJsonPath: readArgValue("--rodc-out-json"),
+    rodcLatestJsonPath: readArgValue("--rodc-latest-json"),
     yorkViews: parseYorkViews(readArgValue("--views")),
     frameSize: { width, height },
   })

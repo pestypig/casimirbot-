@@ -2,6 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
+import {
+  computeWarpRodcChecksum,
+  WARP_RODC_SNAPSHOT_SCHEMA_VERSION,
+  type WarpRodcSnapshotV1,
+  type WarpRodcStability,
+  type WarpRodcVerdictStatus,
+} from "../shared/warp-rodc-contract";
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
 const FULL_SOLVE_DIR = path.join("artifacts", "research", "full-solve");
@@ -10,10 +17,20 @@ const DEFAULT_OUT_JSON = path.join(FULL_SOLVE_DIR, `render-congruence-benchmark-
 const DEFAULT_OUT_MD = path.join(DOC_AUDIT_DIR, `warp-render-congruence-benchmark-${DATE_STAMP}.md`);
 const DEFAULT_LATEST_JSON = path.join(FULL_SOLVE_DIR, "render-congruence-benchmark-latest.json");
 const DEFAULT_LATEST_MD = path.join(DOC_AUDIT_DIR, "warp-render-congruence-benchmark-latest.md");
+const DEFAULT_RODC_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `warp-render-congruence-rodc-${DATE_STAMP}.json`,
+);
+const DEFAULT_RODC_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "warp-render-congruence-rodc-latest.json",
+);
 const DEFAULT_INTEGRITY_PATH = path.join(FULL_SOLVE_DIR, "integrity-parity-suite-latest.json");
 const DEFAULT_DEBUG_LOG_PATH = path.join("artifacts", "research", "full-solve", "alcubierre-debug-log-latest.jsonl");
 const BOUNDARY_STATEMENT =
   "This benchmark checks renderer/metric congruence and GR observable parity anchors; it is not a physical warp feasibility claim.";
+const RODC_BOUNDARY_STATEMENT =
+  "This reduced-order snapshot summarizes render/metric congruence benchmark outputs under a declared benchmark contract; it is not a physical warp feasibility claim.";
 
 type BenchmarkVerdict = "PASS" | "PARTIAL" | "FAIL" | "INCONCLUSIVE";
 type SolveOrderStatus = "pass" | "warn" | "fail" | "unknown";
@@ -64,6 +81,24 @@ type ObservableSummary = {
   shapiro: boolean | null;
   verdict: BenchmarkVerdict;
   note: string;
+};
+
+type RenderBenchmarkPayload = {
+  artifactType: string;
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  overallVerdict: BenchmarkVerdict;
+  overallNote: string;
+  render: RenderSummary;
+  observables: ObservableSummary;
+  paths: {
+    dated_json: string;
+    latest_json: string;
+    dated_md: string;
+    latest_md: string;
+  };
+  checksum?: string;
 };
 
 const readArgValue = (name: string, argv = process.argv.slice(2)): string | undefined => {
@@ -119,6 +154,173 @@ const computeChecksum = (payload: Record<string, unknown>): string => {
   delete copy.checksum;
   const canonical = JSON.stringify(copy, Object.keys(copy).sort());
   return crypto.createHash("sha256").update(canonical).digest("hex");
+};
+
+const computeFileHash = (filePath: string): string =>
+  crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+
+const toRodcVerdictStatus = (verdict: BenchmarkVerdict): WarpRodcVerdictStatus => {
+  if (verdict === "PASS") return "congruent";
+  if (verdict === "FAIL") return "distinct";
+  return "inconclusive";
+};
+
+const toRodcStability = (_verdict: BenchmarkVerdict): WarpRodcStability => "not_evaluated";
+
+export const buildWarpRenderCongruenceRodcSnapshot = (args: {
+  payload: RenderBenchmarkPayload;
+  debugLogPath: string;
+  integrityPath: string;
+  minEvents: number;
+}): WarpRodcSnapshotV1 => {
+  const { payload, debugLogPath, integrityPath, minEvents } = args;
+  const renderPenalty =
+    payload.render.verdict === "PASS"
+      ? 0
+      : payload.render.verdict === "PARTIAL"
+        ? 0.5
+        : payload.render.verdict === "FAIL"
+          ? 1
+          : 0.75;
+  const observablesPenalty =
+    payload.observables.verdict === "PASS"
+      ? 0
+      : payload.observables.verdict === "PARTIAL"
+        ? 0.5
+        : payload.observables.verdict === "FAIL"
+          ? 1
+          : 0.75;
+  const featureVector = {
+    debug_log_parse_errors: payload.render.parseErrors,
+    total_events: payload.render.totalEvents,
+    displacement_events: payload.render.displacementEvents,
+    required_event_count: payload.render.requiredEventCount,
+    status_mismatch_count: payload.render.statusMismatchCount,
+    max_rms_z_residual_m: payload.render.maxRmsZResidual_m,
+    max_abs_z_residual_m: payload.render.maxAbsZResidual_m,
+    max_hausdorff_m: payload.render.maxHausdorff_m,
+    observable_integrity_suite_present: payload.observables.integritySuitePresent,
+    observable_final_parity_verdict: payload.observables.finalParityVerdict,
+    overall_verdict: payload.overallVerdict,
+  } satisfies Record<string, number | string | boolean | null>;
+  const payloadBase: WarpRodcSnapshotV1 = {
+    artifactType: WARP_RODC_SNAPSHOT_SCHEMA_VERSION,
+    artifactFamily: "warp-render-congruence-benchmark",
+    generatedOn: payload.generatedOn,
+    generatedAt: payload.generatedAt,
+    boundaryStatement: RODC_BOUNDARY_STATEMENT,
+    contract: {
+      id: "warp_render_congruence_benchmark_contract",
+      version: 1,
+      lane_id: "render_metric_parity_lane_a",
+      classification_scope: "diagnostic_local_only",
+    },
+    inputs: {
+      metricT00Ref: null,
+      metricT00Source: null,
+      shape_function_id: null,
+      warpFieldType: null,
+      dims: null,
+      source_case_id: "render_congruence_benchmark",
+    },
+    provenance: {
+      repo_commit_sha: null,
+      serviceVersion: null,
+      buildHash: null,
+      runtimeInstanceId: null,
+      timestamp_ms: null,
+      sourceAuditArtifact: payload.paths.latest_json,
+    },
+    evidence_hashes: {
+      metric_ref_hash: null,
+      theta_channel_hash: null,
+      k_trace_hash: null,
+      slice_hashes_by_view: {},
+      other_hashes: {
+        debug_log_sha256: computeFileHash(debugLogPath),
+        integrity_suite_sha256: fs.existsSync(integrityPath)
+          ? computeFileHash(integrityPath)
+          : null,
+        benchmark_payload_checksum: payload.checksum ?? null,
+      },
+    },
+    feature_vector: featureVector,
+    distance: {
+      to_alcubierre: null,
+      to_natario: null,
+      to_other_baselines: {
+        render_displacement_alignment: renderPenalty,
+        observable_parity_alignment: observablesPenalty,
+      },
+      winning_reference:
+        payload.overallVerdict === "PASS"
+          ? "render_metric_parity_reference"
+          : null,
+      reference_margin: null,
+    },
+    policy: {
+      distance_metric: "benchmark_penalty_l1",
+      normalization_method: "status_penalty",
+      reference_margin_min: 0,
+      reference_match_threshold: 0.25,
+      distinctness_threshold: 0.75,
+      feature_weights: {
+        debug_log_parse_errors: 0.6,
+        displacement_events: 1,
+        status_mismatch_count: 1.2,
+        max_rms_z_residual_m: 1,
+        max_abs_z_residual_m: 1,
+        max_hausdorff_m: 1,
+        observable_integrity_suite_present: 0.8,
+      },
+    },
+    robustness: {
+      enabled: false,
+      totalVariants: 0,
+      evaluatedVariants: 0,
+      dominantFraction: 0,
+      dominantVerdict: null,
+      stableVerdict: null,
+      stabilityStatus: "not_evaluated",
+      stable_fraction_min: 0,
+      marginal_fraction_min: 0,
+      verdictCounts: {},
+    },
+    preconditions: {
+      controlsIndependent: payload.observables.integritySuitePresent,
+      allRequiredViewsRendered: payload.render.displacementEvents >= minEvents,
+      provenanceHashesPresent: true,
+      runtimeStatusProvenancePresent: false,
+      readyForFamilyVerdict:
+        payload.render.displacementEvents >= minEvents &&
+        payload.observables.integritySuitePresent,
+    },
+    cross_lane: {
+      baseline_lane_id: "render_metric_parity_lane_a",
+      alternate_lane_id: null,
+      cross_lane_status: "single_lane_benchmark",
+    },
+    verdict: {
+      family_label:
+        payload.overallVerdict === "PASS"
+          ? "render_metric_parity_aligned"
+          : payload.overallVerdict === "FAIL"
+            ? "render_metric_parity_diverged"
+            : "render_metric_parity_inconclusive",
+      status: toRodcVerdictStatus(payload.overallVerdict),
+      stability: toRodcStability(payload.overallVerdict),
+    },
+    notes: [
+      "This non-York consumer reuses the shared RODC contract for renderer/metric parity benchmarking rather than York-family morphology.",
+      `render verdict=${payload.render.verdict} observables verdict=${payload.observables.verdict} overall=${payload.overallVerdict}`,
+      `minimum displacement events required=${minEvents}; observed=${payload.render.displacementEvents}.`,
+      "No alternate benchmark lane is defined here; cross-lane status remains single_lane_benchmark.",
+    ],
+  };
+  return {
+    ...payloadBase,
+    checksum: computeWarpRodcChecksum(payloadBase as unknown as Record<string, unknown>),
+  };
 };
 
 const deriveRecomputedStatus = (
@@ -406,6 +608,8 @@ export const runWarpRenderCongruenceBenchmark = (options: {
   outMdPath?: string;
   latestJsonPath?: string;
   latestMdPath?: string;
+  rodcOutJsonPath?: string;
+  rodcLatestJsonPath?: string;
   minEvents?: number;
 }) => {
   const debugLogPath = resolvePathFromRoot(options.debugLogPath ?? DEFAULT_DEBUG_LOG_PATH);
@@ -414,6 +618,8 @@ export const runWarpRenderCongruenceBenchmark = (options: {
   const outMdPath = options.outMdPath ?? DEFAULT_OUT_MD;
   const latestJsonPath = options.latestJsonPath ?? DEFAULT_LATEST_JSON;
   const latestMdPath = options.latestMdPath ?? DEFAULT_LATEST_MD;
+  const rodcOutJsonPath = options.rodcOutJsonPath ?? DEFAULT_RODC_OUT_JSON;
+  const rodcLatestJsonPath = options.rodcLatestJsonPath ?? DEFAULT_RODC_LATEST_JSON;
   const minEvents = Number.isFinite(options.minEvents as number)
     ? Math.max(1, Math.floor(options.minEvents as number))
     : 6;
@@ -448,7 +654,7 @@ export const runWarpRenderCongruenceBenchmark = (options: {
           ? "Some lanes pass while others are warn/unknown."
           : "Insufficient data to score either lane.";
 
-  const payloadBase: Record<string, unknown> = {
+  const payloadBase: RenderBenchmarkPayload = {
     artifactType: "warp_render_congruence_benchmark/v1",
     generatedOn: DATE_STAMP,
     generatedAt: new Date().toISOString(),
@@ -468,16 +674,26 @@ export const runWarpRenderCongruenceBenchmark = (options: {
     ...payloadBase,
     checksum: computeChecksum(payloadBase),
   };
+  const rodcArtifact = buildWarpRenderCongruenceRodcSnapshot({
+    payload,
+    debugLogPath,
+    integrityPath,
+    minEvents,
+  });
 
   const markdown = renderMarkdown(payload);
   ensureDirForFile(outJsonPath);
   ensureDirForFile(outMdPath);
   ensureDirForFile(latestJsonPath);
   ensureDirForFile(latestMdPath);
+  ensureDirForFile(rodcOutJsonPath);
+  ensureDirForFile(rodcLatestJsonPath);
   fs.writeFileSync(outJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  fs.writeFileSync(rodcOutJsonPath, `${JSON.stringify(rodcArtifact, null, 2)}\n`);
+  fs.writeFileSync(rodcLatestJsonPath, `${JSON.stringify(rodcArtifact, null, 2)}\n`);
 
   return {
     ok: overallVerdict === "PASS",
@@ -486,9 +702,12 @@ export const runWarpRenderCongruenceBenchmark = (options: {
     outMdPath,
     latestJsonPath,
     latestMdPath,
+    rodcOutJsonPath,
+    rodcLatestJsonPath,
     renderVerdict: render.verdict,
     observablesVerdict: observables.verdict,
     checksum: payload.checksum,
+    rodcChecksum: rodcArtifact.checksum,
   };
 };
 
@@ -510,6 +729,8 @@ if (isEntryPoint) {
     outMdPath: readArgValue("--out-md"),
     latestJsonPath: readArgValue("--latest-json"),
     latestMdPath: readArgValue("--latest-md"),
+    rodcOutJsonPath: readArgValue("--rodc-out-json"),
+    rodcLatestJsonPath: readArgValue("--rodc-latest-json"),
     minEvents: asNumber(readArgValue("--min-events")),
   });
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

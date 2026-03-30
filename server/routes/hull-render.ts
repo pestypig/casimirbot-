@@ -15,6 +15,11 @@ import {
   HULL_CANONICAL_REQUIRED_CHANNELS_BASE,
   HULL_RENDER_CERTIFICATE_SCHEMA_VERSION,
 } from "@shared/hull-render-contract";
+import {
+  YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+  YORK_DIAGNOSTIC_LANE_CONVENTIONS,
+  isYorkDiagnosticLaneId,
+} from "@shared/york-diagnostic-lanes";
 import { getGlobalPipelineState } from "../energy-pipeline.ts";
 import { validateScientificAtlasAgainstCertificate } from "../lib/hull-scientific-atlas-validation.ts";
 
@@ -1126,22 +1131,8 @@ const isYorkRenderView = (
   view === "york-topology-normalized-3p1" ||
   view === "york-shell-map-3p1";
 
-const YORK_DIAGNOSTIC_LANE_CONVENTIONS: Record<
-  string,
-  {
-    chart: string;
-    observer: string;
-    theta_definition: string;
-    kij_sign_convention: string;
-  }
-> = {
-  lane_a_eulerian_comoving_theta_minus_trk: {
-    chart: "comoving_cartesian",
-    observer: "eulerian_n",
-    theta_definition: "theta=-trK",
-    kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
-  },
-};
+const resolveYorkLaneConvention = (laneId: string) =>
+  isYorkDiagnosticLaneId(laneId) ? YORK_DIAGNOSTIC_LANE_CONVENTIONS[laneId] : null;
 
 const validateYorkSnapshotIdentity = (
   cert: HullRenderCertificateV1,
@@ -1249,7 +1240,8 @@ const validateRenderCertificateForRequest = (
         ? payload.scienceLane.diagnosticLaneId.trim()
         : null;
     if (requestedLaneId) {
-      if (!YORK_DIAGNOSTIC_LANE_CONVENTIONS[requestedLaneId]) {
+      const expectedLane = resolveYorkLaneConvention(requestedLaneId);
+      if (!expectedLane) {
         return {
           ok: false,
           reason: "remote_mis_render_certificate_lane_unsupported",
@@ -1280,7 +1272,6 @@ const validateRenderCertificateForRequest = (
           reason: "remote_mis_render_certificate_lane_diagnostics_mismatch",
         };
       }
-      const expectedLane = YORK_DIAGNOSTIC_LANE_CONVENTIONS[requestedLaneId];
       if (
         cert.chart !== expectedLane.chart ||
         cert.observer !== expectedLane.observer ||
@@ -1291,6 +1282,74 @@ const validateRenderCertificateForRequest = (
           ok: false,
           reason: "remote_mis_render_certificate_lane_convention_mismatch",
         };
+      }
+      const observerDefinitionId = cert.diagnostics.observer_definition_id;
+      const observerFormula = cert.diagnostics.observer_construction_formula;
+      const observerInputs = Array.isArray(cert.diagnostics.observer_construction_inputs)
+        ? cert.diagnostics.observer_construction_inputs
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter((entry) => entry.length > 0)
+            .sort()
+        : [];
+      const observerInputsRequired = Array.isArray(cert.diagnostics.observer_inputs_required)
+        ? cert.diagnostics.observer_inputs_required
+            .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+            .filter((entry) => entry.length > 0)
+            .sort()
+        : [];
+      const expectedObserverInputs = [...expectedLane.observer_construction_inputs]
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .sort();
+      const expectedObserverInputsRequired = [...expectedLane.observer_inputs_required]
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .sort();
+      const observerInputsMatch =
+        observerInputs.length === expectedObserverInputs.length &&
+        observerInputs.every((entry, index) => entry === expectedObserverInputs[index]);
+      const observerInputsRequiredMatch =
+        observerInputsRequired.length === expectedObserverInputsRequired.length &&
+        observerInputsRequired.every(
+          (entry, index) => entry === expectedObserverInputsRequired[index],
+        );
+      if (
+        typeof observerDefinitionId !== "string" ||
+        observerDefinitionId.trim().length === 0 ||
+        observerDefinitionId !== expectedLane.observer_definition_id ||
+        typeof observerFormula !== "string" ||
+        observerFormula.trim().length === 0 ||
+        observerFormula !== expectedLane.observer_construction_formula ||
+        cert.diagnostics.observer_normalized !== expectedLane.observer_normalized ||
+        (cert.diagnostics.observer_approximation ?? null) !==
+          (expectedLane.observer_approximation ?? null) ||
+        cert.diagnostics.requires_gamma_metric !== expectedLane.requires_gamma_metric ||
+        cert.diagnostics.semantics_closed !== expectedLane.semantics_closed ||
+        cert.diagnostics.cross_lane_claim_ready !== expectedLane.cross_lane_claim_ready ||
+        (cert.diagnostics.cross_lane_claim_block_reason ?? null) !==
+          (expectedLane.cross_lane_claim_block_reason ?? null) ||
+        !observerInputsMatch
+      ) {
+        return {
+          ok: false,
+          reason: "remote_mis_render_certificate_lane_observer_metadata_mismatch",
+        };
+      }
+      if (requestedLaneId === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID) {
+        if (
+          !observerInputsRequiredMatch ||
+          cert.diagnostics.observer_inputs_present !== true ||
+          cert.diagnostics.lane_b_geometry_ready !== true ||
+          cert.diagnostics.lane_b_semantics_closed !== expectedLane.semantics_closed ||
+          cert.diagnostics.lane_b_semantic_mode !== expectedLane.lane_semantic_mode ||
+          typeof cert.diagnostics.lane_b_tensor_inputs_hash !== "string" ||
+          cert.diagnostics.lane_b_tensor_inputs_hash.trim().length === 0
+        ) {
+          return {
+            ok: false,
+            reason: "remote_mis_render_certificate_lane_b_semantic_evidence_mismatch",
+          };
+        }
       }
     }
   }

@@ -151,6 +151,8 @@
     "warp:full-solve:reference:refresh": "npm run warp:full-solve:canonical:bundle && npm run warp:full-solve:geometry:conformance && npm run warp:external:matrix && npm run warp:shadow:qcd-analog:replay && npm run warp:full-solve:reference:capsule && npm run warp:full-solve:reference:validate -- --capsule artifacts/research/full-solve/full-solve-reference-capsule-latest.json",
     "warp:integrity:check": "tsx scripts/warp-integrity-parity-check.ts",
     "warp:render:congruence:check": "tsx scripts/warp-render-congruence-benchmark.ts",
+    "warp:rodc:claims:validate": "tsx scripts/validate-warp-rodc-claims.ts",
+    "warp:rodc:check": "npm run warp:rodc:claims:validate",
     "warp:render:capture": "tsx scripts/warp-render-command-capture.ts",
     "warp:full-solve:york-control-family:proof-pack": "tsx scripts/warp-york-control-family-proof-pack.ts",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",

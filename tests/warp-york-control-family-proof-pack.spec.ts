@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
+  buildWarpRodcSnapshot,
   buildCrossLaneComparison,
   buildCaseClassificationFeatures,
   buildControlMetricVolumeRef,
@@ -8,16 +9,26 @@ import {
   buildControlDebug,
   decideControlFamilyVerdict,
   evaluateClassificationRobustness,
+  evaluateLaneASnapshotIdentity,
   evaluateYorkSliceCongruence,
   evaluateProofPackPreconditions,
   extractThetaSliceXRho,
   extractThetaSliceXZMidplane,
+  formatLaneCauseCodeNote,
   hasStrongForeAftYork,
   hasSufficientSignalForAlcubierreControl,
   loadYorkDiagnosticContract,
   readSourceFamilyEvidence,
+  renderMarkdown,
+  resolveLaneACauseCode,
   scoreNhm2AgainstReferenceControls,
+  summarizeLaneAParity,
 } from "../scripts/warp-york-control-family-proof-pack";
+import {
+  YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+  YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+  computeYorkDiagnosticLaneField,
+} from "../shared/york-diagnostic-lanes";
 
 const REQUIRED_VIEWS: HullScientificRenderView[] = [
   "york-surface-3p1",
@@ -83,6 +94,15 @@ const makeView = (
     shellSupportCount: view === "york-shell-map-3p1" ? 20 : null,
     shellActiveCount: view === "york-shell-map-3p1" ? 10 : null,
     hashes,
+    laneEvidence: {
+      observer_definition_id: "obs.eulerian_n",
+      observer_inputs_required: ["alpha"],
+      observer_inputs_present: true,
+      lane_b_semantic_mode: "baseline-eulerian-theta-minus-trk",
+      lane_b_tensor_inputs_hash: null,
+      lane_b_geometry_ready: true,
+      lane_b_semantics_closed: true,
+    },
     ...overrides,
   };
 };
@@ -169,7 +189,262 @@ const makeCase = (
       },
     ],
   },
+  parity: {
+    caseId,
+    parityComputed: true,
+    thetaKTraceParityComputed: true,
+    snapshotIdentityComplete: true,
+    renderParityPass: true,
+    thetaKTraceContractPass: true,
+    byView: REQUIRED_VIEWS.map((view) => ({
+      view,
+      coordinateMode: view === "york-surface-rho-3p1" ? "x-rho" : "x-z-midplane",
+      samplingChoice: view === "york-surface-rho-3p1" ? "x-rho cylindrical remap" : "x-z midplane",
+      offlineThetaSliceHash: "slice-hash",
+      offlineNegKTraceSliceHash: "slice-hash",
+      renderThetaSliceHash: "slice-hash",
+      thetaVsRenderMaxAbsResidual: 0,
+      thetaVsKTraceMaxAbsResidual: 0,
+      signCountDelta: {
+        thetaVsRender: { positive: 0, negative: 0, zeroOrNearZero: 0, total: 0 },
+        thetaVsKTrace: { positive: 0, negative: 0, zeroOrNearZero: 0, total: 0 },
+      },
+      supportOverlapPct: { offline: 0.7, render: 0.7, delta: 0 },
+      extremaDelta: {
+        thetaVsRender: { minRaw: 0, maxRaw: 0, absMaxRaw: 0 },
+        thetaVsKTrace: { minRaw: 0, maxRaw: 0, absMaxRaw: 0 },
+      },
+      identity: {
+        complete: true,
+        laneMatches: true,
+        metricRefMatches: true,
+        chartMatches: true,
+        observerMatches: true,
+        thetaDefinitionMatches: true,
+        kijSignConventionMatches: true,
+        thetaHashMatches: true,
+        timestampPresent: true,
+      },
+      status: "pass",
+      causeCode: null,
+    })),
+    status: "pass",
+    causeCode: null,
+  },
 });
+
+const makeProofPackPayloadForMarkdown = () => {
+  const contract = loadYorkDiagnosticContract("configs/york-diagnostic-contract.v1.json");
+  const cases = [
+    makeCase("alcubierre_control", "theta-hash-alc"),
+    makeCase("natario_control", "theta-hash-nat"),
+    makeCase("nhm2_certified", "theta-hash-nhm2"),
+  ] as any[];
+  for (const entry of cases) {
+    entry.perView = (entry.perView ?? []).map((view: any) => ({
+      ...view,
+      endpoint: view.endpoint ?? "http://127.0.0.1:6062/api/helix/hull-render/frame",
+      sourceLane: view.sourceLane ?? "single",
+      laneResults:
+        view.laneResults ??
+        [
+          {
+            lane: "single",
+            endpoint: "http://127.0.0.1:6062/api/helix/hull-render/frame",
+            ok: true,
+            httpStatus: 200,
+            errorCode: null,
+            responseMessage: null,
+            preflightBranch: null,
+            preflightRequirement: null,
+            error: null,
+          },
+        ],
+    }));
+    entry.classificationFeatures = entry.classificationFeatures ?? {
+      theta_abs_max_raw: 1,
+      theta_abs_max_display: 1,
+      positive_count_xz: 10,
+      negative_count_xz: 9,
+      positive_count_xrho: 10,
+      negative_count_xrho: 9,
+      support_overlap_pct: 0.7,
+      near_zero_theta: false,
+      signed_lobe_summary: null,
+      shell_map_activity: 0.2,
+    };
+  }
+  const laneParitySummary = summarizeLaneAParity(cases as any);
+  return {
+    artifactType: "warp_york_control_family_proof_pack/v1",
+    generatedOn: "2026-03-30",
+    generatedAt: "2026-03-30T00:00:00.000Z",
+    boundaryStatement: "boundary",
+    diagnosticContractId: contract.contract_id,
+    classificationScope: contract.classification_scope,
+    diagnosticContract: contract,
+    diagnosticLanes: [
+      {
+        lane_id: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "ADM",
+        semantics_closed: true,
+        cross_lane_claim_ready: true,
+        classification_scope: "diagnostic_local_only",
+        cases,
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          diagnosticParityClosed: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        laneAParity: {
+          ...laneParitySummary,
+        },
+        causeCode: "lane_a_family_congruent",
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [formatLaneCauseCodeNote(YORK_DIAGNOSTIC_BASELINE_LANE_ID, "lane_a_family_congruent")],
+      },
+      {
+        lane_id: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "shift_drift_u(beta_over_alpha)",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK+div(beta/alpha)",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        semantics_closed: true,
+        cross_lane_claim_ready: true,
+        classification_scope: "diagnostic_local_only",
+        cases,
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          diagnosticParityClosed: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        laneAParity: {
+          ...laneParitySummary,
+        },
+        causeCode: "lane_b_family_congruent",
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [formatLaneCauseCodeNote(YORK_DIAGNOSTIC_ALTERNATE_LANE_ID, "lane_b_family_congruent")],
+      },
+    ],
+    crossLaneComparison: {
+      baseline_lane_id: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      alternate_lane_id: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      baseline_verdict: "nhm2_low_expansion_family",
+      alternate_verdict: "nhm2_low_expansion_family",
+      same_classification: true,
+      cross_lane_status: "lane_stable_low_expansion_like",
+      falsifiers: {
+        baseline_controls_calibrated: true,
+        alternate_controls_calibrated: true,
+        baseline_supported: true,
+        alternate_supported: true,
+        lane_b_semantics_closed: true,
+        lane_b_observer_defined: true,
+        lane_b_tensor_inputs_present: true,
+        lane_b_geometry_ready: true,
+        lane_b_controls_calibrated: true,
+        lane_b_parity_closed: true,
+        lane_b_cross_lane_claim_ready: true,
+      },
+      notes: ["Both lanes calibrate and agree on NHM2 classification."],
+    },
+    inputs: {
+      baseUrl: "http://127.0.0.1:5050",
+      frameEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/frame",
+      proxyFrameEndpoint: "http://127.0.0.1:5050/api/helix/hull-render/frame",
+      compareDirectAndProxy: false,
+      nhm2SnapshotPath: "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      yorkViews: REQUIRED_VIEWS,
+      frameSize: { width: 320, height: 180 },
+    },
+    cases,
+    controlDebug: [],
+    preconditions: {
+      controlsIndependent: true,
+      allRequiredViewsRendered: true,
+      provenanceHashesPresent: true,
+      runtimeStatusProvenancePresent: true,
+      offlineRenderParityComputed: true,
+      thetaKTraceParityComputed: true,
+      snapshotIdentityComplete: true,
+      diagnosticParityClosed: true,
+      laneAParityClosed: true,
+      readyForFamilyVerdict: true,
+    },
+    laneAParity: {
+      ...laneParitySummary,
+    },
+    causeCode: "lane_a_family_congruent",
+    guardFailures: [],
+    decisionTable: [],
+    classificationScoring: null,
+    classificationRobustness: null,
+    verdict: "nhm2_low_expansion_family",
+    notes: [formatLaneCauseCodeNote(YORK_DIAGNOSTIC_BASELINE_LANE_ID, "lane_a_family_congruent")],
+    provenance: {
+      commitHash: "eadb6718",
+      runtimeStatus: {
+        statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+        serviceVersion: "v1",
+        buildHash: "build",
+        commitSha: "eadb6718",
+        processStartedAtMs: 1234,
+        runtimeInstanceId: "runtime",
+        reachable: true,
+      },
+    },
+    checksum: "unused",
+  } as any;
+};
 
 describe("warp york control-family proof pack", () => {
   it("keeps controls independent from NHM2-only congruent gate", () => {
@@ -245,6 +520,354 @@ describe("warp york control-family proof pack", () => {
       classificationScoring: null,
     });
     expect(verdict).toBe("inconclusive");
+  });
+
+  it("tracks Lane A parity preconditions as satisfied on the happy path", () => {
+    const evaluated = evaluateProofPackPreconditions({
+      yorkViews: [...REQUIRED_VIEWS],
+      cases: [
+        makeCase("alcubierre_control", "theta-hash-alc"),
+        makeCase("natario_control", "theta-hash-nat"),
+        makeCase("nhm2_certified", "theta-hash-nhm2"),
+      ] as any,
+      runtimeStatus: {
+        statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+        serviceVersion: "v1",
+        buildHash: "build",
+        commitSha: "commit",
+        processStartedAtMs: 1,
+        runtimeInstanceId: "runtime",
+        reachable: true,
+      },
+    });
+
+    expect(evaluated.preconditions.offlineRenderParityComputed).toBe(true);
+    expect(evaluated.preconditions.thetaKTraceParityComputed).toBe(true);
+    expect(evaluated.preconditions.snapshotIdentityComplete).toBe(true);
+    expect(evaluated.preconditions.diagnosticParityClosed).toBe(true);
+    expect(evaluated.preconditions.laneAParityClosed).toBe(true);
+  });
+
+  it("fail-closes when parity layer reports render parity failure", () => {
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    alcCase.parity.status = "fail";
+    alcCase.parity.causeCode = "render_parity_failure";
+    const evaluated = evaluateProofPackPreconditions({
+      yorkViews: [...REQUIRED_VIEWS],
+      cases: [
+        alcCase,
+        makeCase("natario_control", "theta-hash-nat"),
+        makeCase("nhm2_certified", "theta-hash-nhm2"),
+      ] as any,
+      runtimeStatus: {
+        statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+        serviceVersion: "v1",
+        buildHash: "build",
+        commitSha: "commit",
+        processStartedAtMs: 1,
+        runtimeInstanceId: "runtime",
+        reachable: true,
+      },
+    });
+    expect(evaluated.preconditions.diagnosticParityClosed).toBe(false);
+    expect(evaluated.preconditions.laneAParityClosed).toBe(false);
+    expect(evaluated.preconditions.readyForFamilyVerdict).toBe(false);
+    expect(
+      evaluated.guardFailures.some(
+        (failure) =>
+          failure.code === "proof_pack_lane_a_parity_failed" &&
+          failure.detail.includes("render_parity_failure"),
+      ),
+    ).toBe(true);
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: evaluated.guardFailures as any,
+        verdict: "inconclusive",
+      }),
+    ).toBe("render_parity_failure");
+  });
+
+  it("emits theta_ktrace contract cause when parity reports theta_ktrace mismatch", () => {
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    alcCase.parity.status = "fail";
+    alcCase.parity.causeCode = "theta_ktrace_contract_failure";
+    const evaluated = evaluateProofPackPreconditions({
+      yorkViews: [...REQUIRED_VIEWS],
+      cases: [
+        alcCase,
+        makeCase("natario_control", "theta-hash-nat"),
+        makeCase("nhm2_certified", "theta-hash-nhm2"),
+      ] as any,
+      runtimeStatus: {
+        statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+        serviceVersion: "v1",
+        buildHash: "build",
+        commitSha: "commit",
+        processStartedAtMs: 1,
+        runtimeInstanceId: "runtime",
+        reachable: true,
+      },
+    });
+    expect(evaluated.preconditions.diagnosticParityClosed).toBe(false);
+    expect(evaluated.preconditions.laneAParityClosed).toBe(false);
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: evaluated.guardFailures as any,
+        verdict: "inconclusive",
+      }),
+    ).toBe("theta_ktrace_contract_failure");
+  });
+
+  it("emits snapshot identity cause when parity marks identity incomplete", () => {
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    alcCase.parity.snapshotIdentityComplete = false;
+    alcCase.parity.status = "fail";
+    alcCase.parity.causeCode = "snapshot_identity_failure";
+    const evaluated = evaluateProofPackPreconditions({
+      yorkViews: [...REQUIRED_VIEWS],
+      cases: [
+        alcCase,
+        makeCase("natario_control", "theta-hash-nat"),
+        makeCase("nhm2_certified", "theta-hash-nhm2"),
+      ] as any,
+      runtimeStatus: {
+        statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+        serviceVersion: "v1",
+        buildHash: "build",
+        commitSha: "commit",
+        processStartedAtMs: 1,
+        runtimeInstanceId: "runtime",
+        reachable: true,
+      },
+    });
+    expect(evaluated.preconditions.diagnosticParityClosed).toBe(false);
+    expect(evaluated.preconditions.snapshotIdentityComplete).toBe(false);
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: evaluated.guardFailures as any,
+        verdict: "inconclusive",
+      }),
+    ).toBe("snapshot_identity_failure");
+  });
+
+  it("treats ADM and K_ij=-1/2*L_n(gamma_ij) as equivalent for Lane A identity closure", () => {
+    const rendered = makeView("york-surface-3p1") as any;
+    rendered.identity.kij_sign_convention = "K_ij=-1/2*L_n(gamma_ij)";
+    const identity = evaluateLaneASnapshotIdentity({
+      rendered,
+      lane: {
+        lane_id: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "ADM",
+      },
+      expectedMetricRefHash: "metric-ref",
+      expectedThetaHash: "theta-hash",
+      expectedChart: "comoving_cartesian",
+    });
+    expect(identity.kijSignConventionMatches).toBe(true);
+    expect(identity.complete).toBe(true);
+  });
+
+  it("keeps Lane A snapshot identity fail-closed for unsupported kij sign labels", () => {
+    const rendered = makeView("york-surface-3p1") as any;
+    rendered.identity.kij_sign_convention = "unsupported-sign-convention";
+    const identity = evaluateLaneASnapshotIdentity({
+      rendered,
+      lane: {
+        lane_id: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "ADM",
+      },
+      expectedMetricRefHash: "metric-ref",
+      expectedThetaHash: "theta-hash",
+      expectedChart: "comoving_cartesian",
+    });
+    expect(identity.kijSignConventionMatches).toBe(false);
+    expect(identity.complete).toBe(false);
+  });
+
+  it("keeps Lane A snapshot identity fail-closed on real non-alias metadata mismatch", () => {
+    const rendered = makeView("york-surface-3p1") as any;
+    rendered.identity.kij_sign_convention = "K_ij=-1/2*L_n(gamma_ij)";
+    const identity = evaluateLaneASnapshotIdentity({
+      rendered,
+      lane: {
+        lane_id: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "ADM",
+      },
+      expectedMetricRefHash: "metric-ref",
+      expectedThetaHash: "theta-hash",
+      expectedChart: "other-chart",
+    });
+    expect(identity.kijSignConventionMatches).toBe(true);
+    expect(identity.chartMatches).toBe(false);
+    expect(identity.complete).toBe(false);
+  });
+
+  it("maps missing hash and family outcomes to deterministic lane-aware cause codes", () => {
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: [
+          {
+            code: "proof_pack_required_view_missing_provenance_hash",
+            detail: "alcubierre_control:york-surface-3p1:theta_channel_hash",
+          },
+        ] as any,
+        verdict: "inconclusive",
+      }),
+    ).toBe("missing_required_hash");
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: [] as any,
+        verdict: "nhm2_distinct_family",
+      }),
+    ).toBe("lane_a_family_distinct");
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: [] as any,
+        verdict: "nhm2_low_expansion_family",
+      }),
+    ).toBe("lane_a_family_congruent");
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: [] as any,
+        verdict: "nhm2_low_expansion_family",
+        laneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      }),
+    ).toBe("lane_b_family_congruent");
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: [] as any,
+        verdict: "inconclusive",
+      }),
+    ).toBe("lane_a_family_inconclusive");
+    expect(
+      resolveLaneACauseCode({
+        guardFailures: [] as any,
+        verdict: "inconclusive",
+        laneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      }),
+    ).toBe("lane_b_family_inconclusive");
+  });
+
+  it("formats lane cause notes with explicit baseline/alternate labels", () => {
+    expect(
+      formatLaneCauseCodeNote(
+        YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        "lane_a_family_congruent",
+      ),
+    ).toBe("Baseline lane cause code=lane_a_family_congruent.");
+    expect(
+      formatLaneCauseCodeNote(
+        YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        "lane_b_family_congruent",
+      ),
+    ).toBe("Alternate lane cause code=lane_b_family_congruent.");
+    expect(
+      formatLaneCauseCodeNote(
+        YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        "lane_a_family_congruent",
+      ).startsWith("Lane cause code="),
+    ).toBe(false);
+  });
+
+  it("keeps baseline parity case summaries cause-free when status is pass", () => {
+    const summary = summarizeLaneAParity([
+      makeCase("alcubierre_control", "theta-hash-alc"),
+      makeCase("natario_control", "theta-hash-nat"),
+      makeCase("nhm2_certified", "theta-hash-nhm2"),
+    ] as any);
+    expect(summary.status).toBe("closed");
+    expect(summary.causeCode).toBe(null);
+    for (const entry of summary.caseSummaries) {
+      expect(entry.status).toBe("pass");
+      expect(entry.causeCode).toBe(null);
+    }
+  });
+
+  it("keeps alternate-lane parity case summaries cause-free when status is pass", () => {
+    const cases = [
+      makeCase("alcubierre_control", "theta-hash-alc"),
+      makeCase("natario_control", "theta-hash-nat"),
+      makeCase("nhm2_certified", "theta-hash-nhm2"),
+    ] as any[];
+    for (const entry of cases) {
+      entry.parity.caseId = entry.caseId;
+      entry.parity.status = "pass";
+      entry.parity.causeCode = null;
+      for (const audit of entry.parity.byView) {
+        audit.identity.laneMatches = true;
+      }
+    }
+    const summary = summarizeLaneAParity(cases as any);
+    expect(summary.status).toBe("closed");
+    for (const entry of summary.caseSummaries) {
+      expect(entry.status).toBe("pass");
+      expect(entry.causeCode).toBe(null);
+    }
+  });
+
+  it("keeps top-level parity summary cause-free when all parity rows pass", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    expect(payload.laneAParity.status).toBe("closed");
+    expect(payload.laneAParity.causeCode).toBe(null);
+    for (const entry of payload.laneAParity.caseSummaries) {
+      expect(entry.status).toBe("pass");
+      expect(entry.causeCode).toBe(null);
+    }
+  });
+
+  it("preserves parity failure cause codes for non-pass rows", () => {
+    const cases = [
+      makeCase("alcubierre_control", "theta-hash-alc"),
+      makeCase("natario_control", "theta-hash-nat"),
+      makeCase("nhm2_certified", "theta-hash-nhm2"),
+    ] as any[];
+    cases[0].parity.status = "fail";
+    cases[0].parity.causeCode = "snapshot_identity_failure";
+    const summary = summarizeLaneAParity(cases as any);
+    expect(summary.status).toBe("failed");
+    expect(summary.causeCode).toBe("snapshot_identity_failure");
+    const alcubierre = summary.caseSummaries.find(
+      (entry) => entry.caseId === "alcubierre_control",
+    );
+    expect(alcubierre).not.toBeUndefined();
+    expect(alcubierre?.status).toBe("fail");
+    expect(alcubierre?.causeCode).toBe("snapshot_identity_failure");
+  });
+
+  it("renders parity case rows without failure cause codes when status is pass", () => {
+    const payload = makeProofPackPayloadForMarkdown();
+    const markdown = renderMarkdown(payload);
+    expect(markdown).toContain(
+      "| alcubierre_control | true | true | true | true | true | pass | null |",
+    );
+    expect(markdown).toContain(
+      "| natario_control | true | true | true | true | true | pass | null |",
+    );
+    expect(markdown).toContain(
+      "| nhm2_certified | true | true | true | true | true | pass | null |",
+    );
+    expect(markdown).not.toContain(
+      "| alcubierre_control | true | true | true | true | true | pass | snapshot_identity_failure |",
+    );
+  });
+
+  it("renders lane-cause summary with explicit baseline and alternate cause codes", () => {
+    const payload = makeProofPackPayloadForMarkdown();
+    const markdown = renderMarkdown(payload);
+    expect(markdown).toContain("## Lane Causes");
+    expect(markdown).toContain(
+      "- baselineLaneCauseCode: `lane_a_family_congruent`",
+    );
+    expect(markdown).toContain(
+      "- alternateLaneCauseCode: `lane_b_family_congruent`",
+    );
+    expect(markdown).not.toContain("## Lane A Cause");
   });
 
   it("fails control independence when control URLs differ but theta hashes collide", () => {
@@ -541,6 +1164,211 @@ describe("warp york control-family proof pack", () => {
     expect(audit?.alcubierreSignedLobeSummary?.signedLobeSummary).toBe("mixed_or_flat");
   });
 
+  it("computes Lane B from tensors and does not alias Lane A theta", () => {
+    const dims: [number, number, number] = [4, 4, 4];
+    const total = dims[0] * dims[1] * dims[2];
+    const theta = new Float32Array(total);
+    const kTrace = new Float32Array(total);
+    const betaX = new Float32Array(total);
+    const betaY = new Float32Array(total);
+    const betaZ = new Float32Array(total);
+    const alpha = new Float32Array(total);
+    const gammaXX = new Float32Array(total);
+    const gammaXY = new Float32Array(total);
+    const gammaXZ = new Float32Array(total);
+    const gammaYY = new Float32Array(total);
+    const gammaYZ = new Float32Array(total);
+    const gammaZZ = new Float32Array(total);
+    for (let z = 0; z < dims[2]; z += 1) {
+      for (let y = 0; y < dims[1]; y += 1) {
+        for (let x = 0; x < dims[0]; x += 1) {
+          const idx = z * dims[0] * dims[1] + y * dims[0] + x;
+          theta[idx] = 0.05;
+          kTrace[idx] = -0.05;
+          betaX[idx] = x;
+          betaY[idx] = 0;
+          betaZ[idx] = 0;
+          alpha[idx] = 1;
+          gammaXX[idx] = 1;
+          gammaXY[idx] = 0;
+          gammaXZ[idx] = 0;
+          gammaYY[idx] = 1;
+          gammaYZ[idx] = 0;
+          gammaZZ[idx] = 1;
+        }
+      }
+    }
+
+    const laneA = computeYorkDiagnosticLaneField({
+      laneId: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      dims,
+      voxelSizeM: [1, 1, 1],
+      theta,
+      kTrace,
+      betaX,
+      betaY,
+      betaZ,
+      alpha,
+      gammaXX,
+      gammaXY,
+      gammaXZ,
+      gammaYY,
+      gammaYZ,
+      gammaZZ,
+    });
+    const laneB = computeYorkDiagnosticLaneField({
+      laneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      dims,
+      voxelSizeM: [1, 1, 1],
+      theta,
+      kTrace,
+      betaX,
+      betaY,
+      betaZ,
+      alpha,
+      gammaXX,
+      gammaXY,
+      gammaXZ,
+      gammaYY,
+      gammaYZ,
+      gammaZZ,
+    });
+
+    expect(laneA.ok).toBe(true);
+    expect(laneB.ok).toBe(true);
+    if (!laneA.ok || !laneB.ok) return;
+    expect(laneA.source).toBe("canonical_theta_channel");
+    expect(laneB.source).toBe("recomputed_theta_from_ktrace_and_div_beta_over_alpha");
+    expect(laneB.theta[0]).not.toBe(laneA.theta[0]);
+    expect(laneB.observerConstruction.observer_definition_id).toBe(
+      "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+    );
+    expect(laneB.observerConstruction.requires_gamma_metric).toBe(true);
+  });
+
+  it("collapses Lane B to Lane A only when div(beta/alpha)=0", () => {
+    const dims: [number, number, number] = [4, 4, 4];
+    const total = dims[0] * dims[1] * dims[2];
+    const theta = new Float32Array(total).fill(0.05);
+    const kTrace = new Float32Array(total).fill(-0.05);
+    const betaX = new Float32Array(total);
+    const betaY = new Float32Array(total);
+    const betaZ = new Float32Array(total);
+    const alpha = new Float32Array(total).fill(1);
+    const gammaXX = new Float32Array(total).fill(1);
+    const gammaXY = new Float32Array(total);
+    const gammaXZ = new Float32Array(total);
+    const gammaYY = new Float32Array(total).fill(1);
+    const gammaYZ = new Float32Array(total);
+    const gammaZZ = new Float32Array(total).fill(1);
+    const laneA = computeYorkDiagnosticLaneField({
+      laneId: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      dims,
+      voxelSizeM: [1, 1, 1],
+      theta,
+      kTrace,
+      betaX,
+      betaY,
+      betaZ,
+      alpha,
+      gammaXX,
+      gammaXY,
+      gammaXZ,
+      gammaYY,
+      gammaYZ,
+      gammaZZ,
+    });
+    const laneB = computeYorkDiagnosticLaneField({
+      laneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      dims,
+      voxelSizeM: [1, 1, 1],
+      theta,
+      kTrace,
+      betaX,
+      betaY,
+      betaZ,
+      alpha,
+      gammaXX,
+      gammaXY,
+      gammaXZ,
+      gammaYY,
+      gammaYZ,
+      gammaZZ,
+    });
+    expect(laneA.ok).toBe(true);
+    expect(laneB.ok).toBe(true);
+    if (!laneA.ok || !laneB.ok) return;
+    expect(laneB.theta[0]).toBeCloseTo(laneA.theta[0], 12);
+  });
+
+  it("fails Lane B tensor recomputation when required tensors are missing", () => {
+    const dims: [number, number, number] = [4, 4, 4];
+    const total = dims[0] * dims[1] * dims[2];
+    const kTrace = new Float32Array(total);
+    const betaX = new Float32Array(total);
+    const betaY = new Float32Array(total);
+    const betaZ = new Float32Array(total);
+    const gammaXX = new Float32Array(total).fill(1);
+    const gammaXY = new Float32Array(total);
+    const gammaXZ = new Float32Array(total);
+    const gammaYY = new Float32Array(total).fill(1);
+    const gammaYZ = new Float32Array(total);
+    const gammaZZ = new Float32Array(total).fill(1);
+    const laneB = computeYorkDiagnosticLaneField({
+      laneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      dims,
+      voxelSizeM: [1, 1, 1],
+      theta: null,
+      kTrace,
+      betaX,
+      betaY,
+      betaZ,
+      alpha: null,
+      gammaXX,
+      gammaXY,
+      gammaXZ,
+      gammaYY,
+      gammaYZ,
+      gammaZZ,
+    });
+    expect(laneB.ok).toBe(false);
+    if (laneB.ok) return;
+    expect(laneB.error).toBe("scientific_york_lane_tensor_missing");
+    expect(laneB.missingChannels).toContain("alpha");
+  });
+
+  it("fails Lane B tensor recomputation when gamma_ij inputs are missing", () => {
+    const dims: [number, number, number] = [4, 4, 4];
+    const total = dims[0] * dims[1] * dims[2];
+    const kTrace = new Float32Array(total);
+    const betaX = new Float32Array(total);
+    const betaY = new Float32Array(total);
+    const betaZ = new Float32Array(total);
+    const alpha = new Float32Array(total).fill(1);
+    const laneB = computeYorkDiagnosticLaneField({
+      laneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      dims,
+      voxelSizeM: [1, 1, 1],
+      theta: null,
+      kTrace,
+      betaX,
+      betaY,
+      betaZ,
+      alpha,
+      gammaXX: null,
+      gammaXY: null,
+      gammaXZ: null,
+      gammaYY: null,
+      gammaYZ: null,
+      gammaZZ: null,
+    });
+    expect(laneB.ok).toBe(false);
+    if (laneB.ok) return;
+    expect(laneB.error).toBe("scientific_york_lane_tensor_missing");
+    expect(laneB.missingChannels).toContain("gamma_xx");
+    expect(laneB.missingChannels).toContain("gamma_zz");
+  });
+
   it("builds classification features from York evidence fields", () => {
     const caseEntry = makeCase("nhm2_certified", "theta-hash-nhm2") as any;
     caseEntry.primaryYork.rawExtrema.absMax = 2.9e-32;
@@ -565,8 +1393,139 @@ describe("warp york control-family proof pack", () => {
     expect(contract.robustness_checks.enabled).toBe(true);
     expect(contract.robustness_checks.margin_variants.length > 0).toBe(true);
     expect(contract.baseline_lane_id).toBe("lane_a_eulerian_comoving_theta_minus_trk");
-    expect(contract.alternate_lane_id).toBe("lane_b_alternate_observer_pending");
+    expect(contract.alternate_lane_id).toBe(
+      "lane_b_shift_drift_theta_plus_div_beta_over_alpha",
+    );
     expect(contract.lanes.length).toBeGreaterThanOrEqual(2);
+    const laneB = contract.lanes.find(
+      (entry) => entry.lane_id === "lane_b_shift_drift_theta_plus_div_beta_over_alpha",
+    );
+    expect(laneB?.observer_definition_id).toBe(
+      "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+    );
+    expect(laneB?.observer_inputs_required).toContain("gamma_xx");
+    expect(laneB?.lane_semantic_mode).toBe(
+      "diagnostic-observer-proxy-covariant-divergence",
+    );
+    expect(laneB?.requires_gamma_metric).toBe(true);
+    expect(laneB?.semantics_closed).toBe(true);
+    expect(laneB?.cross_lane_claim_ready).toBe(true);
+  });
+
+  it("allows cross-lane output when the current contract Lane B posture is closed", () => {
+    const contract = loadYorkDiagnosticContract("configs/york-diagnostic-contract.v1.json");
+    const laneA = contract.lanes.find(
+      (entry) => entry.lane_id === YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+    );
+    const laneB = contract.lanes.find(
+      (entry) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    expect(laneA).toBeTruthy();
+    expect(laneB).toBeTruthy();
+    if (!laneA || !laneB) return;
+
+    const comparison = buildCrossLaneComparison({
+      baselineLaneId: laneA.lane_id,
+      alternateLaneId: laneB.lane_id,
+      baseline: {
+        lane_id: laneA.lane_id,
+        active: laneA.active,
+        supported: laneA.supported,
+        unsupported_reason: laneA.unsupported_reason,
+        observer: laneA.observer,
+        observer_definition_id: laneA.observer_definition_id,
+        observer_construction_inputs: laneA.observer_construction_inputs,
+        observer_construction_formula: laneA.observer_construction_formula,
+        observer_normalized: laneA.observer_normalized,
+        observer_approximation: laneA.observer_approximation,
+        foliation: laneA.foliation,
+        theta_definition: laneA.theta_definition,
+        kij_sign_convention: laneA.kij_sign_convention,
+        requires_gamma_metric: laneA.requires_gamma_metric,
+        semantics_closed: laneA.semantics_closed,
+        cross_lane_claim_ready: laneA.cross_lane_claim_ready,
+        cross_lane_claim_block_reason: laneA.cross_lane_claim_block_reason,
+        classification_scope: laneA.classification_scope,
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+      alternate: {
+        lane_id: laneB.lane_id,
+        active: laneB.active,
+        supported: laneB.supported,
+        unsupported_reason: laneB.unsupported_reason,
+        observer: laneB.observer,
+        observer_definition_id: laneB.observer_definition_id,
+        observer_construction_inputs: laneB.observer_construction_inputs,
+        observer_construction_formula: laneB.observer_construction_formula,
+        observer_normalized: laneB.observer_normalized,
+        observer_approximation: laneB.observer_approximation,
+        foliation: laneB.foliation,
+        theta_definition: laneB.theta_definition,
+        kij_sign_convention: laneB.kij_sign_convention,
+        requires_gamma_metric: laneB.requires_gamma_metric,
+        semantics_closed: laneB.semantics_closed,
+        cross_lane_claim_ready: laneB.cross_lane_claim_ready,
+        cross_lane_claim_block_reason: laneB.cross_lane_claim_block_reason,
+        classification_scope: laneB.classification_scope,
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: laneB.semantics_closed,
+          laneBObserverDefined:
+            !!laneB.observer_definition_id && !!laneB.observer_construction_formula,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: laneB.cross_lane_claim_ready,
+          readyForCrossLaneComparison: false,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+    });
+    expect(comparison.cross_lane_status).toBe("lane_stable_low_expansion_like");
+    expect(comparison.falsifiers.lane_b_semantics_closed).toBe(true);
+    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(true);
   });
 
   it("computes lane-stable comparison status when calibrated lanes agree", () => {
@@ -698,7 +1657,7 @@ describe("warp york control-family proof pack", () => {
   it("keeps cross-lane comparison inconclusive when alternate lane is unsupported", () => {
     const comparison = buildCrossLaneComparison({
       baselineLaneId: "lane_a_eulerian_comoving_theta_minus_trk",
-      alternateLaneId: "lane_b_alternate_observer_pending",
+      alternateLaneId: "lane_z_test_unsupported",
       baseline: {
         lane_id: "lane_a_eulerian_comoving_theta_minus_trk",
         active: true,
@@ -727,7 +1686,7 @@ describe("warp york control-family proof pack", () => {
         notes: [],
       },
       alternate: {
-        lane_id: "lane_b_alternate_observer_pending",
+        lane_id: "lane_z_test_unsupported",
         active: true,
         supported: false,
         unsupported_reason: "pending",
@@ -756,6 +1715,389 @@ describe("warp york control-family proof pack", () => {
     });
     expect(comparison.cross_lane_status).toBe("lane_comparison_inconclusive");
     expect(comparison.falsifiers.alternate_supported).toBe(false);
+  });
+
+  it("keeps cross-lane comparison inconclusive when Lane B readiness gate is open", () => {
+    const comparison = buildCrossLaneComparison({
+      baselineLaneId: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      alternateLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      baseline: {
+        lane_id: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+      alternate: {
+        lane_id: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "shift_drift_u(beta_over_alpha)",
+        observer_definition_id: "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+        observer_construction_inputs: ["alpha", "beta_x", "gamma_xx", "K_trace"],
+        observer_construction_formula: "theta_B=-trK+div_gamma(beta/alpha)",
+        observer_normalized: false,
+        observer_approximation: "observer-only approximation",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK+div(beta/alpha)",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        requires_gamma_metric: true,
+        semantics_closed: false,
+        cross_lane_claim_ready: false,
+        cross_lane_claim_block_reason: "lane_b_semantics_not_closed",
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: false,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: false,
+          readyForCrossLaneComparison: false,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+    });
+    expect(comparison.cross_lane_status).toBe("lane_comparison_inconclusive");
+    expect(comparison.falsifiers.lane_b_semantics_closed).toBe(false);
+    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(false);
+  });
+
+  it("keeps cross-lane comparison inconclusive when Lane B tensor-input evidence is missing", () => {
+    const comparison = buildCrossLaneComparison({
+      baselineLaneId: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      alternateLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      baseline: {
+        lane_id: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+      alternate: {
+        lane_id: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "shift_drift_u(beta_over_alpha)",
+        observer_definition_id: "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+        observer_construction_inputs: ["alpha", "beta_x", "gamma_xx", "K_trace"],
+        observer_construction_formula: "theta_B=-trK+div_gamma(beta/alpha)",
+        observer_normalized: false,
+        observer_approximation: "observer-only approximation",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK+div(beta/alpha)",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        requires_gamma_metric: true,
+        semantics_closed: true,
+        cross_lane_claim_ready: true,
+        cross_lane_claim_block_reason: null,
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: false,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: false,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+    });
+    expect(comparison.cross_lane_status).toBe("lane_comparison_inconclusive");
+    expect(comparison.falsifiers.lane_b_tensor_inputs_present).toBe(false);
+    expect(comparison.falsifiers.lane_b_geometry_ready).toBe(true);
+  });
+
+  it("keeps cross-lane comparison inconclusive when only Lane B parity is open", () => {
+    const comparison = buildCrossLaneComparison({
+      baselineLaneId: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      alternateLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      baseline: {
+        lane_id: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          diagnosticParityClosed: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+      alternate: {
+        lane_id: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "shift_drift_u(beta_over_alpha)",
+        observer_definition_id: "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+        observer_construction_inputs: ["alpha", "beta_x", "gamma_xx", "K_trace"],
+        observer_construction_formula: "theta_B=-trK+div_gamma(beta/alpha)",
+        observer_normalized: false,
+        observer_approximation: "observer-only approximation",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK+div(beta/alpha)",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        requires_gamma_metric: true,
+        semantics_closed: true,
+        cross_lane_claim_ready: true,
+        cross_lane_claim_block_reason: null,
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          diagnosticParityClosed: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: false,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: false,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+    });
+
+    expect(comparison.cross_lane_status).toBe("lane_comparison_inconclusive");
+    expect(comparison.falsifiers.lane_b_parity_closed).toBe(false);
+    expect(comparison.falsifiers.baseline_controls_calibrated).toBe(true);
+  });
+
+  it("allows lane-stable status when Lane B readiness gate is closed", () => {
+    const comparison = buildCrossLaneComparison({
+      baselineLaneId: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+      alternateLaneId: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+      baseline: {
+        lane_id: YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+      alternate: {
+        lane_id: YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+        active: true,
+        supported: true,
+        unsupported_reason: null,
+        observer: "shift_drift_u(beta_over_alpha)",
+        observer_definition_id: "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+        observer_construction_inputs: ["alpha", "beta_x", "gamma_xx", "K_trace"],
+        observer_construction_formula: "theta_B=-trK+div_gamma(beta/alpha)",
+        observer_normalized: false,
+        observer_approximation: "observer-only approximation",
+        foliation: "comoving_cartesian_3p1",
+        theta_definition: "theta=-trK+div(beta/alpha)",
+        kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        requires_gamma_metric: true,
+        semantics_closed: true,
+        cross_lane_claim_ready: true,
+        cross_lane_claim_block_reason: null,
+        classification_scope: "diagnostic_local_only",
+        cases: [],
+        controlDebug: [],
+        preconditions: {
+          controlsIndependent: true,
+          allRequiredViewsRendered: true,
+          provenanceHashesPresent: true,
+          runtimeStatusProvenancePresent: true,
+          laneAParityClosed: true,
+          readyForFamilyVerdict: true,
+        },
+        controlsCalibratedByReferences: true,
+        laneReadiness: {
+          laneBSemanticsClosed: true,
+          laneBObserverDefined: true,
+          laneBTensorInputsPresent: true,
+          laneBGeometryReady: true,
+          laneBControlsCalibrated: true,
+          laneBParityClosed: true,
+          laneBCrossLaneClaimReady: true,
+          readyForCrossLaneComparison: true,
+        },
+        guardFailures: [],
+        decisionTable: [],
+        classificationScoring: null,
+        classificationRobustness: null,
+        verdict: "nhm2_low_expansion_family",
+        notes: [],
+      },
+    });
+    expect(comparison.cross_lane_status).toBe("lane_stable_low_expansion_like");
+    expect(comparison.falsifiers.lane_b_semantics_closed).toBe(true);
+    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(true);
   });
 
   it("classifies NHM2 as low-expansion-like when feature distance is closer to Natario", () => {
@@ -1490,5 +2832,195 @@ describe("warp york control-family proof pack", () => {
     ];
 
     expect(hasSufficientSignalForAlcubierreControl(alcCase)).toBe(false);
+  });
+
+  it("builds a dedicated reduced-order artifact from the proof-pack payload", () => {
+    const contract = loadYorkDiagnosticContract("configs/york-diagnostic-contract.v1.json");
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    const natCase = makeCase("natario_control", "theta-hash-nat") as any;
+    const nhm2Case = makeCase("nhm2_certified", "theta-hash-nhm2") as any;
+    nhm2Case.classificationFeatures = {
+      theta_abs_max_raw: 1.1,
+      theta_abs_max_display: 1.05,
+      positive_count_xz: 10,
+      negative_count_xz: 9,
+      positive_count_xrho: 11,
+      negative_count_xrho: 10,
+      support_overlap_pct: 3.6,
+      near_zero_theta: true,
+      signed_lobe_summary: null,
+      shell_map_activity: 0.21,
+    };
+    nhm2Case.snapshotMetrics.source = "metric";
+    const payload = {
+      artifactType: "warp_york_control_family_proof_pack/v1",
+      generatedOn: "2026-03-30",
+      generatedAt: "2026-03-30T00:00:00.000Z",
+      boundaryStatement: "boundary",
+      diagnosticContractId: contract.contract_id,
+      classificationScope: contract.classification_scope,
+      diagnosticContract: contract,
+      diagnosticLanes: [
+        {
+          lane_id: contract.baseline_lane_id,
+          active: true,
+          supported: true,
+          unsupported_reason: null,
+          observer: "eulerian_n",
+          foliation: "comoving_cartesian_3p1",
+          theta_definition: "theta=-trK",
+          kij_sign_convention: "ADM",
+          classification_scope: "diagnostic_local_only",
+          cases: [alcCase, natCase, nhm2Case],
+          controlDebug: [],
+          preconditions: {
+            controlsIndependent: true,
+            allRequiredViewsRendered: true,
+            provenanceHashesPresent: true,
+            runtimeStatusProvenancePresent: true,
+            readyForFamilyVerdict: true,
+          },
+          controlsCalibratedByReferences: true,
+          guardFailures: [],
+          decisionTable: [],
+          classificationScoring: {
+            distance_to_alcubierre_reference: 0.13,
+            distance_to_low_expansion_reference: 0.001,
+            reference_margin: 0.129,
+            winning_reference: "natario_control",
+            margin_sufficient: true,
+            winning_reference_within_threshold: true,
+            distinct_by_policy: false,
+            distinctness_threshold: 0.5,
+            margin_min: 0.08,
+            reference_match_threshold: 0.5,
+            distance_metric: "weighted_normalized_l1",
+            normalization_method: "max_abs_reference_target_with_floor",
+            to_alcubierre_breakdown: {} as any,
+            to_low_expansion_breakdown: {} as any,
+          },
+          classificationRobustness: {
+            enabled: true,
+            baselineVerdict: "nhm2_low_expansion_family",
+            variantResults: [],
+            verdictCounts: {
+              nhm2_alcubierre_like_family: 0,
+              nhm2_low_expansion_family: 5,
+              nhm2_distinct_family: 0,
+              inconclusive: 0,
+            },
+            dominantVerdict: "nhm2_low_expansion_family",
+            dominantFraction: 1,
+            stableVerdict: "nhm2_low_expansion_family",
+            stabilityStatus: "stable_low_expansion_like",
+            stabilityPolicy: { stable_fraction_min: 0.8, marginal_fraction_min: 0.6 },
+            totalVariants: 5,
+            evaluatedVariants: 5,
+          },
+          verdict: "nhm2_low_expansion_family",
+          notes: ["lane-note"],
+        },
+      ],
+      crossLaneComparison: {
+        baseline_lane_id: contract.baseline_lane_id,
+        alternate_lane_id: contract.alternate_lane_id,
+        baseline_verdict: "nhm2_low_expansion_family",
+        alternate_verdict: "inconclusive",
+        same_classification: false,
+        cross_lane_status: "lane_comparison_inconclusive",
+        falsifiers: {
+          baseline_controls_calibrated: true,
+          alternate_controls_calibrated: false,
+          baseline_supported: true,
+          alternate_supported: false,
+        },
+        notes: [],
+      },
+      inputs: {
+        baseUrl: "http://127.0.0.1:5050",
+        frameEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/frame",
+        proxyFrameEndpoint: "http://127.0.0.1:5050/api/helix/hull-render/frame",
+        compareDirectAndProxy: false,
+        nhm2SnapshotPath: "artifacts/research/full-solve/nhm2.json",
+        yorkViews: REQUIRED_VIEWS,
+        frameSize: { width: 320, height: 180 },
+      },
+      cases: [alcCase, natCase, nhm2Case],
+      controlDebug: [],
+      preconditions: {
+        controlsIndependent: true,
+        allRequiredViewsRendered: true,
+        provenanceHashesPresent: true,
+        runtimeStatusProvenancePresent: true,
+        readyForFamilyVerdict: true,
+      },
+      guardFailures: [],
+      decisionTable: [],
+      classificationScoring: {
+        distance_to_alcubierre_reference: 0.13,
+        distance_to_low_expansion_reference: 0.001,
+        reference_margin: 0.129,
+        winning_reference: "natario_control",
+        margin_sufficient: true,
+        winning_reference_within_threshold: true,
+        distinct_by_policy: false,
+        distinctness_threshold: 0.5,
+        margin_min: 0.08,
+        reference_match_threshold: 0.5,
+        distance_metric: "weighted_normalized_l1",
+        normalization_method: "max_abs_reference_target_with_floor",
+        to_alcubierre_breakdown: {} as any,
+        to_low_expansion_breakdown: {} as any,
+      },
+      classificationRobustness: {
+        enabled: true,
+        baselineVerdict: "nhm2_low_expansion_family",
+        variantResults: [],
+        verdictCounts: {
+          nhm2_alcubierre_like_family: 0,
+          nhm2_low_expansion_family: 5,
+          nhm2_distinct_family: 0,
+          inconclusive: 0,
+        },
+        dominantVerdict: "nhm2_low_expansion_family",
+        dominantFraction: 1,
+        stableVerdict: "nhm2_low_expansion_family",
+        stabilityStatus: "stable_low_expansion_like",
+        stabilityPolicy: { stable_fraction_min: 0.8, marginal_fraction_min: 0.6 },
+        totalVariants: 5,
+        evaluatedVariants: 5,
+      },
+      verdict: "nhm2_low_expansion_family",
+      notes: ["root-note"],
+      provenance: {
+        commitHash: "eadb6718",
+        runtimeStatus: {
+          statusEndpoint: "http://127.0.0.1:6062/api/helix/hull-render/status",
+          serviceVersion: "v1",
+          buildHash: "build",
+          commitSha: "eadb6718",
+          processStartedAtMs: 1234,
+          runtimeInstanceId: "runtime",
+          reachable: true,
+        },
+      },
+      checksum: "unused",
+    } as any;
+
+    const rodc = buildWarpRodcSnapshot({
+      payload,
+      sourceAuditArtifact: "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    });
+
+    expect(rodc.artifactType).toBe("warp_rodc_snapshot/v1");
+    expect(rodc.contract.lane_id).toBe(contract.baseline_lane_id);
+    expect(rodc.inputs.source_case_id).toBe("nhm2_certified");
+    expect(rodc.distance.winning_reference).toBe("natario_control");
+    expect(rodc.verdict.status).toBe("congruent");
+    expect(rodc.verdict.stability).toBe("stable");
+    expect(rodc.evidence_hashes.theta_channel_hash).toBe("theta-hash-nhm2");
+    expect(rodc.evidence_hashes.slice_hashes_by_view["york-surface-rho-3p1"]).toBe("slice-hash");
+    expect(typeof rodc.checksum).toBe("string");
+    expect(rodc.checksum?.length).toBeGreaterThan(10);
   });
 });

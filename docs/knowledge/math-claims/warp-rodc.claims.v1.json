@@ -1,0 +1,154 @@
+{
+  "$schema": "../../qa/schemas/math-claim-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "registryId": "warp-rodc",
+  "domain": "warp-reduced-order-diagnostics",
+  "updatedAt": "2026-03-30",
+  "claims": [
+    {
+      "claimId": "claim:warp.rodc:york_lane_a_nhm2_low_expansion_family",
+      "statement": "Under york_diagnostic_contract@v1 and lane_a_eulerian_comoving_theta_minus_trk, the current live York reduced-order deterministic congruence artifact classifies the NHM2 certified snapshot as nhm2_low_expansion_family under this diagnostic-local contract; cross-lane status is governed by lane readiness gates and must be read from the current artifact outputs.",
+      "maturity": "diagnostic",
+      "clCeiling": "CL2",
+      "status": "congruent",
+      "contract": {
+        "id": "york_diagnostic_contract",
+        "version": 1,
+        "laneId": "lane_a_eulerian_comoving_theta_minus_trk",
+        "classificationScope": "diagnostic_local_only"
+      },
+      "validityDomain": {
+        "system": "York reduced-order deterministic congruence under lane A",
+        "constraints": [
+          "observer is fixed to eulerian_n",
+          "foliation is fixed to comoving_cartesian_3p1",
+          "theta definition remains theta=-trK in ADM sign convention",
+          "classification scope remains diagnostic_local_only",
+          "family verdict requires all proof-pack preconditions to pass",
+          "cross-lane comparison is allowed only when both lanes close parity/identity/readiness gates under the same contract"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "configs/york-diagnostic-contract.v1.json",
+          "note": "Declares the York diagnostic lane, feature set, weights, and robustness policy."
+        },
+        {
+          "kind": "dataset",
+          "citation": "artifacts/research/full-solve/warp-york-control-family-rodc-latest.json",
+          "note": "Machine-readable reduced-order snapshot for the current Lane A verdict."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/audits/research/warp-york-control-family-proof-pack-latest.md",
+          "note": "Human-readable proof-pack audit with boundary statement, lane preconditions, and robustness summary."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/audits/research/warp-rodc-drift-latest.md",
+          "note": "Drift report for reduced-order artifacts; first run is expected to be inconclusive until a distinct prior artifact exists."
+        },
+        {
+          "kind": "paper",
+          "citation": "Natario (2002), Class. Quantum Grav. 19(6), DOI 10.1088/0264-9381/19/6/308.",
+          "note": "Low-expansion calibration anchor for the Natario control family."
+        },
+        {
+          "kind": "paper",
+          "citation": "Alcubierre (1994), Class. Quantum Grav. 11(5), DOI 10.1088/0264-9381/11/5/001.",
+          "note": "Signed-lobe calibration anchor for the Alcubierre control family."
+        }
+      ],
+      "repoBindings": [
+        "configs/york-diagnostic-contract.v1.json",
+        "shared/warp-rodc-contract.ts",
+        "scripts/warp-york-control-family-proof-pack.ts",
+        "scripts/warp-rodc-drift-report.ts",
+        "docs/warp-tree-dag-congruence-policy.md"
+      ],
+      "baselines": [
+        "alcubierre_control",
+        "natario_control"
+      ],
+      "evidencePaths": [
+        "artifacts/research/full-solve/warp-york-control-family-rodc-latest.json",
+        "artifacts/research/full-solve/warp-rodc-drift-latest.json",
+        "docs/audits/research/warp-york-control-family-proof-pack-latest.md",
+        "docs/audits/research/warp-rodc-drift-latest.md"
+      ],
+      "falsifier": {
+        "condition": "A same-contract rerun changes the family label, drops robustness below the marginal threshold, fails proof-pack preconditions, or yields a supported alternate-lane disagreement.",
+        "evidence": "artifacts/research/full-solve/warp-rodc-drift-latest.json",
+        "note": "This claim must be downgraded to inconclusive if the diagnostic-local preconditions or stability policy stop holding."
+      },
+      "notes": "This registry entry intentionally caps the claim at diagnostic CL2 and keeps the result inside lane-local reduced-order scope."
+    },
+    {
+      "claimId": "claim:warp.rodc:render_metric_parity_lane_a_benchmark",
+      "statement": "Under warp_render_congruence_benchmark_contract@v1 and render_metric_parity_lane_a, the render congruence benchmark currently remains inconclusive due to insufficient displacement events; this claim is restricted to diagnostic-local renderer/observable congruence governance.",
+      "maturity": "diagnostic",
+      "clCeiling": "CL2",
+      "status": "inconclusive",
+      "contract": {
+        "id": "warp_render_congruence_benchmark_contract",
+        "version": 1,
+        "laneId": "render_metric_parity_lane_a",
+        "classificationScope": "diagnostic_local_only"
+      },
+      "validityDomain": {
+        "system": "Render congruence benchmark under render_metric_parity_lane_a",
+        "constraints": [
+          "benchmark claim is diagnostic-local and not a feasibility statement",
+          "minimum displacement-event threshold must be met for a conclusive parity verdict",
+          "observable parity anchors are interpreted only inside the benchmark contract",
+          "cross-lane interpretation is unavailable until a supported alternate benchmark lane exists"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "repo-code",
+          "citation": "scripts/warp-render-congruence-benchmark.ts",
+          "note": "Defines benchmark contract id, lane id, and status mapping for the render parity producer."
+        },
+        {
+          "kind": "dataset",
+          "citation": "artifacts/research/full-solve/warp-render-congruence-rodc-latest.json",
+          "note": "Machine-readable reduced-order benchmark snapshot."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/audits/research/warp-render-congruence-benchmark-latest.md",
+          "note": "Human-readable benchmark audit for render and observable parity lanes."
+        },
+        {
+          "kind": "repo-code",
+          "citation": "docs/audits/research/warp-render-congruence-rodc-drift-latest.md",
+          "note": "Drift report for benchmark contract identity and evidence stability."
+        }
+      ],
+      "repoBindings": [
+        "shared/warp-rodc-contract.ts",
+        "scripts/warp-render-congruence-benchmark.ts",
+        "scripts/warp-rodc-drift-report.ts",
+        "scripts/validate-warp-rodc-claims.ts"
+      ],
+      "baselines": [
+        "render_metric_parity_reference",
+        "observable_parity_reference"
+      ],
+      "evidencePaths": [
+        "artifacts/research/full-solve/warp-render-congruence-rodc-latest.json",
+        "artifacts/research/full-solve/warp-render-congruence-rodc-drift-latest.json",
+        "docs/audits/research/warp-render-congruence-benchmark-latest.md",
+        "docs/audits/research/warp-render-congruence-rodc-drift-latest.md"
+      ],
+      "falsifier": {
+        "condition": "The benchmark must be downgraded if displacement events remain below threshold, if observable/render status diverges under the same contract, or if benchmark artifacts drift under unchanged contract metadata.",
+        "evidence": "artifacts/research/full-solve/warp-render-congruence-rodc-drift-latest.json",
+        "note": "This claim remains diagnostic-local and can validly stay inconclusive until sufficient benchmark evidence accumulates."
+      },
+      "notes": "This registry entry governs the render congruence benchmark as a diagnostic CL2 producer and explicitly disallows feasibility or frame-identity interpretation."
+    }
+  ]
+}
