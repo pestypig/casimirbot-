@@ -55,6 +55,10 @@ type CaseId = "alcubierre_control" | "natario_control" | "nhm2_certified";
 type DecisionRowStatus = "true" | "false";
 type DecisionVerdict =
   | "renderer_or_conversion_wrong"
+  | "proof_pack_york_slice_hash_mismatch"
+  | "proof_pack_york_rho_remap_mismatch"
+  | "proof_pack_york_near_zero_suppression_mismatch"
+  | "proof_pack_york_downstream_render_mismatch"
   | "renderer_fine_controls_consistent"
   | "nhm2_low_expansion_family"
   | "solve_family_mismatch"
@@ -194,6 +198,44 @@ type CaseResult = {
     supportOverlapPct: number | null;
   };
   snapshotMetrics: CaseSnapshotMetrics | null;
+  offlineYorkAudit: CaseOfflineYorkAudit | null;
+};
+
+type OfflineYorkViewAudit = {
+  view: "york-surface-3p1" | "york-surface-rho-3p1";
+  coordinateMode: "x-z-midplane" | "x-rho";
+  samplingChoice: "x-z midplane" | "x-rho cylindrical remap";
+  thetaSliceHash: string | null;
+  rawExtrema: {
+    min: number | null;
+    max: number | null;
+    absMax: number | null;
+  };
+  counts: {
+    positive: number;
+    negative: number;
+    zeroOrNearZero: number;
+    total: number;
+  };
+};
+
+type CaseOfflineYorkAudit = {
+  byView: OfflineYorkViewAudit[];
+  alcubierreSignedLobeSummary?: {
+    foreHalfPositiveTotal: number;
+    foreHalfNegativeTotal: number;
+    aftHalfPositiveTotal: number;
+    aftHalfNegativeTotal: number;
+    signedLobeSummary: "fore+/aft-" | "fore-/aft+" | "mixed_or_flat";
+  };
+};
+
+type YorkCongruenceEvaluation = {
+  hashMismatch: boolean;
+  rhoRemapMismatch: boolean;
+  nearZeroSuppressionMismatch: boolean;
+  downstreamRenderMismatch: boolean;
+  guardFailures: GuardFailure[];
 };
 
 type ControlRequestSelectors = {
@@ -277,6 +319,7 @@ const VALID_YORK_VIEW_SET = new Set<HullScientificRenderView>([
   ...REQUIRED_YORK_VIEWS,
   ...OPTIONAL_YORK_VIEWS,
 ]);
+const YORK_NEAR_ZERO_THETA_ABS_THRESHOLD = 1e-20;
 
 const ensureRequiredYorkViews = (
   views: HullScientificRenderView[],
@@ -544,6 +587,164 @@ const parseBooleanQueryFlag = (
   const normalized = raw.trim().toLowerCase();
   if (normalized.length === 0) return fallback;
   return ["1", "true", "yes", "on"].includes(normalized);
+};
+
+const clampi = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, Math.trunc(value)));
+
+const idx3 = (x: number, y: number, z: number, dims: [number, number, number]): number =>
+  z * dims[0] * dims[1] + y * dims[0] + x;
+
+const computeRawSliceExtrema = (slice: Float32Array): OfflineYorkViewAudit["rawExtrema"] => {
+  if (slice.length === 0) return { min: null, max: null, absMax: null };
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < slice.length; i += 1) {
+    const value = slice[i];
+    if (!Number.isFinite(value)) continue;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: null, max: null, absMax: null };
+  return { min, max, absMax: Math.max(Math.abs(min), Math.abs(max)) };
+};
+
+const computeSliceSignCounts = (slice: Float32Array): OfflineYorkViewAudit["counts"] => {
+  let positive = 0;
+  let negative = 0;
+  let zeroOrNearZero = 0;
+  for (let i = 0; i < slice.length; i += 1) {
+    const value = slice[i];
+    if (!Number.isFinite(value) || Math.abs(value) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD) {
+      zeroOrNearZero += 1;
+    } else if (value > 0) {
+      positive += 1;
+    } else if (value < 0) {
+      negative += 1;
+    } else {
+      zeroOrNearZero += 1;
+    }
+  }
+  return { positive, negative, zeroOrNearZero, total: slice.length };
+};
+
+export const extractThetaSliceXZMidplane = (
+  theta: Float32Array,
+  dims: [number, number, number],
+): Float32Array => {
+  const [nx, ny, nz] = dims;
+  const yMid = clampi(Math.floor(ny * 0.5), 0, ny - 1);
+  const out = new Float32Array(nx * nz);
+  for (let z = 0; z < nz; z += 1) {
+    for (let x = 0; x < nx; x += 1) {
+      out[z * nx + x] = theta[idx3(x, yMid, z, dims)] ?? 0;
+    }
+  }
+  return out;
+};
+
+export const extractThetaSliceXRho = (
+  theta: Float32Array,
+  dims: [number, number, number],
+): Float32Array => {
+  const [nx, ny, nz] = dims;
+  const rhoBins = Math.max(2, nz);
+  const yCenter = (ny - 1) * 0.5;
+  const zCenter = (nz - 1) * 0.5;
+  const maxRho = Math.max(1e-9, Math.hypot(Math.max(yCenter, 1), Math.max(zCenter, 1)));
+  const out = new Float32Array(nx * rhoBins);
+  const sum = new Float64Array(rhoBins);
+  const count = new Uint32Array(rhoBins);
+  for (let x = 0; x < nx; x += 1) {
+    sum.fill(0);
+    count.fill(0);
+    for (let y = 0; y < ny; y += 1) {
+      const dy = y - yCenter;
+      for (let z = 0; z < nz; z += 1) {
+        const dz = z - zCenter;
+        const rhoNorm = Math.hypot(dy, dz) / maxRho;
+        const rhoBin = clampi(Math.round(rhoNorm * (rhoBins - 1)), 0, rhoBins - 1);
+        const value = theta[idx3(x, y, z, dims)] ?? 0;
+        sum[rhoBin] += value;
+        count[rhoBin] += 1;
+      }
+    }
+    for (let rho = 0; rho < rhoBins; rho += 1) {
+      const n = count[rho];
+      out[rho * nx + x] = n > 0 ? Number(sum[rho] / n) : 0;
+    }
+  }
+  return out;
+};
+
+export const computeOfflineYorkAudit = (args: {
+  caseId: CaseId;
+  theta: Float32Array | null;
+  dims: [number, number, number];
+}): CaseOfflineYorkAudit | null => {
+  if (!(args.theta instanceof Float32Array)) return null;
+  const xzSlice = extractThetaSliceXZMidplane(args.theta, args.dims);
+  const xrhoSlice = extractThetaSliceXRho(args.theta, args.dims);
+  const byView: OfflineYorkViewAudit[] = [
+    {
+      view: "york-surface-3p1",
+      coordinateMode: "x-z-midplane",
+      samplingChoice: "x-z midplane",
+      thetaSliceHash: hashFloat32(xzSlice),
+      rawExtrema: computeRawSliceExtrema(xzSlice),
+      counts: computeSliceSignCounts(xzSlice),
+    },
+    {
+      view: "york-surface-rho-3p1",
+      coordinateMode: "x-rho",
+      samplingChoice: "x-rho cylindrical remap",
+      thetaSliceHash: hashFloat32(xrhoSlice),
+      rawExtrema: computeRawSliceExtrema(xrhoSlice),
+      counts: computeSliceSignCounts(xrhoSlice),
+    },
+  ];
+
+  if (args.caseId !== "alcubierre_control") return { byView };
+  const [nx, ny, nz] = args.dims;
+  const xMid = Math.floor(nx * 0.5);
+  let foreHalfPositiveTotal = 0;
+  let foreHalfNegativeTotal = 0;
+  let aftHalfPositiveTotal = 0;
+  let aftHalfNegativeTotal = 0;
+  for (let x = 0; x < nx; x += 1) {
+    for (let y = 0; y < ny; y += 1) {
+      for (let z = 0; z < nz; z += 1) {
+        const value = args.theta[idx3(x, y, z, args.dims)] ?? 0;
+        if (!Number.isFinite(value) || Math.abs(value) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD) {
+          continue;
+        }
+        const isFore = x >= xMid;
+        if (value > 0) {
+          if (isFore) foreHalfPositiveTotal += value;
+          else aftHalfPositiveTotal += value;
+        } else {
+          if (isFore) foreHalfNegativeTotal += value;
+          else aftHalfNegativeTotal += value;
+        }
+      }
+    }
+  }
+  const signedLobeSummary =
+    foreHalfPositiveTotal > 0 && aftHalfNegativeTotal < 0
+      ? "fore+/aft-"
+      : foreHalfNegativeTotal < 0 && aftHalfPositiveTotal > 0
+        ? "fore-/aft+"
+        : "mixed_or_flat";
+  return {
+    byView,
+    alcubierreSignedLobeSummary: {
+      foreHalfPositiveTotal,
+      foreHalfNegativeTotal,
+      aftHalfPositiveTotal,
+      aftHalfNegativeTotal,
+      signedLobeSummary,
+    },
+  };
 };
 
 const readControlRequestSelectors = (requestUrl: string | null): ControlRequestSelectors => {
@@ -1163,6 +1364,7 @@ const runCase = async (args: {
   }
 
   let snapshotMetrics: CaseSnapshotMetrics | null = null;
+  let offlineYorkAudit: CaseOfflineYorkAudit | null = null;
   try {
     const snapshot = await loadHullScientificSnapshot(args.metricVolumeRef, {
       baseUrl: null,
@@ -1194,8 +1396,14 @@ const runCase = async (args: {
               consistent: false,
             },
     };
+    offlineYorkAudit = computeOfflineYorkAudit({
+      caseId: args.caseId,
+      theta: theta instanceof Float32Array ? theta : null,
+      dims: snapshot.dims,
+    });
   } catch {
     snapshotMetrics = null;
+    offlineYorkAudit = null;
   }
 
   const primaryViewId = args.yorkViews.includes("york-surface-rho-3p1")
@@ -1218,6 +1426,7 @@ const runCase = async (args: {
       supportOverlapPct: primaryView?.supportOverlapPct ?? null,
     },
     snapshotMetrics,
+    offlineYorkAudit,
   };
 };
 
@@ -1516,8 +1725,17 @@ export const decideControlFamilyVerdict = (args: {
   natLow: boolean;
   nhm2Low: boolean;
   nhm2IntendedAlcubierre: boolean;
+  yorkCongruence?: YorkCongruenceEvaluation;
 }): DecisionVerdict => {
   if (!args.preconditions.readyForFamilyVerdict) return "inconclusive";
+  if (args.yorkCongruence?.rhoRemapMismatch) return "proof_pack_york_rho_remap_mismatch";
+  if (args.yorkCongruence?.hashMismatch) return "proof_pack_york_slice_hash_mismatch";
+  if (args.yorkCongruence?.nearZeroSuppressionMismatch) {
+    return "proof_pack_york_near_zero_suppression_mismatch";
+  }
+  if (args.yorkCongruence?.downstreamRenderMismatch) {
+    return "proof_pack_york_downstream_render_mismatch";
+  }
   if (!args.alcStrong) return "renderer_or_conversion_wrong";
   if (args.alcStrong && args.natLow && args.nhm2Low && args.nhm2IntendedAlcubierre) {
     return "solve_family_mismatch";
@@ -1525,6 +1743,79 @@ export const decideControlFamilyVerdict = (args: {
   if (args.alcStrong && args.natLow && args.nhm2Low) return "nhm2_low_expansion_family";
   if (args.alcStrong && args.natLow) return "renderer_fine_controls_consistent";
   return "inconclusive";
+};
+
+const approxEqual = (a: number | null, b: number | null, tol = 1e-15): boolean => {
+  if (a == null || b == null) return false;
+  return Math.abs(a - b) <= tol;
+};
+
+export const evaluateYorkSliceCongruence = (cases: CaseResult[]): YorkCongruenceEvaluation => {
+  const guardFailures: GuardFailure[] = [];
+  let hashMismatch = false;
+  let rhoRemapMismatch = false;
+  let nearZeroSuppressionMismatch = false;
+  let downstreamRenderMismatch = false;
+  for (const entry of cases) {
+    const offlineByView = new Map(
+      (entry.offlineYorkAudit?.byView ?? []).map((view) => [view.view, view]),
+    );
+    for (const view of ["york-surface-3p1", "york-surface-rho-3p1"] as const) {
+      const rendered = entry.perView.find((candidate) => candidate.view === view);
+      const offline = offlineByView.get(view);
+      if (!rendered || !offline) continue;
+      if (!rendered.hashes.slice_array_hash || !offline.thetaSliceHash) continue;
+      const hashesMatch = rendered.hashes.slice_array_hash === offline.thetaSliceHash;
+      if (!hashesMatch) {
+        hashMismatch = true;
+        if (view === "york-surface-rho-3p1") rhoRemapMismatch = true;
+        guardFailures.push({
+          code:
+            view === "york-surface-rho-3p1"
+              ? "proof_pack_york_rho_remap_mismatch"
+              : "proof_pack_york_slice_hash_mismatch",
+          detail: `${entry.caseId}:${view}:offline=${offline.thetaSliceHash}:rendered=${rendered.hashes.slice_array_hash}`,
+        });
+      }
+      const extremaMatch =
+        approxEqual(offline.rawExtrema.min, rendered.rawExtrema.min) &&
+        approxEqual(offline.rawExtrema.max, rendered.rawExtrema.max) &&
+        approxEqual(offline.rawExtrema.absMax, rendered.rawExtrema.absMax);
+      const semanticsMatch =
+        rendered.render.coordinate_mode === offline.coordinateMode &&
+        rendered.samplingChoice === offline.samplingChoice;
+      if (hashesMatch && (!extremaMatch || !semanticsMatch)) {
+        downstreamRenderMismatch = true;
+        guardFailures.push({
+          code: "proof_pack_york_slice_hash_mismatch",
+          detail: `${entry.caseId}:${view}:hash_match=true:extrema_match=${extremaMatch}:semantics_match=${semanticsMatch}:coordinate_mode=${rendered.render.coordinate_mode ?? "null"}:sampling_choice=${rendered.samplingChoice ?? "null"}`,
+        });
+      }
+      const structureMeaningful =
+        offline.rawExtrema.absMax != null &&
+        offline.rawExtrema.absMax > YORK_NEAR_ZERO_THETA_ABS_THRESHOLD &&
+        offline.counts.positive > 0 &&
+        offline.counts.negative > 0;
+      const flattened =
+        rendered.nearZeroTheta === true &&
+        ((rendered.displayExtrema.absMax ?? 0) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
+          (rendered.displayExtrema.heightScale ?? 0) <= 1e-12);
+      if (hashesMatch && structureMeaningful && flattened) {
+        nearZeroSuppressionMismatch = true;
+        guardFailures.push({
+          code: "proof_pack_york_near_zero_suppression_mismatch",
+          detail: `${entry.caseId}:${view}:raw_abs_max=${offline.rawExtrema.absMax}:display_abs_max=${rendered.displayExtrema.absMax ?? "null"}:height_scale=${rendered.displayExtrema.heightScale ?? "null"}:near_zero_theta=${String(rendered.nearZeroTheta)}`,
+        });
+      }
+    }
+  }
+  return {
+    hashMismatch,
+    rhoRemapMismatch,
+    nearZeroSuppressionMismatch,
+    downstreamRenderMismatch,
+    guardFailures,
+  };
 };
 
 const hasStrongForeAftYork = (summary: CaseResult["primaryYork"]): boolean => {
@@ -1579,6 +1870,14 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
       const thetaK = entry.snapshotMetrics?.thetaPlusKTrace;
       return `| ${entry.caseId} | ${entry.familyExpectation} | ${raw?.min ?? "null"} | ${raw?.max ?? "null"} | ${raw?.absMax ?? "null"} | ${display?.min ?? "null"} | ${display?.max ?? "null"} | ${display?.absMax ?? "null"} | ${entry.primaryYork.coordinateMode ?? "null"} | ${entry.primaryYork.samplingChoice ?? "null"} | ${entry.primaryYork.supportOverlapPct ?? "null"} | ${thetaK?.maxAbs ?? "null"} | ${thetaK?.rms ?? "null"} | ${thetaK?.consistent ?? "null"} |`;
     })
+    .join("\n");
+  const offlineRows = payload.cases
+    .flatMap((entry) =>
+      (entry.offlineYorkAudit?.byView ?? []).map((audit) => {
+        const lobe = entry.offlineYorkAudit?.alcubierreSignedLobeSummary;
+        return `| ${entry.caseId} | ${audit.view} | ${audit.coordinateMode} | ${audit.samplingChoice} | ${audit.rawExtrema.min ?? "null"} | ${audit.rawExtrema.max ?? "null"} | ${audit.rawExtrema.absMax ?? "null"} | ${audit.counts.positive} | ${audit.counts.negative} | ${audit.counts.zeroOrNearZero} | ${audit.thetaSliceHash ?? "null"} | ${lobe?.foreHalfPositiveTotal ?? "null"} | ${lobe?.foreHalfNegativeTotal ?? "null"} | ${lobe?.aftHalfPositiveTotal ?? "null"} | ${lobe?.aftHalfNegativeTotal ?? "null"} | ${lobe?.signedLobeSummary ?? "null"} |`;
+      }),
+    )
     .join("\n");
   const decisionRows = payload.decisionTable
     .map((row) => `| ${row.id} | ${row.condition} | ${row.status} | ${row.interpretation} |`)
@@ -1658,6 +1957,11 @@ ${laneRows}
 | case | view | ok | theta_min_raw | theta_max_raw | theta_abs_max_raw | theta_min_display | theta_max_display | theta_abs_max_display | coordinate_mode | sampling_choice | support_overlap_pct | theta+K maxAbs | theta+K rms | theta+K consistent | theta_channel_hash | slice_array_hash | normalized_slice_hash | support_mask_slice_hash | shell_masked_slice_hash |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---|---|---|---|---|---|
 ${viewRows}
+
+## Offline York slice audit (numeric)
+| case | view | coordinate_mode | sampling_choice | theta_min_raw | theta_max_raw | theta_abs_max_raw | positive_cells | negative_cells | zero_or_near_zero_cells | offline_slice_hash | fore_pos_total | fore_neg_total | aft_pos_total | aft_neg_total | signed_lobe_summary |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---|
+${offlineRows}
 
 ## Case Summary (primary York = ${primaryViewLabel})
 | case | expectation | theta_min_raw | theta_max_raw | theta_abs_max_raw | theta_min_display | theta_max_display | theta_abs_max_display | coordinate_mode | sampling_choice | support_overlap_pct | theta+K maxAbs | theta+K rms | theta+K consistent |
@@ -1807,6 +2111,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     cases,
     runtimeStatus,
   });
+  const yorkCongruence = evaluateYorkSliceCongruence(cases);
+  guardFailures.push(...yorkCongruence.guardFailures);
   const controlDebug = buildControlDebug(cases);
 
   const decisionTable: DecisionRow[] = [
@@ -1818,6 +2124,69 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       interpretation: preconditions.readyForFamilyVerdict
         ? "Evidence integrity prerequisites satisfied."
         : "Evidence prerequisites failed; verdict must remain inconclusive.",
+    },
+    {
+      id: "offline_raw_slice_matches_rendered_slice_hashes",
+      condition:
+        "Offline York slice hash matches rendered slice_array_hash for x-z and x-rho views",
+      status:
+        (
+          preconditions.readyForFamilyVerdict &&
+          !yorkCongruence.hashMismatch
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        preconditions.readyForFamilyVerdict && !yorkCongruence.hashMismatch
+          ? "Offline extraction and rendered slice arrays are congruent."
+          : preconditions.readyForFamilyVerdict
+            ? "At least one rendered York slice hash diverges from offline extraction."
+            : "Skipped because preconditions failed.",
+    },
+    {
+      id: "xz_matches_but_xrho_differs_isolate_rho_remap",
+      condition:
+        "x-z York slice congruent while x-rho York slice diverges from offline remap",
+      status:
+        (
+          preconditions.readyForFamilyVerdict && yorkCongruence.rhoRemapMismatch
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        preconditions.readyForFamilyVerdict && yorkCongruence.rhoRemapMismatch
+          ? "Likely cylindrical remap mismatch between offline and renderer path."
+          : preconditions.readyForFamilyVerdict
+            ? "No isolated cylindrical remap mismatch detected."
+            : "Skipped because preconditions failed.",
+    },
+    {
+      id: "raw_structure_nontrivial_but_near_zero_flattened",
+      condition:
+        "Offline raw York structure is nontrivial but rendered diagnostics report near-zero flattening",
+      status:
+        (
+          preconditions.readyForFamilyVerdict &&
+          yorkCongruence.nearZeroSuppressionMismatch
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        preconditions.readyForFamilyVerdict && yorkCongruence.nearZeroSuppressionMismatch
+          ? "Display suppression policy likely flattening meaningful structure."
+          : preconditions.readyForFamilyVerdict
+            ? "No near-zero suppression mismatch detected."
+            : "Skipped because preconditions failed.",
+    },
+    {
+      id: "hash_match_but_downstream_render_or_display_issue",
+      condition:
+        "Offline and rendered hashes match but extrema/semantics disagree (downstream display/render issue)",
+      status:
+        (
+          preconditions.readyForFamilyVerdict &&
+          yorkCongruence.downstreamRenderMismatch
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        preconditions.readyForFamilyVerdict && yorkCongruence.downstreamRenderMismatch
+          ? "Downstream render/display interpretation is likely responsible."
+          : preconditions.readyForFamilyVerdict
+            ? "No downstream mismatch detected after hash congruence."
+            : "Skipped because preconditions failed.",
     },
     {
       id: "renderer_or_conversion_wrong_if_alc_control_fails",
@@ -1890,6 +2259,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     natLow,
     nhm2Low,
     nhm2IntendedAlcubierre,
+    yorkCongruence,
   });
 
   const notes: string[] = [];
@@ -1913,6 +2283,17 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   if (!alcStrong) {
     notes.push(
       "Alcubierre control did not present a strong signed fore/aft York lane in primary view; renderer/conversion suspicion is raised by policy.",
+    );
+  }
+  if (yorkCongruence.hashMismatch) {
+    notes.push("Offline-vs-rendered York slice hash mismatch detected.");
+  }
+  if (yorkCongruence.rhoRemapMismatch) {
+    notes.push("x-rho cylindrical remap mismatch isolated against x-z baseline.");
+  }
+  if (yorkCongruence.nearZeroSuppressionMismatch) {
+    notes.push(
+      "Rendered near-zero/height suppression appears active despite meaningful offline signed structure.",
     );
   }
   if (alcStrong && natLow) {

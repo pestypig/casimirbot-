@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
   buildControlMetricVolumeRef,
+  computeOfflineYorkAudit,
   buildControlDebug,
   decideControlFamilyVerdict,
+  evaluateYorkSliceCongruence,
   evaluateProofPackPreconditions,
+  extractThetaSliceXRho,
+  extractThetaSliceXZMidplane,
   readSourceFamilyEvidence,
 } from "../scripts/warp-york-control-family-proof-pack";
 
@@ -38,8 +42,8 @@ const makeView = (
     render: {
       view,
       field_key: "theta",
-      slice_plane: "x-z-midplane",
-      coordinate_mode: "x-z-midplane",
+      slice_plane: view === "york-surface-rho-3p1" ? "x-rho" : "x-z-midplane",
+      coordinate_mode: view === "york-surface-rho-3p1" ? "x-rho" : "x-z-midplane",
       normalization: "symmetric-about-zero",
       magnitude_mode: view === "york-topology-normalized-3p1" ? "normalized-topology-only" : null,
       surface_height: view === "york-topology-normalized-3p1" ? "theta_norm" : "theta",
@@ -133,6 +137,26 @@ const makeCase = (
       sampleCount: 1,
       consistent: true,
     },
+  },
+  offlineYorkAudit: {
+    byView: [
+      {
+        view: "york-surface-3p1",
+        coordinateMode: "x-z-midplane",
+        samplingChoice: "x-z midplane",
+        thetaSliceHash: "slice-hash",
+        rawExtrema: { min: -1, max: 1, absMax: 1 },
+        counts: { positive: 5, negative: 5, zeroOrNearZero: 1, total: 11 },
+      },
+      {
+        view: "york-surface-rho-3p1",
+        coordinateMode: "x-rho",
+        samplingChoice: "x-rho cylindrical remap",
+        thetaSliceHash: "slice-hash",
+        rawExtrema: { min: -1, max: 1, absMax: 1 },
+        counts: { positive: 5, negative: 5, zeroOrNearZero: 1, total: 11 },
+      },
+    ],
   },
 });
 
@@ -353,5 +377,104 @@ describe("warp york control-family proof pack", () => {
         (failure) => failure.code === "proof_pack_control_mapping_evidence_missing_in_payload",
       ),
     ).toBe(true);
+  });
+
+  it("passes offline slice hash congruence when rendered hashes match", () => {
+    const caseEntry = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    const congruence = evaluateYorkSliceCongruence([caseEntry]);
+    expect(congruence.hashMismatch).toBe(false);
+    expect(congruence.rhoRemapMismatch).toBe(false);
+    expect(congruence.guardFailures).toEqual([]);
+  });
+
+  it("emits mismatch guard when rendered slice_array_hash differs", () => {
+    const caseEntry = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    const xzView = caseEntry.perView.find((entry: any) => entry.view === "york-surface-3p1");
+    xzView.hashes.slice_array_hash = "different-hash";
+    const congruence = evaluateYorkSliceCongruence([caseEntry]);
+    expect(congruence.hashMismatch).toBe(true);
+    expect(
+      congruence.guardFailures.some(
+        (failure) => failure.code === "proof_pack_york_slice_hash_mismatch",
+      ),
+    ).toBe(true);
+  });
+
+  it("emits x-rho remap mismatch guard when rho hash diverges", () => {
+    const caseEntry = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    const rhoView = caseEntry.perView.find(
+      (entry: any) => entry.view === "york-surface-rho-3p1",
+    );
+    rhoView.hashes.slice_array_hash = "different-rho-hash";
+    const congruence = evaluateYorkSliceCongruence([caseEntry]);
+    expect(congruence.rhoRemapMismatch).toBe(true);
+    expect(
+      congruence.guardFailures.some(
+        (failure) => failure.code === "proof_pack_york_rho_remap_mismatch",
+      ),
+    ).toBe(true);
+  });
+
+  it("classifies near-zero suppression mismatch when raw signed structure exists", () => {
+    const caseEntry = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    const xzView = caseEntry.perView.find((entry: any) => entry.view === "york-surface-3p1");
+    xzView.nearZeroTheta = true;
+    xzView.displayExtrema.absMax = 0;
+    xzView.displayExtrema.heightScale = 0;
+    const congruence = evaluateYorkSliceCongruence([caseEntry]);
+    expect(congruence.nearZeroSuppressionMismatch).toBe(true);
+    expect(
+      congruence.guardFailures.some(
+        (failure) => failure.code === "proof_pack_york_near_zero_suppression_mismatch",
+      ),
+    ).toBe(true);
+  });
+
+  it("computes offline York audit slices for x-z and x-rho", () => {
+    const dims: [number, number, number] = [4, 4, 4];
+    const theta = new Float32Array(dims[0] * dims[1] * dims[2]);
+    for (let z = 0; z < dims[2]; z += 1) {
+      for (let y = 0; y < dims[1]; y += 1) {
+        for (let x = 0; x < dims[0]; x += 1) {
+          const idx = z * dims[0] * dims[1] + y * dims[0] + x;
+          theta[idx] = x >= 2 ? 1 : -1;
+        }
+      }
+    }
+    const xz = extractThetaSliceXZMidplane(theta, dims);
+    const xrho = extractThetaSliceXRho(theta, dims);
+    expect(xz.length).toBe(16);
+    expect(xrho.length).toBe(16);
+    const audit = computeOfflineYorkAudit({
+      caseId: "alcubierre_control",
+      theta,
+      dims,
+    });
+    expect(audit?.byView).toHaveLength(2);
+    expect(audit?.alcubierreSignedLobeSummary?.signedLobeSummary).toBe("fore+/aft-");
+  });
+
+  it("selects new verdict code for rho remap mismatch", () => {
+    const verdict = decideControlFamilyVerdict({
+      preconditions: {
+        controlsIndependent: true,
+        allRequiredViewsRendered: true,
+        provenanceHashesPresent: true,
+        runtimeStatusProvenancePresent: true,
+        readyForFamilyVerdict: true,
+      },
+      alcStrong: true,
+      natLow: true,
+      nhm2Low: true,
+      nhm2IntendedAlcubierre: false,
+      yorkCongruence: {
+        hashMismatch: true,
+        rhoRemapMismatch: true,
+        nearZeroSuppressionMismatch: false,
+        downstreamRenderMismatch: false,
+        guardFailures: [],
+      },
+    });
+    expect(verdict).toBe("proof_pack_york_rho_remap_mismatch");
   });
 });
