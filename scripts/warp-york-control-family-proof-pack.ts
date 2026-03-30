@@ -628,6 +628,13 @@ const computeSliceSignCounts = (slice: Float32Array): OfflineYorkViewAudit["coun
   return { positive, negative, zeroOrNearZero, total: slice.length };
 };
 
+const hasMeaningfulSignedStructure = (offline: OfflineYorkViewAudit): boolean => {
+  if (offline.rawExtrema.absMax == null || offline.rawExtrema.absMax <= 0) return false;
+  const structuralFloor = Math.max(offline.rawExtrema.absMax * 1e-3, 1e-45);
+  const enoughSignedCells = offline.counts.positive >= 2 && offline.counts.negative >= 2;
+  return enoughSignedCells && offline.rawExtrema.absMax >= structuralFloor;
+};
+
 export const extractThetaSliceXZMidplane = (
   theta: Float32Array,
   dims: [number, number, number],
@@ -1791,11 +1798,7 @@ export const evaluateYorkSliceCongruence = (cases: CaseResult[]): YorkCongruence
           detail: `${entry.caseId}:${view}:hash_match=true:extrema_match=${extremaMatch}:semantics_match=${semanticsMatch}:coordinate_mode=${rendered.render.coordinate_mode ?? "null"}:sampling_choice=${rendered.samplingChoice ?? "null"}`,
         });
       }
-      const structureMeaningful =
-        offline.rawExtrema.absMax != null &&
-        offline.rawExtrema.absMax > YORK_NEAR_ZERO_THETA_ABS_THRESHOLD &&
-        offline.counts.positive > 0 &&
-        offline.counts.negative > 0;
+      const structureMeaningful = hasMeaningfulSignedStructure(offline);
       const flattened =
         rendered.nearZeroTheta === true &&
         ((rendered.displayExtrema.absMax ?? 0) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
