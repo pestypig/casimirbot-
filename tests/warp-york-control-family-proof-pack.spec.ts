@@ -9,6 +9,7 @@ import {
   evaluateProofPackPreconditions,
   extractThetaSliceXRho,
   extractThetaSliceXZMidplane,
+  hasSufficientSignalForAlcubierreControl,
   readSourceFamilyEvidence,
 } from "../scripts/warp-york-control-family-proof-pack";
 
@@ -521,5 +522,57 @@ describe("warp york control-family proof pack", () => {
       },
     });
     expect(verdict).toBe("inconclusive");
+  });
+
+  it("treats tiny but signed Alcubierre lobe structure as signal-sufficient", () => {
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    alcCase.primaryYork.rawExtrema = { min: -8e-33, max: 4e-33, absMax: 8e-33 };
+    alcCase.primaryYork.nearZeroTheta = true;
+    alcCase.offlineYorkAudit.byView = [
+      {
+        view: "york-surface-3p1",
+        coordinateMode: "x-z-midplane",
+        samplingChoice: "x-z midplane",
+        thetaSliceHash: "tiny-signed-xz",
+        rawExtrema: { min: -8e-33, max: 4e-33, absMax: 8e-33 },
+        counts: { positive: 12, negative: 10, zeroOrNearZero: 2, total: 24 },
+      },
+      {
+        view: "york-surface-rho-3p1",
+        coordinateMode: "x-rho",
+        samplingChoice: "x-rho cylindrical remap",
+        thetaSliceHash: "tiny-signed-rho",
+        rawExtrema: { min: -3e-33, max: 2e-33, absMax: 3e-33 },
+        counts: { positive: 8, negative: 7, zeroOrNearZero: 9, total: 24 },
+      },
+    ];
+
+    expect(hasSufficientSignalForAlcubierreControl(alcCase)).toBe(true);
+  });
+
+  it("keeps uniformly near-zero Alcubierre slices signal-insufficient", () => {
+    const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    alcCase.primaryYork.rawExtrema = { min: 0, max: 0, absMax: 0 };
+    alcCase.primaryYork.nearZeroTheta = true;
+    alcCase.offlineYorkAudit.byView = [
+      {
+        view: "york-surface-3p1",
+        coordinateMode: "x-z-midplane",
+        samplingChoice: "x-z midplane",
+        thetaSliceHash: "flat-xz",
+        rawExtrema: { min: 0, max: 0, absMax: 0 },
+        counts: { positive: 0, negative: 0, zeroOrNearZero: 24, total: 24 },
+      },
+      {
+        view: "york-surface-rho-3p1",
+        coordinateMode: "x-rho",
+        samplingChoice: "x-rho cylindrical remap",
+        thetaSliceHash: "flat-rho",
+        rawExtrema: { min: 0, max: 0, absMax: 0 },
+        counts: { positive: 0, negative: 0, zeroOrNearZero: 24, total: 24 },
+      },
+    ];
+
+    expect(hasSufficientSignalForAlcubierreControl(alcCase)).toBe(false);
   });
 });
