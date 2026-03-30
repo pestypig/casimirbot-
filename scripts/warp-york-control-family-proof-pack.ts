@@ -1729,6 +1729,7 @@ export const evaluateProofPackPreconditions = (args: {
 export const decideControlFamilyVerdict = (args: {
   preconditions: ProofPackPreconditions;
   alcStrong: boolean;
+  alcSignalSufficient?: boolean;
   natLow: boolean;
   nhm2Low: boolean;
   nhm2IntendedAlcubierre: boolean;
@@ -1743,6 +1744,7 @@ export const decideControlFamilyVerdict = (args: {
   if (args.yorkCongruence?.downstreamRenderMismatch) {
     return "proof_pack_york_downstream_render_mismatch";
   }
+  if (args.alcSignalSufficient === false) return "inconclusive";
   if (!args.alcStrong) return "renderer_or_conversion_wrong";
   if (args.alcStrong && args.natLow && args.nhm2Low && args.nhm2IntendedAlcubierre) {
     return "solve_family_mismatch";
@@ -1830,6 +1832,13 @@ const hasStrongForeAftYork = (summary: CaseResult["primaryYork"]): boolean => {
   const hasBothSigns = min < 0 && max > 0;
   const notNearZero = summary.nearZeroTheta === false;
   return hasBothSigns && notNearZero && absMax > 1e-20;
+};
+
+const hasSufficientSignalForAlcubierreControl = (summary: CaseResult["primaryYork"]): boolean => {
+  const absMax = summary.rawExtrema?.absMax;
+  if (absMax == null) return false;
+  if (!(absMax > YORK_NEAR_ZERO_THETA_ABS_THRESHOLD)) return false;
+  return summary.nearZeroTheta === false;
 };
 
 const isLowExpansion = (summary: CaseResult["primaryYork"]): boolean => {
@@ -2103,6 +2112,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const nhm2 = cases.find((entry) => entry.caseId === "nhm2_certified")!;
 
   const alcStrong = hasStrongForeAftYork(alc.primaryYork);
+  const alcSignalSufficient = hasSufficientSignalForAlcubierreControl(alc.primaryYork);
   const natLow = isLowExpansion(nat.primaryYork);
   const nhm2Low = isLowExpansion(nhm2.primaryYork);
   const nhm2MatchesNatLowExpansion = natLow && nhm2Low;
@@ -2192,14 +2202,33 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
             : "Skipped because preconditions failed.",
     },
     {
+      id: "alcubierre_control_signal_sufficient",
+      condition:
+        "Alcubierre control has enough York magnitude to support a renderer/conversion fault attribution",
+      status:
+        (preconditions.readyForFamilyVerdict && alcSignalSufficient).toString() as DecisionRowStatus,
+      interpretation:
+        preconditions.readyForFamilyVerdict && alcSignalSufficient
+          ? "Alcubierre control signal is sufficient for strong pass/fail attribution."
+          : preconditions.readyForFamilyVerdict
+            ? "Alcubierre control is low-signal; keep renderer/conversion verdict inconclusive."
+            : "Skipped because preconditions failed.",
+    },
+    {
       id: "renderer_or_conversion_wrong_if_alc_control_fails",
       condition:
         "Alcubierre control fails to show expected fore/aft York numerically (signed non-near-zero)",
       status:
-        (preconditions.readyForFamilyVerdict && !alcStrong).toString() as DecisionRowStatus,
-      interpretation: preconditions.readyForFamilyVerdict && !alcStrong
+        (
+          preconditions.readyForFamilyVerdict &&
+          alcSignalSufficient &&
+          !alcStrong
+        ).toString() as DecisionRowStatus,
+      interpretation: preconditions.readyForFamilyVerdict && alcSignalSufficient && !alcStrong
         ? "Renderer/conversion lane is suspect under this control-family proof test."
-        : preconditions.readyForFamilyVerdict
+        : preconditions.readyForFamilyVerdict && !alcSignalSufficient
+          ? "Skipped because Alcubierre control is low-signal under this run."
+          : preconditions.readyForFamilyVerdict
           ? "Alcubierre control passes this guard."
           : "Skipped because preconditions failed.",
     },
@@ -2259,6 +2288,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const verdict = decideControlFamilyVerdict({
     preconditions,
     alcStrong,
+    alcSignalSufficient,
     natLow,
     nhm2Low,
     nhm2IntendedAlcubierre,
@@ -2283,9 +2313,14 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       "Collapse-point hint: gr-evolve-brick forwards metricT00Ref in sourceParams, but stress-energy field construction in buildStressEnergyBrick is driven by metricT00 scalar and warpFieldType, so differing metricT00Ref alone may not diverge theta.",
     );
   }
-  if (!alcStrong) {
+  if (!alcStrong && alcSignalSufficient) {
     notes.push(
       "Alcubierre control did not present a strong signed fore/aft York lane in primary view; renderer/conversion suspicion is raised by policy.",
+    );
+  }
+  if (!alcSignalSufficient) {
+    notes.push(
+      "Alcubierre control signal is below near-zero threshold for strict renderer fault attribution; verdict remains inconclusive unless a concrete congruence mismatch is detected.",
     );
   }
   if (yorkCongruence.hashMismatch) {

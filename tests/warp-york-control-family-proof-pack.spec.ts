@@ -497,4 +497,29 @@ describe("warp york control-family proof pack", () => {
     });
     expect(verdict).toBe("proof_pack_york_rho_remap_mismatch");
   });
+
+  it("keeps verdict inconclusive when Alcubierre control signal is insufficient", () => {
+    const verdict = decideControlFamilyVerdict({
+      preconditions: {
+        controlsIndependent: true,
+        allRequiredViewsRendered: true,
+        provenanceHashesPresent: true,
+        runtimeStatusProvenancePresent: true,
+        readyForFamilyVerdict: true,
+      },
+      alcStrong: false,
+      alcSignalSufficient: false,
+      natLow: true,
+      nhm2Low: true,
+      nhm2IntendedAlcubierre: false,
+      yorkCongruence: {
+        hashMismatch: false,
+        rhoRemapMismatch: false,
+        nearZeroSuppressionMismatch: false,
+        downstreamRenderMismatch: false,
+        guardFailures: [],
+      },
+    });
+    expect(verdict).toBe("inconclusive");
+  });
 });
