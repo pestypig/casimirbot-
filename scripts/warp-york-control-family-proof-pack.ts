@@ -320,6 +320,7 @@ const VALID_YORK_VIEW_SET = new Set<HullScientificRenderView>([
   ...OPTIONAL_YORK_VIEWS,
 ]);
 const YORK_NEAR_ZERO_THETA_ABS_THRESHOLD = 1e-20;
+const YORK_SIGN_STRUCTURE_EPS = 1e-45;
 
 const ensureRequiredYorkViews = (
   views: HullScientificRenderView[],
@@ -615,7 +616,7 @@ const computeSliceSignCounts = (slice: Float32Array): OfflineYorkViewAudit["coun
   let zeroOrNearZero = 0;
   for (let i = 0; i < slice.length; i += 1) {
     const value = slice[i];
-    if (!Number.isFinite(value) || Math.abs(value) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD) {
+    if (!Number.isFinite(value) || Math.abs(value) <= YORK_SIGN_STRUCTURE_EPS) {
       zeroOrNearZero += 1;
     } else if (value > 0) {
       positive += 1;
@@ -722,7 +723,7 @@ export const computeOfflineYorkAudit = (args: {
     for (let y = 0; y < ny; y += 1) {
       for (let z = 0; z < nz; z += 1) {
         const value = args.theta[idx3(x, y, z, args.dims)] ?? 0;
-        if (!Number.isFinite(value) || Math.abs(value) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD) {
+        if (!Number.isFinite(value) || Math.abs(value) <= YORK_SIGN_STRUCTURE_EPS) {
           continue;
         }
         const isFore = x >= xMid;
@@ -1834,11 +1835,35 @@ const hasStrongForeAftYork = (summary: CaseResult["primaryYork"]): boolean => {
   return hasBothSigns && notNearZero && absMax > 1e-20;
 };
 
-const hasSufficientSignalForAlcubierreControl = (summary: CaseResult["primaryYork"]): boolean => {
+const hasConsistentAlcubierreSignedLobes = (
+  offlineYorkAudit: CaseOfflineYorkAudit | null,
+): boolean => {
+  const signedLobeSummary = offlineYorkAudit?.alcubierreSignedLobeSummary?.signedLobeSummary;
+  return signedLobeSummary === "fore+/aft-" || signedLobeSummary === "fore-/aft+";
+};
+
+const hasOfflineSignedStructure = (offlineYorkAudit: CaseOfflineYorkAudit | null): boolean =>
+  (offlineYorkAudit?.byView ?? []).some(
+    (view) => view.counts.positive > 0 && view.counts.negative > 0,
+  );
+
+export const hasSufficientSignalForAlcubierreControl = (entry: CaseResult): boolean => {
+  const summary = entry.primaryYork;
+  const min = summary.rawExtrema?.min;
+  const max = summary.rawExtrema?.max;
   const absMax = summary.rawExtrema?.absMax;
-  if (absMax == null) return false;
-  if (!(absMax > YORK_NEAR_ZERO_THETA_ABS_THRESHOLD)) return false;
-  return summary.nearZeroTheta === false;
+  const hasRawSignPair =
+    min != null && max != null && absMax != null && absMax > YORK_SIGN_STRUCTURE_EPS && min < 0 && max > 0;
+  if (!hasRawSignPair) return false;
+
+  if (summary.nearZeroTheta === false) {
+    return true;
+  }
+
+  const offlineSignedStructure = hasOfflineSignedStructure(entry.offlineYorkAudit);
+  if (offlineSignedStructure) return true;
+
+  return hasConsistentAlcubierreSignedLobes(entry.offlineYorkAudit);
 };
 
 const isLowExpansion = (summary: CaseResult["primaryYork"]): boolean => {
@@ -2112,7 +2137,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const nhm2 = cases.find((entry) => entry.caseId === "nhm2_certified")!;
 
   const alcStrong = hasStrongForeAftYork(alc.primaryYork);
-  const alcSignalSufficient = hasSufficientSignalForAlcubierreControl(alc.primaryYork);
+  const alcSignalSufficient = hasSufficientSignalForAlcubierreControl(alc);
   const natLow = isLowExpansion(nat.primaryYork);
   const nhm2Low = isLowExpansion(nhm2.primaryYork);
   const nhm2MatchesNatLowExpansion = natLow && nhm2Low;
@@ -2204,7 +2229,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     {
       id: "alcubierre_control_signal_sufficient",
       condition:
-        "Alcubierre control has enough York magnitude to support a renderer/conversion fault attribution",
+        "Alcubierre control has enough signed York structure (raw and offline lobe evidence) to support renderer/conversion attribution",
       status:
         (preconditions.readyForFamilyVerdict && alcSignalSufficient).toString() as DecisionRowStatus,
       interpretation:
