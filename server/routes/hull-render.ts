@@ -545,6 +545,11 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
         scienceLane.requireScientificFrame === true,
       requireCongruentNhm2FullSolve:
         scienceLane.requireCongruentNhm2FullSolve === true,
+      diagnosticLaneId:
+        typeof scienceLane.diagnosticLaneId === "string" &&
+        scienceLane.diagnosticLaneId.trim().length > 0
+          ? scienceLane.diagnosticLaneId.trim()
+          : null,
       requireHullSupportChannels:
         scienceLane.requireHullSupportChannels === true,
       requireOffDiagonalGamma:
@@ -1121,6 +1126,23 @@ const isYorkRenderView = (
   view === "york-topology-normalized-3p1" ||
   view === "york-shell-map-3p1";
 
+const YORK_DIAGNOSTIC_LANE_CONVENTIONS: Record<
+  string,
+  {
+    chart: string;
+    observer: string;
+    theta_definition: string;
+    kij_sign_convention: string;
+  }
+> = {
+  lane_a_eulerian_comoving_theta_minus_trk: {
+    chart: "comoving_cartesian",
+    observer: "eulerian_n",
+    theta_definition: "theta=-trK",
+    kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+  },
+};
+
 const validateYorkSnapshotIdentity = (
   cert: HullRenderCertificateV1,
   payload: HullMisRenderRequestV1,
@@ -1221,6 +1243,56 @@ const validateRenderCertificateForRequest = (
   if (isYorkRenderView(requestedView)) {
     const yorkSnapshotIdentity = validateYorkSnapshotIdentity(cert, payload);
     if (!yorkSnapshotIdentity.ok) return yorkSnapshotIdentity;
+    const requestedLaneId =
+      typeof payload.scienceLane?.diagnosticLaneId === "string" &&
+      payload.scienceLane.diagnosticLaneId.trim().length > 0
+        ? payload.scienceLane.diagnosticLaneId.trim()
+        : null;
+    if (requestedLaneId) {
+      if (!YORK_DIAGNOSTIC_LANE_CONVENTIONS[requestedLaneId]) {
+        return {
+          ok: false,
+          reason: "remote_mis_render_certificate_lane_unsupported",
+        };
+      }
+      if (
+        typeof cert.render.lane_id !== "string" ||
+        cert.render.lane_id.trim().length === 0
+      ) {
+        return {
+          ok: false,
+          reason: "remote_mis_render_certificate_lane_id_missing",
+        };
+      }
+      if (cert.render.lane_id !== requestedLaneId) {
+        return {
+          ok: false,
+          reason: "remote_mis_render_certificate_lane_id_mismatch",
+        };
+      }
+      if (
+        typeof cert.diagnostics.lane_id !== "string" ||
+        cert.diagnostics.lane_id.trim().length === 0 ||
+        cert.diagnostics.lane_id !== requestedLaneId
+      ) {
+        return {
+          ok: false,
+          reason: "remote_mis_render_certificate_lane_diagnostics_mismatch",
+        };
+      }
+      const expectedLane = YORK_DIAGNOSTIC_LANE_CONVENTIONS[requestedLaneId];
+      if (
+        cert.chart !== expectedLane.chart ||
+        cert.observer !== expectedLane.observer ||
+        cert.theta_definition !== expectedLane.theta_definition ||
+        cert.kij_sign_convention !== expectedLane.kij_sign_convention
+      ) {
+        return {
+          ok: false,
+          reason: "remote_mis_render_certificate_lane_convention_mismatch",
+        };
+      }
+    }
   }
   if (requestedView === "york-time-3p1") {
     if (cert.render.field_key !== "theta") {

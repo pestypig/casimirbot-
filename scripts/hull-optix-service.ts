@@ -311,6 +311,7 @@ const HULL_OPTIX_BUILD_HASH = readFirstEnv(
     : null,
   HULL_OPTIX_RUNTIME_FINGERPRINT.slice(0, 16),
 );
+const YORK_DIAGNOSTIC_BASELINE_LANE_ID = "lane_a_eulerian_comoving_theta_minus_trk";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -441,6 +442,11 @@ const parseRequest = (body: unknown): HullMisRenderRequestV1 => {
         scienceLane.requireScientificFrame === true,
       requireCongruentNhm2FullSolve:
         scienceLane.requireCongruentNhm2FullSolve === true,
+      diagnosticLaneId:
+        typeof scienceLane.diagnosticLaneId === "string" &&
+        scienceLane.diagnosticLaneId.trim().length > 0
+          ? scienceLane.diagnosticLaneId.trim()
+          : null,
       requireHullSupportChannels:
         scienceLane.requireHullSupportChannels === true,
       requireOffDiagonalGamma:
@@ -6401,6 +6407,14 @@ const buildRenderCertificate = (args: {
     yorkSurfaceView ||
     yorkTopologyNormalizedView ||
     yorkShellMapView;
+  const requestedLaneId =
+    typeof payload.scienceLane?.diagnosticLaneId === "string" &&
+    payload.scienceLane.diagnosticLaneId.trim().length > 0
+      ? payload.scienceLane.diagnosticLaneId.trim()
+      : null;
+  const laneId = yorkView
+    ? requestedLaneId ?? YORK_DIAGNOSTIC_BASELINE_LANE_ID
+    : null;
   const yorkSamplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
     ? "x-rho"
     : "midplane";
@@ -6508,6 +6522,7 @@ const buildRenderCertificate = (args: {
       integrator: "christoffel-rk4",
       steps: 0,
       field_key: yorkView ? "theta" : shiftShellView ? "beta_x" : null,
+      lane_id: laneId,
       slice_plane: yorkView ? yorkSlicePlane : shiftShellView ? "x-z-midplane" : null,
       coordinate_mode: yorkView
         ? yorkCoordinateMode
@@ -6538,6 +6553,7 @@ const buildRenderCertificate = (args: {
       bundle_spread: ctx.diagnostics.bundleSpread,
       constraint_rms: computeConstraintRms(brick),
       support_coverage_pct: ctx.supportCoveragePct,
+      lane_id: laneId,
       metric_ref_hash: yorkView ? metricRefHash : null,
       timestamp_ms: yorkView ? certificateTimestampMs : null,
       theta_definition: yorkView ? "theta=-trK" : null,
@@ -6851,6 +6867,11 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
     yorkSurfaceRequested ||
     yorkTopologyNormalizedRequested ||
     yorkShellMapRequested;
+  const requestedDiagnosticLaneId =
+    typeof payload.scienceLane?.diagnosticLaneId === "string" &&
+    payload.scienceLane.diagnosticLaneId.trim().length > 0
+      ? payload.scienceLane.diagnosticLaneId.trim()
+      : null;
   const certificateIdentityRequested = yorkRequested || shiftShellRequested;
   const requireCongruentNhm2FullSolve =
     payload.scienceLane?.requireCongruentNhm2FullSolve === true ||
@@ -6936,6 +6957,16 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
     });
   }
   if (useTensorPath && yorkRequested) {
+    if (
+      requestedDiagnosticLaneId &&
+      requestedDiagnosticLaneId !== YORK_DIAGNOSTIC_BASELINE_LANE_ID
+    ) {
+      return res.status(422).json({
+        error: "scientific_york_lane_unsupported",
+        message:
+          `${renderView} supports only ${YORK_DIAGNOSTIC_BASELINE_LANE_ID} in this service`,
+      });
+    }
     const thetaData = metricBrick!.channels.theta?.data;
     if (!(thetaData instanceof Float32Array)) {
       return res.status(422).json({
@@ -7303,6 +7334,22 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
         message: `${renderView} render certificate timestamp_ms does not match requested snapshot timestamp`,
       });
     }
+    if (requestedDiagnosticLaneId) {
+      if (renderCertificate.render.lane_id !== requestedDiagnosticLaneId) {
+        return res.status(422).json({
+          error: "scientific_york_lane_mismatch",
+          message:
+            `${renderView} requires render.lane_id=${requestedDiagnosticLaneId} in render certificate`,
+        });
+      }
+      if (renderCertificate.diagnostics.lane_id !== requestedDiagnosticLaneId) {
+        return res.status(422).json({
+          error: "scientific_york_lane_mismatch",
+          message:
+            `${renderView} requires diagnostics.lane_id=${requestedDiagnosticLaneId} in render certificate`,
+        });
+      }
+    }
   }
   if (useTensorPath && shiftShellRequested) {
     if (
@@ -7407,6 +7454,8 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
                 // a near-flat field is read as a physical result, not as an
                 // ambiguous render artifact. Mattingly-style fixed-coordinate,
                 // auditable scientific visualization.
+                lane_id: renderCertificate.diagnostics.lane_id ?? null,
+                laneId: renderCertificate.diagnostics.lane_id ?? null,
                 metric_ref_hash: renderCertificate.diagnostics.metric_ref_hash ?? null,
                 timestamp_ms: renderCertificate.diagnostics.timestamp_ms ?? null,
                 theta_definition:

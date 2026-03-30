@@ -11,14 +11,60 @@
 - nhm2SnapshotPath: `artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json`
 - yorkViews: `york-surface-3p1, york-surface-rho-3p1, york-topology-normalized-3p1, york-shell-map-3p1`
 
+## Diagnostic Contract
+- diagnosticContractId: `york_diagnostic_contract`
+- version: `1`
+- observer: `eulerian_n`
+- foliation: `comoving_cartesian_3p1`
+- theta_definition: `theta=-trK`
+- kij_sign_convention: `ADM`
+- classificationScope: `diagnostic_local_only`
+- reference alcubierre_control: Expected strong signed fore/aft York morphology under this diagnostic lane.
+- reference natario_control: Expected low-expansion York morphology under this diagnostic lane.
+- feature_set: `theta_abs_max_raw, theta_abs_max_display, positive_count_xz, negative_count_xz, positive_count_xrho, negative_count_xrho, support_overlap_pct, near_zero_theta, signed_lobe_summary, shell_map_activity`
+- robustness.enabled: `true`
+- robustness.weight_perturbation_pct: `0.1`
+- robustness.margin_variants: `0.05, 0.08, 0.12`
+- robustness.threshold_variants: `0.4, 0.5, 0.6`
+- robustness.feature_drop_sets: `drop_shell_map_activity:shell_map_activity; drop_xrho_counts:positive_count_xrho+negative_count_xrho; drop_display_amplitude:theta_abs_max_display`
+- robustness.stability_policy: `stable>=0.8, marginal>=0.6`
+
+## Diagnostic Lanes
+| lane_id | active | supported | observer | foliation | theta_definition | kij_sign_convention | ready_for_verdict | controls_calibrated | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| lane_a_eulerian_comoving_theta_minus_trk | true | true | eulerian_n | comoving_cartesian_3p1 | theta=-trK | ADM | true | true | nhm2_low_expansion_family |
+| lane_b_alternate_observer_pending | true | false | pending | pending | pending | pending | false | false | inconclusive |
+
+## Per-Lane Guard Failures
+| lane_id | code | detail |
+|---|---|---|
+| lane_b_alternate_observer_pending | proof_pack_lane_unsupported | lane_b_alternate_observer_pending:alternate observer/foliation York lane is not yet implemented with honest tensor-path semantics in this repository |
+
+## Cross-Lane Comparison
+| metric | value |
+|---|---|
+| baseline_lane_id | lane_a_eulerian_comoving_theta_minus_trk |
+| alternate_lane_id | lane_b_alternate_observer_pending |
+| baseline_verdict | nhm2_low_expansion_family |
+| alternate_verdict | inconclusive |
+| same_classification | false |
+| cross_lane_status | lane_comparison_inconclusive |
+| baseline_controls_calibrated | true |
+| alternate_controls_calibrated | false |
+| baseline_supported | true |
+| alternate_supported | false |
+
+### Cross-Lane Notes
+- At least one lane is unsupported; cross-lane comparison remains inconclusive.
+
 ## Runtime Status Provenance
 - statusEndpoint: `http://127.0.0.1:6062/api/helix/hull-render/status`
 - reachable: `true`
 - serviceVersion: `casimirbot.hull-optix-service@1.0.0`
-- buildHash: `git-23d660d2074d`
-- commitSha: `23d660d2074dd830c74b750a7af71f0f32ff780a`
-- processStartedAtMs: `1774829631271`
-- runtimeInstanceId: `f3bc4b61a3193407`
+- buildHash: `git-eaf635c35fab`
+- commitSha: `eaf635c35fab3d38f4bf70a5279e7f0fa21ba1ff`
+- processStartedAtMs: `1774848984241`
+- runtimeInstanceId: `94f376a8e1366dd6`
 
 ## Control Debug (pre-render brick audit)
 | case | request_url | metricT00Ref | metricT00Source | requireCongruentSolve | requireNhm2CongruentFullSolve | warpFieldType | request_metric_ref_hash | resolved_metric_ref_hash | theta_hash | K_trace_hash | brick_source | chart | family_id | branch_metricT00Ref | branch_warpFieldType | source_branch | shape_function_id |
@@ -62,12 +108,12 @@
 ## Offline York slice audit (numeric)
 | case | view | coordinate_mode | sampling_choice | theta_min_raw | theta_max_raw | theta_abs_max_raw | positive_cells | negative_cells | zero_or_near_zero_cells | offline_slice_hash | fore_pos_total | fore_neg_total | aft_pos_total | aft_neg_total | signed_lobe_summary |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---|
-| alcubierre_control | york-surface-3p1 | x-z-midplane | x-z midplane | -2.7487295579359796e-32 | 2.5014000914944986e-34 | 2.7487295579359796e-32 | 0 | 0 | 2304 | 6e696fcd1e7dda9704135312d4dcdbf86fafbc96c019c8c700de1b1aeaab44fd | 0 | 0 | 0 | 0 | mixed_or_flat |
-| alcubierre_control | york-surface-rho-3p1 | x-rho | x-rho cylindrical remap | -7.114586253487799e-33 | 5.064018183905395e-35 | 7.114586253487799e-33 | 0 | 0 | 2304 | 3ae52f2e738ca07a16114aa4060393d98142ed06aef8647e4c7ae82b61570f45 | 0 | 0 | 0 | 0 | mixed_or_flat |
-| natario_control | york-surface-3p1 | x-z-midplane | x-z midplane | -3.0000285034962945e-32 | 2.730087466494686e-34 | 3.0000285034962945e-32 | 0 | 0 | 2304 | 8e30159c50538c8cc60a058d4fbbb7636c9be763cc2e4e150f8dedbaf7ecc4e4 | null | null | null | null | null |
-| natario_control | york-surface-rho-3p1 | x-rho | x-rho cylindrical remap | -6.432953078960448e-33 | 4.6373183263317124e-35 | 6.432953078960448e-33 | 0 | 0 | 2304 | 2280724ce476a83fe95f2699cbd61ba60e626c8ecc0c673c3652407ab3568a89 | null | null | null | null | null |
-| nhm2_certified | york-surface-3p1 | x-z-midplane | x-z midplane | -2.9210517400419483e-32 | 2.6582167776127016e-34 | 2.9210517400419483e-32 | 0 | 0 | 2304 | badb6b6d40068cc9b0daa7f5a2b1ae66794936aff9b41779d9618924fa65be4c | null | null | null | null | null |
-| nhm2_certified | york-surface-rho-3p1 | x-rho | x-rho cylindrical remap | -6.636569271674008e-33 | 4.789462479802582e-35 | 6.636569271674008e-33 | 0 | 0 | 2304 | 8e620e7119df6611611550ee10d98810a86b999ce0831d373df1fdfbf66048eb | null | null | null | null | null |
+| alcubierre_control | york-surface-3p1 | x-z-midplane | x-z midplane | -2.7487295579359796e-32 | 2.5014000914944986e-34 | 2.7487295579359796e-32 | 110 | 62 | 2132 | 6e696fcd1e7dda9704135312d4dcdbf86fafbc96c019c8c700de1b1aeaab44fd | 1.0580088710019705e-37 | -8.60004247246575e-36 | 8.236373698413555e-32 | -3.431627388265291e-30 | fore+/aft- |
+| alcubierre_control | york-surface-rho-3p1 | x-rho | x-rho cylindrical remap | -7.114586253487799e-33 | 5.064018183905395e-35 | 7.114586253487799e-33 | 131 | 152 | 2021 | 3ae52f2e738ca07a16114aa4060393d98142ed06aef8647e4c7ae82b61570f45 | 1.0580088710019705e-37 | -8.60004247246575e-36 | 8.236373698413555e-32 | -3.431627388265291e-30 | fore+/aft- |
+| natario_control | york-surface-3p1 | x-z-midplane | x-z midplane | -3.0000285034962945e-32 | 2.730087466494686e-34 | 3.0000285034962945e-32 | 106 | 66 | 2132 | 8e30159c50538c8cc60a058d4fbbb7636c9be763cc2e4e150f8dedbaf7ecc4e4 | null | null | null | null | null |
+| natario_control | york-surface-rho-3p1 | x-rho | x-rho cylindrical remap | -6.432953078960448e-33 | 4.6373183263317124e-35 | 6.432953078960448e-33 | 131 | 151 | 2022 | 2280724ce476a83fe95f2699cbd61ba60e626c8ecc0c673c3652407ab3568a89 | null | null | null | null | null |
+| nhm2_certified | york-surface-3p1 | x-z-midplane | x-z midplane | -2.9210517400419483e-32 | 2.6582167776127016e-34 | 2.9210517400419483e-32 | 106 | 66 | 2132 | badb6b6d40068cc9b0daa7f5a2b1ae66794936aff9b41779d9618924fa65be4c | null | null | null | null | null |
+| nhm2_certified | york-surface-rho-3p1 | x-rho | x-rho cylindrical remap | -6.636569271674008e-33 | 4.789462479802582e-35 | 6.636569271674008e-33 | 131 | 152 | 2021 | 8e620e7119df6611611550ee10d98810a86b999ce0831d373df1fdfbf66048eb | null | null | null | null | null |
 
 ## Case Summary (primary York = york-surface-rho-3p1)
 | case | expectation | theta_min_raw | theta_max_raw | theta_abs_max_raw | theta_min_display | theta_max_display | theta_abs_max_display | coordinate_mode | sampling_choice | support_overlap_pct | theta+K maxAbs | theta+K rms | theta+K consistent |
@@ -75,6 +121,78 @@
 | alcubierre_control | alcubierre-like-control | -7.114586253487799e-33 | 5.064018183905395e-35 | 7.114586253487799e-33 | -6.077930310998365e-36 | 6.077930310998365e-36 | 6.077930310998365e-36 | x-rho | x-rho cylindrical remap | 4.527665317139001 | 0 | 0 | true |
 | natario_control | natario-like-control | -6.432953078960448e-33 | 4.6373183263317124e-35 | 6.432953078960448e-33 | -6.270497544145466e-36 | 6.270497544145466e-36 | 6.270497544145466e-36 | x-rho | x-rho cylindrical remap | 4.588394062078272 | 0 | 0 | true |
 | nhm2_certified | nhm2-certified | -6.636569271674008e-33 | 4.789462479802582e-35 | 6.636569271674008e-33 | -6.331835691719585e-36 | 6.331835691719585e-36 | 6.331835691719585e-36 | x-rho | x-rho cylindrical remap | 4.554655870445344 | 0 | 0 | true |
+
+## Classification Features
+| case | theta_abs_max_raw | theta_abs_max_display | positive_count_xz | negative_count_xz | positive_count_xrho | negative_count_xrho | support_overlap_pct | near_zero_theta | signed_lobe_summary | shell_map_activity |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---|---:|
+| alcubierre_control | 7.114586253487799e-33 | 6.077930310998365e-36 | 110 | 62 | 131 | 152 | 4.527665317139001 | false | fore+/aft- | 0.16666666666666666 |
+| natario_control | 6.432953078960448e-33 | 6.270497544145466e-36 | 106 | 66 | 131 | 151 | 4.588394062078272 | false | null | 0.16666666666666666 |
+| nhm2_certified | 6.636569271674008e-33 | 6.331835691719585e-36 | 106 | 66 | 131 | 152 | 4.554655870445344 | false | null | 0.16666666666666666 |
+
+## Classification Scoring
+| metric | value |
+|---|---|
+| distance_to_alcubierre_reference | 0.13559288214795065 |
+| distance_to_low_expansion_reference | 0.0012469161139296696 |
+| reference_margin | 0.134345966034021 |
+| winning_reference | natario_control |
+| margin_sufficient | true |
+| winning_reference_within_threshold | true |
+| distinct_by_policy | false |
+| margin_min | 0.08 |
+| reference_match_threshold | 0.5 |
+| distinctness_threshold | 0.5 |
+| distance_metric | weighted_normalized_l1 |
+| normalization_method | max_abs_reference_target_with_floor |
+
+## Classification Robustness Summary
+| metric | value |
+|---|---|
+| baselineVerdict | nhm2_low_expansion_family |
+| stabilityStatus | stable_low_expansion_like |
+| dominantVerdict | nhm2_low_expansion_family |
+| dominantFraction | 1 |
+| stableVerdict | nhm2_low_expansion_family |
+| totalVariants | 28 |
+| evaluatedVariants | 28 |
+| stable_fraction_min | 0.8 |
+| marginal_fraction_min | 0.6 |
+| count_nhm2_alcubierre_like_family | 0 |
+| count_nhm2_low_expansion_family | 28 |
+| count_nhm2_distinct_family | 0 |
+| count_inconclusive | 0 |
+
+## Classification Robustness Variants
+| variant_id | variant_type | weight_feature | weight_scale | margin_override | threshold_override | dropped_features | verdict | winning_reference | reference_margin | margin_sufficient |
+|---|---|---|---:|---:|---:|---|---|---|---:|---|
+| baseline | baseline | null | null | null | null | none | nhm2_low_expansion_family | natario_control | 0.134345966034021 | true |
+| weight:theta_abs_max_raw:plus | weight_perturbation | theta_abs_max_raw | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13269076152482442 | true |
+| weight:theta_abs_max_raw:minus | weight_perturbation | theta_abs_max_raw | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13604307445484276 | true |
+| weight:theta_abs_max_display:plus | weight_perturbation | theta_abs_max_display | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13323567038553513 | true |
+| weight:theta_abs_max_display:minus | weight_perturbation | theta_abs_max_display | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13547492211357381 | true |
+| weight:positive_count_xz:plus | weight_perturbation | positive_count_xz | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.133335838924017 | true |
+| weight:positive_count_xz:minus | weight_perturbation | positive_count_xz | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13537735897791978 | true |
+| weight:negative_count_xz:plus | weight_perturbation | negative_count_xz | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13358576082342344 | true |
+| weight:negative_count_xz:minus | weight_perturbation | negative_count_xz | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13512217556484163 | true |
+| weight:positive_count_xrho:plus | weight_perturbation | positive_count_xrho | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13296095607490735 | true |
+| weight:positive_count_xrho:minus | weight_perturbation | positive_count_xrho | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13576013409753698 | true |
+| weight:negative_count_xrho:plus | weight_perturbation | negative_count_xrho | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.1328931318752329 | true |
+| weight:negative_count_xrho:minus | weight_perturbation | negative_count_xrho | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.1358293861750993 | true |
+| weight:support_overlap_pct:plus | weight_perturbation | support_overlap_pct | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13336312128842434 | true |
+| weight:support_overlap_pct:minus | weight_perturbation | support_overlap_pct | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.1353432492123966 | true |
+| weight:near_zero_theta:plus | weight_perturbation | near_zero_theta | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.1332356687940704 | true |
+| weight:near_zero_theta:minus | weight_perturbation | near_zero_theta | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13547492373178585 | true |
+| weight:signed_lobe_summary:plus | weight_perturbation | signed_lobe_summary | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.1450330528731071 | true |
+| weight:signed_lobe_summary:minus | weight_perturbation | signed_lobe_summary | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.12338832003445163 | true |
+| weight:shell_map_activity:plus | weight_perturbation | shell_map_activity | 1.1 | null | null | none | nhm2_low_expansion_family | natario_control | 0.1330981706838598 | true |
+| weight:shell_map_activity:minus | weight_perturbation | shell_map_activity | 0.9 | null | null | none | nhm2_low_expansion_family | natario_control | 0.13561737896178774 | true |
+| margin:0.05 | margin_variant | null | null | 0.05 | null | none | nhm2_low_expansion_family | natario_control | 0.134345966034021 | true |
+| margin:0.12 | margin_variant | null | null | 0.12 | null | none | nhm2_low_expansion_family | natario_control | 0.134345966034021 | true |
+| threshold:0.4 | threshold_variant | null | null | null | 0.4 | none | nhm2_low_expansion_family | natario_control | 0.134345966034021 | true |
+| threshold:0.6 | threshold_variant | null | null | null | 0.6 | none | nhm2_low_expansion_family | natario_control | 0.134345966034021 | true |
+| drop:drop_shell_map_activity | feature_drop | null | null | null | null | shell_map_activity | nhm2_low_expansion_family | natario_control | 0.14824382458926452 | true |
+| drop:drop_xrho_counts | feature_drop | null | null | null | null | positive_count_xrho,negative_count_xrho | nhm2_low_expansion_family | natario_control | 0.17056581859145029 | true |
+| drop:drop_display_amplitude | feature_drop | null | null | null | null | theta_abs_max_display | nhm2_low_expansion_family | natario_control | 0.1465592181673653 | true |
 
 ## Preconditions
 | precondition | pass | policy |
@@ -94,20 +212,27 @@
 | id | condition | status | interpretation |
 |---|---|---|---|
 | preconditions_ready_for_family_verdict | Controls independent, required views rendered, provenance hashes present, and runtime status provenance present | true | Evidence integrity prerequisites satisfied. |
-| offline_raw_slice_matches_rendered_slice_hashes | Offline York slice hash matches rendered slice_array_hash for x-z and x-rho views | true | Offline extraction and rendered slice arrays are congruent. |
-| xz_matches_but_xrho_differs_isolate_rho_remap | x-z York slice congruent while x-rho York slice diverges from offline remap | false | No isolated cylindrical remap mismatch detected. |
-| raw_structure_nontrivial_but_near_zero_flattened | Offline raw York structure is nontrivial but rendered diagnostics report near-zero flattening | false | No near-zero suppression mismatch detected. |
-| hash_match_but_downstream_render_or_display_issue | Offline and rendered hashes match but extrema/semantics disagree (downstream display/render issue) | false | No downstream mismatch detected after hash congruence. |
-| alcubierre_control_signal_sufficient | Alcubierre control has enough York magnitude to support a renderer/conversion fault attribution | false | Alcubierre control is low-signal; keep renderer/conversion verdict inconclusive. |
-| renderer_or_conversion_wrong_if_alc_control_fails | Alcubierre control fails to show expected fore/aft York numerically (signed non-near-zero) | false | Skipped because Alcubierre control is low-signal under this run. |
-| renderer_fine_if_alc_works_nat_low | Alcubierre control works and Natario control remains near-zero expansion | false | Control-family consistency not yet established. |
-| nhm2_not_wrong_if_matches_nat_low_expansion | NHM2 matches Natario-like low-expansion behavior under same York pipeline | false | NHM2 low-expansion match not established from this run. |
-| solve_family_mismatch_if_nhm2_intended_alcubierre | NHM2 was intended Alcubierre-like but numerically matches Natario-like low-expansion behavior | false | No solve-family mismatch trigger under current intent metadata. |
+| renderer_calibrated_by_controls | Controls act as calibration references: Alcubierre strong signed lane + Natario low-expansion lane with stable congruence | true | Control references calibrate this diagnostic lane; NHM2 can be classified relative to them. |
+| nhm2_distance_to_alcubierre_reference | Distance from NHM2 morphology feature vector to Alcubierre reference under the York diagnostic contract | true | distance=0.13559288214795065 |
+| nhm2_distance_to_low_expansion_reference | Distance from NHM2 morphology feature vector to low-expansion reference under the York diagnostic contract | true | distance=0.0012469161139296696 |
+| nhm2_reference_margin_sufficient | Winning reference distance exceeds configured margin and threshold policy | true | margin=0.134345966034021 min=0.08 threshold=0.5 |
+| nhm2_distinct_under_current_york_diagnostic | Renderer is calibrated and NHM2 has no clear winning reference by configured margin policy | false | NHM2 has a clear winning reference under configured distance policy, or calibration is not ready. |
+| classification_robustness_evaluated | Classification robustness sweep executed over nearby policy choices defined in the contract | true | variants=28 evaluated=28 |
+| nhm2_classification_stable_under_contract_perturbations | Current NHM2 family verdict remains dominant across nearby weight/threshold/feature-drop policy variants | true | status=stable_low_expansion_like dominant=nhm2_low_expansion_family fraction=1 |
+| nhm2_classification_marginal_under_contract_perturbations | Current NHM2 family verdict remains preferred but with weak dominance under nearby policy variants | false | status=stable_low_expansion_like stable_min=0.8 marginal_min=0.6 |
+| nhm2_classification_unstable_under_contract_perturbations | Current NHM2 family verdict is sensitive to nearby policy choices and does not maintain a dominant class | false | status=stable_low_expansion_like counts={"nhm2_alcubierre_like_family":0,"nhm2_low_expansion_family":28,"nhm2_distinct_family":0,"inconclusive":0} |
+| renderer_or_conversion_path_clear | Offline-vs-rendered York slice congruence has no hash/remap/suppression/downstream mismatch | true | Renderer/conversion congruence checks pass in this lane. |
 
 ## Verdict
-- `inconclusive`
+- `nhm2_low_expansion_family`
 
 ## Notes
-- Alcubierre control signal is below near-zero threshold for strict renderer fault attribution; verdict remains inconclusive unless a concrete congruence mismatch is detected.
+- Controls are calibration references in this proof-pack; NHM2 classification is diagnostic-local and not a full theory identity claim.
+- lane=lane_a_eulerian_comoving_theta_minus_trk observer=eulerian_n foliation=comoving_cartesian_3p1 theta_definition=theta=-trK
+- Control behavior is separated: Alcubierre-like strong signed lane vs Natario-like near-zero lane.
 - NHM2 primary York behavior aligns with low-expansion Natario-like control in this run.
+- Robustness status=stable_low_expansion_like dominant=nhm2_low_expansion_family fraction=1.
+- Classification contract york_diagnostic_contract@v1 uses weighted_normalized_l1 with margin=0.08.
+- cross-lane status=lane_comparison_inconclusive baseline=nhm2_low_expansion_family alternate=inconclusive
+- At least one lane is unsupported; cross-lane comparison remains inconclusive.
 

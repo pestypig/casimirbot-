@@ -99,6 +99,7 @@ export type HullMisRenderRequestV1 = {
     requireScientificFrame?: boolean;
     requireCanonicalTensorVolume?: boolean;
     requireCongruentNhm2FullSolve?: boolean;
+    diagnosticLaneId?: string | null;
     requireHullSupportChannels?: boolean;
     requireOffDiagonalGamma?: boolean;
     minVolumeDims?: [number, number, number] | null;
@@ -163,6 +164,7 @@ export type HullRenderCertificateV1 = {
     integrator: string;
     steps: number;
     field_key?: string | null;
+    lane_id?: string | null;
     slice_plane?: string | null;
     coordinate_mode?: string | null;
     normalization?: string | null;
@@ -177,6 +179,7 @@ export type HullRenderCertificateV1 = {
     bundle_spread: number;
     constraint_rms: number | null;
     support_coverage_pct: number | null;
+    lane_id?: string | null;
     metric_ref_hash?: string | null;
     timestamp_ms?: number | null;
     theta_definition?: string | null;
@@ -284,6 +287,7 @@ export type HullMisRenderResponseV1 = {
     supportCoveragePct?: number | null;
     maskedOutPct?: number | null;
     supportMaskKind?: HullSupportMaskKind | null;
+    lane_id?: string | null;
     metric_ref_hash?: string | null;
     timestamp_ms?: number | null;
     theta_definition?: string | null;
@@ -327,6 +331,7 @@ export type HullMisRenderResponseV1 = {
     heightScale?: number | null;
     samplingChoice?: string | null;
     coordinateMode?: string | null;
+    laneId?: string | null;
     thetaShellMinRaw?: number | null;
     thetaShellMaxRaw?: number | null;
     thetaShellAbsMaxRaw?: number | null;

@@ -1,0 +1,147 @@
+{
+  "contract_id": "york_diagnostic_contract",
+  "version": 1,
+  "baseline_lane_id": "lane_a_eulerian_comoving_theta_minus_trk",
+  "alternate_lane_id": "lane_b_alternate_observer_pending",
+  "observer": "eulerian_n",
+  "foliation": "comoving_cartesian_3p1",
+  "theta_definition": "theta=-trK",
+  "kij_sign_convention": "ADM",
+  "lanes": [
+    {
+      "lane_id": "lane_a_eulerian_comoving_theta_minus_trk",
+      "active": true,
+      "supported": true,
+      "observer": "eulerian_n",
+      "foliation": "comoving_cartesian_3p1",
+      "theta_definition": "theta=-trK",
+      "kij_sign_convention": "ADM",
+      "classification_scope": "diagnostic_local_only",
+      "coordinate_views": {
+        "york-surface-3p1": "x-z-midplane",
+        "york-surface-rho-3p1": "x-rho",
+        "york-topology-normalized-3p1": "x-z-midplane",
+        "york-shell-map-3p1": "x-z-midplane"
+      },
+      "remap_rules": {
+        "x-z-midplane": "fixed-midplane-no-adaptive-projection",
+        "x-rho": "cylindrical-remap-no-projection-switch"
+      },
+      "normalization_rules": {
+        "raw": "symmetric-about-zero",
+        "topology": "topology-only-unit-max",
+        "raw_display_gain": "must-equal-1"
+      }
+    },
+    {
+      "lane_id": "lane_b_alternate_observer_pending",
+      "active": true,
+      "supported": false,
+      "unsupported_reason": "alternate observer/foliation York lane is not yet implemented with honest tensor-path semantics in this repository",
+      "observer": "pending",
+      "foliation": "pending",
+      "theta_definition": "pending",
+      "kij_sign_convention": "pending",
+      "classification_scope": "diagnostic_local_only",
+      "coordinate_views": {
+        "york-surface-3p1": "pending",
+        "york-surface-rho-3p1": "pending",
+        "york-topology-normalized-3p1": "pending",
+        "york-shell-map-3p1": "pending"
+      },
+      "remap_rules": {
+        "x-z-midplane": "pending",
+        "x-rho": "pending"
+      },
+      "normalization_rules": {
+        "raw": "pending",
+        "topology": "pending",
+        "raw_display_gain": "pending"
+      }
+    }
+  ],
+  "coordinate_views": {
+    "york-surface-3p1": "x-z-midplane",
+    "york-surface-rho-3p1": "x-rho",
+    "york-topology-normalized-3p1": "x-z-midplane",
+    "york-shell-map-3p1": "x-z-midplane"
+  },
+  "remap_rules": {
+    "x-z-midplane": "fixed-midplane-no-adaptive-projection",
+    "x-rho": "cylindrical-remap-no-projection-switch"
+  },
+  "normalization_rules": {
+    "raw": "symmetric-about-zero",
+    "topology": "topology-only-unit-max",
+    "raw_display_gain": "must-equal-1"
+  },
+  "classification_scope": "diagnostic_local_only",
+  "reference_controls": {
+    "alcubierre_control": {
+      "description": "Expected strong signed fore/aft York morphology under this diagnostic lane.",
+      "role": "high_expansion_calibration_reference"
+    },
+    "natario_control": {
+      "description": "Expected low-expansion York morphology under this diagnostic lane.",
+      "role": "low_expansion_calibration_reference"
+    }
+  },
+  "feature_set": [
+    "theta_abs_max_raw",
+    "theta_abs_max_display",
+    "positive_count_xz",
+    "negative_count_xz",
+    "positive_count_xrho",
+    "negative_count_xrho",
+    "support_overlap_pct",
+    "near_zero_theta",
+    "signed_lobe_summary",
+    "shell_map_activity"
+  ],
+  "decision_policy": {
+    "distance_metric": "weighted_normalized_l1",
+    "normalization_method": "max_abs_reference_target_with_floor",
+    "normalization_floor": 1e-30,
+    "missing_value_penalty": 1,
+    "max_component_distance": 2,
+    "feature_weights": {
+      "theta_abs_max_raw": 1.2,
+      "theta_abs_max_display": 0.8,
+      "positive_count_xz": 1.0,
+      "negative_count_xz": 1.0,
+      "positive_count_xrho": 1.0,
+      "negative_count_xrho": 1.0,
+      "support_overlap_pct": 0.7,
+      "near_zero_theta": 0.8,
+      "signed_lobe_summary": 1.2,
+      "shell_map_activity": 0.9
+    },
+    "reference_margin_min": 0.08,
+    "reference_match_threshold": 0.5,
+    "distinctness_threshold": 0.5
+  },
+  "robustness_checks": {
+    "enabled": true,
+    "weight_perturbation_pct": 0.1,
+    "margin_variants": [0.05, 0.08, 0.12],
+    "threshold_variants": [0.4, 0.5, 0.6],
+    "feature_drop_sets": [
+      {
+        "id": "drop_shell_map_activity",
+        "drop_features": ["shell_map_activity"]
+      },
+      {
+        "id": "drop_xrho_counts",
+        "drop_features": ["positive_count_xrho", "negative_count_xrho"]
+      },
+      {
+        "id": "drop_display_amplitude",
+        "drop_features": ["theta_abs_max_display"]
+      }
+    ],
+    "stability_policy": {
+      "stable_fraction_min": 0.8,
+      "marginal_fraction_min": 0.6
+    }
+  }
+}

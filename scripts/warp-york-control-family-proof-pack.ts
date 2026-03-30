@@ -41,6 +41,10 @@ const DEFAULT_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-york-control-family-proof-pack-latest.md",
 );
+const YORK_DIAGNOSTIC_CONTRACT_PATH = path.join(
+  "configs",
+  "york-diagnostic-contract.v1.json",
+);
 const BOUNDARY_STATEMENT =
   "This control-family proof pack is a render/geometry audit for York-family interpretation; it is not a physical warp feasibility claim.";
 const RETRYABLE_RENDER_ERRORS = new Set([
@@ -50,19 +54,16 @@ const RETRYABLE_RENDER_ERRORS = new Set([
   "metric_ref_http_503",
   "metric_ref_http_504",
 ]);
+const NHM2_DIAGNOSTIC_OUTCOME = {
+  ALCUBIERRE_LIKE: "nhm2_alcubierre_like_family",
+  LOW_EXPANSION_LIKE: "nhm2_low_expansion_family",
+  DISTINCT_NHM2_FAMILY: "nhm2_distinct_family",
+} as const;
 
 type CaseId = "alcubierre_control" | "natario_control" | "nhm2_certified";
 type DecisionRowStatus = "true" | "false";
-type DecisionVerdict =
-  | "renderer_or_conversion_wrong"
-  | "proof_pack_york_slice_hash_mismatch"
-  | "proof_pack_york_rho_remap_mismatch"
-  | "proof_pack_york_near_zero_suppression_mismatch"
-  | "proof_pack_york_downstream_render_mismatch"
-  | "renderer_fine_controls_consistent"
-  | "nhm2_low_expansion_family"
-  | "solve_family_mismatch"
-  | "inconclusive";
+type Nhm2DiagnosticOutcome = (typeof NHM2_DIAGNOSTIC_OUTCOME)[keyof typeof NHM2_DIAGNOSTIC_OUTCOME];
+type DecisionVerdict = Nhm2DiagnosticOutcome | "inconclusive";
 
 type GuardFailure = {
   code: string;
@@ -109,6 +110,7 @@ type YorkViewSummary = {
   render: {
     view: HullScientificRenderView | null;
     field_key: string | null;
+    lane_id: string | null;
     slice_plane: string | null;
     coordinate_mode: string | null;
     normalization: string | null;
@@ -117,6 +119,7 @@ type YorkViewSummary = {
     support_overlay: string | null;
   };
   identity: {
+    lane_id: string | null;
     metric_ref_hash: string | null;
     timestamp_ms: number | null;
     chart: string | null;
@@ -142,6 +145,8 @@ type YorkViewSummary = {
   samplingChoice: string | null;
   supportOverlapPct: number | null;
   supportedThetaFraction: number | null;
+  shellSupportCount: number | null;
+  shellActiveCount: number | null;
   hashes: {
     certificate_hash: string | null;
     frame_hash: string | null;
@@ -199,6 +204,7 @@ type CaseResult = {
   };
   snapshotMetrics: CaseSnapshotMetrics | null;
   offlineYorkAudit: CaseOfflineYorkAudit | null;
+  classificationFeatures: CaseClassificationFeatures;
 };
 
 type OfflineYorkViewAudit = {
@@ -271,11 +277,234 @@ type DecisionRow = {
   interpretation: string;
 };
 
+type YorkFeatureName =
+  | "theta_abs_max_raw"
+  | "theta_abs_max_display"
+  | "positive_count_xz"
+  | "negative_count_xz"
+  | "positive_count_xrho"
+  | "negative_count_xrho"
+  | "support_overlap_pct"
+  | "near_zero_theta"
+  | "signed_lobe_summary"
+  | "shell_map_activity";
+
+type YorkSignedLobeSummary = "fore+/aft-" | "fore-/aft+" | "mixed_or_flat";
+
+type YorkFeatureWeightMap = Record<YorkFeatureName, number>;
+
+type ClassificationRobustnessStatus =
+  | "stable_low_expansion_like"
+  | "stable_alcubierre_like"
+  | "stable_distinct"
+  | "marginal_low_expansion_like"
+  | "marginal_distinct"
+  | "unstable_multiclass"
+  | "inconclusive";
+
+type YorkRobustnessFeatureDropSet = {
+  id: string;
+  drop_features: YorkFeatureName[];
+};
+
+type YorkRobustnessChecks = {
+  enabled: boolean;
+  weight_perturbation_pct: number;
+  margin_variants: number[];
+  threshold_variants: number[];
+  feature_drop_sets: YorkRobustnessFeatureDropSet[];
+  stability_policy: {
+    stable_fraction_min: number;
+    marginal_fraction_min: number;
+  };
+};
+
+type YorkDiagnosticLane = {
+  lane_id: string;
+  active: boolean;
+  supported: boolean;
+  unsupported_reason: string | null;
+  observer: string;
+  foliation: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  coordinate_views: Record<string, string>;
+  remap_rules: Record<string, string>;
+  normalization_rules: Record<string, string>;
+  classification_scope: string;
+};
+
+type YorkDiagnosticContract = {
+  contract_id: string;
+  version: number;
+  baseline_lane_id: string;
+  alternate_lane_id: string | null;
+  observer: string;
+  foliation: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  coordinate_views: Record<string, string>;
+  remap_rules: Record<string, string>;
+  normalization_rules: Record<string, string>;
+  classification_scope: string;
+  reference_controls: {
+    alcubierre_control: {
+      description: string;
+      role: string;
+    };
+    natario_control: {
+      description: string;
+      role: string;
+    };
+  };
+  feature_set: YorkFeatureName[];
+  decision_policy: {
+    distance_metric: string;
+    normalization_method: string;
+    normalization_floor: number;
+    missing_value_penalty: number;
+    max_component_distance: number;
+    feature_weights: YorkFeatureWeightMap;
+    reference_margin_min: number;
+    reference_match_threshold: number;
+    distinctness_threshold: number;
+  };
+  robustness_checks: YorkRobustnessChecks;
+  lanes: YorkDiagnosticLane[];
+};
+
+type CaseClassificationFeatures = {
+  theta_abs_max_raw: number | null;
+  theta_abs_max_display: number | null;
+  positive_count_xz: number | null;
+  negative_count_xz: number | null;
+  positive_count_xrho: number | null;
+  negative_count_xrho: number | null;
+  support_overlap_pct: number | null;
+  near_zero_theta: boolean | null;
+  signed_lobe_summary: YorkSignedLobeSummary | null;
+  shell_map_activity: number | null;
+};
+
+type DistanceFeatureBreakdown = Record<YorkFeatureName, number | null>;
+
+type ReferenceDistanceSummary = {
+  distance: number | null;
+  breakdown: DistanceFeatureBreakdown;
+};
+
+type Nhm2ReferenceScoring = {
+  distance_to_alcubierre_reference: number | null;
+  distance_to_low_expansion_reference: number | null;
+  reference_margin: number | null;
+  winning_reference: "alcubierre_control" | "natario_control" | null;
+  margin_sufficient: boolean;
+  winning_reference_within_threshold: boolean;
+  distinct_by_policy: boolean;
+  distinctness_threshold: number;
+  margin_min: number;
+  reference_match_threshold: number;
+  distance_metric: string;
+  normalization_method: string;
+  to_alcubierre_breakdown: DistanceFeatureBreakdown;
+  to_low_expansion_breakdown: DistanceFeatureBreakdown;
+};
+
+type RobustnessVariantType =
+  | "baseline"
+  | "weight_perturbation"
+  | "margin_variant"
+  | "threshold_variant"
+  | "feature_drop";
+
+type ClassificationRobustnessVariantResult = {
+  variant_id: string;
+  variant_type: RobustnessVariantType;
+  policy_patch: {
+    feature_weight_feature: YorkFeatureName | null;
+    feature_weight_scale: number | null;
+    reference_margin_min: number | null;
+    reference_match_threshold: number | null;
+    dropped_features: YorkFeatureName[];
+  };
+  scoring: Nhm2ReferenceScoring;
+  verdict: DecisionVerdict;
+};
+
+type ClassificationRobustnessSummary = {
+  enabled: boolean;
+  baselineVerdict: DecisionVerdict;
+  variantResults: ClassificationRobustnessVariantResult[];
+  verdictCounts: Record<DecisionVerdict, number>;
+  dominantVerdict: DecisionVerdict | null;
+  dominantFraction: number;
+  stableVerdict: DecisionVerdict | null;
+  stabilityStatus: ClassificationRobustnessStatus;
+  stabilityPolicy: {
+    stable_fraction_min: number;
+    marginal_fraction_min: number;
+  };
+  totalVariants: number;
+  evaluatedVariants: number;
+};
+
+type LaneProofPackEvaluation = {
+  lane_id: string;
+  active: boolean;
+  supported: boolean;
+  unsupported_reason: string | null;
+  observer: string;
+  foliation: string;
+  theta_definition: string;
+  kij_sign_convention: string;
+  classification_scope: string;
+  cases: CaseResult[];
+  controlDebug: ControlDebugEntry[];
+  preconditions: ProofPackPreconditions;
+  controlsCalibratedByReferences: boolean;
+  guardFailures: GuardFailure[];
+  decisionTable: DecisionRow[];
+  classificationScoring: Nhm2ReferenceScoring | null;
+  classificationRobustness: ClassificationRobustnessSummary | null;
+  verdict: DecisionVerdict;
+  notes: string[];
+};
+
+type CrossLaneComparisonStatus =
+  | "lane_stable_low_expansion_like"
+  | "lane_stable_alcubierre_like"
+  | "lane_stable_distinct"
+  | "lane_dependent_between_low_and_distinct"
+  | "lane_dependent_between_low_and_alcubierre"
+  | "lane_dependent_between_alcubierre_and_distinct"
+  | "lane_comparison_inconclusive";
+
+type CrossLaneComparison = {
+  baseline_lane_id: string | null;
+  alternate_lane_id: string | null;
+  baseline_verdict: DecisionVerdict | null;
+  alternate_verdict: DecisionVerdict | null;
+  same_classification: boolean;
+  cross_lane_status: CrossLaneComparisonStatus;
+  falsifiers: {
+    baseline_controls_calibrated: boolean;
+    alternate_controls_calibrated: boolean;
+    baseline_supported: boolean;
+    alternate_supported: boolean;
+  };
+  notes: string[];
+};
+
 type ProofPackPayload = {
   artifactType: "warp_york_control_family_proof_pack/v1";
   generatedOn: string;
   generatedAt: string;
   boundaryStatement: string;
+  diagnosticContractId: string;
+  classificationScope: string;
+  diagnosticContract: YorkDiagnosticContract;
+  diagnosticLanes: LaneProofPackEvaluation[];
+  crossLaneComparison: CrossLaneComparison;
   inputs: {
     baseUrl: string;
     frameEndpoint: string;
@@ -290,6 +519,8 @@ type ProofPackPayload = {
   preconditions: ProofPackPreconditions;
   guardFailures: GuardFailure[];
   decisionTable: DecisionRow[];
+  classificationScoring: Nhm2ReferenceScoring | null;
+  classificationRobustness: ClassificationRobustnessSummary | null;
   verdict: DecisionVerdict;
   notes: string[];
   provenance: {
@@ -395,6 +626,321 @@ const ensureDirForFile = (filePath: string): void => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 };
 
+const toNormalizedNumber = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return parsed;
+};
+
+const normalizeFeatureWeights = (
+  featureSet: YorkFeatureName[],
+  rawWeights: Record<string, unknown>,
+): YorkFeatureWeightMap => {
+  const weights = {} as YorkFeatureWeightMap;
+  for (const feature of featureSet) {
+    const candidate = toNormalizedNumber(rawWeights[feature], 1);
+    weights[feature] = candidate > 0 ? candidate : 1;
+  }
+  return weights;
+};
+
+const normalizeNumberArray = (
+  value: unknown,
+  fallback: number[],
+  minimum = 0,
+): number[] => {
+  if (!Array.isArray(value)) return [...fallback];
+  const out = Array.from(
+    new Set(
+      value
+        .map((entry) => toFiniteNumber(entry))
+        .filter((entry): entry is number => Number.isFinite(entry ?? Number.NaN))
+        .map((entry) => Math.max(entry, minimum)),
+    ),
+  );
+  return out.length > 0 ? out : [...fallback];
+};
+
+const normalizeRobustnessFeatureDropSets = (
+  value: unknown,
+): YorkRobustnessFeatureDropSet[] => {
+  if (!Array.isArray(value)) return [];
+  const out: YorkRobustnessFeatureDropSet[] = [];
+  for (const entry of value) {
+    const record = asRecord(entry);
+    const id = asText(record.id);
+    const dropRaw = Array.isArray(record.drop_features) ? record.drop_features : [];
+    const dropFeatures = Array.from(
+      new Set(
+        dropRaw
+          .map((item) => asText(item))
+          .filter((item): item is YorkFeatureName =>
+            [
+              "theta_abs_max_raw",
+              "theta_abs_max_display",
+              "positive_count_xz",
+              "negative_count_xz",
+              "positive_count_xrho",
+              "negative_count_xrho",
+              "support_overlap_pct",
+              "near_zero_theta",
+              "signed_lobe_summary",
+              "shell_map_activity",
+            ].includes(item ?? ""),
+          ),
+      ),
+    );
+    if (!id || dropFeatures.length === 0) continue;
+    out.push({
+      id,
+      drop_features: dropFeatures,
+    });
+  }
+  return out;
+};
+
+const parseYorkLane = (
+  value: unknown,
+  fallback: {
+    lane_id: string;
+    observer: string;
+    foliation: string;
+    theta_definition: string;
+    kij_sign_convention: string;
+    coordinate_views: Record<string, string>;
+    remap_rules: Record<string, string>;
+    normalization_rules: Record<string, string>;
+    classification_scope: string;
+  },
+): YorkDiagnosticLane => {
+  const record = asRecord(value);
+  const laneId = asText(record.lane_id) ?? fallback.lane_id;
+  const active =
+    typeof record.active === "boolean" ? record.active : true;
+  const supported =
+    typeof record.supported === "boolean" ? record.supported : true;
+  return {
+    lane_id: laneId,
+    active,
+    supported,
+    unsupported_reason: asText(record.unsupported_reason),
+    observer: asText(record.observer) ?? fallback.observer,
+    foliation: asText(record.foliation) ?? fallback.foliation,
+    theta_definition: asText(record.theta_definition) ?? fallback.theta_definition,
+    kij_sign_convention:
+      asText(record.kij_sign_convention) ?? fallback.kij_sign_convention,
+    coordinate_views:
+      Object.keys(asRecord(record.coordinate_views)).length > 0
+        ? (asRecord(record.coordinate_views) as Record<string, string>)
+        : fallback.coordinate_views,
+    remap_rules:
+      Object.keys(asRecord(record.remap_rules)).length > 0
+        ? (asRecord(record.remap_rules) as Record<string, string>)
+        : fallback.remap_rules,
+    normalization_rules:
+      Object.keys(asRecord(record.normalization_rules)).length > 0
+        ? (asRecord(record.normalization_rules) as Record<string, string>)
+        : fallback.normalization_rules,
+    classification_scope:
+      asText(record.classification_scope) ?? fallback.classification_scope,
+  };
+};
+
+const normalizeDiagnosticLanes = (
+  raw: Record<string, unknown>,
+  fallbackLane: {
+    lane_id: string;
+    observer: string;
+    foliation: string;
+    theta_definition: string;
+    kij_sign_convention: string;
+    coordinate_views: Record<string, string>;
+    remap_rules: Record<string, string>;
+    normalization_rules: Record<string, string>;
+    classification_scope: string;
+  },
+): YorkDiagnosticLane[] => {
+  const lanesRaw = Array.isArray(raw.lanes) ? raw.lanes : [];
+  const lanes = lanesRaw.map((entry) => parseYorkLane(entry, fallbackLane));
+  const deduped = Array.from(
+    new Map(lanes.map((lane) => [lane.lane_id, lane])).values(),
+  );
+  if (deduped.length > 0) return deduped;
+  return [
+    {
+      ...fallbackLane,
+      active: true,
+      supported: true,
+      unsupported_reason: null,
+    },
+  ];
+};
+
+export const loadYorkDiagnosticContract = (
+  contractPath = YORK_DIAGNOSTIC_CONTRACT_PATH,
+): YorkDiagnosticContract => {
+  const raw = JSON.parse(fs.readFileSync(contractPath, "utf8")) as Record<string, unknown>;
+  const featureSetRaw = Array.isArray(raw.feature_set) ? raw.feature_set : [];
+  const featureSet = featureSetRaw
+    .map((entry) => asText(entry))
+    .filter((entry): entry is YorkFeatureName =>
+      [
+        "theta_abs_max_raw",
+        "theta_abs_max_display",
+        "positive_count_xz",
+        "negative_count_xz",
+        "positive_count_xrho",
+        "negative_count_xrho",
+        "support_overlap_pct",
+        "near_zero_theta",
+        "signed_lobe_summary",
+        "shell_map_activity",
+      ].includes(entry ?? ""),
+    );
+  const uniqueFeatureSet = Array.from(new Set(featureSet));
+  if (uniqueFeatureSet.length === 0) {
+    throw new Error(`invalid_york_diagnostic_contract_feature_set:${contractPath}`);
+  }
+  const decisionPolicyRaw = asRecord(raw.decision_policy);
+  const weightsRaw = asRecord(decisionPolicyRaw.feature_weights);
+  const decisionPolicy: YorkDiagnosticContract["decision_policy"] = {
+    distance_metric: asText(decisionPolicyRaw.distance_metric) ?? "weighted_normalized_l1",
+    normalization_method:
+      asText(decisionPolicyRaw.normalization_method) ?? "max_abs_reference_target_with_floor",
+    normalization_floor: Math.max(
+      toNormalizedNumber(decisionPolicyRaw.normalization_floor, 1e-30),
+      1e-45,
+    ),
+    missing_value_penalty: Math.max(
+      toNormalizedNumber(decisionPolicyRaw.missing_value_penalty, 1),
+      0,
+    ),
+    max_component_distance: Math.max(
+      toNormalizedNumber(decisionPolicyRaw.max_component_distance, 2),
+      0.1,
+    ),
+    feature_weights: normalizeFeatureWeights(uniqueFeatureSet, weightsRaw),
+    reference_margin_min: Math.max(
+      toNormalizedNumber(decisionPolicyRaw.reference_margin_min, 0.08),
+      0,
+    ),
+    reference_match_threshold: Math.max(
+      toNormalizedNumber(decisionPolicyRaw.reference_match_threshold, 0.5),
+      0,
+    ),
+    distinctness_threshold: Math.max(
+      toNormalizedNumber(decisionPolicyRaw.distinctness_threshold, 0.5),
+      0,
+    ),
+  };
+  const robustnessRaw = asRecord(raw.robustness_checks);
+  const stabilityPolicyRaw = asRecord(robustnessRaw.stability_policy);
+  const robustnessChecks: YorkRobustnessChecks = {
+    enabled:
+      typeof robustnessRaw.enabled === "boolean"
+        ? robustnessRaw.enabled
+        : true,
+    weight_perturbation_pct: Math.max(
+      toNormalizedNumber(robustnessRaw.weight_perturbation_pct, 0.1),
+      0,
+    ),
+    margin_variants: normalizeNumberArray(
+      robustnessRaw.margin_variants,
+      [0.05, decisionPolicy.reference_margin_min, 0.12],
+      0,
+    ),
+    threshold_variants: normalizeNumberArray(
+      robustnessRaw.threshold_variants,
+      [0.4, decisionPolicy.reference_match_threshold, 0.6],
+      0,
+    ),
+    feature_drop_sets: normalizeRobustnessFeatureDropSets(
+      robustnessRaw.feature_drop_sets,
+    ),
+    stability_policy: {
+      stable_fraction_min: Math.min(
+        Math.max(
+          toNormalizedNumber(stabilityPolicyRaw.stable_fraction_min, 0.8),
+          0,
+        ),
+        1,
+      ),
+      marginal_fraction_min: Math.min(
+        Math.max(
+          toNormalizedNumber(stabilityPolicyRaw.marginal_fraction_min, 0.6),
+          0,
+        ),
+        1,
+      ),
+    },
+  };
+  if (
+    robustnessChecks.stability_policy.marginal_fraction_min >
+    robustnessChecks.stability_policy.stable_fraction_min
+  ) {
+    robustnessChecks.stability_policy.marginal_fraction_min =
+      robustnessChecks.stability_policy.stable_fraction_min;
+  }
+  const fallbackLane = {
+    lane_id:
+      asText(raw.baseline_lane_id) ??
+      "lane_a_eulerian_comoving_theta_minus_trk",
+    observer: asText(raw.observer) ?? "eulerian_n",
+    foliation: asText(raw.foliation) ?? "comoving_cartesian_3p1",
+    theta_definition: asText(raw.theta_definition) ?? "theta=-trK",
+    kij_sign_convention: asText(raw.kij_sign_convention) ?? "ADM",
+    coordinate_views: asRecord(raw.coordinate_views) as Record<string, string>,
+    remap_rules: asRecord(raw.remap_rules) as Record<string, string>,
+    normalization_rules: asRecord(raw.normalization_rules) as Record<string, string>,
+    classification_scope: asText(raw.classification_scope) ?? "diagnostic_local_only",
+  };
+  const lanes = normalizeDiagnosticLanes(raw, fallbackLane);
+  const baselineLaneId =
+    asText(raw.baseline_lane_id) ??
+    lanes.find((lane) => lane.active && lane.supported)?.lane_id ??
+    lanes[0]!.lane_id;
+  const alternateLaneId =
+    asText(raw.alternate_lane_id) ??
+    lanes.find((lane) => lane.lane_id !== baselineLaneId)?.lane_id ??
+    null;
+  return {
+    contract_id: asText(raw.contract_id) ?? "york_diagnostic_contract",
+    version: Math.max(Math.floor(toNormalizedNumber(raw.version, 1)), 1),
+    baseline_lane_id: baselineLaneId,
+    alternate_lane_id: alternateLaneId,
+    observer: fallbackLane.observer,
+    foliation: fallbackLane.foliation,
+    theta_definition: fallbackLane.theta_definition,
+    kij_sign_convention: fallbackLane.kij_sign_convention,
+    coordinate_views: fallbackLane.coordinate_views,
+    remap_rules: fallbackLane.remap_rules,
+    normalization_rules: fallbackLane.normalization_rules,
+    classification_scope: fallbackLane.classification_scope,
+    reference_controls: {
+      alcubierre_control: {
+        description:
+          asText(asRecord(asRecord(raw.reference_controls).alcubierre_control).description) ??
+          "Expected strong signed fore/aft York morphology under this diagnostic lane.",
+        role:
+          asText(asRecord(asRecord(raw.reference_controls).alcubierre_control).role) ??
+          "high_expansion_calibration_reference",
+      },
+      natario_control: {
+        description:
+          asText(asRecord(asRecord(raw.reference_controls).natario_control).description) ??
+          "Expected low-expansion York morphology under this diagnostic lane.",
+        role:
+          asText(asRecord(asRecord(raw.reference_controls).natario_control).role) ??
+          "low_expansion_calibration_reference",
+      },
+    },
+    feature_set: uniqueFeatureSet,
+    decision_policy: decisionPolicy,
+    robustness_checks: robustnessChecks,
+    lanes,
+  };
+};
+
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -434,6 +980,16 @@ const mapPreflightFailure = (args: {
     scientific_york_chart_unsupported: {
       branch: "hull-optix-service:/frame yorkRequested chart preflight",
       requirement: "chart must be comoving_cartesian for York views",
+    },
+    scientific_york_lane_unsupported: {
+      branch: "hull-optix-service:/frame yorkRequested lane preflight",
+      requirement:
+        "requested diagnosticLaneId must be supported by the active York tensor lane",
+    },
+    scientific_york_lane_mismatch: {
+      branch: "hull-optix-service:/frame yorkRequested lane certificate checks",
+      requirement:
+        "renderCertificate.render.lane_id and diagnostics.lane_id must match diagnosticLaneId",
     },
     scientific_york_shell_support_missing: {
       branch: "hull-optix-service:/frame yorkShellMapRequested support preflight",
@@ -956,6 +1512,7 @@ const loadNhm2MetricVolumeRef = (snapshotPath: string): HullMetricVolumeRefV1 =>
 const buildYorkPayload = (args: {
   caseId: CaseId;
   renderView: HullScientificRenderView;
+  diagnosticLaneId: string;
   metricVolumeRef: HullMetricVolumeRefV1;
   requireCongruentNhm2FullSolve: boolean;
   width: number;
@@ -969,7 +1526,7 @@ const buildYorkPayload = (args: {
   const solve = solveByCase[args.caseId];
   return {
     version: 1,
-    requestId: `york-control-family-${args.caseId}-${args.renderView}`,
+    requestId: `york-control-family-${args.caseId}-${args.renderView}-${args.diagnosticLaneId}`,
     width: args.width,
     height: args.height,
     dpr: 1,
@@ -993,6 +1550,7 @@ const buildYorkPayload = (args: {
       requireScientificFrame: true,
       requireCanonicalTensorVolume: true,
       requireCongruentNhm2FullSolve: args.requireCongruentNhm2FullSolve,
+      diagnosticLaneId: args.diagnosticLaneId,
       requireIntegralSignal: true,
       renderView: args.renderView,
       samplingMode: "trilinear",
@@ -1031,6 +1589,7 @@ const parseYorkViewSummary = (
     render: {
       view: asText(cert?.render?.view) as HullScientificRenderView | null,
       field_key: asText(cert?.render?.field_key),
+      lane_id: asText(cert?.render?.lane_id),
       slice_plane: asText(cert?.render?.slice_plane),
       coordinate_mode: asText(cert?.render?.coordinate_mode),
       normalization: asText(cert?.render?.normalization),
@@ -1039,6 +1598,10 @@ const parseYorkViewSummary = (
       support_overlay: asText(cert?.render?.support_overlay),
     },
     identity: {
+      lane_id:
+        asText(cert?.render?.lane_id) ??
+        asText(diagnostics.lane_id) ??
+        null,
       metric_ref_hash: asText(cert?.metric_ref_hash),
       timestamp_ms: toFiniteNumber(cert?.timestamp_ms),
       chart: asText(cert?.chart),
@@ -1067,6 +1630,8 @@ const parseYorkViewSummary = (
     samplingChoice: asText(diagnostics.sampling_choice),
     supportOverlapPct: toFiniteNumber(diagnostics.shell_theta_overlap_pct),
     supportedThetaFraction: toFiniteNumber(diagnostics.supported_theta_fraction),
+    shellSupportCount: toFiniteNumber(diagnostics.shell_support_count),
+    shellActiveCount: toFiniteNumber(diagnostics.shell_active_count),
     hashes: {
       certificate_hash: asText(cert?.certificate_hash),
       frame_hash: asText(cert?.frame_hash),
@@ -1201,6 +1766,7 @@ const buildErrorYorkViewSummary = (
   render: {
     view: null,
     field_key: null,
+    lane_id: null,
     slice_plane: null,
     coordinate_mode: null,
     normalization: null,
@@ -1209,6 +1775,7 @@ const buildErrorYorkViewSummary = (
     support_overlay: null,
   },
   identity: {
+    lane_id: null,
     metric_ref_hash: null,
     timestamp_ms: null,
     chart: null,
@@ -1230,6 +1797,8 @@ const buildErrorYorkViewSummary = (
   samplingChoice: null,
   supportOverlapPct: null,
   supportedThetaFraction: null,
+  shellSupportCount: null,
+  shellActiveCount: null,
   hashes: {
     certificate_hash: null,
     frame_hash: null,
@@ -1311,6 +1880,7 @@ export const readSourceFamilyEvidence = (snapshot: {
 };
 
 const runCase = async (args: {
+  diagnosticLane: YorkDiagnosticLane;
   caseId: CaseId;
   label: string;
   familyExpectation: CaseResult["familyExpectation"];
@@ -1334,6 +1904,7 @@ const runCase = async (args: {
     const payload = buildYorkPayload({
       caseId: args.caseId,
       renderView: view,
+      diagnosticLaneId: args.diagnosticLane.lane_id,
       metricVolumeRef: args.metricVolumeRef,
       requireCongruentNhm2FullSolve: args.requireCongruentNhm2FullSolve,
       width: args.frameSize.width,
@@ -1418,7 +1989,7 @@ const runCase = async (args: {
     ? "york-surface-rho-3p1"
     : args.yorkViews[0];
   const primaryView = perView.find((entry) => entry.view === primaryViewId) ?? null;
-  return {
+  const caseCore: Omit<CaseResult, "classificationFeatures"> = {
     caseId: args.caseId,
     label: args.label,
     familyExpectation: args.familyExpectation,
@@ -1435,6 +2006,10 @@ const runCase = async (args: {
     },
     snapshotMetrics,
     offlineYorkAudit,
+  };
+  return {
+    ...caseCore,
+    classificationFeatures: buildCaseClassificationFeatures(caseCore),
   };
 };
 
@@ -1729,30 +2304,30 @@ export const evaluateProofPackPreconditions = (args: {
 
 export const decideControlFamilyVerdict = (args: {
   preconditions: ProofPackPreconditions;
-  alcStrong: boolean;
-  alcSignalSufficient?: boolean;
-  natLow: boolean;
-  nhm2Low: boolean;
-  nhm2IntendedAlcubierre: boolean;
+  controlsCalibratedByReferences: boolean;
+  classificationScoring: Nhm2ReferenceScoring | null;
   yorkCongruence?: YorkCongruenceEvaluation;
 }): DecisionVerdict => {
   if (!args.preconditions.readyForFamilyVerdict) return "inconclusive";
-  if (args.yorkCongruence?.rhoRemapMismatch) return "proof_pack_york_rho_remap_mismatch";
-  if (args.yorkCongruence?.hashMismatch) return "proof_pack_york_slice_hash_mismatch";
-  if (args.yorkCongruence?.nearZeroSuppressionMismatch) {
-    return "proof_pack_york_near_zero_suppression_mismatch";
+  const congruenceCalibrationFailed =
+    args.yorkCongruence?.rhoRemapMismatch === true ||
+    args.yorkCongruence?.hashMismatch === true ||
+    args.yorkCongruence?.nearZeroSuppressionMismatch === true ||
+    args.yorkCongruence?.downstreamRenderMismatch === true;
+  if (congruenceCalibrationFailed) return "inconclusive";
+  if (!args.controlsCalibratedByReferences) return "inconclusive";
+  if (!args.classificationScoring) return "inconclusive";
+  if (args.classificationScoring.winning_reference == null) return "inconclusive";
+  if (args.classificationScoring.distinct_by_policy) {
+    return NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY;
   }
-  if (args.yorkCongruence?.downstreamRenderMismatch) {
-    return "proof_pack_york_downstream_render_mismatch";
+  if (args.classificationScoring.winning_reference === "alcubierre_control") {
+    return NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE;
   }
-  if (args.alcSignalSufficient === false) return "inconclusive";
-  if (!args.alcStrong) return "renderer_or_conversion_wrong";
-  if (args.alcStrong && args.natLow && args.nhm2Low && args.nhm2IntendedAlcubierre) {
-    return "solve_family_mismatch";
+  if (args.classificationScoring.winning_reference === "natario_control") {
+    return NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE;
   }
-  if (args.alcStrong && args.natLow && args.nhm2Low) return "nhm2_low_expansion_family";
-  if (args.alcStrong && args.natLow) return "renderer_fine_controls_consistent";
-  return "inconclusive";
+  return NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY;
 };
 
 const approxEqual = (a: number | null, b: number | null, tol = 1e-15): boolean => {
@@ -1824,15 +2399,18 @@ export const evaluateYorkSliceCongruence = (cases: CaseResult[]): YorkCongruence
   };
 };
 
-const hasStrongForeAftYork = (summary: CaseResult["primaryYork"]): boolean => {
+export const hasStrongForeAftYork = (summary: CaseResult["primaryYork"]): boolean => {
   if (!summary.rawExtrema) return false;
   const min = summary.rawExtrema.min;
   const max = summary.rawExtrema.max;
   const absMax = summary.rawExtrema.absMax;
   if (min == null || max == null || absMax == null) return false;
-  const hasBothSigns = min < 0 && max > 0;
-  const notNearZero = summary.nearZeroTheta === false;
-  return hasBothSigns && notNearZero && absMax > 1e-20;
+  const signedFloor = YORK_SIGN_STRUCTURE_EPS;
+  const hasBothSigns = min < -signedFloor && max > signedFloor;
+  if (!hasBothSigns) return false;
+  if (summary.nearZeroTheta === true) return false;
+  if (summary.nearZeroTheta === false) return true;
+  return absMax > signedFloor;
 };
 
 const hasConsistentAlcubierreSignedLobes = (
@@ -1873,7 +2451,1003 @@ const isLowExpansion = (summary: CaseResult["primaryYork"]): boolean => {
   return absMax <= 1e-20;
 };
 
+const findOfflineYorkView = (
+  audit: CaseOfflineYorkAudit | null,
+  view: OfflineYorkViewAudit["view"],
+): OfflineYorkViewAudit | null =>
+  audit?.byView.find((entry) => entry.view === view) ?? null;
+
+const computeShellMapActivity = (shellView: YorkViewSummary | null): number | null => {
+  if (!shellView) return null;
+  if (
+    Number.isFinite(shellView.shellSupportCount ?? Number.NaN) &&
+    Number.isFinite(shellView.shellActiveCount ?? Number.NaN) &&
+    (shellView.shellSupportCount ?? 0) > 0
+  ) {
+    return (shellView.shellActiveCount ?? 0) / (shellView.shellSupportCount ?? 1);
+  }
+  return shellView.supportedThetaFraction;
+};
+
+export const buildCaseClassificationFeatures = (
+  entry: Pick<CaseResult, "offlineYorkAudit" | "perView" | "primaryYork">,
+): CaseClassificationFeatures => {
+  const xz = findOfflineYorkView(entry.offlineYorkAudit, "york-surface-3p1");
+  const xrho = findOfflineYorkView(entry.offlineYorkAudit, "york-surface-rho-3p1");
+  const shellView = entry.perView.find((candidate) => candidate.view === "york-shell-map-3p1") ?? null;
+  return {
+    theta_abs_max_raw: entry.primaryYork.rawExtrema?.absMax ?? null,
+    theta_abs_max_display: entry.primaryYork.displayExtrema?.absMax ?? null,
+    positive_count_xz: xz?.counts.positive ?? null,
+    negative_count_xz: xz?.counts.negative ?? null,
+    positive_count_xrho: xrho?.counts.positive ?? null,
+    negative_count_xrho: xrho?.counts.negative ?? null,
+    support_overlap_pct: entry.primaryYork.supportOverlapPct ?? null,
+    near_zero_theta: entry.primaryYork.nearZeroTheta ?? null,
+    signed_lobe_summary: entry.offlineYorkAudit?.alcubierreSignedLobeSummary?.signedLobeSummary ?? null,
+    shell_map_activity: computeShellMapActivity(shellView),
+  };
+};
+
+const emptyDistanceBreakdown = (featureSet: YorkFeatureName[]): DistanceFeatureBreakdown => {
+  const out = {} as DistanceFeatureBreakdown;
+  for (const feature of featureSet) out[feature] = null;
+  return out;
+};
+
+const computeNumericFeatureDistance = (
+  referenceValue: number | null,
+  targetValue: number | null,
+  policy: YorkDiagnosticContract["decision_policy"],
+): number => {
+  if (!Number.isFinite(referenceValue ?? Number.NaN) || !Number.isFinite(targetValue ?? Number.NaN)) {
+    return policy.missing_value_penalty;
+  }
+  const denom = Math.max(
+    Math.abs(referenceValue ?? 0),
+    Math.abs(targetValue ?? 0),
+    policy.normalization_floor,
+  );
+  const raw = Math.abs((referenceValue ?? 0) - (targetValue ?? 0)) / denom;
+  return Math.min(raw, policy.max_component_distance);
+};
+
+const computeBooleanFeatureDistance = (
+  referenceValue: boolean | null,
+  targetValue: boolean | null,
+  policy: YorkDiagnosticContract["decision_policy"],
+): number => {
+  if (referenceValue == null && targetValue == null) return 0;
+  if (referenceValue == null || targetValue == null) return policy.missing_value_penalty;
+  return referenceValue === targetValue ? 0 : 1;
+};
+
+const computeSignedLobeDistance = (
+  referenceValue: YorkSignedLobeSummary | null,
+  targetValue: YorkSignedLobeSummary | null,
+  policy: YorkDiagnosticContract["decision_policy"],
+): number => {
+  if (referenceValue == null && targetValue == null) return 0;
+  if (referenceValue == null || targetValue == null) return policy.missing_value_penalty;
+  return referenceValue === targetValue ? 0 : 1;
+};
+
+const computeReferenceDistance = (args: {
+  contract: YorkDiagnosticContract;
+  reference: CaseClassificationFeatures;
+  target: CaseClassificationFeatures;
+}): ReferenceDistanceSummary => {
+  const { contract, reference, target } = args;
+  const breakdown = emptyDistanceBreakdown(contract.feature_set);
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const feature of contract.feature_set) {
+    const weight = contract.decision_policy.feature_weights[feature] ?? 1;
+    const safeWeight = Number.isFinite(weight) && weight > 0 ? weight : 1;
+    let componentDistance = contract.decision_policy.missing_value_penalty;
+    switch (feature) {
+      case "near_zero_theta":
+        componentDistance = computeBooleanFeatureDistance(
+          reference.near_zero_theta,
+          target.near_zero_theta,
+          contract.decision_policy,
+        );
+        break;
+      case "signed_lobe_summary":
+        componentDistance = computeSignedLobeDistance(
+          reference.signed_lobe_summary,
+          target.signed_lobe_summary,
+          contract.decision_policy,
+        );
+        break;
+      default: {
+        const refNumeric = reference[feature] as number | null;
+        const targetNumeric = target[feature] as number | null;
+        componentDistance = computeNumericFeatureDistance(
+          refNumeric,
+          targetNumeric,
+          contract.decision_policy,
+        );
+        break;
+      }
+    }
+    const bounded = Math.max(
+      0,
+      Math.min(componentDistance, contract.decision_policy.max_component_distance),
+    );
+    breakdown[feature] = bounded;
+    weightedSum += bounded * safeWeight;
+    weightTotal += safeWeight;
+  }
+  return {
+    distance: weightTotal > 0 ? weightedSum / weightTotal : null,
+    breakdown,
+  };
+};
+
+export const scoreNhm2AgainstReferenceControls = (args: {
+  contract: YorkDiagnosticContract;
+  alcubierreFeatures: CaseClassificationFeatures;
+  natarioFeatures: CaseClassificationFeatures;
+  nhm2Features: CaseClassificationFeatures;
+}): Nhm2ReferenceScoring => {
+  const toAlc = computeReferenceDistance({
+    contract: args.contract,
+    reference: args.alcubierreFeatures,
+    target: args.nhm2Features,
+  });
+  const toLow = computeReferenceDistance({
+    contract: args.contract,
+    reference: args.natarioFeatures,
+    target: args.nhm2Features,
+  });
+  const dAlc = toAlc.distance;
+  const dLow = toLow.distance;
+  const distancesFinite =
+    Number.isFinite(dAlc ?? Number.NaN) && Number.isFinite(dLow ?? Number.NaN);
+  const winningReference: Nhm2ReferenceScoring["winning_reference"] = !distancesFinite
+    ? null
+    : (dAlc ?? Number.POSITIVE_INFINITY) <= (dLow ?? Number.POSITIVE_INFINITY)
+      ? "alcubierre_control"
+      : "natario_control";
+  const margin =
+    distancesFinite && dAlc != null && dLow != null ? Math.abs(dAlc - dLow) : null;
+  const winnerDistance =
+    !distancesFinite || winningReference == null
+      ? null
+      : winningReference === "alcubierre_control"
+        ? dAlc
+        : dLow;
+  const marginSufficient =
+    margin != null && margin >= args.contract.decision_policy.reference_margin_min;
+  const winningReferenceWithinThreshold =
+    winnerDistance != null &&
+    winnerDistance <= args.contract.decision_policy.reference_match_threshold;
+  const distinctByPolicy = !(
+    winningReference != null &&
+    marginSufficient &&
+    winningReferenceWithinThreshold &&
+    winnerDistance != null &&
+    winnerDistance <= args.contract.decision_policy.distinctness_threshold
+  );
+  return {
+    distance_to_alcubierre_reference: dAlc,
+    distance_to_low_expansion_reference: dLow,
+    reference_margin: margin,
+    winning_reference: winningReference,
+    margin_sufficient: marginSufficient,
+    winning_reference_within_threshold: winningReferenceWithinThreshold,
+    distinct_by_policy: distinctByPolicy,
+    distinctness_threshold: args.contract.decision_policy.distinctness_threshold,
+    margin_min: args.contract.decision_policy.reference_margin_min,
+    reference_match_threshold: args.contract.decision_policy.reference_match_threshold,
+    distance_metric: args.contract.decision_policy.distance_metric,
+    normalization_method: args.contract.decision_policy.normalization_method,
+    to_alcubierre_breakdown: toAlc.breakdown,
+    to_low_expansion_breakdown: toLow.breakdown,
+  };
+};
+
+const DECISION_VERDICT_ORDER: DecisionVerdict[] = [
+  NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE,
+  NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE,
+  NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY,
+  "inconclusive",
+];
+
+const createVerdictCountMap = (): Record<DecisionVerdict, number> => ({
+  [NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE]: 0,
+  [NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE]: 0,
+  [NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY]: 0,
+  inconclusive: 0,
+});
+
+type ContractPolicyPatch = {
+  feature_weight_feature: YorkFeatureName | null;
+  feature_weight_scale: number | null;
+  reference_margin_min: number | null;
+  reference_match_threshold: number | null;
+  dropped_features: YorkFeatureName[];
+};
+
+const buildContractVariant = (
+  contract: YorkDiagnosticContract,
+  patch: ContractPolicyPatch,
+): YorkDiagnosticContract => {
+  const dropped = new Set(patch.dropped_features);
+  const featureSet = contract.feature_set.filter((feature) => !dropped.has(feature));
+  if (featureSet.length === 0) {
+    return {
+      ...contract,
+      feature_set: [...contract.feature_set],
+    };
+  }
+
+  const weightSource: Record<string, unknown> = {
+    ...contract.decision_policy.feature_weights,
+  };
+  if (
+    patch.feature_weight_feature &&
+    Number.isFinite(patch.feature_weight_scale ?? Number.NaN) &&
+    (patch.feature_weight_scale ?? 0) > 0
+  ) {
+    const current =
+      toFiniteNumber(weightSource[patch.feature_weight_feature]) ?? 1;
+    weightSource[patch.feature_weight_feature] =
+      current * (patch.feature_weight_scale as number);
+  }
+
+  const decisionPolicy = {
+    ...contract.decision_policy,
+    feature_weights: normalizeFeatureWeights(featureSet, weightSource),
+    reference_margin_min:
+      patch.reference_margin_min != null
+        ? Math.max(patch.reference_margin_min, 0)
+        : contract.decision_policy.reference_margin_min,
+    reference_match_threshold:
+      patch.reference_match_threshold != null
+        ? Math.max(patch.reference_match_threshold, 0)
+        : contract.decision_policy.reference_match_threshold,
+  };
+
+  return {
+    ...contract,
+    feature_set: featureSet,
+    decision_policy: decisionPolicy,
+  };
+};
+
+const classifyRobustnessStatus = (args: {
+  dominantVerdict: DecisionVerdict | null;
+  dominantFraction: number;
+  stableFractionMin: number;
+  marginalFractionMin: number;
+}): ClassificationRobustnessStatus => {
+  const {
+    dominantVerdict,
+    dominantFraction,
+    stableFractionMin,
+    marginalFractionMin,
+  } = args;
+  if (!dominantVerdict || dominantVerdict === "inconclusive") {
+    return "inconclusive";
+  }
+  if (dominantFraction >= stableFractionMin) {
+    if (dominantVerdict === NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) {
+      return "stable_low_expansion_like";
+    }
+    if (dominantVerdict === NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE) {
+      return "stable_alcubierre_like";
+    }
+    return "stable_distinct";
+  }
+  if (dominantFraction >= marginalFractionMin) {
+    if (dominantVerdict === NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) {
+      return "marginal_low_expansion_like";
+    }
+    if (dominantVerdict === NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY) {
+      return "marginal_distinct";
+    }
+  }
+  return "unstable_multiclass";
+};
+
+export const evaluateClassificationRobustness = (args: {
+  contract: YorkDiagnosticContract;
+  preconditions: ProofPackPreconditions;
+  controlsCalibratedByReferences: boolean;
+  yorkCongruence: YorkCongruenceEvaluation;
+  alcubierreFeatures: CaseClassificationFeatures;
+  natarioFeatures: CaseClassificationFeatures;
+  nhm2Features: CaseClassificationFeatures;
+  baselineVerdict: DecisionVerdict;
+  baselineScoring: Nhm2ReferenceScoring;
+}): ClassificationRobustnessSummary => {
+  const variants: Array<{
+    variant_id: string;
+    variant_type: RobustnessVariantType;
+    policy_patch: ContractPolicyPatch;
+  }> = [
+    {
+      variant_id: "baseline",
+      variant_type: "baseline",
+      policy_patch: {
+        feature_weight_feature: null,
+        feature_weight_scale: null,
+        reference_margin_min: null,
+        reference_match_threshold: null,
+        dropped_features: [],
+      },
+    },
+  ];
+
+  if (args.contract.robustness_checks.enabled) {
+    const pct = args.contract.robustness_checks.weight_perturbation_pct;
+    if (pct > 0) {
+      const plusScale = 1 + pct;
+      const minusScale = Math.max(1 - pct, 1e-6);
+      for (const feature of args.contract.feature_set) {
+        variants.push({
+          variant_id: `weight:${feature}:plus`,
+          variant_type: "weight_perturbation",
+          policy_patch: {
+            feature_weight_feature: feature,
+            feature_weight_scale: plusScale,
+            reference_margin_min: null,
+            reference_match_threshold: null,
+            dropped_features: [],
+          },
+        });
+        variants.push({
+          variant_id: `weight:${feature}:minus`,
+          variant_type: "weight_perturbation",
+          policy_patch: {
+            feature_weight_feature: feature,
+            feature_weight_scale: minusScale,
+            reference_margin_min: null,
+            reference_match_threshold: null,
+            dropped_features: [],
+          },
+        });
+      }
+    }
+
+    for (const margin of args.contract.robustness_checks.margin_variants) {
+      if (
+        Math.abs(margin - args.contract.decision_policy.reference_margin_min) <=
+        1e-12
+      ) {
+        continue;
+      }
+      variants.push({
+        variant_id: `margin:${margin}`,
+        variant_type: "margin_variant",
+        policy_patch: {
+          feature_weight_feature: null,
+          feature_weight_scale: null,
+          reference_margin_min: margin,
+          reference_match_threshold: null,
+          dropped_features: [],
+        },
+      });
+    }
+
+    for (const threshold of args.contract.robustness_checks.threshold_variants) {
+      if (
+        Math.abs(
+          threshold - args.contract.decision_policy.reference_match_threshold,
+        ) <= 1e-12
+      ) {
+        continue;
+      }
+      variants.push({
+        variant_id: `threshold:${threshold}`,
+        variant_type: "threshold_variant",
+        policy_patch: {
+          feature_weight_feature: null,
+          feature_weight_scale: null,
+          reference_margin_min: null,
+          reference_match_threshold: threshold,
+          dropped_features: [],
+        },
+      });
+    }
+
+    for (const dropSet of args.contract.robustness_checks.feature_drop_sets) {
+      const dropped = dropSet.drop_features.filter((feature) =>
+        args.contract.feature_set.includes(feature),
+      );
+      if (dropped.length === 0) continue;
+      variants.push({
+        variant_id: `drop:${dropSet.id}`,
+        variant_type: "feature_drop",
+        policy_patch: {
+          feature_weight_feature: null,
+          feature_weight_scale: null,
+          reference_margin_min: null,
+          reference_match_threshold: null,
+          dropped_features: dropped,
+        },
+      });
+    }
+  }
+
+  const dedupedVariants = Array.from(
+    new Map(variants.map((variant) => [variant.variant_id, variant])).values(),
+  );
+  const variantResults: ClassificationRobustnessVariantResult[] = [];
+  for (const variant of dedupedVariants) {
+    const scoring =
+      variant.variant_id === "baseline"
+        ? args.baselineScoring
+        : scoreNhm2AgainstReferenceControls({
+            contract: buildContractVariant(args.contract, variant.policy_patch),
+            alcubierreFeatures: args.alcubierreFeatures,
+            natarioFeatures: args.natarioFeatures,
+            nhm2Features: args.nhm2Features,
+          });
+    const verdict =
+      variant.variant_id === "baseline"
+        ? args.baselineVerdict
+        : decideControlFamilyVerdict({
+            preconditions: args.preconditions,
+            controlsCalibratedByReferences: args.controlsCalibratedByReferences,
+            classificationScoring: scoring,
+            yorkCongruence: args.yorkCongruence,
+          });
+    variantResults.push({
+      variant_id: variant.variant_id,
+      variant_type: variant.variant_type,
+      policy_patch: variant.policy_patch,
+      scoring,
+      verdict,
+    });
+  }
+
+  const verdictCounts = createVerdictCountMap();
+  for (const result of variantResults) {
+    verdictCounts[result.verdict] += 1;
+  }
+
+  const evaluatedVariants = variantResults.filter(
+    (result) => result.verdict !== "inconclusive",
+  ).length;
+  let dominantVerdict: DecisionVerdict | null = null;
+  let dominantCount = 0;
+  for (const verdict of DECISION_VERDICT_ORDER) {
+    const count = verdictCounts[verdict];
+    if (count > dominantCount) {
+      dominantCount = count;
+      dominantVerdict = verdict;
+    }
+  }
+  const dominantFraction =
+    evaluatedVariants > 0 && dominantVerdict
+      ? verdictCounts[dominantVerdict] / evaluatedVariants
+      : 0;
+  const stableFractionMin =
+    args.contract.robustness_checks.stability_policy.stable_fraction_min;
+  const marginalFractionMin =
+    args.contract.robustness_checks.stability_policy.marginal_fraction_min;
+  const stabilityStatus =
+    !args.preconditions.readyForFamilyVerdict ||
+    !args.controlsCalibratedByReferences
+      ? "inconclusive"
+      : classifyRobustnessStatus({
+          dominantVerdict,
+          dominantFraction,
+          stableFractionMin,
+          marginalFractionMin,
+        });
+  const stableVerdict =
+    stabilityStatus.startsWith("stable_") && dominantVerdict
+      ? dominantVerdict
+      : null;
+
+  return {
+    enabled: args.contract.robustness_checks.enabled,
+    baselineVerdict: args.baselineVerdict,
+    variantResults,
+    verdictCounts,
+    dominantVerdict,
+    dominantFraction,
+    stableVerdict,
+    stabilityStatus,
+    stabilityPolicy: {
+      stable_fraction_min: stableFractionMin,
+      marginal_fraction_min: marginalFractionMin,
+    },
+    totalVariants: variantResults.length,
+    evaluatedVariants,
+  };
+};
+
+const buildLaneDecisionTable = (args: {
+  preconditions: ProofPackPreconditions;
+  controlsCalibratedByReferences: boolean;
+  classificationScoring: Nhm2ReferenceScoring | null;
+  classificationRobustness: ClassificationRobustnessSummary | null;
+  yorkCongruence: YorkCongruenceEvaluation;
+}): DecisionRow[] => {
+  const scoring = args.classificationScoring;
+  const robustness = args.classificationRobustness;
+  const hasDistanceToAlcubierre = Number.isFinite(
+    scoring?.distance_to_alcubierre_reference ?? Number.NaN,
+  );
+  const hasDistanceToLowExpansion = Number.isFinite(
+    scoring?.distance_to_low_expansion_reference ?? Number.NaN,
+  );
+
+  return [
+    {
+      id: "preconditions_ready_for_family_verdict",
+      condition:
+        "Controls independent, required views rendered, provenance hashes present, and runtime status provenance present",
+      status: args.preconditions.readyForFamilyVerdict.toString() as DecisionRowStatus,
+      interpretation: args.preconditions.readyForFamilyVerdict
+        ? "Evidence integrity prerequisites satisfied."
+        : "Evidence prerequisites failed; verdict must remain inconclusive.",
+    },
+    {
+      id: "renderer_calibrated_by_controls",
+      condition:
+        "Controls act as calibration references: Alcubierre strong signed lane + Natario low-expansion lane with stable congruence",
+      status:
+        (
+          args.preconditions.readyForFamilyVerdict &&
+          args.controlsCalibratedByReferences
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        args.preconditions.readyForFamilyVerdict && args.controlsCalibratedByReferences
+          ? "Control references calibrate this diagnostic lane; NHM2 can be classified relative to them."
+          : args.preconditions.readyForFamilyVerdict
+            ? "Control calibration failed (congruence mismatch, weak Alcubierre lane, or non-low Natario lane)."
+            : "Skipped because preconditions failed.",
+    },
+    {
+      id: "nhm2_distance_to_alcubierre_reference",
+      condition:
+        "Distance from NHM2 morphology feature vector to Alcubierre reference under the York diagnostic contract",
+      status: hasDistanceToAlcubierre.toString() as DecisionRowStatus,
+      interpretation: hasDistanceToAlcubierre
+        ? `distance=${scoring?.distance_to_alcubierre_reference}`
+        : "Distance unavailable (feature set incomplete).",
+    },
+    {
+      id: "nhm2_distance_to_low_expansion_reference",
+      condition:
+        "Distance from NHM2 morphology feature vector to low-expansion reference under the York diagnostic contract",
+      status: hasDistanceToLowExpansion.toString() as DecisionRowStatus,
+      interpretation: hasDistanceToLowExpansion
+        ? `distance=${scoring?.distance_to_low_expansion_reference}`
+        : "Distance unavailable (feature set incomplete).",
+    },
+    {
+      id: "nhm2_reference_margin_sufficient",
+      condition:
+        "Winning reference distance exceeds configured margin and threshold policy",
+      status:
+        (
+          args.preconditions.readyForFamilyVerdict &&
+          args.controlsCalibratedByReferences &&
+          scoring?.margin_sufficient === true &&
+          scoring?.winning_reference_within_threshold === true
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        args.preconditions.readyForFamilyVerdict && args.controlsCalibratedByReferences
+          ? `margin=${scoring?.reference_margin ?? "null"} min=${scoring?.margin_min ?? "null"} threshold=${scoring?.reference_match_threshold ?? "null"}`
+          : "Skipped because calibration/preconditions failed.",
+    },
+    {
+      id: "nhm2_distinct_under_current_york_diagnostic",
+      condition:
+        "Renderer is calibrated and NHM2 has no clear winning reference by configured margin policy",
+      status:
+        (
+          args.preconditions.readyForFamilyVerdict &&
+          args.controlsCalibratedByReferences &&
+          scoring?.distinct_by_policy === true
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        args.preconditions.readyForFamilyVerdict &&
+        args.controlsCalibratedByReferences &&
+        scoring?.distinct_by_policy === true
+          ? "NHM2 is distinct under this diagnostic-local York classification."
+          : args.preconditions.readyForFamilyVerdict
+            ? "NHM2 has a clear winning reference under configured distance policy, or calibration is not ready."
+            : "Skipped because preconditions failed.",
+    },
+    {
+      id: "classification_robustness_evaluated",
+      condition:
+        "Classification robustness sweep executed over nearby policy choices defined in the contract",
+      status: ((robustness?.variantResults.length ?? 0) > 0).toString() as DecisionRowStatus,
+      interpretation: `variants=${robustness?.totalVariants ?? 0} evaluated=${robustness?.evaluatedVariants ?? 0}`,
+    },
+    {
+      id: "nhm2_classification_stable_under_contract_perturbations",
+      condition:
+        "Current NHM2 family verdict remains dominant across nearby weight/threshold/feature-drop policy variants",
+      status: (robustness?.stabilityStatus.startsWith("stable_") ?? false).toString() as DecisionRowStatus,
+      interpretation: `status=${robustness?.stabilityStatus ?? "null"} dominant=${robustness?.dominantVerdict ?? "null"} fraction=${robustness?.dominantFraction ?? 0}`,
+    },
+    {
+      id: "nhm2_classification_marginal_under_contract_perturbations",
+      condition:
+        "Current NHM2 family verdict remains preferred but with weak dominance under nearby policy variants",
+      status: (robustness?.stabilityStatus.startsWith("marginal_") ?? false).toString() as DecisionRowStatus,
+      interpretation: `status=${robustness?.stabilityStatus ?? "null"} stable_min=${robustness?.stabilityPolicy.stable_fraction_min ?? "null"} marginal_min=${robustness?.stabilityPolicy.marginal_fraction_min ?? "null"}`,
+    },
+    {
+      id: "nhm2_classification_unstable_under_contract_perturbations",
+      condition:
+        "Current NHM2 family verdict is sensitive to nearby policy choices and does not maintain a dominant class",
+      status: (robustness?.stabilityStatus === "unstable_multiclass").toString() as DecisionRowStatus,
+      interpretation: `status=${robustness?.stabilityStatus ?? "null"} counts=${robustness ? JSON.stringify(robustness.verdictCounts) : "{}"}`,
+    },
+    {
+      id: "renderer_or_conversion_path_clear",
+      condition:
+        "Offline-vs-rendered York slice congruence has no hash/remap/suppression/downstream mismatch",
+      status:
+        (
+          !args.yorkCongruence.hashMismatch &&
+          !args.yorkCongruence.rhoRemapMismatch &&
+          !args.yorkCongruence.nearZeroSuppressionMismatch &&
+          !args.yorkCongruence.downstreamRenderMismatch
+        ).toString() as DecisionRowStatus,
+      interpretation:
+        args.yorkCongruence.hashMismatch ||
+        args.yorkCongruence.rhoRemapMismatch ||
+        args.yorkCongruence.nearZeroSuppressionMismatch ||
+        args.yorkCongruence.downstreamRenderMismatch
+          ? "Renderer/conversion mismatch remains in this lane."
+          : "Renderer/conversion congruence checks pass in this lane.",
+    },
+  ];
+};
+
+const evaluateDiagnosticLane = (args: {
+  lane: YorkDiagnosticLane;
+  contract: YorkDiagnosticContract;
+  yorkViews: HullScientificRenderView[];
+  runtimeStatus: ProofPackPayload["provenance"]["runtimeStatus"];
+  cases: CaseResult[];
+}): LaneProofPackEvaluation => {
+  const alc = args.cases.find((entry) => entry.caseId === "alcubierre_control") ?? null;
+  const nat = args.cases.find((entry) => entry.caseId === "natario_control") ?? null;
+  const nhm2 = args.cases.find((entry) => entry.caseId === "nhm2_certified") ?? null;
+
+  const fallbackPreconditions: ProofPackPreconditions = {
+    controlsIndependent: false,
+    allRequiredViewsRendered: false,
+    provenanceHashesPresent: false,
+    runtimeStatusProvenancePresent: false,
+    readyForFamilyVerdict: false,
+  };
+  if (!alc || !nat || !nhm2) {
+    const guardFailures: GuardFailure[] = [
+      {
+        code: "proof_pack_lane_missing_required_cases",
+        detail: `${args.lane.lane_id}:required=alcubierre_control,natario_control,nhm2_certified`,
+      },
+    ];
+    return {
+      lane_id: args.lane.lane_id,
+      active: args.lane.active,
+      supported: args.lane.supported,
+      unsupported_reason: args.lane.unsupported_reason,
+      observer: args.lane.observer,
+      foliation: args.lane.foliation,
+      theta_definition: args.lane.theta_definition,
+      kij_sign_convention: args.lane.kij_sign_convention,
+      classification_scope: args.lane.classification_scope,
+      cases: args.cases,
+      controlDebug: buildControlDebug(args.cases),
+      preconditions: fallbackPreconditions,
+      controlsCalibratedByReferences: false,
+      guardFailures,
+      decisionTable: [],
+      classificationScoring: null,
+      classificationRobustness: null,
+      verdict: "inconclusive",
+      notes: [`lane ${args.lane.lane_id} missing required case outputs`],
+    };
+  }
+
+  const { preconditions, guardFailures } = evaluateProofPackPreconditions({
+    yorkViews: args.yorkViews,
+    cases: args.cases,
+    runtimeStatus: args.runtimeStatus,
+  });
+  const yorkCongruence = evaluateYorkSliceCongruence(args.cases);
+  guardFailures.push(...yorkCongruence.guardFailures);
+
+  const alcStrong = hasStrongForeAftYork(alc.primaryYork);
+  const alcSignalSufficient = hasSufficientSignalForAlcubierreControl(alc);
+  const natLow = isLowExpansion(nat.primaryYork);
+  const congruenceCalibrationFailed =
+    yorkCongruence.hashMismatch ||
+    yorkCongruence.rhoRemapMismatch ||
+    yorkCongruence.nearZeroSuppressionMismatch ||
+    yorkCongruence.downstreamRenderMismatch;
+  const controlsCalibratedByReferences =
+    preconditions.readyForFamilyVerdict &&
+    !congruenceCalibrationFailed &&
+    alcSignalSufficient &&
+    alcStrong &&
+    natLow;
+
+  const classificationScoring = scoreNhm2AgainstReferenceControls({
+    contract: args.contract,
+    alcubierreFeatures: alc.classificationFeatures,
+    natarioFeatures: nat.classificationFeatures,
+    nhm2Features: nhm2.classificationFeatures,
+  });
+  const verdict = decideControlFamilyVerdict({
+    preconditions,
+    controlsCalibratedByReferences,
+    classificationScoring,
+    yorkCongruence,
+  });
+  const classificationRobustness = evaluateClassificationRobustness({
+    contract: args.contract,
+    preconditions,
+    controlsCalibratedByReferences,
+    yorkCongruence,
+    alcubierreFeatures: alc.classificationFeatures,
+    natarioFeatures: nat.classificationFeatures,
+    nhm2Features: nhm2.classificationFeatures,
+    baselineVerdict: verdict,
+    baselineScoring: classificationScoring,
+  });
+  const decisionTable = buildLaneDecisionTable({
+    preconditions,
+    controlsCalibratedByReferences,
+    classificationScoring,
+    classificationRobustness,
+    yorkCongruence,
+  });
+
+  const notes: string[] = [];
+  notes.push(
+    "Controls are calibration references in this proof-pack; NHM2 classification is diagnostic-local and not a full theory identity claim.",
+  );
+  notes.push(
+    `lane=${args.lane.lane_id} observer=${args.lane.observer} foliation=${args.lane.foliation} theta_definition=${args.lane.theta_definition}`,
+  );
+  if (!preconditions.readyForFamilyVerdict) {
+    notes.push("Family verdict forced to inconclusive because proof-pack preconditions are not satisfied.");
+  }
+  if (guardFailures.length > 0) {
+    notes.push(
+      `Guard failures: ${guardFailures.map((entry) => `${entry.code}:${entry.detail}`).join("; ")}`,
+    );
+  }
+  if (controlsCalibratedByReferences) {
+    notes.push("Control behavior is separated: Alcubierre-like strong signed lane vs Natario-like near-zero lane.");
+  }
+  if (!controlsCalibratedByReferences && preconditions.readyForFamilyVerdict) {
+    notes.push("Renderer calibration is not established by controls for this run; verdict remains inconclusive by contract.");
+  }
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) {
+    notes.push("NHM2 primary York behavior aligns with low-expansion Natario-like control in this run.");
+  }
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE) {
+    notes.push("NHM2 primary York behavior aligns with the Alcubierre-like calibration reference in this run.");
+  }
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY) {
+    notes.push("NHM2 is classified as distinct under the current York diagnostic lane after control calibration.");
+  }
+  notes.push(
+    `Robustness status=${classificationRobustness.stabilityStatus} dominant=${classificationRobustness.dominantVerdict ?? "null"} fraction=${classificationRobustness.dominantFraction}.`,
+  );
+
+  return {
+    lane_id: args.lane.lane_id,
+    active: args.lane.active,
+    supported: args.lane.supported,
+    unsupported_reason: args.lane.unsupported_reason,
+    observer: args.lane.observer,
+    foliation: args.lane.foliation,
+    theta_definition: args.lane.theta_definition,
+    kij_sign_convention: args.lane.kij_sign_convention,
+    classification_scope: args.lane.classification_scope,
+    cases: args.cases,
+    controlDebug: buildControlDebug(args.cases),
+    preconditions,
+    controlsCalibratedByReferences,
+    guardFailures,
+    decisionTable,
+    classificationScoring,
+    classificationRobustness,
+    verdict,
+    notes,
+  };
+};
+
+const buildUnsupportedLaneEvaluation = (lane: YorkDiagnosticLane): LaneProofPackEvaluation => {
+  const preconditions: ProofPackPreconditions = {
+    controlsIndependent: false,
+    allRequiredViewsRendered: false,
+    provenanceHashesPresent: false,
+    runtimeStatusProvenancePresent: false,
+    readyForFamilyVerdict: false,
+  };
+  const unsupportedReason =
+    lane.unsupported_reason ??
+    "lane declared unsupported in contract and intentionally not executed";
+  const guardFailures: GuardFailure[] = [
+    {
+      code: "proof_pack_lane_unsupported",
+      detail: `${lane.lane_id}:${unsupportedReason}`,
+    },
+  ];
+  return {
+    lane_id: lane.lane_id,
+    active: lane.active,
+    supported: false,
+    unsupported_reason: unsupportedReason,
+    observer: lane.observer,
+    foliation: lane.foliation,
+    theta_definition: lane.theta_definition,
+    kij_sign_convention: lane.kij_sign_convention,
+    classification_scope: lane.classification_scope,
+    cases: [],
+    controlDebug: [],
+    preconditions,
+    controlsCalibratedByReferences: false,
+    guardFailures,
+    decisionTable: [
+      {
+        id: "lane_supported",
+        condition: "diagnostic lane is declared supported and executable",
+        status: "false",
+        interpretation: unsupportedReason,
+      },
+    ],
+    classificationScoring: null,
+    classificationRobustness: null,
+    verdict: "inconclusive",
+    notes: [
+      `lane ${lane.lane_id} is unsupported: ${unsupportedReason}`,
+      "No frame computation was executed for this lane to avoid fake cross-frame claims.",
+    ],
+  };
+};
+
+const mapStableStatusFromVerdict = (
+  verdict: DecisionVerdict | null,
+): CrossLaneComparisonStatus => {
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) {
+    return "lane_stable_low_expansion_like";
+  }
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE) {
+    return "lane_stable_alcubierre_like";
+  }
+  if (verdict === NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY) {
+    return "lane_stable_distinct";
+  }
+  return "lane_comparison_inconclusive";
+};
+
+const compareLaneVerdictPair = (
+  baselineVerdict: DecisionVerdict,
+  alternateVerdict: DecisionVerdict,
+): CrossLaneComparisonStatus => {
+  const pair = new Set([baselineVerdict, alternateVerdict]);
+  if (
+    pair.has(NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) &&
+    pair.has(NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY)
+  ) {
+    return "lane_dependent_between_low_and_distinct";
+  }
+  if (
+    pair.has(NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) &&
+    pair.has(NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE)
+  ) {
+    return "lane_dependent_between_low_and_alcubierre";
+  }
+  if (
+    pair.has(NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE) &&
+    pair.has(NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY)
+  ) {
+    return "lane_dependent_between_alcubierre_and_distinct";
+  }
+  return "lane_comparison_inconclusive";
+};
+
+export const buildCrossLaneComparison = (args: {
+  baseline: LaneProofPackEvaluation | null;
+  alternate: LaneProofPackEvaluation | null;
+  baselineLaneId: string | null;
+  alternateLaneId: string | null;
+}): CrossLaneComparison => {
+  const baseline = args.baseline;
+  const alternate = args.alternate;
+  const baselineSupported = !!baseline?.supported;
+  const alternateSupported = !!alternate?.supported;
+  const baselineCalibrated =
+    !!baseline?.preconditions.readyForFamilyVerdict &&
+    baseline?.controlsCalibratedByReferences === true;
+  const alternateCalibrated =
+    !!alternate?.preconditions.readyForFamilyVerdict &&
+    alternate?.controlsCalibratedByReferences === true;
+
+  const baselineVerdict = baseline?.verdict ?? null;
+  const alternateVerdict = alternate?.verdict ?? null;
+  const sameClassification =
+    baselineVerdict != null &&
+    alternateVerdict != null &&
+    baselineVerdict === alternateVerdict &&
+    baselineVerdict !== "inconclusive";
+
+  let crossLaneStatus: CrossLaneComparisonStatus = "lane_comparison_inconclusive";
+  const notes: string[] = [];
+
+  if (!baseline || !alternate) {
+    notes.push("Missing baseline or alternate lane evaluation.");
+  } else if (!baselineSupported || !alternateSupported) {
+    notes.push("At least one lane is unsupported; cross-lane comparison remains inconclusive.");
+  } else if (!baselineCalibrated || !alternateCalibrated) {
+    notes.push("At least one lane failed control calibration; cross-lane verdict comparison is blocked.");
+  } else if (baselineVerdict === "inconclusive" || alternateVerdict === "inconclusive") {
+    notes.push("At least one lane verdict is inconclusive under current preconditions.");
+  } else if (sameClassification) {
+    crossLaneStatus = mapStableStatusFromVerdict(baselineVerdict);
+    notes.push("Both lanes calibrate and agree on NHM2 classification.");
+  } else {
+    crossLaneStatus = compareLaneVerdictPair(baselineVerdict, alternateVerdict);
+    notes.push("Both lanes calibrate but disagree on NHM2 classification (lane dependence under current diagnostics).");
+  }
+
+  return {
+    baseline_lane_id: args.baselineLaneId,
+    alternate_lane_id: args.alternateLaneId,
+    baseline_verdict: baselineVerdict,
+    alternate_verdict: alternateVerdict,
+    same_classification: sameClassification,
+    cross_lane_status: crossLaneStatus,
+    falsifiers: {
+      baseline_controls_calibrated: baselineCalibrated,
+      alternate_controls_calibrated: alternateCalibrated,
+      baseline_supported: baselineSupported,
+      alternate_supported: alternateSupported,
+    },
+    notes,
+  };
+};
+
 const renderMarkdown = (payload: ProofPackPayload): string => {
+  const laneRowsSummary = payload.diagnosticLanes
+    .map(
+      (lane) =>
+        `| ${lane.lane_id} | ${lane.active} | ${lane.supported} | ${lane.observer} | ${lane.foliation} | ${lane.theta_definition} | ${lane.kij_sign_convention} | ${lane.preconditions.readyForFamilyVerdict} | ${lane.controlsCalibratedByReferences} | ${lane.verdict} |`,
+    )
+    .join("\n");
+  const laneGuardRows = payload.diagnosticLanes
+    .flatMap((lane) =>
+      lane.guardFailures.map(
+        (failure) =>
+          `| ${lane.lane_id} | ${failure.code} | ${failure.detail} |`,
+      ),
+    )
+    .join("\n");
+  const crossLaneRows = [
+    `| baseline_lane_id | ${payload.crossLaneComparison.baseline_lane_id ?? "null"} |`,
+    `| alternate_lane_id | ${payload.crossLaneComparison.alternate_lane_id ?? "null"} |`,
+    `| baseline_verdict | ${payload.crossLaneComparison.baseline_verdict ?? "null"} |`,
+    `| alternate_verdict | ${payload.crossLaneComparison.alternate_verdict ?? "null"} |`,
+    `| same_classification | ${payload.crossLaneComparison.same_classification} |`,
+    `| cross_lane_status | ${payload.crossLaneComparison.cross_lane_status} |`,
+    `| baseline_controls_calibrated | ${payload.crossLaneComparison.falsifiers.baseline_controls_calibrated} |`,
+    `| alternate_controls_calibrated | ${payload.crossLaneComparison.falsifiers.alternate_controls_calibrated} |`,
+    `| baseline_supported | ${payload.crossLaneComparison.falsifiers.baseline_supported} |`,
+    `| alternate_supported | ${payload.crossLaneComparison.falsifiers.alternate_supported} |`,
+  ].join("\n");
+  const crossLaneNotes = payload.crossLaneComparison.notes.length
+    ? payload.crossLaneComparison.notes.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
   const primaryViewLabel = payload.cases[0]?.primaryYork.view ?? "n/a";
   const laneRows = payload.cases
     .flatMap((entry) =>
@@ -1908,6 +3482,28 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
       return `| ${entry.caseId} | ${entry.familyExpectation} | ${raw?.min ?? "null"} | ${raw?.max ?? "null"} | ${raw?.absMax ?? "null"} | ${display?.min ?? "null"} | ${display?.max ?? "null"} | ${display?.absMax ?? "null"} | ${entry.primaryYork.coordinateMode ?? "null"} | ${entry.primaryYork.samplingChoice ?? "null"} | ${entry.primaryYork.supportOverlapPct ?? "null"} | ${thetaK?.maxAbs ?? "null"} | ${thetaK?.rms ?? "null"} | ${thetaK?.consistent ?? "null"} |`;
     })
     .join("\n");
+  const classificationFeatureRows = payload.cases
+    .map((entry) => {
+      const features = entry.classificationFeatures;
+      return `| ${entry.caseId} | ${features.theta_abs_max_raw ?? "null"} | ${features.theta_abs_max_display ?? "null"} | ${features.positive_count_xz ?? "null"} | ${features.negative_count_xz ?? "null"} | ${features.positive_count_xrho ?? "null"} | ${features.negative_count_xrho ?? "null"} | ${features.support_overlap_pct ?? "null"} | ${features.near_zero_theta ?? "null"} | ${features.signed_lobe_summary ?? "null"} | ${features.shell_map_activity ?? "null"} |`;
+    })
+    .join("\n");
+  const scoring = payload.classificationScoring;
+  const scoringRows = scoring
+    ? `| distance_to_alcubierre_reference | ${scoring.distance_to_alcubierre_reference ?? "null"} |\n| distance_to_low_expansion_reference | ${scoring.distance_to_low_expansion_reference ?? "null"} |\n| reference_margin | ${scoring.reference_margin ?? "null"} |\n| winning_reference | ${scoring.winning_reference ?? "null"} |\n| margin_sufficient | ${scoring.margin_sufficient} |\n| winning_reference_within_threshold | ${scoring.winning_reference_within_threshold} |\n| distinct_by_policy | ${scoring.distinct_by_policy} |\n| margin_min | ${scoring.margin_min} |\n| reference_match_threshold | ${scoring.reference_match_threshold} |\n| distinctness_threshold | ${scoring.distinctness_threshold} |\n| distance_metric | ${scoring.distance_metric} |\n| normalization_method | ${scoring.normalization_method} |`
+    : "| unavailable | unavailable |";
+  const robustness = payload.classificationRobustness;
+  const robustnessSummaryRows = robustness
+    ? `| baselineVerdict | ${robustness.baselineVerdict} |\n| stabilityStatus | ${robustness.stabilityStatus} |\n| dominantVerdict | ${robustness.dominantVerdict ?? "null"} |\n| dominantFraction | ${robustness.dominantFraction} |\n| stableVerdict | ${robustness.stableVerdict ?? "null"} |\n| totalVariants | ${robustness.totalVariants} |\n| evaluatedVariants | ${robustness.evaluatedVariants} |\n| stable_fraction_min | ${robustness.stabilityPolicy.stable_fraction_min} |\n| marginal_fraction_min | ${robustness.stabilityPolicy.marginal_fraction_min} |\n| count_nhm2_alcubierre_like_family | ${robustness.verdictCounts.nhm2_alcubierre_like_family} |\n| count_nhm2_low_expansion_family | ${robustness.verdictCounts.nhm2_low_expansion_family} |\n| count_nhm2_distinct_family | ${robustness.verdictCounts.nhm2_distinct_family} |\n| count_inconclusive | ${robustness.verdictCounts.inconclusive} |`
+    : "| unavailable | unavailable |";
+  const robustnessVariantRows = robustness
+    ? robustness.variantResults
+        .map(
+          (variant) =>
+            `| ${variant.variant_id} | ${variant.variant_type} | ${variant.policy_patch.feature_weight_feature ?? "null"} | ${variant.policy_patch.feature_weight_scale ?? "null"} | ${variant.policy_patch.reference_margin_min ?? "null"} | ${variant.policy_patch.reference_match_threshold ?? "null"} | ${variant.policy_patch.dropped_features.join(",") || "none"} | ${variant.verdict} | ${variant.scoring.winning_reference ?? "null"} | ${variant.scoring.reference_margin ?? "null"} | ${variant.scoring.margin_sufficient} |`,
+        )
+        .join("\n")
+    : "| unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable | unavailable |";
   const offlineRows = payload.cases
     .flatMap((entry) =>
       (entry.offlineYorkAudit?.byView ?? []).map((audit) => {
@@ -1971,6 +3567,42 @@ const renderMarkdown = (payload: ProofPackPayload): string => {
 - nhm2SnapshotPath: \`${payload.inputs.nhm2SnapshotPath}\`
 - yorkViews: \`${payload.inputs.yorkViews.join(", ")}\`
 
+## Diagnostic Contract
+- diagnosticContractId: \`${payload.diagnosticContractId}\`
+- version: \`${payload.diagnosticContract.version}\`
+- observer: \`${payload.diagnosticContract.observer}\`
+- foliation: \`${payload.diagnosticContract.foliation}\`
+- theta_definition: \`${payload.diagnosticContract.theta_definition}\`
+- kij_sign_convention: \`${payload.diagnosticContract.kij_sign_convention}\`
+- classificationScope: \`${payload.classificationScope}\`
+- reference alcubierre_control: ${payload.diagnosticContract.reference_controls.alcubierre_control.description}
+- reference natario_control: ${payload.diagnosticContract.reference_controls.natario_control.description}
+- feature_set: \`${payload.diagnosticContract.feature_set.join(", ")}\`
+- robustness.enabled: \`${payload.diagnosticContract.robustness_checks.enabled}\`
+- robustness.weight_perturbation_pct: \`${payload.diagnosticContract.robustness_checks.weight_perturbation_pct}\`
+- robustness.margin_variants: \`${payload.diagnosticContract.robustness_checks.margin_variants.join(", ")}\`
+- robustness.threshold_variants: \`${payload.diagnosticContract.robustness_checks.threshold_variants.join(", ")}\`
+- robustness.feature_drop_sets: \`${payload.diagnosticContract.robustness_checks.feature_drop_sets.map((entry) => `${entry.id}:${entry.drop_features.join("+")}`).join("; ") || "none"}\`
+- robustness.stability_policy: \`stable>=${payload.diagnosticContract.robustness_checks.stability_policy.stable_fraction_min}, marginal>=${payload.diagnosticContract.robustness_checks.stability_policy.marginal_fraction_min}\`
+
+## Diagnostic Lanes
+| lane_id | active | supported | observer | foliation | theta_definition | kij_sign_convention | ready_for_verdict | controls_calibrated | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+${laneRowsSummary || "| none | none | none | none | none | none | none | none | none | none |"}
+
+## Per-Lane Guard Failures
+| lane_id | code | detail |
+|---|---|---|
+${laneGuardRows || "| none | none | none |"}
+
+## Cross-Lane Comparison
+| metric | value |
+|---|---|
+${crossLaneRows}
+
+### Cross-Lane Notes
+${crossLaneNotes}
+
 ## Runtime Status Provenance
 - statusEndpoint: \`${payload.provenance.runtimeStatus.statusEndpoint}\`
 - reachable: \`${payload.provenance.runtimeStatus.reachable}\`
@@ -2005,6 +3637,26 @@ ${offlineRows}
 |---|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---|
 ${caseRows}
 
+## Classification Features
+| case | theta_abs_max_raw | theta_abs_max_display | positive_count_xz | negative_count_xz | positive_count_xrho | negative_count_xrho | support_overlap_pct | near_zero_theta | signed_lobe_summary | shell_map_activity |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---|---:|
+${classificationFeatureRows}
+
+## Classification Scoring
+| metric | value |
+|---|---|
+${scoringRows}
+
+## Classification Robustness Summary
+| metric | value |
+|---|---|
+${robustnessSummaryRows}
+
+## Classification Robustness Variants
+| variant_id | variant_type | weight_feature | weight_scale | margin_override | threshold_override | dropped_features | verdict | winning_reference | reference_margin | margin_sufficient |
+|---|---|---|---:|---:|---:|---|---|---|---:|---|
+${robustnessVariantRows}
+
 ## Preconditions
 | precondition | pass | policy |
 |---|---|---|
@@ -2033,6 +3685,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   frameEndpoint?: string;
   proxyFrameEndpoint?: string;
   compareDirectAndProxy?: boolean;
+  contractPath?: string;
   nhm2SnapshotPath?: string;
   outJsonPath?: string;
   outMdPath?: string;
@@ -2049,6 +3702,9 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     (compareDirectAndProxy
       ? `${baseUrl}/api/helix/hull-render/frame`
       : null);
+  const diagnosticContract = loadYorkDiagnosticContract(
+    options?.contractPath ?? YORK_DIAGNOSTIC_CONTRACT_PATH,
+  );
   const nhm2SnapshotPath = options?.nhm2SnapshotPath ?? DEFAULT_NHM2_SNAPSHOT_PATH;
   const outJsonPath = options?.outJsonPath ?? DEFAULT_OUT_JSON;
   const outMdPath = options?.outMdPath ?? DEFAULT_OUT_MD;
@@ -2062,6 +3718,24 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     height: Math.max(128, Math.floor(options?.frameSize?.height ?? 720)),
   };
   const runtimeStatus = await fetchRuntimeStatusProvenance(frameEndpoint);
+  const laneById = new Map(
+    diagnosticContract.lanes.map((lane) => [lane.lane_id, lane]),
+  );
+  const baselineLane =
+    laneById.get(diagnosticContract.baseline_lane_id) ??
+    diagnosticContract.lanes.find((lane) => lane.active && lane.supported) ??
+    diagnosticContract.lanes[0];
+  if (!baselineLane) {
+    throw new Error("no_diagnostic_lanes_configured");
+  }
+  const alternateLane =
+    (diagnosticContract.alternate_lane_id
+      ? laneById.get(diagnosticContract.alternate_lane_id)
+      : null) ??
+    diagnosticContract.lanes.find(
+      (lane) => lane.lane_id !== baselineLane.lane_id,
+    ) ??
+    null;
 
   const nhm2MetricVolumeRef = loadNhm2MetricVolumeRef(nhm2SnapshotPath);
   const alcMetricVolumeRef = buildControlMetricVolumeRef({
@@ -2093,291 +3767,114 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     requireNhm2CongruentFullSolve: false,
   });
 
-  const cases = await Promise.all([
-    runCase({
-      caseId: "alcubierre_control",
-      label: "Alcubierre-like control",
-      familyExpectation: "alcubierre-like-control",
-      metricVolumeRef: alcMetricVolumeRef,
-      frameEndpoint,
-      proxyFrameEndpoint,
-      compareDirectAndProxy,
-      requireCongruentNhm2FullSolve: false,
+  const runSupportedLane = async (
+    lane: YorkDiagnosticLane,
+  ): Promise<LaneProofPackEvaluation> => {
+    const cases = await Promise.all([
+      runCase({
+        diagnosticLane: lane,
+        caseId: "alcubierre_control",
+        label: "Alcubierre-like control",
+        familyExpectation: "alcubierre-like-control",
+        metricVolumeRef: alcMetricVolumeRef,
+        frameEndpoint,
+        proxyFrameEndpoint,
+        compareDirectAndProxy,
+        requireCongruentNhm2FullSolve: false,
+        yorkViews,
+        frameSize,
+      }),
+      runCase({
+        diagnosticLane: lane,
+        caseId: "natario_control",
+        label: "Natario-like control",
+        familyExpectation: "natario-like-control",
+        metricVolumeRef: natMetricVolumeRef,
+        frameEndpoint,
+        proxyFrameEndpoint,
+        compareDirectAndProxy,
+        requireCongruentNhm2FullSolve: false,
+        yorkViews,
+        frameSize,
+      }),
+      runCase({
+        diagnosticLane: lane,
+        caseId: "nhm2_certified",
+        label: "NHM2 certified snapshot",
+        familyExpectation: "nhm2-certified",
+        metricVolumeRef: nhm2MetricVolumeRef,
+        frameEndpoint,
+        proxyFrameEndpoint,
+        compareDirectAndProxy,
+        requireCongruentNhm2FullSolve: true,
+        yorkViews,
+        frameSize,
+      }),
+    ]);
+    return evaluateDiagnosticLane({
+      lane,
+      contract: diagnosticContract,
       yorkViews,
-      frameSize,
-    }),
-    runCase({
-      caseId: "natario_control",
-      label: "Natario-like control",
-      familyExpectation: "natario-like-control",
-      metricVolumeRef: natMetricVolumeRef,
-      frameEndpoint,
-      proxyFrameEndpoint,
-      compareDirectAndProxy,
-      requireCongruentNhm2FullSolve: false,
-      yorkViews,
-      frameSize,
-    }),
-    runCase({
-      caseId: "nhm2_certified",
-      label: "NHM2 certified snapshot",
-      familyExpectation: "nhm2-certified",
-      metricVolumeRef: nhm2MetricVolumeRef,
-      frameEndpoint,
-      proxyFrameEndpoint,
-      compareDirectAndProxy,
-      requireCongruentNhm2FullSolve: true,
-      yorkViews,
-      frameSize,
-    }),
-  ]);
+      runtimeStatus,
+      cases,
+    });
+  };
 
-  const alc = cases.find((entry) => entry.caseId === "alcubierre_control")!;
-  const nat = cases.find((entry) => entry.caseId === "natario_control")!;
-  const nhm2 = cases.find((entry) => entry.caseId === "nhm2_certified")!;
-
-  const alcStrong = hasStrongForeAftYork(alc.primaryYork);
-  const alcSignalSufficient = hasSufficientSignalForAlcubierreControl(alc);
-  const natLow = isLowExpansion(nat.primaryYork);
-  const nhm2Low = isLowExpansion(nhm2.primaryYork);
-  const nhm2MatchesNatLowExpansion = natLow && nhm2Low;
-  const nhm2IntendedAlcubierre = /warp\.metric\.t00\.alcubierre/i.test(
-    nhm2.metricVolumeRef.url ?? "",
+  const laneEvaluations: LaneProofPackEvaluation[] = [];
+  laneEvaluations.push(
+    baselineLane.supported ? await runSupportedLane(baselineLane) : buildUnsupportedLaneEvaluation(baselineLane),
   );
-  const { preconditions, guardFailures } = evaluateProofPackPreconditions({
-    yorkViews,
-    cases,
-    runtimeStatus,
-  });
-  const yorkCongruence = evaluateYorkSliceCongruence(cases);
-  guardFailures.push(...yorkCongruence.guardFailures);
-  const controlDebug = buildControlDebug(cases);
+  if (alternateLane && alternateLane.lane_id !== baselineLane.lane_id) {
+    laneEvaluations.push(
+      alternateLane.supported
+        ? await runSupportedLane(alternateLane)
+        : buildUnsupportedLaneEvaluation(alternateLane),
+    );
+  }
 
-  const decisionTable: DecisionRow[] = [
-    {
-      id: "preconditions_ready_for_family_verdict",
-      condition:
-        "Controls independent, required views rendered, provenance hashes present, and runtime status provenance present",
-      status: preconditions.readyForFamilyVerdict.toString() as DecisionRowStatus,
-      interpretation: preconditions.readyForFamilyVerdict
-        ? "Evidence integrity prerequisites satisfied."
-        : "Evidence prerequisites failed; verdict must remain inconclusive.",
-    },
-    {
-      id: "offline_raw_slice_matches_rendered_slice_hashes",
-      condition:
-        "Offline York slice hash matches rendered slice_array_hash for x-z and x-rho views",
-      status:
-        (
-          preconditions.readyForFamilyVerdict &&
-          !yorkCongruence.hashMismatch
-        ).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && !yorkCongruence.hashMismatch
-          ? "Offline extraction and rendered slice arrays are congruent."
-          : preconditions.readyForFamilyVerdict
-            ? "At least one rendered York slice hash diverges from offline extraction."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "xz_matches_but_xrho_differs_isolate_rho_remap",
-      condition:
-        "x-z York slice congruent while x-rho York slice diverges from offline remap",
-      status:
-        (
-          preconditions.readyForFamilyVerdict && yorkCongruence.rhoRemapMismatch
-        ).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && yorkCongruence.rhoRemapMismatch
-          ? "Likely cylindrical remap mismatch between offline and renderer path."
-          : preconditions.readyForFamilyVerdict
-            ? "No isolated cylindrical remap mismatch detected."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "raw_structure_nontrivial_but_near_zero_flattened",
-      condition:
-        "Offline raw York structure is nontrivial but rendered diagnostics report near-zero flattening",
-      status:
-        (
-          preconditions.readyForFamilyVerdict &&
-          yorkCongruence.nearZeroSuppressionMismatch
-        ).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && yorkCongruence.nearZeroSuppressionMismatch
-          ? "Display suppression policy likely flattening meaningful structure."
-          : preconditions.readyForFamilyVerdict
-            ? "No near-zero suppression mismatch detected."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "hash_match_but_downstream_render_or_display_issue",
-      condition:
-        "Offline and rendered hashes match but extrema/semantics disagree (downstream display/render issue)",
-      status:
-        (
-          preconditions.readyForFamilyVerdict &&
-          yorkCongruence.downstreamRenderMismatch
-        ).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && yorkCongruence.downstreamRenderMismatch
-          ? "Downstream render/display interpretation is likely responsible."
-          : preconditions.readyForFamilyVerdict
-            ? "No downstream mismatch detected after hash congruence."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "alcubierre_control_signal_sufficient",
-      condition:
-        "Alcubierre control has enough signed York structure (raw and offline lobe evidence) to support renderer/conversion attribution",
-      status:
-        (preconditions.readyForFamilyVerdict && alcSignalSufficient).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && alcSignalSufficient
-          ? "Alcubierre control signal is sufficient for strong pass/fail attribution."
-          : preconditions.readyForFamilyVerdict
-            ? "Alcubierre control is low-signal; keep renderer/conversion verdict inconclusive."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "renderer_or_conversion_wrong_if_alc_control_fails",
-      condition:
-        "Alcubierre control fails to show expected fore/aft York numerically (signed non-near-zero)",
-      status:
-        (
-          preconditions.readyForFamilyVerdict &&
-          alcSignalSufficient &&
-          !alcStrong
-        ).toString() as DecisionRowStatus,
-      interpretation: preconditions.readyForFamilyVerdict && alcSignalSufficient && !alcStrong
-        ? "Renderer/conversion lane is suspect under this control-family proof test."
-        : preconditions.readyForFamilyVerdict && !alcSignalSufficient
-          ? "Skipped because Alcubierre control is low-signal under this run."
-          : preconditions.readyForFamilyVerdict
-          ? "Alcubierre control passes this guard."
-          : "Skipped because preconditions failed.",
-    },
-    {
-      id: "renderer_fine_if_alc_works_nat_low",
-      condition:
-        "Alcubierre control works and Natario control remains near-zero expansion",
-      status:
-        (preconditions.readyForFamilyVerdict && alcStrong && natLow).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && alcStrong && natLow
-          ? "Renderer and conversion are consistent with control-family behavior."
-          : preconditions.readyForFamilyVerdict
-            ? "Control-family consistency not yet established."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "nhm2_not_wrong_if_matches_nat_low_expansion",
-      condition:
-        "NHM2 matches Natario-like low-expansion behavior under same York pipeline",
-      status:
-        (
-          preconditions.readyForFamilyVerdict &&
-          alcStrong &&
-          nhm2MatchesNatLowExpansion
-        ).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict && alcStrong && nhm2MatchesNatLowExpansion
-          ? "NHM2 is not wrong by York appearance alone; it behaves as low-expansion family."
-          : preconditions.readyForFamilyVerdict
-            ? "NHM2 low-expansion match not established from this run."
-            : "Skipped because preconditions failed.",
-    },
-    {
-      id: "solve_family_mismatch_if_nhm2_intended_alcubierre",
-      condition:
-        "NHM2 was intended Alcubierre-like but numerically matches Natario-like low-expansion behavior",
-      status:
-        (
-          preconditions.readyForFamilyVerdict &&
-          alcStrong &&
-          nhm2MatchesNatLowExpansion &&
-          nhm2IntendedAlcubierre
-        ).toString() as DecisionRowStatus,
-      interpretation:
-        preconditions.readyForFamilyVerdict &&
-        alcStrong &&
-        nhm2MatchesNatLowExpansion &&
-        nhm2IntendedAlcubierre
-          ? "Solve-family mismatch detected (intent vs realized family)."
-          : preconditions.readyForFamilyVerdict
-            ? "No solve-family mismatch trigger under current intent metadata."
-            : "Skipped because preconditions failed.",
-    },
-  ];
-
-  const verdict = decideControlFamilyVerdict({
-    preconditions,
-    alcStrong,
-    alcSignalSufficient,
-    natLow,
-    nhm2Low,
-    nhm2IntendedAlcubierre,
-    yorkCongruence,
+  const baselineEvaluation =
+    laneEvaluations.find((lane) => lane.lane_id === baselineLane.lane_id) ??
+    laneEvaluations[0];
+  if (!baselineEvaluation) {
+    throw new Error("proof_pack_lane_evaluation_missing");
+  }
+  const alternateEvaluation = alternateLane
+    ? laneEvaluations.find((lane) => lane.lane_id === alternateLane.lane_id) ?? null
+    : null;
+  const crossLaneComparison = buildCrossLaneComparison({
+    baseline: baselineEvaluation,
+    alternate: alternateEvaluation,
+    baselineLaneId: baselineLane.lane_id,
+    alternateLaneId: alternateLane?.lane_id ?? null,
   });
 
-  const notes: string[] = [];
-  if (!preconditions.readyForFamilyVerdict) {
-    notes.push(
-      "Family verdict forced to inconclusive because proof-pack preconditions are not satisfied.",
-    );
-  }
-  if (guardFailures.length > 0) {
-    notes.push(
-      `Guard failures: ${guardFailures.map((entry) => `${entry.code}:${entry.detail}`).join("; ")}`,
-    );
-  }
-  if (
-    guardFailures.some((entry) => entry.code === "proof_pack_control_theta_hash_collision")
-  ) {
-    notes.push(
-      "Collapse-point hint: gr-evolve-brick forwards metricT00Ref in sourceParams, but stress-energy field construction in buildStressEnergyBrick is driven by metricT00 scalar and warpFieldType, so differing metricT00Ref alone may not diverge theta.",
-    );
-  }
-  if (!alcStrong && alcSignalSufficient) {
-    notes.push(
-      "Alcubierre control did not present a strong signed fore/aft York lane in primary view; renderer/conversion suspicion is raised by policy.",
-    );
-  }
-  if (!alcSignalSufficient) {
-    notes.push(
-      "Alcubierre control signal is below near-zero threshold for strict renderer fault attribution; verdict remains inconclusive unless a concrete congruence mismatch is detected.",
-    );
-  }
-  if (yorkCongruence.hashMismatch) {
-    notes.push("Offline-vs-rendered York slice hash mismatch detected.");
-  }
-  if (yorkCongruence.rhoRemapMismatch) {
-    notes.push("x-rho cylindrical remap mismatch isolated against x-z baseline.");
-  }
-  if (yorkCongruence.nearZeroSuppressionMismatch) {
-    notes.push(
-      "Rendered near-zero/height suppression appears active despite meaningful offline signed structure.",
-    );
-  }
-  if (alcStrong && natLow) {
-    notes.push(
-      "Control behavior is separated: Alcubierre-like strong signed lane vs Natario-like near-zero lane.",
-    );
-  }
-  if (nhm2MatchesNatLowExpansion) {
-    notes.push(
-      "NHM2 primary York behavior aligns with low-expansion Natario-like control in this run.",
-    );
-  }
-  if (nhm2.snapshotMetrics?.thetaPlusKTrace.consistent === false) {
-    notes.push("NHM2 theta + K_trace consistency check is not within tolerance.");
-  }
+  const cases = baselineEvaluation.cases;
+  const controlDebug = baselineEvaluation.controlDebug;
+  const preconditions = baselineEvaluation.preconditions;
+  const guardFailures = baselineEvaluation.guardFailures;
+  const decisionTable = baselineEvaluation.decisionTable;
+  const classificationScoring = baselineEvaluation.classificationScoring;
+  const classificationRobustness = baselineEvaluation.classificationRobustness;
+  const verdict = baselineEvaluation.verdict;
+  const notes = [...baselineEvaluation.notes];
+  notes.push(
+    `Classification contract ${diagnosticContract.contract_id}@v${diagnosticContract.version} uses ${diagnosticContract.decision_policy.distance_metric} with margin=${diagnosticContract.decision_policy.reference_margin_min}.`,
+  );
+  notes.push(
+    `cross-lane status=${crossLaneComparison.cross_lane_status} baseline=${crossLaneComparison.baseline_verdict ?? "null"} alternate=${crossLaneComparison.alternate_verdict ?? "null"}`,
+  );
+  notes.push(...crossLaneComparison.notes);
 
   const payloadBase: ProofPackPayload = {
     artifactType: "warp_york_control_family_proof_pack/v1",
     generatedOn: DATE_STAMP,
     generatedAt: new Date().toISOString(),
     boundaryStatement: BOUNDARY_STATEMENT,
+    diagnosticContractId: diagnosticContract.contract_id,
+    classificationScope: diagnosticContract.classification_scope,
+    diagnosticContract,
+    diagnosticLanes: laneEvaluations,
+    crossLaneComparison,
     inputs: {
       baseUrl,
       frameEndpoint,
@@ -2392,6 +3889,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     preconditions,
     guardFailures,
     decisionTable,
+    classificationScoring,
+    classificationRobustness,
     verdict,
     notes,
     provenance: {
@@ -2444,6 +3943,7 @@ if (isEntryPoint) {
     frameEndpoint: readArgValue("--frame-endpoint"),
     proxyFrameEndpoint: readArgValue("--proxy-frame-endpoint"),
     compareDirectAndProxy,
+    contractPath: readArgValue("--contract"),
     nhm2SnapshotPath: readArgValue("--nhm2-snapshot"),
     outJsonPath: readArgValue("--out-json"),
     outMdPath: readArgValue("--out-md"),
