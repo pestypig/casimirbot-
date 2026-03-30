@@ -430,6 +430,26 @@ describe("warp york control-family proof pack", () => {
     ).toBe(true);
   });
 
+  it("flags suppression mismatch even for tiny amplitudes when signed structure is present", () => {
+    const caseEntry = makeCase("alcubierre_control", "theta-hash-alc") as any;
+    const xzView = caseEntry.perView.find((entry: any) => entry.view === "york-surface-3p1");
+    const offlineView = caseEntry.offlineYorkAudit.byView.find(
+      (entry: any) => entry.view === "york-surface-3p1",
+    );
+    offlineView.rawExtrema = { min: -1e-30, max: 1e-30, absMax: 1e-30 };
+    offlineView.counts = { positive: 12, negative: 9, zeroOrNearZero: 3, total: 24 };
+    xzView.nearZeroTheta = true;
+    xzView.displayExtrema.absMax = 0;
+    xzView.displayExtrema.heightScale = 0;
+    const congruence = evaluateYorkSliceCongruence([caseEntry]);
+    expect(congruence.nearZeroSuppressionMismatch).toBe(true);
+    expect(
+      congruence.guardFailures.some(
+        (failure) => failure.code === "proof_pack_york_near_zero_suppression_mismatch",
+      ),
+    ).toBe(true);
+  });
+
   it("computes offline York audit slices for x-z and x-rho", () => {
     const dims: [number, number, number] = [4, 4, 4];
     const theta = new Float32Array(dims[0] * dims[1] * dims[2]);

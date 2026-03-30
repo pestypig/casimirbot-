@@ -2004,6 +2004,24 @@ const computeSliceRawFiniteRange = (data: Float32Array): [number, number] => {
   return [min, max];
 };
 
+const detectMeaningfulSignedThetaStructure = (
+  data: Float32Array,
+  absMax: number,
+): boolean => {
+  if (!(data instanceof Float32Array) || data.length === 0) return false;
+  const structuralFloor = Math.max(Math.abs(absMax) * 1e-3, 1e-45);
+  let positive = 0;
+  let negative = 0;
+  for (let i = 0; i < data.length; i += 1) {
+    const value = data[i];
+    if (!Number.isFinite(value) || Math.abs(value) < structuralFloor) continue;
+    if (value > 0) positive += 1;
+    else if (value < 0) negative += 1;
+    if (positive >= 2 && negative >= 2) return true;
+  }
+  return false;
+};
+
 const percentile = (values: number[], q: number): number => {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -2412,9 +2430,14 @@ const renderYorkSurfacePanel = (
   const minTheta = Number.isFinite(slice.min) ? slice.min : 0;
   const maxTheta = Number.isFinite(slice.max) ? slice.max : 0;
   const maxAbsTheta = Math.max(Math.abs(minTheta), Math.abs(maxTheta), 1e-45);
-  const nearZeroTheta =
+  const legacyNearZeroTheta =
     maxAbsTheta <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
     Math.abs(maxTheta - minTheta) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD;
+  const hasMeaningfulSignedStructure = detectMeaningfulSignedThetaStructure(
+    slice.data,
+    maxAbsTheta,
+  );
+  const nearZeroTheta = legacyNearZeroTheta && !hasMeaningfulSignedStructure;
   const displayGain = 1;
 
   const yawRad = (38 * Math.PI) / 180;
@@ -2908,9 +2931,14 @@ const computeYorkFrameDiagnostics = (
     1e-45,
   );
   const displayRangeMethod = "computeSliceRange:diverging:p98-abs-symmetric";
-  const nearZeroTheta =
+  const legacyNearZeroTheta =
     thetaAbsMaxRaw <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD ||
     Math.abs(thetaMaxRaw - thetaMinRaw) <= YORK_NEAR_ZERO_THETA_ABS_THRESHOLD;
+  const hasMeaningfulSignedStructure = detectMeaningfulSignedThetaStructure(
+    thetaSlice,
+    thetaAbsMaxRaw,
+  );
+  const nearZeroTheta = legacyNearZeroTheta && !hasMeaningfulSignedStructure;
   const displayGain = 1;
   const heightScale = nearZeroTheta ? 0 : 0.9 * displayGain;
 
