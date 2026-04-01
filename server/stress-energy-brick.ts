@@ -5,6 +5,18 @@ import { enhancedAvgEnergyDensity, natarioShiftFromDensity } from "../modules/dy
 import { computeInvariantMassFromFluxTotals } from "../modules/gr/stress-energy-integrals.ts";
 import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.ts";
 
+export type Nhm2SourceRedesignMode =
+  | "signed_shell_bias"
+  | "coupling_localization"
+  | "drive_vs_geometry_split"
+  | "source_profile_simplified_signed";
+
+export type Nhm2SourceReformulationMode =
+  | "volume_driven_signed_source"
+  | "fore_aft_antisymmetric_driver"
+  | "geometry_source_decoupling"
+  | "shell_to_dual_layer_family";
+
 export interface StressEnergyBrickParams {
   dims: [number, number, number];
   bounds?: { min: Vec3; max: Vec3 };
@@ -26,6 +38,8 @@ export interface StressEnergyBrickParams {
   metricT00Source?: string;
   metricT00Ref?: string;
   warpFieldType?: "natario" | "natario_sdf" | "alcubierre" | "irrotational";
+  sourceRedesignMode?: Nhm2SourceRedesignMode | null;
+  sourceReformulationMode?: Nhm2SourceReformulationMode | null;
   observerRapidityCap?: number;
   observerTypeITolerance?: number;
 }
@@ -105,6 +119,8 @@ export interface StressEnergyMappingStats {
   shape_function_id?: string;
   warpFieldType?: string;
   metricT00Ref?: string;
+  sourceRedesignMode?: Nhm2SourceRedesignMode | null;
+  sourceReformulationMode?: Nhm2SourceReformulationMode | null;
 }
 
 export type ObserverMarginSource = "algebraic_type_i" | "capped_search";
@@ -162,6 +178,8 @@ export interface StressEnergyBrick {
   source_branch?: string;
   shape_function_id?: string;
   warpFieldType?: string;
+  sourceRedesignMode?: Nhm2SourceRedesignMode | null;
+  sourceReformulationMode?: Nhm2SourceReformulationMode | null;
   channels: {
     t00: StressEnergyChannel;
     Sx: StressEnergyChannel;
@@ -184,17 +202,32 @@ type StressEnergyFamilyId =
   | "alcubierre_control"
   | "natario_control"
   | "nhm2_certified"
+  | "nhm2_redesign_signed_shell_bias"
+  | "nhm2_redesign_coupling_localization"
+  | "nhm2_redesign_drive_vs_geometry_split"
+  | "nhm2_redesign_source_profile_simplified_signed"
+  | "nhm2_reform_volume_driven_signed_source"
+  | "nhm2_reform_fore_aft_antisymmetric_driver"
+  | "nhm2_reform_geometry_source_decoupling"
+  | "nhm2_reform_shell_to_dual_layer_family"
   | "irrotational_control"
   | "vdb_control"
   | "unknown";
 
-type StressEnergySourceBranch = "metric_t00_ref" | "warp_field_type" | "pipeline_default";
+type StressEnergySourceBranch =
+  | "metric_t00_ref"
+  | "warp_field_type"
+  | "pipeline_default"
+  | "source_redesign_mode"
+  | "source_reformulation_mode";
 
 type StressEnergyFamilyContext = {
   familyId: StressEnergyFamilyId;
   sourceBranch: StressEnergySourceBranch;
   warpFieldType: "natario" | "natario_sdf" | "alcubierre" | "irrotational";
   shapeFunctionId: string;
+  sourceRedesignMode?: Nhm2SourceRedesignMode | null;
+  sourceReformulationMode?: Nhm2SourceReformulationMode | null;
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -271,6 +304,32 @@ const blendDirections = (a: Vec3, b: Vec3 | null, weight: number): Vec3 => {
 
 const normalizeWarpFieldType = (value: unknown): "natario" | "natario_sdf" | "alcubierre" | "irrotational" | null => {
   if (value === "natario" || value === "natario_sdf" || value === "alcubierre" || value === "irrotational") {
+    return value;
+  }
+  return null;
+};
+
+const normalizeNhm2SourceRedesignMode = (value: unknown): Nhm2SourceRedesignMode | null => {
+  if (
+    value === "signed_shell_bias" ||
+    value === "coupling_localization" ||
+    value === "drive_vs_geometry_split" ||
+    value === "source_profile_simplified_signed"
+  ) {
+    return value;
+  }
+  return null;
+};
+
+const normalizeNhm2SourceReformulationMode = (
+  value: unknown,
+): Nhm2SourceReformulationMode | null => {
+  if (
+    value === "volume_driven_signed_source" ||
+    value === "fore_aft_antisymmetric_driver" ||
+    value === "geometry_source_decoupling" ||
+    value === "shell_to_dual_layer_family"
+  ) {
     return value;
   }
   return null;
@@ -378,6 +437,143 @@ const resolveStressEnergyFamilyContext = (args: {
     sourceBranch: "pipeline_default",
     warpFieldType: "natario",
     shapeFunctionId: "natario_shift_shell_v1",
+  };
+};
+
+const applyNhm2SourceRedesignContext = (
+  context: StressEnergyFamilyContext,
+  sourceRedesignMode: Nhm2SourceRedesignMode | null,
+): StressEnergyFamilyContext => {
+  if (context.familyId !== "nhm2_certified" || sourceRedesignMode == null) {
+    return context;
+  }
+  if (sourceRedesignMode === "signed_shell_bias") {
+    return {
+      familyId: "nhm2_redesign_signed_shell_bias",
+      sourceBranch: "source_redesign_mode",
+      warpFieldType: context.warpFieldType,
+      shapeFunctionId: "nhm2_redesign_signed_shell_bias_v1",
+      sourceRedesignMode,
+    };
+  }
+  if (sourceRedesignMode === "coupling_localization") {
+    return {
+      familyId: "nhm2_redesign_coupling_localization",
+      sourceBranch: "source_redesign_mode",
+      warpFieldType: context.warpFieldType,
+      shapeFunctionId: "nhm2_redesign_coupling_localization_v1",
+      sourceRedesignMode,
+    };
+  }
+  if (sourceRedesignMode === "drive_vs_geometry_split") {
+    return {
+      familyId: "nhm2_redesign_drive_vs_geometry_split",
+      sourceBranch: "source_redesign_mode",
+      warpFieldType: context.warpFieldType,
+      shapeFunctionId: "nhm2_redesign_drive_vs_geometry_split_v1",
+      sourceRedesignMode,
+    };
+  }
+  return {
+    familyId: "nhm2_redesign_source_profile_simplified_signed",
+    sourceBranch: "source_redesign_mode",
+    warpFieldType: context.warpFieldType,
+    shapeFunctionId: "nhm2_redesign_source_profile_simplified_signed_v1",
+    sourceRedesignMode,
+  };
+};
+
+const applyNhm2SourceReformulationContext = (
+  context: StressEnergyFamilyContext,
+  sourceReformulationMode: Nhm2SourceReformulationMode | null,
+): StressEnergyFamilyContext => {
+  if (context.familyId !== "nhm2_certified" || sourceReformulationMode == null) {
+    return context;
+  }
+  if (sourceReformulationMode === "volume_driven_signed_source") {
+    return {
+      familyId: "nhm2_reform_volume_driven_signed_source",
+      sourceBranch: "source_reformulation_mode",
+      warpFieldType: context.warpFieldType,
+      shapeFunctionId: "nhm2_reform_volume_driven_signed_source_v1",
+      sourceReformulationMode,
+    };
+  }
+  if (sourceReformulationMode === "fore_aft_antisymmetric_driver") {
+    return {
+      familyId: "nhm2_reform_fore_aft_antisymmetric_driver",
+      sourceBranch: "source_reformulation_mode",
+      warpFieldType: context.warpFieldType,
+      shapeFunctionId: "nhm2_reform_fore_aft_antisymmetric_driver_v1",
+      sourceReformulationMode,
+    };
+  }
+  if (sourceReformulationMode === "geometry_source_decoupling") {
+    return {
+      familyId: "nhm2_reform_geometry_source_decoupling",
+      sourceBranch: "source_reformulation_mode",
+      warpFieldType: context.warpFieldType,
+      shapeFunctionId: "nhm2_reform_geometry_source_decoupling_v1",
+      sourceReformulationMode,
+    };
+  }
+  return {
+    familyId: "nhm2_reform_shell_to_dual_layer_family",
+    sourceBranch: "source_reformulation_mode",
+    warpFieldType: context.warpFieldType,
+    shapeFunctionId: "nhm2_reform_shell_to_dual_layer_family_v1",
+    sourceReformulationMode,
+  };
+};
+
+type Nhm2StructuralScalars = {
+  xNorm: number;
+  axialBias: number;
+  signedLongitudinal: number;
+  shellSharpen: number;
+  volumeEnvelope: number;
+  frontLobe: number;
+  aftLobe: number;
+  antisymmetricDriver: number;
+  dualLayerEnvelope: number;
+};
+
+const computeNhm2StructuralScalars = (args: {
+  px: number;
+  py: number;
+  pz: number;
+  centerDist: number;
+  wallSigma: number;
+  axes: Vec3;
+}): Nhm2StructuralScalars => {
+  const xNorm = args.px / Math.max(args.axes[0], 1e-6);
+  const axialBias = 0.5 + 0.5 * Math.tanh(xNorm / 0.25);
+  const signedLongitudinal = clamp01(axialBias) * 2 - 1;
+  const shellSharpen = Math.exp(
+    -0.5 * Math.pow(args.centerDist / Math.max(args.wallSigma * 0.72, 1e-6), 2),
+  );
+  const volumeEnvelope = Math.exp(
+    -0.5 *
+      (Math.pow(args.px / Math.max(args.axes[0] * 0.58, 1e-6), 2) +
+        Math.pow(args.py / Math.max(args.axes[1] * 0.72, 1e-6), 2) +
+        Math.pow(args.pz / Math.max(args.axes[2] * 0.72, 1e-6), 2)),
+  );
+  const frontLobe = gaussian(xNorm - 0.38, 0.16);
+  const aftLobe = gaussian(xNorm + 0.38, 0.16);
+  const antisymmetricDriver = frontLobe - aftLobe;
+  const dualLayerEnvelope =
+    gaussian(args.centerDist - args.wallSigma * 0.7, Math.max(args.wallSigma * 0.8, 1e-6)) -
+    0.85 * gaussian(args.centerDist + args.wallSigma * 0.55, Math.max(args.wallSigma * 0.55, 1e-6));
+  return {
+    xNorm,
+    axialBias,
+    signedLongitudinal,
+    shellSharpen,
+    volumeEnvelope,
+    frontLobe,
+    aftLobe,
+    antisymmetricDriver,
+    dualLayerEnvelope,
   };
 };
 
@@ -1051,11 +1247,25 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const metricMode =
     metricSource === "metric" && Number.isFinite(metricT00Raw);
   const metricT00Source = metricMode ? (typeof metricSource === "string" ? metricSource : "metric") : undefined;
-  const familyContext = resolveStressEnergyFamilyContext({
+  const sourceRedesignMode = normalizeNhm2SourceRedesignMode(
+    input.sourceRedesignMode ?? (state as any)?.dynamicConfig?.sourceRedesignMode ?? null,
+  );
+  const sourceReformulationMode = normalizeNhm2SourceReformulationMode(
+    input.sourceReformulationMode ?? (state as any)?.dynamicConfig?.sourceReformulationMode ?? null,
+  );
+  const baseFamilyContext = resolveStressEnergyFamilyContext({
     metricT00Ref,
     inputWarpFieldType: input.warpFieldType ?? null,
     stateWarpFieldType: (state as any)?.warpFieldType ?? null,
   });
+  const redesignFamilyContext = applyNhm2SourceRedesignContext(
+    baseFamilyContext,
+    sourceRedesignMode,
+  );
+  const familyContext = applyNhm2SourceReformulationContext(
+    redesignFamilyContext,
+    sourceReformulationMode,
+  );
 
   const { rho_avg: rhoAvgPipeline, rho_inst: rhoInstPipeline } = enhancedAvgEnergyDensity({
     gap_m,
@@ -1092,6 +1302,8 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const totalVoxels = nx * ny * nz;
   const envelope = new Float32Array(totalVoxels);
   let envelopeSum = 0;
+  let envelopeAbsSum = 0;
+  let envelopeHasSignedSupport = false;
   const radialMap = input.radialMap ?? null;
 
   const nowSeconds = Date.now() / 1000;
@@ -1101,6 +1313,22 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const familyDirectionBlend =
     familyContext.familyId === "alcubierre_control"
       ? 0.78
+      : familyContext.familyId === "nhm2_redesign_signed_shell_bias"
+        ? 0.72
+        : familyContext.familyId === "nhm2_redesign_coupling_localization"
+          ? 0.18
+          : familyContext.familyId === "nhm2_redesign_drive_vs_geometry_split"
+            ? 0.88
+            : familyContext.familyId === "nhm2_redesign_source_profile_simplified_signed"
+              ? 0.64
+      : familyContext.familyId === "nhm2_reform_volume_driven_signed_source"
+        ? 0.9
+        : familyContext.familyId === "nhm2_reform_fore_aft_antisymmetric_driver"
+          ? 1.0
+          : familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+            ? 0.14
+            : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+              ? 0.82
       : familyContext.familyId === "nhm2_certified"
         ? 0.46
         : familyContext.familyId === "irrotational_control"
@@ -1109,6 +1337,22 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   const familyShiftScale =
     familyContext.familyId === "alcubierre_control"
       ? 1.14
+      : familyContext.familyId === "nhm2_redesign_signed_shell_bias"
+        ? 1.18
+        : familyContext.familyId === "nhm2_redesign_coupling_localization"
+          ? 1.04
+          : familyContext.familyId === "nhm2_redesign_drive_vs_geometry_split"
+            ? 1.08
+            : familyContext.familyId === "nhm2_redesign_source_profile_simplified_signed"
+              ? 1.12
+      : familyContext.familyId === "nhm2_reform_volume_driven_signed_source"
+        ? 1.28
+        : familyContext.familyId === "nhm2_reform_fore_aft_antisymmetric_driver"
+          ? 1.34
+          : familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+            ? 1.22
+            : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+              ? 1.26
       : familyContext.familyId === "nhm2_certified"
         ? 0.94
         : familyContext.familyId === "vdb_control"
@@ -1131,14 +1375,39 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const sectorEnvelope = computeSectorEnvelope(theta, phase01, { sigma: sigmaSector, splitEnabled, splitFrac });
         const phaseDelta = shortestPhaseDelta(theta, phase01);
         const strobeEnvelope = 0.5 + 0.5 * Math.cos(TWO_PI * wrap01(strobePhase - phaseDelta));
-        const xNorm = px / Math.max(axes[0], 1e-6);
-        const axialBias = 0.5 + 0.5 * Math.tanh(xNorm / 0.25);
-        const shellSharpen = Math.exp(-0.5 * Math.pow(centerDist / Math.max(wallSigma * 0.72, 1e-6), 2));
+        const structural = computeNhm2StructuralScalars({
+          px,
+          py,
+          pz,
+          centerDist,
+          wallSigma,
+          axes,
+        });
         const familyEnvelope =
           familyContext.familyId === "alcubierre_control"
-            ? 0.68 + 0.64 * axialBias
+            ? 0.68 + 0.64 * structural.axialBias
+            : familyContext.familyId === "nhm2_redesign_signed_shell_bias"
+              ? 0.48 + 0.34 * structural.shellSharpen + 0.42 * structural.axialBias
+              : familyContext.familyId === "nhm2_redesign_coupling_localization"
+                ? 0.24 + 1.08 * structural.shellSharpen * structural.shellSharpen
+                : familyContext.familyId === "nhm2_redesign_drive_vs_geometry_split"
+                  ? 0.38 + 0.32 * structural.shellSharpen + 0.42 * Math.abs(structural.signedLongitudinal)
+                  : familyContext.familyId === "nhm2_redesign_source_profile_simplified_signed"
+                    ? 0.36 + 0.56 * structural.shellSharpen + 0.18 * structural.axialBias
+                    : familyContext.familyId === "nhm2_reform_volume_driven_signed_source"
+                      ? 0.16 * wallEnvelope +
+                        structural.volumeEnvelope *
+                          structural.signedLongitudinal *
+                          (0.42 + 0.58 * Math.abs(structural.signedLongitudinal))
+                      : familyContext.familyId === "nhm2_reform_fore_aft_antisymmetric_driver"
+                        ? wallEnvelope * (0.18 + 1.24 * structural.antisymmetricDriver)
+                        : familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+                          ? 0.14 + 0.26 * wallEnvelope + 0.92 * structural.volumeEnvelope
+                          : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+                            ? structural.dualLayerEnvelope *
+                              (0.52 + 0.48 * Math.abs(structural.signedLongitudinal))
             : familyContext.familyId === "nhm2_certified"
-              ? 0.82 + 0.18 * shellSharpen
+              ? 0.82 + 0.18 * structural.shellSharpen
               : familyContext.familyId === "irrotational_control"
                 ? 0.9 + 0.1 * Math.sin(TWO_PI * theta)
                 : familyContext.familyId === "vdb_control"
@@ -1152,12 +1421,15 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
           familyEnvelope;
         envelope[idx] = value;
         envelopeSum += value;
+        envelopeAbsSum += Math.abs(value);
+        envelopeHasSignedSupport ||= value < 0;
         idx += 1;
       }
     }
   }
 
-  const envelopeScale = envelopeSum > EPS ? totalVoxels / envelopeSum : 1;
+  const envelopeNormBase = envelopeHasSignedSupport ? envelopeAbsSum : envelopeSum;
+  const envelopeScale = envelopeNormBase > EPS ? totalVoxels / envelopeNormBase : 1;
   const t00 = new Float32Array(totalVoxels);
   const betaX = new Float32Array(totalVoxels);
   const betaY = new Float32Array(totalVoxels);
@@ -1186,19 +1458,80 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const radius = resolveHullRadius(dir, axes, radialMap);
         const normal = radialMap ? dir : ellipsoidNormal(pos, axesSq);
         const betaDir = blendDirections(normal, driveDirUnit, familyDirectionBlend);
-        const xNorm = px / Math.max(axes[0], 1e-6);
-        const axialBias = 0.5 + 0.5 * Math.tanh(xNorm / 0.25);
+        const structural = computeNhm2StructuralScalars({
+          px,
+          py,
+          pz,
+          centerDist: pLen - radius,
+          wallSigma,
+          axes,
+        });
         const familyAxialScale =
           familyContext.familyId === "alcubierre_control"
-            ? 0.72 + 0.56 * axialBias
+            ? 0.72 + 0.56 * structural.axialBias
+            : familyContext.familyId === "nhm2_redesign_signed_shell_bias"
+              ? 0.35 + 0.95 * Math.abs(structural.signedLongitudinal) + 0.35 * structural.axialBias
+              : familyContext.familyId === "nhm2_redesign_coupling_localization"
+                ? 0.82 + 0.28 * Math.exp(-0.5 * Math.pow((pLen - radius) / Math.max(wallSigma, 1e-6), 2))
+                : familyContext.familyId === "nhm2_redesign_drive_vs_geometry_split"
+                  ? 0.48 + 0.92 * structural.axialBias
+                  : familyContext.familyId === "nhm2_redesign_source_profile_simplified_signed"
+                    ? 0.22 + 1.22 * Math.abs(structural.signedLongitudinal)
+                    : familyContext.familyId === "nhm2_reform_volume_driven_signed_source"
+                      ? 0.24 + 1.32 * Math.abs(structural.signedLongitudinal)
+                      : familyContext.familyId === "nhm2_reform_fore_aft_antisymmetric_driver"
+                        ? 0.12 + 1.44 * Math.abs(structural.antisymmetricDriver)
+                        : familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+                          ? 0.18 + 0.78 * structural.shellSharpen + 0.42 * Math.abs(structural.antisymmetricDriver)
+                          : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+                            ? 0.2 + 1.18 * Math.abs(structural.dualLayerEnvelope)
             : familyContext.familyId === "nhm2_certified"
-              ? 0.9 + 0.1 * Math.abs(axialBias - 0.5) * 2
+              ? 0.9 + 0.1 * Math.abs(structural.axialBias - 0.5) * 2
               : 1.0;
+        const familySignedScale =
+          familyContext.familyId === "nhm2_redesign_signed_shell_bias"
+            ? 0.35 + 0.95 * Math.abs(structural.signedLongitudinal)
+            : familyContext.familyId === "nhm2_redesign_drive_vs_geometry_split"
+              ? 0.55 + 0.75 * Math.abs(structural.signedLongitudinal)
+              : familyContext.familyId === "nhm2_redesign_source_profile_simplified_signed"
+                ? 0.15 + 1.35 * Math.abs(structural.signedLongitudinal)
+                : familyContext.familyId === "nhm2_reform_volume_driven_signed_source"
+                  ? 0.26 + 1.48 * Math.abs(structural.signedLongitudinal)
+                  : familyContext.familyId === "nhm2_reform_fore_aft_antisymmetric_driver"
+                    ? 0.24 + 1.52 * Math.abs(structural.antisymmetricDriver)
+                    : familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+                      ? 0.22 + 0.96 * structural.shellSharpen
+                      : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+                        ? 0.24 + 1.34 * Math.abs(structural.dualLayerEnvelope)
+                : 1.0;
+        const familyDirectionalSign =
+          familyContext.familyId === "nhm2_redesign_signed_shell_bias" ||
+          familyContext.familyId === "nhm2_redesign_drive_vs_geometry_split" ||
+          familyContext.familyId === "nhm2_redesign_source_profile_simplified_signed"
+            ? (structural.signedLongitudinal >= 0 ? 1 : -1)
+            : familyContext.familyId === "nhm2_reform_volume_driven_signed_source"
+              ? (structural.signedLongitudinal >= 0 ? 1 : -1)
+              : familyContext.familyId === "nhm2_reform_fore_aft_antisymmetric_driver"
+                ? (structural.antisymmetricDriver >= 0 ? 1 : -1)
+                : familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+                  ? (structural.signedLongitudinal >= 0 ? 1 : -1)
+                  : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+                    ? (structural.dualLayerEnvelope >= 0 ? 1 : -1)
+            : null;
+        const betaSourceDensity =
+          familyContext.familyId === "nhm2_reform_geometry_source_decoupling"
+            ? Math.abs(rho_avg) *
+              (0.18 + 0.82 * structural.shellSharpen) *
+              (0.3 + 0.7 * Math.abs(structural.antisymmetricDriver))
+            : familyContext.familyId === "nhm2_reform_shell_to_dual_layer_family"
+              ? Math.abs(density) + Math.abs(rho_avg) * Math.abs(structural.dualLayerEnvelope)
+              : Math.abs(density);
         const betaAmp =
-          natarioShiftFromDensity(Math.abs(density), Math.max(radius, 1e-3)) *
+          natarioShiftFromDensity(betaSourceDensity, Math.max(radius, 1e-3)) *
           familyShiftScale *
-          familyAxialScale;
-        const sign = density >= 0 ? 1 : -1;
+          familyAxialScale *
+          familySignedScale;
+        const sign = familyDirectionalSign ?? (density >= 0 ? 1 : -1);
         const vecX = betaDir[0] * betaAmp * sign;
         const vecY = betaDir[1] * betaAmp * sign;
         const vecZ = betaDir[2] * betaAmp * sign;
@@ -1447,6 +1780,8 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
       shape_function_id: familyContext.shapeFunctionId,
       warpFieldType: familyContext.warpFieldType,
       metricT00Ref,
+      sourceRedesignMode: familyContext.sourceRedesignMode ?? null,
+      sourceReformulationMode: familyContext.sourceReformulationMode ?? null,
     },
     observerRobust,
   };
@@ -1464,6 +1799,8 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     source_branch: familyContext.sourceBranch,
     shape_function_id: familyContext.shapeFunctionId,
     warpFieldType: familyContext.warpFieldType,
+    sourceRedesignMode: familyContext.sourceRedesignMode ?? null,
+    sourceReformulationMode: familyContext.sourceReformulationMode ?? null,
     channels: {
       t00: { data: t00, min: t00Min, max: t00Max },
       Sx: { data: Sx, min: SxMin, max: SxMax },
@@ -1494,6 +1831,8 @@ export interface StressEnergyBrickResponse {
   source_branch?: string;
   shape_function_id?: string;
   warpFieldType?: string;
+  sourceRedesignMode?: Nhm2SourceRedesignMode | null;
+  sourceReformulationMode?: Nhm2SourceReformulationMode | null;
   channels: {
     t00: StressEnergyBrickResponseChannel;
     Sx: StressEnergyBrickResponseChannel;
@@ -1517,6 +1856,8 @@ export interface StressEnergyBrickBinaryHeader {
   metricT00Source?: string;
   family_id?: string;
   source_branch?: string;
+  sourceRedesignMode?: Nhm2SourceRedesignMode | null;
+  sourceReformulationMode?: Nhm2SourceReformulationMode | null;
   shape_function_id?: string;
   warpFieldType?: string;
   channelOrder: typeof STRESS_ENERGY_CHANNEL_ORDER;
@@ -1548,6 +1889,8 @@ export const serializeStressEnergyBrick = (brick: StressEnergyBrick): StressEner
   source_branch: brick.source_branch,
   shape_function_id: brick.shape_function_id,
   warpFieldType: brick.warpFieldType,
+  sourceRedesignMode: brick.sourceRedesignMode ?? null,
+  sourceReformulationMode: brick.sourceReformulationMode ?? null,
   channels: {
     t00: { data: encodeFloat32(brick.channels.t00.data), min: brick.channels.t00.min, max: brick.channels.t00.max },
     Sx: { data: encodeFloat32(brick.channels.Sx.data), min: brick.channels.Sx.min, max: brick.channels.Sx.max },
@@ -1580,6 +1923,8 @@ export const serializeStressEnergyBrickBinary = (brick: StressEnergyBrick): Stre
       source_branch: brick.source_branch,
       shape_function_id: brick.shape_function_id,
       warpFieldType: brick.warpFieldType,
+      sourceRedesignMode: brick.sourceRedesignMode ?? null,
+      sourceReformulationMode: brick.sourceReformulationMode ?? null,
       channelOrder: STRESS_ENERGY_CHANNEL_ORDER,
       channels: {
         t00: { min: t00.min, max: t00.max, bytes: t00.data.byteLength },

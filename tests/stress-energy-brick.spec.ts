@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { buildStressEnergyBrick } from "../server/stress-energy-brick";
+import { buildStressEnergyFieldSetFromPipeline } from "../server/gr/evolution/stress-energy";
 
 const baseParams = {
   dims: [20, 12, 12] as [number, number, number],
@@ -108,5 +109,73 @@ describe("stress-energy brick builder", () => {
     expect(natario.stats.mapping?.family_id).toBe("natario_control");
     expect(alcubierre.stats.mapping?.metricT00Ref).toBe("warp.metric.T00.alcubierre.analytic");
     expect(natario.stats.mapping?.metricT00Ref).toBe("warp.metric.T00.natario.shift");
+  });
+
+  it("propagates sourceRedesignMode into the GR matter builder", () => {
+    const grid = {
+      dims: [48, 48, 48] as [number, number, number],
+      spacing: [1007 / 48, 264 / 48, 173 / 48] as [number, number, number],
+      bounds: {
+        min: [-1007 / 2, -264 / 2, -173 / 2] as [number, number, number],
+        max: [1007 / 2, 264 / 2, 173 / 2] as [number, number, number],
+      },
+    };
+    const baseline = buildStressEnergyFieldSetFromPipeline(grid, {
+      ...baseParams,
+      metricT00: -2.5e5,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      warpFieldType: "natario_sdf",
+    });
+    const redesign = buildStressEnergyFieldSetFromPipeline(grid, {
+      ...baseParams,
+      metricT00: -2.5e5,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      warpFieldType: "natario_sdf",
+      sourceRedesignMode: "signed_shell_bias",
+    });
+
+    expect(redesign.brick.sourceRedesignMode).toBe("signed_shell_bias");
+    expect(redesign.brick.family_id).toBe("nhm2_redesign_signed_shell_bias");
+    expect(redesign.brick.shape_function_id).toBe("nhm2_redesign_signed_shell_bias_v1");
+    expect(hashFloat32(redesign.fields.rho)).not.toBe(hashFloat32(baseline.fields.rho));
+  });
+
+  it("propagates sourceReformulationMode into the GR matter builder", () => {
+    const grid = {
+      dims: [48, 48, 48] as [number, number, number],
+      spacing: [1007 / 48, 264 / 48, 173 / 48] as [number, number, number],
+      bounds: {
+        min: [-1007 / 2, -264 / 2, -173 / 2] as [number, number, number],
+        max: [1007 / 2, 264 / 2, 173 / 2] as [number, number, number],
+      },
+    };
+    const baseline = buildStressEnergyFieldSetFromPipeline(grid, {
+      ...baseParams,
+      metricT00: -2.5e5,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      warpFieldType: "natario_sdf",
+    });
+    const reformulation = buildStressEnergyFieldSetFromPipeline(grid, {
+      ...baseParams,
+      metricT00: -2.5e5,
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      warpFieldType: "natario_sdf",
+      sourceReformulationMode: "fore_aft_antisymmetric_driver",
+    });
+
+    expect(reformulation.brick.sourceReformulationMode).toBe(
+      "fore_aft_antisymmetric_driver",
+    );
+    expect(reformulation.brick.family_id).toBe(
+      "nhm2_reform_fore_aft_antisymmetric_driver",
+    );
+    expect(reformulation.brick.shape_function_id).toBe(
+      "nhm2_reform_fore_aft_antisymmetric_driver_v1",
+    );
+    expect(hashFloat32(reformulation.fields.rho)).not.toBe(hashFloat32(baseline.fields.rho));
   });
 });

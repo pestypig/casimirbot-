@@ -6475,9 +6475,7 @@ const buildRenderCertificate = (args: {
     payload.scienceLane.diagnosticLaneId.trim().length > 0
       ? payload.scienceLane.diagnosticLaneId.trim()
       : null;
-  const laneId = yorkView
-    ? normalizeYorkDiagnosticLaneId(requestedLaneId)
-    : null;
+  const laneId = normalizeYorkDiagnosticLaneId(requestedLaneId);
   const laneConvention =
     laneId != null ? resolveYorkLaneConvention(laneId) : null;
   const yorkSamplingPolicy: "midplane" | "x-rho" = yorkSurfaceRhoView
@@ -7693,6 +7691,8 @@ app.post("/api/helix/hull-render/frame", async (req, res) => {
           supportCoveragePct: tensorContext!.supportCoveragePct,
           maskedOutPct: tensorContext!.maskedOutPct,
           supportMaskKind: tensorContext!.supportMaskKind,
+          lane_id: renderCertificate?.diagnostics.lane_id ?? null,
+          laneId: renderCertificate?.diagnostics.lane_id ?? null,
           ...((renderView === "york-time-3p1" ||
             renderView === "york-surface-3p1" ||
             renderView === "york-surface-rho-3p1" ||

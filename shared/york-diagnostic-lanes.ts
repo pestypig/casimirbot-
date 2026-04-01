@@ -18,13 +18,24 @@ export type YorkDiagnosticLaneConvention = {
   observer_construction_formula: string;
   observer_normalized: boolean;
   observer_approximation: string | null;
+  semantic_mode:
+    | "eulerian_normal"
+    | "observer_proxy"
+    | "cross_lane_reference"
+    | "diagnostic_local_only";
   lane_semantic_mode: string;
   foliation: string;
+  foliation_definition: string;
   theta_definition: string;
   kij_sign_convention: string;
   requires_gamma_metric: boolean;
+  is_proxy: boolean;
+  is_reference_only: boolean;
+  is_authoritative_for_readiness: boolean;
+  is_cross_lane_promotable: boolean;
   semantics_closed: boolean;
   cross_lane_claim_ready: boolean;
+  reference_comparison_ready: boolean;
   cross_lane_claim_block_reason: string | null;
 };
 
@@ -42,13 +53,21 @@ export const YORK_DIAGNOSTIC_LANE_CONVENTIONS: Record<
     observer_construction_formula: "u^a = n^a (Eulerian normal observer)",
     observer_normalized: true,
     observer_approximation: null,
+    semantic_mode: "eulerian_normal",
     lane_semantic_mode: "baseline-eulerian-theta-minus-trk",
     foliation: "comoving_cartesian_3p1",
+    foliation_definition:
+      "Eulerian normal observer on the fixed comoving Cartesian 3+1 foliation.",
     theta_definition: "theta=-trK",
     kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
     requires_gamma_metric: false,
+    is_proxy: false,
+    is_reference_only: false,
+    is_authoritative_for_readiness: true,
+    is_cross_lane_promotable: true,
     semantics_closed: true,
     cross_lane_claim_ready: true,
+    reference_comparison_ready: true,
     cross_lane_claim_block_reason: null,
   },
   [YORK_DIAGNOSTIC_ALTERNATE_LANE_ID]: {
@@ -87,13 +106,21 @@ export const YORK_DIAGNOSTIC_LANE_CONVENTIONS: Record<
     observer_normalized: false,
     observer_approximation:
       "diagnostic-local observer-only drift proxy on fixed comoving foliation; u^i_proxy is not renormalized to a full alternate slicing congruence",
+    semantic_mode: "observer_proxy",
     lane_semantic_mode: "diagnostic-observer-proxy-covariant-divergence",
     foliation: "comoving_cartesian_3p1",
+    foliation_definition:
+      "Diagnostic-local observer-drift proxy evaluated on the same fixed comoving Cartesian 3+1 foliation as Lane A.",
     theta_definition: "theta=-trK+div(beta/alpha)",
     kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
     requires_gamma_metric: true,
+    is_proxy: true,
+    is_reference_only: true,
+    is_authoritative_for_readiness: false,
+    is_cross_lane_promotable: false,
     semantics_closed: true,
-    cross_lane_claim_ready: true,
+    cross_lane_claim_ready: false,
+    reference_comparison_ready: true,
     cross_lane_claim_block_reason: null,
   },
 };
@@ -333,12 +360,23 @@ export type YorkDiagnosticObserverConstructionInfo = {
   observer_construction_formula: string;
   observer_normalized: boolean;
   observer_approximation: string | null;
+  semantic_mode:
+    | "eulerian_normal"
+    | "observer_proxy"
+    | "cross_lane_reference"
+    | "diagnostic_local_only";
+  foliation_definition: string;
+  is_proxy: boolean;
+  is_reference_only: boolean;
+  is_authoritative_for_readiness: boolean;
+  is_cross_lane_promotable: boolean;
   observer_inputs_present: boolean;
   lane_b_semantic_mode: string;
   lane_b_geometry_ready: boolean;
   requires_gamma_metric: boolean;
   semantics_closed: boolean;
   cross_lane_claim_ready: boolean;
+  reference_comparison_ready: boolean;
   cross_lane_claim_block_reason: string | null;
 };
 
@@ -375,12 +413,19 @@ export const computeYorkDiagnosticLaneField = (
     observer_construction_formula: laneConvention.observer_construction_formula,
     observer_normalized: laneConvention.observer_normalized,
     observer_approximation: laneConvention.observer_approximation,
+    semantic_mode: laneConvention.semantic_mode,
+    foliation_definition: laneConvention.foliation_definition,
+    is_proxy: laneConvention.is_proxy,
+    is_reference_only: laneConvention.is_reference_only,
+    is_authoritative_for_readiness: laneConvention.is_authoritative_for_readiness,
+    is_cross_lane_promotable: laneConvention.is_cross_lane_promotable,
     observer_inputs_present: false,
     lane_b_semantic_mode: laneConvention.lane_semantic_mode,
     lane_b_geometry_ready: false,
     requires_gamma_metric: laneConvention.requires_gamma_metric,
     semantics_closed: laneConvention.semantics_closed,
     cross_lane_claim_ready: laneConvention.cross_lane_claim_ready,
+    reference_comparison_ready: laneConvention.reference_comparison_ready,
     cross_lane_claim_block_reason: laneConvention.cross_lane_claim_block_reason,
   };
   if (args.laneId === YORK_DIAGNOSTIC_BASELINE_LANE_ID) {

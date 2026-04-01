@@ -7466,6 +7466,32 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       sourceWarpFieldTypeRaw === "irrotational"
         ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
         : undefined;
+    const sourceRedesignModeOverrideRaw =
+      typeof (query as any).sourceRedesignMode === "string"
+        ? String((query as any).sourceRedesignMode)
+        : typeof (query as any).source_redesign_mode === "string"
+          ? String((query as any).source_redesign_mode)
+          : null;
+    const sourceRedesignMode =
+      sourceRedesignModeOverrideRaw === "signed_shell_bias" ||
+      sourceRedesignModeOverrideRaw === "coupling_localization" ||
+      sourceRedesignModeOverrideRaw === "drive_vs_geometry_split" ||
+      sourceRedesignModeOverrideRaw === "source_profile_simplified_signed"
+        ? (sourceRedesignModeOverrideRaw as StressEnergyBrickParams["sourceRedesignMode"])
+        : undefined;
+    const sourceReformulationModeOverrideRaw =
+      typeof (query as any).sourceReformulationMode === "string"
+        ? String((query as any).sourceReformulationMode)
+        : typeof (query as any).source_reformulation_mode === "string"
+          ? String((query as any).source_reformulation_mode)
+          : null;
+    const sourceReformulationMode =
+      sourceReformulationModeOverrideRaw === "volume_driven_signed_source" ||
+      sourceReformulationModeOverrideRaw === "fore_aft_antisymmetric_driver" ||
+      sourceReformulationModeOverrideRaw === "geometry_source_decoupling" ||
+      sourceReformulationModeOverrideRaw === "shell_to_dual_layer_family"
+        ? (sourceReformulationModeOverrideRaw as StressEnergyBrickParams["sourceReformulationMode"])
+        : undefined;
     const sourceDutyFR = Number.isFinite(dutyFROverride)
       ? Math.max(dutyFROverride, 1e-8)
       : Math.max(pipelineInputs.dutyFR, 1e-8);
@@ -7502,6 +7528,8 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       metricT00Source: sourceMetricT00Source ?? undefined,
       metricT00Ref: sourceMetricT00Ref ?? undefined,
       warpFieldType: sourceWarpFieldType,
+      sourceRedesignMode,
+      sourceReformulationMode,
     };
     const sourceCacheKey = {
       dutyFR: sourceDutyFR,
@@ -7516,6 +7544,8 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
       pressureFactor: pressureFactor ?? null,
       driveDir: driveDir ?? null,
       warpFieldType: sourceWarpFieldType ?? null,
+      sourceRedesignMode: sourceRedesignMode ?? null,
+      sourceReformulationMode: sourceReformulationMode ?? null,
       hullAxes,
       hullWall,
       overrides: {
@@ -7529,6 +7559,8 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
         metricT00Source: metricT00SourceOverride,
         metricT00Ref: metricT00RefOverride,
         warpFieldType: warpFieldTypeOverrideRaw,
+        sourceRedesignMode: sourceRedesignModeOverrideRaw,
+        sourceReformulationMode: sourceReformulationModeOverrideRaw,
       },
     };
     const geometrySig = buildGrGeometrySignature(
@@ -7849,6 +7881,32 @@ export async function getGrRegionStats(req: Request, res: Response) {
           sourceWarpFieldTypeRaw === "irrotational"
             ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
             : undefined;
+        const sourceRedesignModeOverrideRaw =
+          typeof (query as any).sourceRedesignMode === "string"
+            ? String((query as any).sourceRedesignMode)
+            : typeof (query as any).source_redesign_mode === "string"
+              ? String((query as any).source_redesign_mode)
+              : null;
+        const sourceRedesignMode =
+          sourceRedesignModeOverrideRaw === "signed_shell_bias" ||
+          sourceRedesignModeOverrideRaw === "coupling_localization" ||
+          sourceRedesignModeOverrideRaw === "drive_vs_geometry_split" ||
+          sourceRedesignModeOverrideRaw === "source_profile_simplified_signed"
+            ? (sourceRedesignModeOverrideRaw as StressEnergyBrickParams["sourceRedesignMode"])
+            : undefined;
+        const sourceReformulationModeOverrideRaw =
+          typeof (query as any).sourceReformulationMode === "string"
+            ? String((query as any).sourceReformulationMode)
+            : typeof (query as any).source_reformulation_mode === "string"
+              ? String((query as any).source_reformulation_mode)
+              : null;
+        const sourceReformulationMode =
+          sourceReformulationModeOverrideRaw === "volume_driven_signed_source" ||
+          sourceReformulationModeOverrideRaw === "fore_aft_antisymmetric_driver" ||
+          sourceReformulationModeOverrideRaw === "geometry_source_decoupling" ||
+          sourceReformulationModeOverrideRaw === "shell_to_dual_layer_family"
+            ? (sourceReformulationModeOverrideRaw as StressEnergyBrickParams["sourceReformulationMode"])
+            : undefined;
         const sourceParams: Partial<StressEnergyBrickParams> = {
           bounds,
           hullAxes,
@@ -7861,6 +7919,8 @@ export async function getGrRegionStats(req: Request, res: Response) {
           phase01: phase01Value,
           driveDir: driveDir ?? undefined,
           warpFieldType: sourceWarpFieldType,
+          sourceRedesignMode,
+          sourceReformulationMode,
         };
         const sourceCacheKey = {
           dutyFR: dutyFRValue,
@@ -7872,6 +7932,8 @@ export async function getGrRegionStats(req: Request, res: Response) {
           pressureFactor: pressureFactor ?? null,
           driveDir: driveDir ?? null,
           warpFieldType: sourceWarpFieldType ?? null,
+          sourceRedesignMode: sourceRedesignMode ?? null,
+          sourceReformulationMode: sourceReformulationMode ?? null,
           hullAxes,
           hullWall,
         };

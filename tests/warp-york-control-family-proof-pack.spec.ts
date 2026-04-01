@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
@@ -5,15 +9,53 @@ import {
   buildCrossLaneComparison,
   buildCaseClassificationFeatures,
   buildControlMetricVolumeRef,
+  buildNhm2SourceToYorkProvenanceArtifact,
+  buildNhm2SourceFormulaAuditArtifact,
+  buildNhm2SourceStageAuditArtifact,
+  buildNhm2TimingAuthorityAuditArtifact,
+  buildNhm2BrickAuthorityAuditArtifact,
+  buildNhm2SnapshotAuthorityAuditArtifact,
+  buildNhm2DiagnosticSemanticAuditArtifact,
+  buildNhm2SolveAuthorityAuditArtifact,
+  buildNhm2YorkRenderDebugArtifact,
+  buildNhm2YorkFixedScaleComparisonArtifact,
+  buildWarpYorkCanonicalCalibrationArtifact,
+  buildNhm2AblationSpecs,
+  buildNhm2SourceRedesignSpecs,
+  buildNhm2YorkAblationPanelArtifact,
+  buildNhm2CanonicalVisualComparisonArtifact,
+  buildRenderTaxonomyArtifact,
+  buildNhm2SourceCouplingRedesignArtifact,
+  buildNhm2SourceCouplingRedesignRealizationArtifact,
+  buildNhm2DeeperReformulationArtifact,
+  buildNhm2ParameterSweepArtifact,
+  buildNhm2ParameterSweepPlan,
+  classifyAblationMovement,
+  classifySourceRedesignMovement,
+  classifySourceReformulationMovement,
+  classifySweepRunMorphology,
   computeOfflineYorkAudit,
   buildControlDebug,
+  computeSolveAuthorityReadiness,
+  computeSourceToYorkBridgeReadiness,
+  decideNhm2SourceCouplingRedesignVerdict,
+  decideNhm2DeeperReformulationVerdict,
   decideControlFamilyVerdict,
+  deriveYorkOptixTracefreeMagnitude,
   evaluateClassificationRobustness,
+  evaluateYorkOptixFieldRenderIntegrity,
+  evaluateYorkOptixPresentationImageQuality,
   evaluateLaneASnapshotIdentity,
   evaluateYorkSliceCongruence,
   evaluateProofPackPreconditions,
+  enrichCanonicalCalibrationRenderTaxonomy,
+  enrichCanonicalVisualComparisonRenderTaxonomy,
+  enrichYorkOptixRenderTaxonomy,
   extractThetaSliceXRho,
   extractThetaSliceXZMidplane,
+  formatDeeperReformulationProofPackSummary,
+  formatSourceCouplingRedesignProofPackSummary,
+  formatYorkOptixRenderProofPackSummary,
   formatLaneCauseCodeNote,
   hasStrongForeAftYork,
   hasSufficientSignalForAlcubierreControl,
@@ -21,8 +63,39 @@ import {
   readSourceFamilyEvidence,
   renderMarkdown,
   resolveLaneACauseCode,
+  renderNhm2SourceToYorkProvenanceMarkdown,
+  renderNhm2SourceFormulaAuditMarkdown,
+  renderNhm2SourceStageAuditMarkdown,
+  renderNhm2TimingAuthorityAuditMarkdown,
+  renderNhm2BrickAuthorityAuditMarkdown,
+  renderNhm2SnapshotAuthorityAuditMarkdown,
+  renderNhm2DiagnosticSemanticAuditMarkdown,
+  renderNhm2SolveAuthorityAuditMarkdown,
+  renderNhm2YorkRenderDebugMarkdown,
+  renderNhm2YorkFixedScaleComparisonMarkdown,
+  renderWarpYorkCanonicalCalibrationMarkdown,
+  renderNhm2AblationDecisionMemo,
+  renderNhm2YorkAblationPanelMarkdown,
+  renderNhm2SourceCouplingRedesignDecisionMemo,
+  renderNhm2SourceCouplingRedesignMarkdown,
+  renderNhm2SourceCouplingRedesignRealizationMarkdown,
+  renderNhm2SourceCouplingRedesignRealizationMemo,
+  renderNhm2DeeperReformulationDecisionMemo,
+  renderNhm2DeeperReformulationMarkdown,
+  renderNhm2ParameterSweepDecisionMemo,
+  renderNhm2ParameterSweepMarkdown,
+  renderNhm2YorkOptixRenderMarkdown,
+  renderNhm2YorkOptixRenderMemo,
+  renderNhm2CanonicalVisualComparisonMarkdown,
+  renderNhm2CanonicalVisualComparisonDecisionMemo,
+  renderRenderTaxonomyAuditMarkdown,
+  renderRenderTaxonomyStandardMemo,
+  renderNhm2YorkPaperComparisonMemo,
+  renderNhm2NasaFigure1OverlayMemo,
+  renderNhm2RenderCalibrationDecisionMemo,
   scoreNhm2AgainstReferenceControls,
   summarizeLaneAParity,
+  buildYorkOptixPresentationPayload,
 } from "../scripts/warp-york-control-family-proof-pack";
 import {
   YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
@@ -290,11 +363,28 @@ const makeProofPackPayloadForMarkdown = () => {
         supported: true,
         unsupported_reason: null,
         observer: "eulerian_n",
+        observer_definition_id: "obs.eulerian_n",
+        observer_inputs_required: ["alpha"],
+        observer_construction_inputs: ["alpha"],
+        observer_construction_formula: "u^a = n^a (Eulerian normal observer)",
+        observer_normalized: true,
+        observer_approximation: null,
+        semantic_mode: "eulerian_normal",
+        lane_semantic_mode: "baseline-eulerian-theta-minus-trk",
         foliation: "comoving_cartesian_3p1",
+        foliation_definition:
+          "Eulerian normal observer on the fixed comoving Cartesian 3+1 foliation.",
         theta_definition: "theta=-trK",
         kij_sign_convention: "ADM",
+        requires_gamma_metric: false,
+        is_proxy: false,
+        is_reference_only: false,
+        is_authoritative_for_readiness: true,
+        is_cross_lane_promotable: true,
         semantics_closed: true,
         cross_lane_claim_ready: true,
+        reference_comparison_ready: true,
+        cross_lane_claim_block_reason: null,
         classification_scope: "diagnostic_local_only",
         cases,
         controlDebug: [],
@@ -316,6 +406,8 @@ const makeProofPackPayloadForMarkdown = () => {
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
           laneBCrossLaneClaimReady: true,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: true,
           readyForCrossLaneComparison: true,
         },
         laneAParity: {
@@ -335,11 +427,54 @@ const makeProofPackPayloadForMarkdown = () => {
         supported: true,
         unsupported_reason: null,
         observer: "shift_drift_u(beta_over_alpha)",
+        observer_definition_id: "obs.shift_drift_beta_over_alpha_covariant_divergence_v1",
+        observer_inputs_required: [
+          "alpha",
+          "beta_x",
+          "beta_y",
+          "beta_z",
+          "gamma_xx",
+          "gamma_xy",
+          "gamma_xz",
+          "gamma_yy",
+          "gamma_yz",
+          "gamma_zz",
+          "K_trace",
+        ],
+        observer_construction_inputs: [
+          "alpha",
+          "beta_x",
+          "beta_y",
+          "beta_z",
+          "gamma_xx",
+          "gamma_xy",
+          "gamma_xz",
+          "gamma_yy",
+          "gamma_yz",
+          "gamma_zz",
+          "K_trace",
+        ],
+        observer_construction_formula:
+          "u^i_proxy = beta^i/alpha; theta_B = -trK + div_gamma(u_proxy)",
+        observer_normalized: false,
+        observer_approximation:
+          "diagnostic-local observer-only drift proxy on fixed comoving foliation",
+        semantic_mode: "observer_proxy",
+        lane_semantic_mode: "diagnostic-observer-proxy-covariant-divergence",
         foliation: "comoving_cartesian_3p1",
+        foliation_definition:
+          "Diagnostic-local observer-drift proxy evaluated on the same fixed comoving Cartesian 3+1 foliation as Lane A.",
         theta_definition: "theta=-trK+div(beta/alpha)",
         kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
+        requires_gamma_metric: true,
+        is_proxy: true,
+        is_reference_only: true,
+        is_authoritative_for_readiness: false,
+        is_cross_lane_promotable: false,
         semantics_closed: true,
-        cross_lane_claim_ready: true,
+        cross_lane_claim_ready: false,
+        reference_comparison_ready: true,
+        cross_lane_claim_block_reason: null,
         classification_scope: "diagnostic_local_only",
         cases,
         controlDebug: [],
@@ -360,7 +495,9 @@ const makeProofPackPayloadForMarkdown = () => {
           laneBGeometryReady: true,
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
-          laneBCrossLaneClaimReady: true,
+          laneBCrossLaneClaimReady: false,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: true,
           readyForCrossLaneComparison: true,
         },
         laneAParity: {
@@ -393,9 +530,13 @@ const makeProofPackPayloadForMarkdown = () => {
         lane_b_geometry_ready: true,
         lane_b_controls_calibrated: true,
         lane_b_parity_closed: true,
-        lane_b_cross_lane_claim_ready: true,
+        lane_b_cross_lane_claim_ready: false,
+        lane_b_reference_comparison_ready: true,
       },
-      notes: ["Both lanes calibrate and agree on NHM2 classification."],
+      notes: [
+        "Both lanes calibrate and agree on NHM2 classification.",
+        "Lane B remains reference-only for advisory comparison; cross-lane claim promotion is disabled by policy.",
+      ],
     },
     inputs: {
       baseUrl: "http://127.0.0.1:5050",
@@ -444,6 +585,906 @@ const makeProofPackPayloadForMarkdown = () => {
     },
     checksum: "unused",
   } as any;
+};
+
+const makeSourceToYorkFixture = () =>
+  ({
+    generatedOn: "2026-03-31T00:00:00.000Z",
+    boundaryStatement: "boundary",
+    sourceAuditArtifact: "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourcePaths: {
+      nhm2Contract: "configs/nhm2-coupled-inputs.json",
+      promotedProfile: "shared/warp-promoted-profile.ts",
+      timingAuthorityArtifact: "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      proofPackArtifact: "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      nhm2SnapshotEvidence: "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+    },
+    nhm2ContractInputs: {
+      warpFieldType: "natario_sdf",
+      sectorCount: 80,
+      concurrentSectors: 2,
+      dutyCycle: 0.12,
+      dutyShip: 0.12,
+      qCavity: 100000,
+      qSpoilingFactor: 3,
+      gammaGeo: 1,
+      gammaVanDenBroeck: 500,
+      modulationFreq_GHz: 15,
+      zeta: 5,
+      reducedOrderReference: {
+        radius_m: 1.1,
+        tauLC_ms: 3.358,
+      },
+      fullHull: {
+        Lx_m: 1.1,
+        Ly_m: 1.1,
+        Lz_m: 1.1,
+      },
+    },
+    promotedProfileDefaults: {
+      warpFieldType: "natario_sdf",
+      sectorCount: 80,
+      concurrentSectors: 2,
+      dutyCycle: 0.12,
+      dutyShip: 0.12,
+      qCavity: 100000,
+      qSpoilingFactor: 3,
+      gammaGeo: 1,
+      gammaVanDenBroeck: 500,
+      modulationFreq_GHz: 15,
+      zeta: null,
+      reducedOrderReference: { radius_m: 1.1, tauLC_ms: 3.358 },
+      fullHull: { Lx_m: 1.1, Ly_m: 1.1, Lz_m: 1.1 },
+    },
+    liveTimingAuthority: {
+      tauLC_ms: 3.358,
+      tauPulse_ms: 0.000067,
+      TS: 50,
+      TS_ratio: 50,
+      epsilon: 0.001,
+      isHomogenized: true,
+      timingSource: "configured-autoscale",
+      timingAuthority: "artifacts/research/full-solve/A/run-1-raw-output.json",
+    },
+    reducedOrderPipelinePayload: {
+      wave: "A",
+      proposalLabel: "wave-a-profile",
+      params: { tauLC_ms: 3.358, gammaGeo: 1, zeta: 5 },
+      grRequest: { TS: 50, TS_ratio: 50, epsilon: 0.001, dutyFR: 0.0015 },
+    },
+    proofPackBrickRequest: {
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      metricT00Source: "metric",
+      dutyFR: 0.0015,
+      q: 3,
+      gammaGeo: 26,
+      gammaVdB: 500,
+      zeta: 0.84,
+      dims: "48x48x48",
+      requireCongruentSolve: true,
+      requireNhm2CongruentFullSolve: true,
+      brickUrl:
+        "http://127.0.0.1:5050/api/helix/gr-evolve-brick?dims=48x48x48&metricT00Source=metric&metricT00Ref=warp.metric.T00.natario_sdf.shift&requireCongruentSolve=1&requireNhm2CongruentFullSolve=1",
+    },
+    proofPackSnapshotRefs: {
+      metric_ref_hash: "metric-ref",
+      theta_channel_hash: "theta-hash",
+      k_trace_hash: "ktrace-hash",
+      snapshot_brick_url:
+        "http://127.0.0.1:5050/api/helix/gr-evolve-brick?dims=48x48x48&metricT00Source=metric&metricT00Ref=warp.metric.T00.natario_sdf.shift&requireCongruentSolve=1&requireNhm2CongruentFullSolve=1",
+      york_verdict: "nhm2_low_expansion_family",
+      cross_lane_status: "lane_stable_low_expansion_like",
+    },
+    parameterMappings: [
+      {
+        field: "warpFieldType -> metricT00Ref",
+        source_value: "natario_sdf",
+        target_value: "warp.metric.T00.natario_sdf.shift",
+        mapping_type: "derived_transform",
+        mapping_formula: "metricT00Ref selects reduced-order stress family",
+        mapping_note: "derived",
+        status: "closed",
+      },
+      {
+        field: "dutyShip -> dutyFR",
+        source_value: 0.12,
+        target_value: 0.0015,
+        mapping_type: "audit_harness_override",
+        mapping_formula: null,
+        mapping_note: "harness",
+        status: "closed",
+      },
+      {
+        field: "qCavity -> q",
+        source_value: 100000,
+        target_value: 3,
+        mapping_type: "audit_harness_override",
+        mapping_formula: null,
+        mapping_note: "harness",
+        status: "closed",
+      },
+      {
+        field: "qSpoilingFactor -> q",
+        source_value: 3,
+        target_value: 3,
+        mapping_type: "policy_override",
+        mapping_formula: "reduced-order q selector = qSpoilingFactor",
+        mapping_note: "policy",
+        status: "closed",
+      },
+      {
+        field: "gammaGeo",
+        source_value: 1,
+        target_value: 26,
+        mapping_type: "audit_harness_override",
+        mapping_formula: null,
+        mapping_note: "harness",
+        status: "closed",
+      },
+      {
+        field: "gammaVanDenBroeck -> gammaVdB",
+        source_value: 500,
+        target_value: 500,
+        mapping_type: "direct_copy",
+        mapping_formula: "gammaVdB = gammaVanDenBroeck",
+        mapping_note: null,
+        status: "closed",
+      },
+      {
+        field: "zeta",
+        source_value: 5,
+        target_value: 0.84,
+        mapping_type: "audit_harness_override",
+        mapping_formula: null,
+        mapping_note: "harness",
+        status: "closed",
+      },
+      {
+        field: "fullHull.Lx_m/Ly_m/Lz_m -> dims",
+        source_value: { Lx_m: 1.1, Ly_m: 1.1, Lz_m: 1.1 },
+        target_value: "48x48x48",
+        mapping_type: "audit_harness_override",
+        mapping_formula: null,
+        mapping_note: "harness",
+        status: "closed",
+      },
+      {
+        field: "sectorCount",
+        source_value: 80,
+        target_value: null,
+        mapping_type: "missing_derivation",
+        mapping_formula: null,
+        mapping_note: "missing",
+        status: "open",
+      },
+      {
+        field: "modulationFreq_GHz",
+        source_value: 15,
+        target_value: null,
+        mapping_type: "missing_derivation",
+        mapping_formula: null,
+        mapping_note: "missing",
+        status: "open",
+      },
+    ],
+    bridgeReadiness: {
+      sourceContractPresent: true,
+      timingAuthorityPresent: true,
+      reducedOrderPayloadPresent: true,
+      proofPackBrickPresent: true,
+      parameterMappingsComplete: false,
+      parameterMappingsExplained: false,
+      metricRefProvenanceClosed: true,
+      bridgeReady: false,
+      gatingStatus: "legacy_advisory_non_gating",
+      gatingBlocksMechanismChain: false,
+      statusNote: "Legacy bridge completeness remains open, but it is non-gating.",
+      blockReasons: [
+        "bridge_param_mapping_missing",
+        "bridge_contract_to_brick_drift_unexplained",
+      ],
+    },
+    notes: [],
+    checksum: "source-to-york-checksum",
+  }) as any;
+
+const writeTinyPng = async (
+  filePath: string,
+  color: { r: number; g: number; b: number; alpha?: number },
+) => {
+  await sharp({
+    create: {
+      width: 24,
+      height: 24,
+      channels: 4,
+      background: {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        alpha: color.alpha ?? 1,
+      },
+    },
+  })
+    .png()
+    .toFile(filePath);
+};
+
+const makeCanonicalVisualComparisonFixtures = async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "canonical-visual-comparison-"));
+  const caseIds = [
+    "flat_space_zero_theta",
+    "natario_control",
+    "alcubierre_control",
+    "nhm2_certified",
+  ] as const;
+  const colors = {
+    flat_space_zero_theta: { r: 210, g: 214, b: 220 },
+    natario_control: { r: 50, g: 130, b: 190 },
+    alcubierre_control: { r: 190, g: 90, b: 70 },
+    nhm2_certified: { r: 110, g: 140, b: 110 },
+  } as const;
+  for (const caseId of caseIds) {
+    await writeTinyPng(path.join(tempDir, `${caseId}-diag.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-main.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-atlas.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-long.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-tracefree.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-rho.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-trace.png`), colors[caseId]);
+  }
+  const canonicalCalibrationArtifact = {
+    comparisonContract: {
+      laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+      observer: "eulerian_n",
+      foliation: "comoving_cartesian_3p1",
+      thetaDefinition: "theta=-trK",
+      signConvention: "ADM",
+      fixedScalePolicy: "comparison_fixed_raw_global",
+      visualMetricSourceStage: "pre_png_color_buffer",
+      outputSize: { width: 320, height: 180 },
+      requiredViews: [
+        "york-surface-3p1",
+        "york-surface-rho-3p1",
+        "york-topology-normalized-3p1",
+      ],
+    },
+    nhm2CurrentClass: "natario_like_low_expansion",
+    decisionGate: {
+      calibration_verdict: "canonical_controls_validated_nhm2_natario_like",
+    },
+    canonicalCases: caseIds.map((caseId) => ({
+      case_id: caseId,
+      label:
+        caseId === "flat_space_zero_theta"
+          ? "Flat-space zero-theta baseline"
+          : caseId === "natario_control"
+            ? "Natario-like control"
+            : caseId === "alcubierre_control"
+              ? "Alcubierre-like control"
+              : "NHM2 certified snapshot",
+      case_role:
+        caseId === "flat_space_zero_theta"
+          ? "zero_baseline"
+          : caseId === "nhm2_certified"
+            ? "nhm2_current"
+            : "canonical_control",
+      views: [
+        {
+          case_id: caseId,
+          view_id: "york-surface-3p1",
+          png_path: path.join(tempDir, `${caseId}-diag.png`),
+          png_hash: `${caseId}-diag-hash`,
+        },
+        {
+          case_id: caseId,
+          view_id: "york-surface-rho-3p1",
+          png_path: path.join(tempDir, `${caseId}-diag.png`),
+          png_hash: `${caseId}-rho-hash`,
+        },
+        {
+          case_id: caseId,
+          view_id: "york-topology-normalized-3p1",
+          png_path: path.join(tempDir, `${caseId}-diag.png`),
+          png_hash: `${caseId}-topo-hash`,
+        },
+      ],
+    })),
+    pairwiseMetrics: [
+      {
+        lhs_case_id: "nhm2_certified",
+        rhs_case_id: "natario_control",
+        raw_control_distance: 0.0012,
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            metric_source_stage: "pre_png_color_buffer",
+            pixel_rms: 0.0003,
+            mean_absolute_pixel_difference: 0.0002,
+            changed_pixel_fraction: 0.12,
+            diff_abs_max: 0.01,
+          },
+        ],
+      },
+      {
+        lhs_case_id: "nhm2_certified",
+        rhs_case_id: "alcubierre_control",
+        raw_control_distance: 0.135,
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            metric_source_stage: "pre_png_color_buffer",
+            pixel_rms: 0.0007,
+            mean_absolute_pixel_difference: 0.0005,
+            changed_pixel_fraction: 0.31,
+            diff_abs_max: 0.03,
+          },
+        ],
+      },
+      {
+        lhs_case_id: "natario_control",
+        rhs_case_id: "alcubierre_control",
+        raw_control_distance: 0.136,
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            metric_source_stage: "pre_png_color_buffer",
+            pixel_rms: 0.001,
+            mean_absolute_pixel_difference: 0.0008,
+            changed_pixel_fraction: 0.36,
+            diff_abs_max: 0.05,
+          },
+        ],
+      },
+      {
+        lhs_case_id: "flat_space_zero_theta",
+        rhs_case_id: "natario_control",
+        raw_control_distance: 0.77,
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            metric_source_stage: "pre_png_color_buffer",
+            pixel_rms: 0.014,
+            mean_absolute_pixel_difference: 0.01,
+            changed_pixel_fraction: 0.8,
+            diff_abs_max: 1,
+          },
+        ],
+      },
+      {
+        lhs_case_id: "flat_space_zero_theta",
+        rhs_case_id: "alcubierre_control",
+        raw_control_distance: 0.776,
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            metric_source_stage: "pre_png_color_buffer",
+            pixel_rms: 0.013,
+            mean_absolute_pixel_difference: 0.01,
+            changed_pixel_fraction: 0.8,
+            diff_abs_max: 1,
+          },
+        ],
+      },
+      {
+        lhs_case_id: "flat_space_zero_theta",
+        rhs_case_id: "nhm2_certified",
+        raw_control_distance: 0.776,
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            metric_source_stage: "pre_png_color_buffer",
+            pixel_rms: 0.014,
+            mean_absolute_pixel_difference: 0.01,
+            changed_pixel_fraction: 0.8,
+            diff_abs_max: 1,
+          },
+        ],
+      },
+    ],
+  } as any;
+  const optixRenderArtifact = {
+    presentationRenderLayerStatus: "available",
+    fieldSuiteRealizationStatus: "realized",
+    fieldSuiteReadabilityStatus: "readable",
+    presentationRenderQuality: "ok",
+    presentationReadinessVerdict: "ready_for_human_inspection",
+    presentationRenderBackedByAuthoritativeMetric: true,
+    comparisonContract: {
+      laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+      observer: "eulerian_n",
+      foliation: "comoving_cartesian_3p1",
+      signConvention: "ADM",
+    },
+    caseRenders: caseIds.map((caseId) => ({
+      case_id: caseId,
+      label: caseId,
+      case_role:
+        caseId === "flat_space_zero_theta"
+          ? "zero_baseline"
+          : caseId === "nhm2_certified"
+            ? "nhm2_current"
+            : "canonical_control",
+      contextRenders: [
+        {
+          renderView: "transport-3p1",
+          imagePath: path.join(tempDir, `${caseId}-main.png`),
+        },
+        {
+          renderView: "full-atlas",
+          imagePath: path.join(tempDir, `${caseId}-atlas.png`),
+        },
+      ],
+      fieldRenders: [
+        {
+          presentationFieldId: "longitudinal_signed_strain",
+          variant: "main",
+          label: "Longitudinal signed strain",
+          imagePath: path.join(tempDir, `${caseId}-long.png`),
+          presentationProjectionImageHash: `${caseId}-long-hash`,
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          fieldMin: -0.1,
+          fieldMax: 0.1,
+          fieldAbsMax: 0.1,
+          displayPolicyId: "optix_longitudinal_signed_strain_signed_asinh",
+          displayRangeMin: -0.08,
+          displayRangeMax: 0.08,
+          displayTransform: "signed_asinh",
+          colormapFamily: "diverging_cyan_amber",
+          warnings: [],
+        },
+        {
+          presentationFieldId: "tracefree_magnitude",
+          variant: "main",
+          label: "Tracefree magnitude",
+          imagePath: path.join(tempDir, `${caseId}-tracefree.png`),
+          presentationProjectionImageHash: `${caseId}-tracefree-hash`,
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          fieldMin: 0,
+          fieldMax: 0.01,
+          fieldAbsMax: 0.01,
+          displayPolicyId: "optix_tracefree_magnitude_positive_log10",
+          displayRangeMin: 0,
+          displayRangeMax: 0.01,
+          displayTransform: "positive_log10",
+          colormapFamily: "sequential_inferno",
+          warnings: [],
+        },
+        {
+          presentationFieldId: "energy_density",
+          variant: "main",
+          label: "Energy density",
+          imagePath: path.join(tempDir, `${caseId}-rho.png`),
+          presentationProjectionImageHash: `${caseId}-rho-hash`,
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          fieldMin: -0.02,
+          fieldMax: 0.02,
+          fieldAbsMax: 0.02,
+          displayPolicyId: "optix_energy_density_signed_asinh",
+          displayRangeMin: -0.02,
+          displayRangeMax: 0.02,
+          displayTransform: "signed_asinh",
+          colormapFamily: "diverging_teal_rose",
+          warnings: [],
+        },
+        {
+          presentationFieldId: "trace_check",
+          variant: "main",
+          label: "Trace check",
+          imagePath: path.join(tempDir, `${caseId}-trace.png`),
+          presentationProjectionImageHash: `${caseId}-trace-hash`,
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          fieldMin: -0.03,
+          fieldMax: 0.03,
+          fieldAbsMax: 0.03,
+          displayPolicyId: "optix_trace_check_signed_linear_anchor",
+          displayRangeMin: -0.03,
+          displayRangeMax: 0.03,
+          displayTransform: "signed_linear",
+          colormapFamily: "diverging_cyan_amber",
+          warnings: [],
+        },
+      ],
+    })),
+  } as any;
+  const fixedScaleComparisonArtifact = {
+    fixed_scale_render_verdict: "shared_scale_preserves_natario_like_class",
+    nhm2_vs_natario_visual_distance: { pixel_rms: 0.0003 },
+    nhm2_vs_alcubierre_visual_distance: { pixel_rms: 0.0007 },
+  } as any;
+  return {
+    tempDir,
+    canonicalCalibrationArtifact,
+    optixRenderArtifact,
+    fixedScaleComparisonArtifact,
+  };
+};
+
+const buildRenderTaxonomyFixtures = async () => {
+  const fixtures = await makeCanonicalVisualComparisonFixtures();
+  enrichCanonicalCalibrationRenderTaxonomy({
+    generatedOn: "2026-03-31",
+    artifact: fixtures.canonicalCalibrationArtifact,
+  });
+  enrichYorkOptixRenderTaxonomy({
+    generatedOn: "2026-03-31",
+    artifact: fixtures.optixRenderArtifact,
+  });
+  const canonicalVisualComparisonArtifact =
+    await buildNhm2CanonicalVisualComparisonArtifact({
+      generatedOn: "2026-03-31",
+      sourceAuditArtifactPath: "proof-pack.json",
+      canonicalCalibrationArtifactPath: "calibration.json",
+      fixedScaleArtifactPath: "fixed-scale.json",
+      optixRenderArtifactPath: "optix.json",
+      canonicalCalibrationArtifact: fixtures.canonicalCalibrationArtifact,
+      fixedScaleComparisonArtifact: fixtures.fixedScaleComparisonArtifact,
+      optixRenderArtifact: fixtures.optixRenderArtifact,
+      exportDirectory: path.join(fixtures.tempDir, "comparison"),
+    });
+  enrichCanonicalVisualComparisonRenderTaxonomy({
+    generatedOn: "2026-03-31",
+    artifact: canonicalVisualComparisonArtifact,
+  });
+  for (const caseEntry of fixtures.canonicalCalibrationArtifact.canonicalCases) {
+    for (const view of caseEntry.views) {
+      if (view.renderTaxonomy) {
+        view.renderTaxonomy.legacyPath = null;
+      }
+    }
+  }
+  for (const caseEntry of fixtures.optixRenderArtifact.caseRenders) {
+    for (const render of caseEntry.contextRenders) {
+      if (render.renderTaxonomy) {
+        render.renderTaxonomy.legacyPath = null;
+      }
+    }
+    for (const render of caseEntry.fieldRenders) {
+      if (render.renderTaxonomy) {
+        render.renderTaxonomy.legacyPath = null;
+      }
+    }
+  }
+  for (const caseEntry of canonicalVisualComparisonArtifact.canonicalCases) {
+    if (caseEntry.comparisonCardRender) {
+      caseEntry.comparisonCardRender.legacyPath = null;
+    }
+  }
+  if (canonicalVisualComparisonArtifact.overviewPanelRender) {
+    canonicalVisualComparisonArtifact.overviewPanelRender.legacyPath = null;
+  }
+  const renderTaxonomyArtifact = buildRenderTaxonomyArtifact({
+    generatedOn: "2026-03-31",
+    canonicalCalibrationArtifact: fixtures.canonicalCalibrationArtifact,
+    optixRenderArtifact: fixtures.optixRenderArtifact,
+    canonicalVisualComparisonArtifact,
+  });
+  return {
+    ...fixtures,
+    canonicalVisualComparisonArtifact,
+    renderTaxonomyArtifact,
+  };
+};
+
+const buildSourceStageFixture = (overrides?: {
+  canonical?: Record<string, unknown>;
+  recovery?: Record<string, unknown>;
+  sourceToYork?: Record<string, unknown>;
+  sourceAuthorityRoleOverrides?: Record<string, "authoritative" | "comparison_only" | "derived_only" | "legacy" | "fallback" | "unknown">;
+  sourceAuthorityReadinessScopeOverride?: string[];
+  comparisonPolicyOverride?: Record<string, unknown>;
+}) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-source-stage-"));
+  const canonicalPath = path.join(tmpDir, "canonical-qi-forensics.json");
+  const recoveryPath = path.join(tmpDir, "recovery-search.json");
+  const firstDivergencePath = path.join(tmpDir, "g4-first-divergence.json");
+  const canonical = {
+    rhoSource: "warp.metric.T00.natario_sdf.shift",
+    metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    metricT00Si_Jm3: -14690028178.574236,
+    qeiRenormalizationScheme: "point_splitting",
+    qeiSamplingNormalization: "unit_integral",
+    quantityWorldlineClass: "timelike",
+    ...overrides?.canonical,
+  };
+  const recoveryCase = {
+    id: "case_0001",
+    rhoSource: "warp.metric.T00.natario_sdf.shift",
+    metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    metricT00Si_Jm3: -89888730.09553961,
+    qeiRenormalizationScheme: "point_splitting",
+    qeiSamplingNormalization: "unit_integral",
+    quantityWorldlineClass: "timelike",
+    metricT00Derivation: "forward_shift_to_K_to_rho_E",
+    ...overrides?.recovery,
+  };
+  fs.writeFileSync(canonicalPath, JSON.stringify(canonical, null, 2));
+  fs.writeFileSync(
+    recoveryPath,
+    JSON.stringify({
+      bestCandidate: recoveryCase,
+      cases: [recoveryCase],
+    }),
+  );
+  fs.writeFileSync(
+    firstDivergencePath,
+    JSON.stringify({
+      canonical: { path: canonicalPath },
+      recovery: { path: recoveryPath, caseId: "case_0001" },
+      tolerances: { absTol: 1e-12, relTol: 1e-9 },
+      firstDivergence: {
+        stageId: "S0_source",
+        stageLabel: "Source",
+        differingFields: ["metricT00Si_Jm3"],
+        summary: "S0_source diverged on: metricT00Si_Jm3",
+      },
+      stageComparisons: [
+        {
+          id: "S0_source",
+          label: "Source",
+          diverged: true,
+          comparedFields: 3,
+          differingFields: ["metricT00Si_Jm3"],
+        },
+      ],
+    }),
+  );
+  const payload = makeProofPackPayloadForMarkdown() as any;
+  const sourceToYork = {
+    ...makeSourceToYorkFixture(),
+    ...(overrides?.sourceToYork ?? {}),
+  } as any;
+  const sourceFormulaArtifact = buildNhm2SourceFormulaAuditArtifact({
+    payload,
+    sourceToYork,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    firstDivergencePath,
+    comparisonPolicyOverride: overrides?.comparisonPolicyOverride as any,
+  });
+  const artifact = buildNhm2SourceStageAuditArtifact({
+    payload,
+    sourceToYork,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    firstDivergencePath,
+    sourceFormulaAudit: sourceFormulaArtifact,
+    sourceFormulaAuditPath:
+      "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+    sourceAuthorityRoleOverrides: overrides?.sourceAuthorityRoleOverrides,
+    sourceAuthorityReadinessScopeOverride: overrides?.sourceAuthorityReadinessScopeOverride,
+  });
+  return { artifact, sourceFormulaArtifact, firstDivergencePath, payload, sourceToYork };
+};
+
+const buildTimingAuthorityFixture = (overrides?: {
+  sourceToYork?: Record<string, unknown>;
+  timingPolicyOverride?: Record<string, unknown>;
+}) => {
+  const payload = makeProofPackPayloadForMarkdown() as any;
+  const sourceToYork = {
+    ...makeSourceToYorkFixture(),
+    ...(overrides?.sourceToYork ?? {}),
+  } as any;
+  const artifact = buildNhm2TimingAuthorityAuditArtifact({
+    payload,
+    sourceToYork,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    timingPolicyOverride: overrides?.timingPolicyOverride as any,
+  });
+  return { artifact, payload, sourceToYork };
+};
+
+const buildBrickAuthorityFixture = (overrides?: {
+  sourceToYork?: Record<string, unknown>;
+  brickPolicyOverride?: Record<string, unknown>;
+}) => {
+  const payload = makeProofPackPayloadForMarkdown() as any;
+  const sourceToYork = {
+    ...makeSourceToYorkFixture(),
+    ...(overrides?.sourceToYork ?? {}),
+  } as any;
+  const artifact = buildNhm2BrickAuthorityAuditArtifact({
+    payload,
+    sourceToYork,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    brickPolicyOverride: overrides?.brickPolicyOverride as any,
+  });
+  return { artifact, payload, sourceToYork };
+};
+
+const buildSnapshotAuthorityFixture = (overrides?: {
+  payload?: Record<string, unknown>;
+  sourceToYork?: Record<string, unknown>;
+  snapshotPolicyOverride?: Record<string, unknown>;
+  snapshotArtifactOverride?: Record<string, unknown>;
+  syncLiveRefs?: boolean;
+}) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-snapshot-authority-"));
+  const snapshotPath = path.join(tmpDir, "nhm2-snapshot.json");
+  const payload = (overrides?.payload ?? makeProofPackPayloadForMarkdown()) as any;
+  const sourceToYork = {
+    ...makeSourceToYorkFixture(),
+    ...(overrides?.sourceToYork ?? {}),
+  } as any;
+  const nhm2Case = payload.cases.find((entry: any) => entry.caseId === "nhm2_certified");
+  if (nhm2Case && overrides?.syncLiveRefs !== false) {
+    nhm2Case.metricVolumeRef.url =
+      sourceToYork.proofPackBrickRequest?.brickUrl ?? nhm2Case.metricVolumeRef.url;
+    nhm2Case.snapshotMetrics = {
+      ...nhm2Case.snapshotMetrics,
+      source: sourceToYork.proofPackBrickRequest?.metricT00Source ?? nhm2Case.snapshotMetrics?.source,
+      metricRefHash:
+        sourceToYork.proofPackSnapshotRefs?.metric_ref_hash ??
+        nhm2Case.snapshotMetrics?.metricRefHash ??
+        null,
+      requestMetricRefHash:
+        sourceToYork.proofPackSnapshotRefs?.metric_ref_hash ??
+        nhm2Case.snapshotMetrics?.requestMetricRefHash ??
+        null,
+      channelHashes: {
+        ...nhm2Case.snapshotMetrics?.channelHashes,
+        theta:
+          sourceToYork.proofPackSnapshotRefs?.theta_channel_hash ??
+          nhm2Case.snapshotMetrics?.channelHashes?.theta ??
+          null,
+        K_trace:
+          sourceToYork.proofPackSnapshotRefs?.k_trace_hash ??
+          nhm2Case.snapshotMetrics?.channelHashes?.K_trace ??
+          null,
+      },
+      sourceFamily: {
+        ...nhm2Case.snapshotMetrics?.sourceFamily,
+        metricT00Ref:
+          sourceToYork.proofPackBrickRequest?.metricT00Ref ??
+          nhm2Case.snapshotMetrics?.sourceFamily?.metricT00Ref ??
+          null,
+      },
+    };
+  }
+
+  const snapshotArtifactBase = {
+    generatedAtMs: 1234,
+    runId: "snapshot-run",
+    metricVolumeRef: {
+      url:
+        sourceToYork.proofPackSnapshotRefs?.snapshot_brick_url ??
+        sourceToYork.proofPackBrickRequest?.brickUrl ??
+        nhm2Case?.metricVolumeRef?.url ??
+        null,
+      hash:
+        sourceToYork.proofPackSnapshotRefs?.metric_ref_hash ??
+        nhm2Case?.snapshotMetrics?.metricRefHash ??
+        null,
+    },
+  } as any;
+  const snapshotArtifactOverride = (overrides?.snapshotArtifactOverride ?? {}) as any;
+  const snapshotArtifact = {
+    ...snapshotArtifactBase,
+    ...snapshotArtifactOverride,
+    metricVolumeRef: {
+      ...snapshotArtifactBase.metricVolumeRef,
+      ...(snapshotArtifactOverride.metricVolumeRef ?? {}),
+    },
+  };
+  fs.writeFileSync(snapshotPath, JSON.stringify(snapshotArtifact, null, 2));
+  const artifact = buildNhm2SnapshotAuthorityAuditArtifact({
+    payload,
+    sourceToYork,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    nhm2SnapshotPath: snapshotPath,
+    snapshotPolicyOverride: overrides?.snapshotPolicyOverride as any,
+  });
+  return { artifact, payload, sourceToYork, snapshotPath };
+};
+
+const buildDiagnosticSemanticFixture = (overrides?: {
+  payload?: Record<string, unknown>;
+  diagnosticPolicyOverride?: Record<string, unknown>;
+}) => {
+  const payload = (overrides?.payload ?? makeProofPackPayloadForMarkdown()) as any;
+  const artifact = buildNhm2DiagnosticSemanticAuditArtifact({
+    payload,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    diagnosticContractPath: "configs/york-diagnostic-contract.v1.json",
+    diagnosticPolicyOverride: overrides?.diagnosticPolicyOverride as any,
+  });
+  return { artifact, payload };
+};
+
+const buildYorkRenderDebugFixture = (overrides?: {
+  payload?: Record<string, unknown>;
+}) => {
+  const payload = (overrides?.payload ?? makeProofPackPayloadForMarkdown()) as any;
+  payload.classificationScoring ??= {
+    distance_to_alcubierre_reference: 0.13559288214795065,
+    distance_to_low_expansion_reference: 0.0012469161139296696,
+    reference_margin: 0.134345966034021,
+    winning_reference: "natario_control",
+    margin_sufficient: true,
+    winning_reference_within_threshold: true,
+    distinct_by_policy: false,
+    distinctness_threshold: 0.5,
+    margin_min: 0.08,
+    reference_match_threshold: 0.5,
+    distance_metric: "weighted_normalized_l1",
+    normalization_method: "max_abs_reference_target_with_floor",
+    to_alcubierre_breakdown: {},
+    to_low_expansion_breakdown: {},
+  };
+  payload.verdict ??= "nhm2_low_expansion_family";
+  const sourceToYork = makeSourceToYorkFixture();
+  const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+    buildSourceStageFixture({
+      payload,
+      sourceToYork,
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      },
+    });
+  const { artifact: timingAudit } = buildTimingAuthorityFixture({ payload, sourceToYork });
+  const { artifact: brickAudit } = buildBrickAuthorityFixture({ payload, sourceToYork });
+  const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+    payload,
+    sourceToYork,
+  });
+  const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({ payload });
+  const solveAuthorityArtifact = buildNhm2SolveAuthorityAuditArtifact({
+    payload,
+    sourceToYork,
+    timingAudit,
+    brickAudit,
+    snapshotAudit,
+    diagnosticAudit,
+    sourceFormulaAudit: sourceFormulaArtifact,
+    sourceStageAudit,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    timingAuditPath:
+      "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+    brickAuditPath:
+      "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+    snapshotAuditPath: snapshotPath,
+    diagnosticAuditPath:
+      "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+    sourceFormulaAuditPath:
+      "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+    sourceStageAuditPath:
+      "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+    nhm2SnapshotPath:
+      "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+    waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+    firstDivergencePath,
+  });
+  const artifact = buildNhm2YorkRenderDebugArtifact({
+    payload,
+    solveAuthorityAudit: solveAuthorityArtifact,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    solveAuthorityAuditPath:
+      "artifacts/research/full-solve/nhm2-solve-authority-audit-latest.json",
+    diagnosticContractPath: "configs/york-diagnostic-contract.v1.json",
+  });
+  return { artifact, payload, solveAuthorityArtifact };
 };
 
 describe("warp york control-family proof pack", () => {
@@ -1396,6 +2437,12 @@ describe("warp york control-family proof pack", () => {
     expect(contract.alternate_lane_id).toBe(
       "lane_b_shift_drift_theta_plus_div_beta_over_alpha",
     );
+    expect(contract.diagnostic_policy.authoritativeLaneIdsForMechanismReadiness).toEqual([
+      "lane_a_eulerian_comoving_theta_minus_trk",
+    ]);
+    expect(contract.diagnostic_policy.crossLaneAgreementBlocksMechanismReadiness).toBe(
+      false,
+    );
     expect(contract.lanes.length).toBeGreaterThanOrEqual(2);
     const laneB = contract.lanes.find(
       (entry) => entry.lane_id === "lane_b_shift_drift_theta_plus_div_beta_over_alpha",
@@ -1407,9 +2454,30 @@ describe("warp york control-family proof pack", () => {
     expect(laneB?.lane_semantic_mode).toBe(
       "diagnostic-observer-proxy-covariant-divergence",
     );
+    expect(laneB?.semantic_mode).toBe("observer_proxy");
+    expect(laneB?.foliation_definition).toContain("Diagnostic-local observer-drift proxy");
+    expect(laneB?.is_proxy).toBe(true);
+    expect(laneB?.is_reference_only).toBe(true);
+    expect(laneB?.is_authoritative_for_readiness).toBe(false);
+    expect(laneB?.is_cross_lane_promotable).toBe(false);
     expect(laneB?.requires_gamma_metric).toBe(true);
     expect(laneB?.semantics_closed).toBe(true);
-    expect(laneB?.cross_lane_claim_ready).toBe(true);
+    expect(laneB?.cross_lane_claim_ready).toBe(false);
+    expect(laneB?.reference_comparison_ready).toBe(true);
+  });
+
+  it("keeps proxy/reference-only Lane B non-claim-ready while preserving reference comparison usability", () => {
+    const contract = loadYorkDiagnosticContract("configs/york-diagnostic-contract.v1.json");
+    const laneB = contract.lanes.find(
+      (entry) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    expect(laneB).toBeTruthy();
+    if (!laneB) return;
+    expect(laneB.is_proxy).toBe(true);
+    expect(laneB.is_reference_only).toBe(true);
+    expect(laneB.is_cross_lane_promotable).toBe(false);
+    expect(laneB.cross_lane_claim_ready).toBe(false);
+    expect(laneB.reference_comparison_ready).toBe(true);
   });
 
   it("allows cross-lane output when the current contract Lane B posture is closed", () => {
@@ -1444,6 +2512,7 @@ describe("warp york control-family proof pack", () => {
         requires_gamma_metric: laneA.requires_gamma_metric,
         semantics_closed: laneA.semantics_closed,
         cross_lane_claim_ready: laneA.cross_lane_claim_ready,
+        reference_comparison_ready: laneA.reference_comparison_ready,
         cross_lane_claim_block_reason: laneA.cross_lane_claim_block_reason,
         classification_scope: laneA.classification_scope,
         cases: [],
@@ -1465,6 +2534,8 @@ describe("warp york control-family proof pack", () => {
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
           laneBCrossLaneClaimReady: true,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: true,
           readyForCrossLaneComparison: true,
         },
         guardFailures: [],
@@ -1491,6 +2562,7 @@ describe("warp york control-family proof pack", () => {
         requires_gamma_metric: laneB.requires_gamma_metric,
         semantics_closed: laneB.semantics_closed,
         cross_lane_claim_ready: laneB.cross_lane_claim_ready,
+        reference_comparison_ready: laneB.reference_comparison_ready,
         cross_lane_claim_block_reason: laneB.cross_lane_claim_block_reason,
         classification_scope: laneB.classification_scope,
         cases: [],
@@ -1513,6 +2585,8 @@ describe("warp york control-family proof pack", () => {
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
           laneBCrossLaneClaimReady: laneB.cross_lane_claim_ready,
+          laneBReferenceComparisonReady: laneB.reference_comparison_ready,
+          readyForReferenceComparison: laneB.reference_comparison_ready,
           readyForCrossLaneComparison: false,
         },
         guardFailures: [],
@@ -1525,7 +2599,11 @@ describe("warp york control-family proof pack", () => {
     });
     expect(comparison.cross_lane_status).toBe("lane_stable_low_expansion_like");
     expect(comparison.falsifiers.lane_b_semantics_closed).toBe(true);
-    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(true);
+    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(false);
+    expect(comparison.falsifiers.lane_b_reference_comparison_ready).toBe(true);
+    expect(comparison.notes).toContain(
+      "Lane B remains reference-only for advisory comparison; cross-lane claim promotion is disabled by policy.",
+    );
   });
 
   it("computes lane-stable comparison status when calibrated lanes agree", () => {
@@ -1776,6 +2854,7 @@ describe("warp york control-family proof pack", () => {
         requires_gamma_metric: true,
         semantics_closed: false,
         cross_lane_claim_ready: false,
+        reference_comparison_ready: true,
         cross_lane_claim_block_reason: "lane_b_semantics_not_closed",
         classification_scope: "diagnostic_local_only",
         cases: [],
@@ -1797,6 +2876,8 @@ describe("warp york control-family proof pack", () => {
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
           laneBCrossLaneClaimReady: false,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: false,
           readyForCrossLaneComparison: false,
         },
         guardFailures: [],
@@ -1810,6 +2891,7 @@ describe("warp york control-family proof pack", () => {
     expect(comparison.cross_lane_status).toBe("lane_comparison_inconclusive");
     expect(comparison.falsifiers.lane_b_semantics_closed).toBe(false);
     expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(false);
+    expect(comparison.falsifiers.lane_b_reference_comparison_ready).toBe(true);
   });
 
   it("keeps cross-lane comparison inconclusive when Lane B tensor-input evidence is missing", () => {
@@ -1870,7 +2952,8 @@ describe("warp york control-family proof pack", () => {
         kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
         requires_gamma_metric: true,
         semantics_closed: true,
-        cross_lane_claim_ready: true,
+        cross_lane_claim_ready: false,
+        reference_comparison_ready: true,
         cross_lane_claim_block_reason: null,
         classification_scope: "diagnostic_local_only",
         cases: [],
@@ -1891,7 +2974,9 @@ describe("warp york control-family proof pack", () => {
           laneBGeometryReady: true,
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
-          laneBCrossLaneClaimReady: true,
+          laneBCrossLaneClaimReady: false,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: false,
           readyForCrossLaneComparison: false,
         },
         guardFailures: [],
@@ -1938,11 +3023,13 @@ describe("warp york control-family proof pack", () => {
           laneBObserverDefined: true,
           laneBTensorInputsPresent: true,
           laneBGeometryReady: true,
-          laneBControlsCalibrated: true,
-          laneBParityClosed: true,
-          laneBCrossLaneClaimReady: true,
-          readyForCrossLaneComparison: true,
-        },
+        laneBControlsCalibrated: true,
+        laneBParityClosed: true,
+        laneBCrossLaneClaimReady: true,
+        laneBReferenceComparisonReady: true,
+        readyForReferenceComparison: true,
+        readyForCrossLaneComparison: true,
+      },
         guardFailures: [],
         decisionTable: [],
         classificationScoring: null,
@@ -1966,7 +3053,8 @@ describe("warp york control-family proof pack", () => {
         kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
         requires_gamma_metric: true,
         semantics_closed: true,
-        cross_lane_claim_ready: true,
+        cross_lane_claim_ready: false,
+        reference_comparison_ready: true,
         cross_lane_claim_block_reason: null,
         classification_scope: "diagnostic_local_only",
         cases: [],
@@ -1988,7 +3076,9 @@ describe("warp york control-family proof pack", () => {
           laneBGeometryReady: true,
           laneBControlsCalibrated: true,
           laneBParityClosed: false,
-          laneBCrossLaneClaimReady: true,
+          laneBCrossLaneClaimReady: false,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: false,
           readyForCrossLaneComparison: false,
         },
         guardFailures: [],
@@ -2035,11 +3125,13 @@ describe("warp york control-family proof pack", () => {
           laneBObserverDefined: true,
           laneBTensorInputsPresent: true,
           laneBGeometryReady: true,
-          laneBControlsCalibrated: true,
-          laneBParityClosed: true,
-          laneBCrossLaneClaimReady: true,
-          readyForCrossLaneComparison: true,
-        },
+        laneBControlsCalibrated: true,
+        laneBParityClosed: true,
+        laneBCrossLaneClaimReady: true,
+        laneBReferenceComparisonReady: true,
+        readyForReferenceComparison: true,
+        readyForCrossLaneComparison: true,
+      },
         guardFailures: [],
         decisionTable: [],
         classificationScoring: null,
@@ -2063,7 +3155,8 @@ describe("warp york control-family proof pack", () => {
         kij_sign_convention: "K_ij=-1/2*L_n(gamma_ij)",
         requires_gamma_metric: true,
         semantics_closed: true,
-        cross_lane_claim_ready: true,
+        cross_lane_claim_ready: false,
+        reference_comparison_ready: true,
         cross_lane_claim_block_reason: null,
         classification_scope: "diagnostic_local_only",
         cases: [],
@@ -2084,7 +3177,9 @@ describe("warp york control-family proof pack", () => {
           laneBGeometryReady: true,
           laneBControlsCalibrated: true,
           laneBParityClosed: true,
-          laneBCrossLaneClaimReady: true,
+          laneBCrossLaneClaimReady: false,
+          laneBReferenceComparisonReady: true,
+          readyForReferenceComparison: true,
           readyForCrossLaneComparison: true,
         },
         guardFailures: [],
@@ -2097,7 +3192,8 @@ describe("warp york control-family proof pack", () => {
     });
     expect(comparison.cross_lane_status).toBe("lane_stable_low_expansion_like");
     expect(comparison.falsifiers.lane_b_semantics_closed).toBe(true);
-    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(true);
+    expect(comparison.falsifiers.lane_b_cross_lane_claim_ready).toBe(false);
+    expect(comparison.falsifiers.lane_b_reference_comparison_ready).toBe(true);
   });
 
   it("classifies NHM2 as low-expansion-like when feature distance is closer to Natario", () => {
@@ -3023,4 +4119,4454 @@ describe("warp york control-family proof pack", () => {
     expect(typeof rodc.checksum).toBe("string");
     expect(rodc.checksum?.length).toBeGreaterThan(10);
   });
+
+  it("builds source-to-york provenance artifact sections and keeps bridge blocked on missing derivations", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.verdict = "nhm2_low_expansion_family";
+    payload.crossLaneComparison.cross_lane_status = "lane_stable_low_expansion_like";
+    const nhm2Case = payload.cases.find((entry: any) => entry.caseId === "nhm2_certified");
+    expect(nhm2Case).toBeTruthy();
+    nhm2Case.metricVolumeRef.url =
+      "http://127.0.0.1:5050/api/helix/gr-evolve-brick?dims=48x48x48&dutyFR=0.0015&q=3&gammaGeo=26&gammaVdB=500&zeta=0.84&metricT00Source=metric&metricT00Ref=warp.metric.T00.natario_sdf.shift&requireCongruentSolve=1&requireNhm2CongruentFullSolve=1";
+    nhm2Case.snapshotMetrics.metricRefHash = "metric-ref";
+    nhm2Case.snapshotMetrics.requestMetricRefHash = "metric-ref";
+    payload.controlDebug = [
+      {
+        caseId: "nhm2_certified",
+        requestUrl: nhm2Case.metricVolumeRef.url,
+      },
+    ];
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-source-york-"));
+    const snapshotPath = path.join(tmpDir, "nhm2-snapshot.json");
+    const runOutputPath = path.join(tmpDir, "run-1-raw-output.json");
+    const evidencePath = path.join(tmpDir, "evidence-pack.json");
+    fs.writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        metricVolumeRef: {
+          url: nhm2Case.metricVolumeRef.url,
+          hash: "metric-ref",
+        },
+      }),
+    );
+    fs.writeFileSync(
+      runOutputPath,
+      JSON.stringify({
+        result: {
+          attempts: [
+            {
+              proposal: {
+                label: "wave-a-promoted-profile-NHM2-2026-03-01-iter-1",
+                params: {
+                  tauLC_ms: 3.34,
+                  warpFieldType: "natario_sdf",
+                  sectorCount: 80,
+                  concurrentSectors: 2,
+                  dutyCycle: 0.12,
+                  dutyShip: 0.12,
+                  qCavity: 100000,
+                  qSpoilingFactor: 3,
+                  gammaGeo: 1,
+                  gammaVanDenBroeck: 500,
+                  modulationFreq_GHz: 15,
+                },
+              },
+              grRequest: {
+                TS: 50,
+                TS_ratio: 50,
+                epsilon: 0.001,
+                dutyEffectiveFR: 0.0015,
+              },
+            },
+          ],
+          finalState: {
+            isHomogenized: true,
+          },
+        },
+      }),
+    );
+    fs.writeFileSync(
+      evidencePath,
+      JSON.stringify({
+        wave: "A",
+        runArtifacts: [
+          {
+            accepted: true,
+            outputPath: runOutputPath,
+          },
+        ],
+        g4Diagnostics: {
+          tauPulse_s: 6.7e-8,
+          tauSelectedSource: "configured",
+        },
+      }),
+    );
+
+    const artifact = buildNhm2SourceToYorkProvenanceArtifact({
+      payload,
+      nhm2SnapshotPath: snapshotPath,
+      waveAEvidencePackPath: evidencePath,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    });
+    expect(artifact.artifactType).toBe("nhm2_source_to_york_provenance/v1");
+    expect(artifact.nhm2ContractInputs.qCavity).toBe(100000);
+    expect(artifact.promotedProfileDefaults.gammaGeo).toBe(1);
+    expect(artifact.proofPackBrickRequest.gammaGeo).toBe(26);
+    expect(artifact.proofPackSnapshotRefs.york_verdict).toBe("nhm2_low_expansion_family");
+    expect(
+      artifact.parameterMappings.find((entry) => entry.field === "dutyShip -> dutyFR")
+        ?.mapping_type,
+    ).toBe("audit_harness_override");
+    expect(
+      artifact.parameterMappings.find((entry) => entry.field === "modulationFreq_GHz")
+        ?.mapping_type,
+    ).toBe("missing_derivation");
+    expect(artifact.bridgeReadiness.parameterMappingsComplete).toBe(false);
+    expect(artifact.bridgeReadiness.bridgeReady).toBe(false);
+    expect(artifact.bridgeReadiness.gatingStatus).toBe("legacy_advisory_non_gating");
+    expect(artifact.bridgeReadiness.gatingBlocksMechanismChain).toBe(false);
+    expect(artifact.bridgeReadiness.blockReasons).toContain("bridge_param_mapping_missing");
+    expect(renderNhm2SourceToYorkProvenanceMarkdown(artifact)).toContain(
+      "## Parameter Mapping",
+    );
+    expect(renderNhm2SourceToYorkProvenanceMarkdown(artifact)).toContain(
+      "legacy_advisory_non_gating",
+    );
+  });
+
+  it("keeps bridge readiness fail-closed for missing/unexplained mappings and can close when complete", () => {
+    const openReadiness = computeSourceToYorkBridgeReadiness({
+      sourceContractPresent: true,
+      timingAuthorityPresent: true,
+      reducedOrderPayloadPresent: true,
+      proofPackBrickPresent: true,
+      parameterMappings: [
+        {
+          field: "sectorCount",
+          source_value: 80,
+          target_value: null,
+          mapping_type: "missing_derivation",
+          mapping_formula: null,
+          mapping_note: "not serialized",
+          status: "open",
+        },
+      ] as any,
+      metricRefProvenanceClosed: true,
+    });
+    expect(openReadiness.bridgeReady).toBe(false);
+    expect(openReadiness.gatingStatus).toBe("legacy_advisory_non_gating");
+    expect(openReadiness.gatingBlocksMechanismChain).toBe(false);
+    expect(openReadiness.blockReasons).toContain("bridge_param_mapping_missing");
+    expect(openReadiness.blockReasons).toContain(
+      "bridge_contract_to_brick_drift_unexplained",
+    );
+
+    const closedReadiness = computeSourceToYorkBridgeReadiness({
+      sourceContractPresent: true,
+      timingAuthorityPresent: true,
+      reducedOrderPayloadPresent: true,
+      proofPackBrickPresent: true,
+      parameterMappings: [
+        {
+          field: "gammaVanDenBroeck -> gammaVdB",
+          source_value: 500,
+          target_value: 500,
+          mapping_type: "direct_copy",
+          mapping_formula: "gammaVdB = gammaVanDenBroeck",
+          mapping_note: null,
+          status: "closed",
+        },
+        {
+          field: "qSpoilingFactor -> q",
+          source_value: 3,
+          target_value: 3,
+          mapping_type: "policy_override",
+          mapping_formula: "q = qSpoilingFactor",
+          mapping_note: "reduced-order selector",
+          status: "closed",
+        },
+      ] as any,
+      metricRefProvenanceClosed: true,
+    });
+    expect(closedReadiness.parameterMappingsComplete).toBe(true);
+    expect(closedReadiness.parameterMappingsExplained).toBe(true);
+    expect(closedReadiness.bridgeReady).toBe(true);
+    expect(closedReadiness.gatingBlocksMechanismChain).toBe(false);
+  });
+
+  it("emits source-stage compared fields with numeric deltas and markdown summary", () => {
+    const { artifact } = buildSourceStageFixture();
+    expect(artifact.artifactType).toBe("nhm2_source_stage_audit/v1");
+    expect(
+      artifact.comparedSourceFields.find((entry) => entry.field === "metricT00Si_Jm3")
+        ?.delta_abs,
+    ).toBeGreaterThan(0);
+    expect(artifact.sourceAuthorityPolicy.authoritativeAuthorityId).toBe(
+      "canonical_qi_forensics",
+    );
+    expect(artifact.sourceAuthorityPolicy.mixedAuthorityDetected).toBe(false);
+    expect(artifact.numericGapDecomposition.primaryCandidate).toBe(
+      "recovery_reconstruction_mismatch",
+    );
+    expect(
+      artifact.numericGapDecomposition.numericGapCandidates.find(
+        (entry) => entry.candidate_id === "recovery_reconstruction_mismatch",
+      )?.status,
+    ).toBe("supported");
+    expect(artifact.stage.source_stage_cause).toBe("none");
+    expect(artifact.stage.source_stage_ready).toBe(true);
+    expect(artifact.blockingFindings).toEqual([]);
+    expect(artifact.advisoryFindings).toContain("recovery_reconstruction_mismatch");
+    const markdown = renderNhm2SourceStageAuditMarkdown(artifact);
+    expect(markdown).toContain("## Compared Source Fields");
+    expect(markdown).toContain("## Source Authorities In Conflict");
+    expect(markdown).toContain("## Source Formula Comparison Policy");
+    expect(markdown).toContain("## Source-Path Provenance");
+    expect(markdown).toContain("## Numeric Gap Decomposition");
+    expect(markdown).toContain("## Numeric Gap Candidates");
+  });
+
+  it("classifies normalization drift when selectors match but normalization differs", () => {
+    const { artifact } = buildSourceStageFixture({
+      canonical: { metricT00Normalization: "point_splitting" },
+      sourceToYork: {
+        ...makeSourceToYorkFixture(),
+        reducedOrderPipelinePayload: {
+          ...makeSourceToYorkFixture().reducedOrderPipelinePayload,
+          grRequest: {
+            ...makeSourceToYorkFixture().reducedOrderPipelinePayload.grRequest,
+            warp: {
+              metricT00Contract: {
+                observer: "eulerian_n",
+                normalization: "si_stress",
+                unitSystem: "SI",
+              },
+              metricAdapter: {
+                chart: { label: "comoving_cartesian" },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(
+      artifact.componentAudit.find((entry) => entry.component === "metric_selector")?.status,
+    ).toBe("matched");
+    expect(
+      artifact.componentAudit.find((entry) => entry.component === "normalization_mode")?.status,
+    ).toBe("drifted");
+    expect(artifact.stage.source_stage_cause).toBe("normalization_drift");
+    expect(artifact.stage.source_stage_ready).toBe(false);
+  });
+
+  it("classifies normalization scale mismatch when qei normalization labels differ", () => {
+    const { artifact } = buildSourceStageFixture({
+      canonical: {
+        qeiSamplingNormalization: "unit_integral",
+        qeiRenormalizationScheme: "point_splitting",
+      },
+      recovery: {
+        qeiSamplingNormalization: "volume_average",
+        qeiRenormalizationScheme: "adiabatic_subtraction",
+        metricT00Derivation: null,
+      },
+    });
+    expect(artifact.stage.source_stage_cause).toBe("normalization_scale_mismatch");
+    expect(artifact.numericGapDecomposition.primaryCandidate).toBe(
+      "normalization_scale_mismatch",
+    );
+  });
+
+  it("classifies unit-system drift when units differ across source authorities", () => {
+    const { artifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00UnitSystem: "SI",
+      },
+      recovery: {
+        metricT00UnitSystem: "CGS",
+        metricT00Derivation: null,
+      },
+    });
+    expect(artifact.stage.source_stage_cause).toBe("unit_system_drift");
+    expect(artifact.numericGapDecomposition.primaryCandidate).toBe(
+      "unit_conversion_mismatch",
+    );
+  });
+
+  it("classifies metric selector drift when rhoSource/metricT00Ref diverge", () => {
+    const { artifact } = buildSourceStageFixture({
+      canonical: {
+        rhoSource: "warp.metric.T00.alcubierre.analytic",
+        metricT00Ref: "warp.metric.T00.alcubierre.analytic",
+      },
+    });
+    expect(
+      artifact.componentAudit.find((entry) => entry.component === "metric_selector")?.status,
+    ).toBe("drifted");
+    expect(artifact.stage.source_stage_cause).toBe("metric_selector_drift");
+  });
+
+  it("reports mixed authority when more than one source path is marked authoritative for readiness", () => {
+    const { artifact } = buildSourceStageFixture({
+      sourceAuthorityRoleOverrides: {
+        canonical_qi_forensics: "authoritative",
+        recovery_search_case: "authoritative",
+      },
+    });
+    expect(artifact.sourceAuthorityPolicy.mixedAuthorityDetected).toBe(true);
+    expect(artifact.stage.source_stage_cause).toBe("mixed_authority_source_path");
+    expect(
+      artifact.sourceAuthoritiesInConflict.filter((entry) => entry.current_role === "authoritative")
+        .length,
+    ).toBeGreaterThan(1);
+  });
+
+  it("keeps mixed-authority closed when recovery remains comparison-only", () => {
+    const { artifact } = buildSourceStageFixture();
+    const recoveryAuthority = artifact.sourceAuthoritiesInConflict.find(
+      (entry) => entry.authority_id === "recovery_search_case",
+    );
+    expect(recoveryAuthority?.current_role).toBe("comparison_only");
+    expect(artifact.sourceAuthorityPolicy.mixedAuthorityDetected).toBe(false);
+    expect(artifact.stage.source_stage_cause).not.toBe("mixed_authority_source_path");
+  });
+
+  it("keeps recovery reconstruction mismatch advisory when comparison path is reconstruction-only", () => {
+    const { artifact, sourceFormulaArtifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00Derivation: null,
+        metricT00GeomSource: "direct_metric_pipeline",
+      },
+      recovery: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+      },
+    });
+    expect(sourceFormulaArtifact.formulaComparison.formulaMismatchClass).toBe(
+      "direct_vs_reconstructed",
+    );
+    expect(artifact.numericGapDecomposition.primaryCandidate).toBe(
+      "source_formula_mismatch",
+    );
+    expect(sourceFormulaArtifact.policy.comparison_path_blocks_readiness).toBe(false);
+    expect(artifact.stage.source_stage_cause).toBe("none");
+    expect(artifact.stage.source_stage_ready).toBe(true);
+    expect(artifact.blockingFindings).toEqual([]);
+    expect(artifact.advisoryFindings).toContain("recovery_reconstruction_mismatch");
+  });
+
+  it("emits source-formula audit artifact and markdown with explicit mismatch class", () => {
+    const { sourceFormulaArtifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00GeomSource: "direct_metric_pipeline",
+      },
+      recovery: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+      },
+    });
+    expect(sourceFormulaArtifact.artifactType).toBe("nhm2_source_formula_audit/v1");
+    expect(sourceFormulaArtifact.policy.comparison_path_policy).toBe(
+      "canonical_authoritative_recovery_comparison_only",
+    );
+    expect(sourceFormulaArtifact.policy.comparison_path_role).toBe("reconstruction_only");
+    expect(sourceFormulaArtifact.policy.comparison_path_expected_equivalence).toBe(false);
+    expect(sourceFormulaArtifact.policy.comparison_path_blocks_readiness).toBe(false);
+    expect(sourceFormulaArtifact.policy.comparison_mismatch_disposition).toBe("advisory");
+    expect(sourceFormulaArtifact.policy.comparison_requires_formula_equivalence).toBe(false);
+    expect(sourceFormulaArtifact.stage.formulaMismatchClass).toBe(
+      "direct_vs_reconstructed",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.reconstructionOnlyComparison).toBe(
+      true,
+    );
+    const markdown = renderNhm2SourceFormulaAuditMarkdown(sourceFormulaArtifact);
+    expect(markdown).toContain("## Formula Comparison");
+    expect(markdown).toContain("formulaMismatchClass");
+  });
+
+  it("classifies same-formula numeric drift when formula path is equivalent but metric amplitude differs", () => {
+    const { artifact, sourceFormulaArtifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+        metricT00GeomSource: null,
+      },
+      recovery: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+      },
+    });
+    expect(sourceFormulaArtifact.formulaComparison.formulaMismatchClass).toBe(
+      "same_formula_numeric_drift",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.formulaEquivalent).toBe(false);
+    expect(artifact.stage.source_stage_cause).toBe("same_formula_numeric_drift");
+  });
+
+  it("marks recovery reconstruction mismatch as blocking when equivalence policy requires it", () => {
+    const { artifact, sourceFormulaArtifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00GeomSource: "direct_metric_pipeline",
+      },
+      recovery: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+      },
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: true,
+        comparison_path_blocks_readiness: true,
+        comparison_mismatch_disposition: "blocking",
+      },
+    });
+    expect(artifact.sourceAuthorityPolicy.mixedAuthorityDetected).toBe(false);
+    expect(sourceFormulaArtifact.formulaComparison.reconstructionOnlyComparison).toBe(
+      true,
+    );
+    expect(sourceFormulaArtifact.policy.comparison_path_blocks_readiness).toBe(true);
+    expect(artifact.stage.source_stage_cause).toBe("recovery_reconstruction_mismatch");
+    expect(artifact.stage.source_stage_ready).toBe(false);
+    expect(artifact.blockingFindings).toContain("recovery_reconstruction_mismatch");
+    expect(artifact.advisoryFindings).toEqual([]);
+  });
+
+  it("refines unresolved numeric source gap into same-formula numeric drift when metadata and formula class align", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.reducedOrderPipelinePayload = {
+      ...sourceToYork.reducedOrderPipelinePayload,
+      grRequest: {
+        ...sourceToYork.reducedOrderPipelinePayload.grRequest,
+        warp: {
+          metricAdapter: {
+            chart: { label: "comoving_cartesian" },
+          },
+          metricT00Contract: {
+            observer: "eulerian_n",
+            normalization: "point_splitting",
+            unitSystem: "SI_inferred_jm3",
+          },
+        },
+      },
+    };
+    const { artifact } = buildSourceStageFixture({
+      sourceToYork,
+      canonical: {
+        metricT00Observer: "eulerian_n",
+        chartLabel: "comoving_cartesian",
+        metricT00UnitSystem: "SI_inferred_jm3",
+      },
+      recovery: {
+        metricT00Observer: "eulerian_n",
+        chartLabel: "comoving_cartesian",
+        metricT00UnitSystem: "SI_inferred_jm3",
+        metricT00Derivation: null,
+      },
+    });
+    expect(artifact.componentAudit.every((entry) => entry.status !== "missing")).toBe(true);
+    expect(artifact.stage.source_stage_cause).toBe("same_formula_numeric_drift");
+    expect(artifact.numericGapDecomposition.primaryCandidate).toBe(
+      "unexplained_numeric_gap",
+    );
+    expect(artifact.stage.source_stage_ready).toBe(false);
+  });
+
+  it("builds solve-authority audit domains/splits and keeps mechanism chain blocked when splits are open", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const laneB = payload.diagnosticLanes.find(
+      (entry: any) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    laneB.observer_approximation =
+      "diagnostic-local observer-only drift proxy on fixed comoving foliation";
+    laneB.cross_lane_claim_ready = false;
+    laneB.reference_comparison_ready = true;
+    laneB.semantics_closed = true;
+
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        sourceToYork,
+        comparisonPolicyOverride: {
+          comparison_path_expected_equivalence: true,
+          comparison_path_blocks_readiness: true,
+          comparison_mismatch_disposition: "blocking",
+        },
+      });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({
+      sourceToYork,
+    });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({
+      sourceToYork,
+      brickPolicyOverride: {
+        auditHarnessOverridesBlockReadiness: true,
+      },
+    });
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork,
+      syncLiveRefs: false,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({
+      payload,
+      diagnosticPolicyOverride: {
+        crossLaneAgreementBlocksMechanismReadiness: true,
+      },
+    });
+
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+
+    expect(artifact.artifactType).toBe("nhm2_solve_authority_audit/v1");
+    expect(artifact.authorityDomains.contract_authority.source_path).toContain(
+      "needle-hull-mark2-cavity-contract.v1.json",
+    );
+    expect(artifact.authorityDomains.snapshot_authority.source_kind).toBe(
+      "snapshot_authority_audit_artifact",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).toContain(
+      "contract_to_brick_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).toContain(
+      "snapshot_authority_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).toContain(
+      "source_stage_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).toContain(
+      "diagnostic_cross_lane_normalization_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).toContain(
+      "diagnostic_cross_lane_reference_only_split",
+    );
+    expect(artifact.firstDivergence?.stage_id).toBe("S0_source");
+    expect(artifact.sourceStageCause).toBe("recovery_reconstruction_mismatch");
+    expect(artifact.sourceStageReady).toBe(false);
+    expect(artifact.readiness.yorkClassificationReady).toBe(true);
+    expect(artifact.readiness.sourceAuthorityClosed).toBe(false);
+    expect(artifact.readiness.mechanismChainReady).toBe(false);
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_source_stage_reconstruction_equivalence_required",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_source_stage_recovery_reconstruction_mismatch",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_brick_audit_harness_override_active",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).not.toContain(
+      "solve_authority_brick_split_open",
+    );
+    const markdown = renderNhm2SolveAuthorityAuditMarkdown(artifact);
+    expect(markdown).toContain("## Authority Domains");
+    expect(markdown).toContain("## Detected Splits");
+  });
+
+  it("maps refined source-formula mismatch classes into solve-authority blocker codes", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        canonical: {
+          metricT00Derivation: "forward_shift_to_K_to_rho_E",
+          metricT00GeomSource: null,
+        },
+        recovery: {
+          metricT00Derivation: "forward_shift_to_K_to_rho_E",
+        },
+      });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({
+      sourceToYork,
+    });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({
+      sourceToYork,
+      brickPolicyOverride: {
+        auditHarnessOverridesBlockReadiness: true,
+      },
+    });
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({
+      payload,
+    });
+    expect(sourceStageAudit.stage.source_stage_cause).toBe("same_formula_numeric_drift");
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+    expect(artifact.sourceFormulaMismatchClass).toBe("same_formula_numeric_drift");
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_source_stage_same_formula_numeric_drift",
+    );
+  });
+
+  it("keeps source authority closed when recovery reconstruction mismatch is advisory-only", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit } = buildSourceStageFixture({
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      },
+    });
+    expect(sourceStageAudit.stage.source_stage_ready).toBe(true);
+    expect(sourceStageAudit.stage.source_stage_cause).toBe("none");
+    const readiness = computeSolveAuthorityReadiness({
+      payload,
+      sourceToYork,
+      splits: [] as any,
+      sourceStageAudit,
+    });
+    expect(readiness.yorkClassificationReady).toBe(true);
+    expect(readiness.sourceAuthorityClosed).toBe(true);
+    expect(
+      readiness.mechanismClaimBlockReasons.some((entry) =>
+        entry.startsWith("solve_authority_source_stage_"),
+      ),
+    ).toBe(false);
+  });
+
+  it("emits timing-authority audit artifact with policy, ownership, and readiness evidence", () => {
+    const { artifact } = buildTimingAuthorityFixture();
+    expect(artifact.artifactType).toBe("nhm2_timing_authority_audit/v1");
+    expect(artifact.timingPolicy.authoritativeTauLcAuthorityId).toBe("geometry_derived");
+    expect(artifact.timingAuthorities.some((entry) => entry.authority_id === "autoscale_prev")).toBe(
+      true,
+    );
+    expect(artifact.timingFieldOwnership.some((entry) => entry.field === "TS_ratio")).toBe(true);
+    expect(typeof artifact.timingReadiness.timingAuthorityClosed).toBe("boolean");
+    const markdown = renderNhm2TimingAuthorityAuditMarkdown(artifact);
+    expect(markdown).toContain("## Timing Policy");
+    expect(markdown).toContain("## Timing Authorities");
+  });
+
+  it("emits brick-authority audit artifact with policy, mappings, and readiness evidence", () => {
+    const { artifact } = buildBrickAuthorityFixture();
+    expect(artifact.artifactType).toBe("nhm2_brick_authority_audit/v1");
+    expect(artifact.brickPolicy.requiredBrickFieldsForReadiness).toContain("metricT00Ref");
+    expect(artifact.brickFieldOwnership.some((entry) => entry.field === "metricT00Source")).toBe(
+      true,
+    );
+    expect(typeof artifact.brickReadiness.brickAuthorityClosed).toBe("boolean");
+    const markdown = renderNhm2BrickAuthorityAuditMarkdown(artifact);
+    expect(markdown).toContain("## Brick Policy");
+    expect(markdown).toContain("## Brick Field Ownership");
+  });
+
+  it("emits snapshot-authority audit artifact with policy, sources, and comparison evidence", () => {
+    const { artifact } = buildSnapshotAuthorityFixture();
+    expect(artifact.artifactType).toBe("nhm2_snapshot_authority_audit/v1");
+    expect(artifact.snapshotSources.map((entry) => entry.source_id)).toContain(
+      "snapshot_artifact",
+    );
+    expect(artifact.snapshotSources.map((entry) => entry.source_id)).toContain(
+      "proof_pack_snapshot_refs",
+    );
+    expect(artifact.snapshotComparison.some((entry) => entry.field === "metric_ref_hash")).toBe(
+      true,
+    );
+    const markdown = renderNhm2SnapshotAuthorityAuditMarkdown(artifact);
+    expect(markdown).toContain("## Snapshot Policy");
+    expect(markdown).toContain("## Snapshot Comparison");
+  });
+
+  it("emits diagnostic-semantic audit artifact with policy, lane ownership, and readiness evidence", () => {
+    const { artifact } = buildDiagnosticSemanticFixture();
+    expect(artifact.artifactType).toBe("nhm2_diagnostic_semantic_audit/v1");
+    expect(artifact.diagnosticPolicy.authoritativeLaneIdsForMechanismReadiness).toEqual([
+      YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+    ]);
+    expect(
+      artifact.laneSemantics.some(
+        (entry) =>
+          entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID &&
+          entry.is_reference_only === true,
+      ),
+    ).toBe(true);
+    const markdown = renderNhm2DiagnosticSemanticAuditMarkdown(artifact);
+    expect(markdown).toContain("## Diagnostic Policy");
+    expect(markdown).toContain("## Lane Semantics");
+  });
+
+  it("closes diagnostic readiness when Lane A is authoritative and proxy Lane B is advisory-only", () => {
+    const { artifact } = buildDiagnosticSemanticFixture();
+    expect(artifact.diagnosticReadiness.diagnosticAuthorityClosed).toBe(true);
+    expect(artifact.blockingFindings).toEqual([]);
+    expect(artifact.advisoryFindings).toContain("diagnostic_proxy_lane_active");
+    expect(artifact.advisoryFindings).toContain("diagnostic_cross_lane_reference_only");
+    expect(artifact.advisoryFindings).toContain("diagnostic_semantics_closed");
+  });
+
+  it("renders Lane B as reference-only and not claim-ready in the proof-pack output", () => {
+    const payload = makeProofPackPayloadForMarkdown();
+    const laneB = payload.diagnosticLanes.find(
+      (entry) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    expect(laneB).toBeTruthy();
+    if (!laneB) return;
+    expect(laneB.cross_lane_claim_ready).toBe(false);
+    expect(laneB.reference_comparison_ready).toBe(true);
+
+    const markdown = renderMarkdown(payload);
+    expect(markdown).toContain(
+      `| ${YORK_DIAGNOSTIC_ALTERNATE_LANE_ID} | true | true | shift_drift_u(beta_over_alpha) | comoving_cartesian_3p1 | theta=-trK+div(beta/alpha) | K_ij=-1/2*L_n(gamma_ij) | true | false | true | true | true | true | nhm2_low_expansion_family | lane_b_family_congruent |`,
+    );
+    expect(markdown).toContain("| lane_b_cross_lane_claim_ready | false |");
+    expect(markdown).toContain("| lane_b_reference_comparison_ready | true |");
+  });
+
+  it("emits york render-debug artifact with explicit Lane A authority and view/display policy", () => {
+    const { artifact } = buildYorkRenderDebugFixture();
+    expect(artifact.artifactType).toBe("nhm2_york_render_debug/v1");
+    expect(artifact.renderPolicy.authoritativeLaneId).toBe(
+      YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+    );
+    expect(artifact.renderPolicy.imagesUsedAsPrimaryEvidence).toBe(false);
+    expect(artifact.viewDefinitions.map((entry) => entry.view_id)).toEqual(REQUIRED_VIEWS);
+    expect(artifact.frameDebugSummary.some((entry) => entry.view_id === "york-shell-map-3p1")).toBe(
+      true,
+    );
+    const markdown = renderNhm2YorkRenderDebugMarkdown(artifact);
+    expect(markdown).toContain("## Render Policy");
+    expect(markdown).toContain("## Paper Comparison Matrix");
+  });
+
+  it("classifies NHM2 as Natario-aligned after convention mapping and Alcubierre-different on Lane A", () => {
+    const { artifact } = buildYorkRenderDebugFixture();
+    const natario = artifact.paperComparisonMatrix.find(
+      (entry) => entry.reference_id === "natario_primary",
+    );
+    const alcubierre = artifact.paperComparisonMatrix.find(
+      (entry) => entry.reference_id === "alcubierre_primary",
+    );
+    expect(natario).toBeTruthy();
+    expect(alcubierre).toBeTruthy();
+    if (!natario || !alcubierre) return;
+    expect(natario.sign_match_status).toBe("compatible_after_sign_flip");
+    expect(natario.morphology_match_status).toBe("compatible_after_observer_scope_note");
+    expect(alcubierre.morphology_match_status).toBe("morphology_different");
+    expect(artifact.paper_comparison_verdict).toBe("paper_match_after_convention_alignment");
+    expect(artifact.dominant_difference_cause).toBe("real_nhm2_morphology_difference");
+  });
+
+  it("keeps mechanism closure intact while reporting render normalization as display-only", () => {
+    const { artifact, solveAuthorityArtifact } = buildYorkRenderDebugFixture();
+    expect(solveAuthorityArtifact.readiness.diagnosticAuthorityClosed).toBe(true);
+    expect(solveAuthorityArtifact.readiness.mechanismChainReady).toBe(true);
+    expect(solveAuthorityArtifact.readiness.mechanismClaimBlockReasons).toEqual([]);
+    expect(artifact.render_debug_verdict).toBe("render_matches_authoritative_geometry");
+    expect(artifact.normalizationPolicy.topology_normalization_scope).toContain("display-only");
+    expect(artifact.differenceCauses).toContain("display_normalization_difference");
+  });
+
+  it("renders a paper-comparison memo that keeps images subordinate to the numeric/convention basis", () => {
+    const { artifact } = buildYorkRenderDebugFixture();
+    const memo = renderNhm2YorkPaperComparisonMemo(artifact);
+    expect(memo).toContain("Lane A is the only admissible basis");
+    expect(memo).toContain("images_used_as_primary_evidence = no");
+    expect(memo).toContain("Natario");
+    expect(memo).toContain("Alcubierre");
+    expect(memo).toContain("Gourgoulhon");
+  });
+
+  it("blocks diagnostic readiness when policy requires non-proxy normalized cross-lane semantics", () => {
+    const { artifact } = buildDiagnosticSemanticFixture({
+      diagnosticPolicyOverride: {
+        crossLaneAgreementBlocksMechanismReadiness: true,
+      },
+    });
+    expect(artifact.diagnosticReadiness.diagnosticAuthorityClosed).toBe(false);
+    expect(artifact.blockingFindings).toContain(
+      "diagnostic_cross_lane_requires_normalized_observer",
+    );
+    expect(artifact.blockingFindings).toContain("diagnostic_cross_lane_reference_only");
+  });
+
+  it("classifies missing observer and foliation definitions by readiness ownership", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const laneA = payload.diagnosticLanes.find(
+      (entry: any) => entry.lane_id === YORK_DIAGNOSTIC_BASELINE_LANE_ID,
+    );
+    const laneB = payload.diagnosticLanes.find(
+      (entry: any) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    laneA.observer_definition_id = null;
+    laneB.foliation_definition = null;
+    laneB.foliation = null;
+
+    const { artifact } = buildDiagnosticSemanticFixture({ payload });
+    expect(artifact.diagnosticReadiness.diagnosticAuthorityClosed).toBe(false);
+    expect(artifact.blockingFindings).toContain("diagnostic_missing_observer_definition");
+    expect(artifact.advisoryFindings).toContain("diagnostic_missing_foliation_definition");
+  });
+
+  it("removes the generic diagnostic semantic blocker when semantics close", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        sourceToYork,
+        comparisonPolicyOverride: {
+          comparison_path_expected_equivalence: false,
+          comparison_path_blocks_readiness: false,
+          comparison_mismatch_disposition: "advisory",
+        },
+      });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({ sourceToYork });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({ sourceToYork });
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({ payload });
+
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+
+    expect(artifact.readiness.diagnosticAuthorityClosed).toBe(true);
+    expect(
+      artifact.readiness.mechanismClaimBlockReasons.some((entry) =>
+        entry.includes("diagnostic_semantic_split_open"),
+      ),
+    ).toBe(false);
+    expect(
+      artifact.readiness.mechanismClaimBlockReasons.some((entry) =>
+        entry.startsWith("solve_authority_diagnostic_"),
+      ),
+    ).toBe(false);
+    expect(artifact.readiness.mechanismChainReady).toBe(true);
+  });
+
+  it("keeps source, timing, brick, and snapshot closure states unchanged when diagnostic policy blocks", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        sourceToYork,
+        comparisonPolicyOverride: {
+          comparison_path_expected_equivalence: false,
+          comparison_path_blocks_readiness: false,
+          comparison_mismatch_disposition: "advisory",
+        },
+      });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({ sourceToYork });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({ sourceToYork });
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({
+      payload,
+      diagnosticPolicyOverride: {
+        crossLaneAgreementBlocksMechanismReadiness: true,
+      },
+    });
+
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+
+    expect(artifact.readiness.sourceAuthorityClosed).toBe(true);
+    expect(artifact.readiness.timingAuthorityClosed).toBe(true);
+    expect(artifact.readiness.brickAuthorityClosed).toBe(true);
+    expect(artifact.readiness.snapshotAuthorityClosed).toBe(true);
+    expect(artifact.readiness.diagnosticAuthorityClosed).toBe(false);
+    expect(artifact.readiness.mechanismChainReady).toBe(false);
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_diagnostic_cross_lane_requires_normalized_observer",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_diagnostic_cross_lane_reference_only",
+    );
+  });
+
+  it("closes snapshot readiness when snapshot refs match the live-derived brick chain", () => {
+    const { artifact } = buildSnapshotAuthorityFixture();
+    expect(artifact.snapshotReadiness.snapshotAuthorityClosed).toBe(true);
+    expect(artifact.blockingFindings).toEqual([]);
+    expect(artifact.snapshotComparison).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "metric_ref_hash",
+          comparison_status: "matched",
+        }),
+        expect.objectContaining({
+          field: "theta_channel_hash",
+          comparison_status: "matched",
+        }),
+        expect.objectContaining({
+          field: "k_trace_hash",
+          comparison_status: "matched",
+        }),
+        expect.objectContaining({
+          field: "snapshot_brick_url",
+          comparison_status: "matched",
+        }),
+      ]),
+    );
+    expect(artifact.advisoryFindings).toContain("snapshot_authority_closed");
+  });
+
+  it("treats missing live equivalents as blocking or advisory based on snapshot policy", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.proofPackBrickRequest.metricT00Ref = null;
+
+    const blocking = buildSnapshotAuthorityFixture({
+      sourceToYork,
+    }).artifact;
+    expect(blocking.snapshotReadiness.snapshotAuthorityClosed).toBe(false);
+    expect(blocking.blockingFindings).toContain("snapshot_missing_live_equivalent");
+
+    const advisory = buildSnapshotAuthorityFixture({
+      sourceToYork,
+      snapshotPolicyOverride: {
+        missingLiveEquivalentBlocksReadiness: false,
+      },
+    }).artifact;
+    expect(advisory.snapshotReadiness.snapshotAuthorityClosed).toBe(true);
+    expect(advisory.blockingFindings).toEqual([]);
+    expect(advisory.advisoryFindings).toContain("snapshot_missing_live_equivalent");
+  });
+
+  it("treats snapshot-only authority as reference-only when policy allows it", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.proofPackSnapshotRefs.metric_ref_hash = "snapshot-only-metric-ref";
+    sourceToYork.proofPackSnapshotRefs.snapshot_brick_url =
+      "http://127.0.0.1:5050/api/helix/gr-evolve-brick?dims=48x48x48&metricT00Ref=warp.metric.T00.natario_sdf.shift&referenceOnly=1";
+
+    const artifact = buildSnapshotAuthorityFixture({
+      sourceToYork,
+      snapshotPolicyOverride: {
+        snapshotOnlyAllowedForReference: true,
+      },
+      syncLiveRefs: false,
+    }).artifact;
+
+    expect(artifact.snapshotReadiness.snapshotAuthorityClosed).toBe(true);
+    expect(artifact.blockingFindings).toEqual([]);
+    expect(artifact.advisoryFindings).toContain("snapshot_reference_only");
+  });
+
+  it("removes the generic snapshot split blocker when snapshot authority closes", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const laneB = payload.diagnosticLanes.find(
+      (entry: any) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    laneB.observer_approximation =
+      "diagnostic-local observer-only drift proxy on fixed comoving foliation";
+    laneB.cross_lane_claim_ready = false;
+    laneB.reference_comparison_ready = true;
+    laneB.semantics_closed = true;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        sourceToYork,
+        comparisonPolicyOverride: {
+          comparison_path_expected_equivalence: false,
+          comparison_path_blocks_readiness: false,
+          comparison_mismatch_disposition: "advisory",
+        },
+      });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({ sourceToYork });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({ sourceToYork });
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({
+      payload,
+    });
+
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+
+    expect(artifact.readiness.snapshotAuthorityClosed).toBe(true);
+    expect(
+      artifact.readiness.mechanismClaimBlockReasons.some((entry) =>
+        entry.startsWith("solve_authority_snapshot_"),
+      ),
+    ).toBe(false);
+    expect(artifact.readiness.diagnosticAuthorityClosed).toBe(true);
+    expect(
+      artifact.readiness.mechanismClaimBlockReasons.some((entry) =>
+        entry.startsWith("solve_authority_diagnostic_"),
+      ),
+    ).toBe(false);
+  });
+
+  it("closes direct-copy and derived brick fields when required mappings/formulas are present", () => {
+    const { artifact } = buildBrickAuthorityFixture();
+    expect(artifact.brickReadiness.brickAuthorityClosed).toBe(true);
+    const metricSource = artifact.brickFieldOwnership.find(
+      (entry) => entry.field === "metricT00Source",
+    );
+    expect(metricSource?.mapping_type).toBe("direct_copy");
+    expect(metricSource?.status).toBe("closed");
+    const metricRef = artifact.brickFieldOwnership.find(
+      (entry) => entry.field === "metricT00Ref",
+    );
+    expect(metricRef?.mapping_type).toBe("derived_transform");
+    expect(metricRef?.mapping_formula_or_note).not.toBeNull();
+  });
+
+  it("requires explicit derivation metadata for derived-transform brick fields", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.parameterMappings = sourceToYork.parameterMappings.map((entry: any) =>
+      entry.field === "warpFieldType -> metricT00Ref"
+        ? { ...entry, mapping_formula: null, mapping_note: null }
+        : entry,
+    );
+    const { artifact } = buildBrickAuthorityFixture({
+      sourceToYork,
+      brickPolicyOverride: {
+        derivedTransformRequiresFormula: true,
+      },
+    });
+    expect(artifact.brickReadiness.brickAuthorityClosed).toBe(false);
+    expect(artifact.blockingFindings).toContain("brick_missing_parameter_derivation");
+  });
+
+  it("blocks readiness for required missing-derivation brick fields when policy requires it", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.parameterMappings = sourceToYork.parameterMappings.filter(
+      (entry: any) => entry.field !== "warpFieldType -> metricT00Ref",
+    );
+    const { artifact } = buildBrickAuthorityFixture({
+      sourceToYork,
+      brickPolicyOverride: {
+        requiredBrickFieldsForReadiness: ["metricT00Ref"],
+        missingDerivationBlocksReadiness: true,
+      },
+    });
+    expect(artifact.brickReadiness.brickAuthorityClosed).toBe(false);
+    expect(artifact.blockingFindings).toContain("brick_missing_parameter_derivation");
+  });
+
+  it("treats audit-harness brick overrides as advisory or blocking based on policy", () => {
+    const advisory = buildBrickAuthorityFixture({
+      brickPolicyOverride: {
+        auditHarnessOverridesBlockReadiness: false,
+      },
+    }).artifact;
+    expect(advisory.brickReadiness.brickAuthorityClosed).toBe(true);
+    expect(advisory.advisoryFindings).toContain("brick_audit_harness_override_active");
+    expect(advisory.blockingFindings).not.toContain("brick_audit_harness_override_active");
+
+    const blocking = buildBrickAuthorityFixture({
+      brickPolicyOverride: {
+        auditHarnessOverridesBlockReadiness: true,
+      },
+    }).artifact;
+    expect(blocking.brickReadiness.brickAuthorityClosed).toBe(false);
+    expect(blocking.blockingFindings).toContain("brick_audit_harness_override_active");
+  });
+
+  it("treats duty fallback as advisory or blocking based on policy", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.liveTimingAuthority.timingSource = "duty-fallback-derived";
+    const advisory = buildTimingAuthorityFixture({
+      sourceToYork,
+      timingPolicyOverride: {
+        fallbackTimingBlocksReadiness: false,
+      },
+    }).artifact;
+    expect(advisory.timingReadiness.timingAuthorityClosed).toBe(true);
+    expect(advisory.blockingFindings).not.toContain("timing_fallback_source_active");
+    expect(advisory.advisoryFindings).toContain("timing_fallback_source_active");
+
+    const blocking = buildTimingAuthorityFixture({
+      sourceToYork,
+      timingPolicyOverride: {
+        fallbackTimingBlocksReadiness: true,
+      },
+    }).artifact;
+    expect(blocking.timingReadiness.timingAuthorityClosed).toBe(false);
+    expect(blocking.blockingFindings).toContain("timing_fallback_source_active");
+  });
+
+  it("applies simulated/autoscale timing policy toggles deterministically", () => {
+    const sourceToYork = makeSourceToYorkFixture();
+    sourceToYork.liveTimingAuthority.timingSource = "configured-simulated";
+    const simulatedBlocking = buildTimingAuthorityFixture({
+      sourceToYork,
+      timingPolicyOverride: {
+        simulatedTimingBlocksReadiness: true,
+      },
+    }).artifact;
+    expect(simulatedBlocking.timingReadiness.timingAuthorityClosed).toBe(false);
+    expect(simulatedBlocking.blockingFindings).toContain("timing_simulated_profile_active");
+
+    const autoscaleBlocking = buildTimingAuthorityFixture({
+      sourceToYork,
+      timingPolicyOverride: {
+        autoscaleTimingBlocksReadiness: true,
+      },
+    }).artifact;
+    expect(autoscaleBlocking.timingReadiness.timingAuthorityClosed).toBe(false);
+    expect(autoscaleBlocking.blockingFindings).toContain("timing_autoscale_source_active");
+  });
+
+  it("replaces the generic snapshot blocker with a specific snapshot blocker when timing policy is closed", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const laneB = payload.diagnosticLanes.find(
+      (entry: any) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    laneB.observer_approximation =
+      "diagnostic-local observer-only drift proxy on fixed comoving foliation";
+    laneB.cross_lane_claim_ready = false;
+    laneB.reference_comparison_ready = true;
+    laneB.semantics_closed = true;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        sourceToYork,
+        comparisonPolicyOverride: {
+          comparison_path_expected_equivalence: false,
+          comparison_path_blocks_readiness: false,
+          comparison_mismatch_disposition: "advisory",
+        },
+    });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({ sourceToYork });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({
+      sourceToYork,
+    });
+    const snapshotSourceToYork = {
+      ...sourceToYork,
+      proofPackSnapshotRefs: {
+        ...sourceToYork.proofPackSnapshotRefs,
+        snapshot_brick_url: `${sourceToYork.proofPackBrickRequest.brickUrl}&generation=stale`,
+      },
+    };
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork: snapshotSourceToYork,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({
+      payload,
+    });
+    expect(timingAudit.timingReadiness.timingAuthorityClosed).toBe(true);
+    expect(brickAudit.brickReadiness.brickAuthorityClosed).toBe(true);
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork: snapshotSourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+    expect(artifact.readiness.timingAuthorityClosed).toBe(true);
+    expect(artifact.readiness.mechanismClaimBlockReasons).not.toContain(
+      "solve_authority_timing_split_open",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).not.toContain(
+      "solve_authority_brick_split_open",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).not.toContain(
+      "solve_authority_snapshot_split_open",
+    );
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_snapshot_brick_ref_mismatch",
+    );
+    expect(artifact.readiness.diagnosticAuthorityClosed).toBe(true);
+  });
+
+  it("keeps source/timing/brick/diagnostic readiness unchanged when snapshot is the only open downstream stage", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const laneB = payload.diagnosticLanes.find(
+      (entry: any) => entry.lane_id === YORK_DIAGNOSTIC_ALTERNATE_LANE_ID,
+    );
+    laneB.observer_approximation =
+      "diagnostic-local observer-only drift proxy on fixed comoving foliation";
+    laneB.cross_lane_claim_ready = false;
+    laneB.reference_comparison_ready = true;
+    laneB.semantics_closed = true;
+    const sourceToYork = makeSourceToYorkFixture();
+    const { artifact: sourceStageAudit, sourceFormulaArtifact, firstDivergencePath } =
+      buildSourceStageFixture({
+        sourceToYork,
+        comparisonPolicyOverride: {
+          comparison_path_expected_equivalence: false,
+          comparison_path_blocks_readiness: false,
+          comparison_mismatch_disposition: "advisory",
+        },
+    });
+    const { artifact: timingAudit } = buildTimingAuthorityFixture({
+      sourceToYork,
+    });
+    const { artifact: brickAudit } = buildBrickAuthorityFixture({
+      sourceToYork,
+    });
+    const snapshotSourceToYork = {
+      ...sourceToYork,
+      proofPackBrickRequest: {
+        ...sourceToYork.proofPackBrickRequest,
+        metricT00Ref: null,
+      },
+    };
+    const { artifact: snapshotAudit, snapshotPath } = buildSnapshotAuthorityFixture({
+      payload,
+      sourceToYork: snapshotSourceToYork,
+    });
+    const { artifact: diagnosticAudit } = buildDiagnosticSemanticFixture({
+      payload,
+    });
+    const artifact = buildNhm2SolveAuthorityAuditArtifact({
+      payload,
+      sourceToYork: snapshotSourceToYork,
+      timingAudit,
+      brickAudit,
+      snapshotAudit,
+      diagnosticAudit,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceStageAudit,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceToYorkArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      timingAuditPath:
+        "artifacts/research/full-solve/nhm2-timing-authority-audit-latest.json",
+      brickAuditPath:
+        "artifacts/research/full-solve/nhm2-brick-authority-audit-latest.json",
+      snapshotAuditPath: snapshotPath,
+      diagnosticAuditPath:
+        "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+      sourceFormulaAuditPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceStageAuditPath:
+        "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+      nhm2SnapshotPath:
+        "artifacts/research/full-solve/nhm2-snapshot-congruence-evidence-latest.json",
+      waveAEvidencePackPath: "artifacts/research/full-solve/A/evidence-pack.json",
+      firstDivergencePath,
+    });
+    expect(artifact.splits.map((entry) => entry.split_id)).not.toContain(
+      "source_stage_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).not.toContain(
+      "timing_authority_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).not.toContain(
+      "contract_to_brick_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).toContain(
+      "snapshot_authority_split",
+    );
+    expect(artifact.splits.map((entry) => entry.split_id)).not.toContain(
+      "diagnostic_semantic_split",
+    );
+    expect(artifact.readiness.sourceAuthorityClosed).toBe(true);
+    expect(artifact.readiness.timingAuthorityClosed).toBe(true);
+    expect(artifact.readiness.brickAuthorityClosed).toBe(true);
+    expect(artifact.readiness.snapshotAuthorityClosed).toBe(false);
+    expect(artifact.readiness.diagnosticAuthorityClosed).toBe(true);
+    expect(artifact.readiness.mechanismChainReady).toBe(false);
+    expect(artifact.readiness.mechanismClaimBlockReasons).toContain(
+      "solve_authority_snapshot_missing_live_equivalent",
+    );
+  });
+
+  it("keeps readiness split explicit: York classification can be ready while mechanism chain stays blocked", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const readiness = computeSolveAuthorityReadiness({
+      payload,
+      sourceToYork: makeSourceToYorkFixture(),
+      splits: [
+        {
+          split_id: "source_stage_split",
+          severity: "high",
+          fields: ["metricT00Si_Jm3"],
+          authorities_involved: ["source_authority", "brick_authority"],
+          evidence: ["stage=S0_source"],
+          blocks: ["mechanism_claims"],
+          recommended_next_patch: "patch source stage",
+        },
+      ] as any,
+    });
+    expect(readiness.yorkClassificationReady).toBe(true);
+    expect(readiness.sourceAuthorityClosed).toBe(false);
+    expect(readiness.mechanismChainReady).toBe(false);
+  });
+
+  it("emits fixed-scale comparison artifacts and keeps NHM2 closer to Natario under shared scaling", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.classificationScoring = {
+      distance_to_alcubierre_reference: 0.24,
+      distance_to_low_expansion_reference: 0.03,
+      reference_margin: 0.21,
+      winning_reference: "natario_control",
+      margin_sufficient: true,
+      winning_reference_within_threshold: true,
+      distinct_by_policy: false,
+      distinctness_threshold: 0.4,
+      margin_min: 0.05,
+      reference_match_threshold: 0.5,
+      distance_metric: "weighted_normalized_l1",
+      normalization_method: "contract-v1",
+      to_alcubierre_breakdown: {} as any,
+      to_low_expansion_breakdown: {} as any,
+    };
+    const caseById = new Map(payload.cases.map((entry: any) => [entry.caseId, entry]));
+    caseById.get("alcubierre_control").classificationFeatures = {
+      theta_abs_max_raw: 1,
+      theta_abs_max_display: 1,
+      positive_count_xz: 12,
+      negative_count_xz: 12,
+      positive_count_xrho: 10,
+      negative_count_xrho: 10,
+      support_overlap_pct: 0.8,
+      near_zero_theta: false,
+      signed_lobe_summary: "fore+/aft-",
+      shell_map_activity: 0.7,
+    };
+    caseById.get("natario_control").classificationFeatures = {
+      theta_abs_max_raw: 0.15,
+      theta_abs_max_display: 0.15,
+      positive_count_xz: 8,
+      negative_count_xz: 8,
+      positive_count_xrho: 8,
+      negative_count_xrho: 8,
+      support_overlap_pct: 0.78,
+      near_zero_theta: false,
+      signed_lobe_summary: "mixed_or_flat",
+      shell_map_activity: 0.2,
+    };
+    caseById.get("nhm2_certified").classificationFeatures = {
+      theta_abs_max_raw: 0.12,
+      theta_abs_max_display: 0.12,
+      positive_count_xz: 8,
+      negative_count_xz: 8,
+      positive_count_xrho: 8,
+      negative_count_xrho: 8,
+      support_overlap_pct: 0.77,
+      near_zero_theta: false,
+      signed_lobe_summary: "mixed_or_flat",
+      shell_map_activity: 0.22,
+    };
+    const makeInputCase = (
+      caseId: "alcubierre_control" | "natario_control" | "nhm2_certified",
+      xz: number[],
+      xrho: number[],
+      signed: "fore+/aft-" | "fore-/aft+" | "mixed_or_flat",
+    ) => ({
+      case_id: caseId,
+      label: caseId,
+      views: [
+        {
+          view_id: "york-surface-3p1",
+          coordinate_mode: "x-z-midplane",
+          sampling_choice: "x-z midplane",
+          source_width: 4,
+          source_height: 4,
+          slice: Float32Array.from(xz),
+          slice_hash: `hash-${caseId}-xz`,
+          raw_extrema: { min: Math.min(...xz), max: Math.max(...xz), absMax: Math.max(...xz.map(Math.abs)) },
+          signed_lobe_summary: signed,
+        },
+        {
+          view_id: "york-surface-rho-3p1",
+          coordinate_mode: "x-rho",
+          sampling_choice: "x-rho cylindrical remap",
+          source_width: 4,
+          source_height: 4,
+          slice: Float32Array.from(xrho),
+          slice_hash: `hash-${caseId}-xrho`,
+          raw_extrema: {
+            min: Math.min(...xrho),
+            max: Math.max(...xrho),
+            absMax: Math.max(...xrho.map(Math.abs)),
+          },
+          signed_lobe_summary: null,
+        },
+        {
+          view_id: "york-topology-normalized-3p1",
+          coordinate_mode: "x-z-midplane",
+          sampling_choice: "x-z midplane",
+          source_width: 4,
+          source_height: 4,
+          slice: Float32Array.from(xz),
+          slice_hash: `hash-${caseId}-topology`,
+          raw_extrema: { min: Math.min(...xz), max: Math.max(...xz), absMax: Math.max(...xz.map(Math.abs)) },
+          signed_lobe_summary: signed,
+        },
+      ],
+    });
+    const caseInputs = [
+      makeInputCase(
+        "alcubierre_control",
+        [-1, -1, -0.8, -0.8, -0.4, -0.3, 0.3, 0.4, -0.2, -0.1, 0.6, 0.8, 0.5, 0.7, 1, 1],
+        [-0.9, -0.8, -0.7, -0.6, -0.2, -0.1, 0.1, 0.2, -0.1, 0.2, 0.5, 0.8, 0.3, 0.6, 0.9, 1],
+        "fore+/aft-",
+      ),
+      makeInputCase(
+        "natario_control",
+        [-0.12, -0.1, -0.08, -0.1, -0.06, -0.04, 0.04, 0.06, -0.04, -0.02, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12],
+        [-0.1, -0.08, -0.06, -0.05, -0.03, -0.01, 0.01, 0.03, -0.02, 0.01, 0.03, 0.05, 0.04, 0.06, 0.08, 0.1],
+        "mixed_or_flat",
+      ),
+      makeInputCase(
+        "nhm2_certified",
+        [-0.11, -0.09, -0.07, -0.09, -0.05, -0.03, 0.03, 0.05, -0.03, -0.01, 0.01, 0.03, 0.05, 0.07, 0.09, 0.11],
+        [-0.09, -0.07, -0.05, -0.04, -0.025, -0.005, 0.005, 0.025, -0.015, 0.005, 0.025, 0.04, 0.035, 0.055, 0.075, 0.09],
+        "mixed_or_flat",
+      ),
+    ] as any;
+    const exportDir = fs.mkdtempSync(path.join(os.tmpdir(), "york-fixed-scale-"));
+    const artifact = await buildNhm2YorkFixedScaleComparisonArtifact({
+      payload,
+      solveAuthorityAudit: {
+        readiness: {
+          sourceAuthorityClosed: true,
+          timingAuthorityClosed: true,
+          brickAuthorityClosed: true,
+          snapshotAuthorityClosed: true,
+          diagnosticAuthorityClosed: true,
+          yorkClassificationReady: true,
+          mechanismChainReady: true,
+          mechanismClaimBlockReasons: [],
+        },
+      } as any,
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      solveAuthorityAuditPath:
+        "artifacts/research/full-solve/nhm2-solve-authority-audit-latest.json",
+      yorkRenderDebugArtifactPath:
+        "artifacts/research/full-solve/nhm2-york-render-debug-latest.json",
+      exportDirectory: exportDir,
+      frameSize: { width: 96, height: 64 },
+      caseInputs,
+    });
+    expect(artifact.caseExports).toHaveLength(3);
+    expect(artifact.pairwiseMetrics).toHaveLength(3);
+    expect(artifact.fixed_scale_render_verdict).toBe(
+      "shared_scale_preserves_natario_like_class",
+    );
+    expect(artifact.nasaFigure1Comparison.display_sign_multiplier).toBe(-1);
+    expect(artifact.nhm2_vs_natario_visual_distance?.pixel_rms).toBeLessThan(
+      artifact.nhm2_vs_alcubierre_visual_distance?.pixel_rms ?? Infinity,
+    );
+    expect(artifact.nasaFigure1Comparison.primary_control_baseline_case).toBe(
+      "natario_control",
+    );
+    expect(
+      artifact.nasaFigure1Comparison.relative_to_primary_control_pixel_rms_ratio ?? 0,
+    ).toBeGreaterThan(1.5);
+    expect(artifact.is_nhm2_close_to_nasa_fig1).toBe("no");
+    expect(artifact.figure1_overlay_verdict).toBe(
+      "real_nhm2_vs_alcubierre_morphology_difference",
+    );
+    expect(artifact.exportIntegrity.valid).toBe(true);
+    expect(artifact.exportIntegrity.visual_metric_source_stage).toBe(
+      "pre_png_color_buffer",
+    );
+    expect(artifact.exportIntegrity.blockingFindings).toHaveLength(0);
+    const topologyMetric = artifact.pairwiseMetrics
+      .find((entry) => entry.pair_id === "nhm2_vs_alcubierre")
+      ?.views.find((entry) => entry.view_id === "york-topology-normalized-3p1");
+    expect(topologyMetric?.metric_source_stage).toBe("pre_png_color_buffer");
+    expect(topologyMetric?.lhs_display_buffer_hash).not.toBe(
+      topologyMetric?.rhs_display_buffer_hash,
+    );
+    expect(topologyMetric?.pixel_rms ?? 0).toBeGreaterThan(0);
+    expect(artifact.nasaFigure1Comparison.metric_source_stage).toBe(
+      "pre_png_color_buffer",
+    );
+    expect(artifact.notes).toContain("mechanism_chain_ready=true");
+    expect(artifact.notes).toContain("diagnostic_authority_closed=true");
+    expect(artifact.differenceCauses).toContain("autoscale_masked_visual_difference");
+    for (const entry of artifact.caseExports.flatMap((item) => item.views)) {
+      expect(fs.existsSync(entry.png_path)).toBe(true);
+    }
+  });
+
+  it("fails loudly when distinct transformed buffers collapse to identical fixed-scale PNGs", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.classificationScoring = {
+      distance_to_alcubierre_reference: 0.2,
+      distance_to_low_expansion_reference: 0.05,
+    };
+    const exportDir = fs.mkdtempSync(path.join(os.tmpdir(), "york-fixed-scale-collision-"));
+    const makeCase = (
+      case_id: "alcubierre_control" | "natario_control" | "nhm2_certified",
+      xzValue: number,
+    ) => ({
+      case_id,
+      label: case_id,
+      views: [
+        {
+          view_id: "york-surface-3p1",
+          coordinate_mode: "x-z-midplane",
+          sampling_choice: "x-z midplane",
+          source_width: 1,
+          source_height: 1,
+          slice: Float32Array.from([xzValue]),
+          slice_hash: `${case_id}-xz`,
+          raw_extrema: { min: xzValue, max: xzValue, absMax: Math.abs(xzValue) },
+          signed_lobe_summary: "mixed_or_flat",
+        },
+        {
+          view_id: "york-surface-rho-3p1",
+          coordinate_mode: "x-rho",
+          sampling_choice: "x-rho cylindrical remap",
+          source_width: 1,
+          source_height: 1,
+          slice: Float32Array.from([xzValue]),
+          slice_hash: `${case_id}-xrho`,
+          raw_extrema: { min: xzValue, max: xzValue, absMax: Math.abs(xzValue) },
+          signed_lobe_summary: null,
+        },
+        {
+          view_id: "york-topology-normalized-3p1",
+          coordinate_mode: "x-z-midplane",
+          sampling_choice: "x-z midplane",
+          source_width: 1,
+          source_height: 1,
+          slice: Float32Array.from([xzValue]),
+          slice_hash: `${case_id}-top`,
+          raw_extrema: { min: xzValue, max: xzValue, absMax: Math.abs(xzValue) },
+          signed_lobe_summary: "mixed_or_flat",
+        },
+      ],
+    });
+    await expect(
+      buildNhm2YorkFixedScaleComparisonArtifact({
+        payload,
+        solveAuthorityAudit: {
+          readiness: {
+            sourceAuthorityClosed: true,
+            timingAuthorityClosed: true,
+            brickAuthorityClosed: true,
+            snapshotAuthorityClosed: true,
+            diagnosticAuthorityClosed: true,
+            yorkClassificationReady: true,
+            mechanismChainReady: true,
+            mechanismClaimBlockReasons: [],
+          },
+        } as any,
+        sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+        solveAuthorityAuditPath: "artifacts/research/full-solve/solve.json",
+        yorkRenderDebugArtifactPath: "artifacts/research/full-solve/render.json",
+        exportDirectory: exportDir,
+        frameSize: { width: 1, height: 1 },
+        caseInputs: [
+          makeCase("alcubierre_control", 0.5001),
+          makeCase("natario_control", 0.50015),
+          makeCase("nhm2_certified", 0.5002),
+        ] as any,
+      }),
+    ).rejects.toThrow(/fixed_scale_export_integrity_failed/);
+  });
+
+  it("renders fixed-scale comparison markdown and NASA overlay memo with primary-source references", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.classificationScoring = {
+      distance_to_alcubierre_reference: 0.3,
+      distance_to_low_expansion_reference: 0.04,
+    };
+    const exportDir = fs.mkdtempSync(path.join(os.tmpdir(), "york-fixed-scale-render-"));
+    const artifact = await buildNhm2YorkFixedScaleComparisonArtifact({
+      payload,
+      solveAuthorityAudit: {
+        readiness: {
+          sourceAuthorityClosed: true,
+          timingAuthorityClosed: true,
+          brickAuthorityClosed: true,
+          snapshotAuthorityClosed: true,
+          diagnosticAuthorityClosed: true,
+          yorkClassificationReady: true,
+          mechanismChainReady: true,
+          mechanismClaimBlockReasons: [],
+        },
+      } as any,
+      sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+      solveAuthorityAuditPath: "artifacts/research/full-solve/solve.json",
+      yorkRenderDebugArtifactPath: "artifacts/research/full-solve/render.json",
+      exportDirectory: exportDir,
+      frameSize: { width: 64, height: 64 },
+      caseInputs: [
+        {
+          case_id: "alcubierre_control",
+          label: "alc",
+          views: [
+            {
+              view_id: "york-surface-3p1",
+              coordinate_mode: "x-z-midplane",
+              sampling_choice: "x-z midplane",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-1, -0.5, 0.5, 1]),
+              slice_hash: "a-xz",
+              raw_extrema: { min: -1, max: 1, absMax: 1 },
+              signed_lobe_summary: "fore+/aft-",
+            },
+            {
+              view_id: "york-surface-rho-3p1",
+              coordinate_mode: "x-rho",
+              sampling_choice: "x-rho cylindrical remap",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-1, -0.5, 0.5, 1]),
+              slice_hash: "a-rho",
+              raw_extrema: { min: -1, max: 1, absMax: 1 },
+              signed_lobe_summary: null,
+            },
+            {
+              view_id: "york-topology-normalized-3p1",
+              coordinate_mode: "x-z-midplane",
+              sampling_choice: "x-z midplane",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-1, -0.5, 0.5, 1]),
+              slice_hash: "a-top",
+              raw_extrema: { min: -1, max: 1, absMax: 1 },
+              signed_lobe_summary: "fore+/aft-",
+            },
+          ],
+        },
+        {
+          case_id: "natario_control",
+          label: "nat",
+          views: [
+            {
+              view_id: "york-surface-3p1",
+              coordinate_mode: "x-z-midplane",
+              sampling_choice: "x-z midplane",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-0.1, -0.05, 0.05, 0.1]),
+              slice_hash: "n-xz",
+              raw_extrema: { min: -0.1, max: 0.1, absMax: 0.1 },
+              signed_lobe_summary: "mixed_or_flat",
+            },
+            {
+              view_id: "york-surface-rho-3p1",
+              coordinate_mode: "x-rho",
+              sampling_choice: "x-rho cylindrical remap",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-0.1, -0.05, 0.05, 0.1]),
+              slice_hash: "n-rho",
+              raw_extrema: { min: -0.1, max: 0.1, absMax: 0.1 },
+              signed_lobe_summary: null,
+            },
+            {
+              view_id: "york-topology-normalized-3p1",
+              coordinate_mode: "x-z-midplane",
+              sampling_choice: "x-z midplane",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-0.1, -0.05, 0.05, 0.1]),
+              slice_hash: "n-top",
+              raw_extrema: { min: -0.1, max: 0.1, absMax: 0.1 },
+              signed_lobe_summary: "mixed_or_flat",
+            },
+          ],
+        },
+        {
+          case_id: "nhm2_certified",
+          label: "nhm2",
+          views: [
+            {
+              view_id: "york-surface-3p1",
+              coordinate_mode: "x-z-midplane",
+              sampling_choice: "x-z midplane",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-0.08, -0.04, 0.04, 0.08]),
+              slice_hash: "h-xz",
+              raw_extrema: { min: -0.08, max: 0.08, absMax: 0.08 },
+              signed_lobe_summary: "mixed_or_flat",
+            },
+            {
+              view_id: "york-surface-rho-3p1",
+              coordinate_mode: "x-rho",
+              sampling_choice: "x-rho cylindrical remap",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-0.08, -0.04, 0.04, 0.08]),
+              slice_hash: "h-rho",
+              raw_extrema: { min: -0.08, max: 0.08, absMax: 0.08 },
+              signed_lobe_summary: null,
+            },
+            {
+              view_id: "york-topology-normalized-3p1",
+              coordinate_mode: "x-z-midplane",
+              sampling_choice: "x-z midplane",
+              source_width: 2,
+              source_height: 2,
+              slice: Float32Array.from([-0.08, -0.04, 0.04, 0.08]),
+              slice_hash: "h-top",
+              raw_extrema: { min: -0.08, max: 0.08, absMax: 0.08 },
+              signed_lobe_summary: "mixed_or_flat",
+            },
+          ],
+        },
+      ] as any,
+    });
+    const markdown = renderNhm2YorkFixedScaleComparisonMarkdown(artifact);
+    const memo = renderNhm2NasaFigure1OverlayMemo(artifact);
+    expect(markdown).toContain("NASA Figure 1 Reference");
+    expect(markdown).toContain("visual_metric_source_stage");
+    expect(markdown).toContain("fixed_scale_render_verdict");
+    expect(memo).toContain("ntrs.nasa.gov");
+    expect(memo).toContain("is_nhm2_close_to_nasa_fig1");
+    expect(memo).toContain("pre-PNG color buffer");
+  });
+
+  it("builds a canonical calibration ladder and explicit unavailable ablation panel", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.classificationScoring = {
+      distance_to_alcubierre_reference: 0.32,
+      distance_to_low_expansion_reference: 0.05,
+      reference_margin: 0.27,
+      winning_reference: "natario_control",
+      margin_sufficient: true,
+      winning_reference_within_threshold: true,
+      distinct_by_policy: false,
+      distinctness_threshold: 0.5,
+      margin_min: 0.08,
+      reference_match_threshold: 0.5,
+      distance_metric: "weighted_normalized_l1",
+      normalization_method: "contract-v1",
+      to_alcubierre_breakdown: {} as any,
+      to_low_expansion_breakdown: {} as any,
+    };
+    const caseById = new Map(payload.cases.map((entry: any) => [entry.caseId, entry]));
+    caseById.get("alcubierre_control").primaryYork = {
+      ...caseById.get("alcubierre_control").primaryYork,
+      rawExtrema: { min: -1, max: 1, absMax: 1 },
+      nearZeroTheta: false,
+    };
+    caseById.get("alcubierre_control").offlineYorkAudit.alcubierreSignedLobeSummary = {
+      foreHalfPositiveTotal: 4,
+      foreHalfNegativeTotal: -1,
+      aftHalfPositiveTotal: 1,
+      aftHalfNegativeTotal: -4,
+      signedLobeSummary: "fore+/aft-",
+    };
+    caseById.get("natario_control").primaryYork = {
+      ...caseById.get("natario_control").primaryYork,
+      rawExtrema: { min: -1e-25, max: 1e-25, absMax: 1e-25 },
+      nearZeroTheta: true,
+    };
+    caseById.get("nhm2_certified").primaryYork = {
+      ...caseById.get("nhm2_certified").primaryYork,
+      rawExtrema: { min: -0.12, max: 0.12, absMax: 0.12 },
+      nearZeroTheta: false,
+    };
+    caseById.get("alcubierre_control").classificationFeatures = {
+      theta_abs_max_raw: 1,
+      theta_abs_max_display: 1,
+      positive_count_xz: 12,
+      negative_count_xz: 12,
+      positive_count_xrho: 10,
+      negative_count_xrho: 10,
+      support_overlap_pct: 0.8,
+      near_zero_theta: false,
+      signed_lobe_summary: "fore+/aft-",
+      shell_map_activity: 0.7,
+    };
+    caseById.get("natario_control").classificationFeatures = {
+      theta_abs_max_raw: 0.05,
+      theta_abs_max_display: 0.05,
+      positive_count_xz: 8,
+      negative_count_xz: 8,
+      positive_count_xrho: 8,
+      negative_count_xrho: 8,
+      support_overlap_pct: 0.78,
+      near_zero_theta: true,
+      signed_lobe_summary: "mixed_or_flat",
+      shell_map_activity: 0.1,
+    };
+    caseById.get("nhm2_certified").classificationFeatures = {
+      theta_abs_max_raw: 0.06,
+      theta_abs_max_display: 0.06,
+      positive_count_xz: 8,
+      negative_count_xz: 8,
+      positive_count_xrho: 8,
+      negative_count_xrho: 8,
+      support_overlap_pct: 0.77,
+      near_zero_theta: false,
+      signed_lobe_summary: "mixed_or_flat",
+      shell_map_activity: 0.12,
+    };
+    const makeInputCase = (
+      caseId: "alcubierre_control" | "natario_control" | "nhm2_certified",
+      xz: number[],
+      xrho: number[],
+      signed: "fore+/aft-" | "mixed_or_flat",
+      support: number,
+    ) => ({
+      case_id: caseId,
+      label: caseId,
+      views: [
+        {
+          view_id: "york-surface-3p1",
+          coordinate_mode: "x-z-midplane",
+          sampling_choice: "x-z midplane",
+          source_width: 4,
+          source_height: 4,
+          slice: Float32Array.from(xz),
+          slice_hash: `${caseId}-xz`,
+          raw_extrema: { min: Math.min(...xz), max: Math.max(...xz), absMax: Math.max(...xz.map(Math.abs)) },
+          signed_lobe_summary: signed,
+          support_overlap_pct: support,
+          near_zero_theta: Math.max(...xz.map(Math.abs)) <= 1e-20,
+        },
+        {
+          view_id: "york-surface-rho-3p1",
+          coordinate_mode: "x-rho",
+          sampling_choice: "x-rho cylindrical remap",
+          source_width: 4,
+          source_height: 4,
+          slice: Float32Array.from(xrho),
+          slice_hash: `${caseId}-xrho`,
+          raw_extrema: { min: Math.min(...xrho), max: Math.max(...xrho), absMax: Math.max(...xrho.map(Math.abs)) },
+          signed_lobe_summary: null,
+          support_overlap_pct: support,
+          near_zero_theta: Math.max(...xrho.map(Math.abs)) <= 1e-20,
+        },
+        {
+          view_id: "york-topology-normalized-3p1",
+          coordinate_mode: "x-z-midplane",
+          sampling_choice: "x-z midplane",
+          source_width: 4,
+          source_height: 4,
+          slice: Float32Array.from(xz),
+          slice_hash: `${caseId}-topology`,
+          raw_extrema: { min: Math.min(...xz), max: Math.max(...xz), absMax: Math.max(...xz.map(Math.abs)) },
+          signed_lobe_summary: signed,
+          support_overlap_pct: support,
+          near_zero_theta: Math.max(...xz.map(Math.abs)) <= 1e-20,
+        },
+      ],
+    });
+    const caseInputs = [
+      makeInputCase(
+        "alcubierre_control",
+        [-1, -0.8, -0.6, -0.4, -0.2, -0.1, 0.2, 0.4, -0.1, 0.1, 0.5, 0.7, 0.3, 0.6, 0.9, 1],
+        [-1, -0.8, -0.6, -0.4, -0.2, -0.1, 0.2, 0.4, -0.1, 0.1, 0.5, 0.7, 0.3, 0.6, 0.9, 1],
+        "fore+/aft-",
+        0.8,
+      ),
+      makeInputCase(
+        "natario_control",
+        [-0.05, -0.04, -0.03, -0.02, -0.01, -0.005, 0.005, 0.01, -0.005, 0.005, 0.01, 0.02, 0.02, 0.03, 0.04, 0.05],
+        [-0.05, -0.04, -0.03, -0.02, -0.01, -0.005, 0.005, 0.01, -0.005, 0.005, 0.01, 0.02, 0.02, 0.03, 0.04, 0.05],
+        "mixed_or_flat",
+        0.78,
+      ),
+      makeInputCase(
+        "nhm2_certified",
+        [-0.06, -0.05, -0.04, -0.03, -0.015, -0.008, 0.008, 0.015, -0.008, 0.008, 0.015, 0.03, 0.03, 0.04, 0.05, 0.06],
+        [-0.06, -0.05, -0.04, -0.03, -0.015, -0.008, 0.008, 0.015, -0.008, 0.008, 0.015, 0.03, 0.03, 0.04, 0.05, 0.06],
+        "mixed_or_flat",
+        0.77,
+      ),
+    ] as any;
+    const fixedExportDir = fs.mkdtempSync(path.join(os.tmpdir(), "york-fixed-scale-calibration-"));
+    const calibrationExportDir = fs.mkdtempSync(path.join(os.tmpdir(), "york-calibration-panel-"));
+    const fixedScaleArtifact = await buildNhm2YorkFixedScaleComparisonArtifact({
+      payload,
+      solveAuthorityAudit: {
+        readiness: {
+          sourceAuthorityClosed: true,
+          timingAuthorityClosed: true,
+          brickAuthorityClosed: true,
+          snapshotAuthorityClosed: true,
+          diagnosticAuthorityClosed: true,
+          yorkClassificationReady: true,
+          mechanismChainReady: true,
+          mechanismClaimBlockReasons: [],
+        },
+      } as any,
+      sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+      solveAuthorityAuditPath: "artifacts/research/full-solve/solve.json",
+      yorkRenderDebugArtifactPath: "artifacts/research/full-solve/render.json",
+      exportDirectory: fixedExportDir,
+      frameSize: { width: 96, height: 64 },
+      caseInputs,
+    });
+    const calibrationArtifact = await buildWarpYorkCanonicalCalibrationArtifact({
+      payload,
+      solveAuthorityAudit: {
+        readiness: {
+          sourceAuthorityClosed: true,
+          timingAuthorityClosed: true,
+          brickAuthorityClosed: true,
+          snapshotAuthorityClosed: true,
+          diagnosticAuthorityClosed: true,
+          yorkClassificationReady: true,
+          mechanismChainReady: true,
+          mechanismClaimBlockReasons: [],
+        },
+      } as any,
+      sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+      solveAuthorityAuditPath: "artifacts/research/full-solve/solve.json",
+      fixedScaleArtifactPath: "artifacts/research/full-solve/fixed-scale.json",
+      exportDirectory: calibrationExportDir,
+      frameSize: { width: 96, height: 64 },
+      caseInputs,
+    });
+    expect(calibrationArtifact.canonicalCases).toHaveLength(4);
+    expect(calibrationArtifact.pairwiseMetrics).toHaveLength(6);
+    expect(calibrationArtifact.controlValidation.control_validation_status).toBe("validated");
+    expect(calibrationArtifact.decisionGate.calibration_verdict).toBe(
+      "canonical_controls_validated_nhm2_natario_like",
+    );
+    expect(calibrationArtifact.nhm2CurrentClass).toBe("natario_like_low_expansion");
+    expect(calibrationArtifact.zeroExpectationChecks.every((entry) => entry.pixel_rms === 0)).toBe(true);
+    expect(calibrationArtifact.exportIntegrity.valid).toBe(true);
+    const ablationArtifact = buildNhm2YorkAblationPanelArtifact({
+      payload,
+      canonicalCalibrationArtifact: calibrationArtifact,
+      sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+      canonicalCalibrationArtifactPath:
+        "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+      exportDirectory: "artifacts/research/full-solve/rendered-york-ablation-panel-2026-03-31",
+      ablationComparisons: [
+        {
+          ablation_id: "nhm2_without_hull_coupling",
+          case_id: "nhm2_without_hull_coupling",
+          label: "NHM2 without hull coupling",
+          status: "available",
+          reason: "Derived from live selectors",
+          metricT00Ref: "warp.metric.T00.natario.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-hull",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?metricT00Ref=warp.metric.T00.natario.shift",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario",
+            sourceRedesignMode: null,
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          couplingToggles: { hull_coupling_removed: true },
+          hullSupportToggles: { support_mask_display_only: false },
+          derivationNote: "selector derived",
+          caseViews: [],
+          comparison_to_nhm2: null,
+          comparison_to_natario: null,
+          comparison_to_alcubierre: null,
+          comparison_to_flat: null,
+          raw_control_distance_delta: {
+            toward_natario: 0.01,
+            toward_alcubierre: 0.04,
+            toward_flat: -0.02,
+          },
+          pixel_rms_delta: {
+            toward_natario: 0.001,
+            toward_alcubierre: 0.003,
+            toward_flat: -0.001,
+          },
+          sign_count_delta: { positive: 2, negative: 2 },
+          signed_lobe_summary_change: "mixed_or_flat -> fore+/aft-",
+          topology_view_delta: 0.02,
+          movementClass: "toward_alcubierre",
+          movementMagnitude: 0.04,
+          dominantShift: "toward Alcubierre",
+          likelySubsystemImplication: "Hull coupling suppresses Alcubierre-like lobes.",
+        },
+        {
+          ablation_id: "nhm2_without_casimir_drive",
+          case_id: "nhm2_without_casimir_drive",
+          label: "NHM2 without Casimir drive",
+          status: "available",
+          reason: "Derived from live selectors",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-casimir",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?q=1e-6",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: null,
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 1e-6,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          couplingToggles: { casimir_drive_q: 1e-6 },
+          hullSupportToggles: { support_mask_display_only: false },
+          derivationNote: "selector derived",
+          caseViews: [],
+          comparison_to_nhm2: null,
+          comparison_to_natario: null,
+          comparison_to_alcubierre: null,
+          comparison_to_flat: null,
+          raw_control_distance_delta: {
+            toward_natario: 0,
+            toward_alcubierre: 0,
+            toward_flat: 0.002,
+          },
+          pixel_rms_delta: {
+            toward_natario: 0,
+            toward_alcubierre: 0,
+            toward_flat: 0.0002,
+          },
+          sign_count_delta: { positive: 0, negative: 0 },
+          signed_lobe_summary_change: "unchanged",
+          topology_view_delta: 0.001,
+          movementClass: "no_meaningful_shift",
+          movementMagnitude: 0,
+          dominantShift: "no material change",
+          likelySubsystemImplication: "Casimir drive is not the primary morphology driver.",
+        },
+        {
+          ablation_id: "nhm2_simplified_source",
+          case_id: "nhm2_simplified_source",
+          label: "NHM2 simplified source",
+          status: "available",
+          reason: "Derived from live selectors",
+          metricT00Ref: "warp.metric.T00.irrotational.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-source",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?metricT00Ref=warp.metric.T00.irrotational.shift",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.irrotational.shift",
+            metricT00Source: "metric",
+            warpFieldType: "irrotational",
+            sourceRedesignMode: null,
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          couplingToggles: { simplified_source_family: "irrotational_shell_v1" },
+          hullSupportToggles: { support_mask_display_only: false },
+          derivationNote: "selector derived",
+          caseViews: [],
+          comparison_to_nhm2: null,
+          comparison_to_natario: null,
+          comparison_to_alcubierre: null,
+          comparison_to_flat: null,
+          raw_control_distance_delta: {
+            toward_natario: -0.01,
+            toward_alcubierre: 0.08,
+            toward_flat: -0.03,
+          },
+          pixel_rms_delta: {
+            toward_natario: -0.001,
+            toward_alcubierre: 0.006,
+            toward_flat: -0.001,
+          },
+          sign_count_delta: { positive: 4, negative: 4 },
+          signed_lobe_summary_change: "mixed_or_flat -> fore+/aft-",
+          topology_view_delta: 0.05,
+          movementClass: "toward_alcubierre",
+          movementMagnitude: 0.08,
+          dominantShift: "source-shape shift",
+          likelySubsystemImplication: "Higher-order source shaping dominates current morphology.",
+        },
+        {
+          ablation_id: "nhm2_support_mask_off",
+          case_id: "nhm2_support_mask_off",
+          label: "NHM2 support mask off",
+          status: "unavailable",
+          reason: "display-only overlay",
+          metricT00Ref: null,
+          metricT00Source: null,
+          metricRefHash: null,
+          metricVolumeRefUrl: null,
+          sourceSelectors: null,
+          couplingToggles: { hull_coupling_removed: false },
+          hullSupportToggles: { support_mask_display_only: true },
+          derivationNote: "unavailable",
+          caseViews: [],
+          comparison_to_nhm2: null,
+          comparison_to_natario: null,
+          comparison_to_alcubierre: null,
+          comparison_to_flat: null,
+          raw_control_distance_delta: {
+            toward_natario: null,
+            toward_alcubierre: null,
+            toward_flat: null,
+          },
+          pixel_rms_delta: {
+            toward_natario: null,
+            toward_alcubierre: null,
+            toward_flat: null,
+          },
+          sign_count_delta: { positive: null, negative: null },
+          signed_lobe_summary_change: "unavailable",
+          topology_view_delta: null,
+          movementClass: "unavailable",
+          movementMagnitude: null,
+          dominantShift: "Unavailable",
+          likelySubsystemImplication: "display-only",
+        },
+      ] as any,
+      dominantSensitivityCause: "source_shaping",
+      ablationDecision: "source_shaping_dominates_current_morphology",
+    });
+    expect(ablationArtifact.ablationComparisons).toHaveLength(4);
+    expect(ablationArtifact.implementedAblations).toEqual([
+      "nhm2_without_hull_coupling",
+      "nhm2_without_casimir_drive",
+      "nhm2_simplified_source",
+    ]);
+    expect(ablationArtifact.stillUnavailableAblations).toEqual([
+      expect.objectContaining({ ablation_id: "nhm2_support_mask_off" }),
+    ]);
+    expect(ablationArtifact.ablationDecision).toBe("source_shaping_dominates_current_morphology");
+    const calibrationMarkdown = renderWarpYorkCanonicalCalibrationMarkdown(calibrationArtifact);
+    const ablationMarkdown = renderNhm2YorkAblationPanelMarkdown(ablationArtifact);
+    const ablationMemo = renderNhm2AblationDecisionMemo(ablationArtifact);
+    const memo = renderNhm2RenderCalibrationDecisionMemo({
+      canonicalCalibrationArtifact: calibrationArtifact,
+      ablationPanelArtifact: ablationArtifact,
+      fixedScaleComparisonArtifact: fixedScaleArtifact,
+    });
+    expect(calibrationMarkdown).toContain("flat_space_zero_theta");
+    expect(calibrationMarkdown).toContain("canonical_controls_validated_nhm2_natario_like");
+    expect(ablationMarkdown).toContain("source_shaping_dominates_current_morphology");
+    expect(ablationMemo).toContain("implementedAblations");
+    expect(memo).toContain("primary comparator: canonical controls");
+    expect(memo).toContain("NHM2 solve/coupling or source design");
+  });
+
+  it("derives deterministic NHM2 ablation specs from the baseline metric ref", () => {
+    const baselineRef = buildControlMetricVolumeRef({
+      baseUrl: "http://127.0.0.1:5050",
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      dutyFR: 0.0015,
+      q: 3,
+      gammaGeo: 26,
+      gammaVdB: 500,
+      zeta: 0.84,
+      phase01: 0,
+      requireCongruentSolve: true,
+      requireNhm2CongruentFullSolve: true,
+    });
+    const specs = buildNhm2AblationSpecs({
+      baseUrl: "http://127.0.0.1:5050",
+      baselineMetricVolumeRef: baselineRef,
+    });
+    expect(specs.filter((entry) => entry.status === "available")).toHaveLength(3);
+    expect(specs.find((entry) => entry.ablation_id === "nhm2_without_hull_coupling")).toEqual(
+      expect.objectContaining({
+        status: "available",
+        selectors: expect.objectContaining({
+          metricT00Ref: "warp.metric.T00.natario.shift",
+          warpFieldType: "natario",
+          dutyFR: 0.0015,
+          q: 3,
+          gammaGeo: 26,
+          gammaVdB: 500,
+          zeta: 0.84,
+        }),
+      }),
+    );
+    expect(specs.find((entry) => entry.ablation_id === "nhm2_without_casimir_drive")).toEqual(
+      expect.objectContaining({
+        status: "available",
+        selectors: expect.objectContaining({
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          q: 1e-6,
+        }),
+      }),
+    );
+    expect(specs.find((entry) => entry.ablation_id === "nhm2_support_mask_off")).toEqual(
+      expect.objectContaining({
+        status: "unavailable",
+        reason: expect.stringContaining("display overlays"),
+      }),
+    );
+  });
+
+  it("classifies ablation movement and sweep morphology deterministically", () => {
+    const ablationMovement = classifyAblationMovement({
+      ablationId: "nhm2_simplified_source",
+      baselineDistances: { natario: 0.08, alcubierre: 0.24, flat: 0.31 },
+      ablationDistances: { natario: 0.1, alcubierre: 0.11, flat: 0.35 },
+      baselinePrimaryPixelRms: { natario: 0.003, alcubierre: 0.009, flat: 0.01 },
+      ablationPrimaryPixelRms: { natario: 0.004, alcubierre: 0.004, flat: 0.012 },
+      baselineSignedLobeSummary: "mixed_or_flat",
+      ablationSignedLobeSummary: "fore+/aft-",
+      baselineSignCounts: { positive: 8, negative: 8 },
+      ablationSignCounts: { positive: 12, negative: 12 },
+    });
+    expect(ablationMovement.movementClass).toBe("toward_alcubierre");
+    expect(ablationMovement.raw_control_distance_delta.toward_alcubierre).toBeCloseTo(0.13);
+    const plan = buildNhm2ParameterSweepPlan({
+      baselineSelectors: {
+        metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+        metricT00Source: "metric",
+        warpFieldType: "natario_sdf",
+        sourceRedesignMode: null,
+        sourceReformulationMode: null,
+        dutyFR: 0.0015,
+        q: 3,
+        gammaGeo: 26,
+        gammaVdB: 500,
+        zeta: 0.84,
+        phase01: 0,
+        requireCongruentSolve: true,
+        requireNhm2CongruentFullSolve: true,
+      },
+    });
+    expect(plan.map((entry) => entry.parameter_name)).toEqual([
+      "dutyFR",
+      "q",
+      "gammaGeo",
+      "gammaVdB",
+      "zeta",
+    ]);
+    const morphologyClass = classifySweepRunMorphology({
+      features: {
+        theta_abs_max_raw: 0.05,
+        theta_abs_max_display: 0.05,
+        positive_count_xz: 8,
+        negative_count_xz: 8,
+        positive_count_xrho: 8,
+        negative_count_xrho: 8,
+        support_overlap_pct: 0.75,
+        near_zero_theta: true,
+        signed_lobe_summary: "mixed_or_flat",
+        shell_map_activity: 0.12,
+      },
+      scoring: {
+        distance_to_alcubierre_reference: 0.22,
+        distance_to_low_expansion_reference: 0.04,
+        reference_margin: 0.18,
+        winning_reference: "natario_control",
+        margin_sufficient: true,
+        winning_reference_within_threshold: true,
+        distinct_by_policy: false,
+        distinctness_threshold: 0.5,
+        margin_min: 0.08,
+        reference_match_threshold: 0.5,
+        distance_metric: "weighted_normalized_l1",
+        normalization_method: "contract-v1",
+        to_alcubierre_breakdown: {} as any,
+        to_low_expansion_breakdown: {} as any,
+      },
+      distanceToFlat: 0.12,
+    });
+    expect(morphologyClass).toBe("natario_like_low_expansion");
+    const flatMorphologyClass = classifySweepRunMorphology({
+      features: {
+        theta_abs_max_raw: 1e-30,
+        theta_abs_max_display: 1e-30,
+        positive_count_xz: 0,
+        negative_count_xz: 0,
+        positive_count_xrho: 0,
+        negative_count_xrho: 0,
+        support_overlap_pct: 0.75,
+        near_zero_theta: true,
+        signed_lobe_summary: "mixed_or_flat",
+        shell_map_activity: 0,
+      },
+      scoring: {
+        distance_to_alcubierre_reference: 0.33,
+        distance_to_low_expansion_reference: 0.08,
+        reference_margin: 0.25,
+        winning_reference: "natario_control",
+        margin_sufficient: true,
+        winning_reference_within_threshold: true,
+        distinct_by_policy: false,
+        distinctness_threshold: 0.5,
+        margin_min: 0.08,
+        reference_match_threshold: 0.5,
+        distance_metric: "weighted_normalized_l1",
+        normalization_method: "contract-v1",
+        to_alcubierre_breakdown: {} as any,
+        to_low_expansion_breakdown: {} as any,
+      },
+      distanceToFlat: 0.01,
+    });
+    expect(flatMorphologyClass).toBe("flat_or_degenerate");
+  });
+
+  it("renders parameter sweep summaries cleanly when no Alcubierre-like run is found", () => {
+    const artifact = {
+      artifactType: "nhm2_parameter_sweep/v1",
+      generatedOn: "2026-03-31",
+      generatedAt: "2026-03-31T00:00:00.000Z",
+      boundaryStatement: "bounded sweep",
+      sourceAuditArtifact: "artifacts/research/full-solve/source.json",
+      canonicalCalibrationArtifactPath:
+        "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+      ablationArtifactPath:
+        "artifacts/research/full-solve/nhm2-york-ablation-panel-latest.json",
+      exportDirectory: "artifacts/research/full-solve/rendered-york-parameter-sweep-2026-03-31",
+      comparisonContract: {
+        laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        thetaDefinition: "theta=-trK",
+        signConvention: "ADM",
+        fixedScalePolicy: "comparison_fixed_raw_global + comparison_fixed_topology_global with no per-case autoscaling",
+        visualMetricSourceStage: "pre_png_color_buffer",
+        outputSize: { width: 96, height: 64 },
+        requiredViews: [
+          "york-surface-3p1",
+          "york-surface-rho-3p1",
+          "york-topology-normalized-3p1",
+        ],
+      },
+      sweepDimensions: [],
+      baselineRunId: "nhm2_sweep_baseline",
+      runs: [],
+      representativeRunIds: {
+        baseline: "nhm2_sweep_baseline",
+        best_natario_like: "nhm2_sweep_baseline",
+        best_alcubierre_like: null,
+        boundary_like: null,
+        degenerate_example: null,
+      },
+      parameterSensitivityRanking: [],
+      sweepVerdict: "alcubierre_like_not_found",
+      bestRunClass: "natario_like_low_expansion",
+      alcubierreLikeReachable: "no",
+      dominantMorphologyDrivers: ["gammaGeo", "q"],
+      recommendedNextAction: "redesign",
+      notes: ["visual_metric_source_stage=pre_png_color_buffer"],
+    } as any;
+    const markdown = renderNhm2ParameterSweepMarkdown(artifact);
+    const memo = renderNhm2ParameterSweepDecisionMemo(artifact);
+    expect(markdown).toContain("alcubierre_like_not_found");
+    expect(markdown).toContain("pre_png_color_buffer");
+    expect(memo).toContain("alcubierreLikeReachable");
+    expect(memo).toContain("not more screenshot debugging");
+  });
+
+  it("renders the source-to-York bridge as legacy advisory rather than a live mechanism gate", () => {
+    const sourceToYork = makeSourceToYorkFixture() as any;
+    const markdown = renderNhm2SourceToYorkProvenanceMarkdown(sourceToYork);
+    expect(sourceToYork.bridgeReadiness.gatingStatus).toBe("legacy_advisory_non_gating");
+    expect(sourceToYork.bridgeReadiness.gatingBlocksMechanismChain).toBe(false);
+    expect(markdown).toContain("gatingBlocksMechanismChain | false");
+    expect(markdown).toContain("Legacy Bridge Gaps");
+
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.sourceToYorkBridge = {
+      readiness: sourceToYork.bridgeReadiness,
+      artifactPath: "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-source-to-york-provenance-latest.md",
+    };
+    payload.solveAuthorityAudit = {
+      readiness: {
+        sourceAuthorityClosed: true,
+        timingAuthorityClosed: true,
+        brickAuthorityClosed: true,
+        snapshotAuthorityClosed: true,
+        diagnosticAuthorityClosed: true,
+        yorkClassificationReady: true,
+        mechanismChainReady: true,
+        mechanismClaimBlockReasons: [],
+      },
+      artifactPath: "artifacts/research/full-solve/nhm2-solve-authority-audit-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-solve-authority-audit-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+    expect(proofPackMarkdown).toContain("legacy_advisory_non_gating");
+    expect(proofPackMarkdown).toContain("mechanismChainReady");
+  });
+
+  it("flags near-empty OptiX presentation images before they are treated as usable renders", () => {
+    const findings = evaluateYorkOptixPresentationImageQuality({
+      width: 320,
+      height: 180,
+      fileSizeBytes: 1100,
+      meanIntensity: 0.995,
+      nonBackgroundPixelFraction: 0.002,
+      contrastStdDev: 0.01,
+    });
+    expect(findings).toContain("presentation_image_tiny_file");
+    expect(findings).toContain("presentation_image_low_non_background_fraction");
+    expect(findings).toContain("presentation_image_low_contrast");
+    expect(findings).toContain("presentation_image_near_uniform");
+  });
+
+  it("builds OptiX presentation payloads with scientific-lane requirements and fixed output size", () => {
+    const payload = buildYorkOptixPresentationPayload({
+      caseId: "nhm2_certified",
+      renderView: "transport-3p1",
+      diagnosticLaneId: "lane_a_eulerian_comoving_theta_minus_trk",
+      metricVolumeRef: {
+        kind: "gr-evolve-brick",
+        url: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?metricT00Ref=test",
+      } as any,
+      requireCongruentNhm2FullSolve: true,
+    });
+    expect(payload.width).toBe(1280);
+    expect(payload.height).toBe(720);
+    expect(payload.scienceLane?.requireScientificFrame).toBe(true);
+    expect(payload.scienceLane?.requireCanonicalTensorVolume).toBe(true);
+    expect(payload.scienceLane?.requireHullSupportChannels).toBe(true);
+    expect(payload.scienceLane?.requireOffDiagonalGamma).toBe(true);
+    expect(payload.scienceLane?.samplingMode).toBe("trilinear");
+    expect(payload.scienceLane?.renderView).toBe("transport-3p1");
+  });
+
+  it("renders OptiX presentation artifacts and summary text as a secondary layer", () => {
+    const artifact = {
+      artifactType: "nhm2_york_optix_render/v1",
+      generatedOn: "2026-03-31",
+      generatedAt: "2026-03-31T00:00:00.000Z",
+      boundaryStatement: "boundary",
+      sourceAuditArtifact: "artifacts/research/full-solve/source.json",
+      solveAuthorityAuditPath: "artifacts/research/full-solve/solve.json",
+      fixedScaleArtifactPath: "artifacts/research/full-solve/fixed.json",
+      canonicalCalibrationArtifactPath:
+        "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+      exportDirectory:
+        "artifacts/research/full-solve/rendered-york-optix-panel-2026-03-31",
+      comparisonContract: {
+        laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        thetaDefinition: "theta=-trK",
+        signConvention: "ADM",
+        fixedScalePolicy: "comparison_fixed_raw_global",
+        visualMetricSourceStage: "pre_png_color_buffer",
+        outputSize: { width: 320, height: 180 },
+        requiredViews: [
+          "york-surface-3p1",
+          "york-surface-rho-3p1",
+          "york-topology-normalized-3p1",
+        ],
+      },
+      diagnosticLayer: {
+        authoritativeLaneId: "lane_a_eulerian_comoving_theta_minus_trk",
+        fixedScaleArtifactPath: "artifacts/research/full-solve/nhm2-york-fixed-scale-comparison-latest.json",
+        canonicalCalibrationArtifactPath:
+          "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+        visualMetricSourceStage: "pre_png_color_buffer",
+        note: "Lane A slices remain authoritative.",
+      },
+      presentationLayer: {
+        rendererEntrypoint: "http://127.0.0.1:6062/api/helix/hull-render/frame",
+        fallbackEntrypoint: "http://127.0.0.1:5050/api/helix/hull-render/frame",
+        outputSize: { width: 1280, height: 720 },
+        contextViews: [
+          {
+            renderView: "transport-3p1",
+            caption: "main",
+            role: "main_volumetric",
+          },
+          {
+            renderView: "full-atlas",
+            caption: "atlas",
+            role: "context_atlas",
+          },
+        ],
+        presentationFields: [
+          {
+            presentationFieldId: "longitudinal_signed_strain",
+            label: "Longitudinal signed strain",
+            formula: "K_xx",
+            nature: "signed",
+            primaryContextView: "transport-3p1",
+            description: "Ship-axis longitudinal strain.",
+          },
+          {
+            presentationFieldId: "tracefree_magnitude",
+            label: "Tracefree magnitude",
+            formula: "A_ij A^ij",
+            nature: "magnitude",
+            primaryContextView: "transport-3p1",
+            description: "Tracefree magnitude.",
+          },
+        ],
+        usePolicy:
+          "Use Lane A slices for formal comparisons. Use OptiX renders as secondary presentation only.",
+      },
+      caseRenders: [
+        {
+          case_id: "nhm2_certified",
+          label: "NHM2 certified snapshot",
+          case_role: "nhm2_current",
+          metricBinding: {
+            metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?metricT00Ref=nhm2",
+            metricRefHash: "metric-ref",
+            metricVolumeHash: "metric-volume-hash",
+            laneAFieldHash: "lane-a-field-hash",
+            thetaChannelHash: "theta-hash",
+            kTraceChannelHash: "ktrace-hash",
+            longitudinalSignedStrainHash: "kxx-hash",
+            tracefreeMagnitudeHash: "aijaij-hash",
+            energyDensityHash: "rho-hash",
+            laneASliceHash: "lane-a-slice-hash",
+          },
+          contextRenders: [
+            {
+              renderView: "transport-3p1",
+              caption: "main",
+              presentationRenderMode: "optix_scientific_transport_3p1",
+              endpoint: "http://127.0.0.1:6062/api/helix/hull-render/frame",
+              requestId: "req-main",
+              presentationRenderRequestHash: "req-hash",
+              presentationRenderImageHash: "img-hash",
+              presentationRenderBackedByAuthoritativeMetric: true,
+              scientificTier: "research-grade",
+              backend: "optix",
+              rendererSource: "optix/cuda.research.pass2",
+              laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+              certificateHash: "cert-hash",
+              frameHash: "frame-hash",
+              imagePath:
+                "artifacts/research/full-solve/rendered-york-optix-panel-2026-03-31/nhm2_certified-york-optix-3p1-main.png",
+              imageMime: "image/png",
+              dimensions: { width: 1280, height: 720 },
+              fileSizeBytes: 180000,
+              meanIntensity: 0.41,
+              nonBackgroundPixelFraction: 0.32,
+              contrastStdDev: 0.18,
+              warnings: [],
+              attachments: ["depth-linear-m-f32le", "shell-mask-u8"],
+              atlasPaneStatus: null,
+              note: "bound",
+              ok: true,
+              error: null,
+            },
+          ],
+          fieldRenders: [
+            {
+              presentationFieldId: "longitudinal_signed_strain",
+              label: "Longitudinal signed strain",
+              formula: "K_xx",
+              fieldNature: "signed",
+              variant: "main",
+              contextRenderView: "transport-3p1",
+              authoritativeSource: "snapshot.channel.K_xx",
+              presentationFieldSelector: "longitudinal_signed_strain:snapshot.channel.K_xx",
+              presentationFieldSelectorHash: "selector-hash",
+              presentationRenderMode: "solve_backed_optix_context_field_projection",
+              presentationFieldHash: "kxx-hash",
+              presentationScalarFieldHash: "kxx-hash",
+              metricVolumeHash: "metric-volume-hash",
+              thetaHash: "theta-hash",
+              kTraceHash: "ktrace-hash",
+              laneAFieldHash: "lane-a-field-hash",
+              optixContextImageHash: "img-hash",
+              presentationRenderRequestHash: "req-hash-field",
+              presentationRenderImageHash: "img-hash-field",
+              presentationProjectionRequestHash: "req-hash-field",
+              presentationProjectionImageHash: "img-hash-field",
+              presentationRenderBackedByAuthoritativeMetric: true,
+              imagePath:
+                "artifacts/research/full-solve/rendered-york-optix-panel-2026-03-31/nhm2_certified-longitudinal_signed_strain-optix-3p1-main.png",
+              imageMime: "image/png",
+              laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+              dimensions: { width: 1280, height: 720 },
+              fileSizeBytes: 181000,
+              meanIntensity: 0.38,
+              nonBackgroundPixelFraction: 0.29,
+              contrastStdDev: 0.22,
+              warnings: [],
+              fieldMin: -0.3,
+              fieldMax: 0.31,
+              fieldAbsMax: 0.31,
+              displayPolicyId: "optix_longitudinal_signed_strain_signed_asinh",
+              displayRangeMin: -0.22,
+              displayRangeMax: 0.22,
+              displayTransform: "signed_asinh",
+              colormapFamily: "diverging_cyan_amber",
+              note: "derived",
+              ok: true,
+              error: null,
+            },
+          ],
+        },
+      ],
+      presentationRenderLayerStatus: "available",
+      fieldSuiteRealizationStatus: "realized",
+      fieldSuiteReadabilityStatus: "readable",
+      optixScientificRenderAvailable: true,
+      presentationRenderQuality: "ok",
+      presentationRenderQualityReasons: [],
+      presentationReadinessVerdict: "ready_for_human_inspection",
+      presentationRenderBackedByAuthoritativeMetric: true,
+      blockingFindings: [],
+      advisoryFindings: [],
+      notes: ["authoritative_lane=lane_a_eulerian_comoving_theta_minus_trk"],
+      checksum: "checksum",
+    } as any;
+    const markdown = renderNhm2YorkOptixRenderMarkdown(artifact);
+    const memo = renderNhm2YorkOptixRenderMemo(artifact);
+    const summary = formatYorkOptixRenderProofPackSummary({ artifact });
+    expect(markdown).toContain("Per-Case Presentation Trace");
+    expect(markdown).toContain("Natario-Congruent Presentation Fields");
+    expect(markdown).toContain("longitudinal_signed_strain");
+    expect(markdown).toContain("metric-volume-hash");
+    expect(markdown).toContain("optix_longitudinal_signed_strain_signed_asinh");
+    expect(markdown).toContain("Lane A slices + fixed-scale + pre-PNG metrics");
+    expect(markdown).toContain("| advisoryFindings | none |");
+    expect(memo).toContain("secondary to the fixed-scale diagnostic artifact");
+    expect(memo).toContain("longitudinal signed strain");
+    expect(memo).toContain("presentationRenderQuality: `ok`");
+    expect(memo).toContain("advisoryFindings: none");
+    expect(summary).toContain("presentation_render_layer_status=available");
+    expect(summary).toContain("field_suite_realization_status=realized");
+    expect(summary).toContain("field_suite_readability_status=readable");
+    expect(summary).toContain("presentation_readiness_verdict=ready_for_human_inspection");
+    expect(summary).toContain("presentation_render_backed_by_authoritative_metric=true");
+  });
+
+  it("renders presentation layer status separately from the diagnostic layer in the proof-pack markdown", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.presentationRenderSummary = {
+      presentationRenderLayerStatus: "available",
+      fieldSuiteRealizationStatus: "realized",
+      fieldSuiteReadabilityStatus: "readable",
+      optixScientificRenderAvailable: true,
+      presentationRenderQuality: "ok",
+      presentationRenderQualityReasons: [],
+      presentationReadinessVerdict: "ready_for_human_inspection",
+      presentationRenderBackedByAuthoritativeMetric: true,
+      artifactPath: "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+    expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+    expect(proofPackMarkdown).toContain("presentationRenderLayerStatus");
+    expect(proofPackMarkdown).toContain("fieldSuiteRealizationStatus");
+    expect(proofPackMarkdown).toContain("nhm2-york-optix-render-latest.json");
+    expect(proofPackMarkdown).toContain("## Solve-Authority Audit");
+  });
+
+  it("builds a final canonical comparison artifact with canonical cases and both layers", async () => {
+    const fixtures = await makeCanonicalVisualComparisonFixtures();
+    const exportDir = path.join(fixtures.tempDir, "final-panel");
+    const artifact = await buildNhm2CanonicalVisualComparisonArtifact({
+      generatedOn: "2026-03-31",
+      sourceAuditArtifactPath: "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      canonicalCalibrationArtifactPath:
+        "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+      fixedScaleArtifactPath:
+        "artifacts/research/full-solve/nhm2-york-fixed-scale-comparison-latest.json",
+      optixRenderArtifactPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      canonicalCalibrationArtifact: fixtures.canonicalCalibrationArtifact,
+      fixedScaleComparisonArtifact: fixtures.fixedScaleComparisonArtifact,
+      optixRenderArtifact: fixtures.optixRenderArtifact,
+      exportDirectory: exportDir,
+    });
+    expect(artifact.canonicalCases.map((entry) => entry.case_id)).toEqual([
+      "flat_space_zero_theta",
+      "natario_control",
+      "alcubierre_control",
+      "nhm2_certified",
+    ]);
+    expect(artifact.finalComparisonVerdict).toBe(
+      "canonical_controls_validated_nhm2_natario_like",
+    );
+    expect(artifact.presentationVerdict).toBe(
+      "presentation_layer_ready_and_consistent",
+    );
+    expect(artifact.nhm2ClosestCanonicalFamily).toBe("natario_like_low_expansion");
+    expect(artifact.canonicalCases.every((entry) => entry.diagnosticLayer.authoritative)).toBe(
+      true,
+    );
+    expect(artifact.canonicalCases.every((entry) => entry.presentationLayer.secondary)).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(exportDir, "nhm2-canonical-comparison-overview.png"))).toBe(
+      true,
+    );
+    const nhm2Case = artifact.canonicalCases.find(
+      (entry) => entry.case_id === "nhm2_certified",
+    );
+    expect(nhm2Case?.diagnosticLayer.pairwiseComparisons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ other_case_id: "natario_control", pixel_rms: 0.0003 }),
+        expect.objectContaining({
+          other_case_id: "alcubierre_control",
+          pixel_rms: 0.0007,
+        }),
+      ]),
+    );
+  });
+
+  it("renders final canonical comparison markdown and memo with explicit layer separation", async () => {
+    const fixtures = await makeCanonicalVisualComparisonFixtures();
+    const artifact = await buildNhm2CanonicalVisualComparisonArtifact({
+      generatedOn: "2026-03-31",
+      sourceAuditArtifactPath: "proof-pack.json",
+      canonicalCalibrationArtifactPath: "calibration.json",
+      fixedScaleArtifactPath: "fixed-scale.json",
+      optixRenderArtifactPath: "optix.json",
+      canonicalCalibrationArtifact: fixtures.canonicalCalibrationArtifact,
+      fixedScaleComparisonArtifact: fixtures.fixedScaleComparisonArtifact,
+      optixRenderArtifact: fixtures.optixRenderArtifact,
+      exportDirectory: path.join(fixtures.tempDir, "comparison"),
+    });
+    const markdown = renderNhm2CanonicalVisualComparisonMarkdown(artifact);
+    const memo = renderNhm2CanonicalVisualComparisonDecisionMemo(artifact);
+    expect(markdown).toContain("## Basis");
+    expect(markdown).toContain("authoritative diagnostic layer | primary");
+    expect(markdown).toContain("presentation layer | secondary");
+    expect(markdown).toContain("## NHM2 certified snapshot");
+    expect(markdown).toContain("### Diagnostic Layer");
+    expect(markdown).toContain("### Presentation Layer");
+    expect(memo).toContain("finalComparisonVerdict: `canonical_controls_validated_nhm2_natario_like`");
+    expect(memo).toContain("presentationRenderLayerStatus: `available`");
+    expect(memo).toContain("If presentation and diagnostics disagree, debug presentation first");
+  });
+
+  it("renders proof-pack final comparison summary in sync with presentation readiness", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.presentationRenderSummary = {
+      presentationRenderLayerStatus: "available",
+      fieldSuiteRealizationStatus: "realized",
+      fieldSuiteReadabilityStatus: "readable",
+      optixScientificRenderAvailable: true,
+      presentationRenderQuality: "ok",
+      presentationRenderQualityReasons: [],
+      presentationReadinessVerdict: "ready_for_human_inspection",
+      presentationRenderBackedByAuthoritativeMetric: true,
+      artifactPath: "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+    };
+    payload.finalCanonicalVisualComparisonSummary = {
+      finalComparisonVerdict: "canonical_controls_validated_nhm2_natario_like",
+      diagnosticVerdict: "shared_scale_preserves_natario_like_class",
+      presentationVerdict: "presentation_layer_ready_and_consistent",
+      nhm2ClosestCanonicalFamily: "natario_like_low_expansion",
+      alcubierreLikeTransitionObserved: "no",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      memoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+      exportDirectory:
+        "artifacts/research/full-solve/rendered-york-final-comparison-panel-2026-03-31",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+    expect(proofPackMarkdown).toContain("## Final Canonical Visual Comparison");
+    expect(proofPackMarkdown).toContain("presentation_layer_ready_and_consistent");
+    expect(proofPackMarkdown).toContain("natario_like_low_expansion");
+    expect(proofPackMarkdown).toContain(
+      "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+    );
+    expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+  });
+
+  it("builds a render taxonomy manifest with category and role metadata on every render", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    expect(fixtures.renderTaxonomyArtifact.renderEntries.length).toBeGreaterThan(0);
+    expect(
+      fixtures.renderTaxonomyArtifact.renderEntries.every(
+        (entry) => entry.renderCategory && entry.renderRole,
+      ),
+    ).toBe(true);
+  });
+
+  it("marks scientific 3+1 field renders with field-specific labeling metadata", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const fieldEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "scientific_3p1_field",
+    );
+    expect(fieldEntries.length).toBeGreaterThan(0);
+    expect(
+      fieldEntries.every(
+        (entry) =>
+          entry.quantitySymbol &&
+          entry.laneId === "lane_a_eulerian_comoving_theta_minus_trk" &&
+          entry.title.includes(" - "),
+      ),
+    ).toBe(true);
+  });
+
+  it("categorizes comparison cards as comparison_panel renders", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const comparisonEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "comparison_panel",
+    );
+    expect(comparisonEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "comparison_card", renderRole: "presentation" }),
+        expect.objectContaining({
+          fieldId: "comparison_overview",
+          renderRole: "presentation",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps diagnostic Lane A renders tagged as authoritative proof outputs", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const diagnosticEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "diagnostic_lane_a",
+    );
+    expect(diagnosticEntries.length).toBeGreaterThan(0);
+    expect(
+      diagnosticEntries.every(
+        (entry) =>
+          entry.renderRole === "proof" &&
+          entry.authoritativeStatus === "primary_authoritative",
+      ),
+    ).toBe(true);
+  });
+
+  it("emits taxonomy-compliant canonical render paths", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    expect(
+      fixtures.renderTaxonomyArtifact.renderEntries.every((entry) =>
+        /artifacts[\\/]+research[\\/]+full-solve[\\/]+rendered[\\/]+/.test(
+          entry.canonicalPath ?? "",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("renders taxonomy audits and proof-pack summary with explicit diagnostic vs presentation separation", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const taxonomyMarkdown = renderRenderTaxonomyAuditMarkdown(
+      fixtures.renderTaxonomyArtifact,
+    );
+    const taxonomyMemo = renderRenderTaxonomyStandardMemo(fixtures.renderTaxonomyArtifact);
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.renderTaxonomySummary = {
+      authoritativeRenderCategory: "diagnostic_lane_a",
+      presentationRenderCategory: "scientific_3p1_field",
+      comparisonRenderCategory: "comparison_panel",
+      repoOrientationConvention: "x_ship_y_port_z_zenith",
+      artifactPath: "artifacts/research/full-solve/render-taxonomy-latest.json",
+      reportPath: "docs/audits/research/warp-render-taxonomy-latest.md",
+      standardPath: "docs/research/render-taxonomy-and-labeling-standard-2026-03-31.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+    expect(taxonomyMarkdown).toContain("## Categories");
+    expect(taxonomyMarkdown).toContain("diagnostic_lane_a");
+    expect(taxonomyMarkdown).toContain("scientific_3p1_field");
+    expect(taxonomyMemo).toContain("diagnostic_lane_a");
+    expect(taxonomyMemo).toContain("scientific_3p1_field");
+    expect(proofPackMarkdown).toContain("## Render Taxonomy");
+    expect(proofPackMarkdown).toContain("diagnostic_lane_a");
+    expect(proofPackMarkdown).toContain("scientific_3p1_field");
+    expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+  });
+
+  it("flags collapsed OptiX field images when scalar fields differ", () => {
+    const issues = evaluateYorkOptixFieldRenderIntegrity({
+      caseRole: "canonical_control",
+      fieldRenders: [
+        {
+          presentationFieldId: "longitudinal_signed_strain",
+          label: "Longitudinal signed strain",
+          formula: "K_xx",
+          fieldNature: "signed",
+          variant: "main",
+          contextRenderView: "transport-3p1",
+          authoritativeSource: "snapshot.channel.K_xx",
+          presentationFieldSelector: "longitudinal_signed_strain:snapshot.channel.K_xx",
+          presentationFieldSelectorHash: "selector-kxx",
+          presentationRenderMode: "solve_backed_optix_context_field_projection",
+          presentationFieldHash: "field-kxx",
+          presentationScalarFieldHash: "field-kxx",
+          metricVolumeHash: "metric",
+          thetaHash: "theta",
+          kTraceHash: "ktrace",
+          laneAFieldHash: "lane-a",
+          optixContextImageHash: "context",
+          presentationRenderRequestHash: "req-kxx",
+          presentationRenderImageHash: "shared-image",
+          presentationProjectionRequestHash: "req-kxx",
+          presentationProjectionImageHash: "shared-image",
+          presentationRenderBackedByAuthoritativeMetric: true,
+          imagePath: "kxx.png",
+          imageMime: "image/png",
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          dimensions: { width: 10, height: 10 },
+          fileSizeBytes: 1000,
+          meanIntensity: 0.1,
+          nonBackgroundPixelFraction: 0.1,
+          contrastStdDev: 0.1,
+          warnings: [],
+          fieldMin: -1,
+          fieldMax: 1,
+          fieldAbsMax: 1,
+          displayPolicyId: "signed-policy",
+          displayRangeMin: -1,
+          displayRangeMax: 1,
+          displayTransform: "signed_asinh",
+          colormapFamily: "diverging_cyan_amber",
+          note: null,
+          ok: true,
+          error: null,
+        },
+        {
+          presentationFieldId: "trace_check",
+          label: "Trace check",
+          formula: "theta=-trK",
+          fieldNature: "signed",
+          variant: "main",
+          contextRenderView: "transport-3p1",
+          authoritativeSource: "lane_a.theta",
+          presentationFieldSelector: "trace_check:lane_a.theta",
+          presentationFieldSelectorHash: "selector-theta",
+          presentationRenderMode: "solve_backed_optix_context_field_projection",
+          presentationFieldHash: "field-theta",
+          presentationScalarFieldHash: "field-theta",
+          metricVolumeHash: "metric",
+          thetaHash: "theta",
+          kTraceHash: "ktrace",
+          laneAFieldHash: "lane-a",
+          optixContextImageHash: "context",
+          presentationRenderRequestHash: "req-theta",
+          presentationRenderImageHash: "shared-image",
+          presentationProjectionRequestHash: "req-theta",
+          presentationProjectionImageHash: "shared-image",
+          presentationRenderBackedByAuthoritativeMetric: true,
+          imagePath: "theta.png",
+          imageMime: "image/png",
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          dimensions: { width: 10, height: 10 },
+          fileSizeBytes: 1000,
+          meanIntensity: 0.1,
+          nonBackgroundPixelFraction: 0.1,
+          contrastStdDev: 0.1,
+          warnings: [],
+          fieldMin: -2,
+          fieldMax: 2,
+          fieldAbsMax: 2,
+          displayPolicyId: "trace-policy",
+          displayRangeMin: -2,
+          displayRangeMax: 2,
+          displayTransform: "signed_linear",
+          colormapFamily: "diverging_cyan_amber",
+          note: null,
+          ok: true,
+          error: null,
+        },
+      ] as any,
+    });
+    expect(issues).toEqual([
+      {
+        code: "presentation_distinct_fields_collapsed",
+        indices: [0, 1],
+      },
+    ]);
+  });
+
+  it("derives nonzero tracefree magnitude from KijKij and K_trace for non-flat fields", () => {
+    const field = deriveYorkOptixTracefreeMagnitude({
+      channels: {
+        KijKij: {
+          data: new Float32Array([4, 1.5]),
+          min: 1.5,
+          max: 4,
+        },
+        K_trace: {
+          data: new Float32Array([3, 1]),
+          min: 1,
+          max: 3,
+        },
+      },
+    } as any);
+    expect(field).not.toBeNull();
+    expect(field?.[0]).toBeCloseTo(1, 6);
+    expect(field?.[1]).toBeCloseTo(7 / 6, 6);
+  });
+
+  it("treats low-contrast but distinct presentation images as advisory-only", () => {
+    const warnings = evaluateYorkOptixPresentationImageQuality({
+      width: 1280,
+      height: 720,
+      fileSizeBytes: 90000,
+      meanIntensity: 0.04,
+      nonBackgroundPixelFraction: 0.06,
+      contrastStdDev: 0.03,
+    });
+    expect(warnings).toContain("presentation_image_low_contrast");
+    expect(warnings).not.toContain("presentation_distinct_fields_collapsed");
+    expect(warnings).not.toContain("presentation_tracefree_magnitude_zero_unexpected");
+  });
+
+  it("does not flag tuned non-flat main Natario fields as low-contrast unnecessarily", () => {
+    const warnings = evaluateYorkOptixPresentationImageQuality({
+      width: 1280,
+      height: 720,
+      fileSizeBytes: 90000,
+      meanIntensity: 0.025,
+      nonBackgroundPixelFraction: 0.046,
+      contrastStdDev: 0.029,
+      presentationFieldId: "longitudinal_signed_strain",
+    });
+    expect(warnings).not.toContain("presentation_image_low_contrast");
+    expect(warnings).not.toContain("presentation_image_near_uniform");
+  });
+
+  it("does not mark dark field renders near-uniform when contrast and support coverage are sufficient", () => {
+    const warnings = evaluateYorkOptixPresentationImageQuality({
+      width: 1280,
+      height: 720,
+      fileSizeBytes: 90000,
+      meanIntensity: 0.014,
+      nonBackgroundPixelFraction: 0.035,
+      contrastStdDev: 0.02,
+      presentationFieldId: "energy_density",
+    });
+    expect(warnings).not.toContain("presentation_image_low_contrast");
+    expect(warnings).not.toContain("presentation_image_near_uniform");
+  });
+
+  it("still allows trace-check to remain advisory when it is physically near-zero", () => {
+    const warnings = evaluateYorkOptixPresentationImageQuality({
+      width: 1280,
+      height: 720,
+      fileSizeBytes: 90000,
+      meanIntensity: 0.025,
+      nonBackgroundPixelFraction: 0.046,
+      contrastStdDev: 0.015,
+      presentationFieldId: "trace_check",
+    });
+    expect(warnings).toContain("presentation_image_low_contrast");
+  });
+
+  it("derives deterministic NHM2 source redesign specs from the baseline metric ref", () => {
+    const baselineRef = buildControlMetricVolumeRef({
+      baseUrl: "http://127.0.0.1:5050",
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+      dutyFR: 0.0015,
+      q: 3,
+      gammaGeo: 26,
+      gammaVdB: 500,
+      zeta: 0.84,
+      phase01: 0,
+      requireCongruentSolve: true,
+      requireNhm2CongruentFullSolve: true,
+    });
+    const specs = buildNhm2SourceRedesignSpecs({
+      baseUrl: "http://127.0.0.1:5050",
+      baselineMetricVolumeRef: baselineRef,
+    });
+    expect(specs).toHaveLength(4);
+    expect(specs.map((entry) => entry.redesign_id)).toEqual([
+      "nhm2_redesign_signed_shell_bias",
+      "nhm2_redesign_coupling_localization",
+      "nhm2_redesign_drive_vs_geometry_split",
+      "nhm2_redesign_source_profile_simplified_signed",
+    ]);
+    for (const entry of specs) {
+      expect(entry.selectors.sourceRedesignMode).not.toBeNull();
+      expect(entry.metricVolumeRef.url).toContain("sourceRedesignMode=");
+      expect(entry.metricVolumeRef.url).not.toContain("requireCongruentSolve=1");
+      expect(entry.metricVolumeRef.url).not.toContain("requireNhm2CongruentFullSolve=1");
+    }
+  });
+
+  it("classifies source redesign movement and verdict logic deterministically", () => {
+    const movement = classifySourceRedesignMovement({
+      redesignId: "nhm2_redesign_signed_shell_bias",
+      baselineDistances: { natario: 0.08, alcubierre: 0.24, flat: 0.31 },
+      redesignDistances: { natario: 0.09, alcubierre: 0.12, flat: 0.34 },
+      baselinePrimaryPixelRms: { natario: 0.003, alcubierre: 0.009, flat: 0.01 },
+      redesignPrimaryPixelRms: { natario: 0.004, alcubierre: 0.004, flat: 0.011 },
+      baselineSignedLobeSummary: "mixed_or_flat",
+      redesignSignedLobeSummary: "fore+/aft-",
+      baselineSignCounts: { positive: 8, negative: 8 },
+      redesignSignCounts: { positive: 12, negative: 12 },
+      authoritativeMorphologyChanged: true,
+      redesignRealizationStatus: "realized_in_lane_a",
+    });
+    expect(movement.movementClass).toBe("toward_alcubierre");
+    expect(movement.raw_control_distance_delta.toward_alcubierre).toBeCloseTo(0.12);
+
+    const verdict = decideNhm2SourceCouplingRedesignVerdict({
+      redesignComparisons: [
+        {
+          redesign_id: "nhm2_redesign_signed_shell_bias",
+          case_id: "nhm2_redesign_signed_shell_bias",
+          label: "signed shell bias",
+          hypothesis: "bias",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-a",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?sourceRedesignMode=signed_shell_bias",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: "signed_shell_bias",
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          redesignToggles: { source_redesign_mode: "signed_shell_bias" },
+          derivationNote: "derived",
+          caseViews: [
+            {
+              case_id: "nhm2_redesign_signed_shell_bias",
+              view_id: "york-surface-3p1",
+              policy_id: "comparison_fixed_raw_global",
+              data_mode: "raw_theta",
+              theta_min: -1,
+              theta_max: 1,
+              theta_abs_max: 1,
+              global_abs_max: 1,
+              normalization_gain: 1,
+              color_scale_mode: "signed_diverging_global",
+              clipping_applied: false,
+              sample_count: 16,
+              positive_count: 8,
+              negative_count: 8,
+              near_zero_count: 0,
+              signed_lobe_summary: "fore+/aft-",
+              support_overlap_pct: 0.7,
+              slice_hash: "slice-a",
+              source_slice_hash: "slice-a",
+              display_buffer_hash: "display-a",
+              color_buffer_hash: "color-a",
+              png_path: "a.png",
+              png_hash: "png-a",
+            },
+          ],
+          comparison_to_nhm2: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-nhm2_certified",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "nhm2_certified",
+            raw_control_distance: 0.04,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_natario: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-natario_control",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "natario_control",
+            raw_control_distance: 0.11,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_alcubierre: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-alcubierre_control",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "alcubierre_control",
+            raw_control_distance: 0.1,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_flat: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-flat_space_zero_theta",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "flat_space_zero_theta",
+            raw_control_distance: 0.33,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          raw_control_distance_delta: {
+            toward_natario: -0.01,
+            toward_alcubierre: 0.12,
+            toward_flat: -0.02,
+          },
+          pixel_rms_delta: {
+            toward_natario: -0.001,
+            toward_alcubierre: 0.005,
+            toward_flat: -0.001,
+          },
+          sign_count_delta: { positive: 4, negative: 4 },
+          signed_lobe_summary_change: "mixed_or_flat -> fore+/aft-",
+          topology_view_delta: 0.02,
+          authoritativeMorphologyChanged: true,
+          movementBasis: "authoritative_lane_pairwise_metric",
+          redesignRealizationStatus: "realized_in_lane_a",
+          dropStage: null,
+          realizationNote: "This redesign changes the authoritative Lane A output.",
+          realizationTrace: {
+            primary_view_id: "york-surface-3p1",
+            inputSelectorHash: "input-a",
+            baselineInputSelectorHash: "input-b",
+            normalizedSelectorHash: "norm-a",
+            baselineNormalizedSelectorHash: "norm-b",
+            promotedProfileHash: "profile-a",
+            baselinePromotedProfileHash: "profile-b",
+            brickRequestHash: "request-a",
+            baselineBrickRequestHash: "request-b",
+            metricVolumeHash: "metric-a",
+            baselineMetricVolumeHash: "metric-b",
+            laneASliceHash: "slice-a",
+            baselineLaneASliceHash: "slice-b",
+            laneADisplayHash: "display-a",
+            baselineLaneADisplayHash: "display-b",
+            laneAColorHash: "color-a",
+            baselineLaneAColorHash: "color-b",
+            selectorChanged: true,
+            normalizedSelectorChanged: true,
+            promotedProfileChanged: true,
+            brickRequestChanged: true,
+            metricVolumeChanged: true,
+            laneASliceChanged: true,
+            laneADisplayChanged: true,
+            laneAColorChanged: true,
+          },
+          authoritativeComparisonSummary: [],
+          movementClass: "toward_alcubierre",
+          movementMagnitude: 0.12,
+          dominantShift: "toward Alcubierre",
+          likelySubsystemImplication: "signed bias helps",
+        },
+      ] as any,
+    });
+    expect(verdict.redesignVerdict).toBe(
+      "source_coupling_redesign_finds_boundary_case",
+    );
+    expect(verdict.authoritativeMorphologyChangeObserved).toBe("yes");
+    expect(verdict.bestRedesignVariant).toBe("nhm2_redesign_signed_shell_bias");
+    expect(verdict.alcubierreLikeTransitionObserved).toBe("yes");
+  });
+
+  it("suppresses redesign movement when the authoritative Lane A output is unchanged", () => {
+    const movement = classifySourceRedesignMovement({
+      redesignId: "nhm2_redesign_drive_vs_geometry_split",
+      baselineDistances: { natario: 0.08, alcubierre: 0.24, flat: 0.31 },
+      redesignDistances: { natario: 0.07, alcubierre: 0.15, flat: 0.27 },
+      baselinePrimaryPixelRms: { natario: 0.003, alcubierre: 0.009, flat: 0.01 },
+      redesignPrimaryPixelRms: { natario: 0.002, alcubierre: 0.004, flat: 0.008 },
+      baselineSignedLobeSummary: "mixed_or_flat",
+      redesignSignedLobeSummary: "fore+/aft-",
+      baselineSignCounts: { positive: 8, negative: 8 },
+      redesignSignCounts: { positive: 12, negative: 12 },
+      authoritativeMorphologyChanged: false,
+      redesignRealizationStatus: "metric_volume_changed_but_lane_a_unchanged",
+    });
+    expect(movement.movementClass).toBe("no_authoritative_morphology_change");
+    expect(movement.movementMagnitude).toBe(0);
+    expect(movement.dominantShift).toContain("declared Lane A render contract did not realize");
+    expect(movement.likelySubsystemImplication).toContain("not yet realized");
+  });
+
+  it("downgrades redesign verdicts when all variants are no-op in the authoritative lane", () => {
+    const verdict = decideNhm2SourceCouplingRedesignVerdict({
+      redesignComparisons: [
+        {
+          redesign_id: "nhm2_redesign_signed_shell_bias",
+          case_id: "nhm2_redesign_signed_shell_bias",
+          label: "signed shell bias",
+          hypothesis: "bias",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-a",
+          metricVolumeRefUrl:
+            "http://127.0.0.1:5050/api/helix/gr-evolve-brick?sourceRedesignMode=signed_shell_bias",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: "signed_shell_bias",
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          redesignToggles: { source_redesign_mode: "signed_shell_bias" },
+          derivationNote: "derived",
+          caseViews: [],
+          comparison_to_nhm2: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-nhm2_certified",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "nhm2_certified",
+            raw_control_distance: 0.04,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_natario: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-natario_control",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "natario_control",
+            raw_control_distance: 0.11,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_alcubierre: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-alcubierre_control",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "alcubierre_control",
+            raw_control_distance: 0.1,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_flat: {
+            pair_id: "nhm2_redesign_signed_shell_bias-vs-flat_space_zero_theta",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "flat_space_zero_theta",
+            raw_control_distance: 0.33,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          authoritativeMorphologyChanged: false,
+          movementBasis: "authoritative_lane_no_change_gate",
+          redesignRealizationStatus: "metric_volume_changed_but_lane_a_unchanged",
+          dropStage: "lane_a_surface",
+          realizationNote: "The redesign changed the metric volume identity, but Lane A stayed identical.",
+          realizationTrace: {
+            primary_view_id: "york-surface-3p1",
+            inputSelectorHash: "input-a",
+            baselineInputSelectorHash: "input-b",
+            normalizedSelectorHash: "norm-a",
+            baselineNormalizedSelectorHash: "norm-b",
+            promotedProfileHash: "profile-a",
+            baselinePromotedProfileHash: "profile-b",
+            brickRequestHash: "request-a",
+            baselineBrickRequestHash: "request-b",
+            metricVolumeHash: "metric-a",
+            baselineMetricVolumeHash: "metric-b",
+            laneASliceHash: "slice-b",
+            baselineLaneASliceHash: "slice-b",
+            laneADisplayHash: "display-b",
+            baselineLaneADisplayHash: "display-b",
+            laneAColorHash: "color-b",
+            baselineLaneAColorHash: "color-b",
+            selectorChanged: true,
+            normalizedSelectorChanged: true,
+            promotedProfileChanged: true,
+            brickRequestChanged: true,
+            metricVolumeChanged: true,
+            laneASliceChanged: false,
+            laneADisplayChanged: false,
+            laneAColorChanged: false,
+          },
+          authoritativeComparisonSummary: [],
+          raw_control_distance_delta: {
+            toward_natario: -0.01,
+            toward_alcubierre: 0.12,
+            toward_flat: -0.02,
+          },
+          pixel_rms_delta: {
+            toward_natario: -0.001,
+            toward_alcubierre: 0.005,
+            toward_flat: -0.001,
+          },
+          sign_count_delta: { positive: 0, negative: 0 },
+          signed_lobe_summary_change: "unchanged",
+          topology_view_delta: 0,
+          movementClass: "no_authoritative_morphology_change",
+          movementMagnitude: 0,
+          dominantShift: "Lane A unchanged",
+          likelySubsystemImplication: "fix redesign realization",
+        },
+      ] as any,
+    });
+    expect(verdict.redesignVerdict).toBe(
+      "source_coupling_redesign_partially_realized_inconclusive",
+    );
+    expect(verdict.authoritativeMorphologyChangeObserved).toBe("no");
+    expect(verdict.bestRedesignVariant).toBeNull();
+    expect(verdict.strongestMorphologyShift).toBeNull();
+    expect(verdict.recommendedNextAction).toContain("geometry-to-Lane-A realization stage");
+  });
+
+  it("renders source coupling redesign summaries with the canonical Lane A contract", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const calibrationArtifact = {
+      comparisonContract: {
+        laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        thetaDefinition: "theta=-trK",
+        signConvention: "ADM",
+        fixedScalePolicy:
+          "comparison_fixed_raw_global + comparison_fixed_topology_global with no per-case autoscaling",
+        visualMetricSourceStage: "pre_png_color_buffer",
+        outputSize: { width: 96, height: 64 },
+        requiredViews: [
+          "york-surface-3p1",
+          "york-surface-rho-3p1",
+          "york-topology-normalized-3p1",
+        ],
+      },
+      nhm2CurrentClass: "natario_like_low_expansion",
+      decisionGate: { calibration_verdict: "canonical_controls_validated_nhm2_natario_like" },
+    } as any;
+    const ablationArtifact = {
+      ablationDecision: "no_single_ablation_explains_morphology",
+    } as any;
+    const parameterSweepArtifact = {
+      sweepVerdict: "alcubierre_like_not_found",
+    } as any;
+    const redesignArtifact = buildNhm2SourceCouplingRedesignArtifact({
+      payload,
+      canonicalCalibrationArtifact: calibrationArtifact,
+      ablationArtifact,
+      parameterSweepArtifact,
+      sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+      canonicalCalibrationArtifactPath:
+        "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+      ablationArtifactPath:
+        "artifacts/research/full-solve/nhm2-york-ablation-panel-latest.json",
+      parameterSweepArtifactPath:
+        "artifacts/research/full-solve/nhm2-parameter-sweep-latest.json",
+      exportDirectory:
+        "artifacts/research/full-solve/rendered-york-redesign-panel-2026-03-31",
+      redesignComparisons: [
+        {
+          redesign_id: "nhm2_redesign_drive_vs_geometry_split",
+          case_id: "nhm2_redesign_drive_vs_geometry_split",
+          label: "drive split",
+          hypothesis: "drive-vs-geometry split",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-drive",
+          metricVolumeRefUrl:
+            "http://127.0.0.1:5050/api/helix/gr-evolve-brick?sourceRedesignMode=drive_vs_geometry_split",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: "drive_vs_geometry_split",
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          redesignToggles: { source_redesign_mode: "drive_vs_geometry_split" },
+          derivationNote: "derived",
+          caseViews: [],
+          comparison_to_nhm2: {
+            pair_id: "nhm2_redesign_drive_vs_geometry_split-vs-nhm2_certified",
+            lhs_case_id: "nhm2_redesign_drive_vs_geometry_split",
+            rhs_case_id: "nhm2_certified",
+            raw_control_distance: 0.05,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_natario: {
+            pair_id: "nhm2_redesign_drive_vs_geometry_split-vs-natario_control",
+            lhs_case_id: "nhm2_redesign_drive_vs_geometry_split",
+            rhs_case_id: "natario_control",
+            raw_control_distance: 0.07,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_alcubierre: {
+            pair_id: "nhm2_redesign_drive_vs_geometry_split-vs-alcubierre_control",
+            lhs_case_id: "nhm2_redesign_drive_vs_geometry_split",
+            rhs_case_id: "alcubierre_control",
+            raw_control_distance: 0.16,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_flat: {
+            pair_id: "nhm2_redesign_drive_vs_geometry_split-vs-flat_space_zero_theta",
+            lhs_case_id: "nhm2_redesign_drive_vs_geometry_split",
+            rhs_case_id: "flat_space_zero_theta",
+            raw_control_distance: 0.42,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          raw_control_distance_delta: {
+            toward_natario: 0.01,
+            toward_alcubierre: 0.03,
+            toward_flat: -0.02,
+          },
+          pixel_rms_delta: {
+            toward_natario: 0.001,
+            toward_alcubierre: 0.002,
+            toward_flat: -0.001,
+          },
+          sign_count_delta: { positive: 1, negative: 1 },
+          signed_lobe_summary_change: "unchanged",
+          topology_view_delta: 0.01,
+          authoritativeMorphologyChanged: true,
+          movementBasis: "authoritative_lane_pairwise_metric",
+          redesignRealizationStatus: "realized_in_lane_a",
+          dropStage: null,
+          realizationNote: "This redesign changes the authoritative Lane A output.",
+          realizationTrace: {
+            primary_view_id: "york-surface-3p1",
+            inputSelectorHash: "input-drive",
+            baselineInputSelectorHash: "input-base",
+            normalizedSelectorHash: "norm-drive",
+            baselineNormalizedSelectorHash: "norm-base",
+            promotedProfileHash: "profile-drive",
+            baselinePromotedProfileHash: "profile-base",
+            brickRequestHash: "request-drive",
+            baselineBrickRequestHash: "request-base",
+            metricVolumeHash: "metric-drive",
+            baselineMetricVolumeHash: "metric-base",
+            laneASliceHash: "slice-drive",
+            baselineLaneASliceHash: "slice-base",
+            laneADisplayHash: "display-drive",
+            baselineLaneADisplayHash: "display-base",
+            laneAColorHash: "color-drive",
+            baselineLaneAColorHash: "color-base",
+            selectorChanged: true,
+            normalizedSelectorChanged: true,
+            promotedProfileChanged: true,
+            brickRequestChanged: true,
+            metricVolumeChanged: true,
+            laneASliceChanged: true,
+            laneADisplayChanged: true,
+            laneAColorChanged: true,
+          },
+          authoritativeComparisonSummary: [],
+          movementClass: "toward_alcubierre",
+          movementMagnitude: 0.03,
+          dominantShift: "toward Alcubierre",
+          likelySubsystemImplication: "drive/geometry split matters",
+        },
+      ] as any,
+      redesignVerdict: "source_coupling_redesign_moves_toward_alcubierre_but_not_enough",
+      authoritativeMorphologyChangeObserved: "yes",
+      bestRedesignVariant: "nhm2_redesign_drive_vs_geometry_split",
+      strongestMorphologyShift: {
+        redesign_id: "nhm2_redesign_drive_vs_geometry_split",
+        movementClass: "toward_alcubierre",
+        movementMagnitude: 0.03,
+        dominantShift: "toward Alcubierre",
+      },
+      alcubierreLikeTransitionObserved: "no",
+      recommendedNextAction: "bounded structural follow-up",
+    });
+    const markdown = renderNhm2SourceCouplingRedesignMarkdown(redesignArtifact);
+    const memo = renderNhm2SourceCouplingRedesignDecisionMemo(redesignArtifact);
+    expect(markdown).toContain("lane_a_eulerian_comoving_theta_minus_trk");
+    expect(markdown).toContain("pre_png_color_buffer");
+    expect(markdown).toContain("source_coupling_redesign_moves_toward_alcubierre_but_not_enough");
+    expect(memo).toContain("ablation");
+    expect(memo).toContain("parameter sweep");
+    expect(redesignArtifact.notes).toContain("visual_metric_source_stage=pre_png_color_buffer");
+  });
+
+  it("formats proof-pack redesign summary honestly when no authoritative Lane A redesign is realized", () => {
+    const summary = formatSourceCouplingRedesignProofPackSummary({
+      calibrationVerdict: "canonical_controls_validated_nhm2_natario_like",
+      nhm2CurrentClass: "natario_like_low_expansion",
+      ablationDecision: "no_single_ablation_explains_morphology",
+      parameterSweepVerdict: "alcubierre_like_not_found",
+      sourceCouplingRedesignArtifact: {
+        artifactType: "nhm2_source_coupling_redesign/v1",
+        generatedOn: "2026-03-31",
+        generatedAt: "2026-03-31T00:00:00.000Z",
+        boundaryStatement: "boundary",
+        sourceAuditArtifact: "source.json",
+        canonicalCalibrationArtifactPath: "calibration.json",
+        ablationArtifactPath: "ablation.json",
+        parameterSweepArtifactPath: "sweep.json",
+        exportDirectory: "rendered",
+        comparisonContract: {
+          laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+          observer: "eulerian_n",
+          foliation: "comoving_cartesian_3p1",
+          thetaDefinition: "theta=-trK",
+          signConvention: "ADM",
+          fixedScalePolicy: "comparison_fixed_raw_global",
+          visualMetricSourceStage: "pre_png_color_buffer",
+          outputSize: { width: 96, height: 64 },
+          requiredViews: [
+            "york-surface-3p1",
+            "york-surface-rho-3p1",
+            "york-topology-normalized-3p1",
+          ],
+        },
+        current_case_id: "nhm2_certified",
+        nhm2_current_class: "natario_like_low_expansion",
+        authoritativeMorphologyChangeObserved: "no",
+        redesignComparisons: [],
+        redesignVerdict: "source_coupling_redesign_not_realized_in_authoritative_lane",
+        bestRedesignVariant: null,
+        strongestMorphologyShift: null,
+        alcubierreLikeTransitionObserved: "no",
+        recommendedNextAction: "Fix redesign realization/wiring first",
+        notes: [],
+      },
+    } as any);
+    expect(summary).toContain(
+      "source_coupling_redesign_verdict=source_coupling_redesign_not_realized_in_authoritative_lane",
+    );
+    expect(summary).toContain("authoritative_morphology_change_observed=no");
+    expect(summary).toContain("best_redesign_variant=none");
+    expect(summary).toContain("redesign_next_action=fix_redesign_realization_wiring_first");
+  });
+
+  it("builds redesign realization artifacts with propagation traces and drop stages", () => {
+    const redesignArtifact = {
+      artifactType: "nhm2_source_coupling_redesign/v1",
+      generatedOn: "2026-03-31",
+      generatedAt: "2026-03-31T00:00:00.000Z",
+      boundaryStatement: "boundary",
+      sourceAuditArtifact: "source.json",
+      canonicalCalibrationArtifactPath: "calibration.json",
+      ablationArtifactPath: "ablation.json",
+      parameterSweepArtifactPath: "sweep.json",
+      exportDirectory: "rendered",
+      comparisonContract: {
+        laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+        observer: "eulerian_n",
+        foliation: "comoving_cartesian_3p1",
+        thetaDefinition: "theta=-trK",
+        signConvention: "ADM",
+        fixedScalePolicy: "comparison_fixed_raw_global",
+        visualMetricSourceStage: "pre_png_color_buffer",
+        outputSize: { width: 96, height: 64 },
+        requiredViews: [
+          "york-surface-3p1",
+          "york-surface-rho-3p1",
+          "york-topology-normalized-3p1",
+        ],
+      },
+      current_case_id: "nhm2_certified",
+      nhm2_current_class: "natario_like_low_expansion",
+      authoritativeMorphologyChangeObserved: "yes",
+      redesignComparisons: [
+        {
+          redesign_id: "nhm2_redesign_signed_shell_bias",
+          case_id: "nhm2_redesign_signed_shell_bias",
+          label: "signed shell bias",
+          hypothesis: "bias",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-a",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?sourceRedesignMode=signed_shell_bias",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: "signed_shell_bias",
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          redesignToggles: { source_redesign_mode: "signed_shell_bias" },
+          derivationNote: "derived",
+          caseViews: [],
+          comparison_to_nhm2: {
+            pair_id: "a-vs-nhm2",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "nhm2_certified",
+            raw_control_distance: 0.03,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_natario: {
+            pair_id: "a-vs-natario",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "natario_control",
+            raw_control_distance: 0.06,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_alcubierre: {
+            pair_id: "a-vs-alcubierre",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "alcubierre_control",
+            raw_control_distance: 0.14,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_flat: {
+            pair_id: "a-vs-flat",
+            lhs_case_id: "nhm2_redesign_signed_shell_bias",
+            rhs_case_id: "flat_space_zero_theta",
+            raw_control_distance: 0.2,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          authoritativeMorphologyChanged: true,
+          movementBasis: "authoritative_lane_pairwise_metric",
+          redesignRealizationStatus: "realized_in_lane_a",
+          dropStage: null,
+          realizationNote: "realized",
+          realizationTrace: {
+            primary_view_id: "york-surface-3p1",
+            inputSelectorHash: "input-a",
+            baselineInputSelectorHash: "input-base",
+            normalizedSelectorHash: "norm-a",
+            baselineNormalizedSelectorHash: "norm-base",
+            promotedProfileHash: "profile-a",
+            baselinePromotedProfileHash: "profile-base",
+            brickRequestHash: "request-a",
+            baselineBrickRequestHash: "request-base",
+            metricVolumeHash: "metric-a",
+            baselineMetricVolumeHash: "metric-base",
+            laneASliceHash: "slice-a",
+            baselineLaneASliceHash: "slice-base",
+            laneADisplayHash: "display-a",
+            baselineLaneADisplayHash: "display-base",
+            laneAColorHash: "color-a",
+            baselineLaneAColorHash: "color-base",
+            selectorChanged: true,
+            normalizedSelectorChanged: true,
+            promotedProfileChanged: true,
+            brickRequestChanged: true,
+            metricVolumeChanged: true,
+            laneASliceChanged: true,
+            laneADisplayChanged: true,
+            laneAColorChanged: true,
+          },
+          authoritativeComparisonSummary: [],
+          raw_control_distance_delta: {
+            toward_natario: 0.01,
+            toward_alcubierre: 0.02,
+            toward_flat: -0.01,
+          },
+          pixel_rms_delta: {
+            toward_natario: 0.001,
+            toward_alcubierre: 0.002,
+            toward_flat: -0.001,
+          },
+          sign_count_delta: { positive: 1, negative: 1 },
+          signed_lobe_summary_change: "changed",
+          topology_view_delta: 0.01,
+          movementClass: "toward_alcubierre",
+          movementMagnitude: 0.02,
+          dominantShift: "toward Alcubierre",
+          likelySubsystemImplication: "signed bias helps",
+        },
+        {
+          redesign_id: "nhm2_redesign_coupling_localization",
+          case_id: "nhm2_redesign_coupling_localization",
+          label: "coupling localization",
+          hypothesis: "localization",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "hash-b",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?sourceRedesignMode=coupling_localization",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: "coupling_localization",
+            sourceReformulationMode: null,
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          redesignToggles: { source_redesign_mode: "coupling_localization" },
+          derivationNote: "derived",
+          caseViews: [],
+          comparison_to_nhm2: {
+            pair_id: "b-vs-nhm2",
+            lhs_case_id: "nhm2_redesign_coupling_localization",
+            rhs_case_id: "nhm2_certified",
+            raw_control_distance: 0.01,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_natario: {
+            pair_id: "b-vs-natario",
+            lhs_case_id: "nhm2_redesign_coupling_localization",
+            rhs_case_id: "natario_control",
+            raw_control_distance: 0.05,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_alcubierre: {
+            pair_id: "b-vs-alcubierre",
+            lhs_case_id: "nhm2_redesign_coupling_localization",
+            rhs_case_id: "alcubierre_control",
+            raw_control_distance: 0.2,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          comparison_to_flat: {
+            pair_id: "b-vs-flat",
+            lhs_case_id: "nhm2_redesign_coupling_localization",
+            rhs_case_id: "flat_space_zero_theta",
+            raw_control_distance: 0.3,
+            metric_source_stage: "pre_png_color_buffer",
+            views: [],
+          },
+          authoritativeMorphologyChanged: false,
+          movementBasis: "authoritative_lane_no_change_gate",
+          redesignRealizationStatus: "selector_changed_but_brick_request_unchanged",
+          dropStage: "brick_request",
+          realizationNote: "The brick request stayed identical.",
+          realizationTrace: {
+            primary_view_id: "york-surface-3p1",
+            inputSelectorHash: "input-b",
+            baselineInputSelectorHash: "input-base",
+            normalizedSelectorHash: "norm-b",
+            baselineNormalizedSelectorHash: "norm-base",
+            promotedProfileHash: "profile-b",
+            baselinePromotedProfileHash: "profile-base",
+            brickRequestHash: "request-base",
+            baselineBrickRequestHash: "request-base",
+            metricVolumeHash: "metric-base",
+            baselineMetricVolumeHash: "metric-base",
+            laneASliceHash: "slice-base",
+            baselineLaneASliceHash: "slice-base",
+            laneADisplayHash: "display-base",
+            baselineLaneADisplayHash: "display-base",
+            laneAColorHash: "color-base",
+            baselineLaneAColorHash: "color-base",
+            selectorChanged: true,
+            normalizedSelectorChanged: true,
+            promotedProfileChanged: false,
+            brickRequestChanged: false,
+            metricVolumeChanged: false,
+            laneASliceChanged: false,
+            laneADisplayChanged: false,
+            laneAColorChanged: false,
+          },
+          authoritativeComparisonSummary: [],
+          raw_control_distance_delta: {
+            toward_natario: 0,
+            toward_alcubierre: 0,
+            toward_flat: 0,
+          },
+          pixel_rms_delta: {
+            toward_natario: 0,
+            toward_alcubierre: 0,
+            toward_flat: 0,
+          },
+          sign_count_delta: { positive: 0, negative: 0 },
+          signed_lobe_summary_change: "unchanged",
+          topology_view_delta: 0,
+          movementClass: "no_authoritative_morphology_change",
+          movementMagnitude: 0,
+          dominantShift: "Lane A unchanged",
+          likelySubsystemImplication: "fix realization first",
+        },
+      ] as any,
+      redesignVerdict: "source_coupling_redesign_partially_realized_inconclusive",
+      bestRedesignVariant: "nhm2_redesign_signed_shell_bias",
+      strongestMorphologyShift: {
+        redesign_id: "nhm2_redesign_signed_shell_bias",
+        movementClass: "toward_alcubierre",
+        movementMagnitude: 0.02,
+        dominantShift: "toward Alcubierre",
+      },
+      alcubierreLikeTransitionObserved: "no",
+      recommendedNextAction: "keep working on realization",
+      notes: [],
+    } as any;
+    const realizationArtifact = buildNhm2SourceCouplingRedesignRealizationArtifact({
+      redesignArtifact,
+      redesignArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-coupling-redesign-latest.json",
+    });
+    const markdown = renderNhm2SourceCouplingRedesignRealizationMarkdown(
+      realizationArtifact,
+    );
+    const memo = renderNhm2SourceCouplingRedesignRealizationMemo(realizationArtifact);
+    expect(realizationArtifact.realizedModes).toEqual([
+      "nhm2_redesign_signed_shell_bias",
+    ]);
+    expect(realizationArtifact.unrealizedModes[0]?.dropStage).toBe("brick_request");
+    expect(realizationArtifact.firstDropStage).toBe("brick_request");
+    expect(markdown).toContain("brick_request");
+    expect(markdown).toContain("inputSelectorHash");
+    expect(memo).toContain("bestRealizedVariant");
+  });
+
+  it("does not assign reformulation movement when authoritative Lane A is unchanged", () => {
+    const result = classifySourceReformulationMovement({
+      reformulationId: "nhm2_reform_geometry_source_decoupling",
+      baselineDistances: { natario: 0.1, alcubierre: 0.2, flat: 0.3 },
+      reformulationDistances: { natario: 0.08, alcubierre: 0.18, flat: 0.28 },
+      baselinePrimaryPixelRms: { natario: 0.01, alcubierre: 0.02, flat: 0.03 },
+      reformulationPrimaryPixelRms: { natario: 0.009, alcubierre: 0.019, flat: 0.029 },
+      baselineSignedLobeSummary: "mixed_or_flat",
+      reformulationSignedLobeSummary: "mixed_or_flat",
+      baselineSignCounts: { positive: 12, negative: 10 },
+      reformulationSignCounts: { positive: 12, negative: 10 },
+      authoritativeMorphologyChanged: false,
+    });
+    expect(result.movementClass).toBe("no_material_change");
+    expect(result.movementMagnitude).toBe(0);
+    expect(result.dominantShift).toContain("does not change the authoritative Lane A output");
+  });
+
+  it("classifies realized reformulations from authoritative Lane A differences", () => {
+    const result = classifySourceReformulationMovement({
+      reformulationId: "nhm2_reform_fore_aft_antisymmetric_driver",
+      baselineDistances: { natario: 0.12, alcubierre: 0.24, flat: 0.18 },
+      reformulationDistances: { natario: 0.11, alcubierre: 0.18, flat: 0.2 },
+      baselinePrimaryPixelRms: { natario: 0.01, alcubierre: 0.03, flat: 0.02 },
+      reformulationPrimaryPixelRms: { natario: 0.009, alcubierre: 0.019, flat: 0.025 },
+      baselineSignedLobeSummary: "mixed_or_flat",
+      reformulationSignedLobeSummary: "fore+/aft-",
+      baselineSignCounts: { positive: 10, negative: 8 },
+      reformulationSignCounts: { positive: 14, negative: 12 },
+      authoritativeMorphologyChanged: true,
+    });
+    expect(result.movementClass).toBe("toward_alcubierre");
+    expect((result.movementMagnitude ?? 0) > 0).toBe(true);
+  });
+
+  it("suppresses best reformulation variant when no realized Lane A reformulation exists", () => {
+    const verdict = decideNhm2DeeperReformulationVerdict({
+      reformulationComparisons: [
+        {
+          reformulation_id: "nhm2_reform_volume_driven_signed_source",
+          authoritativeMorphologyChanged: false,
+          movementClass: "no_material_change",
+          movementMagnitude: 0,
+          comparison_to_natario: { raw_control_distance: 0.1 },
+          comparison_to_alcubierre: { raw_control_distance: 0.2 },
+        },
+      ] as any,
+    });
+    expect(verdict.reformulationVerdict).toBe("deeper_reformulation_inconclusive");
+    expect(verdict.authoritativeMorphologyChangeObserved).toBe("no");
+    expect(verdict.bestReformulationVariant).toBeNull();
+  });
+
+  it("keeps the reformulation verdict Natario-locked when realized variants do not move toward Alcubierre", () => {
+    const verdict = decideNhm2DeeperReformulationVerdict({
+      reformulationComparisons: [
+        {
+          reformulation_id: "nhm2_reform_shell_to_dual_layer_family",
+          authoritativeMorphologyChanged: true,
+          movementClass: "toward_flat_or_degenerate",
+          movementMagnitude: 0.04,
+          dominantShift: "flat collapse",
+          comparison_to_natario: { raw_control_distance: 0.11 },
+          comparison_to_alcubierre: { raw_control_distance: 0.28 },
+        },
+      ] as any,
+    });
+    expect(verdict.reformulationVerdict).toBe("deeper_reformulation_still_natario_locked");
+    expect(verdict.bestReformulationVariant).toBe("nhm2_reform_shell_to_dual_layer_family");
+    expect(verdict.alcubierreLikeTransitionObserved).toBe("no");
+  });
+
+  it("renders reformulation artifacts and memo with aligned summary language", () => {
+    const artifact = buildNhm2DeeperReformulationArtifact({
+      payload: makeProofPackPayloadForMarkdown() as any,
+      canonicalCalibrationArtifact: {
+        comparisonContract: {
+          laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
+          observer: "eulerian_n",
+          foliation: "comoving_cartesian_3p1",
+          thetaDefinition: "theta=-trK",
+          signConvention: "ADM",
+          fixedScalePolicy: "comparison_fixed_raw_global",
+          visualMetricSourceStage: "pre_png_color_buffer",
+          outputSize: { width: 96, height: 64 },
+          requiredViews: [
+            "york-surface-3p1",
+            "york-surface-rho-3p1",
+            "york-topology-normalized-3p1",
+          ],
+        },
+        decisionGate: { calibration_verdict: "canonical_controls_validated_nhm2_natario_like" },
+        nhm2CurrentClass: "natario_like_low_expansion",
+      } as any,
+      sourceCouplingRedesignArtifact: {
+        redesignVerdict: "source_coupling_redesign_still_natario_locked",
+      } as any,
+      sourceAuditArtifactPath: "source.json",
+      canonicalCalibrationArtifactPath: "calibration.json",
+      redesignArtifactPath: "redesign.json",
+      exportDirectory: "rendered",
+      reformulationComparisons: [
+        {
+          reformulation_id: "nhm2_reform_fore_aft_antisymmetric_driver",
+          case_id: "nhm2_reform_fore_aft_antisymmetric_driver",
+          label: "antisymmetric driver",
+          hypothesis: "driver hypothesis",
+          metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+          metricT00Source: "metric",
+          metricRefHash: "metric-hash",
+          metricVolumeRefUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?sourceReformulationMode=fore_aft_antisymmetric_driver",
+          sourceSelectors: {
+            metricT00Ref: "warp.metric.T00.natario_sdf.shift",
+            metricT00Source: "metric",
+            warpFieldType: "natario_sdf",
+            sourceRedesignMode: null,
+            sourceReformulationMode: "fore_aft_antisymmetric_driver",
+            dutyFR: 0.0015,
+            q: 3,
+            gammaGeo: 26,
+            gammaVdB: 500,
+            zeta: 0.84,
+            phase01: 0,
+            requireCongruentSolve: false,
+            requireNhm2CongruentFullSolve: false,
+          },
+          reformulationToggles: { source_reformulation_mode: "fore_aft_antisymmetric_driver" },
+          derivationNote: "derived",
+          caseViews: [],
+          comparison_to_nhm2: { raw_control_distance: 0.03 },
+          comparison_to_natario: { raw_control_distance: 0.08 },
+          comparison_to_alcubierre: { raw_control_distance: 0.16 },
+          comparison_to_flat: { raw_control_distance: 0.2 },
+          authoritativeMorphologyChanged: true,
+          movementBasis: "authoritative_lane_pairwise_metric",
+          reformulationRealizationStatus: "realized_in_lane_a",
+          dropStage: null,
+          realizationNote: "realized",
+          realizationTrace: {
+            primary_view_id: "york-surface-3p1",
+            inputSelectorHash: "input",
+            baselineInputSelectorHash: "base-input",
+            normalizedSelectorHash: "norm",
+            baselineNormalizedSelectorHash: "base-norm",
+            promotedProfileHash: "profile",
+            baselinePromotedProfileHash: "base-profile",
+            brickRequestHash: "request",
+            baselineBrickRequestHash: "base-request",
+            metricRefHash: "metric",
+            baselineMetricRefHash: "base-metric",
+            metricVolumeHash: "metric-volume",
+            baselineMetricVolumeHash: "base-metric-volume",
+            matterChannelHash: "matter",
+            baselineMatterChannelHash: "base-matter",
+            geometryChannelHash: "geom",
+            baselineGeometryChannelHash: "base-geom",
+            laneAFieldHash: "field",
+            baselineLaneAFieldHash: "base-field",
+            thetaChannelHash: "theta",
+            baselineThetaChannelHash: "base-theta",
+            kTraceChannelHash: "ktrace",
+            baselineKTraceChannelHash: "base-ktrace",
+            laneASliceHash: "slice",
+            baselineLaneASliceHash: "base-slice",
+            laneADisplayHash: "display",
+            baselineLaneADisplayHash: "base-display",
+            laneAColorHash: "color",
+            baselineLaneAColorHash: "base-color",
+            selectorChanged: true,
+            normalizedSelectorChanged: true,
+            promotedProfileChanged: true,
+            brickRequestChanged: true,
+            metricRefChanged: true,
+            metricVolumeChanged: true,
+            matterChannelsChanged: true,
+            geometryChannelsChanged: true,
+            laneAFieldChanged: true,
+            thetaChannelChanged: true,
+            kTraceChannelChanged: true,
+            laneASliceChanged: true,
+            laneADisplayChanged: true,
+            laneAColorChanged: true,
+          },
+          authoritativeComparisonSummary: [],
+          raw_control_distance_delta: { toward_natario: 0.01, toward_alcubierre: 0.05, toward_flat: -0.02 },
+          pixel_rms_delta: { toward_natario: 0.001, toward_alcubierre: 0.004, toward_flat: -0.001 },
+          sign_count_delta: { positive: 2, negative: 3 },
+          signed_lobe_summary_change: "mixed_or_flat -> fore+/aft-",
+          topology_view_delta: 0.02,
+          movementClass: "toward_alcubierre",
+          movementMagnitude: 0.05,
+          dominantShift: "toward Alcubierre",
+          likelySubsystemImplication: "antisymmetric driver matters",
+        },
+      ] as any,
+      reformulationVerdict: "deeper_reformulation_moves_toward_alcubierre_but_not_enough",
+      authoritativeMorphologyChangeObserved: "yes",
+      bestReformulationVariant: "nhm2_reform_fore_aft_antisymmetric_driver",
+      strongestMorphologyShift: {
+        reformulation_id: "nhm2_reform_fore_aft_antisymmetric_driver",
+        movementClass: "toward_alcubierre",
+        movementMagnitude: 0.05,
+        dominantShift: "toward Alcubierre",
+      },
+      alcubierreLikeTransitionObserved: "no",
+      recommendedNextAction: "iterate on the antisymmetric driver family",
+    } as any);
+    const summary = formatDeeperReformulationProofPackSummary({
+      deeperReformulationArtifact: artifact,
+    });
+    const markdown = renderNhm2DeeperReformulationMarkdown(artifact);
+    const memo = renderNhm2DeeperReformulationDecisionMemo(artifact);
+    expect(summary).toContain(
+      "deeper_reformulation_verdict=deeper_reformulation_moves_toward_alcubierre_but_not_enough",
+    );
+    expect(summary).toContain(
+      "best_reformulation_variant=nhm2_reform_fore_aft_antisymmetric_driver",
+    );
+    expect(markdown).toContain("sourceReformulationMode");
+    expect(markdown).toContain("pre_png_color_buffer");
+    expect(memo).toContain("Realized local source/coupling redesigns remained Natario-like");
+  });
+
+  it("falls back to render-contract suspicion when canonical controls fail", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.classificationScoring = {
+      distance_to_alcubierre_reference: 0.2,
+      distance_to_low_expansion_reference: 0.18,
+      reference_margin: 0.02,
+      winning_reference: "natario_control",
+      margin_sufficient: false,
+      winning_reference_within_threshold: true,
+      distinct_by_policy: true,
+      distinctness_threshold: 0.5,
+      margin_min: 0.08,
+      reference_match_threshold: 0.5,
+      distance_metric: "weighted_normalized_l1",
+      normalization_method: "contract-v1",
+      to_alcubierre_breakdown: {} as any,
+      to_low_expansion_breakdown: {} as any,
+    };
+    const caseById = new Map(payload.cases.map((entry: any) => [entry.caseId, entry]));
+    caseById.get("alcubierre_control").primaryYork = {
+      ...caseById.get("alcubierre_control").primaryYork,
+      rawExtrema: { min: -1, max: 1, absMax: 1 },
+      nearZeroTheta: false,
+    };
+    caseById.get("alcubierre_control").offlineYorkAudit.alcubierreSignedLobeSummary = {
+      foreHalfPositiveTotal: 1,
+      foreHalfNegativeTotal: -1,
+      aftHalfPositiveTotal: 1,
+      aftHalfNegativeTotal: -1,
+      signedLobeSummary: "mixed_or_flat",
+    };
+    caseById.get("natario_control").primaryYork = {
+      ...caseById.get("natario_control").primaryYork,
+      rawExtrema: { min: -0.4, max: 0.4, absMax: 0.4 },
+      nearZeroTheta: false,
+    };
+    const caseInputs = [
+      {
+        case_id: "alcubierre_control",
+        label: "alc",
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            coordinate_mode: "x-z-midplane",
+            sampling_choice: "x-z midplane",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-1, -0.5, 0.5, 1]),
+            slice_hash: "a-xz",
+            raw_extrema: { min: -1, max: 1, absMax: 1 },
+            signed_lobe_summary: "mixed_or_flat",
+            support_overlap_pct: 0.8,
+            near_zero_theta: false,
+          },
+          {
+            view_id: "york-surface-rho-3p1",
+            coordinate_mode: "x-rho",
+            sampling_choice: "x-rho cylindrical remap",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-1, -0.5, 0.5, 1]),
+            slice_hash: "a-rho",
+            raw_extrema: { min: -1, max: 1, absMax: 1 },
+            signed_lobe_summary: null,
+            support_overlap_pct: 0.8,
+            near_zero_theta: false,
+          },
+          {
+            view_id: "york-topology-normalized-3p1",
+            coordinate_mode: "x-z-midplane",
+            sampling_choice: "x-z midplane",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-1, -0.5, 0.5, 1]),
+            slice_hash: "a-top",
+            raw_extrema: { min: -1, max: 1, absMax: 1 },
+            signed_lobe_summary: "mixed_or_flat",
+            support_overlap_pct: 0.8,
+            near_zero_theta: false,
+          },
+        ],
+      },
+      {
+        case_id: "natario_control",
+        label: "nat",
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            coordinate_mode: "x-z-midplane",
+            sampling_choice: "x-z midplane",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-0.4, -0.2, 0.2, 0.4]),
+            slice_hash: "n-xz",
+            raw_extrema: { min: -0.4, max: 0.4, absMax: 0.4 },
+            signed_lobe_summary: "fore+/aft-",
+            support_overlap_pct: 0.7,
+            near_zero_theta: false,
+          },
+          {
+            view_id: "york-surface-rho-3p1",
+            coordinate_mode: "x-rho",
+            sampling_choice: "x-rho cylindrical remap",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-0.4, -0.2, 0.2, 0.4]),
+            slice_hash: "n-rho",
+            raw_extrema: { min: -0.4, max: 0.4, absMax: 0.4 },
+            signed_lobe_summary: null,
+            support_overlap_pct: 0.7,
+            near_zero_theta: false,
+          },
+          {
+            view_id: "york-topology-normalized-3p1",
+            coordinate_mode: "x-z-midplane",
+            sampling_choice: "x-z midplane",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-0.4, -0.2, 0.2, 0.4]),
+            slice_hash: "n-top",
+            raw_extrema: { min: -0.4, max: 0.4, absMax: 0.4 },
+            signed_lobe_summary: "fore+/aft-",
+            support_overlap_pct: 0.7,
+            near_zero_theta: false,
+          },
+        ],
+      },
+      {
+        case_id: "nhm2_certified",
+        label: "nhm2",
+        views: [
+          {
+            view_id: "york-surface-3p1",
+            coordinate_mode: "x-z-midplane",
+            sampling_choice: "x-z midplane",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-0.1, -0.05, 0.05, 0.1]),
+            slice_hash: "h-xz",
+            raw_extrema: { min: -0.1, max: 0.1, absMax: 0.1 },
+            signed_lobe_summary: "mixed_or_flat",
+            support_overlap_pct: 0.75,
+            near_zero_theta: false,
+          },
+          {
+            view_id: "york-surface-rho-3p1",
+            coordinate_mode: "x-rho",
+            sampling_choice: "x-rho cylindrical remap",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-0.1, -0.05, 0.05, 0.1]),
+            slice_hash: "h-rho",
+            raw_extrema: { min: -0.1, max: 0.1, absMax: 0.1 },
+            signed_lobe_summary: null,
+            support_overlap_pct: 0.75,
+            near_zero_theta: false,
+          },
+          {
+            view_id: "york-topology-normalized-3p1",
+            coordinate_mode: "x-z-midplane",
+            sampling_choice: "x-z midplane",
+            source_width: 2,
+            source_height: 2,
+            slice: Float32Array.from([-0.1, -0.05, 0.05, 0.1]),
+            slice_hash: "h-top",
+            raw_extrema: { min: -0.1, max: 0.1, absMax: 0.1 },
+            signed_lobe_summary: "mixed_or_flat",
+            support_overlap_pct: 0.75,
+            near_zero_theta: false,
+          },
+        ],
+      },
+    ] as any;
+    const calibrationExportDir = fs.mkdtempSync(path.join(os.tmpdir(), "york-calibration-fail-"));
+    const calibrationArtifact = await buildWarpYorkCanonicalCalibrationArtifact({
+      payload,
+      solveAuthorityAudit: {
+        readiness: {
+          sourceAuthorityClosed: true,
+          timingAuthorityClosed: true,
+          brickAuthorityClosed: true,
+          snapshotAuthorityClosed: true,
+          diagnosticAuthorityClosed: true,
+          yorkClassificationReady: true,
+          mechanismChainReady: true,
+          mechanismClaimBlockReasons: [],
+        },
+      } as any,
+      sourceAuditArtifactPath: "artifacts/research/full-solve/source.json",
+      solveAuthorityAuditPath: "artifacts/research/full-solve/solve.json",
+      fixedScaleArtifactPath: "artifacts/research/full-solve/fixed-scale.json",
+      exportDirectory: calibrationExportDir,
+      frameSize: { width: 64, height: 64 },
+      caseInputs,
+    });
+    expect(calibrationArtifact.controlValidation.control_validation_status).toBe("failed");
+    expect(calibrationArtifact.decisionGate.calibration_verdict).toBe(
+      "render_contract_not_validated",
+    );
+    expect(calibrationArtifact.decisionGate.recommended_next_debug_target).toBe(
+      "render_or_convention_contract",
+    );
+  });
 });
+

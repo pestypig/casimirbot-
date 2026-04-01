@@ -269,6 +269,8 @@ export const buildStressEnergySourceFromPipeline = (
     metricT00,
     metricT00Source,
     metricT00Ref,
+    sourceRedesignMode: overrides.sourceRedesignMode ?? null,
+    sourceReformulationMode: overrides.sourceReformulationMode ?? null,
   };
 
   const brick = buildStressEnergyBrick(params);
