@@ -133,6 +133,8 @@ export type WarpMetricAdapterSnapshot = {
       | "not-computed";
     thetaMax?: number;
     thetaRms?: number;
+    divBetaMaxAbs?: number;
+    divBetaRms?: number;
     curlMax?: number;
     curlRms?: number;
     thetaConformalMax?: number;
@@ -211,6 +213,32 @@ const normalize = (v: Vec3): Vec3 => {
   const m = Math.hypot(v[0], v[1], v[2]);
   if (!m) return [0, 0, 0];
   return [v[0] / m, v[1] / m, v[2] / m];
+};
+
+const normalizeBetaDiagnostics = (
+  betaDiagnostics: WarpMetricAdapterSnapshot["betaDiagnostics"] | undefined,
+): WarpMetricAdapterSnapshot["betaDiagnostics"] | undefined => {
+  if (!betaDiagnostics) return betaDiagnostics;
+  const normalized = { ...betaDiagnostics };
+  const thetaMax = isFiniteNumber(normalized.thetaMax)
+    ? normalized.thetaMax
+    : isFiniteNumber(normalized.divBetaMaxAbs)
+      ? normalized.divBetaMaxAbs
+      : undefined;
+  const thetaRms = isFiniteNumber(normalized.thetaRms)
+    ? normalized.thetaRms
+    : isFiniteNumber(normalized.divBetaRms)
+      ? normalized.divBetaRms
+      : undefined;
+  if (thetaMax !== undefined) {
+    normalized.thetaMax = thetaMax;
+    normalized.divBetaMaxAbs = thetaMax;
+  }
+  if (thetaRms !== undefined) {
+    normalized.thetaRms = thetaRms;
+    normalized.divBetaRms = thetaRms;
+  }
+  return normalized;
 };
 
 const buildSamplePoints = (scale: number, count: number): Vec3[] => {
@@ -632,6 +660,8 @@ export const buildWarpMetricAdapterSnapshot = (
         : conformalNote;
     }
   }
+
+  betaDiagnostics = normalizeBetaDiagnostics(betaDiagnostics);
 
   return {
     family: input.family,

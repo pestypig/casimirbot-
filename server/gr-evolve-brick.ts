@@ -30,7 +30,7 @@ import {
   evaluateWarpMetricLapseField,
   type WarpMetricAdapterSnapshot,
   type WarpMetricLapseSummary,
-} from "../modules/warp/warp-metric-adapter.js";
+} from "../modules/warp/warp-metric-adapter.ts";
 import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick.ts";
 
 const SIXTEEN_PI = 16 * Math.PI;

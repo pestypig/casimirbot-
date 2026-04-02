@@ -51,8 +51,30 @@ describe("buildWarpMetricAdapterSnapshot", () => {
     expect(snap.betaDiagnostics?.method).toBe("finite-diff");
     expect(snap.betaDiagnostics?.thetaMax).toBeCloseTo(3, 6);
     expect(snap.betaDiagnostics?.thetaRms).toBeCloseTo(3, 6);
+    expect(snap.betaDiagnostics?.divBetaMaxAbs).toBeCloseTo(3, 6);
+    expect(snap.betaDiagnostics?.divBetaRms).toBeCloseTo(3, 6);
     expect(snap.betaDiagnostics?.curlMax ?? 0).toBeLessThan(1e-8);
     expect(snap.betaDiagnostics?.sampleCount ?? 0).toBeGreaterThan(0);
+  });
+
+  it("normalizes legacy divBeta aliases onto the canonical theta diagnostics schema", () => {
+    const snap = buildWarpMetricAdapterSnapshot({
+      family: "natario",
+      betaDiagnostics: {
+        method: "hodge-grid",
+        divBetaMaxAbs: 0.25,
+        divBetaRms: 0.125,
+      },
+    });
+
+    expect(snap.betaDiagnostics).toEqual(
+      expect.objectContaining({
+        thetaMax: 0.25,
+        thetaRms: 0.125,
+        divBetaMaxAbs: 0.25,
+        divBetaRms: 0.125,
+      }),
+    );
   });
 
   it("applies VdB conformal derivative correction to theta diagnostics", () => {

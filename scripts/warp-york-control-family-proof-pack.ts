@@ -131,6 +131,54 @@ const DEFAULT_SOURCE_FORMULA_AUDIT_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-source-formula-audit-latest.md",
 );
+const DEFAULT_SOURCE_MECHANISM_MATURITY_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-source-mechanism-maturity-${DATE_STAMP}.json`,
+);
+const DEFAULT_SOURCE_MECHANISM_MATURITY_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-source-mechanism-maturity-latest.json",
+);
+const DEFAULT_SOURCE_MECHANISM_MATURITY_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-source-mechanism-maturity-${DATE_STAMP}.md`,
+);
+const DEFAULT_SOURCE_MECHANISM_MATURITY_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-source-mechanism-maturity-latest.md",
+);
+const DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-source-mechanism-promotion-contract-${DATE_STAMP}.json`,
+);
+const DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-source-mechanism-promotion-contract-latest.json",
+);
+const DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-source-mechanism-promotion-contract-${DATE_STAMP}.md`,
+);
+const DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-source-mechanism-promotion-contract-latest.md",
+);
+const DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-source-mechanism-parity-route-feasibility-${DATE_STAMP}.json`,
+);
+const DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-source-mechanism-parity-route-feasibility-latest.json",
+);
+const DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-source-mechanism-parity-route-feasibility-${DATE_STAMP}.md`,
+);
+const DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-source-mechanism-parity-route-feasibility-latest.md",
+);
 const DEFAULT_TIMING_AUTHORITY_AUDIT_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-timing-authority-audit-${DATE_STAMP}.json`,
@@ -715,9 +763,32 @@ type SourceToYorkMappingType =
   | "derived_transform"
   | "policy_override"
   | "audit_harness_override"
-  | "missing_derivation";
+  | "missing_derivation"
+  | "missing_serialization"
+  | "intentional_non_mapping"
+  | "unexplained_contract_to_brick_drift";
 
 type SourceToYorkMappingStatus = "closed" | "open";
+
+type SourceToYorkTimingAuthorityStatus =
+  | "artifact_missing"
+  | "artifact_unrecognized"
+  | "recognized_required_fields_missing"
+  | "recognized_required_fields_present"
+  | "recognized_required_fields_present_optional_fields_partial";
+
+type SourceToYorkBridgeClosurePolicy =
+  | "close_with_current_serialization"
+  | "close_after_explicit_timing_authority_wiring"
+  | "legacy_bridge_retained_as_advisory_only"
+  | "non_closable_without_architectural_change";
+
+type SourceToYorkClosureCandidateStatus =
+  | "closed_with_current_serialization"
+  | "closable_with_current_serialization"
+  | "closable_after_explicit_timing_authority_wiring"
+  | "legacy_advisory_open"
+  | "non_closable_without_architectural_change";
 
 type SourceToYorkParameterMapping = {
   field: string;
@@ -732,6 +803,10 @@ type SourceToYorkParameterMapping = {
 type SourceToYorkBridgeReadiness = {
   sourceContractPresent: boolean;
   timingAuthorityPresent: boolean;
+  timingAuthorityStatus: SourceToYorkTimingAuthorityStatus;
+  timingAuthorityArtifactRecognized: boolean;
+  timingAuthorityRequiredFields: TimingFieldName[];
+  timingAuthorityOptionalMissingFields: TimingFieldName[];
   reducedOrderPayloadPresent: boolean;
   proofPackBrickPresent: boolean;
   parameterMappingsComplete: boolean;
@@ -742,6 +817,14 @@ type SourceToYorkBridgeReadiness = {
   gatingBlocksMechanismChain: false;
   statusNote: string;
   blockReasons: string[];
+  bridgeOpenFieldCount: number;
+  bridgeClosedFieldCount: number;
+  openFields: string[];
+  closedFields: string[];
+  residualBlockingReasons: string[];
+  residualAdvisoryReasons: string[];
+  closureCandidateStatus: SourceToYorkClosureCandidateStatus;
+  bridgeClosurePolicy: SourceToYorkBridgeClosurePolicy;
 };
 
 type SourceToYorkProvenanceArtifact = {
@@ -842,6 +925,12 @@ type SourceToYorkProvenanceArtifact = {
   bridgeReadiness: SourceToYorkBridgeReadiness;
   notes: string[];
   checksum?: string;
+};
+
+type ProofPackSourceToYorkBridgeSummary = {
+  readiness: SourceToYorkBridgeReadiness;
+  artifactPath: string;
+  reportPath: string;
 };
 
 type TimingAuthorityId =
@@ -1742,12 +1831,14 @@ type RenderTaxonomyFieldId =
   | "trace_check_diagnostic"
   | "transport_context"
   | "atlas_context"
+  | "diagnostics_dashboard"
   | "comparison_card"
   | "comparison_overview";
 
 type RenderBaseImagePolicy =
   | "native_renderer_output"
   | "neutral_field_canvas"
+  | "diagnostic_card_canvas"
   | "field_plus_context_overlay";
 
 type RenderBaseImageSource =
@@ -1832,10 +1923,38 @@ type ShiftDirectionOverlayCaseDistinctness =
   | "collapsed_across_cases"
   | "mixed"
   | "not_applicable";
+type ShiftDirectionOverlayInterpretationPolicy =
+  "normalize_non_material_internal_variance_after_sampled_field_match";
+type ShiftDirectionOverlayCollapseStage =
+  | "genuinely_identical_sampled_direction_field"
+  | "stream_seed_generation"
+  | "streamline_geometry"
+  | "overlay_svg_composition"
+  | "png_rasterization_or_boundary_overlay"
+  | "distinct_through_image"
+  | "not_applicable";
+type ShiftDirectionOverlayInternalVarianceStatus =
+  | "not_applicable"
+  | "non_material_after_sampled_field_match"
+  | "material_collapse_requires_debug";
 type ShiftGeometryMechanismFamily =
   | "shift_geometry"
   | "residual_to_control"
   | "constraint_context";
+
+type ShiftDirectionOverlayPairwiseComparison = {
+  lhsCaseId: CalibrationPanelCaseId;
+  rhsCaseId: CalibrationPanelCaseId;
+  presentationScalarHashesDiffer: boolean;
+  directionVectorFieldHashesDiffer: boolean;
+  streamSeedHashesDiffer: boolean;
+  streamGeometryHashesDiffer: boolean;
+  directionOverlayHashesDiffer: boolean;
+  imageHashesDiffer: boolean;
+  collapseStage: ShiftDirectionOverlayCollapseStage;
+  internalVarianceStatus: ShiftDirectionOverlayInternalVarianceStatus;
+  note: string;
+};
 
 type ShiftGeometryFieldSummary = {
   caseId: CalibrationPanelCaseId;
@@ -1940,6 +2059,8 @@ type Nhm2ShiftGeometryVisualizationArtifact = {
   directionOverlayStatus: ShiftDirectionOverlayStatus;
   directionOverlayWarnings: ShiftDirectionOverlayWarningCode[];
   directionOverlayCaseDistinctness: ShiftDirectionOverlayCaseDistinctness;
+  directionOverlayInterpretationPolicy: ShiftDirectionOverlayInterpretationPolicy;
+  directionOverlayPairwiseComparisons: ShiftDirectionOverlayPairwiseComparison[];
   constraintContextStatus: ShiftConstraintContextStatus;
   recommendedInterpretationOrder: string[];
   lineCutStatus: "deferred_pending_probe_family";
@@ -3215,6 +3336,71 @@ type SourceFormulaMismatchClass =
   | "unresolved_formula_mismatch"
   | "none";
 
+type SourceFormulaComparisonMode =
+  | "authoritative_direct_vs_reconstructed_proxy"
+  | "formula_parity_check"
+  | "mixed_formula_path_audit";
+
+type SourceFormulaMismatchReason =
+  | "unit_contract_mismatch"
+  | "normalization_mismatch"
+  | "duty_definition_mismatch"
+  | "timing_source_mismatch"
+  | "proxy_vs_metric_term_gap"
+  | "missing_term_mapping"
+  | "unexpected_numeric_divergence"
+  | "none";
+
+type SourceFormulaComparisonEntryStatus =
+  | "matched"
+  | "mismatched"
+  | "missing_direct_input"
+  | "missing_reconstructed_input"
+  | "not_comparable";
+
+type SourceFormulaResolvedInputComparison = {
+  inputId: string;
+  directValue: unknown;
+  reconstructedValue: unknown;
+  delta: number | null;
+  relativeDelta: number | null;
+  units: string | null;
+  status: SourceFormulaComparisonEntryStatus;
+  note: string | null;
+};
+
+type SourceFormulaTermComparison = {
+  termId: string;
+  directValue: unknown;
+  reconstructedValue: unknown;
+  delta: number | null;
+  relativeDelta: number | null;
+  units: string | null;
+  status: SourceFormulaComparisonEntryStatus;
+  note: string | null;
+};
+
+type SourceFormulaTolerancePolicy = {
+  relTol: number;
+  absTol: number;
+  numericParityRule: string;
+  formulaEquivalenceRequires: string[];
+};
+
+type SourceFormulaInterpretationPolicyId =
+  | "expected_proxy_vs_metric_gap_non_promotable"
+  | "parity_required_before_promotion"
+  | "open_congruence_failure";
+
+type SourceFormulaInterpretationPolicy = {
+  policyId: SourceFormulaInterpretationPolicyId;
+  parityExpected: boolean;
+  promotionBlockedByMismatch: boolean;
+  laneAUnaffectedByMismatch: boolean;
+  interpretationStatus: "advisory" | "blocking";
+  note: string;
+};
+
 type SourceFormulaComparisonPathRole =
   | "reconstruction_only"
   | "formula_authoritative"
@@ -3259,10 +3445,18 @@ type SourceFormulaPathAudit = {
 };
 
 type SourceFormulaComparison = {
+  directFormulaId: string | null;
+  reconstructedFormulaId: string | null;
+  comparisonMode: SourceFormulaComparisonMode;
+  tolerancePolicy: SourceFormulaTolerancePolicy;
   formula_class_match: boolean;
   unit_contract_match: boolean;
   normalization_contract_match: boolean;
   derivation_mode_match: boolean;
+  mismatchReason: SourceFormulaMismatchReason;
+  additionalMismatchReasons: SourceFormulaMismatchReason[];
+  resolvedInputComparisons: SourceFormulaResolvedInputComparison[];
+  termComparisons: SourceFormulaTermComparison[];
   intermediate_term_deltas: Array<{
     term: string;
     canonical_value: unknown;
@@ -3291,6 +3485,7 @@ type Nhm2SourceFormulaAuditArtifact = {
     recoveryCaseId: string | null;
   };
   policy: SourceFormulaComparisonPolicy;
+  interpretationPolicy: SourceFormulaInterpretationPolicy;
   canonicalFormula: SourceFormulaPathAudit;
   comparisonFormula: SourceFormulaPathAudit;
   formulaComparison: SourceFormulaComparison;
@@ -3298,10 +3493,310 @@ type Nhm2SourceFormulaAuditArtifact = {
     formulaEquivalent: boolean;
     reconstructionOnlyComparison: boolean;
     formulaMismatchClass: SourceFormulaMismatchClass;
+    mismatchReason: SourceFormulaMismatchReason;
+    sourceFormulaInterpretationPolicy: SourceFormulaInterpretationPolicyId;
     summary: string;
   };
   notes: string[];
   checksum?: string;
+};
+
+type SourceMechanismMaturityTier = "reduced_order_advisory";
+type SourceMechanismClaimBoundaryPolicyId =
+  "bounded_advisory_non_promotable_until_explicit_promotion_contract";
+type SourceMechanismAuthoritativeStatus = "non_authoritative";
+type SourceMechanismPromotionEligibility = "blocked";
+type SourceMechanismPromotionRequirementId =
+  | "direct_proxy_parity_route_for_equivalence_or_cross_lane_claims"
+  | "bounded_exemption_contract_for_non_authoritative_claim_subsets"
+  | "promotion_grade_timing_authority_contract_if_optional_fields_required"
+  | "first_principles_or_authoritative_source_realization_contract"
+  | "explicit_cross_lane_promotion_contract_beyond_reference_only_scope";
+type SourceMechanismClaimId =
+  | "source_to_york_provenance_closed_under_current_serialization_policy"
+  | "reduced_order_source_selectors_serialized_and_explained"
+  | "reconstructed_proxy_path_usable_for_advisory_comparison"
+  | "lane_a_classification_unaffected_by_source_mechanism_advisories"
+  | "bounded_non_authoritative_source_annotation"
+  | "bounded_non_authoritative_mechanism_context"
+  | "bounded_non_authoritative_reduced_order_comparison"
+  | "reconstructed_proxy_path_formula_equivalent_to_authoritative_direct_metric"
+  | "source_mechanism_lane_is_authoritative"
+  | "unbounded_non_authoritative_source_mechanism_promotion_claim"
+  | "source_mechanism_layer_closes_physical_viability"
+  | "shift_plus_lapse_branch_is_proof_promoted";
+type SourceMechanismPromotionBlocker =
+  | "proxy_vs_metric_term_gap"
+  | "direct_vs_reconstructed_non_parity"
+  | "timing_authority_optional_fields_partial"
+  | "reference_only_cross_lane_scope";
+type SourceMechanismPromotionContractStatus =
+  | "blocked_pending_route_selection"
+  | "blocked_pending_route_closure"
+  | "active_for_bounded_claims_only"
+  | "eligible_under_formal_exemption"
+  | "eligible_via_parity_route";
+type SourceMechanismPromotionRouteId =
+  | "direct_proxy_parity_route"
+  | "formal_exemption_route";
+type SourceMechanismSelectedPromotionRoute =
+  | SourceMechanismPromotionRouteId
+  | "none_active";
+type SourceMechanismPromotionDecisionPolicyId =
+  "parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims";
+type SourceMechanismPromotionClaimId =
+  | "formula_equivalent_to_authoritative_direct_metric"
+  | "source_mechanism_lane_authoritative"
+  | "source_mechanism_lane_promotable_non_authoritative"
+  | "bounded_non_authoritative_source_annotation"
+  | "bounded_non_authoritative_mechanism_context"
+  | "bounded_non_authoritative_reduced_order_comparison"
+  | "source_mechanism_layer_supports_viability_promotion"
+  | "cross_lane_promotion_beyond_reference_only_scope";
+type SourceMechanismPromotionRouteStatus =
+  | "available_but_unmet"
+  | "partially_activatable_for_bounded_claims"
+  | "not_available"
+  | "satisfied";
+type SourceMechanismParityRouteFeasibilityStatus =
+  | "closable_with_existing_emitted_terms"
+  | "closable_after_missing_term_serialization"
+  | "blocked_pending_model_upgrade"
+  | "blocked_by_derivation_class_difference";
+type SourceMechanismParityRouteBlockingClass =
+  | "none"
+  | "missing_metric_side_serialization"
+  | "missing_proxy_term_mapping"
+  | "direct_metric_vs_reconstructed_proxy_derivation_gap";
+type SourceMechanismClaimPromotionStatus =
+  | "blocked"
+  | "route_available_but_unmet"
+  | "eligible_if_route_selected"
+  | "active_under_selected_route"
+  | "permanently_disallowed_in_current_contract";
+type SourceMechanismClaimRequiredRoute =
+  | SourceMechanismPromotionRouteId
+  | "no_route_available";
+
+type SourceMechanismExemptionEligibleClaim = {
+  claimId:
+    | "bounded_non_authoritative_source_annotation"
+    | "bounded_non_authoritative_mechanism_context"
+    | "bounded_non_authoritative_reduced_order_comparison";
+  claimScope: string;
+  requiredDisclaimers: string[];
+  forbiddenInferences: string[];
+  requiredEvidence: string[];
+  requiresOptionalTimingClosure: boolean;
+  requiresCrossLaneExpansion: boolean;
+  requiresParity: boolean;
+  currentEvidenceSatisfied: boolean;
+};
+
+type SourceMechanismParityPathDecompositionStatus =
+  | "aggregate_authoritative_metric_term_only"
+  | "proxy_reconstruction_terms_available";
+
+type SourceMechanismParityPathDecomposition = {
+  pathRole: "authoritative_direct_metric" | "reconstructed_proxy";
+  formulaClass: SourceFormulaClass;
+  derivationMode: SourceFormulaDerivationMode;
+  decompositionStatus: SourceMechanismParityPathDecompositionStatus;
+  finalMetricTermId: "final_metricT00Si_Jm3";
+  contributorTerms: string[];
+  sharedContributorTerms: string[];
+  supportingMatchedTerms: string[];
+  unavailableContributorTerms: string[];
+  missingAdditiveBreakdown: boolean;
+  note: string;
+};
+
+type SourceMechanismParityRouteFeasibilityBlock = {
+  routeId: "direct_proxy_parity_route";
+  routeStatus: SourceMechanismPromotionRouteStatus;
+  feasibilityStatus: SourceMechanismParityRouteFeasibilityStatus;
+  routeBlockingClass: SourceMechanismParityRouteBlockingClass;
+  dominantMismatchTerm: string | null;
+  matchedTerms: string[];
+  unmatchedTerms: string[];
+  sharedContributors: string[];
+  sharedSupportingTerms: string[];
+  directOnlyContributors: string[];
+  reconstructedOnlyContributors: string[];
+  unmatchedContributors: string[];
+  directPathDecomposition: SourceMechanismParityPathDecomposition;
+  reconstructedPathDecomposition: SourceMechanismParityPathDecomposition;
+  missingProxyTerms: string[];
+  missingDirectTerms: string[];
+  closureWorkItems: string[];
+  nextClosureAction: string;
+  proofOfClosureArtifact: string;
+  routeSummary: string;
+};
+
+type SourceMechanismPromotionRoute = {
+  routeId: SourceMechanismPromotionRouteId;
+  routeStatus: SourceMechanismPromotionRouteStatus;
+  parityRequired: boolean;
+  termsRequiringClosure: string[];
+  tolerancePolicySummary: string | null;
+  proofArtifactPath: string | null;
+  claimSetEligible: SourceMechanismPromotionClaimId[];
+  claimSetBlocked: SourceMechanismPromotionClaimId[];
+  requiredEvidence: string[];
+  routeFeasibilityStatus: SourceMechanismParityRouteFeasibilityStatus | null;
+  routeBlockingClass: SourceMechanismParityRouteBlockingClass | null;
+  dominantMismatchTerm: string | null;
+  nextClosureAction: string | null;
+  proofOfClosureArtifact: string | null;
+  feasibilityArtifactPath: string | null;
+  summary: string;
+};
+
+type SourceMechanismPromotionClaimMapping = {
+  claimId: SourceMechanismPromotionClaimId;
+  currentStatus: SourceMechanismClaimPromotionStatus;
+  requiredRoute: SourceMechanismClaimRequiredRoute;
+  blockingReasons: string[];
+  requiredEvidence: string[];
+};
+
+type SourceMechanismPromotionContractBlock = {
+  contractId: "nhm2_source_mechanism_promotion_contract.v1";
+  contractStatus: SourceMechanismPromotionContractStatus;
+  selectedPromotionRoute: SourceMechanismSelectedPromotionRoute;
+  availableRoutes: SourceMechanismPromotionRoute[];
+  promotionDecisionPolicy: SourceMechanismPromotionDecisionPolicyId;
+  claimsRequiringParity: SourceMechanismPromotionClaimId[];
+  claimsEligibleUnderExemption: SourceMechanismPromotionClaimId[];
+  claimsBlockedEvenWithExemption: SourceMechanismPromotionClaimId[];
+  exemptionEligibleClaimDetails: SourceMechanismExemptionEligibleClaim[];
+  exemptionRouteActivated: boolean;
+  activeClaimSet: SourceMechanismPromotionClaimId[];
+  inactiveClaimSet: SourceMechanismPromotionClaimId[];
+  activationScope: string;
+  activationDisclaimers: string[];
+  forbiddenPromotions: string[];
+  activationSummary: string;
+  claimMappings: SourceMechanismPromotionClaimMapping[];
+  remainingConditions: string[];
+  nonNegotiableConditions: string[];
+  laneAUnaffected: boolean;
+  referenceOnlyCrossLaneScope: boolean;
+  summary: string;
+};
+
+type SourceMechanismMaturityBlock = {
+  maturityTier: SourceMechanismMaturityTier;
+  claimBoundaryPolicy: SourceMechanismClaimBoundaryPolicyId;
+  authoritativeStatus: SourceMechanismAuthoritativeStatus;
+  promotionEligibility: SourceMechanismPromotionEligibility;
+  promotionBlockers: SourceMechanismPromotionBlocker[];
+  allowedClaims: SourceMechanismClaimId[];
+  disallowedClaims: SourceMechanismClaimId[];
+  requiredForPromotion: SourceMechanismPromotionRequirementId[];
+  sourceFormulaInterpretationPolicy: SourceFormulaInterpretationPolicyId;
+  sourceToYorkBridgeClosurePolicy: SourceToYorkBridgeClosurePolicy;
+  timingAuthorityStatus: SourceToYorkTimingAuthorityStatus;
+  bridgeReady: boolean;
+  bridgeGatingStatus: "legacy_advisory_non_gating";
+  parityExpected: boolean;
+  promotionBlocked: boolean;
+  laneAUnaffected: boolean;
+  laneAAuthoritative: boolean;
+  referenceOnlyCrossLaneScope: boolean;
+  promotionContractId: string;
+  promotionContractStatus: SourceMechanismPromotionContractStatus;
+  selectedPromotionRoute: SourceMechanismSelectedPromotionRoute;
+  promotionSummary: string;
+  summary: string;
+};
+
+type Nhm2SourceMechanismMaturityArtifact = {
+  artifactType: "nhm2_source_mechanism_maturity/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifact: string;
+  sourceFormulaArtifact: string;
+  sourceToYorkArtifact: string;
+  diagnosticSemanticArtifact: string;
+  sourceStageArtifact: string;
+  sourceMechanismPromotionContractArtifact: string;
+  sourceMechanismMaturity: SourceMechanismMaturityBlock;
+  notes: string[];
+  checksum?: string;
+};
+
+type Nhm2SourceMechanismPromotionContractArtifact = {
+  artifactType: "nhm2_source_mechanism_promotion_contract/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceFormulaArtifact: string;
+  sourceToYorkArtifact: string;
+  sourceMechanismMaturityArtifact: string;
+  sourceMechanismPromotionContract: SourceMechanismPromotionContractBlock;
+  notes: string[];
+  checksum?: string;
+};
+
+type Nhm2SourceMechanismParityRouteFeasibilityArtifact = {
+  artifactType: "nhm2_source_mechanism_parity_route_feasibility/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceFormulaArtifact: string;
+  sourceMechanismPromotionContractArtifact: string;
+  sourceMechanismMaturityArtifact: string;
+  sourceMechanismParityRouteFeasibility: SourceMechanismParityRouteFeasibilityBlock;
+  notes: string[];
+  checksum?: string;
+};
+
+type ProofPackSourceMechanismMaturitySummary = SourceMechanismMaturityBlock & {
+  artifactPath: string;
+  reportPath: string;
+};
+
+type ProofPackSourceMechanismPromotionContractSummary = {
+  contractId: string;
+  contractStatus: SourceMechanismPromotionContractStatus;
+  selectedPromotionRoute: SourceMechanismSelectedPromotionRoute;
+  promotionDecisionPolicy: SourceMechanismPromotionDecisionPolicyId;
+  claimsRequiringParityCount: number;
+  claimsEligibleUnderExemptionCount: number;
+  claimsBlockedEvenWithExemptionCount: number;
+  exemptionEligibleClaimCount: number;
+  exemptionBlockedClaimCount: number;
+  exemptionRouteActivated: boolean;
+  activeClaimSetCount: number;
+  inactiveClaimSetCount: number;
+  exemptionRouteStatus: SourceMechanismPromotionRouteStatus;
+  activationScope: string;
+  activationSummary: string;
+  exemptionRouteSummary: string;
+  routeFeasibilityStatus: SourceMechanismParityRouteFeasibilityStatus;
+  routeBlockingClass: SourceMechanismParityRouteBlockingClass;
+  dominantMismatchTerm: string | null;
+  nextClosureAction: string;
+  promotionSummary: string;
+  artifactPath: string;
+  reportPath: string;
+};
+
+type ProofPackSourceMechanismParityRouteFeasibilitySummary = {
+  routeId: "direct_proxy_parity_route";
+  routeStatus: SourceMechanismPromotionRouteStatus;
+  routeFeasibilityStatus: SourceMechanismParityRouteFeasibilityStatus;
+  routeBlockingClass: SourceMechanismParityRouteBlockingClass;
+  dominantMismatchTerm: string | null;
+  matchedTermsCount: number;
+  unmatchedTermsCount: number;
+  nextClosureAction: string;
+  parityRouteSummary: string;
+  artifactPath: string;
+  reportPath: string;
 };
 
 type SourceStageComparedField = {
@@ -4013,11 +4508,7 @@ export type ProofPackPayload = {
   classificationScoring: Nhm2ReferenceScoring | null;
   classificationRobustness: ClassificationRobustnessSummary | null;
   verdict: DecisionVerdict;
-  sourceToYorkBridge?: {
-    readiness: SourceToYorkBridgeReadiness;
-    artifactPath: string;
-    reportPath: string;
-  };
+  sourceToYorkBridge?: ProofPackSourceToYorkBridgeSummary;
   timingAuthorityAudit?: {
     timingAuthorityClosed: boolean;
     blockingFindings: TimingFindingCode[];
@@ -4062,9 +4553,23 @@ export type ProofPackPayload = {
     formulaEquivalent: boolean;
     reconstructionOnlyComparison: boolean;
     formulaMismatchClass: SourceFormulaMismatchClass;
+    comparisonMode: SourceFormulaComparisonMode;
+    mismatchReason: SourceFormulaMismatchReason;
+    additionalMismatchReasons: SourceFormulaMismatchReason[];
+    sourceFormulaInterpretationPolicy: SourceFormulaInterpretationPolicyId;
+    parityExpected: boolean;
+    promotionBlockedByMismatch: boolean;
+    laneAUnaffectedByMismatch: boolean;
+    tolerancePolicySummary: string;
+    directFormulaId: string | null;
+    reconstructedFormulaId: string | null;
+    termMismatchCount: number;
     artifactPath: string;
     reportPath: string;
   };
+  sourceMechanismMaturity?: ProofPackSourceMechanismMaturitySummary;
+  sourceMechanismPromotionContract?: ProofPackSourceMechanismPromotionContractSummary;
+  sourceMechanismParityRouteFeasibility?: ProofPackSourceMechanismParityRouteFeasibilitySummary;
   presentationRenderSummary?: {
     presentationRenderLayerStatus: YorkOptixPresentationLayerStatus;
     fieldSuiteRealizationStatus: YorkOptixFieldSuiteRealizationStatus;
@@ -4083,6 +4588,7 @@ export type ProofPackPayload = {
     mandatoryResidualComparisons: string[];
     directionOverlayStatus: ShiftDirectionOverlayStatus;
     directionOverlayCaseDistinctness: ShiftDirectionOverlayCaseDistinctness;
+    directionOverlayInterpretationPolicy: ShiftDirectionOverlayInterpretationPolicy;
     directionOverlayWarnings: ShiftDirectionOverlayWarningCode[];
     constraintContextStatus: ShiftConstraintContextStatus;
     artifactPath: string;
@@ -4506,6 +5012,19 @@ const RENDER_FIELD_FAMILY_DEFINITIONS: Array<{
     defaultRole: "overlay",
     primaryScientificQuestion:
       "How do hull/support/ADM/derived panes line up for the same solved metric volume?",
+    defaultDisplayPolicyId: null,
+    defaultDisplayTransform: null,
+    defaultColormapFamily: null,
+  },
+  {
+    fieldId: "diagnostics_dashboard",
+    label: "Diagnostics dashboard",
+    quantitySymbol: "diagnostic dashboard",
+    quantityUnits: "n/a",
+    defaultCategory: "comparison_panel",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "How does mild shift-plus-lapse NHM2 compare to the unit-lapse baseline while preserving provenance and proof hierarchy?",
     defaultDisplayPolicyId: null,
     defaultDisplayTransform: null,
     defaultColormapFamily: null,
@@ -5592,7 +6111,7 @@ const stableStringify = (value: unknown): string => {
   return JSON.stringify(canonical(value));
 };
 
-const computeChecksum = (payload: ProofPackPayload): string => {
+export const computeChecksum = (payload: ProofPackPayload): string => {
   const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
   delete copy.generatedAt;
   delete copy.checksum;
@@ -5899,28 +6418,95 @@ const makeSourceToYorkMapping = (args: {
   };
 };
 
+const SOURCE_TO_YORK_REQUIRED_TIMING_FIELDS: TimingFieldName[] = [
+  "tauLC_ms",
+  "tauPulse_ms",
+  "TS_ratio",
+];
+
+const SOURCE_TO_YORK_OPTIONAL_TIMING_FIELDS: TimingFieldName[] = [
+  "TS",
+  "epsilon",
+  "isHomogenized",
+];
+
+const isSourceToYorkTimingFieldPresent = (
+  field: TimingFieldName,
+  value: number | boolean | null,
+): boolean => {
+  if (field === "isHomogenized") {
+    return typeof value === "boolean";
+  }
+  return typeof value === "number" && Number.isFinite(value);
+};
+
+const resolveSourceToYorkTimingAuthorityStatus = (args: {
+  artifactRecognized: boolean;
+  requiredMissingFields: TimingFieldName[];
+  optionalMissingFields: TimingFieldName[];
+}): SourceToYorkTimingAuthorityStatus => {
+  if (!args.artifactRecognized) return "artifact_unrecognized";
+  if (args.requiredMissingFields.length > 0) return "recognized_required_fields_missing";
+  if (args.optionalMissingFields.length > 0) {
+    return "recognized_required_fields_present_optional_fields_partial";
+  }
+  return "recognized_required_fields_present";
+};
+
+export const buildSourceToYorkBridgeSummary = (args: {
+  artifact: SourceToYorkProvenanceArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackSourceToYorkBridgeSummary => ({
+  readiness: { ...args.artifact.bridgeReadiness },
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
 export const computeSourceToYorkBridgeReadiness = (args: {
   sourceContractPresent: boolean;
   timingAuthorityPresent: boolean;
+  timingAuthorityStatus?: SourceToYorkTimingAuthorityStatus;
+  timingAuthorityArtifactRecognized?: boolean;
+  timingAuthorityRequiredFields?: TimingFieldName[];
+  timingAuthorityOptionalMissingFields?: TimingFieldName[];
   reducedOrderPayloadPresent: boolean;
   proofPackBrickPresent: boolean;
   parameterMappings: SourceToYorkParameterMapping[];
   metricRefProvenanceClosed: boolean;
 }): SourceToYorkBridgeReadiness => {
-  const hasMissingDerivation = args.parameterMappings.some(
-    (mapping) => mapping.mapping_type === "missing_derivation",
+  const timingAuthorityRequiredFields = args.timingAuthorityRequiredFields?.length
+    ? [...args.timingAuthorityRequiredFields]
+    : [...SOURCE_TO_YORK_REQUIRED_TIMING_FIELDS];
+  const timingAuthorityOptionalMissingFields = args.timingAuthorityOptionalMissingFields?.length
+    ? [...args.timingAuthorityOptionalMissingFields]
+    : [];
+  const timingAuthorityStatus =
+    args.timingAuthorityStatus ??
+    (args.timingAuthorityPresent
+      ? "recognized_required_fields_present"
+      : args.timingAuthorityArtifactRecognized
+        ? "recognized_required_fields_missing"
+        : "artifact_missing");
+  const timingAuthorityArtifactRecognized =
+    args.timingAuthorityArtifactRecognized ?? args.timingAuthorityPresent;
+  const openMappings = args.parameterMappings.filter((mapping) => mapping.status === "open");
+  const closedMappings = args.parameterMappings.filter((mapping) => mapping.status === "closed");
+  const hasMissingDerivation = openMappings.some(
+    (mapping) =>
+      mapping.mapping_type === "missing_derivation" ||
+      mapping.mapping_type === "missing_serialization",
   );
   const hasUnexplainedDrift = args.parameterMappings.some(
     (mapping) =>
       mapping.status === "open" &&
       mapping.mapping_type !== "missing_derivation" &&
+      mapping.mapping_type !== "missing_serialization" &&
       mapping.mapping_type !== "audit_harness_override" &&
       mapping.mapping_type !== "policy_override" &&
       mapping.mapping_type !== "derived_transform",
   );
-  const parameterMappingsComplete =
-    !hasMissingDerivation &&
-    args.parameterMappings.every((mapping) => mapping.status === "closed");
+  const parameterMappingsComplete = openMappings.length === 0;
   const parameterMappingsExplained = !hasMissingDerivation && !hasUnexplainedDrift;
   const blockReasons: string[] = [];
   if (!args.sourceContractPresent) blockReasons.push("bridge_source_contract_missing");
@@ -5942,9 +6528,78 @@ export const computeSourceToYorkBridgeReadiness = (args: {
     parameterMappingsComplete &&
     parameterMappingsExplained &&
     args.metricRefProvenanceClosed;
+  const openFields: string[] = [];
+  const closedFields: string[] = [];
+  if (args.sourceContractPresent) {
+    closedFields.push("sourceContract");
+  } else {
+    openFields.push("sourceContract");
+  }
+  if (args.timingAuthorityPresent) {
+    closedFields.push("timingAuthority.required_fields");
+  } else {
+    openFields.push("timingAuthority.required_fields");
+  }
+  if (args.reducedOrderPayloadPresent) {
+    closedFields.push("reducedOrderPipelinePayload");
+  } else {
+    openFields.push("reducedOrderPipelinePayload");
+  }
+  if (args.proofPackBrickPresent) {
+    closedFields.push("proofPackBrickRequest");
+  } else {
+    openFields.push("proofPackBrickRequest");
+  }
+  if (args.metricRefProvenanceClosed) {
+    closedFields.push("metricRefProvenance");
+  } else {
+    openFields.push("metricRefProvenance");
+  }
+  openFields.push(...openMappings.map((mapping) => mapping.field));
+  closedFields.push(...closedMappings.map((mapping) => mapping.field));
+
+  const residualBlockingReasons = [...blockReasons];
+  const residualAdvisoryReasons: string[] = [];
+  if (timingAuthorityOptionalMissingFields.length > 0) {
+    residualAdvisoryReasons.push("bridge_timing_authority_optional_fields_partial");
+  }
+
+  let bridgeClosurePolicy: SourceToYorkBridgeClosurePolicy;
+  let closureCandidateStatus: SourceToYorkClosureCandidateStatus;
+  if (bridgeReady) {
+    bridgeClosurePolicy = "close_with_current_serialization";
+    closureCandidateStatus = "closed_with_current_serialization";
+  } else if (
+    !args.timingAuthorityPresent &&
+    timingAuthorityArtifactRecognized &&
+    args.sourceContractPresent &&
+    args.reducedOrderPayloadPresent &&
+    args.proofPackBrickPresent &&
+    args.metricRefProvenanceClosed
+  ) {
+    bridgeClosurePolicy = "close_after_explicit_timing_authority_wiring";
+    closureCandidateStatus = "closable_after_explicit_timing_authority_wiring";
+  } else if (
+    args.sourceContractPresent &&
+    timingAuthorityArtifactRecognized &&
+    args.reducedOrderPayloadPresent &&
+    args.proofPackBrickPresent &&
+    args.metricRefProvenanceClosed
+  ) {
+    bridgeClosurePolicy = "close_with_current_serialization";
+    closureCandidateStatus = "closable_with_current_serialization";
+  } else {
+    bridgeClosurePolicy = "non_closable_without_architectural_change";
+    closureCandidateStatus = "non_closable_without_architectural_change";
+  }
+
   return {
     sourceContractPresent: args.sourceContractPresent,
     timingAuthorityPresent: args.timingAuthorityPresent,
+    timingAuthorityStatus,
+    timingAuthorityArtifactRecognized,
+    timingAuthorityRequiredFields,
+    timingAuthorityOptionalMissingFields,
     reducedOrderPayloadPresent: args.reducedOrderPayloadPresent,
     proofPackBrickPresent: args.proofPackBrickPresent,
     parameterMappingsComplete,
@@ -5954,9 +6609,19 @@ export const computeSourceToYorkBridgeReadiness = (args: {
     gatingStatus: "legacy_advisory_non_gating",
     gatingBlocksMechanismChain: false,
     statusNote: bridgeReady
-      ? "Legacy source-to-York bridge audit is closed, but it is advisory-only and does not gate the current mechanism chain."
+      ? residualAdvisoryReasons.length > 0
+        ? "Legacy source-to-York bridge is closed under the current serialization/readiness policy; optional timing-authority fields remain advisory-only and do not reopen the mechanism chain."
+        : "Legacy source-to-York bridge audit is closed, but it is advisory-only and does not gate the current mechanism chain."
       : "Legacy source-to-York bridge completeness remains open, but it is advisory-only and does not reopen the closed mechanism chain.",
     blockReasons,
+    bridgeOpenFieldCount: openFields.length,
+    bridgeClosedFieldCount: closedFields.length,
+    openFields,
+    closedFields,
+    residualBlockingReasons,
+    residualAdvisoryReasons,
+    closureCandidateStatus,
+    bridgeClosurePolicy,
   };
 };
 
@@ -6049,6 +6714,7 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
   );
   const proposal = asRecord(firstAttempt.proposal);
   const proposalParams = asRecord(proposal.params);
+  const proposalDynamicConfig = asRecord(proposalParams.dynamicConfig);
   const grRequest = asRecord(firstAttempt.grRequest);
   const g4Diagnostics = asRecord(waveAEvidence?.g4Diagnostics);
   const finalState = asRecord(asRecord(primaryRunOutput?.result).finalState);
@@ -6085,6 +6751,27 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
     params: proposalParams,
     grRequest: Object.keys(grRequest).length > 0 ? grRequest : null,
   };
+  const reducedOrderHandoff = {
+    sectorCount:
+      toFiniteNumber(proposalParams.sectorCount) ??
+      toFiniteNumber(proposalDynamicConfig.sectorCount) ??
+      toFiniteNumber(promotedProfileDefaults.sectorCount),
+    concurrentSectors:
+      toFiniteNumber(proposalParams.concurrentSectors) ??
+      toFiniteNumber(proposalDynamicConfig.concurrentSectors) ??
+      toFiniteNumber(promotedProfileDefaults.concurrentSectors),
+    dutyCycle:
+      toFiniteNumber(proposalParams.dutyCycle) ??
+      toFiniteNumber(proposalDynamicConfig.dutyCycle) ??
+      toFiniteNumber(promotedProfileDefaults.dutyCycle),
+    modulationFreq_GHz:
+      toFiniteNumber(proposalParams.modulationFreq_GHz) ??
+      toFiniteNumber(proposalDynamicConfig.modulationFreqGHz) ??
+      toFiniteNumber(promotedProfileDefaults.modulationFreq_GHz),
+    radius_m:
+      toFiniteNumber(proposalParams.shipRadius_m) ??
+      toFiniteNumber(promotedProfileDefaults.reducedOrderReference.radius_m),
+  };
 
   const snapshotEvidence = readJsonIfExists(args.nhm2SnapshotPath);
   const snapshotMetricRef = asRecord(snapshotEvidence?.metricVolumeRef);
@@ -6120,23 +6807,32 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
     makeSourceToYorkMapping({
       field: "sectorCount",
       sourceValue: nhm2ContractInputs.sectorCount,
-      targetValue: null,
-      mappingType: "missing_derivation",
-      mappingNote: "No sectorCount selector is serialized into proof-pack brick requests.",
+      targetValue: reducedOrderHandoff.sectorCount,
+      mappingType: "direct_copy",
+      mappingFormula:
+        "sectorCount is forwarded through reducedOrderPipelinePayload.params before the fixed proof-pack brick selector stage",
+      mappingNote:
+        "Proof-pack brick requests do not repeat sectorCount, but the reduced-order handoff keeps the canonical sectorCount value explicit.",
     }),
     makeSourceToYorkMapping({
       field: "concurrentSectors",
       sourceValue: nhm2ContractInputs.concurrentSectors,
-      targetValue: null,
-      mappingType: "missing_derivation",
-      mappingNote: "No concurrentSectors selector is serialized into proof-pack brick requests.",
+      targetValue: reducedOrderHandoff.concurrentSectors,
+      mappingType: "direct_copy",
+      mappingFormula:
+        "concurrentSectors is forwarded through reducedOrderPipelinePayload.params before the fixed proof-pack brick selector stage",
+      mappingNote:
+        "Proof-pack brick requests do not repeat concurrentSectors, but the reduced-order handoff keeps the live concurrent-sector count explicit.",
     }),
     makeSourceToYorkMapping({
       field: "dutyCycle",
       sourceValue: nhm2ContractInputs.dutyCycle,
-      targetValue: null,
-      mappingType: "missing_derivation",
-      mappingNote: "Proof-pack brick requests carry dutyFR only; dutyCycle mapping is not explicit.",
+      targetValue: reducedOrderHandoff.dutyCycle,
+      mappingType: "direct_copy",
+      mappingFormula:
+        "dutyCycle is forwarded through reducedOrderPipelinePayload.params; later proof-pack brick requests intentionally use dutyFR override for York control comparability",
+      mappingNote:
+        "The dutyCycle handoff is explicit in reduced-order payloads even though the final brick request carries dutyFR instead.",
     }),
     makeSourceToYorkMapping({
       field: "dutyShip -> dutyFR",
@@ -6181,9 +6877,12 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
     makeSourceToYorkMapping({
       field: "modulationFreq_GHz",
       sourceValue: nhm2ContractInputs.modulationFreq_GHz,
-      targetValue: null,
-      mappingType: "missing_derivation",
-      mappingNote: "Proof-pack brick request has no modulation frequency selector.",
+      targetValue: reducedOrderHandoff.modulationFreq_GHz,
+      mappingType: "direct_copy",
+      mappingFormula:
+        "modulationFreq_GHz is forwarded through reducedOrderPipelinePayload.params before the fixed proof-pack brick selector stage",
+      mappingNote:
+        "Proof-pack brick requests do not repeat modulationFreq_GHz, but the reduced-order handoff preserves the canonical modulation frequency.",
     }),
     makeSourceToYorkMapping({
       field: "zeta",
@@ -6196,10 +6895,12 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
     makeSourceToYorkMapping({
       field: "reducedOrderReference.radius_m",
       sourceValue: nhm2ContractInputs.reducedOrderReference.radius_m,
-      targetValue: null,
-      mappingType: "missing_derivation",
+      targetValue: reducedOrderHandoff.radius_m,
+      mappingType: "derived_transform",
+      mappingFormula:
+        "reducedOrderReference.radius_m is serialized as reducedOrderPipelinePayload.params.shipRadius_m for reduced-order handoff compatibility",
       mappingNote:
-        "Reduced-order reference radius is not serialized into proof-pack brick query params.",
+        "The fixed proof-pack brick query does not repeat radius, but the reduced-order handoff keeps the promoted/reference ship radius explicit.",
     }),
     makeSourceToYorkMapping({
       field: "reducedOrderReference.tauLC_ms",
@@ -6221,15 +6922,32 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
   const sourceContractPresent =
     typeof nhm2ContractInputs.warpFieldType === "string" &&
     nhm2ContractInputs.warpFieldType.trim().length > 0;
-  const timingAuthorityPresent =
-    Number.isFinite(liveTimingAuthority.tauLC_ms ?? Number.NaN) &&
-    Number.isFinite(liveTimingAuthority.tauPulse_ms ?? Number.NaN) &&
-    Number.isFinite(liveTimingAuthority.TS_ratio ?? Number.NaN) &&
-    Number.isFinite(liveTimingAuthority.TS ?? Number.NaN) &&
-    Number.isFinite(liveTimingAuthority.epsilon ?? Number.NaN) &&
-    typeof liveTimingAuthority.isHomogenized === "boolean" &&
+  const timingAuthorityArtifactRecognized =
+    typeof liveTimingAuthority.timingAuthority === "string" &&
+    liveTimingAuthority.timingAuthority.trim().length > 0 &&
     typeof liveTimingAuthority.timingSource === "string" &&
     liveTimingAuthority.timingSource.trim().length > 0;
+  const timingAuthorityRequiredMissingFields = SOURCE_TO_YORK_REQUIRED_TIMING_FIELDS.filter(
+    (field) =>
+      !isSourceToYorkTimingFieldPresent(
+        field,
+        liveTimingAuthority[field as keyof typeof liveTimingAuthority] as number | boolean | null,
+      ),
+  );
+  const timingAuthorityOptionalMissingFields = SOURCE_TO_YORK_OPTIONAL_TIMING_FIELDS.filter(
+    (field) =>
+      !isSourceToYorkTimingFieldPresent(
+        field,
+        liveTimingAuthority[field as keyof typeof liveTimingAuthority] as number | boolean | null,
+      ),
+  );
+  const timingAuthorityStatus = resolveSourceToYorkTimingAuthorityStatus({
+    artifactRecognized: timingAuthorityArtifactRecognized,
+    requiredMissingFields: timingAuthorityRequiredMissingFields,
+    optionalMissingFields: timingAuthorityOptionalMissingFields,
+  });
+  const timingAuthorityPresent =
+    timingAuthorityArtifactRecognized && timingAuthorityRequiredMissingFields.length === 0;
   const reducedOrderPayloadPresent =
     reducedOrderPipelinePayload.proposalLabel != null &&
     Object.keys(reducedOrderPipelinePayload.params).length > 0;
@@ -6260,6 +6978,10 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
   const bridgeReadiness = computeSourceToYorkBridgeReadiness({
     sourceContractPresent,
     timingAuthorityPresent,
+    timingAuthorityStatus,
+    timingAuthorityArtifactRecognized,
+    timingAuthorityRequiredFields: SOURCE_TO_YORK_REQUIRED_TIMING_FIELDS,
+    timingAuthorityOptionalMissingFields,
     reducedOrderPayloadPresent,
     proofPackBrickPresent,
     parameterMappings,
@@ -6276,7 +6998,7 @@ export const buildNhm2SourceToYorkProvenanceArtifact = (args: {
     );
   } else {
     notes.push(
-      "Legacy bridge completeness is closed; the closed mechanism chain still remains the authoritative readiness surface.",
+      "Legacy bridge completeness is closed under the current serialization/readiness policy; the closed mechanism chain still remains the authoritative readiness surface.",
     );
   }
 
@@ -6325,6 +7047,15 @@ export const renderNhm2SourceToYorkProvenanceMarkdown = (
     .join("\n");
   const blockReasonRows = payload.bridgeReadiness.blockReasons.length
     ? payload.bridgeReadiness.blockReasons.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const advisoryReasonRows = payload.bridgeReadiness.residualAdvisoryReasons.length
+    ? payload.bridgeReadiness.residualAdvisoryReasons.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const openFieldRows = payload.bridgeReadiness.openFields.length
+    ? payload.bridgeReadiness.openFields.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const closedFieldRows = payload.bridgeReadiness.closedFields.length
+    ? payload.bridgeReadiness.closedFields.map((entry) => `- ${entry}`).join("\n")
     : "- none";
   const notes = notesList.length
     ? notesList.map((entry) => `- ${entry}`).join("\n")
@@ -6436,15 +7167,32 @@ ${mappingRows}
 | statusNote | ${payload.bridgeReadiness.statusNote} |
 | sourceContractPresent | ${payload.bridgeReadiness.sourceContractPresent} |
 | timingAuthorityPresent | ${payload.bridgeReadiness.timingAuthorityPresent} |
+| timingAuthorityStatus | ${payload.bridgeReadiness.timingAuthorityStatus} |
+| timingAuthorityArtifactRecognized | ${payload.bridgeReadiness.timingAuthorityArtifactRecognized} |
+| timingAuthorityRequiredFields | ${payload.bridgeReadiness.timingAuthorityRequiredFields.join(",") || "none"} |
+| timingAuthorityOptionalMissingFields | ${payload.bridgeReadiness.timingAuthorityOptionalMissingFields.join(",") || "none"} |
 | reducedOrderPayloadPresent | ${payload.bridgeReadiness.reducedOrderPayloadPresent} |
 | proofPackBrickPresent | ${payload.bridgeReadiness.proofPackBrickPresent} |
 | parameterMappingsComplete | ${payload.bridgeReadiness.parameterMappingsComplete} |
 | parameterMappingsExplained | ${payload.bridgeReadiness.parameterMappingsExplained} |
 | metricRefProvenanceClosed | ${payload.bridgeReadiness.metricRefProvenanceClosed} |
 | bridgeReady | ${payload.bridgeReadiness.bridgeReady} |
+| bridgeOpenFieldCount | ${payload.bridgeReadiness.bridgeOpenFieldCount} |
+| bridgeClosedFieldCount | ${payload.bridgeReadiness.bridgeClosedFieldCount} |
+| closureCandidateStatus | ${payload.bridgeReadiness.closureCandidateStatus} |
+| bridgeClosurePolicy | ${payload.bridgeReadiness.bridgeClosurePolicy} |
 
 ### Legacy Bridge Gaps
 ${blockReasonRows}
+
+### Residual Advisory Reasons
+${advisoryReasonRows}
+
+### Open Bridge Fields
+${openFieldRows}
+
+### Closed Bridge Fields
+${closedFieldRows}
 
 ## Notes
 ${notes}
@@ -6555,6 +7303,82 @@ const numericallyEqual = (
   const delta = Math.abs(a - b);
   const denom = Math.max(Math.abs(a), Math.abs(b), 1);
   return delta <= Math.max(absTol, relTol * denom);
+};
+
+const computeComparisonDelta = (
+  directValue: unknown,
+  reconstructedValue: unknown,
+): { delta: number | null; relativeDelta: number | null } => {
+  const direct = toFiniteNumber(directValue);
+  const reconstructed = toFiniteNumber(reconstructedValue);
+  if (direct == null || reconstructed == null) {
+    return { delta: null, relativeDelta: null };
+  }
+  const delta = reconstructed - direct;
+  const relativeDelta = delta / Math.max(Math.abs(direct), Math.abs(reconstructed), 1);
+  return { delta, relativeDelta };
+};
+
+const classifySourceFormulaComparisonEntryStatus = (
+  directValue: unknown,
+  reconstructedValue: unknown,
+): SourceFormulaComparisonEntryStatus => {
+  if (directValue == null && reconstructedValue == null) return "not_comparable";
+  if (directValue == null) return "missing_direct_input";
+  if (reconstructedValue == null) return "missing_reconstructed_input";
+  return valuesEquivalent(directValue, reconstructedValue) ? "matched" : "mismatched";
+};
+
+const buildSourceFormulaComparisonEntry = (args: {
+  id: string;
+  directValue: unknown;
+  reconstructedValue: unknown;
+  units?: string | null;
+  note?: string | null;
+}): SourceFormulaResolvedInputComparison => {
+  const { delta, relativeDelta } = computeComparisonDelta(
+    args.directValue,
+    args.reconstructedValue,
+  );
+  return {
+    inputId: args.id,
+    directValue: args.directValue ?? null,
+    reconstructedValue: args.reconstructedValue ?? null,
+    delta,
+    relativeDelta,
+    units: args.units ?? null,
+    status: classifySourceFormulaComparisonEntryStatus(
+      args.directValue,
+      args.reconstructedValue,
+    ),
+    note: args.note ?? null,
+  };
+};
+
+const buildSourceFormulaTermComparison = (args: {
+  termId: string;
+  directValue: unknown;
+  reconstructedValue: unknown;
+  units?: string | null;
+  note?: string | null;
+}): SourceFormulaTermComparison => {
+  const { delta, relativeDelta } = computeComparisonDelta(
+    args.directValue,
+    args.reconstructedValue,
+  );
+  return {
+    termId: args.termId,
+    directValue: args.directValue ?? null,
+    reconstructedValue: args.reconstructedValue ?? null,
+    delta,
+    relativeDelta,
+    units: args.units ?? null,
+    status: classifySourceFormulaComparisonEntryStatus(
+      args.directValue,
+      args.reconstructedValue,
+    ),
+    note: args.note ?? null,
+  };
 };
 
 const resolveSourceFormulaClass = (
@@ -7293,14 +8117,15 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
   const canonicalDerivation = asText(canonicalRecord.metricT00Derivation);
   const comparisonGeomSource = asText(recoveryRecord.metricT00GeomSource);
   const comparisonDerivation = asText(recoveryRecord.metricT00Derivation);
+  const recoveryParams = asRecord(recoveryRecord.params);
   const canonicalClass = resolveSourceFormulaClass(canonicalGeomSource, canonicalDerivation);
   const comparisonClass = resolveSourceFormulaClass(comparisonGeomSource, comparisonDerivation);
-  const canonicalMode = resolveSourceFormulaDerivationMode({
+  const canonicalDerivationMode = resolveSourceFormulaDerivationMode({
     formulaClass: canonicalClass,
     metricT00Derivation: canonicalDerivation,
     metricT00GeomSource: canonicalGeomSource,
   });
-  const comparisonMode = resolveSourceFormulaDerivationMode({
+  const comparisonDerivationMode = resolveSourceFormulaDerivationMode({
     formulaClass: comparisonClass,
     metricT00Derivation: comparisonDerivation,
     metricT00GeomSource: comparisonGeomSource,
@@ -7340,6 +8165,20 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
       metricT00Source: asText(canonicalRecord.metricT00Source),
       metricT00Derivation: canonicalDerivation,
       metricT00GeomSource: canonicalGeomSource,
+      qeiSamplingNormalization: asText(canonicalRecord.qeiSamplingNormalization),
+      qeiRenormalizationScheme: asText(canonicalRecord.qeiRenormalizationScheme),
+      dutyEffective_FR: null,
+      sectorCount: null,
+      concurrentSectors: null,
+      qCavity: null,
+      qSpoilingFactor: null,
+      gammaGeo: null,
+      gammaVanDenBroeck: null,
+      tauSelected_s: toFiniteNumber(canonicalRecord.tauSelected_s),
+      tauLC_s: toFiniteNumber(canonicalRecord.tauLC_s),
+      tauPulse_s: toFiniteNumber(canonicalRecord.tauPulse_s),
+      selectorAvailabilityNote:
+        "Canonical qi-forensics artifact does not serialize duty/sector/Q/gamma selectors.",
     },
     intermediate_terms: {
       rhoMetric_Jm3: toFiniteNumber(canonicalRecord.rhoMetric_Jm3),
@@ -7352,7 +8191,7 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
     final_metricT00Si_Jm3: canonicalMetricT00Si,
     unit_contract: canonicalUnit,
     normalization_contract: canonicalNorm,
-    derivation_mode: canonicalMode,
+    derivation_mode: canonicalDerivationMode,
     readiness_authoritative: true,
   };
   const comparisonFormula: SourceFormulaPathAudit = {
@@ -7377,6 +8216,25 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
       metricT00Derivation: comparisonDerivation,
       metricT00GeomSource: comparisonGeomSource,
       metricT00ContractStatus: asText(recoveryRecord.metricT00ContractStatus),
+      qeiSamplingNormalization: asText(recoveryRecord.qeiSamplingNormalization),
+      qeiRenormalizationScheme: asText(recoveryRecord.qeiRenormalizationScheme),
+      dutyCycle: toFiniteNumber(recoveryParams.dutyCycle),
+      dutyShip: toFiniteNumber(recoveryParams.dutyShip),
+      dutyEffective_FR:
+        toFiniteNumber(recoveryParams.dutyEffective_FR) ??
+        toFiniteNumber(recoveryRecord.dutyEffective_FR),
+      sectorCount: toFiniteNumber(recoveryParams.sectorCount),
+      concurrentSectors: toFiniteNumber(recoveryParams.concurrentSectors),
+      qCavity: toFiniteNumber(recoveryParams.qCavity),
+      qSpoilingFactor: toFiniteNumber(recoveryParams.qSpoilingFactor),
+      gammaGeo: toFiniteNumber(recoveryParams.gammaGeo),
+      gammaVanDenBroeck: toFiniteNumber(recoveryParams.gammaVanDenBroeck),
+      tauSelected_s:
+        toFiniteNumber(recoveryParams.tau_s_ms) != null
+          ? (toFiniteNumber(recoveryParams.tau_s_ms) as number) * 1e-3
+          : null,
+      gap_nm: toFiniteNumber(recoveryParams.gap_nm),
+      shipRadius_m: toFiniteNumber(recoveryParams.shipRadius_m),
     },
     intermediate_terms: {
       rhoMetric_Jm3: toFiniteNumber(recoveryRecord.rhoMetric_Jm3),
@@ -7389,7 +8247,7 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
     final_metricT00Si_Jm3: comparisonMetricT00Si,
     unit_contract: comparisonUnit,
     normalization_contract: comparisonNorm,
-    derivation_mode: comparisonMode,
+    derivation_mode: comparisonDerivationMode,
     readiness_authoritative: false,
   };
 
@@ -7426,6 +8284,14 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
     comparisonFormula.derivation_mode === "reconstructed" &&
     canonicalFormula.derivation_mode !== "reconstructed" &&
     !formulaEquivalent;
+  const comparisonMode: SourceFormulaComparisonMode =
+    reconstructionOnlyComparison ||
+    (canonicalFormula.derivation_mode === "direct" &&
+      comparisonFormula.derivation_mode === "reconstructed")
+      ? "authoritative_direct_vs_reconstructed_proxy"
+      : formulaClassMatch && derivationModeMatch
+        ? "formula_parity_check"
+        : "mixed_formula_path_audit";
 
   let formulaMismatchClass: SourceFormulaMismatchClass = "none";
   if (reconstructionOnlyComparison) {
@@ -7473,12 +8339,322 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
       equal: valuesEquivalent(canonicalValue, comparisonValue),
     };
   });
+  const termComparisons: SourceFormulaTermComparison[] = [
+    buildSourceFormulaTermComparison({
+      termId: "final_metricT00Si_Jm3",
+      directValue: canonicalFormula.final_metricT00Si_Jm3,
+      reconstructedValue: comparisonFormula.final_metricT00Si_Jm3,
+      units: "J/m^3",
+      note:
+        reconstructionOnlyComparison && !metricParity
+          ? "Direct canonical metric T00 and reconstructed recovery metric T00 diverge materially."
+          : "Final metric T00 comparison.",
+    }),
+    ...Array.from(intermediateTermKeys).map((term) =>
+      buildSourceFormulaTermComparison({
+        termId: term,
+        directValue: canonicalFormula.intermediate_terms[term],
+        reconstructedValue: comparisonFormula.intermediate_terms[term],
+        units:
+          term === "rhoMetric_Jm3" || term === "metricStressRhoSiMean_Jm3"
+            ? "J/m^3"
+            : term === "couplingAlpha" || term === "metricT00SiRelError"
+              ? "dimensionless"
+              : null,
+        note:
+          term === "metricStressRhoSiMean_Jm3" &&
+          canonicalFormula.intermediate_terms[term] == null &&
+          comparisonFormula.intermediate_terms[term] != null
+            ? "Reconstructed path emits stress-density mean explicitly; canonical direct artifact does not serialize it as a separate intermediate."
+            : term === "rhoMetric_Jm3" &&
+                valuesEquivalent(
+                  canonicalFormula.intermediate_terms[term],
+                  comparisonFormula.intermediate_terms[term],
+                )
+              ? "Shared rhoMetric term is numerically aligned across direct and reconstructed paths."
+              : null,
+      }),
+    ),
+  ];
+  const resolvedInputComparisons: SourceFormulaResolvedInputComparison[] = [
+    buildSourceFormulaComparisonEntry({
+      id: "rhoSource",
+      directValue: canonicalFormula.inputs_used.rhoSource,
+      reconstructedValue: comparisonFormula.inputs_used.rhoSource,
+      note: "Metric source selector carried into the formula path.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "metricT00Ref",
+      directValue: canonicalFormula.inputs_used.metricT00Ref,
+      reconstructedValue: comparisonFormula.inputs_used.metricT00Ref,
+      note: "Metric T00 provenance reference used by each path.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "metricT00Derivation",
+      directValue: canonicalFormula.inputs_used.metricT00Derivation,
+      reconstructedValue: comparisonFormula.inputs_used.metricT00Derivation,
+      note: "Direct path uses authoritative metric output; comparison path reconstructs through forward shift -> K -> rho_E.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "metricT00GeomSource",
+      directValue: canonicalFormula.inputs_used.metricT00GeomSource,
+      reconstructedValue: comparisonFormula.inputs_used.metricT00GeomSource,
+      note: "Metric geometry provenance class.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "qeiSamplingNormalization",
+      directValue: canonicalFormula.inputs_used.qeiSamplingNormalization,
+      reconstructedValue: comparisonFormula.inputs_used.qeiSamplingNormalization,
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "qeiRenormalizationScheme",
+      directValue: canonicalFormula.inputs_used.qeiRenormalizationScheme,
+      reconstructedValue: comparisonFormula.inputs_used.qeiRenormalizationScheme,
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "dutyEffective_FR",
+      directValue: canonicalFormula.inputs_used.dutyEffective_FR,
+      reconstructedValue: comparisonFormula.inputs_used.dutyEffective_FR,
+      units: "fraction",
+      note:
+        "Recovery path emits duty-effective input; canonical direct artifact does not serialize an equivalent duty selector.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "sectorCount",
+      directValue: canonicalFormula.inputs_used.sectorCount,
+      reconstructedValue: comparisonFormula.inputs_used.sectorCount,
+      units: "count",
+      note:
+        "Sector-strobing inputs are present on the reconstructed path only in current artifacts.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "concurrentSectors",
+      directValue: canonicalFormula.inputs_used.concurrentSectors,
+      reconstructedValue: comparisonFormula.inputs_used.concurrentSectors,
+      units: "count",
+      note:
+        "Concurrent-sector selector is present on the reconstructed path only in current artifacts.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "gammaGeo",
+      directValue: canonicalFormula.inputs_used.gammaGeo,
+      reconstructedValue: comparisonFormula.inputs_used.gammaGeo,
+      units: "dimensionless",
+      note:
+        "Geometry amplification selector is present on the reconstructed path only in current artifacts.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "gammaVanDenBroeck",
+      directValue: canonicalFormula.inputs_used.gammaVanDenBroeck,
+      reconstructedValue: comparisonFormula.inputs_used.gammaVanDenBroeck,
+      units: "dimensionless",
+      note:
+        "VdB amplification selector is present on the reconstructed path only in current artifacts.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "qCavity",
+      directValue: canonicalFormula.inputs_used.qCavity,
+      reconstructedValue: comparisonFormula.inputs_used.qCavity,
+      units: "quality_factor",
+      note: "Q cavity selector used by the reconstructed path.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "qSpoilingFactor",
+      directValue: canonicalFormula.inputs_used.qSpoilingFactor,
+      reconstructedValue: comparisonFormula.inputs_used.qSpoilingFactor,
+      units: "dimensionless",
+      note: "Q spoiling selector used by the reconstructed path.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "selected_tau_s",
+      directValue: canonicalFormula.inputs_used.tauSelected_s,
+      reconstructedValue: comparisonFormula.inputs_used.tauSelected_s,
+      units: "s",
+      note:
+        "Canonical selected QEI timescale vs reconstructed candidate tau input.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "tauLC_s",
+      directValue: canonicalFormula.inputs_used.tauLC_s,
+      reconstructedValue: null,
+      units: "s",
+      note: "Canonical lower-bound timescale is not serialized on the reconstructed path.",
+    }),
+    buildSourceFormulaComparisonEntry({
+      id: "tauPulse_s",
+      directValue: canonicalFormula.inputs_used.tauPulse_s,
+      reconstructedValue: null,
+      units: "s",
+      note: "Canonical pulse timescale is not serialized on the reconstructed path.",
+    }),
+  ];
+  const mismatchReasons = new Set<SourceFormulaMismatchReason>();
+  if (!formulaEquivalent) {
+    if (
+      canonicalFormula.unit_contract != null &&
+      comparisonFormula.unit_contract != null &&
+      canonicalFormula.unit_contract !== comparisonFormula.unit_contract
+    ) {
+      mismatchReasons.add("unit_contract_mismatch");
+    }
+    if (
+      canonicalFormula.normalization_contract != null &&
+      comparisonFormula.normalization_contract != null &&
+      canonicalFormula.normalization_contract !== comparisonFormula.normalization_contract
+    ) {
+      mismatchReasons.add("normalization_mismatch");
+    }
+    const dutyInputIds = new Set([
+      "dutyEffective_FR",
+      "sectorCount",
+      "concurrentSectors",
+      "gammaGeo",
+      "gammaVanDenBroeck",
+      "qCavity",
+      "qSpoilingFactor",
+    ]);
+    if (
+      resolvedInputComparisons.some(
+        (entry) =>
+          dutyInputIds.has(entry.inputId) &&
+          (entry.status === "mismatched" ||
+            entry.status === "missing_direct_input" ||
+            entry.status === "missing_reconstructed_input"),
+      )
+    ) {
+      mismatchReasons.add("duty_definition_mismatch");
+    }
+    const timingInputIds = new Set(["selected_tau_s", "tauLC_s", "tauPulse_s"]);
+    if (
+      resolvedInputComparisons.some(
+        (entry) =>
+          timingInputIds.has(entry.inputId) &&
+          (entry.status === "mismatched" ||
+            entry.status === "missing_direct_input" ||
+            entry.status === "missing_reconstructed_input"),
+      )
+    ) {
+      mismatchReasons.add("timing_source_mismatch");
+    }
+    const canonicalRhoMetric = toFiniteNumber(canonicalFormula.intermediate_terms.rhoMetric_Jm3);
+    if (
+      reconstructionOnlyComparison &&
+      canonicalRhoMetric != null &&
+      comparisonMetricT00Si != null &&
+      numericallyEqual(canonicalRhoMetric, comparisonMetricT00Si, relTol, absTol) &&
+      !metricParity
+    ) {
+      mismatchReasons.add("proxy_vs_metric_term_gap");
+    }
+    if (
+      termComparisons.some(
+        (entry) =>
+          entry.status === "missing_direct_input" ||
+          entry.status === "missing_reconstructed_input",
+      ) ||
+      resolvedInputComparisons.some(
+        (entry) =>
+          entry.status === "missing_direct_input" ||
+          entry.status === "missing_reconstructed_input",
+      )
+    ) {
+      mismatchReasons.add("missing_term_mapping");
+    }
+    if (mismatchReasons.size === 0) {
+      mismatchReasons.add("unexpected_numeric_divergence");
+    }
+  }
+  const mismatchReasonPriority: SourceFormulaMismatchReason[] = [
+    "unit_contract_mismatch",
+    "normalization_mismatch",
+    "proxy_vs_metric_term_gap",
+    "duty_definition_mismatch",
+    "timing_source_mismatch",
+    "missing_term_mapping",
+    "unexpected_numeric_divergence",
+  ];
+  const mismatchReason =
+    mismatchReasonPriority.find((entry) => mismatchReasons.has(entry)) ?? "none";
+  const additionalMismatchReasons = Array.from(mismatchReasons).filter(
+    (entry) => entry !== mismatchReason,
+  );
+  const policyOverride = args.comparisonPolicyOverride ?? {};
+  const tolerancePolicy: SourceFormulaTolerancePolicy = {
+    relTol,
+    absTol,
+    numericParityRule:
+      "final_metric_numeric_parity requires delta <= max(absTol, relTol * max(|direct|, |reconstructed|, 1)).",
+    formulaEquivalenceRequires: [
+      "formula_class_match",
+      "unit_contract_match",
+      "normalization_contract_match",
+      "derivation_mode_match",
+      "final_metric_numeric_parity",
+    ],
+  };
+  const interpretationPolicy: SourceFormulaInterpretationPolicy =
+    reconstructionOnlyComparison &&
+    mismatchReason === "proxy_vs_metric_term_gap" &&
+    !policyOverride?.comparison_path_expected_equivalence &&
+    !policyOverride?.comparisonPathExpectedEquivalence
+      ? {
+          policyId: "expected_proxy_vs_metric_gap_non_promotable",
+          parityExpected: false,
+          promotionBlockedByMismatch: true,
+          laneAUnaffectedByMismatch: true,
+          interpretationStatus: "advisory",
+          note:
+            "Authoritative direct metric and reconstructed proxy paths are not expected to satisfy parity in reconstruction-only comparison mode; mismatch remains non-promotable for parity claims.",
+        }
+      : !formulaEquivalent &&
+          (policyOverride?.comparison_path_expected_equivalence === true ||
+            policyOverride?.comparisonPathExpectedEquivalence === true)
+        ? {
+            policyId: "parity_required_before_promotion",
+            parityExpected: true,
+            promotionBlockedByMismatch: true,
+            laneAUnaffectedByMismatch: true,
+            interpretationStatus: "blocking",
+            note:
+              "Policy requires direct-vs-comparison parity before promotion; mismatch remains open until equivalent term mapping is achieved.",
+          }
+        : !formulaEquivalent
+          ? {
+              policyId: "open_congruence_failure",
+              parityExpected: true,
+              promotionBlockedByMismatch: true,
+              laneAUnaffectedByMismatch: true,
+              interpretationStatus: "blocking",
+              note:
+                "Mismatch remains an open congruence failure because the current policy surface does not settle it as an expected proxy-vs-metric gap.",
+            }
+          : {
+              policyId: "parity_required_before_promotion",
+              parityExpected: true,
+              promotionBlockedByMismatch: false,
+              laneAUnaffectedByMismatch: true,
+              interpretationStatus: "advisory",
+              note:
+                "Direct and comparison paths satisfy current parity policy within emitted tolerance.",
+            };
 
   const formulaComparison: SourceFormulaComparison = {
+    directFormulaId:
+      canonicalFormula.derivation_mode === "direct" ? canonicalFormula.formula_path_id : null,
+    reconstructedFormulaId:
+      comparisonFormula.derivation_mode === "reconstructed"
+        ? comparisonFormula.formula_path_id
+        : null,
+    comparisonMode,
+    tolerancePolicy,
     formula_class_match: formulaClassMatch,
     unit_contract_match: unitContractMatch,
     normalization_contract_match: normalizationContractMatch,
     derivation_mode_match: derivationModeMatch,
+    mismatchReason,
+    additionalMismatchReasons,
+    resolvedInputComparisons,
+    termComparisons,
     intermediate_term_deltas: intermediateTermDeltas,
     final_metric_delta_abs: finalMetricDeltaAbs,
     final_metric_delta_rel: finalMetricDeltaRel,
@@ -7486,10 +8662,15 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
     reconstructionOnlyComparison,
     formulaMismatchClass,
     notes: [
+      `direct_formula_id=${canonicalFormula.formula_path_id}`,
+      `reconstructed_formula_id=${comparisonFormula.formula_path_id}`,
+      `comparison_mode=${comparisonMode}`,
       `canonical.formula_class=${canonicalFormula.formula_class}`,
       `comparison.formula_class=${comparisonFormula.formula_class}`,
       `canonical.derivation_mode=${canonicalFormula.derivation_mode}`,
       `comparison.derivation_mode=${comparisonFormula.derivation_mode}`,
+      `mismatch_reason=${mismatchReason}`,
+      `additional_mismatch_reasons=${additionalMismatchReasons.join(",") || "none"}`,
       `formula_equivalent=${String(formulaEquivalent)}`,
       `reconstruction_only_comparison=${String(reconstructionOnlyComparison)}`,
     ],
@@ -7511,7 +8692,6 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
     comparisonMismatchDisposition: "advisory",
     comparison_requires_formula_equivalence: false,
   };
-  const policyOverride = args.comparisonPolicyOverride ?? {};
   const comparisonPathRole =
     policyOverride.comparison_path_role ??
     policyOverride.comparisonPathRole ??
@@ -7559,6 +8739,7 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
       recoveryCaseId,
     },
     policy,
+    interpretationPolicy,
     canonicalFormula,
     comparisonFormula,
     formulaComparison,
@@ -7566,13 +8747,16 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
       formulaEquivalent,
       reconstructionOnlyComparison,
       formulaMismatchClass,
+      mismatchReason,
+      sourceFormulaInterpretationPolicy: interpretationPolicy.policyId,
       summary:
         formulaMismatchClass === "none"
           ? "Canonical and comparison source formulas are equivalent within emitted tolerance."
-          : `source formula mismatch class=${formulaMismatchClass}`,
+          : `source formula mismatch class=${formulaMismatchClass}; mismatch_reason=${mismatchReason}; interpretation_policy=${interpretationPolicy.policyId}`,
     },
     notes: [
       `comparison_path_role=${policy.comparison_path_role}; expected_equivalence=${String(policy.comparison_path_expected_equivalence)}; blocks_readiness=${String(policy.comparison_path_blocks_readiness)}; mismatch_disposition=${policy.comparison_mismatch_disposition}.`,
+      `interpretation_policy=${interpretationPolicy.policyId}; parity_expected=${String(interpretationPolicy.parityExpected)}; promotion_blocked=${String(interpretationPolicy.promotionBlockedByMismatch)}; lane_a_unaffected=${String(interpretationPolicy.laneAUnaffectedByMismatch)}.`,
       `final_metric_delta_abs=${finalMetricDeltaAbs ?? "null"}`,
       `final_metric_delta_rel=${finalMetricDeltaRel ?? "null"}`,
     ],
@@ -7586,16 +8770,30 @@ export const buildNhm2SourceFormulaAuditArtifact = (args: {
 export const renderNhm2SourceFormulaAuditMarkdown = (
   payload: Nhm2SourceFormulaAuditArtifact,
 ): string => {
+  const formatCell = (value: unknown): string =>
+    value == null ? "null" : JSON.stringify(value).replace(/\|/g, "\\|");
   const canonicalCodeRows = payload.canonicalFormula.code_path_references
     .map((entry) => `| ${entry.path} | ${entry.symbol} |`)
     .join("\n");
   const comparisonCodeRows = payload.comparisonFormula.code_path_references
     .map((entry) => `| ${entry.path} | ${entry.symbol} |`)
     .join("\n");
+  const resolvedInputRows = payload.formulaComparison.resolvedInputComparisons
+    .map(
+      (entry) =>
+        `| ${entry.inputId} | ${formatCell(entry.directValue)} | ${formatCell(entry.reconstructedValue)} | ${entry.delta ?? "null"} | ${entry.relativeDelta ?? "null"} | ${entry.units ?? "null"} | ${entry.status} | ${entry.note ?? "null"} |`,
+    )
+    .join("\n");
+  const termRows = payload.formulaComparison.termComparisons
+    .map(
+      (entry) =>
+        `| ${entry.termId} | ${formatCell(entry.directValue)} | ${formatCell(entry.reconstructedValue)} | ${entry.delta ?? "null"} | ${entry.relativeDelta ?? "null"} | ${entry.units ?? "null"} | ${entry.status} | ${entry.note ?? "null"} |`,
+    )
+    .join("\n");
   const intermediateRows = payload.formulaComparison.intermediate_term_deltas
     .map(
       (entry) =>
-        `| ${entry.term} | ${JSON.stringify(entry.canonical_value)} | ${JSON.stringify(entry.comparison_value)} | ${entry.equal} |`,
+        `| ${entry.term} | ${formatCell(entry.canonical_value)} | ${formatCell(entry.comparison_value)} | ${entry.equal} |`,
     )
     .join("\n");
   const notes = payload.notes.length
@@ -7630,6 +8828,16 @@ export const renderNhm2SourceFormulaAuditMarkdown = (
 | comparisonPathBlocksReadiness | ${payload.policy.comparisonPathBlocksReadiness} |
 | comparisonMismatchDisposition | ${payload.policy.comparisonMismatchDisposition} |
 | comparison_requires_formula_equivalence | ${payload.policy.comparison_requires_formula_equivalence} |
+
+## Interpretation Policy
+| field | value |
+|---|---|
+| policyId | ${payload.interpretationPolicy.policyId} |
+| parityExpected | ${payload.interpretationPolicy.parityExpected} |
+| promotionBlockedByMismatch | ${payload.interpretationPolicy.promotionBlockedByMismatch} |
+| laneAUnaffectedByMismatch | ${payload.interpretationPolicy.laneAUnaffectedByMismatch} |
+| interpretationStatus | ${payload.interpretationPolicy.interpretationStatus} |
+| note | ${payload.interpretationPolicy.note} |
 
 ## Canonical Formula Path
 | field | value |
@@ -7670,17 +8878,40 @@ ${comparisonCodeRows || "| none | none |"}
 ## Formula Comparison
 | field | value |
 |---|---|
+| directFormulaId | ${payload.formulaComparison.directFormulaId ?? "null"} |
+| reconstructedFormulaId | ${payload.formulaComparison.reconstructedFormulaId ?? "null"} |
+| comparisonMode | ${payload.formulaComparison.comparisonMode} |
 | formula_class_match | ${payload.formulaComparison.formula_class_match} |
 | unit_contract_match | ${payload.formulaComparison.unit_contract_match} |
 | normalization_contract_match | ${payload.formulaComparison.normalization_contract_match} |
 | derivation_mode_match | ${payload.formulaComparison.derivation_mode_match} |
+| mismatchReason | ${payload.formulaComparison.mismatchReason} |
+| additionalMismatchReasons | ${payload.formulaComparison.additionalMismatchReasons.join(",") || "none"} |
 | final_metric_delta_abs | ${payload.formulaComparison.final_metric_delta_abs ?? "null"} |
 | final_metric_delta_rel | ${payload.formulaComparison.final_metric_delta_rel ?? "null"} |
 | formulaEquivalent | ${payload.formulaComparison.formulaEquivalent} |
 | reconstructionOnlyComparison | ${payload.formulaComparison.reconstructionOnlyComparison} |
 | formulaMismatchClass | ${payload.formulaComparison.formulaMismatchClass} |
 
-### Intermediate Terms
+### Tolerance Policy
+| field | value |
+|---|---|
+| relTol | ${payload.formulaComparison.tolerancePolicy.relTol} |
+| absTol | ${payload.formulaComparison.tolerancePolicy.absTol} |
+| numericParityRule | ${payload.formulaComparison.tolerancePolicy.numericParityRule} |
+| formulaEquivalenceRequires | ${payload.formulaComparison.tolerancePolicy.formulaEquivalenceRequires.join(",")} |
+
+### Resolved Inputs
+| inputId | directValue | reconstructedValue | delta | relativeDelta | units | status | note |
+|---|---|---|---|---|---|---|---|
+${resolvedInputRows || "| none | null | null | null | null | null | not_comparable | null |"}
+
+### Term Comparisons
+| termId | directValue | reconstructedValue | delta | relativeDelta | units | status | note |
+|---|---|---|---|---|---|---|---|
+${termRows || "| none | null | null | null | null | null | not_comparable | null |"}
+
+### Intermediate Terms (Legacy Alias)
 | term | canonical_value | comparison_value | equal |
 |---|---|---|---|
 ${intermediateRows || "| none | null | null | true |"}
@@ -7691,7 +8922,967 @@ ${intermediateRows || "| none | null | null | true |"}
 | formulaEquivalent | ${payload.stage.formulaEquivalent} |
 | reconstructionOnlyComparison | ${payload.stage.reconstructionOnlyComparison} |
 | formulaMismatchClass | ${payload.stage.formulaMismatchClass} |
+| mismatchReason | ${payload.stage.mismatchReason} |
+| sourceFormulaInterpretationPolicy | ${payload.stage.sourceFormulaInterpretationPolicy} |
 | summary | ${payload.stage.summary} |
+
+## Notes
+${notes}
+`;
+};
+
+const buildSourceMechanismParityRouteFeasibilityBlock = (args: {
+  sourceFormulaAudit: Nhm2SourceFormulaAuditArtifact;
+  sourceFormulaArtifactPath: string;
+}): SourceMechanismParityRouteFeasibilityBlock => {
+  const termComparisons = args.sourceFormulaAudit.formulaComparison.termComparisons;
+  const matchedTerms = termComparisons
+    .filter((entry) => entry.status === "matched")
+    .map((entry) => entry.termId);
+  const unmatchedTerms = termComparisons
+    .filter((entry) => entry.status !== "matched")
+    .map((entry) => entry.termId);
+  const dominantMismatchEntry =
+    termComparisons.find((entry) => entry.termId === "final_metricT00Si_Jm3") ??
+    termComparisons.find((entry) => entry.status === "mismatched") ??
+    termComparisons.find((entry) => entry.status !== "matched") ??
+    null;
+  const dominantMismatchTerm = dominantMismatchEntry?.termId ?? null;
+  const sharedContributors = matchedTerms.includes("rhoMetric_Jm3")
+    ? ["rhoMetric_Jm3"]
+    : [];
+  const sharedSupportingTerms = [
+    "couplingAlpha",
+    "metricT00SiRelError",
+    "qeiSamplingNormalization",
+    "qeiRenormalizationScheme",
+  ].filter((termId) => matchedTerms.includes(termId));
+  const directOnlyContributors =
+    dominantMismatchTerm === "final_metricT00Si_Jm3"
+      ? ["direct_metric_closure_term_set_beyond_rhoMetric"]
+      : [];
+  const reconstructedOnlyContributors = unmatchedTerms.includes(
+    "metricStressRhoSiMean_Jm3",
+  )
+    ? ["metricStressRhoSiMean_Jm3"]
+    : [];
+  const unmatchedContributors = [
+    ...directOnlyContributors,
+    ...reconstructedOnlyContributors,
+  ];
+  const missingProxyTerms = [...directOnlyContributors];
+  const missingDirectTerms = directOnlyContributors.length
+    ? ["authoritative_direct_metric_additive_decomposition_for_final_metricT00Si_Jm3"]
+    : [];
+  const feasibilityStatus: SourceMechanismParityRouteFeasibilityStatus =
+    unmatchedTerms.length === 0
+      ? "closable_with_existing_emitted_terms"
+      : !args.sourceFormulaAudit.formulaComparison.derivation_mode_match &&
+          args.sourceFormulaAudit.formulaComparison.formulaMismatchClass ===
+            "direct_vs_reconstructed"
+        ? "blocked_by_derivation_class_difference"
+        : missingDirectTerms.length > 0
+          ? "closable_after_missing_term_serialization"
+          : "blocked_pending_model_upgrade";
+  const routeBlockingClass: SourceMechanismParityRouteBlockingClass =
+    feasibilityStatus === "blocked_by_derivation_class_difference"
+      ? "direct_metric_vs_reconstructed_proxy_derivation_gap"
+      : feasibilityStatus === "closable_after_missing_term_serialization"
+        ? "missing_metric_side_serialization"
+        : missingProxyTerms.length > 0
+          ? "missing_proxy_term_mapping"
+          : "none";
+  const closureWorkItems =
+    feasibilityStatus === "blocked_by_derivation_class_difference"
+      ? [
+          "Serialize an additive authoritative direct-metric decomposition for final_metricT00Si_Jm3 instead of exposing only the aggregate final metric term.",
+          "Define a mapped proxy closure term set beyond rhoMetric_Jm3, or upgrade the reconstructed path to a direct-metric derivation class.",
+          "Re-emit the source-formula audit to show whether final_metricT00Si_Jm3 becomes term-closable or remains architecture-level non-equivalent.",
+        ]
+      : feasibilityStatus === "closable_after_missing_term_serialization"
+        ? [
+            "Emit the missing authoritative direct-metric additive decomposition for final_metricT00Si_Jm3.",
+            "Re-compare the reconstructed proxy path against the newly serialized direct-side term set under the existing tolerance policy.",
+          ]
+        : [
+            "Close the remaining direct-vs-reconstructed terms under the source-formula tolerance policy.",
+          ];
+  const nextClosureAction =
+    feasibilityStatus === "blocked_by_derivation_class_difference"
+      ? "emit_authoritative_direct_metric_closure_decomposition_and_define_proxy_mapping_contract"
+      : feasibilityStatus === "closable_after_missing_term_serialization"
+        ? "serialize_authoritative_direct_metric_closure_terms"
+        : "re_emit_source_formula_audit_with_numeric_parity";
+  const routeSummary =
+    feasibilityStatus === "blocked_by_derivation_class_difference"
+      ? "Parity route is not realistically closable in current architecture without a derivation-class upgrade: the reconstructed path already matches rhoMetric_Jm3 but does not carry a mapped direct-metric closure term beyond rhoMetric, and the authoritative direct path emits final_metricT00Si_Jm3 only as an aggregate."
+      : feasibilityStatus === "closable_after_missing_term_serialization"
+        ? "Parity route appears closable only after missing authoritative direct-side decomposition is serialized."
+        : feasibilityStatus === "closable_with_existing_emitted_terms"
+          ? "Parity route is closable with existing emitted terms."
+          : "Parity route remains blocked pending additional model closure work.";
+
+  return {
+    routeId: "direct_proxy_parity_route",
+    routeStatus: unmatchedTerms.length === 0 ? "satisfied" : "available_but_unmet",
+    feasibilityStatus,
+    routeBlockingClass,
+    dominantMismatchTerm,
+    matchedTerms,
+    unmatchedTerms,
+    sharedContributors,
+    sharedSupportingTerms,
+    directOnlyContributors,
+    reconstructedOnlyContributors,
+    unmatchedContributors,
+    directPathDecomposition: {
+      pathRole: "authoritative_direct_metric",
+      formulaClass: args.sourceFormulaAudit.canonicalFormula.formula_class,
+      derivationMode: args.sourceFormulaAudit.canonicalFormula.derivation_mode,
+      decompositionStatus: "aggregate_authoritative_metric_term_only",
+      finalMetricTermId: "final_metricT00Si_Jm3",
+      contributorTerms: sharedContributors,
+      sharedContributorTerms: sharedContributors,
+      supportingMatchedTerms: sharedSupportingTerms,
+      unavailableContributorTerms: missingDirectTerms,
+      missingAdditiveBreakdown: true,
+      note:
+        "Canonical direct path exposes rhoMetric-scale agreement but serializes final_metricT00Si_Jm3 as an authoritative aggregate, so the residual direct-only closure contribution is not additively decomposed in current artifacts.",
+    },
+    reconstructedPathDecomposition: {
+      pathRole: "reconstructed_proxy",
+      formulaClass: args.sourceFormulaAudit.comparisonFormula.formula_class,
+      derivationMode: args.sourceFormulaAudit.comparisonFormula.derivation_mode,
+      decompositionStatus: "proxy_reconstruction_terms_available",
+      finalMetricTermId: "final_metricT00Si_Jm3",
+      contributorTerms: sharedContributors,
+      sharedContributorTerms: sharedContributors,
+      supportingMatchedTerms: sharedSupportingTerms,
+      unavailableContributorTerms: missingProxyTerms,
+      missingAdditiveBreakdown: false,
+      note:
+        "Reconstructed path closes at the rhoMetric-scale proxy term and emits metricStressRhoSiMean_Jm3, but does not expose a mapped direct-metric closure term beyond rhoMetric_Jm3 for final-metric parity.",
+    },
+    missingProxyTerms,
+    missingDirectTerms,
+    closureWorkItems,
+    nextClosureAction,
+    proofOfClosureArtifact: normalizePath(args.sourceFormulaArtifactPath),
+    routeSummary,
+  };
+};
+
+const computeSourceMechanismParityRouteFeasibilityChecksum = (
+  payload: Nhm2SourceMechanismParityRouteFeasibilityArtifact,
+): string => {
+  const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  delete copy.generatedAt;
+  delete copy.checksum;
+  return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
+};
+
+export const buildNhm2SourceMechanismParityRouteFeasibilityArtifact = (args: {
+  payload: ProofPackPayload;
+  sourceFormulaAudit: Nhm2SourceFormulaAuditArtifact;
+  sourceFormulaArtifactPath: string;
+  sourceMechanismPromotionContractArtifactPath: string;
+  sourceMechanismMaturityArtifactPath: string;
+}): Nhm2SourceMechanismParityRouteFeasibilityArtifact => {
+  const sourceMechanismParityRouteFeasibility =
+    buildSourceMechanismParityRouteFeasibilityBlock({
+      sourceFormulaAudit: args.sourceFormulaAudit,
+      sourceFormulaArtifactPath: args.sourceFormulaArtifactPath,
+    });
+  const payloadBase: Nhm2SourceMechanismParityRouteFeasibilityArtifact = {
+    artifactType: "nhm2_source_mechanism_parity_route_feasibility/v1",
+    generatedOn: args.payload.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact evaluates whether the direct_proxy_parity_route is realistically closable in the current architecture; it does not itself promote the source/mechanism lane or alter Lane A.",
+    sourceFormulaArtifact: normalizePath(args.sourceFormulaArtifactPath),
+    sourceMechanismPromotionContractArtifact: normalizePath(
+      args.sourceMechanismPromotionContractArtifactPath,
+    ),
+    sourceMechanismMaturityArtifact: normalizePath(
+      args.sourceMechanismMaturityArtifactPath,
+    ),
+    sourceMechanismParityRouteFeasibility,
+    notes: [
+      `route_status=${sourceMechanismParityRouteFeasibility.routeStatus}; feasibility_status=${sourceMechanismParityRouteFeasibility.feasibilityStatus}; blocking_class=${sourceMechanismParityRouteFeasibility.routeBlockingClass}.`,
+      `dominant_mismatch_term=${sourceMechanismParityRouteFeasibility.dominantMismatchTerm ?? "none"}; matched_terms=${sourceMechanismParityRouteFeasibility.matchedTerms.join(",") || "none"}; unmatched_terms=${sourceMechanismParityRouteFeasibility.unmatchedTerms.join(",") || "none"}.`,
+      `missing_proxy_terms=${sourceMechanismParityRouteFeasibility.missingProxyTerms.join(",") || "none"}; missing_direct_terms=${sourceMechanismParityRouteFeasibility.missingDirectTerms.join(",") || "none"}.`,
+    ],
+  };
+  return {
+    ...payloadBase,
+    checksum: computeSourceMechanismParityRouteFeasibilityChecksum(payloadBase),
+  };
+};
+
+export const renderNhm2SourceMechanismParityRouteFeasibilityMarkdown = (
+  payload: Nhm2SourceMechanismParityRouteFeasibilityArtifact,
+): string => {
+  const route = payload.sourceMechanismParityRouteFeasibility;
+  const notes = payload.notes.length
+    ? payload.notes.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const closureWorkItems = route.closureWorkItems.length
+    ? route.closureWorkItems.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  return `# NHM2 Source / Mechanism Parity-Route Feasibility (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+| field | value |
+|---|---|
+| routeId | ${route.routeId} |
+| routeStatus | ${route.routeStatus} |
+| feasibilityStatus | ${route.feasibilityStatus} |
+| routeBlockingClass | ${route.routeBlockingClass} |
+| dominantMismatchTerm | ${route.dominantMismatchTerm ?? "none"} |
+| matchedTerms | ${route.matchedTerms.join(",") || "none"} |
+| unmatchedTerms | ${route.unmatchedTerms.join(",") || "none"} |
+| sharedContributors | ${route.sharedContributors.join(",") || "none"} |
+| sharedSupportingTerms | ${route.sharedSupportingTerms.join(",") || "none"} |
+| directOnlyContributors | ${route.directOnlyContributors.join(",") || "none"} |
+| reconstructedOnlyContributors | ${route.reconstructedOnlyContributors.join(",") || "none"} |
+| unmatchedContributors | ${route.unmatchedContributors.join(",") || "none"} |
+| missingProxyTerms | ${route.missingProxyTerms.join(",") || "none"} |
+| missingDirectTerms | ${route.missingDirectTerms.join(",") || "none"} |
+| nextClosureAction | ${route.nextClosureAction} |
+| proofOfClosureArtifact | ${route.proofOfClosureArtifact} |
+| routeSummary | ${route.routeSummary} |
+
+## Direct Path Decomposition
+| field | value |
+|---|---|
+| pathRole | ${route.directPathDecomposition.pathRole} |
+| formulaClass | ${route.directPathDecomposition.formulaClass} |
+| derivationMode | ${route.directPathDecomposition.derivationMode} |
+| decompositionStatus | ${route.directPathDecomposition.decompositionStatus} |
+| finalMetricTermId | ${route.directPathDecomposition.finalMetricTermId} |
+| contributorTerms | ${route.directPathDecomposition.contributorTerms.join(",") || "none"} |
+| sharedContributorTerms | ${route.directPathDecomposition.sharedContributorTerms.join(",") || "none"} |
+| supportingMatchedTerms | ${route.directPathDecomposition.supportingMatchedTerms.join(",") || "none"} |
+| unavailableContributorTerms | ${route.directPathDecomposition.unavailableContributorTerms.join(",") || "none"} |
+| missingAdditiveBreakdown | ${route.directPathDecomposition.missingAdditiveBreakdown} |
+| note | ${route.directPathDecomposition.note} |
+
+## Reconstructed Path Decomposition
+| field | value |
+|---|---|
+| pathRole | ${route.reconstructedPathDecomposition.pathRole} |
+| formulaClass | ${route.reconstructedPathDecomposition.formulaClass} |
+| derivationMode | ${route.reconstructedPathDecomposition.derivationMode} |
+| decompositionStatus | ${route.reconstructedPathDecomposition.decompositionStatus} |
+| finalMetricTermId | ${route.reconstructedPathDecomposition.finalMetricTermId} |
+| contributorTerms | ${route.reconstructedPathDecomposition.contributorTerms.join(",") || "none"} |
+| sharedContributorTerms | ${route.reconstructedPathDecomposition.sharedContributorTerms.join(",") || "none"} |
+| supportingMatchedTerms | ${route.reconstructedPathDecomposition.supportingMatchedTerms.join(",") || "none"} |
+| unavailableContributorTerms | ${route.reconstructedPathDecomposition.unavailableContributorTerms.join(",") || "none"} |
+| missingAdditiveBreakdown | ${route.reconstructedPathDecomposition.missingAdditiveBreakdown} |
+| note | ${route.reconstructedPathDecomposition.note} |
+
+## Closure Work Items
+${closureWorkItems}
+
+## Inputs
+- sourceFormulaArtifact: \`${payload.sourceFormulaArtifact}\`
+- sourceMechanismPromotionContractArtifact: \`${payload.sourceMechanismPromotionContractArtifact}\`
+- sourceMechanismMaturityArtifact: \`${payload.sourceMechanismMaturityArtifact}\`
+
+## Notes
+${notes}
+`;
+};
+
+const buildSourceMechanismPromotionContractBlock = (args: {
+  sourceFormulaAudit: Nhm2SourceFormulaAuditArtifact;
+  sourceToYork: SourceToYorkProvenanceArtifact;
+  diagnosticSemanticAudit: Nhm2DiagnosticSemanticAuditArtifact;
+  sourceFormulaArtifactPath: string;
+  sourceMechanismParityRouteFeasibilityArtifactPath: string;
+}): SourceMechanismPromotionContractBlock => {
+  const mismatchedTerms = args.sourceFormulaAudit.formulaComparison.termComparisons
+    .filter((entry) => entry.status === "mismatched")
+    .map((entry) => entry.termId);
+  const parityRouteFeasibility = buildSourceMechanismParityRouteFeasibilityBlock({
+    sourceFormulaAudit: args.sourceFormulaAudit,
+    sourceFormulaArtifactPath: args.sourceFormulaArtifactPath,
+  });
+  const tolerancePolicySummary =
+    "relTol=" +
+    args.sourceFormulaAudit.formulaComparison.tolerancePolicy.relTol +
+    "; absTol=" +
+    args.sourceFormulaAudit.formulaComparison.tolerancePolicy.absTol +
+    "; rule=" +
+    args.sourceFormulaAudit.formulaComparison.tolerancePolicy.numericParityRule;
+
+  const claimsRequiringParity: SourceMechanismPromotionClaimId[] = [
+    "formula_equivalent_to_authoritative_direct_metric",
+    "source_mechanism_layer_supports_viability_promotion",
+    "cross_lane_promotion_beyond_reference_only_scope",
+  ];
+  const laneAUnaffected = args.sourceFormulaAudit.interpretationPolicy.laneAUnaffectedByMismatch;
+  const referenceOnlyCrossLaneScope = args.diagnosticSemanticAudit.advisoryFindings.includes(
+    "diagnostic_cross_lane_reference_only",
+  );
+  const bridgeReady = args.sourceToYork.bridgeReadiness.bridgeReady;
+  const parameterMappingsClosed =
+    args.sourceToYork.bridgeReadiness.parameterMappingsComplete &&
+    args.sourceToYork.bridgeReadiness.parameterMappingsExplained;
+  const proxyComparisonUsable =
+    args.sourceFormulaAudit.interpretationPolicy.policyId ===
+      "expected_proxy_vs_metric_gap_non_promotable" && laneAUnaffected;
+  const exemptionEligibleClaimDetails: SourceMechanismExemptionEligibleClaim[] = [
+    {
+      claimId: "bounded_non_authoritative_source_annotation",
+      claimScope:
+        "Serialize Source→York bridge closure, mapping status, and timing-authority status as a non-authoritative annotation layer attached to Lane A outputs.",
+      requiredDisclaimers: [
+        "Lane A remains authoritative.",
+        "Source/mechanism annotation is non-authoritative and reduced-order only.",
+        "No formula equivalence to the authoritative direct metric path is implied.",
+        "No physical viability or readiness promotion is implied.",
+        "Cross-lane scope remains reference_only.",
+      ],
+      forbiddenInferences: [
+        "formula_equivalent_to_authoritative_direct_metric",
+        "source_mechanism_lane_authoritative",
+        "source_mechanism_layer_supports_viability_promotion",
+        "cross_lane_promotion_beyond_reference_only_scope",
+      ],
+      requiredEvidence: [
+        "Source→York bridge remains closed under current serialization/readiness policy.",
+        "Reduced-order source selectors remain serialized and explained.",
+        "Timing authority status remains explicit and machine-readable.",
+      ],
+      requiresOptionalTimingClosure: false,
+      requiresCrossLaneExpansion: false,
+      requiresParity: false,
+      currentEvidenceSatisfied: bridgeReady && parameterMappingsClosed && laneAUnaffected,
+    },
+    {
+      claimId: "bounded_non_authoritative_mechanism_context",
+      claimScope:
+        "Provide reduced-order source/mechanism context as explanatory support for Lane A classifications without elevating the source/mechanism lane above advisory status.",
+      requiredDisclaimers: [
+        "Mechanism context is reduced-order and advisory only.",
+        "Lane A classification remains the authoritative decision surface.",
+        "No authority, parity, or viability closure is implied.",
+        "Cross-lane scope remains reference_only.",
+      ],
+      forbiddenInferences: [
+        "source_mechanism_lane_authoritative",
+        "formula_equivalent_to_authoritative_direct_metric",
+        "source_mechanism_layer_supports_viability_promotion",
+        "cross_lane_promotion_beyond_reference_only_scope",
+      ],
+      requiredEvidence: [
+        "Reduced-order source selectors remain serialized and explained.",
+        "Lane A remains unaffected by the settled source/mechanism advisories.",
+        "Reference-only cross-lane scope remains explicit.",
+      ],
+      requiresOptionalTimingClosure: false,
+      requiresCrossLaneExpansion: false,
+      requiresParity: false,
+      currentEvidenceSatisfied:
+        parameterMappingsClosed && laneAUnaffected && referenceOnlyCrossLaneScope,
+    },
+    {
+      claimId: "bounded_non_authoritative_reduced_order_comparison",
+      claimScope:
+        "Compare the reconstructed proxy path to authoritative direct metric outputs only as a bounded reduced-order advisory comparison with explicit proxy-vs-metric mismatch policy attached.",
+      requiredDisclaimers: [
+        "Comparison is advisory and reduced-order only.",
+        "Proxy-vs-metric mismatch remains non-promotable and non-equivalent.",
+        "Lane A remains authoritative.",
+        "No viability promotion or cross-lane scope expansion is implied.",
+      ],
+      forbiddenInferences: [
+        "formula_equivalent_to_authoritative_direct_metric",
+        "source_mechanism_lane_authoritative",
+        "source_mechanism_layer_supports_viability_promotion",
+        "cross_lane_promotion_beyond_reference_only_scope",
+      ],
+      requiredEvidence: [
+        "Reconstructed proxy path remains usable for advisory comparison.",
+        "Source-formula interpretation policy remains expected_proxy_vs_metric_gap_non_promotable.",
+        "Lane A remains unaffected by the settled advisory mismatch.",
+      ],
+      requiresOptionalTimingClosure: false,
+      requiresCrossLaneExpansion: false,
+      requiresParity: false,
+      currentEvidenceSatisfied:
+        proxyComparisonUsable && laneAUnaffected && referenceOnlyCrossLaneScope,
+    },
+  ];
+  const claimsEligibleUnderExemption: SourceMechanismPromotionClaimId[] =
+    exemptionEligibleClaimDetails.map((entry) => entry.claimId);
+  const exemptionRouteStatus = exemptionEligibleClaimDetails.every(
+    (entry) => entry.currentEvidenceSatisfied,
+  )
+    ? "partially_activatable_for_bounded_claims"
+    : "available_but_unmet";
+  const claimsBlockedEvenWithExemption: SourceMechanismPromotionClaimId[] = [
+    "source_mechanism_lane_promotable_non_authoritative",
+    "formula_equivalent_to_authoritative_direct_metric",
+    "source_mechanism_lane_authoritative",
+    "source_mechanism_layer_supports_viability_promotion",
+    "cross_lane_promotion_beyond_reference_only_scope",
+  ];
+
+  const directProxyParityRoute: SourceMechanismPromotionRoute = {
+    routeId: "direct_proxy_parity_route",
+    routeStatus: parityRouteFeasibility.routeStatus,
+    parityRequired: true,
+    termsRequiringClosure: mismatchedTerms,
+    tolerancePolicySummary,
+    proofArtifactPath: normalizePath(args.sourceFormulaArtifactPath),
+    claimSetEligible: claimsRequiringParity,
+    claimSetBlocked: ["source_mechanism_lane_promotable_non_authoritative"],
+    requiredEvidence: [
+      ...parityRouteFeasibility.closureWorkItems,
+      "Establish an explicit cross-lane promotion contract before any scope expansion beyond reference_only.",
+      "Provide first-principles or authoritative source realization evidence for any viability-facing promotion claim.",
+    ],
+    routeFeasibilityStatus: parityRouteFeasibility.feasibilityStatus,
+    routeBlockingClass: parityRouteFeasibility.routeBlockingClass,
+    dominantMismatchTerm: parityRouteFeasibility.dominantMismatchTerm,
+    nextClosureAction: parityRouteFeasibility.nextClosureAction,
+    proofOfClosureArtifact: parityRouteFeasibility.proofOfClosureArtifact,
+    feasibilityArtifactPath: normalizePath(
+      args.sourceMechanismParityRouteFeasibilityArtifactPath,
+    ),
+    summary: parityRouteFeasibility.routeSummary,
+  };
+  const formalExemptionRoute: SourceMechanismPromotionRoute = {
+    routeId: "formal_exemption_route",
+    routeStatus: exemptionRouteStatus,
+    parityRequired: false,
+    termsRequiringClosure: [],
+    tolerancePolicySummary: null,
+    proofArtifactPath: normalizePath(args.sourceFormulaArtifactPath),
+    claimSetEligible: claimsEligibleUnderExemption,
+    claimSetBlocked: claimsBlockedEvenWithExemption,
+    requiredEvidence: [
+      "Select only the bounded exemption claim ids emitted in this contract; the broad non-authoritative promotion claim is no longer eligible.",
+      "Carry each bounded claim's required disclaimers and forbidden inferences into every downstream artifact that uses the exemption route.",
+      "Preserve reference_only cross-lane scope unless an explicit cross-lane promotion contract is separately satisfied.",
+      "Close optional timing-authority fields only if a future bounded claim subset explicitly depends on them.",
+    ],
+    routeFeasibilityStatus: null,
+    routeBlockingClass: null,
+    dominantMismatchTerm: null,
+    nextClosureAction: null,
+    proofOfClosureArtifact: null,
+    feasibilityArtifactPath: null,
+    summary:
+      "Exemption route is narrowed to bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims only; it cannot grant broad non-authoritative promotion, formula equivalence, authority, viability promotion, or cross-lane scope expansion.",
+  };
+
+  const claimMappings: SourceMechanismPromotionClaimMapping[] = [
+    {
+      claimId: "formula_equivalent_to_authoritative_direct_metric",
+      currentStatus: "route_available_but_unmet",
+      requiredRoute: "direct_proxy_parity_route",
+      blockingReasons: ["proxy_vs_metric_term_gap", "direct_vs_reconstructed_non_parity"],
+      requiredEvidence: [
+        `Close mismatched terms: ${mismatchedTerms.join(",") || "none"}.`,
+        `Satisfy tolerance policy ${tolerancePolicySummary}.`,
+        "Re-emit the source-formula audit with formulaEquivalent=true.",
+      ],
+    },
+    {
+      claimId: "source_mechanism_lane_authoritative",
+      currentStatus: "permanently_disallowed_in_current_contract",
+      requiredRoute: "no_route_available",
+      blockingReasons: ["lane_a_authority_reserved", "source_mechanism_non_authoritative_by_contract"],
+      requiredEvidence: [
+        "No route is available in the current contract because Lane A remains the authoritative surface.",
+      ],
+    },
+    {
+      claimId: "source_mechanism_lane_promotable_non_authoritative",
+      currentStatus: "permanently_disallowed_in_current_contract",
+      requiredRoute: "no_route_available",
+      blockingReasons: [
+        "claim_scope_too_broad_for_stable_exemption_surface",
+        "reference_only_cross_lane_scope",
+      ],
+      requiredEvidence: [
+        "Replace this broad claim with one of the bounded exemption claim subsets emitted by the contract.",
+        "Keep Lane A unaffected status and reference_only cross-lane scope explicit.",
+        "Do not restore this broad claim unless a future contract defines a stable bounded scope that subsumes it without ambiguity.",
+      ],
+    },
+    ...exemptionEligibleClaimDetails.map(
+      (entry): SourceMechanismPromotionClaimMapping => ({
+        claimId: entry.claimId,
+        currentStatus: entry.currentEvidenceSatisfied
+          ? "eligible_if_route_selected"
+          : "route_available_but_unmet",
+        requiredRoute: "formal_exemption_route",
+        blockingReasons: entry.currentEvidenceSatisfied
+          ? ["formal_exemption_route_not_selected"]
+          : [
+              "bounded_exemption_claim_evidence_incomplete",
+              ...(entry.requiresOptionalTimingClosure
+                ? ["timing_authority_optional_fields_partial"]
+                : []),
+            ],
+        requiredEvidence: [
+          ...entry.requiredEvidence,
+          "Carry all required disclaimers and forbidden inferences into the downstream claim surface.",
+        ],
+      }),
+    ),
+    {
+      claimId: "source_mechanism_layer_supports_viability_promotion",
+      currentStatus: "route_available_but_unmet",
+      requiredRoute: "direct_proxy_parity_route",
+      blockingReasons: [
+        "proxy_vs_metric_term_gap",
+        "direct_vs_reconstructed_non_parity",
+        "reference_only_cross_lane_scope",
+      ],
+      requiredEvidence: [
+        "Close direct-vs-proxy parity under the source-formula audit tolerance policy.",
+        "Provide first-principles or authoritative source realization evidence suitable for promotion.",
+        "Adopt an explicit cross-lane promotion contract beyond reference_only scope.",
+      ],
+    },
+    {
+      claimId: "cross_lane_promotion_beyond_reference_only_scope",
+      currentStatus: "route_available_but_unmet",
+      requiredRoute: "direct_proxy_parity_route",
+      blockingReasons: ["reference_only_cross_lane_scope", "direct_vs_reconstructed_non_parity"],
+      requiredEvidence: [
+        "Close direct-vs-proxy parity for the promoted claim set.",
+        "Adopt an explicit cross-lane promotion contract that expands beyond reference_only scope.",
+      ],
+    },
+  ];
+
+  return {
+    contractId: "nhm2_source_mechanism_promotion_contract.v1",
+    contractStatus: "blocked_pending_route_selection",
+    selectedPromotionRoute: "none_active",
+    availableRoutes: [directProxyParityRoute, formalExemptionRoute],
+    promotionDecisionPolicy:
+      "parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims",
+    claimsRequiringParity,
+    claimsEligibleUnderExemption,
+    claimsBlockedEvenWithExemption,
+    exemptionEligibleClaimDetails,
+    claimMappings,
+    remainingConditions: [
+      "select_promotion_route",
+      "if_formal_exemption_route_is_selected_bind_only_the_bounded_exemption_claim_subsets",
+      "if_direct_proxy_parity_route_is_selected_close_final_metricT00Si_Jm3_or_upgrade_derivation_class",
+      "retain_reference_only_cross_lane_scope_until_explicit_cross_lane_promotion_contract_exists",
+      "close_optional_timing_authority_fields_only_if_a_selected_bounded_claim_scope_requires_them",
+    ],
+    nonNegotiableConditions: [
+      "lane_a_remains_authoritative",
+      "formula_equivalence_is_never_granted_by_policy_override",
+      "physical_viability_is_not_promoted_from_source_mechanism_lane_alone",
+      "reference_only_cross_lane_scope_persists_without_explicit_contract",
+    ],
+    laneAUnaffected,
+    referenceOnlyCrossLaneScope,
+    summary:
+      "Promotion contract keeps the parity route blocked by a derivation-class gap and narrows the formal exemption route to three bounded non-authoritative claim subsets; no route is active, so promotion remains blocked.",
+  };
+};
+
+const computeSourceMechanismPromotionContractChecksum = (
+  payload: Nhm2SourceMechanismPromotionContractArtifact,
+): string => {
+  const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  delete copy.generatedAt;
+  delete copy.checksum;
+  return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
+};
+
+export const buildNhm2SourceMechanismPromotionContractArtifact = (args: {
+  payload: ProofPackPayload;
+  sourceFormulaAudit: Nhm2SourceFormulaAuditArtifact;
+  sourceToYork: SourceToYorkProvenanceArtifact;
+  diagnosticSemanticAudit: Nhm2DiagnosticSemanticAuditArtifact;
+  sourceFormulaArtifactPath: string;
+  sourceToYorkArtifactPath: string;
+  sourceMechanismMaturityArtifactPath: string;
+  sourceMechanismParityRouteFeasibilityArtifactPath: string;
+}): Nhm2SourceMechanismPromotionContractArtifact => {
+  const sourceMechanismPromotionContract = buildSourceMechanismPromotionContractBlock({
+    sourceFormulaAudit: args.sourceFormulaAudit,
+    sourceToYork: args.sourceToYork,
+    diagnosticSemanticAudit: args.diagnosticSemanticAudit,
+    sourceFormulaArtifactPath: args.sourceFormulaArtifactPath,
+    sourceMechanismParityRouteFeasibilityArtifactPath:
+      args.sourceMechanismParityRouteFeasibilityArtifactPath,
+  });
+  const payloadBase: Nhm2SourceMechanismPromotionContractArtifact = {
+    artifactType: "nhm2_source_mechanism_promotion_contract/v1",
+    generatedOn: args.payload.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This promotion contract defines the only routes under which the non-authoritative source/mechanism lane could ever be promoted; it does not itself promote the lane or alter Lane A.",
+    sourceFormulaArtifact: normalizePath(args.sourceFormulaArtifactPath),
+    sourceToYorkArtifact: normalizePath(args.sourceToYorkArtifactPath),
+    sourceMechanismMaturityArtifact: normalizePath(args.sourceMechanismMaturityArtifactPath),
+    sourceMechanismPromotionContract,
+    notes: [
+      `contract_status=${sourceMechanismPromotionContract.contractStatus}; selected_route=${sourceMechanismPromotionContract.selectedPromotionRoute}; policy=${sourceMechanismPromotionContract.promotionDecisionPolicy}.`,
+      `claims_requiring_parity=${sourceMechanismPromotionContract.claimsRequiringParity.join(",") || "none"}; claims_eligible_under_exemption=${sourceMechanismPromotionContract.claimsEligibleUnderExemption.join(",") || "none"}.`,
+      `claims_blocked_even_with_exemption=${sourceMechanismPromotionContract.claimsBlockedEvenWithExemption.join(",") || "none"}; lane_a_unaffected=${String(sourceMechanismPromotionContract.laneAUnaffected)}.`,
+      `direct_proxy_parity_route_feasibility=${sourceMechanismPromotionContract.availableRoutes.find((route) => route.routeId === "direct_proxy_parity_route")?.routeFeasibilityStatus ?? "none"}; blocking_class=${sourceMechanismPromotionContract.availableRoutes.find((route) => route.routeId === "direct_proxy_parity_route")?.routeBlockingClass ?? "none"}.`,
+    ],
+  };
+  return {
+    ...payloadBase,
+    checksum: computeSourceMechanismPromotionContractChecksum(payloadBase),
+  };
+};
+
+export const renderNhm2SourceMechanismPromotionContractMarkdown = (
+  payload: Nhm2SourceMechanismPromotionContractArtifact,
+): string => {
+  const contract = payload.sourceMechanismPromotionContract;
+  const notes = payload.notes.length
+    ? payload.notes.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const remainingConditions = contract.remainingConditions.length
+    ? contract.remainingConditions.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const nonNegotiableConditions = contract.nonNegotiableConditions.length
+    ? contract.nonNegotiableConditions.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const routes = contract.availableRoutes
+    .map(
+      (route) => `### ${route.routeId}
+| field | value |
+|---|---|
+| routeStatus | ${route.routeStatus} |
+| parityRequired | ${route.parityRequired} |
+| termsRequiringClosure | ${route.termsRequiringClosure.join(",") || "none"} |
+| tolerancePolicySummary | ${route.tolerancePolicySummary ?? "none"} |
+| proofArtifactPath | ${route.proofArtifactPath ?? "none"} |
+| routeFeasibilityStatus | ${route.routeFeasibilityStatus ?? "none"} |
+| routeBlockingClass | ${route.routeBlockingClass ?? "none"} |
+| dominantMismatchTerm | ${route.dominantMismatchTerm ?? "none"} |
+| nextClosureAction | ${route.nextClosureAction ?? "none"} |
+| proofOfClosureArtifact | ${route.proofOfClosureArtifact ?? "none"} |
+| feasibilityArtifactPath | ${route.feasibilityArtifactPath ?? "none"} |
+| claimSetEligible | ${route.claimSetEligible.join(",") || "none"} |
+| claimSetBlocked | ${route.claimSetBlocked.join(",") || "none"} |
+| summary | ${route.summary} |
+
+Required Evidence
+${route.requiredEvidence.map((entry) => `- ${entry}`).join("\n") || "- none"}
+`,
+    )
+    .join("\n");
+  const claimMappings = contract.claimMappings.length
+    ? contract.claimMappings
+        .map(
+          (entry) =>
+            `| ${entry.claimId} | ${entry.currentStatus} | ${entry.requiredRoute} | ${entry.blockingReasons.join(",") || "none"} | ${entry.requiredEvidence.join("; ") || "none"} |`,
+        )
+        .join("\n")
+    : "| none | none | none | none | none |";
+  const exemptionClaimDetails = contract.exemptionEligibleClaimDetails.length
+    ? contract.exemptionEligibleClaimDetails
+        .map(
+          (entry) => `### ${entry.claimId}
+| field | value |
+|---|---|
+| claimScope | ${entry.claimScope} |
+| currentEvidenceSatisfied | ${entry.currentEvidenceSatisfied} |
+| requiresOptionalTimingClosure | ${entry.requiresOptionalTimingClosure} |
+| requiresCrossLaneExpansion | ${entry.requiresCrossLaneExpansion} |
+| requiresParity | ${entry.requiresParity} |
+
+Required Disclaimers
+${entry.requiredDisclaimers.map((item) => `- ${item}`).join("\n") || "- none"}
+
+Forbidden Inferences
+${entry.forbiddenInferences.map((item) => `- ${item}`).join("\n") || "- none"}
+
+Required Evidence
+${entry.requiredEvidence.map((item) => `- ${item}`).join("\n") || "- none"}
+`,
+        )
+        .join("\n")
+    : "- none";
+
+  return `# NHM2 Source / Mechanism Promotion Contract (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Source Paths
+- sourceFormulaArtifact: \`${payload.sourceFormulaArtifact}\`
+- sourceToYorkArtifact: \`${payload.sourceToYorkArtifact}\`
+- sourceMechanismMaturityArtifact: \`${payload.sourceMechanismMaturityArtifact}\`
+
+## Contract
+| field | value |
+|---|---|
+| contractId | ${contract.contractId} |
+| contractStatus | ${contract.contractStatus} |
+| selectedPromotionRoute | ${contract.selectedPromotionRoute} |
+| promotionDecisionPolicy | ${contract.promotionDecisionPolicy} |
+| claimsRequiringParity | ${contract.claimsRequiringParity.join(",") || "none"} |
+| claimsEligibleUnderExemption | ${contract.claimsEligibleUnderExemption.join(",") || "none"} |
+| claimsBlockedEvenWithExemption | ${contract.claimsBlockedEvenWithExemption.join(",") || "none"} |
+| laneAUnaffected | ${contract.laneAUnaffected} |
+| referenceOnlyCrossLaneScope | ${contract.referenceOnlyCrossLaneScope} |
+| summary | ${contract.summary} |
+
+## Available Routes
+${routes}
+
+## Claim Route Map
+| claimId | currentStatus | requiredRoute | blockingReasons | requiredEvidence |
+|---|---|---|---|---|
+${claimMappings}
+
+## Exemption Claim Surface
+${exemptionClaimDetails}
+
+## Remaining Conditions
+${remainingConditions}
+
+## Non-Negotiable Conditions
+${nonNegotiableConditions}
+
+## Notes
+${notes}
+`;
+};
+
+const computeSourceMechanismMaturityChecksum = (
+  payload: Nhm2SourceMechanismMaturityArtifact,
+): string => {
+  const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  delete copy.generatedAt;
+  delete copy.checksum;
+  return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
+};
+
+export const buildNhm2SourceMechanismMaturityArtifact = (args: {
+  payload: ProofPackPayload;
+  sourceFormulaAudit: Nhm2SourceFormulaAuditArtifact;
+  sourceToYork: SourceToYorkProvenanceArtifact;
+  diagnosticSemanticAudit: Nhm2DiagnosticSemanticAuditArtifact;
+  sourceStageAudit: Nhm2SourceStageAuditArtifact;
+  sourceAuditArtifactPath: string;
+  sourceFormulaAuditPath: string;
+  sourceToYorkArtifactPath: string;
+  diagnosticSemanticAuditPath: string;
+  sourceStageAuditPath: string;
+  sourceMechanismPromotionContractArtifactPath: string;
+  sourceMechanismParityRouteFeasibilityArtifactPath: string;
+}): Nhm2SourceMechanismMaturityArtifact => {
+  const promotionContract = buildSourceMechanismPromotionContractBlock({
+    sourceFormulaAudit: args.sourceFormulaAudit,
+    sourceToYork: args.sourceToYork,
+    diagnosticSemanticAudit: args.diagnosticSemanticAudit,
+    sourceFormulaArtifactPath: args.sourceFormulaAuditPath,
+    sourceMechanismParityRouteFeasibilityArtifactPath:
+      args.sourceMechanismParityRouteFeasibilityArtifactPath,
+  });
+  const promotionBlockers = new Set<SourceMechanismPromotionBlocker>();
+  if (
+    args.sourceFormulaAudit.formulaComparison.mismatchReason === "proxy_vs_metric_term_gap" ||
+    args.sourceFormulaAudit.formulaComparison.additionalMismatchReasons.includes(
+      "missing_term_mapping",
+    )
+  ) {
+    promotionBlockers.add("proxy_vs_metric_term_gap");
+  }
+  if (
+    args.sourceFormulaAudit.formulaComparison.formulaMismatchClass ===
+      "direct_vs_reconstructed" &&
+    !args.sourceFormulaAudit.interpretationPolicy.parityExpected
+  ) {
+    promotionBlockers.add("direct_vs_reconstructed_non_parity");
+  }
+  if (
+    args.sourceToYork.bridgeReadiness.residualAdvisoryReasons.includes(
+      "bridge_timing_authority_optional_fields_partial",
+    )
+  ) {
+    promotionBlockers.add("timing_authority_optional_fields_partial");
+  }
+  if (
+    args.diagnosticSemanticAudit.advisoryFindings.includes(
+      "diagnostic_cross_lane_reference_only",
+    )
+  ) {
+    promotionBlockers.add("reference_only_cross_lane_scope");
+  }
+  const exemptionEligibleClaims =
+    promotionContract.exemptionEligibleClaimDetails.filter(
+      (entry) => entry.currentEvidenceSatisfied,
+    );
+
+  const allowedClaims = new Set<SourceMechanismClaimId>();
+  if (args.sourceToYork.bridgeReadiness.bridgeReady) {
+    allowedClaims.add("source_to_york_provenance_closed_under_current_serialization_policy");
+  }
+  if (
+    args.sourceToYork.bridgeReadiness.parameterMappingsComplete &&
+    args.sourceToYork.bridgeReadiness.parameterMappingsExplained
+  ) {
+    allowedClaims.add("reduced_order_source_selectors_serialized_and_explained");
+  }
+  allowedClaims.add("reconstructed_proxy_path_usable_for_advisory_comparison");
+  if (args.sourceFormulaAudit.interpretationPolicy.laneAUnaffectedByMismatch) {
+    allowedClaims.add("lane_a_classification_unaffected_by_source_mechanism_advisories");
+  }
+  for (const claim of exemptionEligibleClaims) {
+    allowedClaims.add(claim.claimId);
+  }
+
+  const disallowedClaims: SourceMechanismClaimId[] = [
+    "reconstructed_proxy_path_formula_equivalent_to_authoritative_direct_metric",
+    "source_mechanism_lane_is_authoritative",
+    "unbounded_non_authoritative_source_mechanism_promotion_claim",
+    "source_mechanism_layer_closes_physical_viability",
+    "shift_plus_lapse_branch_is_proof_promoted",
+  ];
+
+  const requiredForPromotion: SourceMechanismPromotionRequirementId[] = [
+    "direct_proxy_parity_route_for_equivalence_or_cross_lane_claims",
+    "bounded_exemption_contract_for_non_authoritative_claim_subsets",
+    "promotion_grade_timing_authority_contract_if_optional_fields_required",
+    "first_principles_or_authoritative_source_realization_contract",
+    "explicit_cross_lane_promotion_contract_beyond_reference_only_scope",
+  ];
+
+  const sourceMechanismMaturity: SourceMechanismMaturityBlock = {
+    maturityTier: "reduced_order_advisory",
+    claimBoundaryPolicy:
+      "bounded_advisory_non_promotable_until_explicit_promotion_contract",
+    authoritativeStatus: "non_authoritative",
+    promotionEligibility: "blocked",
+    promotionBlockers: Array.from(promotionBlockers),
+    allowedClaims: Array.from(allowedClaims),
+    disallowedClaims,
+    requiredForPromotion,
+    sourceFormulaInterpretationPolicy: args.sourceFormulaAudit.interpretationPolicy.policyId,
+    sourceToYorkBridgeClosurePolicy: args.sourceToYork.bridgeReadiness.bridgeClosurePolicy,
+    timingAuthorityStatus: args.sourceToYork.bridgeReadiness.timingAuthorityStatus,
+    bridgeReady: args.sourceToYork.bridgeReadiness.bridgeReady,
+    bridgeGatingStatus: args.sourceToYork.bridgeReadiness.gatingStatus,
+    parityExpected: args.sourceFormulaAudit.interpretationPolicy.parityExpected,
+    promotionBlocked: true,
+    laneAUnaffected: args.sourceFormulaAudit.interpretationPolicy.laneAUnaffectedByMismatch,
+    laneAAuthoritative: true,
+    referenceOnlyCrossLaneScope: args.diagnosticSemanticAudit.advisoryFindings.includes(
+      "diagnostic_cross_lane_reference_only",
+    ),
+    promotionContractId: promotionContract.contractId,
+    promotionContractStatus: promotionContract.contractStatus,
+    selectedPromotionRoute: promotionContract.selectedPromotionRoute,
+    promotionSummary: promotionContract.summary,
+    summary:
+      "Source/mechanism layer is reduced-order advisory only: currently supportable advisory claims are limited to bounded source annotation, mechanism context, and reduced-order comparison subsets, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope.",
+  };
+
+  const payloadBase: Nhm2SourceMechanismMaturityArtifact = {
+    artifactType: "nhm2_source_mechanism_maturity/v1",
+    generatedOn: args.payload.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This source/mechanism maturity artifact formalizes claim boundaries for reduced-order and proxy-source NHM2 evidence; it does not alter Lane A.",
+    sourceAuditArtifact: normalizePath(args.sourceAuditArtifactPath),
+    sourceFormulaArtifact: normalizePath(args.sourceFormulaAuditPath),
+    sourceToYorkArtifact: normalizePath(args.sourceToYorkArtifactPath),
+    diagnosticSemanticArtifact: normalizePath(args.diagnosticSemanticAuditPath),
+    sourceStageArtifact: normalizePath(args.sourceStageAuditPath),
+    sourceMechanismPromotionContractArtifact: normalizePath(
+      args.sourceMechanismPromotionContractArtifactPath,
+    ),
+    sourceMechanismMaturity,
+    notes: [
+      `maturity_tier=${sourceMechanismMaturity.maturityTier}; authoritative_status=${sourceMechanismMaturity.authoritativeStatus}; promotion_eligibility=${sourceMechanismMaturity.promotionEligibility}.`,
+      `claim_boundary_policy=${sourceMechanismMaturity.claimBoundaryPolicy}; promotion_blockers=${sourceMechanismMaturity.promotionBlockers.join(",") || "none"}.`,
+      `bridge_ready=${String(sourceMechanismMaturity.bridgeReady)}; bridge_closure_policy=${sourceMechanismMaturity.sourceToYorkBridgeClosurePolicy}; timing_authority_status=${sourceMechanismMaturity.timingAuthorityStatus}.`,
+      `source_formula_interpretation_policy=${sourceMechanismMaturity.sourceFormulaInterpretationPolicy}; parity_expected=${String(sourceMechanismMaturity.parityExpected)}; lane_a_unaffected=${String(sourceMechanismMaturity.laneAUnaffected)}.`,
+      `reference_only_cross_lane_scope=${String(sourceMechanismMaturity.referenceOnlyCrossLaneScope)}; lane_a_authoritative=${String(sourceMechanismMaturity.laneAAuthoritative)}.`,
+      `promotion_contract_id=${sourceMechanismMaturity.promotionContractId}; promotion_contract_status=${sourceMechanismMaturity.promotionContractStatus}; selected_promotion_route=${sourceMechanismMaturity.selectedPromotionRoute}.`,
+    ],
+  };
+  return {
+    ...payloadBase,
+    checksum: computeSourceMechanismMaturityChecksum(payloadBase),
+  };
+};
+
+export const renderNhm2SourceMechanismMaturityMarkdown = (
+  payload: Nhm2SourceMechanismMaturityArtifact,
+): string => {
+  const maturity = payload.sourceMechanismMaturity;
+  const notes = payload.notes.length
+    ? payload.notes.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const allowedClaims = maturity.allowedClaims.length
+    ? maturity.allowedClaims.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const disallowedClaims = maturity.disallowedClaims.length
+    ? maturity.disallowedClaims.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const requiredForPromotion = maturity.requiredForPromotion.length
+    ? maturity.requiredForPromotion.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+
+  return `# NHM2 Source / Mechanism Maturity (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Source Paths
+- sourceAuditArtifact: \`${payload.sourceAuditArtifact}\`
+- sourceFormulaArtifact: \`${payload.sourceFormulaArtifact}\`
+- sourceToYorkArtifact: \`${payload.sourceToYorkArtifact}\`
+- diagnosticSemanticArtifact: \`${payload.diagnosticSemanticArtifact}\`
+- sourceStageArtifact: \`${payload.sourceStageArtifact}\`
+- sourceMechanismPromotionContractArtifact: \`${payload.sourceMechanismPromotionContractArtifact}\`
+
+## Source / Mechanism Maturity
+| field | value |
+|---|---|
+| maturityTier | ${maturity.maturityTier} |
+| claimBoundaryPolicy | ${maturity.claimBoundaryPolicy} |
+| authoritativeStatus | ${maturity.authoritativeStatus} |
+| promotionEligibility | ${maturity.promotionEligibility} |
+| promotionBlockers | ${maturity.promotionBlockers.join(",") || "none"} |
+| sourceFormulaInterpretationPolicy | ${maturity.sourceFormulaInterpretationPolicy} |
+| sourceToYorkBridgeClosurePolicy | ${maturity.sourceToYorkBridgeClosurePolicy} |
+| timingAuthorityStatus | ${maturity.timingAuthorityStatus} |
+| bridgeReady | ${maturity.bridgeReady} |
+| bridgeGatingStatus | ${maturity.bridgeGatingStatus} |
+| parityExpected | ${maturity.parityExpected} |
+| promotionBlocked | ${maturity.promotionBlocked} |
+| laneAUnaffected | ${maturity.laneAUnaffected} |
+| laneAAuthoritative | ${maturity.laneAAuthoritative} |
+| referenceOnlyCrossLaneScope | ${maturity.referenceOnlyCrossLaneScope} |
+| promotionContractId | ${maturity.promotionContractId} |
+| promotionContractStatus | ${maturity.promotionContractStatus} |
+| selectedPromotionRoute | ${maturity.selectedPromotionRoute} |
+| promotionSummary | ${maturity.promotionSummary} |
+| summary | ${maturity.summary} |
+
+## Allowed Claims
+${allowedClaims}
+
+## Disallowed Claims
+${disallowedClaims}
+
+## Required For Promotion
+${requiredForPromotion}
 
 ## Notes
 ${notes}
@@ -17355,7 +19546,7 @@ const buildShiftDirectionStreamlinePath = (args: {
   });
 };
 
-const buildShiftDirectionVectorFieldHash = (args: {
+const buildShiftDirectionPresentationScalarHash = (args: {
   betaXSlice: Float32Array;
   betaZSlice: Float32Array;
   sourceWidth: number;
@@ -17370,6 +19561,150 @@ const buildShiftDirectionVectorFieldHash = (args: {
     }),
   );
 
+type ShiftDirectionSamplePoint = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  magnitude: number;
+  ux: number;
+  uy: number;
+  relativeMagnitude: number;
+};
+
+const buildShiftDirectionSampleGrid = (args: {
+  betaXSlice: Float32Array;
+  betaZSlice: Float32Array;
+  sourceWidth: number;
+  sourceHeight: number;
+  magnitudeFloor: number;
+  referenceMagnitude: number;
+  sampleCols?: number;
+  sampleRows?: number;
+}): {
+  directionVectorFieldHash: string;
+  candidates: ShiftDirectionSamplePoint[];
+} => {
+  const sampleCols = Math.max(args.sampleCols ?? 29, 5);
+  const sampleRows = Math.max(args.sampleRows ?? 17, 5);
+  const candidates: ShiftDirectionSamplePoint[] = [];
+  const hashedSamples: Array<{
+    x: number;
+    y: number;
+    active: boolean;
+    ux: number;
+    uy: number;
+    relativeMagnitude: number;
+  }> = [];
+  for (let row = 1; row < sampleRows - 1; row += 1) {
+    for (let col = 1; col < sampleCols - 1; col += 1) {
+      const x = (col / (sampleCols - 1)) * Math.max(args.sourceWidth - 1, 1);
+      const y = (row / (sampleRows - 1)) * Math.max(args.sourceHeight - 1, 1);
+      const sample = sampleShiftVectorSlice({
+        betaXSlice: args.betaXSlice,
+        betaZSlice: args.betaZSlice,
+        sourceWidth: args.sourceWidth,
+        sourceHeight: args.sourceHeight,
+        x,
+        y,
+      });
+      const active = Number.isFinite(sample.magnitude) && sample.magnitude >= args.magnitudeFloor;
+      const ux = active ? sample.vx / Math.max(sample.magnitude, Number.MIN_VALUE) : 0;
+      const uy = active ? sample.vy / Math.max(sample.magnitude, Number.MIN_VALUE) : 0;
+      const relativeMagnitude = active
+        ? clamp01(
+            sample.magnitude /
+              Math.max(args.referenceMagnitude, args.magnitudeFloor, Number.MIN_VALUE),
+          )
+        : 0;
+      hashedSamples.push({
+        x: Number(x.toFixed(3)),
+        y: Number(y.toFixed(3)),
+        active,
+        ux: Number(ux.toFixed(4)),
+        uy: Number(uy.toFixed(4)),
+        relativeMagnitude: Number(relativeMagnitude.toFixed(4)),
+      });
+      if (!active) continue;
+      candidates.push({
+        x,
+        y,
+        vx: sample.vx,
+        vy: sample.vy,
+        magnitude: sample.magnitude,
+        ux,
+        uy,
+        relativeMagnitude,
+      });
+    }
+  }
+  return {
+    directionVectorFieldHash: sha256Hex(
+      stableStringify({
+        sampleCols,
+        sampleRows,
+        samples: hashedSamples,
+      }),
+    ),
+    candidates,
+  };
+};
+
+const selectShiftDirectionSeeds = (args: {
+  candidates: ShiftDirectionSamplePoint[];
+  sourceWidth: number;
+  sourceHeight: number;
+  maxSeeds?: number;
+  binCols?: number;
+  binRows?: number;
+}): ShiftDirectionSamplePoint[] => {
+  if (args.candidates.length === 0) return [];
+  const maxSeeds = Math.max(args.maxSeeds ?? 16, 1);
+  const binCols = Math.max(args.binCols ?? 5, 1);
+  const binRows = Math.max(args.binRows ?? 3, 1);
+  const sortedCandidates = [...args.candidates].sort((lhs, rhs) => {
+    if (rhs.magnitude !== lhs.magnitude) return rhs.magnitude - lhs.magnitude;
+    if (lhs.y !== rhs.y) return lhs.y - rhs.y;
+    return lhs.x - rhs.x;
+  });
+  const minSeedDistance = Math.max(
+    Math.min(args.sourceWidth / Math.max(binCols, 1), args.sourceHeight / Math.max(binRows, 1)) * 0.45,
+    2.5,
+  );
+  const seeds: ShiftDirectionSamplePoint[] = [];
+  const trySelect = (candidate: ShiftDirectionSamplePoint) => {
+    if (
+      seeds.some((seed) => Math.hypot(seed.x - candidate.x, seed.y - candidate.y) < minSeedDistance)
+    ) {
+      return;
+    }
+    seeds.push(candidate);
+  };
+  for (let binRow = 0; binRow < binRows; binRow += 1) {
+    for (let binCol = 0; binCol < binCols; binCol += 1) {
+      const xMin = (binCol / binCols) * Math.max(args.sourceWidth - 1, 1);
+      const xMax = ((binCol + 1) / binCols) * Math.max(args.sourceWidth - 1, 1);
+      const yMin = (binRow / binRows) * Math.max(args.sourceHeight - 1, 1);
+      const yMax = ((binRow + 1) / binRows) * Math.max(args.sourceHeight - 1, 1);
+      const binCandidates = sortedCandidates.filter(
+        (candidate) =>
+          candidate.x >= xMin &&
+          candidate.x <= xMax &&
+          candidate.y >= yMin &&
+          candidate.y <= yMax,
+      );
+      if (binCandidates.length === 0) continue;
+      trySelect(binCandidates[0]!);
+      if (seeds.length >= maxSeeds) return seeds;
+    }
+  }
+  for (const candidate of sortedCandidates) {
+    trySelect(candidate);
+    if (seeds.length >= maxSeeds) break;
+  }
+  return seeds;
+};
+
 const renderShiftDirectionXzOverlayPng = async (args: {
   betaXSlice: Float32Array;
   betaZSlice: Float32Array;
@@ -17381,6 +19716,7 @@ const renderShiftDirectionXzOverlayPng = async (args: {
   hullSdfSlice?: Float32Array | null;
 }): Promise<{
   png: Buffer;
+  presentationScalarFieldHash: string;
   directionVectorFieldHash: string;
   streamSeedHash: string | null;
   streamGeometryHash: string | null;
@@ -17404,7 +19740,7 @@ const renderShiftDirectionXzOverlayPng = async (args: {
     }
   }
   magnitudeSamples.sort((a, b) => a - b);
-  const directionVectorFieldHash = buildShiftDirectionVectorFieldHash(args);
+  const presentationScalarFieldHash = buildShiftDirectionPresentationScalarHash(args);
   const maxMagnitude = magnitudeSamples.at(-1) ?? 0;
   const robustMagnitude =
     computeSortedYorkOptixQuantile(magnitudeSamples, 0.98) ??
@@ -17423,30 +19759,28 @@ const renderShiftDirectionXzOverlayPng = async (args: {
           magnitudeFloor,
         )
       : Number.POSITIVE_INFINITY;
-  const seedCandidates: Array<{ x: number; y: number; vx: number; vy: number; magnitude: number }> = [];
-  const seedCols = 15;
-  const seedRows = 9;
-  for (let row = 1; row < seedRows - 1; row += 1) {
-    for (let col = 1; col < seedCols - 1; col += 1) {
-      const x = (col / (seedCols - 1)) * Math.max(args.sourceWidth - 1, 1);
-      const y = (row / (seedRows - 1)) * Math.max(args.sourceHeight - 1, 1);
-      const sample = sampleShiftVectorSlice({
-        betaXSlice: args.betaXSlice,
-        betaZSlice: args.betaZSlice,
-        sourceWidth: args.sourceWidth,
-        sourceHeight: args.sourceHeight,
-        x,
-        y,
-      });
-      if (sample.magnitude >= magnitudeFloor) {
-        seedCandidates.push({ x, y, ...sample });
-      }
-    }
-  }
-  seedCandidates.sort((lhs, rhs) => rhs.magnitude - lhs.magnitude);
-  let seeds = seedCandidates.filter((seed) => seed.magnitude >= seedFloor);
+  const sampledField = buildShiftDirectionSampleGrid({
+    betaXSlice: args.betaXSlice,
+    betaZSlice: args.betaZSlice,
+    sourceWidth: args.sourceWidth,
+    sourceHeight: args.sourceHeight,
+    magnitudeFloor,
+    referenceMagnitude: robustMagnitude,
+  });
+  const directionVectorFieldHash = sampledField.directionVectorFieldHash;
+  const seedCandidates = sampledField.candidates;
+  let seeds = selectShiftDirectionSeeds({
+    candidates: seedCandidates.filter((seed) => seed.magnitude >= seedFloor),
+    sourceWidth: args.sourceWidth,
+    sourceHeight: args.sourceHeight,
+  });
   if (seeds.length < 10) {
-    seeds = seedCandidates.slice(0, Math.min(14, seedCandidates.length));
+    seeds = selectShiftDirectionSeeds({
+      candidates: seedCandidates,
+      sourceWidth: args.sourceWidth,
+      sourceHeight: args.sourceHeight,
+      maxSeeds: Math.min(16, seedCandidates.length),
+    });
   }
   const streamSeedHash =
     seeds.length > 0
@@ -17602,6 +19936,7 @@ const renderShiftDirectionXzOverlayPng = async (args: {
       width: decoded.width,
       height: decoded.height,
     }),
+    presentationScalarFieldHash,
     directionVectorFieldHash,
     streamSeedHash,
     streamGeometryHash,
@@ -18793,6 +21128,82 @@ const computeShiftGeometryChecksum = (
   payload: Nhm2ShiftGeometryVisualizationArtifact,
 ): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 
+export const buildShiftDirectionOverlayPairwiseComparisons = (
+  renderEntries: ShiftGeometryRenderEntry[],
+): ShiftDirectionOverlayPairwiseComparison[] => {
+  const directionEntries = renderEntries.filter((entry) => entry.fieldId === "beta_direction_xz");
+  const comparisons: ShiftDirectionOverlayPairwiseComparison[] = [];
+  for (let i = 0; i < directionEntries.length; i += 1) {
+    for (let j = i + 1; j < directionEntries.length; j += 1) {
+      const lhs = directionEntries[i]!;
+      const rhs = directionEntries[j]!;
+      const presentationScalarHashesDiffer =
+        lhs.presentationScalarFieldHash !== rhs.presentationScalarFieldHash;
+      const directionVectorFieldHashesDiffer =
+        (lhs.directionVectorFieldHash ?? null) !== (rhs.directionVectorFieldHash ?? null);
+      const streamSeedHashesDiffer = (lhs.streamSeedHash ?? null) !== (rhs.streamSeedHash ?? null);
+      const streamGeometryHashesDiffer =
+        (lhs.streamGeometryHash ?? null) !== (rhs.streamGeometryHash ?? null);
+      const directionOverlayHashesDiffer =
+        (lhs.directionOverlayHash ?? null) !== (rhs.directionOverlayHash ?? null);
+      const imageHashesDiffer = (lhs.imageHash ?? null) !== (rhs.imageHash ?? null);
+      let collapseStage: ShiftDirectionOverlayCollapseStage = "not_applicable";
+      let internalVarianceStatus: ShiftDirectionOverlayInternalVarianceStatus = "not_applicable";
+      let note = "comparison_not_applicable";
+      if (!imageHashesDiffer) {
+        if (!directionVectorFieldHashesDiffer) {
+          collapseStage = "genuinely_identical_sampled_direction_field";
+          const internalVariancePresent =
+            streamSeedHashesDiffer || streamGeometryHashesDiffer || directionOverlayHashesDiffer;
+          internalVarianceStatus = internalVariancePresent
+            ? "non_material_after_sampled_field_match"
+            : "not_applicable";
+          note = internalVariancePresent
+            ? presentationScalarHashesDiffer
+              ? "raw_direction_slices_differ_but_the_sampled_overlay_direction_field_is_identical_at_render_resolution; internal_seed_geometry_overlay_variance_is_retained_as_raw_debug_data_but_normalized_as_non_material_because_the_sampled_overlay_direction_field_and_final_image_match"
+              : "sampled_overlay_direction_field_is_identical; internal_seed_geometry_overlay_variance_is_retained_as_raw_debug_data_but_normalized_as_non_material_because_the_final_image_matches"
+            : presentationScalarHashesDiffer
+              ? "raw_direction_slices_differ_but_the_sampled_overlay_direction_field_is_identical_at_render_resolution"
+              : "sampled_overlay_direction_field_is_identical";
+        } else if (!streamSeedHashesDiffer) {
+          collapseStage = "stream_seed_generation";
+          internalVarianceStatus = "material_collapse_requires_debug";
+          note = "directional_distinctness_is_lost_when_the_deterministic_seed_policy_selects_identical_seeds";
+        } else if (!streamGeometryHashesDiffer) {
+          collapseStage = "streamline_geometry";
+          internalVarianceStatus = "material_collapse_requires_debug";
+          note = "distinct_seed_sets_converge_to_identical_streamline_geometry";
+        } else if (!directionOverlayHashesDiffer) {
+          collapseStage = "overlay_svg_composition";
+          internalVarianceStatus = "material_collapse_requires_debug";
+          note = "distinct_streamline_geometry_converges_during_overlay_svg_composition";
+        } else {
+          collapseStage = "png_rasterization_or_boundary_overlay";
+          internalVarianceStatus = "material_collapse_requires_debug";
+          note = "distinct_overlay_svg_output_converges_during_png_rasterization_or_boundary_overlay";
+        }
+      } else {
+        collapseStage = "distinct_through_image";
+        note = "case_specific_directional_distinctness_survives_through_final_image";
+      }
+      comparisons.push({
+        lhsCaseId: lhs.caseId,
+        rhsCaseId: rhs.caseId,
+        presentationScalarHashesDiffer,
+        directionVectorFieldHashesDiffer,
+        streamSeedHashesDiffer,
+        streamGeometryHashesDiffer,
+        directionOverlayHashesDiffer,
+        imageHashesDiffer,
+        collapseStage,
+        internalVarianceStatus,
+        note,
+      });
+    }
+  }
+  return comparisons;
+};
+
 export const evaluateShiftDirectionOverlayCaseDistinctness = (
   renderEntries: ShiftGeometryRenderEntry[],
 ): {
@@ -18814,21 +21225,15 @@ export const evaluateShiftDirectionOverlayCaseDistinctness = (
       warningSet.add(warning);
     }
   }
-  let collapsedAcrossCases = false;
-  for (let i = 0; i < directionEntries.length; i += 1) {
-    for (let j = i + 1; j < directionEntries.length; j += 1) {
-      const lhs = directionEntries[i]!;
-      const rhs = directionEntries[j]!;
-      if (!lhs.imageHash || lhs.imageHash !== rhs.imageHash) continue;
-      const lhsDirectionalHash = lhs.directionVectorFieldHash ?? lhs.presentationScalarFieldHash;
-      const rhsDirectionalHash = rhs.directionVectorFieldHash ?? rhs.presentationScalarFieldHash;
-      const directionalHashesDiffer = lhsDirectionalHash !== rhsDirectionalHash;
-      const geometryHashesDiffer = lhs.streamGeometryHash !== rhs.streamGeometryHash;
-      if (directionalHashesDiffer || geometryHashesDiffer) {
-        collapsedAcrossCases = true;
-      }
-    }
-  }
+  const pairwiseComparisons = buildShiftDirectionOverlayPairwiseComparisons(renderEntries);
+  const collapsedAcrossCases = pairwiseComparisons.some((comparison) =>
+    [
+      "stream_seed_generation",
+      "streamline_geometry",
+      "overlay_svg_composition",
+      "png_rasterization_or_boundary_overlay",
+    ].includes(comparison.collapseStage),
+  );
   if (collapsedAcrossCases) {
     warningSet.add("direction_overlay_collapsed_across_cases");
   }
@@ -19297,7 +21702,7 @@ export const buildNhm2ShiftGeometryVisualizationArtifact = async (args: {
         thetaHash: metricBinding.thetaChannelHash,
         kTraceHash: metricBinding.kTraceChannelHash,
         laneAFieldHash: metricBinding.laneAFieldHash,
-        presentationScalarFieldHash: overlay.directionVectorFieldHash,
+        presentationScalarFieldHash: overlay.presentationScalarFieldHash,
         directionVectorFieldHash: overlay.directionVectorFieldHash,
         streamSeedHash: overlay.streamSeedHash,
         streamGeometryHash: overlay.streamGeometryHash,
@@ -19467,6 +21872,8 @@ export const buildNhm2ShiftGeometryVisualizationArtifact = async (args: {
     residualSummaries.push(summary);
   }
 
+  const directionOverlayPairwiseComparisons =
+    buildShiftDirectionOverlayPairwiseComparisons(renderEntries);
   const directionOverlaySummary = evaluateShiftDirectionOverlayCaseDistinctness(renderEntries);
   const artifactBase: Nhm2ShiftGeometryVisualizationArtifact = {
     artifactType: "nhm2_shift_geometry_visualization/v1",
@@ -19497,6 +21904,9 @@ export const buildNhm2ShiftGeometryVisualizationArtifact = async (args: {
     directionOverlayStatus: directionOverlaySummary.directionOverlayStatus,
     directionOverlayWarnings: directionOverlaySummary.directionOverlayWarnings,
     directionOverlayCaseDistinctness: directionOverlaySummary.directionOverlayCaseDistinctness,
+    directionOverlayInterpretationPolicy:
+      "normalize_non_material_internal_variance_after_sampled_field_match",
+    directionOverlayPairwiseComparisons,
     constraintContextStatus: "deferred_units_and_policy_unresolved",
     recommendedInterpretationOrder: [
       "beta_magnitude",
@@ -19513,7 +21923,8 @@ export const buildNhm2ShiftGeometryVisualizationArtifact = async (args: {
       "shift_geometry_secondary_interpretive=true",
       "scientific_3p1_field shift frames remain on a neutral field canvas with no transport-context inheritance.",
       "beta_magnitude and beta_x reuse the same authoritative solved snapshot path as the OptiX York field suite.",
-      "beta_direction_xz uses case-specific directional geometry on the x-z slice with explicit hull/support context and an explicit degraded fallback state if only hull context remains.",
+      "beta_direction_xz now records both the raw full-slice hash and the sampled overlay-direction hash so any cross-case collapse can be localized to sampled field, seed generation, streamline geometry, overlay composition, or final image rasterization.",
+      "when a pair matches on the sampled overlay-direction field and on the final image, any differing seed, streamline-geometry, or overlay hashes are retained as raw debug data but interpreted as non-material internal variance rather than a blocking collapse.",
       "paired constraint companion deferred in this pass because the constraint-unit labeling policy is not yet standardized enough for first-class publication.",
       "line cuts deferred until a dedicated probe-family taxonomy is added.",
     ],
@@ -19530,7 +21941,7 @@ export const renderNhm2ShiftGeometryVisualizationMarkdown = (
   const renderRows = payload.renderEntries
     .map(
       (entry) =>
-        `| ${entry.caseId} | ${entry.referenceCaseId ?? "null"} | ${entry.fieldId} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.directionOverlayStatus ?? "null"} | ${(entry.directionOverlayWarnings ?? []).join(",") || "none"} | ${entry.directionVectorFieldHash ?? "null"} | ${entry.streamSeedHash ?? "null"} | ${entry.streamGeometryHash ?? "null"} | ${entry.directionOverlayHash ?? "null"} | ${entry.fieldAbsMax ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
+        `| ${entry.caseId} | ${entry.referenceCaseId ?? "null"} | ${entry.fieldId} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.directionOverlayStatus ?? "null"} | ${(entry.directionOverlayWarnings ?? []).join(",") || "none"} | ${entry.presentationScalarFieldHash ?? "null"} | ${entry.directionVectorFieldHash ?? "null"} | ${entry.streamSeedHash ?? "null"} | ${entry.streamGeometryHash ?? "null"} | ${entry.directionOverlayHash ?? "null"} | ${entry.fieldAbsMax ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
     )
     .join("\n");
   const fieldSummaryRows = payload.fieldSummaries
@@ -19543,6 +21954,12 @@ export const renderNhm2ShiftGeometryVisualizationMarkdown = (
     .map(
       (entry) =>
         `| ${entry.referenceCaseId} | ${entry.betaMagnitudeResidual?.canonicalPath ?? "null"} | ${entry.betaMagnitudeResidualAbsMax ?? "null"} | ${entry.betaXResidual?.canonicalPath ?? "null"} | ${entry.betaXResidualAbsMax ?? "null"} |`,
+    )
+    .join("\n");
+  const pairwiseRows = payload.directionOverlayPairwiseComparisons
+    .map(
+      (entry) =>
+        `| ${entry.lhsCaseId} | ${entry.rhsCaseId} | ${entry.presentationScalarHashesDiffer} | ${entry.directionVectorFieldHashesDiffer} | ${entry.streamSeedHashesDiffer} | ${entry.streamGeometryHashesDiffer} | ${entry.directionOverlayHashesDiffer} | ${entry.imageHashesDiffer} | ${entry.collapseStage} | ${entry.internalVarianceStatus} | ${entry.note} |`,
     )
     .join("\n");
   const notes = payload.notes.map((entry) => `- ${entry}`).join("\n");
@@ -19563,6 +21980,7 @@ export const renderNhm2ShiftGeometryVisualizationMarkdown = (
 | laneId | ${payload.shiftConvention.laneId} |
 | directionOverlayStatus | ${payload.directionOverlayStatus} |
 | directionOverlayCaseDistinctness | ${payload.directionOverlayCaseDistinctness} |
+| directionOverlayInterpretationPolicy | ${payload.directionOverlayInterpretationPolicy} |
 | directionOverlayWarnings | ${payload.directionOverlayWarnings.join(",") || "none"} |
 | constraintContextStatus | ${payload.constraintContextStatus} |
 | lineCutStatus | ${payload.lineCutStatus} |
@@ -19583,9 +22001,14 @@ ${fieldSummaryRows}
 |---|---|---:|---|---:|
 ${residualRows}
 
+## Direction Overlay Pairwise Comparisons
+| lhsCaseId | rhsCaseId | presentationScalarHashesDiffer | directionVectorFieldHashesDiffer | streamSeedHashesDiffer | streamGeometryHashesDiffer | directionOverlayHashesDiffer | imageHashesDiffer | collapseStage | internalVarianceStatus | note |
+|---|---|---|---|---|---|---|---|---|---|---|
+${pairwiseRows}
+
 ## Render Entries
-| caseId | referenceCaseId | fieldId | variant | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | directionOverlayStatus | directionOverlayWarnings | directionVectorFieldHash | streamSeedHash | streamGeometryHash | directionOverlayHash | fieldAbsMax | displayPolicyId | displayTransform | imagePath | imageHash |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|---|
+| caseId | referenceCaseId | fieldId | variant | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | directionOverlayStatus | directionOverlayWarnings | presentationScalarFieldHash | directionVectorFieldHash | streamSeedHash | streamGeometryHash | directionOverlayHash | fieldAbsMax | displayPolicyId | displayTransform | imagePath | imageHash |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|---|
 ${renderRows}
 
 ## Recommended Interpretation Order
@@ -27210,21 +29633,37 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| statusNote | ${payload.sourceToYorkBridge.readiness.statusNote} |`,
         `| sourceContractPresent | ${payload.sourceToYorkBridge.readiness.sourceContractPresent} |`,
         `| timingAuthorityPresent | ${payload.sourceToYorkBridge.readiness.timingAuthorityPresent} |`,
+        `| timingAuthorityStatus | ${payload.sourceToYorkBridge.readiness.timingAuthorityStatus} |`,
+        `| timingAuthorityArtifactRecognized | ${payload.sourceToYorkBridge.readiness.timingAuthorityArtifactRecognized} |`,
+        `| timingAuthorityRequiredFields | ${payload.sourceToYorkBridge.readiness.timingAuthorityRequiredFields.join(",") || "none"} |`,
+        `| timingAuthorityOptionalMissingFields | ${payload.sourceToYorkBridge.readiness.timingAuthorityOptionalMissingFields.join(",") || "none"} |`,
         `| reducedOrderPayloadPresent | ${payload.sourceToYorkBridge.readiness.reducedOrderPayloadPresent} |`,
         `| proofPackBrickPresent | ${payload.sourceToYorkBridge.readiness.proofPackBrickPresent} |`,
         `| parameterMappingsComplete | ${payload.sourceToYorkBridge.readiness.parameterMappingsComplete} |`,
         `| parameterMappingsExplained | ${payload.sourceToYorkBridge.readiness.parameterMappingsExplained} |`,
         `| metricRefProvenanceClosed | ${payload.sourceToYorkBridge.readiness.metricRefProvenanceClosed} |`,
         `| bridgeReady | ${payload.sourceToYorkBridge.readiness.bridgeReady} |`,
+        `| bridgeOpenFieldCount | ${payload.sourceToYorkBridge.readiness.bridgeOpenFieldCount} |`,
+        `| bridgeClosedFieldCount | ${payload.sourceToYorkBridge.readiness.bridgeClosedFieldCount} |`,
+        `| closureCandidateStatus | ${payload.sourceToYorkBridge.readiness.closureCandidateStatus} |`,
+        `| bridgeClosurePolicy | ${payload.sourceToYorkBridge.readiness.bridgeClosurePolicy} |`,
         `| artifactPath | ${payload.sourceToYorkBridge.artifactPath} |`,
         `| reportPath | ${payload.sourceToYorkBridge.reportPath} |`,
       ].join("\n")
     : "| bridge | unavailable |";
   const sourceToYorkBlockReasons =
     payload.sourceToYorkBridge?.readiness.blockReasons ?? [];
+  const sourceToYorkAdvisoryReasons =
+    payload.sourceToYorkBridge?.readiness.residualAdvisoryReasons ?? [];
   const sourceBridgeBlockers =
     sourceToYorkBlockReasons.length > 0
       ? sourceToYorkBlockReasons
+          .map((entry) => `- ${entry}`)
+          .join("\n")
+      : "- none";
+  const sourceBridgeAdvisories =
+    sourceToYorkAdvisoryReasons.length > 0
+      ? sourceToYorkAdvisoryReasons
           .map((entry) => `- ${entry}`)
           .join("\n")
       : "- none";
@@ -27354,10 +29793,99 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| formulaEquivalent | ${payload.sourceFormulaAudit.formulaEquivalent} |`,
         `| reconstructionOnlyComparison | ${payload.sourceFormulaAudit.reconstructionOnlyComparison} |`,
         `| formulaMismatchClass | ${payload.sourceFormulaAudit.formulaMismatchClass} |`,
+        `| comparisonMode | ${payload.sourceFormulaAudit.comparisonMode} |`,
+        `| mismatchReason | ${payload.sourceFormulaAudit.mismatchReason} |`,
+        `| additionalMismatchReasons | ${payload.sourceFormulaAudit.additionalMismatchReasons.join(",") || "none"} |`,
+        `| sourceFormulaInterpretationPolicy | ${payload.sourceFormulaAudit.sourceFormulaInterpretationPolicy} |`,
+        `| parityExpected | ${payload.sourceFormulaAudit.parityExpected} |`,
+        `| promotionBlockedByMismatch | ${payload.sourceFormulaAudit.promotionBlockedByMismatch} |`,
+        `| laneAUnaffectedByMismatch | ${payload.sourceFormulaAudit.laneAUnaffectedByMismatch} |`,
+        `| tolerancePolicySummary | ${payload.sourceFormulaAudit.tolerancePolicySummary} |`,
+        `| directFormulaId | ${payload.sourceFormulaAudit.directFormulaId ?? "null"} |`,
+        `| reconstructedFormulaId | ${payload.sourceFormulaAudit.reconstructedFormulaId ?? "null"} |`,
+        `| termMismatchCount | ${payload.sourceFormulaAudit.termMismatchCount} |`,
         `| artifactPath | ${payload.sourceFormulaAudit.artifactPath} |`,
         `| reportPath | ${payload.sourceFormulaAudit.reportPath} |`,
       ].join("\n")
     : "| source_formula_audit | unavailable |";
+  const sourceMechanismRows = payload.sourceMechanismMaturity
+    ? [
+        `| maturityTier | ${payload.sourceMechanismMaturity.maturityTier} |`,
+        `| claimBoundaryPolicy | ${payload.sourceMechanismMaturity.claimBoundaryPolicy} |`,
+        `| authoritativeStatus | ${payload.sourceMechanismMaturity.authoritativeStatus} |`,
+        `| promotionEligibility | ${payload.sourceMechanismMaturity.promotionEligibility} |`,
+        `| promotionBlockers | ${payload.sourceMechanismMaturity.promotionBlockers.join(",") || "none"} |`,
+        `| sourceFormulaInterpretationPolicy | ${payload.sourceMechanismMaturity.sourceFormulaInterpretationPolicy} |`,
+        `| sourceToYorkBridgeClosurePolicy | ${payload.sourceMechanismMaturity.sourceToYorkBridgeClosurePolicy} |`,
+        `| timingAuthorityStatus | ${payload.sourceMechanismMaturity.timingAuthorityStatus} |`,
+        `| bridgeReady | ${payload.sourceMechanismMaturity.bridgeReady} |`,
+        `| bridgeGatingStatus | ${payload.sourceMechanismMaturity.bridgeGatingStatus} |`,
+        `| parityExpected | ${payload.sourceMechanismMaturity.parityExpected} |`,
+        `| promotionBlocked | ${payload.sourceMechanismMaturity.promotionBlocked} |`,
+        `| laneAUnaffected | ${payload.sourceMechanismMaturity.laneAUnaffected} |`,
+        `| laneAAuthoritative | ${payload.sourceMechanismMaturity.laneAAuthoritative} |`,
+        `| referenceOnlyCrossLaneScope | ${payload.sourceMechanismMaturity.referenceOnlyCrossLaneScope} |`,
+        `| promotionContractId | ${payload.sourceMechanismMaturity.promotionContractId} |`,
+        `| promotionContractStatus | ${payload.sourceMechanismMaturity.promotionContractStatus} |`,
+        `| selectedPromotionRoute | ${payload.sourceMechanismMaturity.selectedPromotionRoute} |`,
+        `| promotionSummary | ${payload.sourceMechanismMaturity.promotionSummary} |`,
+        `| summary | ${payload.sourceMechanismMaturity.summary} |`,
+        `| artifactPath | ${payload.sourceMechanismMaturity.artifactPath} |`,
+        `| reportPath | ${payload.sourceMechanismMaturity.reportPath} |`,
+      ].join("\n")
+    : "| source_mechanism_maturity | unavailable |";
+  const sourceMechanismAllowedClaims = payload.sourceMechanismMaturity?.allowedClaims.length
+    ? payload.sourceMechanismMaturity.allowedClaims.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const sourceMechanismDisallowedClaims = payload.sourceMechanismMaturity?.disallowedClaims.length
+    ? payload.sourceMechanismMaturity.disallowedClaims
+        .map((entry) => `- ${entry}`)
+        .join("\n")
+    : "- none";
+  const sourceMechanismRequiredForPromotion =
+    payload.sourceMechanismMaturity?.requiredForPromotion.length
+      ? payload.sourceMechanismMaturity.requiredForPromotion
+          .map((entry) => `- ${entry}`)
+          .join("\n")
+      : "- none";
+  const sourceMechanismPromotionContractRows = payload.sourceMechanismPromotionContract
+    ? [
+        `| contractId | ${payload.sourceMechanismPromotionContract.contractId} |`,
+        `| contractStatus | ${payload.sourceMechanismPromotionContract.contractStatus} |`,
+        `| selectedPromotionRoute | ${payload.sourceMechanismPromotionContract.selectedPromotionRoute} |`,
+        `| promotionDecisionPolicy | ${payload.sourceMechanismPromotionContract.promotionDecisionPolicy} |`,
+        `| claimsRequiringParityCount | ${payload.sourceMechanismPromotionContract.claimsRequiringParityCount} |`,
+        `| claimsEligibleUnderExemptionCount | ${payload.sourceMechanismPromotionContract.claimsEligibleUnderExemptionCount} |`,
+        `| claimsBlockedEvenWithExemptionCount | ${payload.sourceMechanismPromotionContract.claimsBlockedEvenWithExemptionCount} |`,
+        `| exemptionEligibleClaimCount | ${payload.sourceMechanismPromotionContract.exemptionEligibleClaimCount} |`,
+        `| exemptionBlockedClaimCount | ${payload.sourceMechanismPromotionContract.exemptionBlockedClaimCount} |`,
+        `| exemptionRouteStatus | ${payload.sourceMechanismPromotionContract.exemptionRouteStatus} |`,
+        `| routeFeasibilityStatus | ${payload.sourceMechanismPromotionContract.routeFeasibilityStatus} |`,
+        `| routeBlockingClass | ${payload.sourceMechanismPromotionContract.routeBlockingClass} |`,
+        `| dominantMismatchTerm | ${payload.sourceMechanismPromotionContract.dominantMismatchTerm ?? "none"} |`,
+        `| nextClosureAction | ${payload.sourceMechanismPromotionContract.nextClosureAction} |`,
+        `| exemptionRouteSummary | ${payload.sourceMechanismPromotionContract.exemptionRouteSummary} |`,
+        `| promotionSummary | ${payload.sourceMechanismPromotionContract.promotionSummary} |`,
+        `| artifactPath | ${payload.sourceMechanismPromotionContract.artifactPath} |`,
+        `| reportPath | ${payload.sourceMechanismPromotionContract.reportPath} |`,
+      ].join("\n")
+    : "| source_mechanism_promotion_contract | unavailable |";
+  const sourceMechanismParityRouteFeasibilityRows =
+    payload.sourceMechanismParityRouteFeasibility
+      ? [
+          `| routeId | ${payload.sourceMechanismParityRouteFeasibility.routeId} |`,
+          `| routeStatus | ${payload.sourceMechanismParityRouteFeasibility.routeStatus} |`,
+          `| routeFeasibilityStatus | ${payload.sourceMechanismParityRouteFeasibility.routeFeasibilityStatus} |`,
+          `| routeBlockingClass | ${payload.sourceMechanismParityRouteFeasibility.routeBlockingClass} |`,
+          `| dominantMismatchTerm | ${payload.sourceMechanismParityRouteFeasibility.dominantMismatchTerm ?? "none"} |`,
+          `| matchedTermsCount | ${payload.sourceMechanismParityRouteFeasibility.matchedTermsCount} |`,
+          `| unmatchedTermsCount | ${payload.sourceMechanismParityRouteFeasibility.unmatchedTermsCount} |`,
+          `| nextClosureAction | ${payload.sourceMechanismParityRouteFeasibility.nextClosureAction} |`,
+          `| parityRouteSummary | ${payload.sourceMechanismParityRouteFeasibility.parityRouteSummary} |`,
+          `| artifactPath | ${payload.sourceMechanismParityRouteFeasibility.artifactPath} |`,
+          `| reportPath | ${payload.sourceMechanismParityRouteFeasibility.reportPath} |`,
+        ].join("\n")
+      : "| source_mechanism_parity_route_feasibility | unavailable |";
   const presentationRenderRows = payload.presentationRenderSummary
     ? [
         `| presentationRenderLayerStatus | ${payload.presentationRenderSummary.presentationRenderLayerStatus} |`,
@@ -27379,6 +29907,7 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| mandatoryResidualComparisons | ${payload.shiftGeometrySummary.mandatoryResidualComparisons.join(",")} |`,
         `| directionOverlayStatus | ${payload.shiftGeometrySummary.directionOverlayStatus} |`,
         `| directionOverlayCaseDistinctness | ${payload.shiftGeometrySummary.directionOverlayCaseDistinctness} |`,
+        `| directionOverlayInterpretationPolicy | ${payload.shiftGeometrySummary.directionOverlayInterpretationPolicy} |`,
         `| directionOverlayWarnings | ${payload.shiftGeometrySummary.directionOverlayWarnings.join(",") || "none"} |`,
         `| constraintContextStatus | ${payload.shiftGeometrySummary.constraintContextStatus} |`,
         `| artifactPath | ${payload.shiftGeometrySummary.artifactPath} |`,
@@ -27556,6 +30085,9 @@ ${sourceBridgeRows}
 ### Source-To-York Legacy Gaps
 ${sourceBridgeBlockers}
 
+### Source-To-York Advisory Reasons
+${sourceBridgeAdvisories}
+
 ## Timing-Authority Audit
 | field | value |
 |---|---|
@@ -27609,6 +30141,30 @@ ${sourceStageRows}
 | field | value |
 |---|---|
 ${sourceFormulaRows}
+
+## Source / Mechanism Maturity
+| field | value |
+|---|---|
+${sourceMechanismRows}
+
+### Allowed Claims
+${sourceMechanismAllowedClaims}
+
+### Disallowed Claims
+${sourceMechanismDisallowedClaims}
+
+### Required For Promotion
+${sourceMechanismRequiredForPromotion}
+
+## Source / Mechanism Promotion Contract
+| field | value |
+|---|---|
+${sourceMechanismPromotionContractRows}
+
+## Source / Mechanism Parity-Route Feasibility
+| field | value |
+|---|---|
+${sourceMechanismParityRouteFeasibilityRows}
 
 ## Presentation Render Layer
 | field | value |
@@ -27681,6 +30237,18 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   sourceFormulaAuditLatestJsonPath?: string;
   sourceFormulaAuditOutMdPath?: string;
   sourceFormulaAuditLatestMdPath?: string;
+  sourceMechanismMaturityOutJsonPath?: string;
+  sourceMechanismMaturityLatestJsonPath?: string;
+  sourceMechanismMaturityOutMdPath?: string;
+  sourceMechanismMaturityLatestMdPath?: string;
+  sourceMechanismPromotionContractOutJsonPath?: string;
+  sourceMechanismPromotionContractLatestJsonPath?: string;
+  sourceMechanismPromotionContractOutMdPath?: string;
+  sourceMechanismPromotionContractLatestMdPath?: string;
+  sourceMechanismParityRouteFeasibilityOutJsonPath?: string;
+  sourceMechanismParityRouteFeasibilityLatestJsonPath?: string;
+  sourceMechanismParityRouteFeasibilityOutMdPath?: string;
+  sourceMechanismParityRouteFeasibilityLatestMdPath?: string;
   timingAuthorityAuditOutJsonPath?: string;
   timingAuthorityAuditLatestJsonPath?: string;
   timingAuthorityAuditOutMdPath?: string;
@@ -27817,6 +30385,41 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     options?.sourceFormulaAuditOutMdPath ?? DEFAULT_SOURCE_FORMULA_AUDIT_OUT_MD;
   const sourceFormulaAuditLatestMdPath =
     options?.sourceFormulaAuditLatestMdPath ?? DEFAULT_SOURCE_FORMULA_AUDIT_LATEST_MD;
+  const sourceMechanismMaturityOutJsonPath =
+    options?.sourceMechanismMaturityOutJsonPath ??
+    DEFAULT_SOURCE_MECHANISM_MATURITY_OUT_JSON;
+  const sourceMechanismMaturityLatestJsonPath =
+    options?.sourceMechanismMaturityLatestJsonPath ??
+    DEFAULT_SOURCE_MECHANISM_MATURITY_LATEST_JSON;
+  const sourceMechanismMaturityOutMdPath =
+    options?.sourceMechanismMaturityOutMdPath ?? DEFAULT_SOURCE_MECHANISM_MATURITY_OUT_MD;
+  const sourceMechanismMaturityLatestMdPath =
+    options?.sourceMechanismMaturityLatestMdPath ??
+    DEFAULT_SOURCE_MECHANISM_MATURITY_LATEST_MD;
+  const sourceMechanismPromotionContractOutJsonPath =
+    options?.sourceMechanismPromotionContractOutJsonPath ??
+    DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_OUT_JSON;
+  const sourceMechanismPromotionContractLatestJsonPath =
+    options?.sourceMechanismPromotionContractLatestJsonPath ??
+    DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_JSON;
+  const sourceMechanismPromotionContractOutMdPath =
+    options?.sourceMechanismPromotionContractOutMdPath ??
+    DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_OUT_MD;
+  const sourceMechanismPromotionContractLatestMdPath =
+    options?.sourceMechanismPromotionContractLatestMdPath ??
+    DEFAULT_SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_MD;
+  const sourceMechanismParityRouteFeasibilityOutJsonPath =
+    options?.sourceMechanismParityRouteFeasibilityOutJsonPath ??
+    DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_OUT_JSON;
+  const sourceMechanismParityRouteFeasibilityLatestJsonPath =
+    options?.sourceMechanismParityRouteFeasibilityLatestJsonPath ??
+    DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_LATEST_JSON;
+  const sourceMechanismParityRouteFeasibilityOutMdPath =
+    options?.sourceMechanismParityRouteFeasibilityOutMdPath ??
+    DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_OUT_MD;
+  const sourceMechanismParityRouteFeasibilityLatestMdPath =
+    options?.sourceMechanismParityRouteFeasibilityLatestMdPath ??
+    DEFAULT_SOURCE_MECHANISM_PARITY_ROUTE_FEASIBILITY_LATEST_MD;
   const timingAuthorityAuditOutJsonPath =
     options?.timingAuthorityAuditOutJsonPath ?? DEFAULT_TIMING_AUTHORITY_AUDIT_OUT_JSON;
   const timingAuthorityAuditLatestJsonPath =
@@ -28225,8 +30828,13 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     sourceAuditArtifactPath: latestJsonPath,
   });
   notes.push(
-    `source_to_york_bridge_status=${sourceToYorkArtifact.bridgeReadiness.gatingStatus} gating_blocks_mechanism_chain=${sourceToYorkArtifact.bridgeReadiness.gatingBlocksMechanismChain} legacy_bridge_ready=${sourceToYorkArtifact.bridgeReadiness.bridgeReady} reasons=${sourceToYorkArtifact.bridgeReadiness.blockReasons.join(",") || "none"}`,
+    `source_to_york_bridge_status=${sourceToYorkArtifact.bridgeReadiness.gatingStatus} gating_blocks_mechanism_chain=${sourceToYorkArtifact.bridgeReadiness.gatingBlocksMechanismChain} legacy_bridge_ready=${sourceToYorkArtifact.bridgeReadiness.bridgeReady} closure_policy=${sourceToYorkArtifact.bridgeReadiness.bridgeClosurePolicy} closure_candidate_status=${sourceToYorkArtifact.bridgeReadiness.closureCandidateStatus} blocking=${sourceToYorkArtifact.bridgeReadiness.residualBlockingReasons.join(",") || "none"} advisory=${sourceToYorkArtifact.bridgeReadiness.residualAdvisoryReasons.join(",") || "none"}`,
   );
+  const sourceToYorkBridgeSummary = buildSourceToYorkBridgeSummary({
+    artifact: sourceToYorkArtifact,
+    artifactPath: sourceToYorkLatestJsonPath,
+    reportPath: sourceToYorkLatestMdPath,
+  });
   const timingAuthorityAuditArtifact = buildNhm2TimingAuthorityAuditArtifact({
     payload: {
       artifactType: "warp_york_control_family_proof_pack/v1",
@@ -28490,6 +31098,154 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   notes.push(
     `source_stage_ready=${sourceStageAuditArtifact.stage.source_stage_ready} cause=${sourceStageAuditArtifact.stage.source_stage_cause}`,
   );
+  const sourceMechanismMaturityArtifact = buildNhm2SourceMechanismMaturityArtifact({
+    payload: {
+      artifactType: "warp_york_control_family_proof_pack/v1",
+      generatedOn: DATE_STAMP,
+      generatedAt: new Date().toISOString(),
+      boundaryStatement: BOUNDARY_STATEMENT,
+      diagnosticContractId: diagnosticContract.contract_id,
+      classificationScope: diagnosticContract.classification_scope,
+      diagnosticContract,
+      diagnosticLanes: laneEvaluations,
+      crossLaneComparison,
+      inputs: {
+        baseUrl,
+        frameEndpoint,
+        proxyFrameEndpoint,
+        compareDirectAndProxy,
+        nhm2SnapshotPath: normalizePath(nhm2SnapshotPath),
+        yorkViews: [...yorkViews],
+        frameSize,
+      },
+      cases,
+      controlDebug,
+      preconditions,
+      laneAParity,
+      causeCode,
+      guardFailures,
+      decisionTable,
+      classificationScoring,
+      classificationRobustness,
+      verdict,
+      notes,
+      provenance: {
+        commitHash: getHeadCommit(),
+        runtimeStatus,
+      },
+    },
+    sourceFormulaAudit: sourceFormulaAuditArtifact,
+    sourceToYork: sourceToYorkArtifact,
+    diagnosticSemanticAudit: diagnosticSemanticAuditArtifact,
+    sourceStageAudit: sourceStageAuditArtifact,
+    sourceAuditArtifactPath: latestJsonPath,
+    sourceFormulaAuditPath: sourceFormulaAuditLatestJsonPath,
+    sourceToYorkArtifactPath: sourceToYorkLatestJsonPath,
+    diagnosticSemanticAuditPath: diagnosticSemanticAuditLatestJsonPath,
+    sourceStageAuditPath: sourceStageAuditLatestJsonPath,
+    sourceMechanismPromotionContractArtifactPath:
+      sourceMechanismPromotionContractLatestJsonPath,
+    sourceMechanismParityRouteFeasibilityArtifactPath:
+      sourceMechanismParityRouteFeasibilityLatestJsonPath,
+  });
+  notes.push(
+    `source_mechanism_maturity=${sourceMechanismMaturityArtifact.sourceMechanismMaturity.maturityTier} claim_boundary_policy=${sourceMechanismMaturityArtifact.sourceMechanismMaturity.claimBoundaryPolicy} promotion_blockers=${sourceMechanismMaturityArtifact.sourceMechanismMaturity.promotionBlockers.join(",") || "none"} lane_a_authoritative=${sourceMechanismMaturityArtifact.sourceMechanismMaturity.laneAAuthoritative}`,
+  );
+  const sourceMechanismParityRouteFeasibilityArtifact =
+    buildNhm2SourceMechanismParityRouteFeasibilityArtifact({
+      payload: {
+        artifactType: "warp_york_control_family_proof_pack/v1",
+        generatedOn: DATE_STAMP,
+        generatedAt: new Date().toISOString(),
+        boundaryStatement: BOUNDARY_STATEMENT,
+        diagnosticContractId: diagnosticContract.contract_id,
+        classificationScope: diagnosticContract.classification_scope,
+        diagnosticContract,
+        diagnosticLanes: laneEvaluations,
+        crossLaneComparison,
+        inputs: {
+          baseUrl,
+          frameEndpoint,
+          proxyFrameEndpoint,
+          compareDirectAndProxy,
+          nhm2SnapshotPath: normalizePath(nhm2SnapshotPath),
+          yorkViews: [...yorkViews],
+          frameSize,
+        },
+        cases,
+        controlDebug,
+        preconditions,
+        laneAParity,
+        causeCode,
+        guardFailures,
+        decisionTable,
+        classificationScoring,
+        classificationRobustness,
+        verdict,
+        notes,
+        provenance: {
+          commitHash: getHeadCommit(),
+          runtimeStatus,
+        },
+      },
+      sourceFormulaAudit: sourceFormulaAuditArtifact,
+      sourceFormulaArtifactPath: sourceFormulaAuditLatestJsonPath,
+      sourceMechanismPromotionContractArtifactPath:
+        sourceMechanismPromotionContractLatestJsonPath,
+      sourceMechanismMaturityArtifactPath: sourceMechanismMaturityLatestJsonPath,
+    });
+  notes.push(
+    `source_mechanism_parity_route_feasibility=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus} blocking_class=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.routeBlockingClass} dominant_mismatch_term=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.dominantMismatchTerm ?? "none"}`,
+  );
+  const sourceMechanismPromotionContractArtifact =
+    buildNhm2SourceMechanismPromotionContractArtifact({
+      payload: {
+        artifactType: "warp_york_control_family_proof_pack/v1",
+        generatedOn: DATE_STAMP,
+        generatedAt: new Date().toISOString(),
+        boundaryStatement: BOUNDARY_STATEMENT,
+        diagnosticContractId: diagnosticContract.contract_id,
+        classificationScope: diagnosticContract.classification_scope,
+        diagnosticContract,
+        diagnosticLanes: laneEvaluations,
+        crossLaneComparison,
+        inputs: {
+          baseUrl,
+          frameEndpoint,
+          proxyFrameEndpoint,
+          compareDirectAndProxy,
+          nhm2SnapshotPath: normalizePath(nhm2SnapshotPath),
+          yorkViews: [...yorkViews],
+          frameSize,
+        },
+        cases,
+        controlDebug,
+        preconditions,
+        laneAParity,
+        causeCode,
+        guardFailures,
+        decisionTable,
+        classificationScoring,
+        classificationRobustness,
+        verdict,
+        notes,
+        provenance: {
+          commitHash: getHeadCommit(),
+          runtimeStatus,
+        },
+      },
+      sourceFormulaAudit: sourceFormulaAuditArtifact,
+      sourceToYork: sourceToYorkArtifact,
+      diagnosticSemanticAudit: diagnosticSemanticAuditArtifact,
+      sourceFormulaArtifactPath: sourceFormulaAuditLatestJsonPath,
+      sourceToYorkArtifactPath: sourceToYorkLatestJsonPath,
+      sourceMechanismMaturityArtifactPath: sourceMechanismMaturityLatestJsonPath,
+      sourceMechanismParityRouteFeasibilityArtifactPath:
+        sourceMechanismParityRouteFeasibilityLatestJsonPath,
+    });
+  notes.push(
+    `source_mechanism_promotion_contract_status=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus} selected_route=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute} policy=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy}`,
+  );
   const solveAuthorityArtifact = buildNhm2SolveAuthorityAuditArtifact({
     payload: {
       artifactType: "warp_york_control_family_proof_pack/v1",
@@ -28578,11 +31334,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed: timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
         blockingFindings: [...timingAuthorityAuditArtifact.blockingFindings],
@@ -28627,6 +31379,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -28688,11 +31463,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
         classificationScoring,
         classificationRobustness,
         verdict,
-        sourceToYorkBridge: {
-          readiness: sourceToYorkArtifact.bridgeReadiness,
-          artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-          reportPath: normalizePath(sourceToYorkLatestMdPath),
-        },
+        sourceToYorkBridge: sourceToYorkBridgeSummary,
         timingAuthorityAudit: {
           timingAuthorityClosed:
             timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -28738,6 +31509,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
             sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
           formulaMismatchClass:
             sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+          comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+          mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+          additionalMismatchReasons:
+            sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+          sourceFormulaInterpretationPolicy:
+            sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+          parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+          promotionBlockedByMismatch:
+            sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+          laneAUnaffectedByMismatch:
+            sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+          tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+          reconstructedFormulaId:
+            sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+          termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+            (entry) => entry.status === "mismatched",
+          ).length,
           artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
           reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
         },
@@ -28795,11 +31589,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
         classificationScoring,
         classificationRobustness,
         verdict,
-        sourceToYorkBridge: {
-          readiness: sourceToYorkArtifact.bridgeReadiness,
-          artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-          reportPath: normalizePath(sourceToYorkLatestMdPath),
-        },
+        sourceToYorkBridge: sourceToYorkBridgeSummary,
         timingAuthorityAudit: {
           timingAuthorityClosed:
             timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -28845,6 +31635,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
             sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
           formulaMismatchClass:
             sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+          comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+          mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+          additionalMismatchReasons:
+            sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+          sourceFormulaInterpretationPolicy:
+            sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+          parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+          promotionBlockedByMismatch:
+            sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+          laneAUnaffectedByMismatch:
+            sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+          tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+          reconstructedFormulaId:
+            sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+          termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+            (entry) => entry.status === "mismatched",
+          ).length,
           artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
           reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
         },
@@ -28904,11 +31717,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed:
           timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -28954,6 +31763,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -29047,11 +31879,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed:
           timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -29097,6 +31925,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -29148,11 +31999,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed:
           timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -29198,6 +32045,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -29251,11 +32121,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed:
           timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -29301,6 +32167,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -29356,11 +32245,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed:
           timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -29406,6 +32291,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -29457,11 +32365,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       classificationScoring,
       classificationRobustness,
       verdict,
-      sourceToYorkBridge: {
-        readiness: sourceToYorkArtifact.bridgeReadiness,
-        artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-        reportPath: normalizePath(sourceToYorkLatestMdPath),
-      },
+      sourceToYorkBridge: sourceToYorkBridgeSummary,
       timingAuthorityAudit: {
         timingAuthorityClosed:
           timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -29507,6 +32411,29 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
           sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
         formulaMismatchClass:
           sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+        comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+        mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+        additionalMismatchReasons:
+          sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+        sourceFormulaInterpretationPolicy:
+          sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+        parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+        promotionBlockedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+        laneAUnaffectedByMismatch:
+          sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+        tolerancePolicySummary:
+          "relTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+          "; absTol=" +
+          sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+          "; rule=final_metric_numeric_parity",
+        directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+        reconstructedFormulaId:
+          sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+        termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+          (entry) => entry.status === "mismatched",
+        ).length,
         artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
         reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
       },
@@ -29732,11 +32659,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     classificationScoring,
     classificationRobustness,
     verdict,
-    sourceToYorkBridge: {
-      readiness: sourceToYorkArtifact.bridgeReadiness,
-      artifactPath: normalizePath(sourceToYorkLatestJsonPath),
-      reportPath: normalizePath(sourceToYorkLatestMdPath),
-    },
+    sourceToYorkBridge: sourceToYorkBridgeSummary,
     timingAuthorityAudit: {
       timingAuthorityClosed: timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
       blockingFindings: [...timingAuthorityAuditArtifact.blockingFindings],
@@ -29781,8 +32704,118 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
         sourceFormulaAuditArtifact.formulaComparison.reconstructionOnlyComparison,
       formulaMismatchClass:
         sourceFormulaAuditArtifact.formulaComparison.formulaMismatchClass,
+      comparisonMode: sourceFormulaAuditArtifact.formulaComparison.comparisonMode,
+      mismatchReason: sourceFormulaAuditArtifact.formulaComparison.mismatchReason,
+      additionalMismatchReasons:
+        sourceFormulaAuditArtifact.formulaComparison.additionalMismatchReasons,
+      sourceFormulaInterpretationPolicy:
+        sourceFormulaAuditArtifact.interpretationPolicy.policyId,
+      parityExpected: sourceFormulaAuditArtifact.interpretationPolicy.parityExpected,
+      promotionBlockedByMismatch:
+        sourceFormulaAuditArtifact.interpretationPolicy.promotionBlockedByMismatch,
+      laneAUnaffectedByMismatch:
+        sourceFormulaAuditArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+      tolerancePolicySummary:
+        "relTol=" +
+        sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.relTol +
+        "; absTol=" +
+        sourceFormulaAuditArtifact.formulaComparison.tolerancePolicy.absTol +
+        "; rule=final_metric_numeric_parity",
+      directFormulaId: sourceFormulaAuditArtifact.formulaComparison.directFormulaId,
+      reconstructedFormulaId:
+        sourceFormulaAuditArtifact.formulaComparison.reconstructedFormulaId,
+      termMismatchCount: sourceFormulaAuditArtifact.formulaComparison.termComparisons.filter(
+        (entry) => entry.status === "mismatched",
+      ).length,
       artifactPath: normalizePath(sourceFormulaAuditLatestJsonPath),
       reportPath: normalizePath(sourceFormulaAuditLatestMdPath),
+    },
+    sourceMechanismMaturity: {
+      ...sourceMechanismMaturityArtifact.sourceMechanismMaturity,
+      artifactPath: normalizePath(sourceMechanismMaturityLatestJsonPath),
+      reportPath: normalizePath(sourceMechanismMaturityLatestMdPath),
+    },
+    sourceMechanismPromotionContract: (() => {
+      const formalExemptionRoute =
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.find(
+          (route) => route.routeId === "formal_exemption_route",
+        );
+      return {
+      contractId:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractId,
+      contractStatus:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus,
+      selectedPromotionRoute:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .selectedPromotionRoute,
+      promotionDecisionPolicy:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .promotionDecisionPolicy,
+      claimsRequiringParityCount:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .claimsRequiringParity.length,
+      claimsEligibleUnderExemptionCount:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .claimsEligibleUnderExemption.length,
+      claimsBlockedEvenWithExemptionCount:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .claimsBlockedEvenWithExemption.length,
+      exemptionEligibleClaimCount:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .exemptionEligibleClaimDetails.length,
+      exemptionBlockedClaimCount:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
+          .claimsBlockedEvenWithExemption.length,
+      exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
+      exemptionRouteSummary: formalExemptionRoute?.summary ?? "none",
+      routeFeasibilityStatus:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .feasibilityStatus,
+      routeBlockingClass:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeBlockingClass,
+      dominantMismatchTerm:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .dominantMismatchTerm,
+      nextClosureAction:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .nextClosureAction,
+      promotionSummary:
+        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.summary,
+      artifactPath: normalizePath(sourceMechanismPromotionContractLatestJsonPath),
+      reportPath: normalizePath(sourceMechanismPromotionContractLatestMdPath),
+      };
+    })(),
+    sourceMechanismParityRouteFeasibility: {
+      routeId:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeId,
+      routeStatus:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeStatus,
+      routeFeasibilityStatus:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .feasibilityStatus,
+      routeBlockingClass:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeBlockingClass,
+      dominantMismatchTerm:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .dominantMismatchTerm,
+      matchedTermsCount:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .matchedTerms.length,
+      unmatchedTermsCount:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .unmatchedTerms.length,
+      nextClosureAction:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .nextClosureAction,
+      parityRouteSummary:
+        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeSummary,
+      artifactPath: normalizePath(sourceMechanismParityRouteFeasibilityLatestJsonPath),
+      reportPath: normalizePath(sourceMechanismParityRouteFeasibilityLatestMdPath),
     },
     solveAuthorityAudit: {
       readiness: solveAuthorityArtifact.readiness,
@@ -29818,6 +32851,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       directionOverlayStatus: shiftGeometryVisualizationArtifact.directionOverlayStatus,
       directionOverlayCaseDistinctness:
         shiftGeometryVisualizationArtifact.directionOverlayCaseDistinctness,
+      directionOverlayInterpretationPolicy:
+        shiftGeometryVisualizationArtifact.directionOverlayInterpretationPolicy,
       directionOverlayWarnings: shiftGeometryVisualizationArtifact.directionOverlayWarnings,
       constraintContextStatus: shiftGeometryVisualizationArtifact.constraintContextStatus,
       artifactPath: normalizePath(shiftGeometryVisualizationLatestJsonPath),
@@ -29879,6 +32914,18 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   ensureDirForFile(sourceFormulaAuditLatestJsonPath);
   ensureDirForFile(sourceFormulaAuditOutMdPath);
   ensureDirForFile(sourceFormulaAuditLatestMdPath);
+  ensureDirForFile(sourceMechanismMaturityOutJsonPath);
+  ensureDirForFile(sourceMechanismMaturityLatestJsonPath);
+  ensureDirForFile(sourceMechanismMaturityOutMdPath);
+  ensureDirForFile(sourceMechanismMaturityLatestMdPath);
+  ensureDirForFile(sourceMechanismPromotionContractOutJsonPath);
+  ensureDirForFile(sourceMechanismPromotionContractLatestJsonPath);
+  ensureDirForFile(sourceMechanismPromotionContractOutMdPath);
+  ensureDirForFile(sourceMechanismPromotionContractLatestMdPath);
+  ensureDirForFile(sourceMechanismParityRouteFeasibilityOutJsonPath);
+  ensureDirForFile(sourceMechanismParityRouteFeasibilityLatestJsonPath);
+  ensureDirForFile(sourceMechanismParityRouteFeasibilityOutMdPath);
+  ensureDirForFile(sourceMechanismParityRouteFeasibilityLatestMdPath);
   ensureDirForFile(timingAuthorityAuditOutJsonPath);
   ensureDirForFile(timingAuthorityAuditLatestJsonPath);
   ensureDirForFile(timingAuthorityAuditOutMdPath);
@@ -30006,6 +33053,65 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   );
   fs.writeFileSync(sourceFormulaAuditOutMdPath, `${sourceFormulaAuditMarkdown}\n`);
   fs.writeFileSync(sourceFormulaAuditLatestMdPath, `${sourceFormulaAuditMarkdown}\n`);
+  fs.writeFileSync(
+    sourceMechanismMaturityOutJsonPath,
+    `${JSON.stringify(sourceMechanismMaturityArtifact, null, 2)}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismMaturityLatestJsonPath,
+    `${JSON.stringify(sourceMechanismMaturityArtifact, null, 2)}\n`,
+  );
+  const sourceMechanismMaturityMarkdown = renderNhm2SourceMechanismMaturityMarkdown(
+    sourceMechanismMaturityArtifact,
+  );
+  fs.writeFileSync(
+    sourceMechanismMaturityOutMdPath,
+    `${sourceMechanismMaturityMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismMaturityLatestMdPath,
+    `${sourceMechanismMaturityMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismPromotionContractOutJsonPath,
+    `${JSON.stringify(sourceMechanismPromotionContractArtifact, null, 2)}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismPromotionContractLatestJsonPath,
+    `${JSON.stringify(sourceMechanismPromotionContractArtifact, null, 2)}\n`,
+  );
+  const sourceMechanismPromotionContractMarkdown =
+    renderNhm2SourceMechanismPromotionContractMarkdown(
+      sourceMechanismPromotionContractArtifact,
+    );
+  fs.writeFileSync(
+    sourceMechanismPromotionContractOutMdPath,
+    `${sourceMechanismPromotionContractMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismPromotionContractLatestMdPath,
+    `${sourceMechanismPromotionContractMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismParityRouteFeasibilityOutJsonPath,
+    `${JSON.stringify(sourceMechanismParityRouteFeasibilityArtifact, null, 2)}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismParityRouteFeasibilityLatestJsonPath,
+    `${JSON.stringify(sourceMechanismParityRouteFeasibilityArtifact, null, 2)}\n`,
+  );
+  const sourceMechanismParityRouteFeasibilityMarkdown =
+    renderNhm2SourceMechanismParityRouteFeasibilityMarkdown(
+      sourceMechanismParityRouteFeasibilityArtifact,
+    );
+  fs.writeFileSync(
+    sourceMechanismParityRouteFeasibilityOutMdPath,
+    `${sourceMechanismParityRouteFeasibilityMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    sourceMechanismParityRouteFeasibilityLatestMdPath,
+    `${sourceMechanismParityRouteFeasibilityMarkdown}\n`,
+  );
   fs.writeFileSync(
     timingAuthorityAuditOutJsonPath,
     `${JSON.stringify(timingAuthorityAuditArtifact, null, 2)}\n`,
@@ -30367,6 +33473,14 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     sourceFormulaAuditLatestJsonPath,
     sourceFormulaAuditOutMdPath,
     sourceFormulaAuditLatestMdPath,
+    sourceMechanismMaturityOutJsonPath,
+    sourceMechanismMaturityLatestJsonPath,
+    sourceMechanismMaturityOutMdPath,
+    sourceMechanismMaturityLatestMdPath,
+    sourceMechanismPromotionContractOutJsonPath,
+    sourceMechanismPromotionContractLatestJsonPath,
+    sourceMechanismPromotionContractOutMdPath,
+    sourceMechanismPromotionContractLatestMdPath,
     timingAuthorityAuditOutJsonPath,
     timingAuthorityAuditLatestJsonPath,
     timingAuthorityAuditOutMdPath,
@@ -30454,6 +33568,9 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     sourceToYorkArtifact,
     sourceStageAuditArtifact,
     sourceFormulaAuditArtifact,
+    sourceMechanismMaturityArtifact,
+    sourceMechanismPromotionContractArtifact,
+    sourceMechanismParityRouteFeasibilityArtifact,
     timingAuthorityAuditArtifact,
     brickAuthorityAuditArtifact,
     snapshotAuthorityAuditArtifact,
@@ -30514,6 +33631,42 @@ if (isEntryPoint) {
     sourceFormulaAuditLatestJsonPath: readArgValue("--source-formula-audit-latest-json"),
     sourceFormulaAuditOutMdPath: readArgValue("--source-formula-audit-out-md"),
     sourceFormulaAuditLatestMdPath: readArgValue("--source-formula-audit-latest-md"),
+    sourceMechanismMaturityOutJsonPath: readArgValue(
+      "--source-mechanism-maturity-out-json",
+    ),
+    sourceMechanismMaturityLatestJsonPath: readArgValue(
+      "--source-mechanism-maturity-latest-json",
+    ),
+    sourceMechanismMaturityOutMdPath: readArgValue(
+      "--source-mechanism-maturity-out-md",
+    ),
+    sourceMechanismMaturityLatestMdPath: readArgValue(
+      "--source-mechanism-maturity-latest-md",
+    ),
+    sourceMechanismPromotionContractOutJsonPath: readArgValue(
+      "--source-mechanism-promotion-contract-out-json",
+    ),
+    sourceMechanismPromotionContractLatestJsonPath: readArgValue(
+      "--source-mechanism-promotion-contract-latest-json",
+    ),
+    sourceMechanismPromotionContractOutMdPath: readArgValue(
+      "--source-mechanism-promotion-contract-out-md",
+    ),
+    sourceMechanismPromotionContractLatestMdPath: readArgValue(
+      "--source-mechanism-promotion-contract-latest-md",
+    ),
+    sourceMechanismParityRouteFeasibilityOutJsonPath: readArgValue(
+      "--source-mechanism-parity-route-feasibility-out-json",
+    ),
+    sourceMechanismParityRouteFeasibilityLatestJsonPath: readArgValue(
+      "--source-mechanism-parity-route-feasibility-latest-json",
+    ),
+    sourceMechanismParityRouteFeasibilityOutMdPath: readArgValue(
+      "--source-mechanism-parity-route-feasibility-out-md",
+    ),
+    sourceMechanismParityRouteFeasibilityLatestMdPath: readArgValue(
+      "--source-mechanism-parity-route-feasibility-latest-md",
+    ),
     timingAuthorityAuditOutJsonPath: readArgValue("--timing-authority-audit-out-json"),
     timingAuthorityAuditLatestJsonPath: readArgValue("--timing-authority-audit-latest-json"),
     timingAuthorityAuditOutMdPath: readArgValue("--timing-authority-audit-out-md"),
@@ -30679,4 +33832,9 @@ if (isEntryPoint) {
       process.exitCode = 1;
     });
 }
+
+
+
+
+
 

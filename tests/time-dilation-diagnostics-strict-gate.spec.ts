@@ -12,10 +12,10 @@ const baseMath = { root: { id: "server/energy-pipeline.ts", stage: "certified", 
 const baseGrBrick = { meta: { status: "CERTIFIED" }, stats: { solverHealth: { status: "CERTIFIED" } }, dims: [1, 1, 1] };
 const baseRegion = { summary: { wall: { detected: true, source: "kretschmann" } } };
 
-function stubFetch(pipeline: any) {
+function stubFetch(pipeline: any, proofs: any = baseProofs) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.includes("/api/helix/pipeline/proofs")) return { ok: true, json: async () => baseProofs } as Response;
+    if (url.includes("/api/helix/pipeline/proofs")) return { ok: true, json: async () => proofs } as Response;
     if (url.includes("/api/helix/math/graph")) return { ok: true, json: async () => baseMath } as Response;
     if (url.includes("/api/helix/gr-evolve-brick")) return { ok: true, json: async () => baseGrBrick } as Response;
     if (url.includes("/api/helix/lapse-brick")) return { ok: true, json: async () => ({}) } as Response;
@@ -86,6 +86,55 @@ describe("time dilation strict verification gate", () => {
     expect(diagnostics.congruence.requiredFieldsOk).toBe(false);
     expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(false);
     expect(diagnostics.natarioCanonical.reason).toBe("natario_required_fields_missing");
+  });
+
+  it("consumes the emitted theta diagnostics schema for Natario canonical checks", async () => {
+    stubFetch(
+      {
+        ...basePipeline,
+        viability: {
+          certificateHash: "cert:1",
+          integrityOk: true,
+          constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+        },
+        warp: {
+          metricT00Contract: { family: "natario" },
+          metricAdapter: {
+            alpha: 1,
+            gammaDiag: [1, 1, 1],
+            betaDiagnostics: {
+              method: "finite-diff",
+              thetaRms: 2e-4,
+              thetaMax: 4e-4,
+            },
+          },
+        },
+      },
+      {
+        values: {
+          natario_expansion_tolerance: { value: 1e-3, proxy: false },
+          theta_geom: { value: 2e-4, proxy: false },
+          metric_k_trace_mean: { value: -2e-4, proxy: false },
+          theta_k_tolerance: { value: 1e-3, proxy: false },
+        },
+      },
+    );
+
+    const diagnostics = await buildTimeDilationDiagnostics({
+      baseUrl: "http://example.test",
+      publish: false,
+    });
+
+    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(true);
+    expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(true);
+    expect(diagnostics.natarioCanonical.checks.divBeta).toEqual(
+      expect.objectContaining({
+        status: "pass",
+        rms: 2e-4,
+        maxAbs: 4e-4,
+        source: "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax",
+      }),
+    );
   });
 
 

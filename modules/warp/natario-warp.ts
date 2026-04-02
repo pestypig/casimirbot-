@@ -909,6 +909,44 @@ type HodgeResult = {
   geometryAssetId?: string;
 };
 
+export function trilinearInterpolateScalarGrid(
+  arr: ArrayLike<number>,
+  dims: [number, number, number],
+  coords: [number, number, number],
+): number {
+  const [nx, ny, nz] = dims;
+  const [fxRaw, fyRaw, fzRaw] = coords;
+  const fx = clamp(fxRaw, 0, Math.max(0, nx - 1));
+  const fy = clamp(fyRaw, 0, Math.max(0, ny - 1));
+  const fz = clamp(fzRaw, 0, Math.max(0, nz - 1));
+  const i0 = Math.floor(fx);
+  const j0 = Math.floor(fy);
+  const k0 = Math.floor(fz);
+  const i1 = Math.min(nx - 1, i0 + 1);
+  const j1 = Math.min(ny - 1, j0 + 1);
+  const k1 = Math.min(nz - 1, k0 + 1);
+  const tx = fx - i0;
+  const ty = fy - j0;
+  const tz = fz - k0;
+  const idxBase = (ii: number, jj: number, kk: number) => ii + nx * (jj + ny * kk);
+  const c000 = idxBase(i0, j0, k0);
+  const c100 = idxBase(i1, j0, k0);
+  const c010 = idxBase(i0, j1, k0);
+  const c110 = idxBase(i1, j1, k0);
+  const c001 = idxBase(i0, j0, k1);
+  const c101 = idxBase(i1, j0, k1);
+  const c011 = idxBase(i0, j1, k1);
+  const c111 = idxBase(i1, j1, k1);
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  const x00 = lerp(Number(arr[c000]), Number(arr[c100]), tx);
+  const x10 = lerp(Number(arr[c010]), Number(arr[c110]), tx);
+  const x01 = lerp(Number(arr[c001]), Number(arr[c101]), tx);
+  const x11 = lerp(Number(arr[c011]), Number(arr[c111]), tx);
+  const y0 = lerp(x00, x10, ty);
+  const y1 = lerp(x01, x11, ty);
+  return lerp(y0, y1, tz);
+}
+
 function buildGeometryEvaluator(params: NatarioWarpParams): GeometryEvaluator {
   const geom = params.warpGeometry ?? null;
   const kind = (params.warpGeometryKind ?? (geom as any)?.kind ?? 'ellipsoid') as WarpGeometryKind;
@@ -1220,33 +1258,12 @@ function helmholtzHodgeProject(params: NatarioWarpParams): HodgeResult {
     const fx = clamp((x - minX) / Math.max(1e-9, maxX - minX) * nx - 0.5, 0, nx - 1);
     const fy = clamp((y - minY) / Math.max(1e-9, maxY - minY) * ny - 0.5, 0, ny - 1);
     const fz = clamp((z - minZ) / Math.max(1e-9, maxZ - minZ) * nz - 0.5, 0, nz - 1);
-    const i0 = Math.floor(fx), j0 = Math.floor(fy), k0 = Math.floor(fz);
-    const i1 = Math.min(nx - 1, i0 + 1);
-    const j1 = Math.min(ny - 1, j0 + 1);
-    const k1 = Math.min(nz - 1, k0 + 1);
-    const tx = fx - i0;
-    const ty = fy - j0;
-    const tz = fz - k0;
-    const idxBase = (ii: number, jj: number, kk: number) => ii + nx * (jj + ny * kk);
-    const c000 = idxBase(i0, j0, k0);
-    const c100 = idxBase(i1, j0, k0);
-    const c010 = idxBase(i0, j1, k0);
-    const c110 = idxBase(i1, j1, k0);
-    const c001 = idxBase(i0, j0, k1);
-    const c101 = idxBase(i1, j0, k1);
-    const c011 = idxBase(i0, j1, k1);
-    const c111 = idxBase(i1, j1, k1);
-    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-    const lerpTrilinear = (arr: Float64Array) => {
-      const x00 = lerp(arr[c000], arr[c100], tx);
-      const x10 = lerp(arr[c010], arr[c110], tx);
-      const x01 = lerp(arr[c001], arr[c101], tx);
-      const x11 = lerp(arr[c011], arr[c111], tx);
-      const y0 = lerp(x00, x10, ty);
-      const y1 = lerp(x01, x11, tz);
-      return lerp(y0, y1, tz);
-    };
-    return [lerpTrilinear(betaPX), lerpTrilinear(betaPY), lerpTrilinear(betaPZ)];
+    const coords: [number, number, number] = [fx, fy, fz];
+    return [
+      trilinearInterpolateScalarGrid(betaPX, [nx, ny, nz], coords),
+      trilinearInterpolateScalarGrid(betaPY, [nx, ny, nz], coords),
+      trilinearInterpolateScalarGrid(betaPZ, [nx, ny, nz], coords),
+    ];
   };
 
   return {

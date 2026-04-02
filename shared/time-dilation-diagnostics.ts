@@ -946,6 +946,30 @@ const toNumber = (value: unknown): number | null => {
   return Number.isFinite(num) ? num : null;
 };
 
+const resolveNatarioBetaDivergenceDiagnostics = (
+  pipeline: any,
+): {
+  rms: number | null;
+  maxAbs: number | null;
+  source: string;
+} => {
+  const betaDiagnostics = (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics ?? null;
+  const thetaRms = toNumber(betaDiagnostics?.thetaRms);
+  const thetaMax = toNumber(betaDiagnostics?.thetaMax);
+  if (thetaRms != null || thetaMax != null) {
+    return {
+      rms: thetaRms,
+      maxAbs: thetaMax,
+      source: "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax",
+    };
+  }
+  return {
+    rms: toNumber(betaDiagnostics?.divBetaRms),
+    maxAbs: toNumber(betaDiagnostics?.divBetaMaxAbs),
+    source: "pipeline.warp.metricAdapter.betaDiagnostics.divBetaRms/divBetaMaxAbs",
+  };
+};
+
 const boolFromProof = (proofPack: ProofPack | null, key: string): boolean | null => {
   const entry = getProofValue(proofPack, key);
   if (!entry || entry.proxy) return null;
@@ -1718,8 +1742,9 @@ export async function buildTimeDilationDiagnostics(
     details: cabinLapse.details,
   };
 
-  const divBetaRms = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);
-  const divBetaMaxAbs = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaMaxAbs);
+  const natarioBetaDivergence = resolveNatarioBetaDivergenceDiagnostics(pipeline);
+  const divBetaRms = natarioBetaDivergence.rms;
+  const divBetaMaxAbs = natarioBetaDivergence.maxAbs;
   const natarioExpansionTolerance = toNumber(readProofString(proofPack, "natario_expansion_tolerance")) ?? 1e-3;
   const divBetaStatus: "pass" | "fail" | "unknown" = divBetaRms == null
     ? "unknown"
@@ -1812,7 +1837,7 @@ export async function buildTimeDilationDiagnostics(
           rms: divBetaRms,
           maxAbs: divBetaMaxAbs,
           tolerance: natarioExpansionTolerance,
-          source: "pipeline.warp.metricAdapter.betaDiagnostics",
+          source: natarioBetaDivergence.source,
         },
         thetaKConsistency: {
           status: thetaKStatus,

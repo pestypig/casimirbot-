@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculateNatarioWarpBubble, type NatarioWarpParams } from "../modules/warp/natario-warp";
+import {
+  calculateNatarioWarpBubble,
+  trilinearInterpolateScalarGrid,
+  type NatarioWarpParams,
+} from "../modules/warp/natario-warp";
 
 describe("natario metric-derived T00", () => {
   const baseParams: NatarioWarpParams = {
@@ -122,5 +126,21 @@ describe("natario metric-derived T00", () => {
     expect(result.lapseSummary).toBeUndefined();
     const center = result.shiftVectorField.evaluateShiftVector(0, 0, 0);
     expect(center[1]).toBeLessThan(0);
+  });
+
+  it("uses the y-blend weight for trilinear interpolation in sampled shift evaluation", () => {
+    const dims: [number, number, number] = [2, 2, 2];
+    const values = new Float64Array(dims[0] * dims[1] * dims[2]);
+    const idx = (i: number, j: number, k: number) => i + dims[0] * (j + dims[1] * k);
+    for (let k = 0; k < dims[2]; k += 1) {
+      for (let j = 0; j < dims[1]; j += 1) {
+        for (let i = 0; i < dims[0]; i += 1) {
+          values[idx(i, j, k)] = 100 * i + 10 * j + k;
+        }
+      }
+    }
+
+    const sample = trilinearInterpolateScalarGrid(values, dims, [0.25, 0.6, 0.2]);
+    expect(sample).toBeCloseTo(31.2, 10);
   });
 });

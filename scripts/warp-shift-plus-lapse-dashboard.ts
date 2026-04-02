@@ -1,0 +1,1804 @@
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import sharp from "sharp";
+import { createCanvas } from "@napi-rs/canvas";
+import {
+  buildShiftPlusLapseComparisonPayload,
+  writeShiftPlusLapseComparisonArtifacts,
+} from "./warp-shift-plus-lapse-comparison.js";
+import { renderRenderTaxonomyAuditMarkdown } from "./warp-york-control-family-proof-pack.js";
+
+const DATE_STAMP = "2026-04-01";
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const OUT_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "nhm2-shift-plus-lapse-dashboard-latest.json",
+);
+const OUT_AUDIT = path.join(
+  ROOT,
+  "docs",
+  "audits",
+  "research",
+  "warp-nhm2-shift-plus-lapse-dashboard-latest.md",
+);
+const OUT_MEMO = path.join(
+  ROOT,
+  "docs",
+  "research",
+  "nhm2-shift-plus-lapse-dashboard-memo-2026-04-01.md",
+);
+const OUT_RENDER_DIR = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "rendered",
+  "comparison_panel",
+  DATE_STAMP,
+);
+const LEGACY_CARD_PATH = path.join(
+  OUT_RENDER_DIR,
+  "nhm2_shift_lapse-comparison_panel-diagnostics_dashboard-card.png",
+);
+const OUT_RENDER_TAXONOMY_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "render-taxonomy-latest.json",
+);
+const OUT_RENDER_TAXONOMY_AUDIT = path.join(
+  ROOT,
+  "docs",
+  "audits",
+  "research",
+  "warp-render-taxonomy-latest.md",
+);
+
+const DASHBOARD_LAYOUT_VERSION = "v2_measured_card_family";
+const FONT_FAMILY = "'Segoe UI', Arial, sans-serif";
+const CARD_MARGIN = 24;
+const HEADER_HEIGHT = 106;
+const HEADER_BADGE_WIDTH = 420;
+const SECTION_GAP = 18;
+const ROW_PADDING = 22;
+const BADGE_HEIGHT = 28;
+const BADGE_GAP = 8;
+
+const LAYOUT_BUDGET = {
+  maxContentWidth: 1460,
+  columnWidthBudget: 420,
+  rowPadding: 18,
+  sectionPadding: 22,
+  badgeWrapThreshold: 220,
+  noteWrapWidth: 1280,
+  minCardHeight: 520,
+  dynamicCardHeight: true,
+  measuredTextRenderer: "@napi-rs/canvas.measureText",
+} as const;
+
+type DashboardPanelId =
+  | "proof_status_panel"
+  | "cabin_gravity_panel"
+  | "wall_safety_panel"
+  | "precision_panel";
+
+type DashboardCardId =
+  | "dashboard_overview"
+  | "proof_status"
+  | "cabin_gravity"
+  | "wall_safety"
+  | "precision_provenance";
+
+type DashboardRow = {
+  rowId: string;
+  label: string;
+  baselineValue: unknown;
+  generalizedValue: unknown;
+  units: string;
+  delta: unknown;
+  baselineSourceKind?: string | null;
+  generalizedSourceKind?: string | null;
+  badgeId: string;
+  badgeIds: string[];
+  crossCaseSourceMismatch: boolean;
+  note: string;
+};
+
+type DashboardPanel = {
+  panelId: DashboardPanelId;
+  title: string;
+  purpose: string;
+  rows: DashboardRow[];
+  sectionNote: string;
+};
+
+type BadgeDefinition = {
+  badgeId: string;
+  label: string;
+  meaning: string;
+  displayPriority: number;
+};
+
+type DashboardCardEntry = {
+  cardId: DashboardCardId;
+  title: string;
+  path: string;
+  hash: string;
+  renderCategory: "comparison_panel";
+  renderRole: "presentation";
+  sectionSource: string;
+  layoutVersion: string;
+  primary: boolean;
+};
+
+type DashboardPayload = {
+  artifactId: string;
+  capturedAt: string;
+  date: string;
+  dashboardId: string;
+  dashboardStatus: string;
+  comparisonId: string;
+  scenarioId: string;
+  dashboardSurfaceKind: string;
+  dashboardLayoutVersion: string;
+  layoutBudget: typeof LAYOUT_BUDGET;
+  renderedCardFamilyStatus: string;
+  renderedCardReadingOrder: DashboardCardId[];
+  primaryRenderedCardId: DashboardCardId | null;
+  renderedCards: DashboardCardEntry[];
+  legacyMonolithicCardStatus: string;
+  legacyMonolithicCardPath: string | null;
+  renderedCardStatus: string;
+  renderedCardPath: string | null;
+  renderedCardHash: string | null;
+  renderedCardCategory: string | null;
+  renderedCardRole: string | null;
+  renderedCardLayoutVersion: string | null;
+  proofPolicy: Record<string, unknown> & { dashboardNote?: string };
+  comparisonSemantics: {
+    crossCaseSourceMismatchCount: number;
+    wallSafetySourceParity: boolean;
+    cabinGravityUsesAnalyticCompanion: boolean;
+  };
+  panels: DashboardPanel[];
+  badgeLegend: BadgeDefinition[];
+  provenanceWarnings: Array<Record<string, unknown>>;
+  recommendedReadingOrder: DashboardPanelId[];
+};
+
+type DashboardSeed = Omit<
+  DashboardPayload,
+  | "dashboardSurfaceKind"
+  | "dashboardLayoutVersion"
+  | "layoutBudget"
+  | "renderedCardFamilyStatus"
+  | "renderedCardReadingOrder"
+  | "primaryRenderedCardId"
+  | "renderedCards"
+  | "legacyMonolithicCardStatus"
+  | "legacyMonolithicCardPath"
+  | "renderedCardStatus"
+  | "renderedCardPath"
+  | "renderedCardHash"
+  | "renderedCardCategory"
+  | "renderedCardRole"
+  | "renderedCardLayoutVersion"
+>;
+
+type CardSpec = {
+  cardId: DashboardCardId;
+  title: string;
+  sectionSource: string;
+  width: number;
+  primary: boolean;
+  variant: string;
+  minHeight: number;
+  question: string;
+};
+
+type TextStyle = {
+  fontSize: number;
+  fontWeight: number;
+  lineHeight: number;
+  fill: string;
+};
+
+type RenderTaxonomyArtifact = any;
+
+type RenderTaxonomyEntry = {
+  renderId: string;
+  caseId: string;
+  renderCategory: string;
+  renderRole: string;
+  fieldId: string;
+  variant: string;
+  canonicalPath: string | null;
+  legacyPath: string | null;
+  authoritativeStatus: string;
+  primaryScientificQuestion: string;
+  baseImagePolicy: string;
+  baseImageSource: string;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: string;
+  title: string;
+  subtitle: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  observer: string | null;
+  foliation: string | null;
+  signConvention: string | null;
+  laneId: string | null;
+  displayPolicyId: string | null;
+  displayRangeMin: number | null;
+  displayRangeMax: number | null;
+  displayTransform: string | null;
+  colormapFamily: string | null;
+  cameraPoseId: string | null;
+  orientationConventionId: string;
+};
+
+const TEXT: Record<string, TextStyle> = {
+  headerTitle: { fontSize: 34, fontWeight: 800, lineHeight: 40, fill: "#f6f1e8" },
+  headerSubtitle: { fontSize: 15, fontWeight: 600, lineHeight: 22, fill: "#d5dde6" },
+  headerMeta: { fontSize: 13, fontWeight: 500, lineHeight: 18, fill: "#d5dde6" },
+  sectionTitle: { fontSize: 24, fontWeight: 800, lineHeight: 30, fill: "#10233b" },
+  sectionPurpose: { fontSize: 14, fontWeight: 600, lineHeight: 20, fill: "#405160" },
+  note: { fontSize: 13, fontWeight: 500, lineHeight: 18, fill: "#5a6270" },
+  body: { fontSize: 14, fontWeight: 500, lineHeight: 20, fill: "#334150" },
+  bodyBold: { fontSize: 14, fontWeight: 700, lineHeight: 20, fill: "#10233b" },
+  rowLabel: { fontSize: 18, fontWeight: 800, lineHeight: 24, fill: "#10233b" },
+  rowUnits: { fontSize: 12, fontWeight: 600, lineHeight: 16, fill: "#6a7280" },
+  blockCaption: { fontSize: 11, fontWeight: 800, lineHeight: 14, fill: "#586270" },
+  blockValue: { fontSize: 18, fontWeight: 800, lineHeight: 24, fill: "#10233b" },
+  blockValueSmall: { fontSize: 16, fontWeight: 700, lineHeight: 22, fill: "#10233b" },
+  badge: { fontSize: 12, fontWeight: 700, lineHeight: 16, fill: "#10233b" },
+  legendBody: { fontSize: 12, fontWeight: 500, lineHeight: 16, fill: "#334150" },
+  warningTitle: { fontSize: 18, fontWeight: 800, lineHeight: 24, fill: "#10233b" },
+};
+
+const BADGES: BadgeDefinition[] = [
+  {
+    badgeId: "lane_a_unchanged",
+    label: "Lane A unchanged",
+    meaning:
+      "The authoritative York proof surface remains unchanged and still governs formal comparison.",
+    displayPriority: 1,
+  },
+  {
+    badgeId: "reference_only",
+    label: "reference_only",
+    meaning:
+      "The generalized shift-plus-lapse branch remains diagnostic/reference-only and is not promoted to proof status.",
+    displayPriority: 2,
+  },
+  {
+    badgeId: "raw_brick",
+    label: "raw brick",
+    meaning:
+      "The displayed value comes directly from the float32 GR evolve brick or a brick-derived summary.",
+    displayPriority: 3,
+  },
+  {
+    badgeId: "analytic_companion",
+    label: "analytic companion",
+    meaning:
+      "The displayed value uses the analytic lapse-summary companion because the mild reference under-resolves in float32 brick channels.",
+    displayPriority: 4,
+  },
+  {
+    badgeId: "mixed_source",
+    label: "mixed source",
+    meaning:
+      "The comparison row mixes raw-brick baseline values with analytic-companion generalized values; read it as conceptually aligned, not numerically identical pipelines.",
+    displayPriority: 5,
+  },
+  {
+    badgeId: "source_mismatch",
+    label: "source mismatch",
+    meaning:
+      "Baseline and generalized values do not share the same numeric provenance and should be read with the listed source kinds.",
+    displayPriority: 6,
+  },
+  {
+    badgeId: "wall_safety_brick_derived",
+    label: "wall safety brick-derived",
+    meaning:
+      "Wall-normal and bulk shift/lapse safety rows remain brick-derived in the current comparison.",
+    displayPriority: 7,
+  },
+  {
+    badgeId: "unresolved",
+    label: "unresolved",
+    meaning:
+      "A nested supporting diagnostic remains unavailable or unresolved and is not being represented as analytic fallback.",
+    displayPriority: 8,
+  },
+];
+
+const BADGE_STYLE: Record<string, { fill: string; stroke: string; text: string }> = {
+  lane_a_unchanged: { fill: "#d7efe0", stroke: "#2d6a4f", text: "#163828" },
+  reference_only: { fill: "#f6e6bf", stroke: "#8a5a00", text: "#5b3a00" },
+  raw_brick: { fill: "#d8e6f2", stroke: "#295a7a", text: "#17394d" },
+  analytic_companion: { fill: "#f2d9e2", stroke: "#8d3a5e", text: "#561f39" },
+  mixed_source: { fill: "#f4dfc3", stroke: "#8b5e1a", text: "#5c3d0f" },
+  source_mismatch: { fill: "#f7d7d7", stroke: "#a33a3a", text: "#651f1f" },
+  wall_safety_brick_derived: { fill: "#d2efea", stroke: "#1d6b67", text: "#124846" },
+  unresolved: { fill: "#e4e7eb", stroke: "#5e6b78", text: "#39424b" },
+};
+
+const CARD_SPECS: CardSpec[] = [
+  {
+    cardId: "dashboard_overview",
+    title: "Diagnostics Dashboard Overview",
+    sectionSource: "dashboard_summary",
+    width: 1320,
+    primary: true,
+    variant: "dashboard_overview",
+    minHeight: 760,
+    question:
+      "How should a reviewer navigate the proof hierarchy, cabin gravity, wall safety, and provenance caveats for mild shift-plus-lapse NHM2?",
+  },
+  {
+    cardId: "proof_status",
+    title: "Proof Status",
+    sectionSource: "proof_status_panel",
+    width: 1180,
+    primary: false,
+    variant: "proof_status",
+    minHeight: 520,
+    question:
+      "What proof hierarchy applies before reading any generalized shift-plus-lapse diagnostic row?",
+  },
+  {
+    cardId: "cabin_gravity",
+    title: "Cabin Gravity",
+    sectionSource: "cabin_gravity_panel",
+    width: 1480,
+    primary: false,
+    variant: "cabin_gravity",
+    minHeight: 1080,
+    question:
+      "How do local lapse diagnostics differ from the unit-lapse baseline while keeping source provenance explicit?",
+  },
+  {
+    cardId: "wall_safety",
+    title: "Wall Safety",
+    sectionSource: "wall_safety_panel",
+    width: 1320,
+    primary: false,
+    variant: "wall_safety",
+    minHeight: 720,
+    question:
+      "How do brick-derived wall-safety diagnostics compare between the unit-lapse baseline and the mild generalized branch?",
+  },
+  {
+    cardId: "precision_provenance",
+    title: "Precision / Provenance",
+    sectionSource: "precision_panel",
+    width: 1480,
+    primary: false,
+    variant: "precision_provenance",
+    minHeight: 1120,
+    question:
+      "Where do mixed-source and unresolved provenance conditions affect the mild shift-plus-lapse comparison?",
+  },
+];
+
+const CABIN_ROW_IDS = [
+  "alphaCenterline",
+  "alphaGradientVec_m_inv",
+  "centerline_dtau_dt",
+  "cabin_clock_split_per_day_s",
+  "cabin_gravity_gradient_si",
+] as const;
+
+const WALL_ROW_IDS = [
+  "betaOverAlphaMax",
+  "betaOutwardOverAlphaWallMax",
+  "wallHorizonMargin",
+] as const;
+
+const METRICS_CANVAS = createCanvas(128, 128);
+const METRICS_CTX = METRICS_CANVAS.getContext("2d");
+
+const DASHBOARD_FIELD_FAMILY = {
+  fieldId: "diagnostics_dashboard",
+  label: "Diagnostics dashboard",
+  quantitySymbol: "diagnostic dashboard",
+  quantityUnits: "n/a",
+  defaultCategory: "comparison_panel",
+  defaultRole: "presentation",
+  primaryScientificQuestion:
+    "How does mild shift-plus-lapse NHM2 compare to the unit-lapse baseline while preserving provenance and proof hierarchy?",
+  defaultDisplayPolicyId: null,
+  defaultDisplayTransform: null,
+  defaultColormapFamily: null,
+};
+
+const normalizePath = (value: string) => value.replaceAll("\\", "/");
+const ensureDirForFile = (filePath: string) =>
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+const sha256 = (value: string | Buffer) =>
+  crypto.createHash("sha256").update(value).digest("hex");
+const fontSpec = (style: TextStyle) =>
+  `${style.fontWeight} ${style.fontSize}px ${FONT_FAMILY}`;
+const findQuantity = (section: any, quantityId: string) =>
+  section?.quantities?.find((q: any) => q.quantityId === quantityId);
+const panelById = (payload: { panels: DashboardPanel[] }, panelId: DashboardPanelId) =>
+  payload.panels.find((panel) => panel.panelId === panelId)!;
+const cardSpecById = (cardId: DashboardCardId) =>
+  CARD_SPECS.find((entry) => entry.cardId === cardId)!;
+const buildCardAbsolutePath = (cardId: DashboardCardId) =>
+  path.join(OUT_RENDER_DIR, `nhm2_shift_lapse-comparison_panel-${cardId}-card.png`);
+const escapeXml = (value: unknown) =>
+  `${value ?? ""}`
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+
+const formatNumber = (value: number): string => {
+  const abs = Math.abs(value);
+  if (abs === 0) return "0";
+  if (abs >= 1e4 || abs < 1e-3) return value.toExponential(3).replace(/e\+?/, "e");
+  if (Number.isInteger(value) && abs < 1e4) return `${value}`;
+  const fixed =
+    abs >= 100 ? value.toFixed(2) : abs >= 1 ? value.toFixed(6) : value.toFixed(8);
+  return fixed.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+};
+
+const formatValue = (value: unknown, signed = false): string => {
+  if (value == null) return "n/a";
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => formatValue(entry)).join(", ")}]`;
+  }
+  if (typeof value === "number") {
+    const text = formatNumber(value);
+    return signed && value > 0 ? `+${text}` : text;
+  }
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return `${value}`;
+};
+
+const measureTextWidth = (value: string, style: TextStyle) => {
+  METRICS_CTX.font = fontSpec(style);
+  return METRICS_CTX.measureText(value).width;
+};
+
+const splitLongTokenToWidth = (
+  token: string,
+  maxWidth: number,
+  style: TextStyle,
+): string[] => {
+  if (measureTextWidth(token, style) <= maxWidth) return [token];
+  const parts: string[] = [];
+  let current = "";
+  for (const char of token) {
+    const candidate = `${current}${char}`;
+    if (current && measureTextWidth(candidate, style) > maxWidth) {
+      parts.push(current);
+      current = char;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+};
+
+const wrapText = (value: string, maxWidth: number, style: TextStyle): string[] => {
+  const normalized = value.trim();
+  if (!normalized) return [""];
+  const words = normalized.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    for (const part of splitLongTokenToWidth(word, maxWidth, style)) {
+      const candidate = current ? `${current} ${part}` : part;
+      if (current && measureTextWidth(candidate, style) > maxWidth) {
+        lines.push(current);
+        current = part;
+      } else if (!current && measureTextWidth(part, style) > maxWidth) {
+        lines.push(part);
+        current = "";
+      } else {
+        current = candidate;
+      }
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [normalized];
+};
+
+const renderTextLines = (
+  lines: string[],
+  x: number,
+  y: number,
+  style: TextStyle,
+  textAnchor: "start" | "middle" | "end" = "start",
+) => ({
+  svg: lines
+    .map(
+      (line, index) =>
+        `<text x="${x}" y="${y + index * style.lineHeight}" fill="${style.fill}" font-size="${style.fontSize}" font-weight="${style.fontWeight}" font-family="${FONT_FAMILY}" text-anchor="${textAnchor}">${escapeXml(line)}</text>`,
+    )
+    .join(""),
+  height: lines.length > 0 ? lines.length * style.lineHeight : 0,
+});
+
+const badgeLabel = (badgeId: string) =>
+  BADGES.find((entry) => entry.badgeId === badgeId)?.label ?? badgeId;
+
+const sourceBadgeIds = (sourceKind: string | null | undefined): string[] => {
+  switch (sourceKind) {
+    case "brick_float32_direct":
+      return ["raw_brick"];
+    case "analytic_lapse_summary_companion":
+      return ["analytic_companion"];
+    case "mixed_source_prefer_analytic_for_underflow":
+      return ["mixed_source"];
+    case "unresolved_gravity_gradient":
+    case "unavailable":
+      return ["unresolved"];
+    default:
+      return [];
+  }
+};
+
+const uniqueBadgeIds = (ids: Array<string | null | undefined>) =>
+  [...new Set(ids.filter((id): id is string => Boolean(id)))];
+
+const measureBadgeWidth = (label: string) =>
+  Math.max(92, measureTextWidth(label, TEXT.badge) + 24);
+
+const renderBadgeStrip = (
+  badgeIds: string[],
+  x: number,
+  y: number,
+  maxWidth: number,
+) => {
+  const ids = uniqueBadgeIds(badgeIds);
+  if (ids.length === 0) return { svg: "", height: 0 };
+  let cursorX = x;
+  let cursorY = y;
+  const parts: string[] = [];
+  for (const badgeId of ids) {
+    const label = badgeLabel(badgeId);
+    const style = BADGE_STYLE[badgeId] ?? BADGE_STYLE.unresolved;
+    const width = measureBadgeWidth(label);
+    if (cursorX !== x && cursorX + width > x + maxWidth) {
+      cursorX = x;
+      cursorY += BADGE_HEIGHT + BADGE_GAP;
+    }
+    parts.push(
+      `<rect x="${cursorX}" y="${cursorY}" width="${width}" height="${BADGE_HEIGHT}" rx="14" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5" />`,
+      `<text x="${cursorX + width / 2}" y="${cursorY + 19}" fill="${style.text}" font-size="${TEXT.badge.fontSize}" font-weight="${TEXT.badge.fontWeight}" font-family="${FONT_FAMILY}" text-anchor="middle">${escapeXml(label)}</text>`,
+    );
+    cursorX += width + BADGE_GAP;
+  }
+  return { svg: parts.join(""), height: cursorY - y + BADGE_HEIGHT };
+};
+
+const rowBadgeBundles = (row: DashboardRow) => {
+  const baselineSourceBadges = sourceBadgeIds(row.baselineSourceKind);
+  const generalizedSourceBadges = sourceBadgeIds(row.generalizedSourceKind);
+  const extraBadges = uniqueBadgeIds(
+    row.badgeIds.filter(
+      (badgeId) =>
+        !baselineSourceBadges.includes(badgeId) &&
+        !generalizedSourceBadges.includes(badgeId),
+    ),
+  );
+  return { baselineSourceBadges, generalizedSourceBadges, extraBadges };
+};
+
+const buildDashboardRow = (
+  quantity: any,
+  panelId: "cabin_gravity_panel" | "wall_safety_panel",
+): DashboardRow => {
+  const badgeIds = new Set<string>();
+  let badgeId = "raw_brick";
+  if (panelId === "wall_safety_panel") {
+    badgeId = "wall_safety_brick_derived";
+    badgeIds.add("wall_safety_brick_derived");
+  } else if (quantity.crossCaseSourceMismatch) {
+    badgeId = "mixed_source";
+    badgeIds.add("mixed_source");
+    badgeIds.add("source_mismatch");
+  } else if (
+    quantity.generalizedSourceKind === "analytic_lapse_summary_companion" ||
+    quantity.baselineSourceKind === "analytic_lapse_summary_companion"
+  ) {
+    badgeId = "analytic_companion";
+    badgeIds.add("analytic_companion");
+  } else {
+    badgeId = "raw_brick";
+    badgeIds.add("raw_brick");
+  }
+  if (quantity.crossCaseSourceMismatch) badgeIds.add("source_mismatch");
+  const defaultNote =
+    panelId === "wall_safety_panel"
+      ? "Wall safety remains a brick-derived combined shift/lapse horizon proxy and is not a comfort score."
+      : quantity.crossCaseSourceMismatch
+        ? "Generalized mild-reference value uses analytic-companion reporting under float32 under-resolution."
+        : "Row is directly comparable without a cross-case source mismatch.";
+  return {
+    rowId: quantity.quantityId,
+    label: quantity.label,
+    baselineValue: quantity.baselineValue,
+    generalizedValue: quantity.generalizedValue,
+    units: quantity.units,
+    delta: quantity.delta,
+    baselineSourceKind: quantity.baselineSourceKind,
+    generalizedSourceKind: quantity.generalizedSourceKind,
+    badgeId,
+    badgeIds: [...badgeIds],
+    crossCaseSourceMismatch: Boolean(quantity.crossCaseSourceMismatch),
+    note: quantity.note ?? defaultNote,
+  };
+};
+
+const buildProofRows = (comparison: any): DashboardRow[] => [
+  {
+    rowId: "authoritative_proof_surface",
+    label: "Authoritative Proof Surface",
+    baselineValue: comparison.proofPolicy.authoritativeProofSurface,
+    generalizedValue: comparison.proofPolicy.authoritativeProofSurface,
+    units: "status",
+    delta: "unchanged",
+    baselineSourceKind: "comparison_contract",
+    generalizedSourceKind: "comparison_contract",
+    badgeId: "lane_a_unchanged",
+    badgeIds: ["lane_a_unchanged"],
+    crossCaseSourceMismatch: false,
+    note: "Lane A remains the proof surface for formal warp comparisons and class decisions.",
+  },
+  {
+    rowId: "branch_status",
+    label: "Branch Status",
+    baselineValue: comparison.baselineBranchStatus,
+    generalizedValue: comparison.generalizedBranchStatus,
+    units: "status",
+    delta: "comparison_only",
+    baselineSourceKind: "comparison_contract",
+    generalizedSourceKind: "comparison_contract",
+    badgeId: "reference_only",
+    badgeIds: ["lane_a_unchanged", "reference_only"],
+    crossCaseSourceMismatch: false,
+    note: "The baseline branch stays unchanged while the generalized branch remains reference-only.",
+  },
+];
+
+const buildPrecisionRows = (comparison: any): DashboardRow[] => [
+  {
+    rowId: "crossCaseSourceMismatchCount",
+    label: "Cross-Case Source Mismatch Count",
+    baselineValue: 0,
+    generalizedValue: comparison.comparisonSummary.crossCaseSourceMismatchCount,
+    units: "count",
+    delta: comparison.comparisonSummary.crossCaseSourceMismatchCount,
+    baselineSourceKind: "comparison_summary",
+    generalizedSourceKind: "comparison_summary",
+    badgeId:
+      comparison.comparisonSummary.crossCaseSourceMismatchCount > 0
+        ? "source_mismatch"
+        : "raw_brick",
+    badgeIds:
+      comparison.comparisonSummary.crossCaseSourceMismatchCount > 0
+        ? ["mixed_source", "source_mismatch"]
+        : ["raw_brick"],
+    crossCaseSourceMismatch: false,
+    note: "Counts the cabin-gravity rows where baseline and generalized provenance differ.",
+  },
+  {
+    rowId: "wallSafetySourceParity",
+    label: "Wall Safety Source Parity",
+    baselineValue: comparison.baselinePrecisionContext.wallSafetySource,
+    generalizedValue: comparison.generalizedPrecisionContext.wallSafetySource,
+    units: "status",
+    delta: comparison.comparisonSummary.wallSafetySourceParity ? "aligned" : "mixed",
+    baselineSourceKind: "comparison_summary",
+    generalizedSourceKind: "comparison_summary",
+    badgeId: "wall_safety_brick_derived",
+    badgeIds: ["wall_safety_brick_derived", "raw_brick"],
+    crossCaseSourceMismatch: false,
+    note: "Wall safety remains brick-derived in both cases.",
+  },
+  {
+    rowId: "cabinGravitySourcePolicy",
+    label: "Cabin Gravity Source Policy",
+    baselineValue: comparison.baselinePrecisionContext.channelPrecisionPolicy,
+    generalizedValue: comparison.generalizedPrecisionContext.channelPrecisionPolicy,
+    units: "policy",
+    delta: comparison.precisionComparisonStatus,
+    baselineSourceKind: "comparison_summary",
+    generalizedSourceKind: "comparison_summary",
+    badgeId: "mixed_source",
+    badgeIds: ["mixed_source", "source_mismatch"],
+    crossCaseSourceMismatch: true,
+    note: "The generalized mild reference intentionally prefers analytic companion reporting for under-resolved cabin/lapse diagnostics.",
+  },
+  {
+    rowId: "baselineDirectPipelineNestedProvenance",
+    label: "Baseline Nested Direct-Pipeline Provenance",
+    baselineValue:
+      comparison.baselineCase?.cabinObservables?.directPipelineCabinObservables?.details
+        ?.source ?? null,
+    generalizedValue: comparison.generalizedCase?.cabinObservables?.details?.source ?? null,
+    units: "status",
+    delta: "normalized",
+    baselineSourceKind: "comparison_summary",
+    generalizedSourceKind: "comparison_summary",
+    badgeId: "unresolved",
+    badgeIds: ["unresolved"],
+    crossCaseSourceMismatch: false,
+    note: "Baseline nested direct-pipeline cabin diagnostics are marked unresolved rather than analytic fallback when no analytic companion value exists.",
+  },
+];
+
+const renderCardHeader = (
+  width: number,
+  title: string,
+  subtitle: string,
+  meta: string,
+  badgeIds: string[],
+) => {
+  const innerWidth = width - CARD_MARGIN * 2;
+  const titleSvg = renderTextLines(
+    wrapText(title, innerWidth - 320, TEXT.headerTitle),
+    CARD_MARGIN + 28,
+    CARD_MARGIN + 40,
+    TEXT.headerTitle,
+  );
+  const subtitleSvg = renderTextLines(
+    wrapText(subtitle, innerWidth - 40, TEXT.headerSubtitle),
+    CARD_MARGIN + 28,
+    CARD_MARGIN + 40 + titleSvg.height,
+    TEXT.headerSubtitle,
+  );
+  const metaSvg = renderTextLines(
+    wrapText(meta, innerWidth - 40, TEXT.headerMeta),
+    CARD_MARGIN + 28,
+    CARD_MARGIN + 40 + titleSvg.height + subtitleSvg.height,
+    TEXT.headerMeta,
+  );
+  const badgeSvg = renderBadgeStrip(
+    badgeIds,
+    CARD_MARGIN + innerWidth - HEADER_BADGE_WIDTH,
+    CARD_MARGIN + 22,
+    HEADER_BADGE_WIDTH,
+  );
+  return {
+    svg: [
+      `<rect x="${CARD_MARGIN}" y="${CARD_MARGIN}" width="${innerWidth}" height="${HEADER_HEIGHT}" rx="26" fill="#10233b" />`,
+      titleSvg.svg,
+      subtitleSvg.svg,
+      metaSvg.svg,
+      badgeSvg.svg,
+    ].join(""),
+    bodyY: CARD_MARGIN + HEADER_HEIGHT + SECTION_GAP,
+  };
+};
+
+const renderIntroBox = (
+  x: number,
+  y: number,
+  width: number,
+  title: string,
+  purpose: string,
+  sectionNote: string,
+) => {
+  const titleSvg = renderTextLines([title], x + 20, y + 28, TEXT.sectionTitle);
+  const purposeSvg = renderTextLines(
+    wrapText(purpose, width - 40, TEXT.sectionPurpose),
+    x + 20,
+    y + 56,
+    TEXT.sectionPurpose,
+  );
+  const noteSvg = renderTextLines(
+    wrapText(sectionNote, width - 40, TEXT.note),
+    x + 20,
+    y + 56 + purposeSvg.height + 10,
+    TEXT.note,
+  );
+  const height = 24 + titleSvg.height + 8 + purposeSvg.height + 10 + noteSvg.height + 20;
+  return {
+    svg: [
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="22" fill="#fffaf4" stroke="#d3c6b1" stroke-width="1.5" />`,
+      `<rect x="${x}" y="${y}" width="${width}" height="6" fill="#12324a" rx="22" />`,
+      titleSvg.svg,
+      purposeSvg.svg,
+      noteSvg.svg,
+    ].join(""),
+    height,
+  };
+};
+
+const renderMetricBlock = (
+  title: string,
+  value: unknown,
+  badgeIds: string[],
+  x: number,
+  y: number,
+  width: number,
+) => {
+  const captionSvg = renderTextLines([title], x, y + 14, TEXT.blockCaption);
+  const valueText = formatValue(value);
+  const valueStyle =
+    valueText.length > 28 ? TEXT.blockValueSmall : TEXT.blockValue;
+  const valueSvg = renderTextLines(
+    wrapText(valueText, width, valueStyle),
+    x,
+    y + 40,
+    valueStyle,
+  );
+  const badgeSvg = renderBadgeStrip(
+    badgeIds,
+    x,
+    y + 40 + valueSvg.height + 6,
+    Math.max(width, LAYOUT_BUDGET.badgeWrapThreshold),
+  );
+  const height = 18 + valueSvg.height + (badgeSvg.height > 0 ? 8 + badgeSvg.height : 0);
+  return { svg: `${captionSvg.svg}${valueSvg.svg}${badgeSvg.svg}`, height };
+};
+
+const renderMetricRow = (row: DashboardRow, x: number, y: number, width: number) => {
+  const bundles = rowBadgeBundles(row);
+  const labelSvg = renderTextLines(
+    wrapText(row.label, width - ROW_PADDING * 2, TEXT.rowLabel),
+    x + ROW_PADDING,
+    y + ROW_PADDING + 8,
+    TEXT.rowLabel,
+  );
+  const unitsSvg = renderTextLines(
+    [`units: ${row.units}`],
+    x + ROW_PADDING,
+    y + ROW_PADDING + 8 + labelSvg.height + 4,
+    TEXT.rowUnits,
+  );
+  const contentWidth = width - ROW_PADDING * 2;
+  const columnGap = 18;
+  const colWidth = Math.floor((contentWidth - columnGap * 2) / 3);
+  const columnsY = y + ROW_PADDING + 8 + labelSvg.height + 4 + unitsSvg.height + 12;
+  const baselineBlock = renderMetricBlock(
+    "BASELINE",
+    row.baselineValue,
+    bundles.baselineSourceBadges,
+    x + ROW_PADDING,
+    columnsY,
+    colWidth,
+  );
+  const generalizedBlock = renderMetricBlock(
+    "GENERALIZED",
+    row.generalizedValue,
+    bundles.generalizedSourceBadges,
+    x + ROW_PADDING + colWidth + columnGap,
+    columnsY,
+    colWidth,
+  );
+  const deltaBlock = renderMetricBlock(
+    "DELTA / CHANGE",
+    row.delta,
+    bundles.extraBadges,
+    x + ROW_PADDING + (colWidth + columnGap) * 2,
+    columnsY,
+    colWidth,
+  );
+  const columnsHeight = Math.max(
+    baselineBlock.height,
+    generalizedBlock.height,
+    deltaBlock.height,
+  );
+  const noteTitleSvg = renderTextLines(
+    ["NOTE"],
+    x + ROW_PADDING,
+    columnsY + columnsHeight + 18,
+    TEXT.blockCaption,
+  );
+  const noteSvg = renderTextLines(
+    wrapText(row.note, Math.min(contentWidth, LAYOUT_BUDGET.noteWrapWidth), TEXT.note),
+    x + ROW_PADDING,
+    columnsY + columnsHeight + 38,
+    TEXT.note,
+  );
+  const totalHeight =
+    ROW_PADDING +
+    labelSvg.height +
+    4 +
+    unitsSvg.height +
+    12 +
+    columnsHeight +
+    18 +
+    noteTitleSvg.height +
+    6 +
+    noteSvg.height +
+    ROW_PADDING;
+  return {
+    svg: [
+      `<rect x="${x}" y="${y}" width="${width}" height="${totalHeight}" rx="20" fill="#fcf8f1" stroke="#dfd2bf" stroke-width="1.5" />`,
+      labelSvg.svg,
+      unitsSvg.svg,
+      baselineBlock.svg,
+      generalizedBlock.svg,
+      deltaBlock.svg,
+      noteTitleSvg.svg,
+      noteSvg.svg,
+    ].join(""),
+    height: totalHeight,
+  };
+};
+
+const renderWarningList = (
+  warnings: Array<Record<string, unknown>>,
+  x: number,
+  y: number,
+  width: number,
+) => {
+  const titleSvg = renderTextLines(
+    ["Provenance Warnings"],
+    x + 20,
+    y + 30,
+    TEXT.warningTitle,
+  );
+  let currentY = y + 60;
+  const elements: string[] = [];
+  for (const warning of warnings) {
+    const body = `${warning.quantityId}: ${warning.note}`;
+    const bodySvg = renderTextLines(
+      wrapText(body, width - 40, TEXT.note),
+      x + 20,
+      currentY,
+      TEXT.note,
+    );
+    elements.push(bodySvg.svg);
+    currentY += bodySvg.height + 10;
+  }
+  const height = Math.max(90, currentY - y + 12);
+  return {
+    svg: [
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="20" fill="#fffaf4" stroke="#d3c6b1" stroke-width="1.5" />`,
+      titleSvg.svg,
+      ...elements,
+    ].join(""),
+    height,
+  };
+};
+
+const renderBadgeLegendBlock = (
+  badges: BadgeDefinition[],
+  x: number,
+  y: number,
+  width: number,
+) => {
+  const titleSvg = renderTextLines(["Badge Legend"], x + 20, y + 30, TEXT.warningTitle);
+  const introSvg = renderTextLines(
+    wrapText(
+      "Badges remain visible inline on each row. This legend is a secondary reference for badge meaning only.",
+      width - 40,
+      TEXT.note,
+    ),
+    x + 20,
+    y + 56,
+    TEXT.note,
+  );
+  let currentY = y + 56 + introSvg.height + 10;
+  const elements: string[] = [];
+  for (const badge of badges.slice().sort((a, b) => a.displayPriority - b.displayPriority)) {
+    const badgeSvg = renderBadgeStrip([badge.badgeId], x + 20, currentY, width - 40);
+    const meaningSvg = renderTextLines(
+      wrapText(badge.meaning, width - 40, TEXT.legendBody),
+      x + 20,
+      currentY + badgeSvg.height + 8,
+      TEXT.legendBody,
+    );
+    elements.push(badgeSvg.svg, meaningSvg.svg);
+    currentY += badgeSvg.height + 8 + meaningSvg.height + 12;
+  }
+  const height = currentY - y + 8;
+  return {
+    svg: [
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="20" fill="#fffaf4" stroke="#d3c6b1" stroke-width="1.5" />`,
+      titleSvg.svg,
+      introSvg.svg,
+      ...elements,
+    ].join(""),
+    height,
+  };
+};
+
+const renderSummaryTile = (
+  label: string,
+  value: string,
+  note: string,
+  badgeIds: string[],
+  x: number,
+  y: number,
+  width: number,
+) => {
+  const labelSvg = renderTextLines([label], x + 18, y + 26, TEXT.blockCaption);
+  const valueStyle = value.length > 34 ? TEXT.blockValueSmall : TEXT.blockValue;
+  const valueSvg = renderTextLines(
+    wrapText(value, width - 36, valueStyle),
+    x + 18,
+    y + 50,
+    valueStyle,
+  );
+  const badgeSvg = renderBadgeStrip(badgeIds, x + 18, y + 54 + valueSvg.height, width - 36);
+  const noteSvg = renderTextLines(
+    wrapText(note, width - 36, TEXT.note),
+    x + 18,
+    y + 54 + valueSvg.height + (badgeSvg.height > 0 ? badgeSvg.height + 10 : 0),
+    TEXT.note,
+  );
+  const height =
+    20 +
+    labelSvg.height +
+    8 +
+    valueSvg.height +
+    (badgeSvg.height > 0 ? badgeSvg.height + 10 : 0) +
+    noteSvg.height +
+    18;
+  return {
+    svg: [
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="#fcf8f1" stroke="#dfd2bf" stroke-width="1.5" />`,
+      labelSvg.svg,
+      valueSvg.svg,
+      badgeSvg.svg,
+      noteSvg.svg,
+    ].join(""),
+    height,
+  };
+};
+
+const renderCompanionCardList = (
+  cards: CardSpec[],
+  x: number,
+  y: number,
+  width: number,
+) => {
+  const titleSvg = renderTextLines(
+    ["Companion Cards"],
+    x + 20,
+    y + 30,
+    TEXT.warningTitle,
+  );
+  let currentY = y + 60;
+  const elements: string[] = [];
+  for (const card of cards) {
+    const body = `${card.title}: ${
+      card.sectionSource === "dashboard_summary"
+        ? "index the card family"
+        : `driven by ${card.sectionSource}`
+    }.`;
+    const bulletSvg = renderTextLines(["•"], x + 20, currentY, TEXT.bodyBold);
+    const bodySvg = renderTextLines(
+      wrapText(body, width - 50, TEXT.body),
+      x + 38,
+      currentY,
+      TEXT.body,
+    );
+    elements.push(bulletSvg.svg, bodySvg.svg);
+    currentY += bodySvg.height + 10;
+  }
+  const height = currentY - y + 12;
+  return {
+    svg: [
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="20" fill="#fffaf4" stroke="#d3c6b1" stroke-width="1.5" />`,
+      titleSvg.svg,
+      ...elements,
+    ].join(""),
+    height,
+  };
+};
+
+const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
+  const width = spec.width;
+  const innerWidth = width - CARD_MARGIN * 2;
+  const header = renderCardHeader(
+    width,
+    "NHM2 Shift+Lapse Dashboard Overview",
+    "Unit-lapse NHM2 baseline vs mild shift-plus-lapse reference | presentation/comparison layer only",
+    `scenario=${payload.scenarioId} | crossCaseSourceMismatchCount=${payload.comparisonSemantics.crossCaseSourceMismatchCount} | wallSafetySourceParity=${payload.comparisonSemantics.wallSafetySourceParity ? "true" : "false"}`,
+    ["lane_a_unchanged", "reference_only"],
+  );
+  let currentY = header.bodyY;
+  const elements: string[] = [];
+  const intro = renderIntroBox(
+    CARD_MARGIN,
+    currentY,
+    innerWidth,
+    "Dashboard Overview",
+    "Use this index card to route a reviewer to the proof-status, cabin-gravity, wall-safety, and precision/provenance cards without re-deriving the comparison semantics.",
+    "This overview card is not the proof surface. It summarizes the card family while keeping Lane A authoritative and the generalized branch reference-only.",
+  );
+  elements.push(intro.svg);
+  currentY += intro.height + SECTION_GAP;
+  const summaryTiles = [
+    {
+      label: "Comparison ID",
+      value: payload.comparisonId,
+      note: "Stable identifier for the unit-lapse baseline vs mild generalized comparison.",
+      badgeIds: ["lane_a_unchanged"],
+    },
+    {
+      label: "Scenario ID",
+      value: payload.scenarioId,
+      note: "Published mild cabin-gravity reference scenario for the generalized branch.",
+      badgeIds: ["reference_only"],
+    },
+    {
+      label: "Proof Hierarchy",
+      value: "Lane A authoritative | generalized reference_only",
+      note: "The overview card remains presentation/comparison only and does not alter proof status.",
+      badgeIds: ["lane_a_unchanged", "reference_only"],
+    },
+    {
+      label: "Provenance Warnings",
+      value: `${payload.provenanceWarnings.length}`,
+      note: "Rows with mixed-source comparison remain explicitly disclosed rather than normalized away.",
+      badgeIds: ["source_mismatch"],
+    },
+    {
+      label: "Wall Safety Source Parity",
+      value: payload.comparisonSemantics.wallSafetySourceParity
+        ? "brick-derived aligned"
+        : "mixed sources",
+      note: "Wall safety stays brick-derived in both compared cases.",
+      badgeIds: ["wall_safety_brick_derived", "raw_brick"],
+    },
+    {
+      label: "Cabin Gravity Source Policy",
+      value: payload.comparisonSemantics.cabinGravityUsesAnalyticCompanion
+        ? "analytic companion in mild reference"
+        : "raw brick only",
+      note: "Mild-reference lapse diagnostics remain precision-aware rather than pretending float32 direct fidelity.",
+      badgeIds: ["analytic_companion", "mixed_source"],
+    },
+  ];
+  const tileGap = 16;
+  const tileWidth = Math.floor((innerWidth - tileGap) / 2);
+  for (let index = 0; index < summaryTiles.length; index += 2) {
+    const leftTile = renderSummaryTile(
+      summaryTiles[index].label,
+      summaryTiles[index].value,
+      summaryTiles[index].note,
+      summaryTiles[index].badgeIds,
+      CARD_MARGIN,
+      currentY,
+      tileWidth,
+    );
+    elements.push(leftTile.svg);
+    let rowHeight = leftTile.height;
+    const rightTileSpec = summaryTiles[index + 1];
+    if (rightTileSpec) {
+      const rightTile = renderSummaryTile(
+        rightTileSpec.label,
+        rightTileSpec.value,
+        rightTileSpec.note,
+        rightTileSpec.badgeIds,
+        CARD_MARGIN + tileWidth + tileGap,
+        currentY,
+        tileWidth,
+      );
+      elements.push(rightTile.svg);
+      rowHeight = Math.max(rowHeight, rightTile.height);
+    }
+    currentY += rowHeight + SECTION_GAP;
+  }
+  const companions = renderCompanionCardList(CARD_SPECS, CARD_MARGIN, currentY, innerWidth);
+  elements.push(companions.svg);
+  currentY += companions.height + CARD_MARGIN;
+  const totalHeight = Math.max(spec.minHeight, currentY);
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}">
+  <rect width="${width}" height="${totalHeight}" fill="#f1ece3" />
+  ${header.svg}
+  ${elements.join("")}
+</svg>`.trim();
+};
+
+const renderPanelCard = (
+  payload: DashboardSeed,
+  spec: CardSpec,
+  panel: DashboardPanel,
+  options: { includeWarnings?: boolean; includeLegend?: boolean } = {},
+) => {
+  const width = spec.width;
+  const innerWidth = width - CARD_MARGIN * 2;
+  const headerBadges =
+    spec.cardId === "proof_status"
+      ? ["lane_a_unchanged", "reference_only"]
+      : spec.cardId === "wall_safety"
+        ? ["wall_safety_brick_derived"]
+        : spec.cardId === "precision_provenance"
+          ? ["mixed_source", "source_mismatch", "unresolved"]
+          : ["mixed_source", "analytic_companion"];
+  const subtitleByCard: Record<DashboardCardId, string> = {
+    dashboard_overview: "",
+    proof_status:
+      "Lane A authoritative | generalized branch reference_only | presentation/comparison layer only",
+    cabin_gravity:
+      "Local lapse diagnostics | mild reference may use analytic companion under float32 under-resolution",
+    wall_safety:
+      "Brick-derived combined shift/lapse horizon proxy | separate from cabin gravity diagnostics",
+    precision_provenance:
+      "Mixed-source comparison disclosure | unresolved vs analytic fallback remains explicit",
+  };
+  const metaByCard: Record<DashboardCardId, string> = {
+    dashboard_overview: "",
+    proof_status: `scenario=${payload.scenarioId} | proof=Lane A authoritative`,
+    cabin_gravity: `scenario=${payload.scenarioId} | crossCaseSourceMismatchCount=${payload.comparisonSemantics.crossCaseSourceMismatchCount}`,
+    wall_safety: `scenario=${payload.scenarioId} | wallSafetySourceParity=${payload.comparisonSemantics.wallSafetySourceParity ? "true" : "false"}`,
+    precision_provenance: `scenario=${payload.scenarioId} | provenanceWarnings=${payload.provenanceWarnings.length}`,
+  };
+  const header = renderCardHeader(
+    width,
+    `NHM2 Shift+Lapse ${spec.title}`,
+    subtitleByCard[spec.cardId],
+    metaByCard[spec.cardId],
+    headerBadges,
+  );
+  let currentY = header.bodyY;
+  const elements: string[] = [];
+  const intro = renderIntroBox(
+    CARD_MARGIN,
+    currentY,
+    innerWidth,
+    panel.title,
+    panel.purpose,
+    panel.sectionNote,
+  );
+  elements.push(intro.svg);
+  currentY += intro.height + SECTION_GAP;
+  for (const row of panel.rows) {
+    const renderedRow = renderMetricRow(row, CARD_MARGIN, currentY, innerWidth);
+    elements.push(renderedRow.svg);
+    currentY += renderedRow.height + SECTION_GAP;
+  }
+  if (options.includeWarnings) {
+    const warnings = renderWarningList(
+      payload.provenanceWarnings,
+      CARD_MARGIN,
+      currentY,
+      innerWidth,
+    );
+    elements.push(warnings.svg);
+    currentY += warnings.height + SECTION_GAP;
+  }
+  if (options.includeLegend) {
+    const legend = renderBadgeLegendBlock(
+      payload.badgeLegend,
+      CARD_MARGIN,
+      currentY,
+      innerWidth,
+    );
+    elements.push(legend.svg);
+    currentY += legend.height + CARD_MARGIN;
+  } else {
+    currentY += CARD_MARGIN;
+  }
+  const totalHeight = Math.max(spec.minHeight, currentY);
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}">
+  <rect width="${width}" height="${totalHeight}" fill="#f1ece3" />
+  ${header.svg}
+  ${elements.join("")}
+</svg>`.trim();
+};
+
+const renderDashboardCardFamily = async (payload: DashboardSeed) => {
+  fs.mkdirSync(OUT_RENDER_DIR, { recursive: true });
+  if (fs.existsSync(LEGACY_CARD_PATH)) {
+    fs.rmSync(LEGACY_CARD_PATH, { force: true });
+  }
+  const renderedCards: DashboardCardEntry[] = [];
+  for (const spec of CARD_SPECS) {
+    const svg =
+      spec.cardId === "dashboard_overview"
+        ? renderOverviewCard(payload, spec)
+        : renderPanelCard(
+            payload,
+            spec,
+            panelById(payload, spec.sectionSource as DashboardPanelId),
+            {
+              includeWarnings: spec.cardId === "precision_provenance",
+              includeLegend: spec.cardId === "precision_provenance",
+            },
+          );
+    const png = await sharp(Buffer.from(svg, "utf8"))
+      .png({ compressionLevel: 9, quality: 100 })
+      .toBuffer();
+    const absPath = buildCardAbsolutePath(spec.cardId);
+    ensureDirForFile(absPath);
+    fs.writeFileSync(absPath, png);
+    renderedCards.push({
+      cardId: spec.cardId,
+      title: spec.title,
+      path: normalizePath(path.relative(ROOT, absPath)),
+      hash: sha256(png),
+      renderCategory: "comparison_panel",
+      renderRole: "presentation",
+      sectionSource: spec.sectionSource,
+      layoutVersion: DASHBOARD_LAYOUT_VERSION,
+      primary: spec.primary,
+    });
+  }
+  const primaryCard = renderedCards.find((card) => card.primary) ?? null;
+  return {
+    dashboardSurfaceKind: "diagnostics_dashboard_json_with_rendered_card_family",
+    dashboardLayoutVersion: DASHBOARD_LAYOUT_VERSION,
+    renderedCardFamilyStatus: "generated",
+    renderedCardReadingOrder: CARD_SPECS.map((spec) => spec.cardId),
+    primaryRenderedCardId: primaryCard?.cardId ?? null,
+    renderedCards,
+    legacyMonolithicCardStatus: "deprecated_not_generated",
+    legacyMonolithicCardPath: normalizePath(path.relative(ROOT, LEGACY_CARD_PATH)),
+    renderedCardStatus: primaryCard ? "generated_primary_overview" : "missing_primary_card",
+    renderedCardPath: primaryCard?.path ?? null,
+    renderedCardHash: primaryCard?.hash ?? null,
+    renderedCardCategory: primaryCard?.renderCategory ?? null,
+    renderedCardRole: primaryCard?.renderRole ?? null,
+    renderedCardLayoutVersion: primaryCard?.layoutVersion ?? null,
+  };
+};
+
+const computeRenderTaxonomyChecksum = (payload: RenderTaxonomyArtifact) =>
+  sha256(JSON.stringify(payload));
+
+const recomputeRenderTaxonomySummary = (renderEntries: RenderTaxonomyEntry[]) => {
+  const categoryCounts: Record<string, number> = {
+    diagnostic_lane_a: 0,
+    transport_context: 0,
+    scientific_3p1_field: 0,
+    comparison_panel: 0,
+    mechanism_overlay: 0,
+    invariant_crosscheck: 0,
+  };
+  for (const entry of renderEntries) {
+    categoryCounts[entry.renderCategory] = (categoryCounts[entry.renderCategory] ?? 0) + 1;
+  }
+  return {
+    totalRenderCount: renderEntries.length,
+    categoryCounts,
+    authoritativeRenderCount: renderEntries.filter(
+      (entry) => entry.authoritativeStatus === "primary_authoritative",
+    ).length,
+    secondaryRenderCount: renderEntries.filter(
+      (entry) => entry.authoritativeStatus !== "primary_authoritative",
+    ).length,
+  };
+};
+
+const buildDashboardRenderTaxonomyEntries = (dashboard: DashboardPayload): RenderTaxonomyEntry[] =>
+  dashboard.renderedCards.map((card) => {
+    const spec = cardSpecById(card.cardId);
+    const titleByCard: Record<DashboardCardId, string> = {
+      dashboard_overview:
+        "Diagnostics Dashboard Overview - Unit-Lapse NHM2 vs Mild Shift+Lapse",
+      proof_status: "Proof Status - Unit-Lapse NHM2 vs Mild Shift+Lapse",
+      cabin_gravity: "Cabin Gravity - Unit-Lapse NHM2 vs Mild Shift+Lapse",
+      wall_safety: "Wall Safety - Unit-Lapse NHM2 vs Mild Shift+Lapse",
+      precision_provenance:
+        "Precision / Provenance - Unit-Lapse NHM2 vs Mild Shift+Lapse",
+    };
+    return {
+      renderId: `nhm2_shift_lapse:comparison_panel:diagnostics_dashboard:${card.cardId}`,
+      caseId: "nhm2_shift_lapse",
+      renderCategory: "comparison_panel",
+      renderRole: "presentation",
+      fieldId: "diagnostics_dashboard",
+      variant: spec.variant,
+      canonicalPath: card.path,
+      legacyPath: null,
+      authoritativeStatus: "secondary_interpretive",
+      primaryScientificQuestion: spec.question,
+      baseImagePolicy: "diagnostic_card_canvas",
+      baseImageSource: "none",
+      inheritsTransportContext: false,
+      contextCompositionMode: "none",
+      title: titleByCard[card.cardId],
+      subtitle:
+        card.cardId === "dashboard_overview"
+          ? "overview index | proof=Lane A authoritative | generalized=reference_only | transport_context=absent"
+          : `${card.sectionSource} | proof=Lane A authoritative | generalized=reference_only | transport_context=absent`,
+      quantitySymbol: "diagnostic dashboard",
+      quantityUnits: "n/a",
+      observer: "eulerian_n",
+      foliation: "comoving_cartesian_3p1",
+      signConvention:
+        "Dashboard cards preserve baseline raw-brick values, generalized analytic-companion mild-lapse rows where required, and brick-derived wall-safety rows.",
+      laneId: `${dashboard.proofPolicy.authoritativeProofSurface ?? "lane_a_eulerian_comoving_theta_minus_trk"}`,
+      displayPolicyId: null,
+      displayRangeMin: null,
+      displayRangeMax: null,
+      displayTransform: null,
+      colormapFamily: null,
+      cameraPoseId: `diagnostics_dashboard_${card.cardId}`,
+      orientationConventionId: "x_ship_y_port_z_zenith",
+    };
+  });
+
+const updateRenderTaxonomyArtifacts = (dashboard: DashboardPayload) => {
+  if (dashboard.renderedCardFamilyStatus !== "generated" || dashboard.renderedCards.length === 0) {
+    return null;
+  }
+  if (!fs.existsSync(OUT_RENDER_TAXONOMY_JSON)) {
+    throw new Error(
+      `render_taxonomy_missing:${normalizePath(path.relative(ROOT, OUT_RENDER_TAXONOMY_JSON))}`,
+    );
+  }
+  const taxonomy = JSON.parse(
+    fs.readFileSync(OUT_RENDER_TAXONOMY_JSON, "utf8"),
+  ) as RenderTaxonomyArtifact;
+  const renderEntries = [
+    ...taxonomy.renderEntries.filter(
+      (entry: RenderTaxonomyEntry) =>
+        !entry.renderId.startsWith("nhm2_shift_lapse:comparison_panel:diagnostics_dashboard:"),
+    ),
+    ...buildDashboardRenderTaxonomyEntries(dashboard),
+  ];
+  const fieldFamilies = [
+    ...taxonomy.fieldFamilies.filter(
+      (entry: any) => entry.fieldId !== DASHBOARD_FIELD_FAMILY.fieldId,
+    ),
+    DASHBOARD_FIELD_FAMILY,
+  ].sort((lhs: any, rhs: any) => lhs.label.localeCompare(rhs.label));
+  const notes = Array.from(
+    new Set([
+      ...taxonomy.notes,
+      "diagnostics_dashboard comparison_panel outputs now ship as a measured multi-card family on a neutral diagnostic card canvas with inline provenance badges and no transport-context inheritance.",
+    ]),
+  );
+  const artifactBase = {
+    ...taxonomy,
+    generatedAt: new Date().toISOString(),
+    fieldFamilies,
+    renderEntries,
+    summary: recomputeRenderTaxonomySummary(renderEntries),
+    notes,
+  };
+  const nextArtifact = {
+    ...artifactBase,
+    checksum: computeRenderTaxonomyChecksum(artifactBase),
+  };
+  ensureDirForFile(OUT_RENDER_TAXONOMY_JSON);
+  ensureDirForFile(OUT_RENDER_TAXONOMY_AUDIT);
+  fs.writeFileSync(
+    OUT_RENDER_TAXONOMY_JSON,
+    `${JSON.stringify(nextArtifact, null, 2)}\n`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    OUT_RENDER_TAXONOMY_AUDIT,
+    renderRenderTaxonomyAuditMarkdown(nextArtifact as any),
+    "utf8",
+  );
+  return {
+    outRenderTaxonomyJson: OUT_RENDER_TAXONOMY_JSON,
+    outRenderTaxonomyAudit: OUT_RENDER_TAXONOMY_AUDIT,
+  };
+};
+
+export const buildShiftPlusLapseDashboardPayload = async (
+  comparisonPayload?: any,
+): Promise<DashboardPayload> => {
+  const comparison =
+    comparisonPayload ?? (await buildShiftPlusLapseComparisonPayload());
+  const proofRows = buildProofRows(comparison);
+  const cabinRows = CABIN_ROW_IDS.map((id) =>
+    buildDashboardRow(
+      findQuantity(comparison.cabinGravityComparison, id),
+      "cabin_gravity_panel",
+    ),
+  );
+  const wallRows = WALL_ROW_IDS.map((id) =>
+    buildDashboardRow(
+      findQuantity(comparison.wallSafetyComparison, id),
+      "wall_safety_panel",
+    ),
+  );
+  const precisionRows = buildPrecisionRows(comparison);
+  const basePayload: DashboardSeed = {
+    artifactId: "nhm2_shift_plus_lapse_dashboard",
+    capturedAt: new Date().toISOString(),
+    date: DATE_STAMP,
+    dashboardId: "nhm2_unit_lapse_vs_mild_shift_plus_lapse_dashboard",
+    dashboardStatus: "available",
+    comparisonId: comparison.comparisonId,
+    scenarioId: comparison.scenarioId,
+    proofPolicy: {
+      ...comparison.proofPolicy,
+      dashboardNote:
+        "This dashboard is a human-facing comparison surface only. It does not replace Lane A or promote the generalized branch.",
+    },
+    comparisonSemantics: {
+      crossCaseSourceMismatchCount:
+        comparison.comparisonSummary.crossCaseSourceMismatchCount,
+      wallSafetySourceParity: comparison.comparisonSummary.wallSafetySourceParity,
+      cabinGravityUsesAnalyticCompanion:
+        comparison.comparisonSummary.cabinGravityUsesAnalyticCompanion,
+    },
+    panels: [
+      {
+        panelId: "proof_status_panel",
+        title: "Proof Status",
+        purpose:
+          "Keep proof hierarchy explicit before reading any lapse or wall-safety diagnostic row.",
+        rows: proofRows,
+        sectionNote:
+          "Lane A remains authoritative. The generalized branch is reference-only and this dashboard is presentation/comparison only.",
+      },
+      {
+        panelId: "cabin_gravity_panel",
+        title: "Cabin Gravity",
+        purpose:
+          "Compare local lapse diagnostics and clock-split observables between the unit-lapse baseline and the mild generalized branch.",
+        rows: cabinRows,
+        sectionNote:
+          "These are local lapse diagnostics. In the mild generalized branch they may use analytic companion reporting under float32 under-resolution.",
+      },
+      {
+        panelId: "wall_safety_panel",
+        title: "Wall Safety",
+        purpose:
+          "Compare combined shift/lapse horizon-proxy diagnostics without treating them as comfort metrics.",
+        rows: wallRows,
+        sectionNote:
+          "Wall safety remains a separate diagnostic family from cabin gravity and stays brick-derived in the current comparison.",
+      },
+      {
+        panelId: "precision_panel",
+        title: "Precision / Provenance",
+        purpose:
+          "Show how raw-brick and analytic-companion provenance are mixed or aligned across the comparison.",
+        rows: precisionRows,
+        sectionNote:
+          "Read these rows before collapsing the dashboard into any downstream summary. They explain where mild-reference under-resolution is handled analytically and where brick alignment is preserved.",
+      },
+    ],
+    badgeLegend: BADGES,
+    provenanceWarnings: comparison.provenanceWarnings,
+    recommendedReadingOrder: [
+      "proof_status_panel",
+      "cabin_gravity_panel",
+      "wall_safety_panel",
+      "precision_panel",
+    ],
+  };
+  const rendered = await renderDashboardCardFamily(basePayload);
+  return {
+    ...basePayload,
+    dashboardSurfaceKind: rendered.dashboardSurfaceKind,
+    dashboardLayoutVersion: rendered.dashboardLayoutVersion,
+    layoutBudget: LAYOUT_BUDGET,
+    renderedCardFamilyStatus: rendered.renderedCardFamilyStatus,
+    renderedCardReadingOrder: rendered.renderedCardReadingOrder,
+    primaryRenderedCardId: rendered.primaryRenderedCardId,
+    renderedCards: rendered.renderedCards,
+    legacyMonolithicCardStatus: rendered.legacyMonolithicCardStatus,
+    legacyMonolithicCardPath: rendered.legacyMonolithicCardPath,
+    renderedCardStatus: rendered.renderedCardStatus,
+    renderedCardPath: rendered.renderedCardPath,
+    renderedCardHash: rendered.renderedCardHash,
+    renderedCardCategory: rendered.renderedCardCategory,
+    renderedCardRole: rendered.renderedCardRole,
+    renderedCardLayoutVersion: rendered.renderedCardLayoutVersion,
+  };
+};
+
+const buildPanelTable = (rows: DashboardRow[]) => {
+  const header =
+    "| row | baseline | generalized | delta | units | baseline source | generalized source | primary badge | mismatch |";
+  const separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |";
+  const body = rows.map((row) => {
+    const baseline = Array.isArray(row.baselineValue)
+      ? `[${row.baselineValue.map((entry) => formatValue(entry)).join(", ")}]`
+      : `${formatValue(row.baselineValue)}`;
+    const generalized = Array.isArray(row.generalizedValue)
+      ? `[${row.generalizedValue.map((entry) => formatValue(entry)).join(", ")}]`
+      : `${formatValue(row.generalizedValue)}`;
+    const delta = Array.isArray(row.delta)
+      ? `[${row.delta.map((entry) => formatValue(entry, true)).join(", ")}]`
+      : `${formatValue(row.delta, true)}`;
+    return `| ${row.label} | ${baseline} | ${generalized} | ${delta} | ${row.units} | ${row.baselineSourceKind ?? "n/a"} | ${row.generalizedSourceKind ?? "n/a"} | ${row.badgeId} | ${row.crossCaseSourceMismatch ? "yes" : "no"} |`;
+  });
+  return [header, separator, ...body].join("\n");
+};
+
+const buildBadgeLegendMarkdown = (badges: BadgeDefinition[]) => {
+  const header = "| badge | label | meaning | priority |";
+  const separator = "| --- | --- | --- | --- |";
+  const rows = badges
+    .slice()
+    .sort((a, b) => a.displayPriority - b.displayPriority)
+    .map(
+      (badge) =>
+        `| ${badge.badgeId} | ${badge.label} | ${badge.meaning} | ${badge.displayPriority} |`,
+    );
+  return [header, separator, ...rows].join("\n");
+};
+
+const buildRenderedCardsTable = (cards: DashboardCardEntry[]) => {
+  const header = "| cardId | title | sectionSource | primary | path | hash |";
+  const separator = "| --- | --- | --- | --- | --- | --- |";
+  const rows = cards.map(
+    (card) =>
+      `| ${card.cardId} | ${card.title} | ${card.sectionSource} | ${card.primary ? "yes" : "no"} | ${card.path} | ${card.hash} |`,
+  );
+  return [header, separator, ...rows].join("\n");
+};
+
+const buildAuditMarkdown = (payload: DashboardPayload) => {
+  const proofPanel = panelById(payload, "proof_status_panel");
+  const cabinPanel = panelById(payload, "cabin_gravity_panel");
+  const wallPanel = panelById(payload, "wall_safety_panel");
+  const precisionPanel = panelById(payload, "precision_panel");
+  const warningList =
+    payload.provenanceWarnings.length > 0
+      ? payload.provenanceWarnings
+          .map(
+            (warning: any) =>
+              `- ${warning.quantityId}: ${warning.note} (${warning.baselineSourceKind} vs ${warning.generalizedSourceKind})`,
+          )
+          .join("\n")
+      : "- none";
+  return [
+    "# NHM2 Shift-Plus-Lapse Dashboard Companion",
+    "",
+    `- date: ${payload.date}`,
+    `- dashboardId: ${payload.dashboardId}`,
+    `- comparisonId: ${payload.comparisonId}`,
+    `- scenarioId: ${payload.scenarioId}`,
+    `- dashboardStatus: ${payload.dashboardStatus}`,
+    `- dashboardLayoutVersion: ${payload.dashboardLayoutVersion}`,
+    `- renderedCardFamilyStatus: ${payload.renderedCardFamilyStatus}`,
+    `- primaryRenderedCardId: ${payload.primaryRenderedCardId ?? "null"}`,
+    `- renderedCardStatus: ${payload.renderedCardStatus}`,
+    `- renderedCardPath: ${payload.renderedCardPath ?? "null"}`,
+    `- renderedCardHash: ${payload.renderedCardHash ?? "null"}`,
+    `- legacyMonolithicCardStatus: ${payload.legacyMonolithicCardStatus}`,
+    `- legacyMonolithicCardPath: ${payload.legacyMonolithicCardPath ?? "null"}`,
+    "",
+    "## Proof Status",
+    "",
+    `- authoritativeProofSurface: ${payload.proofPolicy.authoritativeProofSurface}`,
+    `- laneAUnchanged: ${payload.proofPolicy.laneAUnchanged ? "yes" : "no"}`,
+    `- baselineBranchStatus: ${proofPanel.rows[1]?.baselineValue ?? "n/a"}`,
+    `- generalizedBranchStatus: ${proofPanel.rows[1]?.generalizedValue ?? "n/a"}`,
+    `- proofNote: ${proofPanel.sectionNote}`,
+    "",
+    "## Cabin Gravity Panel",
+    "",
+    `- panelPurpose: ${cabinPanel.purpose}`,
+    `- sectionNote: ${cabinPanel.sectionNote}`,
+    "",
+    buildPanelTable(cabinPanel.rows),
+    "",
+    "## Wall Safety Panel",
+    "",
+    `- panelPurpose: ${wallPanel.purpose}`,
+    `- sectionNote: ${wallPanel.sectionNote}`,
+    "",
+    buildPanelTable(wallPanel.rows),
+    "",
+    "## Precision Panel",
+    "",
+    `- panelPurpose: ${precisionPanel.purpose}`,
+    `- sectionNote: ${precisionPanel.sectionNote}`,
+    "",
+    buildPanelTable(precisionPanel.rows),
+    "",
+    "## Rendered Card Family",
+    "",
+    "- the previous single-card overlap/clipping failure was replaced by a measured multi-card family.",
+    "- each subject now has a dedicated rendered card with dynamic height, wrapped notes, and wrapped badge rows.",
+    "- proof hierarchy remains unchanged and visible on-card.",
+    "- provenance badges remain visible on-card rather than being hidden in metadata only.",
+    "- no field imagery, transport context, or volumetric render content is used in the card family.",
+    "",
+    buildRenderedCardsTable(payload.renderedCards),
+    "",
+    "## Provenance Warnings",
+    "",
+    `- provenanceWarningCount: ${payload.provenanceWarnings.length}`,
+    warningList,
+    "",
+    "## Badge Legend",
+    "",
+    buildBadgeLegendMarkdown(payload.badgeLegend),
+    "",
+  ].join("\n");
+};
+
+const buildMemoMarkdown = (payload: DashboardPayload) => {
+  const proofPanel = panelById(payload, "proof_status_panel");
+  const cabinPanel = panelById(payload, "cabin_gravity_panel");
+  const wallPanel = panelById(payload, "wall_safety_panel");
+  const precisionPanel = panelById(payload, "precision_panel");
+  return [
+    "# NHM2 Shift-Plus-Lapse Dashboard Memo",
+    "",
+    "This is a human-facing dashboard card family built directly from the provenance-aware shift-plus-lapse dashboard JSON artifact.",
+    "",
+    "It does not supersede proof artifacts:",
+    "",
+    "- Lane A remains authoritative and unchanged.",
+    "- warp.metric.T00.nhm2.shift_lapse remains reference_only.",
+    "- Cabin gravity and wall safety stay separate diagnostic families.",
+    "- Raw brick vs analytic companion provenance remains visible on-card.",
+    "- No field render, transport context, or volumetric imagery is introduced in this patch.",
+    "",
+    "## Why The Monolithic Card Was Replaced",
+    "",
+    "- the previous single card forced metric values, badge strips, and notes into one overcrowded surface",
+    "- horizontal overlap and vertical clipping made the output unsuitable for serious review",
+    "- replacing it with a planned card family preserves all provenance without hiding information to make the layout fit",
+    "",
+    "## How Layout Budgeting Now Works",
+    "",
+    "- text width is measured with @napi-rs/canvas before drawing",
+    "- long values, notes, and badge runs wrap to measured column widths",
+    "- row height is computed from wrapped content rather than assumed fixed",
+    "- each subject area now gets a dedicated card with its own vertical budget",
+    "",
+    "## Why Subject Separation Improves Scientific Readability",
+    "",
+    "- proof hierarchy is visible in a compact card rather than buried below metric clutter",
+    "- cabin gravity rows keep analytic-companion provenance explicit without sharing space with wall-safety rows",
+    "- wall safety remains readable as a brick-derived horizon proxy rather than a comfort score",
+    "- precision/provenance caveats are explained in their own card without compressing the source story",
+    "",
+    `- dashboardCardFamilyStatus: ${payload.renderedCardFamilyStatus}`,
+    "- layoutPlanningStatus: measured_dynamic_multicard_layout",
+    `- proofHierarchyStatus: ${proofPanel ? "lane_a_authoritative_and_visible" : "missing"}`,
+    `- provenanceBadgeStatus: ${payload.badgeLegend.length > 0 ? "visible_on_card_family" : "missing"}`,
+    "- recommendedNextAction: If a later interactive UI is added, enumerate cards directly from renderedCards in the dashboard artifact and preserve the same badge ids, proof-status wording, and cabin-vs-wall section split rather than recompressing the content into a single surface.",
+    "",
+    `- dashboardStatus: ${payload.dashboardStatus}`,
+    `- proofPanelStatus: ${proofPanel ? "available" : "missing"}`,
+    `- cabinGravityPanelStatus: ${cabinPanel ? "available" : "missing"}`,
+    `- wallSafetyPanelStatus: ${wallPanel ? "available" : "missing"}`,
+    `- precisionPanelStatus: ${precisionPanel ? "available" : "missing"}`,
+    "",
+  ].join("\n");
+};
+
+export const writeShiftPlusLapseDashboardArtifacts = async (payload?: DashboardPayload) => {
+  const dashboard = payload ?? (await buildShiftPlusLapseDashboardPayload());
+  ensureDirForFile(OUT_JSON);
+  ensureDirForFile(OUT_AUDIT);
+  ensureDirForFile(OUT_MEMO);
+  fs.writeFileSync(OUT_JSON, `${JSON.stringify(dashboard, null, 2)}\n`, "utf8");
+  fs.writeFileSync(OUT_AUDIT, buildAuditMarkdown(dashboard), "utf8");
+  fs.writeFileSync(OUT_MEMO, buildMemoMarkdown(dashboard), "utf8");
+  const taxonomyOutputs = updateRenderTaxonomyArtifacts(dashboard);
+  return {
+    outJson: OUT_JSON,
+    outAudit: OUT_AUDIT,
+    outMemo: OUT_MEMO,
+    outRenderedCards: dashboard.renderedCards.map((card) => path.join(ROOT, card.path)),
+    ...taxonomyOutputs,
+  };
+};
+
+const run = async () => {
+  const comparison = await buildShiftPlusLapseComparisonPayload();
+  writeShiftPlusLapseComparisonArtifacts(comparison);
+  const dashboard = await buildShiftPlusLapseDashboardPayload(comparison);
+  const outputs = await writeShiftPlusLapseDashboardArtifacts(dashboard);
+  process.stdout.write(`${JSON.stringify({ ok: true, ...outputs }, null, 2)}\n`);
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

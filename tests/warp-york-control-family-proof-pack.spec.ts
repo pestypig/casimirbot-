@@ -6,11 +6,15 @@ import { describe, expect, it } from "vitest";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
   buildWarpRodcSnapshot,
+  buildSourceToYorkBridgeSummary,
   buildCrossLaneComparison,
   buildCaseClassificationFeatures,
   buildControlMetricVolumeRef,
   buildNhm2SourceToYorkProvenanceArtifact,
   buildNhm2SourceFormulaAuditArtifact,
+  buildNhm2SourceMechanismMaturityArtifact,
+  buildNhm2SourceMechanismPromotionContractArtifact,
+  buildNhm2SourceMechanismParityRouteFeasibilityArtifact,
   buildNhm2SourceStageAuditArtifact,
   buildNhm2TimingAuthorityAuditArtifact,
   buildNhm2BrickAuthorityAuditArtifact,
@@ -42,6 +46,7 @@ import {
   decideNhm2DeeperReformulationVerdict,
   decideControlFamilyVerdict,
   deriveYorkOptixTracefreeMagnitude,
+  buildShiftDirectionOverlayPairwiseComparisons,
   evaluateShiftDirectionOverlayCaseDistinctness,
   evaluateClassificationRobustness,
   evaluateYorkOptixFieldRenderIntegrity,
@@ -66,6 +71,9 @@ import {
   resolveLaneACauseCode,
   renderNhm2SourceToYorkProvenanceMarkdown,
   renderNhm2SourceFormulaAuditMarkdown,
+  renderNhm2SourceMechanismMaturityMarkdown,
+  renderNhm2SourceMechanismPromotionContractMarkdown,
+  renderNhm2SourceMechanismParityRouteFeasibilityMarkdown,
   renderNhm2SourceStageAuditMarkdown,
   renderNhm2TimingAuthorityAuditMarkdown,
   renderNhm2BrickAuthorityAuditMarkdown,
@@ -772,6 +780,10 @@ const makeSourceToYorkFixture = () =>
     bridgeReadiness: {
       sourceContractPresent: true,
       timingAuthorityPresent: true,
+      timingAuthorityStatus: "recognized_required_fields_present",
+      timingAuthorityArtifactRecognized: true,
+      timingAuthorityRequiredFields: ["tauLC_ms", "tauPulse_ms", "TS_ratio"],
+      timingAuthorityOptionalMissingFields: [],
       reducedOrderPayloadPresent: true,
       proofPackBrickPresent: true,
       parameterMappingsComplete: false,
@@ -785,6 +797,31 @@ const makeSourceToYorkFixture = () =>
         "bridge_param_mapping_missing",
         "bridge_contract_to_brick_drift_unexplained",
       ],
+      bridgeOpenFieldCount: 2,
+      bridgeClosedFieldCount: 13,
+      openFields: ["sectorCount", "modulationFreq_GHz"],
+      closedFields: [
+        "sourceContract",
+        "timingAuthority.required_fields",
+        "reducedOrderPipelinePayload",
+        "proofPackBrickRequest",
+        "metricRefProvenance",
+        "warpFieldType -> metricT00Ref",
+        "dutyShip -> dutyFR",
+        "qCavity -> q",
+        "qSpoilingFactor -> q",
+        "gammaGeo",
+        "gammaVanDenBroeck -> gammaVdB",
+        "zeta",
+        "fullHull.Lx_m/Ly_m/Lz_m -> dims",
+      ],
+      residualBlockingReasons: [
+        "bridge_param_mapping_missing",
+        "bridge_contract_to_brick_drift_unexplained",
+      ],
+      residualAdvisoryReasons: [],
+      closureCandidateStatus: "closable_with_current_serialization",
+      bridgeClosurePolicy: "close_with_current_serialization",
     },
     notes: [],
     checksum: "source-to-york-checksum",
@@ -1797,6 +1834,9 @@ const makeCanonicalVisualComparisonFixtures = async () => {
     directionOverlayStatus: "available",
     directionOverlayWarnings: ["direction_streamline_generation_degraded"],
     directionOverlayCaseDistinctness: "distinct_across_cases",
+    directionOverlayInterpretationPolicy:
+      "normalize_non_material_internal_variance_after_sampled_field_match",
+    directionOverlayPairwiseComparisons: [],
     constraintContextStatus: "deferred_units_and_policy_unresolved",
     recommendedInterpretationOrder: [
       "beta_magnitude",
@@ -2136,6 +2176,140 @@ const buildDiagnosticSemanticFixture = (overrides?: {
     diagnosticPolicyOverride: overrides?.diagnosticPolicyOverride as any,
   });
   return { artifact, payload };
+};
+
+const buildSourceMechanismMaturityFixture = (overrides?: {
+  payload?: Record<string, unknown>;
+  sourceToYork?: Record<string, unknown>;
+  canonical?: Record<string, unknown>;
+  recovery?: Record<string, unknown>;
+  comparisonPolicyOverride?: Record<string, unknown>;
+  diagnosticPolicyOverride?: Record<string, unknown>;
+}) => {
+  const payload = (overrides?.payload ?? makeProofPackPayloadForMarkdown()) as any;
+  const sourceToYork = {
+    ...makeSourceToYorkFixture(),
+    bridgeReadiness: {
+      ...makeSourceToYorkFixture().bridgeReadiness,
+      timingAuthorityStatus: "recognized_required_fields_present_optional_fields_partial",
+      timingAuthorityOptionalMissingFields: ["TS", "epsilon", "isHomogenized"],
+      parameterMappingsComplete: true,
+      parameterMappingsExplained: true,
+      bridgeReady: true,
+      blockReasons: [],
+      bridgeOpenFieldCount: 0,
+      bridgeClosedFieldCount: 19,
+      openFields: [],
+      closedFields: [
+        "sourceContract",
+        "timingAuthority.required_fields",
+        "reducedOrderPipelinePayload",
+        "proofPackBrickRequest",
+        "metricRefProvenance",
+        "warpFieldType -> metricT00Ref",
+        "sectorCount",
+        "concurrentSectors",
+        "dutyCycle",
+        "dutyShip -> dutyFR",
+        "qCavity -> q",
+        "qSpoilingFactor -> q",
+        "gammaGeo",
+        "gammaVanDenBroeck -> gammaVdB",
+        "modulationFreq_GHz",
+        "zeta",
+        "reducedOrderReference.radius_m",
+        "reducedOrderReference.tauLC_ms",
+        "fullHull.Lx_m/Ly_m/Lz_m -> dims",
+      ],
+      residualBlockingReasons: [],
+      residualAdvisoryReasons: ["bridge_timing_authority_optional_fields_partial"],
+      closureCandidateStatus: "closed_with_current_serialization",
+      statusNote:
+        "Legacy source-to-York bridge is closed under the current serialization/readiness policy; optional timing-authority fields remain advisory-only and do not reopen the mechanism chain.",
+    },
+    ...(overrides?.sourceToYork ?? {}),
+  } as any;
+  const { sourceFormulaArtifact, artifact: sourceStageAudit } = buildSourceStageFixture({
+    canonical: {
+      metricT00GeomSource: "direct_metric_pipeline",
+      rhoMetric_Jm3: -89888730.09553961,
+      ...(overrides?.canonical ?? {}),
+    },
+    recovery: {
+      metricT00Derivation: "forward_shift_to_K_to_rho_E",
+      rhoMetric_Jm3: -89888730.09553961,
+      metricStressRhoSiMean_Jm3: -89888730.09553961,
+      ...(overrides?.recovery ?? {}),
+    },
+    sourceToYork,
+    comparisonPolicyOverride:
+      overrides?.comparisonPolicyOverride ??
+      ({
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      } as any),
+  });
+  const { artifact: diagnosticSemanticAudit } = buildDiagnosticSemanticFixture({
+    payload,
+    diagnosticPolicyOverride: overrides?.diagnosticPolicyOverride,
+  });
+  const artifact = buildNhm2SourceMechanismMaturityArtifact({
+    payload,
+    sourceFormulaAudit: sourceFormulaArtifact,
+    sourceToYork,
+    diagnosticSemanticAudit,
+    sourceStageAudit,
+    sourceAuditArtifactPath:
+      "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    sourceFormulaAuditPath:
+      "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    diagnosticSemanticAuditPath:
+      "artifacts/research/full-solve/nhm2-diagnostic-semantic-audit-latest.json",
+    sourceStageAuditPath:
+      "artifacts/research/full-solve/nhm2-source-stage-audit-latest.json",
+    sourceMechanismPromotionContractArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json",
+    sourceMechanismParityRouteFeasibilityArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-mechanism-parity-route-feasibility-latest.json",
+  });
+  const parityRouteFeasibilityArtifact =
+    buildNhm2SourceMechanismParityRouteFeasibilityArtifact({
+      payload,
+      sourceFormulaAudit: sourceFormulaArtifact,
+      sourceFormulaArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      sourceMechanismPromotionContractArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json",
+      sourceMechanismMaturityArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-mechanism-maturity-latest.json",
+    });
+  const promotionContractArtifact = buildNhm2SourceMechanismPromotionContractArtifact({
+    payload,
+    sourceFormulaAudit: sourceFormulaArtifact,
+    sourceToYork,
+    diagnosticSemanticAudit,
+    sourceFormulaArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+    sourceToYorkArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+    sourceMechanismMaturityArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-mechanism-maturity-latest.json",
+    sourceMechanismParityRouteFeasibilityArtifactPath:
+      "artifacts/research/full-solve/nhm2-source-mechanism-parity-route-feasibility-latest.json",
+  });
+  return {
+    artifact,
+    payload,
+    sourceToYork,
+    sourceFormulaArtifact,
+    sourceStageAudit,
+    diagnosticSemanticAudit,
+    parityRouteFeasibilityArtifact,
+    promotionContractArtifact,
+  };
 };
 
 const buildYorkRenderDebugFixture = (overrides?: {
@@ -4851,7 +5025,7 @@ describe("warp york control-family proof pack", () => {
     expect(rodc.checksum?.length).toBeGreaterThan(10);
   });
 
-  it("builds source-to-york provenance artifact sections and keeps bridge blocked on missing derivations", () => {
+  it("builds source-to-york provenance artifact sections and closes serialized bridge mappings under the current readiness policy", () => {
     const payload = makeProofPackPayloadForMarkdown() as any;
     payload.verdict = "nhm2_low_expansion_family";
     payload.crossLaneComparison.cross_lane_status = "lane_stable_low_expansion_like";
@@ -4901,6 +5075,7 @@ describe("warp york control-family proof pack", () => {
                   gammaGeo: 1,
                   gammaVanDenBroeck: 500,
                   modulationFreq_GHz: 15,
+                  shipRadius_m: 2,
                 },
               },
               grRequest: {
@@ -4953,17 +5128,34 @@ describe("warp york control-family proof pack", () => {
     expect(
       artifact.parameterMappings.find((entry) => entry.field === "modulationFreq_GHz")
         ?.mapping_type,
-    ).toBe("missing_derivation");
-    expect(artifact.bridgeReadiness.parameterMappingsComplete).toBe(false);
-    expect(artifact.bridgeReadiness.bridgeReady).toBe(false);
+    ).toBe("direct_copy");
+    expect(artifact.parameterMappings.find((entry) => entry.field === "sectorCount")?.status).toBe(
+      "closed",
+    );
+    expect(
+      artifact.parameterMappings.find((entry) => entry.field === "reducedOrderReference.radius_m")
+        ?.status,
+    ).toBe("closed");
+    expect(artifact.bridgeReadiness.timingAuthorityPresent).toBe(true);
+    expect(artifact.bridgeReadiness.timingAuthorityStatus).toBe(
+      "recognized_required_fields_present",
+    );
+    expect(artifact.bridgeReadiness.parameterMappingsComplete).toBe(true);
+    expect(artifact.bridgeReadiness.parameterMappingsExplained).toBe(true);
+    expect(artifact.bridgeReadiness.bridgeReady).toBe(true);
+    expect(artifact.bridgeReadiness.bridgeOpenFieldCount).toBe(0);
+    expect(artifact.bridgeReadiness.bridgeClosurePolicy).toBe("close_with_current_serialization");
     expect(artifact.bridgeReadiness.gatingStatus).toBe("legacy_advisory_non_gating");
     expect(artifact.bridgeReadiness.gatingBlocksMechanismChain).toBe(false);
-    expect(artifact.bridgeReadiness.blockReasons).toContain("bridge_param_mapping_missing");
+    expect(artifact.bridgeReadiness.blockReasons).toEqual([]);
     expect(renderNhm2SourceToYorkProvenanceMarkdown(artifact)).toContain(
       "## Parameter Mapping",
     );
     expect(renderNhm2SourceToYorkProvenanceMarkdown(artifact)).toContain(
       "legacy_advisory_non_gating",
+    );
+    expect(renderNhm2SourceToYorkProvenanceMarkdown(artifact)).toContain(
+      "bridgeClosurePolicy | close_with_current_serialization",
     );
   });
 
@@ -4971,6 +5163,10 @@ describe("warp york control-family proof pack", () => {
     const openReadiness = computeSourceToYorkBridgeReadiness({
       sourceContractPresent: true,
       timingAuthorityPresent: true,
+      timingAuthorityStatus: "recognized_required_fields_present",
+      timingAuthorityArtifactRecognized: true,
+      timingAuthorityRequiredFields: ["tauLC_ms", "tauPulse_ms", "TS_ratio"],
+      timingAuthorityOptionalMissingFields: [],
       reducedOrderPayloadPresent: true,
       proofPackBrickPresent: true,
       parameterMappings: [
@@ -4993,10 +5189,18 @@ describe("warp york control-family proof pack", () => {
     expect(openReadiness.blockReasons).toContain(
       "bridge_contract_to_brick_drift_unexplained",
     );
+    expect(openReadiness.bridgeOpenFieldCount).toBe(1);
+    expect(openReadiness.openFields).toContain("sectorCount");
+    expect(openReadiness.bridgeClosurePolicy).toBe("close_with_current_serialization");
+    expect(openReadiness.closureCandidateStatus).toBe("closable_with_current_serialization");
 
     const closedReadiness = computeSourceToYorkBridgeReadiness({
       sourceContractPresent: true,
       timingAuthorityPresent: true,
+      timingAuthorityStatus: "recognized_required_fields_present_optional_fields_partial",
+      timingAuthorityArtifactRecognized: true,
+      timingAuthorityRequiredFields: ["tauLC_ms", "tauPulse_ms", "TS_ratio"],
+      timingAuthorityOptionalMissingFields: ["TS", "epsilon", "isHomogenized"],
       reducedOrderPayloadPresent: true,
       proofPackBrickPresent: true,
       parameterMappings: [
@@ -5025,6 +5229,31 @@ describe("warp york control-family proof pack", () => {
     expect(closedReadiness.parameterMappingsExplained).toBe(true);
     expect(closedReadiness.bridgeReady).toBe(true);
     expect(closedReadiness.gatingBlocksMechanismChain).toBe(false);
+    expect(closedReadiness.timingAuthorityStatus).toBe(
+      "recognized_required_fields_present_optional_fields_partial",
+    );
+    expect(closedReadiness.residualAdvisoryReasons).toContain(
+      "bridge_timing_authority_optional_fields_partial",
+    );
+    expect(closedReadiness.bridgeClosurePolicy).toBe("close_with_current_serialization");
+    expect(closedReadiness.closureCandidateStatus).toBe("closed_with_current_serialization");
+  });
+
+  it("propagates refined source-to-york bridge summary fields into the proof-pack alias", () => {
+    const sourceToYork = makeSourceToYorkFixture() as any;
+    const summary = buildSourceToYorkBridgeSummary({
+      artifact: sourceToYork,
+      artifactPath: "artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-source-to-york-provenance-latest.md",
+    });
+
+    expect(summary.readiness.bridgeOpenFieldCount).toBe(2);
+    expect(summary.readiness.bridgeClosurePolicy).toBe("close_with_current_serialization");
+    expect(summary.readiness.timingAuthorityStatus).toBe(
+      "recognized_required_fields_present",
+    );
+    expect(summary.readiness.openFields).toContain("sectorCount");
+    expect(summary.artifactPath).toContain("nhm2-source-to-york-provenance-latest.json");
   });
 
   it("emits source-stage compared fields with numeric deltas and markdown summary", () => {
@@ -5191,9 +5420,29 @@ describe("warp york control-family proof pack", () => {
     const { sourceFormulaArtifact } = buildSourceStageFixture({
       canonical: {
         metricT00GeomSource: "direct_metric_pipeline",
+        rhoMetric_Jm3: -89888730.09553961,
+        couplingAlpha: 0.5,
+        metricT00SiRelError: 0,
+        tauSelected_s: 0.00002,
+        tauLC_s: 0.000003358990438645391,
+        tauPulse_s: 6.717980877290783e-8,
       },
       recovery: {
         metricT00Derivation: "forward_shift_to_K_to_rho_E",
+        rhoMetric_Jm3: -89888730.09553961,
+        metricStressRhoSiMean_Jm3: -89888730.09553961,
+        couplingAlpha: 0.5,
+        metricT00SiRelError: 0,
+        params: {
+          dutyEffective_FR: 0.12,
+          sectorCount: 80,
+          concurrentSectors: 2,
+          qCavity: 100000,
+          qSpoilingFactor: 3,
+          gammaGeo: 1,
+          gammaVanDenBroeck: 500,
+          tau_s_ms: 0.02,
+        },
       },
     });
     expect(sourceFormulaArtifact.artifactType).toBe("nhm2_source_formula_audit/v1");
@@ -5208,12 +5457,505 @@ describe("warp york control-family proof pack", () => {
     expect(sourceFormulaArtifact.stage.formulaMismatchClass).toBe(
       "direct_vs_reconstructed",
     );
+    expect(sourceFormulaArtifact.formulaComparison.directFormulaId).toBe(
+      "canonical_qi_forensics.metricT00Si_Jm3",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.reconstructedFormulaId).toBe(
+      "recovery_search_case.metricT00Si_Jm3",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.comparisonMode).toBe(
+      "authoritative_direct_vs_reconstructed_proxy",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.mismatchReason).toBe(
+      "proxy_vs_metric_term_gap",
+    );
+    expect(sourceFormulaArtifact.interpretationPolicy).toMatchObject({
+      policyId: "expected_proxy_vs_metric_gap_non_promotable",
+      parityExpected: false,
+      promotionBlockedByMismatch: true,
+      laneAUnaffectedByMismatch: true,
+      interpretationStatus: "advisory",
+    });
+    expect(sourceFormulaArtifact.formulaComparison.additionalMismatchReasons).toContain(
+      "missing_term_mapping",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.additionalMismatchReasons).toContain(
+      "duty_definition_mismatch",
+    );
+    expect(sourceFormulaArtifact.formulaComparison.additionalMismatchReasons).toContain(
+      "timing_source_mismatch",
+    );
+    expect(
+      sourceFormulaArtifact.formulaComparison.termComparisons.find(
+        (entry) => entry.termId === "final_metricT00Si_Jm3",
+      ),
+    ).toMatchObject({
+      status: "mismatched",
+      units: "J/m^3",
+    });
+    expect(
+      sourceFormulaArtifact.formulaComparison.resolvedInputComparisons.find(
+        (entry) => entry.inputId === "dutyEffective_FR",
+      ),
+    ).toMatchObject({
+      status: "missing_direct_input",
+      units: "fraction",
+    });
     expect(sourceFormulaArtifact.formulaComparison.reconstructionOnlyComparison).toBe(
       true,
     );
     const markdown = renderNhm2SourceFormulaAuditMarkdown(sourceFormulaArtifact);
     expect(markdown).toContain("## Formula Comparison");
+    expect(markdown).toContain("## Interpretation Policy");
+    expect(markdown).toContain("### Resolved Inputs");
+    expect(markdown).toContain("### Term Comparisons");
+    expect(markdown).toContain("mismatchReason");
+    expect(markdown).toContain("sourceFormulaInterpretationPolicy");
     expect(markdown).toContain("formulaMismatchClass");
+  });
+
+  it("does not leave a false formulaEquivalent without explicit reason and term breakdown", () => {
+    const { sourceFormulaArtifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00GeomSource: "direct_metric_pipeline",
+        rhoMetric_Jm3: -89888730.09553961,
+      },
+      recovery: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+        rhoMetric_Jm3: -89888730.09553961,
+        metricStressRhoSiMean_Jm3: -89888730.09553961,
+      },
+    });
+
+    expect(sourceFormulaArtifact.formulaComparison.formulaEquivalent).toBe(false);
+    expect(sourceFormulaArtifact.formulaComparison.mismatchReason).not.toBe("none");
+    expect(sourceFormulaArtifact.formulaComparison.termComparisons.length).toBeGreaterThan(0);
+    expect(sourceFormulaArtifact.formulaComparison.resolvedInputComparisons.length).toBeGreaterThan(
+      0,
+    );
+    expect(sourceFormulaArtifact.stage.summary).toContain("mismatch_reason=");
+  });
+
+  it("propagates source-formula interpretation policy into the proof-pack alias summary", () => {
+    const { sourceFormulaArtifact } = buildSourceStageFixture({
+      canonical: {
+        metricT00GeomSource: "direct_metric_pipeline",
+        rhoMetric_Jm3: -89888730.09553961,
+      },
+      recovery: {
+        metricT00Derivation: "forward_shift_to_K_to_rho_E",
+        rhoMetric_Jm3: -89888730.09553961,
+        metricStressRhoSiMean_Jm3: -89888730.09553961,
+      },
+    });
+    const payload = makeProofPackPayloadForMarkdown();
+    payload.sourceFormulaAudit = {
+      formulaEquivalent: sourceFormulaArtifact.formulaComparison.formulaEquivalent,
+      reconstructionOnlyComparison:
+        sourceFormulaArtifact.formulaComparison.reconstructionOnlyComparison,
+      formulaMismatchClass: sourceFormulaArtifact.formulaComparison.formulaMismatchClass,
+      comparisonMode: sourceFormulaArtifact.formulaComparison.comparisonMode,
+      mismatchReason: sourceFormulaArtifact.formulaComparison.mismatchReason,
+      additionalMismatchReasons:
+        sourceFormulaArtifact.formulaComparison.additionalMismatchReasons,
+      sourceFormulaInterpretationPolicy: sourceFormulaArtifact.interpretationPolicy.policyId,
+      parityExpected: sourceFormulaArtifact.interpretationPolicy.parityExpected,
+      promotionBlockedByMismatch:
+        sourceFormulaArtifact.interpretationPolicy.promotionBlockedByMismatch,
+      laneAUnaffectedByMismatch:
+        sourceFormulaArtifact.interpretationPolicy.laneAUnaffectedByMismatch,
+      tolerancePolicySummary:
+        `relTol=${sourceFormulaArtifact.formulaComparison.tolerancePolicy.relTol}; absTol=${sourceFormulaArtifact.formulaComparison.tolerancePolicy.absTol}; rule=final_metric_numeric_parity`,
+      directFormulaId: sourceFormulaArtifact.formulaComparison.directFormulaId,
+      reconstructedFormulaId:
+        sourceFormulaArtifact.formulaComparison.reconstructedFormulaId,
+      termMismatchCount: sourceFormulaArtifact.formulaComparison.termComparisons.filter(
+        (entry) => entry.status === "mismatched",
+      ).length,
+      artifactPath: "artifacts/research/full-solve/nhm2-source-formula-audit-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-source-formula-audit-latest.md",
+    } as any;
+
+    const markdown = renderMarkdown(payload as any);
+    const additionalMismatchReasons = sourceFormulaArtifact.formulaComparison.additionalMismatchReasons.join(
+      ",",
+    );
+    expect(markdown).toContain("| comparisonMode | authoritative_direct_vs_reconstructed_proxy |");
+    expect(markdown).toContain(
+      `| additionalMismatchReasons | ${additionalMismatchReasons} |`,
+    );
+    expect(markdown).toContain(
+      "| sourceFormulaInterpretationPolicy | expected_proxy_vs_metric_gap_non_promotable |",
+    );
+    expect(markdown).toContain("| parityExpected | false |");
+    expect(markdown).toContain("| promotionBlockedByMismatch | true |");
+    expect(markdown).toContain("| laneAUnaffectedByMismatch | true |");
+  });
+
+  it("builds a bounded advisory source/mechanism maturity artifact with explicit blockers and claims", () => {
+    const { artifact } = buildSourceMechanismMaturityFixture({
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      },
+    });
+
+    expect(artifact.sourceMechanismMaturity).toMatchObject({
+      maturityTier: "reduced_order_advisory",
+      claimBoundaryPolicy:
+        "bounded_advisory_non_promotable_until_explicit_promotion_contract",
+      authoritativeStatus: "non_authoritative",
+      promotionEligibility: "blocked",
+      sourceFormulaInterpretationPolicy: "expected_proxy_vs_metric_gap_non_promotable",
+      sourceToYorkBridgeClosurePolicy: "close_with_current_serialization",
+      bridgeReady: true,
+      bridgeGatingStatus: "legacy_advisory_non_gating",
+      parityExpected: false,
+      promotionBlocked: true,
+      laneAUnaffected: true,
+      laneAAuthoritative: true,
+      referenceOnlyCrossLaneScope: true,
+      promotionContractId: "nhm2_source_mechanism_promotion_contract.v1",
+      promotionContractStatus: "blocked_pending_route_selection",
+      selectedPromotionRoute: "none_active",
+    });
+    expect(artifact.sourceMechanismMaturity.promotionBlockers).toContain(
+      "proxy_vs_metric_term_gap",
+    );
+    expect(artifact.sourceMechanismMaturity.promotionBlockers).toContain(
+      "direct_vs_reconstructed_non_parity",
+    );
+    expect(artifact.sourceMechanismMaturity.promotionBlockers).toContain(
+      "timing_authority_optional_fields_partial",
+    );
+    expect(artifact.sourceMechanismMaturity.promotionBlockers).toContain(
+      "reference_only_cross_lane_scope",
+    );
+    expect(artifact.sourceMechanismMaturity.allowedClaims).toContain(
+      "source_to_york_provenance_closed_under_current_serialization_policy",
+    );
+    expect(artifact.sourceMechanismMaturity.allowedClaims).toContain(
+      "reconstructed_proxy_path_usable_for_advisory_comparison",
+    );
+    expect(artifact.sourceMechanismMaturity.allowedClaims).toContain(
+      "bounded_non_authoritative_source_annotation",
+    );
+    expect(artifact.sourceMechanismMaturity.allowedClaims).toContain(
+      "bounded_non_authoritative_reduced_order_comparison",
+    );
+    expect(artifact.sourceMechanismMaturity.disallowedClaims).toContain(
+      "reconstructed_proxy_path_formula_equivalent_to_authoritative_direct_metric",
+    );
+    expect(artifact.sourceMechanismMaturity.disallowedClaims).toContain(
+      "unbounded_non_authoritative_source_mechanism_promotion_claim",
+    );
+    expect(artifact.sourceMechanismMaturity.requiredForPromotion).toContain(
+      "direct_proxy_parity_route_for_equivalence_or_cross_lane_claims",
+    );
+    expect(artifact.sourceMechanismMaturity.requiredForPromotion).toContain(
+      "bounded_exemption_contract_for_non_authoritative_claim_subsets",
+    );
+
+    const markdown = renderNhm2SourceMechanismMaturityMarkdown(artifact);
+    expect(markdown).toContain("## Source / Mechanism Maturity");
+    expect(markdown).toContain("## Allowed Claims");
+    expect(markdown).toContain("## Disallowed Claims");
+    expect(markdown).toContain("## Required For Promotion");
+    expect(markdown).toContain("| promotionContractStatus | blocked_pending_route_selection |");
+    expect(markdown).toContain("| selectedPromotionRoute | none_active |");
+  });
+
+  it("propagates source/mechanism maturity policy into the proof-pack alias summary", () => {
+    const {
+      artifact: maturityArtifact,
+      promotionContractArtifact,
+      parityRouteFeasibilityArtifact,
+    } =
+      buildSourceMechanismMaturityFixture({
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      },
+    });
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.sourceMechanismMaturity = {
+      ...maturityArtifact.sourceMechanismMaturity,
+      artifactPath: "artifacts/research/full-solve/nhm2-source-mechanism-maturity-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-source-mechanism-maturity-latest.md",
+    };
+    payload.sourceMechanismPromotionContract = (() => {
+      const formalExemptionRoute =
+        promotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.find(
+          (entry) => entry.routeId === "formal_exemption_route",
+        );
+      return {
+      contractId: promotionContractArtifact.sourceMechanismPromotionContract.contractId,
+      contractStatus: promotionContractArtifact.sourceMechanismPromotionContract.contractStatus,
+      selectedPromotionRoute:
+        promotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute,
+      promotionDecisionPolicy:
+        promotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy,
+      claimsRequiringParityCount:
+        promotionContractArtifact.sourceMechanismPromotionContract.claimsRequiringParity.length,
+      claimsEligibleUnderExemptionCount:
+        promotionContractArtifact.sourceMechanismPromotionContract.claimsEligibleUnderExemption
+          .length,
+      claimsBlockedEvenWithExemptionCount:
+        promotionContractArtifact.sourceMechanismPromotionContract
+          .claimsBlockedEvenWithExemption.length,
+      exemptionEligibleClaimCount:
+        promotionContractArtifact.sourceMechanismPromotionContract
+          .exemptionEligibleClaimDetails.length,
+      exemptionBlockedClaimCount:
+        promotionContractArtifact.sourceMechanismPromotionContract
+          .claimsBlockedEvenWithExemption.length,
+      exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
+      exemptionRouteSummary: formalExemptionRoute?.summary ?? "none",
+      routeFeasibilityStatus:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .feasibilityStatus,
+      routeBlockingClass:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeBlockingClass,
+      dominantMismatchTerm:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .dominantMismatchTerm,
+      nextClosureAction:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .nextClosureAction,
+      promotionSummary: promotionContractArtifact.sourceMechanismPromotionContract.summary,
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-source-mechanism-promotion-contract-latest.md",
+      };
+    })();
+    payload.sourceMechanismParityRouteFeasibility = {
+      routeId:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.routeId,
+      routeStatus:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.routeStatus,
+      routeFeasibilityStatus:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .feasibilityStatus,
+      routeBlockingClass:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeBlockingClass,
+      dominantMismatchTerm:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .dominantMismatchTerm,
+      matchedTermsCount:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .matchedTerms.length,
+      unmatchedTermsCount:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .unmatchedTerms.length,
+      nextClosureAction:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .nextClosureAction,
+      parityRouteSummary:
+        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+          .routeSummary,
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-source-mechanism-parity-route-feasibility-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-source-mechanism-parity-route-feasibility-latest.md",
+    };
+
+    const markdown = renderMarkdown(payload);
+    expect(markdown).toContain(
+      "| claimBoundaryPolicy | bounded_advisory_non_promotable_until_explicit_promotion_contract |",
+    );
+    expect(markdown).toContain(
+      "| promotionBlockers | proxy_vs_metric_term_gap,direct_vs_reconstructed_non_parity,timing_authority_optional_fields_partial,reference_only_cross_lane_scope |",
+    );
+    expect(markdown).toContain("| laneAAuthoritative | true |");
+    expect(markdown).toContain("| laneAUnaffected | true |");
+    expect(markdown).toContain("## Source / Mechanism Promotion Contract");
+    expect(markdown).toContain("| contractStatus | blocked_pending_route_selection |");
+    expect(markdown).toContain("| selectedPromotionRoute | none_active |");
+    expect(markdown).toContain(
+      "| exemptionRouteStatus | partially_activatable_for_bounded_claims |",
+    );
+    expect(markdown).toContain("## Source / Mechanism Parity-Route Feasibility");
+    expect(markdown).toContain(
+      "| routeFeasibilityStatus | blocked_by_derivation_class_difference |",
+    );
+    expect(markdown).toContain("| dominantMismatchTerm | final_metricT00Si_Jm3 |");
+    expect(markdown).toContain(
+      "source_to_york_provenance_closed_under_current_serialization_policy",
+    );
+    expect(markdown).toContain(
+      "reconstructed_proxy_path_formula_equivalent_to_authoritative_direct_metric",
+    );
+  });
+
+  it("builds an explicit source/mechanism promotion contract with parity and exemption routes", () => {
+    const { promotionContractArtifact, parityRouteFeasibilityArtifact } =
+      buildSourceMechanismMaturityFixture({
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      },
+    });
+
+    expect(promotionContractArtifact.sourceMechanismPromotionContract).toMatchObject({
+      contractId: "nhm2_source_mechanism_promotion_contract.v1",
+      contractStatus: "blocked_pending_route_selection",
+      selectedPromotionRoute: "none_active",
+      promotionDecisionPolicy:
+        "parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims",
+      laneAUnaffected: true,
+      referenceOnlyCrossLaneScope: true,
+    });
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.map(
+        (entry) => entry.routeId,
+      ),
+    ).toEqual(["direct_proxy_parity_route", "formal_exemption_route"]);
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.claimsRequiringParity,
+    ).toContain("formula_equivalent_to_authoritative_direct_metric");
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.claimsEligibleUnderExemption,
+    ).toEqual(
+      expect.arrayContaining([
+        "bounded_non_authoritative_source_annotation",
+        "bounded_non_authoritative_mechanism_context",
+        "bounded_non_authoritative_reduced_order_comparison",
+      ]),
+    );
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.claimsBlockedEvenWithExemption,
+    ).toContain("source_mechanism_layer_supports_viability_promotion");
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.claimsBlockedEvenWithExemption,
+    ).toContain("source_mechanism_lane_promotable_non_authoritative");
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.claimMappings,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          claimId: "formula_equivalent_to_authoritative_direct_metric",
+          requiredRoute: "direct_proxy_parity_route",
+        }),
+        expect.objectContaining({
+          claimId: "bounded_non_authoritative_source_annotation",
+          requiredRoute: "formal_exemption_route",
+          currentStatus: "eligible_if_route_selected",
+        }),
+        expect.objectContaining({
+          claimId: "source_mechanism_lane_promotable_non_authoritative",
+          requiredRoute: "no_route_available",
+          currentStatus: "permanently_disallowed_in_current_contract",
+        }),
+      ]),
+    );
+    const directProxyParityRoute =
+      promotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.find(
+        (entry) => entry.routeId === "direct_proxy_parity_route",
+      );
+    expect(directProxyParityRoute).toMatchObject({
+      routeFeasibilityStatus: "blocked_by_derivation_class_difference",
+      routeBlockingClass: "direct_metric_vs_reconstructed_proxy_derivation_gap",
+      dominantMismatchTerm: "final_metricT00Si_Jm3",
+      nextClosureAction:
+        "emit_authoritative_direct_metric_closure_decomposition_and_define_proxy_mapping_contract",
+      feasibilityArtifactPath:
+        "artifacts/research/full-solve/nhm2-source-mechanism-parity-route-feasibility-latest.json",
+    });
+    expect(directProxyParityRoute?.summary).toBe(
+      parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.routeSummary,
+    );
+    const formalExemptionRoute =
+      promotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.find(
+        (entry) => entry.routeId === "formal_exemption_route",
+      );
+    expect(formalExemptionRoute).toMatchObject({
+      routeStatus: "partially_activatable_for_bounded_claims",
+      claimSetEligible: [
+        "bounded_non_authoritative_source_annotation",
+        "bounded_non_authoritative_mechanism_context",
+        "bounded_non_authoritative_reduced_order_comparison",
+      ],
+    });
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.exemptionEligibleClaimDetails,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          claimId: "bounded_non_authoritative_source_annotation",
+          requiresParity: false,
+          requiresOptionalTimingClosure: false,
+          requiresCrossLaneExpansion: false,
+          currentEvidenceSatisfied: true,
+        }),
+        expect.objectContaining({
+          claimId: "bounded_non_authoritative_reduced_order_comparison",
+          requiresParity: false,
+          currentEvidenceSatisfied: true,
+        }),
+      ]),
+    );
+
+    const markdown = renderNhm2SourceMechanismPromotionContractMarkdown(
+      promotionContractArtifact,
+    );
+    expect(markdown).toContain("## Available Routes");
+    expect(markdown).toContain("### direct_proxy_parity_route");
+    expect(markdown).toContain("### formal_exemption_route");
+    expect(markdown).toContain("## Claim Route Map");
+    expect(markdown).toContain("## Exemption Claim Surface");
+    expect(markdown).toContain("bounded_non_authoritative_source_annotation");
+    expect(markdown).toContain("Forbidden Inferences");
+    expect(markdown).toContain("| routeFeasibilityStatus | blocked_by_derivation_class_difference |");
+    expect(markdown).toContain(
+      "| dominantMismatchTerm | final_metricT00Si_Jm3 |",
+    );
+  });
+
+  it("builds a parity-route feasibility artifact that marks the direct metric gap as structural", () => {
+    const { parityRouteFeasibilityArtifact } = buildSourceMechanismMaturityFixture({
+      comparisonPolicyOverride: {
+        comparison_path_expected_equivalence: false,
+        comparison_path_blocks_readiness: false,
+        comparison_mismatch_disposition: "advisory",
+      },
+    });
+
+    expect(
+      parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility,
+    ).toMatchObject({
+      routeId: "direct_proxy_parity_route",
+      routeStatus: "available_but_unmet",
+      feasibilityStatus: "blocked_by_derivation_class_difference",
+      routeBlockingClass: "direct_metric_vs_reconstructed_proxy_derivation_gap",
+      dominantMismatchTerm: "final_metricT00Si_Jm3",
+      missingProxyTerms: ["direct_metric_closure_term_set_beyond_rhoMetric"],
+      missingDirectTerms: [
+        "authoritative_direct_metric_additive_decomposition_for_final_metricT00Si_Jm3",
+      ],
+      nextClosureAction:
+        "emit_authoritative_direct_metric_closure_decomposition_and_define_proxy_mapping_contract",
+    });
+    expect(
+      parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.matchedTerms,
+    ).toContain("rhoMetric_Jm3");
+    expect(
+      parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.unmatchedTerms,
+    ).toEqual(
+      expect.arrayContaining(["final_metricT00Si_Jm3", "metricStressRhoSiMean_Jm3"]),
+    );
+    const markdown = renderNhm2SourceMechanismParityRouteFeasibilityMarkdown(
+      parityRouteFeasibilityArtifact,
+    );
+    expect(markdown).toContain("| feasibilityStatus | blocked_by_derivation_class_difference |");
+    expect(markdown).toContain("| dominantMismatchTerm | final_metricT00Si_Jm3 |");
+    expect(markdown).toContain("## Direct Path Decomposition");
+    expect(markdown).toContain("## Reconstructed Path Decomposition");
   });
 
   it("classifies same-formula numeric drift when formula path is equivalent but metric amplitude differs", () => {
@@ -5252,6 +5994,13 @@ describe("warp york control-family proof pack", () => {
       true,
     );
     expect(sourceFormulaArtifact.policy.comparison_path_blocks_readiness).toBe(true);
+    expect(sourceFormulaArtifact.interpretationPolicy).toMatchObject({
+      policyId: "parity_required_before_promotion",
+      parityExpected: true,
+      promotionBlockedByMismatch: true,
+      laneAUnaffectedByMismatch: true,
+      interpretationStatus: "blocking",
+    });
     expect(artifact.stage.source_stage_cause).toBe("recovery_reconstruction_mismatch");
     expect(artifact.stage.source_stage_ready).toBe(false);
     expect(artifact.blockingFindings).toContain("recovery_reconstruction_mismatch");
@@ -7339,6 +8088,7 @@ describe("warp york control-family proof pack", () => {
     expect(sourceToYork.bridgeReadiness.gatingStatus).toBe("legacy_advisory_non_gating");
     expect(sourceToYork.bridgeReadiness.gatingBlocksMechanismChain).toBe(false);
     expect(markdown).toContain("gatingBlocksMechanismChain | false");
+    expect(markdown).toContain("bridgeClosurePolicy | close_with_current_serialization");
     expect(markdown).toContain("Legacy Bridge Gaps");
 
     const payload = makeProofPackPayloadForMarkdown() as any;
@@ -7363,6 +8113,7 @@ describe("warp york control-family proof pack", () => {
     };
     const proofPackMarkdown = renderMarkdown(payload);
     expect(proofPackMarkdown).toContain("legacy_advisory_non_gating");
+    expect(proofPackMarkdown).toContain("bridgeClosurePolicy | close_with_current_serialization");
     expect(proofPackMarkdown).toContain("mechanismChainReady");
   });
 
@@ -7663,6 +8414,8 @@ describe("warp york control-family proof pack", () => {
       ],
       directionOverlayStatus: "available",
       directionOverlayCaseDistinctness: "distinct_across_cases",
+      directionOverlayInterpretationPolicy:
+        "normalize_non_material_internal_variance_after_sampled_field_match",
       directionOverlayWarnings: [],
       constraintContextStatus: "deferred_units_and_policy_unresolved",
       artifactPath:
@@ -7675,6 +8428,7 @@ describe("warp york control-family proof pack", () => {
     expect(proofPackMarkdown).toContain("beta_magnitude,beta_x,beta_direction_xz");
     expect(proofPackMarkdown).toContain("directionOverlayStatus");
     expect(proofPackMarkdown).toContain("directionOverlayCaseDistinctness");
+    expect(proofPackMarkdown).toContain("directionOverlayInterpretationPolicy");
     expect(proofPackMarkdown).toContain("nhm2-shift-geometry-visualization-latest.json");
     expect(proofPackMarkdown).toContain("## Presentation Render Layer");
     expect(proofPackMarkdown).toContain("## Final Canonical Visual Comparison");
@@ -7917,6 +8671,37 @@ describe("warp york control-family proof pack", () => {
     expect(status.directionOverlayWarnings).toContain("direction_overlay_collapsed_across_cases");
   });
 
+  it("localizes directional overlay collapse to the seed stage when sampled direction hashes differ but seeds do not", () => {
+    const comparisons = buildShiftDirectionOverlayPairwiseComparisons([
+      {
+        caseId: "flat_space_zero_theta",
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        presentationScalarFieldHash: "raw-a",
+        directionVectorFieldHash: "sampled-a",
+        streamSeedHash: "shared-seeds",
+        streamGeometryHash: "shared-geometry",
+        directionOverlayHash: "shared-overlay",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        caseId: "natario_control",
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        presentationScalarFieldHash: "raw-b",
+        directionVectorFieldHash: "sampled-b",
+        streamSeedHash: "shared-seeds",
+        streamGeometryHash: "shared-geometry",
+        directionOverlayHash: "shared-overlay",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(comparisons).toHaveLength(1);
+    expect(comparisons[0]?.collapseStage).toBe("stream_seed_generation");
+  });
+
   it("does not flag directional collapse when the sampled x-z vector field is genuinely identical", () => {
     const status = evaluateShiftDirectionOverlayCaseDistinctness([
       {
@@ -7934,6 +8719,104 @@ describe("warp york control-family proof pack", () => {
         directionVectorFieldHash: "vector-shared",
         presentationScalarFieldHash: "upstream-b",
         streamGeometryHash: "geometry-shared",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(status.directionOverlayStatus).toBe("available");
+    expect(status.directionOverlayCaseDistinctness).toBe("mixed");
+    expect(status.directionOverlayWarnings).not.toContain("direction_overlay_collapsed_across_cases");
+  });
+
+  it("treats identical final images as genuine when the sampled overlay field matches even if raw slices differ", () => {
+    const comparisons = buildShiftDirectionOverlayPairwiseComparisons([
+      {
+        caseId: "flat_space_zero_theta",
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        presentationScalarFieldHash: "raw-a",
+        directionVectorFieldHash: "sampled-shared",
+        streamSeedHash: "shared-seeds",
+        streamGeometryHash: "shared-geometry",
+        directionOverlayHash: "shared-overlay",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        caseId: "natario_control",
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        presentationScalarFieldHash: "raw-b",
+        directionVectorFieldHash: "sampled-shared",
+        streamSeedHash: "shared-seeds",
+        streamGeometryHash: "shared-geometry",
+        directionOverlayHash: "shared-overlay",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(comparisons).toHaveLength(1);
+    expect(comparisons[0]?.collapseStage).toBe("genuinely_identical_sampled_direction_field");
+    expect(comparisons[0]?.presentationScalarHashesDiffer).toBe(true);
+    expect(comparisons[0]?.internalVarianceStatus).toBe("not_applicable");
+  });
+
+  it("normalizes intermediate seed and geometry variance when the sampled overlay field and final image already match", () => {
+    const comparisons = buildShiftDirectionOverlayPairwiseComparisons([
+      {
+        caseId: "flat_space_zero_theta",
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        presentationScalarFieldHash: "raw-a",
+        directionVectorFieldHash: "sampled-shared",
+        streamSeedHash: "seed-a",
+        streamGeometryHash: "geometry-a",
+        directionOverlayHash: "overlay-a",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        caseId: "natario_control",
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        presentationScalarFieldHash: "raw-b",
+        directionVectorFieldHash: "sampled-shared",
+        streamSeedHash: "seed-b",
+        streamGeometryHash: "geometry-b",
+        directionOverlayHash: "overlay-b",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(comparisons).toHaveLength(1);
+    expect(comparisons[0]?.collapseStage).toBe("genuinely_identical_sampled_direction_field");
+    expect(comparisons[0]?.internalVarianceStatus).toBe(
+      "non_material_after_sampled_field_match",
+    );
+    expect(comparisons[0]?.note).toContain("normalized_as_non_material");
+  });
+
+  it("keeps matched sampled-field internal variance non-blocking in the overlay summary", () => {
+    const status = evaluateShiftDirectionOverlayCaseDistinctness([
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        directionVectorFieldHash: "vector-shared",
+        presentationScalarFieldHash: "upstream-a",
+        streamSeedHash: "seed-a",
+        streamGeometryHash: "geometry-a",
+        directionOverlayHash: "overlay-a",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        directionVectorFieldHash: "vector-shared",
+        presentationScalarFieldHash: "upstream-b",
+        streamSeedHash: "seed-b",
+        streamGeometryHash: "geometry-b",
+        directionOverlayHash: "overlay-b",
         directionOverlayStatus: "case_specific_streamlines",
         directionOverlayWarnings: [],
       },
