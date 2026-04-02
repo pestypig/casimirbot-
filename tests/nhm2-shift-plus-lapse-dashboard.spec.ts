@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { buildShiftPlusLapseDashboardPayload } from "../scripts/warp-shift-plus-lapse-dashboard";
+import {
+  buildShiftPlusLapseDashboardPayload,
+  buildSourceMechanismConsumerConformanceSummary,
+} from "../scripts/warp-shift-plus-lapse-dashboard";
 
 const findPanel = (payload: any, panelId: string) =>
   payload.panels?.find((panel: any) => panel.panelId === panelId);
@@ -87,6 +90,7 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
     const branchStatusRow = findRow(proofPanel, "branch_status");
 
     expect(proofPanel.sectionNote).toContain("Lane A remains authoritative");
+    expect(proofPanel.sectionNote).toContain("bounded non-authoritative advisory only");
     expect(proofSurfaceRow).toEqual(
       expect.objectContaining({
         badgeId: "lane_a_unchanged",
@@ -101,6 +105,43 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
     );
     expect(cabinPanel.sectionNote).toContain("local lapse diagnostics");
     expect(wallPanel.sectionNote).toContain("brick-derived");
+  });
+
+  it("serializes bounded source/mechanism route boundaries into the dashboard payload", () => {
+    expect(payload.sourceMechanismPromotionContractStatus).toBe(
+      "active_for_bounded_claims_only",
+    );
+    expect(payload.sourceMechanismSelectedPromotionRoute).toBe(
+      "formal_exemption_route",
+    );
+    expect(payload.sourceMechanismExemptionRouteActivated).toBe(true);
+    expect(payload.sourceMechanismNonAuthoritative).toBe(true);
+    expect(payload.sourceMechanismFormulaEquivalent).toBe(false);
+    expect(payload.sourceMechanismParityRouteStatus).toBe(
+      "blocked_by_derivation_class_difference",
+    );
+    expect(payload.sourceMechanismActiveClaimSet).toEqual([
+      "bounded_non_authoritative_source_annotation",
+      "bounded_non_authoritative_mechanism_context",
+      "bounded_non_authoritative_reduced_order_comparison",
+    ]);
+    expect(payload.sourceMechanismBlockedClaimSet).toEqual(
+      expect.arrayContaining([
+        "formula_equivalent_to_authoritative_direct_metric",
+        "source_mechanism_layer_supports_viability_promotion",
+        "cross_lane_promotion_beyond_reference_only_scope",
+      ]),
+    );
+    expect(payload.sourceMechanismForbiddenPromotions).toEqual(
+      expect.arrayContaining([
+        "formula_equivalent_to_authoritative_direct_metric",
+        "nhm2_shift_lapse_proof_promotion",
+      ]),
+    );
+    expect(payload.sourceMechanismReferenceOnlyScope).toBe(true);
+    expect(payload.sourceMechanismConsumerSummary).toContain(
+      "warp.metric.T00.nhm2_shift_lapse remains reference_only",
+    );
   });
 
   it("carries provenance warnings and comparison semantics through unchanged", () => {
@@ -221,8 +262,155 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
       expect(fs.statSync(cardPath).size).toBeGreaterThan(0);
     }
     expect(artifact.legacyMonolithicCardStatus).toBe("deprecated_not_generated");
+    expect(artifact.sourceMechanismConsumerConformance).toEqual(
+      expect.objectContaining({
+        consumerConformanceStatus: "conformant",
+        conformanceDataMode: "artifact_coupled",
+        stalenessRisk: "possible_latest_artifact_drift",
+        referenceOnlyScopePreserved: true,
+        laneAAuthorityPreserved: true,
+      }),
+    );
+    expect(artifact.sourceMechanismConsumerConformance.referenceOnlyMissingOnSurfaces).toEqual(
+      [],
+    );
+    expect(artifact.sourceMechanismConsumerConformance.laneAAuthorityMissingOnSurfaces).toEqual(
+      [],
+    );
+    expect(artifact.sourceMechanismConsumerConformance.checkedSurfaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          surfaceId: "proof_pack_alias_json",
+          status: "conformant",
+          inspectionMode: "direct_content",
+          dataMode: "artifact_coupled",
+          laneAAuthorityPresent: true,
+        }),
+        expect.objectContaining({
+          surfaceId: "shift_plus_lapse_dashboard_json",
+          status: "conformant",
+          inspectionMode: "direct_content",
+          dataMode: "artifact_coupled",
+          laneAAuthorityPresent: true,
+        }),
+        expect.objectContaining({
+          surfaceId: "shift_plus_lapse_dashboard_cards",
+          surfaceType: "rendered_card_family",
+          inspectionMode: "pre_raster_render_source",
+          dataMode: "artifact_coupled",
+          laneAAuthorityPresent: true,
+          referenceOnlyPresent: true,
+          checkedTargets: [
+            "dashboard_overview",
+            "proof_status",
+            "precision_provenance",
+          ],
+        }),
+      ]),
+    );
     const legacyCardPath = path.join(process.cwd(), artifact.legacyMonolithicCardPath);
     expect(fs.existsSync(legacyCardPath)).toBe(false);
+  });
+
+  it("writes a consumer-conformance artifact that confirms proof-pack and dashboard bounded-route discipline", () => {
+    const artifactPath = path.join(
+      process.cwd(),
+      "artifacts",
+      "research",
+      "full-solve",
+      "nhm2-source-mechanism-consumer-conformance-latest.json",
+    );
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+    expect(artifact.sourceMechanismConsumerConformance).toEqual(
+      expect.objectContaining({
+        consumerConformanceStatus: "conformant",
+        conformanceDataMode: "artifact_coupled",
+        stalenessRisk: "possible_latest_artifact_drift",
+        referenceOnlyScopePreserved: true,
+        laneAAuthorityPreserved: true,
+      }),
+    );
+    expect(artifact.sourceMechanismConsumerConformance.activeClaimSet).toEqual([
+      "bounded_non_authoritative_source_annotation",
+      "bounded_non_authoritative_mechanism_context",
+      "bounded_non_authoritative_reduced_order_comparison",
+    ]);
+    expect(artifact.sourceMechanismConsumerConformance.blockedClaimSet).toEqual(
+      expect.arrayContaining([
+        "formula_equivalent_to_authoritative_direct_metric",
+        "source_mechanism_layer_supports_viability_promotion",
+      ]),
+    );
+    expect(artifact.sourceMechanismConsumerConformance.nonConformantSurfaces).toEqual([]);
+  });
+
+  it("downgrades consumer conformance when checked Lane A authority markers are removed", () => {
+    const proofPackArtifactPath = path.join(
+      process.cwd(),
+      "artifacts",
+      "research",
+      "full-solve",
+      "warp-york-control-family-proof-pack-latest.json",
+    );
+    const proofPackAuditPath = path.join(
+      process.cwd(),
+      "docs",
+      "audits",
+      "research",
+      "warp-york-control-family-proof-pack-latest.md",
+    );
+    const dashboardAuditPath = path.join(
+      process.cwd(),
+      "docs",
+      "audits",
+      "research",
+      "warp-nhm2-shift-plus-lapse-dashboard-latest.md",
+    );
+    const proofPackArtifact = JSON.parse(fs.readFileSync(proofPackArtifactPath, "utf8"));
+    const proofPackMarkdown = fs.readFileSync(proofPackAuditPath, "utf8");
+    const dashboardAuditMarkdown = fs.readFileSync(dashboardAuditPath, "utf8");
+    const mutatedPayload = {
+      ...payload,
+      panels: payload.panels.map((panel: any) =>
+        panel.panelId === "proof_status_panel"
+          ? {
+              ...panel,
+              sectionNote: panel.sectionNote.replace(
+                "Lane A remains authoritative.",
+                "Authority wording removed.",
+              ),
+            }
+          : panel,
+      ),
+    };
+    const summary = buildSourceMechanismConsumerConformanceSummary({
+      dashboard: mutatedPayload,
+      proofPackArtifact: {
+        ...proofPackArtifact,
+        sourceMechanismMaturity: {
+          ...proofPackArtifact.sourceMechanismMaturity,
+          laneAAuthoritative: false,
+        },
+      },
+      proofPackMarkdown: proofPackMarkdown.replace(
+        "| laneAAuthoritative | true |",
+        "| laneAAuthoritative | false |",
+      ),
+      dashboardAuditMarkdown: dashboardAuditMarkdown.replace(
+        "- proofNote: Lane A remains authoritative.",
+        "- proofNote: authority wording removed.",
+      ),
+    });
+    expect(summary.consumerConformanceStatus).toBe("non_conformant");
+    expect(summary.laneAAuthorityPreserved).toBe(false);
+    expect(summary.laneAAuthorityMissingOnSurfaces).toEqual(
+      expect.arrayContaining([
+        "proof_pack_alias_json",
+        "proof_pack_audit_markdown",
+        "shift_plus_lapse_dashboard_json",
+        "shift_plus_lapse_dashboard_audit_markdown",
+      ]),
+    );
   });
 
   it("publishes the rendered card family into render taxonomy as comparison_panel entries without transport inheritance", () => {

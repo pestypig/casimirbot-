@@ -390,6 +390,22 @@ const DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-shift-geometry-visualization-latest.md",
 );
+const DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-curvature-invariant-visualization-${DATE_STAMP}.json`,
+);
+const DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-curvature-invariant-visualization-latest.json",
+);
+const DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-curvature-invariant-visualization-${DATE_STAMP}.md`,
+);
+const DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-curvature-invariant-visualization-latest.md",
+);
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
@@ -1774,7 +1790,16 @@ type YorkOptixPresentationFieldId =
   | "longitudinal_signed_strain"
   | "tracefree_magnitude"
   | "energy_density"
-  | "trace_check";
+  | "trace_check"
+  | "kretschmann"
+  | "ricci4"
+  | "ricci2"
+  | "weylI";
+type CurvatureInvariantFieldId =
+  | "kretschmann"
+  | "ricci4"
+  | "ricci2"
+  | "weylI";
 type YorkOptixPresentationFieldNature = "signed" | "magnitude";
 type YorkOptixPresentationFieldVariant = "main" | "hull-overlay";
 type YorkOptixPresentationFieldRenderMode =
@@ -2069,6 +2094,103 @@ type Nhm2ShiftGeometryVisualizationArtifact = {
   checksum?: string;
 };
 
+type CurvatureInvariantDisplayNormalization =
+  "case_local_robust_scale_no_cross_case_matched_vertical_scale";
+
+type CurvatureInvariantFieldSummary = {
+  fieldId: CurvatureInvariantFieldId;
+  label: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  brickNative: true;
+  solveBackedSecondary: true;
+  crosscheckOnly: false;
+  displayNormalization: CurvatureInvariantDisplayNormalization;
+  displayPolicyId: string | null;
+  displayTransform: YorkOptixPresentationDisplayTransform | null;
+  colormapFamily: YorkOptixPresentationColormapFamily | null;
+  mainRender: CanonicalVisualComparisonFieldSummary | null;
+  xzSliceCompanion: RenderTaxonomyEntryMetadata | null;
+  notes: string[];
+};
+
+type CurvatureInvariantRenderEntry = {
+  renderId: string;
+  caseId: Extract<CalibrationPanelCaseId, "nhm2_certified">;
+  suiteFamily: "rodal_inspired_curvature_invariant";
+  renderCategory: RenderTaxonomyCategory;
+  renderRole: RenderTaxonomyRole;
+  authoritativeStatus: RenderAuthoritativeStatus;
+  primaryScientificQuestion: string;
+  fieldId: CurvatureInvariantFieldId;
+  variant: string;
+  canonicalPath: string | null;
+  legacyPath: string | null;
+  title: string;
+  subtitle: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  observer: string;
+  foliation: string;
+  signConvention: string;
+  laneId: string | null;
+  displayPolicyId: string | null;
+  displayRangeMin: number | null;
+  displayRangeMax: number | null;
+  displayTransform: string | null;
+  colormapFamily: string | null;
+  cameraPoseId: string | null;
+  orientationConventionId: RenderOrientationConventionId;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
+  imagePath: string | null;
+  imageHash: string | null;
+  metricVolumeHash: string | null;
+  thetaHash: string | null;
+  kTraceHash: string | null;
+  laneAFieldHash: string | null;
+  presentationScalarFieldHash: string | null;
+  fieldMin: number | null;
+  fieldMax: number | null;
+  fieldAbsMax: number | null;
+  renderTaxonomy: RenderTaxonomyEntryMetadata | null;
+  warnings: string[];
+  note: string | null;
+};
+
+type Nhm2CurvatureInvariantVisualizationArtifact = {
+  artifactType: "nhm2_curvature_invariant_visualization/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string;
+  canonicalCalibrationArtifactPath: string;
+  optixRenderArtifactPath: string;
+  caseId: Extract<CalibrationPanelCaseId, "nhm2_certified">;
+  caseLabel: string;
+  suiteStatus: "available" | "degraded" | "missing";
+  observer: string;
+  foliation: string;
+  laneId: string;
+  signConvention: string;
+  styleReference: {
+    inspiration: string;
+    usagePolicy: string;
+    notes: string[];
+  };
+  renderEntries: CurvatureInvariantRenderEntry[];
+  fieldSummaries: CurvatureInvariantFieldSummary[];
+  invariantCrosscheckStatus: "unpopulated" | "populated";
+  momentumDensityStatus:
+    | "deferred_not_yet_first_class"
+    | "surfaced_as_first_class_scientific_family";
+  renderTaxonomy: RenderTaxonomySummary | null;
+  notes: string[];
+  checksum?: string;
+};
+
 type RenderTaxonomyManifestEntry = {
   renderId: string;
   caseId: string;
@@ -2160,6 +2282,10 @@ type YorkOptixPresentationMetricBinding = {
   longitudinalSignedStrainHash: string | null;
   tracefreeMagnitudeHash: string | null;
   energyDensityHash: string | null;
+  kretschmannHash: string | null;
+  ricci4Hash: string | null;
+  ricci2Hash: string | null;
+  weylIHash: string | null;
   laneASliceHash: string | null;
 };
 
@@ -3678,6 +3804,7 @@ type SourceMechanismPromotionContractBlock = {
   activationDisclaimers: string[];
   forbiddenPromotions: string[];
   activationSummary: string;
+  consumerSummary: string;
   claimMappings: SourceMechanismPromotionClaimMapping[];
   remainingConditions: string[];
   nonNegotiableConditions: string[];
@@ -3772,6 +3899,13 @@ type ProofPackSourceMechanismPromotionContractSummary = {
   exemptionRouteActivated: boolean;
   activeClaimSetCount: number;
   inactiveClaimSetCount: number;
+  sourceMechanismActiveClaimSet: SourceMechanismPromotionClaimId[];
+  sourceMechanismBlockedClaimSet: SourceMechanismPromotionClaimId[];
+  sourceMechanismForbiddenPromotions: string[];
+  sourceMechanismReferenceOnlyScope: boolean;
+  sourceMechanismNonAuthoritative: boolean;
+  sourceMechanismFormulaEquivalent: boolean;
+  sourceMechanismConsumerSummary: string;
   exemptionRouteStatus: SourceMechanismPromotionRouteStatus;
   activationScope: string;
   activationSummary: string;
@@ -4594,6 +4728,18 @@ export type ProofPackPayload = {
     artifactPath: string;
     reportPath: string;
   };
+  curvatureInvariantSummary?: {
+    artifactType: "nhm2_curvature_invariant_visualization/v1";
+    suiteStatus: "available" | "degraded" | "missing";
+    surfacedFields: CurvatureInvariantFieldId[];
+    slicePlanes: string[];
+    invariantCrosscheckStatus: "unpopulated" | "populated";
+    momentumDensityStatus:
+      | "deferred_not_yet_first_class"
+      | "surfaced_as_first_class_scientific_family";
+    artifactPath: string;
+    reportPath: string;
+  };
   renderTaxonomySummary?: {
     authoritativeRenderCategory: RenderTaxonomyCategory;
     presentationRenderCategory: RenderTaxonomyCategory;
@@ -4703,7 +4849,53 @@ const OPTIX_PRESENTATION_FIELD_DESCRIPTORS: YorkOptixPresentationFieldDescriptor
     description:
       "Diagnostic cross-check field kept in the presentation suite to anchor the Natario-congruent fields back to the authoritative Lane A trace definition.",
   },
+  {
+    presentationFieldId: "kretschmann",
+    label: "Kretschmann scalar",
+    formula: "R_abcd R^abcd",
+    nature: "magnitude",
+    primaryContextView: "transport-3p1",
+    description:
+      "Brick-native 4D curvature invariant rendered as a secondary scientific field in the repo's hull/body-fixed 3+1 presentation frame.",
+  },
+  {
+    presentationFieldId: "ricci4",
+    label: "Ricci scalar (4D)",
+    formula: "R^(4)",
+    nature: "signed",
+    primaryContextView: "transport-3p1",
+    description:
+      "Brick-native 4D Ricci scalar rendered for secondary scientific inspection rather than proof-lane authority.",
+  },
+  {
+    presentationFieldId: "ricci2",
+    label: "Ricci contraction",
+    formula: "R_ab R^ab",
+    nature: "signed",
+    primaryContextView: "transport-3p1",
+    description:
+      "Brick-native Ricci-tensor contraction rendered in the same comoving 3+1 frame, with sign preserved because the Lorentzian contraction is not assumed nonnegative.",
+  },
+  {
+    presentationFieldId: "weylI",
+    label: "Weyl contraction",
+    formula: "C_abcd C^abcd",
+    nature: "signed",
+    primaryContextView: "transport-3p1",
+    description:
+      "Brick-native Weyl invariant rendered as a Rodal-inspired curvature-structure inspection field without reusing spherical plotting conventions.",
+  },
 ];
+const CURVATURE_INVARIANT_FIELD_IDS: CurvatureInvariantFieldId[] = [
+  "kretschmann",
+  "ricci4",
+  "ricci2",
+  "weylI",
+];
+const isCurvatureInvariantFieldId = (
+  fieldId: YorkOptixPresentationFieldId,
+): fieldId is CurvatureInvariantFieldId =>
+  CURVATURE_INVARIANT_FIELD_IDS.includes(fieldId as CurvatureInvariantFieldId);
 const OPTIX_PRESENTATION_PROJECTION_BASE_SIZE = { width: 960, height: 540 } as const;
 const OPTIX_PRESENTATION_CAMERA = {
   yaw: Math.PI * 0.16,
@@ -4737,6 +4929,9 @@ const readArgValue = (name: string, argv = process.argv.slice(2)): string | unde
   if (argv[index].includes("=")) return argv[index].split("=", 2)[1];
   return argv[index + 1];
 };
+
+const hasArg = (name: string, argv = process.argv.slice(2)): boolean =>
+  argv.some((value) => value === name || value.startsWith(`${name}=`));
 
 const parseYorkViews = (value: string | undefined): HullScientificRenderView[] => {
   if (!value || value.trim().length === 0) return [...DEFAULT_YORK_VIEWS];
@@ -4792,6 +4987,28 @@ const normalizePath = (filePath: string): string => filePath.replace(/\\/g, "/")
 
 const ensureDirForFile = (filePath: string): void => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
+};
+
+const readJsonArtifact = <T>(filePath: string, expectedArtifactType?: string): T => {
+  const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+  if (!expectedArtifactType) return parsed;
+  const artifactType = asText(asRecord(parsed).artifactType);
+  if (artifactType !== expectedArtifactType) {
+    throw new Error(
+      `unexpected_artifact_type:${normalizePath(filePath)}:${artifactType ?? "null"}:${expectedArtifactType}`,
+    );
+  }
+  return parsed;
+};
+
+const writeJsonArtifact = (filePath: string, value: unknown): void => {
+  ensureDirForFile(filePath);
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+const writeMarkdownArtifact = (filePath: string, markdown: string): void => {
+  ensureDirForFile(filePath);
+  fs.writeFileSync(filePath, `${markdown}\n`);
 };
 
 const syncLegacyAliasFile = (sourcePath: string, aliasPath: string): void => {
@@ -4974,6 +5191,58 @@ const RENDER_FIELD_FAMILY_DEFINITIONS: Array<{
     primaryScientificQuestion:
       "Where does solved stress-energy localize relative to the same support family used by the diagnostics?",
     defaultDisplayPolicyId: "optix_energy_density_signed_asinh",
+    defaultDisplayTransform: "signed_asinh",
+    defaultColormapFamily: "diverging_teal_rose",
+  },
+  {
+    fieldId: "kretschmann",
+    label: "Kretschmann scalar",
+    quantitySymbol: "R_abcd R^abcd",
+    quantityUnits: "m^-4",
+    defaultCategory: "scientific_3p1_field",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "Where does solved 4D curvature concentration localize in the NHM2 hull/body-fixed 3+1 frame?",
+    defaultDisplayPolicyId: "optix_kretschmann_positive_log10",
+    defaultDisplayTransform: "positive_log10",
+    defaultColormapFamily: "sequential_inferno",
+  },
+  {
+    fieldId: "ricci4",
+    label: "Ricci scalar (4D)",
+    quantitySymbol: "R^(4)",
+    quantityUnits: "m^-2",
+    defaultCategory: "scientific_3p1_field",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "What signed 4D Ricci-scalar structure does the solved NHM2 snapshot exhibit in repo-native 3+1 frames?",
+    defaultDisplayPolicyId: "optix_ricci4_signed_asinh",
+    defaultDisplayTransform: "signed_asinh",
+    defaultColormapFamily: "diverging_teal_rose",
+  },
+  {
+    fieldId: "ricci2",
+    label: "Ricci contraction",
+    quantitySymbol: "R_ab R^ab",
+    quantityUnits: "m^-4",
+    defaultCategory: "scientific_3p1_field",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "How does the brick-native Ricci contraction organize through the solved NHM2 3+1 volume without being promoted to proof status?",
+    defaultDisplayPolicyId: "optix_ricci2_signed_asinh",
+    defaultDisplayTransform: "signed_asinh",
+    defaultColormapFamily: "diverging_teal_rose",
+  },
+  {
+    fieldId: "weylI",
+    label: "Weyl contraction",
+    quantitySymbol: "C_abcd C^abcd",
+    quantityUnits: "m^-4",
+    defaultCategory: "scientific_3p1_field",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "Where does free-curvature structure appear in NHM2 when rendered as a secondary hull-aligned 3+1 scientific field?",
+    defaultDisplayPolicyId: "optix_weylI_signed_asinh",
     defaultDisplayTransform: "signed_asinh",
     defaultColormapFamily: "diverging_teal_rose",
   },
@@ -9319,11 +9588,10 @@ const buildSourceMechanismPromotionContractBlock = (args: {
   ];
   const claimsEligibleUnderExemption: SourceMechanismPromotionClaimId[] =
     exemptionEligibleClaimDetails.map((entry) => entry.claimId);
-  const exemptionRouteStatus = exemptionEligibleClaimDetails.every(
+  const exemptionEvidenceReady = exemptionEligibleClaimDetails.every(
     (entry) => entry.currentEvidenceSatisfied,
-  )
-    ? "partially_activatable_for_bounded_claims"
-    : "available_but_unmet";
+  );
+  const exemptionRouteStatus = exemptionEvidenceReady ? "satisfied" : "available_but_unmet";
   const claimsBlockedEvenWithExemption: SourceMechanismPromotionClaimId[] = [
     "source_mechanism_lane_promotable_non_authoritative",
     "formula_equivalent_to_authoritative_direct_metric",
@@ -9331,6 +9599,36 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     "source_mechanism_layer_supports_viability_promotion",
     "cross_lane_promotion_beyond_reference_only_scope",
   ];
+  const exemptionRouteActivated = exemptionEvidenceReady;
+  const activeClaimSet: SourceMechanismPromotionClaimId[] = exemptionRouteActivated
+    ? [...claimsEligibleUnderExemption]
+    : [];
+  const inactiveClaimSet: SourceMechanismPromotionClaimId[] = [
+    "source_mechanism_lane_promotable_non_authoritative",
+    "formula_equivalent_to_authoritative_direct_metric",
+    "source_mechanism_lane_authoritative",
+    "source_mechanism_layer_supports_viability_promotion",
+    "cross_lane_promotion_beyond_reference_only_scope",
+  ];
+  const activationScope =
+    "bounded_non_authoritative_advisory_only_reference_only_cross_lane";
+  const activationDisclaimers = [
+    "Lane A remains authoritative and unchanged.",
+    "The exemption route is active only for the bounded advisory claim set.",
+    "The source/mechanism lane remains non-authoritative.",
+    "The reconstructed proxy path remains non-equivalent to the authoritative direct metric path.",
+    "Cross-lane scope remains reference_only.",
+    "warp.metric.T00.nhm2_shift_lapse remains reference_only.",
+  ];
+  const forbiddenPromotions = [
+    "formula_equivalent_to_authoritative_direct_metric",
+    "source_mechanism_lane_authoritative",
+    "source_mechanism_layer_supports_viability_promotion",
+    "cross_lane_promotion_beyond_reference_only_scope",
+    "nhm2_shift_lapse_proof_promotion",
+  ];
+  const consumerSummary =
+    "Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only.";
 
   const directProxyParityRoute: SourceMechanismPromotionRoute = {
     routeId: "direct_proxy_parity_route",
@@ -9378,7 +9676,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     proofOfClosureArtifact: null,
     feasibilityArtifactPath: null,
     summary:
-      "Exemption route is narrowed to bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims only; it cannot grant broad non-authoritative promotion, formula equivalence, authority, viability promotion, or cross-lane scope expansion.",
+      "Exemption route is active only for bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims; it cannot grant broad non-authoritative promotion, formula equivalence, authority, viability promotion, or cross-lane scope expansion.",
   };
 
   const claimMappings: SourceMechanismPromotionClaimMapping[] = [
@@ -9419,12 +9717,18 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     ...exemptionEligibleClaimDetails.map(
       (entry): SourceMechanismPromotionClaimMapping => ({
         claimId: entry.claimId,
-        currentStatus: entry.currentEvidenceSatisfied
-          ? "eligible_if_route_selected"
-          : "route_available_but_unmet",
+        currentStatus:
+          entry.currentEvidenceSatisfied && exemptionRouteActivated
+            ? "active_under_selected_route"
+            : entry.currentEvidenceSatisfied
+              ? "eligible_if_route_selected"
+              : "route_available_but_unmet",
         requiredRoute: "formal_exemption_route",
-        blockingReasons: entry.currentEvidenceSatisfied
-          ? ["formal_exemption_route_not_selected"]
+        blockingReasons:
+          entry.currentEvidenceSatisfied && exemptionRouteActivated
+            ? []
+            : entry.currentEvidenceSatisfied
+              ? ["formal_exemption_route_not_selected"]
           : [
               "bounded_exemption_claim_evidence_incomplete",
               ...(entry.requiresOptionalTimingClosure
@@ -9466,8 +9770,8 @@ const buildSourceMechanismPromotionContractBlock = (args: {
 
   return {
     contractId: "nhm2_source_mechanism_promotion_contract.v1",
-    contractStatus: "blocked_pending_route_selection",
-    selectedPromotionRoute: "none_active",
+    contractStatus: "active_for_bounded_claims_only",
+    selectedPromotionRoute: "formal_exemption_route",
     availableRoutes: [directProxyParityRoute, formalExemptionRoute],
     promotionDecisionPolicy:
       "parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims",
@@ -9475,10 +9779,17 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     claimsEligibleUnderExemption,
     claimsBlockedEvenWithExemption,
     exemptionEligibleClaimDetails,
+    exemptionRouteActivated,
+    activeClaimSet,
+    inactiveClaimSet,
+    activationScope,
+    activationDisclaimers,
+    forbiddenPromotions,
+    activationSummary:
+      "Formal exemption route is active only for the three bounded advisory claim subsets; stronger claims remain blocked and Lane A remains authoritative.",
+    consumerSummary,
     claimMappings,
     remainingConditions: [
-      "select_promotion_route",
-      "if_formal_exemption_route_is_selected_bind_only_the_bounded_exemption_claim_subsets",
       "if_direct_proxy_parity_route_is_selected_close_final_metricT00Si_Jm3_or_upgrade_derivation_class",
       "retain_reference_only_cross_lane_scope_until_explicit_cross_lane_promotion_contract_exists",
       "close_optional_timing_authority_fields_only_if_a_selected_bounded_claim_scope_requires_them",
@@ -9492,7 +9803,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     laneAUnaffected,
     referenceOnlyCrossLaneScope,
     summary:
-      "Promotion contract keeps the parity route blocked by a derivation-class gap and narrows the formal exemption route to three bounded non-authoritative claim subsets; no route is active, so promotion remains blocked.",
+      "Promotion contract keeps the parity route blocked by a derivation-class gap and activates the formal exemption route only for three bounded non-authoritative advisory claim subsets; broader promotion remains blocked.",
   };
 };
 
@@ -9537,12 +9848,68 @@ export const buildNhm2SourceMechanismPromotionContractArtifact = (args: {
       `contract_status=${sourceMechanismPromotionContract.contractStatus}; selected_route=${sourceMechanismPromotionContract.selectedPromotionRoute}; policy=${sourceMechanismPromotionContract.promotionDecisionPolicy}.`,
       `claims_requiring_parity=${sourceMechanismPromotionContract.claimsRequiringParity.join(",") || "none"}; claims_eligible_under_exemption=${sourceMechanismPromotionContract.claimsEligibleUnderExemption.join(",") || "none"}.`,
       `claims_blocked_even_with_exemption=${sourceMechanismPromotionContract.claimsBlockedEvenWithExemption.join(",") || "none"}; lane_a_unaffected=${String(sourceMechanismPromotionContract.laneAUnaffected)}.`,
+      `exemption_route_activated=${String(sourceMechanismPromotionContract.exemptionRouteActivated)}; active_claim_set=${sourceMechanismPromotionContract.activeClaimSet.join(",") || "none"}; inactive_claim_set=${sourceMechanismPromotionContract.inactiveClaimSet.join(",") || "none"}.`,
       `direct_proxy_parity_route_feasibility=${sourceMechanismPromotionContract.availableRoutes.find((route) => route.routeId === "direct_proxy_parity_route")?.routeFeasibilityStatus ?? "none"}; blocking_class=${sourceMechanismPromotionContract.availableRoutes.find((route) => route.routeId === "direct_proxy_parity_route")?.routeBlockingClass ?? "none"}.`,
     ],
   };
   return {
     ...payloadBase,
     checksum: computeSourceMechanismPromotionContractChecksum(payloadBase),
+  };
+};
+
+export const buildSourceMechanismPromotionContractSummary = (args: {
+  promotionContractArtifact: Nhm2SourceMechanismPromotionContractArtifact;
+  parityRouteFeasibilityArtifact: Nhm2SourceMechanismParityRouteFeasibilityArtifact;
+  sourceFormulaAudit: Nhm2SourceFormulaAuditArtifact;
+  maturityArtifact: Nhm2SourceMechanismMaturityArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackSourceMechanismPromotionContractSummary => {
+  const contract = args.promotionContractArtifact.sourceMechanismPromotionContract;
+  const formalExemptionRoute = contract.availableRoutes.find(
+    (route) => route.routeId === "formal_exemption_route",
+  );
+  return {
+    contractId: contract.contractId,
+    contractStatus: contract.contractStatus,
+    selectedPromotionRoute: contract.selectedPromotionRoute,
+    promotionDecisionPolicy: contract.promotionDecisionPolicy,
+    claimsRequiringParityCount: contract.claimsRequiringParity.length,
+    claimsEligibleUnderExemptionCount: contract.claimsEligibleUnderExemption.length,
+    claimsBlockedEvenWithExemptionCount: contract.claimsBlockedEvenWithExemption.length,
+    exemptionEligibleClaimCount: contract.exemptionEligibleClaimDetails.length,
+    exemptionBlockedClaimCount: contract.claimsBlockedEvenWithExemption.length,
+    exemptionRouteActivated: contract.exemptionRouteActivated,
+    activeClaimSetCount: contract.activeClaimSet.length,
+    inactiveClaimSetCount: contract.inactiveClaimSet.length,
+    sourceMechanismActiveClaimSet: [...contract.activeClaimSet],
+    sourceMechanismBlockedClaimSet: [...contract.inactiveClaimSet],
+    sourceMechanismForbiddenPromotions: [...contract.forbiddenPromotions],
+    sourceMechanismReferenceOnlyScope: contract.referenceOnlyCrossLaneScope,
+    sourceMechanismNonAuthoritative:
+      args.maturityArtifact.sourceMechanismMaturity.authoritativeStatus === "non_authoritative",
+    sourceMechanismFormulaEquivalent:
+      args.sourceFormulaAudit.formulaComparison.formulaEquivalent,
+    sourceMechanismConsumerSummary: contract.consumerSummary,
+    exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
+    activationScope: contract.activationScope,
+    activationSummary: contract.activationSummary,
+    exemptionRouteSummary: formalExemptionRoute?.summary ?? "none",
+    routeFeasibilityStatus:
+      args.parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus,
+    routeBlockingClass:
+      args.parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+        .routeBlockingClass,
+    dominantMismatchTerm:
+      args.parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+        .dominantMismatchTerm,
+    nextClosureAction:
+      args.parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
+        .nextClosureAction,
+    promotionSummary: contract.summary,
+    artifactPath: normalizePath(args.artifactPath),
+    reportPath: normalizePath(args.reportPath),
   };
 };
 
@@ -9592,6 +9959,18 @@ ${route.requiredEvidence.map((entry) => `- ${entry}`).join("\n") || "- none"}
         )
         .join("\n")
     : "| none | none | none | none | none |";
+  const activationDisclaimers = contract.activationDisclaimers.length
+    ? contract.activationDisclaimers.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const forbiddenPromotions = contract.forbiddenPromotions.length
+    ? contract.forbiddenPromotions.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const activeClaimSet = contract.activeClaimSet.length
+    ? contract.activeClaimSet.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const inactiveClaimSet = contract.inactiveClaimSet.length
+    ? contract.inactiveClaimSet.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
   const exemptionClaimDetails = contract.exemptionEligibleClaimDetails.length
     ? contract.exemptionEligibleClaimDetails
         .map(
@@ -9636,12 +10015,28 @@ ${entry.requiredEvidence.map((item) => `- ${item}`).join("\n") || "- none"}
 | claimsRequiringParity | ${contract.claimsRequiringParity.join(",") || "none"} |
 | claimsEligibleUnderExemption | ${contract.claimsEligibleUnderExemption.join(",") || "none"} |
 | claimsBlockedEvenWithExemption | ${contract.claimsBlockedEvenWithExemption.join(",") || "none"} |
+| exemptionRouteActivated | ${contract.exemptionRouteActivated} |
+| activationScope | ${contract.activationScope} |
 | laneAUnaffected | ${contract.laneAUnaffected} |
 | referenceOnlyCrossLaneScope | ${contract.referenceOnlyCrossLaneScope} |
+| activationSummary | ${contract.activationSummary} |
+| consumerSummary | ${contract.consumerSummary} |
 | summary | ${contract.summary} |
 
 ## Available Routes
 ${routes}
+
+## Active Claim Set
+${activeClaimSet}
+
+## Inactive Claim Set
+${inactiveClaimSet}
+
+## Activation Disclaimers
+${activationDisclaimers}
+
+## Forbidden Promotions
+${forbiddenPromotions}
 
 ## Claim Route Map
 | claimId | currentStatus | requiredRoute | blockingReasons | requiredEvidence |
@@ -9756,7 +10151,6 @@ export const buildNhm2SourceMechanismMaturityArtifact = (args: {
 
   const requiredForPromotion: SourceMechanismPromotionRequirementId[] = [
     "direct_proxy_parity_route_for_equivalence_or_cross_lane_claims",
-    "bounded_exemption_contract_for_non_authoritative_claim_subsets",
     "promotion_grade_timing_authority_contract_if_optional_fields_required",
     "first_principles_or_authoritative_source_realization_contract",
     "explicit_cross_lane_promotion_contract_beyond_reference_only_scope",
@@ -9789,7 +10183,7 @@ export const buildNhm2SourceMechanismMaturityArtifact = (args: {
     selectedPromotionRoute: promotionContract.selectedPromotionRoute,
     promotionSummary: promotionContract.summary,
     summary:
-      "Source/mechanism layer is reduced-order advisory only: currently supportable advisory claims are limited to bounded source annotation, mechanism context, and reduced-order comparison subsets, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope.",
+      "Source/mechanism layer is reduced-order advisory only: the formal exemption route is active for bounded source annotation, mechanism context, and reduced-order comparison claims, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope.",
   };
 
   const payloadBase: Nhm2SourceMechanismMaturityArtifact = {
@@ -18495,6 +18889,78 @@ const computeYorkOptixPresentationDisplayPolicy = (args: {
         overlayOpacity: 0.98,
       };
     }
+    case "kretschmann": {
+      const displayMax = Math.max(robustPositive, fieldAbsMax * 0.35, nonzeroFloor);
+      return {
+        displayPolicyId: "optix_kretschmann_positive_log10",
+        displayRangeMin: 0,
+        displayRangeMax: displayMax,
+        displayTransform: "positive_log10",
+        displayTransformScale: Math.max(midPositive ?? displayMax / 18, displayMax / 42, nonzeroFloor),
+        colormapFamily: "sequential_inferno",
+        visibilityFloor: 0.012,
+        alphaFloor: 0.42,
+        alphaScale: 0.7,
+        radiusFloor: 1,
+        radiusScale: 5,
+        baseDimFactor: 0.18,
+        overlayOpacity: 0.99,
+      };
+    }
+    case "ricci4": {
+      const displayAbs = Math.max(robustAbs, fieldAbsMax * 0.3, nonzeroFloor);
+      return {
+        displayPolicyId: "optix_ricci4_signed_asinh",
+        displayRangeMin: -displayAbs,
+        displayRangeMax: displayAbs,
+        displayTransform: "signed_asinh",
+        displayTransformScale: Math.max(midAbs ?? displayAbs / 12, displayAbs / 24, nonzeroFloor),
+        colormapFamily: "diverging_teal_rose",
+        visibilityFloor: 0.018,
+        alphaFloor: 0.32,
+        alphaScale: 0.64,
+        radiusFloor: 1,
+        radiusScale: 4,
+        baseDimFactor: 0.22,
+        overlayOpacity: 0.98,
+      };
+    }
+    case "ricci2": {
+      const displayAbs = Math.max(robustAbs, fieldAbsMax * 0.3, nonzeroFloor);
+      return {
+        displayPolicyId: "optix_ricci2_signed_asinh",
+        displayRangeMin: -displayAbs,
+        displayRangeMax: displayAbs,
+        displayTransform: "signed_asinh",
+        displayTransformScale: Math.max(midAbs ?? displayAbs / 12, displayAbs / 24, nonzeroFloor),
+        colormapFamily: "diverging_teal_rose",
+        visibilityFloor: 0.018,
+        alphaFloor: 0.32,
+        alphaScale: 0.64,
+        radiusFloor: 1,
+        radiusScale: 4,
+        baseDimFactor: 0.22,
+        overlayOpacity: 0.98,
+      };
+    }
+    case "weylI": {
+      const displayAbs = Math.max(robustAbs, fieldAbsMax * 0.3, nonzeroFloor);
+      return {
+        displayPolicyId: "optix_weylI_signed_asinh",
+        displayRangeMin: -displayAbs,
+        displayRangeMax: displayAbs,
+        displayTransform: "signed_asinh",
+        displayTransformScale: Math.max(midAbs ?? displayAbs / 12, displayAbs / 24, nonzeroFloor),
+        colormapFamily: "diverging_teal_rose",
+        visibilityFloor: 0.018,
+        alphaFloor: 0.32,
+        alphaScale: 0.64,
+        radiusFloor: 1,
+        radiusScale: 4,
+        baseDimFactor: 0.22,
+        overlayOpacity: 0.98,
+      };
+    }
     case "trace_check":
     default: {
       const displayAbs = Math.max(fieldAbsMax, robustAbs, nonzeroFloor);
@@ -19015,6 +19481,42 @@ const deriveYorkOptixPresentationField = (args: {
       data = args.laneAField;
       authoritativeSource = "lane_a.theta";
       note = "Lane A trace check retained as the diagnostic anchor field.";
+      break;
+    case "kretschmann":
+      data =
+        args.snapshot.channels.kretschmann?.data instanceof Float32Array
+          ? args.snapshot.channels.kretschmann.data
+          : null;
+      authoritativeSource = "snapshot.channel.kretschmann";
+      note =
+        "Brick-native Kretschmann scalar channel rendered as a secondary scientific curvature frame. This is solve-backed presentation only and does not alter Lane A authority.";
+      break;
+    case "ricci4":
+      data =
+        args.snapshot.channels.ricci4?.data instanceof Float32Array
+          ? args.snapshot.channels.ricci4.data
+          : null;
+      authoritativeSource = "snapshot.channel.ricci4";
+      note =
+        "Brick-native 4D Ricci scalar rendered as a secondary scientific curvature frame. This is not a morphology-verdict surface and does not relabel York proof slices.";
+      break;
+    case "ricci2":
+      data =
+        args.snapshot.channels.ricci2?.data instanceof Float32Array
+          ? args.snapshot.channels.ricci2.data
+          : null;
+      authoritativeSource = "snapshot.channel.ricci2";
+      note =
+        "Brick-native Ricci contraction rendered with sign preserved because the Lorentzian contraction is not assumed nonnegative in the repo contract.";
+      break;
+    case "weylI":
+      data =
+        args.snapshot.channels.weylI?.data instanceof Float32Array
+          ? args.snapshot.channels.weylI.data
+          : null;
+      authoritativeSource = "snapshot.channel.weylI";
+      note =
+        "Brick-native Weyl contraction rendered in a Rodal-inspired inspection style while staying in the repo's comoving Cartesian 3+1 frame rather than a spherical literature clone.";
       break;
   }
   if (!(data instanceof Float32Array) && !(data instanceof Float64Array)) return null;
@@ -20089,6 +20591,10 @@ type YorkOptixPresentationCaseSnapshot = {
   longitudinalSignedStrain: Float32Array | null;
   tracefreeMagnitude: YorkOptixNumericField | null;
   energyDensity: Float32Array | null;
+  kretschmann: Float32Array | null;
+  ricci4: Float32Array | null;
+  ricci2: Float32Array | null;
+  weylI: Float32Array | null;
 };
 
 const loadYorkOptixPresentationCaseSnapshot = async (args: {
@@ -20169,6 +20675,16 @@ const loadYorkOptixPresentationCaseSnapshot = async (args: {
   const tracefreeMagnitude = deriveYorkOptixTracefreeMagnitude(snapshot);
   const energyDensity =
     snapshot.channels.rho?.data instanceof Float32Array ? snapshot.channels.rho.data : null;
+  const kretschmann =
+    snapshot.channels.kretschmann?.data instanceof Float32Array
+      ? snapshot.channels.kretschmann.data
+      : null;
+  const ricci4 =
+    snapshot.channels.ricci4?.data instanceof Float32Array ? snapshot.channels.ricci4.data : null;
+  const ricci2 =
+    snapshot.channels.ricci2?.data instanceof Float32Array ? snapshot.channels.ricci2.data : null;
+  const weylI =
+    snapshot.channels.weylI?.data instanceof Float32Array ? snapshot.channels.weylI.data : null;
   return {
     snapshot,
     laneAField: laneField.theta,
@@ -20182,6 +20698,10 @@ const loadYorkOptixPresentationCaseSnapshot = async (args: {
     longitudinalSignedStrain,
     tracefreeMagnitude,
     energyDensity,
+    kretschmann,
+    ricci4,
+    ricci2,
+    weylI,
   };
 };
 
@@ -20214,6 +20734,10 @@ const buildYorkOptixMetricBinding = (args: {
   ),
   tracefreeMagnitudeHash: computeOptionalNumericFieldHash(args.caseSnapshot.tracefreeMagnitude),
   energyDensityHash: computeOptionalNumericFieldHash(args.caseSnapshot.energyDensity),
+  kretschmannHash: computeOptionalFloat32Hash(args.caseSnapshot.kretschmann),
+  ricci4Hash: computeOptionalFloat32Hash(args.caseSnapshot.ricci4),
+  ricci2Hash: computeOptionalFloat32Hash(args.caseSnapshot.ricci2),
+  weylIHash: computeOptionalFloat32Hash(args.caseSnapshot.weylI),
   laneASliceHash: hashFloat32(args.caseSnapshot.laneASlice),
 });
 
@@ -20425,6 +20949,14 @@ const resolveYorkOptixBindingFieldHash = (
       return metricBinding.energyDensityHash;
     case "trace_check":
       return metricBinding.laneAFieldHash;
+    case "kretschmann":
+      return metricBinding.kretschmannHash;
+    case "ricci4":
+      return metricBinding.ricci4Hash;
+    case "ricci2":
+      return metricBinding.ricci2Hash;
+    case "weylI":
+      return metricBinding.weylIHash;
   }
 };
 
@@ -20665,6 +21197,12 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       height: geometryHeight,
     });
     for (const descriptor of OPTIX_PRESENTATION_FIELD_DESCRIPTORS) {
+      if (
+        isCurvatureInvariantFieldId(descriptor.presentationFieldId) &&
+        spec.case_id !== "nhm2_certified"
+      ) {
+        continue;
+      }
       const derivedField = deriveYorkOptixPresentationField({
         descriptor,
         snapshot: caseSnapshot.snapshot,
@@ -20676,7 +21214,10 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
               field: derivedField,
             })
           : null;
-      for (const variant of ["main", "hull-overlay"] as const) {
+      const variants = isCurvatureInvariantFieldId(descriptor.presentationFieldId)
+        ? (["main"] as const)
+        : (["main", "hull-overlay"] as const);
+      for (const variant of variants) {
         const requestHash = sha256Hex(
           stableStringify({
             caseId: spec.case_id,
@@ -20935,7 +21476,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       ],
       presentationFields: OPTIX_PRESENTATION_FIELD_DESCRIPTORS,
       usePolicy:
-        "Use Lane A slices and fixed-scale pre-PNG metrics for formal decisions. Use these OptiX renders only for secondary human-facing inspection and presentation. For the current Natario-like low-expansion family, inspect longitudinal signed strain, tracefree magnitude, energy density, and theta trace-check together rather than treating York time alone as the main visual field. If presentation looks inconsistent with diagnostics, debug the presentation renderer before revising the diagnostic verdict.",
+        "Use Lane A slices and fixed-scale pre-PNG metrics for formal decisions. Use these OptiX renders only for secondary human-facing inspection and presentation. For the current Natario-like low-expansion family, inspect longitudinal signed strain, tracefree magnitude, energy density, theta trace-check, and the NHM2 curvature-invariant suite together rather than treating York time alone as the main visual field. If presentation looks inconsistent with diagnostics, debug the presentation renderer before revising the diagnostic verdict.",
     },
     caseRenders,
     presentationRenderLayerStatus: summary.presentationRenderLayerStatus,
@@ -20958,6 +21499,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       "scientific_3p1_field renders use a neutral dedicated field canvas and do not inherit transport-context imagery.",
       "transport_context remains a separate solve-backed context product for human orientation rather than a base image for field renders.",
       "Longitudinal signed strain uses the ship-axis Cartesian K_xx projection; no synthetic spherical K_rr field is introduced.",
+      "NHM2 now surfaces a first-pass brick-native curvature-invariant suite as secondary scientific renders; these frames do not change proof-lane authority and do not claim cross-case matched normalization.",
       "Current nasa-fig1-style slice exports remain useful for convention studies but are not the preferred human-facing morphology renders for the present low-expansion NHM2 family.",
     ],
   };
@@ -21102,11 +21644,28 @@ For the current Natario-like low-expansion family, the presentation suite is no 
 - energy density from \`rho\`
 - trace check from Lane A \`theta=-trK\`
 
+NHM2 also now carries a first-pass brick-native curvature-invariant suite rendered in repo-native hull/body-fixed 3+1 frames:
+
+- Kretschmann scalar \`R_abcd R^abcd\`
+- 4D Ricci scalar \`R^(4)\`
+- Ricci contraction \`R_ab R^ab\`
+- Weyl contraction \`C_abcd C^abcd\`
+
+These invariant renders are secondary scientific presentation only. They are Rodal-inspired in visual language, but they are not a relabeling of Lane A proof surfaces, not a certified invariant atlas, and not a spherical-coordinate clone. Their display normalization is case-local and not advertised as a cross-case matched vertical scale.
+
 ## Use policy
 
 - Use Lane A fixed-scale slices and pre-PNG color-buffer metrics for morphology class decisions.
 - Use the OptiX 3+1 renders for human-facing inspection and scientific presentation.
+- Use the NHM2 invariant suite as a secondary curvature-structure inspection aid, not as authoritative proof.
+- Momentum-density-style Rodal panels remain deferred even though the brick already exports \`Sx/Sy/Sz\`.
 - If the presentation renders look inconsistent with the diagnostic layer, investigate the presentation renderer first rather than changing the diagnostic verdict.
+
+## Publication
+
+- publicationCommand: \`npm run warp:full-solve:york-control-family:publish-invariant-latest\`
+- useWhen: refresh the NHM2 invariant suite plus repo-facing \`latest\` render-taxonomy/proof-pack outputs without rerunning the stalled redesign/reformulation tail of the monolithic proof-pack command
+- proofStatus: this publication path does not widen Lane A authority or promote invariant renders above secondary scientific presentation
 
 ## Final fields
 
@@ -21122,6 +21681,7 @@ For the current Natario-like low-expansion family, the presentation suite is no 
 - renderTaxonomyRoot: \`${payload.renderTaxonomy?.canonicalRenderRoot ?? "null"}\`
 - recommendedNextAction: ${payload.presentationReadinessVerdict === "ready_for_human_inspection" ? "presentation_suite_ready_for_secondary_human_inspection" : payload.presentationReadinessVerdict === "presentation_metadata_incomplete" ? "complete_presentation_metadata_before_release" : "improve_presentation_readability_before_release"}
 - recommendedUsePolicy: ${payload.presentationLayer.usePolicy}
+- publicationCommand: \`npm run warp:full-solve:york-control-family:publish-invariant-latest\`
 `;
 
 const computeShiftGeometryChecksum = (
@@ -22017,6 +22577,436 @@ ${payload.recommendedInterpretationOrder.map((entry) => `- ${entry}`).join("\n")
 ## Notes
 ${notes}
 `;
+};
+
+const computeCurvatureInvariantVisualizationChecksum = (
+  payload: Nhm2CurvatureInvariantVisualizationArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const createCurvatureInvariantRenderEntry = (args: {
+  generatedOn: string;
+  caseId: Extract<CalibrationPanelCaseId, "nhm2_certified">;
+  caseLabel: string;
+  renderCategory: RenderTaxonomyCategory;
+  renderRole: RenderTaxonomyRole;
+  authoritativeStatus: RenderAuthoritativeStatus;
+  primaryScientificQuestion: string;
+  fieldId: CurvatureInvariantFieldId;
+  variant: string;
+  imagePath: string | null;
+  imageHash: string | null;
+  observer: string;
+  foliation: string;
+  signConvention: string;
+  laneId: string | null;
+  displayPolicyId: string | null;
+  displayRangeMin: number | null;
+  displayRangeMax: number | null;
+  displayTransform: string | null;
+  colormapFamily: string | null;
+  cameraPoseId: string | null;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
+  metricVolumeHash: string | null;
+  thetaHash: string | null;
+  kTraceHash: string | null;
+  laneAFieldHash: string | null;
+  presentationScalarFieldHash: string | null;
+  fieldMin: number | null;
+  fieldMax: number | null;
+  fieldAbsMax: number | null;
+  warnings: string[];
+  note: string | null;
+  titlePrefix?: string | null;
+}): CurvatureInvariantRenderEntry => {
+  const renderTaxonomy = createRenderTaxonomyMetadata({
+    generatedOn: args.generatedOn,
+    caseId: args.caseId,
+    caseLabel: args.caseLabel,
+    renderCategory: args.renderCategory,
+    renderRole: args.renderRole,
+    authoritativeStatus: args.authoritativeStatus,
+    primaryScientificQuestion: args.primaryScientificQuestion,
+    fieldId: args.fieldId,
+    variant: args.variant,
+    legacyPath: args.imagePath,
+    observer: args.observer,
+    foliation: args.foliation,
+    signConvention: args.signConvention,
+    laneId: args.laneId,
+    displayPolicyId: args.displayPolicyId,
+    displayRangeMin: args.displayRangeMin,
+    displayRangeMax: args.displayRangeMax,
+    displayTransform: args.displayTransform,
+    colormapFamily: args.colormapFamily,
+    cameraPoseId: args.cameraPoseId,
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
+    titlePrefix: args.titlePrefix,
+  });
+  return {
+    renderId: renderTaxonomy.renderId,
+    caseId: args.caseId,
+    suiteFamily: "rodal_inspired_curvature_invariant",
+    renderCategory: args.renderCategory,
+    renderRole: args.renderRole,
+    authoritativeStatus: args.authoritativeStatus,
+    primaryScientificQuestion: args.primaryScientificQuestion,
+    fieldId: args.fieldId,
+    variant: args.variant,
+    canonicalPath: renderTaxonomy.canonicalPath,
+    legacyPath: renderTaxonomy.legacyPath,
+    title: renderTaxonomy.frameLabel.title,
+    subtitle: renderTaxonomy.frameLabel.subtitle,
+    quantitySymbol: renderTaxonomy.frameLabel.quantitySymbol,
+    quantityUnits: renderTaxonomy.frameLabel.quantityUnits,
+    observer: renderTaxonomy.frameLabel.observer,
+    foliation: renderTaxonomy.frameLabel.foliation,
+    signConvention: renderTaxonomy.frameLabel.signConvention,
+    laneId: renderTaxonomy.frameLabel.laneId,
+    displayPolicyId: renderTaxonomy.frameLabel.displayPolicyId,
+    displayRangeMin: renderTaxonomy.frameLabel.displayRangeMin,
+    displayRangeMax: renderTaxonomy.frameLabel.displayRangeMax,
+    displayTransform: renderTaxonomy.frameLabel.displayTransform,
+    colormapFamily: renderTaxonomy.frameLabel.colormapFamily,
+    cameraPoseId: renderTaxonomy.frameLabel.cameraPoseId,
+    orientationConventionId: renderTaxonomy.frameLabel.orientationConventionId,
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
+    imagePath: renderTaxonomy.legacyPath,
+    imageHash: args.imageHash,
+    metricVolumeHash: args.metricVolumeHash,
+    thetaHash: args.thetaHash,
+    kTraceHash: args.kTraceHash,
+    laneAFieldHash: args.laneAFieldHash,
+    presentationScalarFieldHash: args.presentationScalarFieldHash,
+    fieldMin: args.fieldMin,
+    fieldMax: args.fieldMax,
+    fieldAbsMax: args.fieldAbsMax,
+    renderTaxonomy,
+    warnings: args.warnings,
+    note: args.note,
+  };
+};
+
+const summarizeCurvatureInvariantSuiteStatus = (
+  fieldSummaries: CurvatureInvariantFieldSummary[],
+): "available" | "degraded" | "missing" => {
+  const realizedCount = fieldSummaries.filter(
+    (entry) => entry.mainRender != null && entry.xzSliceCompanion != null,
+  ).length;
+  if (realizedCount <= 0) return "missing";
+  return realizedCount === fieldSummaries.length ? "available" : "degraded";
+};
+
+export const formatCurvatureInvariantProofPackSummary = (args: {
+  artifact: Nhm2CurvatureInvariantVisualizationArtifact;
+}): string =>
+  `curvature_invariant_suite_status=${args.artifact.suiteStatus} surfaced_fields=${args.artifact.fieldSummaries.map((entry) => entry.fieldId).join(",")} invariant_crosscheck_status=${args.artifact.invariantCrosscheckStatus} momentum_density_status=${args.artifact.momentumDensityStatus}`;
+
+export const buildNhm2CurvatureInvariantVisualizationArtifact = async (args: {
+  generatedOn: string;
+  sourceAuditArtifactPath: string;
+  canonicalCalibrationArtifactPath: string;
+  optixRenderArtifactPath: string;
+  optixRenderArtifact: Nhm2YorkOptixRenderArtifact;
+  diagnosticLane: YorkDiagnosticLane;
+  caseResults: CaseResult[];
+}): Promise<Nhm2CurvatureInvariantVisualizationArtifact> => {
+  const nhm2Case = args.caseResults.find((entry) => entry.caseId === "nhm2_certified");
+  if (!nhm2Case) {
+    throw new Error("curvature_invariant_visualization_missing_nhm2_case");
+  }
+  const nhm2Snapshot = await loadYorkOptixPresentationCaseSnapshot({
+    metricVolumeRef: nhm2Case.metricVolumeRef,
+    diagnosticLane: args.diagnosticLane,
+  });
+  const metricBinding = buildYorkOptixMetricBinding({
+    metricVolumeRef: nhm2Case.metricVolumeRef,
+    caseSnapshot: nhm2Snapshot,
+  });
+  const nhm2OptixCase =
+    args.optixRenderArtifact.caseRenders.find((entry) => entry.case_id === "nhm2_certified") ??
+    null;
+  const observer = args.optixRenderArtifact.comparisonContract.observer;
+  const foliation = args.optixRenderArtifact.comparisonContract.foliation;
+  const signConvention =
+    "ADM-compatible 4D curvature invariants on the comoving Cartesian snapshot; secondary scientific presentation only";
+  const supportSlice = nhm2Snapshot.supportMask
+    ? extractThetaSliceXZMidplane(nhm2Snapshot.supportMask, nhm2Snapshot.snapshot.dims)
+    : null;
+  const hullSlice = nhm2Snapshot.hullSdf
+    ? extractThetaSliceXZMidplane(nhm2Snapshot.hullSdf, nhm2Snapshot.snapshot.dims)
+    : null;
+  const renderEntries: CurvatureInvariantRenderEntry[] = [];
+  const fieldSummaries: CurvatureInvariantFieldSummary[] = [];
+
+  for (const fieldId of CURVATURE_INVARIANT_FIELD_IDS) {
+    const descriptor = OPTIX_PRESENTATION_FIELD_DESCRIPTORS.find(
+      (entry) => entry.presentationFieldId === fieldId,
+    );
+    if (!descriptor) continue;
+    const derivedField = deriveYorkOptixPresentationField({
+      descriptor,
+      snapshot: nhm2Snapshot.snapshot,
+      laneAField: nhm2Snapshot.laneAField,
+    });
+    const displayPolicy =
+      derivedField != null
+        ? computeYorkOptixPresentationDisplayPolicy({
+            field: derivedField,
+          })
+        : null;
+    const mainRender = nhm2OptixCase
+      ? toShiftGeometryFieldSummary(findOptixFieldRender(nhm2OptixCase, fieldId, "main"))
+      : null;
+    let xzSliceCompanion: CurvatureInvariantRenderEntry | null = null;
+    if (derivedField && displayPolicy) {
+      const slice = extractYorkNumericSliceForView(
+        derivedField.data,
+        nhm2Snapshot.snapshot.dims,
+        "x-z-midplane",
+      );
+      const outputPath = buildCanonicalRenderAliasPath({
+        generatedOn: args.generatedOn,
+        renderCategory: "scientific_3p1_field",
+        caseId: "nhm2_certified",
+        fieldId,
+        variant: "xz_slice_companion",
+      });
+      const png = await renderYorkOptixFieldSlicePng({
+        slice,
+        sourceWidth: nhm2Snapshot.snapshot.dims[0],
+        sourceHeight: nhm2Snapshot.snapshot.dims[2],
+        outputWidth: OPTIX_PRESENTATION_FRAME_SIZE.width,
+        outputHeight: OPTIX_PRESENTATION_FRAME_SIZE.height,
+        fieldNature: derivedField.fieldNature,
+        displayPolicy,
+        includeHullOverlay: true,
+        supportSlice,
+        hullSdfSlice: hullSlice,
+      });
+      ensureDirForFile(outputPath);
+      fs.writeFileSync(outputPath, png);
+      const quality = await analyzeYorkOptixPresentationImage(png, fieldId);
+      xzSliceCompanion = createCurvatureInvariantRenderEntry({
+        generatedOn: args.generatedOn,
+        caseId: "nhm2_certified",
+        caseLabel: nhm2Case.label,
+        renderCategory: "scientific_3p1_field",
+        renderRole: "presentation",
+        authoritativeStatus: "secondary_solve_backed",
+        primaryScientificQuestion:
+          resolveRenderFieldFamilyDefinition(fieldId)?.primaryScientificQuestion ??
+          `How should ${fieldId} be interpreted for this solved case?`,
+        fieldId,
+        variant: "xz_slice_companion",
+        imagePath: outputPath,
+        imageHash: sha256Hex(png),
+        observer,
+        foliation,
+        signConvention,
+        laneId: args.diagnosticLane.lane_id,
+        displayPolicyId: displayPolicy.displayPolicyId,
+        displayRangeMin: displayPolicy.displayRangeMin,
+        displayRangeMax: displayPolicy.displayRangeMax,
+        displayTransform: displayPolicy.displayTransform,
+        colormapFamily: displayPolicy.colormapFamily,
+        cameraPoseId: "slice_x_z_midplane",
+        baseImagePolicy: "field_plus_context_overlay",
+        baseImageSource: "hull_mask",
+        inheritsTransportContext: false,
+        contextCompositionMode: "hull_overlay",
+        metricVolumeHash: metricBinding.metricVolumeHash,
+        thetaHash: metricBinding.thetaChannelHash,
+        kTraceHash: metricBinding.kTraceChannelHash,
+        laneAFieldHash: metricBinding.laneAFieldHash,
+        presentationScalarFieldHash: derivedField.fieldHash,
+        fieldMin: derivedField.fieldMin,
+        fieldMax: derivedField.fieldMax,
+        fieldAbsMax: derivedField.fieldAbsMax,
+        warnings: quality.warnings,
+        note:
+          `${derivedField.note} This x-z slice companion is Rodal-inspired in visual language only, remains hull-aligned in repo-native 3+1 coordinates, and is not an authoritative proof surface or a spherical-coordinate literature clone.`,
+        titlePrefix: `${descriptor.label} Slice`,
+      });
+      renderEntries.push(xzSliceCompanion);
+    }
+    const family = resolveRenderFieldFamilyDefinition(fieldId);
+    fieldSummaries.push({
+      fieldId,
+      label: descriptor.label,
+      quantitySymbol: family?.quantitySymbol ?? descriptor.formula,
+      quantityUnits: family?.quantityUnits ?? "mixed",
+      brickNative: true,
+      solveBackedSecondary: true,
+      crosscheckOnly: false,
+      displayNormalization: "case_local_robust_scale_no_cross_case_matched_vertical_scale",
+      displayPolicyId: displayPolicy?.displayPolicyId ?? mainRender?.displayPolicyId ?? null,
+      displayTransform:
+        displayPolicy?.displayTransform ?? mainRender?.displayTransform ?? null,
+      colormapFamily: displayPolicy?.colormapFamily ?? mainRender?.colormapFamily ?? null,
+      mainRender,
+      xzSliceCompanion: xzSliceCompanion?.renderTaxonomy ?? null,
+      notes: [
+        "brick-native invariant channel",
+        "secondary scientific presentation only",
+        "not a morphology verdict surface",
+        "not a Rodal-spherical coordinate clone",
+        "display normalization uses a per-case robust range without cross-case matched vertical scale",
+        fieldId === "ricci2"
+          ? "ricci2 preserves sign because the Lorentzian contraction is not assumed nonnegative in the repo contract"
+          : "field semantics follow the brick-native export contract",
+      ],
+    });
+  }
+
+  const artifactBase: Nhm2CurvatureInvariantVisualizationArtifact = {
+    artifactType: "nhm2_curvature_invariant_visualization/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact adds a Rodal-inspired NHM2 curvature-invariant inspection suite in repo-native hull/body-fixed 3+1 frames while keeping Lane A diagnostics as the authoritative proof surface.",
+    sourceAuditArtifactPath: normalizePath(args.sourceAuditArtifactPath),
+    canonicalCalibrationArtifactPath: normalizePath(args.canonicalCalibrationArtifactPath),
+    optixRenderArtifactPath: normalizePath(args.optixRenderArtifactPath),
+    caseId: "nhm2_certified",
+    caseLabel: nhm2Case.label,
+    suiteStatus: summarizeCurvatureInvariantSuiteStatus(fieldSummaries),
+    observer,
+    foliation,
+    laneId: args.diagnosticLane.lane_id,
+    signConvention,
+    styleReference: {
+      inspiration: "Jose Rodal (2024) invariant visual language",
+      usagePolicy:
+        "Use Rodal only as visualization/style inspiration. Do not relabel repo proof surfaces, do not imply literature authority, and do not clone spherical chart conventions.",
+      notes: [
+        "repo-native frame = comoving Cartesian 3+1 with hull/body-fixed slice conventions",
+        "current suite is solve-backed secondary presentation, not a certified invariant proof lane",
+      ],
+    },
+    renderEntries,
+    fieldSummaries,
+    invariantCrosscheckStatus: "unpopulated",
+    momentumDensityStatus: "deferred_not_yet_first_class",
+    renderTaxonomy: null,
+    notes: [
+      "diagnostic_lane_a_remains_primary=true",
+      "curvature_invariant_suite_secondary_scientific=true",
+      "main invariant renders stay solve-backed and secondary to Lane A diagnostics",
+      "x-z slice companions use explicit hull/support overlays instead of transport-context inheritance",
+      "invariant_crosscheck remains empty until explicit comparison or residual products are added",
+      "brick channels Sx,Sy,Sz exist but momentum-density render families are deferred pending a clean display policy and first-class taxonomy contract",
+    ],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeCurvatureInvariantVisualizationChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2CurvatureInvariantVisualizationMarkdown = (
+  payload: Nhm2CurvatureInvariantVisualizationArtifact,
+): string => {
+  const fieldRows = payload.fieldSummaries
+    .map(
+      (entry) =>
+        `| ${entry.fieldId} | ${entry.label} | ${entry.brickNative} | ${entry.solveBackedSecondary} | ${entry.crosscheckOnly} | ${entry.displayNormalization} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.colormapFamily ?? "null"} | ${entry.mainRender?.imagePath ?? "null"} | ${entry.xzSliceCompanion?.canonicalPath ?? "null"} | ${entry.notes.join("; ")} |`,
+    )
+    .join("\n");
+  const renderRows = payload.renderEntries
+    .map(
+      (entry) =>
+        `| ${entry.fieldId} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
+    )
+    .join("\n");
+  const styleNotes = payload.styleReference.notes.map((entry) => `- ${entry}`).join("\n");
+  const notes = payload.notes.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Curvature Invariant Visualization (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| caseId | ${payload.caseId} |
+| suiteStatus | ${payload.suiteStatus} |
+| observer | ${payload.observer} |
+| foliation | ${payload.foliation} |
+| laneId | ${payload.laneId} |
+| signConvention | ${payload.signConvention} |
+| invariantCrosscheckStatus | ${payload.invariantCrosscheckStatus} |
+| momentumDensityStatus | ${payload.momentumDensityStatus} |
+
+## Style Reference Policy
+- inspiration: ${payload.styleReference.inspiration}
+- usagePolicy: ${payload.styleReference.usagePolicy}
+${styleNotes}
+
+## Field Summaries
+| fieldId | label | brickNative | solveBackedSecondary | crosscheckOnly | displayNormalization | displayPolicyId | displayTransform | colormapFamily | mainRender | xzSliceCompanion | notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+${fieldRows}
+
+## Render Entries
+| fieldId | variant | renderCategory | renderRole | authoritativeStatus | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | displayPolicyId | displayTransform | imagePath | imageHash |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+${renderRows}
+
+## Notes
+${notes}
+`;
+};
+
+export const enrichCurvatureInvariantRenderTaxonomy = (args: {
+  generatedOn: string;
+  artifact: Nhm2CurvatureInvariantVisualizationArtifact;
+}): void => {
+  args.artifact.renderTaxonomy ??= null;
+  for (const entry of args.artifact.renderEntries) {
+    if (entry.renderTaxonomy) continue;
+    entry.renderTaxonomy = createRenderTaxonomyMetadata({
+      generatedOn: args.generatedOn,
+      caseId: entry.caseId,
+      caseLabel: entry.title.split(" - ").slice(1).join(" - ") || entry.caseId,
+      renderCategory: entry.renderCategory,
+      renderRole: entry.renderRole,
+      authoritativeStatus: entry.authoritativeStatus,
+      primaryScientificQuestion: entry.primaryScientificQuestion,
+      fieldId: entry.fieldId,
+      variant: entry.variant,
+      legacyPath: entry.imagePath,
+      observer: entry.observer,
+      foliation: entry.foliation,
+      signConvention: entry.signConvention,
+      laneId: entry.laneId,
+      displayPolicyId: entry.displayPolicyId,
+      displayRangeMin: entry.displayRangeMin,
+      displayRangeMax: entry.displayRangeMax,
+      displayTransform: entry.displayTransform,
+      colormapFamily: entry.colormapFamily,
+      cameraPoseId: entry.cameraPoseId,
+      baseImagePolicy: entry.baseImagePolicy,
+      baseImageSource: entry.baseImageSource,
+      inheritsTransportContext: entry.inheritsTransportContext,
+      contextCompositionMode: entry.contextCompositionMode,
+      titlePrefix: entry.title.split(" - ")[0] ?? entry.fieldId,
+    });
+    entry.canonicalPath = entry.renderTaxonomy.canonicalPath;
+    entry.legacyPath = entry.renderTaxonomy.legacyPath;
+    entry.title = entry.renderTaxonomy.frameLabel.title;
+    entry.subtitle = entry.renderTaxonomy.frameLabel.subtitle;
+    entry.quantitySymbol = entry.renderTaxonomy.frameLabel.quantitySymbol;
+    entry.quantityUnits = entry.renderTaxonomy.frameLabel.quantityUnits;
+    entry.orientationConventionId = entry.renderTaxonomy.frameLabel.orientationConventionId;
+  }
 };
 
 const computeCanonicalVisualComparisonChecksum = (
@@ -23119,6 +24109,7 @@ export const buildRenderTaxonomyArtifact = (args: {
   canonicalCalibrationArtifact: WarpYorkCanonicalCalibrationArtifact;
   optixRenderArtifact: Nhm2YorkOptixRenderArtifact;
   shiftGeometryArtifact: Nhm2ShiftGeometryVisualizationArtifact;
+  curvatureInvariantArtifact: Nhm2CurvatureInvariantVisualizationArtifact;
   canonicalVisualComparisonArtifact: Nhm2CanonicalVisualComparisonArtifact;
 }): RenderTaxonomyArtifact => {
   const renderEntries: RenderTaxonomyManifestEntry[] = [];
@@ -23141,6 +24132,9 @@ export const buildRenderTaxonomyArtifact = (args: {
     }
   }
   for (const render of args.shiftGeometryArtifact.renderEntries) {
+    addEntry(render.caseId, render.renderTaxonomy);
+  }
+  for (const render of args.curvatureInvariantArtifact.renderEntries) {
     addEntry(render.caseId, render.renderTaxonomy);
   }
   for (const caseEntry of args.canonicalVisualComparisonArtifact.canonicalCases) {
@@ -23189,11 +24183,13 @@ export const buildRenderTaxonomyArtifact = (args: {
     notes: [
       "diagnostic_lane_a remains the proof surface for class decisions.",
       "transport_context remains a separate solve-backed context family and is not a dedicated field frame.",
-      "scientific_3p1_field remains solve-backed but secondary presentation only.",
+      "scientific_3p1_field remains solve-backed but secondary presentation only, including brick-native curvature invariants when surfaced as NHM2 scientific frames.",
       "shift_geometry suites remain solve-backed but interpretive and cannot outrun the authoritative Lane A diagnostic surface.",
       "comparison_panel outputs are communication/review surfaces, not proof surfaces.",
       "mechanism_overlay outputs remain interpretive and secondary to both diagnostics and single-field presentation renders.",
-      "No invariant_crosscheck render family is populated in the current proof-pack run.",
+      categoryCounts.invariant_crosscheck > 0
+        ? "invariant_crosscheck contains only explicit comparison or cross-basis consistency products and remains separate from the main brick-native invariant field suite."
+        : "Brick-native curvature invariants are now surfaced as scientific_3p1_field renders, while invariant_crosscheck remains empty until explicit comparison or cross-basis products exist.",
     ],
   };
   return {
@@ -23306,9 +24302,11 @@ Every render entry in the manifest now carries:
 
 - \`diagnostic_lane_a\` is the proof surface.
 - \`transport_context\` is a separate solve-backed context family and not a dedicated scientific field frame.
-- \`scientific_3p1_field\` is the human-facing scientific presentation surface.
+- \`scientific_3p1_field\` is the human-facing scientific presentation surface, including brick-native curvature invariants when they are surfaced as NHM2 scientific frames.
 - \`comparison_panel\` is for review and communication.
 - \`mechanism_overlay\` is interpretive and secondary.
+- \`invariant_crosscheck\` is reserved for explicit comparison or consistency products and may remain empty even when invariant scientific fields are present.
+- No invariant render is authoritative proof by default.
 - If presentation and diagnostics disagree, debug presentation first.
 
 ## Orientation convention
@@ -23324,13 +24322,20 @@ Every render entry in the manifest now carries:
 - directory pattern: \`artifacts/research/full-solve/rendered/<renderCategory>/YYYY-MM-DD/\`
 - filename pattern: \`<caseId>-<renderCategory>-<fieldId>-<variant>.png\`
 
+## Publication
+
+- publicationCommand: \`npm run warp:full-solve:york-control-family:publish-invariant-latest\`
+- useWhen: refresh the NHM2 curvature-invariant latest artifacts, render taxonomy, and proof-pack summaries without rerunning the stalled redesign/reformulation tail
+- proofStatus: publication refreshes serialized outputs only and does not widen Lane A proof authority or populate \`invariant_crosscheck\` unless explicit crosscheck renders exist
+
 ## Final fields
 
 - authoritativeRenderCategory: \`${payload.authoritativeRenderCategory}\`
 - presentationRenderCategory: \`${payload.presentationRenderCategory}\`
 - comparisonRenderCategory: \`${payload.comparisonRenderCategory}\`
 - repoOrientationConvention: \`${payload.repoOrientationConvention.orientationConventionId}\`
-- recommendedUsePolicy: diagnostic primary, transport_context separate from field frames, scientific_3p1_field secondary, comparison panels for review, overlays interpretive only
+- recommendedUsePolicy: diagnostic primary, transport_context separate from field frames, scientific_3p1_field secondary including brick-native invariant frames, invariant_crosscheck reserved for explicit crosschecks, comparison panels for review, overlays interpretive only
+- publicationCommand: \`npm run warp:full-solve:york-control-family:publish-invariant-latest\`
 `;
 
 export const renderNhm2NasaFigure1OverlayMemo = (
@@ -29859,7 +30864,19 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| claimsBlockedEvenWithExemptionCount | ${payload.sourceMechanismPromotionContract.claimsBlockedEvenWithExemptionCount} |`,
         `| exemptionEligibleClaimCount | ${payload.sourceMechanismPromotionContract.exemptionEligibleClaimCount} |`,
         `| exemptionBlockedClaimCount | ${payload.sourceMechanismPromotionContract.exemptionBlockedClaimCount} |`,
+        `| exemptionRouteActivated | ${payload.sourceMechanismPromotionContract.exemptionRouteActivated} |`,
+        `| activeClaimSetCount | ${payload.sourceMechanismPromotionContract.activeClaimSetCount} |`,
+        `| inactiveClaimSetCount | ${payload.sourceMechanismPromotionContract.inactiveClaimSetCount} |`,
+        `| sourceMechanismActiveClaimSet | ${payload.sourceMechanismPromotionContract.sourceMechanismActiveClaimSet.join(",") || "none"} |`,
+        `| sourceMechanismBlockedClaimSet | ${payload.sourceMechanismPromotionContract.sourceMechanismBlockedClaimSet.join(",") || "none"} |`,
+        `| sourceMechanismForbiddenPromotions | ${payload.sourceMechanismPromotionContract.sourceMechanismForbiddenPromotions.join(",") || "none"} |`,
+        `| sourceMechanismReferenceOnlyScope | ${payload.sourceMechanismPromotionContract.sourceMechanismReferenceOnlyScope} |`,
+        `| sourceMechanismNonAuthoritative | ${payload.sourceMechanismPromotionContract.sourceMechanismNonAuthoritative} |`,
+        `| sourceMechanismFormulaEquivalent | ${payload.sourceMechanismPromotionContract.sourceMechanismFormulaEquivalent} |`,
+        `| sourceMechanismConsumerSummary | ${payload.sourceMechanismPromotionContract.sourceMechanismConsumerSummary} |`,
         `| exemptionRouteStatus | ${payload.sourceMechanismPromotionContract.exemptionRouteStatus} |`,
+        `| activationScope | ${payload.sourceMechanismPromotionContract.activationScope} |`,
+        `| activationSummary | ${payload.sourceMechanismPromotionContract.activationSummary} |`,
         `| routeFeasibilityStatus | ${payload.sourceMechanismPromotionContract.routeFeasibilityStatus} |`,
         `| routeBlockingClass | ${payload.sourceMechanismPromotionContract.routeBlockingClass} |`,
         `| dominantMismatchTerm | ${payload.sourceMechanismPromotionContract.dominantMismatchTerm ?? "none"} |`,
@@ -29914,6 +30931,18 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| reportPath | ${payload.shiftGeometrySummary.reportPath} |`,
       ].join("\n")
     : "| shift_geometry | unavailable |";
+  const curvatureInvariantRows = payload.curvatureInvariantSummary
+    ? [
+        `| artifactType | ${payload.curvatureInvariantSummary.artifactType} |`,
+        `| suiteStatus | ${payload.curvatureInvariantSummary.suiteStatus} |`,
+        `| surfacedFields | ${payload.curvatureInvariantSummary.surfacedFields.join(",")} |`,
+        `| slicePlanes | ${payload.curvatureInvariantSummary.slicePlanes.join(",")} |`,
+        `| invariantCrosscheckStatus | ${payload.curvatureInvariantSummary.invariantCrosscheckStatus} |`,
+        `| momentumDensityStatus | ${payload.curvatureInvariantSummary.momentumDensityStatus} |`,
+        `| artifactPath | ${payload.curvatureInvariantSummary.artifactPath} |`,
+        `| reportPath | ${payload.curvatureInvariantSummary.reportPath} |`,
+      ].join("\n")
+    : "| curvature_invariant_suite | unavailable |";
   const renderTaxonomyRows = payload.renderTaxonomySummary
     ? [
         `| authoritativeRenderCategory | ${payload.renderTaxonomySummary.authoritativeRenderCategory} |`,
@@ -30176,6 +31205,11 @@ ${presentationRenderRows}
 |---|---|
 ${shiftGeometryRows}
 
+## Curvature Invariant Visualization
+| field | value |
+|---|---|
+${curvatureInvariantRows}
+
 ## Render Taxonomy
 | field | value |
 |---|---|
@@ -30210,6 +31244,506 @@ ${decisionRows}
 ## Notes
 ${notes}
 `;
+};
+
+const upsertProofPackSummaryNote = (
+  notes: string[],
+  prefix: string,
+  nextNote: string,
+): string[] => [...notes.filter((entry) => !entry.startsWith(prefix)), nextNote];
+
+const buildRenderTaxonomySummaryFromArtifact = (args: {
+  renderTaxonomyArtifact: RenderTaxonomyArtifact;
+  renderTaxonomyLatestJsonPath: string;
+  renderTaxonomyLatestMdPath: string;
+  renderTaxonomyStandardMemoPath: string;
+}): RenderTaxonomySummary => ({
+  artifactPath: normalizePath(args.renderTaxonomyLatestJsonPath),
+  reportPath: normalizePath(args.renderTaxonomyLatestMdPath),
+  standardPath: normalizePath(args.renderTaxonomyStandardMemoPath),
+  canonicalRenderRoot: args.renderTaxonomyArtifact.canonicalRenderRoot,
+  authoritativeRenderCategory: args.renderTaxonomyArtifact.authoritativeRenderCategory,
+  presentationRenderCategory: args.renderTaxonomyArtifact.presentationRenderCategory,
+  comparisonRenderCategory: args.renderTaxonomyArtifact.comparisonRenderCategory,
+  repoOrientationConvention:
+    args.renderTaxonomyArtifact.repoOrientationConvention.orientationConventionId,
+});
+
+export const buildWarpYorkControlFamilyPublishedLatestPayload = (args: {
+  existingProofPackPayload: ProofPackPayload;
+  yorkOptixRenderArtifact: Nhm2YorkOptixRenderArtifact;
+  shiftGeometryArtifact: Nhm2ShiftGeometryVisualizationArtifact;
+  curvatureInvariantArtifact: Nhm2CurvatureInvariantVisualizationArtifact;
+  canonicalVisualComparisonArtifact: Nhm2CanonicalVisualComparisonArtifact;
+  renderTaxonomyArtifact: RenderTaxonomyArtifact;
+  yorkOptixRenderLatestJsonPath: string;
+  yorkOptixRenderLatestMdPath: string;
+  shiftGeometryVisualizationLatestJsonPath: string;
+  shiftGeometryVisualizationLatestMdPath: string;
+  curvatureInvariantVisualizationLatestJsonPath: string;
+  curvatureInvariantVisualizationLatestMdPath: string;
+  renderTaxonomyLatestJsonPath: string;
+  renderTaxonomyLatestMdPath: string;
+  renderTaxonomyStandardMemoPath: string;
+  yorkCanonicalVisualComparisonLatestJsonPath: string;
+  yorkCanonicalVisualComparisonLatestMdPath: string;
+  yorkCanonicalVisualComparisonDecisionMemoPath: string;
+  generatedOn?: string;
+  generatedAt?: string;
+}): {
+  renderTaxonomySummary: RenderTaxonomySummary;
+  payload: ProofPackPayload;
+} => {
+  const generatedOn = args.generatedOn ?? args.existingProofPackPayload.generatedOn;
+  const generatedAt = args.generatedAt ?? new Date().toISOString();
+  const renderTaxonomySummary = buildRenderTaxonomySummaryFromArtifact({
+    renderTaxonomyArtifact: args.renderTaxonomyArtifact,
+    renderTaxonomyLatestJsonPath: args.renderTaxonomyLatestJsonPath,
+    renderTaxonomyLatestMdPath: args.renderTaxonomyLatestMdPath,
+    renderTaxonomyStandardMemoPath: args.renderTaxonomyStandardMemoPath,
+  });
+  args.yorkOptixRenderArtifact.renderTaxonomy = { ...renderTaxonomySummary };
+  args.yorkOptixRenderArtifact.checksum = computeYorkOptixRenderChecksum(
+    args.yorkOptixRenderArtifact,
+  );
+  args.shiftGeometryArtifact.renderTaxonomy = { ...renderTaxonomySummary };
+  args.shiftGeometryArtifact.checksum = computeShiftGeometryChecksum(
+    args.shiftGeometryArtifact,
+  );
+  args.curvatureInvariantArtifact.renderTaxonomy = { ...renderTaxonomySummary };
+  args.curvatureInvariantArtifact.checksum = computeCurvatureInvariantVisualizationChecksum(
+    args.curvatureInvariantArtifact,
+  );
+  args.canonicalVisualComparisonArtifact.renderTaxonomy = { ...renderTaxonomySummary };
+  args.canonicalVisualComparisonArtifact.checksum = computeCanonicalVisualComparisonChecksum(
+    args.canonicalVisualComparisonArtifact,
+  );
+
+  let notes = [...args.existingProofPackPayload.notes];
+  notes = upsertProofPackSummaryNote(
+    notes,
+    "presentation_render_layer_status=",
+    formatYorkOptixRenderProofPackSummary({
+      artifact: args.yorkOptixRenderArtifact,
+    }),
+  );
+  notes = upsertProofPackSummaryNote(
+    notes,
+    "shift_geometry_status=",
+    formatShiftGeometryProofPackSummary({
+      artifact: args.shiftGeometryArtifact,
+    }),
+  );
+  notes = upsertProofPackSummaryNote(
+    notes,
+    "curvature_invariant_suite_status=",
+    formatCurvatureInvariantProofPackSummary({
+      artifact: args.curvatureInvariantArtifact,
+    }),
+  );
+  notes = upsertProofPackSummaryNote(
+    notes,
+    "render_taxonomy authoritative=",
+    `render_taxonomy authoritative=${args.renderTaxonomyArtifact.authoritativeRenderCategory} presentation=${args.renderTaxonomyArtifact.presentationRenderCategory} comparison=${args.renderTaxonomyArtifact.comparisonRenderCategory}`,
+  );
+
+  const payloadBase: ProofPackPayload = {
+    ...args.existingProofPackPayload,
+    generatedOn,
+    generatedAt,
+    presentationRenderSummary: {
+      presentationRenderLayerStatus: args.yorkOptixRenderArtifact.presentationRenderLayerStatus,
+      fieldSuiteRealizationStatus: args.yorkOptixRenderArtifact.fieldSuiteRealizationStatus,
+      fieldSuiteReadabilityStatus: args.yorkOptixRenderArtifact.fieldSuiteReadabilityStatus,
+      optixScientificRenderAvailable: args.yorkOptixRenderArtifact.optixScientificRenderAvailable,
+      presentationRenderQuality: args.yorkOptixRenderArtifact.presentationRenderQuality,
+      presentationRenderQualityReasons: [
+        ...(args.yorkOptixRenderArtifact.presentationRenderQualityReasons ?? []),
+      ],
+      presentationReadinessVerdict: args.yorkOptixRenderArtifact.presentationReadinessVerdict,
+      presentationRenderBackedByAuthoritativeMetric:
+        args.yorkOptixRenderArtifact.presentationRenderBackedByAuthoritativeMetric,
+      artifactPath: normalizePath(args.yorkOptixRenderLatestJsonPath),
+      reportPath: normalizePath(args.yorkOptixRenderLatestMdPath),
+    },
+    shiftGeometrySummary: {
+      shiftGeometryStatus: args.shiftGeometryArtifact.shiftGeometryStatus,
+      mandatoryFirstPassFields: [...(args.shiftGeometryArtifact.mandatoryFirstPassFields ?? [])],
+      mandatoryResidualComparisons: [
+        ...(args.shiftGeometryArtifact.mandatoryResidualComparisons ?? []),
+      ],
+      directionOverlayStatus: args.shiftGeometryArtifact.directionOverlayStatus,
+      directionOverlayCaseDistinctness:
+        args.shiftGeometryArtifact.directionOverlayCaseDistinctness,
+      directionOverlayInterpretationPolicy:
+        args.shiftGeometryArtifact.directionOverlayInterpretationPolicy,
+      directionOverlayWarnings: [...(args.shiftGeometryArtifact.directionOverlayWarnings ?? [])],
+      constraintContextStatus: args.shiftGeometryArtifact.constraintContextStatus,
+      artifactPath: normalizePath(args.shiftGeometryVisualizationLatestJsonPath),
+      reportPath: normalizePath(args.shiftGeometryVisualizationLatestMdPath),
+    },
+    curvatureInvariantSummary: {
+      artifactType: "nhm2_curvature_invariant_visualization/v1",
+      suiteStatus: args.curvatureInvariantArtifact.suiteStatus,
+      surfacedFields: [...CURVATURE_INVARIANT_FIELD_IDS],
+      slicePlanes: ["x-z-midplane"],
+      invariantCrosscheckStatus: args.curvatureInvariantArtifact.invariantCrosscheckStatus,
+      momentumDensityStatus: args.curvatureInvariantArtifact.momentumDensityStatus,
+      artifactPath: normalizePath(args.curvatureInvariantVisualizationLatestJsonPath),
+      reportPath: normalizePath(args.curvatureInvariantVisualizationLatestMdPath),
+    },
+    renderTaxonomySummary: { ...renderTaxonomySummary },
+    finalCanonicalVisualComparisonSummary: {
+      finalComparisonVerdict: args.canonicalVisualComparisonArtifact.finalComparisonVerdict,
+      diagnosticVerdict: args.canonicalVisualComparisonArtifact.diagnosticVerdict,
+      presentationVerdict: args.canonicalVisualComparisonArtifact.presentationVerdict,
+      nhm2ClosestCanonicalFamily:
+        args.canonicalVisualComparisonArtifact.nhm2ClosestCanonicalFamily,
+      alcubierreLikeTransitionObserved:
+        args.canonicalVisualComparisonArtifact.alcubierreLikeTransitionObserved,
+      artifactPath: normalizePath(args.yorkCanonicalVisualComparisonLatestJsonPath),
+      reportPath: normalizePath(args.yorkCanonicalVisualComparisonLatestMdPath),
+      memoPath: normalizePath(args.yorkCanonicalVisualComparisonDecisionMemoPath),
+      exportDirectory: normalizePath(args.canonicalVisualComparisonArtifact.exportDirectory),
+    },
+    notes,
+  };
+  return {
+    renderTaxonomySummary,
+    payload: {
+      ...payloadBase,
+      checksum: computeChecksum(payloadBase),
+    },
+  };
+};
+
+export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
+  baseUrl?: string;
+  frameEndpoint?: string;
+  proxyFrameEndpoint?: string;
+  compareDirectAndProxy?: boolean;
+  outJsonPath?: string;
+  outMdPath?: string;
+  latestJsonPath?: string;
+  latestMdPath?: string;
+  yorkFixedScaleComparisonLatestJsonPath?: string;
+  yorkOptixRenderOutJsonPath?: string;
+  yorkOptixRenderLatestJsonPath?: string;
+  yorkOptixRenderOutMdPath?: string;
+  yorkOptixRenderLatestMdPath?: string;
+  yorkOptixRenderExportDir?: string;
+  yorkOptixRenderMemoPath?: string;
+  shiftGeometryVisualizationLatestJsonPath?: string;
+  shiftGeometryVisualizationLatestMdPath?: string;
+  curvatureInvariantVisualizationOutJsonPath?: string;
+  curvatureInvariantVisualizationLatestJsonPath?: string;
+  curvatureInvariantVisualizationOutMdPath?: string;
+  curvatureInvariantVisualizationLatestMdPath?: string;
+  renderTaxonomyOutJsonPath?: string;
+  renderTaxonomyLatestJsonPath?: string;
+  renderTaxonomyOutMdPath?: string;
+  renderTaxonomyLatestMdPath?: string;
+  renderTaxonomyStandardMemoPath?: string;
+  yorkCanonicalVisualComparisonLatestJsonPath?: string;
+  yorkCanonicalVisualComparisonLatestMdPath?: string;
+  yorkCanonicalVisualComparisonDecisionMemoPath?: string;
+  yorkCanonicalCalibrationLatestJsonPath?: string;
+  solveAuthorityLatestJsonPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  outMdPath: string;
+  latestJsonPath: string;
+  latestMdPath: string;
+  yorkOptixRenderOutJsonPath: string;
+  yorkOptixRenderLatestJsonPath: string;
+  yorkOptixRenderOutMdPath: string;
+  yorkOptixRenderLatestMdPath: string;
+  yorkOptixRenderMemoPath: string;
+  curvatureInvariantVisualizationOutJsonPath: string;
+  curvatureInvariantVisualizationLatestJsonPath: string;
+  curvatureInvariantVisualizationOutMdPath: string;
+  curvatureInvariantVisualizationLatestMdPath: string;
+  renderTaxonomyOutJsonPath: string;
+  renderTaxonomyLatestJsonPath: string;
+  renderTaxonomyOutMdPath: string;
+  renderTaxonomyLatestMdPath: string;
+  renderTaxonomyStandardMemoPath: string;
+  payload: ProofPackPayload;
+  yorkOptixRenderArtifact: Nhm2YorkOptixRenderArtifact;
+  curvatureInvariantVisualizationArtifact: Nhm2CurvatureInvariantVisualizationArtifact;
+  renderTaxonomyArtifact: RenderTaxonomyArtifact;
+}> => {
+  const latestJsonPath = options?.latestJsonPath ?? DEFAULT_LATEST_JSON;
+  const latestMdPath = options?.latestMdPath ?? DEFAULT_LATEST_MD;
+  const outJsonPath = options?.outJsonPath ?? DEFAULT_OUT_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_OUT_MD;
+  const yorkFixedScaleComparisonLatestJsonPath =
+    options?.yorkFixedScaleComparisonLatestJsonPath ??
+    DEFAULT_YORK_FIXED_SCALE_COMPARISON_LATEST_JSON;
+  const yorkOptixRenderOutJsonPath =
+    options?.yorkOptixRenderOutJsonPath ?? DEFAULT_YORK_OPTIX_RENDER_OUT_JSON;
+  const yorkOptixRenderLatestJsonPath =
+    options?.yorkOptixRenderLatestJsonPath ?? DEFAULT_YORK_OPTIX_RENDER_LATEST_JSON;
+  const yorkOptixRenderOutMdPath =
+    options?.yorkOptixRenderOutMdPath ?? DEFAULT_YORK_OPTIX_RENDER_OUT_MD;
+  const yorkOptixRenderLatestMdPath =
+    options?.yorkOptixRenderLatestMdPath ?? DEFAULT_YORK_OPTIX_RENDER_LATEST_MD;
+  const yorkOptixRenderExportDir =
+    options?.yorkOptixRenderExportDir ?? DEFAULT_YORK_OPTIX_RENDER_EXPORT_DIR;
+  const yorkOptixRenderMemoPath =
+    options?.yorkOptixRenderMemoPath ?? DEFAULT_YORK_OPTIX_RENDER_MEMO_PATH;
+  const shiftGeometryVisualizationLatestJsonPath =
+    options?.shiftGeometryVisualizationLatestJsonPath ??
+    DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_JSON;
+  const shiftGeometryVisualizationLatestMdPath =
+    options?.shiftGeometryVisualizationLatestMdPath ??
+    DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_MD;
+  const curvatureInvariantVisualizationOutJsonPath =
+    options?.curvatureInvariantVisualizationOutJsonPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_JSON;
+  const curvatureInvariantVisualizationLatestJsonPath =
+    options?.curvatureInvariantVisualizationLatestJsonPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_JSON;
+  const curvatureInvariantVisualizationOutMdPath =
+    options?.curvatureInvariantVisualizationOutMdPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_MD;
+  const curvatureInvariantVisualizationLatestMdPath =
+    options?.curvatureInvariantVisualizationLatestMdPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_MD;
+  const renderTaxonomyOutJsonPath =
+    options?.renderTaxonomyOutJsonPath ?? DEFAULT_RENDER_TAXONOMY_OUT_JSON;
+  const renderTaxonomyLatestJsonPath =
+    options?.renderTaxonomyLatestJsonPath ?? DEFAULT_RENDER_TAXONOMY_LATEST_JSON;
+  const renderTaxonomyOutMdPath =
+    options?.renderTaxonomyOutMdPath ?? DEFAULT_RENDER_TAXONOMY_OUT_MD;
+  const renderTaxonomyLatestMdPath =
+    options?.renderTaxonomyLatestMdPath ?? DEFAULT_RENDER_TAXONOMY_LATEST_MD;
+  const renderTaxonomyStandardMemoPath =
+    options?.renderTaxonomyStandardMemoPath ?? DEFAULT_RENDER_TAXONOMY_STANDARD_MEMO_PATH;
+  const yorkCanonicalVisualComparisonLatestJsonPath =
+    options?.yorkCanonicalVisualComparisonLatestJsonPath ??
+    DEFAULT_CANONICAL_VISUAL_COMPARISON_LATEST_JSON;
+  const yorkCanonicalVisualComparisonLatestMdPath =
+    options?.yorkCanonicalVisualComparisonLatestMdPath ??
+    DEFAULT_CANONICAL_VISUAL_COMPARISON_LATEST_MD;
+  const yorkCanonicalVisualComparisonDecisionMemoPath =
+    options?.yorkCanonicalVisualComparisonDecisionMemoPath ??
+    DEFAULT_CANONICAL_VISUAL_COMPARISON_DECISION_MEMO_PATH;
+  const yorkCanonicalCalibrationLatestJsonPath =
+    options?.yorkCanonicalCalibrationLatestJsonPath ??
+    DEFAULT_YORK_CANONICAL_CALIBRATION_LATEST_JSON;
+  const solveAuthorityLatestJsonPath =
+    options?.solveAuthorityLatestJsonPath ?? DEFAULT_SOLVE_AUTHORITY_LATEST_JSON;
+
+  process.stderr.write(
+    "[warp-york-control-family-proof-pack] publish_stage=load_existing_latest_artifacts\n",
+  );
+  const existingProofPackPayload = readJsonArtifact<ProofPackPayload>(
+    latestJsonPath,
+    "warp_york_control_family_proof_pack/v1",
+  );
+  const yorkFixedScaleComparisonArtifact =
+    readJsonArtifact<WarpYorkFixedScaleComparisonArtifact>(
+      yorkFixedScaleComparisonLatestJsonPath,
+      "nhm2_york_fixed_scale_comparison/v1",
+    );
+  const yorkCanonicalCalibrationArtifact =
+    readJsonArtifact<WarpYorkCanonicalCalibrationArtifact>(
+      yorkCanonicalCalibrationLatestJsonPath,
+      "warp_york_canonical_calibration/v1",
+    );
+  const shiftGeometryArtifact =
+    readJsonArtifact<Nhm2ShiftGeometryVisualizationArtifact>(
+      shiftGeometryVisualizationLatestJsonPath,
+      "nhm2_shift_geometry_visualization/v1",
+    );
+  const canonicalVisualComparisonArtifact =
+    readJsonArtifact<Nhm2CanonicalVisualComparisonArtifact>(
+      yorkCanonicalVisualComparisonLatestJsonPath,
+      "nhm2_canonical_visual_comparison/v1",
+    );
+  const compareDirectAndProxy =
+    options?.compareDirectAndProxy ??
+    existingProofPackPayload.inputs.compareDirectAndProxy ??
+    false;
+  const baseUrl = normalizeBaseUrl(
+    options?.baseUrl ?? existingProofPackPayload.inputs.baseUrl ?? DEFAULT_BASE_URL,
+  );
+  const frameEndpoint =
+    options?.frameEndpoint ??
+    existingProofPackPayload.inputs.frameEndpoint ??
+    DEFAULT_FRAME_ENDPOINT;
+  const proxyFrameEndpoint =
+    options?.proxyFrameEndpoint ??
+    existingProofPackPayload.inputs.proxyFrameEndpoint ??
+    (compareDirectAndProxy ? DEFAULT_PROXY_FRAME_ENDPOINT : null);
+  const laneId = yorkCanonicalCalibrationArtifact.comparisonContract.laneUsed;
+  const diagnosticLane =
+    existingProofPackPayload.diagnosticContract.lanes.find(
+      (entry) => entry.lane_id === laneId,
+    ) ?? null;
+  if (!diagnosticLane) {
+    throw new Error(`publish_invariant_latest_lane_missing:${laneId}`);
+  }
+  const natarioCase =
+    existingProofPackPayload.cases.find((entry) => entry.caseId === "natario_control") ?? null;
+  if (!natarioCase) {
+    throw new Error("publish_invariant_latest_natario_case_missing");
+  }
+  const publicationPayloadBase: ProofPackPayload = {
+    ...existingProofPackPayload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+  };
+
+  process.stderr.write(
+    "[warp-york-control-family-proof-pack] publish_stage=build_york_optix_render\n",
+  );
+  const yorkOptixRenderArtifact = await buildNhm2YorkOptixRenderArtifact({
+    payload: publicationPayloadBase,
+    canonicalCalibrationArtifact: yorkCanonicalCalibrationArtifact,
+    sourceAuditArtifactPath: latestJsonPath,
+    solveAuthorityAuditPath: solveAuthorityLatestJsonPath,
+    fixedScaleArtifactPath: yorkFixedScaleComparisonLatestJsonPath,
+    canonicalCalibrationArtifactPath: yorkCanonicalCalibrationLatestJsonPath,
+    exportDirectory: yorkOptixRenderExportDir,
+    baseUrl,
+    frameEndpoint,
+    proxyFrameEndpoint,
+    diagnosticLane,
+    caseResults: existingProofPackPayload.cases,
+    natarioMetricVolumeRef: natarioCase.metricVolumeRef,
+  });
+  enrichYorkOptixRenderTaxonomy({
+    generatedOn: DATE_STAMP,
+    artifact: yorkOptixRenderArtifact,
+  });
+  yorkOptixRenderArtifact.checksum = computeYorkOptixRenderChecksum(yorkOptixRenderArtifact);
+
+  process.stderr.write(
+    "[warp-york-control-family-proof-pack] publish_stage=build_curvature_invariant_visualization\n",
+  );
+  const curvatureInvariantVisualizationArtifact =
+    await buildNhm2CurvatureInvariantVisualizationArtifact({
+      generatedOn: DATE_STAMP,
+      sourceAuditArtifactPath: latestJsonPath,
+      canonicalCalibrationArtifactPath: yorkCanonicalCalibrationLatestJsonPath,
+      optixRenderArtifactPath: yorkOptixRenderLatestJsonPath,
+      optixRenderArtifact: yorkOptixRenderArtifact,
+      diagnosticLane,
+      caseResults: existingProofPackPayload.cases,
+    });
+  enrichCurvatureInvariantRenderTaxonomy({
+    generatedOn: DATE_STAMP,
+    artifact: curvatureInvariantVisualizationArtifact,
+  });
+  curvatureInvariantVisualizationArtifact.checksum =
+    computeCurvatureInvariantVisualizationChecksum(curvatureInvariantVisualizationArtifact);
+
+  process.stderr.write(
+    "[warp-york-control-family-proof-pack] publish_stage=build_render_taxonomy\n",
+  );
+  const renderTaxonomyArtifact = buildRenderTaxonomyArtifact({
+    generatedOn: DATE_STAMP,
+    canonicalCalibrationArtifact: yorkCanonicalCalibrationArtifact,
+    optixRenderArtifact: yorkOptixRenderArtifact,
+    shiftGeometryArtifact,
+    curvatureInvariantArtifact: curvatureInvariantVisualizationArtifact,
+    canonicalVisualComparisonArtifact,
+  });
+  const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+    existingProofPackPayload: publicationPayloadBase,
+    yorkOptixRenderArtifact,
+    shiftGeometryArtifact,
+    curvatureInvariantArtifact: curvatureInvariantVisualizationArtifact,
+    canonicalVisualComparisonArtifact,
+    renderTaxonomyArtifact,
+    yorkOptixRenderLatestJsonPath,
+    yorkOptixRenderLatestMdPath,
+    shiftGeometryVisualizationLatestJsonPath,
+    shiftGeometryVisualizationLatestMdPath,
+    curvatureInvariantVisualizationLatestJsonPath,
+    curvatureInvariantVisualizationLatestMdPath,
+    renderTaxonomyLatestJsonPath,
+    renderTaxonomyLatestMdPath,
+    renderTaxonomyStandardMemoPath,
+    yorkCanonicalVisualComparisonLatestJsonPath,
+    yorkCanonicalVisualComparisonLatestMdPath,
+    yorkCanonicalVisualComparisonDecisionMemoPath,
+    generatedOn: DATE_STAMP,
+    generatedAt: publicationPayloadBase.generatedAt,
+  });
+
+  process.stderr.write(
+    "[warp-york-control-family-proof-pack] publish_stage=write_publication_files\n",
+  );
+  writeJsonArtifact(yorkOptixRenderOutJsonPath, yorkOptixRenderArtifact);
+  writeJsonArtifact(yorkOptixRenderLatestJsonPath, yorkOptixRenderArtifact);
+  const yorkOptixRenderMarkdown = renderNhm2YorkOptixRenderMarkdown(yorkOptixRenderArtifact);
+  writeMarkdownArtifact(yorkOptixRenderOutMdPath, yorkOptixRenderMarkdown);
+  writeMarkdownArtifact(yorkOptixRenderLatestMdPath, yorkOptixRenderMarkdown);
+  writeMarkdownArtifact(
+    yorkOptixRenderMemoPath,
+    renderNhm2YorkOptixRenderMemo(yorkOptixRenderArtifact),
+  );
+
+  writeJsonArtifact(
+    curvatureInvariantVisualizationOutJsonPath,
+    curvatureInvariantVisualizationArtifact,
+  );
+  writeJsonArtifact(
+    curvatureInvariantVisualizationLatestJsonPath,
+    curvatureInvariantVisualizationArtifact,
+  );
+  const curvatureInvariantMarkdown = renderNhm2CurvatureInvariantVisualizationMarkdown(
+    curvatureInvariantVisualizationArtifact,
+  );
+  writeMarkdownArtifact(curvatureInvariantVisualizationOutMdPath, curvatureInvariantMarkdown);
+  writeMarkdownArtifact(
+    curvatureInvariantVisualizationLatestMdPath,
+    curvatureInvariantMarkdown,
+  );
+
+  writeJsonArtifact(renderTaxonomyOutJsonPath, renderTaxonomyArtifact);
+  writeJsonArtifact(renderTaxonomyLatestJsonPath, renderTaxonomyArtifact);
+  const renderTaxonomyMarkdown = renderRenderTaxonomyAuditMarkdown(renderTaxonomyArtifact);
+  writeMarkdownArtifact(renderTaxonomyOutMdPath, renderTaxonomyMarkdown);
+  writeMarkdownArtifact(renderTaxonomyLatestMdPath, renderTaxonomyMarkdown);
+  writeMarkdownArtifact(
+    renderTaxonomyStandardMemoPath,
+    renderRenderTaxonomyStandardMemo(renderTaxonomyArtifact),
+  );
+
+  writeJsonArtifact(outJsonPath, payload);
+  writeJsonArtifact(latestJsonPath, payload);
+  const proofPackMarkdown = renderMarkdown(payload);
+  writeMarkdownArtifact(outMdPath, proofPackMarkdown);
+  writeMarkdownArtifact(latestMdPath, proofPackMarkdown);
+
+  return {
+    outJsonPath,
+    outMdPath,
+    latestJsonPath,
+    latestMdPath,
+    yorkOptixRenderOutJsonPath,
+    yorkOptixRenderLatestJsonPath,
+    yorkOptixRenderOutMdPath,
+    yorkOptixRenderLatestMdPath,
+    yorkOptixRenderMemoPath,
+    curvatureInvariantVisualizationOutJsonPath,
+    curvatureInvariantVisualizationLatestJsonPath,
+    curvatureInvariantVisualizationOutMdPath,
+    curvatureInvariantVisualizationLatestMdPath,
+    renderTaxonomyOutJsonPath,
+    renderTaxonomyLatestJsonPath,
+    renderTaxonomyOutMdPath,
+    renderTaxonomyLatestMdPath,
+    renderTaxonomyStandardMemoPath,
+    payload,
+    yorkOptixRenderArtifact,
+    curvatureInvariantVisualizationArtifact,
+    renderTaxonomyArtifact,
+  };
 };
 
 export const runWarpYorkControlFamilyProofPack = async (options?: {
@@ -30285,6 +31819,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   shiftGeometryVisualizationLatestJsonPath?: string;
   shiftGeometryVisualizationOutMdPath?: string;
   shiftGeometryVisualizationLatestMdPath?: string;
+  curvatureInvariantVisualizationOutJsonPath?: string;
+  curvatureInvariantVisualizationLatestJsonPath?: string;
+  curvatureInvariantVisualizationOutMdPath?: string;
+  curvatureInvariantVisualizationLatestMdPath?: string;
   renderTaxonomyOutJsonPath?: string;
   renderTaxonomyLatestJsonPath?: string;
   renderTaxonomyOutMdPath?: string;
@@ -30504,6 +32042,18 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const shiftGeometryVisualizationLatestMdPath =
     options?.shiftGeometryVisualizationLatestMdPath ??
     DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_MD;
+  const curvatureInvariantVisualizationOutJsonPath =
+    options?.curvatureInvariantVisualizationOutJsonPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_JSON;
+  const curvatureInvariantVisualizationLatestJsonPath =
+    options?.curvatureInvariantVisualizationLatestJsonPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_JSON;
+  const curvatureInvariantVisualizationOutMdPath =
+    options?.curvatureInvariantVisualizationOutMdPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_MD;
+  const curvatureInvariantVisualizationLatestMdPath =
+    options?.curvatureInvariantVisualizationLatestMdPath ??
+    DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_MD;
   const renderTaxonomyOutJsonPath =
     options?.renderTaxonomyOutJsonPath ?? DEFAULT_RENDER_TAXONOMY_OUT_JSON;
   const renderTaxonomyLatestJsonPath =
@@ -31244,7 +32794,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
         sourceMechanismParityRouteFeasibilityLatestJsonPath,
     });
   notes.push(
-    `source_mechanism_promotion_contract_status=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus} selected_route=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute} policy=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy}`,
+      `source_mechanism_promotion_contract_status=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus} selected_route=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute} policy=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy}`,
+  );
+  notes.push(
+    `source_mechanism_consumer_scope=active_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.activeClaimSet.join(",") || "none"} blocked_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.inactiveClaimSet.join(",") || "none"} reference_only_scope=${String(sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.referenceOnlyCrossLaneScope)} formula_equivalence=${String(sourceFormulaAuditArtifact.formulaComparison.formulaEquivalent)} parity_route=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus} nhm2_shift_lapse_reference_only=true`,
   );
   const solveAuthorityArtifact = buildNhm2SolveAuthorityAuditArtifact({
     payload: {
@@ -31846,6 +33399,27 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   notes.push(
     formatShiftGeometryProofPackSummary({
       artifact: shiftGeometryVisualizationArtifact,
+    }),
+  );
+  const curvatureInvariantVisualizationArtifact =
+    await buildNhm2CurvatureInvariantVisualizationArtifact({
+      generatedOn: DATE_STAMP,
+      sourceAuditArtifactPath: latestJsonPath,
+      canonicalCalibrationArtifactPath: yorkCanonicalCalibrationLatestJsonPath,
+      optixRenderArtifactPath: yorkOptixRenderLatestJsonPath,
+      optixRenderArtifact: yorkOptixRenderArtifact,
+      diagnosticLane: fixedScaleLane,
+      caseResults: cases,
+    });
+  enrichCurvatureInvariantRenderTaxonomy({
+    generatedOn: DATE_STAMP,
+    artifact: curvatureInvariantVisualizationArtifact,
+  });
+  curvatureInvariantVisualizationArtifact.checksum =
+    computeCurvatureInvariantVisualizationChecksum(curvatureInvariantVisualizationArtifact);
+  notes.push(
+    formatCurvatureInvariantProofPackSummary({
+      artifact: curvatureInvariantVisualizationArtifact,
     }),
   );
   const yorkAblationPanelData = await buildNhm2AblationComparisonData({
@@ -32603,6 +34177,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     canonicalCalibrationArtifact: yorkCanonicalCalibrationArtifact,
     optixRenderArtifact: yorkOptixRenderArtifact,
     shiftGeometryArtifact: shiftGeometryVisualizationArtifact,
+    curvatureInvariantArtifact: curvatureInvariantVisualizationArtifact,
     canonicalVisualComparisonArtifact,
   });
   const renderTaxonomySummary: RenderTaxonomySummary = {
@@ -32622,6 +34197,9 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   shiftGeometryVisualizationArtifact.checksum = computeShiftGeometryChecksum(
     shiftGeometryVisualizationArtifact,
   );
+  curvatureInvariantVisualizationArtifact.renderTaxonomy = { ...renderTaxonomySummary };
+  curvatureInvariantVisualizationArtifact.checksum =
+    computeCurvatureInvariantVisualizationChecksum(curvatureInvariantVisualizationArtifact);
   canonicalVisualComparisonArtifact.renderTaxonomy = { ...renderTaxonomySummary };
   canonicalVisualComparisonArtifact.checksum = computeCanonicalVisualComparisonChecksum(
     canonicalVisualComparisonArtifact,
@@ -32735,57 +34313,14 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       artifactPath: normalizePath(sourceMechanismMaturityLatestJsonPath),
       reportPath: normalizePath(sourceMechanismMaturityLatestMdPath),
     },
-    sourceMechanismPromotionContract: (() => {
-      const formalExemptionRoute =
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.find(
-          (route) => route.routeId === "formal_exemption_route",
-        );
-      return {
-      contractId:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractId,
-      contractStatus:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus,
-      selectedPromotionRoute:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .selectedPromotionRoute,
-      promotionDecisionPolicy:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .promotionDecisionPolicy,
-      claimsRequiringParityCount:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .claimsRequiringParity.length,
-      claimsEligibleUnderExemptionCount:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .claimsEligibleUnderExemption.length,
-      claimsBlockedEvenWithExemptionCount:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .claimsBlockedEvenWithExemption.length,
-      exemptionEligibleClaimCount:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .exemptionEligibleClaimDetails.length,
-      exemptionBlockedClaimCount:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract
-          .claimsBlockedEvenWithExemption.length,
-      exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
-      exemptionRouteSummary: formalExemptionRoute?.summary ?? "none",
-      routeFeasibilityStatus:
-        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .feasibilityStatus,
-      routeBlockingClass:
-        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .routeBlockingClass,
-      dominantMismatchTerm:
-        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .dominantMismatchTerm,
-      nextClosureAction:
-        sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .nextClosureAction,
-      promotionSummary:
-        sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.summary,
-      artifactPath: normalizePath(sourceMechanismPromotionContractLatestJsonPath),
-      reportPath: normalizePath(sourceMechanismPromotionContractLatestMdPath),
-      };
-    })(),
+    sourceMechanismPromotionContract: buildSourceMechanismPromotionContractSummary({
+      promotionContractArtifact: sourceMechanismPromotionContractArtifact,
+      parityRouteFeasibilityArtifact: sourceMechanismParityRouteFeasibilityArtifact,
+      sourceFormulaAudit: sourceFormulaAuditArtifact,
+      maturityArtifact: sourceMechanismMaturityArtifact,
+      artifactPath: sourceMechanismPromotionContractLatestJsonPath,
+      reportPath: sourceMechanismPromotionContractLatestMdPath,
+    }),
     sourceMechanismParityRouteFeasibility: {
       routeId:
         sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
@@ -32857,6 +34392,16 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       constraintContextStatus: shiftGeometryVisualizationArtifact.constraintContextStatus,
       artifactPath: normalizePath(shiftGeometryVisualizationLatestJsonPath),
       reportPath: normalizePath(shiftGeometryVisualizationLatestMdPath),
+    },
+    curvatureInvariantSummary: {
+      artifactType: "nhm2_curvature_invariant_visualization/v1",
+      suiteStatus: curvatureInvariantVisualizationArtifact.suiteStatus,
+      surfacedFields: [...CURVATURE_INVARIANT_FIELD_IDS],
+      slicePlanes: ["x-z-midplane"],
+      invariantCrosscheckStatus: curvatureInvariantVisualizationArtifact.invariantCrosscheckStatus,
+      momentumDensityStatus: curvatureInvariantVisualizationArtifact.momentumDensityStatus,
+      artifactPath: normalizePath(curvatureInvariantVisualizationLatestJsonPath),
+      reportPath: normalizePath(curvatureInvariantVisualizationLatestMdPath),
     },
     renderTaxonomySummary: {
       authoritativeRenderCategory: renderTaxonomyArtifact.authoritativeRenderCategory,
@@ -32962,6 +34507,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   ensureDirForFile(shiftGeometryVisualizationLatestJsonPath);
   ensureDirForFile(shiftGeometryVisualizationOutMdPath);
   ensureDirForFile(shiftGeometryVisualizationLatestMdPath);
+  ensureDirForFile(curvatureInvariantVisualizationOutJsonPath);
+  ensureDirForFile(curvatureInvariantVisualizationLatestJsonPath);
+  ensureDirForFile(curvatureInvariantVisualizationOutMdPath);
+  ensureDirForFile(curvatureInvariantVisualizationLatestMdPath);
   ensureDirForFile(renderTaxonomyOutJsonPath);
   ensureDirForFile(renderTaxonomyLatestJsonPath);
   ensureDirForFile(renderTaxonomyOutMdPath);
@@ -33254,6 +34803,24 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   fs.writeFileSync(
     shiftGeometryVisualizationLatestMdPath,
     `${shiftGeometryVisualizationMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    curvatureInvariantVisualizationOutJsonPath,
+    `${JSON.stringify(curvatureInvariantVisualizationArtifact, null, 2)}\n`,
+  );
+  fs.writeFileSync(
+    curvatureInvariantVisualizationLatestJsonPath,
+    `${JSON.stringify(curvatureInvariantVisualizationArtifact, null, 2)}\n`,
+  );
+  const curvatureInvariantVisualizationMarkdown =
+    renderNhm2CurvatureInvariantVisualizationMarkdown(curvatureInvariantVisualizationArtifact);
+  fs.writeFileSync(
+    curvatureInvariantVisualizationOutMdPath,
+    `${curvatureInvariantVisualizationMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    curvatureInvariantVisualizationLatestMdPath,
+    `${curvatureInvariantVisualizationMarkdown}\n`,
   );
   fs.writeFileSync(
     renderTaxonomyOutJsonPath,
@@ -33580,7 +35147,9 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     yorkFixedScaleComparisonArtifact,
     yorkOptixRenderArtifact,
     shiftGeometryVisualizationArtifact,
+    curvatureInvariantVisualizationArtifact,
     canonicalVisualComparisonArtifact,
+    renderTaxonomyArtifact,
     yorkCanonicalCalibrationArtifact,
     yorkAblationPanelArtifact,
     sourceCouplingRedesignArtifact,
@@ -33600,229 +35169,317 @@ const isEntryPoint = (() => {
 })();
 
 if (isEntryPoint) {
-  const width = parsePositiveInt(readArgValue("--width"), 1280);
-  const height = parsePositiveInt(readArgValue("--height"), 720);
+  const argv = process.argv.slice(2);
+  const width = parsePositiveInt(readArgValue("--width", argv), 1280);
+  const height = parsePositiveInt(readArgValue("--height", argv), 720);
   const compareDirectAndProxy = parseBooleanArg(
-    readArgValue("--compare-direct-proxy"),
+    readArgValue("--compare-direct-proxy", argv),
     false,
   );
-  runWarpYorkControlFamilyProofPack({
-    baseUrl: readArgValue("--base-url"),
-    frameEndpoint: readArgValue("--frame-endpoint"),
-    proxyFrameEndpoint: readArgValue("--proxy-frame-endpoint"),
+  const publishInvariantLatest = hasArg("--publish-invariant-latest", argv);
+  const parsedOptions = {
+    baseUrl: readArgValue("--base-url", argv),
+    frameEndpoint: readArgValue("--frame-endpoint", argv),
+    proxyFrameEndpoint: readArgValue("--proxy-frame-endpoint", argv),
     compareDirectAndProxy,
-    contractPath: readArgValue("--contract"),
-    nhm2SnapshotPath: readArgValue("--nhm2-snapshot"),
-    outJsonPath: readArgValue("--out-json"),
-    outMdPath: readArgValue("--out-md"),
-    latestJsonPath: readArgValue("--latest-json"),
-    latestMdPath: readArgValue("--latest-md"),
-    rodcOutJsonPath: readArgValue("--rodc-out-json"),
-    rodcLatestJsonPath: readArgValue("--rodc-latest-json"),
-    sourceToYorkOutJsonPath: readArgValue("--source-to-york-out-json"),
-    sourceToYorkLatestJsonPath: readArgValue("--source-to-york-latest-json"),
-    sourceToYorkOutMdPath: readArgValue("--source-to-york-out-md"),
-    sourceToYorkLatestMdPath: readArgValue("--source-to-york-latest-md"),
-    sourceStageAuditOutJsonPath: readArgValue("--source-stage-audit-out-json"),
-    sourceStageAuditLatestJsonPath: readArgValue("--source-stage-audit-latest-json"),
-    sourceStageAuditOutMdPath: readArgValue("--source-stage-audit-out-md"),
-    sourceStageAuditLatestMdPath: readArgValue("--source-stage-audit-latest-md"),
-    sourceFormulaAuditOutJsonPath: readArgValue("--source-formula-audit-out-json"),
-    sourceFormulaAuditLatestJsonPath: readArgValue("--source-formula-audit-latest-json"),
-    sourceFormulaAuditOutMdPath: readArgValue("--source-formula-audit-out-md"),
-    sourceFormulaAuditLatestMdPath: readArgValue("--source-formula-audit-latest-md"),
+    contractPath: readArgValue("--contract", argv),
+    nhm2SnapshotPath: readArgValue("--nhm2-snapshot", argv),
+    outJsonPath: readArgValue("--out-json", argv),
+    outMdPath: readArgValue("--out-md", argv),
+    latestJsonPath: readArgValue("--latest-json", argv),
+    latestMdPath: readArgValue("--latest-md", argv),
+    rodcOutJsonPath: readArgValue("--rodc-out-json", argv),
+    rodcLatestJsonPath: readArgValue("--rodc-latest-json", argv),
+    sourceToYorkOutJsonPath: readArgValue("--source-to-york-out-json", argv),
+    sourceToYorkLatestJsonPath: readArgValue("--source-to-york-latest-json", argv),
+    sourceToYorkOutMdPath: readArgValue("--source-to-york-out-md", argv),
+    sourceToYorkLatestMdPath: readArgValue("--source-to-york-latest-md", argv),
+    sourceStageAuditOutJsonPath: readArgValue("--source-stage-audit-out-json", argv),
+    sourceStageAuditLatestJsonPath: readArgValue("--source-stage-audit-latest-json", argv),
+    sourceStageAuditOutMdPath: readArgValue("--source-stage-audit-out-md", argv),
+    sourceStageAuditLatestMdPath: readArgValue("--source-stage-audit-latest-md", argv),
+    sourceFormulaAuditOutJsonPath: readArgValue("--source-formula-audit-out-json", argv),
+    sourceFormulaAuditLatestJsonPath: readArgValue("--source-formula-audit-latest-json", argv),
+    sourceFormulaAuditOutMdPath: readArgValue("--source-formula-audit-out-md", argv),
+    sourceFormulaAuditLatestMdPath: readArgValue("--source-formula-audit-latest-md", argv),
     sourceMechanismMaturityOutJsonPath: readArgValue(
       "--source-mechanism-maturity-out-json",
+      argv,
     ),
     sourceMechanismMaturityLatestJsonPath: readArgValue(
       "--source-mechanism-maturity-latest-json",
+      argv,
     ),
     sourceMechanismMaturityOutMdPath: readArgValue(
       "--source-mechanism-maturity-out-md",
+      argv,
     ),
     sourceMechanismMaturityLatestMdPath: readArgValue(
       "--source-mechanism-maturity-latest-md",
+      argv,
     ),
     sourceMechanismPromotionContractOutJsonPath: readArgValue(
       "--source-mechanism-promotion-contract-out-json",
+      argv,
     ),
     sourceMechanismPromotionContractLatestJsonPath: readArgValue(
       "--source-mechanism-promotion-contract-latest-json",
+      argv,
     ),
     sourceMechanismPromotionContractOutMdPath: readArgValue(
       "--source-mechanism-promotion-contract-out-md",
+      argv,
     ),
     sourceMechanismPromotionContractLatestMdPath: readArgValue(
       "--source-mechanism-promotion-contract-latest-md",
+      argv,
     ),
     sourceMechanismParityRouteFeasibilityOutJsonPath: readArgValue(
       "--source-mechanism-parity-route-feasibility-out-json",
+      argv,
     ),
     sourceMechanismParityRouteFeasibilityLatestJsonPath: readArgValue(
       "--source-mechanism-parity-route-feasibility-latest-json",
+      argv,
     ),
     sourceMechanismParityRouteFeasibilityOutMdPath: readArgValue(
       "--source-mechanism-parity-route-feasibility-out-md",
+      argv,
     ),
     sourceMechanismParityRouteFeasibilityLatestMdPath: readArgValue(
       "--source-mechanism-parity-route-feasibility-latest-md",
+      argv,
     ),
-    timingAuthorityAuditOutJsonPath: readArgValue("--timing-authority-audit-out-json"),
-    timingAuthorityAuditLatestJsonPath: readArgValue("--timing-authority-audit-latest-json"),
-    timingAuthorityAuditOutMdPath: readArgValue("--timing-authority-audit-out-md"),
-    timingAuthorityAuditLatestMdPath: readArgValue("--timing-authority-audit-latest-md"),
-    brickAuthorityAuditOutJsonPath: readArgValue("--brick-authority-audit-out-json"),
-    brickAuthorityAuditLatestJsonPath: readArgValue("--brick-authority-audit-latest-json"),
-    brickAuthorityAuditOutMdPath: readArgValue("--brick-authority-audit-out-md"),
-    brickAuthorityAuditLatestMdPath: readArgValue("--brick-authority-audit-latest-md"),
-    snapshotAuthorityAuditOutJsonPath: readArgValue("--snapshot-authority-audit-out-json"),
+    timingAuthorityAuditOutJsonPath: readArgValue("--timing-authority-audit-out-json", argv),
+    timingAuthorityAuditLatestJsonPath: readArgValue(
+      "--timing-authority-audit-latest-json",
+      argv,
+    ),
+    timingAuthorityAuditOutMdPath: readArgValue("--timing-authority-audit-out-md", argv),
+    timingAuthorityAuditLatestMdPath: readArgValue("--timing-authority-audit-latest-md", argv),
+    brickAuthorityAuditOutJsonPath: readArgValue("--brick-authority-audit-out-json", argv),
+    brickAuthorityAuditLatestJsonPath: readArgValue(
+      "--brick-authority-audit-latest-json",
+      argv,
+    ),
+    brickAuthorityAuditOutMdPath: readArgValue("--brick-authority-audit-out-md", argv),
+    brickAuthorityAuditLatestMdPath: readArgValue("--brick-authority-audit-latest-md", argv),
+    snapshotAuthorityAuditOutJsonPath: readArgValue("--snapshot-authority-audit-out-json", argv),
     snapshotAuthorityAuditLatestJsonPath: readArgValue(
       "--snapshot-authority-audit-latest-json",
+      argv,
     ),
-    snapshotAuthorityAuditOutMdPath: readArgValue("--snapshot-authority-audit-out-md"),
+    snapshotAuthorityAuditOutMdPath: readArgValue("--snapshot-authority-audit-out-md", argv),
     snapshotAuthorityAuditLatestMdPath: readArgValue(
       "--snapshot-authority-audit-latest-md",
+      argv,
     ),
     diagnosticSemanticAuditOutJsonPath: readArgValue(
       "--diagnostic-semantic-audit-out-json",
+      argv,
     ),
     diagnosticSemanticAuditLatestJsonPath: readArgValue(
       "--diagnostic-semantic-audit-latest-json",
+      argv,
     ),
     diagnosticSemanticAuditOutMdPath: readArgValue(
       "--diagnostic-semantic-audit-out-md",
+      argv,
     ),
     diagnosticSemanticAuditLatestMdPath: readArgValue(
       "--diagnostic-semantic-audit-latest-md",
+      argv,
     ),
-    yorkRenderDebugOutJsonPath: readArgValue("--york-render-debug-out-json"),
-    yorkRenderDebugLatestJsonPath: readArgValue("--york-render-debug-latest-json"),
-    yorkRenderDebugOutMdPath: readArgValue("--york-render-debug-out-md"),
-    yorkRenderDebugLatestMdPath: readArgValue("--york-render-debug-latest-md"),
-    yorkPaperComparisonMemoPath: readArgValue("--york-paper-comparison-memo"),
+    yorkRenderDebugOutJsonPath: readArgValue("--york-render-debug-out-json", argv),
+    yorkRenderDebugLatestJsonPath: readArgValue("--york-render-debug-latest-json", argv),
+    yorkRenderDebugOutMdPath: readArgValue("--york-render-debug-out-md", argv),
+    yorkRenderDebugLatestMdPath: readArgValue("--york-render-debug-latest-md", argv),
+    yorkPaperComparisonMemoPath: readArgValue("--york-paper-comparison-memo", argv),
     yorkFixedScaleComparisonOutJsonPath: readArgValue(
       "--york-fixed-scale-comparison-out-json",
+      argv,
     ),
     yorkFixedScaleComparisonLatestJsonPath: readArgValue(
       "--york-fixed-scale-comparison-latest-json",
+      argv,
     ),
     yorkFixedScaleComparisonOutMdPath: readArgValue(
       "--york-fixed-scale-comparison-out-md",
+      argv,
     ),
     yorkFixedScaleComparisonLatestMdPath: readArgValue(
       "--york-fixed-scale-comparison-latest-md",
+      argv,
     ),
-    yorkFixedScaleExportDir: readArgValue("--york-fixed-scale-export-dir"),
-    yorkOptixRenderOutJsonPath: readArgValue("--york-optix-render-out-json"),
-    yorkOptixRenderLatestJsonPath: readArgValue("--york-optix-render-latest-json"),
-    yorkOptixRenderOutMdPath: readArgValue("--york-optix-render-out-md"),
-    yorkOptixRenderLatestMdPath: readArgValue("--york-optix-render-latest-md"),
-    yorkOptixRenderExportDir: readArgValue("--york-optix-render-export-dir"),
-    yorkOptixRenderMemoPath: readArgValue("--york-optix-render-memo"),
+    yorkFixedScaleExportDir: readArgValue("--york-fixed-scale-export-dir", argv),
+    yorkOptixRenderOutJsonPath: readArgValue("--york-optix-render-out-json", argv),
+    yorkOptixRenderLatestJsonPath: readArgValue("--york-optix-render-latest-json", argv),
+    yorkOptixRenderOutMdPath: readArgValue("--york-optix-render-out-md", argv),
+    yorkOptixRenderLatestMdPath: readArgValue("--york-optix-render-latest-md", argv),
+    yorkOptixRenderExportDir: readArgValue("--york-optix-render-export-dir", argv),
+    yorkOptixRenderMemoPath: readArgValue("--york-optix-render-memo", argv),
     shiftGeometryVisualizationOutJsonPath: readArgValue(
       "--shift-geometry-visualization-out-json",
+      argv,
     ),
     shiftGeometryVisualizationLatestJsonPath: readArgValue(
       "--shift-geometry-visualization-latest-json",
+      argv,
     ),
     shiftGeometryVisualizationOutMdPath: readArgValue(
       "--shift-geometry-visualization-out-md",
+      argv,
     ),
     shiftGeometryVisualizationLatestMdPath: readArgValue(
       "--shift-geometry-visualization-latest-md",
+      argv,
     ),
+    curvatureInvariantVisualizationOutJsonPath: readArgValue(
+      "--curvature-invariant-visualization-out-json",
+      argv,
+    ),
+    curvatureInvariantVisualizationLatestJsonPath: readArgValue(
+      "--curvature-invariant-visualization-latest-json",
+      argv,
+    ),
+    curvatureInvariantVisualizationOutMdPath: readArgValue(
+      "--curvature-invariant-visualization-out-md",
+      argv,
+    ),
+    curvatureInvariantVisualizationLatestMdPath: readArgValue(
+      "--curvature-invariant-visualization-latest-md",
+      argv,
+    ),
+    renderTaxonomyOutJsonPath: readArgValue("--render-taxonomy-out-json", argv),
+    renderTaxonomyLatestJsonPath: readArgValue("--render-taxonomy-latest-json", argv),
+    renderTaxonomyOutMdPath: readArgValue("--render-taxonomy-out-md", argv),
+    renderTaxonomyLatestMdPath: readArgValue("--render-taxonomy-latest-md", argv),
+    renderTaxonomyStandardMemoPath: readArgValue("--render-taxonomy-standard-memo", argv),
     yorkCanonicalVisualComparisonOutJsonPath: readArgValue(
       "--york-canonical-visual-comparison-out-json",
+      argv,
     ),
     yorkCanonicalVisualComparisonLatestJsonPath: readArgValue(
       "--york-canonical-visual-comparison-latest-json",
+      argv,
     ),
     yorkCanonicalVisualComparisonOutMdPath: readArgValue(
       "--york-canonical-visual-comparison-out-md",
+      argv,
     ),
     yorkCanonicalVisualComparisonLatestMdPath: readArgValue(
       "--york-canonical-visual-comparison-latest-md",
+      argv,
     ),
     yorkCanonicalVisualComparisonExportDir: readArgValue(
       "--york-canonical-visual-comparison-export-dir",
+      argv,
     ),
     yorkCanonicalVisualComparisonDecisionMemoPath: readArgValue(
       "--york-canonical-visual-comparison-decision-memo",
+      argv,
     ),
     yorkCanonicalCalibrationOutJsonPath: readArgValue(
       "--york-canonical-calibration-out-json",
+      argv,
     ),
     yorkCanonicalCalibrationLatestJsonPath: readArgValue(
       "--york-canonical-calibration-latest-json",
+      argv,
     ),
     yorkCanonicalCalibrationOutMdPath: readArgValue(
       "--york-canonical-calibration-out-md",
+      argv,
     ),
     yorkCanonicalCalibrationLatestMdPath: readArgValue(
       "--york-canonical-calibration-latest-md",
+      argv,
     ),
-    yorkCalibrationExportDir: readArgValue("--york-calibration-export-dir"),
-    yorkAblationPanelOutJsonPath: readArgValue("--york-ablation-panel-out-json"),
-    yorkAblationPanelLatestJsonPath: readArgValue("--york-ablation-panel-latest-json"),
-    yorkAblationPanelOutMdPath: readArgValue("--york-ablation-panel-out-md"),
-    yorkAblationPanelLatestMdPath: readArgValue("--york-ablation-panel-latest-md"),
-    yorkAblationExportDir: readArgValue("--york-ablation-export-dir"),
-    ablationDecisionMemoPath: readArgValue("--ablation-decision-memo"),
+    yorkCalibrationExportDir: readArgValue("--york-calibration-export-dir", argv),
+    yorkAblationPanelOutJsonPath: readArgValue("--york-ablation-panel-out-json", argv),
+    yorkAblationPanelLatestJsonPath: readArgValue("--york-ablation-panel-latest-json", argv),
+    yorkAblationPanelOutMdPath: readArgValue("--york-ablation-panel-out-md", argv),
+    yorkAblationPanelLatestMdPath: readArgValue("--york-ablation-panel-latest-md", argv),
+    yorkAblationExportDir: readArgValue("--york-ablation-export-dir", argv),
+    ablationDecisionMemoPath: readArgValue("--ablation-decision-memo", argv),
     sourceCouplingRedesignOutJsonPath: readArgValue(
       "--source-coupling-redesign-out-json",
+      argv,
     ),
     sourceCouplingRedesignLatestJsonPath: readArgValue(
       "--source-coupling-redesign-latest-json",
+      argv,
     ),
-    sourceCouplingRedesignOutMdPath: readArgValue("--source-coupling-redesign-out-md"),
+    sourceCouplingRedesignOutMdPath: readArgValue("--source-coupling-redesign-out-md", argv),
     sourceCouplingRedesignLatestMdPath: readArgValue(
       "--source-coupling-redesign-latest-md",
+      argv,
     ),
     sourceCouplingRedesignRealizationOutJsonPath: readArgValue(
       "--source-coupling-redesign-realization-out-json",
+      argv,
     ),
     sourceCouplingRedesignRealizationLatestJsonPath: readArgValue(
       "--source-coupling-redesign-realization-latest-json",
+      argv,
     ),
     sourceCouplingRedesignRealizationOutMdPath: readArgValue(
       "--source-coupling-redesign-realization-out-md",
+      argv,
     ),
     sourceCouplingRedesignRealizationLatestMdPath: readArgValue(
       "--source-coupling-redesign-realization-latest-md",
+      argv,
     ),
-    sourceCouplingRedesignExportDir: readArgValue("--source-coupling-redesign-export-dir"),
+    sourceCouplingRedesignExportDir: readArgValue(
+      "--source-coupling-redesign-export-dir",
+      argv,
+    ),
     sourceCouplingRedesignDecisionMemoPath: readArgValue(
       "--source-coupling-redesign-decision-memo",
+      argv,
     ),
     sourceCouplingRedesignRealizationMemoPath: readArgValue(
       "--source-coupling-redesign-realization-memo",
+      argv,
     ),
-    deeperReformulationOutJsonPath: readArgValue("--deeper-reformulation-out-json"),
-    deeperReformulationLatestJsonPath: readArgValue("--deeper-reformulation-latest-json"),
-    deeperReformulationOutMdPath: readArgValue("--deeper-reformulation-out-md"),
-    deeperReformulationLatestMdPath: readArgValue("--deeper-reformulation-latest-md"),
-    deeperReformulationExportDir: readArgValue("--deeper-reformulation-export-dir"),
+    deeperReformulationOutJsonPath: readArgValue("--deeper-reformulation-out-json", argv),
+    deeperReformulationLatestJsonPath: readArgValue(
+      "--deeper-reformulation-latest-json",
+      argv,
+    ),
+    deeperReformulationOutMdPath: readArgValue("--deeper-reformulation-out-md", argv),
+    deeperReformulationLatestMdPath: readArgValue(
+      "--deeper-reformulation-latest-md",
+      argv,
+    ),
+    deeperReformulationExportDir: readArgValue("--deeper-reformulation-export-dir", argv),
     deeperReformulationDecisionMemoPath: readArgValue(
       "--deeper-reformulation-decision-memo",
+      argv,
     ),
-    parameterSweepOutJsonPath: readArgValue("--parameter-sweep-out-json"),
-    parameterSweepLatestJsonPath: readArgValue("--parameter-sweep-latest-json"),
-    parameterSweepOutMdPath: readArgValue("--parameter-sweep-out-md"),
-    parameterSweepLatestMdPath: readArgValue("--parameter-sweep-latest-md"),
-    parameterSweepExportDir: readArgValue("--parameter-sweep-export-dir"),
-    parameterSweepDecisionMemoPath: readArgValue("--parameter-sweep-decision-memo"),
-    renderCalibrationDecisionMemoPath: readArgValue("--render-calibration-decision-memo"),
-    nasaFigure1OverlayMemoPath: readArgValue("--nasa-figure1-overlay-memo"),
-    solveAuthorityOutJsonPath: readArgValue("--solve-authority-out-json"),
-    solveAuthorityLatestJsonPath: readArgValue("--solve-authority-latest-json"),
-    solveAuthorityOutMdPath: readArgValue("--solve-authority-out-md"),
-    solveAuthorityLatestMdPath: readArgValue("--solve-authority-latest-md"),
-    waveAEvidencePackPath: readArgValue("--wave-a-evidence-pack"),
-    firstDivergencePath: readArgValue("--first-divergence"),
-    yorkViews: parseYorkViews(readArgValue("--views")),
+    parameterSweepOutJsonPath: readArgValue("--parameter-sweep-out-json", argv),
+    parameterSweepLatestJsonPath: readArgValue("--parameter-sweep-latest-json", argv),
+    parameterSweepOutMdPath: readArgValue("--parameter-sweep-out-md", argv),
+    parameterSweepLatestMdPath: readArgValue("--parameter-sweep-latest-md", argv),
+    parameterSweepExportDir: readArgValue("--parameter-sweep-export-dir", argv),
+    parameterSweepDecisionMemoPath: readArgValue("--parameter-sweep-decision-memo", argv),
+    renderCalibrationDecisionMemoPath: readArgValue("--render-calibration-decision-memo", argv),
+    nasaFigure1OverlayMemoPath: readArgValue("--nasa-figure1-overlay-memo", argv),
+    solveAuthorityOutJsonPath: readArgValue("--solve-authority-out-json", argv),
+    solveAuthorityLatestJsonPath: readArgValue("--solve-authority-latest-json", argv),
+    solveAuthorityOutMdPath: readArgValue("--solve-authority-out-md", argv),
+    solveAuthorityLatestMdPath: readArgValue("--solve-authority-latest-md", argv),
+    waveAEvidencePackPath: readArgValue("--wave-a-evidence-pack", argv),
+    firstDivergencePath: readArgValue("--first-divergence", argv),
+    yorkViews: parseYorkViews(readArgValue("--views", argv)),
     frameSize: { width, height },
-  })
-    .then((result) => {
+  };
+  const runner = publishInvariantLatest
+    ? publishWarpYorkControlFamilyInvariantLatest(parsedOptions)
+    : runWarpYorkControlFamilyProofPack(parsedOptions);
+  runner
+    .then((result: { payload: ProofPackPayload }) => {
       process.stdout.write(`${JSON.stringify(result.payload, null, 2)}\n`);
     })
     .catch((error) => {

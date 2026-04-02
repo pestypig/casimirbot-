@@ -59,6 +59,62 @@ const OUT_RENDER_TAXONOMY_AUDIT = path.join(
   "research",
   "warp-render-taxonomy-latest.md",
 );
+const PROOF_PACK_LATEST_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "warp-york-control-family-proof-pack-latest.json",
+);
+const PROOF_PACK_LATEST_AUDIT = path.join(
+  ROOT,
+  "docs",
+  "audits",
+  "research",
+  "warp-york-control-family-proof-pack-latest.md",
+);
+const SOURCE_FORMULA_AUDIT_LATEST_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "nhm2-source-formula-audit-latest.json",
+);
+const SOURCE_MECHANISM_MATURITY_LATEST_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "nhm2-source-mechanism-maturity-latest.json",
+);
+const SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "nhm2-source-mechanism-promotion-contract-latest.json",
+);
+const SOURCE_MECHANISM_PARITY_ROUTE_LATEST_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "nhm2-source-mechanism-parity-route-feasibility-latest.json",
+);
+const OUT_SOURCE_MECHANISM_CONFORMANCE_JSON = path.join(
+  ROOT,
+  "artifacts",
+  "research",
+  "full-solve",
+  "nhm2-source-mechanism-consumer-conformance-latest.json",
+);
+const OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT = path.join(
+  ROOT,
+  "docs",
+  "audits",
+  "research",
+  "warp-nhm2-source-mechanism-consumer-conformance-latest.md",
+);
 
 const DASHBOARD_LAYOUT_VERSION = "v2_measured_card_family";
 const FONT_FAMILY = "'Segoe UI', Arial, sans-serif";
@@ -137,6 +193,84 @@ type DashboardCardEntry = {
   primary: boolean;
 };
 
+type SourceMechanismPolicyContext = {
+  contractStatus: string;
+  selectedPromotionRoute: string;
+  exemptionRouteActivated: boolean;
+  nonAuthoritative: boolean;
+  formulaEquivalent: boolean;
+  parityRouteStatus: string;
+  parityRouteBlockingClass: string;
+  activeClaimSet: string[];
+  blockedClaimSet: string[];
+  forbiddenPromotions: string[];
+  requiredDisclaimers: string[];
+  referenceOnlyScope: boolean;
+  consumerSummary: string;
+};
+
+type SourceMechanismConsumerSurfaceCheck = {
+  surfaceId: string;
+  surfaceType: string;
+  inspectionMode: "direct_content" | "pre_raster_render_source";
+  dataMode: "artifact_coupled" | "current_build_graph";
+  status: "conformant" | "non_conformant";
+  checkedTargets: string[];
+  checkedFields: string[];
+  verifiedFields: string[];
+  missingDisclaimers: string[];
+  leakedInferences: string[];
+  laneAAuthorityChecks: string[];
+  laneAAuthorityPresent: boolean;
+  referenceOnlyChecks: string[];
+  referenceOnlyPresent: boolean;
+  notes: string[];
+};
+
+type SourceMechanismConsumerConformanceSummary = {
+  consumerConformanceStatus: "conformant" | "non_conformant";
+  conformanceDataMode:
+    | "current_build_graph"
+    | "artifact_coupled"
+    | "mixed_current_build_and_artifact_coupled";
+  stalenessRisk: "none" | "possible_latest_artifact_drift";
+  artifactCouplingNote: string;
+  checkedSurfaces: SourceMechanismConsumerSurfaceCheck[];
+  conformantSurfaces: string[];
+  nonConformantSurfaces: string[];
+  activeClaimSet: string[];
+  blockedClaimSet: string[];
+  requiredDisclaimers: string[];
+  forbiddenInferences: string[];
+  referenceOnlyScopePreserved: boolean;
+  referenceOnlyMissingOnSurfaces: string[];
+  laneAAuthorityPreserved: boolean;
+  laneAAuthorityMissingOnSurfaces: string[];
+  summary: string;
+  artifactPath: string;
+  reportPath: string;
+};
+
+type SourceMechanismConsumerConformanceArtifact = {
+  artifactType: "nhm2_source_mechanism_consumer_conformance/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  proofPackArtifact: string;
+  proofPackReport: string;
+  promotionContractArtifact: string;
+  maturityArtifact: string;
+  dashboardArtifact: string;
+  dashboardReport: string;
+  renderedCardDirectory: string;
+  sourceMechanismConsumerConformance: Omit<
+    SourceMechanismConsumerConformanceSummary,
+    "artifactPath" | "reportPath"
+  >;
+  notes: string[];
+  checksum?: string;
+};
+
 type DashboardPayload = {
   artifactId: string;
   capturedAt: string;
@@ -161,6 +295,19 @@ type DashboardPayload = {
   renderedCardRole: string | null;
   renderedCardLayoutVersion: string | null;
   proofPolicy: Record<string, unknown> & { dashboardNote?: string };
+  sourceMechanismPromotionContractStatus: string;
+  sourceMechanismSelectedPromotionRoute: string;
+  sourceMechanismExemptionRouteActivated: boolean;
+  sourceMechanismNonAuthoritative: boolean;
+  sourceMechanismFormulaEquivalent: boolean;
+  sourceMechanismParityRouteStatus: string;
+  sourceMechanismParityRouteBlockingClass: string;
+  sourceMechanismActiveClaimSet: string[];
+  sourceMechanismBlockedClaimSet: string[];
+  sourceMechanismForbiddenPromotions: string[];
+  sourceMechanismReferenceOnlyScope: boolean;
+  sourceMechanismConsumerSummary: string;
+  sourceMechanismConsumerConformance?: SourceMechanismConsumerConformanceSummary;
   comparisonSemantics: {
     crossCaseSourceMismatchCount: number;
     wallSafetySourceParity: boolean;
@@ -190,6 +337,15 @@ type DashboardSeed = Omit<
   | "renderedCardRole"
   | "renderedCardLayoutVersion"
 >;
+
+type DashboardRenderedCardSource = {
+  cardId: DashboardCardId;
+  title: string;
+  sectionSource: string;
+  primary: boolean;
+  svg: string;
+  inspectionText: string;
+};
 
 type CardSpec = {
   cardId: DashboardCardId;
@@ -426,6 +582,8 @@ const ensureDirForFile = (filePath: string) =>
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 const sha256 = (value: string | Buffer) =>
   crypto.createHash("sha256").update(value).digest("hex");
+const readJsonFile = <T = any>(filePath: string): T =>
+  JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 const fontSpec = (style: TextStyle) =>
   `${style.fontWeight} ${style.fontSize}px ${FONT_FAMILY}`;
 const findQuantity = (section: any, quantityId: string) =>
@@ -443,6 +601,32 @@ const escapeXml = (value: unknown) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
+
+const loadSourceMechanismPolicyContext = (): SourceMechanismPolicyContext => {
+  const promotionArtifact = readJsonFile<any>(SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_JSON);
+  const maturityArtifact = readJsonFile<any>(SOURCE_MECHANISM_MATURITY_LATEST_JSON);
+  const formulaArtifact = readJsonFile<any>(SOURCE_FORMULA_AUDIT_LATEST_JSON);
+  const parityArtifact = readJsonFile<any>(SOURCE_MECHANISM_PARITY_ROUTE_LATEST_JSON);
+  const contract = promotionArtifact.sourceMechanismPromotionContract;
+  const maturity = maturityArtifact.sourceMechanismMaturity;
+  const formulaComparison = formulaArtifact.formulaComparison;
+  const parity = parityArtifact.sourceMechanismParityRouteFeasibility;
+  return {
+    contractStatus: contract.contractStatus,
+    selectedPromotionRoute: contract.selectedPromotionRoute,
+    exemptionRouteActivated: contract.exemptionRouteActivated === true,
+    nonAuthoritative: maturity.authoritativeStatus === "non_authoritative",
+    formulaEquivalent: formulaComparison.formulaEquivalent === true,
+    parityRouteStatus: parity.feasibilityStatus,
+    parityRouteBlockingClass: parity.routeBlockingClass,
+    activeClaimSet: [...contract.activeClaimSet],
+    blockedClaimSet: [...contract.inactiveClaimSet],
+    forbiddenPromotions: [...contract.forbiddenPromotions],
+    requiredDisclaimers: [...contract.activationDisclaimers],
+    referenceOnlyScope: contract.referenceOnlyCrossLaneScope === true,
+    consumerSummary: contract.consumerSummary,
+  };
+};
 
 const formatNumber = (value: number): string => {
   const abs = Math.abs(value);
@@ -1136,7 +1320,7 @@ const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
     {
       label: "Proof Hierarchy",
       value: "Lane A authoritative | generalized reference_only",
-      note: "The overview card remains presentation/comparison only and does not alter proof status.",
+      note: "The overview card remains presentation/comparison only and does not alter proof status or source/mechanism authority.",
       badgeIds: ["lane_a_unchanged", "reference_only"],
     },
     {
@@ -1160,6 +1344,20 @@ const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
         : "raw brick only",
       note: "Mild-reference lapse diagnostics remain precision-aware rather than pretending float32 direct fidelity.",
       badgeIds: ["analytic_companion", "mixed_source"],
+    },
+    {
+      label: "Source/Mechanism Route",
+      value: payload.sourceMechanismExemptionRouteActivated
+        ? "bounded advisory claims only"
+        : "no advisory route active",
+      note: "Only source annotation, mechanism context, and reduced-order comparison claims are active; the source/mechanism lane remains non-authoritative.",
+      badgeIds: ["lane_a_unchanged", "reference_only"],
+    },
+    {
+      label: "Forbidden Promotions",
+      value: "no formula eq | no viability | no cross-lane",
+      note: "Parity route remains blocked by derivation-class difference, and warp.metric.T00.nhm2_shift_lapse remains reference_only.",
+      badgeIds: ["lane_a_unchanged", "reference_only"],
     },
   ];
   const tileGap = 16;
@@ -1223,20 +1421,20 @@ const renderPanelCard = (
   const subtitleByCard: Record<DashboardCardId, string> = {
     dashboard_overview: "",
     proof_status:
-      "Lane A authoritative | generalized branch reference_only | presentation/comparison layer only",
+      "Lane A authoritative | generalized branch reference_only | source/mechanism bounded advisory only",
     cabin_gravity:
       "Local lapse diagnostics | mild reference may use analytic companion under float32 under-resolution",
     wall_safety:
       "Brick-derived combined shift/lapse horizon proxy | separate from cabin gravity diagnostics",
     precision_provenance:
-      "Mixed-source comparison disclosure | unresolved vs analytic fallback remains explicit",
+      "Mixed-source comparison disclosure | parity blocked and formula-equivalence not implied",
   };
   const metaByCard: Record<DashboardCardId, string> = {
     dashboard_overview: "",
     proof_status: `scenario=${payload.scenarioId} | proof=Lane A authoritative`,
     cabin_gravity: `scenario=${payload.scenarioId} | crossCaseSourceMismatchCount=${payload.comparisonSemantics.crossCaseSourceMismatchCount}`,
     wall_safety: `scenario=${payload.scenarioId} | wallSafetySourceParity=${payload.comparisonSemantics.wallSafetySourceParity ? "true" : "false"}`,
-    precision_provenance: `scenario=${payload.scenarioId} | provenanceWarnings=${payload.provenanceWarnings.length}`,
+    precision_provenance: `scenario=${payload.scenarioId} | provenanceWarnings=${payload.provenanceWarnings.length} | parity=${payload.sourceMechanismParityRouteStatus}`,
   };
   const header = renderCardHeader(
     width,
@@ -1293,13 +1491,13 @@ const renderPanelCard = (
 </svg>`.trim();
 };
 
-const renderDashboardCardFamily = async (payload: DashboardSeed) => {
-  fs.mkdirSync(OUT_RENDER_DIR, { recursive: true });
-  if (fs.existsSync(LEGACY_CARD_PATH)) {
-    fs.rmSync(LEGACY_CARD_PATH, { force: true });
-  }
-  const renderedCards: DashboardCardEntry[] = [];
-  for (const spec of CARD_SPECS) {
+const svgToInspectionText = (svg: string) =>
+  svg.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+const buildDashboardCardRenderSources = (
+  payload: DashboardSeed,
+): DashboardRenderedCardSource[] =>
+  CARD_SPECS.map((spec) => {
     const svg =
       spec.cardId === "dashboard_overview"
         ? renderOverviewCard(payload, spec)
@@ -1312,7 +1510,25 @@ const renderDashboardCardFamily = async (payload: DashboardSeed) => {
               includeLegend: spec.cardId === "precision_provenance",
             },
           );
-    const png = await sharp(Buffer.from(svg, "utf8"))
+    return {
+      cardId: spec.cardId,
+      title: spec.title,
+      sectionSource: spec.sectionSource,
+      primary: spec.primary,
+      svg,
+      inspectionText: svgToInspectionText(svg),
+    };
+  });
+
+const renderDashboardCardFamily = async (payload: DashboardSeed) => {
+  fs.mkdirSync(OUT_RENDER_DIR, { recursive: true });
+  if (fs.existsSync(LEGACY_CARD_PATH)) {
+    fs.rmSync(LEGACY_CARD_PATH, { force: true });
+  }
+  const renderedCards: DashboardCardEntry[] = [];
+  for (const source of buildDashboardCardRenderSources(payload)) {
+    const spec = cardSpecById(source.cardId);
+    const png = await sharp(Buffer.from(source.svg, "utf8"))
       .png({ compressionLevel: 9, quality: 100 })
       .toBuffer();
     const absPath = buildCardAbsolutePath(spec.cardId);
@@ -1491,6 +1707,7 @@ export const buildShiftPlusLapseDashboardPayload = async (
 ): Promise<DashboardPayload> => {
   const comparison =
     comparisonPayload ?? (await buildShiftPlusLapseComparisonPayload());
+  const sourceMechanism = loadSourceMechanismPolicyContext();
   const proofRows = buildProofRows(comparison);
   const cabinRows = CABIN_ROW_IDS.map((id) =>
     buildDashboardRow(
@@ -1515,9 +1732,28 @@ export const buildShiftPlusLapseDashboardPayload = async (
     scenarioId: comparison.scenarioId,
     proofPolicy: {
       ...comparison.proofPolicy,
+      disclaimer: [
+        ...(Array.isArray(comparison.proofPolicy?.disclaimer)
+          ? comparison.proofPolicy.disclaimer
+          : []),
+        "Source/mechanism exemption activation is limited to bounded non-authoritative advisory claims only.",
+        "No formula-equivalence, viability-promotion, or cross-lane authority-expansion claim is made from this dashboard.",
+      ],
       dashboardNote:
-        "This dashboard is a human-facing comparison surface only. It does not replace Lane A or promote the generalized branch.",
+        "This dashboard is a human-facing comparison surface only. It does not replace Lane A, it does not promote the generalized branch, and any active source/mechanism route remains bounded to non-authoritative advisory claims.",
     },
+    sourceMechanismPromotionContractStatus: sourceMechanism.contractStatus,
+    sourceMechanismSelectedPromotionRoute: sourceMechanism.selectedPromotionRoute,
+    sourceMechanismExemptionRouteActivated: sourceMechanism.exemptionRouteActivated,
+    sourceMechanismNonAuthoritative: sourceMechanism.nonAuthoritative,
+    sourceMechanismFormulaEquivalent: sourceMechanism.formulaEquivalent,
+    sourceMechanismParityRouteStatus: sourceMechanism.parityRouteStatus,
+    sourceMechanismParityRouteBlockingClass: sourceMechanism.parityRouteBlockingClass,
+    sourceMechanismActiveClaimSet: [...sourceMechanism.activeClaimSet],
+    sourceMechanismBlockedClaimSet: [...sourceMechanism.blockedClaimSet],
+    sourceMechanismForbiddenPromotions: [...sourceMechanism.forbiddenPromotions],
+    sourceMechanismReferenceOnlyScope: sourceMechanism.referenceOnlyScope,
+    sourceMechanismConsumerSummary: sourceMechanism.consumerSummary,
     comparisonSemantics: {
       crossCaseSourceMismatchCount:
         comparison.comparisonSummary.crossCaseSourceMismatchCount,
@@ -1533,7 +1769,7 @@ export const buildShiftPlusLapseDashboardPayload = async (
           "Keep proof hierarchy explicit before reading any lapse or wall-safety diagnostic row.",
         rows: proofRows,
         sectionNote:
-          "Lane A remains authoritative. The generalized branch is reference-only and this dashboard is presentation/comparison only.",
+          "Lane A remains authoritative. The generalized branch is reference-only. Source/mechanism context is bounded non-authoritative advisory only; no formula equivalence, viability promotion, or cross-lane authority expansion is implied.",
       },
       {
         panelId: "cabin_gravity_panel",
@@ -1560,7 +1796,7 @@ export const buildShiftPlusLapseDashboardPayload = async (
           "Show how raw-brick and analytic-companion provenance are mixed or aligned across the comparison.",
         rows: precisionRows,
         sectionNote:
-          "Read these rows before collapsing the dashboard into any downstream summary. They explain where mild-reference under-resolution is handled analytically and where brick alignment is preserved.",
+          "Read these rows before collapsing the dashboard into any downstream summary. They explain where mild-reference under-resolution is handled analytically, where brick alignment is preserved, and why the active source/mechanism route remains bounded advisory only rather than implying formula equivalence or viability promotion.",
       },
     ],
     badgeLegend: BADGES,
@@ -1635,6 +1871,574 @@ const buildRenderedCardsTable = (cards: DashboardCardEntry[]) => {
   return [header, separator, ...rows].join("\n");
 };
 
+const computeSourceMechanismConsumerConformanceChecksum = (
+  payload: SourceMechanismConsumerConformanceArtifact,
+) => {
+  const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  delete copy.generatedAt;
+  delete copy.checksum;
+  return sha256(JSON.stringify(copy));
+};
+
+const evaluateSurface = (args: {
+  surfaceId: string;
+  surfaceType: string;
+  inspectionMode: "direct_content" | "pre_raster_render_source";
+  dataMode: "artifact_coupled" | "current_build_graph";
+  checkedTargets?: string[];
+  checks: Array<{ field: string; pass: boolean; note: string }>;
+  laneAAuthorityChecks?: string[];
+  referenceOnlyChecks?: string[];
+  leakedInferences?: string[];
+}) => {
+  const missingDisclaimers = args.checks
+    .filter((entry) => !entry.pass)
+    .map((entry) => entry.field);
+  const verifiedFields = args.checks
+    .filter((entry) => entry.pass)
+    .map((entry) => entry.field);
+  const laneAAuthorityChecks = [...(args.laneAAuthorityChecks ?? [])];
+  const referenceOnlyChecks = [...(args.referenceOnlyChecks ?? [])];
+  return {
+    surfaceId: args.surfaceId,
+    surfaceType: args.surfaceType,
+    inspectionMode: args.inspectionMode,
+    dataMode: args.dataMode,
+    status: missingDisclaimers.length === 0 && (args.leakedInferences?.length ?? 0) === 0
+      ? "conformant"
+      : "non_conformant",
+    checkedTargets: [...(args.checkedTargets ?? [])],
+    checkedFields: args.checks.map((entry) => entry.field),
+    verifiedFields,
+    missingDisclaimers,
+    leakedInferences: [...(args.leakedInferences ?? [])],
+    laneAAuthorityChecks,
+    laneAAuthorityPresent:
+      laneAAuthorityChecks.length > 0 &&
+      laneAAuthorityChecks.every((field) => verifiedFields.includes(field)),
+    referenceOnlyChecks,
+    referenceOnlyPresent:
+      referenceOnlyChecks.length > 0 &&
+      referenceOnlyChecks.every((field) => verifiedFields.includes(field)),
+    notes: args.checks.map((entry) => entry.note),
+  } satisfies SourceMechanismConsumerSurfaceCheck;
+};
+
+export const buildSourceMechanismConsumerConformanceSummary = (args: {
+  dashboard: DashboardPayload;
+  proofPackArtifact: any;
+  proofPackMarkdown: string;
+  dashboardAuditMarkdown: string;
+}): Omit<SourceMechanismConsumerConformanceSummary, "artifactPath" | "reportPath"> => {
+  const requiredDisclaimers = [
+    "Only the three bounded advisory source/mechanism claims are active.",
+    "The source/mechanism lane remains non-authoritative.",
+    "The direct-proxy parity route remains blocked by derivation-class difference.",
+    "Formula equivalence to the authoritative direct metric remains false/blocked.",
+    "Viability promotion from the source/mechanism lane remains blocked.",
+    "Cross-lane expansion beyond reference_only remains blocked.",
+    "warp.metric.T00.nhm2_shift_lapse remains reference_only.",
+  ];
+  const proofPanel = panelById(args.dashboard, "proof_status_panel");
+  const authoritativeProofSurfaceRow =
+    proofPanel.rows.find((row) => row.rowId === "authoritative_proof_surface") ?? null;
+  const branchStatusRow =
+    proofPanel.rows.find((row) => row.rowId === "branch_status") ?? null;
+  const proofPackSummary = args.proofPackArtifact.sourceMechanismPromotionContract ?? {};
+  const proofPackSurface = evaluateSurface({
+    surfaceId: "proof_pack_alias_json",
+    surfaceType: "json_alias",
+    inspectionMode: "direct_content",
+    dataMode: "artifact_coupled",
+    checkedTargets: [
+      "sourceMechanismPromotionContract",
+      "sourceMechanismMaturity",
+      "sourceFormulaAudit",
+      "sourceMechanismParityRouteFeasibility",
+    ],
+    checks: [
+      {
+        field: "activeClaimSet",
+        pass:
+          Array.isArray(proofPackSummary.sourceMechanismActiveClaimSet) &&
+          proofPackSummary.sourceMechanismActiveClaimSet.length === 3,
+        note: "Proof-pack alias must carry the active bounded claim set.",
+      },
+      {
+        field: "blockedClaimSet",
+        pass:
+          Array.isArray(proofPackSummary.sourceMechanismBlockedClaimSet) &&
+          proofPackSummary.sourceMechanismBlockedClaimSet.includes(
+            "formula_equivalent_to_authoritative_direct_metric",
+          ) &&
+          proofPackSummary.sourceMechanismBlockedClaimSet.includes(
+            "source_mechanism_layer_supports_viability_promotion",
+          ) &&
+          proofPackSummary.sourceMechanismBlockedClaimSet.includes(
+            "cross_lane_promotion_beyond_reference_only_scope",
+          ),
+        note: "Proof-pack alias must keep stronger source/mechanism claims blocked.",
+      },
+      {
+        field: "forbiddenPromotions",
+        pass:
+          Array.isArray(proofPackSummary.sourceMechanismForbiddenPromotions) &&
+          proofPackSummary.sourceMechanismForbiddenPromotions.includes(
+            "nhm2_shift_lapse_proof_promotion",
+          ),
+        note: "Proof-pack alias must explicitly forbid nhm2_shift_lapse proof promotion.",
+      },
+      {
+        field: "referenceOnlyScope",
+        pass: proofPackSummary.sourceMechanismReferenceOnlyScope === true,
+        note: "Proof-pack alias must preserve reference_only cross-lane scope.",
+      },
+      {
+        field: "laneAAuthoritativeField",
+        pass: args.proofPackArtifact.sourceMechanismMaturity?.laneAAuthoritative === true,
+        note: "Proof-pack JSON must expose an explicit Lane A authoritative field.",
+      },
+      {
+        field: "activationSummaryLaneA",
+        pass:
+          typeof proofPackSummary.activationSummary === "string" &&
+          proofPackSummary.activationSummary.includes("Lane A remains authoritative"),
+        note: "Proof-pack JSON must state that the active bounded route leaves Lane A authoritative.",
+      },
+      {
+        field: "consumerSummary",
+        pass:
+          typeof proofPackSummary.sourceMechanismConsumerSummary === "string" &&
+          proofPackSummary.sourceMechanismConsumerSummary.includes(
+            "warp.metric.T00.nhm2_shift_lapse remains reference_only",
+          ),
+        note: "Proof-pack alias must summarize the bounded advisory boundary explicitly.",
+      },
+      {
+        field: "formulaEquivalent",
+        pass: args.proofPackArtifact.sourceFormulaAudit?.formulaEquivalent === false,
+        note: "Proof-pack alias must keep formula equivalence false/blocked.",
+      },
+      {
+        field: "parityRouteBlocked",
+        pass:
+          args.proofPackArtifact.sourceMechanismParityRouteFeasibility
+            ?.routeFeasibilityStatus === "blocked_by_derivation_class_difference",
+        note: "Proof-pack alias must keep the parity route visibly blocked.",
+      },
+    ],
+    laneAAuthorityChecks: ["laneAAuthoritativeField", "activationSummaryLaneA"],
+    referenceOnlyChecks: ["referenceOnlyScope", "consumerSummary"],
+  });
+  const proofPackMarkdownSurface = evaluateSurface({
+    surfaceId: "proof_pack_audit_markdown",
+    surfaceType: "markdown_audit",
+    inspectionMode: "direct_content",
+    dataMode: "artifact_coupled",
+    checkedTargets: [
+      "Source / Mechanism Maturity",
+      "Source / Mechanism Promotion Contract",
+    ],
+    checks: [
+      {
+        field: "active_for_bounded_claims_only",
+        pass: args.proofPackMarkdown.includes("| contractStatus | active_for_bounded_claims_only |"),
+        note: "Proof-pack markdown must show the bounded-only activation status.",
+      },
+      {
+        field: "activeClaimSet",
+        pass: args.proofPackMarkdown.includes("| sourceMechanismActiveClaimSet |"),
+        note: "Proof-pack markdown must list the active bounded claim set.",
+      },
+      {
+        field: "forbiddenPromotions",
+        pass: args.proofPackMarkdown.includes("| sourceMechanismForbiddenPromotions |"),
+        note: "Proof-pack markdown must list forbidden promotions explicitly.",
+      },
+      {
+        field: "formulaEquivalentFalse",
+        pass: args.proofPackMarkdown.includes("| sourceMechanismFormulaEquivalent | false |"),
+        note: "Proof-pack markdown must keep formula equivalence visibly false.",
+      },
+      {
+        field: "referenceOnlyScope",
+        pass: args.proofPackMarkdown.includes("| sourceMechanismReferenceOnlyScope | true |"),
+        note: "Proof-pack markdown must preserve reference_only scope.",
+      },
+      {
+        field: "laneAAuthoritativeField",
+        pass: args.proofPackMarkdown.includes("| laneAAuthoritative | true |"),
+        note: "Proof-pack markdown must expose the explicit Lane A authoritative field.",
+      },
+      {
+        field: "activationSummaryLaneA",
+        pass: args.proofPackMarkdown.includes("Lane A remains authoritative"),
+        note: "Proof-pack markdown must state that the active bounded route leaves Lane A authoritative.",
+      },
+    ],
+    laneAAuthorityChecks: ["laneAAuthoritativeField", "activationSummaryLaneA"],
+    referenceOnlyChecks: ["referenceOnlyScope"],
+  });
+  const dashboardProofNote = panelById(args.dashboard, "proof_status_panel").sectionNote;
+  const dashboardPrecisionNote = panelById(args.dashboard, "precision_panel").sectionNote;
+  const dashboardJsonSurface = evaluateSurface({
+    surfaceId: "shift_plus_lapse_dashboard_json",
+    surfaceType: "dashboard_json",
+    inspectionMode: "direct_content",
+    dataMode: "artifact_coupled",
+    checkedTargets: [
+      "proof_status_panel",
+      "precision_panel",
+      "sourceMechanism* top-level fields",
+    ],
+    checks: [
+      {
+        field: "activeClaimSet",
+        pass: args.dashboard.sourceMechanismActiveClaimSet.length === 3,
+        note: "Dashboard JSON must carry the active bounded claim set.",
+      },
+      {
+        field: "blockedClaimSet",
+        pass:
+          args.dashboard.sourceMechanismBlockedClaimSet.includes(
+            "source_mechanism_layer_supports_viability_promotion",
+          ) &&
+          args.dashboard.sourceMechanismBlockedClaimSet.includes(
+            "cross_lane_promotion_beyond_reference_only_scope",
+          ),
+        note: "Dashboard JSON must keep stronger claims blocked.",
+      },
+      {
+        field: "forbiddenPromotions",
+        pass: args.dashboard.sourceMechanismForbiddenPromotions.includes(
+          "nhm2_shift_lapse_proof_promotion",
+        ),
+        note: "Dashboard JSON must explicitly forbid nhm2_shift_lapse proof promotion.",
+      },
+      {
+        field: "referenceOnlyScope",
+        pass: args.dashboard.sourceMechanismReferenceOnlyScope === true,
+        note: "Dashboard JSON must preserve reference_only scope.",
+      },
+      {
+        field: "branchStatusReferenceOnly",
+        pass:
+          `${branchStatusRow?.generalizedValue ?? ""}`.includes("reference_only"),
+        note: "Dashboard JSON must keep the generalized branch explicitly reference_only.",
+      },
+      {
+        field: "formulaEquivalentFalse",
+        pass: args.dashboard.sourceMechanismFormulaEquivalent === false,
+        note: "Dashboard JSON must not imply formula equivalence.",
+      },
+      {
+        field: "parityRouteBlocked",
+        pass:
+          args.dashboard.sourceMechanismParityRouteStatus ===
+          "blocked_by_derivation_class_difference",
+        note: "Dashboard JSON must keep the parity route visibly blocked.",
+      },
+      {
+        field: "proofStatusBoundary",
+        pass:
+          dashboardProofNote.includes("bounded non-authoritative advisory only") &&
+          dashboardProofNote.includes("no formula equivalence"),
+        note: "Proof-status panel note must carry the bounded-route boundary.",
+      },
+      {
+        field: "precisionBoundary",
+        pass:
+          dashboardPrecisionNote.includes("bounded advisory only") &&
+          dashboardPrecisionNote.includes("viability promotion"),
+        note: "Precision panel note must carry the bounded-route and forbidden-inference boundary.",
+      },
+      {
+        field: "proofStatusSectionNoteLaneA",
+        pass: dashboardProofNote.includes("Lane A remains authoritative"),
+        note: "Dashboard JSON proof-status note must explicitly preserve Lane A authority.",
+      },
+      {
+        field: "authoritativeProofSurfaceRow",
+        pass:
+          `${authoritativeProofSurfaceRow?.generalizedValue ?? ""}` ===
+          "lane_a_eulerian_comoving_theta_minus_trk",
+        note: "Dashboard JSON must keep the authoritative proof-surface row pointed at Lane A.",
+      },
+    ],
+    laneAAuthorityChecks: ["proofStatusSectionNoteLaneA", "authoritativeProofSurfaceRow"],
+    referenceOnlyChecks: ["referenceOnlyScope", "branchStatusReferenceOnly"],
+  });
+  const dashboardMarkdownSurface = evaluateSurface({
+    surfaceId: "shift_plus_lapse_dashboard_audit_markdown",
+    surfaceType: "markdown_audit",
+    inspectionMode: "direct_content",
+    dataMode: "artifact_coupled",
+    checkedTargets: [
+      "Proof Status",
+      "Source / Mechanism Consumer Boundary",
+      "Source / Mechanism Consumer Conformance",
+    ],
+    checks: [
+      {
+        field: "consumerBoundarySection",
+        pass: args.dashboardAuditMarkdown.includes("## Source / Mechanism Consumer Boundary"),
+        note: "Dashboard audit markdown must include an explicit source/mechanism boundary section.",
+      },
+      {
+        field: "activeClaimSet",
+        pass: args.dashboardAuditMarkdown.includes("- activeClaimSet:"),
+        note: "Dashboard audit markdown must list the active bounded claim set.",
+      },
+      {
+        field: "forbiddenPromotions",
+        pass: args.dashboardAuditMarkdown.includes("- forbiddenPromotions:"),
+        note: "Dashboard audit markdown must list forbidden promotions.",
+      },
+      {
+        field: "consumerConformanceSection",
+        pass: args.dashboardAuditMarkdown.includes("## Source / Mechanism Consumer Conformance"),
+        note: "Dashboard audit markdown must include the conformance result.",
+      },
+      {
+        field: "referenceOnlySummary",
+        pass: args.dashboardAuditMarkdown.includes("reference_only"),
+        note: "Dashboard audit markdown must preserve reference_only wording.",
+      },
+      {
+        field: "proofNoteLaneA",
+        pass: args.dashboardAuditMarkdown.includes("- proofNote: Lane A remains authoritative."),
+        note: "Dashboard audit markdown must preserve the explicit Lane A proof note.",
+      },
+      {
+        field: "authoritativeProofSurface",
+        pass: args.dashboardAuditMarkdown.includes(
+          "- authoritativeProofSurface: lane_a_eulerian_comoving_theta_minus_trk",
+        ),
+        note: "Dashboard audit markdown must preserve the authoritative proof surface identifier.",
+      },
+    ],
+    laneAAuthorityChecks: ["proofNoteLaneA", "authoritativeProofSurface"],
+    referenceOnlyChecks: ["referenceOnlySummary"],
+  });
+  const renderedCardSources = buildDashboardCardRenderSources(args.dashboard);
+  const dashboardOverviewCard =
+    renderedCardSources.find((card) => card.cardId === "dashboard_overview") ?? null;
+  const proofStatusCard =
+    renderedCardSources.find((card) => card.cardId === "proof_status") ?? null;
+  const precisionCard =
+    renderedCardSources.find((card) => card.cardId === "precision_provenance") ?? null;
+  const renderedCardSurface = evaluateSurface({
+    surfaceId: "shift_plus_lapse_dashboard_cards",
+    surfaceType: "rendered_card_family",
+    inspectionMode: "pre_raster_render_source",
+    dataMode: "artifact_coupled",
+    checkedTargets: [
+      "dashboard_overview",
+      "proof_status",
+      "precision_provenance",
+    ],
+    checks: [
+      {
+        field: "overviewLaneAAuthority",
+        pass:
+          typeof dashboardOverviewCard?.inspectionText === "string" &&
+          dashboardOverviewCard.inspectionText.includes("Lane A authoritative"),
+        note: "Rendered overview card must preserve Lane A authority in the proof hierarchy tile.",
+      },
+      {
+        field: "proofStatusLaneAAuthority",
+        pass:
+          typeof proofStatusCard?.inspectionText === "string" &&
+          proofStatusCard.inspectionText.includes("Lane A authoritative"),
+        note: "Rendered proof-status card must preserve Lane A authority in its subtitle/meta.",
+      },
+      {
+        field: "overviewReferenceOnly",
+        pass:
+          typeof dashboardOverviewCard?.inspectionText === "string" &&
+          dashboardOverviewCard.inspectionText.includes("reference_only"),
+        note: "Rendered overview card must preserve reference_only scope.",
+      },
+      {
+        field: "proofStatusReferenceOnly",
+        pass:
+          typeof proofStatusCard?.inspectionText === "string" &&
+          proofStatusCard.inspectionText.includes("reference_only"),
+        note: "Rendered proof-status card must preserve reference_only scope.",
+      },
+      {
+        field: "overviewNonAuthoritative",
+        pass:
+          typeof dashboardOverviewCard?.inspectionText === "string" &&
+          dashboardOverviewCard.inspectionText.includes("non-authoritative"),
+        note: "Rendered overview card must preserve the non-authoritative source/mechanism boundary.",
+      },
+      {
+        field: "overviewForbiddenPromotionSummary",
+        pass:
+          typeof dashboardOverviewCard?.inspectionText === "string" &&
+          dashboardOverviewCard.inspectionText.includes(
+            "no formula eq | no viability | no cross-lane",
+          ),
+        note: "Rendered overview card must state the forbidden promotions compactly.",
+      },
+      {
+        field: "proofStatusForbiddenPromotionBoundary",
+        pass:
+          typeof proofStatusCard?.inspectionText === "string" &&
+          proofStatusCard.inspectionText.includes(
+            "no formula equivalence, viability promotion, or cross-lane authority expansion is implied",
+          ),
+        note: "Rendered proof-status card must keep the forbidden-inference boundary explicit.",
+      },
+      {
+        field: "precisionFormulaEquivalenceBoundary",
+        pass:
+          typeof precisionCard?.inspectionText === "string" &&
+          precisionCard.inspectionText.includes(
+            "formula-equivalence not implied",
+          ) &&
+          precisionCard.inspectionText.includes("parity blocked"),
+        note: "Rendered precision/provenance card must keep formula-equivalence and parity boundaries explicit.",
+      },
+    ],
+    laneAAuthorityChecks: ["overviewLaneAAuthority", "proofStatusLaneAAuthority"],
+    referenceOnlyChecks: ["overviewReferenceOnly", "proofStatusReferenceOnly"],
+  });
+  const checkedSurfaces = [
+    proofPackSurface,
+    proofPackMarkdownSurface,
+    dashboardJsonSurface,
+    dashboardMarkdownSurface,
+    renderedCardSurface,
+  ];
+  const conformantSurfaces = checkedSurfaces
+    .filter((entry) => entry.status === "conformant")
+    .map((entry) => entry.surfaceId);
+  const nonConformantSurfaces = checkedSurfaces
+    .filter((entry) => entry.status === "non_conformant")
+    .map((entry) => entry.surfaceId);
+  const laneAAuthorityMissingOnSurfaces = checkedSurfaces
+    .filter((entry) => !entry.laneAAuthorityPresent)
+    .map((entry) => entry.surfaceId);
+  const referenceOnlyMissingOnSurfaces = checkedSurfaces
+    .filter((entry) => !entry.referenceOnlyPresent)
+    .map((entry) => entry.surfaceId);
+  const distinctDataModes = [...new Set(checkedSurfaces.map((entry) => entry.dataMode))];
+  const conformanceDataMode =
+    distinctDataModes.length === 1
+      ? distinctDataModes[0]
+      : "mixed_current_build_and_artifact_coupled";
+  const stalenessRisk =
+    checkedSurfaces.some((entry) => entry.dataMode === "artifact_coupled")
+      ? "possible_latest_artifact_drift"
+      : "none";
+  const artifactCouplingNote =
+    conformanceDataMode === "artifact_coupled"
+      ? "Consumer-conformance is artifact-coupled: proof-pack surfaces are read from latest aliases, and the dashboard current-build outputs embed source/mechanism policy state sourced from latest artifacts."
+      : conformanceDataMode === "mixed_current_build_and_artifact_coupled"
+        ? "Consumer-conformance mixes current-build dashboard surfaces with artifact-coupled upstream proof-pack policy inputs; latest-alias drift remains possible."
+        : "Consumer-conformance is evaluated only from the current in-memory build graph.";
+  return {
+    consumerConformanceStatus:
+      nonConformantSurfaces.length === 0 &&
+      laneAAuthorityMissingOnSurfaces.length === 0 &&
+      referenceOnlyMissingOnSurfaces.length === 0
+        ? "conformant"
+        : "non_conformant",
+    conformanceDataMode,
+    stalenessRisk,
+    artifactCouplingNote,
+    checkedSurfaces,
+    conformantSurfaces,
+    nonConformantSurfaces,
+    activeClaimSet: [...args.dashboard.sourceMechanismActiveClaimSet],
+    blockedClaimSet: [...args.dashboard.sourceMechanismBlockedClaimSet],
+    requiredDisclaimers,
+    forbiddenInferences: [...args.dashboard.sourceMechanismForbiddenPromotions],
+    referenceOnlyScopePreserved: referenceOnlyMissingOnSurfaces.length === 0,
+    referenceOnlyMissingOnSurfaces,
+    laneAAuthorityPreserved: laneAAuthorityMissingOnSurfaces.length === 0,
+    laneAAuthorityMissingOnSurfaces,
+    summary:
+      nonConformantSurfaces.length === 0 &&
+      laneAAuthorityMissingOnSurfaces.length === 0 &&
+      referenceOnlyMissingOnSurfaces.length === 0
+        ? `Checked proof-pack JSON/markdown, dashboard JSON/markdown, and rendered dashboard card sources preserve the bounded advisory source/mechanism route, explicit Lane A authority, and reference_only scope. ${artifactCouplingNote}`
+        : `Consumer surfaces still leak or omit bounded-route, Lane A, or reference_only markers on: ${[
+            ...new Set([
+              ...nonConformantSurfaces,
+              ...laneAAuthorityMissingOnSurfaces,
+              ...referenceOnlyMissingOnSurfaces,
+            ]),
+          ].join(", ")}.`,
+  };
+};
+
+const buildSourceMechanismConsumerConformanceMarkdown = (
+  payload: SourceMechanismConsumerConformanceArtifact,
+) => {
+  const summary = payload.sourceMechanismConsumerConformance;
+  const surfaceRows = summary.checkedSurfaces.length
+    ? summary.checkedSurfaces
+        .map(
+          (surface) =>
+            `| ${surface.surfaceId} | ${surface.surfaceType} | ${surface.inspectionMode} | ${surface.dataMode} | ${surface.checkedTargets.join(",") || "none"} | ${surface.status} | ${surface.checkedFields.join(",") || "none"} | ${surface.verifiedFields.join(",") || "none"} | ${surface.laneAAuthorityPresent} | ${surface.referenceOnlyPresent} | ${surface.missingDisclaimers.join(",") || "none"} | ${surface.leakedInferences.join(",") || "none"} | ${surface.notes.join("; ") || "none"} |`,
+        )
+        .join("\n")
+    : "| none | none | none | none | none | none | none | none | none | none | none | none | none |";
+  const bulletList = (values: string[]) =>
+    values.length ? values.map((entry) => `- ${entry}`).join("\n") : "- none";
+  return [
+    "# NHM2 Source / Mechanism Consumer Conformance",
+    "",
+    `"${payload.boundaryStatement}"`,
+    "",
+    "## Source Paths",
+    `- proofPackArtifact: \`${payload.proofPackArtifact}\``,
+    `- proofPackReport: \`${payload.proofPackReport}\``,
+    `- promotionContractArtifact: \`${payload.promotionContractArtifact}\``,
+    `- maturityArtifact: \`${payload.maturityArtifact}\``,
+    `- dashboardArtifact: \`${payload.dashboardArtifact}\``,
+    `- dashboardReport: \`${payload.dashboardReport}\``,
+    `- renderedCardDirectory: \`${payload.renderedCardDirectory}\``,
+    "",
+    "## Consumer Conformance",
+    "| field | value |",
+    "| --- | --- |",
+    `| consumerConformanceStatus | ${summary.consumerConformanceStatus} |`,
+    `| conformanceDataMode | ${summary.conformanceDataMode} |`,
+    `| stalenessRisk | ${summary.stalenessRisk} |`,
+    `| artifactCouplingNote | ${summary.artifactCouplingNote} |`,
+    `| referenceOnlyScopePreserved | ${summary.referenceOnlyScopePreserved} |`,
+    `| referenceOnlyMissingOnSurfaces | ${summary.referenceOnlyMissingOnSurfaces.join(",") || "none"} |`,
+    `| laneAAuthorityPreserved | ${summary.laneAAuthorityPreserved} |`,
+    `| laneAAuthorityMissingOnSurfaces | ${summary.laneAAuthorityMissingOnSurfaces.join(",") || "none"} |`,
+    `| summary | ${summary.summary} |`,
+    "",
+    "## Checked Surfaces",
+    "| surfaceId | surfaceType | inspectionMode | dataMode | checkedTargets | status | checkedFields | verifiedFields | laneAAuthorityPresent | referenceOnlyPresent | missingDisclaimers | leakedInferences | notes |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    surfaceRows,
+    "",
+    "## Active Claim Set",
+    bulletList(summary.activeClaimSet),
+    "",
+    "## Blocked Claim Set",
+    bulletList(summary.blockedClaimSet),
+    "",
+    "## Required Disclaimers",
+    bulletList(summary.requiredDisclaimers),
+    "",
+    "## Forbidden Inferences",
+    bulletList(summary.forbiddenInferences),
+    "",
+    "## Notes",
+    bulletList(payload.notes),
+    "",
+  ].join("\n");
+};
+
 const buildAuditMarkdown = (payload: DashboardPayload) => {
   const proofPanel = panelById(payload, "proof_status_panel");
   const cabinPanel = panelById(payload, "cabin_gravity_panel");
@@ -1673,6 +2477,21 @@ const buildAuditMarkdown = (payload: DashboardPayload) => {
     `- baselineBranchStatus: ${proofPanel.rows[1]?.baselineValue ?? "n/a"}`,
     `- generalizedBranchStatus: ${proofPanel.rows[1]?.generalizedValue ?? "n/a"}`,
     `- proofNote: ${proofPanel.sectionNote}`,
+    "",
+    "## Source / Mechanism Consumer Boundary",
+    "",
+    `- promotionContractStatus: ${payload.sourceMechanismPromotionContractStatus}`,
+    `- selectedPromotionRoute: ${payload.sourceMechanismSelectedPromotionRoute}`,
+    `- exemptionRouteActivated: ${payload.sourceMechanismExemptionRouteActivated ? "yes" : "no"}`,
+    `- sourceMechanismNonAuthoritative: ${payload.sourceMechanismNonAuthoritative ? "yes" : "no"}`,
+    `- sourceMechanismFormulaEquivalent: ${payload.sourceMechanismFormulaEquivalent ? "yes" : "no"}`,
+    `- parityRouteStatus: ${payload.sourceMechanismParityRouteStatus}`,
+    `- parityRouteBlockingClass: ${payload.sourceMechanismParityRouteBlockingClass}`,
+    `- sourceMechanismReferenceOnlyScope: ${payload.sourceMechanismReferenceOnlyScope ? "yes" : "no"}`,
+    `- activeClaimSet: ${payload.sourceMechanismActiveClaimSet.join(", ") || "none"}`,
+    `- blockedClaimSet: ${payload.sourceMechanismBlockedClaimSet.join(", ") || "none"}`,
+    `- forbiddenPromotions: ${payload.sourceMechanismForbiddenPromotions.join(", ") || "none"}`,
+    `- sourceMechanismConsumerSummary: ${payload.sourceMechanismConsumerSummary}`,
     "",
     "## Cabin Gravity Panel",
     "",
@@ -1714,6 +2533,23 @@ const buildAuditMarkdown = (payload: DashboardPayload) => {
     "",
     buildBadgeLegendMarkdown(payload.badgeLegend),
     "",
+    "## Source / Mechanism Consumer Conformance",
+    "",
+    `- consumerConformanceStatus: ${payload.sourceMechanismConsumerConformance?.consumerConformanceStatus ?? "n/a"}`,
+    `- conformanceDataMode: ${payload.sourceMechanismConsumerConformance?.conformanceDataMode ?? "n/a"}`,
+    `- stalenessRisk: ${payload.sourceMechanismConsumerConformance?.stalenessRisk ?? "n/a"}`,
+    `- artifactCouplingNote: ${payload.sourceMechanismConsumerConformance?.artifactCouplingNote ?? "n/a"}`,
+    `- checkedSurfaceCount: ${payload.sourceMechanismConsumerConformance?.checkedSurfaces.length ?? 0}`,
+    `- conformantSurfaces: ${payload.sourceMechanismConsumerConformance?.conformantSurfaces.join(", ") || "none"}`,
+    `- nonConformantSurfaces: ${payload.sourceMechanismConsumerConformance?.nonConformantSurfaces.join(", ") || "none"}`,
+    `- referenceOnlyScopePreserved: ${payload.sourceMechanismConsumerConformance?.referenceOnlyScopePreserved ? "yes" : "no"}`,
+    `- referenceOnlyMissingOnSurfaces: ${payload.sourceMechanismConsumerConformance?.referenceOnlyMissingOnSurfaces.join(", ") || "none"}`,
+    `- laneAAuthorityPreserved: ${payload.sourceMechanismConsumerConformance?.laneAAuthorityPreserved ? "yes" : "no"}`,
+    `- laneAAuthorityMissingOnSurfaces: ${payload.sourceMechanismConsumerConformance?.laneAAuthorityMissingOnSurfaces.join(", ") || "none"}`,
+    `- summary: ${payload.sourceMechanismConsumerConformance?.summary ?? "n/a"}`,
+    `- artifactPath: ${payload.sourceMechanismConsumerConformance?.artifactPath ?? "n/a"}`,
+    `- reportPath: ${payload.sourceMechanismConsumerConformance?.reportPath ?? "n/a"}`,
+    "",
   ].join("\n");
 };
 
@@ -1733,6 +2569,8 @@ const buildMemoMarkdown = (payload: DashboardPayload) => {
     "- warp.metric.T00.nhm2.shift_lapse remains reference_only.",
     "- Cabin gravity and wall safety stay separate diagnostic families.",
     "- Raw brick vs analytic companion provenance remains visible on-card.",
+    "- The source/mechanism exemption route is active only for bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims.",
+    "- Formula equivalence, viability promotion, authority expansion, and cross-lane expansion remain blocked.",
     "- No field render, transport context, or volumetric imagery is introduced in this patch.",
     "",
     "## Why The Monolithic Card Was Replaced",
@@ -1754,12 +2592,18 @@ const buildMemoMarkdown = (payload: DashboardPayload) => {
     "- cabin gravity rows keep analytic-companion provenance explicit without sharing space with wall-safety rows",
     "- wall safety remains readable as a brick-derived horizon proxy rather than a comfort score",
     "- precision/provenance caveats are explained in their own card without compressing the source story",
+    "- downstream consumer surfaces now carry the same bounded source/mechanism claim boundary rather than leaving it implicit in a separate contract artifact",
+    "- the consumer-conformance artifact now checks proof-pack JSON/markdown, dashboard JSON/markdown, and current-build rendered card sources for explicit Lane A authority and reference_only preservation",
+    `- remaining limitation: ${payload.sourceMechanismConsumerConformance?.artifactCouplingNote ?? "n/a"}`,
     "",
     `- dashboardCardFamilyStatus: ${payload.renderedCardFamilyStatus}`,
     "- layoutPlanningStatus: measured_dynamic_multicard_layout",
     `- proofHierarchyStatus: ${proofPanel ? "lane_a_authoritative_and_visible" : "missing"}`,
     `- provenanceBadgeStatus: ${payload.badgeLegend.length > 0 ? "visible_on_card_family" : "missing"}`,
-    "- recommendedNextAction: If a later interactive UI is added, enumerate cards directly from renderedCards in the dashboard artifact and preserve the same badge ids, proof-status wording, and cabin-vs-wall section split rather than recompressing the content into a single surface.",
+    `- consumerConformanceStatus: ${payload.sourceMechanismConsumerConformance?.consumerConformanceStatus ?? "n/a"}`,
+    `- consumerConformanceDataMode: ${payload.sourceMechanismConsumerConformance?.conformanceDataMode ?? "n/a"}`,
+    `- consumerConformanceStalenessRisk: ${payload.sourceMechanismConsumerConformance?.stalenessRisk ?? "n/a"}`,
+    "- recommendedNextAction: Future work is now either parity-route architecture or additional consumer/readiness hardening; do not widen the bounded advisory claim set without an explicit contract change.",
     "",
     `- dashboardStatus: ${payload.dashboardStatus}`,
     `- proofPanelStatus: ${proofPanel ? "available" : "missing"}`,
@@ -1770,19 +2614,93 @@ const buildMemoMarkdown = (payload: DashboardPayload) => {
   ].join("\n");
 };
 
+const buildSourceMechanismConsumerConformanceArtifact = (args: {
+  dashboard: DashboardPayload;
+  dashboardAuditMarkdown: string;
+  proofPackArtifact: any;
+  proofPackMarkdown: string;
+}): SourceMechanismConsumerConformanceArtifact => {
+  const summary = buildSourceMechanismConsumerConformanceSummary({
+    dashboard: args.dashboard,
+    proofPackArtifact: args.proofPackArtifact,
+    proofPackMarkdown: args.proofPackMarkdown,
+    dashboardAuditMarkdown: args.dashboardAuditMarkdown,
+  });
+  const payloadBase: SourceMechanismConsumerConformanceArtifact = {
+    artifactType: "nhm2_source_mechanism_consumer_conformance/v1",
+    generatedOn: args.dashboard.date,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This consumer-conformance artifact checks proof-pack latest aliases, current dashboard JSON/markdown outputs, and current-build rendered dashboard card sources to ensure the active bounded source/mechanism exemption route is not widened into broader promotion.",
+    proofPackArtifact: normalizePath(PROOF_PACK_LATEST_JSON),
+    proofPackReport: normalizePath(PROOF_PACK_LATEST_AUDIT),
+    promotionContractArtifact: normalizePath(
+      SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_JSON,
+    ),
+    maturityArtifact: normalizePath(SOURCE_MECHANISM_MATURITY_LATEST_JSON),
+    dashboardArtifact: normalizePath(OUT_JSON),
+    dashboardReport: normalizePath(OUT_AUDIT),
+    renderedCardDirectory: normalizePath(OUT_RENDER_DIR),
+    sourceMechanismConsumerConformance: summary,
+    notes: [
+      `consumer_conformance_status=${summary.consumerConformanceStatus}; checked_surfaces=${summary.checkedSurfaces.length}; conformant_surfaces=${summary.conformantSurfaces.join(",") || "none"}; non_conformant_surfaces=${summary.nonConformantSurfaces.join(",") || "none"}.`,
+      `active_claim_set=${summary.activeClaimSet.join(",") || "none"}; blocked_claim_set=${summary.blockedClaimSet.join(",") || "none"}.`,
+      `reference_only_scope_preserved=${String(summary.referenceOnlyScopePreserved)}; reference_only_missing_on_surfaces=${summary.referenceOnlyMissingOnSurfaces.join(",") || "none"}; lane_a_authority_preserved=${String(summary.laneAAuthorityPreserved)}; lane_a_authority_missing_on_surfaces=${summary.laneAAuthorityMissingOnSurfaces.join(",") || "none"}.`,
+      `conformance_data_mode=${summary.conformanceDataMode}; staleness_risk=${summary.stalenessRisk}.`,
+    ],
+  };
+  return {
+    ...payloadBase,
+    checksum: computeSourceMechanismConsumerConformanceChecksum(payloadBase),
+  };
+};
+
 export const writeShiftPlusLapseDashboardArtifacts = async (payload?: DashboardPayload) => {
-  const dashboard = payload ?? (await buildShiftPlusLapseDashboardPayload());
+  const dashboardBase = payload ?? (await buildShiftPlusLapseDashboardPayload());
+  const provisionalAuditMarkdown = buildAuditMarkdown(dashboardBase);
+  const proofPackArtifact = readJsonFile<any>(PROOF_PACK_LATEST_JSON);
+  const proofPackMarkdown = fs.readFileSync(PROOF_PACK_LATEST_AUDIT, "utf8");
+  const consumerConformanceArtifact = buildSourceMechanismConsumerConformanceArtifact({
+    dashboard: dashboardBase,
+    dashboardAuditMarkdown: provisionalAuditMarkdown,
+    proofPackArtifact,
+    proofPackMarkdown,
+  });
+  const dashboard: DashboardPayload = {
+    ...dashboardBase,
+    sourceMechanismConsumerConformance: {
+      ...consumerConformanceArtifact.sourceMechanismConsumerConformance,
+      artifactPath: normalizePath(OUT_SOURCE_MECHANISM_CONFORMANCE_JSON),
+      reportPath: normalizePath(OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT),
+    },
+  };
+  const auditMarkdown = buildAuditMarkdown(dashboard);
+  const memoMarkdown = buildMemoMarkdown(dashboard);
   ensureDirForFile(OUT_JSON);
   ensureDirForFile(OUT_AUDIT);
   ensureDirForFile(OUT_MEMO);
+  ensureDirForFile(OUT_SOURCE_MECHANISM_CONFORMANCE_JSON);
+  ensureDirForFile(OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT);
   fs.writeFileSync(OUT_JSON, `${JSON.stringify(dashboard, null, 2)}\n`, "utf8");
-  fs.writeFileSync(OUT_AUDIT, buildAuditMarkdown(dashboard), "utf8");
-  fs.writeFileSync(OUT_MEMO, buildMemoMarkdown(dashboard), "utf8");
+  fs.writeFileSync(OUT_AUDIT, auditMarkdown, "utf8");
+  fs.writeFileSync(OUT_MEMO, memoMarkdown, "utf8");
+  fs.writeFileSync(
+    OUT_SOURCE_MECHANISM_CONFORMANCE_JSON,
+    `${JSON.stringify(consumerConformanceArtifact, null, 2)}\n`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT,
+    buildSourceMechanismConsumerConformanceMarkdown(consumerConformanceArtifact),
+    "utf8",
+  );
   const taxonomyOutputs = updateRenderTaxonomyArtifacts(dashboard);
   return {
     outJson: OUT_JSON,
     outAudit: OUT_AUDIT,
     outMemo: OUT_MEMO,
+    outSourceMechanismConsumerConformanceJson: OUT_SOURCE_MECHANISM_CONFORMANCE_JSON,
+    outSourceMechanismConsumerConformanceAudit: OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT,
     outRenderedCards: dashboard.renderedCards.map((card) => path.join(ROOT, card.path)),
     ...taxonomyOutputs,
   };

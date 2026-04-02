@@ -29,10 +29,10 @@
 | laneAAuthoritative | true |
 | referenceOnlyCrossLaneScope | true |
 | promotionContractId | nhm2_source_mechanism_promotion_contract.v1 |
-| promotionContractStatus | blocked_pending_route_selection |
-| selectedPromotionRoute | none_active |
-| promotionSummary | Promotion contract keeps the parity route blocked by a derivation-class gap and narrows the formal exemption route to three bounded non-authoritative claim subsets; no route is active, so promotion remains blocked. |
-| summary | Source/mechanism layer is reduced-order advisory only: currently supportable advisory claims are limited to bounded source annotation, mechanism context, and reduced-order comparison subsets, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope. |
+| promotionContractStatus | active_for_bounded_claims_only |
+| selectedPromotionRoute | formal_exemption_route |
+| promotionSummary | Promotion contract keeps the parity route blocked by a derivation-class gap and activates the formal exemption route only for three bounded non-authoritative advisory claim subsets; broader promotion remains blocked. |
+| summary | Source/mechanism layer is reduced-order advisory only: the formal exemption route is active for bounded source annotation, mechanism context, and reduced-order comparison claims, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope. |
 
 ## Allowed Claims
 - source_to_york_provenance_closed_under_current_serialization_policy
@@ -52,7 +52,6 @@
 
 ## Required For Promotion
 - direct_proxy_parity_route_for_equivalence_or_cross_lane_claims
-- bounded_exemption_contract_for_non_authoritative_claim_subsets
 - promotion_grade_timing_authority_contract_if_optional_fields_required
 - first_principles_or_authoritative_source_realization_contract
 - explicit_cross_lane_promotion_contract_beyond_reference_only_scope
@@ -63,5 +62,5 @@
 - bridge_ready=true; bridge_closure_policy=close_with_current_serialization; timing_authority_status=recognized_required_fields_present_optional_fields_partial.
 - source_formula_interpretation_policy=expected_proxy_vs_metric_gap_non_promotable; parity_expected=false; lane_a_unaffected=true.
 - reference_only_cross_lane_scope=true; lane_a_authoritative=true.
-- promotion_contract_id=nhm2_source_mechanism_promotion_contract.v1; promotion_contract_status=blocked_pending_route_selection; selected_promotion_route=none_active.
+- promotion_contract_id=nhm2_source_mechanism_promotion_contract.v1; promotion_contract_status=active_for_bounded_claims_only; selected_promotion_route=formal_exemption_route.
 

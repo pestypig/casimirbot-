@@ -264,6 +264,17 @@ export const buildDiagnosticsFromBrick = (brick: BrickLike): GrPipelineDiagnosti
       lapseMax,
       betaMaxAbs: Number.isFinite(betaMaxAbs) ? betaMaxAbs : 0,
     },
+    ...(Number.isFinite(stats.divBetaRms) &&
+    Number.isFinite(stats.divBetaMaxAbs) &&
+    stats.divBetaSource
+      ? {
+          divBeta: {
+            rms: stats.divBetaRms,
+            maxAbs: stats.divBetaMaxAbs,
+            source: stats.divBetaSource,
+          },
+        }
+      : {}),
     ...(stats.stiffness ? { stiffness: stats.stiffness } : {}),
     constraints: {
       H_constraint,

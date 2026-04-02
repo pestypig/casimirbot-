@@ -947,12 +947,33 @@ const toNumber = (value: unknown): number | null => {
 };
 
 const resolveNatarioBetaDivergenceDiagnostics = (
+  proofPack: ProofPack | null,
   pipeline: any,
 ): {
   rms: number | null;
   maxAbs: number | null;
   source: string;
 } => {
+  const proofRmsEntry = getProofValue(proofPack, "metric_div_beta_rms");
+  const proofMaxAbsEntry = getProofValue(proofPack, "metric_div_beta_max_abs");
+  const proofSourceEntry = getProofValue(proofPack, "metric_div_beta_source");
+  const proofRms = proofRmsEntry && !proofRmsEntry.proxy
+    ? toNumber(proofRmsEntry.value)
+    : null;
+  const proofMaxAbs = proofMaxAbsEntry && !proofMaxAbsEntry.proxy
+    ? toNumber(proofMaxAbsEntry.value)
+    : null;
+  const proofSource =
+    proofSourceEntry && !proofSourceEntry.proxy && proofSourceEntry.value != null
+      ? String(proofSourceEntry.value)
+      : "proof.metric_div_beta_rms/metric_div_beta_max_abs";
+  if (proofRms != null || proofMaxAbs != null) {
+    return {
+      rms: proofRms,
+      maxAbs: proofMaxAbs,
+      source: proofSource,
+    };
+  }
   const betaDiagnostics = (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics ?? null;
   const thetaRms = toNumber(betaDiagnostics?.thetaRms);
   const thetaMax = toNumber(betaDiagnostics?.thetaMax);
@@ -1742,7 +1763,7 @@ export async function buildTimeDilationDiagnostics(
     details: cabinLapse.details,
   };
 
-  const natarioBetaDivergence = resolveNatarioBetaDivergenceDiagnostics(pipeline);
+  const natarioBetaDivergence = resolveNatarioBetaDivergenceDiagnostics(proofPack, pipeline);
   const divBetaRms = natarioBetaDivergence.rms;
   const divBetaMaxAbs = natarioBetaDivergence.maxAbs;
   const natarioExpansionTolerance = toNumber(readProofString(proofPack, "natario_expansion_tolerance")) ?? 1e-3;

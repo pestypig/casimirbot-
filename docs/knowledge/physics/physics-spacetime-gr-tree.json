@@ -16,7 +16,8 @@
       "children": [
         "spacetime-metric-basics",
         "einstein-field-equations",
-        "physics-spacetime-gr-equation-residual"
+        "physics-spacetime-gr-equation-residual",
+        "relativistic-map-projections"
       ],
       "links": [],
       "summary": "Dedicated lane for spacetime geometry and general-relativity constraints.",
@@ -144,6 +145,213 @@
           "curvature_unit_proxy_contract.v1"
         ]
       }
+    },
+    {
+      "id": "relativistic-map-projections",
+      "slug": "relativistic-map-projections",
+      "title": "Relativistic Map Projections",
+      "excerpt": "Projection-only relativistic map family for ship-comoving and Sun-centered reachability views.",
+      "bodyMD": "This node groups relativistic map projections that remap catalog coordinates under explicit observer semantics. These projections are diagnostic and display-oriented; they are not resolved warp metric claims.",
+      "tags": [
+        "physics",
+        "spacetime",
+        "relativistic-map",
+        "projection"
+      ],
+      "children": [
+        "instantaneous-comoving-ship-map",
+        "sun-centered-accessibility-map",
+        "flat-sr-flip-burn-control",
+        "warp-route-time-map-placeholder"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-spacetime-gr-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Projection-only relativistic map family for ship-comoving and Sun-centered reachability views.",
+      "nodeType": "concept",
+      "dependencies": [
+        "physics-spacetime-gr-tree"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/research/relativistic-map-projection-brief-2026-04-02.md"
+        },
+        {
+          "type": "code",
+          "path": "shared/relativistic-map-projections.ts"
+        }
+      ]
+    },
+    {
+      "id": "instantaneous-comoving-ship-map",
+      "slug": "instantaneous-comoving-ship-map",
+      "title": "Instantaneous Comoving Ship Map",
+      "excerpt": "Live ship-view projection using an instantaneous comoving frame and directional Lorentz contraction.",
+      "bodyMD": "A physically literal special-relativistic ship-view map at one proper-time sample. The map contracts only the component of each separation vector parallel to the current ship velocity.",
+      "tags": [
+        "physics",
+        "spacetime",
+        "ship_comoving",
+        "lorentz-contraction",
+        "projection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "relativistic-map-projections",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "flat-sr-flip-burn-control",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Live ship-view projection using an instantaneous comoving frame and directional Lorentz contraction.",
+      "nodeType": "concept",
+      "dependencies": [
+        "relativistic-map-projections"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/research/relativistic-map-projection-brief-2026-04-02.md"
+        }
+      ]
+    },
+    {
+      "id": "sun-centered-accessibility-map",
+      "slug": "sun-centered-accessibility-map",
+      "title": "Sun-Centered Accessibility Map",
+      "excerpt": "Reachability reprojection that preserves Sun-frame direction while remapping radius to onboard trip time.",
+      "bodyMD": "This map keeps the ordinary Sun-centered direction of each destination but replaces radius with a proper-time reachability radius under a declared control law.",
+      "tags": [
+        "physics",
+        "spacetime",
+        "accessibility-map",
+        "proper-time",
+        "projection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "relativistic-map-projections",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "flat-sr-flip-burn-control",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Reachability reprojection that preserves Sun-frame direction while remapping radius to onboard trip time.",
+      "nodeType": "concept",
+      "dependencies": [
+        "relativistic-map-projections"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/research/relativistic-map-projection-brief-2026-04-02.md"
+        }
+      ]
+    },
+    {
+      "id": "flat-sr-flip-burn-control",
+      "slug": "flat-sr-flip-burn-control",
+      "title": "Flat-SR Flip-Burn Control",
+      "excerpt": "Outer-reference constant proper-acceleration control used for relativistic map projections.",
+      "bodyMD": "This node denotes the flat-spacetime control law used as a proxy/reference model for map projections. It is not a warp-field identity claim.",
+      "tags": [
+        "physics",
+        "spacetime",
+        "special-relativity",
+        "proxy",
+        "flip-burn"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "relativistic-map-projections",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "see-also",
+          "to": "warp-route-time-map-placeholder",
+          "edgeType": "proxy_only",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Outer-reference constant proper-acceleration control used for relativistic map projections.",
+      "nodeType": "concept",
+      "dependencies": [
+        "relativistic-map-projections"
+      ],
+      "validity": {
+        "equation_ref": "efe_baseline",
+        "maturity_ceiling": "diagnostic",
+        "proxy_semantics": "outer_reference_only",
+        "strict_fail_reason": "RELATIVISTIC_MAP_WARP_PROMOTION_REQUIRES_WORLDLINE"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/research/relativistic-map-projection-brief-2026-04-02.md"
+        }
+      ]
+    },
+    {
+      "id": "warp-route-time-map-placeholder",
+      "slug": "warp-route-time-map-placeholder",
+      "title": "Warp Route-Time Map Placeholder",
+      "excerpt": "Placeholder node for a future warp-derived accessibility projection computed from an actual worldline integral.",
+      "bodyMD": "This placeholder exists so the DAG can acknowledge a future warp-derived route-time map without claiming that the current flat-SR accessibility map is already warp-derived.",
+      "tags": [
+        "physics",
+        "spacetime",
+        "warp",
+        "placeholder",
+        "projection"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "relativistic-map-projections",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Placeholder node for a future warp-derived accessibility projection computed from an actual worldline integral.",
+      "nodeType": "concept",
+      "dependencies": [
+        "relativistic-map-projections"
+      ],
+      "validity": {
+        "maturity_ceiling": "diagnostic",
+        "strict_fail_reason": "RELATIVISTIC_MAP_WARP_WORLDLINE_REQUIRED",
+        "proxy_semantics": "placeholder_only"
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/research/relativistic-map-projection-brief-2026-04-02.md"
+        }
+      ]
     }
   ],
   "schema": {

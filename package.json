@@ -155,6 +155,7 @@
     "warp:rodc:check": "npm run warp:rodc:claims:validate",
     "warp:render:capture": "tsx scripts/warp-render-command-capture.ts",
     "warp:full-solve:york-control-family:proof-pack": "tsx scripts/warp-york-control-family-proof-pack.ts",
+    "warp:full-solve:york-control-family:publish-invariant-latest": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-invariant-latest",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",
     "warp:deliverable:bundle": "tsx scripts/warp-deliverable-bundle.ts",

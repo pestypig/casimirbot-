@@ -28,6 +28,7 @@ import { halobankSolarRouter } from "./routes/halobank-solar";
 import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
+import { helixRelativisticMapRouter } from "./routes/helix/relativistic-map";
 import { helixTimeDilationRouter } from "./routes/helix/time-dilation";
 import { helixReasoningTheaterRouter } from "./routes/helix/reasoning-theater";
 import { warpViabilityRouter } from "./routes/warp-viability";
@@ -1230,6 +1231,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix/qi", helixQiRouter);
   app.use("/api/helix/math", helixMathRouter);
   app.use("/api/helix/audit", helixAuditTreeRouter);
+  app.use("/api/helix/relativistic-map", helixRelativisticMapRouter);
   app.use("/api/helix/time-dilation", helixTimeDilationRouter);
   app.use("/api/helix", helixReasoningTheaterRouter);
   app.use("/api/helix/hull-preview", hullPreviewRouter);

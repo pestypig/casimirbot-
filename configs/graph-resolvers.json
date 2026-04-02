@@ -284,7 +284,13 @@
         "general relativity",
         "einstein field equations",
         "metric tensor",
-        "curvature"
+        "curvature",
+        "relativistic map",
+        "proper-time accessibility map",
+        "accessibility map",
+        "instantaneous comoving frame",
+        "lorentz contraction",
+        "flip burn"
       ],
       "maxAnchors": 3,
       "maxDepth": 2,

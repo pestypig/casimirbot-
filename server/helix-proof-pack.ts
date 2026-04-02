@@ -1061,6 +1061,27 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     );
   }
 
+  const grDivBeta = state.gr?.divBeta;
+  if (grDivBeta) {
+    values.metric_div_beta_rms = makeDerivedNumber(
+      toFiniteNumber(grDivBeta.rms),
+      "1/m",
+      "pipeline.gr.divBeta.rms",
+      false,
+    );
+    values.metric_div_beta_max_abs = makeDerivedNumber(
+      toFiniteNumber(grDivBeta.maxAbs),
+      "1/m",
+      "pipeline.gr.divBeta.maxAbs",
+      false,
+    );
+    values.metric_div_beta_source = makeStringValue(
+      grDivBeta.source,
+      "pipeline.gr.divBeta.source",
+      false,
+    );
+  }
+
   const cl3Threshold = resolveCl3Threshold();
   values.gr_cl3_rho_threshold = makeDerivedNumber(
     cl3Threshold,

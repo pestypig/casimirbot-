@@ -18,7 +18,7 @@ The core NHM2 research stack is now artifact-backed in-repo across:
 At the same time, several concrete gaps still block stronger congruence claims:
 - a now materially closed Source→York bridge whose optional timing-authority partiality remains advisory rather than proof-promotable
 - a source-formula direct-vs-reconstructed proxy gap still reported by the proof-pack
-- a now explicit source/mechanism maturity lane that is bounded to reduced-order advisory claims, paired with an explicit promotion contract whose parity route is blocked by derivation-class difference in current architecture and whose exemption route is narrowed to bounded source-annotation, mechanism-context, and reduced-order-comparison claims only
+- a now explicit source/mechanism maturity lane that is bounded to reduced-order advisory claims, paired with an explicit promotion contract whose parity route is blocked by derivation-class difference in current architecture and whose exemption route is now active only for bounded source-annotation, mechanism-context, and reduced-order-comparison claims
 - a generalized shift-plus-lapse branch that is diagnostic/reference-only, not a full generalized NHM2 solve
 - a directional mechanism layer that must keep its pairwise collapse-stage interpretation explicit so internal variance is not overstated or hidden
 
@@ -229,8 +229,8 @@ That last point matters: the interpolation/schema fixes did not overturn the Lan
 
 1. Treat the interpolation bug and the `divBeta*`/`theta*` schema mismatch as closed and keep their regression tests in place.
 2. Treat the flat-vs-Natário `beta_direction_xz` same-image pair as a genuine sampled-field match with non-material internal variance, and keep the raw intermediate hashes visible for future debugging.
-3. Keep current claims at diagnostic/reference tier; the Source→York bridge is now materially closed in current serialization mode, the source-formula gap remains policy-closed as advisory for Lane A but still not promotable as parity, and the source/mechanism lane is now explicitly bounded to reduced-order advisory claims with only narrow exemption-eligible subsets.
-4. Treat the next unresolved work as route closure rather than route ambiguity: the parity route is explicitly blocked by derivation-class difference centered on `final_metricT00Si_Jm3`, an un-emitted authoritative direct additive closure term set, and the absence of a mapped proxy-side closure term beyond `rhoMetric_Jm3`, while the exemption route is now narrowed to bounded source annotation, mechanism context, and reduced-order comparison claims only and is not selected.
+3. Keep current claims at diagnostic/reference tier; the Source→York bridge is now materially closed in current serialization mode, the source-formula gap remains policy-closed as advisory for Lane A but still not promotable as parity, and the source/mechanism lane is now explicitly bounded to reduced-order advisory claims with only three activated bounded exemption claims.
+4. Treat the next unresolved work as parity architecture or downstream bounded-claim consumer hardening rather than route ambiguity: the parity route is explicitly blocked by derivation-class difference centered on `final_metricT00Si_Jm3`, an un-emitted authoritative direct additive closure term set, and the absence of a mapped proxy-side closure term beyond `rhoMetric_Jm3`, while the exemption route is active only for bounded source annotation, mechanism context, and reduced-order comparison claims, downstream proof-pack/dashboard consumers now check Lane A authority directly, include the rendered dashboard card family in conformance, and cannot expand the route beyond that bounded scope without a new contract.
 5. Preserve the current presentation/dashboard work, but do not let it outrun the corrected artifact surfaces.
 
 ## Bottom Line
@@ -241,5 +241,5 @@ We should not agree with its stale repo-state claims about missing artifacts and
 The corrected shared view should be:
 - the repo is now substantially more complete and artifact-backed than that memo says
 - most provenance and integration ambiguity is now closed enough to support coherent diagnostic-tier interpretation
-- the remaining source/mechanism issues are formalized as a bounded advisory maturity layer with an explicit promotion contract, an explicit parity-route feasibility reading, and a narrowed exemption-route claim surface rather than a vague open bucket
-- the next unresolved work is promotion-level route closure, specifically derivation-class closure for parity or stabilization/selection of only the bounded advisory exemption subsets, not basic coherence
+- the remaining source/mechanism issues are formalized as a bounded advisory maturity layer with an explicit promotion contract, an explicit parity-route feasibility reading, an activated but tightly bounded exemption-route claim surface, and downstream consumer-conformance checks that now explicitly verify Lane A authority and rendered-card boundaries rather than a vague open bucket
+- the next unresolved work is promotion-level route closure, specifically derivation-class closure for parity or additional consumer/readiness hardening of the bounded advisory claim subsets; the remaining limitation on the current consumer-conformance result is declared artifact-coupling risk rather than hidden contract ambiguity

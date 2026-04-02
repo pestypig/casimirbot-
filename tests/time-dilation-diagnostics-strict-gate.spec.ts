@@ -88,7 +88,59 @@ describe("time dilation strict verification gate", () => {
     expect(diagnostics.natarioCanonical.reason).toBe("natario_required_fields_missing");
   });
 
-  it("consumes the emitted theta diagnostics schema for Natario canonical checks", async () => {
+  it("prefers brick-native div_beta proof values for Natario canonical checks when available", async () => {
+    stubFetch(
+      {
+        ...basePipeline,
+        viability: {
+          certificateHash: "cert:1",
+          integrityOk: true,
+          constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+        },
+        warp: {
+          metricT00Contract: { family: "natario" },
+          metricAdapter: {
+            alpha: 1,
+            gammaDiag: [1, 1, 1],
+            betaDiagnostics: {
+              method: "finite-diff",
+              thetaRms: 8e-4,
+              thetaMax: 9e-4,
+            },
+          },
+        },
+      },
+      {
+        values: {
+          natario_expansion_tolerance: { value: 1e-3, proxy: false },
+          theta_geom: { value: 2e-4, proxy: false },
+          metric_k_trace_mean: { value: -2e-4, proxy: false },
+          theta_k_tolerance: { value: 1e-3, proxy: false },
+          metric_div_beta_rms: { value: 2e-4, proxy: false },
+          metric_div_beta_max_abs: { value: 4e-4, proxy: false },
+          metric_div_beta_source: { value: "gr_evolve_brick", proxy: false },
+        },
+      },
+    );
+
+    const diagnostics = await buildTimeDilationDiagnostics({
+      baseUrl: "http://example.test",
+      publish: false,
+    });
+
+    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(true);
+    expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(true);
+    expect(diagnostics.natarioCanonical.checks.divBeta).toEqual(
+      expect.objectContaining({
+        status: "pass",
+        rms: 2e-4,
+        maxAbs: 4e-4,
+        source: "gr_evolve_brick",
+      }),
+    );
+  });
+
+  it("falls back to adapter beta diagnostics when brick-native div_beta proof values are absent", async () => {
     stubFetch(
       {
         ...basePipeline,

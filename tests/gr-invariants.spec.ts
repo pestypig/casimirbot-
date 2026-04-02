@@ -17,8 +17,9 @@ const maxAbs = (data: Float32Array) => {
 
 describe("GR invariants", () => {
   it("keeps Minkowski invariants near zero", () => {
+    const dims = [6, 6, 6] as const;
     const bounds = { min: [-1, -1, -1] as const, max: [1, 1, 1] as const };
-    const grid = gridFromBounds([6, 6, 6], bounds);
+    const grid = gridFromBounds(dims, bounds);
     const state = createMinkowskiState(grid);
     const brick = buildEvolutionBrick({
       state,
@@ -26,10 +27,19 @@ describe("GR invariants", () => {
       includeInvariants: true,
     });
     const kretschmann = brick.channels.kretschmann?.data ?? new Float32Array();
+    const weylI = brick.channels.weylI?.data ?? new Float32Array();
     const ricci4 = brick.channels.ricci4?.data ?? new Float32Array();
+    const ricci2 = brick.channels.ricci2?.data ?? new Float32Array();
+
+    expect(kretschmann.length).toBe(dims[0] * dims[1] * dims[2]);
+    expect(weylI.length).toBe(dims[0] * dims[1] * dims[2]);
+    expect(ricci4.length).toBe(dims[0] * dims[1] * dims[2]);
+    expect(ricci2.length).toBe(dims[0] * dims[1] * dims[2]);
 
     expect(maxAbs(kretschmann)).toBeLessThan(1e-6);
+    expect(maxAbs(weylI)).toBeLessThan(1e-6);
     expect(maxAbs(ricci4)).toBeLessThan(1e-6);
+    expect(maxAbs(ricci2)).toBeLessThan(1e-6);
   });
 
   it("uses propagated residual intervals for threshold gating", () => {

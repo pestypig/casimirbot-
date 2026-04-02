@@ -1236,6 +1236,11 @@ export type GrPipelineDiagnostics = {
     betaOutwardOverAlphaWallP98?: number | null;
     wallHorizonMargin?: number | null;
   };
+  divBeta?: {
+    rms: number;
+    maxAbs: number;
+    source: "gr_evolve_brick";
+  };
   stiffness?: import("./gr-evolve-brick").GrEvolveBrickStats["stiffness"];
   constraints: {
     H_constraint: GrConstraintDiagnostics;

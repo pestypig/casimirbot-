@@ -82,7 +82,7 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
     expect(MILD_REFERENCE.expectedAlphaGradientGeom).toBeLessThan(6e-17);
   });
 
-  it("exports lapse-gradient, Eulerian acceleration, and beta/alpha channels from the GR brick", () => {
+  it("exports lapse-gradient, Eulerian acceleration, beta/alpha, and div_beta channels from the GR brick", () => {
     const bounds = { min: [-1, -1, -1] as const, max: [1, 1, 1] as const };
     const grid = gridFromBounds([3, 3, 3], bounds);
     const state = createBssnState(grid);
@@ -112,14 +112,19 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
     const accel = brick.channels.eulerian_accel_geom_mag?.data ?? new Float32Array();
     const ratio = brick.channels.beta_over_alpha_mag?.data ?? new Float32Array();
     const gradZ = brick.channels.alpha_grad_z?.data ?? new Float32Array();
+    const divBeta = brick.channels.div_beta?.data ?? new Float32Array();
 
     expect(accel.length).toBe(state.alpha.length);
     expect(ratio.length).toBe(state.alpha.length);
     expect(gradZ.length).toBe(state.alpha.length);
+    expect(divBeta.length).toBe(state.alpha.length);
     expect(Math.max(...Array.from(accel))).toBeGreaterThan(0);
     expect(Math.max(...Array.from(ratio))).toBeGreaterThan(0);
     expect(Math.max(...Array.from(gradZ))).toBeGreaterThan(0);
+    expect(Math.max(...Array.from(divBeta).map((value) => Math.abs(value)))).toBeLessThan(1e-6);
     expect(Array.from(ratio).every((value) => Number.isFinite(value) && value > 0)).toBe(true);
+    expect(brick.stats?.divBetaRms ?? NaN).toBeLessThan(1e-6);
+    expect(brick.stats?.divBetaMaxAbs ?? NaN).toBeLessThan(1e-6);
   });
 
   it("threads shift-plus-lapse alpha gradients and beta/alpha diagnostics through the live GR evolve brick", async () => {
@@ -142,8 +147,12 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
     expect(brick.channels.alpha_grad_z?.data.length ?? 0).toBeGreaterThan(0);
     expect(brick.channels.eulerian_accel_geom_mag?.data.length ?? 0).toBeGreaterThan(0);
     expect(brick.channels.beta_over_alpha_mag?.data.length ?? 0).toBeGreaterThan(0);
+    expect(brick.channels.div_beta?.data.length ?? 0).toBeGreaterThan(0);
     expect(brick.channels.beta_x?.max ?? 0).toBeGreaterThan(0);
     expect(brick.stats.stiffness?.betaOverAlphaMax ?? 0).toBeGreaterThan(0);
+    expect(Number.isFinite(brick.stats.divBetaRms)).toBe(true);
+    expect(Number.isFinite(brick.stats.divBetaMaxAbs)).toBe(true);
+    expect(brick.stats.divBetaSource).toBe("gr_evolve_brick");
     expect(brick.stats.wallSafety?.betaOutwardOverAlphaWallMax ?? 0).toBeGreaterThanOrEqual(0);
     expect(brick.stats.wallSafety?.betaOutwardOverAlphaWallP98 ?? 0).toBeGreaterThanOrEqual(0);
     expect(Number.isFinite(brick.stats.wallSafety?.wallHorizonMargin)).toBe(true);

@@ -26,6 +26,8 @@ export interface GrEvolutionStats {
   M_rms?: number;
   H_maxAbs?: number;
   M_maxAbs?: number;
+  divBetaRms?: number;
+  divBetaMaxAbs?: number;
 }
 
 export interface GrEvolutionBrick {
@@ -362,6 +364,7 @@ const buildLapseGradientFields = (
   const eulerian_accel_geom_z = new Float32Array(total);
   const eulerian_accel_geom_mag = new Float32Array(total);
   const beta_over_alpha_mag = new Float32Array(total);
+  const div_beta = new Float32Array(total);
   const grid = state.grid;
   const [nx, ny, nz] = grid.dims;
   const order = stencils?.order ?? 2;
@@ -398,6 +401,11 @@ const buildLapseGradientFields = (
         const betaMag = Math.hypot(state.beta_x[idx], state.beta_y[idx], state.beta_z[idx]);
         const ratio = betaMag / alphaSafe;
         beta_over_alpha_mag[idx] = Number.isFinite(ratio) ? ratio : 0;
+        const divBeta =
+          diff1(state.beta_x, i, j, k, 0, grid, stencil) +
+          diff1(state.beta_y, i, j, k, 1, grid, stencil) +
+          diff1(state.beta_z, i, j, k, 2, grid, stencil);
+        div_beta[idx] = Number.isFinite(divBeta) ? divBeta : 0;
         idx += 1;
       }
     }
@@ -411,6 +419,7 @@ const buildLapseGradientFields = (
     eulerian_accel_geom_z,
     eulerian_accel_geom_mag,
     beta_over_alpha_mag,
+    div_beta,
   };
 };
 
@@ -1215,17 +1224,26 @@ const buildRiemannInvariants = (
   return { kretschmann, weylI, ricci4, ricci2 };
 };
 
-const buildStats = (constraints?: ConstraintFields | null): GrEvolutionStats | undefined => {
-  if (!constraints) return undefined;
-  const H_rms = rmsFromArray(constraints.H);
-  const M_rms = rmsFromVector(constraints.Mx, constraints.My, constraints.Mz);
-  const H_maxAbs = maxAbsFromArray(constraints.H);
-  const M_maxAbs = Math.max(
-    maxAbsFromArray(constraints.Mx),
-    maxAbsFromArray(constraints.My),
-    maxAbsFromArray(constraints.Mz),
-  );
-  return { H_rms, M_rms, H_maxAbs, M_maxAbs };
+const buildStats = (
+  constraints?: ConstraintFields | null,
+  divBeta?: Float32Array | null,
+): GrEvolutionStats | undefined => {
+  const stats: GrEvolutionStats = {};
+  if (constraints) {
+    stats.H_rms = rmsFromArray(constraints.H);
+    stats.M_rms = rmsFromVector(constraints.Mx, constraints.My, constraints.Mz);
+    stats.H_maxAbs = maxAbsFromArray(constraints.H);
+    stats.M_maxAbs = Math.max(
+      maxAbsFromArray(constraints.Mx),
+      maxAbsFromArray(constraints.My),
+      maxAbsFromArray(constraints.Mz),
+    );
+  }
+  if (divBeta) {
+    stats.divBetaRms = rmsFromArray(divBeta);
+    stats.divBetaMaxAbs = maxAbsFromArray(divBeta);
+  }
+  return Object.keys(stats).length ? stats : undefined;
 };
 
 const gridVoxelSize = (grid: GridSpec): Vec3 => [
@@ -1285,6 +1303,7 @@ export const buildEvolutionBrick = ({
   channels.eulerian_accel_geom_z = buildChannelFromArray(lapseGradient.eulerian_accel_geom_z);
   channels.eulerian_accel_geom_mag = buildChannelFromArray(lapseGradient.eulerian_accel_geom_mag);
   channels.beta_over_alpha_mag = buildChannelFromArray(lapseGradient.beta_over_alpha_mag);
+  channels.div_beta = buildChannelFromArray(lapseGradient.div_beta);
   channelOrder.push(
     "alpha_grad_x",
     "alpha_grad_y",
@@ -1294,6 +1313,7 @@ export const buildEvolutionBrick = ({
     "eulerian_accel_geom_z",
     "eulerian_accel_geom_mag",
     "beta_over_alpha_mag",
+    "div_beta",
   );
   const curvature = buildCurvatureScalars(state, constraints ?? null, matter ?? null);
   channels.ricci3 = buildChannelFromArray(curvature.ricci3);
@@ -1358,7 +1378,7 @@ export const buildEvolutionBrick = ({
     dt_s,
     channelOrder,
     channels,
-    stats: buildStats(constraints),
+    stats: buildStats(constraints, lapseGradient.div_beta),
   };
 };
 

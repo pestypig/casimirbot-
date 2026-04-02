@@ -42,9 +42,11 @@ Every render entry in the manifest now carries:
 
 - `diagnostic_lane_a` is the proof surface.
 - `transport_context` is a separate solve-backed context family and not a dedicated scientific field frame.
-- `scientific_3p1_field` is the human-facing scientific presentation surface.
+- `scientific_3p1_field` is the human-facing scientific presentation surface, including brick-native curvature invariants when they are surfaced as NHM2 scientific frames.
 - `comparison_panel` is for review and communication.
 - `mechanism_overlay` is interpretive and secondary.
+- `invariant_crosscheck` is reserved for explicit comparison or consistency products and may remain empty even when invariant scientific fields are present.
+- No invariant render is authoritative proof by default.
 - If presentation and diagnostics disagree, debug presentation first.
 
 ## Orientation convention
@@ -60,11 +62,18 @@ Every render entry in the manifest now carries:
 - directory pattern: `artifacts/research/full-solve/rendered/<renderCategory>/YYYY-MM-DD/`
 - filename pattern: `<caseId>-<renderCategory>-<fieldId>-<variant>.png`
 
+## Publication
+
+- publicationCommand: `npm run warp:full-solve:york-control-family:publish-invariant-latest`
+- useWhen: refresh the NHM2 curvature-invariant latest artifacts, render taxonomy, and proof-pack summaries without rerunning the stalled redesign/reformulation tail
+- proofStatus: publication refreshes serialized outputs only and does not widen Lane A proof authority or populate `invariant_crosscheck` unless explicit crosscheck renders exist
+
 ## Final fields
 
 - authoritativeRenderCategory: `diagnostic_lane_a`
 - presentationRenderCategory: `scientific_3p1_field`
 - comparisonRenderCategory: `comparison_panel`
 - repoOrientationConvention: `x_ship_y_port_z_zenith`
-- recommendedUsePolicy: diagnostic primary, transport_context separate from field frames, scientific_3p1_field secondary, comparison panels for review, overlays interpretive only
+- recommendedUsePolicy: diagnostic primary, transport_context separate from field frames, scientific_3p1_field secondary including brick-native invariant frames, invariant_crosscheck reserved for explicit crosschecks, comparison panels for review, overlays interpretive only
+- publicationCommand: `npm run warp:full-solve:york-control-family:publish-invariant-latest`
 

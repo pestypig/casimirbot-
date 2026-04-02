@@ -15,6 +15,7 @@ import {
   buildNhm2SourceMechanismMaturityArtifact,
   buildNhm2SourceMechanismPromotionContractArtifact,
   buildNhm2SourceMechanismParityRouteFeasibilityArtifact,
+  buildSourceMechanismPromotionContractSummary,
   buildNhm2SourceStageAuditArtifact,
   buildNhm2TimingAuthorityAuditArtifact,
   buildNhm2BrickAuthorityAuditArtifact,
@@ -68,6 +69,7 @@ import {
   loadYorkDiagnosticContract,
   readSourceFamilyEvidence,
   renderMarkdown,
+  buildWarpYorkControlFamilyPublishedLatestPayload,
   resolveLaneACauseCode,
   renderNhm2SourceToYorkProvenanceMarkdown,
   renderNhm2SourceFormulaAuditMarkdown,
@@ -93,6 +95,7 @@ import {
   renderNhm2DeeperReformulationMarkdown,
   renderNhm2ParameterSweepDecisionMemo,
   renderNhm2ParameterSweepMarkdown,
+  renderNhm2CurvatureInvariantVisualizationMarkdown,
   renderNhm2ShiftGeometryVisualizationMarkdown,
   renderNhm2YorkOptixRenderMarkdown,
   renderNhm2YorkOptixRenderMemo,
@@ -1074,6 +1077,13 @@ const makeCanonicalVisualComparisonFixtures = async () => {
     await writeTinyPng(path.join(tempDir, `${caseId}-beta-x-slice.png`), colors[caseId]);
     await writeTinyPng(path.join(tempDir, `${caseId}-beta-direction-xz.png`), colors[caseId]);
   }
+  for (const fieldId of ["kretschmann", "ricci4", "ricci2", "weylI"] as const) {
+    await writeTinyPng(path.join(tempDir, `nhm2_certified-${fieldId}.png`), colors.nhm2_certified);
+    await writeTinyPng(
+      path.join(tempDir, `nhm2_certified-${fieldId}-slice.png`),
+      colors.nhm2_certified,
+    );
+  }
   await writeTinyPng(path.join(tempDir, `nhm2-natario-beta-mag-residual.png`), {
     r: 120,
     g: 90,
@@ -1411,12 +1421,100 @@ const makeCanonicalVisualComparisonFixtures = async () => {
           colormapFamily: "diverging_cyan_amber",
           warnings: [],
         },
+        ...(caseId === "nhm2_certified"
+          ? ([
+              {
+                presentationFieldId: "kretschmann",
+                variant: "main",
+                label: "Kretschmann scalar",
+                imagePath: path.join(tempDir, `${caseId}-kretschmann.png`),
+                presentationProjectionImageHash: `${caseId}-kretschmann-hash`,
+                laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+                baseImagePolicy: "neutral_field_canvas",
+                baseImageSource: "none",
+                inheritsTransportContext: false,
+                contextCompositionMode: "none",
+                fieldMin: 0,
+                fieldMax: 0.012,
+                fieldAbsMax: 0.012,
+                displayPolicyId: "optix_kretschmann_positive_log10",
+                displayRangeMin: 0,
+                displayRangeMax: 0.012,
+                displayTransform: "positive_log10",
+                colormapFamily: "sequential_inferno",
+                warnings: [],
+              },
+              {
+                presentationFieldId: "ricci4",
+                variant: "main",
+                label: "Ricci scalar (4D)",
+                imagePath: path.join(tempDir, `${caseId}-ricci4.png`),
+                presentationProjectionImageHash: `${caseId}-ricci4-hash`,
+                laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+                baseImagePolicy: "neutral_field_canvas",
+                baseImageSource: "none",
+                inheritsTransportContext: false,
+                contextCompositionMode: "none",
+                fieldMin: -0.01,
+                fieldMax: 0.01,
+                fieldAbsMax: 0.01,
+                displayPolicyId: "optix_ricci4_signed_asinh",
+                displayRangeMin: -0.01,
+                displayRangeMax: 0.01,
+                displayTransform: "signed_asinh",
+                colormapFamily: "diverging_teal_rose",
+                warnings: [],
+              },
+              {
+                presentationFieldId: "ricci2",
+                variant: "main",
+                label: "Ricci contraction",
+                imagePath: path.join(tempDir, `${caseId}-ricci2.png`),
+                presentationProjectionImageHash: `${caseId}-ricci2-hash`,
+                laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+                baseImagePolicy: "neutral_field_canvas",
+                baseImageSource: "none",
+                inheritsTransportContext: false,
+                contextCompositionMode: "none",
+                fieldMin: -0.008,
+                fieldMax: 0.008,
+                fieldAbsMax: 0.008,
+                displayPolicyId: "optix_ricci2_signed_asinh",
+                displayRangeMin: -0.008,
+                displayRangeMax: 0.008,
+                displayTransform: "signed_asinh",
+                colormapFamily: "diverging_teal_rose",
+                warnings: [],
+              },
+              {
+                presentationFieldId: "weylI",
+                variant: "main",
+                label: "Weyl contraction",
+                imagePath: path.join(tempDir, `${caseId}-weylI.png`),
+                presentationProjectionImageHash: `${caseId}-weylI-hash`,
+                laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+                baseImagePolicy: "neutral_field_canvas",
+                baseImageSource: "none",
+                inheritsTransportContext: false,
+                contextCompositionMode: "none",
+                fieldMin: -0.015,
+                fieldMax: 0.015,
+                fieldAbsMax: 0.015,
+                displayPolicyId: "optix_weylI_signed_asinh",
+                displayRangeMin: -0.015,
+                displayRangeMax: 0.015,
+                displayTransform: "signed_asinh",
+                colormapFamily: "diverging_teal_rose",
+                warnings: [],
+              },
+            ] as any[])
+          : []),
       ],
     })),
   } as any;
   const findFieldRender = (
     caseId: (typeof caseIds)[number],
-    fieldId: "beta_magnitude" | "beta_x",
+    fieldId: string,
   ) =>
     optixRenderArtifact.caseRenders
       .find((entry: any) => entry.case_id === caseId)
@@ -1860,11 +1958,264 @@ const makeCanonicalVisualComparisonFixtures = async () => {
     nhm2_vs_natario_visual_distance: { pixel_rms: 0.0003 },
     nhm2_vs_alcubierre_visual_distance: { pixel_rms: 0.0007 },
   } as any;
+  const curvatureInvariantRenderEntries = [
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      fieldId: "kretschmann",
+      variant: "xz_slice_companion",
+      renderCategory: "scientific_3p1_field",
+      renderRole: "presentation",
+      authoritativeStatus: "secondary_solve_backed",
+      mechanismFamily: "curvature_invariant_suite",
+      imagePath: path.join(tempDir, "nhm2_certified-kretschmann-slice.png"),
+      imageHash: "nhm2-kretschmann-slice-hash",
+      primaryScientificQuestion:
+        "Where does solved 4D curvature concentration localize in the NHM2 hull/body-fixed 3+1 frame?",
+      title: "Kretschmann Slice",
+      quantitySymbol: "R_abcd R^abcd",
+      quantityUnits: "m^-4",
+      signConvention:
+        "ADM-compatible 4D curvature invariants on the comoving Cartesian snapshot; secondary scientific presentation only",
+      displayPolicyId: "optix_kretschmann_positive_log10",
+      displayRangeMin: 0,
+      displayRangeMax: 0.012,
+      displayTransform: "positive_log10",
+      colormapFamily: "sequential_inferno",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: 0,
+      fieldMax: 0.012,
+      fieldAbsMax: 0.012,
+      note:
+        "Brick-native Kretschmann x-z slice companion. Rodal-inspired in style only, hull-aligned in repo-native 3+1 coordinates, and not an authoritative proof surface.",
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      fieldId: "ricci4",
+      variant: "xz_slice_companion",
+      renderCategory: "scientific_3p1_field",
+      renderRole: "presentation",
+      authoritativeStatus: "secondary_solve_backed",
+      mechanismFamily: "curvature_invariant_suite",
+      imagePath: path.join(tempDir, "nhm2_certified-ricci4-slice.png"),
+      imageHash: "nhm2-ricci4-slice-hash",
+      primaryScientificQuestion:
+        "What signed 4D Ricci-scalar structure does the solved NHM2 snapshot exhibit in repo-native 3+1 frames?",
+      title: "Ricci4 Slice",
+      quantitySymbol: "R^(4)",
+      quantityUnits: "m^-2",
+      signConvention:
+        "ADM-compatible 4D curvature invariants on the comoving Cartesian snapshot; secondary scientific presentation only",
+      displayPolicyId: "optix_ricci4_signed_asinh",
+      displayRangeMin: -0.01,
+      displayRangeMax: 0.01,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_teal_rose",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.01,
+      fieldMax: 0.01,
+      fieldAbsMax: 0.01,
+      note:
+        "Brick-native Ricci4 x-z slice companion. Secondary scientific presentation only and not a morphology-verdict surface.",
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      fieldId: "ricci2",
+      variant: "xz_slice_companion",
+      renderCategory: "scientific_3p1_field",
+      renderRole: "presentation",
+      authoritativeStatus: "secondary_solve_backed",
+      mechanismFamily: "curvature_invariant_suite",
+      imagePath: path.join(tempDir, "nhm2_certified-ricci2-slice.png"),
+      imageHash: "nhm2-ricci2-slice-hash",
+      primaryScientificQuestion:
+        "How does the brick-native Ricci contraction organize through the solved NHM2 3+1 volume without being promoted to proof status?",
+      title: "Ricci2 Slice",
+      quantitySymbol: "R_ab R^ab",
+      quantityUnits: "m^-4",
+      signConvention:
+        "ADM-compatible 4D curvature invariants on the comoving Cartesian snapshot; secondary scientific presentation only",
+      displayPolicyId: "optix_ricci2_signed_asinh",
+      displayRangeMin: -0.008,
+      displayRangeMax: 0.008,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_teal_rose",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.008,
+      fieldMax: 0.008,
+      fieldAbsMax: 0.008,
+      note:
+        "Brick-native Ricci2 x-z slice companion with sign preserved. Secondary scientific presentation only.",
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      fieldId: "weylI",
+      variant: "xz_slice_companion",
+      renderCategory: "scientific_3p1_field",
+      renderRole: "presentation",
+      authoritativeStatus: "secondary_solve_backed",
+      mechanismFamily: "curvature_invariant_suite",
+      imagePath: path.join(tempDir, "nhm2_certified-weylI-slice.png"),
+      imageHash: "nhm2-weylI-slice-hash",
+      primaryScientificQuestion:
+        "Where does free-curvature structure appear in NHM2 when rendered as a secondary hull-aligned 3+1 scientific field?",
+      title: "Weyl Slice",
+      quantitySymbol: "C_abcd C^abcd",
+      quantityUnits: "m^-4",
+      signConvention:
+        "ADM-compatible 4D curvature invariants on the comoving Cartesian snapshot; secondary scientific presentation only",
+      displayPolicyId: "optix_weylI_signed_asinh",
+      displayRangeMin: -0.015,
+      displayRangeMax: 0.015,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_teal_rose",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.015,
+      fieldMax: 0.015,
+      fieldAbsMax: 0.015,
+      note:
+        "Brick-native Weyl x-z slice companion. Rodal-inspired in style only and not a spherical-coordinate clone.",
+    }),
+  ];
+  const curvatureInvariantArtifact = {
+    artifactType: "nhm2_curvature_invariant_visualization/v1",
+    generatedOn: "2026-03-31",
+    generatedAt: "2026-03-31T00:00:00.000Z",
+    boundaryStatement:
+      "This artifact adds a Rodal-inspired NHM2 curvature-invariant inspection suite in repo-native hull/body-fixed 3+1 frames while keeping Lane A diagnostics as the authoritative proof surface.",
+    sourceAuditArtifactPath: "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    canonicalCalibrationArtifactPath:
+      "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+    optixRenderArtifactPath: "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+    caseId: "nhm2_certified",
+    caseLabel: "NHM2 certified snapshot",
+    suiteStatus: "available",
+    observer: "eulerian_n",
+    foliation: "comoving_cartesian_3p1",
+    laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+    signConvention:
+      "ADM-compatible 4D curvature invariants on the comoving Cartesian snapshot; secondary scientific presentation only",
+    styleReference: {
+      inspiration: "Jose Rodal (2024) invariant visual language",
+      usagePolicy:
+        "Use Rodal only as visualization/style inspiration. Do not relabel repo proof surfaces, do not imply literature authority, and do not clone spherical chart conventions.",
+      notes: [
+        "repo-native frame = comoving Cartesian 3+1 with hull/body-fixed slice conventions",
+        "current suite is solve-backed secondary presentation, not a certified invariant proof lane",
+      ],
+    },
+    renderEntries: curvatureInvariantRenderEntries,
+    fieldSummaries: (["kretschmann", "ricci4", "ricci2", "weylI"] as const).map((fieldId) => ({
+      fieldId,
+      label:
+        fieldId === "kretschmann"
+          ? "Kretschmann scalar"
+          : fieldId === "ricci4"
+            ? "Ricci scalar (4D)"
+            : fieldId === "ricci2"
+              ? "Ricci contraction"
+              : "Weyl contraction",
+      quantitySymbol:
+        fieldId === "kretschmann"
+          ? "R_abcd R^abcd"
+          : fieldId === "ricci4"
+            ? "R^(4)"
+            : fieldId === "ricci2"
+              ? "R_ab R^ab"
+              : "C_abcd C^abcd",
+      quantityUnits: fieldId === "ricci4" ? "m^-2" : "m^-4",
+      brickNative: true,
+      solveBackedSecondary: true,
+      crosscheckOnly: false,
+      displayNormalization: "case_local_robust_scale_no_cross_case_matched_vertical_scale",
+      displayPolicyId:
+        findFieldRender("nhm2_certified", fieldId)?.displayPolicyId ??
+        curvatureInvariantRenderEntries.find((entry) => entry.fieldId === fieldId)?.displayPolicyId ??
+        null,
+      displayTransform:
+        findFieldRender("nhm2_certified", fieldId)?.displayTransform ??
+        curvatureInvariantRenderEntries.find((entry) => entry.fieldId === fieldId)?.displayTransform ??
+        null,
+      colormapFamily:
+        findFieldRender("nhm2_certified", fieldId)?.colormapFamily ??
+        curvatureInvariantRenderEntries.find((entry) => entry.fieldId === fieldId)?.colormapFamily ??
+        null,
+      mainRender: {
+        presentationFieldId: fieldId,
+        label:
+          findFieldRender("nhm2_certified", fieldId)?.label ??
+          (fieldId === "kretschmann"
+            ? "Kretschmann scalar"
+            : fieldId === "ricci4"
+              ? "Ricci scalar (4D)"
+              : fieldId === "ricci2"
+                ? "Ricci contraction"
+                : "Weyl contraction"),
+        imagePath: findFieldRender("nhm2_certified", fieldId)?.imagePath ?? null,
+        imageHash:
+          findFieldRender("nhm2_certified", fieldId)?.presentationProjectionImageHash ?? null,
+        laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+        baseImagePolicy: "neutral_field_canvas",
+        baseImageSource: "none",
+        inheritsTransportContext: false,
+        contextCompositionMode: "none",
+        fieldMin: findFieldRender("nhm2_certified", fieldId)?.fieldMin ?? null,
+        fieldMax: findFieldRender("nhm2_certified", fieldId)?.fieldMax ?? null,
+        fieldAbsMax: findFieldRender("nhm2_certified", fieldId)?.fieldAbsMax ?? null,
+        displayPolicyId: findFieldRender("nhm2_certified", fieldId)?.displayPolicyId ?? null,
+        displayRangeMin: findFieldRender("nhm2_certified", fieldId)?.displayRangeMin ?? null,
+        displayRangeMax: findFieldRender("nhm2_certified", fieldId)?.displayRangeMax ?? null,
+        displayTransform: findFieldRender("nhm2_certified", fieldId)?.displayTransform ?? null,
+        colormapFamily: findFieldRender("nhm2_certified", fieldId)?.colormapFamily ?? null,
+        warnings: [],
+        renderTaxonomy: null,
+      },
+      xzSliceCompanion:
+        curvatureInvariantRenderEntries.find((entry) => entry.fieldId === fieldId)?.renderTaxonomy ??
+        null,
+      notes: [
+        "brick-native invariant channel",
+        "secondary scientific presentation only",
+        "not a morphology verdict surface",
+        "not a Rodal-spherical coordinate clone",
+      ],
+    })),
+    invariantCrosscheckStatus: "unpopulated",
+    momentumDensityStatus: "deferred_not_yet_first_class",
+    renderTaxonomy: null,
+    notes: [
+      "diagnostic_lane_a_remains_primary=true",
+      "curvature_invariant_suite_secondary_scientific=true",
+      "invariant_crosscheck remains empty until explicit comparison or residual products are added",
+      "brick channels Sx,Sy,Sz exist but momentum-density render families are deferred pending a clean display policy and first-class taxonomy contract",
+    ],
+    checksum: "curvature-invariant-checksum",
+  } as any;
   return {
     tempDir,
     canonicalCalibrationArtifact,
     optixRenderArtifact,
     shiftGeometryArtifact,
+    curvatureInvariantArtifact,
     fixedScaleComparisonArtifact,
   };
 };
@@ -1914,6 +2265,11 @@ const buildRenderTaxonomyFixtures = async () => {
       }
     }
   }
+  for (const render of fixtures.curvatureInvariantArtifact.renderEntries) {
+    if (render.renderTaxonomy) {
+      render.renderTaxonomy.legacyPath = null;
+    }
+  }
   for (const caseEntry of canonicalVisualComparisonArtifact.canonicalCases) {
     if (caseEntry.comparisonCardRender) {
       caseEntry.comparisonCardRender.legacyPath = null;
@@ -1927,6 +2283,7 @@ const buildRenderTaxonomyFixtures = async () => {
     canonicalCalibrationArtifact: fixtures.canonicalCalibrationArtifact,
     optixRenderArtifact: fixtures.optixRenderArtifact,
     shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+    curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
     canonicalVisualComparisonArtifact,
   });
   return {
@@ -2393,6 +2750,26 @@ const buildYorkRenderDebugFixture = (overrides?: {
 };
 
 describe("warp york control-family proof pack", () => {
+  it("emits brick-native div_beta proof values from GR diagnostics when available", async () => {
+    const { initializePipelineState } = await import("../server/energy-pipeline");
+    const { buildProofPack } = await import("../server/helix-proof-pack");
+
+    const state = initializePipelineState();
+    (state as any).gr = {
+      divBeta: {
+        rms: 2e-4,
+        maxAbs: 4e-4,
+        source: "gr_evolve_brick",
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.metric_div_beta_rms?.value).toBe(2e-4);
+    expect(pack.values.metric_div_beta_max_abs?.value).toBe(4e-4);
+    expect(pack.values.metric_div_beta_source?.value).toBe("gr_evolve_brick");
+    expect(pack.values.metric_div_beta_source?.proxy).toBe(false);
+  });
+
   it("keeps controls independent from NHM2-only congruent gate", () => {
     const controlRef = buildControlMetricVolumeRef({
       baseUrl: "http://127.0.0.1:5050",
@@ -5617,8 +5994,8 @@ describe("warp york control-family proof pack", () => {
       laneAAuthoritative: true,
       referenceOnlyCrossLaneScope: true,
       promotionContractId: "nhm2_source_mechanism_promotion_contract.v1",
-      promotionContractStatus: "blocked_pending_route_selection",
-      selectedPromotionRoute: "none_active",
+      promotionContractStatus: "active_for_bounded_claims_only",
+      selectedPromotionRoute: "formal_exemption_route",
     });
     expect(artifact.sourceMechanismMaturity.promotionBlockers).toContain(
       "proxy_vs_metric_term_gap",
@@ -5653,7 +6030,7 @@ describe("warp york control-family proof pack", () => {
     expect(artifact.sourceMechanismMaturity.requiredForPromotion).toContain(
       "direct_proxy_parity_route_for_equivalence_or_cross_lane_claims",
     );
-    expect(artifact.sourceMechanismMaturity.requiredForPromotion).toContain(
+    expect(artifact.sourceMechanismMaturity.requiredForPromotion).not.toContain(
       "bounded_exemption_contract_for_non_authoritative_claim_subsets",
     );
 
@@ -5662,13 +6039,14 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain("## Allowed Claims");
     expect(markdown).toContain("## Disallowed Claims");
     expect(markdown).toContain("## Required For Promotion");
-    expect(markdown).toContain("| promotionContractStatus | blocked_pending_route_selection |");
-    expect(markdown).toContain("| selectedPromotionRoute | none_active |");
+    expect(markdown).toContain("| promotionContractStatus | active_for_bounded_claims_only |");
+    expect(markdown).toContain("| selectedPromotionRoute | formal_exemption_route |");
   });
 
   it("propagates source/mechanism maturity policy into the proof-pack alias summary", () => {
     const {
       artifact: maturityArtifact,
+      sourceFormulaArtifact,
       promotionContractArtifact,
       parityRouteFeasibilityArtifact,
     } =
@@ -5686,51 +6064,16 @@ describe("warp york control-family proof pack", () => {
       reportPath: "docs/audits/research/warp-nhm2-source-mechanism-maturity-latest.md",
     };
     payload.sourceMechanismPromotionContract = (() => {
-      const formalExemptionRoute =
-        promotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.find(
-          (entry) => entry.routeId === "formal_exemption_route",
-        );
-      return {
-      contractId: promotionContractArtifact.sourceMechanismPromotionContract.contractId,
-      contractStatus: promotionContractArtifact.sourceMechanismPromotionContract.contractStatus,
-      selectedPromotionRoute:
-        promotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute,
-      promotionDecisionPolicy:
-        promotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy,
-      claimsRequiringParityCount:
-        promotionContractArtifact.sourceMechanismPromotionContract.claimsRequiringParity.length,
-      claimsEligibleUnderExemptionCount:
-        promotionContractArtifact.sourceMechanismPromotionContract.claimsEligibleUnderExemption
-          .length,
-      claimsBlockedEvenWithExemptionCount:
-        promotionContractArtifact.sourceMechanismPromotionContract
-          .claimsBlockedEvenWithExemption.length,
-      exemptionEligibleClaimCount:
-        promotionContractArtifact.sourceMechanismPromotionContract
-          .exemptionEligibleClaimDetails.length,
-      exemptionBlockedClaimCount:
-        promotionContractArtifact.sourceMechanismPromotionContract
-          .claimsBlockedEvenWithExemption.length,
-      exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
-      exemptionRouteSummary: formalExemptionRoute?.summary ?? "none",
-      routeFeasibilityStatus:
-        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .feasibilityStatus,
-      routeBlockingClass:
-        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .routeBlockingClass,
-      dominantMismatchTerm:
-        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .dominantMismatchTerm,
-      nextClosureAction:
-        parityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility
-          .nextClosureAction,
-      promotionSummary: promotionContractArtifact.sourceMechanismPromotionContract.summary,
-      artifactPath:
-        "artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json",
-      reportPath:
-        "docs/audits/research/warp-nhm2-source-mechanism-promotion-contract-latest.md",
-      };
+      return buildSourceMechanismPromotionContractSummary({
+        promotionContractArtifact,
+        parityRouteFeasibilityArtifact,
+        sourceFormulaAudit: sourceFormulaArtifact,
+        maturityArtifact,
+        artifactPath:
+          "artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json",
+        reportPath:
+          "docs/audits/research/warp-nhm2-source-mechanism-promotion-contract-latest.md",
+      });
     })();
     payload.sourceMechanismParityRouteFeasibility = {
       routeId:
@@ -5764,6 +6107,26 @@ describe("warp york control-family proof pack", () => {
         "docs/audits/research/warp-nhm2-source-mechanism-parity-route-feasibility-latest.md",
     };
 
+    expect(payload.sourceMechanismPromotionContract).toEqual(
+      expect.objectContaining({
+        sourceMechanismActiveClaimSet: [
+          "bounded_non_authoritative_source_annotation",
+          "bounded_non_authoritative_mechanism_context",
+          "bounded_non_authoritative_reduced_order_comparison",
+        ],
+        sourceMechanismBlockedClaimSet: expect.arrayContaining([
+          "formula_equivalent_to_authoritative_direct_metric",
+          "source_mechanism_layer_supports_viability_promotion",
+        ]),
+        sourceMechanismForbiddenPromotions: expect.arrayContaining([
+          "nhm2_shift_lapse_proof_promotion",
+        ]),
+        sourceMechanismReferenceOnlyScope: true,
+        sourceMechanismNonAuthoritative: true,
+        sourceMechanismFormulaEquivalent: false,
+      }),
+    );
+
     const markdown = renderMarkdown(payload);
     expect(markdown).toContain(
       "| claimBoundaryPolicy | bounded_advisory_non_promotable_until_explicit_promotion_contract |",
@@ -5774,11 +6137,27 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain("| laneAAuthoritative | true |");
     expect(markdown).toContain("| laneAUnaffected | true |");
     expect(markdown).toContain("## Source / Mechanism Promotion Contract");
-    expect(markdown).toContain("| contractStatus | blocked_pending_route_selection |");
-    expect(markdown).toContain("| selectedPromotionRoute | none_active |");
+    expect(markdown).toContain("| contractStatus | active_for_bounded_claims_only |");
+    expect(markdown).toContain("| selectedPromotionRoute | formal_exemption_route |");
+    expect(markdown).toContain("| exemptionRouteActivated | true |");
+    expect(markdown).toContain("| activeClaimSetCount | 3 |");
+    expect(markdown).toContain("| inactiveClaimSetCount | 5 |");
     expect(markdown).toContain(
-      "| exemptionRouteStatus | partially_activatable_for_bounded_claims |",
+      "| sourceMechanismActiveClaimSet | bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison |",
     );
+    expect(markdown).toContain(
+      "| sourceMechanismBlockedClaimSet | source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope |",
+    );
+    expect(markdown).toContain(
+      "| sourceMechanismForbiddenPromotions | formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope,nhm2_shift_lapse_proof_promotion |",
+    );
+    expect(markdown).toContain("| sourceMechanismReferenceOnlyScope | true |");
+    expect(markdown).toContain("| sourceMechanismNonAuthoritative | true |");
+    expect(markdown).toContain("| sourceMechanismFormulaEquivalent | false |");
+    expect(markdown).toContain(
+      "| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only. |",
+    );
+    expect(markdown).toContain("| exemptionRouteStatus | satisfied |");
     expect(markdown).toContain("## Source / Mechanism Parity-Route Feasibility");
     expect(markdown).toContain(
       "| routeFeasibilityStatus | blocked_by_derivation_class_difference |",
@@ -5804,12 +6183,18 @@ describe("warp york control-family proof pack", () => {
 
     expect(promotionContractArtifact.sourceMechanismPromotionContract).toMatchObject({
       contractId: "nhm2_source_mechanism_promotion_contract.v1",
-      contractStatus: "blocked_pending_route_selection",
-      selectedPromotionRoute: "none_active",
+      contractStatus: "active_for_bounded_claims_only",
+      selectedPromotionRoute: "formal_exemption_route",
       promotionDecisionPolicy:
         "parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims",
       laneAUnaffected: true,
       referenceOnlyCrossLaneScope: true,
+      exemptionRouteActivated: true,
+      activeClaimSet: [
+        "bounded_non_authoritative_source_annotation",
+        "bounded_non_authoritative_mechanism_context",
+        "bounded_non_authoritative_reduced_order_comparison",
+      ],
     });
     expect(
       promotionContractArtifact.sourceMechanismPromotionContract.availableRoutes.map(
@@ -5835,6 +6220,12 @@ describe("warp york control-family proof pack", () => {
       promotionContractArtifact.sourceMechanismPromotionContract.claimsBlockedEvenWithExemption,
     ).toContain("source_mechanism_lane_promotable_non_authoritative");
     expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.forbiddenPromotions,
+    ).toContain("nhm2_shift_lapse_proof_promotion");
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.consumerSummary,
+    ).toContain("warp.metric.T00.nhm2_shift_lapse remains reference_only");
+    expect(
       promotionContractArtifact.sourceMechanismPromotionContract.claimMappings,
     ).toEqual(
       expect.arrayContaining([
@@ -5845,7 +6236,7 @@ describe("warp york control-family proof pack", () => {
         expect.objectContaining({
           claimId: "bounded_non_authoritative_source_annotation",
           requiredRoute: "formal_exemption_route",
-          currentStatus: "eligible_if_route_selected",
+          currentStatus: "active_under_selected_route",
         }),
         expect.objectContaining({
           claimId: "source_mechanism_lane_promotable_non_authoritative",
@@ -5875,7 +6266,7 @@ describe("warp york control-family proof pack", () => {
         (entry) => entry.routeId === "formal_exemption_route",
       );
     expect(formalExemptionRoute).toMatchObject({
-      routeStatus: "partially_activatable_for_bounded_claims",
+      routeStatus: "satisfied",
       claimSetEligible: [
         "bounded_non_authoritative_source_annotation",
         "bounded_non_authoritative_mechanism_context",
@@ -5908,9 +6299,14 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain("### direct_proxy_parity_route");
     expect(markdown).toContain("### formal_exemption_route");
     expect(markdown).toContain("## Claim Route Map");
+    expect(markdown).toContain("## Active Claim Set");
+    expect(markdown).toContain("## Activation Disclaimers");
+    expect(markdown).toContain("## Forbidden Promotions");
+    expect(markdown).toContain("| consumerSummary |");
     expect(markdown).toContain("## Exemption Claim Surface");
     expect(markdown).toContain("bounded_non_authoritative_source_annotation");
     expect(markdown).toContain("Forbidden Inferences");
+    expect(markdown).toContain("| exemptionRouteActivated | true |");
     expect(markdown).toContain("| routeFeasibilityStatus | blocked_by_derivation_class_difference |");
     expect(markdown).toContain(
       "| dominantMismatchTerm | final_metricT00Si_Jm3 |",
@@ -8434,6 +8830,116 @@ describe("warp york control-family proof pack", () => {
     expect(proofPackMarkdown).toContain("## Final Canonical Visual Comparison");
   });
 
+  it("renders curvature-invariant publication status separately from Lane A proof surfaces", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.curvatureInvariantSummary = {
+      artifactType: "nhm2_curvature_invariant_visualization/v1",
+      suiteStatus: "available",
+      surfacedFields: ["kretschmann", "ricci4", "ricci2", "weylI"],
+      slicePlanes: ["x-z-midplane"],
+      invariantCrosscheckStatus: "unpopulated",
+      momentumDensityStatus: "deferred_not_yet_first_class",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+    expect(proofPackMarkdown).toContain("## Curvature Invariant Visualization");
+    expect(proofPackMarkdown).toContain(
+      "| artifactType | nhm2_curvature_invariant_visualization/v1 |",
+    );
+    expect(proofPackMarkdown).toContain("| invariantCrosscheckStatus | unpopulated |");
+    expect(proofPackMarkdown).toContain(
+      "| momentumDensityStatus | deferred_not_yet_first_class |",
+    );
+    expect(proofPackMarkdown).toContain(
+      "nhm2-curvature-invariant-visualization-latest.json",
+    );
+    expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+  });
+
+  it("builds a refreshed latest proof-pack payload for invariant publication without populating invariant_crosscheck", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const existingProofPackPayload = makeProofPackPayloadForMarkdown() as any;
+    existingProofPackPayload.notes = [
+      "presentation_render_layer_status=stale",
+      "shift_geometry_status=stale",
+      "curvature_invariant_suite_status=stale",
+      "render_taxonomy authoritative=stale presentation=stale comparison=stale",
+      "keep-me",
+    ];
+    const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+      existingProofPackPayload,
+      yorkOptixRenderArtifact: fixtures.optixRenderArtifact,
+      shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+      curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
+      canonicalVisualComparisonArtifact: fixtures.canonicalVisualComparisonArtifact,
+      renderTaxonomyArtifact: fixtures.renderTaxonomyArtifact,
+      yorkOptixRenderLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      yorkOptixRenderLatestMdPath:
+        "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+      shiftGeometryVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      shiftGeometryVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+      curvatureInvariantVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      curvatureInvariantVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+      renderTaxonomyLatestJsonPath:
+        "artifacts/research/full-solve/render-taxonomy-latest.json",
+      renderTaxonomyLatestMdPath:
+        "docs/audits/research/warp-render-taxonomy-latest.md",
+      renderTaxonomyStandardMemoPath:
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      yorkCanonicalVisualComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      yorkCanonicalVisualComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      yorkCanonicalVisualComparisonDecisionMemoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+    });
+
+    expect(payload.curvatureInvariantSummary).toMatchObject({
+      artifactType: "nhm2_curvature_invariant_visualization/v1",
+      suiteStatus: "available",
+      invariantCrosscheckStatus: "unpopulated",
+      momentumDensityStatus: "deferred_not_yet_first_class",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+    });
+    expect(payload.curvatureInvariantSummary?.surfacedFields).toEqual([
+      "kretschmann",
+      "ricci4",
+      "ricci2",
+      "weylI",
+    ]);
+    expect(payload.renderTaxonomySummary).toMatchObject({
+      artifactPath: "artifacts/research/full-solve/render-taxonomy-latest.json",
+      reportPath: "docs/audits/research/warp-render-taxonomy-latest.md",
+      standardPath: "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      authoritativeRenderCategory: "diagnostic_lane_a",
+      presentationRenderCategory: "scientific_3p1_field",
+    });
+    expect(
+      payload.notes.filter((note) => note.startsWith("presentation_render_layer_status=")),
+    ).toHaveLength(1);
+    expect(
+      payload.notes.filter((note) => note.startsWith("shift_geometry_status=")),
+    ).toHaveLength(1);
+    expect(
+      payload.notes.filter((note) => note.startsWith("curvature_invariant_suite_status=")),
+    ).toHaveLength(1);
+    expect(
+      payload.notes.filter((note) => note.startsWith("render_taxonomy authoritative=")),
+    ).toHaveLength(1);
+    expect(payload.notes).toContain("keep-me");
+  });
+
   it("builds a final canonical comparison artifact with canonical cases and both layers", async () => {
     const fixtures = await makeCanonicalVisualComparisonFixtures();
     const exportDir = path.join(fixtures.tempDir, "final-panel");
@@ -8574,6 +9080,99 @@ describe("warp york control-family proof pack", () => {
           entry.quantitySymbol &&
           entry.laneId === "lane_a_eulerian_comoving_theta_minus_trk" &&
           entry.title.includes(" - "),
+      ),
+    ).toBe(true);
+  });
+
+  it("registers brick-native curvature invariants as first-class taxonomy field families", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    expect(fixtures.renderTaxonomyArtifact.fieldFamilies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldId: "kretschmann",
+          defaultCategory: "scientific_3p1_field",
+          defaultRole: "presentation",
+          defaultDisplayPolicyId: "optix_kretschmann_positive_log10",
+        }),
+        expect.objectContaining({
+          fieldId: "ricci4",
+          defaultCategory: "scientific_3p1_field",
+          defaultRole: "presentation",
+          defaultDisplayPolicyId: "optix_ricci4_signed_asinh",
+        }),
+        expect.objectContaining({
+          fieldId: "ricci2",
+          defaultCategory: "scientific_3p1_field",
+          defaultRole: "presentation",
+          defaultDisplayPolicyId: "optix_ricci2_signed_asinh",
+        }),
+        expect.objectContaining({
+          fieldId: "weylI",
+          defaultCategory: "scientific_3p1_field",
+          defaultRole: "presentation",
+          defaultDisplayPolicyId: "optix_weylI_signed_asinh",
+        }),
+      ]),
+    );
+  });
+
+  it("emits NHM2 curvature-invariant renders as secondary scientific fields rather than Lane A proofs", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const invariantEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) =>
+        entry.caseId === "nhm2_certified" &&
+        ["kretschmann", "ricci4", "ricci2", "weylI"].includes(String(entry.fieldId)),
+    );
+    expect(invariantEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "kretschmann", variant: "main" }),
+        expect.objectContaining({ fieldId: "ricci4", variant: "main" }),
+        expect.objectContaining({ fieldId: "ricci2", variant: "main" }),
+        expect.objectContaining({ fieldId: "weylI", variant: "main" }),
+        expect.objectContaining({ fieldId: "kretschmann", variant: "xz_slice_companion" }),
+        expect.objectContaining({ fieldId: "ricci4", variant: "xz_slice_companion" }),
+        expect.objectContaining({ fieldId: "ricci2", variant: "xz_slice_companion" }),
+        expect.objectContaining({ fieldId: "weylI", variant: "xz_slice_companion" }),
+      ]),
+    );
+    expect(
+      invariantEntries.every(
+        (entry) =>
+          entry.renderCategory === "scientific_3p1_field" &&
+          entry.renderRole === "presentation" &&
+          entry.authoritativeStatus === "secondary_solve_backed" &&
+          entry.baseImageSource !== "transport_context",
+      ),
+    ).toBe(true);
+  });
+
+  it("renders the NHM2 curvature-invariant audit with explicit secondary status and deferred momentum-density scope", async () => {
+    const fixtures = await makeCanonicalVisualComparisonFixtures();
+    const markdown = renderNhm2CurvatureInvariantVisualizationMarkdown(
+      fixtures.curvatureInvariantArtifact,
+    );
+    expect(markdown).toContain("NHM2 Curvature Invariant Visualization");
+    expect(markdown).toContain("invariantCrosscheckStatus | unpopulated");
+    expect(markdown).toContain("momentumDensityStatus | deferred_not_yet_first_class");
+    expect(markdown).toContain("Rodal");
+  });
+
+  it("keeps invariant_crosscheck empty until explicit comparison products are emitted", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    expect(fixtures.renderTaxonomyArtifact.summary.categoryCounts.invariant_crosscheck).toBe(0);
+    expect(fixtures.renderTaxonomyArtifact.notes.join(" ")).toContain("invariant_crosscheck");
+  });
+
+  it("keeps diagnostic Lane A entries theta-only after the invariant taxonomy expansion", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const diagnosticEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "diagnostic_lane_a",
+    );
+    expect(
+      diagnosticEntries.every(
+        (entry) =>
+          entry.fieldId === "trace_check_diagnostic" &&
+          entry.quantitySymbol === "theta=-trK",
       ),
     ).toBe(true);
   });
@@ -8903,7 +9502,7 @@ describe("warp york control-family proof pack", () => {
     ).toBe(true);
   });
 
-  it("keeps scientific 3+1 field renders on a neutral canvas with no transport-context inheritance", async () => {
+  it("keeps scientific 3+1 field renders out of the transport-context inheritance path", async () => {
     const fixtures = await buildRenderTaxonomyFixtures();
     const fieldEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
       (entry) => entry.renderCategory === "scientific_3p1_field",
@@ -8912,9 +9511,11 @@ describe("warp york control-family proof pack", () => {
     expect(
       fieldEntries.every(
         (entry) =>
-          entry.baseImagePolicy === "neutral_field_canvas" &&
-          entry.baseImageSource === "none" &&
-          entry.inheritsTransportContext === false,
+          entry.inheritsTransportContext === false &&
+          entry.baseImageSource !== "transport_context" &&
+          ["neutral_field_canvas", "field_plus_context_overlay"].includes(
+            String(entry.baseImagePolicy),
+          ),
       ),
     ).toBe(true);
   });

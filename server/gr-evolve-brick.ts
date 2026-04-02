@@ -82,6 +82,9 @@ export interface GrEvolveBrickStats {
   cfl: number;
   H_rms: number;
   M_rms: number;
+  divBetaRms?: number;
+  divBetaMaxAbs?: number;
+  divBetaSource?: "gr_evolve_brick";
   thetaPeakAbs?: number;
   thetaGrowthPerStep?: number;
   rhoConstraint?: GrPipelineDiagnostics["constraints"]["H_constraint"];
@@ -258,6 +261,7 @@ const GR_EVOLVE_CHANNEL_ORDER = [
   "eulerian_accel_geom_z",
   "eulerian_accel_geom_mag",
   "beta_over_alpha_mag",
+  "div_beta",
   "gamma_xx",
   "gamma_yy",
   "gamma_zz",
@@ -1156,6 +1160,9 @@ export const buildGrDiagnostics = (
   const lapseMax = Number.isFinite(alpha?.max) ? alpha.max : 0;
   const stiffness = brick.stats.stiffness;
   const wallSafety = brick.stats.wallSafety;
+  const divBetaRms = brick.stats.divBetaRms;
+  const divBetaMaxAbs = brick.stats.divBetaMaxAbs;
+  const divBetaSource = brick.stats.divBetaSource;
   const betaMaxAbs = maxAbsBeta(
     brick.channels.beta_x,
     brick.channels.beta_y,
@@ -1198,6 +1205,17 @@ export const buildGrDiagnostics = (
         wallSafety?.betaOutwardOverAlphaWallP98 ?? null,
       wallHorizonMargin: wallSafety?.wallHorizonMargin ?? null,
     },
+    ...(Number.isFinite(divBetaRms) &&
+    Number.isFinite(divBetaMaxAbs) &&
+    divBetaSource
+      ? {
+          divBeta: {
+            rms: divBetaRms,
+            maxAbs: divBetaMaxAbs,
+            source: divBetaSource,
+          },
+        }
+      : {}),
     ...(stiffness ? { stiffness } : {}),
     constraints: {
       H_constraint,
@@ -1405,6 +1423,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const det_gamma = evolutionChannels.det_gamma;
   const ricci3 = evolutionChannels.ricci3;
   const KijKij = evolutionChannels.KijKij;
+  const div_beta = evolutionChannels.div_beta;
   const rhoConstraint = buildRhoConstraintDiagnostics(ricci3, K_trace, KijKij);
   const wallSafety = computeWallShiftLapseSafety({
     state: pipelineState,
@@ -1467,6 +1486,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   if (det_gamma) channels.det_gamma = det_gamma;
   if (ricci3) channels.ricci3 = ricci3;
   if (KijKij) channels.KijKij = KijKij;
+  if (div_beta) channels.div_beta = div_beta;
   if (kretschmann) channels.kretschmann = kretschmann;
   if (weylI) channels.weylI = weylI;
   if (ricci4) channels.ricci4 = ricci4;
@@ -1517,6 +1537,16 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const time_s_end = evolution.time_s;
   const thetaPeakAbs = maxAbsFromChannel(K_trace);
   const thetaGrowthPerStep = steps > 0 ? thetaPeakAbs / steps : 0;
+  const divBetaRms = div_beta
+    ? (Number.isFinite(evolutionBrick.stats?.divBetaRms)
+        ? evolutionBrick.stats?.divBetaRms
+        : rmsFromChannel(div_beta))
+    : undefined;
+  const divBetaMaxAbs = div_beta
+    ? (Number.isFinite(evolutionBrick.stats?.divBetaMaxAbs)
+        ? evolutionBrick.stats?.divBetaMaxAbs
+        : maxAbsFromChannel(div_beta))
+    : undefined;
   const solverHealth = buildSolverHealth(evolution.fixups, steps);
   const clampFraction = computeClampFraction(evolution.fixups, steps);
   if (evolution.fixups) {
@@ -1567,6 +1597,9 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     cfl: Number.isFinite(cfl) ? cfl : 0,
     H_rms: evolutionBrick.stats?.H_rms ?? rmsFromChannel(H_constraint),
     M_rms: evolutionBrick.stats?.M_rms ?? rmsFromVector(M_constraint_x, M_constraint_y, M_constraint_z),
+    ...(Number.isFinite(divBetaRms) ? { divBetaRms } : {}),
+    ...(Number.isFinite(divBetaMaxAbs) ? { divBetaMaxAbs } : {}),
+    ...(div_beta ? { divBetaSource: "gr_evolve_brick" as const } : {}),
     thetaPeakAbs: Number.isFinite(thetaPeakAbs) ? thetaPeakAbs : 0,
     thetaGrowthPerStep: Number.isFinite(thetaGrowthPerStep) ? thetaGrowthPerStep : 0,
     dissipation: {

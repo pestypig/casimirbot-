@@ -1144,7 +1144,7 @@ describe("hull-render router", () => {
       ...baseCertificate,
       diagnostics: {
         ...baseCertificate.diagnostics,
-        cross_lane_claim_ready: false,
+        cross_lane_claim_ready: true,
       },
     });
     const remote = express();

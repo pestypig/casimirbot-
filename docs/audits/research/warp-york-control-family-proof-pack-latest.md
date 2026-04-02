@@ -402,10 +402,10 @@
 | laneAAuthoritative | true |
 | referenceOnlyCrossLaneScope | true |
 | promotionContractId | nhm2_source_mechanism_promotion_contract.v1 |
-| promotionContractStatus | blocked_pending_route_selection |
-| selectedPromotionRoute | none_active |
-| promotionSummary | Promotion contract keeps the parity route blocked by a derivation-class gap and narrows the formal exemption route to three bounded non-authoritative claim subsets; no route is active, so promotion remains blocked. |
-| summary | Source/mechanism layer is reduced-order advisory only: currently supportable advisory claims are limited to bounded source annotation, mechanism context, and reduced-order comparison subsets, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope. |
+| promotionContractStatus | active_for_bounded_claims_only |
+| selectedPromotionRoute | formal_exemption_route |
+| promotionSummary | Promotion contract keeps the parity route blocked by a derivation-class gap and activates the formal exemption route only for three bounded non-authoritative advisory claim subsets; broader promotion remains blocked. |
+| summary | Source/mechanism layer is reduced-order advisory only: the formal exemption route is active for bounded source annotation, mechanism context, and reduced-order comparison claims, while promotion beyond that remains blocked by direct-vs-proxy non-parity, proxy-vs-metric term gap, partial optional timing authority, and reference-only cross-lane scope. |
 | artifactPath | artifacts/research/full-solve/nhm2-source-mechanism-maturity-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-source-mechanism-maturity-latest.md |
 
@@ -427,7 +427,6 @@
 
 ### Required For Promotion
 - direct_proxy_parity_route_for_equivalence_or_cross_lane_claims
-- bounded_exemption_contract_for_non_authoritative_claim_subsets
 - promotion_grade_timing_authority_contract_if_optional_fields_required
 - first_principles_or_authoritative_source_realization_contract
 - explicit_cross_lane_promotion_contract_beyond_reference_only_scope
@@ -436,23 +435,35 @@
 | field | value |
 |---|---|
 | contractId | nhm2_source_mechanism_promotion_contract.v1 |
-| contractStatus | blocked_pending_route_selection |
-| selectedPromotionRoute | none_active |
+| contractStatus | active_for_bounded_claims_only |
+| selectedPromotionRoute | formal_exemption_route |
 | promotionDecisionPolicy | parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims |
 | claimsRequiringParityCount | 3 |
 | claimsEligibleUnderExemptionCount | 3 |
 | claimsBlockedEvenWithExemptionCount | 5 |
 | exemptionEligibleClaimCount | 3 |
 | exemptionBlockedClaimCount | 5 |
-| exemptionRouteStatus | partially_activatable_for_bounded_claims |
+| exemptionRouteActivated | true |
+| activeClaimSetCount | 3 |
+| inactiveClaimSetCount | 5 |
+| sourceMechanismActiveClaimSet | bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison |
+| sourceMechanismBlockedClaimSet | source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope |
+| sourceMechanismForbiddenPromotions | formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope,nhm2_shift_lapse_proof_promotion |
+| sourceMechanismReferenceOnlyScope | true |
+| sourceMechanismNonAuthoritative | true |
+| sourceMechanismFormulaEquivalent | false |
+| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only. |
+| exemptionRouteStatus | satisfied |
+| activationScope | bounded_non_authoritative_advisory_only_reference_only_cross_lane |
+| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; stronger claims remain blocked and Lane A remains authoritative. |
 | routeFeasibilityStatus | blocked_by_derivation_class_difference |
 | routeBlockingClass | direct_metric_vs_reconstructed_proxy_derivation_gap |
 | dominantMismatchTerm | final_metricT00Si_Jm3 |
 | nextClosureAction | emit_authoritative_direct_metric_closure_decomposition_and_define_proxy_mapping_contract |
-| exemptionRouteSummary | Exemption route is narrowed to bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims only; it cannot grant broad non-authoritative promotion, formula equivalence, authority, viability promotion, or cross-lane scope expansion. |
-| promotionSummary | Promotion contract keeps the parity route blocked by a derivation-class gap and narrows the formal exemption route to three bounded non-authoritative claim subsets; no route is active, so promotion remains blocked. |
-| artifactPath | artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json |
-| reportPath | docs/audits/research/warp-nhm2-source-mechanism-promotion-contract-latest.md |
+| exemptionRouteSummary | Exemption route is active only for bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims; it cannot grant broad non-authoritative promotion, formula equivalence, authority, viability promotion, or cross-lane scope expansion. |
+| promotionSummary | Promotion contract keeps the parity route blocked by a derivation-class gap and activates the formal exemption route only for three bounded non-authoritative advisory claim subsets; broader promotion remains blocked. |
+| artifactPath | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-mechanism-promotion-contract-latest.json |
+| reportPath | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/docs/audits/research/warp-nhm2-source-mechanism-promotion-contract-latest.md |
 
 ## Source / Mechanism Parity-Route Feasibility
 | field | value |
@@ -473,12 +484,12 @@
 | field | value |
 |---|---|
 | presentationRenderLayerStatus | available |
-| fieldSuiteRealizationStatus | realized |
+| fieldSuiteRealizationStatus | collapsed |
 | fieldSuiteReadabilityStatus | flat |
 | optixScientificRenderAvailable | true |
-| presentationRenderQuality | warning |
+| presentationRenderQuality | failed |
 | presentationReadinessVerdict | field_realized_but_presentation_flat |
-| presentationRenderQualityReasons | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| presentationRenderQualityReasons | presentation_distinct_fields_collapsed |
 | presentationRenderBackedByAuthoritativeMetric | true |
 | artifactPath | artifacts/research/full-solve/nhm2-york-optix-render-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-york-optix-render-latest.md |
@@ -487,8 +498,8 @@
 | field | value |
 |---|---|
 | shiftGeometryStatus | available |
-| mandatoryFirstPassFields | beta_magnitude,beta_x,beta_direction_xz |
-| mandatoryResidualComparisons | nhm2_minus_natario_beta_residual,nhm2_minus_alcubierre_beta_residual |
+| mandatoryFirstPassFields |  |
+| mandatoryResidualComparisons |  |
 | directionOverlayStatus | available |
 | directionOverlayCaseDistinctness | mixed |
 | directionOverlayInterpretationPolicy | normalize_non_material_internal_variance_after_sampled_field_match |
@@ -496,6 +507,18 @@
 | constraintContextStatus | deferred_units_and_policy_unresolved |
 | artifactPath | artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md |
+
+## Curvature Invariant Visualization
+| field | value |
+|---|---|
+| artifactType | nhm2_curvature_invariant_visualization/v1 |
+| suiteStatus | available |
+| surfacedFields | kretschmann,ricci4,ricci2,weylI |
+| slicePlanes | x-z-midplane |
+| invariantCrosscheckStatus | unpopulated |
+| momentumDensityStatus | deferred_not_yet_first_class |
+| artifactPath | artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md |
 
 ## Render Taxonomy
 | field | value |
@@ -588,12 +611,14 @@
 - solve_authority_chain_ready=true reasons=none
 - york_render_debug_verdict=render_matches_authoritative_geometry paper_comparison_verdict=paper_match_after_convention_alignment dominant_difference_cause=real_nhm2_morphology_difference
 - york_fixed_scale_render_verdict=shared_scale_preserves_natario_like_class figure1_overlay_verdict=real_nhm2_vs_alcubierre_morphology_difference is_nhm2_close_to_nasa_fig1=no
-- presentation_render_layer_status=available field_suite_realization_status=realized field_suite_readability_status=flat optix_scientific_render_available=true presentation_render_quality=warning presentation_readiness_verdict=field_realized_but_presentation_flat presentation_render_backed_by_authoritative_metric=true
-- shift_geometry_status=available case_count=4 residual_count=2 direction_overlay_status=available direction_overlay_case_distinctness=mixed constraint_context_status=deferred_units_and_policy_unresolved
 - york_calibration_verdict=canonical_controls_validated_nhm2_natario_like nhm2_current_class=natario_like_low_expansion ablation_decision=no_single_ablation_explains_morphology parameter_sweep_verdict=alcubierre_like_not_found source_coupling_redesign_verdict=source_coupling_redesign_still_natario_locked authoritative_morphology_change_observed=yes best_redesign_variant=nhm2_redesign_source_profile_simplified_signed redesign_first_drop_stage=none redesign_next_action=use_realized_lane_a_redesign_evidence
 - deeper_reformulation_verdict=deeper_reformulation_still_natario_locked authoritative_reformulation_change_observed=yes best_reformulation_variant=nhm2_reform_fore_aft_antisymmetric_driver reformulation_next_action=use_realized_reformulation_evidence
-- render_taxonomy authoritative=diagnostic_lane_a presentation=scientific_3p1_field comparison=comparison_panel
 - source_mechanism_parity_route_feasibility=blocked_by_derivation_class_difference blocking_class=direct_metric_vs_reconstructed_proxy_derivation_gap dominant_mismatch_term=final_metricT00Si_Jm3
 - source_mechanism_maturity=reduced_order_advisory claim_boundary_policy=bounded_advisory_non_promotable_until_explicit_promotion_contract promotion_blockers=proxy_vs_metric_term_gap,direct_vs_reconstructed_non_parity,timing_authority_optional_fields_partial,reference_only_cross_lane_scope lane_a_authoritative=true
-- source_mechanism_promotion_contract_status=blocked_pending_route_selection selected_route=none_active policy=parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims exemption_route_status=partially_activatable_for_bounded_claims exemption_claims=bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison
+- source_mechanism_promotion_contract_status=active_for_bounded_claims_only selected_route=formal_exemption_route policy=parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims exemption_route_status=satisfied exemption_route_activated=true active_claim_set=bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison
+- source_mechanism_consumer_scope=active_claims:bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison blocked_claims:source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope reference_only_scope=true formula_equivalence=false parity_route=blocked_by_derivation_class_difference nhm2_shift_lapse_reference_only=true
+- presentation_render_layer_status=available field_suite_realization_status=collapsed field_suite_readability_status=flat optix_scientific_render_available=true presentation_render_quality=failed presentation_readiness_verdict=field_realized_but_presentation_flat presentation_render_backed_by_authoritative_metric=true
+- shift_geometry_status=available case_count=4 residual_count=2 direction_overlay_status=available direction_overlay_case_distinctness=mixed constraint_context_status=deferred_units_and_policy_unresolved
+- curvature_invariant_suite_status=available surfaced_fields=kretschmann,ricci4,ricci2,weylI invariant_crosscheck_status=unpopulated momentum_density_status=deferred_not_yet_first_class
+- render_taxonomy authoritative=diagnostic_lane_a presentation=scientific_3p1_field comparison=comparison_panel
 

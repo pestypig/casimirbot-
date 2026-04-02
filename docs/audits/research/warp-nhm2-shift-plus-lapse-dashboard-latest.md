@@ -10,7 +10,7 @@
 - primaryRenderedCardId: dashboard_overview
 - renderedCardStatus: generated_primary_overview
 - renderedCardPath: artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-dashboard_overview-card.png
-- renderedCardHash: 758cdfbbe153824e6a946fe98dd03c284443c55ef4ce110bf2a1da10ab2f97e6
+- renderedCardHash: f8a1cdbaa12bde7114a7feab937a673696681eacc562a6c8b4ad6dc01c820d53
 - legacyMonolithicCardStatus: deprecated_not_generated
 - legacyMonolithicCardPath: artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-diagnostics_dashboard-card.png
 
@@ -20,7 +20,22 @@
 - laneAUnchanged: yes
 - baselineBranchStatus: unit_lapse_baseline_unchanged
 - generalizedBranchStatus: reference_only_mild_shift_plus_lapse
-- proofNote: Lane A remains authoritative. The generalized branch is reference-only and this dashboard is presentation/comparison only.
+- proofNote: Lane A remains authoritative. The generalized branch is reference-only. Source/mechanism context is bounded non-authoritative advisory only; no formula equivalence, viability promotion, or cross-lane authority expansion is implied.
+
+## Source / Mechanism Consumer Boundary
+
+- promotionContractStatus: active_for_bounded_claims_only
+- selectedPromotionRoute: formal_exemption_route
+- exemptionRouteActivated: yes
+- sourceMechanismNonAuthoritative: yes
+- sourceMechanismFormulaEquivalent: no
+- parityRouteStatus: blocked_by_derivation_class_difference
+- parityRouteBlockingClass: direct_metric_vs_reconstructed_proxy_derivation_gap
+- sourceMechanismReferenceOnlyScope: yes
+- activeClaimSet: bounded_non_authoritative_source_annotation, bounded_non_authoritative_mechanism_context, bounded_non_authoritative_reduced_order_comparison
+- blockedClaimSet: source_mechanism_lane_promotable_non_authoritative, formula_equivalent_to_authoritative_direct_metric, source_mechanism_lane_authoritative, source_mechanism_layer_supports_viability_promotion, cross_lane_promotion_beyond_reference_only_scope
+- forbiddenPromotions: formula_equivalent_to_authoritative_direct_metric, source_mechanism_lane_authoritative, source_mechanism_layer_supports_viability_promotion, cross_lane_promotion_beyond_reference_only_scope, nhm2_shift_lapse_proof_promotion
+- sourceMechanismConsumerSummary: Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only.
 
 ## Cabin Gravity Panel
 
@@ -49,7 +64,7 @@
 ## Precision Panel
 
 - panelPurpose: Show how raw-brick and analytic-companion provenance are mixed or aligned across the comparison.
-- sectionNote: Read these rows before collapsing the dashboard into any downstream summary. They explain where mild-reference under-resolution is handled analytically and where brick alignment is preserved.
+- sectionNote: Read these rows before collapsing the dashboard into any downstream summary. They explain where mild-reference under-resolution is handled analytically, where brick alignment is preserved, and why the active source/mechanism route remains bounded advisory only rather than implying formula equivalence or viability promotion.
 
 | row | baseline | generalized | delta | units | baseline source | generalized source | primary badge | mismatch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -68,11 +83,11 @@
 
 | cardId | title | sectionSource | primary | path | hash |
 | --- | --- | --- | --- | --- | --- |
-| dashboard_overview | Diagnostics Dashboard Overview | dashboard_summary | yes | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-dashboard_overview-card.png | 758cdfbbe153824e6a946fe98dd03c284443c55ef4ce110bf2a1da10ab2f97e6 |
-| proof_status | Proof Status | proof_status_panel | no | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-proof_status-card.png | 49344fa80908294cb40dd3f7bfdc44883307a84e0b8af58928380ca1d299d452 |
+| dashboard_overview | Diagnostics Dashboard Overview | dashboard_summary | yes | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-dashboard_overview-card.png | f8a1cdbaa12bde7114a7feab937a673696681eacc562a6c8b4ad6dc01c820d53 |
+| proof_status | Proof Status | proof_status_panel | no | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-proof_status-card.png | a7cd274cfb46334951eafaf378ab8e6ada6c71b2e629c043d0849ba828b21dcc |
 | cabin_gravity | Cabin Gravity | cabin_gravity_panel | no | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-cabin_gravity-card.png | e43d1a959a6bfc24ab5d7c56ba3e315a4cad625f3b3b3b0061744c5970ca6489 |
 | wall_safety | Wall Safety | wall_safety_panel | no | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-wall_safety-card.png | 1c21c0174f4773c689c0ba95fddb26e26e3e6d7072fb049caa54e287daf14abe |
-| precision_provenance | Precision / Provenance | precision_panel | no | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-precision_provenance-card.png | 1820d021481313642b7bd54767a8e2151c6ed2adfdffa95a8af2f344d0b9ed92 |
+| precision_provenance | Precision / Provenance | precision_panel | no | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_shift_lapse-comparison_panel-precision_provenance-card.png | 3a669c8162cf4d6ffa20dc2f08807b9825fd86770c3b9f9eb4f04b56808fdfc0 |
 
 ## Provenance Warnings
 
@@ -95,3 +110,20 @@
 | source_mismatch | source mismatch | Baseline and generalized values do not share the same numeric provenance and should be read with the listed source kinds. | 6 |
 | wall_safety_brick_derived | wall safety brick-derived | Wall-normal and bulk shift/lapse safety rows remain brick-derived in the current comparison. | 7 |
 | unresolved | unresolved | A nested supporting diagnostic remains unavailable or unresolved and is not being represented as analytic fallback. | 8 |
+
+## Source / Mechanism Consumer Conformance
+
+- consumerConformanceStatus: conformant
+- conformanceDataMode: artifact_coupled
+- stalenessRisk: possible_latest_artifact_drift
+- artifactCouplingNote: Consumer-conformance is artifact-coupled: proof-pack surfaces are read from latest aliases, and the dashboard current-build outputs embed source/mechanism policy state sourced from latest artifacts.
+- checkedSurfaceCount: 5
+- conformantSurfaces: proof_pack_alias_json, proof_pack_audit_markdown, shift_plus_lapse_dashboard_json, shift_plus_lapse_dashboard_audit_markdown, shift_plus_lapse_dashboard_cards
+- nonConformantSurfaces: none
+- referenceOnlyScopePreserved: yes
+- referenceOnlyMissingOnSurfaces: none
+- laneAAuthorityPreserved: yes
+- laneAAuthorityMissingOnSurfaces: none
+- summary: Checked proof-pack JSON/markdown, dashboard JSON/markdown, and rendered dashboard card sources preserve the bounded advisory source/mechanism route, explicit Lane A authority, and reference_only scope. Consumer-conformance is artifact-coupled: proof-pack surfaces are read from latest aliases, and the dashboard current-build outputs embed source/mechanism policy state sourced from latest artifacts.
+- artifactPath: C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-mechanism-consumer-conformance-latest.json
+- reportPath: C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/docs/audits/research/warp-nhm2-source-mechanism-consumer-conformance-latest.md
