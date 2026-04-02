@@ -1,0 +1,65 @@
+{
+  "contract_id": "adm_gravity_diagnostic_contract",
+  "version": 1,
+  "baseline_lane_id": "adm_lane_reference_local_static_shift_plus_lapse",
+  "observer_family": "grid_static_local",
+  "foliation": "comoving_cartesian_3p1",
+  "sign_convention": "alphaGradientVec_m_inv resolves along x_ship/y_port/z_zenith; eulerian_accel_geom_i = partial_i alpha / alpha; beta_over_alpha_mag = |beta| / alpha.",
+  "required_fields": [
+    "alpha",
+    "alpha_grad_x",
+    "alpha_grad_y",
+    "alpha_grad_z",
+    "eulerian_accel_geom_x",
+    "eulerian_accel_geom_y",
+    "eulerian_accel_geom_z",
+    "eulerian_accel_geom_mag",
+    "beta_over_alpha_mag"
+  ],
+  "authoritative_status": {
+    "lane_a_york_remains_authoritative": true,
+    "contract_is_authoritative_for_readiness": false,
+    "contract_is_reference_only": true
+  },
+  "diagnostic_policy": {
+    "classification_scope": "diagnostic_local_only",
+    "promotion_status": "secondary_companion_only",
+    "hard_gate_role": "none",
+    "proof_surface_note": "Use Lane A for formal readiness and morphology claims. Use ADM gravity diagnostics only as secondary companion evidence."
+  },
+  "lanes": [
+    {
+      "lane_id": "adm_lane_reference_local_static_shift_plus_lapse",
+      "active": true,
+      "supported": true,
+      "observer_family": "grid_static_local",
+      "observer_definition_id": "obs.grid_static_local_shift_plus_lapse_v1",
+      "observer_inputs_required": [
+        "alpha",
+        "alpha_grad_x",
+        "alpha_grad_y",
+        "alpha_grad_z",
+        "eulerian_accel_geom_mag",
+        "beta_over_alpha_mag"
+      ],
+      "foliation": "comoving_cartesian_3p1",
+      "foliation_definition": "Local static and Eulerian companion diagnostics on the same fixed comoving Cartesian 3+1 foliation as Lane A.",
+      "required_fields": [
+        "alpha",
+        "alpha_grad_x",
+        "alpha_grad_y",
+        "alpha_grad_z",
+        "eulerian_accel_geom_x",
+        "eulerian_accel_geom_y",
+        "eulerian_accel_geom_z",
+        "eulerian_accel_geom_mag",
+        "beta_over_alpha_mag"
+      ],
+      "is_reference_only": true,
+      "is_authoritative_for_readiness": false,
+      "semantics_closed": true,
+      "proof_status": "secondary_companion_only",
+      "notes": "Secondary ADM gravity companion only. Lane A remains authoritative for readiness and morphology claims."
+    }
+  ]
+}

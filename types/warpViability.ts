@@ -46,6 +46,16 @@ export type WarpSolverGuardrailScalar = {
   exceeded?: boolean;
 };
 
+export type WarpCombinedShiftLapseSafety = {
+  status: "pass" | "warn" | "unknown";
+  betaOverAlphaMax?: number;
+  betaOverAlphaP98?: number;
+  betaOutwardOverAlphaWallMax?: number | null;
+  betaOutwardOverAlphaWallP98?: number | null;
+  wallHorizonMargin?: number | null;
+  note?: string;
+};
+
 export type WarpSolverGuardrails = {
   source: "pipeline-gr" | "proxy";
   proxy: boolean;
@@ -54,6 +64,7 @@ export type WarpSolverGuardrails = {
   M_constraint?: WarpSolverGuardrailConstraint;
   lapse?: WarpSolverGuardrailScalar;
   beta?: WarpSolverGuardrailScalar;
+  combinedShiftLapseSafety?: WarpCombinedShiftLapseSafety;
 };
 
 export interface WarpSnapshot {

@@ -326,6 +326,22 @@ const REQUESTED_RENDER_TAXONOMY_STANDARD_MEMO_PATH = path.join(
   "research",
   `render-taxonomy-and-labeling-standard-${REQUESTED_REPORT_DATE_STAMP}.md`,
 );
+const DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-shift-geometry-visualization-${DATE_STAMP}.json`,
+);
+const DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-shift-geometry-visualization-latest.json",
+);
+const DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-shift-geometry-visualization-${DATE_STAMP}.md`,
+);
+const DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-shift-geometry-visualization-latest.md",
+);
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
@@ -1664,6 +1680,8 @@ type Nhm2YorkFixedScaleComparisonArtifact = {
 type YorkOptixPresentationCaseId = CalibrationPanelCaseId;
 type YorkOptixPresentationRenderView = "transport-3p1" | "full-atlas";
 type YorkOptixPresentationFieldId =
+  | "beta_magnitude"
+  | "beta_x"
   | "longitudinal_signed_strain"
   | "tracefree_magnitude"
   | "energy_density"
@@ -1671,7 +1689,8 @@ type YorkOptixPresentationFieldId =
 type YorkOptixPresentationFieldNature = "signed" | "magnitude";
 type YorkOptixPresentationFieldVariant = "main" | "hull-overlay";
 type YorkOptixPresentationFieldRenderMode =
-  | "solve_backed_optix_context_field_projection";
+  | "solve_backed_optix_neutral_field_projection"
+  | "solve_backed_optix_neutral_field_hull_overlay";
 
 type YorkOptixPresentationLayerStatus = "available" | "degraded" | "missing";
 type YorkOptixPresentationQualityStatus = "ok" | "warning" | "failed";
@@ -1704,6 +1723,7 @@ type YorkOptixPresentationFindingCode =
 
 type RenderTaxonomyCategory =
   | "diagnostic_lane_a"
+  | "transport_context"
   | "scientific_3p1_field"
   | "comparison_panel"
   | "mechanism_overlay"
@@ -1718,11 +1738,28 @@ type RenderAuthoritativeStatus =
 
 type RenderTaxonomyFieldId =
   | YorkOptixPresentationFieldId
+  | "beta_direction_xz"
   | "trace_check_diagnostic"
   | "transport_context"
   | "atlas_context"
   | "comparison_card"
   | "comparison_overview";
+
+type RenderBaseImagePolicy =
+  | "native_renderer_output"
+  | "neutral_field_canvas"
+  | "field_plus_context_overlay";
+
+type RenderBaseImageSource =
+  | "native_renderer"
+  | "none"
+  | "transport_context"
+  | "hull_mask";
+
+type RenderContextCompositionMode =
+  | "none"
+  | "hull_overlay"
+  | "transport_context_overlay";
 
 type RenderOrientationConventionId = "x_ship_y_port_z_zenith";
 
@@ -1759,6 +1796,10 @@ type RenderTaxonomyEntryMetadata = {
   variant: string;
   canonicalPath: string | null;
   legacyPath: string | null;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
   frameLabel: RenderFrameLabelMetadata;
 };
 
@@ -1773,6 +1814,140 @@ type RenderTaxonomySummary = {
   repoOrientationConvention: RenderOrientationConventionId;
 };
 
+type ShiftGeometryStatus = "available" | "degraded" | "missing";
+type ShiftConstraintContextStatus =
+  | "deferred_units_and_policy_unresolved"
+  | "paired_constraint_companion_emitted";
+type ShiftDirectionOverlayWarningCode =
+  | "direction_streamline_generation_degraded"
+  | "direction_overlay_fell_back_to_hull_only"
+  | "direction_overlay_collapsed_across_cases";
+type ShiftDirectionOverlayEntryStatus =
+  | "case_specific_streamlines"
+  | "case_specific_glyph_fallback"
+  | "degraded_hull_only";
+type ShiftDirectionOverlayStatus = "available" | "degraded" | "collapsed" | "missing";
+type ShiftDirectionOverlayCaseDistinctness =
+  | "distinct_across_cases"
+  | "collapsed_across_cases"
+  | "mixed"
+  | "not_applicable";
+type ShiftGeometryMechanismFamily =
+  | "shift_geometry"
+  | "residual_to_control"
+  | "constraint_context";
+
+type ShiftGeometryFieldSummary = {
+  caseId: CalibrationPanelCaseId;
+  label: string;
+  metricVolumeHash: string | null;
+  laneAFieldHash: string | null;
+  betaMagnitudeMain: CanonicalVisualComparisonFieldSummary | null;
+  betaMagnitudeSliceCompanion: RenderTaxonomyEntryMetadata | null;
+  betaXMain: CanonicalVisualComparisonFieldSummary | null;
+  betaXSliceCompanion: RenderTaxonomyEntryMetadata | null;
+  betaDirectionXZ: RenderTaxonomyEntryMetadata | null;
+  betaDirectionXZStatus: ShiftDirectionOverlayEntryStatus | null;
+  betaDirectionXZWarnings: ShiftDirectionOverlayWarningCode[];
+  betaDirectionXZVectorFieldHash: string | null;
+  betaDirectionXZImageHash: string | null;
+};
+
+type ShiftGeometryResidualSummary = {
+  referenceCaseId: Extract<CalibrationPanelCaseId, "natario_control" | "alcubierre_control">;
+  referenceLabel: string;
+  betaMagnitudeResidual: RenderTaxonomyEntryMetadata | null;
+  betaXResidual: RenderTaxonomyEntryMetadata | null;
+  betaMagnitudeResidualAbsMax: number | null;
+  betaXResidualAbsMax: number | null;
+};
+
+type ShiftGeometryRenderEntry = {
+  renderId: string;
+  caseId: CalibrationPanelCaseId;
+  referenceCaseId: CalibrationPanelCaseId | null;
+  mechanismFamily: ShiftGeometryMechanismFamily;
+  renderCategory: RenderTaxonomyCategory;
+  renderRole: RenderTaxonomyRole;
+  authoritativeStatus: RenderAuthoritativeStatus;
+  primaryScientificQuestion: string;
+  fieldId: RenderTaxonomyFieldId;
+  variant: string;
+  canonicalPath: string | null;
+  legacyPath: string | null;
+  title: string;
+  subtitle: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  observer: string;
+  foliation: string;
+  signConvention: string;
+  laneId: string | null;
+  displayPolicyId: string | null;
+  displayRangeMin: number | null;
+  displayRangeMax: number | null;
+  displayTransform: string | null;
+  colormapFamily: string | null;
+  cameraPoseId: string | null;
+  orientationConventionId: RenderOrientationConventionId;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
+  imagePath: string | null;
+  imageHash: string | null;
+  metricVolumeHash: string | null;
+  thetaHash: string | null;
+  kTraceHash: string | null;
+  laneAFieldHash: string | null;
+  presentationScalarFieldHash: string | null;
+  directionVectorFieldHash: string | null;
+  streamSeedHash: string | null;
+  streamGeometryHash: string | null;
+  directionOverlayHash: string | null;
+  directionOverlayStatus: ShiftDirectionOverlayEntryStatus | null;
+  directionOverlayWarnings: ShiftDirectionOverlayWarningCode[];
+  fieldMin: number | null;
+  fieldMax: number | null;
+  fieldAbsMax: number | null;
+  renderTaxonomy: RenderTaxonomyEntryMetadata | null;
+  warnings: string[];
+  note: string | null;
+};
+
+type Nhm2ShiftGeometryVisualizationArtifact = {
+  artifactType: "nhm2_shift_geometry_visualization/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string;
+  canonicalCalibrationArtifactPath: string;
+  optixRenderArtifactPath: string;
+  shiftGeometryStatus: ShiftGeometryStatus;
+  caseSet: CalibrationPanelCaseId[];
+  shiftConvention: {
+    storedShiftComponent: "beta^i";
+    betaXDefinition: "beta^x";
+    betaMagnitudeDefinition: "|beta| = sqrt(gamma_ij beta^i beta^j)";
+    observer: string;
+    foliation: string;
+    laneId: string;
+    signConvention: string;
+  };
+  renderEntries: ShiftGeometryRenderEntry[];
+  fieldSummaries: ShiftGeometryFieldSummary[];
+  residualSummaries: ShiftGeometryResidualSummary[];
+  directionOverlayStatus: ShiftDirectionOverlayStatus;
+  directionOverlayWarnings: ShiftDirectionOverlayWarningCode[];
+  directionOverlayCaseDistinctness: ShiftDirectionOverlayCaseDistinctness;
+  constraintContextStatus: ShiftConstraintContextStatus;
+  recommendedInterpretationOrder: string[];
+  lineCutStatus: "deferred_pending_probe_family";
+  renderTaxonomy: RenderTaxonomySummary | null;
+  notes: string[];
+  checksum?: string;
+};
+
 type RenderTaxonomyManifestEntry = {
   renderId: string;
   caseId: string;
@@ -1784,6 +1959,10 @@ type RenderTaxonomyManifestEntry = {
   legacyPath: string | null;
   authoritativeStatus: RenderAuthoritativeStatus;
   primaryScientificQuestion: string;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
   title: string;
   subtitle: string;
   quantitySymbol: string;
@@ -1855,6 +2034,8 @@ type YorkOptixPresentationMetricBinding = {
   laneAFieldHash: string | null;
   thetaChannelHash: string | null;
   kTraceChannelHash: string | null;
+  betaMagnitudeHash: string | null;
+  betaXHash: string | null;
   longitudinalSignedStrainHash: string | null;
   tracefreeMagnitudeHash: string | null;
   energyDensityHash: string | null;
@@ -1865,6 +2046,10 @@ type YorkOptixPresentationContextRenderEntry = {
   renderView: YorkOptixPresentationRenderView;
   caption: string;
   presentationRenderMode: "optix_scientific_transport_3p1" | "optix_scientific_full_atlas";
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
   endpoint: string;
   requestId: string;
   presentationRenderRequestHash: string;
@@ -1927,6 +2112,10 @@ type YorkOptixPresentationFieldRenderEntry = {
   fieldNature: YorkOptixPresentationFieldNature;
   variant: YorkOptixPresentationFieldVariant;
   contextRenderView: YorkOptixPresentationRenderView;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
   authoritativeSource: string;
   presentationFieldSelector: string;
   presentationFieldSelectorHash: string;
@@ -2038,6 +2227,10 @@ type CanonicalVisualComparisonFieldSummary = {
   imagePath: string | null;
   imageHash: string | null;
   laneId: string | null;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
   fieldMin: number | null;
   fieldMax: number | null;
   fieldAbsMax: number | null;
@@ -2094,6 +2287,8 @@ type CanonicalVisualComparisonCaseRecord = {
     presentationSummary: string;
   };
   morphologyInterpretation: {
+    beta_magnitude: string;
+    beta_x: string;
     trace_check: string;
     longitudinal_signed_strain: string;
     tracefree_magnitude: string;
@@ -3882,6 +4077,17 @@ export type ProofPackPayload = {
     artifactPath: string;
     reportPath: string;
   };
+  shiftGeometrySummary?: {
+    shiftGeometryStatus: ShiftGeometryStatus;
+    mandatoryFirstPassFields: string[];
+    mandatoryResidualComparisons: string[];
+    directionOverlayStatus: ShiftDirectionOverlayStatus;
+    directionOverlayCaseDistinctness: ShiftDirectionOverlayCaseDistinctness;
+    directionOverlayWarnings: ShiftDirectionOverlayWarningCode[];
+    constraintContextStatus: ShiftConstraintContextStatus;
+    artifactPath: string;
+    reportPath: string;
+  };
   renderTaxonomySummary?: {
     authoritativeRenderCategory: RenderTaxonomyCategory;
     presentationRenderCategory: RenderTaxonomyCategory;
@@ -3937,6 +4143,24 @@ const OPTIX_PRESENTATION_VIEWS: YorkOptixPresentationRenderView[] = [
 ];
 const OPTIX_PRESENTATION_FRAME_SIZE = { width: 1280, height: 720 } as const;
 const OPTIX_PRESENTATION_FIELD_DESCRIPTORS: YorkOptixPresentationFieldDescriptor[] = [
+  {
+    presentationFieldId: "beta_magnitude",
+    label: "Shift magnitude",
+    formula: "|beta| = sqrt(gamma_ij beta^i beta^j)",
+    nature: "magnitude",
+    primaryContextView: "transport-3p1",
+    description:
+      "Shift-magnitude transport intensity derived from the solved ADM shift components on the same authoritative snapshot.",
+  },
+  {
+    presentationFieldId: "beta_x",
+    label: "Ship-axis shift",
+    formula: "beta^x",
+    nature: "signed",
+    primaryContextView: "transport-3p1",
+    description:
+      "Signed ship-axis shift component rendered directly from the solved contravariant beta^x channel in the comoving Cartesian chart.",
+  },
   {
     presentationFieldId: "longitudinal_signed_strain",
     label: "Longitudinal signed strain",
@@ -4109,6 +4333,13 @@ const RENDER_TAXONOMY_CATEGORY_DEFINITIONS: Array<{
       "Authoritative Lane A fixed-scale diagnostic outputs used for formal comparison and morphology class decisions.",
   },
   {
+    renderCategory: "transport_context",
+    renderRole: "presentation",
+    authoritativeStatus: "secondary_solve_backed",
+    description:
+      "Solve-backed volumetric transport-context renders that provide overall 3+1 morphology context without serving as dedicated field frames.",
+  },
+  {
     renderCategory: "scientific_3p1_field",
     renderRole: "presentation",
     authoritativeStatus: "secondary_solve_backed",
@@ -4150,6 +4381,44 @@ const RENDER_FIELD_FAMILY_DEFINITIONS: Array<{
   defaultDisplayTransform: string | null;
   defaultColormapFamily: string | null;
 }> = [
+  {
+    fieldId: "beta_magnitude",
+    label: "Shift magnitude",
+    quantitySymbol: "|beta|",
+    quantityUnits: "dimensionless",
+    defaultCategory: "scientific_3p1_field",
+    defaultRole: "presentation",
+    primaryScientificQuestion: "Where does the solved transport intensity live?",
+    defaultDisplayPolicyId: "optix_beta_magnitude_positive_log10",
+    defaultDisplayTransform: "positive_log10",
+    defaultColormapFamily: "sequential_inferno",
+  },
+  {
+    fieldId: "beta_x",
+    label: "Ship-axis shift",
+    quantitySymbol: "beta^x",
+    quantityUnits: "dimensionless",
+    defaultCategory: "scientific_3p1_field",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "How does forward/back transport organize along the ship axis in the solved 3+1 field?",
+    defaultDisplayPolicyId: "optix_beta_x_signed_asinh",
+    defaultDisplayTransform: "signed_asinh",
+    defaultColormapFamily: "diverging_cyan_amber",
+  },
+  {
+    fieldId: "beta_direction_xz",
+    label: "Shift direction x-z",
+    quantitySymbol: "beta^x / beta^z",
+    quantityUnits: "dimensionless",
+    defaultCategory: "mechanism_overlay",
+    defaultRole: "overlay",
+    primaryScientificQuestion:
+      "Does the transport pattern look shell-localized and sliding/shear-like on the x-z slice?",
+    defaultDisplayPolicyId: "shift_direction_stream_xz",
+    defaultDisplayTransform: "vector_streamline",
+    defaultColormapFamily: "diverging_cyan_amber",
+  },
   {
     fieldId: "trace_check",
     label: "Trace check",
@@ -4220,7 +4489,7 @@ const RENDER_FIELD_FAMILY_DEFINITIONS: Array<{
     label: "3+1 transport context",
     quantitySymbol: "theta context",
     quantityUnits: "s^-1",
-    defaultCategory: "mechanism_overlay",
+    defaultCategory: "transport_context",
     defaultRole: "presentation",
     primaryScientificQuestion:
       "What is the solve-backed overall 3+1 morphology context before drilling down into single-field renders?",
@@ -4349,6 +4618,10 @@ const createRenderTaxonomyMetadata = (args: {
   displayTransform: string | null;
   colormapFamily: string | null;
   cameraPoseId: string | null;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
   titlePrefix?: string | null;
 }): RenderTaxonomyEntryMetadata => {
   const fieldFamily = resolveRenderFieldFamilyDefinition(args.fieldId);
@@ -4370,6 +4643,10 @@ const createRenderTaxonomyMetadata = (args: {
     variant: args.variant,
     canonicalPath: normalizePath(canonicalPath),
     legacyPath: args.legacyPath ? normalizePath(args.legacyPath) : null,
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
     frameLabel: {
       title,
       subtitle: buildRenderSubtitle({
@@ -4411,6 +4688,10 @@ const toRenderTaxonomyManifestEntry = (
   legacyPath: metadata.legacyPath,
   authoritativeStatus: metadata.authoritativeStatus,
   primaryScientificQuestion: metadata.primaryScientificQuestion,
+  baseImagePolicy: metadata.baseImagePolicy,
+  baseImageSource: metadata.baseImageSource,
+  inheritsTransportContext: metadata.inheritsTransportContext,
+  contextCompositionMode: metadata.contextCompositionMode,
   title: metadata.frameLabel.title,
   subtitle: metadata.frameLabel.subtitle,
   quantitySymbol: metadata.frameLabel.quantitySymbol,
@@ -15751,6 +16032,8 @@ type YorkOptixDerivedPresentationField = {
 const clamp01 = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 
+const lerp = (lhs: number, rhs: number, t: number): number => lhs + (rhs - lhs) * t;
+
 const decodePngToRgba = async (
   png: Buffer,
 ): Promise<{
@@ -15931,6 +16214,42 @@ const computeYorkOptixPresentationDisplayPolicy = (args: {
     robustPositive;
   const nonzeroFloor = 1e-90;
   switch (args.field.presentationFieldId) {
+    case "beta_magnitude": {
+      const displayMax = Math.max(robustPositive, fieldAbsMax * 0.35, nonzeroFloor);
+      return {
+        displayPolicyId: "optix_beta_magnitude_positive_log10",
+        displayRangeMin: 0,
+        displayRangeMax: displayMax,
+        displayTransform: "positive_log10",
+        displayTransformScale: Math.max(midPositive ?? displayMax / 22, displayMax / 48, nonzeroFloor),
+        colormapFamily: "sequential_inferno",
+        visibilityFloor: 0.014,
+        alphaFloor: 0.38,
+        alphaScale: 0.72,
+        radiusFloor: 1,
+        radiusScale: 5,
+        baseDimFactor: 0.18,
+        overlayOpacity: 0.99,
+      };
+    }
+    case "beta_x": {
+      const displayAbs = Math.max(robustAbs, fieldAbsMax * 0.3, nonzeroFloor);
+      return {
+        displayPolicyId: "optix_beta_x_signed_asinh",
+        displayRangeMin: -displayAbs,
+        displayRangeMax: displayAbs,
+        displayTransform: "signed_asinh",
+        displayTransformScale: Math.max(midAbs ?? displayAbs / 10, displayAbs / 24, nonzeroFloor),
+        colormapFamily: "diverging_cyan_amber",
+        visibilityFloor: 0.018,
+        alphaFloor: 0.3,
+        alphaScale: 0.64,
+        radiusFloor: 1,
+        radiusScale: 4,
+        baseDimFactor: 0.2,
+        overlayOpacity: 0.98,
+      };
+    }
     case "longitudinal_signed_strain": {
       const displayAbs = Math.max(robustAbs, fieldAbsMax * 0.35, nonzeroFloor);
       return {
@@ -16032,6 +16351,212 @@ const invertSymmetric3x3 = (
     c12 * invDet,
     c22 * invDet,
   ];
+};
+
+export const deriveYorkOptixShiftMagnitude = (
+  snapshot: HullScientificSnapshot,
+): Float64Array | null => {
+  const betaX = snapshot.channels.beta_x?.data;
+  const betaY = snapshot.channels.beta_y?.data;
+  const betaZ = snapshot.channels.beta_z?.data;
+  const gammaXX = snapshot.channels.gamma_xx?.data;
+  const gammaXY = snapshot.channels.gamma_xy?.data;
+  const gammaXZ = snapshot.channels.gamma_xz?.data;
+  const gammaYY = snapshot.channels.gamma_yy?.data;
+  const gammaYZ = snapshot.channels.gamma_yz?.data;
+  const gammaZZ = snapshot.channels.gamma_zz?.data;
+  if (
+    !(betaX instanceof Float32Array) ||
+    !(betaY instanceof Float32Array) ||
+    !(betaZ instanceof Float32Array) ||
+    !(gammaXX instanceof Float32Array) ||
+    !(gammaXY instanceof Float32Array) ||
+    !(gammaXZ instanceof Float32Array) ||
+    !(gammaYY instanceof Float32Array) ||
+    !(gammaYZ instanceof Float32Array) ||
+    !(gammaZZ instanceof Float32Array)
+  ) {
+    return null;
+  }
+  const n = Math.min(
+    betaX.length,
+    betaY.length,
+    betaZ.length,
+    gammaXX.length,
+    gammaXY.length,
+    gammaXZ.length,
+    gammaYY.length,
+    gammaYZ.length,
+    gammaZZ.length,
+  );
+  if (n <= 0) return null;
+  const out = new Float64Array(n);
+  let hasSignal = false;
+  for (let i = 0; i < n; i += 1) {
+    const bx = Number(betaX[i] ?? 0);
+    const by = Number(betaY[i] ?? 0);
+    const bz = Number(betaZ[i] ?? 0);
+    const scalar =
+      Number(gammaXX[i] ?? 0) * bx * bx +
+      2 * Number(gammaXY[i] ?? 0) * bx * by +
+      2 * Number(gammaXZ[i] ?? 0) * bx * bz +
+      Number(gammaYY[i] ?? 0) * by * by +
+      2 * Number(gammaYZ[i] ?? 0) * by * bz +
+      Number(gammaZZ[i] ?? 0) * bz * bz;
+    const resolved = Number.isFinite(scalar) && scalar > 0 ? Math.sqrt(scalar) : 0;
+    out[i] = resolved;
+    hasSignal ||= resolved > 0;
+  }
+  return hasSignal ? out : new Float64Array(n);
+};
+
+const deriveYorkOptixMomentumConstraintMagnitude = (
+  snapshot: HullScientificSnapshot,
+): Float64Array | null => {
+  const mx = snapshot.channels.M_constraint_x?.data;
+  const my = snapshot.channels.M_constraint_y?.data;
+  const mz = snapshot.channels.M_constraint_z?.data;
+  if (
+    !(mx instanceof Float32Array) ||
+    !(my instanceof Float32Array) ||
+    !(mz instanceof Float32Array)
+  ) {
+    return null;
+  }
+  const n = Math.min(mx.length, my.length, mz.length);
+  if (n <= 0) return null;
+  const out = new Float64Array(n);
+  let hasSignal = false;
+  for (let i = 0; i < n; i += 1) {
+    const value = Math.hypot(Number(mx[i] ?? 0), Number(my[i] ?? 0), Number(mz[i] ?? 0));
+    const resolved = Number.isFinite(value) ? value : 0;
+    out[i] = resolved;
+    hasSignal ||= resolved > 0;
+  }
+  return hasSignal ? out : new Float64Array(n);
+};
+
+const extractYorkNumericSliceXZMidplane = (
+  field: YorkOptixNumericField,
+  dims: [number, number, number],
+): Float32Array => {
+  const [nx, ny, nz] = dims;
+  const yMid = clampi(Math.floor(ny * 0.5), 0, ny - 1);
+  const out = new Float32Array(nx * nz);
+  for (let z = 0; z < nz; z += 1) {
+    for (let x = 0; x < nx; x += 1) {
+      out[z * nx + x] = Number(field[idx3(x, yMid, z, dims)] ?? 0);
+    }
+  }
+  return out;
+};
+
+const extractYorkNumericSliceXRho = (
+  field: YorkOptixNumericField,
+  dims: [number, number, number],
+): Float32Array => {
+  const [nx, ny, nz] = dims;
+  const rhoBins = Math.max(2, nz);
+  const yCenter = (ny - 1) * 0.5;
+  const zCenter = (nz - 1) * 0.5;
+  const maxRho = Math.max(1e-9, Math.hypot(Math.max(yCenter, 1), Math.max(zCenter, 1)));
+  const out = new Float32Array(nx * rhoBins);
+  const sum = new Float64Array(rhoBins);
+  const count = new Uint32Array(rhoBins);
+  for (let x = 0; x < nx; x += 1) {
+    sum.fill(0);
+    count.fill(0);
+    for (let y = 0; y < ny; y += 1) {
+      const dy = y - yCenter;
+      for (let z = 0; z < nz; z += 1) {
+        const dz = z - zCenter;
+        const rhoNorm = Math.hypot(dy, dz) / maxRho;
+        const rhoBin = clampi(Math.round(rhoNorm * (rhoBins - 1)), 0, rhoBins - 1);
+        const value = Number(field[idx3(x, y, z, dims)] ?? 0);
+        sum[rhoBin] += value;
+        count[rhoBin] += 1;
+      }
+    }
+    for (let rho = 0; rho < rhoBins; rho += 1) {
+      const n = count[rho];
+      out[rho * nx + x] = n > 0 ? Number(sum[rho] / n) : 0;
+    }
+  }
+  return out;
+};
+
+const extractYorkNumericSliceForView = (
+  field: YorkOptixNumericField,
+  dims: [number, number, number],
+  view: "x-z-midplane" | "x-rho",
+): Float32Array =>
+  view === "x-rho" ? extractYorkNumericSliceXRho(field, dims) : extractYorkNumericSliceXZMidplane(field, dims);
+
+const computeYorkNumericResidual = (
+  lhs: YorkOptixNumericField | null,
+  rhs: YorkOptixNumericField | null,
+): Float64Array | null => {
+  if (
+    !(lhs instanceof Float32Array) &&
+    !(lhs instanceof Float64Array)
+  ) {
+    return null;
+  }
+  if (
+    !(rhs instanceof Float32Array) &&
+    !(rhs instanceof Float64Array)
+  ) {
+    return null;
+  }
+  const n = Math.min(lhs.length, rhs.length);
+  if (n <= 0) return null;
+  const out = new Float64Array(n);
+  let hasSignal = false;
+  for (let i = 0; i < n; i += 1) {
+    const value = Number(lhs[i] ?? 0) - Number(rhs[i] ?? 0);
+    const resolved = Number.isFinite(value) ? value : 0;
+    out[i] = resolved;
+    hasSignal ||= resolved !== 0;
+  }
+  return hasSignal ? out : new Float64Array(n);
+};
+
+const sampleYorkNumericAxialLine = (args: {
+  field: YorkOptixNumericField;
+  snapshot: HullScientificSnapshot;
+  quantity: string;
+}) => {
+  const [nx, ny, nz] = args.snapshot.dims;
+  const yMid = clampi(Math.floor(ny * 0.5), 0, ny - 1);
+  const zMid = clampi(Math.floor(nz * 0.5), 0, nz - 1);
+  const bounds = args.snapshot.bounds;
+  const minX = bounds?.min?.[0] ?? -1;
+  const maxX = bounds?.max?.[0] ?? 1;
+  const out = new Float64Array(nx);
+  let peakIndex = 0;
+  let peakAbs = -1;
+  for (let x = 0; x < nx; x += 1) {
+    const value = Number(args.field[idx3(x, yMid, zMid, args.snapshot.dims)] ?? 0);
+    out[x] = Number.isFinite(value) ? value : 0;
+    const absValue = Math.abs(out[x] ?? 0);
+    if (absValue > peakAbs) {
+      peakAbs = absValue;
+      peakIndex = x;
+    }
+  }
+  const denom = Math.max(nx - 1, 1);
+  const peakLocation =
+    minX + ((maxX - minX) * peakIndex) / denom;
+  return {
+    quantity: args.quantity,
+    endpoints: {
+      start: [minX, 0, 0] as [number, number, number],
+      end: [maxX, 0, 0] as [number, number, number],
+    },
+    sampleCount: nx,
+    peakLocation,
+    samples: out,
+  };
 };
 
 export const deriveYorkOptixTracefreeMagnitude = (
@@ -16250,6 +16775,21 @@ const deriveYorkOptixPresentationField = (args: {
   let authoritativeSource = "";
   let note = "";
   switch (args.descriptor.presentationFieldId) {
+    case "beta_magnitude":
+      data = deriveYorkOptixShiftMagnitude(args.snapshot);
+      authoritativeSource = "derived.sqrt_gamma_ij_beta^i_beta^j";
+      note =
+        "Shift magnitude derived from the solved contravariant shift components using the same spatial metric path: |beta| = sqrt(gamma_ij beta^i beta^j).";
+      break;
+    case "beta_x":
+      data =
+        args.snapshot.channels.beta_x?.data instanceof Float32Array
+          ? args.snapshot.channels.beta_x.data
+          : null;
+      authoritativeSource = "snapshot.channel.beta_x";
+      note =
+        "Signed ship-axis transport component rendered directly from the solved contravariant beta^x channel.";
+      break;
     case "longitudinal_signed_strain":
       data =
         args.snapshot.channels.K_xx?.data instanceof Float32Array
@@ -16524,6 +17064,555 @@ const compositeYorkOptixPresentationLayers = async (args: {
   });
 };
 
+const createYorkOptixNeutralFieldCanvas = async (args: {
+  width: number;
+  height: number;
+}): Promise<Buffer> => {
+  const rgba = new Uint8ClampedArray(args.width * args.height * 4);
+  for (let pixelIndex = 0; pixelIndex < args.width * args.height; pixelIndex += 1) {
+    const base = pixelIndex * 4;
+    rgba[base] = 9;
+    rgba[base + 1] = 13;
+    rgba[base + 2] = 18;
+    rgba[base + 3] = 255;
+  }
+  return encodeRgbaToPng({
+    rgba,
+    width: args.width,
+    height: args.height,
+  });
+};
+
+const computeSliceCanvasPlacement = (args: {
+  sourceWidth: number;
+  sourceHeight: number;
+  outputWidth: number;
+  outputHeight: number;
+  padding?: number;
+}) => {
+  const padding = args.padding ?? 44;
+  const targetWidth = Math.max(1, args.outputWidth - padding * 2);
+  const targetHeight = Math.max(1, args.outputHeight - padding * 2);
+  const sourceAspect = args.sourceWidth / Math.max(args.sourceHeight, 1);
+  const targetAspect = targetWidth / Math.max(targetHeight, 1);
+  let drawWidth = targetWidth;
+  let drawHeight = targetHeight;
+  if (sourceAspect > targetAspect) {
+    drawHeight = Math.max(1, Math.round(targetWidth / Math.max(sourceAspect, 1e-9)));
+  } else {
+    drawWidth = Math.max(1, Math.round(targetHeight * sourceAspect));
+  }
+  const offsetX = Math.max(0, Math.floor((args.outputWidth - drawWidth) * 0.5));
+  const offsetY = Math.max(0, Math.floor((args.outputHeight - drawHeight) * 0.5));
+  return { offsetX, offsetY, drawWidth, drawHeight };
+};
+
+const createNeutralFieldCanvasRgba = (args: {
+  width: number;
+  height: number;
+}): Uint8ClampedArray => {
+  const rgba = new Uint8ClampedArray(args.width * args.height * 4);
+  for (let pixelIndex = 0; pixelIndex < args.width * args.height; pixelIndex += 1) {
+    const base = pixelIndex * 4;
+    rgba[base] = 9;
+    rgba[base + 1] = 13;
+    rgba[base + 2] = 18;
+    rgba[base + 3] = 255;
+  }
+  return rgba;
+};
+
+const paintShiftSliceBoundaryOverlay = (args: {
+  rgba: Uint8ClampedArray;
+  outputWidth: number;
+  outputHeight: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  placement: {
+    offsetX: number;
+    offsetY: number;
+    drawWidth: number;
+    drawHeight: number;
+  };
+  supportSlice?: Float32Array | null;
+  hullSdfSlice?: Float32Array | null;
+}) => {
+  const drawPoint = (sx: number, sy: number, color: readonly [number, number, number]) => {
+    const px =
+      args.placement.offsetX +
+      Math.round((sx / Math.max(args.sourceWidth - 1, 1)) * Math.max(args.placement.drawWidth - 1, 0));
+    const py =
+      args.placement.offsetY +
+      Math.round((sy / Math.max(args.sourceHeight - 1, 1)) * Math.max(args.placement.drawHeight - 1, 0));
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const x = px + dx;
+        const y = py + dy;
+        if (x < 0 || y < 0 || x >= args.outputWidth || y >= args.outputHeight) continue;
+        const idx = (y * args.outputWidth + x) * 4;
+        args.rgba[idx] = lerpByte(args.rgba[idx], color[0], 0.72);
+        args.rgba[idx + 1] = lerpByte(args.rgba[idx + 1], color[1], 0.72);
+        args.rgba[idx + 2] = lerpByte(args.rgba[idx + 2], color[2], 0.72);
+        args.rgba[idx + 3] = 255;
+      }
+    }
+  };
+  const isSupportBoundary = (x: number, y: number) => {
+    if (!(args.supportSlice instanceof Float32Array)) return false;
+    const index = y * args.sourceWidth + x;
+    if ((args.supportSlice[index] ?? 0) <= 0.5) return false;
+    for (const [dx, dy] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= args.sourceWidth || ny >= args.sourceHeight) return true;
+      const neighbor = args.supportSlice[ny * args.sourceWidth + nx] ?? 0;
+      if (neighbor <= 0.5) return true;
+    }
+    return false;
+  };
+  const isHullBoundary = (x: number, y: number) => {
+    if (!(args.hullSdfSlice instanceof Float32Array)) return false;
+    const index = y * args.sourceWidth + x;
+    const value = Number(args.hullSdfSlice[index] ?? Number.NaN);
+    if (!Number.isFinite(value)) return false;
+    if (Math.abs(value) <= 1e-4) return true;
+    for (const [dx, dy] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= args.sourceWidth || ny >= args.sourceHeight) continue;
+      const neighbor = Number(args.hullSdfSlice[ny * args.sourceWidth + nx] ?? Number.NaN);
+      if (!Number.isFinite(neighbor)) continue;
+      if ((value <= 0 && neighbor > 0) || (value >= 0 && neighbor < 0)) return true;
+    }
+    return false;
+  };
+  for (let y = 0; y < args.sourceHeight; y += 1) {
+    for (let x = 0; x < args.sourceWidth; x += 1) {
+      if (isSupportBoundary(x, y)) {
+        drawPoint(x, y, [214, 238, 255]);
+      }
+      if (isHullBoundary(x, y)) {
+        drawPoint(x, y, [255, 191, 92]);
+      }
+    }
+  }
+};
+
+const renderYorkOptixFieldSlicePng = async (args: {
+  slice: Float32Array;
+  sourceWidth: number;
+  sourceHeight: number;
+  outputWidth: number;
+  outputHeight: number;
+  fieldNature: YorkOptixPresentationFieldNature;
+  displayPolicy: YorkOptixPresentationDisplayPolicy;
+  includeHullOverlay: boolean;
+  supportSlice?: Float32Array | null;
+  hullSdfSlice?: Float32Array | null;
+}): Promise<Buffer> => {
+  const rgba = createNeutralFieldCanvasRgba({
+    width: args.outputWidth,
+    height: args.outputHeight,
+  });
+  const placement = computeSliceCanvasPlacement({
+    sourceWidth: args.sourceWidth,
+    sourceHeight: args.sourceHeight,
+    outputWidth: args.outputWidth,
+    outputHeight: args.outputHeight,
+  });
+  for (let py = 0; py < placement.drawHeight; py += 1) {
+    const sy = Math.max(
+      0,
+      Math.min(
+        args.sourceHeight - 1,
+        Math.floor((py / Math.max(placement.drawHeight - 1, 1)) * Math.max(args.sourceHeight - 1, 0)),
+      ),
+    );
+    for (let px = 0; px < placement.drawWidth; px += 1) {
+      const sx = Math.max(
+        0,
+        Math.min(
+          args.sourceWidth - 1,
+          Math.floor((px / Math.max(placement.drawWidth - 1, 1)) * Math.max(args.sourceWidth - 1, 0)),
+        ),
+      );
+      const value = Number(args.slice[sy * args.sourceWidth + sx] ?? 0);
+      const normalizedMagnitude = mapYorkOptixDisplayMagnitude(value, args.displayPolicy);
+      const color = mapYorkOptixPresentationFieldToRgb({
+        value,
+        normalizedMagnitude,
+        policy: args.displayPolicy,
+        nature: args.fieldNature,
+      });
+      const idx =
+        ((placement.offsetY + py) * args.outputWidth + placement.offsetX + px) * 4;
+      rgba[idx] = color[0];
+      rgba[idx + 1] = color[1];
+      rgba[idx + 2] = color[2];
+      rgba[idx + 3] = 255;
+    }
+  }
+  if (args.includeHullOverlay) {
+    paintShiftSliceBoundaryOverlay({
+      rgba,
+      outputWidth: args.outputWidth,
+      outputHeight: args.outputHeight,
+      sourceWidth: args.sourceWidth,
+      sourceHeight: args.sourceHeight,
+      placement,
+      supportSlice: args.supportSlice,
+      hullSdfSlice: args.hullSdfSlice,
+    });
+  }
+  return encodeRgbaToPng({
+    rgba,
+    width: args.outputWidth,
+    height: args.outputHeight,
+  });
+};
+
+const sampleShiftVectorSlice = (args: {
+  betaXSlice: Float32Array;
+  betaZSlice: Float32Array;
+  sourceWidth: number;
+  sourceHeight: number;
+  x: number;
+  y: number;
+}): { vx: number; vy: number; magnitude: number } => {
+  const x0 = clampi(Math.floor(args.x), 0, args.sourceWidth - 1);
+  const y0 = clampi(Math.floor(args.y), 0, args.sourceHeight - 1);
+  const x1 = clampi(x0 + 1, 0, args.sourceWidth - 1);
+  const y1 = clampi(y0 + 1, 0, args.sourceHeight - 1);
+  const tx = clamp01(args.x - x0);
+  const ty = clamp01(args.y - y0);
+  const lerpField = (field: Float32Array) => {
+    const v00 = Number(field[y0 * args.sourceWidth + x0] ?? 0);
+    const v10 = Number(field[y0 * args.sourceWidth + x1] ?? 0);
+    const v01 = Number(field[y1 * args.sourceWidth + x0] ?? 0);
+    const v11 = Number(field[y1 * args.sourceWidth + x1] ?? 0);
+    return lerp(lerp(v00, v10, tx), lerp(v01, v11, tx), ty);
+  };
+  const vx = lerpField(args.betaXSlice);
+  const vy = lerpField(args.betaZSlice);
+  return { vx, vy, magnitude: Math.hypot(vx, vy) };
+};
+
+const buildShiftDirectionStreamlinePath = (args: {
+  betaXSlice: Float32Array;
+  betaZSlice: Float32Array;
+  sourceWidth: number;
+  sourceHeight: number;
+  seedX: number;
+  seedY: number;
+  magnitudeFloor: number;
+  referenceMagnitude: number;
+  maxSteps?: number;
+}) => {
+  const integrate = (direction: 1 | -1) => {
+    const points: Array<{ x: number; y: number; vx: number; vy: number; magnitude: number }> = [];
+    let x = args.seedX;
+    let y = args.seedY;
+    for (let step = 0; step < (args.maxSteps ?? 64); step += 1) {
+      if (x < 1 || y < 1 || x >= args.sourceWidth - 1 || y >= args.sourceHeight - 1) break;
+      const sample = sampleShiftVectorSlice({
+        betaXSlice: args.betaXSlice,
+        betaZSlice: args.betaZSlice,
+        sourceWidth: args.sourceWidth,
+        sourceHeight: args.sourceHeight,
+        x,
+        y,
+      });
+      if (!Number.isFinite(sample.magnitude) || sample.magnitude <= args.magnitudeFloor) break;
+      points.push({ x, y, ...sample });
+      const ux = sample.vx / Math.max(sample.magnitude, Number.MIN_VALUE);
+      const uy = sample.vy / Math.max(sample.magnitude, Number.MIN_VALUE);
+      const relativeMagnitude = clamp01(
+        sample.magnitude / Math.max(args.referenceMagnitude, args.magnitudeFloor, Number.MIN_VALUE),
+      );
+      const stepScale = 0.72 + relativeMagnitude * 0.42;
+      x += ux * stepScale * direction;
+      y += uy * stepScale * direction;
+    }
+    return points;
+  };
+  const backward = integrate(-1).reverse();
+  const forward = integrate(1);
+  const merged = [...backward, { x: args.seedX, y: args.seedY, vx: 0, vy: 0, magnitude: 0 }, ...forward];
+  return merged.filter((point, index, array) => {
+    if (index === 0) return true;
+    const prev = array[index - 1]!;
+    return Math.hypot(point.x - prev.x, point.y - prev.y) > 0.2;
+  });
+};
+
+const buildShiftDirectionVectorFieldHash = (args: {
+  betaXSlice: Float32Array;
+  betaZSlice: Float32Array;
+  sourceWidth: number;
+  sourceHeight: number;
+}): string =>
+  sha256Hex(
+    stableStringify({
+      betaXHash: computeOptionalFloat32Hash(args.betaXSlice),
+      betaZHash: computeOptionalFloat32Hash(args.betaZSlice),
+      sourceWidth: args.sourceWidth,
+      sourceHeight: args.sourceHeight,
+    }),
+  );
+
+const renderShiftDirectionXzOverlayPng = async (args: {
+  betaXSlice: Float32Array;
+  betaZSlice: Float32Array;
+  sourceWidth: number;
+  sourceHeight: number;
+  outputWidth: number;
+  outputHeight: number;
+  supportSlice?: Float32Array | null;
+  hullSdfSlice?: Float32Array | null;
+}): Promise<{
+  png: Buffer;
+  directionVectorFieldHash: string;
+  streamSeedHash: string | null;
+  streamGeometryHash: string | null;
+  directionOverlayHash: string;
+  status: ShiftDirectionOverlayEntryStatus;
+  warnings: ShiftDirectionOverlayWarningCode[];
+  streamlineCount: number;
+  glyphCount: number;
+}> => {
+  const placement = computeSliceCanvasPlacement({
+    sourceWidth: args.sourceWidth,
+    sourceHeight: args.sourceHeight,
+    outputWidth: args.outputWidth,
+    outputHeight: args.outputHeight,
+  });
+  const magnitudeSamples: number[] = [];
+  for (let i = 0; i < args.betaXSlice.length; i += 1) {
+    const magnitude = Math.hypot(Number(args.betaXSlice[i] ?? 0), Number(args.betaZSlice[i] ?? 0));
+    if (Number.isFinite(magnitude) && magnitude > 0) {
+      magnitudeSamples.push(magnitude);
+    }
+  }
+  magnitudeSamples.sort((a, b) => a - b);
+  const directionVectorFieldHash = buildShiftDirectionVectorFieldHash(args);
+  const maxMagnitude = magnitudeSamples.at(-1) ?? 0;
+  const robustMagnitude =
+    computeSortedYorkOptixQuantile(magnitudeSamples, 0.98) ??
+    computeSortedYorkOptixQuantile(magnitudeSamples, 0.9) ??
+    maxMagnitude;
+  const magnitudeFloor =
+    maxMagnitude > 0
+      ? Math.max(robustMagnitude * 1e-6, maxMagnitude * 1e-12, Number.MIN_VALUE)
+      : Number.POSITIVE_INFINITY;
+  const seedFloor =
+    maxMagnitude > 0
+      ? Math.max(
+          (computeSortedYorkOptixQuantile(magnitudeSamples, 0.7) ??
+            computeSortedYorkOptixQuantile(magnitudeSamples, 0.55) ??
+            maxMagnitude) * 0.85,
+          magnitudeFloor,
+        )
+      : Number.POSITIVE_INFINITY;
+  const seedCandidates: Array<{ x: number; y: number; vx: number; vy: number; magnitude: number }> = [];
+  const seedCols = 15;
+  const seedRows = 9;
+  for (let row = 1; row < seedRows - 1; row += 1) {
+    for (let col = 1; col < seedCols - 1; col += 1) {
+      const x = (col / (seedCols - 1)) * Math.max(args.sourceWidth - 1, 1);
+      const y = (row / (seedRows - 1)) * Math.max(args.sourceHeight - 1, 1);
+      const sample = sampleShiftVectorSlice({
+        betaXSlice: args.betaXSlice,
+        betaZSlice: args.betaZSlice,
+        sourceWidth: args.sourceWidth,
+        sourceHeight: args.sourceHeight,
+        x,
+        y,
+      });
+      if (sample.magnitude >= magnitudeFloor) {
+        seedCandidates.push({ x, y, ...sample });
+      }
+    }
+  }
+  seedCandidates.sort((lhs, rhs) => rhs.magnitude - lhs.magnitude);
+  let seeds = seedCandidates.filter((seed) => seed.magnitude >= seedFloor);
+  if (seeds.length < 10) {
+    seeds = seedCandidates.slice(0, Math.min(14, seedCandidates.length));
+  }
+  const streamSeedHash =
+    seeds.length > 0
+      ? sha256Hex(
+          stableStringify(
+            seeds.map((seed) => ({
+              x: Number(seed.x.toFixed(4)),
+              y: Number(seed.y.toFixed(4)),
+              vx: Number(seed.vx.toExponential(6)),
+              vy: Number(seed.vy.toExponential(6)),
+              magnitude: Number(seed.magnitude.toExponential(6)),
+            })),
+          ),
+        )
+      : null;
+  const streamlineGeometries = seeds
+    .map((seed) =>
+      buildShiftDirectionStreamlinePath({
+        ...args,
+        seedX: seed.x,
+        seedY: seed.y,
+        magnitudeFloor,
+        referenceMagnitude: robustMagnitude,
+      }),
+    )
+    .filter((points) => points.length >= 6)
+    .map((points) => {
+      const avgX =
+        points.reduce((sum, point) => sum + (point.vx ?? 0), 0) / Math.max(points.length, 1);
+      const avgMagnitude =
+        points.reduce((sum, point) => sum + (point.magnitude ?? 0), 0) / Math.max(points.length, 1);
+      const stroke = avgX >= 0 ? '#f5c35e' : '#4fb7ff';
+      const width = 1.45 + 2.3 * clamp01(avgMagnitude / Math.max(robustMagnitude, magnitudeFloor));
+      const opacity = 0.58 + 0.32 * clamp01(avgMagnitude / Math.max(maxMagnitude, magnitudeFloor));
+      const mapped = points
+        .map((point) => {
+          const px =
+            placement.offsetX +
+            (point.x / Math.max(args.sourceWidth - 1, 1)) * Math.max(placement.drawWidth - 1, 0);
+          const py =
+            placement.offsetY +
+            (point.y / Math.max(args.sourceHeight - 1, 1)) * Math.max(placement.drawHeight - 1, 0);
+          return `${px.toFixed(1)},${py.toFixed(1)}`;
+        })
+        .join(' ');
+      return {
+        points,
+        svg: `<polyline points="${mapped}" fill="none" stroke="${stroke}" stroke-width="${width.toFixed(
+          2,
+        )}" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity.toFixed(2)}"/>`,
+      };
+    });
+  const glyphGeometries = seeds
+    .slice(0, Math.min(10, seeds.length))
+    .map((seed) => {
+      const magnitude = seed.magnitude;
+      if (!Number.isFinite(magnitude) || magnitude <= magnitudeFloor) return null;
+      const ux = seed.vx / Math.max(magnitude, Number.MIN_VALUE);
+      const uy = seed.vy / Math.max(magnitude, Number.MIN_VALUE);
+      const px =
+        placement.offsetX +
+        (seed.x / Math.max(args.sourceWidth - 1, 1)) * Math.max(placement.drawWidth - 1, 0);
+      const py =
+        placement.offsetY +
+        (seed.y / Math.max(args.sourceHeight - 1, 1)) * Math.max(placement.drawHeight - 1, 0);
+      const glyphLength = 10 + 12 * clamp01(magnitude / Math.max(robustMagnitude, magnitudeFloor));
+      const tipX = px + ux * glyphLength;
+      const tipY = py + uy * glyphLength;
+      const wing = 3.6;
+      const leftX = tipX - ux * 4 - uy * wing;
+      const leftY = tipY - uy * 4 + ux * wing;
+      const rightX = tipX - ux * 4 + uy * wing;
+      const rightY = tipY - uy * 4 - ux * wing;
+      const stroke = seed.vx >= 0 ? '#f5c35e' : '#4fb7ff';
+      const opacity = 0.42 + 0.3 * clamp01(magnitude / Math.max(maxMagnitude, magnitudeFloor));
+      return {
+        x: px,
+        y: py,
+        tipX,
+        tipY,
+        svg: `<g opacity="${opacity.toFixed(2)}">
+          <line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${tipX.toFixed(1)}" y2="${tipY.toFixed(
+            1,
+          )}" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M ${leftX.toFixed(1)} ${leftY.toFixed(1)} L ${tipX.toFixed(1)} ${tipY.toFixed(
+            1,
+          )} L ${rightX.toFixed(1)} ${rightY.toFixed(1)}" fill="none" stroke="${stroke}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>`,
+      };
+    })
+    .filter((glyph): glyph is NonNullable<typeof glyph> => glyph != null);
+  const streamGeometryHash =
+    streamlineGeometries.length > 0 || glyphGeometries.length > 0
+      ? sha256Hex(
+          stableStringify({
+            streamlineCount: streamlineGeometries.length,
+            glyphCount: glyphGeometries.length,
+            streamlines: streamlineGeometries.map((geometry) =>
+              geometry.points.map((point) => ({
+                x: Number(point.x.toFixed(4)),
+                y: Number(point.y.toFixed(4)),
+                magnitude: Number(point.magnitude.toExponential(6)),
+              })),
+            ),
+            glyphs: glyphGeometries.map((glyph) => ({
+              x: Number(glyph.x.toFixed(2)),
+              y: Number(glyph.y.toFixed(2)),
+              tipX: Number(glyph.tipX.toFixed(2)),
+              tipY: Number(glyph.tipY.toFixed(2)),
+            })),
+          }),
+        )
+      : null;
+  const overlayWarnings: ShiftDirectionOverlayWarningCode[] = [];
+  const status: ShiftDirectionOverlayEntryStatus =
+    streamlineGeometries.length > 0
+      ? 'case_specific_streamlines'
+      : glyphGeometries.length > 0
+        ? 'case_specific_glyph_fallback'
+        : 'degraded_hull_only';
+  if (status !== 'case_specific_streamlines') {
+    overlayWarnings.push('direction_streamline_generation_degraded');
+  }
+  if (status === 'degraded_hull_only') {
+    overlayWarnings.push('direction_overlay_fell_back_to_hull_only');
+  }
+  const polylines = streamlineGeometries.map((geometry) => geometry.svg).join('\n');
+  const glyphs = glyphGeometries.map((geometry) => geometry.svg).join('\n');
+  const svg = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${args.outputWidth}" height="${args.outputHeight}">
+      <rect x="0" y="0" width="${args.outputWidth}" height="${args.outputHeight}" fill="#090d12"/>
+      <rect x="${placement.offsetX}" y="${placement.offsetY}" width="${placement.drawWidth}" height="${placement.drawHeight}" fill="#10161f" stroke="#223143" stroke-width="1"/>
+      ${polylines}
+      ${glyphs}
+    </svg>`,
+  );
+  const directionOverlayHash = sha256Hex(svg);
+  const png = await sharp(svg).png().toBuffer();
+  const decoded = await decodePngToRgba(png);
+  paintShiftSliceBoundaryOverlay({
+    rgba: decoded.rgba,
+    outputWidth: decoded.width,
+    outputHeight: decoded.height,
+    sourceWidth: args.sourceWidth,
+    sourceHeight: args.sourceHeight,
+    placement,
+    supportSlice: args.supportSlice,
+    hullSdfSlice: args.hullSdfSlice,
+  });
+  return {
+    png: await encodeRgbaToPng({
+      rgba: decoded.rgba,
+      width: decoded.width,
+      height: decoded.height,
+    }),
+    directionVectorFieldHash,
+    streamSeedHash,
+    streamGeometryHash,
+    directionOverlayHash,
+    status,
+    warnings: overlayWarnings,
+    streamlineCount: streamlineGeometries.length,
+    glyphCount: glyphGeometries.length,
+  };
+};
+
 const buildYorkOptixFlatMetricVolumeRef = (args: {
   baseUrl: string;
   natarioMetricVolumeRef: HullMetricVolumeRefV1;
@@ -16658,6 +17747,10 @@ type YorkOptixPresentationCaseSnapshot = {
   laneASlice: Float32Array;
   supportMask: Float32Array | null;
   hullSdf: Float32Array | null;
+  betaX: Float32Array | null;
+  betaY: Float32Array | null;
+  betaZ: Float32Array | null;
+  betaMagnitude: YorkOptixNumericField | null;
   longitudinalSignedStrain: Float32Array | null;
   tracefreeMagnitude: YorkOptixNumericField | null;
   energyDensity: Float32Array | null;
@@ -16731,6 +17824,13 @@ const loadYorkOptixPresentationCaseSnapshot = async (args: {
       : buildSupportMaskFromHullSdf(hullSdf);
   const longitudinalSignedStrain =
     snapshot.channels.K_xx?.data instanceof Float32Array ? snapshot.channels.K_xx.data : null;
+  const betaX =
+    snapshot.channels.beta_x?.data instanceof Float32Array ? snapshot.channels.beta_x.data : null;
+  const betaY =
+    snapshot.channels.beta_y?.data instanceof Float32Array ? snapshot.channels.beta_y.data : null;
+  const betaZ =
+    snapshot.channels.beta_z?.data instanceof Float32Array ? snapshot.channels.beta_z.data : null;
+  const betaMagnitude = deriveYorkOptixShiftMagnitude(snapshot);
   const tracefreeMagnitude = deriveYorkOptixTracefreeMagnitude(snapshot);
   const energyDensity =
     snapshot.channels.rho?.data instanceof Float32Array ? snapshot.channels.rho.data : null;
@@ -16740,6 +17840,10 @@ const loadYorkOptixPresentationCaseSnapshot = async (args: {
     laneASlice: extractThetaSliceXZMidplane(laneField.theta, snapshot.dims),
     supportMask,
     hullSdf,
+    betaX,
+    betaY,
+    betaZ,
+    betaMagnitude,
     longitudinalSignedStrain,
     tracefreeMagnitude,
     energyDensity,
@@ -16768,6 +17872,8 @@ const buildYorkOptixMetricBinding = (args: {
       ? args.caseSnapshot.snapshot.channels.K_trace.data
       : null,
   ),
+  betaMagnitudeHash: computeOptionalNumericFieldHash(args.caseSnapshot.betaMagnitude),
+  betaXHash: computeOptionalFloat32Hash(args.caseSnapshot.betaX),
   longitudinalSignedStrainHash: computeOptionalFloat32Hash(
     args.caseSnapshot.longitudinalSignedStrain,
   ),
@@ -16972,6 +18078,10 @@ const resolveYorkOptixBindingFieldHash = (
   presentationFieldId: YorkOptixPresentationFieldId,
 ): string | null => {
   switch (presentationFieldId) {
+    case "beta_magnitude":
+      return metricBinding.betaMagnitudeHash;
+    case "beta_x":
+      return metricBinding.betaXHash;
     case "longitudinal_signed_strain":
       return metricBinding.longitudinalSignedStrainHash;
     case "tracefree_magnitude":
@@ -17057,7 +18167,6 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       caseSnapshot,
     });
     const contextRenders: YorkOptixPresentationContextRenderEntry[] = [];
-    const contextRenderBuffers = new Map<YorkOptixPresentationRenderView, Buffer>();
     for (const renderView of OPTIX_PRESENTATION_VIEWS) {
       const requestPayload = buildYorkOptixPresentationPayload({
         caseId: spec.case_id,
@@ -17106,7 +18215,6 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
         } else if (certificateLaneId == null) {
           warnings.unshift("presentation_lane_binding_unreported");
         }
-        contextRenderBuffers.set(renderView, imageBuffer);
         contextRenders.push({
           renderView,
           caption:
@@ -17117,6 +18225,10 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             renderView === "transport-3p1"
               ? "optix_scientific_transport_3p1"
               : "optix_scientific_full_atlas",
+          baseImagePolicy: "native_renderer_output",
+          baseImageSource: "native_renderer",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           endpoint: renderResult.endpoint,
           requestId: requestPayload.requestId ?? `${spec.case_id}-${renderView}`,
           presentationRenderRequestHash: requestHash,
@@ -17165,6 +18277,10 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             renderView === "transport-3p1"
               ? "optix_scientific_transport_3p1"
               : "optix_scientific_full_atlas",
+          baseImagePolicy: "native_renderer_output",
+          baseImageSource: "native_renderer",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           endpoint: args.proxyFrameEndpoint ?? fallbackProxyEndpoint,
           requestId: requestPayload.requestId ?? `${spec.case_id}-${renderView}`,
           presentationRenderRequestHash: requestHash,
@@ -17198,7 +18314,6 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       contextRenders.find(
         (entry) => entry.renderView === "transport-3p1" && entry.ok && entry.imagePath,
       ) ?? null;
-    const primaryContextBuffer = contextRenderBuffers.get("transport-3p1") ?? null;
     const geometryWidth =
       primaryContextRender?.dimensions.width ?? OPTIX_PRESENTATION_PROJECTION_BASE_SIZE.width;
     const geometryHeight =
@@ -17207,6 +18322,10 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       snapshot: caseSnapshot.snapshot,
       supportMask: caseSnapshot.supportMask,
       hullSdf: caseSnapshot.hullSdf,
+      width: geometryWidth,
+      height: geometryHeight,
+    });
+    const neutralFieldCanvas = await createYorkOptixNeutralFieldCanvas({
       width: geometryWidth,
       height: geometryHeight,
     });
@@ -17228,8 +18347,15 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             caseId: spec.case_id,
             presentationFieldId: descriptor.presentationFieldId,
             variant,
-            presentationRenderMode: "solve_backed_optix_context_field_projection",
+            presentationRenderMode:
+              variant === "hull-overlay"
+                ? "solve_backed_optix_neutral_field_hull_overlay"
+                : "solve_backed_optix_neutral_field_projection",
             contextRenderView: descriptor.primaryContextView,
+            baseImagePolicy: "neutral_field_canvas",
+            baseImageSource: "none",
+            inheritsTransportContext: false,
+            contextCompositionMode: variant === "hull-overlay" ? "hull_overlay" : "none",
             metricVolumeHash: metricBinding.metricVolumeHash,
             laneAFieldHash: metricBinding.laneAFieldHash,
             presentationFieldHash: derivedField?.fieldHash ?? null,
@@ -17244,7 +18370,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           args.exportDirectory,
           `${spec.case_id}-${descriptor.presentationFieldId}-optix-3p1-${variant}.png`,
         );
-        if (!(derivedField && displayPolicy && primaryContextRender && primaryContextBuffer)) {
+        if (!(derivedField && displayPolicy)) {
           fieldRenders.push({
             presentationFieldId: descriptor.presentationFieldId,
             label: descriptor.label,
@@ -17252,6 +18378,10 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             fieldNature: descriptor.nature,
             variant,
             contextRenderView: descriptor.primaryContextView,
+            baseImagePolicy: "neutral_field_canvas",
+            baseImageSource: "none",
+            inheritsTransportContext: false,
+            contextCompositionMode: variant === "hull-overlay" ? "hull_overlay" : "none",
             authoritativeSource:
               derivedField?.authoritativeSource ?? "presentation_field_unavailable",
             presentationFieldSelector:
@@ -17265,15 +18395,17 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
                   authoritativeSource: "presentation_field_unavailable",
                 }),
               ),
-            presentationRenderMode: "solve_backed_optix_context_field_projection",
+            presentationRenderMode:
+              variant === "hull-overlay"
+                ? "solve_backed_optix_neutral_field_hull_overlay"
+                : "solve_backed_optix_neutral_field_projection",
             presentationFieldHash: derivedField?.fieldHash ?? null,
             presentationScalarFieldHash: derivedField?.fieldHash ?? null,
             metricVolumeHash: metricBinding.metricVolumeHash,
             thetaHash: metricBinding.thetaChannelHash,
             kTraceHash: metricBinding.kTraceChannelHash,
             laneAFieldHash: metricBinding.laneAFieldHash,
-            optixContextImageHash:
-              primaryContextRender?.presentationRenderImageHash ?? null,
+            optixContextImageHash: null,
             presentationRenderRequestHash: requestHash,
             presentationRenderImageHash: "",
             presentationProjectionRequestHash: requestHash,
@@ -17281,7 +18413,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             presentationRenderBackedByAuthoritativeMetric: false,
             imagePath: null,
             imageMime: null,
-            laneId: primaryContextRender?.laneId ?? null,
+            laneId: args.diagnosticLane.lane_id,
             dimensions: {
               width: geometryWidth,
               height: geometryHeight,
@@ -17302,13 +18434,13 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
             note:
               derivedField == null
                 ? `Derived presentation field ${descriptor.presentationFieldId} is unavailable from the authoritative metric volume.`
-                : `Primary OptiX context render was unavailable, so ${descriptor.presentationFieldId} could not be projected.`,
+                : `Neutral field canvas projection could not be prepared for ${descriptor.presentationFieldId}.`,
             renderTaxonomy: null,
             ok: false,
             error:
               derivedField == null
                 ? `presentation_field_unavailable:${descriptor.presentationFieldId}`
-                : "presentation_context_render_unavailable:transport-3p1",
+                : `presentation_projection_unavailable:${descriptor.presentationFieldId}`,
           });
           continue;
         }
@@ -17321,7 +18453,7 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           includeHullOverlay: variant === "hull-overlay",
         });
         const composed = await compositeYorkOptixPresentationLayers({
-          basePng: primaryContextBuffer,
+          basePng: neutralFieldCanvas,
           overlayRgba: overlay,
           baseDimFactor: displayPolicy.baseDimFactor,
           overlayOpacity: displayPolicy.overlayOpacity,
@@ -17337,12 +18469,6 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           metricBinding,
           descriptor.presentationFieldId,
         );
-        const inheritedBindingWarnings = primaryContextRender.warnings.filter(
-          (warning) =>
-            warning === "presentation_metric_binding_mismatch" ||
-            warning === "presentation_lane_binding_mismatch" ||
-            warning === "presentation_lane_binding_unreported",
-        );
         const fieldHashMatches =
           expectedFieldHash != null &&
           derivedField.fieldHash != null &&
@@ -17350,7 +18476,6 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
         const warnings = Array.from(
           new Set<YorkOptixPresentationFindingCode>([
             ...quality.warnings,
-            ...inheritedBindingWarnings,
             ...(fieldHashMatches ? [] : (["presentation_metric_binding_mismatch"] as const)),
           ]),
         );
@@ -17361,26 +18486,32 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           fieldNature: descriptor.nature,
           variant,
           contextRenderView: descriptor.primaryContextView,
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: variant === "hull-overlay" ? "hull_overlay" : "none",
           authoritativeSource: derivedField.authoritativeSource,
           presentationFieldSelector: derivedField.selector,
           presentationFieldSelectorHash: derivedField.selectorHash,
-          presentationRenderMode: "solve_backed_optix_context_field_projection",
+          presentationRenderMode:
+            variant === "hull-overlay"
+              ? "solve_backed_optix_neutral_field_hull_overlay"
+              : "solve_backed_optix_neutral_field_projection",
           presentationFieldHash: derivedField.fieldHash,
           presentationScalarFieldHash: derivedField.fieldHash,
           metricVolumeHash: metricBinding.metricVolumeHash,
           thetaHash: metricBinding.thetaChannelHash,
           kTraceHash: metricBinding.kTraceChannelHash,
           laneAFieldHash: metricBinding.laneAFieldHash,
-          optixContextImageHash: primaryContextRender.presentationRenderImageHash,
+          optixContextImageHash: null,
           presentationRenderRequestHash: requestHash,
           presentationRenderImageHash: imageHash,
           presentationProjectionRequestHash: requestHash,
           presentationProjectionImageHash: imageHash,
-          presentationRenderBackedByAuthoritativeMetric:
-            primaryContextRender.presentationRenderBackedByAuthoritativeMetric && fieldHashMatches,
+          presentationRenderBackedByAuthoritativeMetric: fieldHashMatches,
           imagePath: normalizePath(outputPath),
           imageMime: "image/png",
-          laneId: primaryContextRender.laneId,
+          laneId: args.diagnosticLane.lane_id,
           dimensions: {
             width: geometryWidth,
             height: geometryHeight,
@@ -17400,8 +18531,8 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
           colormapFamily: displayPolicy.colormapFamily,
           note:
             variant === "hull-overlay"
-              ? `${derivedField.note} Hull/support overlay retained for ship-context interpretation.`
-              : derivedField.note,
+              ? `${derivedField.note} Rendered on a neutral field canvas with an explicit hull/support overlay.`
+              : `${derivedField.note} Rendered on a neutral field canvas with no inherited transport background.`,
           renderTaxonomy: null,
           ok: true,
           error: null,
@@ -17489,6 +18620,8 @@ export const buildNhm2YorkOptixRenderArtifact = async (args: {
       `visual_metric_source_stage=${args.canonicalCalibrationArtifact.comparisonContract.visualMetricSourceStage}`,
       "presentation_field_suite=natario_congruent",
       "OptiX presentation renders are bound to the same metric volume refs used to compute the authoritative Lane A fields.",
+      "scientific_3p1_field renders use a neutral dedicated field canvas and do not inherit transport-context imagery.",
+      "transport_context remains a separate solve-backed context product for human orientation rather than a base image for field renders.",
       "Longitudinal signed strain uses the ship-axis Cartesian K_xx projection; no synthetic spherical K_rr field is introduced.",
       "Current nasa-fig1-style slice exports remain useful for convention studies but are not the preferred human-facing morphology renders for the present low-expansion NHM2 family.",
     ],
@@ -17518,7 +18651,7 @@ export const renderNhm2YorkOptixRenderMarkdown = (
     .flatMap((entry) =>
       entry.contextRenders.map(
         (render) =>
-          `| ${entry.case_id} | ${render.renderView} | ${render.renderTaxonomy?.renderCategory ?? "null"} | ${render.renderTaxonomy?.renderRole ?? "null"} | ${render.ok} | ${entry.metricBinding.metricVolumeHash ?? "null"} | ${entry.metricBinding.laneAFieldHash ?? "null"} | ${render.presentationRenderRequestHash} | ${render.presentationRenderImageHash || "null"} | ${render.certificateHash ?? "null"} | ${render.frameHash ?? "null"} | ${render.renderTaxonomy?.canonicalPath ?? "null"} | ${render.imagePath ?? "null"} | ${render.fileSizeBytes} | ${render.meanIntensity ?? "null"} | ${render.nonBackgroundPixelFraction ?? "null"} | ${render.contrastStdDev ?? "null"} | ${render.warnings.join(",") || "none"} |`,
+          `| ${entry.case_id} | ${render.renderView} | ${render.renderTaxonomy?.renderCategory ?? "null"} | ${render.renderTaxonomy?.renderRole ?? "null"} | ${render.baseImagePolicy} | ${render.baseImageSource} | ${render.inheritsTransportContext} | ${render.contextCompositionMode} | ${render.ok} | ${entry.metricBinding.metricVolumeHash ?? "null"} | ${entry.metricBinding.laneAFieldHash ?? "null"} | ${render.presentationRenderRequestHash} | ${render.presentationRenderImageHash || "null"} | ${render.certificateHash ?? "null"} | ${render.frameHash ?? "null"} | ${render.renderTaxonomy?.canonicalPath ?? "null"} | ${render.imagePath ?? "null"} | ${render.fileSizeBytes} | ${render.meanIntensity ?? "null"} | ${render.nonBackgroundPixelFraction ?? "null"} | ${render.contrastStdDev ?? "null"} | ${render.warnings.join(",") || "none"} |`,
       ),
     )
     .join("\n");
@@ -17526,7 +18659,7 @@ export const renderNhm2YorkOptixRenderMarkdown = (
     .flatMap((entry) =>
       entry.fieldRenders.map(
         (render) =>
-          `| ${entry.case_id} | ${render.presentationFieldId} | ${render.variant} | ${render.renderTaxonomy?.renderCategory ?? "null"} | ${render.renderTaxonomy?.renderRole ?? "null"} | ${render.ok} | ${render.laneId ?? "null"} | ${render.presentationFieldSelectorHash} | ${render.presentationScalarFieldHash ?? "null"} | ${render.metricVolumeHash ?? "null"} | ${render.thetaHash ?? "null"} | ${render.kTraceHash ?? "null"} | ${render.laneAFieldHash ?? "null"} | ${render.contextRenderView} | ${render.optixContextImageHash ?? "null"} | ${render.presentationProjectionRequestHash} | ${render.presentationProjectionImageHash || "null"} | ${render.displayPolicyId ?? "null"} | ${render.displayRangeMin ?? "null"} | ${render.displayRangeMax ?? "null"} | ${render.displayTransform ?? "null"} | ${render.colormapFamily ?? "null"} | ${render.renderTaxonomy?.canonicalPath ?? "null"} | ${render.imagePath ?? "null"} | ${render.fileSizeBytes} | ${render.meanIntensity ?? "null"} | ${render.nonBackgroundPixelFraction ?? "null"} | ${render.contrastStdDev ?? "null"} | ${render.fieldAbsMax ?? "null"} | ${render.warnings.join(",") || "none"} |`,
+          `| ${entry.case_id} | ${render.presentationFieldId} | ${render.variant} | ${render.renderTaxonomy?.renderCategory ?? "null"} | ${render.renderTaxonomy?.renderRole ?? "null"} | ${render.baseImagePolicy} | ${render.baseImageSource} | ${render.inheritsTransportContext} | ${render.contextCompositionMode} | ${render.ok} | ${render.laneId ?? "null"} | ${render.presentationFieldSelectorHash} | ${render.presentationScalarFieldHash ?? "null"} | ${render.metricVolumeHash ?? "null"} | ${render.thetaHash ?? "null"} | ${render.kTraceHash ?? "null"} | ${render.laneAFieldHash ?? "null"} | ${render.contextRenderView} | ${render.optixContextImageHash ?? "null"} | ${render.presentationProjectionRequestHash} | ${render.presentationProjectionImageHash || "null"} | ${render.displayPolicyId ?? "null"} | ${render.displayRangeMin ?? "null"} | ${render.displayRangeMax ?? "null"} | ${render.displayTransform ?? "null"} | ${render.colormapFamily ?? "null"} | ${render.renderTaxonomy?.canonicalPath ?? "null"} | ${render.imagePath ?? "null"} | ${render.fileSizeBytes} | ${render.meanIntensity ?? "null"} | ${render.nonBackgroundPixelFraction ?? "null"} | ${render.contrastStdDev ?? "null"} | ${render.fieldAbsMax ?? "null"} | ${render.warnings.join(",") || "none"} |`,
       ),
     )
     .join("\n");
@@ -17580,13 +18713,13 @@ ${taxonomyRows}
 
   ## Per-Case Presentation Trace
   ### Context Renders
-  | case_id | renderView | renderCategory | renderRole | ok | metricVolumeHash | laneAFieldHash | presentationRenderRequestHash | presentationRenderImageHash | certificateHash | frameHash | canonicalPath | imagePath | fileSizeBytes | meanIntensity | nonBackgroundPixelFraction | contrastStdDev | warnings |
-  |---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---:|---:|---:|---|
+  | case_id | renderView | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | ok | metricVolumeHash | laneAFieldHash | presentationRenderRequestHash | presentationRenderImageHash | certificateHash | frameHash | canonicalPath | imagePath | fileSizeBytes | meanIntensity | nonBackgroundPixelFraction | contrastStdDev | warnings |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---:|---:|---:|---|
   ${contextRows}
 
   ### Field Renders
-  | case_id | presentationFieldId | variant | renderCategory | renderRole | ok | laneId | presentationFieldSelectorHash | presentationScalarFieldHash | metricVolumeHash | thetaHash | kTraceHash | laneAFieldHash | contextRenderView | optixContextImageHash | presentationProjectionRequestHash | presentationProjectionImageHash | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | canonicalPath | imagePath | fileSizeBytes | meanIntensity | nonBackgroundPixelFraction | contrastStdDev | fieldAbsMax | warnings |
-  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---:|---|---|---|---|---:|---:|---:|---:|---:|---|
+  | case_id | presentationFieldId | variant | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | ok | laneId | presentationFieldSelectorHash | presentationScalarFieldHash | metricVolumeHash | thetaHash | kTraceHash | laneAFieldHash | contextRenderView | optixContextImageHash | presentationProjectionRequestHash | presentationProjectionImageHash | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | canonicalPath | imagePath | fileSizeBytes | meanIntensity | nonBackgroundPixelFraction | contrastStdDev | fieldAbsMax | warnings |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---:|---|---|---|---|---:|---:|---:|---:|---:|---|
   ${fieldRows}
 
 ## Findings
@@ -17623,8 +18756,12 @@ export const renderNhm2YorkOptixRenderMemo = (
 
 The repo now restores a separate OptiX/CUDA-backed 3+1 scientific presentation layer for the canonical York comparison cases. This layer is bound to the same solved metric volumes that drive the authoritative Lane A diagnostic slices, but it remains secondary to the fixed-scale diagnostic artifact for all formal comparisons.
 
+Scientific field renders now use a neutral dedicated field canvas. The old transport-context image remains available as its own solve-backed context product and is no longer reused as the base image for \`scientific_3p1_field\`.
+
 For the current Natario-like low-expansion family, the presentation suite is no longer theta-only. The main visual fields are:
 
+- shift magnitude from \`|beta| = sqrt(gamma_ij beta^i beta^j)\`
+- ship-axis shift from \`beta^x\`
 - longitudinal signed strain from \`K_xx\`
 - tracefree magnitude from \`A_ij A^ij\`
 - energy density from \`rho\`
@@ -17652,6 +18789,813 @@ For the current Natario-like low-expansion family, the presentation suite is no 
 - recommendedUsePolicy: ${payload.presentationLayer.usePolicy}
 `;
 
+const computeShiftGeometryChecksum = (
+  payload: Nhm2ShiftGeometryVisualizationArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+export const evaluateShiftDirectionOverlayCaseDistinctness = (
+  renderEntries: ShiftGeometryRenderEntry[],
+): {
+  directionOverlayStatus: ShiftDirectionOverlayStatus;
+  directionOverlayWarnings: ShiftDirectionOverlayWarningCode[];
+  directionOverlayCaseDistinctness: ShiftDirectionOverlayCaseDistinctness;
+} => {
+  const directionEntries = renderEntries.filter((entry) => entry.fieldId === "beta_direction_xz");
+  if (directionEntries.length === 0) {
+    return {
+      directionOverlayStatus: "missing",
+      directionOverlayWarnings: [],
+      directionOverlayCaseDistinctness: "not_applicable",
+    };
+  }
+  const warningSet = new Set<ShiftDirectionOverlayWarningCode>();
+  for (const entry of directionEntries) {
+    for (const warning of entry.directionOverlayWarnings) {
+      warningSet.add(warning);
+    }
+  }
+  let collapsedAcrossCases = false;
+  for (let i = 0; i < directionEntries.length; i += 1) {
+    for (let j = i + 1; j < directionEntries.length; j += 1) {
+      const lhs = directionEntries[i]!;
+      const rhs = directionEntries[j]!;
+      if (!lhs.imageHash || lhs.imageHash !== rhs.imageHash) continue;
+      const lhsDirectionalHash = lhs.directionVectorFieldHash ?? lhs.presentationScalarFieldHash;
+      const rhsDirectionalHash = rhs.directionVectorFieldHash ?? rhs.presentationScalarFieldHash;
+      const directionalHashesDiffer = lhsDirectionalHash !== rhsDirectionalHash;
+      const geometryHashesDiffer = lhs.streamGeometryHash !== rhs.streamGeometryHash;
+      if (directionalHashesDiffer || geometryHashesDiffer) {
+        collapsedAcrossCases = true;
+      }
+    }
+  }
+  if (collapsedAcrossCases) {
+    warningSet.add("direction_overlay_collapsed_across_cases");
+  }
+  const distinctNonNullImageHashes = new Set(
+    directionEntries.map((entry) => entry.imageHash).filter((entry): entry is string => Boolean(entry)),
+  );
+  const directionOverlayCaseDistinctness: ShiftDirectionOverlayCaseDistinctness =
+    collapsedAcrossCases
+      ? "collapsed_across_cases"
+      : directionEntries.length <= 1
+        ? "not_applicable"
+        : distinctNonNullImageHashes.size === directionEntries.length
+          ? "distinct_across_cases"
+          : "mixed";
+  const directionOverlayStatus: ShiftDirectionOverlayStatus =
+    collapsedAcrossCases
+      ? "collapsed"
+      : directionEntries.some((entry) => entry.directionOverlayStatus === "degraded_hull_only")
+        ? "degraded"
+        : "available";
+  return {
+    directionOverlayStatus,
+    directionOverlayWarnings: [...warningSet],
+    directionOverlayCaseDistinctness,
+  };
+};
+
+const summarizeShiftGeometryStatus = (
+  renderEntries: ShiftGeometryRenderEntry[],
+  directionOverlayStatus: ShiftDirectionOverlayStatus,
+): ShiftGeometryStatus =>
+  renderEntries.length === 0
+    ? "missing"
+    : directionOverlayStatus !== "available"
+      ? "degraded"
+      : renderEntries.every((entry) => entry.imagePath && entry.imageHash)
+      ? "available"
+      : "degraded";
+
+const toShiftGeometryFieldSummary = (
+  render: YorkOptixPresentationFieldRenderEntry | null,
+): CanonicalVisualComparisonFieldSummary | null =>
+  render == null
+    ? null
+    : {
+        presentationFieldId: render.presentationFieldId,
+        label: render.label,
+        imagePath: render.imagePath ? normalizePath(render.imagePath) : null,
+        imageHash: render.presentationProjectionImageHash ?? null,
+        laneId: render.laneId ?? null,
+        baseImagePolicy: render.baseImagePolicy,
+        baseImageSource: render.baseImageSource,
+        inheritsTransportContext: render.inheritsTransportContext,
+        contextCompositionMode: render.contextCompositionMode,
+        fieldMin: render.fieldMin,
+        fieldMax: render.fieldMax,
+        fieldAbsMax: render.fieldAbsMax,
+        displayPolicyId: render.displayPolicyId,
+        displayRangeMin: render.displayRangeMin,
+        displayRangeMax: render.displayRangeMax,
+        displayTransform: render.displayTransform,
+        colormapFamily: render.colormapFamily,
+        warnings: render.warnings,
+        renderTaxonomy: render.renderTaxonomy,
+      };
+
+const buildShiftResidualDisplayPolicy = (args: {
+  residual: YorkOptixNumericField;
+  policyId: string;
+  colormapFamily: YorkOptixPresentationColormapFamily;
+}): YorkOptixPresentationDisplayPolicy => {
+  const absSamples = collectYorkOptixFieldSamples(args.residual, "abs");
+  const fieldAbsMax = Math.max(Math.abs(computeYorkOptixFieldExtrema(args.residual).absMax ?? 0), 0);
+  const robustAbs =
+    computeSortedYorkOptixQuantile(absSamples, 0.995) ??
+    computeSortedYorkOptixQuantile(absSamples, 0.98) ??
+    fieldAbsMax;
+  const midAbs =
+    computeSortedYorkOptixQuantile(absSamples, 0.75) ??
+    computeSortedYorkOptixQuantile(absSamples, 0.5) ??
+    robustAbs;
+  const displayAbs = Math.max(robustAbs, fieldAbsMax * 0.35, 1e-90);
+  return {
+    displayPolicyId: args.policyId,
+    displayRangeMin: -displayAbs,
+    displayRangeMax: displayAbs,
+    displayTransform: "signed_asinh",
+    displayTransformScale: Math.max(midAbs ?? displayAbs / 10, displayAbs / 24, 1e-90),
+    colormapFamily: args.colormapFamily,
+    visibilityFloor: 0.018,
+    alphaFloor: 0.3,
+    alphaScale: 0.64,
+    radiusFloor: 1,
+    radiusScale: 4,
+    baseDimFactor: 0.2,
+    overlayOpacity: 0.98,
+  };
+};
+
+const createShiftGeometryRenderEntry = (args: {
+  generatedOn: string;
+  caseId: CalibrationPanelCaseId;
+  caseLabel: string;
+  referenceCaseId: CalibrationPanelCaseId | null;
+  mechanismFamily: ShiftGeometryMechanismFamily;
+  renderCategory: RenderTaxonomyCategory;
+  renderRole: RenderTaxonomyRole;
+  authoritativeStatus: RenderAuthoritativeStatus;
+  primaryScientificQuestion: string;
+  fieldId: RenderTaxonomyFieldId;
+  variant: string;
+  imagePath: string | null;
+  imageHash: string | null;
+  observer: string;
+  foliation: string;
+  signConvention: string;
+  laneId: string | null;
+  displayPolicyId: string | null;
+  displayRangeMin: number | null;
+  displayRangeMax: number | null;
+  displayTransform: string | null;
+  colormapFamily: string | null;
+  cameraPoseId: string | null;
+  baseImagePolicy: RenderBaseImagePolicy;
+  baseImageSource: RenderBaseImageSource;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: RenderContextCompositionMode;
+  metricVolumeHash: string | null;
+  thetaHash: string | null;
+  kTraceHash: string | null;
+  laneAFieldHash: string | null;
+  presentationScalarFieldHash: string | null;
+  directionVectorFieldHash?: string | null;
+  streamSeedHash?: string | null;
+  streamGeometryHash?: string | null;
+  directionOverlayHash?: string | null;
+  directionOverlayStatus?: ShiftDirectionOverlayEntryStatus | null;
+  directionOverlayWarnings?: ShiftDirectionOverlayWarningCode[];
+  fieldMin: number | null;
+  fieldMax: number | null;
+  fieldAbsMax: number | null;
+  warnings: string[];
+  note: string | null;
+  titlePrefix?: string | null;
+}): ShiftGeometryRenderEntry => {
+  const renderTaxonomy = createRenderTaxonomyMetadata({
+    generatedOn: args.generatedOn,
+    caseId: args.caseId,
+    caseLabel: args.caseLabel,
+    renderCategory: args.renderCategory,
+    renderRole: args.renderRole,
+    authoritativeStatus: args.authoritativeStatus,
+    primaryScientificQuestion: args.primaryScientificQuestion,
+    fieldId: args.fieldId,
+    variant: args.variant,
+    legacyPath: args.imagePath,
+    observer: args.observer,
+    foliation: args.foliation,
+    signConvention: args.signConvention,
+    laneId: args.laneId,
+    displayPolicyId: args.displayPolicyId,
+    displayRangeMin: args.displayRangeMin,
+    displayRangeMax: args.displayRangeMax,
+    displayTransform: args.displayTransform,
+    colormapFamily: args.colormapFamily,
+    cameraPoseId: args.cameraPoseId,
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
+    titlePrefix: args.titlePrefix,
+  });
+  return {
+    renderId: renderTaxonomy.renderId,
+    caseId: args.caseId,
+    referenceCaseId: args.referenceCaseId,
+    mechanismFamily: args.mechanismFamily,
+    renderCategory: args.renderCategory,
+    renderRole: args.renderRole,
+    authoritativeStatus: args.authoritativeStatus,
+    primaryScientificQuestion: args.primaryScientificQuestion,
+    fieldId: args.fieldId,
+    variant: args.variant,
+    canonicalPath: renderTaxonomy.canonicalPath,
+    legacyPath: renderTaxonomy.legacyPath,
+    title: renderTaxonomy.frameLabel.title,
+    subtitle: renderTaxonomy.frameLabel.subtitle,
+    quantitySymbol: renderTaxonomy.frameLabel.quantitySymbol,
+    quantityUnits: renderTaxonomy.frameLabel.quantityUnits,
+    observer: renderTaxonomy.frameLabel.observer,
+    foliation: renderTaxonomy.frameLabel.foliation,
+    signConvention: renderTaxonomy.frameLabel.signConvention,
+    laneId: renderTaxonomy.frameLabel.laneId,
+    displayPolicyId: renderTaxonomy.frameLabel.displayPolicyId,
+    displayRangeMin: renderTaxonomy.frameLabel.displayRangeMin,
+    displayRangeMax: renderTaxonomy.frameLabel.displayRangeMax,
+    displayTransform: renderTaxonomy.frameLabel.displayTransform,
+    colormapFamily: renderTaxonomy.frameLabel.colormapFamily,
+    cameraPoseId: renderTaxonomy.frameLabel.cameraPoseId,
+    orientationConventionId: renderTaxonomy.frameLabel.orientationConventionId,
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
+    imagePath: renderTaxonomy.legacyPath,
+    imageHash: args.imageHash,
+    metricVolumeHash: args.metricVolumeHash,
+    thetaHash: args.thetaHash,
+    kTraceHash: args.kTraceHash,
+    laneAFieldHash: args.laneAFieldHash,
+    presentationScalarFieldHash: args.presentationScalarFieldHash,
+    directionVectorFieldHash: args.directionVectorFieldHash ?? null,
+    streamSeedHash: args.streamSeedHash ?? null,
+    streamGeometryHash: args.streamGeometryHash ?? null,
+    directionOverlayHash: args.directionOverlayHash ?? null,
+    directionOverlayStatus: args.directionOverlayStatus ?? null,
+    directionOverlayWarnings: args.directionOverlayWarnings ?? [],
+    fieldMin: args.fieldMin,
+    fieldMax: args.fieldMax,
+    fieldAbsMax: args.fieldAbsMax,
+    renderTaxonomy,
+    warnings: args.warnings,
+    note: args.note,
+  };
+};
+
+export const formatShiftGeometryProofPackSummary = (args: {
+  artifact: Nhm2ShiftGeometryVisualizationArtifact;
+}): string =>
+  `shift_geometry_status=${args.artifact.shiftGeometryStatus} case_count=${args.artifact.caseSet.length} residual_count=${args.artifact.residualSummaries.length} direction_overlay_status=${args.artifact.directionOverlayStatus} direction_overlay_case_distinctness=${args.artifact.directionOverlayCaseDistinctness} constraint_context_status=${args.artifact.constraintContextStatus}`;
+
+export const buildNhm2ShiftGeometryVisualizationArtifact = async (args: {
+  generatedOn: string;
+  baseUrl: string;
+  sourceAuditArtifactPath: string;
+  canonicalCalibrationArtifactPath: string;
+  optixRenderArtifactPath: string;
+  canonicalCalibrationArtifact: WarpYorkCanonicalCalibrationArtifact;
+  optixRenderArtifact: Nhm2YorkOptixRenderArtifact;
+  diagnosticLane: YorkDiagnosticLane;
+  caseResults: CaseResult[];
+  natarioMetricVolumeRef: HullMetricVolumeRefV1;
+}): Promise<Nhm2ShiftGeometryVisualizationArtifact> => {
+  const byCaseId = new Map(args.caseResults.map((entry) => [entry.caseId, entry]));
+  const flatMetricVolumeRef = buildYorkOptixFlatMetricVolumeRef({
+    baseUrl: args.baseUrl,
+    natarioMetricVolumeRef: args.natarioMetricVolumeRef,
+  });
+  const caseSpecs: Array<{
+    caseId: CalibrationPanelCaseId;
+    label: string;
+    metricVolumeRef: HullMetricVolumeRefV1;
+  }> = [
+    {
+      caseId: "flat_space_zero_theta",
+      label: "Flat-space zero-theta baseline",
+      metricVolumeRef: flatMetricVolumeRef,
+    },
+    {
+      caseId: "natario_control",
+      label: byCaseId.get("natario_control")?.label ?? "Natario-like control",
+      metricVolumeRef: byCaseId.get("natario_control")!.metricVolumeRef,
+    },
+    {
+      caseId: "alcubierre_control",
+      label: byCaseId.get("alcubierre_control")?.label ?? "Alcubierre-like control",
+      metricVolumeRef: byCaseId.get("alcubierre_control")!.metricVolumeRef,
+    },
+    {
+      caseId: "nhm2_certified",
+      label: byCaseId.get("nhm2_certified")?.label ?? "NHM2 certified snapshot",
+      metricVolumeRef: byCaseId.get("nhm2_certified")!.metricVolumeRef,
+    },
+  ];
+  const snapshotByCase = new Map<
+    CalibrationPanelCaseId,
+    {
+      label: string;
+      snapshot: YorkOptixPresentationCaseSnapshot;
+      metricBinding: YorkOptixPresentationMetricBinding;
+      optixCase: YorkOptixPresentationCaseRecord | null;
+    }
+  >();
+  for (const spec of caseSpecs) {
+    const snapshot = await loadYorkOptixPresentationCaseSnapshot({
+      metricVolumeRef: spec.metricVolumeRef,
+      diagnosticLane: args.diagnosticLane,
+    });
+    snapshotByCase.set(spec.caseId, {
+      label: spec.label,
+      snapshot,
+      metricBinding: buildYorkOptixMetricBinding({
+        metricVolumeRef: spec.metricVolumeRef,
+        caseSnapshot: snapshot,
+      }),
+      optixCase:
+        args.optixRenderArtifact.caseRenders.find((entry) => entry.case_id === spec.caseId) ?? null,
+    });
+  }
+  const renderEntries: ShiftGeometryRenderEntry[] = [];
+  const fieldSummaries: ShiftGeometryFieldSummary[] = [];
+  const observer = args.canonicalCalibrationArtifact.comparisonContract.observer;
+  const foliation = args.canonicalCalibrationArtifact.comparisonContract.foliation;
+  const signConvention = "stored shift channels are contravariant beta^i in the comoving Cartesian chart";
+  for (const spec of caseSpecs) {
+    const entry = snapshotByCase.get(spec.caseId)!;
+    const { snapshot, metricBinding, optixCase } = entry;
+    const betaMagnitudeMain = toShiftGeometryFieldSummary(
+      optixCase ? findOptixFieldRender(optixCase, "beta_magnitude", "main") : null,
+    );
+    const betaXMain = toShiftGeometryFieldSummary(
+      optixCase ? findOptixFieldRender(optixCase, "beta_x", "main") : null,
+    );
+    const supportSlice = entry.snapshot.supportMask
+      ? extractThetaSliceXZMidplane(entry.snapshot.supportMask, snapshot.snapshot.dims)
+      : null;
+    const hullSlice = entry.snapshot.hullSdf
+      ? extractThetaSliceXZMidplane(entry.snapshot.hullSdf, snapshot.snapshot.dims)
+      : null;
+    const buildSliceCompanion = async (
+      fieldId: Extract<YorkOptixPresentationFieldId, "beta_magnitude" | "beta_x">,
+    ) => {
+      const descriptor = OPTIX_PRESENTATION_FIELD_DESCRIPTORS.find(
+        (candidate) => candidate.presentationFieldId === fieldId,
+      );
+      if (!descriptor) return null;
+      const derivedField = deriveYorkOptixPresentationField({
+        descriptor,
+        snapshot: snapshot.snapshot,
+        laneAField: snapshot.laneAField,
+      });
+      if (!derivedField) return null;
+      const displayPolicy = computeYorkOptixPresentationDisplayPolicy({ field: derivedField });
+      const slice = extractYorkNumericSliceForView(
+        derivedField.data,
+        snapshot.snapshot.dims,
+        "x-z-midplane",
+      );
+      const outputPath = buildCanonicalRenderAliasPath({
+        generatedOn: args.generatedOn,
+        renderCategory: "scientific_3p1_field",
+        caseId: spec.caseId,
+        fieldId,
+        variant: "xz_slice_companion",
+      });
+      const png = await renderYorkOptixFieldSlicePng({
+        slice,
+        sourceWidth: snapshot.snapshot.dims[0],
+        sourceHeight: snapshot.snapshot.dims[2],
+        outputWidth: OPTIX_PRESENTATION_FRAME_SIZE.width,
+        outputHeight: OPTIX_PRESENTATION_FRAME_SIZE.height,
+        fieldNature: derivedField.fieldNature,
+        displayPolicy,
+        includeHullOverlay: false,
+      });
+      ensureDirForFile(outputPath);
+      fs.writeFileSync(outputPath, png);
+      const quality = await analyzeYorkOptixPresentationImage(png, fieldId);
+      return createShiftGeometryRenderEntry({
+        generatedOn: args.generatedOn,
+        caseId: spec.caseId,
+        caseLabel: spec.label,
+        referenceCaseId: null,
+        mechanismFamily: "shift_geometry",
+        renderCategory: "scientific_3p1_field",
+        renderRole: "presentation",
+        authoritativeStatus: "secondary_solve_backed",
+        primaryScientificQuestion:
+          resolveRenderFieldFamilyDefinition(fieldId)?.primaryScientificQuestion ??
+          `How should ${fieldId} be interpreted for this solved case?`,
+        fieldId,
+        variant: "xz_slice_companion",
+        imagePath: outputPath,
+        imageHash: sha256Hex(png),
+        observer,
+        foliation,
+        signConvention,
+        laneId: args.diagnosticLane.lane_id,
+        displayPolicyId: displayPolicy.displayPolicyId,
+        displayRangeMin: displayPolicy.displayRangeMin,
+        displayRangeMax: displayPolicy.displayRangeMax,
+        displayTransform: displayPolicy.displayTransform,
+        colormapFamily: displayPolicy.colormapFamily,
+        cameraPoseId: "slice_x_z_midplane",
+        baseImagePolicy: "neutral_field_canvas",
+        baseImageSource: "none",
+        inheritsTransportContext: false,
+        contextCompositionMode: "none",
+        metricVolumeHash: metricBinding.metricVolumeHash,
+        thetaHash: metricBinding.thetaChannelHash,
+        kTraceHash: metricBinding.kTraceChannelHash,
+        laneAFieldHash: metricBinding.laneAFieldHash,
+        presentationScalarFieldHash: derivedField.fieldHash,
+        fieldMin: derivedField.fieldMin,
+        fieldMax: derivedField.fieldMax,
+        fieldAbsMax: derivedField.fieldAbsMax,
+        warnings: quality.warnings,
+        note: `${derivedField.note} This x-z slice companion stays on a neutral field canvas and does not inherit transport-context imagery.`,
+        titlePrefix: `${derivedField.label} Slice`,
+      });
+    };
+    const betaMagnitudeSliceCompanion = await buildSliceCompanion("beta_magnitude");
+    const betaXSliceCompanion = await buildSliceCompanion("beta_x");
+    if (betaMagnitudeSliceCompanion) renderEntries.push(betaMagnitudeSliceCompanion);
+    if (betaXSliceCompanion) renderEntries.push(betaXSliceCompanion);
+    const betaXSlice = snapshot.betaX
+      ? extractThetaSliceXZMidplane(snapshot.betaX, snapshot.snapshot.dims)
+      : null;
+    const betaZSlice = snapshot.betaZ
+      ? extractThetaSliceXZMidplane(snapshot.betaZ, snapshot.snapshot.dims)
+      : null;
+    let betaDirectionXZ: ShiftGeometryRenderEntry | null = null;
+    if (betaXSlice && betaZSlice) {
+      const outputPath = buildCanonicalRenderAliasPath({
+        generatedOn: args.generatedOn,
+        renderCategory: "mechanism_overlay",
+        caseId: spec.caseId,
+        fieldId: "beta_direction_xz",
+        variant: "stream_xz_hull_overlay",
+      });
+      const overlay = await renderShiftDirectionXzOverlayPng({
+        betaXSlice,
+        betaZSlice,
+        sourceWidth: snapshot.snapshot.dims[0],
+        sourceHeight: snapshot.snapshot.dims[2],
+        outputWidth: OPTIX_PRESENTATION_FRAME_SIZE.width,
+        outputHeight: OPTIX_PRESENTATION_FRAME_SIZE.height,
+        supportSlice,
+        hullSdfSlice: hullSlice,
+      });
+      ensureDirForFile(outputPath);
+      fs.writeFileSync(outputPath, overlay.png);
+      const quality = await analyzeYorkOptixPresentationImage(overlay.png);
+      const directionWarnings = [...new Set([...overlay.warnings, ...quality.warnings])];
+      betaDirectionXZ = createShiftGeometryRenderEntry({
+        generatedOn: args.generatedOn,
+        caseId: spec.caseId,
+        caseLabel: spec.label,
+        referenceCaseId: null,
+        mechanismFamily: "shift_geometry",
+        renderCategory: "mechanism_overlay",
+        renderRole: "overlay",
+        authoritativeStatus: "secondary_interpretive",
+        primaryScientificQuestion:
+          resolveRenderFieldFamilyDefinition("beta_direction_xz")?.primaryScientificQuestion ??
+          "Does the shift direction organize as a shell-localized sliding/shear pattern?",
+        fieldId: "beta_direction_xz",
+        variant: "stream_xz_hull_overlay",
+        imagePath: outputPath,
+        imageHash: sha256Hex(overlay.png),
+        observer,
+        foliation,
+        signConvention,
+        laneId: args.diagnosticLane.lane_id,
+        displayPolicyId: "shift_direction_stream_xz",
+        displayRangeMin: null,
+        displayRangeMax: null,
+        displayTransform: "vector_streamline",
+        colormapFamily: "diverging_cyan_amber",
+        cameraPoseId: "slice_x_z_midplane",
+        baseImagePolicy: "field_plus_context_overlay",
+        baseImageSource: "hull_mask",
+        inheritsTransportContext: false,
+        contextCompositionMode: "hull_overlay",
+        metricVolumeHash: metricBinding.metricVolumeHash,
+        thetaHash: metricBinding.thetaChannelHash,
+        kTraceHash: metricBinding.kTraceChannelHash,
+        laneAFieldHash: metricBinding.laneAFieldHash,
+        presentationScalarFieldHash: overlay.directionVectorFieldHash,
+        directionVectorFieldHash: overlay.directionVectorFieldHash,
+        streamSeedHash: overlay.streamSeedHash,
+        streamGeometryHash: overlay.streamGeometryHash,
+        directionOverlayHash: overlay.directionOverlayHash,
+        directionOverlayStatus: overlay.status,
+        directionOverlayWarnings: overlay.warnings,
+        fieldMin: null,
+        fieldMax: null,
+        fieldAbsMax: snapshot.betaMagnitude
+          ? computeYorkOptixFieldExtrema(snapshot.betaMagnitude).absMax
+          : null,
+        warnings: directionWarnings,
+        note:
+          overlay.status === "degraded_hull_only"
+            ? "Shift-direction x-z mechanism overlay degraded to hull/support context only because case-specific stream geometry could not be realized from the sampled beta^x/beta^z slice. This is flagged explicitly and does not count as a successful directional mechanism render."
+            : overlay.status === "case_specific_glyph_fallback"
+              ? "Shift-direction x-z mechanism overlay rendered from the solved beta^x/beta^z slices using case-specific directional glyphs with explicit hull/support context. Streamline generation degraded, so the overlay falls back to sparse case-specific direction glyphs instead of silently reusing a hull-only image."
+              : "Shift-direction x-z mechanism overlay rendered from the solved beta^x/beta^z slices with case-specific streamline geometry and explicit hull/support context. No transport-context imagery is inherited.",
+        titlePrefix: "Shift Direction",
+      });
+      renderEntries.push(betaDirectionXZ);
+    }
+    fieldSummaries.push({
+      caseId: spec.caseId,
+      label: spec.label,
+      metricVolumeHash: metricBinding.metricVolumeHash,
+      laneAFieldHash: metricBinding.laneAFieldHash,
+      betaMagnitudeMain,
+      betaMagnitudeSliceCompanion: betaMagnitudeSliceCompanion?.renderTaxonomy ?? null,
+      betaXMain,
+      betaXSliceCompanion: betaXSliceCompanion?.renderTaxonomy ?? null,
+      betaDirectionXZ: betaDirectionXZ?.renderTaxonomy ?? null,
+      betaDirectionXZStatus: betaDirectionXZ?.directionOverlayStatus ?? null,
+      betaDirectionXZWarnings: betaDirectionXZ?.directionOverlayWarnings ?? [],
+      betaDirectionXZVectorFieldHash: betaDirectionXZ?.directionVectorFieldHash ?? null,
+      betaDirectionXZImageHash: betaDirectionXZ?.imageHash ?? null,
+    });
+  }
+
+  const nhm2Entry = snapshotByCase.get("nhm2_certified");
+  if (!nhm2Entry) throw new Error("shift_geometry_missing_nhm2_snapshot");
+  const residualSummaries: ShiftGeometryResidualSummary[] = [];
+  for (const referenceCaseId of ["natario_control", "alcubierre_control"] as const) {
+    const referenceEntry = snapshotByCase.get(referenceCaseId);
+    if (!referenceEntry) continue;
+    const residualConfigs = [
+      {
+        fieldId: "beta_magnitude" as const,
+        label: "Shift magnitude residual",
+        lhsField: nhm2Entry.snapshot.betaMagnitude,
+        rhsField: referenceEntry.snapshot.betaMagnitude,
+        policyId: `shift_${referenceCaseId}_beta_magnitude_residual_signed_asinh`,
+        colormapFamily: "diverging_teal_rose" as const,
+        quantityNote: "NHM2 minus control shift-magnitude residual",
+      },
+      {
+        fieldId: "beta_x" as const,
+        label: "Ship-axis shift residual",
+        lhsField: nhm2Entry.snapshot.betaX,
+        rhsField: referenceEntry.snapshot.betaX,
+        policyId: `shift_${referenceCaseId}_beta_x_residual_signed_asinh`,
+        colormapFamily: "diverging_cyan_amber" as const,
+        quantityNote: "NHM2 minus control signed ship-axis shift residual",
+      },
+    ];
+    const summary: ShiftGeometryResidualSummary = {
+      referenceCaseId,
+      referenceLabel: referenceEntry.label,
+      betaMagnitudeResidual: null,
+      betaXResidual: null,
+      betaMagnitudeResidualAbsMax: null,
+      betaXResidualAbsMax: null,
+    };
+    const supportSlice = nhm2Entry.snapshot.supportMask
+      ? extractThetaSliceXZMidplane(nhm2Entry.snapshot.supportMask, nhm2Entry.snapshot.snapshot.dims)
+      : null;
+    const hullSlice = nhm2Entry.snapshot.hullSdf
+      ? extractThetaSliceXZMidplane(nhm2Entry.snapshot.hullSdf, nhm2Entry.snapshot.snapshot.dims)
+      : null;
+    for (const config of residualConfigs) {
+      const residual = computeYorkNumericResidual(config.lhsField, config.rhsField);
+      if (!residual) continue;
+      const displayPolicy = buildShiftResidualDisplayPolicy({
+        residual,
+        policyId: config.policyId,
+        colormapFamily: config.colormapFamily,
+      });
+      const slice = extractYorkNumericSliceForView(
+        residual,
+        nhm2Entry.snapshot.snapshot.dims,
+        "x-z-midplane",
+      );
+      const outputPath = buildCanonicalRenderAliasPath({
+        generatedOn: args.generatedOn,
+        renderCategory: "mechanism_overlay",
+        caseId: "nhm2_certified",
+        fieldId: config.fieldId,
+        variant: `residual_to_${referenceCaseId}_xz`,
+      });
+      const png = await renderYorkOptixFieldSlicePng({
+        slice,
+        sourceWidth: nhm2Entry.snapshot.snapshot.dims[0],
+        sourceHeight: nhm2Entry.snapshot.snapshot.dims[2],
+        outputWidth: OPTIX_PRESENTATION_FRAME_SIZE.width,
+        outputHeight: OPTIX_PRESENTATION_FRAME_SIZE.height,
+        fieldNature: "signed",
+        displayPolicy,
+        includeHullOverlay: true,
+        supportSlice,
+        hullSdfSlice: hullSlice,
+      });
+      ensureDirForFile(outputPath);
+      fs.writeFileSync(outputPath, png);
+      const quality = await analyzeYorkOptixPresentationImage(png, config.fieldId);
+      const residualEntry = createShiftGeometryRenderEntry({
+        generatedOn: args.generatedOn,
+        caseId: "nhm2_certified",
+        caseLabel: nhm2Entry.label,
+        referenceCaseId,
+        mechanismFamily: "residual_to_control",
+        renderCategory: "mechanism_overlay",
+        renderRole: "overlay",
+        authoritativeStatus: "secondary_interpretive",
+        primaryScientificQuestion:
+          referenceCaseId === "natario_control"
+            ? "Where does NHM2 depart from the closest canonical family in shift geometry?"
+            : "Where does NHM2 differ from Alcubierre-like transport structure?",
+        fieldId: config.fieldId,
+        variant: `residual_to_${referenceCaseId}_xz`,
+        imagePath: outputPath,
+        imageHash: sha256Hex(png),
+        observer,
+        foliation,
+        signConvention: `${signConvention}; residual = NHM2 - ${referenceCaseId}`,
+        laneId: args.diagnosticLane.lane_id,
+        displayPolicyId: displayPolicy.displayPolicyId,
+        displayRangeMin: displayPolicy.displayRangeMin,
+        displayRangeMax: displayPolicy.displayRangeMax,
+        displayTransform: displayPolicy.displayTransform,
+        colormapFamily: displayPolicy.colormapFamily,
+        cameraPoseId: "slice_x_z_midplane",
+        baseImagePolicy: "field_plus_context_overlay",
+        baseImageSource: "hull_mask",
+        inheritsTransportContext: false,
+        contextCompositionMode: "hull_overlay",
+        metricVolumeHash: nhm2Entry.metricBinding.metricVolumeHash,
+        thetaHash: nhm2Entry.metricBinding.thetaChannelHash,
+        kTraceHash: nhm2Entry.metricBinding.kTraceChannelHash,
+        laneAFieldHash: nhm2Entry.metricBinding.laneAFieldHash,
+        presentationScalarFieldHash: hashYorkOptixNumericField(residual),
+        fieldMin: computeYorkOptixFieldExtrema(residual).min,
+        fieldMax: computeYorkOptixFieldExtrema(residual).max,
+        fieldAbsMax: computeYorkOptixFieldExtrema(residual).absMax,
+        warnings: quality.warnings,
+        note: `${config.quantityNote}. The residual is solve-backed on the same metric path and uses explicit hull/support overlay rather than transport-context inheritance.`,
+        titlePrefix: `${config.label} Residual`,
+      });
+      renderEntries.push(residualEntry);
+      if (config.fieldId === "beta_magnitude") {
+        summary.betaMagnitudeResidual = residualEntry.renderTaxonomy;
+        summary.betaMagnitudeResidualAbsMax = residualEntry.fieldAbsMax;
+      } else {
+        summary.betaXResidual = residualEntry.renderTaxonomy;
+        summary.betaXResidualAbsMax = residualEntry.fieldAbsMax;
+      }
+    }
+    residualSummaries.push(summary);
+  }
+
+  const directionOverlaySummary = evaluateShiftDirectionOverlayCaseDistinctness(renderEntries);
+  const artifactBase: Nhm2ShiftGeometryVisualizationArtifact = {
+    artifactType: "nhm2_shift_geometry_visualization/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact adds a solve-backed shift-geometry visualization suite for NHM2 while keeping Lane A diagnostics as the authoritative proof surface.",
+    sourceAuditArtifactPath: normalizePath(args.sourceAuditArtifactPath),
+    canonicalCalibrationArtifactPath: normalizePath(args.canonicalCalibrationArtifactPath),
+    optixRenderArtifactPath: normalizePath(args.optixRenderArtifactPath),
+    shiftGeometryStatus: summarizeShiftGeometryStatus(
+      renderEntries,
+      directionOverlaySummary.directionOverlayStatus,
+    ),
+    caseSet: caseSpecs.map((entry) => entry.caseId),
+    shiftConvention: {
+      storedShiftComponent: "beta^i",
+      betaXDefinition: "beta^x",
+      betaMagnitudeDefinition: "|beta| = sqrt(gamma_ij beta^i beta^j)",
+      observer,
+      foliation,
+      laneId: args.diagnosticLane.lane_id,
+      signConvention,
+    },
+    renderEntries,
+    fieldSummaries,
+    residualSummaries,
+    directionOverlayStatus: directionOverlaySummary.directionOverlayStatus,
+    directionOverlayWarnings: directionOverlaySummary.directionOverlayWarnings,
+    directionOverlayCaseDistinctness: directionOverlaySummary.directionOverlayCaseDistinctness,
+    constraintContextStatus: "deferred_units_and_policy_unresolved",
+    recommendedInterpretationOrder: [
+      "beta_magnitude",
+      "beta_x",
+      "beta_direction_xz",
+      "nhm2_minus_natario_beta_residual",
+      "nhm2_minus_alcubierre_beta_residual",
+      "linecuts_deferred_pending_probe_family",
+    ],
+    lineCutStatus: "deferred_pending_probe_family",
+    renderTaxonomy: null,
+    notes: [
+      "diagnostic_lane_a_remains_primary=true",
+      "shift_geometry_secondary_interpretive=true",
+      "scientific_3p1_field shift frames remain on a neutral field canvas with no transport-context inheritance.",
+      "beta_magnitude and beta_x reuse the same authoritative solved snapshot path as the OptiX York field suite.",
+      "beta_direction_xz uses case-specific directional geometry on the x-z slice with explicit hull/support context and an explicit degraded fallback state if only hull context remains.",
+      "paired constraint companion deferred in this pass because the constraint-unit labeling policy is not yet standardized enough for first-class publication.",
+      "line cuts deferred until a dedicated probe-family taxonomy is added.",
+    ],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeShiftGeometryChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2ShiftGeometryVisualizationMarkdown = (
+  payload: Nhm2ShiftGeometryVisualizationArtifact,
+): string => {
+  const renderRows = payload.renderEntries
+    .map(
+      (entry) =>
+        `| ${entry.caseId} | ${entry.referenceCaseId ?? "null"} | ${entry.fieldId} | ${entry.variant} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.directionOverlayStatus ?? "null"} | ${(entry.directionOverlayWarnings ?? []).join(",") || "none"} | ${entry.directionVectorFieldHash ?? "null"} | ${entry.streamSeedHash ?? "null"} | ${entry.streamGeometryHash ?? "null"} | ${entry.directionOverlayHash ?? "null"} | ${entry.fieldAbsMax ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.displayTransform ?? "null"} | ${entry.imagePath ?? "null"} | ${entry.imageHash ?? "null"} |`,
+    )
+    .join("\n");
+  const fieldSummaryRows = payload.fieldSummaries
+    .map(
+      (entry) =>
+        `| ${entry.caseId} | ${entry.metricVolumeHash ?? "null"} | ${entry.laneAFieldHash ?? "null"} | ${entry.betaMagnitudeMain?.imagePath ?? "null"} | ${entry.betaMagnitudeSliceCompanion?.canonicalPath ?? "null"} | ${entry.betaXMain?.imagePath ?? "null"} | ${entry.betaXSliceCompanion?.canonicalPath ?? "null"} | ${entry.betaDirectionXZ?.canonicalPath ?? "null"} | ${entry.betaDirectionXZStatus ?? "null"} | ${entry.betaDirectionXZWarnings.join(",") || "none"} | ${entry.betaDirectionXZVectorFieldHash ?? "null"} | ${entry.betaDirectionXZImageHash ?? "null"} |`,
+    )
+    .join("\n");
+  const residualRows = payload.residualSummaries
+    .map(
+      (entry) =>
+        `| ${entry.referenceCaseId} | ${entry.betaMagnitudeResidual?.canonicalPath ?? "null"} | ${entry.betaMagnitudeResidualAbsMax ?? "null"} | ${entry.betaXResidual?.canonicalPath ?? "null"} | ${entry.betaXResidualAbsMax ?? "null"} |`,
+    )
+    .join("\n");
+  const notes = payload.notes.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Shift Geometry Visualization (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| shiftGeometryStatus | ${payload.shiftGeometryStatus} |
+| caseSet | ${payload.caseSet.join(",")} |
+| storedShiftComponent | ${payload.shiftConvention.storedShiftComponent} |
+| betaXDefinition | ${payload.shiftConvention.betaXDefinition} |
+| betaMagnitudeDefinition | ${payload.shiftConvention.betaMagnitudeDefinition} |
+| observer | ${payload.shiftConvention.observer} |
+| foliation | ${payload.shiftConvention.foliation} |
+| laneId | ${payload.shiftConvention.laneId} |
+| directionOverlayStatus | ${payload.directionOverlayStatus} |
+| directionOverlayCaseDistinctness | ${payload.directionOverlayCaseDistinctness} |
+| directionOverlayWarnings | ${payload.directionOverlayWarnings.join(",") || "none"} |
+| constraintContextStatus | ${payload.constraintContextStatus} |
+| lineCutStatus | ${payload.lineCutStatus} |
+
+## Policy
+- diagnostic_lane_a remains the proof surface
+- shift geometry remains secondary and interpretive
+- if shift renders conflict with diagnostics, debug the shift derivation/render path first
+- transport-context inheritance stays off for scientific shift field frames
+
+## Field Summaries
+| caseId | metricVolumeHash | laneAFieldHash | betaMagnitudeMain | betaMagnitudeSliceCompanion | betaXMain | betaXSliceCompanion | betaDirectionXZ | betaDirectionXZStatus | betaDirectionXZWarnings | betaDirectionXZVectorFieldHash | betaDirectionXZImageHash |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+${fieldSummaryRows}
+
+## Residual Summaries
+| referenceCaseId | betaMagnitudeResidual | betaMagnitudeResidualAbsMax | betaXResidual | betaXResidualAbsMax |
+|---|---|---:|---|---:|
+${residualRows}
+
+## Render Entries
+| caseId | referenceCaseId | fieldId | variant | renderCategory | renderRole | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | directionOverlayStatus | directionOverlayWarnings | directionVectorFieldHash | streamSeedHash | streamGeometryHash | directionOverlayHash | fieldAbsMax | displayPolicyId | displayTransform | imagePath | imageHash |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|---|
+${renderRows}
+
+## Recommended Interpretation Order
+${payload.recommendedInterpretationOrder.map((entry) => `- ${entry}`).join("\n")}
+
+## Notes
+${notes}
+`;
+};
+
 const computeCanonicalVisualComparisonChecksum = (
   payload: Nhm2CanonicalVisualComparisonArtifact,
 ): string =>
@@ -17665,6 +19609,8 @@ const FINAL_CANONICAL_COMPARISON_CASE_ORDER: CalibrationPanelCaseId[] = [
 ];
 
 const FINAL_CANONICAL_COMPARISON_PRIMARY_FIELDS: YorkOptixPresentationFieldId[] = [
+  "beta_magnitude",
+  "beta_x",
   "longitudinal_signed_strain",
   "tracefree_magnitude",
   "energy_density",
@@ -17926,6 +19872,10 @@ export const enrichCanonicalCalibrationRenderTaxonomy = (args: {
         colormapFamily: "diagnostic_diverging_signed",
         cameraPoseId:
           view.view_id === "york-surface-rho-3p1" ? "slice_x_rho_remap" : "slice_x_z_midplane",
+        baseImagePolicy: "native_renderer_output",
+        baseImageSource: "native_renderer",
+        inheritsTransportContext: false,
+        contextCompositionMode: "none",
         titlePrefix: "Trace Check",
       });
     }
@@ -17945,7 +19895,8 @@ export const enrichYorkOptixRenderTaxonomy = (args: {
         generatedOn: args.generatedOn,
         caseId: caseEntry.case_id,
         caseLabel: caseEntry.label,
-        renderCategory: "mechanism_overlay",
+        renderCategory:
+          render.renderView === "transport-3p1" ? "transport_context" : "mechanism_overlay",
         renderRole: render.renderView === "transport-3p1" ? "presentation" : "overlay",
         authoritativeStatus:
           render.renderView === "transport-3p1"
@@ -17967,6 +19918,10 @@ export const enrichYorkOptixRenderTaxonomy = (args: {
         displayTransform: null,
         colormapFamily: null,
         cameraPoseId: render.renderView,
+        baseImagePolicy: render.baseImagePolicy,
+        baseImageSource: render.baseImageSource,
+        inheritsTransportContext: render.inheritsTransportContext,
+        contextCompositionMode: render.contextCompositionMode,
         titlePrefix:
           render.renderView === "transport-3p1" ? "3+1 Context" : "Hull / Atlas Overlay",
       });
@@ -18000,9 +19955,57 @@ export const enrichYorkOptixRenderTaxonomy = (args: {
         displayTransform: render.displayTransform,
         colormapFamily: render.colormapFamily,
         cameraPoseId: render.contextRenderView,
+        baseImagePolicy: render.baseImagePolicy,
+        baseImageSource: render.baseImageSource,
+        inheritsTransportContext: render.inheritsTransportContext,
+        contextCompositionMode: render.contextCompositionMode,
         titlePrefix: render.label,
       });
     }
+  }
+};
+
+export const enrichShiftGeometryRenderTaxonomy = (args: {
+  generatedOn: string;
+  artifact: Nhm2ShiftGeometryVisualizationArtifact;
+}): void => {
+  args.artifact.renderTaxonomy ??= null;
+  for (const entry of args.artifact.renderEntries) {
+    if (entry.renderTaxonomy) continue;
+    entry.renderTaxonomy = createRenderTaxonomyMetadata({
+      generatedOn: args.generatedOn,
+      caseId: entry.caseId,
+      caseLabel: entry.title.split(" - ").slice(1).join(" - ") || entry.caseId,
+      renderCategory: entry.renderCategory,
+      renderRole: entry.renderRole,
+      authoritativeStatus: entry.authoritativeStatus,
+      primaryScientificQuestion: entry.primaryScientificQuestion,
+      fieldId: entry.fieldId,
+      variant: entry.variant,
+      legacyPath: entry.imagePath,
+      observer: entry.observer,
+      foliation: entry.foliation,
+      signConvention: entry.signConvention,
+      laneId: entry.laneId,
+      displayPolicyId: entry.displayPolicyId,
+      displayRangeMin: entry.displayRangeMin,
+      displayRangeMax: entry.displayRangeMax,
+      displayTransform: entry.displayTransform,
+      colormapFamily: entry.colormapFamily,
+      cameraPoseId: entry.cameraPoseId,
+      baseImagePolicy: entry.baseImagePolicy,
+      baseImageSource: entry.baseImageSource,
+      inheritsTransportContext: entry.inheritsTransportContext,
+      contextCompositionMode: entry.contextCompositionMode,
+      titlePrefix: entry.title.split(" - ")[0] ?? entry.fieldId,
+    });
+    entry.canonicalPath = entry.renderTaxonomy.canonicalPath;
+    entry.legacyPath = entry.renderTaxonomy.legacyPath;
+    entry.title = entry.renderTaxonomy.frameLabel.title;
+    entry.subtitle = entry.renderTaxonomy.frameLabel.subtitle;
+    entry.quantitySymbol = entry.renderTaxonomy.frameLabel.quantitySymbol;
+    entry.quantityUnits = entry.renderTaxonomy.frameLabel.quantityUnits;
+    entry.orientationConventionId = entry.renderTaxonomy.frameLabel.orientationConventionId;
   }
 };
 
@@ -18036,6 +20039,10 @@ export const enrichCanonicalVisualComparisonRenderTaxonomy = (args: {
       displayTransform: null,
       colormapFamily: null,
       cameraPoseId: "comparison_card_layout",
+      baseImagePolicy: "native_renderer_output",
+      baseImageSource: "native_renderer",
+      inheritsTransportContext: false,
+      contextCompositionMode: "none",
       titlePrefix: "Comparison Card",
     });
   }
@@ -18063,6 +20070,10 @@ export const enrichCanonicalVisualComparisonRenderTaxonomy = (args: {
     displayTransform: null,
     colormapFamily: null,
     cameraPoseId: "comparison_overview_layout",
+    baseImagePolicy: "native_renderer_output",
+    baseImageSource: "native_renderer",
+    inheritsTransportContext: false,
+    contextCompositionMode: "none",
     titlePrefix: "Comparison Overview",
   });
 };
@@ -18159,7 +20170,9 @@ const summarizeCanonicalPresentationCase = (args: {
           .filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
       ),
     )[0] ?? "unreported";
-  return `Solve-backed OptiX 3+1 presentation is available for this case with readability status ${args.readabilityStatus}. Field renders stay bound to ${laneBinding} and remain secondary to the fixed-scale diagnostic layer.`;
+  const transportInheritance =
+    args.caseRender.fieldRenders.some((entry) => entry.inheritsTransportContext) ? "present" : "absent";
+  return `Solve-backed OptiX 3+1 presentation is available for this case with readability status ${args.readabilityStatus}. Field renders stay bound to ${laneBinding}, use a dedicated neutral field canvas, and keep transport-context inheritance ${transportInheritance}. They remain secondary to the fixed-scale diagnostic layer.`;
 };
 
 const summarizeCanonicalMorphologyInterpretation = (args: {
@@ -18168,6 +20181,10 @@ const summarizeCanonicalMorphologyInterpretation = (args: {
   switch (args.caseId) {
     case "flat_space_zero_theta":
       return {
+        beta_magnitude:
+          "Shift magnitude stays near the zero baseline and does not produce a localized transport shell.",
+        beta_x:
+          "Ship-axis shift stays near zero and serves as the transport baseline for the canonical controls.",
         trace_check:
           "Trace check stays near the zero baseline and serves as the control reference for the other cases.",
         longitudinal_signed_strain:
@@ -18181,6 +20198,10 @@ const summarizeCanonicalMorphologyInterpretation = (args: {
       };
     case "natario_control":
       return {
+        beta_magnitude:
+          "Shift magnitude localizes on the transport-support shell without producing the stronger Alcubierre-side transport split.",
+        beta_x:
+          "Ship-axis shift shows the sliding transport organization expected for the calibrated Natario-like low-expansion control.",
         trace_check:
           "Trace check remains low-expansion and near-zero dominant, which is consistent with the current Natario-like control class.",
         longitudinal_signed_strain:
@@ -18194,6 +20215,10 @@ const summarizeCanonicalMorphologyInterpretation = (args: {
       };
     case "alcubierre_control":
       return {
+        beta_magnitude:
+          "Shift magnitude remains solve-backed and readable, but the more important separation still comes from the signed transport structure.",
+        beta_x:
+          "Ship-axis shift presents the strongest canonical signed transport split and remains the clearest Alcubierre-side comparator.",
         trace_check:
           "Trace check remains the clearest signed-lobe comparator and anchors what the repo treats as Alcubierre-like morphology under the current contract.",
         longitudinal_signed_strain:
@@ -18208,6 +20233,10 @@ const summarizeCanonicalMorphologyInterpretation = (args: {
     case "nhm2_certified":
     default:
       return {
+        beta_magnitude:
+          "Shift magnitude is live and shell-localized, but its solved transport pattern remains closer to Natario than to Alcubierre.",
+        beta_x:
+          "Ship-axis shift is now directly visible and still stays closer to Natario's low-expansion transport family than to Alcubierre's stronger signed transport split.",
         trace_check:
           "Trace check remains low-amplitude and does not recover the stronger Alcubierre-style signed fore/aft lobe pattern.",
         longitudinal_signed_strain:
@@ -18291,6 +20320,10 @@ export const buildNhm2CanonicalVisualComparisonArtifact = async (args: {
         imagePath: render?.imagePath ? normalizePath(render.imagePath) : null,
         imageHash: render?.presentationProjectionImageHash ?? null,
         laneId: render?.laneId ?? null,
+        baseImagePolicy: render?.baseImagePolicy ?? "neutral_field_canvas",
+        baseImageSource: render?.baseImageSource ?? "none",
+        inheritsTransportContext: render?.inheritsTransportContext ?? false,
+        contextCompositionMode: render?.contextCompositionMode ?? "none",
         fieldMin: render?.fieldMin ?? null,
         fieldMax: render?.fieldMax ?? null,
         fieldAbsMax: render?.fieldAbsMax ?? null,
@@ -18507,7 +20540,7 @@ export const renderNhm2CanonicalVisualComparisonMarkdown = (
       const fieldRows = entry.presentationLayer.fieldRenders
         .map(
           (field) =>
-            `| ${field.presentationFieldId} | ${field.imagePath ?? "null"} | ${field.laneId ?? "null"} | ${field.fieldMin ?? "null"} | ${field.fieldMax ?? "null"} | ${field.fieldAbsMax ?? "null"} | ${field.displayPolicyId ?? "null"} | ${field.displayRangeMin ?? "null"} | ${field.displayRangeMax ?? "null"} | ${field.displayTransform ?? "null"} | ${field.colormapFamily ?? "null"} | ${field.warnings.join(",") || "none"} |`,
+            `| ${field.presentationFieldId} | ${field.imagePath ?? "null"} | ${field.laneId ?? "null"} | ${field.baseImagePolicy} | ${field.baseImageSource} | ${field.inheritsTransportContext} | ${field.contextCompositionMode} | ${field.fieldMin ?? "null"} | ${field.fieldMax ?? "null"} | ${field.fieldAbsMax ?? "null"} | ${field.displayPolicyId ?? "null"} | ${field.displayRangeMin ?? "null"} | ${field.displayRangeMax ?? "null"} | ${field.displayTransform ?? "null"} | ${field.colormapFamily ?? "null"} | ${field.warnings.join(",") || "none"} |`,
         )
         .join("\n");
       return `## ${entry.label}
@@ -18543,11 +20576,13 @@ ${diagnosticRows}
 
 ${entry.presentationLayer.presentationSummary}
 
-| presentationFieldId | imagePath | laneId | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
-|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
+| presentationFieldId | imagePath | laneId | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
+|---|---|---|---|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
 ${fieldRows}
 
 ### Morphology Interpretation
+- beta_magnitude: ${entry.morphologyInterpretation.beta_magnitude}
+- beta_x: ${entry.morphologyInterpretation.beta_x}
 - trace_check: ${entry.morphologyInterpretation.trace_check}
 - longitudinal_signed_strain: ${entry.morphologyInterpretation.longitudinal_signed_strain}
 - tracefree_magnitude: ${entry.morphologyInterpretation.tracefree_magnitude}
@@ -18660,6 +20695,7 @@ export const buildRenderTaxonomyArtifact = (args: {
   generatedOn: string;
   canonicalCalibrationArtifact: WarpYorkCanonicalCalibrationArtifact;
   optixRenderArtifact: Nhm2YorkOptixRenderArtifact;
+  shiftGeometryArtifact: Nhm2ShiftGeometryVisualizationArtifact;
   canonicalVisualComparisonArtifact: Nhm2CanonicalVisualComparisonArtifact;
 }): RenderTaxonomyArtifact => {
   const renderEntries: RenderTaxonomyManifestEntry[] = [];
@@ -18681,12 +20717,16 @@ export const buildRenderTaxonomyArtifact = (args: {
       addEntry(caseEntry.case_id, render.renderTaxonomy);
     }
   }
+  for (const render of args.shiftGeometryArtifact.renderEntries) {
+    addEntry(render.caseId, render.renderTaxonomy);
+  }
   for (const caseEntry of args.canonicalVisualComparisonArtifact.canonicalCases) {
     addEntry(caseEntry.case_id, caseEntry.comparisonCardRender);
   }
   addEntry("canonical_family", args.canonicalVisualComparisonArtifact.overviewPanelRender);
   const categoryCounts = {
     diagnostic_lane_a: 0,
+    transport_context: 0,
     scientific_3p1_field: 0,
     comparison_panel: 0,
     mechanism_overlay: 0,
@@ -18725,7 +20765,9 @@ export const buildRenderTaxonomyArtifact = (args: {
     },
     notes: [
       "diagnostic_lane_a remains the proof surface for class decisions.",
+      "transport_context remains a separate solve-backed context family and is not a dedicated field frame.",
       "scientific_3p1_field remains solve-backed but secondary presentation only.",
+      "shift_geometry suites remain solve-backed but interpretive and cannot outrun the authoritative Lane A diagnostic surface.",
       "comparison_panel outputs are communication/review surfaces, not proof surfaces.",
       "mechanism_overlay outputs remain interpretive and secondary to both diagnostics and single-field presentation renders.",
       "No invariant_crosscheck render family is populated in the current proof-pack run.",
@@ -18755,7 +20797,7 @@ export const renderRenderTaxonomyAuditMarkdown = (
   const renderRows = payload.renderEntries
     .map(
       (entry) =>
-        `| ${entry.renderId} | ${entry.caseId} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.fieldId} | ${entry.variant} | ${entry.canonicalPath ?? "null"} | ${entry.legacyPath ?? "null"} | ${entry.laneId ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.cameraPoseId ?? "null"} |`,
+        `| ${entry.renderId} | ${entry.caseId} | ${entry.renderCategory} | ${entry.renderRole} | ${entry.authoritativeStatus} | ${entry.fieldId} | ${entry.variant} | ${entry.baseImagePolicy} | ${entry.baseImageSource} | ${entry.inheritsTransportContext} | ${entry.contextCompositionMode} | ${entry.canonicalPath ?? "null"} | ${entry.legacyPath ?? "null"} | ${entry.laneId ?? "null"} | ${entry.displayPolicyId ?? "null"} | ${entry.cameraPoseId ?? "null"} |`,
     )
     .join("\n");
   const notes = payload.notes.map((entry) => `- ${entry}`).join("\n");
@@ -18786,8 +20828,8 @@ ${categoryRows}
 ${fieldRows}
 
 ## Manifest
-| renderId | caseId | renderCategory | renderRole | authoritativeStatus | fieldId | variant | canonicalPath | legacyPath | laneId | displayPolicyId | cameraPoseId |
-|---|---|---|---|---|---|---|---|---|---|---|---|
+| renderId | caseId | renderCategory | renderRole | authoritativeStatus | fieldId | variant | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | canonicalPath | legacyPath | laneId | displayPolicyId | cameraPoseId |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 ${renderRows}
 
 ## Notes
@@ -18832,10 +20874,15 @@ Every render entry in the manifest now carries:
 - displayTransform
 - colormapFamily
 - cameraPoseId
+- baseImagePolicy
+- baseImageSource
+- inheritsTransportContext
+- contextCompositionMode
 
 ## Use policy
 
 - \`diagnostic_lane_a\` is the proof surface.
+- \`transport_context\` is a separate solve-backed context family and not a dedicated scientific field frame.
 - \`scientific_3p1_field\` is the human-facing scientific presentation surface.
 - \`comparison_panel\` is for review and communication.
 - \`mechanism_overlay\` is interpretive and secondary.
@@ -18860,7 +20907,7 @@ Every render entry in the manifest now carries:
 - presentationRenderCategory: \`${payload.presentationRenderCategory}\`
 - comparisonRenderCategory: \`${payload.comparisonRenderCategory}\`
 - repoOrientationConvention: \`${payload.repoOrientationConvention.orientationConventionId}\`
-- recommendedUsePolicy: diagnostic primary, scientific_3p1_field secondary, comparison panels for review, overlays interpretive only
+- recommendedUsePolicy: diagnostic primary, transport_context separate from field frames, scientific_3p1_field secondary, comparison panels for review, overlays interpretive only
 `;
 
 export const renderNhm2NasaFigure1OverlayMemo = (
@@ -25325,6 +27372,19 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| reportPath | ${payload.presentationRenderSummary.reportPath} |`,
       ].join("\n")
     : "| presentation_render_layer | unavailable |";
+  const shiftGeometryRows = payload.shiftGeometrySummary
+      ? [
+        `| shiftGeometryStatus | ${payload.shiftGeometrySummary.shiftGeometryStatus} |`,
+        `| mandatoryFirstPassFields | ${payload.shiftGeometrySummary.mandatoryFirstPassFields.join(",")} |`,
+        `| mandatoryResidualComparisons | ${payload.shiftGeometrySummary.mandatoryResidualComparisons.join(",")} |`,
+        `| directionOverlayStatus | ${payload.shiftGeometrySummary.directionOverlayStatus} |`,
+        `| directionOverlayCaseDistinctness | ${payload.shiftGeometrySummary.directionOverlayCaseDistinctness} |`,
+        `| directionOverlayWarnings | ${payload.shiftGeometrySummary.directionOverlayWarnings.join(",") || "none"} |`,
+        `| constraintContextStatus | ${payload.shiftGeometrySummary.constraintContextStatus} |`,
+        `| artifactPath | ${payload.shiftGeometrySummary.artifactPath} |`,
+        `| reportPath | ${payload.shiftGeometrySummary.reportPath} |`,
+      ].join("\n")
+    : "| shift_geometry | unavailable |";
   const renderTaxonomyRows = payload.renderTaxonomySummary
     ? [
         `| authoritativeRenderCategory | ${payload.renderTaxonomySummary.authoritativeRenderCategory} |`,
@@ -25555,6 +27615,11 @@ ${sourceFormulaRows}
 |---|---|
 ${presentationRenderRows}
 
+## Shift Geometry Visualization
+| field | value |
+|---|---|
+${shiftGeometryRows}
+
 ## Render Taxonomy
 | field | value |
 |---|---|
@@ -25648,6 +27713,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   yorkOptixRenderLatestMdPath?: string;
   yorkOptixRenderExportDir?: string;
   yorkOptixRenderMemoPath?: string;
+  shiftGeometryVisualizationOutJsonPath?: string;
+  shiftGeometryVisualizationLatestJsonPath?: string;
+  shiftGeometryVisualizationOutMdPath?: string;
+  shiftGeometryVisualizationLatestMdPath?: string;
   renderTaxonomyOutJsonPath?: string;
   renderTaxonomyLatestJsonPath?: string;
   renderTaxonomyOutMdPath?: string;
@@ -25820,6 +27889,18 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     options?.yorkOptixRenderExportDir ?? DEFAULT_YORK_OPTIX_RENDER_EXPORT_DIR;
   const yorkOptixRenderMemoPath =
     options?.yorkOptixRenderMemoPath ?? DEFAULT_YORK_OPTIX_RENDER_MEMO_PATH;
+  const shiftGeometryVisualizationOutJsonPath =
+    options?.shiftGeometryVisualizationOutJsonPath ??
+    DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_OUT_JSON;
+  const shiftGeometryVisualizationLatestJsonPath =
+    options?.shiftGeometryVisualizationLatestJsonPath ??
+    DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_JSON;
+  const shiftGeometryVisualizationOutMdPath =
+    options?.shiftGeometryVisualizationOutMdPath ??
+    DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_OUT_MD;
+  const shiftGeometryVisualizationLatestMdPath =
+    options?.shiftGeometryVisualizationLatestMdPath ??
+    DEFAULT_SHIFT_GEOMETRY_VISUALIZATION_LATEST_MD;
   const renderTaxonomyOutJsonPath =
     options?.renderTaxonomyOutJsonPath ?? DEFAULT_RENDER_TAXONOMY_OUT_JSON;
   const renderTaxonomyLatestJsonPath =
@@ -26910,6 +28991,31 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       artifact: yorkOptixRenderArtifact,
     }),
   );
+  const shiftGeometryVisualizationArtifact =
+    await buildNhm2ShiftGeometryVisualizationArtifact({
+      generatedOn: DATE_STAMP,
+      baseUrl,
+      sourceAuditArtifactPath: latestJsonPath,
+      canonicalCalibrationArtifactPath: yorkCanonicalCalibrationLatestJsonPath,
+      optixRenderArtifactPath: yorkOptixRenderLatestJsonPath,
+      canonicalCalibrationArtifact: yorkCanonicalCalibrationArtifact,
+      optixRenderArtifact: yorkOptixRenderArtifact,
+      diagnosticLane: fixedScaleLane,
+      caseResults: cases,
+      natarioMetricVolumeRef: natMetricVolumeRef,
+    });
+  enrichShiftGeometryRenderTaxonomy({
+    generatedOn: DATE_STAMP,
+    artifact: shiftGeometryVisualizationArtifact,
+  });
+  shiftGeometryVisualizationArtifact.checksum = computeShiftGeometryChecksum(
+    shiftGeometryVisualizationArtifact,
+  );
+  notes.push(
+    formatShiftGeometryProofPackSummary({
+      artifact: shiftGeometryVisualizationArtifact,
+    }),
+  );
   const yorkAblationPanelData = await buildNhm2AblationComparisonData({
     baseUrl,
     payload: {
@@ -27569,6 +29675,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     generatedOn: DATE_STAMP,
     canonicalCalibrationArtifact: yorkCanonicalCalibrationArtifact,
     optixRenderArtifact: yorkOptixRenderArtifact,
+    shiftGeometryArtifact: shiftGeometryVisualizationArtifact,
     canonicalVisualComparisonArtifact,
   });
   const renderTaxonomySummary: RenderTaxonomySummary = {
@@ -27584,6 +29691,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   };
   yorkOptixRenderArtifact.renderTaxonomy = { ...renderTaxonomySummary };
   yorkOptixRenderArtifact.checksum = computeYorkOptixRenderChecksum(yorkOptixRenderArtifact);
+  shiftGeometryVisualizationArtifact.renderTaxonomy = { ...renderTaxonomySummary };
+  shiftGeometryVisualizationArtifact.checksum = computeShiftGeometryChecksum(
+    shiftGeometryVisualizationArtifact,
+  );
   canonicalVisualComparisonArtifact.renderTaxonomy = { ...renderTaxonomySummary };
   canonicalVisualComparisonArtifact.checksum = computeCanonicalVisualComparisonChecksum(
     canonicalVisualComparisonArtifact,
@@ -27697,6 +29808,21 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       artifactPath: normalizePath(yorkOptixRenderLatestJsonPath),
       reportPath: normalizePath(yorkOptixRenderLatestMdPath),
     },
+    shiftGeometrySummary: {
+      shiftGeometryStatus: shiftGeometryVisualizationArtifact.shiftGeometryStatus,
+      mandatoryFirstPassFields: ["beta_magnitude", "beta_x", "beta_direction_xz"],
+      mandatoryResidualComparisons: [
+        "nhm2_minus_natario_beta_residual",
+        "nhm2_minus_alcubierre_beta_residual",
+      ],
+      directionOverlayStatus: shiftGeometryVisualizationArtifact.directionOverlayStatus,
+      directionOverlayCaseDistinctness:
+        shiftGeometryVisualizationArtifact.directionOverlayCaseDistinctness,
+      directionOverlayWarnings: shiftGeometryVisualizationArtifact.directionOverlayWarnings,
+      constraintContextStatus: shiftGeometryVisualizationArtifact.constraintContextStatus,
+      artifactPath: normalizePath(shiftGeometryVisualizationLatestJsonPath),
+      reportPath: normalizePath(shiftGeometryVisualizationLatestMdPath),
+    },
     renderTaxonomySummary: {
       authoritativeRenderCategory: renderTaxonomyArtifact.authoritativeRenderCategory,
       presentationRenderCategory: renderTaxonomyArtifact.presentationRenderCategory,
@@ -27785,6 +29911,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   ensureDirForFile(yorkOptixRenderLatestMdPath);
   fs.mkdirSync(yorkOptixRenderExportDir, { recursive: true });
   ensureDirForFile(yorkOptixRenderMemoPath);
+  ensureDirForFile(shiftGeometryVisualizationOutJsonPath);
+  ensureDirForFile(shiftGeometryVisualizationLatestJsonPath);
+  ensureDirForFile(shiftGeometryVisualizationOutMdPath);
+  ensureDirForFile(shiftGeometryVisualizationLatestMdPath);
   ensureDirForFile(renderTaxonomyOutJsonPath);
   ensureDirForFile(renderTaxonomyLatestJsonPath);
   ensureDirForFile(renderTaxonomyOutMdPath);
@@ -28001,6 +30131,24 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   );
   fs.writeFileSync(yorkOptixRenderMemoPath, `${yorkOptixRenderMemo}\n`);
   syncLegacyAliasFile(yorkOptixRenderMemoPath, REQUESTED_YORK_OPTIX_RENDER_MEMO_PATH);
+  fs.writeFileSync(
+    shiftGeometryVisualizationOutJsonPath,
+    `${JSON.stringify(shiftGeometryVisualizationArtifact, null, 2)}\n`,
+  );
+  fs.writeFileSync(
+    shiftGeometryVisualizationLatestJsonPath,
+    `${JSON.stringify(shiftGeometryVisualizationArtifact, null, 2)}\n`,
+  );
+  const shiftGeometryVisualizationMarkdown =
+    renderNhm2ShiftGeometryVisualizationMarkdown(shiftGeometryVisualizationArtifact);
+  fs.writeFileSync(
+    shiftGeometryVisualizationOutMdPath,
+    `${shiftGeometryVisualizationMarkdown}\n`,
+  );
+  fs.writeFileSync(
+    shiftGeometryVisualizationLatestMdPath,
+    `${shiftGeometryVisualizationMarkdown}\n`,
+  );
   fs.writeFileSync(
     renderTaxonomyOutJsonPath,
     `${JSON.stringify(renderTaxonomyArtifact, null, 2)}\n`,
@@ -28251,6 +30399,10 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     yorkOptixRenderLatestMdPath,
     yorkOptixRenderExportDir,
     yorkOptixRenderMemoPath,
+    shiftGeometryVisualizationOutJsonPath,
+    shiftGeometryVisualizationLatestJsonPath,
+    shiftGeometryVisualizationOutMdPath,
+    shiftGeometryVisualizationLatestMdPath,
     yorkCanonicalVisualComparisonOutJsonPath,
     yorkCanonicalVisualComparisonLatestJsonPath,
     yorkCanonicalVisualComparisonOutMdPath,
@@ -28310,6 +30462,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     yorkRenderDebugArtifact,
     yorkFixedScaleComparisonArtifact,
     yorkOptixRenderArtifact,
+    shiftGeometryVisualizationArtifact,
     canonicalVisualComparisonArtifact,
     yorkCanonicalCalibrationArtifact,
     yorkAblationPanelArtifact,
@@ -28413,6 +30566,18 @@ if (isEntryPoint) {
     yorkOptixRenderLatestMdPath: readArgValue("--york-optix-render-latest-md"),
     yorkOptixRenderExportDir: readArgValue("--york-optix-render-export-dir"),
     yorkOptixRenderMemoPath: readArgValue("--york-optix-render-memo"),
+    shiftGeometryVisualizationOutJsonPath: readArgValue(
+      "--shift-geometry-visualization-out-json",
+    ),
+    shiftGeometryVisualizationLatestJsonPath: readArgValue(
+      "--shift-geometry-visualization-latest-json",
+    ),
+    shiftGeometryVisualizationOutMdPath: readArgValue(
+      "--shift-geometry-visualization-out-md",
+    ),
+    shiftGeometryVisualizationLatestMdPath: readArgValue(
+      "--shift-geometry-visualization-latest-md",
+    ),
     yorkCanonicalVisualComparisonOutJsonPath: readArgValue(
       "--york-canonical-visual-comparison-out-json",
     ),
@@ -28514,3 +30679,4 @@ if (isEntryPoint) {
       process.exitCode = 1;
     });
 }
+

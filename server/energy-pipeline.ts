@@ -446,6 +446,7 @@ const resolveCanonicalMetricT00Ref = (
   const family = adapter?.family;
   if (family === "alcubierre") return "warp.metric.T00.alcubierre.analytic";
   if (family === "vdb") return "warp.metric.T00.vdb.regionII";
+  if (family === "nhm2_shift_lapse") return "warp.metric.T00.nhm2.shift_lapse";
   if (family === "natario_sdf") return "warp.metric.T00.natario_sdf.shift";
   if (family === "natario") {
     if (adapter?.requestedFieldType === "irrotational") {
@@ -486,6 +487,9 @@ const resolveMetricFamilyFromRef = (
     return adapter.family;
   }
   if (metricT00Ref.includes(".vdb.")) return "vdb";
+  if (metricT00Ref.includes(".nhm2.") && metricT00Ref.includes(".shift_lapse")) {
+    return "nhm2_shift_lapse";
+  }
   if (metricT00Ref.includes(".natario_sdf.")) return "natario_sdf";
   if (metricT00Ref.includes(".irrotational.")) return "natario";
   if (metricT00Ref.includes(".natario.")) return "natario";
@@ -549,6 +553,10 @@ const buildNatarioRuntimePayload = (
   const warp = ((state as any).warp ?? {}) as Record<string, any>;
   const adapter = warp.metricAdapter as WarpMetricAdapterSnapshot | undefined;
   const alpha = toFiniteNumber(adapter?.alpha) ?? 1;
+  const lapseSummary =
+    adapter?.lapseSummary && typeof adapter.lapseSummary === "object"
+      ? { ...adapter.lapseSummary }
+      : undefined;
   const gammaDiagRaw = Array.isArray(adapter?.gammaDiag) ? adapter.gammaDiag : undefined;
   const gammaDiag: [number, number, number] =
     gammaDiagRaw &&
@@ -654,6 +662,7 @@ const buildNatarioRuntimePayload = (
     chartLabel: adapter?.chart?.label ?? "unspecified",
     chartDtGammaPolicy: adapter?.chart?.dtGammaPolicy ?? "unknown",
     chartContractStatus: adapter?.chart?.contractStatus ?? "unknown",
+    ...(lapseSummary ? { lapseSummary } : {}),
     dutyFactor:
       firstFinite(
         warp.dutyFactor,
@@ -938,7 +947,12 @@ export interface FieldGeometryRequest extends FieldRequest {
   };
 }
 
-export type WarpFieldType = "natario" | "natario_sdf" | "alcubierre" | "irrotational";
+export type WarpFieldType =
+  | "natario"
+  | "natario_sdf"
+  | "nhm2_shift_lapse"
+  | "alcubierre"
+  | "irrotational";
 
 export type WarpSdfPreview = {
   key?: string | null;
@@ -1216,6 +1230,11 @@ export type GrPipelineDiagnostics = {
     lapseMin: number;
     lapseMax: number;
     betaMaxAbs: number;
+    betaOverAlphaMax?: number;
+    betaOverAlphaP98?: number;
+    betaOutwardOverAlphaWallMax?: number | null;
+    betaOutwardOverAlphaWallP98?: number | null;
+    wallHorizonMargin?: number | null;
   };
   stiffness?: import("./gr-evolve-brick").GrEvolveBrickStats["stiffness"];
   constraints: {
@@ -5792,6 +5811,11 @@ export async function calculateEnergyPipeline(
         gTarget,
         epsilonTilt,
         betaTiltVec,
+        alphaProfileKind: (state.dynamicConfig as any)?.alphaProfileKind,
+        alphaCenterline: (state.dynamicConfig as any)?.alphaCenterline,
+        alphaGradientVec_m_inv: (state.dynamicConfig as any)?.alphaGradientVec_m_inv,
+        alphaInteriorSupportKind: (state.dynamicConfig as any)?.alphaInteriorSupportKind,
+        alphaWallTaper_m: (state.dynamicConfig as any)?.alphaWallTaper_m,
         warpFieldType,
         warpGeometry: warpGeometry ?? undefined,
         warpGeometryKind
@@ -5993,6 +6017,7 @@ export async function calculateEnergyPipeline(
             chart: existingAdapter.chart,
             requestedFieldType: existingAdapter.requestedFieldType,
             alpha: existingAdapter.alpha,
+            lapseSummary: existingAdapter.lapseSummary,
             gammaDiag: existingAdapter.gammaDiag,
             hodgeDiagnostics: {
               maxDiv: existingAdapter.betaDiagnostics?.thetaMax,
@@ -6084,6 +6109,7 @@ export async function calculateEnergyPipeline(
             chart: existingAdapter.chart,
             requestedFieldType: existingAdapter.requestedFieldType,
             alpha: existingAdapter.alpha,
+            lapseSummary: existingAdapter.lapseSummary,
             gammaDiag: existingAdapter.gammaDiag,
             hodgeDiagnostics: {
               maxDiv: existingAdapter.betaDiagnostics?.thetaMax,
@@ -6158,6 +6184,7 @@ export async function calculateEnergyPipeline(
       chart: adapter.chart,
       requestedFieldType: adapter.requestedFieldType,
       alpha: adapter.alpha,
+      lapseSummary: adapter.lapseSummary ?? (warpStateLatest as any)?.lapseSummary,
       gammaDiag: adapter.gammaDiag,
       betaDiagnostics: adapter.betaDiagnostics,
       vdbConformalDiagnostics,
@@ -7067,7 +7094,12 @@ function resolveMetricRhoFromState(
   const natarioMetricRef =
     typeof natario?.metricT00Ref === "string" && natario.metricT00Ref.length > 0
       ? String(natario.metricT00Ref)
-      : "warp.metric.T00.natario.shift";
+      : warp?.metricAdapter?.family === "nhm2_shift_lapse" ||
+          warp?.requestedFieldType === "nhm2_shift_lapse" ||
+          state?.warpFieldType === "nhm2_shift_lapse" ||
+          state?.dynamicConfig?.warpFieldType === "nhm2_shift_lapse"
+        ? "warp.metric.T00.nhm2.shift_lapse"
+        : "warp.metric.T00.natario.shift";
   if (natarioMetricSource === "metric" && natarioMetricT00 !== undefined) {
     if (debug) {
       debug.source = natarioMetricRef;

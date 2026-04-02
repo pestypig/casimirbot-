@@ -37,7 +37,12 @@ export interface StressEnergyBrickParams {
   metricT00?: number;
   metricT00Source?: string;
   metricT00Ref?: string;
-  warpFieldType?: "natario" | "natario_sdf" | "alcubierre" | "irrotational";
+  warpFieldType?:
+    | "natario"
+    | "natario_sdf"
+    | "nhm2_shift_lapse"
+    | "alcubierre"
+    | "irrotational";
   sourceRedesignMode?: Nhm2SourceRedesignMode | null;
   sourceReformulationMode?: Nhm2SourceReformulationMode | null;
   observerRapidityCap?: number;
@@ -202,6 +207,7 @@ type StressEnergyFamilyId =
   | "alcubierre_control"
   | "natario_control"
   | "nhm2_certified"
+  | "nhm2_shift_lapse_diagnostic"
   | "nhm2_redesign_signed_shell_bias"
   | "nhm2_redesign_coupling_localization"
   | "nhm2_redesign_drive_vs_geometry_split"
@@ -224,7 +230,12 @@ type StressEnergySourceBranch =
 type StressEnergyFamilyContext = {
   familyId: StressEnergyFamilyId;
   sourceBranch: StressEnergySourceBranch;
-  warpFieldType: "natario" | "natario_sdf" | "alcubierre" | "irrotational";
+  warpFieldType:
+    | "natario"
+    | "natario_sdf"
+    | "nhm2_shift_lapse"
+    | "alcubierre"
+    | "irrotational";
   shapeFunctionId: string;
   sourceRedesignMode?: Nhm2SourceRedesignMode | null;
   sourceReformulationMode?: Nhm2SourceReformulationMode | null;
@@ -302,8 +313,16 @@ const blendDirections = (a: Vec3, b: Vec3 | null, weight: number): Vec3 => {
   ]);
 };
 
-const normalizeWarpFieldType = (value: unknown): "natario" | "natario_sdf" | "alcubierre" | "irrotational" | null => {
-  if (value === "natario" || value === "natario_sdf" || value === "alcubierre" || value === "irrotational") {
+const normalizeWarpFieldType = (
+  value: unknown,
+): "natario" | "natario_sdf" | "nhm2_shift_lapse" | "alcubierre" | "irrotational" | null => {
+  if (
+    value === "natario" ||
+    value === "natario_sdf" ||
+    value === "nhm2_shift_lapse" ||
+    value === "alcubierre" ||
+    value === "irrotational"
+  ) {
     return value;
   }
   return null;
@@ -354,6 +373,14 @@ const resolveFamilyFromMetricRef = (metricT00Ref: string | undefined): StressEne
       shapeFunctionId: "nhm2_natario_sdf_shell_v1",
     };
   }
+  if (lower.includes(".nhm2.") && lower.includes(".shift_lapse")) {
+    return {
+      familyId: "nhm2_shift_lapse_diagnostic",
+      sourceBranch: "metric_t00_ref",
+      warpFieldType: "nhm2_shift_lapse",
+      shapeFunctionId: "nhm2_shift_lapse_shell_v1",
+    };
+  }
   if (lower.includes(".natario.")) {
     return {
       familyId: "natario_control",
@@ -382,7 +409,7 @@ const resolveFamilyFromMetricRef = (metricT00Ref: string | undefined): StressEne
 };
 
 const resolveFamilyFromWarpFieldType = (
-  warpFieldType: "natario" | "natario_sdf" | "alcubierre" | "irrotational",
+  warpFieldType: "natario" | "natario_sdf" | "nhm2_shift_lapse" | "alcubierre" | "irrotational",
   sourceBranch: StressEnergySourceBranch,
 ): StressEnergyFamilyContext => {
   if (warpFieldType === "alcubierre") {
@@ -399,6 +426,14 @@ const resolveFamilyFromWarpFieldType = (
       sourceBranch,
       warpFieldType,
       shapeFunctionId: "nhm2_natario_sdf_shell_v1",
+    };
+  }
+  if (warpFieldType === "nhm2_shift_lapse") {
+    return {
+      familyId: "nhm2_shift_lapse_diagnostic",
+      sourceBranch,
+      warpFieldType,
+      shapeFunctionId: "nhm2_shift_lapse_shell_v1",
     };
   }
   if (warpFieldType === "irrotational") {
@@ -1573,7 +1608,10 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     dz,
   );
   const warpFieldType = familyContext.warpFieldType;
-  const isNatarioField = warpFieldType === "natario" || warpFieldType === "natario_sdf";
+  const isNatarioField =
+    warpFieldType === "natario" ||
+    warpFieldType === "natario_sdf" ||
+    warpFieldType === "nhm2_shift_lapse";
   const clampLimit = isNatarioField ? NATARIO_K_TOL : ALCUBIERRE_K_TOL;
   const clampMode = isNatarioField ? "natario" : "stability";
   const natarioClamp = clampNatarioShift(

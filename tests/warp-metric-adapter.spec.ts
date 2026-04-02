@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildWarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter";
+import {
+  buildWarpMetricAdapterSnapshot,
+  evaluateWarpMetricLapseField,
+} from "../modules/warp/warp-metric-adapter";
 
 describe("buildWarpMetricAdapterSnapshot", () => {
   it("defaults dtGammaPolicy based on chart label", () => {
@@ -79,5 +82,47 @@ describe("buildWarpMetricAdapterSnapshot", () => {
     expect(String(snap.betaDiagnostics?.note ?? "")).toContain(
       "VdB conformal correction",
     );
+  });
+
+  it("preserves lapse summaries and evaluates a nontrivial spatial alpha field", () => {
+    const snap = buildWarpMetricAdapterSnapshot({
+      family: "nhm2_shift_lapse",
+      alpha: 0.995,
+      lapseSummary: {
+        alphaCenterline: 0.995,
+        alphaMin: 0.99,
+        alphaMax: 1.01,
+        alphaProfileKind: "linear_gradient_tapered",
+        alphaGradientAxis: "z_zenith",
+        alphaGradientVec_m_inv: [0, 0, 5e-5],
+        alphaInteriorSupportKind: "hull_interior",
+        alphaWallTaper_m: 8,
+      },
+    });
+
+    expect(snap.family).toBe("nhm2_shift_lapse");
+    expect(snap.lapseSummary).toEqual(
+      expect.objectContaining({
+        alphaCenterline: 0.995,
+        alphaGradientAxis: "z_zenith",
+      }),
+    );
+
+    const center = evaluateWarpMetricLapseField({
+      lapseSummary: snap.lapseSummary,
+      point: [0, 0, 0],
+      hullAxes: [10, 10, 10],
+      bubbleRadius_m: 10,
+    });
+    const above = evaluateWarpMetricLapseField({
+      lapseSummary: snap.lapseSummary,
+      point: [0, 0, 5],
+      hullAxes: [10, 10, 10],
+      bubbleRadius_m: 10,
+    });
+
+    expect(center).toBeCloseTo(0.995, 8);
+    expect(above).toBeGreaterThan(center);
+    expect(above).toBeLessThanOrEqual(1.01);
   });
 });

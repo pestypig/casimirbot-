@@ -266,6 +266,52 @@ describe("warp viability congruence wiring", () => {
     expect(result.snapshot.theta_chart_contract_ok).toBe(false);
   });
 
+  it("emits a combined shift-lapse advisory block from GR gauge diagnostics", async () => {
+    runtime.pipeline = makePipeline({
+      gr: {
+        constraints: {
+          rho_constraint: { mean: -1.5, rms: 0.1, maxAbs: 0.2 },
+          H_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+          M_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+        },
+        matter: { stressEnergy: { avgT00: -1.4 } },
+        gauge: {
+          lapseMin: 0.97,
+          betaMaxAbs: 0.1,
+          betaOverAlphaMax: 0.83,
+          betaOverAlphaP98: 0.71,
+          betaOutwardOverAlphaWallMax: 0.62,
+          betaOutwardOverAlphaWallP98: 0.58,
+          wallHorizonMargin: 0.38,
+        },
+      },
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricAdapter: {
+          family: "nhm2_shift_lapse",
+          chart: { label: "comoving_cartesian" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+    expect((result.snapshot as any).grGuardrails?.combinedShiftLapseSafety).toEqual(
+      expect.objectContaining({
+        status: "pass",
+        betaOverAlphaMax: 0.83,
+        betaOverAlphaP98: 0.71,
+        betaOutwardOverAlphaWallMax: 0.62,
+        betaOutwardOverAlphaWallP98: 0.58,
+        wallHorizonMargin: 0.38,
+        note:
+          "Combined shift/lapse safety remains advisory-only for this diagnostics-first branch.",
+      }),
+    );
+  });
+
   it("fails FordRomanQI on proxy rho source in strict mode", async () => {
     runtime.pipeline = makePipeline({
       qiGuardrail: {

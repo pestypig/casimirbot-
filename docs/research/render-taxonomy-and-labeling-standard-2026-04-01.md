@@ -33,10 +33,15 @@ Every render entry in the manifest now carries:
 - displayTransform
 - colormapFamily
 - cameraPoseId
+- baseImagePolicy
+- baseImageSource
+- inheritsTransportContext
+- contextCompositionMode
 
 ## Use policy
 
 - `diagnostic_lane_a` is the proof surface.
+- `transport_context` is a separate solve-backed context family and not a dedicated scientific field frame.
 - `scientific_3p1_field` is the human-facing scientific presentation surface.
 - `comparison_panel` is for review and communication.
 - `mechanism_overlay` is interpretive and secondary.
@@ -61,5 +66,5 @@ Every render entry in the manifest now carries:
 - presentationRenderCategory: `scientific_3p1_field`
 - comparisonRenderCategory: `comparison_panel`
 - repoOrientationConvention: `x_ship_y_port_z_zenith`
-- recommendedUsePolicy: diagnostic primary, scientific_3p1_field secondary, comparison panels for review, overlays interpretive only
+- recommendedUsePolicy: diagnostic primary, transport_context separate from field frames, scientific_3p1_field secondary, comparison panels for review, overlays interpretive only
 

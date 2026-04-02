@@ -6,15 +6,15 @@
 - authoritativeDiagnosticBasis: `lane_a_eulerian_comoving_theta_minus_trk` / `pre_png_color_buffer`
 - presentationRenderLayerStatus: `available`
 - fieldSuiteRealizationStatus: `realized`
-- fieldSuiteReadabilityStatus: `readable`
-- presentationReadinessVerdict: `ready_for_human_inspection`
+- fieldSuiteReadabilityStatus: `flat`
+- presentationReadinessVerdict: `field_realized_but_presentation_flat`
 - renderTaxonomyRoot: `artifacts/research/full-solve/rendered`
 
 ## Final comparison
 
 - finalComparisonVerdict: `canonical_controls_validated_nhm2_natario_like`
 - diagnosticVerdict: `shared_scale_preserves_natario_like_class`
-- presentationVerdict: `presentation_layer_ready_and_consistent`
+- presentationVerdict: `presentation_layer_has_advisories`
 - nhm2ClosestCanonicalFamily: `natario_like_low_expansion`
 - alcubierreLikeTransitionObserved: no
 
@@ -31,8 +31,8 @@ NHM2 remains Natario-like under the authoritative Lane A contract. The readable 
 - finalComparisonVerdict: `canonical_controls_validated_nhm2_natario_like`
 - nhm2ClosestCanonicalFamily: `natario_like_low_expansion`
 - authoritativeDiagnosticBasis: `lane_a_eulerian_comoving_theta_minus_trk` / `theta=-trK`
-- presentationLayerStatus: `ready_for_human_inspection`
+- presentationLayerStatus: `field_realized_but_presentation_flat`
 - renderTaxonomyRoot: `artifacts/research/full-solve/rendered`
-- recommendedNextAction: If a different morphology is still desired, continue model-family work rather than render debugging.
+- recommendedNextAction: Resolve remaining presentation issues before relying on the OptiX layer for human-facing comparison.
 - scopeNote: This is a repo-local comparison pack. The authoritative morphology verdict still comes from Lane A diagnostics; the OptiX suite is secondary presentation only.
 

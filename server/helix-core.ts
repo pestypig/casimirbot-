@@ -987,7 +987,9 @@ const UpdateSchema = z.object({
   hullAreaOverride_uncertainty_m2: hullAreaOverrideSchema.shape.hullAreaOverride_uncertainty_m2,
   hullAreaPerSector_m2: hullAreaPerSectorSchema,
   driveDir: brickVec3Schema.optional(),
-  warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]).optional(),
+  warpFieldType: z
+    .enum(["natario", "natario_sdf", "nhm2_shift_lapse", "alcubierre", "irrotational"])
+    .optional(),
   warpGeometry: warpGeometrySchema.partial().optional(),
   warpGeometryKind: warpGeometryKindSchema.optional(),
   warpGeometryAssetId: z.string().optional(),
@@ -4837,7 +4839,9 @@ export async function getLatticeProbe(req: Request, res: Response) {
     const warpGeometry =
       warpFieldType === "alcubierre"
         ? { geomScale: 1, betaWeight: 1 }
-        : warpFieldType === "natario" || warpFieldType === "natario_sdf"
+        : warpFieldType === "natario" ||
+            warpFieldType === "natario_sdf" ||
+            warpFieldType === "nhm2_shift_lapse"
           ? { geomScale: LATTICE_PROBE_NATARIO_GEOM_WARP_SCALE, betaWeight: 0 }
           : { geomScale: 1, betaWeight: 0 };
 
@@ -4949,6 +4953,7 @@ export async function getLatticeProbe(req: Request, res: Response) {
         warpFieldType === "alcubierre" ||
         warpFieldType === "natario" ||
         warpFieldType === "natario_sdf" ||
+        warpFieldType === "nhm2_shift_lapse" ||
         warpFieldType === "irrotational"
           ? (warpFieldType as StressEnergyBrickParams["warpFieldType"])
           : undefined,
@@ -7462,6 +7467,7 @@ export async function getGrEvolveBrick(req: Request, res: Response) {
     const sourceWarpFieldType =
       sourceWarpFieldTypeRaw === "natario" ||
       sourceWarpFieldTypeRaw === "natario_sdf" ||
+      sourceWarpFieldTypeRaw === "nhm2_shift_lapse" ||
       sourceWarpFieldTypeRaw === "alcubierre" ||
       sourceWarpFieldTypeRaw === "irrotational"
         ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
@@ -7877,6 +7883,7 @@ export async function getGrRegionStats(req: Request, res: Response) {
         const sourceWarpFieldType =
           sourceWarpFieldTypeRaw === "natario" ||
           sourceWarpFieldTypeRaw === "natario_sdf" ||
+          sourceWarpFieldTypeRaw === "nhm2_shift_lapse" ||
           sourceWarpFieldTypeRaw === "alcubierre" ||
           sourceWarpFieldTypeRaw === "irrotational"
             ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])
@@ -8268,6 +8275,7 @@ export async function getGrConstraintNetwork4d(req: Request, res: Response) {
     const sourceWarpFieldType =
       sourceWarpFieldTypeRaw === "natario" ||
       sourceWarpFieldTypeRaw === "natario_sdf" ||
+      sourceWarpFieldTypeRaw === "nhm2_shift_lapse" ||
       sourceWarpFieldTypeRaw === "alcubierre" ||
       sourceWarpFieldTypeRaw === "irrotational"
         ? (sourceWarpFieldTypeRaw as StressEnergyBrickParams["warpFieldType"])

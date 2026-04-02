@@ -202,6 +202,33 @@ describe("proof pack contract", () => {
     expect((pack.values.gr_cl3_rho_delta_metric_mean?.value as number) > 0).toBe(true);
   });
 
+  it("uses nhm2 shift-lapse metric fallback for CL3 metric source when that family is active", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).warp = {
+      metricAdapter: {
+        family: "nhm2_shift_lapse",
+      },
+    };
+    (state as any).natario = {
+      metricT00: -42,
+      metricT00Source: "metric",
+    };
+    (state as any).gr = {
+      constraints: {
+        rho_constraint: {
+          mean: -40 * SI_TO_GEOM_STRESS,
+        },
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.gr_cl3_rho_gate_source?.value).toBe(
+      "warp.metric.T00.nhm2.shift_lapse",
+    );
+  });
+
   it("emits the exploratory quantum semiclassical replay/comparison side by side with proof-pack geometry", async () => {
     const { initializePipelineState, calculateEnergyPipeline, buildProofPack } =
       await loadPipelineModules();

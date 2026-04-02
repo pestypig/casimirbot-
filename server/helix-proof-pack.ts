@@ -814,7 +814,12 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     typeof (state as any)?.natario?.metricT00Ref === "string" &&
     (state as any).natario.metricT00Ref.length > 0
       ? String((state as any).natario.metricT00Ref)
-      : "warp.metric.T00.natario.shift";
+      : (state as any)?.warp?.metricAdapter?.family === "nhm2_shift_lapse" ||
+          (state as any)?.warp?.requestedFieldType === "nhm2_shift_lapse" ||
+          (state as any)?.warpFieldType === "nhm2_shift_lapse" ||
+          (state as any)?.dynamicConfig?.warpFieldType === "nhm2_shift_lapse"
+        ? "warp.metric.T00.nhm2.shift_lapse"
+        : "warp.metric.T00.natario.shift";
   const natarioMetricT00Raw = toFiniteNumber(
     (state as any)?.natario?.metricT00 ??
       (state as any)?.natario?.stressEnergyTensor?.T00,

@@ -7,10 +7,10 @@
 |---|---|
 | finalComparisonVerdict | canonical_controls_validated_nhm2_natario_like |
 | diagnosticVerdict | shared_scale_preserves_natario_like_class |
-| presentationVerdict | presentation_layer_ready_and_consistent |
+| presentationVerdict | presentation_layer_has_advisories |
 | nhm2ClosestCanonicalFamily | natario_like_low_expansion |
 | alcubierreLikeTransitionObserved | no |
-| recommendedNextAction | If a different morphology is still desired, continue model-family work rather than render debugging. |
+| recommendedNextAction | Resolve remaining presentation issues before relying on the OptiX layer for human-facing comparison. |
 | overviewPanelPath | artifacts/research/full-solve/rendered-york-final-comparison-panel-2026-04-01/nhm2-canonical-comparison-overview.png |
 | exportDirectory | artifacts/research/full-solve/rendered-york-final-comparison-panel-2026-04-01 |
 
@@ -31,9 +31,9 @@
 | visualMetricSourceStage | pre_png_color_buffer |
 | presentationRenderLayerStatus | available |
 | fieldSuiteRealizationStatus | realized |
-| fieldSuiteReadabilityStatus | readable |
-| presentationRenderQuality | ok |
-| presentationReadinessVerdict | ready_for_human_inspection |
+| fieldSuiteReadabilityStatus | flat |
+| presentationRenderQuality | warning |
+| presentationReadinessVerdict | field_realized_but_presentation_flat |
 | presentationRenderBackedByAuthoritativeMetric | true |
 
 ## Render Taxonomy
@@ -72,7 +72,7 @@ Flat space remains the zero-theta reference and anchors both the diagnostic and 
 | field | value |
 |---|---|
 | secondary | true |
-| readabilityStatus | readable |
+| readabilityStatus | flat |
 | laneBinding | lane_a_eulerian_comoving_theta_minus_trk |
 | mainRenderPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-york-optix-3p1-main.png |
 | hullOverlayPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-york-optix-3p1-hull-overlay.png |
@@ -81,16 +81,20 @@ Flat space remains the zero-theta reference and anchors both the diagnostic and 
 | comparisonCardRole | presentation |
 | comparisonCardCanonicalPath | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/flat_space_zero_theta-comparison_panel-comparison_card-card.png |
 
-Solve-backed OptiX 3+1 presentation is available for this case with readability status readable. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk and remain secondary to the fixed-scale diagnostic layer.
+Solve-backed OptiX 3+1 presentation is available for this case with readability status flat. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk, use a dedicated neutral field canvas, and keep transport-context inheritance absent. They remain secondary to the fixed-scale diagnostic layer.
 
-| presentationFieldId | imagePath | laneId | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
-|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
-| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -9.341594831267178e-34 | 3.8518660601198135e-32 | 3.8518660601198135e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.3481531210419346e-32 | 1.3481531210419346e-32 | signed_asinh | diverging_cyan_amber | none |
-| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | 0 | 3.4970749780882613e-66 | 3.4970749780882613e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.3988299912353045e-66 | positive_log10 | sequential_inferno | none |
-| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -2.7660397775435932e-33 | 0 | 2.7660397775435932e-33 | optix_energy_density_signed_asinh | -2.7660397775435932e-33 | 2.7660397775435932e-33 | signed_asinh | diverging_teal_rose | none |
-| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -1.1480880526811711e-31 | 1.0439332067492494e-33 | 1.1480880526811711e-31 | optix_trace_check_signed_linear_anchor | -1.1480880526811711e-31 | 1.1480880526811711e-31 | signed_linear | diverging_cyan_amber | none |
+| presentationFieldId | imagePath | laneId | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
+|---|---|---|---|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
+| beta_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-beta_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 5.168780918476138e-33 | 5.168780918476138e-33 | optix_beta_magnitude_positive_log10 | 0 | 3.677275269110284e-33 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| beta_x | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-beta_x-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -8.879830344550451e-34 | 8.879830344550451e-34 | 8.879830344550451e-34 | optix_beta_x_signed_asinh | -8.879830344550451e-34 | 8.879830344550451e-34 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -9.341594831267178e-34 | 3.8518660601198135e-32 | 3.8518660601198135e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.3481531210419346e-32 | 1.3481531210419346e-32 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 3.4970749780882613e-66 | 3.4970749780882613e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.3988299912353045e-66 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -2.7660397775435932e-33 | 0 | 2.7660397775435932e-33 | optix_energy_density_signed_asinh | -2.7660397775435932e-33 | 2.7660397775435932e-33 | signed_asinh | diverging_teal_rose | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/flat_space_zero_theta-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -1.1480880526811711e-31 | 1.0439332067492494e-33 | 1.1480880526811711e-31 | optix_trace_check_signed_linear_anchor | -1.1480880526811711e-31 | 1.1480880526811711e-31 | signed_linear | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
 
 ### Morphology Interpretation
+- beta_magnitude: Shift magnitude stays near the zero baseline and does not produce a localized transport shell.
+- beta_x: Ship-axis shift stays near zero and serves as the transport baseline for the canonical controls.
 - trace_check: Trace check stays near the zero baseline and serves as the control reference for the other cases.
 - longitudinal_signed_strain: Longitudinal signed strain stays near the flat reference with no meaningful ship-axis deformation pattern.
 - tracefree_magnitude: Tracefree magnitude remains effectively a baseline support map and does not introduce a non-flat morphology signal.
@@ -121,7 +125,7 @@ Natario remains the calibrated low-expansion control family. Its diagnostic sepa
 | field | value |
 |---|---|
 | secondary | true |
-| readabilityStatus | readable |
+| readabilityStatus | flat |
 | laneBinding | lane_a_eulerian_comoving_theta_minus_trk |
 | mainRenderPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-york-optix-3p1-main.png |
 | hullOverlayPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-york-optix-3p1-hull-overlay.png |
@@ -130,16 +134,20 @@ Natario remains the calibrated low-expansion control family. Its diagnostic sepa
 | comparisonCardRole | presentation |
 | comparisonCardCanonicalPath | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/natario_control-comparison_panel-comparison_card-card.png |
 
-Solve-backed OptiX 3+1 presentation is available for this case with readability status readable. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk and remain secondary to the fixed-scale diagnostic layer.
+Solve-backed OptiX 3+1 presentation is available for this case with readability status flat. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk, use a dedicated neutral field canvas, and keep transport-context inheritance absent. They remain secondary to the fixed-scale diagnostic layer.
 
-| presentationFieldId | imagePath | laneId | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
-|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
-| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -9.341594831267178e-34 | 3.851865766246226e-32 | 3.851865766246226e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.348153018186179e-32 | 1.348153018186179e-32 | signed_asinh | diverging_cyan_amber | none |
-| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | 0 | 3.497074978088269e-66 | 3.497074978088269e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.3988299912353076e-66 | positive_log10 | sequential_inferno | none |
-| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -2.7660399612145856e-33 | 0 | 2.7660399612145856e-33 | optix_energy_density_signed_asinh | -2.7660399612145856e-33 | 2.7660399612145856e-33 | signed_asinh | diverging_teal_rose | none |
-| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -1.148087935131736e-31 | 1.0439332067492494e-33 | 1.148087935131736e-31 | optix_trace_check_signed_linear_anchor | -1.148087935131736e-31 | 1.148087935131736e-31 | signed_linear | diverging_cyan_amber | none |
+| presentationFieldId | imagePath | laneId | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
+|---|---|---|---|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
+| beta_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-beta_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 5.168780918476138e-33 | 5.168780918476138e-33 | optix_beta_magnitude_positive_log10 | 0 | 3.677275269110284e-33 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| beta_x | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-beta_x-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -8.879830344550451e-34 | 8.879830344550451e-34 | 8.879830344550451e-34 | optix_beta_x_signed_asinh | -8.879830344550451e-34 | 8.879830344550451e-34 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -9.341594831267178e-34 | 3.851865766246226e-32 | 3.851865766246226e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.348153018186179e-32 | 1.348153018186179e-32 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 3.497074978088269e-66 | 3.497074978088269e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.3988299912353076e-66 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -2.7660399612145856e-33 | 0 | 2.7660399612145856e-33 | optix_energy_density_signed_asinh | -2.7660399612145856e-33 | 2.7660399612145856e-33 | signed_asinh | diverging_teal_rose | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/natario_control-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -1.148087935131736e-31 | 1.0439332067492494e-33 | 1.148087935131736e-31 | optix_trace_check_signed_linear_anchor | -1.148087935131736e-31 | 1.148087935131736e-31 | signed_linear | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
 
 ### Morphology Interpretation
+- beta_magnitude: Shift magnitude localizes on the transport-support shell without producing the stronger Alcubierre-side transport split.
+- beta_x: Ship-axis shift shows the sliding transport organization expected for the calibrated Natario-like low-expansion control.
 - trace_check: Trace check remains low-expansion and near-zero dominant, which is consistent with the current Natario-like control class.
 - longitudinal_signed_strain: Longitudinal signed strain carries the main visible deformation pattern without producing an Alcubierre-style fore/aft signed lobe split.
 - tracefree_magnitude: Tracefree magnitude localizes deformation while staying in a low-expansion presentation family.
@@ -170,7 +178,7 @@ Alcubierre remains the signed-lobe control comparator. Against the same Lane A c
 | field | value |
 |---|---|
 | secondary | true |
-| readabilityStatus | readable |
+| readabilityStatus | flat |
 | laneBinding | lane_a_eulerian_comoving_theta_minus_trk |
 | mainRenderPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-york-optix-3p1-main.png |
 | hullOverlayPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-york-optix-3p1-hull-overlay.png |
@@ -179,16 +187,20 @@ Alcubierre remains the signed-lobe control comparator. Against the same Lane A c
 | comparisonCardRole | presentation |
 | comparisonCardCanonicalPath | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/alcubierre_control-comparison_panel-comparison_card-card.png |
 
-Solve-backed OptiX 3+1 presentation is available for this case with readability status readable. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk and remain secondary to the fixed-scale diagnostic layer.
+Solve-backed OptiX 3+1 presentation is available for this case with readability status flat. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk, use a dedicated neutral field canvas, and keep transport-context inheritance absent. They remain secondary to the fixed-scale diagnostic layer.
 
-| presentationFieldId | imagePath | laneId | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
-|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
-| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -1.0319540927949049e-33 | 4.251882967347998e-32 | 4.251882967347998e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.4881590385717992e-32 | 1.4881590385717992e-32 | signed_asinh | diverging_cyan_amber | none |
-| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | 0 | 4.259473549839161e-66 | 4.259473549839161e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.7037894199356644e-66 | positive_log10 | sequential_inferno | none |
-| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -3.0532934953441125e-33 | 0 | 3.0532934953441125e-33 | optix_energy_density_signed_asinh | -3.0366958025556197e-33 | 3.0366958025556197e-33 | signed_asinh | diverging_teal_rose | none |
-| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -1.2673171516412898e-31 | 1.1523435405958195e-33 | 1.2673171516412898e-31 | optix_trace_check_signed_linear_anchor | -1.2673171516412898e-31 | 1.2673171516412898e-31 | signed_linear | diverging_cyan_amber | none |
+| presentationFieldId | imagePath | laneId | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
+|---|---|---|---|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
+| beta_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-beta_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 5.7055600896753026e-33 | 5.7055600896753026e-33 | optix_beta_magnitude_positive_log10 | 0 | 3.73886953506351e-33 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| beta_x | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-beta_x-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -9.80200198935069e-34 | 9.80200198935069e-34 | 9.80200198935069e-34 | optix_beta_x_signed_asinh | -9.80200198935069e-34 | 9.80200198935069e-34 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -1.0319540927949049e-33 | 4.251882967347998e-32 | 4.251882967347998e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.4881590385717992e-32 | 1.4881590385717992e-32 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 4.259473549839161e-66 | 4.259473549839161e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.7037894199356644e-66 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -3.0532934953441125e-33 | 0 | 3.0532934953441125e-33 | optix_energy_density_signed_asinh | -3.0366958025556197e-33 | 3.0366958025556197e-33 | signed_asinh | diverging_teal_rose | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/alcubierre_control-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -1.2673171516412898e-31 | 1.1523435405958195e-33 | 1.2673171516412898e-31 | optix_trace_check_signed_linear_anchor | -1.2673171516412898e-31 | 1.2673171516412898e-31 | signed_linear | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
 
 ### Morphology Interpretation
+- beta_magnitude: Shift magnitude remains solve-backed and readable, but the more important separation still comes from the signed transport structure.
+- beta_x: Ship-axis shift presents the strongest canonical signed transport split and remains the clearest Alcubierre-side comparator.
 - trace_check: Trace check remains the clearest signed-lobe comparator and anchors what the repo treats as Alcubierre-like morphology under the current contract.
 - longitudinal_signed_strain: Longitudinal signed strain presents a stronger signed split than the NHM2/Natario pair and remains the canonical Alcubierre-side visual comparator.
 - tracefree_magnitude: Tracefree magnitude is localized, but the decisive separation from NHM2 still comes from the signed-lobe behavior rather than the magnitude channel alone.
@@ -219,7 +231,7 @@ Under the authoritative Lane A contract, NHM2 remains closer to Natario than Alc
 | field | value |
 |---|---|
 | secondary | true |
-| readabilityStatus | readable |
+| readabilityStatus | flat |
 | laneBinding | lane_a_eulerian_comoving_theta_minus_trk |
 | mainRenderPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-york-optix-3p1-main.png |
 | hullOverlayPath | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-york-optix-3p1-hull-overlay.png |
@@ -228,16 +240,20 @@ Under the authoritative Lane A contract, NHM2 remains closer to Natario than Alc
 | comparisonCardRole | presentation |
 | comparisonCardCanonicalPath | artifacts/research/full-solve/rendered/comparison_panel/2026-04-01/nhm2_certified-comparison_panel-comparison_card-card.png |
 
-Solve-backed OptiX 3+1 presentation is available for this case with readability status readable. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk and remain secondary to the fixed-scale diagnostic layer.
+Solve-backed OptiX 3+1 presentation is available for this case with readability status flat. Field renders stay bound to lane_a_eulerian_comoving_theta_minus_trk, use a dedicated neutral field canvas, and keep transport-context inheritance absent. They remain secondary to the fixed-scale diagnostic layer.
 
-| presentationFieldId | imagePath | laneId | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
-|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
-| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -9.782329907718686e-34 | 4.034941076799929e-32 | 4.034941076799929e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.412229376879975e-32 | 1.412229376879975e-32 | signed_asinh | diverging_cyan_amber | none |
-| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | 0 | 3.8349611119566775e-66 | 3.8349611119566775e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.533984444782671e-66 | positive_log10 | sequential_inferno | none |
-| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -2.8975068820685656e-33 | 0 | 2.8975068820685656e-33 | optix_energy_density_signed_asinh | -2.8975068820685656e-33 | 2.8975068820685656e-33 | signed_asinh | diverging_teal_rose | none |
-| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | -1.2026554408418224e-31 | 1.0935473335486042e-33 | 1.2026554408418224e-31 | optix_trace_check_signed_linear_anchor | -1.2026554408418224e-31 | 1.2026554408418224e-31 | signed_linear | diverging_cyan_amber | none |
+| presentationFieldId | imagePath | laneId | baseImagePolicy | baseImageSource | inheritsTransportContext | contextCompositionMode | fieldMin | fieldMax | fieldAbsMax | displayPolicyId | displayRangeMin | displayRangeMax | displayTransform | colormapFamily | warnings |
+|---|---|---|---|---|---|---|---:|---:|---:|---|---:|---:|---|---|---|
+| beta_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-beta_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 5.414448049465444e-33 | 5.414448049465444e-33 | optix_beta_magnitude_positive_log10 | 0 | 3.738233851629498e-33 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| beta_x | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-beta_x-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -9.301879652598693e-34 | 9.301879652598693e-34 | 9.301879652598693e-34 | optix_beta_x_signed_asinh | -9.301879652598693e-34 | 9.301879652598693e-34 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| longitudinal_signed_strain | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-longitudinal_signed_strain-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -9.782329907718686e-34 | 4.034941076799929e-32 | 4.034941076799929e-32 | optix_longitudinal_signed_strain_signed_asinh | -1.412229376879975e-32 | 1.412229376879975e-32 | signed_asinh | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| tracefree_magnitude | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-tracefree_magnitude-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | 0 | 3.8349611119566775e-66 | 3.8349611119566775e-66 | optix_tracefree_magnitude_positive_log10 | 0 | 1.533984444782671e-66 | positive_log10 | sequential_inferno | presentation_image_low_non_background_fraction,presentation_image_low_contrast |
+| energy_density | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-energy_density-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -2.8975068820685656e-33 | 0 | 2.8975068820685656e-33 | optix_energy_density_signed_asinh | -2.8975068820685656e-33 | 2.8975068820685656e-33 | signed_asinh | diverging_teal_rose | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
+| trace_check | artifacts/research/full-solve/rendered-york-optix-panel-2026-04-01/nhm2_certified-trace_check-optix-3p1-main.png | lane_a_eulerian_comoving_theta_minus_trk | neutral_field_canvas | none | false | none | -1.2026554408418224e-31 | 1.0935473335486042e-33 | 1.2026554408418224e-31 | optix_trace_check_signed_linear_anchor | -1.2026554408418224e-31 | 1.2026554408418224e-31 | signed_linear | diverging_cyan_amber | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
 
 ### Morphology Interpretation
+- beta_magnitude: Shift magnitude is live and shell-localized, but its solved transport pattern remains closer to Natario than to Alcubierre.
+- beta_x: Ship-axis shift is now directly visible and still stays closer to Natario's low-expansion transport family than to Alcubierre's stronger signed transport split.
 - trace_check: Trace check remains low-amplitude and does not recover the stronger Alcubierre-style signed fore/aft lobe pattern.
 - longitudinal_signed_strain: Longitudinal signed strain is the clearest human-facing deformation view for NHM2 and it stays closer to Natario’s low-expansion structure than to Alcubierre’s signed-lobe structure.
 - tracefree_magnitude: Tracefree magnitude is live and localized, but it does not reveal an Alcubierre-like transition; it stays in the same low-expansion family as the Natario control.

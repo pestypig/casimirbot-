@@ -42,6 +42,7 @@ import {
   decideNhm2DeeperReformulationVerdict,
   decideControlFamilyVerdict,
   deriveYorkOptixTracefreeMagnitude,
+  evaluateShiftDirectionOverlayCaseDistinctness,
   evaluateClassificationRobustness,
   evaluateYorkOptixFieldRenderIntegrity,
   evaluateYorkOptixPresentationImageQuality,
@@ -84,6 +85,7 @@ import {
   renderNhm2DeeperReformulationMarkdown,
   renderNhm2ParameterSweepDecisionMemo,
   renderNhm2ParameterSweepMarkdown,
+  renderNhm2ShiftGeometryVisualizationMarkdown,
   renderNhm2YorkOptixRenderMarkdown,
   renderNhm2YorkOptixRenderMemo,
   renderNhm2CanonicalVisualComparisonMarkdown,
@@ -809,6 +811,204 @@ const writeTinyPng = async (
     .toFile(filePath);
 };
 
+const makeRenderTaxonomyMetadataFixture = (args: {
+  renderId: string;
+  renderCategory: string;
+  renderRole: string;
+  authoritativeStatus: string;
+  primaryScientificQuestion: string;
+  fieldId: string;
+  variant: string;
+  canonicalPath: string;
+  baseImagePolicy: string;
+  baseImageSource: string;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: string;
+  title: string;
+  subtitle: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  observer?: string;
+  foliation?: string;
+  signConvention: string;
+  laneId?: string | null;
+  displayPolicyId?: string | null;
+  displayRangeMin?: number | null;
+  displayRangeMax?: number | null;
+  displayTransform?: string | null;
+  colormapFamily?: string | null;
+  cameraPoseId?: string | null;
+}) =>
+  ({
+    renderId: args.renderId,
+    renderCategory: args.renderCategory,
+    renderRole: args.renderRole,
+    authoritativeStatus: args.authoritativeStatus,
+    primaryScientificQuestion: args.primaryScientificQuestion,
+    fieldId: args.fieldId,
+    variant: args.variant,
+    canonicalPath: args.canonicalPath,
+    legacyPath: args.canonicalPath,
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
+    frameLabel: {
+      title: args.title,
+      subtitle: args.subtitle,
+      quantitySymbol: args.quantitySymbol,
+      quantityUnits: args.quantityUnits,
+      observer: args.observer ?? "eulerian_n",
+      foliation: args.foliation ?? "comoving_cartesian_3p1",
+      signConvention: args.signConvention,
+      laneId: args.laneId ?? "lane_a_eulerian_comoving_theta_minus_trk",
+      displayPolicyId: args.displayPolicyId ?? null,
+      displayRangeMin: args.displayRangeMin ?? null,
+      displayRangeMax: args.displayRangeMax ?? null,
+      displayTransform: args.displayTransform ?? null,
+      colormapFamily: args.colormapFamily ?? null,
+      cameraPoseId: args.cameraPoseId ?? null,
+      orientationConventionId: "x_ship_y_port_z_zenith",
+      axisLabels: {
+        x: "x_ship",
+        y: "y_port",
+        z: "z_zenith",
+      },
+    },
+  }) as any;
+
+const makeShiftRenderEntryFixture = (args: {
+  caseId: "flat_space_zero_theta" | "natario_control" | "alcubierre_control" | "nhm2_certified";
+  caseLabel: string;
+  fieldId: string;
+  variant: string;
+  renderCategory: string;
+  renderRole: string;
+  authoritativeStatus: string;
+  mechanismFamily: string;
+  imagePath: string;
+  imageHash: string;
+  primaryScientificQuestion: string;
+  title: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  signConvention: string;
+  displayPolicyId?: string | null;
+  displayRangeMin?: number | null;
+  displayRangeMax?: number | null;
+  displayTransform?: string | null;
+  colormapFamily?: string | null;
+  cameraPoseId?: string | null;
+  baseImagePolicy: string;
+  baseImageSource: string;
+  inheritsTransportContext: boolean;
+  contextCompositionMode: string;
+  referenceCaseId?: "natario_control" | "alcubierre_control" | null;
+  fieldMin?: number | null;
+  fieldMax?: number | null;
+  fieldAbsMax?: number | null;
+  presentationScalarFieldHash?: string | null;
+  directionVectorFieldHash?: string | null;
+  streamSeedHash?: string | null;
+  streamGeometryHash?: string | null;
+  directionOverlayHash?: string | null;
+  directionOverlayStatus?: string | null;
+  directionOverlayWarnings?: string[];
+  note: string;
+}) => {
+  const canonicalPath = path.join(
+    "artifacts",
+    "research",
+    "full-solve",
+    "rendered",
+    args.renderCategory,
+    "2026-03-31",
+    path.basename(args.imagePath),
+  );
+  const renderId = [
+    args.caseId,
+    args.referenceCaseId ?? "none",
+    args.fieldId,
+    args.variant,
+  ].join(":");
+  return {
+    renderId,
+    caseId: args.caseId,
+    referenceCaseId: args.referenceCaseId ?? null,
+    mechanismFamily: args.mechanismFamily,
+    renderCategory: args.renderCategory,
+    renderRole: args.renderRole,
+    authoritativeStatus: args.authoritativeStatus,
+    primaryScientificQuestion: args.primaryScientificQuestion,
+    fieldId: args.fieldId,
+    variant: args.variant,
+    canonicalPath,
+    legacyPath: canonicalPath,
+    title: `${args.title} - ${args.caseLabel}`,
+    subtitle: `observer=eulerian_n | foliation=comoving_cartesian_3p1 | lane=lane_a_eulerian_comoving_theta_minus_trk | sign=${args.signConvention} | transform=${args.displayTransform ?? "none"}`,
+    quantitySymbol: args.quantitySymbol,
+    quantityUnits: args.quantityUnits,
+    observer: "eulerian_n",
+    foliation: "comoving_cartesian_3p1",
+    signConvention: args.signConvention,
+    laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+    displayPolicyId: args.displayPolicyId ?? null,
+    displayRangeMin: args.displayRangeMin ?? null,
+    displayRangeMax: args.displayRangeMax ?? null,
+    displayTransform: args.displayTransform ?? null,
+    colormapFamily: args.colormapFamily ?? null,
+    cameraPoseId: args.cameraPoseId ?? null,
+    orientationConventionId: "x_ship_y_port_z_zenith",
+    baseImagePolicy: args.baseImagePolicy,
+    baseImageSource: args.baseImageSource,
+    inheritsTransportContext: args.inheritsTransportContext,
+    contextCompositionMode: args.contextCompositionMode,
+    imagePath: args.imagePath,
+    imageHash: args.imageHash,
+    metricVolumeHash: `${args.caseId}-metric-volume-hash`,
+    thetaHash: `${args.caseId}-theta-hash`,
+    kTraceHash: `${args.caseId}-ktrace-hash`,
+    laneAFieldHash: `${args.caseId}-lane-a-field-hash`,
+    presentationScalarFieldHash: args.presentationScalarFieldHash ?? `${renderId}-scalar-hash`,
+    directionVectorFieldHash: args.directionVectorFieldHash ?? null,
+    streamSeedHash: args.streamSeedHash ?? null,
+    streamGeometryHash: args.streamGeometryHash ?? null,
+    directionOverlayHash: args.directionOverlayHash ?? null,
+    directionOverlayStatus: args.directionOverlayStatus ?? null,
+    directionOverlayWarnings: args.directionOverlayWarnings ?? [],
+    fieldMin: args.fieldMin ?? null,
+    fieldMax: args.fieldMax ?? null,
+    fieldAbsMax: args.fieldAbsMax ?? null,
+    renderTaxonomy: makeRenderTaxonomyMetadataFixture({
+      renderId,
+      renderCategory: args.renderCategory,
+      renderRole: args.renderRole,
+      authoritativeStatus: args.authoritativeStatus,
+      primaryScientificQuestion: args.primaryScientificQuestion,
+      fieldId: args.fieldId,
+      variant: args.variant,
+      canonicalPath,
+      baseImagePolicy: args.baseImagePolicy,
+      baseImageSource: args.baseImageSource,
+      inheritsTransportContext: args.inheritsTransportContext,
+      contextCompositionMode: args.contextCompositionMode,
+      title: `${args.title} - ${args.caseLabel}`,
+      subtitle: `observer=eulerian_n | foliation=comoving_cartesian_3p1 | lane=lane_a_eulerian_comoving_theta_minus_trk | sign=${args.signConvention} | transform=${args.displayTransform ?? "none"}`,
+      quantitySymbol: args.quantitySymbol,
+      quantityUnits: args.quantityUnits,
+      signConvention: args.signConvention,
+      displayPolicyId: args.displayPolicyId ?? null,
+      displayRangeMin: args.displayRangeMin ?? null,
+      displayRangeMax: args.displayRangeMax ?? null,
+      displayTransform: args.displayTransform ?? null,
+      colormapFamily: args.colormapFamily ?? null,
+      cameraPoseId: args.cameraPoseId ?? null,
+    }),
+    warnings: [],
+    note: args.note,
+  } as any;
+};
+
 const makeCanonicalVisualComparisonFixtures = async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "canonical-visual-comparison-"));
   const caseIds = [
@@ -831,7 +1031,32 @@ const makeCanonicalVisualComparisonFixtures = async () => {
     await writeTinyPng(path.join(tempDir, `${caseId}-tracefree.png`), colors[caseId]);
     await writeTinyPng(path.join(tempDir, `${caseId}-rho.png`), colors[caseId]);
     await writeTinyPng(path.join(tempDir, `${caseId}-trace.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-beta-mag.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-beta-x.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-beta-mag-slice.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-beta-x-slice.png`), colors[caseId]);
+    await writeTinyPng(path.join(tempDir, `${caseId}-beta-direction-xz.png`), colors[caseId]);
   }
+  await writeTinyPng(path.join(tempDir, `nhm2-natario-beta-mag-residual.png`), {
+    r: 120,
+    g: 90,
+    b: 150,
+  });
+  await writeTinyPng(path.join(tempDir, `nhm2-natario-beta-x-residual.png`), {
+    r: 90,
+    g: 140,
+    b: 150,
+  });
+  await writeTinyPng(path.join(tempDir, `nhm2-alcubierre-beta-mag-residual.png`), {
+    r: 160,
+    g: 100,
+    b: 110,
+  });
+  await writeTinyPng(path.join(tempDir, `nhm2-alcubierre-beta-x-residual.png`), {
+    r: 110,
+    g: 110,
+    b: 160,
+  });
   const canonicalCalibrationArtifact = {
     comparisonContract: {
       laneUsed: "lane_a_eulerian_comoving_theta_minus_trk",
@@ -1008,13 +1233,63 @@ const makeCanonicalVisualComparisonFixtures = async () => {
         {
           renderView: "transport-3p1",
           imagePath: path.join(tempDir, `${caseId}-main.png`),
+          baseImagePolicy: "native_renderer_output",
+          baseImageSource: "native_renderer",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
         },
         {
           renderView: "full-atlas",
           imagePath: path.join(tempDir, `${caseId}-atlas.png`),
+          baseImagePolicy: "native_renderer_output",
+          baseImageSource: "native_renderer",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
         },
       ],
       fieldRenders: [
+        {
+          presentationFieldId: "beta_magnitude",
+          variant: "main",
+          label: "Shift magnitude",
+          imagePath: path.join(tempDir, `${caseId}-beta-mag.png`),
+          presentationProjectionImageHash: `${caseId}-beta-mag-hash`,
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
+          fieldMin: 0,
+          fieldMax: 0.05,
+          fieldAbsMax: 0.05,
+          displayPolicyId: "optix_beta_magnitude_positive_log10",
+          displayRangeMin: 0,
+          displayRangeMax: 0.05,
+          displayTransform: "positive_log10",
+          colormapFamily: "sequential_inferno",
+          warnings: [],
+        },
+        {
+          presentationFieldId: "beta_x",
+          variant: "main",
+          label: "Ship-axis shift component",
+          imagePath: path.join(tempDir, `${caseId}-beta-x.png`),
+          presentationProjectionImageHash: `${caseId}-beta-x-hash`,
+          laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
+          fieldMin: -0.03,
+          fieldMax: 0.03,
+          fieldAbsMax: 0.03,
+          displayPolicyId: "optix_beta_x_signed_asinh",
+          displayRangeMin: -0.03,
+          displayRangeMax: 0.03,
+          displayTransform: "signed_asinh",
+          colormapFamily: "diverging_cyan_amber",
+          warnings: [],
+        },
         {
           presentationFieldId: "longitudinal_signed_strain",
           variant: "main",
@@ -1022,6 +1297,10 @@ const makeCanonicalVisualComparisonFixtures = async () => {
           imagePath: path.join(tempDir, `${caseId}-long.png`),
           presentationProjectionImageHash: `${caseId}-long-hash`,
           laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           fieldMin: -0.1,
           fieldMax: 0.1,
           fieldAbsMax: 0.1,
@@ -1039,6 +1318,10 @@ const makeCanonicalVisualComparisonFixtures = async () => {
           imagePath: path.join(tempDir, `${caseId}-tracefree.png`),
           presentationProjectionImageHash: `${caseId}-tracefree-hash`,
           laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           fieldMin: 0,
           fieldMax: 0.01,
           fieldAbsMax: 0.01,
@@ -1056,6 +1339,10 @@ const makeCanonicalVisualComparisonFixtures = async () => {
           imagePath: path.join(tempDir, `${caseId}-rho.png`),
           presentationProjectionImageHash: `${caseId}-rho-hash`,
           laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           fieldMin: -0.02,
           fieldMax: 0.02,
           fieldAbsMax: 0.02,
@@ -1073,6 +1360,10 @@ const makeCanonicalVisualComparisonFixtures = async () => {
           imagePath: path.join(tempDir, `${caseId}-trace.png`),
           presentationProjectionImageHash: `${caseId}-trace-hash`,
           laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           fieldMin: -0.03,
           fieldMax: 0.03,
           fieldAbsMax: 0.03,
@@ -1086,6 +1377,444 @@ const makeCanonicalVisualComparisonFixtures = async () => {
       ],
     })),
   } as any;
+  const findFieldRender = (
+    caseId: (typeof caseIds)[number],
+    fieldId: "beta_magnitude" | "beta_x",
+  ) =>
+    optixRenderArtifact.caseRenders
+      .find((entry: any) => entry.case_id === caseId)
+      ?.fieldRenders.find((entry: any) => entry.presentationFieldId === fieldId) ?? null;
+  const shiftGeometryRenderEntries = [
+    ...caseIds.flatMap((caseId) => {
+      const caseLabel =
+        caseId === "flat_space_zero_theta"
+          ? "Flat-space zero-theta baseline"
+          : caseId === "natario_control"
+            ? "Natario-like control"
+            : caseId === "alcubierre_control"
+              ? "Alcubierre-like control"
+              : "NHM2 certified snapshot";
+      return [
+        makeShiftRenderEntryFixture({
+          caseId,
+          caseLabel,
+          fieldId: "beta_magnitude",
+          variant: "xz_slice_companion",
+          renderCategory: "scientific_3p1_field",
+          renderRole: "presentation",
+          authoritativeStatus: "secondary_solve_backed",
+          mechanismFamily: "shift_geometry",
+          imagePath: path.join(tempDir, `${caseId}-beta-mag-slice.png`),
+          imageHash: `${caseId}-beta-mag-slice-hash`,
+          primaryScientificQuestion: "Where does the solved transport intensity live?",
+          title: "Shift Magnitude Slice",
+          quantitySymbol: "|beta|",
+          quantityUnits: "geom",
+          signConvention: "stored shift channels are contravariant beta^i",
+          displayPolicyId: "optix_beta_magnitude_positive_log10",
+          displayRangeMin: 0,
+          displayRangeMax: 0.05,
+          displayTransform: "positive_log10",
+          colormapFamily: "sequential_inferno",
+          cameraPoseId: "slice_x_z_midplane",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
+          fieldMin: 0,
+          fieldMax: 0.05,
+          fieldAbsMax: 0.05,
+          note: "Solve-backed x-z slice companion on a neutral field canvas.",
+        }),
+        makeShiftRenderEntryFixture({
+          caseId,
+          caseLabel,
+          fieldId: "beta_x",
+          variant: "xz_slice_companion",
+          renderCategory: "scientific_3p1_field",
+          renderRole: "presentation",
+          authoritativeStatus: "secondary_solve_backed",
+          mechanismFamily: "shift_geometry",
+          imagePath: path.join(tempDir, `${caseId}-beta-x-slice.png`),
+          imageHash: `${caseId}-beta-x-slice-hash`,
+          primaryScientificQuestion: "How does forward/back transport organize along x_ship?",
+          title: "Ship-Axis Shift Slice",
+          quantitySymbol: "beta^x",
+          quantityUnits: "geom",
+          signConvention: "stored shift channels are contravariant beta^i",
+          displayPolicyId: "optix_beta_x_signed_asinh",
+          displayRangeMin: -0.03,
+          displayRangeMax: 0.03,
+          displayTransform: "signed_asinh",
+          colormapFamily: "diverging_cyan_amber",
+          cameraPoseId: "slice_x_z_midplane",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
+          fieldMin: -0.03,
+          fieldMax: 0.03,
+          fieldAbsMax: 0.03,
+          note: "Solve-backed ship-axis shift companion on a neutral field canvas.",
+        }),
+        makeShiftRenderEntryFixture({
+          caseId,
+          caseLabel,
+          fieldId: "beta_direction_xz",
+          variant: "stream_xz_hull_overlay",
+          renderCategory: "mechanism_overlay",
+          renderRole: "overlay",
+          authoritativeStatus: "secondary_interpretive",
+          mechanismFamily: "shift_geometry",
+          imagePath: path.join(tempDir, `${caseId}-beta-direction-xz.png`),
+          imageHash: `${caseId}-beta-direction-xz-hash`,
+          primaryScientificQuestion:
+            "Does the transport pattern look shell-localized and sliding/shear-like?",
+          title: "Shift Direction",
+          quantitySymbol: "arg(beta_x,beta_z)",
+          quantityUnits: "direction",
+          signConvention: "stored shift channels are contravariant beta^i",
+          displayPolicyId: "shift_direction_stream_xz",
+          displayTransform: "vector_streamline",
+          colormapFamily: "diverging_cyan_amber",
+          cameraPoseId: "slice_x_z_midplane",
+          baseImagePolicy: "field_plus_context_overlay",
+          baseImageSource: "hull_mask",
+          inheritsTransportContext: false,
+          contextCompositionMode: "hull_overlay",
+          directionVectorFieldHash: `${caseId}-beta-direction-vector-hash`,
+          streamSeedHash: `${caseId}-beta-direction-seed-hash`,
+          streamGeometryHash: `${caseId}-beta-direction-geometry-hash`,
+          directionOverlayHash: `${caseId}-beta-direction-overlay-hash`,
+          directionOverlayStatus:
+            caseId === "flat_space_zero_theta"
+              ? "case_specific_glyph_fallback"
+              : "case_specific_streamlines",
+          directionOverlayWarnings:
+            caseId === "flat_space_zero_theta"
+              ? ["direction_streamline_generation_degraded"]
+              : [],
+          fieldAbsMax: 0.05,
+          note:
+            caseId === "flat_space_zero_theta"
+              ? "Shift-direction x-z overlay fell back to sparse case-specific direction glyphs with explicit hull/support context."
+              : "Shift-direction x-z overlay with case-specific streamline geometry, explicit hull/support context, and no transport-context inheritance.",
+        }),
+      ];
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      referenceCaseId: "natario_control",
+      fieldId: "beta_magnitude",
+      variant: "residual_to_natario_control_xz",
+      renderCategory: "mechanism_overlay",
+      renderRole: "overlay",
+      authoritativeStatus: "secondary_interpretive",
+      mechanismFamily: "residual_to_control",
+      imagePath: path.join(tempDir, "nhm2-natario-beta-mag-residual.png"),
+      imageHash: "nhm2-natario-beta-mag-residual-hash",
+      primaryScientificQuestion:
+        "Where does NHM2 depart from the closest canonical family in shift magnitude?",
+      title: "Shift Magnitude Residual",
+      quantitySymbol: "Delta|beta|",
+      quantityUnits: "geom",
+      signConvention: "residual = NHM2 - natario_control",
+      displayPolicyId: "shift_natario_control_beta_magnitude_residual_signed_asinh",
+      displayRangeMin: -0.01,
+      displayRangeMax: 0.01,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_teal_rose",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.01,
+      fieldMax: 0.01,
+      fieldAbsMax: 0.01,
+      note: "NHM2 minus Natario shift-magnitude residual.",
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      referenceCaseId: "natario_control",
+      fieldId: "beta_x",
+      variant: "residual_to_natario_control_xz",
+      renderCategory: "mechanism_overlay",
+      renderRole: "overlay",
+      authoritativeStatus: "secondary_interpretive",
+      mechanismFamily: "residual_to_control",
+      imagePath: path.join(tempDir, "nhm2-natario-beta-x-residual.png"),
+      imageHash: "nhm2-natario-beta-x-residual-hash",
+      primaryScientificQuestion:
+        "Where does NHM2 depart from the closest canonical family in ship-axis transport?",
+      title: "Ship-Axis Shift Residual",
+      quantitySymbol: "Delta beta^x",
+      quantityUnits: "geom",
+      signConvention: "residual = NHM2 - natario_control",
+      displayPolicyId: "shift_natario_control_beta_x_residual_signed_asinh",
+      displayRangeMin: -0.01,
+      displayRangeMax: 0.01,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_cyan_amber",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.01,
+      fieldMax: 0.01,
+      fieldAbsMax: 0.01,
+      note: "NHM2 minus Natario ship-axis shift residual.",
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      referenceCaseId: "alcubierre_control",
+      fieldId: "beta_magnitude",
+      variant: "residual_to_alcubierre_control_xz",
+      renderCategory: "mechanism_overlay",
+      renderRole: "overlay",
+      authoritativeStatus: "secondary_interpretive",
+      mechanismFamily: "residual_to_control",
+      imagePath: path.join(tempDir, "nhm2-alcubierre-beta-mag-residual.png"),
+      imageHash: "nhm2-alcubierre-beta-mag-residual-hash",
+      primaryScientificQuestion:
+        "Where does NHM2 differ from Alcubierre-like transport structure in shift magnitude?",
+      title: "Shift Magnitude Residual",
+      quantitySymbol: "Delta|beta|",
+      quantityUnits: "geom",
+      signConvention: "residual = NHM2 - alcubierre_control",
+      displayPolicyId: "shift_alcubierre_control_beta_magnitude_residual_signed_asinh",
+      displayRangeMin: -0.02,
+      displayRangeMax: 0.02,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_teal_rose",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.02,
+      fieldMax: 0.02,
+      fieldAbsMax: 0.02,
+      note: "NHM2 minus Alcubierre shift-magnitude residual.",
+    }),
+    makeShiftRenderEntryFixture({
+      caseId: "nhm2_certified",
+      caseLabel: "NHM2 certified snapshot",
+      referenceCaseId: "alcubierre_control",
+      fieldId: "beta_x",
+      variant: "residual_to_alcubierre_control_xz",
+      renderCategory: "mechanism_overlay",
+      renderRole: "overlay",
+      authoritativeStatus: "secondary_interpretive",
+      mechanismFamily: "residual_to_control",
+      imagePath: path.join(tempDir, "nhm2-alcubierre-beta-x-residual.png"),
+      imageHash: "nhm2-alcubierre-beta-x-residual-hash",
+      primaryScientificQuestion:
+        "Where does NHM2 differ from Alcubierre-like transport structure in ship-axis transport?",
+      title: "Ship-Axis Shift Residual",
+      quantitySymbol: "Delta beta^x",
+      quantityUnits: "geom",
+      signConvention: "residual = NHM2 - alcubierre_control",
+      displayPolicyId: "shift_alcubierre_control_beta_x_residual_signed_asinh",
+      displayRangeMin: -0.02,
+      displayRangeMax: 0.02,
+      displayTransform: "signed_asinh",
+      colormapFamily: "diverging_cyan_amber",
+      cameraPoseId: "slice_x_z_midplane",
+      baseImagePolicy: "field_plus_context_overlay",
+      baseImageSource: "hull_mask",
+      inheritsTransportContext: false,
+      contextCompositionMode: "hull_overlay",
+      fieldMin: -0.02,
+      fieldMax: 0.02,
+      fieldAbsMax: 0.02,
+      note: "NHM2 minus Alcubierre ship-axis shift residual.",
+    }),
+  ];
+  const shiftGeometryArtifact = {
+    artifactType: "nhm2_shift_geometry_visualization/v1",
+    generatedOn: "2026-03-31",
+    generatedAt: "2026-03-31T00:00:00.000Z",
+    boundaryStatement:
+      "This artifact adds a solve-backed shift-geometry visualization suite for NHM2 while keeping Lane A diagnostics as the authoritative proof surface.",
+    sourceAuditArtifactPath: "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    canonicalCalibrationArtifactPath:
+      "artifacts/research/full-solve/warp-york-canonical-calibration-latest.json",
+    optixRenderArtifactPath: "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+    shiftGeometryStatus: "available",
+    caseSet: [...caseIds],
+    shiftConvention: {
+      storedShiftComponent: "beta^i",
+      betaXDefinition: "beta^x",
+      betaMagnitudeDefinition: "|beta| = sqrt(gamma_ij beta^i beta^j)",
+      observer: "eulerian_n",
+      foliation: "comoving_cartesian_3p1",
+      laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+      signConvention: "stored shift channels are contravariant beta^i in the comoving Cartesian chart",
+    },
+    renderEntries: shiftGeometryRenderEntries,
+    fieldSummaries: caseIds.map((caseId) => ({
+      caseId,
+      label:
+        caseId === "flat_space_zero_theta"
+          ? "Flat-space zero-theta baseline"
+          : caseId === "natario_control"
+            ? "Natario-like control"
+            : caseId === "alcubierre_control"
+              ? "Alcubierre-like control"
+              : "NHM2 certified snapshot",
+      metricVolumeHash: `${caseId}-metric-volume-hash`,
+      laneAFieldHash: `${caseId}-lane-a-field-hash`,
+      betaMagnitudeMain: {
+        presentationFieldId: "beta_magnitude",
+        label: "Shift magnitude",
+        imagePath: findFieldRender(caseId, "beta_magnitude")?.imagePath ?? null,
+        imageHash: findFieldRender(caseId, "beta_magnitude")?.presentationProjectionImageHash ?? null,
+        laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+        baseImagePolicy: "neutral_field_canvas",
+        baseImageSource: "none",
+        inheritsTransportContext: false,
+        contextCompositionMode: "none",
+        fieldMin: 0,
+        fieldMax: 0.05,
+        fieldAbsMax: 0.05,
+        displayPolicyId: "optix_beta_magnitude_positive_log10",
+        displayRangeMin: 0,
+        displayRangeMax: 0.05,
+        displayTransform: "positive_log10",
+        colormapFamily: "sequential_inferno",
+        warnings: [],
+        renderTaxonomy: null,
+      },
+      betaMagnitudeSliceCompanion:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_magnitude" &&
+            entry.variant === "xz_slice_companion",
+        )?.renderTaxonomy ?? null,
+      betaXMain: {
+        presentationFieldId: "beta_x",
+        label: "Ship-axis shift component",
+        imagePath: findFieldRender(caseId, "beta_x")?.imagePath ?? null,
+        imageHash: findFieldRender(caseId, "beta_x")?.presentationProjectionImageHash ?? null,
+        laneId: "lane_a_eulerian_comoving_theta_minus_trk",
+        baseImagePolicy: "neutral_field_canvas",
+        baseImageSource: "none",
+        inheritsTransportContext: false,
+        contextCompositionMode: "none",
+        fieldMin: -0.03,
+        fieldMax: 0.03,
+        fieldAbsMax: 0.03,
+        displayPolicyId: "optix_beta_x_signed_asinh",
+        displayRangeMin: -0.03,
+        displayRangeMax: 0.03,
+        displayTransform: "signed_asinh",
+        colormapFamily: "diverging_cyan_amber",
+        warnings: [],
+        renderTaxonomy: null,
+      },
+      betaXSliceCompanion:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_x" &&
+            entry.variant === "xz_slice_companion",
+        )?.renderTaxonomy ?? null,
+      betaDirectionXZ:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_direction_xz",
+        )?.renderTaxonomy ?? null,
+      betaDirectionXZStatus:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_direction_xz",
+        )?.directionOverlayStatus ?? null,
+      betaDirectionXZWarnings:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_direction_xz",
+        )?.directionOverlayWarnings ?? [],
+      betaDirectionXZVectorFieldHash:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_direction_xz",
+        )?.directionVectorFieldHash ?? null,
+      betaDirectionXZImageHash:
+        shiftGeometryRenderEntries.find(
+          (entry) =>
+            entry.caseId === caseId &&
+            entry.fieldId === "beta_direction_xz",
+        )?.imageHash ?? null,
+    })),
+    residualSummaries: [
+      {
+        referenceCaseId: "natario_control",
+        referenceLabel: "Natario-like control",
+        betaMagnitudeResidual:
+          shiftGeometryRenderEntries.find(
+            (entry) =>
+              entry.referenceCaseId === "natario_control" &&
+              entry.fieldId === "beta_magnitude",
+          )?.renderTaxonomy ?? null,
+        betaXResidual:
+          shiftGeometryRenderEntries.find(
+            (entry) =>
+              entry.referenceCaseId === "natario_control" &&
+              entry.fieldId === "beta_x",
+          )?.renderTaxonomy ?? null,
+        betaMagnitudeResidualAbsMax: 0.01,
+        betaXResidualAbsMax: 0.01,
+      },
+      {
+        referenceCaseId: "alcubierre_control",
+        referenceLabel: "Alcubierre-like control",
+        betaMagnitudeResidual:
+          shiftGeometryRenderEntries.find(
+            (entry) =>
+              entry.referenceCaseId === "alcubierre_control" &&
+              entry.fieldId === "beta_magnitude",
+          )?.renderTaxonomy ?? null,
+        betaXResidual:
+          shiftGeometryRenderEntries.find(
+            (entry) =>
+              entry.referenceCaseId === "alcubierre_control" &&
+              entry.fieldId === "beta_x",
+          )?.renderTaxonomy ?? null,
+        betaMagnitudeResidualAbsMax: 0.02,
+        betaXResidualAbsMax: 0.02,
+      },
+    ],
+    directionOverlayStatus: "available",
+    directionOverlayWarnings: ["direction_streamline_generation_degraded"],
+    directionOverlayCaseDistinctness: "distinct_across_cases",
+    constraintContextStatus: "deferred_units_and_policy_unresolved",
+    recommendedInterpretationOrder: [
+      "beta_magnitude",
+      "beta_x",
+      "beta_direction_xz",
+      "nhm2_minus_natario_beta_residual",
+      "nhm2_minus_alcubierre_beta_residual",
+      "linecuts_deferred_pending_probe_family",
+    ],
+    lineCutStatus: "deferred_pending_probe_family",
+    renderTaxonomy: null,
+    notes: [
+      "diagnostic_lane_a_remains_primary=true",
+      "shift_geometry_secondary_interpretive=true",
+      "scientific_3p1_field shift frames remain on a neutral field canvas with no transport-context inheritance.",
+    ],
+    checksum: "shift-geometry-checksum",
+  } as any;
   const fixedScaleComparisonArtifact = {
     fixed_scale_render_verdict: "shared_scale_preserves_natario_like_class",
     nhm2_vs_natario_visual_distance: { pixel_rms: 0.0003 },
@@ -1095,6 +1824,7 @@ const makeCanonicalVisualComparisonFixtures = async () => {
     tempDir,
     canonicalCalibrationArtifact,
     optixRenderArtifact,
+    shiftGeometryArtifact,
     fixedScaleComparisonArtifact,
   };
 };
@@ -1156,6 +1886,7 @@ const buildRenderTaxonomyFixtures = async () => {
     generatedOn: "2026-03-31",
     canonicalCalibrationArtifact: fixtures.canonicalCalibrationArtifact,
     optixRenderArtifact: fixtures.optixRenderArtifact,
+    shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
     canonicalVisualComparisonArtifact,
   });
   return {
@@ -6766,6 +7497,10 @@ describe("warp york control-family proof pack", () => {
               renderView: "transport-3p1",
               caption: "main",
               presentationRenderMode: "optix_scientific_transport_3p1",
+              baseImagePolicy: "native_renderer_output",
+              baseImageSource: "native_renderer",
+              inheritsTransportContext: false,
+              contextCompositionMode: "none",
               endpoint: "http://127.0.0.1:6062/api/helix/hull-render/frame",
               requestId: "req-main",
               presentationRenderRequestHash: "req-hash",
@@ -6801,17 +7536,21 @@ describe("warp york control-family proof pack", () => {
               fieldNature: "signed",
               variant: "main",
               contextRenderView: "transport-3p1",
+              baseImagePolicy: "neutral_field_canvas",
+              baseImageSource: "none",
+              inheritsTransportContext: false,
+              contextCompositionMode: "none",
               authoritativeSource: "snapshot.channel.K_xx",
               presentationFieldSelector: "longitudinal_signed_strain:snapshot.channel.K_xx",
               presentationFieldSelectorHash: "selector-hash",
-              presentationRenderMode: "solve_backed_optix_context_field_projection",
+              presentationRenderMode: "solve_backed_optix_neutral_field_projection",
               presentationFieldHash: "kxx-hash",
               presentationScalarFieldHash: "kxx-hash",
               metricVolumeHash: "metric-volume-hash",
               thetaHash: "theta-hash",
               kTraceHash: "ktrace-hash",
               laneAFieldHash: "lane-a-field-hash",
-              optixContextImageHash: "img-hash",
+              optixContextImageHash: null,
               presentationRenderRequestHash: "req-hash-field",
               presentationRenderImageHash: "img-hash-field",
               presentationProjectionRequestHash: "req-hash-field",
@@ -6864,8 +7603,10 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain("metric-volume-hash");
     expect(markdown).toContain("optix_longitudinal_signed_strain_signed_asinh");
     expect(markdown).toContain("Lane A slices + fixed-scale + pre-PNG metrics");
+    expect(markdown).toContain("neutral_field_canvas");
     expect(markdown).toContain("| advisoryFindings | none |");
     expect(memo).toContain("secondary to the fixed-scale diagnostic artifact");
+    expect(memo).toContain("neutral dedicated field canvas");
     expect(memo).toContain("longitudinal signed strain");
     expect(memo).toContain("presentationRenderQuality: `ok`");
     expect(memo).toContain("advisoryFindings: none");
@@ -6896,6 +7637,47 @@ describe("warp york control-family proof pack", () => {
     expect(proofPackMarkdown).toContain("fieldSuiteRealizationStatus");
     expect(proofPackMarkdown).toContain("nhm2-york-optix-render-latest.json");
     expect(proofPackMarkdown).toContain("## Solve-Authority Audit");
+  });
+
+  it("renders the shift-geometry artifact markdown with explicit proof-vs-interpretive separation", async () => {
+    const fixtures = await makeCanonicalVisualComparisonFixtures();
+    const markdown = renderNhm2ShiftGeometryVisualizationMarkdown(
+      fixtures.shiftGeometryArtifact,
+    );
+    expect(markdown).toContain("# NHM2 Shift Geometry Visualization");
+    expect(markdown).toContain("diagnostic_lane_a remains the proof surface");
+    expect(markdown).toContain("shift geometry remains secondary and interpretive");
+    expect(markdown).toContain("transport-context inheritance stays off for scientific shift field frames");
+    expect(markdown).toContain("beta_direction_xz");
+    expect(markdown).toContain("nhm2_minus_natario_beta_residual");
+  });
+
+  it("renders shift-geometry status separately from the authoritative diagnostic layer in proof-pack markdown", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.shiftGeometrySummary = {
+      shiftGeometryStatus: "available",
+      mandatoryFirstPassFields: ["beta_magnitude", "beta_x", "beta_direction_xz"],
+      mandatoryResidualComparisons: [
+        "nhm2_minus_natario",
+        "nhm2_minus_alcubierre",
+      ],
+      directionOverlayStatus: "available",
+      directionOverlayCaseDistinctness: "distinct_across_cases",
+      directionOverlayWarnings: [],
+      constraintContextStatus: "deferred_units_and_policy_unresolved",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+    expect(proofPackMarkdown).toContain("## Shift Geometry Visualization");
+    expect(proofPackMarkdown).toContain("beta_magnitude,beta_x,beta_direction_xz");
+    expect(proofPackMarkdown).toContain("directionOverlayStatus");
+    expect(proofPackMarkdown).toContain("directionOverlayCaseDistinctness");
+    expect(proofPackMarkdown).toContain("nhm2-shift-geometry-visualization-latest.json");
+    expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+    expect(proofPackMarkdown).toContain("## Final Canonical Visual Comparison");
   });
 
   it("builds a final canonical comparison artifact with canonical cases and both layers", async () => {
@@ -7042,6 +7824,236 @@ describe("warp york control-family proof pack", () => {
     ).toBe(true);
   });
 
+  it("emits beta_magnitude and beta_x as taxonomy-compliant scientific shift field renders", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const shiftFieldEntries = fixtures.shiftGeometryArtifact.renderEntries.filter(
+      (entry) =>
+        entry.renderCategory === "scientific_3p1_field" &&
+        (entry.fieldId === "beta_magnitude" || entry.fieldId === "beta_x"),
+    );
+    expect(shiftFieldEntries.length).toBeGreaterThanOrEqual(8);
+    expect(
+      shiftFieldEntries.every(
+        (entry) =>
+          entry.renderRole === "presentation" &&
+          entry.baseImagePolicy === "neutral_field_canvas" &&
+          entry.baseImageSource === "none" &&
+          entry.inheritsTransportContext === false &&
+          entry.laneId === "lane_a_eulerian_comoving_theta_minus_trk",
+      ),
+    ).toBe(true);
+  });
+
+  it("emits beta_direction_xz as a taxonomy-compliant mechanism overlay", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const directionEntries = fixtures.shiftGeometryArtifact.renderEntries.filter(
+      (entry) => entry.fieldId === "beta_direction_xz",
+    );
+    expect(directionEntries.length).toBe(4);
+    expect(
+      directionEntries.every(
+        (entry) =>
+          entry.renderCategory === "mechanism_overlay" &&
+          entry.renderRole === "overlay" &&
+          entry.baseImagePolicy === "field_plus_context_overlay" &&
+          entry.baseImageSource === "hull_mask" &&
+          entry.inheritsTransportContext === false &&
+          Boolean(entry.directionVectorFieldHash) &&
+          Boolean(entry.streamSeedHash) &&
+          Boolean(entry.streamGeometryHash ?? entry.directionOverlayStatus === "degraded_hull_only"),
+      ),
+    ).toBe(true);
+  });
+
+  it("marks directional overlay cases as distinct when vector hashes differ and image hashes differ", () => {
+    const status = evaluateShiftDirectionOverlayCaseDistinctness([
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "image-a",
+        directionVectorFieldHash: "vector-a",
+        presentationScalarFieldHash: "scalar-a",
+        streamGeometryHash: "geometry-a",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "image-b",
+        directionVectorFieldHash: "vector-b",
+        presentationScalarFieldHash: "scalar-b",
+        streamGeometryHash: "geometry-b",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(status.directionOverlayStatus).toBe("available");
+    expect(status.directionOverlayCaseDistinctness).toBe("distinct_across_cases");
+    expect(status.directionOverlayWarnings).not.toContain("direction_overlay_collapsed_across_cases");
+  });
+
+  it("flags directional overlay collapse when image hashes match across distinct vector fields", () => {
+    const status = evaluateShiftDirectionOverlayCaseDistinctness([
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        directionVectorFieldHash: "vector-a",
+        presentationScalarFieldHash: "scalar-a",
+        streamGeometryHash: "geometry-a",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        directionVectorFieldHash: "vector-b",
+        presentationScalarFieldHash: "scalar-b",
+        streamGeometryHash: "geometry-b",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(status.directionOverlayStatus).toBe("collapsed");
+    expect(status.directionOverlayCaseDistinctness).toBe("collapsed_across_cases");
+    expect(status.directionOverlayWarnings).toContain("direction_overlay_collapsed_across_cases");
+  });
+
+  it("does not flag directional collapse when the sampled x-z vector field is genuinely identical", () => {
+    const status = evaluateShiftDirectionOverlayCaseDistinctness([
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        directionVectorFieldHash: "vector-shared",
+        presentationScalarFieldHash: "upstream-a",
+        streamGeometryHash: "geometry-shared",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "shared-image",
+        directionVectorFieldHash: "vector-shared",
+        presentationScalarFieldHash: "upstream-b",
+        streamGeometryHash: "geometry-shared",
+        directionOverlayStatus: "case_specific_streamlines",
+        directionOverlayWarnings: [],
+      },
+    ] as any);
+    expect(status.directionOverlayStatus).toBe("available");
+    expect(status.directionOverlayCaseDistinctness).toBe("mixed");
+    expect(status.directionOverlayWarnings).not.toContain("direction_overlay_collapsed_across_cases");
+  });
+
+  it("flags hull-only directional fallback explicitly", () => {
+    const status = evaluateShiftDirectionOverlayCaseDistinctness([
+      {
+        fieldId: "beta_direction_xz",
+        imageHash: "hull-only",
+        directionVectorFieldHash: "vector-a",
+        presentationScalarFieldHash: "scalar-a",
+        streamGeometryHash: null,
+        directionOverlayStatus: "degraded_hull_only",
+        directionOverlayWarnings: [
+          "direction_streamline_generation_degraded",
+          "direction_overlay_fell_back_to_hull_only",
+        ],
+      },
+    ] as any);
+    expect(status.directionOverlayStatus).toBe("degraded");
+    expect(status.directionOverlayWarnings).toEqual(
+      expect.arrayContaining([
+        "direction_streamline_generation_degraded",
+        "direction_overlay_fell_back_to_hull_only",
+      ]),
+    );
+  });
+
+  it("emits NHM2 residual-to-control shift entries for Natario and Alcubierre", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const residualEntries = fixtures.shiftGeometryArtifact.renderEntries.filter(
+      (entry) => entry.mechanismFamily === "residual_to_control",
+    );
+    expect(residualEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          caseId: "nhm2_certified",
+          referenceCaseId: "natario_control",
+          fieldId: "beta_magnitude",
+        }),
+        expect.objectContaining({
+          caseId: "nhm2_certified",
+          referenceCaseId: "natario_control",
+          fieldId: "beta_x",
+        }),
+        expect.objectContaining({
+          caseId: "nhm2_certified",
+          referenceCaseId: "alcubierre_control",
+          fieldId: "beta_magnitude",
+        }),
+        expect.objectContaining({
+          caseId: "nhm2_certified",
+          referenceCaseId: "alcubierre_control",
+          fieldId: "beta_x",
+        }),
+      ]),
+    );
+  });
+
+  it("emits shift entries with required labeling metadata", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const shiftEntries = fixtures.shiftGeometryArtifact.renderEntries;
+    expect(shiftEntries.length).toBeGreaterThan(0);
+    expect(
+      shiftEntries.every(
+        (entry) =>
+          entry.title &&
+          entry.subtitle &&
+          entry.quantitySymbol &&
+          entry.quantityUnits &&
+          entry.observer === "eulerian_n" &&
+          entry.foliation === "comoving_cartesian_3p1" &&
+          entry.signConvention &&
+          entry.laneId === "lane_a_eulerian_comoving_theta_minus_trk" &&
+          entry.orientationConventionId === "x_ship_y_port_z_zenith" &&
+          entry.baseImagePolicy &&
+          entry.baseImageSource,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps scientific 3+1 field renders on a neutral canvas with no transport-context inheritance", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const fieldEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "scientific_3p1_field",
+    );
+    expect(fieldEntries.length).toBeGreaterThan(0);
+    expect(
+      fieldEntries.every(
+        (entry) =>
+          entry.baseImagePolicy === "neutral_field_canvas" &&
+          entry.baseImageSource === "none" &&
+          entry.inheritsTransportContext === false,
+      ),
+    ).toBe(true);
+  });
+
+  it("emits transport context renders as a separate taxonomy category", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const transportEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "transport_context",
+    );
+    expect(transportEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldId: "transport_context",
+          renderRole: "presentation",
+          baseImagePolicy: "native_renderer_output",
+          baseImageSource: "native_renderer",
+          inheritsTransportContext: false,
+        }),
+      ]),
+    );
+  });
+
   it("categorizes comparison cards as comparison_panel renders", async () => {
     const fixtures = await buildRenderTaxonomyFixtures();
     const comparisonEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
@@ -7103,13 +8115,46 @@ describe("warp york control-family proof pack", () => {
     const proofPackMarkdown = renderMarkdown(payload);
     expect(taxonomyMarkdown).toContain("## Categories");
     expect(taxonomyMarkdown).toContain("diagnostic_lane_a");
+    expect(taxonomyMarkdown).toContain("transport_context");
     expect(taxonomyMarkdown).toContain("scientific_3p1_field");
     expect(taxonomyMemo).toContain("diagnostic_lane_a");
+    expect(taxonomyMemo).toContain("transport_context");
     expect(taxonomyMemo).toContain("scientific_3p1_field");
     expect(proofPackMarkdown).toContain("## Render Taxonomy");
     expect(proofPackMarkdown).toContain("diagnostic_lane_a");
     expect(proofPackMarkdown).toContain("scientific_3p1_field");
     expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+  });
+
+  it("requires overlay inheritance metadata to be explicit when present", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const overlayEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) => entry.renderCategory === "mechanism_overlay",
+    );
+    expect(overlayEntries.length).toBeGreaterThan(0);
+    expect(
+      overlayEntries.every(
+        (entry) =>
+          entry.inheritsTransportContext === false ||
+          entry.baseImageSource === "transport_context",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps shift field frames out of the transport-context inheritance path", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const shiftFieldEntries = fixtures.renderTaxonomyArtifact.renderEntries.filter(
+      (entry) =>
+        entry.renderCategory === "scientific_3p1_field" &&
+        (entry.fieldId === "beta_magnitude" || entry.fieldId === "beta_x"),
+    );
+    expect(
+      shiftFieldEntries.every(
+        (entry) =>
+          entry.inheritsTransportContext === false &&
+          entry.baseImageSource !== "transport_context",
+      ),
+    ).toBe(true);
   });
 
   it("flags collapsed OptiX field images when scalar fields differ", () => {
@@ -7123,17 +8168,21 @@ describe("warp york control-family proof pack", () => {
           fieldNature: "signed",
           variant: "main",
           contextRenderView: "transport-3p1",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           authoritativeSource: "snapshot.channel.K_xx",
           presentationFieldSelector: "longitudinal_signed_strain:snapshot.channel.K_xx",
           presentationFieldSelectorHash: "selector-kxx",
-          presentationRenderMode: "solve_backed_optix_context_field_projection",
+          presentationRenderMode: "solve_backed_optix_neutral_field_projection",
           presentationFieldHash: "field-kxx",
           presentationScalarFieldHash: "field-kxx",
           metricVolumeHash: "metric",
           thetaHash: "theta",
           kTraceHash: "ktrace",
           laneAFieldHash: "lane-a",
-          optixContextImageHash: "context",
+          optixContextImageHash: null,
           presentationRenderRequestHash: "req-kxx",
           presentationRenderImageHash: "shared-image",
           presentationProjectionRequestHash: "req-kxx",
@@ -7167,17 +8216,21 @@ describe("warp york control-family proof pack", () => {
           fieldNature: "signed",
           variant: "main",
           contextRenderView: "transport-3p1",
+          baseImagePolicy: "neutral_field_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
           authoritativeSource: "lane_a.theta",
           presentationFieldSelector: "trace_check:lane_a.theta",
           presentationFieldSelectorHash: "selector-theta",
-          presentationRenderMode: "solve_backed_optix_context_field_projection",
+          presentationRenderMode: "solve_backed_optix_neutral_field_projection",
           presentationFieldHash: "field-theta",
           presentationScalarFieldHash: "field-theta",
           metricVolumeHash: "metric",
           thetaHash: "theta",
           kTraceHash: "ktrace",
           laneAFieldHash: "lane-a",
-          optixContextImageHash: "context",
+          optixContextImageHash: null,
           presentationRenderRequestHash: "req-theta",
           presentationRenderImageHash: "shared-image",
           presentationProjectionRequestHash: "req-theta",

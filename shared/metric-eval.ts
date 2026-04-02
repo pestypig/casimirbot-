@@ -25,6 +25,7 @@ export const metricModeFromWarpFieldType = (warpFieldType?: WarpFieldType | null
       return METRIC_MODE.irrotational;
     case "natario":
     case "natario_sdf":
+    case "nhm2_shift_lapse":
     default:
       return METRIC_MODE.natario;
   }

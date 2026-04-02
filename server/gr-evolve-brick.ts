@@ -8,6 +8,8 @@ import {
 } from "./curvature-brick.ts";
 import {
   buildEvolutionBrick,
+  createMinkowskiState,
+  gridFromBounds,
   runInitialDataSolve,
   runBssnEvolution,
   computeShiftStiffnessMetrics,
@@ -23,7 +25,12 @@ import {
 } from "./gr/evolution/index.js";
 import { toGeometricTime, toSiTime, type GrUnitSystem } from "../shared/gr-units.ts";
 import type { GrPipelineDiagnostics } from "./energy-pipeline.ts";
-import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.js";
+import {
+  DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM,
+  evaluateWarpMetricLapseField,
+  type WarpMetricAdapterSnapshot,
+  type WarpMetricLapseSummary,
+} from "../modules/warp/warp-metric-adapter.js";
 import type { StressEnergyBrickParams, StressEnergyStats } from "./stress-energy-brick.ts";
 
 const SIXTEEN_PI = 16 * Math.PI;
@@ -89,6 +96,7 @@ export interface GrEvolveBrickStats {
   solverHealth?: GrSolverHealth;
   stressEnergy?: StressEnergyStats;
   perf?: GrEvolveBrickPerfStats;
+  wallSafety?: GrWallShiftLapseSafetySummary;
 }
 
 export type GrSolverHealthStatus = "CERTIFIED" | "UNSTABLE" | "NOT_CERTIFIED";
@@ -118,6 +126,17 @@ export interface GrEvolveBrickPerfStats {
   channelCount: number;
   bytesEstimate: number;
   msPerStep: number;
+}
+
+export interface GrWallShiftLapseSafetySummary {
+  betaOutwardOverAlphaWallMax: number | null;
+  betaOutwardOverAlphaWallP98: number | null;
+  wallHorizonMargin: number | null;
+  wallSamplingPolicy: string;
+  wallNormalModel: string;
+  wallSampleCount: number;
+  wallRegionDefinition: string;
+  sampleOffsetInsideWall_m: number | null;
 }
 
 export interface GrInvariantStats {
@@ -231,6 +250,14 @@ const GR_EVOLVE_CHANNEL_ORDER = [
   "beta_x",
   "beta_y",
   "beta_z",
+  "alpha_grad_x",
+  "alpha_grad_y",
+  "alpha_grad_z",
+  "eulerian_accel_geom_x",
+  "eulerian_accel_geom_y",
+  "eulerian_accel_geom_z",
+  "eulerian_accel_geom_mag",
+  "beta_over_alpha_mag",
   "gamma_xx",
   "gamma_yy",
   "gamma_zz",
@@ -314,6 +341,155 @@ const defaultHullBounds = () => {
   const min: Vec3 = [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2];
   const max: Vec3 = [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2];
   return { min, max };
+};
+
+const toFiniteVec3 = (value: unknown): Vec3 | null => {
+  if (!Array.isArray(value) || value.length < 3) return null;
+  const x = Number(value[0]);
+  const y = Number(value[1]);
+  const z = Number(value[2]);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  return [x, y, z];
+};
+
+const toFiniteNumber = (value: unknown): number | null => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const resolveShiftVectorFromPipeline = (
+  pipelineState: ReturnType<typeof getGlobalPipelineState>,
+): Vec3 | null => {
+  const natarioShift = toFiniteVec3((pipelineState as any)?.natario?.shiftBeta);
+  if (natarioShift) return natarioShift;
+  const betaAvg = toFiniteNumber((pipelineState as any)?.warp?.betaAvg);
+  if (betaAvg != null) return [betaAvg, 0, 0];
+  const shiftAmplitude = toFiniteNumber((pipelineState as any)?.warp?.shiftVectorField?.amplitude);
+  if (shiftAmplitude != null) return [shiftAmplitude, 0, 0];
+  const legacyBetaAvg = toFiniteNumber((pipelineState as any)?.beta_avg);
+  if (legacyBetaAvg != null) return [legacyBetaAvg, 0, 0];
+  return null;
+};
+
+const resolveShiftLapseSummaryFromPipeline = (
+  pipelineState: ReturnType<typeof getGlobalPipelineState>,
+): WarpMetricLapseSummary | null => {
+  const adapter = (pipelineState as any)?.warp?.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  if (adapter?.family === "nhm2_shift_lapse" && adapter.lapseSummary) {
+    return adapter.lapseSummary;
+  }
+  const warpLapseSummary = (pipelineState as any)?.warp?.lapseSummary;
+  if (
+    (pipelineState as any)?.warp?.metricAdapter?.family === "nhm2_shift_lapse" &&
+    warpLapseSummary &&
+    typeof warpLapseSummary === "object"
+  ) {
+    return warpLapseSummary as WarpMetricLapseSummary;
+  }
+  const warpFieldType =
+    (pipelineState as any)?.dynamicConfig?.warpFieldType ??
+    (pipelineState as any)?.warpFieldType ??
+    null;
+  if (warpFieldType !== "nhm2_shift_lapse") return null;
+  const dynamicConfig = (pipelineState as any)?.dynamicConfig ?? {};
+  const alphaCenterline = Math.max(1e-6, Number(dynamicConfig.alphaCenterline ?? 1));
+  const gradientVec =
+    toFiniteVec3(dynamicConfig.alphaGradientVec_m_inv) ??
+    [0, 0, DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM];
+  const hull = (pipelineState as any)?.hull;
+  const hullAxes: Vec3 = hull
+    ? [
+        Math.max(1e-6, Number(hull.Lx_m ?? 1007) / 2),
+        Math.max(1e-6, Number(hull.Ly_m ?? 264) / 2),
+        Math.max(1e-6, Number(hull.Lz_m ?? 173) / 2),
+      ]
+    : [503.5, 132, 86.5];
+  const delta =
+    Math.abs(gradientVec[0]) * hullAxes[0] +
+    Math.abs(gradientVec[1]) * hullAxes[1] +
+    Math.abs(gradientVec[2]) * hullAxes[2];
+  return {
+    alphaCenterline,
+    alphaMin: Math.max(1e-6, Math.min(1, alphaCenterline - delta)),
+    alphaMax: Math.max(alphaCenterline, 1, alphaCenterline + delta),
+    alphaProfileKind:
+      dynamicConfig.alphaProfileKind === "unit" ? "unit" : "linear_gradient_tapered",
+    alphaGradientAxis:
+      Math.abs(gradientVec[0]) >= Math.abs(gradientVec[1]) &&
+      Math.abs(gradientVec[0]) >= Math.abs(gradientVec[2])
+        ? "x_ship"
+        : Math.abs(gradientVec[1]) >= Math.abs(gradientVec[2])
+          ? "y_port"
+          : "z_zenith",
+    alphaGradientVec_m_inv: gradientVec,
+    alphaInteriorSupportKind:
+      dynamicConfig.alphaInteriorSupportKind === "bubble_interior"
+        ? "bubble_interior"
+        : "hull_interior",
+    alphaWallTaper_m: Math.max(
+      1e-6,
+      Number(dynamicConfig.alphaWallTaper_m ?? hull?.wallThickness_m ?? 0.45),
+    ),
+    diagnosticTier: "diagnostic",
+    signConvention:
+      "positive alphaGradientVec_m_inv raises alpha along +x_ship/+y_port/+z_zenith; diagnostic-only generalized NHM2 branch",
+  };
+};
+
+const applyShiftLapseSummaryToState = (
+  state: BssnState,
+  lapseSummary: WarpMetricLapseSummary,
+  pipelineState: ReturnType<typeof getGlobalPipelineState>,
+): void => {
+  const hull = (pipelineState as any)?.hull;
+  const hullAxes: Vec3 | undefined = hull
+    ? [
+        Math.max(1e-6, Number(hull.Lx_m ?? 1007) / 2),
+        Math.max(1e-6, Number(hull.Ly_m ?? 264) / 2),
+        Math.max(1e-6, Number(hull.Lz_m ?? 173) / 2),
+      ]
+    : undefined;
+  const bubbleRadius_m =
+    toFiniteNumber((pipelineState as any)?.bubble?.R) ??
+    toFiniteNumber((pipelineState as any)?.R) ??
+    undefined;
+  const bounds = state.grid.bounds ?? defaultHullBounds();
+  const [nx, ny, nz] = state.grid.dims;
+  const [dx, dy, dz] = state.grid.spacing;
+  const shiftVector = resolveShiftVectorFromPipeline(pipelineState) ?? [0, 0, 0];
+  let idx = 0;
+  for (let k = 0; k < nz; k += 1) {
+    const z = bounds.min[2] + (k + 0.5) * dz;
+    for (let j = 0; j < ny; j += 1) {
+      const y = bounds.min[1] + (j + 0.5) * dy;
+      for (let i = 0; i < nx; i += 1) {
+        const x = bounds.min[0] + (i + 0.5) * dx;
+        state.alpha[idx] = evaluateWarpMetricLapseField({
+          lapseSummary,
+          point: [x, y, z],
+          hullAxes,
+          bubbleRadius_m,
+        });
+        state.beta_x[idx] = shiftVector[0];
+        state.beta_y[idx] = shiftVector[1];
+        state.beta_z[idx] = shiftVector[2];
+        idx += 1;
+      }
+    }
+  }
+};
+
+const buildShiftLapseInitialState = (
+  dims: [number, number, number],
+  bounds: { min: Vec3; max: Vec3 },
+): BssnState | null => {
+  const pipelineState = getGlobalPipelineState();
+  const lapseSummary = resolveShiftLapseSummaryFromPipeline(pipelineState);
+  if (!lapseSummary) return null;
+  const grid = gridFromBounds(dims, bounds);
+  const state = createMinkowskiState(grid);
+  applyShiftLapseSummaryToState(state, lapseSummary, pipelineState);
+  return state;
 };
 
 const resolveVoxelSize = (
@@ -515,6 +691,142 @@ const resolveHullSupportChannels = (
     tileSupportMask,
     regionClass,
     reasons,
+  };
+};
+
+const normalizeVec3 = (value: Vec3): Vec3 => {
+  const mag = Math.hypot(value[0], value[1], value[2]);
+  if (!(mag > 0)) return [0, 0, 1];
+  return [value[0] / mag, value[1] / mag, value[2] / mag];
+};
+
+const sampleChannelAtPoint = (
+  channel: GrEvolveBrickChannel,
+  dims: [number, number, number],
+  bounds: { min: Vec3; max: Vec3 },
+  point: Vec3,
+): number | null => {
+  const [nx, ny, nz] = dims;
+  const clampIndex = (value: number, size: number) =>
+    Math.max(0, Math.min(size - 1, value));
+  const xNorm =
+    (point[0] - bounds.min[0]) / Math.max(1e-9, bounds.max[0] - bounds.min[0]);
+  const yNorm =
+    (point[1] - bounds.min[1]) / Math.max(1e-9, bounds.max[1] - bounds.min[1]);
+  const zNorm =
+    (point[2] - bounds.min[2]) / Math.max(1e-9, bounds.max[2] - bounds.min[2]);
+  const ix = clampIndex(Math.floor(xNorm * nx), nx);
+  const iy = clampIndex(Math.floor(yNorm * ny), ny);
+  const iz = clampIndex(Math.floor(zNorm * nz), nz);
+  const idx = iz * nx * ny + iy * nx + ix;
+  const value = channel.data[idx];
+  return Number.isFinite(value) ? value : null;
+};
+
+const buildWallSampleDirections = (
+  polarCount = 9,
+  azimuthCount = 16,
+): Vec3[] => {
+  const directions: Vec3[] = [];
+  for (let i = 0; i < polarCount; i += 1) {
+    const v = (i + 0.5) / polarCount;
+    const z = 1 - 2 * v;
+    const r = Math.sqrt(Math.max(0, 1 - z * z));
+    const phase = i % 2 === 0 ? 0 : 0.5;
+    for (let j = 0; j < azimuthCount; j += 1) {
+      const phi = ((j + phase) / azimuthCount) * Math.PI * 2;
+      directions.push([
+        r * Math.cos(phi),
+        r * Math.sin(phi),
+        z,
+      ]);
+    }
+  }
+  return directions;
+};
+
+const computeWallShiftLapseSafety = (args: {
+  state: ReturnType<typeof getGlobalPipelineState>;
+  dims: [number, number, number];
+  bounds: { min: Vec3; max: Vec3 };
+  sourceParams: Partial<StressEnergyBrickParams> | undefined;
+  alpha: GrEvolveBrickChannel;
+  betaX: GrEvolveBrickChannel;
+  betaY: GrEvolveBrickChannel;
+  betaZ: GrEvolveBrickChannel;
+}): GrWallShiftLapseSafetySummary => {
+  const hullAxes = resolveHullAxes(args.bounds, args.sourceParams, args.state);
+  const radialMap =
+    (args.sourceParams?.radialMap as HullRadialMap | null | undefined) ?? null;
+  const spacing = resolveVoxelSize(args.dims, args.bounds);
+  const minSpacing = Math.max(1e-6, Math.min(...spacing));
+  const rawHullWall = Number(
+    args.sourceParams?.hullWall ??
+      (args.state as any)?.hull?.wallThickness_m ??
+      minSpacing,
+  );
+  const hullWall = Number.isFinite(rawHullWall)
+    ? Math.max(rawHullWall, 0.5 * minSpacing)
+    : 0.5 * minSpacing;
+  const sampleOffsetInsideWall_m = Math.max(
+    1e-6,
+    Math.min(hullWall * 0.5, Math.max(minSpacing, hullWall)),
+  );
+  const directions = buildWallSampleDirections();
+  const outwardSamples: number[] = [];
+  for (const dirRaw of directions) {
+    const dir = normalizeVec3(dirRaw);
+    const radius = resolveHullRadius(dir, hullAxes, radialMap);
+    if (!Number.isFinite(radius) || radius <= 0) continue;
+    const surfacePoint: Vec3 = [
+      dir[0] * radius,
+      dir[1] * radius,
+      dir[2] * radius,
+    ];
+    const ellipsoidNormal = normalizeVec3([
+      surfacePoint[0] / Math.max(1e-12, hullAxes[0] * hullAxes[0]),
+      surfacePoint[1] / Math.max(1e-12, hullAxes[1] * hullAxes[1]),
+      surfacePoint[2] / Math.max(1e-12, hullAxes[2] * hullAxes[2]),
+    ]);
+    const samplePoint: Vec3 = [
+      surfacePoint[0] - ellipsoidNormal[0] * sampleOffsetInsideWall_m,
+      surfacePoint[1] - ellipsoidNormal[1] * sampleOffsetInsideWall_m,
+      surfacePoint[2] - ellipsoidNormal[2] * sampleOffsetInsideWall_m,
+    ];
+    const alpha = sampleChannelAtPoint(args.alpha, args.dims, args.bounds, samplePoint);
+    const betaX = sampleChannelAtPoint(args.betaX, args.dims, args.bounds, samplePoint);
+    const betaY = sampleChannelAtPoint(args.betaY, args.dims, args.bounds, samplePoint);
+    const betaZ = sampleChannelAtPoint(args.betaZ, args.dims, args.bounds, samplePoint);
+    if (
+      alpha == null ||
+      betaX == null ||
+      betaY == null ||
+      betaZ == null
+    ) {
+      continue;
+    }
+    const outward =
+      (betaX * ellipsoidNormal[0] +
+        betaY * ellipsoidNormal[1] +
+        betaZ * ellipsoidNormal[2]) /
+      Math.max(1e-9, Math.abs(alpha));
+    outwardSamples.push(Math.max(0, outward));
+  }
+  const betaOutwardOverAlphaWallMax =
+    outwardSamples.length > 0 ? Math.max(...outwardSamples) : null;
+  const betaOutwardOverAlphaWallP98 =
+    outwardSamples.length > 0 ? percentileFromSamples(outwardSamples, 0.98) : null;
+  return {
+    betaOutwardOverAlphaWallMax,
+    betaOutwardOverAlphaWallP98,
+    wallHorizonMargin:
+      betaOutwardOverAlphaWallMax != null ? 1 - betaOutwardOverAlphaWallMax : null,
+    wallSamplingPolicy: "ellipsoidal_surface_interior_offset_grid_v1",
+    wallNormalModel: "ellipsoidal_hull_gradient_approx",
+    wallSampleCount: outwardSamples.length,
+    wallRegionDefinition:
+      "Sample outward normals on a deterministic ellipsoidal hull grid and evaluate beta.n/alpha one half wall-thickness inside the support wall.",
+    sampleOffsetInsideWall_m,
   };
 };
 
@@ -843,6 +1155,7 @@ export const buildGrDiagnostics = (
   const lapseMin = Number.isFinite(alpha?.min) ? alpha.min : 0;
   const lapseMax = Number.isFinite(alpha?.max) ? alpha.max : 0;
   const stiffness = brick.stats.stiffness;
+  const wallSafety = brick.stats.wallSafety;
   const betaMaxAbs = maxAbsBeta(
     brick.channels.beta_x,
     brick.channels.beta_y,
@@ -873,6 +1186,17 @@ export const buildGrDiagnostics = (
       lapseMin,
       lapseMax,
       betaMaxAbs: Number.isFinite(betaMaxAbs) ? betaMaxAbs : 0,
+      betaOverAlphaMax: Number.isFinite(stiffness?.betaOverAlphaMax)
+        ? stiffness?.betaOverAlphaMax
+        : 0,
+      betaOverAlphaP98: Number.isFinite(stiffness?.betaOverAlphaP98)
+        ? stiffness?.betaOverAlphaP98
+        : 0,
+      betaOutwardOverAlphaWallMax:
+        wallSafety?.betaOutwardOverAlphaWallMax ?? null,
+      betaOutwardOverAlphaWallP98:
+        wallSafety?.betaOutwardOverAlphaWallP98 ?? null,
+      wallHorizonMargin: wallSafety?.wallHorizonMargin ?? null,
     },
     ...(stiffness ? { stiffness } : {}),
     constraints: {
@@ -966,13 +1290,14 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
       cfl_max: GR_CFL_MAX,
     });
   }
-  let initialState = input.initialState;
+  let initialState = input.initialState ?? buildShiftLapseInitialState(dims, bounds);
   let matter = input.matter ?? null;
   let sourceBrickFromInitialData: StressEnergyStats | undefined;
   let sourceKindFromInitialData: GrEvolveBrick["source"] | undefined;
 
   if (useInitialData && !initialState) {
     const initial = runInitialDataSolve({
+      initialState,
       dims,
       bounds,
       iterations: initialIterations,
@@ -1081,6 +1406,16 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   const ricci3 = evolutionChannels.ricci3;
   const KijKij = evolutionChannels.KijKij;
   const rhoConstraint = buildRhoConstraintDiagnostics(ricci3, K_trace, KijKij);
+  const wallSafety = computeWallShiftLapseSafety({
+    state: pipelineState,
+    dims,
+    bounds,
+    sourceParams: input.sourceParams,
+    alpha,
+    betaX: beta_x,
+    betaY: beta_y,
+    betaZ: beta_z,
+  });
   const kretschmann = evolutionChannels.kretschmann;
   const weylI = evolutionChannels.weylI;
   const ricci4 = evolutionChannels.ricci4;
@@ -1136,6 +1471,21 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
   if (weylI) channels.weylI = weylI;
   if (ricci4) channels.ricci4 = ricci4;
   if (ricci2) channels.ricci2 = ricci2;
+  for (const key of [
+    "alpha_grad_x",
+    "alpha_grad_y",
+    "alpha_grad_z",
+    "eulerian_accel_geom_x",
+    "eulerian_accel_geom_y",
+    "eulerian_accel_geom_z",
+    "eulerian_accel_geom_mag",
+    "beta_over_alpha_mag",
+  ] as const) {
+    const channel = evolutionChannels[key];
+    if (channel) {
+      channels[key] = channel;
+    }
+  }
 
   if (includeKij) {
     for (const key of GR_EVOLVE_KIJ_CHANNELS) {
@@ -1225,6 +1575,7 @@ export function buildGrEvolveBrick(input: Partial<GrEvolveBrickParams>): GrEvolv
     },
     advectScheme: evolution.advectSchemeUsed ?? advectScheme,
     stiffness,
+    wallSafety,
     fixups: evolution.fixups,
     solverHealth,
     ...(rhoConstraint ? { rhoConstraint } : {}),

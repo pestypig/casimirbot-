@@ -220,6 +220,34 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     toFiniteVec3((dyn as any)?.betaTiltVec ?? (params as any).betaTiltVec) ?? [0, -1, 0],
     [0, -1, 0],
   );
+  const alphaProfileKindRaw =
+    (dyn as any)?.alphaProfileKind ?? (params as any).alphaProfileKind;
+  const alphaProfileKind =
+    alphaProfileKindRaw === "unit" || alphaProfileKindRaw === "linear_gradient_tapered"
+      ? alphaProfileKindRaw
+      : undefined;
+  const alphaCenterlineRaw = Number(
+    (dyn as any)?.alphaCenterline ?? (params as any).alphaCenterline,
+  );
+  const alphaCenterline = Number.isFinite(alphaCenterlineRaw)
+    ? Math.max(1e-6, alphaCenterlineRaw)
+    : undefined;
+  const alphaGradientVec_m_inv = toFiniteVec3(
+    (dyn as any)?.alphaGradientVec_m_inv ?? (params as any).alphaGradientVec_m_inv,
+  );
+  const alphaInteriorSupportKindRaw =
+    (dyn as any)?.alphaInteriorSupportKind ?? (params as any).alphaInteriorSupportKind;
+  const alphaInteriorSupportKind =
+    alphaInteriorSupportKindRaw === "bubble_interior" ||
+    alphaInteriorSupportKindRaw === "hull_interior"
+      ? alphaInteriorSupportKindRaw
+      : undefined;
+  const alphaWallTaperRaw = Number(
+    (dyn as any)?.alphaWallTaper_m ?? (params as any).alphaWallTaper_m,
+  );
+  const alphaWallTaper_m = Number.isFinite(alphaWallTaperRaw)
+    ? Math.max(1e-6, alphaWallTaperRaw)
+    : undefined;
 
   // Sector counts / duty
   const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
@@ -369,6 +397,11 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     gTarget,
     epsilonTilt,
     betaTiltVec,
+    alphaProfileKind,
+    alphaCenterline,
+    alphaGradientVec_m_inv,
+    alphaInteriorSupportKind,
+    alphaWallTaper_m,
 
     // --- Pipeline seeds (threaded through) ---
     gammaGeo,
@@ -408,6 +441,7 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
   const expectsZeroExpansion =
     fieldType === "natario" ||
     fieldType === "natario_sdf" ||
+    fieldType === "nhm2_shift_lapse" ||
     fieldType === "irrotational";
 
   const ampFactors = (params as any).ampFactors ?? (params as any).amps ?? {};
@@ -525,6 +559,7 @@ export const warpBubbleModule: CasimirModule = {
       if (
         warpFieldType === 'natario' ||
         warpFieldType === 'natario_sdf' ||
+        warpFieldType === 'nhm2_shift_lapse' ||
         warpFieldType === 'irrotational' ||
         warpFieldType === 'alcubierre'
       ) {

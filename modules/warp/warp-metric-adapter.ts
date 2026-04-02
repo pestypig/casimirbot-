@@ -11,9 +11,77 @@ export type DtGammaPolicy = "assumed_zero" | "computed" | "unknown";
 export type WarpMetricFamily =
   | "natario"
   | "natario_sdf"
+  | "nhm2_shift_lapse"
   | "alcubierre"
   | "vdb"
   | "unknown";
+
+export type WarpAlphaProfileKind = "unit" | "linear_gradient_tapered";
+export type WarpAlphaGradientAxis = "x_ship" | "y_port" | "z_zenith" | "unspecified";
+export type WarpAlphaInteriorSupportKind = "bubble_interior" | "hull_interior";
+
+export type WarpLapseReferenceCalibration = {
+  targetCabinGravity_si: number;
+  targetCabinHeight_m: number;
+  expectedAlphaGradientGeom: number;
+  calibrationNote: string;
+};
+
+export type WarpMetricLapseSummary = {
+  alphaCenterline: number;
+  alphaMin: number;
+  alphaMax: number;
+  alphaProfileKind: WarpAlphaProfileKind;
+  alphaGradientAxis: WarpAlphaGradientAxis;
+  alphaGradientVec_m_inv?: Vec3;
+  alphaInteriorSupportKind?: WarpAlphaInteriorSupportKind;
+  alphaWallTaper_m?: number;
+  diagnosticTier?: "diagnostic";
+  signConvention?: string;
+};
+
+const SPEED_OF_LIGHT_MPS = 299_792_458;
+const STANDARD_GRAVITY_MPS2 = 9.80665;
+
+export const DEFAULT_MILD_CABIN_GRAVITY_SI = 0.5 * STANDARD_GRAVITY_MPS2;
+export const DEFAULT_MILD_CABIN_HEIGHT_M = 2.5;
+
+export const deriveWarpAlphaGradientGeomFromGravity = (
+  targetCabinGravity_si: number,
+): number => {
+  const gravity = Math.max(0, Number.isFinite(targetCabinGravity_si) ? targetCabinGravity_si : 0);
+  return gravity / (SPEED_OF_LIGHT_MPS * SPEED_OF_LIGHT_MPS);
+};
+
+export const buildMildCabinGravityReferenceCalibration = (options?: {
+  targetCabinGravity_si?: number;
+  targetCabinHeight_m?: number;
+}): WarpLapseReferenceCalibration => {
+  const targetCabinGravity_si = Math.max(
+    0,
+    Number.isFinite(options?.targetCabinGravity_si)
+      ? Number(options?.targetCabinGravity_si)
+      : DEFAULT_MILD_CABIN_GRAVITY_SI,
+  );
+  const targetCabinHeight_m = Math.max(
+    1e-6,
+    Number.isFinite(options?.targetCabinHeight_m)
+      ? Number(options?.targetCabinHeight_m)
+      : DEFAULT_MILD_CABIN_HEIGHT_M,
+  );
+  return {
+    targetCabinGravity_si,
+    targetCabinHeight_m,
+    expectedAlphaGradientGeom: deriveWarpAlphaGradientGeomFromGravity(targetCabinGravity_si),
+    calibrationNote:
+      "Weak-field ADM calibration: partial_i alpha ~= g_i / c^2. This reference targets mild local cabin gravity only and does not imply strong centerline lapse suppression.",
+  };
+};
+
+export const DEFAULT_MILD_CABIN_GRAVITY_REFERENCE =
+  buildMildCabinGravityReferenceCalibration();
+export const DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM =
+  DEFAULT_MILD_CABIN_GRAVITY_REFERENCE.expectedAlphaGradientGeom;
 
 export type WarpChartContract = {
   label: WarpChartLabel;
@@ -52,6 +120,7 @@ export type WarpMetricAdapterSnapshot = {
   family: WarpMetricFamily;
   chart: WarpChartContract;
   alpha: number;
+  lapseSummary?: WarpMetricLapseSummary;
   gammaDiag: [number, number, number];
   betaSource: "shiftVectorField" | "none";
   requestedFieldType?: string;
@@ -80,6 +149,7 @@ export type WarpMetricAdapterInput = {
   family: WarpMetricFamily;
   chart?: Partial<WarpChartContract>;
   alpha?: number;
+  lapseSummary?: WarpMetricLapseSummary;
   gammaDiag?: [number, number, number];
   shiftVectorField?: ShiftVectorField;
   requestedFieldType?: string;
@@ -131,6 +201,11 @@ const DEFAULT_CHART_DESCRIPTIONS: Record<
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
+
+const smoothstep = (t: number) => {
+  const x = clamp(t, 0, 1);
+  return x * x * (3 - 2 * x);
+};
 
 const normalize = (v: Vec3): Vec3 => {
   const m = Math.hypot(v[0], v[1], v[2]);
@@ -248,6 +323,108 @@ const maxAbsPair = (a: unknown, b: unknown): number | undefined => {
   return Math.max(an ?? 0, bn ?? 0);
 };
 
+const resolveAlphaGradientAxis = (gradient: Vec3 | undefined): WarpAlphaGradientAxis => {
+  if (!gradient) return "unspecified";
+  const [gx, gy, gz] = gradient.map((value) =>
+    isFiniteNumber(value) ? Math.abs(value) : 0,
+  ) as Vec3;
+  const max = Math.max(gx, gy, gz);
+  if (!(max > 0)) return "unspecified";
+  if (max === gx) return "x_ship";
+  if (max === gy) return "y_port";
+  return "z_zenith";
+};
+
+const sanitizeLapseSummary = (
+  summary: WarpMetricLapseSummary | undefined,
+): WarpMetricLapseSummary | undefined => {
+  if (!summary) return undefined;
+  const alphaCenterline = isFiniteNumber(summary.alphaCenterline)
+    ? Math.max(1e-6, summary.alphaCenterline)
+    : 1;
+  const alphaMinRaw = isFiniteNumber(summary.alphaMin) ? summary.alphaMin : alphaCenterline;
+  const alphaMaxRaw = isFiniteNumber(summary.alphaMax) ? summary.alphaMax : alphaCenterline;
+  const alphaMin = Math.max(1e-6, Math.min(alphaMinRaw, alphaMaxRaw));
+  const alphaMax = Math.max(alphaMin, alphaMaxRaw);
+  const alphaGradientVec =
+    Array.isArray(summary.alphaGradientVec_m_inv) &&
+    summary.alphaGradientVec_m_inv.length >= 3 &&
+    summary.alphaGradientVec_m_inv.every(isFiniteNumber)
+      ? ([
+          Number(summary.alphaGradientVec_m_inv[0]),
+          Number(summary.alphaGradientVec_m_inv[1]),
+          Number(summary.alphaGradientVec_m_inv[2]),
+        ] as Vec3)
+      : undefined;
+  const alphaGradientAxis =
+    summary.alphaGradientAxis && summary.alphaGradientAxis !== "unspecified"
+      ? summary.alphaGradientAxis
+      : resolveAlphaGradientAxis(alphaGradientVec);
+  return {
+    alphaCenterline,
+    alphaMin,
+    alphaMax,
+    alphaProfileKind:
+      summary.alphaProfileKind === "linear_gradient_tapered"
+        ? "linear_gradient_tapered"
+        : "unit",
+    alphaGradientAxis,
+    ...(alphaGradientVec ? { alphaGradientVec_m_inv: alphaGradientVec } : {}),
+    ...(summary.alphaInteriorSupportKind
+      ? { alphaInteriorSupportKind: summary.alphaInteriorSupportKind }
+      : {}),
+    ...(isFiniteNumber(summary.alphaWallTaper_m)
+      ? { alphaWallTaper_m: Math.max(1e-6, summary.alphaWallTaper_m) }
+      : {}),
+    diagnosticTier: "diagnostic",
+    ...(typeof summary.signConvention === "string" && summary.signConvention.length > 0
+      ? { signConvention: summary.signConvention }
+      : {}),
+  };
+};
+
+export const evaluateWarpMetricLapseField = (args: {
+  lapseSummary?: WarpMetricLapseSummary;
+  point: Vec3;
+  hullAxes?: Vec3;
+  bubbleRadius_m?: number;
+}): number => {
+  const summary = sanitizeLapseSummary(args.lapseSummary);
+  if (!summary || summary.alphaProfileKind === "unit") {
+    return summary?.alphaCenterline ?? 1;
+  }
+  const gradient = summary.alphaGradientVec_m_inv ?? [0, 0, 0];
+  const targetAlpha =
+    summary.alphaCenterline +
+    gradient[0] * args.point[0] +
+    gradient[1] * args.point[1] +
+    gradient[2] * args.point[2];
+  let support = 1;
+  if (summary.alphaInteriorSupportKind === "bubble_interior") {
+    const radius = Math.max(1e-6, Math.abs(args.bubbleRadius_m ?? 0));
+    if (radius > 0) {
+      const rNorm = Math.hypot(args.point[0], args.point[1], args.point[2]) / radius;
+      const taper = Math.max(1e-6, (summary.alphaWallTaper_m ?? radius * 0.1) / radius);
+      support = smoothstep((1 - rNorm) / taper);
+    }
+  } else if (summary.alphaInteriorSupportKind === "hull_interior") {
+    const axes = args.hullAxes;
+    if (axes && axes.every((value) => isFiniteNumber(value) && value > 0)) {
+      const normalizedRadius = Math.sqrt(
+        (args.point[0] / Math.max(axes[0], 1e-6)) ** 2 +
+          (args.point[1] / Math.max(axes[1], 1e-6)) ** 2 +
+          (args.point[2] / Math.max(axes[2], 1e-6)) ** 2,
+      );
+      const minAxis = Math.max(1e-6, Math.min(axes[0], axes[1], axes[2]));
+      const taper = Math.max(1e-6, summary.alphaWallTaper_m ?? minAxis * 0.1);
+      const inwardDistance = (1 - normalizedRadius) * minAxis;
+      support = normalizedRadius < 1 ? smoothstep(inwardDistance / taper) : 0;
+    }
+  }
+  const blended = 1 + support * (targetAlpha - 1);
+  return clamp(blended, summary.alphaMin, summary.alphaMax);
+};
+
 const computeVdbConformalCorrection = (
   diagnostics: VdbConformalDiagnostics | undefined,
   fallbackBetaAmplitude: number | undefined,
@@ -353,6 +530,7 @@ export const buildWarpMetricAdapterSnapshot = (
     ...(contractReason ? { contractReason } : {}),
   };
   const alpha = isFiniteNumber(input.alpha) ? input.alpha : 1;
+  const lapseSummary = sanitizeLapseSummary(input.lapseSummary);
   const gammaDiag = input.gammaDiag ?? [1, 1, 1];
   const shift = input.shiftVectorField;
   const hasShift = !!shift?.evaluateShiftVector;
@@ -459,6 +637,7 @@ export const buildWarpMetricAdapterSnapshot = (
     family: input.family,
     chart,
     alpha,
+    ...(lapseSummary ? { lapseSummary } : {}),
     gammaDiag,
     betaSource: hasShift ? "shiftVectorField" : "none",
     ...(input.requestedFieldType

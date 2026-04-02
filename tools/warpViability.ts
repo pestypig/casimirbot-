@@ -262,7 +262,9 @@ const resolveMetricT00GeomFromPipeline = (
     typeof (pipeline as any).natario?.metricT00Ref === "string" &&
     (pipeline as any).natario.metricT00Ref.length > 0
       ? String((pipeline as any).natario.metricT00Ref)
-      : "warp.metric.T00.natario.shift";
+      : warpFamily === "nhm2_shift_lapse"
+        ? "warp.metric.T00.nhm2.shift_lapse"
+        : "warp.metric.T00.natario.shift";
   const natarioChart =
     typeof (pipeline as any).natario?.chartLabel === "string" &&
     (pipeline as any).natario.chartLabel.length > 0
@@ -310,7 +312,12 @@ const resolveMetricT00GeomFromPipeline = (
       value: natarioMetricT00 * SI_TO_GEOM_STRESS,
       source: natarioMetricRef,
       chart: natarioChart ?? warpChart,
-      family: "natario",
+      family:
+        natarioMetricRef.includes(".nhm2.") && natarioMetricRef.includes(".shift_lapse")
+          ? "nhm2_shift_lapse"
+          : natarioMetricRef.includes(".natario_sdf.")
+            ? "natario_sdf"
+            : "natario",
       observer: natarioObserver,
       normalization: natarioNormalization,
       unitSystem: natarioUnitSystem,
@@ -627,12 +634,51 @@ const buildGrGuardrails = (
   const M_maxAbs = toFinite(gr?.constraints?.M_constraint?.maxAbs);
   const lapseMin = toFinite(gr?.gauge?.lapseMin);
   const betaMaxAbs = toFinite(gr?.gauge?.betaMaxAbs);
+  const betaOverAlphaMax = toFinite(gr?.gauge?.betaOverAlphaMax);
+  const betaOverAlphaP98 = toFinite(gr?.gauge?.betaOverAlphaP98);
+  const betaOutwardOverAlphaWallMax = toFinite(gr?.gauge?.betaOutwardOverAlphaWallMax);
+  const betaOutwardOverAlphaWallP98 = toFinite(gr?.gauge?.betaOutwardOverAlphaWallP98);
+  const wallHorizonMargin = toFinite(gr?.gauge?.wallHorizonMargin);
 
   const missing: string[] = [];
   if (!Number.isFinite(H_rms)) missing.push("H_constraint_rms");
   if (!Number.isFinite(M_rms)) missing.push("M_constraint_rms");
   if (!Number.isFinite(lapseMin)) missing.push("lapse_floor");
   if (!Number.isFinite(betaMaxAbs)) missing.push("beta_max_abs");
+  if (!Number.isFinite(betaOverAlphaMax)) missing.push("beta_over_alpha_max");
+
+  const combinedShiftLapseSafety =
+    Number.isFinite(betaOverAlphaMax)
+      ? {
+          status:
+            Math.max(
+              betaOverAlphaMax as number,
+              betaOutwardOverAlphaWallMax ?? 0,
+            ) < 1
+              ? ("pass" as const)
+              : ("warn" as const),
+          betaOverAlphaMax,
+          betaOverAlphaP98,
+          betaOutwardOverAlphaWallMax:
+            betaOutwardOverAlphaWallMax ?? null,
+          betaOutwardOverAlphaWallP98:
+            betaOutwardOverAlphaWallP98 ?? null,
+          wallHorizonMargin: wallHorizonMargin ?? null,
+          note:
+            betaOutwardOverAlphaWallMax == null
+              ? "Outward wall-normal beta/alpha safety is unavailable; using bulk betaOverAlpha metrics only."
+              : "Combined shift/lapse safety remains advisory-only for this diagnostics-first branch.",
+        }
+      : {
+          status: "unknown" as const,
+          betaOverAlphaMax,
+          betaOverAlphaP98,
+          betaOutwardOverAlphaWallMax: betaOutwardOverAlphaWallMax ?? null,
+          betaOutwardOverAlphaWallP98: betaOutwardOverAlphaWallP98 ?? null,
+          wallHorizonMargin: wallHorizonMargin ?? null,
+          note:
+            "Combined shift/lapse safety unavailable because betaOverAlpha diagnostics were not present in the GR gauge summary.",
+        };
 
   return {
     source: gr ? "pipeline-gr" : "proxy",
@@ -668,6 +714,7 @@ const buildGrGuardrails = (
         ? (betaMaxAbs as number) > GR_GUARDRAIL_THRESHOLDS.betaMaxAbs
         : undefined,
     },
+    combinedShiftLapseSafety,
   };
 };
 

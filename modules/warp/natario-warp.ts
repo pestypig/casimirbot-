@@ -13,9 +13,11 @@ import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.ts';
 import type { SimulationParameters, WarpGeometry, WarpGeometryKind } from '../../shared/schema.js';
 import {
   buildWarpMetricAdapterSnapshot,
+  DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM,
   type WarpMetricAdapterSnapshot,
   type WarpChartLabel,
   type WarpMetricFamily,
+  type WarpMetricLapseSummary,
 } from './warp-metric-adapter.ts';
 
 export type MassMode = "MODEL_DERIVED" | "TARGET_CALIBRATED" | "MEASURED_FORCE_INFERRED";
@@ -296,10 +298,15 @@ export interface NatarioWarpParams {
   powerTolerance?: number;                  // fractional tolerance
   betaTiltVec?: [number, number, number];   // optional pipeline tilt mapping   
   epsilonTilt?: number;                      // low-g interior tilt amplitude (dimensionless)
+  alphaProfileKind?: "unit" | "linear_gradient_tapered";
+  alphaCenterline?: number;
+  alphaGradientVec_m_inv?: [number, number, number];
+  alphaInteriorSupportKind?: "bubble_interior" | "hull_interior";
+  alphaWallTaper_m?: number;
   exoticMassTarget_kg?: number;
   invariantMass_kg?: number;
   tileArea_m2_override?: number;
-  warpFieldType?: 'natario' | 'natario_sdf' | 'alcubierre' | 'irrotational';
+  warpFieldType?: 'natario' | 'natario_sdf' | 'nhm2_shift_lapse' | 'alcubierre' | 'irrotational';
   warpGeometry?: WarpGeometry | null;
   warpGeometryKind?: WarpGeometryKind;
   warpGeometryAssetId?: string;
@@ -388,6 +395,7 @@ export interface NatarioWarpResult {
   thetaScaleCore_sqrtDuty?: number;
   /** CL1â€“CL2 metadata snapshot (chart + ADM assumptions + beta diagnostics). */
   metricAdapter?: WarpMetricAdapterSnapshot;
+  lapseSummary?: WarpMetricLapseSummary;
 }
 
 /* Minimal physics constants (order-of-magnitude safe) */
@@ -614,13 +622,84 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   }
   const powerDraw = Number.isFinite(params.P_avg_W) ? params.P_avg_W! : Math.abs(amplifiedEnergyDensity) * tileVolume * (params.burstDuration / Math.max(1, params.cycleDuration)) * 1.0;
   const quantumValidation = validateQuantumInequality(totalExoticMass, amplifiedEnergyDensity, Math.max(1e-12, (params.burstDuration||1) * 1e-6), a_m, params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg);
+  const resolveLapseSummary = (): WarpMetricLapseSummary | undefined => {
+    if (fieldType !== "nhm2_shift_lapse") return undefined;
+    const hullAxesResolved: Vec3 = params.hullAxes
+      ? [
+          Math.max(1e-6, params.hullAxes.a),
+          Math.max(1e-6, params.hullAxes.b),
+          Math.max(1e-6, params.hullAxes.c),
+        ]
+      : [
+          Math.max(1e-6, (params.bowlRadius || 1) * 1e-6),
+          Math.max(1e-6, (params.bowlRadius || 1) * 1e-6),
+          Math.max(1e-6, (params.bowlRadius || 1) * 1e-6),
+        ];
+    const gradientVec =
+      Array.isArray(params.alphaGradientVec_m_inv) && params.alphaGradientVec_m_inv.length >= 3
+        ? ([
+            Number(params.alphaGradientVec_m_inv[0] ?? 0),
+            Number(params.alphaGradientVec_m_inv[1] ?? 0),
+            Number(params.alphaGradientVec_m_inv[2] ?? 0),
+          ] as Vec3)
+        : ([0, 0, DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM] as Vec3);
+    const alphaCenterline = Number.isFinite(params.alphaCenterline)
+      ? Math.max(1e-6, params.alphaCenterline as number)
+      : 1;
+    const supportKind =
+      params.alphaInteriorSupportKind ??
+      (params.warpGeometry ? "hull_interior" : "bubble_interior");
+    const wallTaper_m =
+      Number.isFinite(params.alphaWallTaper_m) && (params.alphaWallTaper_m as number) > 0
+        ? Math.max(1e-6, params.alphaWallTaper_m as number)
+        : Math.max(
+            1e-6,
+            params.hullWallThickness_m ??
+              (params.bubbleRadius_m ? params.bubbleRadius_m * 0.12 : Math.min(...hullAxesResolved) * 0.1),
+          );
+    const supportExtents: Vec3 =
+      supportKind === "bubble_interior" && Number.isFinite(params.bubbleRadius_m)
+        ? [
+            Math.max(1e-6, params.bubbleRadius_m as number),
+            Math.max(1e-6, params.bubbleRadius_m as number),
+            Math.max(1e-6, params.bubbleRadius_m as number),
+          ]
+        : hullAxesResolved;
+    const delta =
+      Math.abs(gradientVec[0]) * supportExtents[0] +
+      Math.abs(gradientVec[1]) * supportExtents[1] +
+      Math.abs(gradientVec[2]) * supportExtents[2];
+    const alphaProfileKind =
+      params.alphaProfileKind === "unit" ? "unit" : "linear_gradient_tapered";
+    return {
+      alphaCenterline,
+      alphaMin: Math.max(1e-6, Math.min(1, alphaCenterline - delta)),
+      alphaMax: Math.max(alphaCenterline, 1, alphaCenterline + delta),
+      alphaProfileKind,
+      alphaGradientAxis:
+        Math.abs(gradientVec[0]) >= Math.abs(gradientVec[1]) &&
+        Math.abs(gradientVec[0]) >= Math.abs(gradientVec[2])
+          ? "x_ship"
+          : Math.abs(gradientVec[1]) >= Math.abs(gradientVec[2])
+            ? "y_port"
+            : "z_zenith",
+      alphaGradientVec_m_inv: gradientVec,
+      alphaInteriorSupportKind: supportKind,
+      alphaWallTaper_m: wallTaper_m,
+      diagnosticTier: "diagnostic",
+      signConvention:
+        "positive alphaGradientVec_m_inv raises alpha along +x_ship/+y_port/+z_zenith; epsilonTilt remains shift-only",
+    };
+  };
+  const lapseSummary = resolveLapseSummary();
+
   const shift =
     fieldType === "alcubierre"
       ? calculateAlcubierreShiftField(params)
       : calculateNatarioShiftField(params, totalExoticMass);
   const scale_m = Math.max(1e-9, (params.bowlRadius || 1) * 1e-6);
   let hodge: HodgeResult | undefined;
-  if (fieldType === 'natario_sdf') {
+  if (fieldType === 'natario_sdf' || fieldType === 'nhm2_shift_lapse') {
     hodge = helmholtzHodgeProject(params);
   }
   const dutyFactor = (Number.isFinite(+params.burstDuration) && Number.isFinite(+params.cycleDuration) && +params.cycleDuration > 0)
@@ -629,7 +708,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     ? (geo.amplification * dyn.qEnhancement * Math.sqrt(dutyFactor!))
     : undefined;
   const shiftForMetric =
-    fieldType === "natario_sdf" && hodge
+    (fieldType === "natario_sdf" || fieldType === "nhm2_shift_lapse") && hodge
       ? hodge.evaluate
       : (shift.evaluateShiftVector as any as (x:number,y:number,z:number)=>Vec3);
   const metricStressResult =
@@ -663,6 +742,8 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const metricT00Ref: string | undefined = metricStress
     ? fieldType === "alcubierre"
       ? "warp.metric.T00.alcubierre.analytic"
+      : fieldType === "nhm2_shift_lapse"
+        ? "warp.metric.T00.nhm2.shift_lapse"
       : fieldType === "natario_sdf"
         ? "warp.metric.T00.natario_sdf.shift"
         : fieldType === "irrotational"
@@ -733,9 +814,10 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     geometryKind: params.warpGeometryKind ?? (params.warpGeometry as any)?.kind ?? 'ellipsoid',
     geometryAssetId: params.warpGeometryAssetId ?? (params.warpGeometry as any)?.assetId,
     betaAvg: (shift as any).netShiftAmplitude ?? shift.amplitude,
+    ...(lapseSummary ? { lapseSummary } : {}),
   };
 
-  if (fieldType === 'natario_sdf') {
+  if (fieldType === 'natario_sdf' || fieldType === 'nhm2_shift_lapse') {
     if (!hodge) {
       hodge = helmholtzHodgeProject(params);
     }
@@ -765,7 +847,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
 
   const chartLabel: WarpChartLabel = "comoving_cartesian";
   const adapterFamily: WarpMetricFamily =
-    fieldType === "natario_sdf"
+    fieldType === "nhm2_shift_lapse"
+      ? "nhm2_shift_lapse"
+      : fieldType === "natario_sdf"
       ? "natario_sdf"
       : fieldType === "alcubierre"
         ? "alcubierre"
@@ -782,7 +866,8 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
       notes: adapterNote,
     },
     requestedFieldType: fieldType,
-    alpha: 1,
+    alpha: lapseSummary?.alphaCenterline ?? 1,
+    ...(lapseSummary ? { lapseSummary } : {}),
     gammaDiag: [1, 1, 1],
     shiftVectorField: baseResult.shiftVectorField,
     hodgeDiagnostics: baseResult.hodgeDiagnostics,

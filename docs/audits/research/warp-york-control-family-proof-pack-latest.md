@@ -92,10 +92,10 @@
 - statusEndpoint: `http://127.0.0.1:6062/api/helix/hull-render/status`
 - reachable: `true`
 - serviceVersion: `casimirbot.hull-optix-service@1.0.0`
-- buildHash: `git-f3cfd960c0ae`
-- commitSha: `f3cfd960c0ae362f525655dd5501e91ddbcc53ee`
-- processStartedAtMs: `1775018656864`
-- runtimeInstanceId: `12a87c1b8227a818`
+- buildHash: `git-3efe3cf94cd6`
+- commitSha: `3efe3cf94cd63d4057f7cb352c665fb48beb6896`
+- processStartedAtMs: `1775072269864`
+- runtimeInstanceId: `3667d7bd15f5e7b0`
 
 ## Control Debug (pre-render brick audit)
 | case | request_url | metricT00Ref | metricT00Source | requireCongruentSolve | requireNhm2CongruentFullSolve | warpFieldType | request_metric_ref_hash | resolved_metric_ref_hash | theta_hash | K_trace_hash | brick_source | chart | family_id | branch_metricT00Ref | branch_warpFieldType | source_branch | shape_function_id |
@@ -368,14 +368,27 @@
 |---|---|
 | presentationRenderLayerStatus | available |
 | fieldSuiteRealizationStatus | realized |
-| fieldSuiteReadabilityStatus | readable |
+| fieldSuiteReadabilityStatus | flat |
 | optixScientificRenderAvailable | true |
-| presentationRenderQuality | ok |
-| presentationReadinessVerdict | ready_for_human_inspection |
-| presentationRenderQualityReasons | none |
+| presentationRenderQuality | warning |
+| presentationReadinessVerdict | field_realized_but_presentation_flat |
+| presentationRenderQualityReasons | presentation_image_low_non_background_fraction,presentation_image_low_contrast,presentation_image_near_uniform |
 | presentationRenderBackedByAuthoritativeMetric | true |
 | artifactPath | artifacts/research/full-solve/nhm2-york-optix-render-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-york-optix-render-latest.md |
+
+## Shift Geometry Visualization
+| field | value |
+|---|---|
+| shiftGeometryStatus | available |
+| mandatoryFirstPassFields | beta_magnitude,beta_x,beta_direction_xz |
+| mandatoryResidualComparisons | nhm2_minus_natario_beta_residual,nhm2_minus_alcubierre_beta_residual |
+| directionOverlayStatus | available |
+| directionOverlayCaseDistinctness | mixed |
+| directionOverlayWarnings | none |
+| constraintContextStatus | deferred_units_and_policy_unresolved |
+| artifactPath | artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md |
 
 ## Render Taxonomy
 | field | value |
@@ -393,7 +406,7 @@
 |---|---|
 | finalComparisonVerdict | canonical_controls_validated_nhm2_natario_like |
 | diagnosticVerdict | shared_scale_preserves_natario_like_class |
-| presentationVerdict | presentation_layer_ready_and_consistent |
+| presentationVerdict | presentation_layer_has_advisories |
 | nhm2ClosestCanonicalFamily | natario_like_low_expansion |
 | alcubierreLikeTransitionObserved | no |
 | artifactPath | artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json |
@@ -468,7 +481,8 @@
 - solve_authority_chain_ready=true reasons=none
 - york_render_debug_verdict=render_matches_authoritative_geometry paper_comparison_verdict=paper_match_after_convention_alignment dominant_difference_cause=real_nhm2_morphology_difference
 - york_fixed_scale_render_verdict=shared_scale_preserves_natario_like_class figure1_overlay_verdict=real_nhm2_vs_alcubierre_morphology_difference is_nhm2_close_to_nasa_fig1=no
-- presentation_render_layer_status=available field_suite_realization_status=realized field_suite_readability_status=readable optix_scientific_render_available=true presentation_render_quality=ok presentation_readiness_verdict=ready_for_human_inspection presentation_render_backed_by_authoritative_metric=true
+- presentation_render_layer_status=available field_suite_realization_status=realized field_suite_readability_status=flat optix_scientific_render_available=true presentation_render_quality=warning presentation_readiness_verdict=field_realized_but_presentation_flat presentation_render_backed_by_authoritative_metric=true
+- shift_geometry_status=available case_count=4 residual_count=2 direction_overlay_status=available direction_overlay_case_distinctness=mixed constraint_context_status=deferred_units_and_policy_unresolved
 - york_calibration_verdict=canonical_controls_validated_nhm2_natario_like nhm2_current_class=natario_like_low_expansion ablation_decision=no_single_ablation_explains_morphology parameter_sweep_verdict=alcubierre_like_not_found source_coupling_redesign_verdict=source_coupling_redesign_still_natario_locked authoritative_morphology_change_observed=yes best_redesign_variant=nhm2_redesign_source_profile_simplified_signed redesign_first_drop_stage=none redesign_next_action=use_realized_lane_a_redesign_evidence
 - deeper_reformulation_verdict=deeper_reformulation_still_natario_locked authoritative_reformulation_change_observed=yes best_reformulation_variant=nhm2_reform_fore_aft_antisymmetric_driver reformulation_next_action=use_realized_reformulation_evidence
 - render_taxonomy authoritative=diagnostic_lane_a presentation=scientific_3p1_field comparison=comparison_panel

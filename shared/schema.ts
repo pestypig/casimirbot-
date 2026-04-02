@@ -266,8 +266,20 @@ export const warpGeometrySchema = z.object({
 });
 export type WarpGeometry = z.infer<typeof warpGeometrySchema>;
 
-export const warpFieldTypeSchema = z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]);
+export const warpFieldTypeSchema = z.enum([
+  "natario",
+  "natario_sdf",
+  "nhm2_shift_lapse",
+  "alcubierre",
+  "irrotational",
+]);
 export type WarpFieldType = z.infer<typeof warpFieldTypeSchema>;
+
+export const warpAlphaProfileKindSchema = z.enum(["unit", "linear_gradient_tapered"]);
+export type WarpAlphaProfileKind = z.infer<typeof warpAlphaProfileKindSchema>;
+
+export const warpAlphaInteriorSupportKindSchema = z.enum(["bubble_interior", "hull_interior"]);
+export type WarpAlphaInteriorSupportKind = z.infer<typeof warpAlphaInteriorSupportKindSchema>;
 
 export type TimeDilationRenderMode = "alcubierre" | "natario";
 export type TimeDilationDataSource = "gr-brick" | "lapse-brick" | "analytic-proxy" | "none";
@@ -1132,6 +1144,14 @@ export const dynamicConfigSchema = z.object({
   shiftAmplitude: z.number().positive().min(1e-15).max(1e-9).default(50e-12), // m (shift amplitude)
   expansionTolerance: z.number().positive().min(1e-15).max(1e-6).default(1e-12), // Zero-expansion tolerance
   warpFieldType: warpFieldTypeSchema.default("natario"), // Warp field type
+  gTarget: z.number().nonnegative().optional(),
+  epsilonTilt: z.number().nonnegative().max(5e-7).optional(),
+  betaTiltVec: vec3Schema.optional(),
+  alphaProfileKind: warpAlphaProfileKindSchema.optional(),
+  alphaCenterline: z.number().positive().optional(),
+  alphaGradientVec_m_inv: vec3Schema.optional(),
+  alphaInteriorSupportKind: warpAlphaInteriorSupportKindSchema.optional(),
+  alphaWallTaper_m: z.number().positive().optional(),
   warpGeometry: warpGeometrySchema.optional(),
   // Optional sweep controls (single point or arrays)
   gap_nm: z.union([z.number().positive(), z.array(z.number().positive())]).optional(),

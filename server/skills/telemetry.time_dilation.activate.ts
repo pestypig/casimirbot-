@@ -4,7 +4,9 @@ const DEFAULT_BASE_URL = "http://127.0.0.1:5173";
 
 const ActivateInput = z.object({
   baseUrl: z.string().url().optional(),
-  warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]).default("natario"),
+  warpFieldType: z
+    .enum(["natario", "natario_sdf", "nhm2_shift_lapse", "alcubierre", "irrotational"])
+    .default("natario"),
   grEnabled: z.boolean().default(true),
   publishDiagnostics: z.boolean().default(true),
   async: z.boolean().default(false),

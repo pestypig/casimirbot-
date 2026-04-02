@@ -1,7 +1,9 @@
+import { Buffer } from "node:buffer";
 import {
   computeTimeDilationRenderPlan,
   type TimeDilationRenderUiToggles,
 } from "./time-dilation-render-policy";
+import { evaluateWarpMetricLapseField } from "../modules/warp/warp-metric-adapter.js";
 
 type ProofValue = { value: unknown; proxy?: boolean };
 type ProofPack = { values?: Record<string, ProofValue> };
@@ -26,6 +28,8 @@ const THETA_WARP_PERCENTILE = 0.98;
 const GAMMA_WARP_PERCENTILE = 0.98;
 const SHEAR_WARP_PERCENTILE = 0.98;
 const SPEED_OF_LIGHT_MPS = 299_792_458;
+const SECONDS_PER_DAY = 86_400;
+const SECONDS_PER_YEAR = 365.25 * SECONDS_PER_DAY;
 
 const STAGE_RANK: Record<string, number> = {
   unstaged: -1,
@@ -278,6 +282,254 @@ const finiteVec3 = (value: unknown): [number, number, number] | null => {
   if (x == null || y == null || z == null) return null;
   return [x, y, z];
 };
+
+const decodeFloat32Channel = (channel: any): Float32Array | null => {
+  if (!channel || typeof channel.data !== "string") return null;
+  try {
+    const bytes = Buffer.from(channel.data, "base64");
+    return new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4));
+  } catch {
+    return null;
+  }
+};
+
+const sampleBrickFieldAtPoint = (
+  brick: any,
+  fieldId: string,
+  point: [number, number, number],
+): number | null => {
+  const dims = Array.isArray(brick?.dims) ? brick.dims : null;
+  const bounds = brick?.bounds;
+  const channel = brick?.channels?.[fieldId];
+  const data = decodeFloat32Channel(channel);
+  if (!dims || !bounds || !data || dims.length < 3) return null;
+  const [nx, ny, nz] = dims as [number, number, number];
+  const clampIndex = (value: number, size: number) =>
+    Math.max(0, Math.min(size - 1, value));
+  const xNorm = (point[0] - bounds.min[0]) / Math.max(1e-9, bounds.max[0] - bounds.min[0]);
+  const yNorm = (point[1] - bounds.min[1]) / Math.max(1e-9, bounds.max[1] - bounds.min[1]);
+  const zNorm = (point[2] - bounds.min[2]) / Math.max(1e-9, bounds.max[2] - bounds.min[2]);
+  const ix = clampIndex(Math.floor(xNorm * nx), nx);
+  const iy = clampIndex(Math.floor(yNorm * ny), ny);
+  const iz = clampIndex(Math.floor(zNorm * nz), nz);
+  const idx = iz * nx * ny + iy * nx + ix;
+  const value = data[idx];
+  return Number.isFinite(value) ? value : null;
+};
+
+const resolveLapseSummaryForCabinDiagnostics = (pipeline: any): any =>
+  (pipeline as any)?.warp?.lapseSummary ??
+  (pipeline as any)?.warp?.metricAdapter?.lapseSummary ??
+  null;
+
+const sampleAnalyticLapseAtPoint = (
+  pipeline: any,
+  point: [number, number, number],
+  axes: [number, number, number],
+): number | null => {
+  const lapseSummary = resolveLapseSummaryForCabinDiagnostics(pipeline);
+  if (!lapseSummary) return null;
+  const value = evaluateWarpMetricLapseField({
+    lapseSummary,
+    point,
+    hullAxes: axes,
+  });
+  return Number.isFinite(value) ? value : null;
+};
+
+const resolveCabinLapseDiagnostics = (
+  pipeline: any,
+  grBrick: any,
+  axes: [number, number, number],
+) => {
+  const lapseSummary = resolveLapseSummaryForCabinDiagnostics(pipeline);
+  const referenceCalibration = lapseSummary?.referenceCalibration ?? null;
+  const requestedSeparation =
+    toNumber(referenceCalibration?.targetCabinHeight_m) ?? null;
+  const maxSeparation = Math.max(1e-6, axes[2] * 2);
+  const cabinSampleSeparation =
+    requestedSeparation != null
+      ? Math.max(1e-6, Math.min(requestedSeparation, maxSeparation))
+      : Math.max(1e-6, axes[2] * 0.5);
+  const halfSpanZ = Math.max(1e-6, cabinSampleSeparation * 0.5);
+  const centerPoint: [number, number, number] = [0, 0, 0];
+  const topPoint: [number, number, number] = [0, 0, halfSpanZ];
+  const bottomPoint: [number, number, number] = [0, 0, -halfSpanZ];
+  const centerlineAlpha =
+    sampleBrickFieldAtPoint(grBrick, "alpha", centerPoint) ??
+    sampleAnalyticLapseAtPoint(pipeline, centerPoint, axes) ??
+    toNumber(lapseSummary?.alphaCenterline) ??
+    toNumber((pipeline as any)?.warp?.metricAdapter?.alpha);
+  const rawBrickCenterlineAlpha = sampleBrickFieldAtPoint(grBrick, "alpha", centerPoint);
+  const analyticCenterlineAlpha =
+    sampleAnalyticLapseAtPoint(pipeline, centerPoint, axes) ??
+    toNumber(lapseSummary?.alphaCenterline) ??
+    null;
+  const brickTopAlpha = sampleBrickFieldAtPoint(grBrick, "alpha", topPoint);
+  const brickBottomAlpha = sampleBrickFieldAtPoint(grBrick, "alpha", bottomPoint);
+  const usedAnalyticLapseSamples =
+    lapseSummary &&
+    (brickTopAlpha == null ||
+      brickBottomAlpha == null ||
+      Math.abs((brickTopAlpha ?? 0) - (brickBottomAlpha ?? 0)) < 1e-15);
+  let topAlpha = brickTopAlpha;
+  let bottomAlpha = brickBottomAlpha;
+  if (usedAnalyticLapseSamples) {
+    topAlpha = sampleAnalyticLapseAtPoint(pipeline, topPoint, axes);
+    bottomAlpha = sampleAnalyticLapseAtPoint(pipeline, bottomPoint, axes);
+  }
+  const analyticTopAlpha = sampleAnalyticLapseAtPoint(pipeline, topPoint, axes);
+  const analyticBottomAlpha = sampleAnalyticLapseAtPoint(pipeline, bottomPoint, axes);
+  const centerAccelGeom =
+    sampleBrickFieldAtPoint(grBrick, "eulerian_accel_geom_mag", centerPoint) ??
+    sampleBrickFieldAtPoint(grBrick, "eulerian_accel_geom_z", centerPoint);
+  const analyticSplitFraction =
+    usedAnalyticLapseSamples &&
+    centerlineAlpha != null &&
+    centerlineAlpha !== 0 &&
+    lapseSummary?.alphaGradientVec_m_inv
+      ? Math.abs(
+          Number(lapseSummary.alphaGradientVec_m_inv[0] ?? 0) * (topPoint[0] - bottomPoint[0]) +
+            Number(lapseSummary.alphaGradientVec_m_inv[1] ?? 0) * (topPoint[1] - bottomPoint[1]) +
+            Number(lapseSummary.alphaGradientVec_m_inv[2] ?? 0) * (topPoint[2] - bottomPoint[2]),
+        ) / Math.abs(centerlineAlpha)
+      : null;
+  const splitFraction =
+    analyticSplitFraction ??
+    (centerlineAlpha != null && topAlpha != null && bottomAlpha != null && centerlineAlpha !== 0
+      ? Math.abs(topAlpha - bottomAlpha) / Math.abs(centerlineAlpha)
+      : null);
+  const accelFromSplit =
+    topAlpha != null && bottomAlpha != null
+      ? Math.abs(Math.log(Math.max(1e-9, Math.abs(topAlpha))) - Math.log(Math.max(1e-9, Math.abs(bottomAlpha)))) /
+        Math.max(1e-9, 2 * halfSpanZ)
+      : null;
+  const analyticAccelGeom =
+    centerlineAlpha != null && lapseSummary?.alphaGradientVec_m_inv
+      ? Math.hypot(
+          Number(lapseSummary.alphaGradientVec_m_inv[0] ?? 0),
+          Number(lapseSummary.alphaGradientVec_m_inv[1] ?? 0),
+          Number(lapseSummary.alphaGradientVec_m_inv[2] ?? 0),
+        ) / Math.max(1e-9, Math.abs(centerlineAlpha))
+      : null;
+  const hasRawBrickGradient =
+    (centerAccelGeom != null && Math.abs(centerAccelGeom) > 0) ||
+    (!usedAnalyticLapseSamples &&
+      accelFromSplit != null &&
+      Math.abs(accelFromSplit) > 0);
+  const hasAnalyticGradientCompanion =
+    analyticAccelGeom != null && Math.abs(analyticAccelGeom) > 0;
+  const usedAnalyticGradientCompanion =
+    !hasRawBrickGradient && hasAnalyticGradientCompanion;
+  const gravityGradientGeom =
+    (usedAnalyticGradientCompanion && analyticAccelGeom != null && Math.abs(analyticAccelGeom) > 0
+      ? analyticAccelGeom
+      : null) ??
+    (centerAccelGeom != null && Math.abs(centerAccelGeom) > 0 ? centerAccelGeom : null) ??
+    (accelFromSplit != null && Math.abs(accelFromSplit) > 0 ? accelFromSplit : null) ??
+    analyticAccelGeom;
+  const centerlineAlphaSource =
+    rawBrickCenterlineAlpha != null
+      ? "gr_evolve_brick_alpha"
+      : analyticCenterlineAlpha != null
+        ? "analytic_lapse_summary_companion"
+        : "unavailable";
+  const topBottomAlphaSource = usedAnalyticLapseSamples
+    ? "analytic_lapse_summary_companion"
+    : brickTopAlpha != null && brickBottomAlpha != null
+      ? "gr_evolve_brick_alpha"
+      : "unavailable";
+  const gravityGradientSource =
+    usedAnalyticGradientCompanion && analyticAccelGeom != null
+      ? "analytic_lapse_summary_companion"
+      : centerAccelGeom != null && Math.abs(centerAccelGeom) > 0
+        ? "gr_evolve_brick_eulerian_accel"
+        : accelFromSplit != null && Math.abs(accelFromSplit) > 0
+          ? usedAnalyticLapseSamples
+            ? "analytic_lapse_summary_companion"
+            : "alpha_top_bottom_log_split"
+          : hasAnalyticGradientCompanion
+            ? "analytic_lapse_summary_companion"
+            : "unavailable";
+  const detailsSource =
+    usedAnalyticLapseSamples || usedAnalyticGradientCompanion
+      ? "analytic_lapse_summary_fallback"
+      : gravityGradientSource === "unavailable"
+        ? "unresolved_gravity_gradient"
+        : "gr_evolve_brick_alpha";
+  return {
+    valid:
+      centerlineAlpha != null &&
+      splitFraction != null &&
+      gravityGradientGeom != null,
+    centerline_alpha: centerlineAlpha,
+    centerline_dtau_dt: centerlineAlpha,
+    cabin_clock_split_fraction: splitFraction,
+    cabin_clock_split_per_day_s:
+      splitFraction != null ? splitFraction * SECONDS_PER_DAY : null,
+    cabin_clock_split_per_year_s:
+      splitFraction != null ? splitFraction * SECONDS_PER_YEAR : null,
+    cabin_gravity_gradient_geom: gravityGradientGeom,
+    cabin_gravity_gradient_si:
+      gravityGradientGeom != null ? gravityGradientGeom * SPEED_OF_LIGHT_MPS * SPEED_OF_LIGHT_MPS : null,
+    cabinSampleAxis: "z_zenith",
+    cabinSampleSeparation_m: 2 * halfSpanZ,
+    cabinSamplePolicy:
+      requestedSeparation != null
+        ? "reference_calibrated_symmetric_centerline_z"
+        : "symmetric_centerline_z_quarter_hull_v1",
+    details: {
+      source: detailsSource,
+      centerlineAlphaSource,
+      topBottomAlphaSource,
+      gravityGradientSource,
+      usedAnalyticLapseSamples: Boolean(usedAnalyticLapseSamples),
+      usedAnalyticGradientCompanion: Boolean(usedAnalyticGradientCompanion),
+      samplePoints: {
+        centerline: centerPoint,
+        top_z_zenith: topPoint,
+        bottom_z_zenith: bottomPoint,
+      },
+      sampleSeparation_m: 2 * halfSpanZ,
+      cabinSampleAxis: "z_zenith",
+      cabinSamplePolicy:
+        requestedSeparation != null
+          ? "reference_calibrated_symmetric_centerline_z"
+          : "symmetric_centerline_z_quarter_hull_v1",
+      rawBrickSamples: {
+        centerline_alpha: rawBrickCenterlineAlpha,
+        top_alpha: brickTopAlpha,
+        bottom_alpha: brickBottomAlpha,
+        eulerian_accel_geom_centerline: centerAccelGeom,
+      },
+      analyticCompanionSamples: {
+        centerline_alpha: analyticCenterlineAlpha,
+        top_alpha: analyticTopAlpha,
+        bottom_alpha: analyticBottomAlpha,
+        eulerian_accel_geom: analyticAccelGeom,
+      },
+      formulas: {
+        centerline_dtau_dt: "static cabin observer: dτ/dt = alpha(centerline)",
+        cabin_clock_split_fraction: "|alpha_top - alpha_bottom| / alpha_centerline",
+        cabin_gravity_gradient_geom:
+          "max(eulerian_accel_geom_mag(centerline), |ln(alpha_top)-ln(alpha_bottom)| / Δz)",
+      },
+    },
+    missingFields: [
+      centerlineAlpha == null ? "grBrick.channels.alpha" : null,
+      splitFraction == null ? "grBrick.channels.alpha[top/bottom]" : null,
+      gravityGradientGeom == null
+        ? "grBrick.channels.eulerian_accel_geom_mag"
+        : null,
+    ].filter((value): value is string => typeof value === "string"),
+  };
+};
+
+export const computeCabinLapseDiagnosticsFromBrick = (
+  pipeline: any,
+  grBrick: any,
+  axes: [number, number, number],
+) => resolveCabinLapseDiagnostics(pipeline, grBrick, axes);
 
 
 const finiteVec4 = (value: unknown): [number, number, number, number] | null => {
@@ -1104,6 +1356,63 @@ export async function buildTimeDilationDiagnostics(
       definitionId: "K",
       derivedFrom: "warp.metricAdapter.Ktrace",
     },
+    centerline_alpha: {
+      source: "gr_evolve_brick_alpha",
+      observer: "grid_static_local",
+      chart: canonical.chart,
+      units: "dimensionless",
+      definitionId: "adm_centerline_alpha_v1",
+      derivedFrom: "grBrick.channels.alpha",
+    },
+    centerline_dtau_dt: {
+      source: "gr_evolve_brick_alpha",
+      observer: "grid_static_local",
+      chart: canonical.chart,
+      units: "dimensionless",
+      definitionId: "adm_centerline_dtau_dt_v1",
+      derivedFrom: "centerline_alpha",
+    },
+    cabin_clock_split_fraction: {
+      source: "gr_evolve_brick_alpha",
+      observer: "grid_static_top_bottom_z_zenith",
+      chart: canonical.chart,
+      units: "dimensionless",
+      definitionId: "adm_cabin_clock_split_fraction_v1",
+      derivedFrom: "grBrick.channels.alpha",
+    },
+    cabin_clock_split_per_day_s: {
+      source: "derived:cabin_clock_split_fraction*seconds_per_day",
+      observer: "grid_static_top_bottom_z_zenith",
+      chart: canonical.chart,
+      units: "s/day",
+      definitionId: "adm_cabin_clock_split_per_day_v1",
+      derivedFrom: "cabin_clock_split_fraction",
+    },
+    cabin_clock_split_per_year_s: {
+      source: "derived:cabin_clock_split_fraction*seconds_per_year",
+      observer: "grid_static_top_bottom_z_zenith",
+      chart: canonical.chart,
+      units: "s/year",
+      definitionId: "adm_cabin_clock_split_per_year_v1",
+      derivedFrom: "cabin_clock_split_fraction",
+    },
+    cabin_gravity_gradient_geom: {
+      source: "gr_evolve_brick_eulerian_accel_geom",
+      observer: "eulerian_n_local",
+      chart: canonical.chart,
+      units: "1/m",
+      definitionId: "adm_cabin_gravity_gradient_geom_v1",
+      derivedFrom:
+        "grBrick.channels.eulerian_accel_geom_mag || ln(alpha_top/alpha_bottom)/delta_z",
+    },
+    cabin_gravity_gradient_si: {
+      source: "derived:c^2*cabin_gravity_gradient_geom",
+      observer: "eulerian_n_local",
+      chart: canonical.chart,
+      units: "m/s^2",
+      definitionId: "adm_cabin_gravity_gradient_si_v1",
+      derivedFrom: "cabin_gravity_gradient_geom",
+    },
     ...provenanceBase,
   };
 
@@ -1138,6 +1447,7 @@ export async function buildTimeDilationDiagnostics(
   const shipComovingDtauDt = resolveShipComovingDtauDt(pipeline, proofPack);
   const tidalIndicator = resolveTidalIndicator(pipeline, proofPack);
   const redshift = resolveRedshiftDiagnostics(pipeline, proofPack, canonical);
+  const cabinLapse = resolveCabinLapseDiagnostics(pipeline, grBrick, axes);
 
   if (congruenceKind === "ship_comoving" && !shipComovingDtauDt.valid) {
     congruenceRequirements.requiredFieldsOk = false;
@@ -1195,6 +1505,63 @@ export async function buildTimeDilationDiagnostics(
       units: tidalIndicator.units,
       definitionId: tidalIndicator.provenance.definitionId,
       derivedFrom: tidalIndicator.provenance.derivedFrom,
+    },
+    centerline_alpha: {
+      source: "gr_evolve_brick_alpha",
+      observer: "grid_static_local",
+      chart: canonical.chart,
+      units: "dimensionless",
+      definitionId: "adm_centerline_alpha_v1",
+      derivedFrom: "grBrick.channels.alpha",
+    },
+    centerline_dtau_dt: {
+      source: "gr_evolve_brick_alpha",
+      observer: "grid_static_local",
+      chart: canonical.chart,
+      units: "dimensionless",
+      definitionId: "adm_centerline_dtau_dt_v1",
+      derivedFrom: "centerline_alpha",
+    },
+    cabin_clock_split_fraction: {
+      source: "gr_evolve_brick_alpha",
+      observer: "grid_static_top_bottom_z_zenith",
+      chart: canonical.chart,
+      units: "dimensionless",
+      definitionId: "adm_cabin_clock_split_fraction_v1",
+      derivedFrom: "grBrick.channels.alpha",
+    },
+    cabin_clock_split_per_day_s: {
+      source: "derived:cabin_clock_split_fraction*seconds_per_day",
+      observer: "grid_static_top_bottom_z_zenith",
+      chart: canonical.chart,
+      units: "s/day",
+      definitionId: "adm_cabin_clock_split_per_day_v1",
+      derivedFrom: "cabin_clock_split_fraction",
+    },
+    cabin_clock_split_per_year_s: {
+      source: "derived:cabin_clock_split_fraction*seconds_per_year",
+      observer: "grid_static_top_bottom_z_zenith",
+      chart: canonical.chart,
+      units: "s/year",
+      definitionId: "adm_cabin_clock_split_per_year_v1",
+      derivedFrom: "cabin_clock_split_fraction",
+    },
+    cabin_gravity_gradient_geom: {
+      source: "gr_evolve_brick_eulerian_accel_geom",
+      observer: "eulerian_n_local",
+      chart: canonical.chart,
+      units: "1/m",
+      definitionId: "adm_cabin_gravity_gradient_geom_v1",
+      derivedFrom:
+        "grBrick.channels.eulerian_accel_geom_mag || ln(alpha_top/alpha_bottom)/delta_z",
+    },
+    cabin_gravity_gradient_si: {
+      source: "derived:c^2*cabin_gravity_gradient_geom",
+      observer: "eulerian_n_local",
+      chart: canonical.chart,
+      units: "m/s^2",
+      definitionId: "adm_cabin_gravity_gradient_si_v1",
+      derivedFrom: "cabin_gravity_gradient_geom",
     },
   };
 
@@ -1265,6 +1632,90 @@ export async function buildTimeDilationDiagnostics(
       proxy: redshift.proxy,
       unavailable: redshift.unavailable,
     },
+  };
+
+  observables.centerline_alpha = {
+    source: "gr_evolve_brick_alpha",
+    observerFamily: "grid_static",
+    chart: canonical.chart,
+    units: "dimensionless",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.centerline_alpha,
+    formula: "alpha(centerline)",
+    details: cabinLapse.details,
+  };
+
+  observables.centerline_dtau_dt = {
+    source: "gr_evolve_brick_alpha",
+    observerFamily: "grid_static",
+    chart: canonical.chart,
+    units: "dimensionless",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.centerline_dtau_dt,
+    formula: "d tau / dt = alpha(centerline) for a static local cabin observer",
+    details: cabinLapse.details,
+  };
+
+  observables.cabin_clock_split_fraction = {
+    source: "gr_evolve_brick_alpha",
+    observerFamily: "grid_static",
+    chart: canonical.chart,
+    units: "dimensionless",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.cabin_clock_split_fraction,
+    formula: "|alpha_top - alpha_bottom| / alpha_centerline",
+    details: cabinLapse.details,
+  };
+
+  observables.cabin_clock_split_per_day_s = {
+    source: "derived:cabin_clock_split_fraction*seconds_per_day",
+    observerFamily: "grid_static",
+    chart: canonical.chart,
+    units: "s/day",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.cabin_clock_split_per_day_s,
+    formula: "cabin_clock_split_fraction * 86400",
+    details: cabinLapse.details,
+  };
+
+  observables.cabin_clock_split_per_year_s = {
+    source: "derived:cabin_clock_split_fraction*seconds_per_year",
+    observerFamily: "grid_static",
+    chart: canonical.chart,
+    units: "s/year",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.cabin_clock_split_per_year_s,
+    formula: "cabin_clock_split_fraction * 31557600",
+    details: cabinLapse.details,
+  };
+
+  observables.cabin_gravity_gradient_geom = {
+    source: "gr_evolve_brick_eulerian_accel_geom",
+    observerFamily: "eulerian_adm",
+    chart: canonical.chart,
+    units: "1/m",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.cabin_gravity_gradient_geom,
+    formula: "partial_i alpha / alpha or finite-difference ln(alpha) / delta_z",
+    details: cabinLapse.details,
+  };
+
+  observables.cabin_gravity_gradient_si = {
+    source: "derived:c^2*cabin_gravity_gradient_geom",
+    observerFamily: "eulerian_adm",
+    chart: canonical.chart,
+    units: "m/s^2",
+    valid: cabinLapse.valid,
+    missingFields: cabinLapse.missingFields,
+    value: cabinLapse.cabin_gravity_gradient_si,
+    formula: "c^2 * (partial_i alpha / alpha)",
+    details: cabinLapse.details,
   };
 
   const divBetaRms = toNumber((pipeline as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);

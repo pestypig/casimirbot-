@@ -42,7 +42,9 @@ let controlCommandSeq = 0;
 
 const ActivateSchema = z.object({
   baseUrl: z.string().url().optional(),
-  warpFieldType: z.enum(["natario", "natario_sdf", "alcubierre", "irrotational"]).default("natario"),
+  warpFieldType: z
+    .enum(["natario", "natario_sdf", "nhm2_shift_lapse", "alcubierre", "irrotational"])
+    .default("natario"),
   grEnabled: z.boolean().default(true),
   strictCongruence: z.boolean().optional(),
   applyCanonicalHull: z.boolean().optional(),

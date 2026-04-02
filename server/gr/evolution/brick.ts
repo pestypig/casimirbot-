@@ -349,6 +349,71 @@ const buildDerivedFields = (state: BssnState) => {
   return { g_tt, clockRate_static, theta, det_gamma };
 };
 
+const buildLapseGradientFields = (
+  state: BssnState,
+  stencils?: StencilParams,
+) => {
+  const total = state.alpha.length;
+  const alpha_grad_x = new Float32Array(total);
+  const alpha_grad_y = new Float32Array(total);
+  const alpha_grad_z = new Float32Array(total);
+  const eulerian_accel_geom_x = new Float32Array(total);
+  const eulerian_accel_geom_y = new Float32Array(total);
+  const eulerian_accel_geom_z = new Float32Array(total);
+  const eulerian_accel_geom_mag = new Float32Array(total);
+  const beta_over_alpha_mag = new Float32Array(total);
+  const grid = state.grid;
+  const [nx, ny, nz] = grid.dims;
+  const order = stencils?.order ?? 2;
+  const boundary = normalizeBoundary(stencils?.boundary);
+  const stencil = { order, boundary };
+  let idx = 0;
+  for (let k = 0; k < nz; k += 1) {
+    for (let j = 0; j < ny; j += 1) {
+      for (let i = 0; i < nx; i += 1) {
+        const gradX = diff1(state.alpha, i, j, k, 0, grid, stencil);
+        const gradY = diff1(state.alpha, i, j, k, 1, grid, stencil);
+        const gradZ = diff1(state.alpha, i, j, k, 2, grid, stencil);
+        alpha_grad_x[idx] = Number.isFinite(gradX) ? gradX : 0;
+        alpha_grad_y[idx] = Number.isFinite(gradY) ? gradY : 0;
+        alpha_grad_z[idx] = Number.isFinite(gradZ) ? gradZ : 0;
+        const alphaRaw = state.alpha[idx];
+        const alphaSafe = clampNumber(
+          Number.isFinite(alphaRaw) ? Math.abs(alphaRaw) : ALPHA_MIN,
+          ALPHA_MIN,
+          ALPHA_MAX,
+        );
+        const accelX = alpha_grad_x[idx] / alphaSafe;
+        const accelY = alpha_grad_y[idx] / alphaSafe;
+        const accelZ = alpha_grad_z[idx] / alphaSafe;
+        eulerian_accel_geom_x[idx] = Number.isFinite(accelX) ? accelX : 0;
+        eulerian_accel_geom_y[idx] = Number.isFinite(accelY) ? accelY : 0;
+        eulerian_accel_geom_z[idx] = Number.isFinite(accelZ) ? accelZ : 0;
+        const accelMag = Math.hypot(
+          eulerian_accel_geom_x[idx],
+          eulerian_accel_geom_y[idx],
+          eulerian_accel_geom_z[idx],
+        );
+        eulerian_accel_geom_mag[idx] = Number.isFinite(accelMag) ? accelMag : 0;
+        const betaMag = Math.hypot(state.beta_x[idx], state.beta_y[idx], state.beta_z[idx]);
+        const ratio = betaMag / alphaSafe;
+        beta_over_alpha_mag[idx] = Number.isFinite(ratio) ? ratio : 0;
+        idx += 1;
+      }
+    }
+  }
+  return {
+    alpha_grad_x,
+    alpha_grad_y,
+    alpha_grad_z,
+    eulerian_accel_geom_x,
+    eulerian_accel_geom_y,
+    eulerian_accel_geom_z,
+    eulerian_accel_geom_mag,
+    beta_over_alpha_mag,
+  };
+};
+
 const buildCurvatureScalars = (
   state: BssnState,
   constraints?: ConstraintFields | null,
@@ -1203,6 +1268,7 @@ export const buildEvolutionBrick = ({
     channelOrder.push(key);
   }
   const derived = buildDerivedFields(state);
+  const lapseGradient = buildLapseGradientFields(state, stencils);
   channels.g_tt = buildChannelFromArray(derived.g_tt);
   channelOrder.push("g_tt");
   channels.clockRate_static = buildChannelFromArray(derived.clockRate_static);
@@ -1211,6 +1277,24 @@ export const buildEvolutionBrick = ({
   channelOrder.push("theta");
   channels.det_gamma = buildChannelFromArray(derived.det_gamma);
   channelOrder.push("det_gamma");
+  channels.alpha_grad_x = buildChannelFromArray(lapseGradient.alpha_grad_x);
+  channels.alpha_grad_y = buildChannelFromArray(lapseGradient.alpha_grad_y);
+  channels.alpha_grad_z = buildChannelFromArray(lapseGradient.alpha_grad_z);
+  channels.eulerian_accel_geom_x = buildChannelFromArray(lapseGradient.eulerian_accel_geom_x);
+  channels.eulerian_accel_geom_y = buildChannelFromArray(lapseGradient.eulerian_accel_geom_y);
+  channels.eulerian_accel_geom_z = buildChannelFromArray(lapseGradient.eulerian_accel_geom_z);
+  channels.eulerian_accel_geom_mag = buildChannelFromArray(lapseGradient.eulerian_accel_geom_mag);
+  channels.beta_over_alpha_mag = buildChannelFromArray(lapseGradient.beta_over_alpha_mag);
+  channelOrder.push(
+    "alpha_grad_x",
+    "alpha_grad_y",
+    "alpha_grad_z",
+    "eulerian_accel_geom_x",
+    "eulerian_accel_geom_y",
+    "eulerian_accel_geom_z",
+    "eulerian_accel_geom_mag",
+    "beta_over_alpha_mag",
+  );
   const curvature = buildCurvatureScalars(state, constraints ?? null, matter ?? null);
   channels.ricci3 = buildChannelFromArray(curvature.ricci3);
   channelOrder.push("ricci3");

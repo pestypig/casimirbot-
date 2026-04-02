@@ -41,6 +41,30 @@ describe("natario metric-derived T00", () => {
     expect(Number.isFinite(result.stressEnergyTensor.T00)).toBe(true);
   });
 
+  it("emits a distinct metric-derived source and lapse summary for nhm2_shift_lapse", () => {
+    const result = calculateNatarioWarpBubble({
+      ...baseParams,
+      warpFieldType: "nhm2_shift_lapse",
+      warpGridResolution: 12,
+      alphaCenterline: 0.995,
+      alphaGradientVec_m_inv: [0, 0, 5e-5],
+      alphaInteriorSupportKind: "hull_interior",
+      alphaWallTaper_m: 8,
+    });
+    expect(result.stressEnergySource).toBe("metric");
+    expect(result.metricT00Source).toBe("metric");
+    expect(result.metricT00Ref).toBe("warp.metric.T00.nhm2.shift_lapse");
+    expect(result.metricAdapter?.family).toBe("nhm2_shift_lapse");
+    expect(result.metricAdapter?.alpha).toBeCloseTo(0.995, 8);
+    expect(result.lapseSummary).toEqual(
+      expect.objectContaining({
+        alphaCenterline: 0.995,
+        alphaProfileKind: "linear_gradient_tapered",
+        alphaGradientAxis: "z_zenith",
+      }),
+    );
+  });
+
   it("uses metric-derived stress for irrotational fallback path", () => {
     const result = calculateNatarioWarpBubble({
       ...baseParams,
@@ -78,5 +102,25 @@ describe("natario metric-derived T00", () => {
     const center = result.shiftVectorField.evaluateShiftVector(0, 0, 0);
     expect(center[1]).toBeLessThan(0);
     expect(Math.abs(center[1])).toBeGreaterThan(1e-10);
+  });
+
+  it("keeps current Natario unit-lapse semantics even when lapse inputs are present", () => {
+    const result = calculateNatarioWarpBubble({
+      ...baseParams,
+      warpFieldType: "natario",
+      alphaCenterline: 0.9,
+      alphaGradientVec_m_inv: [0, 0, 1e-3],
+      alphaProfileKind: "linear_gradient_tapered",
+      alphaInteriorSupportKind: "bubble_interior",
+      alphaWallTaper_m: 4,
+      epsilonTilt: 2e-7,
+      betaTiltVec: [0, -1, 0],
+    });
+    expect(result.metricT00Ref).toBe("warp.metric.T00.natario.shift");
+    expect(result.metricAdapter?.family).toBe("natario");
+    expect(result.metricAdapter?.alpha).toBe(1);
+    expect(result.lapseSummary).toBeUndefined();
+    const center = result.shiftVectorField.evaluateShiftVector(0, 0, 0);
+    expect(center[1]).toBeLessThan(0);
   });
 });

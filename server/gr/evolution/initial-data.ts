@@ -1,6 +1,7 @@
 import {
   createMinkowskiState,
   gridFromBounds,
+  type BssnState,
   type GridSpec,
 } from "../../../modules/gr/bssn-state.ts";
 import {
@@ -182,6 +183,7 @@ const solveLichnerowiczYorkJacobi = (
 
 export interface InitialDataSolveParams {
   grid?: GridSpec;
+  initialState?: BssnState;
   dims?: [number, number, number];
   bounds?: Bounds;
   iterations?: number;
@@ -212,6 +214,7 @@ export interface InitialDataSolveResult {
 
 export const runInitialDataSolve = ({
   grid,
+  initialState,
   dims = [128, 128, 128],
   bounds,
   iterations = 120,
@@ -224,6 +227,13 @@ export const runInitialDataSolve = ({
   sourceOptions,
 }: InitialDataSolveParams): InitialDataSolveResult => {
   const resolvedGrid = grid ?? gridFromBounds(dims, bounds ?? defaultBounds());
+  if (initialState) {
+    const [ix, iy, iz] = initialState.grid.dims;
+    const [rx, ry, rz] = resolvedGrid.dims;
+    if (ix !== rx || iy !== ry || iz !== rz) {
+      throw new Error("Initial data state dims do not match requested grid");
+    }
+  }
   let matterFields = matter ?? null;
   let sourceBrick: StressEnergyBrick | undefined;
 
@@ -259,7 +269,7 @@ export const runInitialDataSolve = ({
     clampedTolerance,
   );
 
-  const state = createMinkowskiState(resolvedGrid);
+  const state = initialState ?? createMinkowskiState(resolvedGrid);
   for (let i = 0; i < state.phi.length; i += 1) {
     const psiVal = solve.psi[i] ?? 1;
     const safePsi = Math.max(MIN_PSI, psiVal);

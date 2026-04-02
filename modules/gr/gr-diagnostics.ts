@@ -5,6 +5,8 @@ import { diff1 } from "./stencils.ts";
 export type ShiftStiffnessMetrics = {
   betaMaxAbs: number;
   betaP98Abs: number;
+  betaOverAlphaMax: number;
+  betaOverAlphaP98: number;
   gradBetaMaxAbs: number;
   gradBetaP98Abs: number;
   advectiveCflSuggested: number;
@@ -52,8 +54,10 @@ export const computeShiftStiffnessMetrics = (
     : DEFAULT_CFL_TARGET;
 
   const betaSamples: number[] = [];
+  const betaOverAlphaSamples: number[] = [];
   const gradSamples: number[] = [];
   let betaMaxAbs = 0;
+  let betaOverAlphaMax = 0;
   let gradBetaMaxAbs = 0;
   let charSpeedSuggested = 0;
 
@@ -90,13 +94,16 @@ export const computeShiftStiffnessMetrics = (
         const gradMag = Number.isFinite(gradSq) ? Math.sqrt(gradSq) : 0;
         if (gradMag > gradBetaMaxAbs) gradBetaMaxAbs = gradMag;
 
-        if (idx % stride === 0) {
-          betaSamples.push(betaMag);
-          gradSamples.push(gradMag);
-        }
-
         const alphaRaw = state.alpha[idx];
         const alphaAbs = Number.isFinite(alphaRaw) ? Math.abs(alphaRaw) : 0;
+        const alphaSafe = Math.max(1e-6, alphaAbs);
+        const betaOverAlpha = betaMag / alphaSafe;
+        if (betaOverAlpha > betaOverAlphaMax) betaOverAlphaMax = betaOverAlpha;
+        if (idx % stride === 0) {
+          betaSamples.push(betaMag);
+          betaOverAlphaSamples.push(betaOverAlpha);
+          gradSamples.push(gradMag);
+        }
         const gxx = state.gamma_xx[idx];
         const gyy = state.gamma_yy[idx];
         const gzz = state.gamma_zz[idx];
@@ -120,6 +127,7 @@ export const computeShiftStiffnessMetrics = (
   }
 
   const betaP98Abs = percentile(betaSamples, P98);
+  const betaOverAlphaP98 = percentile(betaOverAlphaSamples, P98);
   const gradBetaP98Abs = percentile(gradSamples, P98);
   const betaSafe = Math.max(1e-12, betaMaxAbs);
   const charSafe = Math.max(1e-12, charSpeedSuggested);
@@ -138,6 +146,8 @@ export const computeShiftStiffnessMetrics = (
   return {
     betaMaxAbs,
     betaP98Abs,
+    betaOverAlphaMax,
+    betaOverAlphaP98,
     gradBetaMaxAbs,
     gradBetaP98Abs,
     advectiveCflSuggested,
