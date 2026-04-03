@@ -75,7 +75,20 @@ client/public/originals/*
 *.bak
 
 # Local artifacts and model weights (keep repo lean)
-/artifacts/
+/artifacts/*
+!/artifacts/research/
+/artifacts/research/*
+!/artifacts/research/full-solve/
+/artifacts/research/full-solve/*
+!/artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json
+!/artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json
+!/artifacts/research/full-solve/nhm2-route-time-worldline-latest.json
+!/artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json
+!/artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json
+!/artifacts/research/full-solve/nhm2-cruise-envelope-latest.json
+!/artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json
+!/artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json
+!/artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json
 /models/
 /.cache/
 /tmp/

@@ -4,6 +4,13 @@ import {
   type TimeDilationRenderUiToggles,
 } from "./time-dilation-render-policy";
 import { evaluateWarpMetricLapseField } from "../modules/warp/warp-metric-adapter.js";
+import {
+  isCertifiedWarpWorldlineContract,
+  resolveWarpWorldlineRepresentativeSample,
+} from "./contracts/warp-worldline-contract.v1";
+import { isCertifiedWarpRouteTimeWorldlineContract } from "./contracts/warp-route-time-worldline.v1";
+import { isCertifiedWarpMissionTimeEstimatorContract } from "./contracts/warp-mission-time-estimator.v1";
+import { isCertifiedWarpMissionTimeComparisonContract } from "./contracts/warp-mission-time-comparison.v1";
 
 type ProofValue = { value: unknown; proxy?: boolean };
 type ProofPack = { values?: Record<string, ProofValue> };
@@ -102,6 +109,107 @@ export type TimeDilationDiagnostics = {
     };
   };
   redshift: RedshiftDiagnostics;
+  transport: {
+    warpWorldline: {
+      status: "solve_backed" | "proxy" | "unavailable";
+      certified: boolean;
+      contractVersion: string | null;
+      sourceSurface: string | null;
+      observerFamily: string | null;
+      chart: string | null;
+      validityRegimeId: string | null;
+      representativeSampleId: string | null;
+      sampleGeometryFamilyId: string | null;
+      sampleCount: number;
+      dtau_dt: number | null;
+      dtau_dt_bounds: { min: number | null; max: number | null };
+      normalizationResidual: number | null;
+      shipProperTimeSemantics: string;
+      transportInterpretation: string | null;
+      transportVariationStatus: string | null;
+      transportInformativenessStatus: string | null;
+      sampleFamilyAdequacy: string | null;
+      flatnessInterpretation: string | null;
+      certifiedTransportMeaning: string | null;
+      eligibleNextProducts: string[];
+      routeTimeStatus: "deferred";
+      provenanceClass: "solve_backed" | "proxy" | "unavailable";
+      claimBoundary: string[];
+      falsifierConditions: string[];
+      unavailableReason: string | null;
+    };
+    warpRouteTimeWorldline: {
+      status: "solve_backed" | "unavailable";
+      certified: boolean;
+      contractVersion: string | null;
+      sourceSurface: string | null;
+      observerFamily: string | null;
+      chart: string | null;
+      routeModelId: string | null;
+      routeParameterName: string | null;
+      validityRegimeId: string | null;
+      progressionSampleCount: number;
+      coordinateTimeSummary: { start: number | null; end: number | null; span: number | null };
+      properTimeSummary: { start: number | null; end: number | null; span: number | null };
+      descriptorScheduleSummary: { min: number | null; max: number | null; spread: number | null };
+      sampleFamilyAdequacy: string | null;
+      transportVariationStatus: string | null;
+      transportInformativenessStatus: string | null;
+      routeTimeStatus: string | null;
+      nextEligibleProducts: string[];
+      shipProperTimeSemantics: string;
+      claimBoundary: string[];
+      falsifierConditions: string[];
+      unavailableReason: string | null;
+    };
+    warpMissionTimeEstimator: {
+      status: "solve_backed" | "unavailable";
+      certified: boolean;
+      contractVersion: string | null;
+      sourceSurface: string | null;
+      observerFamily: string | null;
+      chart: string | null;
+      estimatorModelId: string | null;
+      targetId: string | null;
+      targetName: string | null;
+      targetFrame: string | null;
+      coordinateTimeEstimate: { seconds: number | null; years: number | null };
+      properTimeEstimate: { seconds: number | null; years: number | null };
+      routeTimeStatus: string | null;
+      comparisonReadiness: string | null;
+      nextEligibleProducts: string[];
+      shipProperTimeSemantics: string;
+      claimBoundary: string[];
+      falsifierConditions: string[];
+      nonClaims: string[];
+      unavailableReason: string | null;
+    };
+    warpMissionTimeComparison: {
+      status: "solve_backed" | "unavailable";
+      certified: boolean;
+      contractVersion: string | null;
+      sourceSurface: string | null;
+      observerFamily: string | null;
+      chart: string | null;
+      comparisonModelId: string | null;
+      targetId: string | null;
+      targetName: string | null;
+      targetFrame: string | null;
+      warpCoordinateTimeEstimate: { seconds: number | null; years: number | null };
+      warpProperTimeEstimate: { seconds: number | null; years: number | null };
+      classicalReferenceTimeEstimate: { seconds: number | null; years: number | null };
+      comparisonInterpretationStatus: string | null;
+      properMinusCoordinateSeconds: number | null;
+      properMinusClassicalSeconds: number | null;
+      comparisonReadiness: string | null;
+      deferredComparators: string[];
+      shipProperTimeSemantics: string;
+      claimBoundary: string[];
+      falsifierConditions: string[];
+      nonClaims: string[];
+      unavailableReason: string | null;
+    };
+  };
   provenance: Record<string, {
     source: string;
     observer: string | null;
@@ -545,8 +653,38 @@ const finiteVec4 = (value: unknown): [number, number, number, number] | null => 
 const dot4 = (a: [number, number, number, number], b: [number, number, number, number]) =>
   a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
 
+const resolveCertifiedWarpWorldline = (pipeline: any) =>
+  isCertifiedWarpWorldlineContract((pipeline as any)?.warpWorldline)
+    ? (pipeline as any).warpWorldline
+    : null;
+
+const resolveCertifiedWarpRouteTimeWorldline = (pipeline: any) =>
+  isCertifiedWarpRouteTimeWorldlineContract((pipeline as any)?.warpRouteTimeWorldline)
+    ? (pipeline as any).warpRouteTimeWorldline
+    : null;
+
+const resolveCertifiedWarpMissionTimeEstimator = (pipeline: any) =>
+  isCertifiedWarpMissionTimeEstimatorContract((pipeline as any)?.warpMissionTimeEstimator)
+    ? (pipeline as any).warpMissionTimeEstimator
+    : null;
+
+const resolveCertifiedWarpMissionTimeComparison = (pipeline: any) =>
+  isCertifiedWarpMissionTimeComparisonContract(
+    (pipeline as any)?.warpMissionTimeComparison,
+  )
+    ? (pipeline as any).warpMissionTimeComparison
+    : null;
+
 const resolveShipWorldline = (pipeline: any): { dxdt: [number, number, number] | null; source: string | null } => {
+  const certifiedWorldline = resolveCertifiedWarpWorldline(pipeline);
+  const representativeSample = resolveWarpWorldlineRepresentativeSample(certifiedWorldline);
   const candidates: Array<{ value: unknown; source: string }> = [
+    {
+      value: representativeSample?.coordinateVelocity,
+      source: representativeSample
+        ? `pipeline.warpWorldline.samples.${representativeSample.sampleId}.coordinateVelocity`
+        : "pipeline.warpWorldline.samples.representative.coordinateVelocity",
+    },
     { value: pipeline?.shipKinematics?.dxdt, source: "pipeline.shipKinematics.dxdt" },
     { value: pipeline?.shipKinematics?.dxdt_mps, source: "pipeline.shipKinematics.dxdt_mps" },
     { value: pipeline?.shipKinematics?.velocity_mps, source: "pipeline.shipKinematics.velocity_mps" },
@@ -561,6 +699,42 @@ const resolveShipWorldline = (pipeline: any): { dxdt: [number, number, number] |
 };
 
 const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) => {
+  const certifiedWorldline = resolveCertifiedWarpWorldline(pipeline);
+  const representativeSample = resolveWarpWorldlineRepresentativeSample(certifiedWorldline);
+  if (certifiedWorldline && representativeSample) {
+    return {
+      status: "solve_backed" as const,
+      valid: representativeSample.dtau_dt > 0,
+      missingFields: [] as string[],
+      value: representativeSample.dtau_dt,
+      details: {
+        worldlineSource: "pipeline.warpWorldline",
+        contractVersion: certifiedWorldline.contractVersion,
+        sourceSurface: certifiedWorldline.sourceSurface,
+        sampleId: representativeSample.sampleId,
+        sampleRole: representativeSample.sampleRole,
+        sampleCount: certifiedWorldline.samples.length,
+        representativeSampleId: certifiedWorldline.representativeSampleId,
+        sampleGeometry: certifiedWorldline.sampleGeometry,
+        coordinateVelocity: representativeSample.coordinateVelocity,
+        betaCoord: representativeSample.betaCoord,
+        effectiveTransportVelocityCoord: representativeSample.effectiveTransportVelocityCoord,
+        transportInterpretation: certifiedWorldline.transportInterpretation,
+        transportVariation: certifiedWorldline.transportVariation,
+        transportInformativenessStatus: certifiedWorldline.transportInformativenessStatus,
+        sampleFamilyAdequacy: certifiedWorldline.sampleFamilyAdequacy,
+        flatnessInterpretation: certifiedWorldline.flatnessInterpretation,
+        certifiedTransportMeaning: certifiedWorldline.certifiedTransportMeaning,
+        eligibleNextProducts: certifiedWorldline.eligibleNextProducts,
+        normalizationResidual: representativeSample.normalizationResidual,
+        claimBoundary: certifiedWorldline.claimBoundary,
+        falsifierConditions: certifiedWorldline.falsifierConditions,
+        certified: true,
+        solveBacked: true,
+      },
+    };
+  }
+
   const missingFields: string[] = [];
   const alpha = toNumber((pipeline as any)?.warp?.metricAdapter?.alpha) ?? toNumber(readProofString(proofPack, "metric_alpha"));
   const gammaDiag = finiteVec3((pipeline as any)?.warp?.metricAdapter?.gammaDiag) ?? [
@@ -582,7 +756,13 @@ const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) =
 
   const valid = missingFields.length === 0;
   if (!valid) {
-    return { valid, missingFields, value: null, details: { worldlineSource } };
+    return {
+      status: "unavailable" as const,
+      valid,
+      missingFields,
+      value: null,
+      details: { worldlineSource, solveBacked: false },
+    };
   }
 
   const vRaw = dxdt as [number, number, number];
@@ -603,6 +783,7 @@ const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) =
   const underRoot = (alpha as number) * (alpha as number) - spatialTerm;
 
   return {
+    status: "proxy" as const,
     valid: underRoot > 0,
     missingFields,
     value: underRoot > 0 ? Math.sqrt(underRoot) : null,
@@ -615,6 +796,7 @@ const resolveShipComovingDtauDt = (pipeline: any, proofPack: ProofPack | null) =
       gammaDiag: gamma,
       alpha,
       underRoot,
+      solveBacked: false,
     },
   };
 };
@@ -1623,7 +1805,12 @@ export async function buildTimeDilationDiagnostics(
   );
 
   observables.ship_comoving_dtau_dt = {
-    source: "adm_worldline",
+    source:
+      shipComovingDtauDt.status === "solve_backed"
+        ? "warp_worldline_contract"
+        : shipComovingDtauDt.status === "proxy"
+          ? "adm_worldline_proxy"
+          : "adm_worldline_unavailable",
     observerFamily: "ship_comoving",
     chart: canonical.chart,
     units: "dimensionless",
@@ -1631,7 +1818,10 @@ export async function buildTimeDilationDiagnostics(
     missingFields: shipComovingDtauDt.missingFields,
     value: shipComovingDtauDt.value,
     formula: "dτ/dt = sqrt(alpha^2 - gamma_ij (dx^i/dt + beta^i)(dx^j/dt + beta^j))",
-    details: shipComovingDtauDt.details,
+    details: {
+      status: shipComovingDtauDt.status,
+      ...shipComovingDtauDt.details,
+    },
   };
 
   observables.tidal_indicator = {
@@ -1792,6 +1982,267 @@ export async function buildTimeDilationDiagnostics(
         : thetaKStatus === "fail"
           ? "natario_theta_k_consistency_failed"
           : "natario_constraints_unknown";
+  const certifiedWarpWorldline = resolveCertifiedWarpWorldline(pipeline);
+  const certifiedWarpRouteTimeWorldline =
+    resolveCertifiedWarpRouteTimeWorldline(pipeline);
+  const certifiedWarpMissionTimeEstimator =
+    resolveCertifiedWarpMissionTimeEstimator(pipeline);
+  const certifiedWarpMissionTimeComparison =
+    resolveCertifiedWarpMissionTimeComparison(pipeline);
+  const representativeWorldlineSample = resolveWarpWorldlineRepresentativeSample(
+    certifiedWarpWorldline,
+  );
+  const transportSummary = {
+    warpWorldline: {
+      status: certifiedWarpWorldline
+        ? ("solve_backed" as const)
+        : shipComovingDtauDt.status === "proxy"
+          ? ("proxy" as const)
+          : ("unavailable" as const),
+      certified: Boolean(certifiedWarpWorldline),
+      contractVersion: certifiedWarpWorldline?.contractVersion ?? null,
+      sourceSurface: certifiedWarpWorldline?.sourceSurface.surfaceId ?? null,
+      observerFamily: certifiedWarpWorldline?.observerFamily ?? null,
+      chart: certifiedWarpWorldline?.chart.label ?? canonical.chart,
+      validityRegimeId: certifiedWarpWorldline?.validityRegime.regimeId ?? null,
+      representativeSampleId: certifiedWarpWorldline?.representativeSampleId ?? null,
+      sampleGeometryFamilyId: certifiedWarpWorldline?.sampleGeometry.familyId ?? null,
+      sampleCount: certifiedWarpWorldline?.samples.length ?? 0,
+      dtau_dt: certifiedWarpWorldline?.dtau_dt.representative ?? shipComovingDtauDt.value,
+      dtau_dt_bounds: {
+        min: certifiedWarpWorldline?.dtau_dt.min ?? shipComovingDtauDt.value,
+        max: certifiedWarpWorldline?.dtau_dt.max ?? shipComovingDtauDt.value,
+      },
+      normalizationResidual: representativeWorldlineSample?.normalizationResidual ?? null,
+      shipProperTimeSemantics: certifiedWarpWorldline
+        ? "bounded solve-backed centerline-plus-shell-cross local-comoving contract: d tau = (d tau / dt) dt at the representative center sample"
+        : shipComovingDtauDt.status === "proxy"
+          ? "proxy ADM combination only; not a certified warp worldline contract"
+          : "warp-derived proper-time transport unavailable without a certified warp worldline contract",
+      transportInterpretation: certifiedWarpWorldline
+        ? certifiedWarpWorldline.transportInterpretation.effectiveTransportInterpretation
+        : null,
+      transportVariationStatus: certifiedWarpWorldline
+        ? certifiedWarpWorldline.transportVariation.transportVariationStatus
+        : null,
+      transportInformativenessStatus: certifiedWarpWorldline
+        ? certifiedWarpWorldline.transportInformativenessStatus
+        : null,
+      sampleFamilyAdequacy: certifiedWarpWorldline
+        ? certifiedWarpWorldline.sampleFamilyAdequacy
+        : null,
+      flatnessInterpretation: certifiedWarpWorldline
+        ? certifiedWarpWorldline.flatnessInterpretation
+        : null,
+      certifiedTransportMeaning: certifiedWarpWorldline
+        ? certifiedWarpWorldline.certifiedTransportMeaning
+        : null,
+      eligibleNextProducts: certifiedWarpWorldline
+        ? [...certifiedWarpWorldline.eligibleNextProducts]
+        : [],
+      routeTimeStatus: "deferred" as const,
+      provenanceClass: certifiedWarpWorldline
+        ? ("solve_backed" as const)
+        : shipComovingDtauDt.status === "proxy"
+          ? ("proxy" as const)
+          : ("unavailable" as const),
+      claimBoundary: certifiedWarpWorldline?.claimBoundary ?? [
+        "warp-derived transport unavailable without certified warpWorldline",
+      ],
+      falsifierConditions: certifiedWarpWorldline?.falsifierConditions ?? [
+        "certified_warp_worldline_missing",
+      ],
+      unavailableReason: certifiedWarpWorldline
+        ? null
+        : shipComovingDtauDt.status === "proxy"
+          ? "proxy_only_no_certified_warp_worldline"
+          : "certified_warp_worldline_missing",
+    },
+    warpRouteTimeWorldline: {
+      status: certifiedWarpRouteTimeWorldline
+        ? ("solve_backed" as const)
+        : ("unavailable" as const),
+      certified: Boolean(certifiedWarpRouteTimeWorldline),
+      contractVersion: certifiedWarpRouteTimeWorldline?.contractVersion ?? null,
+      sourceSurface: certifiedWarpRouteTimeWorldline?.sourceSurface.surfaceId ?? null,
+      observerFamily: certifiedWarpRouteTimeWorldline?.observerFamily ?? null,
+      chart: certifiedWarpRouteTimeWorldline?.chart.label ?? canonical.chart,
+      routeModelId: certifiedWarpRouteTimeWorldline?.routeModelId ?? null,
+      routeParameterName:
+        certifiedWarpRouteTimeWorldline?.routeParameterName ?? null,
+      validityRegimeId:
+        certifiedWarpRouteTimeWorldline?.validityRegime.regimeId ?? null,
+      progressionSampleCount:
+        certifiedWarpRouteTimeWorldline?.progressionSampleCount ?? 0,
+      coordinateTimeSummary: {
+        start: certifiedWarpRouteTimeWorldline?.coordinateTimeSummary.start ?? null,
+        end: certifiedWarpRouteTimeWorldline?.coordinateTimeSummary.end ?? null,
+        span: certifiedWarpRouteTimeWorldline?.coordinateTimeSummary.span ?? null,
+      },
+      properTimeSummary: {
+        start: certifiedWarpRouteTimeWorldline?.properTimeSummary.start ?? null,
+        end: certifiedWarpRouteTimeWorldline?.properTimeSummary.end ?? null,
+        span: certifiedWarpRouteTimeWorldline?.properTimeSummary.span ?? null,
+      },
+      descriptorScheduleSummary: {
+        min: certifiedWarpRouteTimeWorldline?.descriptorScheduleSummary.min ?? null,
+        max: certifiedWarpRouteTimeWorldline?.descriptorScheduleSummary.max ?? null,
+        spread:
+          certifiedWarpRouteTimeWorldline?.descriptorScheduleSummary.spread ?? null,
+      },
+      sampleFamilyAdequacy:
+        certifiedWarpRouteTimeWorldline?.sampleFamilyAdequacy ?? null,
+      transportVariationStatus:
+        certifiedWarpRouteTimeWorldline?.transportVariationStatus ?? null,
+      transportInformativenessStatus:
+        certifiedWarpRouteTimeWorldline?.transportInformativenessStatus ?? null,
+      routeTimeStatus: certifiedWarpRouteTimeWorldline?.routeTimeStatus ?? null,
+      nextEligibleProducts: certifiedWarpRouteTimeWorldline
+        ? [...certifiedWarpRouteTimeWorldline.nextEligibleProducts]
+        : [],
+      shipProperTimeSemantics: certifiedWarpRouteTimeWorldline
+        ? "bounded route-time worldline over a certified local probe segment: cumulative proper time is integrated over the normalized local longitudinal progression only"
+        : "bounded route-time warp transport unavailable without a certified route-time worldline contract",
+      claimBoundary: certifiedWarpRouteTimeWorldline?.claimBoundary ?? [
+        "warp-derived route-time transport unavailable without certified warpRouteTimeWorldline",
+      ],
+      falsifierConditions: certifiedWarpRouteTimeWorldline?.falsifierConditions ?? [
+        "certified_route_time_worldline_missing",
+      ],
+      unavailableReason: certifiedWarpRouteTimeWorldline
+        ? null
+        : "certified_route_time_worldline_missing",
+    },
+    warpMissionTimeEstimator: {
+      status: certifiedWarpMissionTimeEstimator
+        ? ("solve_backed" as const)
+        : ("unavailable" as const),
+      certified: Boolean(certifiedWarpMissionTimeEstimator),
+      contractVersion:
+        certifiedWarpMissionTimeEstimator?.contractVersion ?? null,
+      sourceSurface:
+        certifiedWarpMissionTimeEstimator?.sourceSurface.surfaceId ?? null,
+      observerFamily:
+        certifiedWarpMissionTimeEstimator?.observerFamily ?? null,
+      chart: certifiedWarpMissionTimeEstimator?.chart.label ?? canonical.chart,
+      estimatorModelId:
+        certifiedWarpMissionTimeEstimator?.estimatorModelId ?? null,
+      targetId: certifiedWarpMissionTimeEstimator?.targetId ?? null,
+      targetName: certifiedWarpMissionTimeEstimator?.targetName ?? null,
+      targetFrame: certifiedWarpMissionTimeEstimator?.targetFrame ?? null,
+      coordinateTimeEstimate: {
+        seconds:
+          certifiedWarpMissionTimeEstimator?.coordinateTimeEstimate.seconds ??
+          null,
+        years:
+          certifiedWarpMissionTimeEstimator?.coordinateTimeEstimate.years ??
+          null,
+      },
+      properTimeEstimate: {
+        seconds:
+          certifiedWarpMissionTimeEstimator?.properTimeEstimate.seconds ?? null,
+        years:
+          certifiedWarpMissionTimeEstimator?.properTimeEstimate.years ?? null,
+      },
+      routeTimeStatus:
+        certifiedWarpMissionTimeEstimator?.routeTimeStatus ?? null,
+      comparisonReadiness:
+        certifiedWarpMissionTimeEstimator?.comparisonReadiness ?? null,
+      nextEligibleProducts: certifiedWarpMissionTimeEstimator
+        ? [...certifiedWarpMissionTimeEstimator.nextEligibleProducts]
+        : [],
+      shipProperTimeSemantics: certifiedWarpMissionTimeEstimator
+        ? "bounded target-coupled mission-time estimator: ship proper time is extrapolated from the certified bounded local route-time worldline over a deterministic committed local-rest target-distance contract"
+        : "bounded mission-time warp transport unavailable without a certified warp mission-time estimator contract",
+      claimBoundary: certifiedWarpMissionTimeEstimator?.claimBoundary ?? [
+        "warp-derived mission-time transport unavailable without certified warpMissionTimeEstimator",
+      ],
+      falsifierConditions:
+        certifiedWarpMissionTimeEstimator?.falsifierConditions ?? [
+          "certified_warp_mission_time_estimator_missing",
+        ],
+      nonClaims: certifiedWarpMissionTimeEstimator?.nonClaims ?? [
+        "not max-speed certified",
+        "not viability-promotion evidence",
+      ],
+      unavailableReason: certifiedWarpMissionTimeEstimator
+        ? null
+        : "certified_warp_mission_time_estimator_missing",
+    },
+    warpMissionTimeComparison: {
+      status: certifiedWarpMissionTimeComparison
+        ? ("solve_backed" as const)
+        : ("unavailable" as const),
+      certified: Boolean(certifiedWarpMissionTimeComparison),
+      contractVersion:
+        certifiedWarpMissionTimeComparison?.contractVersion ?? null,
+      sourceSurface:
+        certifiedWarpMissionTimeComparison?.sourceSurface.surfaceId ?? null,
+      observerFamily:
+        certifiedWarpMissionTimeComparison?.observerFamily ?? null,
+      chart: certifiedWarpMissionTimeComparison?.chart.label ?? canonical.chart,
+      comparisonModelId:
+        certifiedWarpMissionTimeComparison?.comparisonModelId ?? null,
+      targetId: certifiedWarpMissionTimeComparison?.targetId ?? null,
+      targetName: certifiedWarpMissionTimeComparison?.targetName ?? null,
+      targetFrame: certifiedWarpMissionTimeComparison?.targetFrame ?? null,
+      warpCoordinateTimeEstimate: {
+        seconds:
+          certifiedWarpMissionTimeComparison?.warpCoordinateTimeEstimate
+            .seconds ?? null,
+        years:
+          certifiedWarpMissionTimeComparison?.warpCoordinateTimeEstimate.years ??
+          null,
+      },
+      warpProperTimeEstimate: {
+        seconds:
+          certifiedWarpMissionTimeComparison?.warpProperTimeEstimate.seconds ??
+          null,
+        years:
+          certifiedWarpMissionTimeComparison?.warpProperTimeEstimate.years ??
+          null,
+      },
+      classicalReferenceTimeEstimate: {
+        seconds:
+          certifiedWarpMissionTimeComparison?.classicalReferenceTimeEstimate
+            .seconds ?? null,
+        years:
+          certifiedWarpMissionTimeComparison?.classicalReferenceTimeEstimate
+            .years ?? null,
+      },
+      comparisonInterpretationStatus:
+        certifiedWarpMissionTimeComparison?.comparisonMetrics
+          .interpretationStatus ?? null,
+      properMinusCoordinateSeconds:
+        certifiedWarpMissionTimeComparison?.comparisonMetrics
+          .properMinusCoordinate_seconds ?? null,
+      properMinusClassicalSeconds:
+        certifiedWarpMissionTimeComparison?.comparisonMetrics
+          .properMinusClassical_seconds ?? null,
+      comparisonReadiness:
+        certifiedWarpMissionTimeComparison?.comparisonReadiness ?? null,
+      deferredComparators: certifiedWarpMissionTimeComparison
+        ? [...certifiedWarpMissionTimeComparison.deferredComparators]
+        : [],
+      shipProperTimeSemantics: certifiedWarpMissionTimeComparison
+        ? "bounded mission-time comparison: warp coordinate time, warp proper time, and a classical no-time-dilation reference are reported separately on the same certified target-distance mission-estimator basis"
+        : "bounded mission-time comparison unavailable without a certified warp mission-time comparison contract",
+      claimBoundary: certifiedWarpMissionTimeComparison?.claimBoundary ?? [
+        "warp-derived mission-time comparison unavailable without certified warpMissionTimeComparison",
+      ],
+      falsifierConditions:
+        certifiedWarpMissionTimeComparison?.falsifierConditions ?? [
+          "certified_warp_mission_time_comparison_missing",
+        ],
+      nonClaims: certifiedWarpMissionTimeComparison?.nonClaims ?? [
+        "not max-speed certified",
+        "not viability-promotion evidence",
+      ],
+      unavailableReason: certifiedWarpMissionTimeComparison
+        ? null
+        : "certified_warp_mission_time_comparison_missing",
+    },
+  };
 
   const diagnostics: TimeDilationDiagnostics = {
     kind: "time_dilation_diagnostics",
@@ -1824,6 +2275,7 @@ export async function buildTimeDilationDiagnostics(
     observables,
     tidal: tidalIndicator,
     redshift,
+    transport: transportSummary,
     provenance,
     proofPack,
     renderingSeed,

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildTimeDilationDiagnostics } from "../shared/time-dilation-diagnostics";
+import {
+  makeWarpMissionTimeComparisonFixture,
+  makeWarpMissionTimeEstimatorFixture,
+  makeWarpRouteTimeWorldlineFixture,
+  makeWarpWorldlineFixture,
+} from "./helpers/warp-worldline-fixture";
 
 const basePipeline = {
   strictCongruence: true,
@@ -280,6 +286,122 @@ describe("time dilation strict verification gate", () => {
     expect(dtauDt?.valid).toBe(true);
     expect(dtauDt?.missingFields).toEqual([]);
     expect(dtauDt?.value ?? 0).toBeCloseTo(Math.sqrt(1 - 0.3 * 0.3), 6);
+    expect(dtauDt?.source).toBe("adm_worldline_proxy");
+    expect(diagnostics.transport.warpWorldline.status).toBe("proxy");
+    expect(diagnostics.transport.warpWorldline.certified).toBe(false);
+  });
+
+  it("prefers the certified warp worldline contract for solve-backed transport outputs when present", async () => {
+    const warpWorldline = makeWarpWorldlineFixture();
+    const warpRouteTimeWorldline = makeWarpRouteTimeWorldlineFixture(warpWorldline);
+    const warpMissionTimeEstimator = makeWarpMissionTimeEstimatorFixture({
+      worldline: warpWorldline,
+      routeTime: warpRouteTimeWorldline,
+    });
+    stubFetch({
+      ...basePipeline,
+      viability: {
+        certificateHash: "cert:1",
+        integrityOk: true,
+        constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+      },
+      warpWorldline,
+      warpRouteTimeWorldline,
+      warpMissionTimeEstimator,
+      warpMissionTimeComparison: makeWarpMissionTimeComparisonFixture({
+        missionTimeEstimator: warpMissionTimeEstimator,
+      }),
+    });
+
+    const diagnostics = await buildTimeDilationDiagnostics({
+      baseUrl: "http://example.test",
+      publish: false,
+    });
+
+    expect(diagnostics.observables.ship_comoving_dtau_dt).toEqual(
+      expect.objectContaining({
+        source: "warp_worldline_contract",
+        valid: true,
+      }),
+    );
+    expect(diagnostics.transport.warpWorldline).toEqual(
+      expect.objectContaining({
+        status: "solve_backed",
+        certified: true,
+        contractVersion: "warp_worldline_contract/v1",
+        sourceSurface: "nhm2_metric_local_comoving_transport_cross",
+        validityRegimeId: "nhm2_local_comoving_shell_cross",
+        representativeSampleId: "centerline_center",
+        sampleGeometryFamilyId: "nhm2_centerline_shell_cross",
+        sampleCount: 9,
+        transportInterpretation: "bounded_local_comoving_descriptor_not_speed",
+        transportVariationStatus: "descriptor_and_dtau_varied",
+        transportInformativenessStatus: "descriptor_informative_local_only",
+        sampleFamilyAdequacy: "adequate_for_bounded_cruise_preflight",
+        certifiedTransportMeaning: "bounded_local_shift_descriptor_gradient_only",
+        eligibleNextProducts: ["bounded_cruise_envelope_preflight"],
+        routeTimeStatus: "deferred",
+      }),
+    );
+    expect(diagnostics.transport.warpWorldline.dtau_dt ?? 0).toBeCloseTo(0.8, 8);
+    expect(diagnostics.transport.warpRouteTimeWorldline).toEqual(
+      expect.objectContaining({
+        status: "solve_backed",
+        certified: true,
+        contractVersion: "warp_route_time_worldline/v1",
+        sourceSurface: "nhm2_metric_local_comoving_transport_cross",
+        routeModelId: "nhm2_bounded_local_probe_lambda",
+        routeParameterName: "lambda",
+        progressionSampleCount: 5,
+        sampleFamilyAdequacy: "adequate_for_bounded_cruise_preflight",
+        routeTimeStatus: "bounded_local_segment_certified",
+        nextEligibleProducts: ["mission_time_estimator"],
+      }),
+    );
+    expect(diagnostics.transport.warpMissionTimeEstimator).toEqual(
+      expect.objectContaining({
+        status: "solve_backed",
+        certified: true,
+        contractVersion: "warp_mission_time_estimator/v1",
+        sourceSurface: "nhm2_metric_local_comoving_transport_cross",
+        estimatorModelId: "nhm2_repeated_local_probe_segment_estimator",
+        targetId: "alpha-cen-a",
+        targetName: "Alpha Centauri A",
+        targetFrame: "heliocentric-icrs",
+        routeTimeStatus: "bounded_local_segment_certified",
+      }),
+    );
+    expect(
+      diagnostics.transport.warpMissionTimeEstimator.coordinateTimeEstimate.seconds ??
+        0,
+    ).toBeGreaterThan(0);
+    expect(
+      diagnostics.transport.warpMissionTimeEstimator.properTimeEstimate.seconds ??
+        0,
+    ).toBeGreaterThan(0);
+    expect(diagnostics.transport.warpMissionTimeComparison).toEqual(
+      expect.objectContaining({
+        status: "solve_backed",
+        certified: true,
+        contractVersion: "warp_mission_time_comparison/v1",
+        comparisonModelId: "nhm2_classical_no_time_dilation_reference",
+        targetId: "alpha-cen-a",
+        targetName: "Alpha Centauri A",
+        targetFrame: "heliocentric-icrs",
+        comparisonInterpretationStatus:
+          "bounded_relativistic_differential_detected",
+        comparisonReadiness:
+          "paired_classical_reference_certified_speed_comparators_deferred",
+      }),
+    );
+    expect(
+      diagnostics.transport.warpMissionTimeComparison.properMinusCoordinateSeconds ??
+        Number.NaN,
+    ).toBeLessThan(0);
+    expect(
+      diagnostics.transport.warpMissionTimeComparison.properMinusClassicalSeconds ??
+        Number.NaN,
+    ).toBeLessThan(0);
   });
 
   it("marks redshift unavailable when emitter/receiver worldline contract is missing", async () => {

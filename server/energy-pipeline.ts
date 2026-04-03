@@ -1,6 +1,9 @@
 ﻿// HELIX-CORE: Independent Dynamic Casimir Energy Pipeline
 // This module provides centralized energy calculations that all panels can access
 
+import fs from "node:fs";
+import path from "node:path";
+
 // Model mode switch: raw physics or paper-calibrated power targets.
 // Explicit default: paper-calibrated power targets; set HELIX_MODEL_MODE=raw to bypass.
 const MODEL_MODE: 'calibrated' | 'raw' =
@@ -32,6 +35,51 @@ import { C } from "./utils/physics-const-safe.ts";
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.ts";
 import { computeClocking, type ClockingSnapshot } from "../shared/clocking.ts";
 import { NHM2_FULL_HULL_DIMENSIONS_M, PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.ts";
+import {
+  analyzeWarpWorldlineTransportVariation,
+  WARP_WORLDLINE_CONTRACT_VERSION,
+  WARP_WORLDLINE_NORMALIZATION_TOLERANCE,
+  computeWarpWorldlineDtauDt,
+  computeWarpWorldlineNormalizationResidual,
+  toWarpWorldlineVec3,
+  type WarpWorldlineContractV1,
+  type WarpWorldlineVec3,
+} from "../shared/contracts/warp-worldline-contract.v1.ts";
+import {
+  buildWarpCruiseEnvelopePreflightContractFromWorldline,
+  type WarpCruiseEnvelopePreflightContractV1,
+} from "../shared/contracts/warp-cruise-envelope-preflight.v1.ts";
+import {
+  buildWarpRouteTimeWorldlineContract,
+  type WarpRouteTimeWorldlineContractV1,
+} from "../shared/contracts/warp-route-time-worldline.v1.ts";
+import {
+  DEFAULT_WARP_MISSION_ESTIMATOR_TARGET_ID,
+  LIGHT_YEARS_PER_PARSEC,
+  METERS_PER_PARSEC,
+  buildWarpMissionTimeEstimatorContract,
+  type WarpMissionEstimatorTargetId,
+  type WarpMissionTargetDistanceContractV1,
+  type WarpMissionTimeEstimatorContractV1,
+} from "../shared/contracts/warp-mission-time-estimator.v1.ts";
+import {
+  buildWarpMissionTimeComparisonContract,
+  type WarpMissionTimeComparisonContractV1,
+} from "../shared/contracts/warp-mission-time-comparison.v1.ts";
+import {
+  buildWarpCruiseEnvelopeContract,
+  type WarpCruiseEnvelopeContractV1,
+} from "../shared/contracts/warp-cruise-envelope.v1.ts";
+import {
+  buildWarpInHullProperAccelerationContract,
+  properAccelerationGeomToMps2,
+  properAccelerationMps2ToG,
+  summarizeInHullProperAccelerationChannelExtrema,
+  type WarpInHullProperAccelerationContractV1,
+  type WarpInHullProperAccelerationSampleRole,
+  type WarpInHullProperAccelerationSamplingGeometry,
+  type WarpInHullProperAccelerationVec3,
+} from "../shared/contracts/warp-in-hull-proper-acceleration.v1.ts";
 import type { StressEnergyStats } from "./stress-energy-brick";
 import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.ts";
 import type { CongruenceMeta } from "../types/pipeline";
@@ -1512,6 +1560,13 @@ export interface EnergyPipelineState {
   gr?: GrPipelineDiagnostics;
   grBaseline?: GrInvariantBaseline;
   grRequest?: GrRequestPayload;
+  warpWorldline?: WarpWorldlineContractV1;
+  warpCruiseEnvelopePreflight?: WarpCruiseEnvelopePreflightContractV1;
+  warpRouteTimeWorldline?: WarpRouteTimeWorldlineContractV1;
+  warpMissionTimeEstimator?: WarpMissionTimeEstimatorContractV1;
+  warpMissionTimeComparison?: WarpMissionTimeComparisonContractV1;
+  warpCruiseEnvelope?: WarpCruiseEnvelopeContractV1;
+  warpInHullProperAcceleration?: WarpInHullProperAccelerationContractV1;
   warpViability?: {
     certificate: WarpViabilityCertificate;
     certificateHash?: string;
@@ -2244,6 +2299,1147 @@ const buildVdbFallbackShiftField = (
     ];
   };
   return { amplitude, evaluateShiftVector };
+};
+
+type SolveBackedWarpTransportSampleRole =
+  | "centerline_aft"
+  | "centerline_center"
+  | "centerline_fore"
+  | "shell_aft"
+  | "shell_fore"
+  | "shell_port"
+  | "shell_starboard"
+  | "shell_dorsal"
+  | "shell_ventral";
+
+type SolveBackedWarpTransportSample = {
+  sampleId: SolveBackedWarpTransportSampleRole;
+  sampleRole: SolveBackedWarpTransportSampleRole;
+  sourceModel: "warp_worldline_local_comoving";
+  transportProvenance: "solve_backed_shift_vector_sample";
+  coordinateTime_s: 0;
+  position_m: WarpWorldlineVec3;
+  betaCoord: WarpWorldlineVec3;
+};
+
+type SolveBackedWarpTransportSampleFamily = {
+  familyId: "nhm2_centerline_shell_cross";
+  description: string;
+  representativeSampleId: "centerline_center";
+  ordering: SolveBackedWarpTransportSampleRole[];
+  axes: {
+    centerline: WarpWorldlineVec3;
+    portStarboard: WarpWorldlineVec3;
+    dorsalVentral: WarpWorldlineVec3;
+  };
+  offsets_m: {
+    centerline: number;
+    shellLongitudinal: number;
+    shellTransverse: number;
+    shellVertical: number;
+    shellClearance: number;
+  };
+  samples: SolveBackedWarpTransportSample[];
+};
+
+const crossVec = (
+  lhs: WarpWorldlineVec3,
+  rhs: WarpWorldlineVec3,
+): WarpWorldlineVec3 => [
+  lhs[1] * rhs[2] - lhs[2] * rhs[1],
+  lhs[2] * rhs[0] - lhs[0] * rhs[2],
+  lhs[0] * rhs[1] - lhs[1] * rhs[0],
+];
+
+const buildSolveBackedWarpTransportSampleFamily = (args: {
+  state: EnergyPipelineState;
+  warpResult: Record<string, unknown>;
+  adapter: WarpMetricAdapterSnapshot | undefined;
+  metricT00Source: string | null;
+  metricT00Ref: string | null;
+}): SolveBackedWarpTransportSampleFamily | undefined => {
+  const metricFamily = args.adapter?.family ?? "unknown";
+  const shiftField = (args.warpResult.shiftVectorField ?? null) as
+    | { evaluateShiftVector?: (x: number, y: number, z: number) => unknown }
+    | null;
+  const evaluateShiftVector =
+    shiftField && typeof shiftField.evaluateShiftVector === "function"
+      ? shiftField.evaluateShiftVector
+      : null;
+  if (!evaluateShiftVector) return undefined;
+  if (args.metricT00Source !== "metric") return undefined;
+  if (args.adapter?.chart?.label !== "comoving_cartesian") return undefined;
+  if (args.adapter?.chart?.contractStatus !== "ok") return undefined;
+  if (metricFamily !== "natario" && metricFamily !== "natario_sdf") return undefined;
+  if (
+    args.metricT00Ref == null ||
+    args.metricT00Ref.includes("shift_lapse") ||
+    args.metricT00Ref.includes("nhm2_shift_lapse")
+  ) {
+    return undefined;
+  }
+
+  const driveDirection = normalizeVec(
+    toFiniteVec3(
+      (args.state.dynamicConfig as any)?.warpDriveDirection ??
+        (args.state as any)?.warpGeometry?.driveDirection ??
+        args.state.driveDir ??
+        [1, 0, 0],
+      [1, 0, 0],
+    ),
+  );
+  if (!driveDirection.every((value) => Number.isFinite(value)) || !Math.hypot(...driveDirection)) {
+    return undefined;
+  }
+  const transverseReference =
+    Math.abs(driveDirection[2]) < 0.95
+      ? ([0, 0, 1] as WarpWorldlineVec3)
+      : ([0, 1, 0] as WarpWorldlineVec3);
+  const portStarboardAxis = normalizeVec(crossVec(transverseReference, driveDirection));
+  const dorsalVentralAxis = normalizeVec(crossVec(driveDirection, portStarboardAxis));
+
+  const hull = resolveHullGeometry(args.state);
+  const shellClearance_m = Math.max(1e-6, hull.wallThickness_m * 2);
+  const resolveShellOffset = (halfExtent: number) =>
+    Math.max(1e-6, Math.max(halfExtent * 0.75, halfExtent - shellClearance_m));
+  const centerlineOffset_m = Math.max(1e-6, hull.Lx_m / 4);
+  const shellLongitudinalOffset_m = resolveShellOffset(hull.Lx_m / 2);
+  const shellTransverseOffset_m = resolveShellOffset(hull.Ly_m / 2);
+  const shellVerticalOffset_m = resolveShellOffset(hull.Lz_m / 2);
+  const sampleDefs: Array<{
+    sampleId: SolveBackedWarpTransportSample["sampleId"];
+    sampleRole: SolveBackedWarpTransportSample["sampleRole"];
+    position_m: WarpWorldlineVec3;
+  }> = [
+    {
+      sampleId: "centerline_aft",
+      sampleRole: "centerline_aft",
+      position_m: [
+        -driveDirection[0] * centerlineOffset_m,
+        -driveDirection[1] * centerlineOffset_m,
+        -driveDirection[2] * centerlineOffset_m,
+      ],
+    },
+    {
+      sampleId: "centerline_center",
+      sampleRole: "centerline_center",
+      position_m: [0, 0, 0],
+    },
+    {
+      sampleId: "centerline_fore",
+      sampleRole: "centerline_fore",
+      position_m: [
+        driveDirection[0] * centerlineOffset_m,
+        driveDirection[1] * centerlineOffset_m,
+        driveDirection[2] * centerlineOffset_m,
+      ],
+    },
+    {
+      sampleId: "shell_aft",
+      sampleRole: "shell_aft",
+      position_m: [
+        -driveDirection[0] * shellLongitudinalOffset_m,
+        -driveDirection[1] * shellLongitudinalOffset_m,
+        -driveDirection[2] * shellLongitudinalOffset_m,
+      ],
+    },
+    {
+      sampleId: "shell_fore",
+      sampleRole: "shell_fore",
+      position_m: [
+        driveDirection[0] * shellLongitudinalOffset_m,
+        driveDirection[1] * shellLongitudinalOffset_m,
+        driveDirection[2] * shellLongitudinalOffset_m,
+      ],
+    },
+    {
+      sampleId: "shell_port",
+      sampleRole: "shell_port",
+      position_m: [
+        portStarboardAxis[0] * shellTransverseOffset_m,
+        portStarboardAxis[1] * shellTransverseOffset_m,
+        portStarboardAxis[2] * shellTransverseOffset_m,
+      ],
+    },
+    {
+      sampleId: "shell_starboard",
+      sampleRole: "shell_starboard",
+      position_m: [
+        -portStarboardAxis[0] * shellTransverseOffset_m,
+        -portStarboardAxis[1] * shellTransverseOffset_m,
+        -portStarboardAxis[2] * shellTransverseOffset_m,
+      ],
+    },
+    {
+      sampleId: "shell_dorsal",
+      sampleRole: "shell_dorsal",
+      position_m: [
+        dorsalVentralAxis[0] * shellVerticalOffset_m,
+        dorsalVentralAxis[1] * shellVerticalOffset_m,
+        dorsalVentralAxis[2] * shellVerticalOffset_m,
+      ],
+    },
+    {
+      sampleId: "shell_ventral",
+      sampleRole: "shell_ventral",
+      position_m: [
+        -dorsalVentralAxis[0] * shellVerticalOffset_m,
+        -dorsalVentralAxis[1] * shellVerticalOffset_m,
+        -dorsalVentralAxis[2] * shellVerticalOffset_m,
+      ],
+    },
+  ];
+
+  const samples = sampleDefs.map((entry) => {
+    const betaCoord = toWarpWorldlineVec3(
+      evaluateShiftVector(entry.position_m[0], entry.position_m[1], entry.position_m[2]),
+    );
+    if (!betaCoord) return null;
+    return {
+      sampleId: entry.sampleId,
+      sampleRole: entry.sampleRole,
+      sourceModel: "warp_worldline_local_comoving" as const,
+      transportProvenance: "solve_backed_shift_vector_sample" as const,
+      coordinateTime_s: 0 as const,
+      position_m: entry.position_m,
+      betaCoord,
+    };
+  });
+  if (samples.some((entry) => entry == null)) return undefined;
+
+  return {
+    familyId: "nhm2_centerline_shell_cross",
+    description:
+      "Deterministic bounded local-comoving shell-cross family: centerline aft-center-fore plus shell-proximal aft/fore/port/starboard/dorsal/ventral probes. Samples are evaluated directly from the solve-backed shift-vector field and remain bounded to local transport inspection only.",
+    representativeSampleId: "centerline_center",
+    ordering: sampleDefs.map((entry) => entry.sampleRole),
+    axes: {
+      centerline: [...driveDirection] as WarpWorldlineVec3,
+      portStarboard: [...portStarboardAxis] as WarpWorldlineVec3,
+      dorsalVentral: [...dorsalVentralAxis] as WarpWorldlineVec3,
+    },
+    offsets_m: {
+      centerline: centerlineOffset_m,
+      shellLongitudinal: shellLongitudinalOffset_m,
+      shellTransverse: shellTransverseOffset_m,
+      shellVertical: shellVerticalOffset_m,
+      shellClearance: shellClearance_m,
+    },
+    samples: samples as SolveBackedWarpTransportSample[],
+  };
+};
+
+export const buildWarpWorldlineContractFromState = (
+  state: EnergyPipelineState,
+): WarpWorldlineContractV1 | null => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const adapter = warpState?.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  const metricContract = warpState?.metricT00Contract as MetricT00Contract | undefined;
+  const metricT00Source =
+    typeof warpState?.metricT00Source === "string"
+      ? String(warpState.metricT00Source)
+      : typeof warpState?.stressEnergySource === "string"
+        ? String(warpState.stressEnergySource)
+        : null;
+  const metricT00Ref =
+    typeof warpState?.metricT00Ref === "string" && warpState.metricT00Ref.length > 0
+      ? String(warpState.metricT00Ref)
+      : resolveCanonicalMetricT00Ref(warpState ?? {}, adapter) ?? null;
+  const chartLabel = adapter?.chart?.label ?? null;
+  const chartContractStatus = adapter?.chart?.contractStatus ?? null;
+  const alpha = toFiniteNumber(adapter?.alpha);
+  const gammaDiag = toFiniteVec3(adapter?.gammaDiag, [Number.NaN, Number.NaN, Number.NaN]);
+  const gammaDiagFinite = gammaDiag.every((value) => Number.isFinite(value));
+  const metricFamily = metricContract?.family ?? adapter?.family ?? "unknown";
+  const transportSampleFamily = warpState?.solveBackedTransportSampleFamily as
+    | SolveBackedWarpTransportSampleFamily
+    | undefined;
+
+  if (metricT00Source !== "metric") return null;
+  if (metricContract?.status !== "ok") return null;
+  if (chartContractStatus !== "ok") return null;
+  if (chartLabel !== "comoving_cartesian") return null;
+  if (metricContract?.observer !== "eulerian_n") return null;
+  if (metricContract?.normalization !== "si_stress") return null;
+  if (metricContract?.unitSystem !== "SI") return null;
+  if (metricFamily !== "natario" && metricFamily !== "natario_sdf") return null;
+  if (
+    metricT00Ref == null ||
+    metricT00Ref.includes("shift_lapse") ||
+    metricT00Ref.includes("nhm2_shift_lapse")
+  ) {
+    return null;
+  }
+  if (alpha == null || !gammaDiagFinite || !transportSampleFamily) return null;
+  if (transportSampleFamily.familyId !== "nhm2_centerline_shell_cross") return null;
+  if (transportSampleFamily.representativeSampleId !== "centerline_center") return null;
+  if (
+    transportSampleFamily.ordering.join(",") !==
+    "centerline_aft,centerline_center,centerline_fore,shell_aft,shell_fore,shell_port,shell_starboard,shell_dorsal,shell_ventral"
+  ) {
+    return null;
+  }
+  const centerlineAxis = toWarpWorldlineVec3(transportSampleFamily.axes.centerline);
+  const portStarboardAxis = toWarpWorldlineVec3(transportSampleFamily.axes.portStarboard);
+  const dorsalVentralAxis = toWarpWorldlineVec3(transportSampleFamily.axes.dorsalVentral);
+  if (!centerlineAxis || !portStarboardAxis || !dorsalVentralAxis) return null;
+  const centerlineOffset_m = toFiniteNumber(transportSampleFamily.offsets_m.centerline);
+  const shellLongitudinalOffset_m = toFiniteNumber(
+    transportSampleFamily.offsets_m.shellLongitudinal,
+  );
+  const shellTransverseOffset_m = toFiniteNumber(
+    transportSampleFamily.offsets_m.shellTransverse,
+  );
+  const shellVerticalOffset_m = toFiniteNumber(transportSampleFamily.offsets_m.shellVertical);
+  const shellClearance_m = toFiniteNumber(transportSampleFamily.offsets_m.shellClearance);
+  if (
+    centerlineOffset_m == null ||
+    shellLongitudinalOffset_m == null ||
+    shellTransverseOffset_m == null ||
+    shellVerticalOffset_m == null ||
+    shellClearance_m == null ||
+    !(centerlineOffset_m > 0) ||
+    !(shellLongitudinalOffset_m > 0) ||
+    !(shellTransverseOffset_m > 0) ||
+    !(shellVerticalOffset_m > 0) ||
+    !(shellClearance_m > 0)
+  ) {
+    return null;
+  }
+
+  const coordinateVelocity: WarpWorldlineVec3 = [0, 0, 0];
+  const samples = transportSampleFamily.samples.map((entry) => {
+    if (entry.sourceModel !== "warp_worldline_local_comoving") return null;
+    if (entry.transportProvenance !== "solve_backed_shift_vector_sample") return null;
+    const position_m = toWarpWorldlineVec3(entry.position_m);
+    const betaCoord = toWarpWorldlineVec3(entry.betaCoord);
+    if (!position_m || !betaCoord) return null;
+    const dtauDt = computeWarpWorldlineDtauDt({
+      alpha,
+      gammaDiag,
+      coordinateVelocity,
+      betaCoord,
+    });
+    if (dtauDt == null || !(dtauDt > 0)) return null;
+    const normalizationResidual = computeWarpWorldlineNormalizationResidual({
+      alpha,
+      gammaDiag,
+      coordinateVelocity,
+      betaCoord,
+      dtau_dt: dtauDt,
+    });
+    if (!(Math.abs(normalizationResidual) <= WARP_WORLDLINE_NORMALIZATION_TOLERANCE)) {
+      return null;
+    }
+    const effectiveTransportVelocityCoord: WarpWorldlineVec3 = [...betaCoord];
+    return {
+      sampleId: entry.sampleId,
+      sampleRole: entry.sampleRole,
+      sourceModel: entry.sourceModel,
+      transportProvenance: entry.transportProvenance,
+      coordinateTime_s: entry.coordinateTime_s,
+      position_m,
+      coordinateVelocity,
+      coordinateVelocityUnits: "m/s" as const,
+      betaCoord,
+      effectiveTransportVelocityCoord,
+      dtau_dt: dtauDt,
+      normalizationResidual,
+    };
+  });
+  if (samples.some((entry) => entry == null)) return null;
+
+  const typedSamples = samples as NonNullable<(typeof samples)[number]>[];
+  const representativeSample =
+    typedSamples.find((entry) => entry.sampleId === transportSampleFamily.representativeSampleId) ??
+    null;
+  if (!representativeSample) {
+    return null;
+  }
+  const dtauDtValues = typedSamples.map((entry) => entry.dtau_dt);
+  const normalizationResiduals = typedSamples.map((entry) => Math.abs(entry.normalizationResidual));
+  const maxAbsResidual = Math.max(...normalizationResiduals);
+  const variationAnalysis = analyzeWarpWorldlineTransportVariation(typedSamples);
+  if (!variationAnalysis) return null;
+
+  return {
+    contractVersion: WARP_WORLDLINE_CONTRACT_VERSION,
+    status: "bounded_solve_backed",
+    certified: true,
+    sourceSurface: {
+      surfaceId: "nhm2_metric_local_comoving_transport_cross",
+      producer: "server/energy-pipeline.ts",
+      provenanceClass: "solve_backed",
+      transportVectorSource: "warp.solveBackedTransportSampleFamily",
+      transportVectorField: "shiftVectorField.evaluateShiftVector",
+      metricT00Ref,
+      metricT00Source: "metric",
+      metricFamily,
+      metricT00ContractStatus: "ok",
+      chartContractStatus: "ok",
+    },
+    chart: {
+      label: chartLabel,
+      coordinateMap:
+        typeof adapter?.chart?.coordinateMap === "string"
+          ? String(adapter.chart.coordinateMap)
+          : null,
+      chartFixed: true,
+    },
+    observerFamily: "ship_centerline_local_comoving",
+    validityRegime: {
+      regimeId: "nhm2_local_comoving_shell_cross",
+      bounded: true,
+      chartFixed: true,
+      observerDefined: true,
+      failClosedOutsideRegime: true,
+      routeTimeCertified: false,
+      description:
+        "Bounded centerline-plus-shell-cross NHM2 local-comoving sample family in the comoving Cartesian chart. This contract supports local transport differentiation only and keeps route-time accumulation deferred.",
+      allowedSourceModels: ["warp_worldline_local_comoving"],
+      deferredSourceModels: ["warp_worldline_route_time"],
+      restrictions: [
+        "deterministic_centerline_shell_cross_family_only",
+        "coordinate_velocity_fixed_to_zero_in_comoving_chart",
+        "effective_transport_velocity_is_local_shift_descriptor_not_certified_speed",
+        "route_time_and_mission_time_products_deferred",
+        "outside_declared_chart_or_observer_regime_fail_closed",
+      ],
+    },
+    sampleGeometry: {
+      familyId: "nhm2_centerline_shell_cross",
+      description: transportSampleFamily.description,
+      coordinateFrame: "comoving_cartesian",
+      originDefinition: "ship_center",
+      ordering: [...transportSampleFamily.ordering],
+      representativeSampleId: "centerline_center",
+      axes: {
+        centerline: centerlineAxis,
+        portStarboard: portStarboardAxis,
+        dorsalVentral: dorsalVentralAxis,
+      },
+      offsets_m: {
+        centerline: centerlineOffset_m,
+        shellLongitudinal: shellLongitudinalOffset_m,
+        shellTransverse: shellTransverseOffset_m,
+        shellVertical: shellVerticalOffset_m,
+        shellClearance: shellClearance_m,
+      },
+    },
+    sampleCount: typedSamples.length,
+    representativeSampleId: "centerline_center",
+    transportInterpretation: {
+      coordinateVelocityFrame: "chart_fixed_comoving",
+      coordinateVelocityInterpretation: "zero_by_chart_choice",
+      transportTerm: "solve_backed_shift_term",
+      effectiveTransportInterpretation:
+        "bounded_local_comoving_descriptor_not_speed",
+      certifiedSpeedMeaning: false,
+      note:
+        "The comoving coordinate velocity is fixed to zero by chart choice. Effective transport is represented here only as a solve-backed bounded local shift descriptor. Even when shell-cross variation is present, it is not a certified speed, cruise envelope, or route-time answer.",
+    },
+    transportVariation: variationAnalysis.transportVariation,
+    transportInformativenessStatus: variationAnalysis.transportInformativenessStatus,
+    sampleFamilyAdequacy: variationAnalysis.sampleFamilyAdequacy,
+    flatnessInterpretation: variationAnalysis.flatnessInterpretation,
+    certifiedTransportMeaning: variationAnalysis.certifiedTransportMeaning,
+    eligibleNextProducts: variationAnalysis.eligibleNextProducts,
+    nextRequiredUpgrade: variationAnalysis.nextRequiredUpgrade,
+    samples: typedSamples,
+    timeCoordinateName: "t",
+    positionCoordinates: ["x", "y", "z"],
+    coordinateVelocity,
+    coordinateVelocityUnits: "m/s",
+    effectiveTransportVelocityCoord: [
+      ...representativeSample.effectiveTransportVelocityCoord,
+    ],
+    dtau_dt: {
+      representative: representativeSample.dtau_dt,
+      min: Math.min(...dtauDtValues),
+      max: Math.max(...dtauDtValues),
+      units: "dimensionless",
+      positivityRequired: true,
+    },
+    normalizationResidual: {
+      representative: representativeSample.normalizationResidual,
+      maxAbs: maxAbsResidual,
+      tolerance: WARP_WORLDLINE_NORMALIZATION_TOLERANCE,
+      relation: "alpha^2 - gamma_ij(v^i+beta^i)(v^j+beta^j) - (d tau / dt)^2",
+    },
+    claimBoundary: [
+      "bounded solve-backed transport contract only",
+      "local-comoving shell-cross sample family only",
+      "not route-time certified",
+      "not mission-time certified",
+      "not max-speed certified",
+      "not viability-promotion evidence",
+    ],
+    falsifierConditions: [
+      "metric_t00_source_not_metric",
+      "metric_contract_status_not_ok",
+      "chart_contract_status_not_ok",
+      "chart_not_comoving_cartesian",
+      "solve_backed_transport_sample_family_missing",
+      "transport_sample_family_not_shell_cross",
+      "reference_only_shift_lapse_family_selected",
+      "dtau_dt_nonpositive",
+      "normalization_residual_exceeds_tolerance",
+    ],
+  };
+};
+
+const refreshWarpWorldlineContract = (state: EnergyPipelineState): void => {
+  const contract = buildWarpWorldlineContractFromState(state);
+  if (contract) {
+    state.warpWorldline = contract;
+    return;
+  }
+  delete (state as any).warpWorldline;
+};
+
+const refreshWarpCruiseEnvelopePreflight = (state: EnergyPipelineState): void => {
+  const contract = buildWarpCruiseEnvelopePreflightContractFromWorldline(
+    (state as any).warpWorldline ?? null,
+  );
+  if (contract) {
+    state.warpCruiseEnvelopePreflight = contract;
+    return;
+  }
+  delete (state as any).warpCruiseEnvelopePreflight;
+};
+
+const refreshWarpRouteTimeWorldline = (state: EnergyPipelineState): void => {
+  const contract = buildWarpRouteTimeWorldlineContract({
+    worldline: (state as any).warpWorldline ?? null,
+    preflight: (state as any).warpCruiseEnvelopePreflight ?? null,
+  });
+  if (contract) {
+    state.warpRouteTimeWorldline = contract;
+    return;
+  }
+  delete (state as any).warpRouteTimeWorldline;
+};
+
+const COMMITTED_LOCAL_REST_DIR = path.resolve(process.cwd(), "server/_generated");
+
+const toRepoRelativePath = (filePath: string): string =>
+  path.relative(process.cwd(), filePath).split(path.sep).join("/");
+
+export const resolveCommittedLocalRestMissionTargetDistanceContract = (
+  targetId: WarpMissionEstimatorTargetId = DEFAULT_WARP_MISSION_ESTIMATOR_TARGET_ID,
+): WarpMissionTargetDistanceContractV1 | null => {
+  if (!fs.existsSync(COMMITTED_LOCAL_REST_DIR)) return null;
+  const candidateNames = fs
+    .readdirSync(COMMITTED_LOCAL_REST_DIR)
+    .filter((name) => name.startsWith("local-rest_epoch-") && name.endsWith(".json"));
+  if (candidateNames.length === 0) return null;
+
+  let selected:
+    | {
+        absolutePath: string;
+        snapshot: Record<string, unknown>;
+        epochMs: number;
+        fileName: string;
+      }
+    | null = null;
+  for (const fileName of candidateNames) {
+    const absolutePath = path.join(COMMITTED_LOCAL_REST_DIR, fileName);
+    try {
+      const snapshot = JSON.parse(
+        fs.readFileSync(absolutePath, "utf8"),
+      ) as Record<string, unknown>;
+      const epochMs = Number(snapshot.epochMs);
+      if (!Number.isFinite(epochMs) || epochMs <= 0) continue;
+      if (
+        !selected ||
+        epochMs > selected.epochMs ||
+        (epochMs === selected.epochMs && fileName > selected.fileName)
+      ) {
+        selected = { absolutePath, snapshot, epochMs, fileName };
+      }
+    } catch {
+      continue;
+    }
+  }
+  if (!selected) return null;
+
+  const stars = Array.isArray(selected.snapshot.stars)
+    ? (selected.snapshot.stars as Record<string, unknown>[])
+    : null;
+  if (!stars) return null;
+  const star = stars.find((entry) => entry.id === targetId) ?? null;
+  if (!star) return null;
+
+  const ids =
+    star.ids && typeof star.ids === "object"
+      ? (star.ids as Record<string, unknown>)
+      : null;
+  const vectors =
+    star.vectors && typeof star.vectors === "object"
+      ? (star.vectors as Record<string, unknown>)
+      : null;
+  const heliocentric =
+    vectors?.heliocentric && typeof vectors.heliocentric === "object"
+      ? (vectors.heliocentric as Record<string, unknown>)
+      : null;
+  const nav =
+    star.nav && typeof star.nav === "object"
+      ? (star.nav as Record<string, unknown>)
+      : null;
+  if (!heliocentric || heliocentric.unit !== "m") return null;
+  if (nav?.frame !== "heliocentric-icrs") return null;
+
+  const x = Number(heliocentric.x);
+  const y = Number(heliocentric.y);
+  const z = Number(heliocentric.z);
+  const distanceParsecs = Number(star.distancePc);
+  const targetEpochMs = Number(star.epochMs);
+  const sourceCatalogRadiusPc = Number(selected.snapshot.radiusPc);
+  const sourceCatalogTotal = Number(selected.snapshot.total ?? stars.length);
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(z) ||
+    !(distanceParsecs > 0) ||
+    !(targetEpochMs > 0) ||
+    !(sourceCatalogRadiusPc > 0) ||
+    !(sourceCatalogTotal > 0)
+  ) {
+    return null;
+  }
+
+  const distanceMeters = Math.hypot(x, y, z);
+  if (!(distanceMeters > 0)) return null;
+  const derivedParsecs = distanceMeters / METERS_PER_PARSEC;
+  if (Math.abs(derivedParsecs - distanceParsecs) > 1e-6 * distanceParsecs) {
+    return null;
+  }
+
+  return {
+    contractVersion: "local_rest_target_distance_contract/v1",
+    status: "catalog_distance_resolved",
+    certified: true,
+    catalogFamily: "committed_local_rest_epoch_snapshot",
+    catalogSelectionRule: "max_epochMs_then_lexicographic_filename",
+    snapshotPath: toRepoRelativePath(selected.absolutePath),
+    snapshotEpochMs: selected.epochMs,
+    targetId,
+    targetName:
+      typeof ids?.name === "string" && ids.name.length > 0
+        ? ids.name
+        : targetId,
+    targetFrame: "heliocentric-icrs",
+    targetEpochMs,
+    distanceMeters,
+    distanceParsecs,
+    distanceLightYears: distanceParsecs * LIGHT_YEARS_PER_PARSEC,
+    sourceVectorNormMeters: distanceMeters,
+    sourceCatalogRadiusPc,
+    sourceCatalogTotal,
+    claimBoundary: [
+      "committed local-rest target distance only",
+      "distance provenance fixed to the selected committed epoch snapshot",
+      "not a mission-time estimate by itself",
+    ],
+    falsifierConditions: [
+      "committed_local_rest_snapshot_missing",
+      "target_missing_from_selected_snapshot",
+      "target_frame_not_heliocentric_icrs",
+      "target_distance_inconsistent_with_catalog_vector",
+    ],
+  };
+};
+
+const refreshWarpMissionTimeEstimator = (state: EnergyPipelineState): void => {
+  const targetDistance = resolveCommittedLocalRestMissionTargetDistanceContract();
+  const contract = buildWarpMissionTimeEstimatorContract({
+    worldline: (state as any).warpWorldline ?? null,
+    preflight: (state as any).warpCruiseEnvelopePreflight ?? null,
+    routeTimeWorldline: (state as any).warpRouteTimeWorldline ?? null,
+    targetDistance,
+  });
+  if (contract) {
+    state.warpMissionTimeEstimator = contract;
+    return;
+  }
+  delete (state as any).warpMissionTimeEstimator;
+};
+
+const refreshWarpMissionTimeComparison = (state: EnergyPipelineState): void => {
+  const contract = buildWarpMissionTimeComparisonContract({
+    missionTimeEstimator: (state as any).warpMissionTimeEstimator ?? null,
+  });
+  if (contract) {
+    state.warpMissionTimeComparison = contract;
+    return;
+  }
+  delete (state as any).warpMissionTimeComparison;
+};
+
+const refreshWarpCruiseEnvelope = (state: EnergyPipelineState): void => {
+  const contract = buildWarpCruiseEnvelopeContract({
+    preflight: (state as any).warpCruiseEnvelopePreflight ?? null,
+    routeTimeWorldline: (state as any).warpRouteTimeWorldline ?? null,
+    missionTimeEstimator: (state as any).warpMissionTimeEstimator ?? null,
+    missionTimeComparison: (state as any).warpMissionTimeComparison ?? null,
+  });
+  if (contract) {
+    state.warpCruiseEnvelope = contract;
+    return;
+  }
+  delete (state as any).warpCruiseEnvelope;
+};
+
+const DEFAULT_IN_HULL_PROPER_ACCELERATION_BRICK_DIMS: [number, number, number] = [
+  24,
+  24,
+  24,
+];
+const IN_HULL_PROPER_ACCELERATION_ALPHA_CONST_TOLERANCE = 1e-12;
+
+type InHullProperAccelerationSamplingPoint = {
+  sampleId: WarpInHullProperAccelerationSampleRole;
+  sampleRole: WarpInHullProperAccelerationSampleRole;
+  position_m: WarpInHullProperAccelerationVec3;
+};
+
+const resolveInHullProperAccelerationBrickDims = (
+  state: EnergyPipelineState,
+): [number, number, number] => {
+  const dims = Array.isArray(state.gr?.grid?.dims) ? state.gr?.grid?.dims : null;
+  if (
+    dims &&
+    dims.length === 3 &&
+    dims.every((entry) => Number.isFinite(entry) && Number(entry) > 0)
+  ) {
+    return dims.map((entry) => Math.max(1, Math.floor(Number(entry)))) as [
+      number,
+      number,
+      number,
+    ];
+  }
+  return [...DEFAULT_IN_HULL_PROPER_ACCELERATION_BRICK_DIMS];
+};
+
+const sampleDirectBrickChannelAtPoint = (
+  brick: {
+    dims: [number, number, number];
+    bounds: { min: Vec3; max: Vec3 };
+    channels: Record<string, { data: Float32Array } | undefined>;
+  },
+  fieldId: string,
+  point: WarpInHullProperAccelerationVec3,
+): number | null => {
+  const channel = brick.channels[fieldId];
+  if (!channel?.data) return null;
+  const [nx, ny, nz] = brick.dims;
+  const clampIndex = (value: number, size: number) =>
+    Math.max(0, Math.min(size - 1, value));
+  const xNorm =
+    (point[0] - brick.bounds.min[0]) /
+    Math.max(1e-9, brick.bounds.max[0] - brick.bounds.min[0]);
+  const yNorm =
+    (point[1] - brick.bounds.min[1]) /
+    Math.max(1e-9, brick.bounds.max[1] - brick.bounds.min[1]);
+  const zNorm =
+    (point[2] - brick.bounds.min[2]) /
+    Math.max(1e-9, brick.bounds.max[2] - brick.bounds.min[2]);
+  const ix = clampIndex(Math.floor(xNorm * nx), nx);
+  const iy = clampIndex(Math.floor(yNorm * ny), ny);
+  const iz = clampIndex(Math.floor(zNorm * nz), nz);
+  const idx = iz * nx * ny + iy * nx + ix;
+  const value = channel.data[idx];
+  return Number.isFinite(value) ? value : null;
+};
+
+const buildInHullProperAccelerationSamplingGeometry = (
+  state: EnergyPipelineState,
+  warpState: Record<string, any> | undefined,
+): WarpInHullProperAccelerationSamplingGeometry | null => {
+  const transportSampleFamily = warpState?.solveBackedTransportSampleFamily as
+    | SolveBackedWarpTransportSampleFamily
+    | undefined;
+  let centerlineAxis = toWarpWorldlineVec3(transportSampleFamily?.axes.centerline);
+  let portStarboardAxis = toWarpWorldlineVec3(transportSampleFamily?.axes.portStarboard);
+  let dorsalVentralAxis = toWarpWorldlineVec3(transportSampleFamily?.axes.dorsalVentral);
+  if (!centerlineAxis || !portStarboardAxis || !dorsalVentralAxis) {
+    const driveDirection = normalizeVec(
+      toFiniteVec3(
+        (state.dynamicConfig as any)?.warpDriveDirection ??
+          (state as any)?.warpGeometry?.driveDirection ??
+          state.driveDir ??
+          [1, 0, 0],
+        [1, 0, 0],
+      ),
+    );
+    const transverseReference =
+      Math.abs(driveDirection[2]) < 0.95
+        ? ([0, 0, 1] as WarpWorldlineVec3)
+        : ([0, 1, 0] as WarpWorldlineVec3);
+    centerlineAxis = [...driveDirection];
+    portStarboardAxis = normalizeVec(crossVec(transverseReference, driveDirection));
+    dorsalVentralAxis = normalizeVec(crossVec(driveDirection, portStarboardAxis));
+  }
+  if (!centerlineAxis || !portStarboardAxis || !dorsalVentralAxis) return null;
+
+  const hull = resolveHullGeometry(state);
+  const interiorClearance_m = Math.max(1e-3, hull.wallThickness_m * 4);
+  const resolveInteriorOffset = (halfExtent: number) =>
+    Math.max(1e-6, Math.min(halfExtent * 0.25, Math.max(1e-6, halfExtent - interiorClearance_m)));
+  const centerlineOffset_m = resolveInteriorOffset(hull.Lx_m / 2);
+  const transverseOffset_m = resolveInteriorOffset(hull.Ly_m / 2);
+  const verticalOffset_m = resolveInteriorOffset(hull.Lz_m / 2);
+
+  const sampleDefs: InHullProperAccelerationSamplingPoint[] = [
+    {
+      sampleId: "cabin_center",
+      sampleRole: "cabin_center",
+      position_m: [0, 0, 0],
+    },
+    {
+      sampleId: "cabin_fore",
+      sampleRole: "cabin_fore",
+      position_m: [
+        centerlineAxis[0] * centerlineOffset_m,
+        centerlineAxis[1] * centerlineOffset_m,
+        centerlineAxis[2] * centerlineOffset_m,
+      ],
+    },
+    {
+      sampleId: "cabin_aft",
+      sampleRole: "cabin_aft",
+      position_m: [
+        -centerlineAxis[0] * centerlineOffset_m,
+        -centerlineAxis[1] * centerlineOffset_m,
+        -centerlineAxis[2] * centerlineOffset_m,
+      ],
+    },
+    {
+      sampleId: "cabin_port",
+      sampleRole: "cabin_port",
+      position_m: [
+        portStarboardAxis[0] * transverseOffset_m,
+        portStarboardAxis[1] * transverseOffset_m,
+        portStarboardAxis[2] * transverseOffset_m,
+      ],
+    },
+    {
+      sampleId: "cabin_starboard",
+      sampleRole: "cabin_starboard",
+      position_m: [
+        -portStarboardAxis[0] * transverseOffset_m,
+        -portStarboardAxis[1] * transverseOffset_m,
+        -portStarboardAxis[2] * transverseOffset_m,
+      ],
+    },
+    {
+      sampleId: "cabin_dorsal",
+      sampleRole: "cabin_dorsal",
+      position_m: [
+        dorsalVentralAxis[0] * verticalOffset_m,
+        dorsalVentralAxis[1] * verticalOffset_m,
+        dorsalVentralAxis[2] * verticalOffset_m,
+      ],
+    },
+    {
+      sampleId: "cabin_ventral",
+      sampleRole: "cabin_ventral",
+      position_m: [
+        -dorsalVentralAxis[0] * verticalOffset_m,
+        -dorsalVentralAxis[1] * verticalOffset_m,
+        -dorsalVentralAxis[2] * verticalOffset_m,
+      ],
+    },
+  ];
+
+  return {
+    familyId: "nhm2_cabin_cross",
+    description:
+      "Deterministic bounded cabin-cross sample family in the comoving Cartesian chart: center, fore, aft, port, starboard, dorsal, and ventral interior points. This family is for observer-defined experienced proper acceleration only.",
+    coordinateFrame: "comoving_cartesian",
+    originDefinition: "ship_center",
+    ordering: sampleDefs.map((entry) => entry.sampleId),
+    representativeSampleId: "cabin_center",
+    axes: {
+      centerline: [...centerlineAxis],
+      portStarboard: [...portStarboardAxis],
+      dorsalVentral: [...dorsalVentralAxis],
+    },
+    offsets_m: {
+      centerline: centerlineOffset_m,
+      transverse: transverseOffset_m,
+      vertical: verticalOffset_m,
+      interiorClearance: interiorClearance_m,
+    },
+    samplePositions_m: Object.fromEntries(
+      sampleDefs.map((entry) => [entry.sampleId, [...entry.position_m]]),
+    ) as WarpInHullProperAccelerationSamplingGeometry["samplePositions_m"],
+  };
+};
+
+export const buildWarpInHullProperAccelerationContractFromState = async (
+  state: EnergyPipelineState,
+): Promise<WarpInHullProperAccelerationContractV1 | null> => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const adapter = warpState?.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  const metricContract = warpState?.metricT00Contract as MetricT00Contract | undefined;
+  const metricT00Source =
+    typeof warpState?.metricT00Source === "string"
+      ? String(warpState.metricT00Source)
+      : typeof warpState?.stressEnergySource === "string"
+        ? String(warpState.stressEnergySource)
+        : null;
+  const metricT00Ref =
+    typeof warpState?.metricT00Ref === "string" && warpState.metricT00Ref.length > 0
+      ? String(warpState.metricT00Ref)
+      : resolveCanonicalMetricT00Ref(warpState ?? {}, adapter) ?? null;
+  const chartLabel = adapter?.chart?.label ?? null;
+  const chartContractStatus = adapter?.chart?.contractStatus ?? null;
+  const metricFamily = metricContract?.family ?? adapter?.family ?? "unknown";
+  if (metricT00Source !== "metric") return null;
+  if (metricContract?.status !== "ok") return null;
+  if (metricContract?.observer !== "eulerian_n") return null;
+  if (metricContract?.normalization !== "si_stress") return null;
+  if (metricContract?.unitSystem !== "SI") return null;
+  if (chartLabel !== "comoving_cartesian") return null;
+  if (chartContractStatus !== "ok") return null;
+  if (metricFamily !== "natario" && metricFamily !== "natario_sdf") return null;
+  if (
+    metricT00Ref == null ||
+    metricT00Ref.includes("shift_lapse") ||
+    metricT00Ref.includes("nhm2_shift_lapse")
+  ) {
+    return null;
+  }
+
+  const samplingGeometry = buildInHullProperAccelerationSamplingGeometry(state, warpState);
+  if (!samplingGeometry) return null;
+
+  const previousGlobalState = getGlobalPipelineState();
+  const shouldRestoreGlobalState = previousGlobalState !== state;
+  if (shouldRestoreGlobalState) {
+    setGlobalPipelineState(state);
+  }
+
+  let brick:
+    | {
+        dims: [number, number, number];
+        bounds: { min: Vec3; max: Vec3 };
+        voxelSize_m: [number, number, number];
+        channels: Record<string, { data: Float32Array; min: number; max: number } | undefined>;
+        meta?: { status?: string };
+        stats?: { solverHealth?: { status?: string } };
+      }
+    | null = null;
+  try {
+    const brickModule = await import("./gr-evolve-brick.ts");
+    brick = brickModule.buildGrEvolveBrick({
+      dims: resolveInHullProperAccelerationBrickDims(state),
+      includeMatter: false,
+      includeConstraints: false,
+      includeKij: false,
+      includeInvariants: false,
+    }) as unknown as typeof brick;
+  } finally {
+    if (shouldRestoreGlobalState) {
+      setGlobalPipelineState(previousGlobalState);
+    }
+  }
+
+  if (!brick) return null;
+  if (brick.meta?.status !== "CERTIFIED") return null;
+  if (brick.stats?.solverHealth?.status !== "CERTIFIED") return null;
+
+  const sampleSummaries = samplingGeometry.ordering.map((sampleId) => {
+    const position_m = samplingGeometry.samplePositions_m[sampleId];
+    const alpha = sampleDirectBrickChannelAtPoint(brick, "alpha", position_m);
+    const accelX = sampleDirectBrickChannelAtPoint(
+      brick,
+      "eulerian_accel_geom_x",
+      position_m,
+    );
+    const accelY = sampleDirectBrickChannelAtPoint(
+      brick,
+      "eulerian_accel_geom_y",
+      position_m,
+    );
+    const accelZ = sampleDirectBrickChannelAtPoint(
+      brick,
+      "eulerian_accel_geom_z",
+      position_m,
+    );
+    const accelMagDirect = sampleDirectBrickChannelAtPoint(
+      brick,
+      "eulerian_accel_geom_mag",
+      position_m,
+    );
+    if (
+      alpha == null ||
+      accelX == null ||
+      accelY == null ||
+      accelZ == null ||
+      accelMagDirect == null
+    ) {
+      return null;
+    }
+    const componentMagnitude = Math.hypot(accelX, accelY, accelZ);
+    const properAccelerationGeomMagnitude_per_m = Math.max(
+      Math.abs(accelMagDirect),
+      componentMagnitude,
+    );
+    const properAccelerationMagnitude_mps2 = properAccelerationGeomToMps2(
+      properAccelerationGeomMagnitude_per_m,
+    );
+    return {
+      sampleId,
+      sampleRole: sampleId,
+      position_m: [...position_m] as WarpInHullProperAccelerationVec3,
+      alpha,
+      properAccelerationGeomVector_per_m: [
+        accelX,
+        accelY,
+        accelZ,
+      ] as WarpInHullProperAccelerationVec3,
+      properAccelerationGeomMagnitude_per_m,
+      properAccelerationMagnitude_mps2,
+      properAccelerationMagnitude_g: properAccelerationMps2ToG(
+        properAccelerationMagnitude_mps2,
+      ),
+    };
+  });
+  if (sampleSummaries.some((entry) => entry == null)) return null;
+
+  const typedSampleSummaries = sampleSummaries as Array<
+    NonNullable<(typeof sampleSummaries)[number]>
+  >;
+  const alphaValues = typedSampleSummaries.map((entry) => entry.alpha);
+  const alphaSpread = Math.max(...alphaValues) - Math.min(...alphaValues);
+  const channelExtrema = summarizeInHullProperAccelerationChannelExtrema({
+    accelMagMin: brick.channels.eulerian_accel_geom_mag?.min,
+    accelMagMax: brick.channels.eulerian_accel_geom_mag?.max,
+    alphaGradXMin: brick.channels.alpha_grad_x?.min,
+    alphaGradXMax: brick.channels.alpha_grad_x?.max,
+    alphaGradYMin: brick.channels.alpha_grad_y?.min,
+    alphaGradYMax: brick.channels.alpha_grad_y?.max,
+    alphaGradZMin: brick.channels.alpha_grad_z?.min,
+    alphaGradZMax: brick.channels.alpha_grad_z?.max,
+  });
+  const allSampleMagnitudesZero = typedSampleSummaries.every(
+    (entry) => entry.properAccelerationGeomMagnitude_per_m === 0,
+  );
+  const expectedZeroProfileByModel =
+    warpState?.lapseSummary == null &&
+    adapter?.lapseSummary == null &&
+    alphaSpread <= IN_HULL_PROPER_ACCELERATION_ALPHA_CONST_TOLERANCE;
+  let resolutionAdequacyStatus:
+    | "adequate_constant_lapse_zero_profile"
+    | "adequate_direct_brick_profile"
+    | null = null;
+  let resolutionAdequacyNote: string | null = null;
+  if (
+    allSampleMagnitudesZero &&
+    channelExtrema.wholeBrickAccelerationAbsMax_per_m === 0 &&
+    channelExtrema.wholeBrickGradientAbsMax_per_m === 0 &&
+    expectedZeroProfileByModel
+  ) {
+    resolutionAdequacyStatus = "adequate_constant_lapse_zero_profile";
+    resolutionAdequacyNote =
+      "Direct gr-evolve brick sampling shows a zero proper-acceleration profile across the bounded cabin-cross family, and the current NHM2 metric path has no declared lapse-profile companion. This is treated as a certified constant-lapse zero-profile result rather than as an under-resolved fallback case.";
+  } else if (channelExtrema.wholeBrickAccelerationAbsMax_per_m > 0) {
+    resolutionAdequacyStatus = "adequate_direct_brick_profile";
+    resolutionAdequacyNote =
+      "Direct gr-evolve brick sampling resolves a nonzero interior Eulerian proper-acceleration profile on the bounded cabin-cross family without analytic fallback.";
+  } else {
+    return null;
+  }
+
+  return buildWarpInHullProperAccelerationContract({
+    sourceSurface: {
+      surfaceId: "nhm2_metric_in_hull_proper_acceleration_profile",
+      producer: "server/energy-pipeline.ts",
+      provenanceClass: "solve_backed",
+      brickChannelSource: "gr_evolve_brick",
+      accelerationField: "eulerian_accel_geom_*",
+      metricT00Ref,
+      metricT00Source: "metric",
+      metricFamily,
+      metricT00ContractStatus: "ok",
+      chartContractStatus: "ok",
+      brickStatus: "CERTIFIED",
+      brickSolverStatus: "CERTIFIED",
+    },
+    chart: {
+      label: "comoving_cartesian",
+      coordinateMap:
+        typeof adapter?.chart?.coordinateMap === "string"
+          ? String(adapter.chart.coordinateMap)
+          : null,
+      chartFixed: true,
+    },
+    samplingGeometry,
+    sampleSummaries: typedSampleSummaries.map((entry) => ({
+      sampleId: entry.sampleId,
+      sampleRole: entry.sampleRole,
+      position_m: [...entry.position_m] as WarpInHullProperAccelerationVec3,
+      properAccelerationGeomVector_per_m: [
+        ...entry.properAccelerationGeomVector_per_m,
+      ] as WarpInHullProperAccelerationVec3,
+      properAccelerationGeomMagnitude_per_m:
+        entry.properAccelerationGeomMagnitude_per_m,
+      properAccelerationMagnitude_mps2: entry.properAccelerationMagnitude_mps2,
+      properAccelerationMagnitude_g: entry.properAccelerationMagnitude_g,
+    })),
+    resolutionAdequacy: {
+      status: resolutionAdequacyStatus,
+      criterionId: "direct_gr_evolve_brick_no_fallback_v1",
+      criterionMeaning:
+        "Certified mode samples direct gr-evolve brick Eulerian-acceleration channels only. A zero profile is certifiable only when the whole sampled brick reports zero acceleration/gradient extrema and the solve path exposes no declared lapse-profile companion. Otherwise a certified profile requires direct nonzero brick acceleration support; unresolved zero channels fail closed.",
+      brickDims: [...brick.dims] as [number, number, number],
+      voxelSize_m: [...brick.voxelSize_m] as [number, number, number],
+      wholeBrickAccelerationAbsMax_per_m:
+        channelExtrema.wholeBrickAccelerationAbsMax_per_m,
+      wholeBrickGradientAbsMax_per_m:
+        channelExtrema.wholeBrickGradientAbsMax_per_m,
+      allSampleMagnitudesZero,
+      expectedZeroProfileByModel,
+      note: resolutionAdequacyNote,
+    },
+    claimBoundary: [
+      "bounded in-hull observer-defined proper acceleration only",
+      "experienced acceleration for Eulerian cabin observers only",
+      "not a curvature-gravity certificate",
+      "not a comfort or safety certification by itself",
+    ],
+    falsifierConditions: [
+      "metric_t00_source_not_metric",
+      "metric_contract_status_not_ok",
+      "chart_contract_status_not_ok",
+      "reference_only_shift_lapse_family_selected",
+      "brick_status_not_certified",
+      "brick_solver_status_not_certified",
+      "direct_gr_evolve_brick_channels_missing",
+      "under_resolved_direct_brick_profile",
+      "analytic_fallback_requested_for_certified_mode",
+    ],
+    nonClaims: [
+      "not curvature-gravity certified",
+      "not comfort-certified",
+      "not safety-certified",
+      "not viability-promotion evidence",
+      "not source-mechanism promotion",
+    ],
+  });
+};
+
+const refreshWarpInHullProperAcceleration = async (
+  state: EnergyPipelineState,
+): Promise<void> => {
+  const contract = await buildWarpInHullProperAccelerationContractFromState(state);
+  if (contract) {
+    state.warpInHullProperAcceleration = contract;
+    return;
+  }
+  delete (state as any).warpInHullProperAcceleration;
 };
 
 const refreshMetricT00Contract = (state: EnergyPipelineState): void => {
@@ -5883,6 +7079,29 @@ export async function calculateEnergyPipeline(
         "metricAdapter missing from warp module result",
       );
     }
+    const metricT00Source =
+      typeof sanitizedWarp.metricT00Source === "string"
+        ? String(sanitizedWarp.metricT00Source)
+        : typeof sanitizedWarp.stressEnergySource === "string"
+          ? String(sanitizedWarp.stressEnergySource)
+          : null;
+    const metricT00Ref =
+      typeof sanitizedWarp.metricT00Ref === "string" && sanitizedWarp.metricT00Ref.length > 0
+        ? String(sanitizedWarp.metricT00Ref)
+        : resolveCanonicalMetricT00Ref(
+            sanitizedWarp as Record<string, any>,
+            sanitizedWarp.metricAdapter as WarpMetricAdapterSnapshot | undefined,
+          ) ?? null;
+    const solveBackedTransportSampleFamily = buildSolveBackedWarpTransportSampleFamily({
+      state,
+      warpResult: warp as Record<string, unknown>,
+      adapter: sanitizedWarp.metricAdapter as WarpMetricAdapterSnapshot | undefined,
+      metricT00Source,
+      metricT00Ref,
+    });
+    if (solveBackedTransportSampleFamily) {
+      sanitizedWarp.solveBackedTransportSampleFamily = solveBackedTransportSampleFamily;
+    }
 
     // Store warp results in state for API access
     (state as any).warp = sanitizedWarp;
@@ -6197,6 +7416,13 @@ export async function calculateEnergyPipeline(
     });
   }
   refreshMetricT00Contract(state);
+  refreshWarpWorldlineContract(state);
+  refreshWarpCruiseEnvelopePreflight(state);
+  refreshWarpRouteTimeWorldline(state);
+  refreshWarpMissionTimeEstimator(state);
+  refreshWarpMissionTimeComparison(state);
+  refreshWarpCruiseEnvelope(state);
+  await refreshWarpInHullProperAcceleration(state);
   refreshMetricConstraintAudit(state);
   refreshCl3Telemetry(state);
   refreshThetaAuditFromMetricAdapter(state);

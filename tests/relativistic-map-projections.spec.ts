@@ -3,6 +3,12 @@ import {
   buildRelativisticMapProjection,
   type RelativisticMapVec3,
 } from "../shared/relativistic-map-projections";
+import {
+  makeWarpMissionTimeComparisonFixture,
+  makeWarpMissionTimeEstimatorFixture,
+  makeWarpRouteTimeWorldlineFixture,
+  makeWarpWorldlineFixture,
+} from "./helpers/warp-worldline-fixture";
 
 const SPEED_OF_LIGHT_MPS = 299_792_458;
 
@@ -85,5 +91,80 @@ describe("relativistic map projections", () => {
     expect(result.fail_id).toBe("RELATIVISTIC_MAP_WARP_WORLDLINE_REQUIRED");
     expect(result.claim_tier).toBe("diagnostic");
     expect(result.certifying).toBe(false);
+  });
+
+  it("computes a bounded local-comoving warp projection only when a certified worldline contract is present", () => {
+    const result = buildRelativisticMapProjection({
+      projectionKind: "instantaneous_ship_view",
+      sourceModel: "warp_worldline_local_comoving",
+      catalog: [{ id: "demo", position_m: [10, 5, 0] }],
+      warpWorldline: makeWarpWorldlineFixture(),
+    });
+
+    expect(result.status).toBe("computed");
+    expect(result.provenance_class).toBe("solve_backed");
+    if (result.status !== "computed" || result.projectionKind !== "instantaneous_ship_view") return;
+    const [entry] = result.entries;
+    expect(entry.shipFramePosition_m[0]).toBeCloseTo(8, 8);
+    expect(entry.shipFramePosition_m[1]).toBeCloseTo(5, 8);
+    expect(result.metadata).toEqual(
+      expect.objectContaining({
+        trajectory_model: "warp_worldline_bounded_local_comoving",
+        worldlineContractVersion: "warp_worldline_contract/v1",
+        validityRegimeId: "nhm2_local_comoving_shell_cross",
+        representativeSampleId: "centerline_center",
+        sampleGeometryFamilyId: "nhm2_centerline_shell_cross",
+        transportVariationStatus: "descriptor_and_dtau_varied",
+        sampleFamilyAdequacy: "adequate_for_bounded_cruise_preflight",
+        routeTimeStatus: "deferred",
+      }),
+    );
+  });
+
+  it("keeps warp route-time projections deferred even when the bounded local-comoving contract is present", () => {
+    const warpWorldline = makeWarpWorldlineFixture();
+    const warpRouteTimeWorldline = makeWarpRouteTimeWorldlineFixture(warpWorldline);
+    const result = buildRelativisticMapProjection({
+      projectionKind: "sun_centered_accessibility",
+      sourceModel: "warp_worldline_route_time",
+      catalog: [{ id: "alpha-centauri", position_m: [1, 0, 0] }],
+      warpWorldline,
+      warpRouteTimeWorldline,
+      warpMissionTimeEstimator: makeWarpMissionTimeEstimatorFixture({
+        worldline: warpWorldline,
+        routeTime: warpRouteTimeWorldline,
+      }),
+      warpMissionTimeComparison: makeWarpMissionTimeComparisonFixture({
+        missionTimeEstimator: makeWarpMissionTimeEstimatorFixture({
+          worldline: warpWorldline,
+          routeTime: warpRouteTimeWorldline,
+        }),
+      }),
+    });
+
+    expect(result.status).toBe("unavailable");
+    expect(result.fail_id).toBe("RELATIVISTIC_MAP_WARP_ROUTE_TIME_DEFERRED");
+    expect(result.metadata).toEqual(
+      expect.objectContaining({
+        routeTimeContractVersion: "warp_route_time_worldline/v1",
+        routeModelId: "nhm2_bounded_local_probe_lambda",
+        routeParameterName: "lambda",
+        routeTimeStatus: "bounded_local_segment_certified",
+        missionTimeEstimatorSummary: expect.objectContaining({
+          contractVersion: "warp_mission_time_estimator/v1",
+          estimatorModelId: "nhm2_repeated_local_probe_segment_estimator",
+          targetId: "alpha-cen-a",
+          targetName: "Alpha Centauri A",
+        }),
+        missionTimeComparisonSummary: expect.objectContaining({
+          contractVersion: "warp_mission_time_comparison/v1",
+          comparisonModelId: "nhm2_classical_no_time_dilation_reference",
+          targetId: "alpha-cen-a",
+          targetName: "Alpha Centauri A",
+          comparisonInterpretationStatus:
+            "bounded_relativistic_differential_detected",
+        }),
+      }),
+    );
   });
 });

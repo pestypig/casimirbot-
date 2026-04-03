@@ -1,6 +1,7 @@
 import express, { type Response } from "express";
 import { z } from "zod";
 import { buildRelativisticMapProjection } from "@shared/relativistic-map-projections";
+import { getGlobalPipelineState } from "../../energy-pipeline";
 
 const helixRelativisticMapRouter = express.Router();
 
@@ -57,7 +58,30 @@ helixRelativisticMapRouter.post("/project", (req, res) => {
     return;
   }
 
-  const projection = buildRelativisticMapProjection(parsed.data);
+  const pipelineState = getGlobalPipelineState() as Record<string, unknown> | null;
+  const warpWorldline =
+    parsed.data.sourceModel === "flat_sr_flip_burn_control"
+      ? undefined
+      : ((pipelineState as any)?.warpWorldline ?? null);
+  const warpRouteTimeWorldline =
+    parsed.data.sourceModel === "warp_worldline_route_time"
+      ? ((pipelineState as any)?.warpRouteTimeWorldline ?? null)
+      : undefined;
+  const warpMissionTimeEstimator =
+    parsed.data.sourceModel === "warp_worldline_route_time"
+      ? ((pipelineState as any)?.warpMissionTimeEstimator ?? null)
+      : undefined;
+  const warpMissionTimeComparison =
+    parsed.data.sourceModel === "warp_worldline_route_time"
+      ? ((pipelineState as any)?.warpMissionTimeComparison ?? null)
+      : undefined;
+  const projection = buildRelativisticMapProjection({
+    ...parsed.data,
+    warpWorldline,
+    warpRouteTimeWorldline,
+    warpMissionTimeEstimator,
+    warpMissionTimeComparison,
+  });
   res.setHeader("Cache-Control", "no-store");
   res.json({
     ok: projection.status === "computed",

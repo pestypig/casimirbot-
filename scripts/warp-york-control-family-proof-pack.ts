@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 import type {
@@ -17,6 +17,51 @@ import {
   type WarpRodcStability,
   type WarpRodcVerdictStatus,
 } from "../shared/warp-rodc-contract";
+import {
+  buildWarpCruiseEnvelopePreflightContractFromWorldline,
+  isCertifiedWarpCruiseEnvelopePreflightContract,
+  type WarpCruiseEnvelopePreflightCandidateV1,
+  type WarpCruiseEnvelopePreflightContractV1,
+} from "../shared/contracts/warp-cruise-envelope-preflight.v1";
+import {
+  buildWarpRouteTimeWorldlineContract,
+  isCertifiedWarpRouteTimeWorldlineContract,
+  type WarpRouteTimeWorldlineContractV1,
+  type WarpRouteTimeWorldlineProgressionSampleV1,
+} from "../shared/contracts/warp-route-time-worldline.v1";
+import {
+  buildWarpMissionTimeEstimatorContract,
+  isCertifiedWarpMissionTargetDistanceContract,
+  isCertifiedWarpMissionTimeEstimatorContract,
+  type WarpMissionTargetDistanceContractV1,
+  type WarpMissionTimeEstimatorContractV1,
+} from "../shared/contracts/warp-mission-time-estimator.v1";
+import {
+  buildWarpMissionTimeComparisonContract,
+  isCertifiedWarpMissionTimeComparisonContract,
+  type WarpMissionTimeComparisonContractV1,
+} from "../shared/contracts/warp-mission-time-comparison.v1";
+import {
+  buildWarpCruiseEnvelopeContract,
+  isCertifiedWarpCruiseEnvelopeContract,
+  type WarpCruiseEnvelopeContractV1,
+} from "../shared/contracts/warp-cruise-envelope.v1";
+import {
+  isCertifiedWarpInHullProperAccelerationContract,
+  type WarpInHullProperAccelerationContractV1,
+} from "../shared/contracts/warp-in-hull-proper-acceleration.v1";
+import {
+  WARP_PROOF_SURFACE_MANIFEST_PUBLICATION_MODE,
+  WARP_PROOF_SURFACE_MANIFEST_SURFACE_ORDER,
+  buildWarpProofSurfaceManifestContract,
+  isCertifiedWarpProofSurfaceManifestContract,
+  type WarpProofSurfaceManifestContractV1,
+  type WarpProofSurfaceManifestSurfaceEntryV1,
+} from "../shared/contracts/warp-proof-surface-manifest.v1";
+import {
+  isCertifiedWarpWorldlineContract,
+  type WarpWorldlineContractV1,
+} from "../shared/contracts/warp-worldline-contract.v1";
 import {
   hashFloat32,
   loadHullScientificSnapshot,
@@ -405,6 +450,138 @@ const DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_OUT_MD = path.join(
 const DEFAULT_CURVATURE_INVARIANT_VISUALIZATION_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-curvature-invariant-visualization-latest.md",
+);
+const DEFAULT_WARP_WORLDLINE_PROOF_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-warp-worldline-proof-${DATE_STAMP}.json`,
+);
+const DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-warp-worldline-proof-latest.json",
+);
+const DEFAULT_WARP_WORLDLINE_PROOF_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-warp-worldline-proof-${DATE_STAMP}.md`,
+);
+const DEFAULT_WARP_WORLDLINE_PROOF_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-warp-worldline-proof-latest.md",
+);
+const DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-cruise-envelope-preflight-${DATE_STAMP}.json`,
+);
+const DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-cruise-envelope-preflight-latest.json",
+);
+const DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-cruise-envelope-preflight-${DATE_STAMP}.md`,
+);
+const DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-cruise-envelope-preflight-latest.md",
+);
+const DEFAULT_ROUTE_TIME_WORLDLINE_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-route-time-worldline-${DATE_STAMP}.json`,
+);
+const DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-route-time-worldline-latest.json",
+);
+const DEFAULT_ROUTE_TIME_WORLDLINE_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-route-time-worldline-${DATE_STAMP}.md`,
+);
+const DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-route-time-worldline-latest.md",
+);
+const DEFAULT_MISSION_TIME_ESTIMATOR_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-mission-time-estimator-${DATE_STAMP}.json`,
+);
+const DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-mission-time-estimator-latest.json",
+);
+const DEFAULT_MISSION_TIME_ESTIMATOR_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-mission-time-estimator-${DATE_STAMP}.md`,
+);
+const DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-mission-time-estimator-latest.md",
+);
+const DEFAULT_MISSION_TIME_COMPARISON_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-mission-time-comparison-${DATE_STAMP}.json`,
+);
+const DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-mission-time-comparison-latest.json",
+);
+const DEFAULT_MISSION_TIME_COMPARISON_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-mission-time-comparison-${DATE_STAMP}.md`,
+);
+const DEFAULT_MISSION_TIME_COMPARISON_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-mission-time-comparison-latest.md",
+);
+const DEFAULT_CRUISE_ENVELOPE_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-cruise-envelope-${DATE_STAMP}.json`,
+);
+const DEFAULT_CRUISE_ENVELOPE_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-cruise-envelope-latest.json",
+);
+const DEFAULT_CRUISE_ENVELOPE_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-cruise-envelope-${DATE_STAMP}.md`,
+);
+const DEFAULT_CRUISE_ENVELOPE_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-cruise-envelope-latest.md",
+);
+const DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-in-hull-proper-acceleration-${DATE_STAMP}.json`,
+);
+const DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-in-hull-proper-acceleration-latest.json",
+);
+const DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-in-hull-proper-acceleration-${DATE_STAMP}.md`,
+);
+const DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-in-hull-proper-acceleration-latest.md",
+);
+const DEFAULT_PROOF_SURFACE_MANIFEST_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-proof-surface-manifest-${DATE_STAMP}.json`,
+);
+const DEFAULT_PROOF_SURFACE_MANIFEST_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-proof-surface-manifest-latest.json",
+);
+const DEFAULT_PROOF_SURFACE_MANIFEST_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-proof-surface-manifest-${DATE_STAMP}.md`,
+);
+const DEFAULT_PROOF_SURFACE_MANIFEST_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-proof-surface-manifest-latest.md",
+);
+export const DEFAULT_PROOF_SURFACE_PUBLICATION_LOCK_PATH = path.join(
+  FULL_SOLVE_DIR,
+  ".nhm2-proof-surface-publication.lock",
 );
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
@@ -2188,6 +2365,365 @@ type Nhm2CurvatureInvariantVisualizationArtifact = {
     | "surfaced_as_first_class_scientific_family";
   renderTaxonomy: RenderTaxonomySummary | null;
   notes: string[];
+  checksum?: string;
+};
+
+type Nhm2WarpWorldlineProofArtifact = {
+  artifactType: "nhm2_warp_worldline_proof/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourceSurface: WarpWorldlineContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+    timeCoordinateName: string;
+    positionCoordinates: string[];
+    validityRegimeId: string;
+  };
+  representativeSampleId: string;
+  sampleGeometry: {
+    familyId: string;
+    description: string;
+    ordering: string[];
+    axes: {
+      centerline: [number, number, number];
+      portStarboard: [number, number, number];
+      dorsalVentral: [number, number, number];
+    };
+    offsets_m: {
+      centerline: number;
+      shellLongitudinal: number;
+      shellTransverse: number;
+      shellVertical: number;
+      shellClearance: number;
+    };
+  };
+  transportInterpretation: {
+    coordinateVelocityInterpretation: string;
+    effectiveTransportInterpretation: string;
+    certifiedSpeedMeaning: boolean;
+    note: string;
+  };
+  transportVariation: WarpWorldlineContractV1["transportVariation"];
+  transportInformativenessStatus: WarpWorldlineContractV1["transportInformativenessStatus"];
+  sampleFamilyAdequacy: WarpWorldlineContractV1["sampleFamilyAdequacy"];
+  flatnessInterpretation: string;
+  certifiedTransportMeaning: WarpWorldlineContractV1["certifiedTransportMeaning"];
+  eligibleNextProducts: WarpWorldlineContractV1["eligibleNextProducts"];
+  nextRequiredUpgrade: string;
+  sampleCount: number;
+  dtauDt: {
+    representative: number;
+    min: number;
+    max: number;
+    units: "dimensionless";
+  };
+  normalizationResidual: {
+    representative: number;
+    maxAbs: number;
+    tolerance: number;
+    relation: string;
+  };
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  sampleSummaries: Array<{
+    sampleId: string;
+    sampleRole: string;
+    sourceModel: string;
+    transportProvenance: string;
+    coordinateTime_s: number;
+    position_m: [number, number, number];
+    coordinateVelocity: [number, number, number];
+    betaCoord: [number, number, number];
+    effectiveTransportVelocityCoord: [number, number, number];
+    dtau_dt: number;
+    normalizationResidual: number;
+  }>;
+  checksum?: string;
+};
+
+type Nhm2CruiseEnvelopePreflightArtifact = {
+  artifactType: "nhm2_cruise_envelope_preflight/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  sourceWorldlineArtifactPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourceWorldlineContractVersion: string;
+  sourceSurface: WarpCruiseEnvelopePreflightContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+    validityRegimeId: string;
+  };
+  sourceSampleGeometryFamilyId: string;
+  preflightQuantityId: string;
+  preflightQuantityMeaning: string;
+  preflightQuantityUnits: "dimensionless";
+  transportVariationStatus: string;
+  transportInformativenessStatus: string;
+  sampleFamilyAdequacy: string;
+  flatnessInterpretation: string;
+  certifiedTransportMeaning: string;
+  descriptorNormSummary: WarpCruiseEnvelopePreflightContractV1["descriptorNormSummary"];
+  boundedCruisePreflightBand: WarpCruiseEnvelopePreflightContractV1["boundedCruisePreflightBand"];
+  routeTimeStatus: "deferred";
+  candidateCount: number;
+  admissibleCount: number;
+  rejectedCount: number;
+  candidateSet: WarpCruiseEnvelopePreflightCandidateV1[];
+  admissibleCandidates: WarpCruiseEnvelopePreflightCandidateV1[];
+  rejectedCandidates: WarpCruiseEnvelopePreflightCandidateV1[];
+  gateReasons: string[];
+  eligibleNextProducts: string[];
+  nextRequiredUpgrade: string;
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2RouteTimeWorldlineArtifact = {
+  artifactType: "nhm2_route_time_worldline/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  sourceWorldlineArtifactPath: string | null;
+  sourceCruisePreflightArtifactPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourceWorldlineContractVersion: string;
+  sourceCruisePreflightContractVersion: string;
+  sourceSurface: WarpRouteTimeWorldlineContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+    validityRegimeId: string;
+  };
+  routeModelId: string;
+  routeModelMeaning: string;
+  routeParameterName: string;
+  routeParameterMeaning: string;
+  sourceSampleGeometryFamilyId: string;
+  sampleFamilyAdequacy: string;
+  transportVariationStatus: string;
+  transportInformativenessStatus: string;
+  progressionSampleCount: number;
+  representativeProgressionSampleId: string;
+  progressionSamples: WarpRouteTimeWorldlineProgressionSampleV1[];
+  coordinateTimeSummary: WarpRouteTimeWorldlineContractV1["coordinateTimeSummary"];
+  properTimeSummary: WarpRouteTimeWorldlineContractV1["properTimeSummary"];
+  descriptorScheduleSummary: WarpRouteTimeWorldlineContractV1["descriptorScheduleSummary"];
+  routeProgressMeaning: string;
+  routeTimeStatus: string;
+  nextEligibleProducts: string[];
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2MissionTimeEstimatorArtifact = {
+  artifactType: "nhm2_mission_time_estimator/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  sourceWorldlineArtifactPath: string | null;
+  sourceCruisePreflightArtifactPath: string | null;
+  sourceRouteTimeArtifactPath: string | null;
+  sourceTargetDistanceSnapshotPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourceRouteTimeWorldlineContractVersion: string;
+  sourceCruisePreflightContractVersion: string;
+  sourceWorldlineContractVersion: string;
+  targetDistanceContractVersion: string;
+  sourceSurface: WarpMissionTimeEstimatorContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+    validityRegimeId: string;
+  };
+  estimatorModelId: string;
+  estimatorModelMeaning: string;
+  targetFrame: string;
+  targetId: string;
+  targetName: string;
+  targetDistance: WarpMissionTimeEstimatorContractV1["targetDistance"];
+  routeParameterMeaning: string;
+  routeTimeStatus: string;
+  sourceWorldlineStatus: string;
+  sourceCruisePreflightStatus: string;
+  sourceRouteTimeWorldlineStatus: string;
+  estimatorAssumptions: string[];
+  coordinateTimeEstimate: WarpMissionTimeEstimatorContractV1["coordinateTimeEstimate"];
+  properTimeEstimate: WarpMissionTimeEstimatorContractV1["properTimeEstimate"];
+  comparisonReadiness: string;
+  nextEligibleProducts: string[];
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2MissionTimeComparisonArtifact = {
+  artifactType: "nhm2_mission_time_comparison/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  sourceWorldlineArtifactPath: string | null;
+  sourceCruisePreflightArtifactPath: string | null;
+  sourceRouteTimeArtifactPath: string | null;
+  sourceMissionTimeEstimatorArtifactPath: string | null;
+  sourceTargetDistanceSnapshotPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourceMissionTimeEstimatorContractVersion: string;
+  sourceRouteTimeWorldlineContractVersion: string;
+  sourceCruisePreflightContractVersion: string;
+  sourceWorldlineContractVersion: string;
+  targetDistanceContractVersion: string;
+  sourceSurface: WarpMissionTimeComparisonContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+  };
+  comparisonModelId: string;
+  comparisonModelMeaning: string;
+  targetId: string;
+  targetName: string;
+  targetFrame: string;
+  warpCoordinateTimeEstimate: WarpMissionTimeComparisonContractV1["warpCoordinateTimeEstimate"];
+  warpProperTimeEstimate: WarpMissionTimeComparisonContractV1["warpProperTimeEstimate"];
+  classicalReferenceTimeEstimate: WarpMissionTimeComparisonContractV1["classicalReferenceTimeEstimate"];
+  comparisonMetrics: WarpMissionTimeComparisonContractV1["comparisonMetrics"];
+  comparisonReadiness: string;
+  deferredComparators: string[];
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2CruiseEnvelopeArtifact = {
+  artifactType: "nhm2_cruise_envelope/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  sourceCruisePreflightArtifactPath: string | null;
+  sourceRouteTimeArtifactPath: string | null;
+  sourceMissionTimeEstimatorArtifactPath: string | null;
+  sourceMissionTimeComparisonArtifactPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourcePreflightContractVersion: string;
+  sourceRouteTimeWorldlineContractVersion: string;
+  sourceMissionTimeEstimatorContractVersion: string;
+  sourceMissionTimeComparisonContractVersion: string;
+  sourceWorldlineContractVersion: string;
+  sourceSurface: WarpCruiseEnvelopeContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+    validityRegimeId: string;
+  };
+  cruiseEnvelopeModelId: string;
+  cruiseEnvelopeModelMeaning: string;
+  envelopeQuantityId: string;
+  envelopeQuantityMeaning: string;
+  envelopeQuantityUnits: "dimensionless";
+  targetId: string;
+  targetName: string;
+  targetFrame: string;
+  sourcePreflightStatus: string;
+  sourceRouteTimeWorldlineStatus: string;
+  sourceMissionTimeEstimatorStatus: string;
+  sourceMissionTimeComparisonStatus: string;
+  admissibleBand: WarpCruiseEnvelopeContractV1["admissibleBand"];
+  representativeValue: number;
+  admissibilityReasons: string[];
+  rejectionReasons: string[];
+  comparisonConsistencyStatus: string;
+  comparisonInterpretationStatus: string;
+  comparisonConsistencyNote: string;
+  routeTimeStatus: string;
+  missionTimeStatus: string;
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2InHullProperAccelerationArtifact = {
+  artifactType: "nhm2_in_hull_proper_acceleration/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  sourceAuditArtifactPath: string | null;
+  contractVersion: string;
+  status: string;
+  certified: boolean;
+  sourceSurface: WarpInHullProperAccelerationContractV1["sourceSurface"];
+  chart: {
+    label: string;
+    coordinateMap: string | null;
+    observerFamily: string;
+  };
+  accelerationQuantityId: string;
+  accelerationQuantityMeaning: string;
+  accelerationUnits: "m/s^2";
+  samplingGeometry: WarpInHullProperAccelerationContractV1["samplingGeometry"];
+  sampleCount: number;
+  sampleSummaries: WarpInHullProperAccelerationContractV1["sampleSummaries"];
+  profileSummary: WarpInHullProperAccelerationContractV1["profileSummary"];
+  resolutionAdequacy: WarpInHullProperAccelerationContractV1["resolutionAdequacy"];
+  fallbackUsed: boolean;
+  claimBoundary: string[];
+  falsifierConditions: string[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2ProofSurfaceManifestArtifact = {
+  artifactType: "nhm2_proof_surface_manifest/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  contractVersion: string;
+  status: WarpProofSurfaceManifestContractV1["status"];
+  certified: boolean;
+  publicationMode: WarpProofSurfaceManifestContractV1["publicationMode"];
+  proofSurfaceCount: number;
+  proofSurfaces: WarpProofSurfaceManifestSurfaceEntryV1[];
+  proofPackPath: string;
+  proofPackReportPath: string;
+  proofPackChecksum: string;
+  trackedRepoEvidenceStatus: WarpProofSurfaceManifestContractV1["trackedRepoEvidenceStatus"];
+  claimBoundary: string[];
+  nonClaims: string[];
   checksum?: string;
 };
 
@@ -4740,6 +5276,206 @@ export type ProofPackPayload = {
     artifactPath: string;
     reportPath: string;
   };
+  warpWorldlineSummary?: {
+    artifactType: "nhm2_warp_worldline_proof/v1";
+    contractVersion: string;
+    status: string;
+    certified: boolean;
+    sourceSurface: string;
+    metricT00Ref: string;
+    chart: string;
+    observerFamily: string;
+    validityRegimeId: string;
+    representativeSampleId: string;
+    sampleGeometryFamilyId: string;
+    sampleCount: number;
+    dtauDt: {
+      representative: number;
+      min: number;
+      max: number;
+    };
+    normalizationResidualMaxAbs: number;
+    transportVariationStatus: string;
+    transportInformativenessStatus: string;
+    sampleFamilyAdequacy: string;
+    flatnessInterpretation: string;
+    certifiedTransportMeaning: string;
+    eligibleNextProducts: string[];
+    routeTimeStatus: "deferred";
+    transportInterpretation: string;
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  cruisePreflightSummary?: {
+    artifactType: "nhm2_cruise_envelope_preflight/v1";
+    contractVersion: string;
+    cruisePreflightStatus: string;
+    certified: boolean;
+    sourceSurface: string;
+    chart: string;
+    observerFamily: string;
+    validityRegimeId: string;
+    preflightQuantityId: string;
+    preflightQuantityMeaning: string;
+    candidateCount: number;
+    admissibleCount: number;
+    rejectedCount: number;
+    boundedCruisePreflightBand: {
+      min: number;
+      max: number;
+      units: "dimensionless";
+    };
+    sampleFamilyAdequacy: string;
+    transportVariationStatus: string;
+    routeTimeStatus: "deferred";
+    eligibleNextProducts: string[];
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  routeTimeWorldlineSummary?: {
+    artifactType: "nhm2_route_time_worldline/v1";
+    contractVersion: string;
+    routeTimeWorldlineStatus: string;
+    certified: boolean;
+    sourceSurface: string;
+    chart: string;
+    observerFamily: string;
+    validityRegimeId: string;
+    routeModelId: string;
+    routeParameterName: string;
+    progressionSampleCount: number;
+    coordinateTimeSummary: {
+      start: number;
+      end: number;
+      span: number;
+      units: "s";
+    };
+    properTimeSummary: {
+      start: number;
+      end: number;
+      span: number;
+      units: "s";
+    };
+    sampleFamilyAdequacy: string;
+    transportVariationStatus: string;
+    routeTimeStatus: string;
+    nextEligibleProducts: string[];
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  missionTimeEstimatorSummary?: {
+    artifactType: "nhm2_mission_time_estimator/v1";
+    contractVersion: string;
+    missionTimeEstimatorStatus: string;
+    certified: boolean;
+    sourceSurface: string;
+    chart: string;
+    observerFamily: string;
+    validityRegimeId: string;
+    estimatorModelId: string;
+    targetId: string;
+    targetName: string;
+    targetFrame: string;
+    coordinateTimeEstimate: {
+      seconds: number;
+      years: number;
+      units: { primary: "s"; secondary: "yr" };
+    };
+    properTimeEstimate: {
+      seconds: number;
+      years: number;
+      units: { primary: "s"; secondary: "yr" };
+    };
+    routeTimeStatus: string;
+    nextEligibleProducts: string[];
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  missionTimeComparisonSummary?: {
+    artifactType: "nhm2_mission_time_comparison/v1";
+    contractVersion: string;
+    missionTimeComparisonStatus: string;
+    certified: boolean;
+    sourceSurface: string;
+    chart: string;
+    observerFamily: string;
+    comparisonModelId: string;
+    targetId: string;
+    targetName: string;
+    targetFrame: string;
+    warpCoordinateYears: number;
+    warpProperYears: number;
+    classicalReferenceYears: number;
+    properMinusCoordinateSeconds: number;
+    properMinusClassicalSeconds: number;
+    comparisonInterpretationStatus: string;
+    comparisonReadiness: string;
+    deferredComparators: string[];
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  cruiseEnvelopeSummary?: {
+    artifactType: "nhm2_cruise_envelope/v1";
+    contractVersion: string;
+    cruiseEnvelopeStatus: string;
+    certified: boolean;
+    sourceSurface: string;
+    chart: string;
+    observerFamily: string;
+    cruiseEnvelopeModelId: string;
+    envelopeQuantityId: string;
+    targetId: string;
+    targetName: string;
+    admissibleBand: {
+      min: number;
+      max: number;
+      units: "dimensionless";
+    };
+    representativeValue: number;
+    comparisonConsistencyStatus: string;
+    routeTimeStatus: string;
+    missionTimeStatus: string;
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  inHullProperAccelerationSummary?: {
+    artifactType: "nhm2_in_hull_proper_acceleration/v1";
+    contractVersion: string;
+    inHullProperAccelerationStatus: string;
+    certified: boolean;
+    sourceSurface: string;
+    chart: string;
+    observerFamily: string;
+    accelerationQuantityId: string;
+    sampleCount: number;
+    representative_mps2: number;
+    representative_g: number;
+    min_mps2: number;
+    max_mps2: number;
+    resolutionAdequacy: string;
+    fallbackUsed: boolean;
+    nonClaims: string[];
+    artifactPath: string;
+    reportPath: string;
+  };
+  proofSurfaceManifestSummary?: {
+    artifactType: "nhm2_proof_surface_manifest/v1";
+    contractVersion: string;
+    proofSurfaceManifestStatus: string;
+    certified: boolean;
+    publicationMode: string;
+    proofSurfaceCount: number;
+    trackedRepoEvidenceStatus: string;
+    proofPackChecksum: string;
+    manifestPath: string;
+    manifestReportPath: string;
+  };
   renderTaxonomySummary?: {
     authoritativeRenderCategory: RenderTaxonomyCategory;
     presentationRenderCategory: RenderTaxonomyCategory;
@@ -5009,6 +5745,156 @@ const writeJsonArtifact = (filePath: string, value: unknown): void => {
 const writeMarkdownArtifact = (filePath: string, markdown: string): void => {
   ensureDirForFile(filePath);
   fs.writeFileSync(filePath, `${markdown}\n`);
+};
+
+const computeArtifactJsonChecksum = (value: unknown): string | null => {
+  const checksum = asText(asRecord(value).checksum);
+  if (checksum && /^[a-f0-9]{64}$/i.test(checksum)) {
+    return checksum.toLowerCase();
+  }
+  try {
+    return crypto
+      .createHash("sha256")
+      .update(`${JSON.stringify(value, null, 2)}\n`)
+      .digest("hex");
+  } catch {
+    return null;
+  }
+};
+
+const computeJsonFileChecksum = (filePath: string): string | null => {
+  try {
+    return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  } catch {
+    return null;
+  }
+};
+
+const isGitIgnored = (
+  filePath: string,
+  gitRepoRootPath: string = process.cwd(),
+): boolean => {
+  try {
+    execFileSync("git", ["check-ignore", "-q", "--no-index", "--", normalizePath(filePath)], {
+      cwd: gitRepoRootPath,
+      stdio: "ignore",
+    });
+    return true;
+  } catch (error) {
+    if (error && typeof error === "object" && "status" in error) {
+      return Number((error as { status?: number }).status) === 0;
+    }
+    return false;
+  }
+};
+
+const getGitTrackedState = (
+  filePath: string,
+  gitRepoRootPath: string = process.cwd(),
+): "tracked" | "untracked" | "unknown" => {
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", "--", normalizePath(filePath)], {
+      cwd: gitRepoRootPath,
+      stdio: "ignore",
+    });
+    return "tracked";
+  } catch (error) {
+    if (error && typeof error === "object" && "status" in error) {
+      const status = Number((error as { status?: number }).status);
+      if (status === 1) {
+        return "untracked";
+      }
+    }
+    return "unknown";
+  }
+};
+
+const getGitCleanLandingState = (
+  filePaths: string[],
+  gitRepoRootPath: string = process.cwd(),
+): "clean" | "dirty" | "unknown" => {
+  const normalizedPaths = Array.from(
+    new Set(filePaths.map((entry) => normalizePath(entry)).filter((entry) => entry.length > 0)),
+  );
+  if (normalizedPaths.length === 0) {
+    return "unknown";
+  }
+  try {
+    const output = execFileSync(
+      "git",
+      ["status", "--porcelain", "--untracked-files=all", "--", ...normalizedPaths],
+      {
+        cwd: gitRepoRootPath,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
+    return output.trim().length === 0 ? "clean" : "dirty";
+  } catch {
+    return "unknown";
+  }
+};
+
+let activeProofSurfacePublicationLock:
+  | {
+      lockPath: string;
+      fd: number;
+      depth: number;
+    }
+  | null = null;
+
+const withProofSurfacePublicationLock = async <T>(args: {
+  lockPath?: string;
+  operation: string;
+  fn: () => Promise<T>;
+}): Promise<T> => {
+  const resolvedLockPath = path.resolve(
+    args.lockPath ?? DEFAULT_PROOF_SURFACE_PUBLICATION_LOCK_PATH,
+  );
+  if (activeProofSurfacePublicationLock?.lockPath === resolvedLockPath) {
+    activeProofSurfacePublicationLock.depth += 1;
+    try {
+      return await args.fn();
+    } finally {
+      activeProofSurfacePublicationLock.depth -= 1;
+    }
+  }
+  ensureDirForFile(resolvedLockPath);
+  let fd: number;
+  try {
+    fd = fs.openSync(resolvedLockPath, "wx");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | null)?.code === "EEXIST") {
+      throw new Error(
+        `proof_surface_publication_locked:${normalizePath(resolvedLockPath)}:${args.operation}`,
+      );
+    }
+    throw error;
+  }
+  const lockPayload = {
+    operation: args.operation,
+    pid: process.pid,
+    acquiredAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(fd, `${JSON.stringify(lockPayload, null, 2)}\n`);
+  activeProofSurfacePublicationLock = {
+    lockPath: resolvedLockPath,
+    fd,
+    depth: 1,
+  };
+  try {
+    return await args.fn();
+  } finally {
+    const handle = activeProofSurfacePublicationLock;
+    activeProofSurfacePublicationLock = null;
+    try {
+      if (handle) fs.closeSync(handle.fd);
+    } finally {
+      if (fs.existsSync(resolvedLockPath)) {
+        fs.unlinkSync(resolvedLockPath);
+      }
+    }
+  }
 };
 
 const syncLegacyAliasFile = (sourcePath: string, aliasPath: string): void => {
@@ -6384,6 +7270,11 @@ export const computeChecksum = (payload: ProofPackPayload): string => {
   const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
   delete copy.generatedAt;
   delete copy.checksum;
+  const manifestSummary = asRecord(copy.proofSurfaceManifestSummary);
+  if (Object.keys(manifestSummary).length > 0) {
+    delete manifestSummary.proofPackChecksum;
+    copy.proofSurfaceManifestSummary = manifestSummary;
+  }
   return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
 };
 
@@ -23009,6 +23900,3000 @@ export const enrichCurvatureInvariantRenderTaxonomy = (args: {
   }
 };
 
+const computeWarpWorldlineProofChecksum = (
+  payload: Nhm2WarpWorldlineProofArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildWarpWorldlineProofPackSummary = (args: {
+  artifact: Nhm2WarpWorldlineProofArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["warpWorldlineSummary"]> => ({
+  artifactType: "nhm2_warp_worldline_proof/v1",
+  contractVersion: args.artifact.contractVersion,
+  status: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  metricT00Ref: args.artifact.sourceSurface.metricT00Ref,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  validityRegimeId: args.artifact.chart.validityRegimeId,
+  representativeSampleId: args.artifact.representativeSampleId,
+  sampleGeometryFamilyId: args.artifact.sampleGeometry.familyId,
+  sampleCount: args.artifact.sampleCount,
+  dtauDt: {
+    representative: args.artifact.dtauDt.representative,
+    min: args.artifact.dtauDt.min,
+    max: args.artifact.dtauDt.max,
+  },
+  normalizationResidualMaxAbs: args.artifact.normalizationResidual.maxAbs,
+  transportVariationStatus: args.artifact.transportVariation.transportVariationStatus,
+  transportInformativenessStatus: args.artifact.transportInformativenessStatus,
+  sampleFamilyAdequacy: args.artifact.sampleFamilyAdequacy,
+  flatnessInterpretation: args.artifact.flatnessInterpretation,
+  certifiedTransportMeaning: args.artifact.certifiedTransportMeaning,
+  eligibleNextProducts: [...args.artifact.eligibleNextProducts],
+  routeTimeStatus: "deferred",
+  transportInterpretation:
+    args.artifact.transportInterpretation.effectiveTransportInterpretation,
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatWarpWorldlineProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["warpWorldlineSummary"]>;
+}): string =>
+  `warp_worldline_status=${args.summary.status} certified=${String(args.summary.certified)} source_surface=${args.summary.sourceSurface} sample_count=${args.summary.sampleCount} route_time=${args.summary.routeTimeStatus}`;
+
+const applyWarpWorldlineSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  warpWorldlineArtifact: Nhm2WarpWorldlineProofArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildWarpWorldlineProofPackSummary({
+    artifact: args.warpWorldlineArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "warp_worldline_status=",
+    formatWarpWorldlineProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    warpWorldlineSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeCruiseEnvelopePreflightChecksum = (
+  payload: Nhm2CruiseEnvelopePreflightArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildCruisePreflightProofPackSummary = (args: {
+  artifact: Nhm2CruiseEnvelopePreflightArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["cruisePreflightSummary"]> => ({
+  artifactType: "nhm2_cruise_envelope_preflight/v1",
+  contractVersion: args.artifact.contractVersion,
+  cruisePreflightStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  validityRegimeId: args.artifact.chart.validityRegimeId,
+  preflightQuantityId: args.artifact.preflightQuantityId,
+  preflightQuantityMeaning: args.artifact.preflightQuantityMeaning,
+  candidateCount: args.artifact.candidateCount,
+  admissibleCount: args.artifact.admissibleCount,
+  rejectedCount: args.artifact.rejectedCount,
+  boundedCruisePreflightBand: {
+    min: args.artifact.boundedCruisePreflightBand.min,
+    max: args.artifact.boundedCruisePreflightBand.max,
+    units: args.artifact.boundedCruisePreflightBand.units,
+  },
+  sampleFamilyAdequacy: args.artifact.sampleFamilyAdequacy,
+  transportVariationStatus: args.artifact.transportVariationStatus,
+  routeTimeStatus: args.artifact.routeTimeStatus,
+  eligibleNextProducts: [...args.artifact.eligibleNextProducts],
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatCruisePreflightProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["cruisePreflightSummary"]>;
+}): string =>
+  `cruise_preflight_status=${args.summary.cruisePreflightStatus} quantity=${args.summary.preflightQuantityId} candidate_count=${args.summary.candidateCount} admissible_count=${args.summary.admissibleCount} route_time=${args.summary.routeTimeStatus}`;
+
+const applyCruisePreflightSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  cruisePreflightArtifact: Nhm2CruiseEnvelopePreflightArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildCruisePreflightProofPackSummary({
+    artifact: args.cruisePreflightArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "cruise_preflight_status=",
+    formatCruisePreflightProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    cruisePreflightSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeRouteTimeWorldlineChecksum = (
+  payload: Nhm2RouteTimeWorldlineArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildRouteTimeWorldlineProofPackSummary = (args: {
+  artifact: Nhm2RouteTimeWorldlineArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["routeTimeWorldlineSummary"]> => ({
+  artifactType: "nhm2_route_time_worldline/v1",
+  contractVersion: args.artifact.contractVersion,
+  routeTimeWorldlineStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  validityRegimeId: args.artifact.chart.validityRegimeId,
+  routeModelId: args.artifact.routeModelId,
+  routeParameterName: args.artifact.routeParameterName,
+  progressionSampleCount: args.artifact.progressionSampleCount,
+  coordinateTimeSummary: {
+    start: args.artifact.coordinateTimeSummary.start,
+    end: args.artifact.coordinateTimeSummary.end,
+    span: args.artifact.coordinateTimeSummary.span,
+    units: args.artifact.coordinateTimeSummary.units,
+  },
+  properTimeSummary: {
+    start: args.artifact.properTimeSummary.start,
+    end: args.artifact.properTimeSummary.end,
+    span: args.artifact.properTimeSummary.span,
+    units: args.artifact.properTimeSummary.units,
+  },
+  sampleFamilyAdequacy: args.artifact.sampleFamilyAdequacy,
+  transportVariationStatus: args.artifact.transportVariationStatus,
+  routeTimeStatus: args.artifact.routeTimeStatus,
+  nextEligibleProducts: [...args.artifact.nextEligibleProducts],
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatRouteTimeWorldlineProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["routeTimeWorldlineSummary"]>;
+}): string =>
+  `route_time_worldline_status=${args.summary.routeTimeWorldlineStatus} route_model=${args.summary.routeModelId} progression_samples=${args.summary.progressionSampleCount} route_time=${args.summary.routeTimeStatus}`;
+
+const applyRouteTimeWorldlineSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  routeTimeWorldlineArtifact: Nhm2RouteTimeWorldlineArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildRouteTimeWorldlineProofPackSummary({
+    artifact: args.routeTimeWorldlineArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "route_time_worldline_status=",
+    formatRouteTimeWorldlineProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    routeTimeWorldlineSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeMissionTimeEstimatorChecksum = (
+  payload: Nhm2MissionTimeEstimatorArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildMissionTimeEstimatorProofPackSummary = (args: {
+  artifact: Nhm2MissionTimeEstimatorArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["missionTimeEstimatorSummary"]> => ({
+  artifactType: "nhm2_mission_time_estimator/v1",
+  contractVersion: args.artifact.contractVersion,
+  missionTimeEstimatorStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  validityRegimeId: args.artifact.chart.validityRegimeId,
+  estimatorModelId: args.artifact.estimatorModelId,
+  targetId: args.artifact.targetId,
+  targetName: args.artifact.targetName,
+  targetFrame: args.artifact.targetFrame,
+  coordinateTimeEstimate: {
+    seconds: args.artifact.coordinateTimeEstimate.seconds,
+    years: args.artifact.coordinateTimeEstimate.years,
+    units: { ...args.artifact.coordinateTimeEstimate.units },
+  },
+  properTimeEstimate: {
+    seconds: args.artifact.properTimeEstimate.seconds,
+    years: args.artifact.properTimeEstimate.years,
+    units: { ...args.artifact.properTimeEstimate.units },
+  },
+  routeTimeStatus: args.artifact.routeTimeStatus,
+  nextEligibleProducts: [...args.artifact.nextEligibleProducts],
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatMissionTimeEstimatorProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["missionTimeEstimatorSummary"]>;
+}): string =>
+  `mission_time_estimator_status=${args.summary.missionTimeEstimatorStatus} target=${args.summary.targetId} route_time=${args.summary.routeTimeStatus} coordinate_years=${args.summary.coordinateTimeEstimate.years}`;
+
+const applyMissionTimeEstimatorSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  missionTimeEstimatorArtifact: Nhm2MissionTimeEstimatorArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildMissionTimeEstimatorProofPackSummary({
+    artifact: args.missionTimeEstimatorArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "mission_time_estimator_status=",
+    formatMissionTimeEstimatorProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    missionTimeEstimatorSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeMissionTimeComparisonChecksum = (
+  payload: Nhm2MissionTimeComparisonArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildMissionTimeComparisonProofPackSummary = (args: {
+  artifact: Nhm2MissionTimeComparisonArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["missionTimeComparisonSummary"]> => ({
+  artifactType: "nhm2_mission_time_comparison/v1",
+  contractVersion: args.artifact.contractVersion,
+  missionTimeComparisonStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  comparisonModelId: args.artifact.comparisonModelId,
+  targetId: args.artifact.targetId,
+  targetName: args.artifact.targetName,
+  targetFrame: args.artifact.targetFrame,
+  warpCoordinateYears: args.artifact.warpCoordinateTimeEstimate.years,
+  warpProperYears: args.artifact.warpProperTimeEstimate.years,
+  classicalReferenceYears: args.artifact.classicalReferenceTimeEstimate.years,
+  properMinusCoordinateSeconds:
+    args.artifact.comparisonMetrics.properMinusCoordinate_seconds,
+  properMinusClassicalSeconds:
+    args.artifact.comparisonMetrics.properMinusClassical_seconds,
+  comparisonInterpretationStatus:
+    args.artifact.comparisonMetrics.interpretationStatus,
+  comparisonReadiness: args.artifact.comparisonReadiness,
+  deferredComparators: [...args.artifact.deferredComparators],
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatMissionTimeComparisonProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["missionTimeComparisonSummary"]>;
+}): string =>
+  `mission_time_comparison_status=${args.summary.missionTimeComparisonStatus} target=${args.summary.targetId} interpretation=${args.summary.comparisonInterpretationStatus} proper_minus_coordinate_seconds=${args.summary.properMinusCoordinateSeconds}`;
+
+const applyMissionTimeComparisonSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildMissionTimeComparisonProofPackSummary({
+    artifact: args.missionTimeComparisonArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "mission_time_comparison_status=",
+    formatMissionTimeComparisonProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    missionTimeComparisonSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeCruiseEnvelopeChecksum = (
+  payload: Nhm2CruiseEnvelopeArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildCruiseEnvelopeProofPackSummary = (args: {
+  artifact: Nhm2CruiseEnvelopeArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["cruiseEnvelopeSummary"]> => ({
+  artifactType: "nhm2_cruise_envelope/v1",
+  contractVersion: args.artifact.contractVersion,
+  cruiseEnvelopeStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  cruiseEnvelopeModelId: args.artifact.cruiseEnvelopeModelId,
+  envelopeQuantityId: args.artifact.envelopeQuantityId,
+  targetId: args.artifact.targetId,
+  targetName: args.artifact.targetName,
+  admissibleBand: {
+    min: args.artifact.admissibleBand.min,
+    max: args.artifact.admissibleBand.max,
+    units: args.artifact.admissibleBand.units,
+  },
+  representativeValue: args.artifact.representativeValue,
+  comparisonConsistencyStatus: args.artifact.comparisonConsistencyStatus,
+  routeTimeStatus: args.artifact.routeTimeStatus,
+  missionTimeStatus: args.artifact.missionTimeStatus,
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatCruiseEnvelopeProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["cruiseEnvelopeSummary"]>;
+}): string =>
+  `cruise_envelope_status=${args.summary.cruiseEnvelopeStatus} quantity=${args.summary.envelopeQuantityId} representative_value=${args.summary.representativeValue} comparison_consistency=${args.summary.comparisonConsistencyStatus}`;
+
+const applyCruiseEnvelopeSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  cruiseEnvelopeArtifact: Nhm2CruiseEnvelopeArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildCruiseEnvelopeProofPackSummary({
+    artifact: args.cruiseEnvelopeArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "cruise_envelope_status=",
+    formatCruiseEnvelopeProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    cruiseEnvelopeSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeInHullProperAccelerationChecksum = (
+  payload: Nhm2InHullProperAccelerationArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const buildInHullProperAccelerationProofPackSummary = (args: {
+  artifact: Nhm2InHullProperAccelerationArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["inHullProperAccelerationSummary"]> => ({
+  artifactType: "nhm2_in_hull_proper_acceleration/v1",
+  contractVersion: args.artifact.contractVersion,
+  inHullProperAccelerationStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  sourceSurface: args.artifact.sourceSurface.surfaceId,
+  chart: args.artifact.chart.label,
+  observerFamily: args.artifact.chart.observerFamily,
+  accelerationQuantityId: args.artifact.accelerationQuantityId,
+  sampleCount: args.artifact.sampleCount,
+  representative_mps2: args.artifact.profileSummary.representative_mps2,
+  representative_g: args.artifact.profileSummary.representative_g,
+  min_mps2: args.artifact.profileSummary.min_mps2,
+  max_mps2: args.artifact.profileSummary.max_mps2,
+  resolutionAdequacy: args.artifact.resolutionAdequacy.status,
+  fallbackUsed: args.artifact.fallbackUsed,
+  nonClaims: [...args.artifact.nonClaims],
+  artifactPath: normalizePath(args.artifactPath),
+  reportPath: normalizePath(args.reportPath),
+});
+
+const formatInHullProperAccelerationProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["inHullProperAccelerationSummary"]>;
+}): string =>
+  `in_hull_proper_acceleration_status=${args.summary.inHullProperAccelerationStatus} observer=${args.summary.observerFamily} representative_mps2=${args.summary.representative_mps2} resolution=${args.summary.resolutionAdequacy}`;
+
+const applyInHullProperAccelerationSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  inHullProperAccelerationArtifact: Nhm2InHullProperAccelerationArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildInHullProperAccelerationProofPackSummary({
+    artifact: args.inHullProperAccelerationArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "in_hull_proper_acceleration_status=",
+    formatInHullProperAccelerationProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    inHullProperAccelerationSummary: summary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
+  };
+};
+
+const computeProofSurfaceManifestChecksum = (
+  payload: Nhm2ProofSurfaceManifestArtifact,
+): string => {
+  const copy = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  delete copy.generatedAt;
+  delete copy.checksum;
+  return crypto.createHash("sha256").update(stableStringify(copy)).digest("hex");
+};
+
+const buildProofSurfaceManifestProofPackSummary = (args: {
+  artifact: Nhm2ProofSurfaceManifestArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): NonNullable<ProofPackPayload["proofSurfaceManifestSummary"]> => ({
+  artifactType: "nhm2_proof_surface_manifest/v1",
+  contractVersion: args.artifact.contractVersion,
+  proofSurfaceManifestStatus: args.artifact.status,
+  certified: args.artifact.certified,
+  publicationMode: args.artifact.publicationMode,
+  proofSurfaceCount: args.artifact.proofSurfaceCount,
+  trackedRepoEvidenceStatus: args.artifact.trackedRepoEvidenceStatus,
+  proofPackChecksum: args.artifact.proofPackChecksum,
+  manifestPath: normalizePath(args.artifactPath),
+  manifestReportPath: normalizePath(args.reportPath),
+});
+
+const formatProofSurfaceManifestProofPackSummary = (args: {
+  summary: NonNullable<ProofPackPayload["proofSurfaceManifestSummary"]>;
+}): string =>
+  `proof_surface_manifest_status=${args.summary.proofSurfaceManifestStatus} publication_mode=${args.summary.publicationMode} proof_surface_count=${args.summary.proofSurfaceCount} tracked_repo_evidence=${args.summary.trackedRepoEvidenceStatus}`;
+
+const applyProofSurfaceManifestSummaryToProofPackPayload = (args: {
+  payload: ProofPackPayload;
+  manifestArtifact: Nhm2ProofSurfaceManifestArtifact;
+  artifactPath: string;
+  reportPath: string;
+}): ProofPackPayload => {
+  const summary = buildProofSurfaceManifestProofPackSummary({
+    artifact: args.manifestArtifact,
+    artifactPath: args.artifactPath,
+    reportPath: args.reportPath,
+  });
+  const notes = upsertProofPackSummaryNote(
+    [...args.payload.notes],
+    "proof_surface_manifest_status=",
+    formatProofSurfaceManifestProofPackSummary({ summary }),
+  );
+  const payloadBase: ProofPackPayload = {
+    ...args.payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    proofSurfaceManifestSummary: {
+      ...summary,
+      proofPackChecksum: "",
+    },
+    notes,
+  };
+  const checksum = computeChecksum(payloadBase);
+  return {
+    ...payloadBase,
+    proofSurfaceManifestSummary: {
+      ...summary,
+      proofPackChecksum: checksum,
+    },
+    checksum,
+  };
+};
+
+export const buildNhm2WarpWorldlineProofArtifact = (args: {
+  generatedOn: string;
+  warpWorldline: WarpWorldlineContractV1;
+  sourceAuditArtifactPath?: string | null;
+}): Nhm2WarpWorldlineProofArtifact => {
+  const sampleSummaries = args.warpWorldline.samples.map((entry) => ({
+    sampleId: entry.sampleId,
+    sampleRole: entry.sampleRole,
+    sourceModel: entry.sourceModel,
+    transportProvenance: entry.transportProvenance,
+    coordinateTime_s: entry.coordinateTime_s,
+    position_m: [...entry.position_m] as [number, number, number],
+    coordinateVelocity: [...entry.coordinateVelocity] as [number, number, number],
+    betaCoord: [...entry.betaCoord] as [number, number, number],
+    effectiveTransportVelocityCoord: [
+      ...entry.effectiveTransportVelocityCoord,
+    ] as [number, number, number],
+    dtau_dt: entry.dtau_dt,
+    normalizationResidual: entry.normalizationResidual,
+  }));
+  const artifactBase: Nhm2WarpWorldlineProofArtifact = {
+    artifactType: "nhm2_warp_worldline_proof/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a bounded solve-backed NHM2 warp worldline contract for local-comoving transport diagnostics. It does not certify route time, mission time, speed, or viability.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    contractVersion: args.warpWorldline.contractVersion,
+    status: args.warpWorldline.status,
+    certified: args.warpWorldline.certified,
+    sourceSurface: { ...args.warpWorldline.sourceSurface },
+    chart: {
+      label: args.warpWorldline.chart.label,
+      coordinateMap: args.warpWorldline.chart.coordinateMap ?? null,
+      observerFamily: args.warpWorldline.observerFamily,
+      timeCoordinateName: args.warpWorldline.timeCoordinateName,
+      positionCoordinates: [...args.warpWorldline.positionCoordinates],
+      validityRegimeId: args.warpWorldline.validityRegime.regimeId,
+    },
+    representativeSampleId: args.warpWorldline.representativeSampleId,
+    sampleGeometry: {
+      familyId: args.warpWorldline.sampleGeometry.familyId,
+      description: args.warpWorldline.sampleGeometry.description,
+      ordering: [...args.warpWorldline.sampleGeometry.ordering],
+      axes: {
+        centerline: [...args.warpWorldline.sampleGeometry.axes.centerline],
+        portStarboard: [...args.warpWorldline.sampleGeometry.axes.portStarboard],
+        dorsalVentral: [...args.warpWorldline.sampleGeometry.axes.dorsalVentral],
+      },
+      offsets_m: { ...args.warpWorldline.sampleGeometry.offsets_m },
+    },
+    transportInterpretation: {
+      coordinateVelocityInterpretation:
+        args.warpWorldline.transportInterpretation.coordinateVelocityInterpretation,
+      effectiveTransportInterpretation:
+        args.warpWorldline.transportInterpretation.effectiveTransportInterpretation,
+      certifiedSpeedMeaning:
+        args.warpWorldline.transportInterpretation.certifiedSpeedMeaning,
+      note: args.warpWorldline.transportInterpretation.note,
+    },
+    transportVariation: { ...args.warpWorldline.transportVariation },
+    transportInformativenessStatus: args.warpWorldline.transportInformativenessStatus,
+    sampleFamilyAdequacy: args.warpWorldline.sampleFamilyAdequacy,
+    flatnessInterpretation: args.warpWorldline.flatnessInterpretation,
+    certifiedTransportMeaning: args.warpWorldline.certifiedTransportMeaning,
+    eligibleNextProducts: [...args.warpWorldline.eligibleNextProducts],
+    nextRequiredUpgrade: args.warpWorldline.nextRequiredUpgrade,
+    sampleCount: args.warpWorldline.samples.length,
+    dtauDt: {
+      representative: args.warpWorldline.dtau_dt.representative,
+      min: args.warpWorldline.dtau_dt.min,
+      max: args.warpWorldline.dtau_dt.max,
+      units: "dimensionless",
+    },
+    normalizationResidual: {
+      representative: args.warpWorldline.normalizationResidual.representative,
+      maxAbs: args.warpWorldline.normalizationResidual.maxAbs,
+      tolerance: args.warpWorldline.normalizationResidual.tolerance,
+      relation: args.warpWorldline.normalizationResidual.relation,
+    },
+    claimBoundary: [...args.warpWorldline.claimBoundary],
+    falsifierConditions: [...args.warpWorldline.falsifierConditions],
+    nonClaims: [
+      "not route-time certified",
+      "not mission-time certified",
+      "not max-speed certified",
+      "not full worldline physics closure",
+      "not Lane A proof replacement",
+    ],
+    sampleSummaries,
+  };
+  return {
+    ...artifactBase,
+    checksum: computeWarpWorldlineProofChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2WarpWorldlineProofMarkdown = (
+  payload: Nhm2WarpWorldlineProofArtifact,
+): string => {
+  const sampleRows = payload.sampleSummaries
+    .map(
+      (entry) =>
+        `| ${entry.sampleId} | ${entry.sampleRole} | ${entry.sourceModel} | ${entry.transportProvenance} | ${entry.coordinateTime_s} | ${entry.position_m.join(",")} | ${entry.coordinateVelocity.join(",")} | ${entry.betaCoord.join(",")} | ${entry.effectiveTransportVelocityCoord.join(",")} | ${entry.dtau_dt} | ${entry.normalizationResidual} |`,
+    )
+    .join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const eligibleNextProducts =
+    payload.eligibleNextProducts.length > 0
+      ? payload.eligibleNextProducts.join(",")
+      : "none";
+  return `# NHM2 Warp Worldline Proof (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${payload.certified} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| metricT00Ref | ${payload.sourceSurface.metricT00Ref} |
+| metricFamily | ${payload.sourceSurface.metricFamily} |
+| chart | ${payload.chart.label} |
+| coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
+| observerFamily | ${payload.chart.observerFamily} |
+| timeCoordinateName | ${payload.chart.timeCoordinateName} |
+| positionCoordinates | ${payload.chart.positionCoordinates.join(",")} |
+| validityRegimeId | ${payload.chart.validityRegimeId} |
+| representativeSampleId | ${payload.representativeSampleId} |
+| sampleGeometryFamilyId | ${payload.sampleGeometry.familyId} |
+| sampleGeometryOrdering | ${payload.sampleGeometry.ordering.join(",")} |
+| sampleGeometryCenterlineAxis | ${payload.sampleGeometry.axes.centerline.join(",")} |
+| sampleGeometryPortStarboardAxis | ${payload.sampleGeometry.axes.portStarboard.join(",")} |
+| sampleGeometryDorsalVentralAxis | ${payload.sampleGeometry.axes.dorsalVentral.join(",")} |
+| sampleGeometryCenterlineOffset_m | ${payload.sampleGeometry.offsets_m.centerline} |
+| sampleGeometryShellLongitudinalOffset_m | ${payload.sampleGeometry.offsets_m.shellLongitudinal} |
+| sampleGeometryShellTransverseOffset_m | ${payload.sampleGeometry.offsets_m.shellTransverse} |
+| sampleGeometryShellVerticalOffset_m | ${payload.sampleGeometry.offsets_m.shellVertical} |
+| sampleGeometryShellClearance_m | ${payload.sampleGeometry.offsets_m.shellClearance} |
+| sampleCount | ${payload.sampleCount} |
+| dtau_dt_representative | ${payload.dtauDt.representative} |
+| dtau_dt_min | ${payload.dtauDt.min} |
+| dtau_dt_max | ${payload.dtauDt.max} |
+| normalizationResidual_maxAbs | ${payload.normalizationResidual.maxAbs} |
+| normalizationTolerance | ${payload.normalizationResidual.tolerance} |
+| sourceAuditArtifactPath | ${payload.sourceAuditArtifactPath ?? "null"} |
+| transportInterpretation | ${payload.transportInterpretation.effectiveTransportInterpretation} |
+| transportVariationStatus | ${payload.transportVariation.transportVariationStatus} |
+| transportInformativenessStatus | ${payload.transportInformativenessStatus} |
+| sampleFamilyAdequacy | ${payload.sampleFamilyAdequacy} |
+| flatnessInterpretation | ${payload.flatnessInterpretation} |
+| certifiedTransportMeaning | ${payload.certifiedTransportMeaning} |
+| eligibleNextProducts | ${eligibleNextProducts} |
+| nextRequiredUpgrade | ${payload.nextRequiredUpgrade} |
+| certifiedSpeedMeaning | ${payload.transportInterpretation.certifiedSpeedMeaning} |
+
+## Samples
+| sampleId | sampleRole | sourceModel | transportProvenance | coordinateTime_s | position_m | coordinateVelocity | betaCoord | effectiveTransportVelocityCoord | dtau_dt | normalizationResidual |
+|---|---|---|---|---:|---|---|---|---|---:|---:|
+${sampleRows}
+
+## Geometry
+- ${payload.sampleGeometry.description}
+- centerlineAxis: \`${payload.sampleGeometry.axes.centerline.join(",")}\`
+- portStarboardAxis: \`${payload.sampleGeometry.axes.portStarboard.join(",")}\`
+- dorsalVentralAxis: \`${payload.sampleGeometry.axes.dorsalVentral.join(",")}\`
+- offsets_m: centerline=\`${payload.sampleGeometry.offsets_m.centerline}\`, shellLongitudinal=\`${payload.sampleGeometry.offsets_m.shellLongitudinal}\`, shellTransverse=\`${payload.sampleGeometry.offsets_m.shellTransverse}\`, shellVertical=\`${payload.sampleGeometry.offsets_m.shellVertical}\`, shellClearance=\`${payload.sampleGeometry.offsets_m.shellClearance}\`
+- transportInterpretation: ${payload.transportInterpretation.note}
+
+## Transport Variation
+- status: ${payload.transportVariation.transportVariationStatus}
+- dtauDtSpread.absolute: ${payload.transportVariation.dtauDtSpread.absolute}
+- effectiveTransportSpread.maxPairwiseL2: ${payload.transportVariation.effectiveTransportSpread.maxPairwiseL2}
+- betaSpread.maxPairwiseL2: ${payload.transportVariation.betaSpread.maxPairwiseL2}
+- flatWithinTolerance: ${payload.transportVariation.flatWithinTolerance}
+- flatnessReason: ${payload.transportVariation.flatnessReason}
+- flatnessInterpretation: ${payload.flatnessInterpretation}
+- certifiedTransportMeaning: ${payload.certifiedTransportMeaning}
+- eligibleNextProducts: ${eligibleNextProducts}
+- nextRequiredUpgrade: ${payload.nextRequiredUpgrade}
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const buildNhm2CruiseEnvelopePreflightArtifact = (args: {
+  generatedOn: string;
+  preflight: WarpCruiseEnvelopePreflightContractV1;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+}): Nhm2CruiseEnvelopePreflightArtifact => {
+  const artifactBase: Nhm2CruiseEnvelopePreflightArtifact = {
+    artifactType: "nhm2_cruise_envelope_preflight/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a bounded NHM2 cruise-envelope preflight over the certified local-comoving shell-cross worldline family. It does not certify max speed, route time, mission time, relativistic advantage, or viability.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath
+      ? normalizePath(args.sourceWorldlineArtifactPath)
+      : null,
+    contractVersion: args.preflight.contractVersion,
+    status: args.preflight.status,
+    certified: args.preflight.certified,
+    sourceWorldlineContractVersion: args.preflight.sourceWorldlineContractVersion,
+    sourceSurface: { ...args.preflight.sourceSurface },
+    chart: {
+      label: args.preflight.chart.label,
+      coordinateMap: args.preflight.chart.coordinateMap ?? null,
+      observerFamily: args.preflight.observerFamily,
+      validityRegimeId: args.preflight.validityRegime.regimeId,
+    },
+    sourceSampleGeometryFamilyId: args.preflight.sourceSampleGeometryFamilyId,
+    preflightQuantityId: args.preflight.preflightQuantityId,
+    preflightQuantityMeaning: args.preflight.preflightQuantityMeaning,
+    preflightQuantityUnits: args.preflight.preflightQuantityUnits,
+    transportVariationStatus: args.preflight.transportVariationStatus,
+    transportInformativenessStatus: args.preflight.transportInformativenessStatus,
+    sampleFamilyAdequacy: args.preflight.sampleFamilyAdequacy,
+    flatnessInterpretation: args.preflight.flatnessInterpretation,
+    certifiedTransportMeaning: args.preflight.certifiedTransportMeaning,
+    descriptorNormSummary: { ...args.preflight.descriptorNormSummary },
+    boundedCruisePreflightBand: { ...args.preflight.boundedCruisePreflightBand },
+    routeTimeStatus: args.preflight.routeTimeStatus,
+    candidateCount: args.preflight.candidateCount,
+    admissibleCount: args.preflight.admissibleCount,
+    rejectedCount: args.preflight.rejectedCount,
+    candidateSet: args.preflight.candidateSet.map((entry) => ({ ...entry })),
+    admissibleCandidates: args.preflight.admissibleCandidates.map((entry) => ({ ...entry })),
+    rejectedCandidates: args.preflight.rejectedCandidates.map((entry) => ({ ...entry })),
+    gateReasons: [...args.preflight.gateReasons],
+    eligibleNextProducts: [...args.preflight.eligibleNextProducts],
+    nextRequiredUpgrade: args.preflight.nextRequiredUpgrade,
+    claimBoundary: [...args.preflight.claimBoundary],
+    falsifierConditions: [...args.preflight.falsifierConditions],
+    nonClaims: [...args.preflight.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeCruiseEnvelopePreflightChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2CruiseEnvelopePreflightMarkdown = (
+  payload: Nhm2CruiseEnvelopePreflightArtifact,
+): string => {
+  const candidateRows = payload.candidateSet
+    .map(
+      (entry) =>
+        `| ${entry.candidateId} | ${entry.candidateClass} | ${entry.sourceSampleId ?? "null"} | ${entry.preflightQuantityValue} | ${entry.admissible} | ${entry.gateReasons.join(",")} | ${entry.note} |`,
+    )
+    .join("\n");
+  const gateReasons = payload.gateReasons.map((entry) => `- ${entry}`).join("\n");
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const eligibleNextProducts =
+    payload.eligibleNextProducts.length > 0
+      ? payload.eligibleNextProducts.join(",")
+      : "none";
+  return `# NHM2 Cruise Envelope Preflight (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| chart | ${payload.chart.label} |
+| observerFamily | ${payload.chart.observerFamily} |
+| validityRegimeId | ${payload.chart.validityRegimeId} |
+| sourceSampleGeometryFamilyId | ${payload.sourceSampleGeometryFamilyId} |
+| preflightQuantityId | ${payload.preflightQuantityId} |
+| preflightQuantityMeaning | ${payload.preflightQuantityMeaning} |
+| preflightQuantityUnits | ${payload.preflightQuantityUnits} |
+| candidateCount | ${payload.candidateCount} |
+| admissibleCount | ${payload.admissibleCount} |
+| rejectedCount | ${payload.rejectedCount} |
+| boundedCruisePreflightBand.min | ${payload.boundedCruisePreflightBand.min} |
+| boundedCruisePreflightBand.max | ${payload.boundedCruisePreflightBand.max} |
+| routeTimeStatus | ${payload.routeTimeStatus} |
+| sampleFamilyAdequacy | ${payload.sampleFamilyAdequacy} |
+| transportVariationStatus | ${payload.transportVariationStatus} |
+| transportInformativenessStatus | ${payload.transportInformativenessStatus} |
+| certifiedTransportMeaning | ${payload.certifiedTransportMeaning} |
+| eligibleNextProducts | ${eligibleNextProducts} |
+| nextRequiredUpgrade | ${payload.nextRequiredUpgrade} |
+
+## Descriptor Summary
+- representative: ${payload.descriptorNormSummary.representative}
+- minAdmissible: ${payload.descriptorNormSummary.minAdmissible}
+- maxAdmissible: ${payload.descriptorNormSummary.maxAdmissible}
+- spread: ${payload.descriptorNormSummary.spread}
+- flatnessInterpretation: ${payload.flatnessInterpretation}
+
+## Gate Reasons
+${gateReasons}
+
+## Candidates
+| candidateId | class | sourceSampleId | quantity | admissible | gateReasons | note |
+|---|---|---|---|---|---|---|
+${candidateRows}
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const buildNhm2RouteTimeWorldlineArtifact = (args: {
+  generatedOn: string;
+  routeTimeWorldline: WarpRouteTimeWorldlineContractV1;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+}): Nhm2RouteTimeWorldlineArtifact => {
+  const artifactBase: Nhm2RouteTimeWorldlineArtifact = {
+    artifactType: "nhm2_route_time_worldline/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a bounded NHM2 route-time worldline extension over a certified local probe segment. It does not certify mission time, target ETA, max speed, relativistic advantage, or viability.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath
+      ? normalizePath(args.sourceWorldlineArtifactPath)
+      : null,
+    sourceCruisePreflightArtifactPath: args.sourceCruisePreflightArtifactPath
+      ? normalizePath(args.sourceCruisePreflightArtifactPath)
+      : null,
+    contractVersion: args.routeTimeWorldline.contractVersion,
+    status: args.routeTimeWorldline.status,
+    certified: args.routeTimeWorldline.certified,
+    sourceWorldlineContractVersion:
+      args.routeTimeWorldline.sourceWorldlineContractVersion,
+    sourceCruisePreflightContractVersion:
+      args.routeTimeWorldline.sourceCruisePreflightContractVersion,
+    sourceSurface: { ...args.routeTimeWorldline.sourceSurface },
+    chart: {
+      label: args.routeTimeWorldline.chart.label,
+      coordinateMap: args.routeTimeWorldline.chart.coordinateMap ?? null,
+      observerFamily: args.routeTimeWorldline.observerFamily,
+      validityRegimeId: args.routeTimeWorldline.validityRegime.regimeId,
+    },
+    routeModelId: args.routeTimeWorldline.routeModelId,
+    routeModelMeaning: args.routeTimeWorldline.routeModelMeaning,
+    routeParameterName: args.routeTimeWorldline.routeParameterName,
+    routeParameterMeaning: args.routeTimeWorldline.routeParameterMeaning,
+    sourceSampleGeometryFamilyId:
+      args.routeTimeWorldline.sourceSampleGeometryFamilyId,
+    sampleFamilyAdequacy: args.routeTimeWorldline.sampleFamilyAdequacy,
+    transportVariationStatus: args.routeTimeWorldline.transportVariationStatus,
+    transportInformativenessStatus:
+      args.routeTimeWorldline.transportInformativenessStatus,
+    progressionSampleCount: args.routeTimeWorldline.progressionSampleCount,
+    representativeProgressionSampleId:
+      args.routeTimeWorldline.representativeProgressionSampleId,
+    progressionSamples: args.routeTimeWorldline.progressionSamples.map((entry) => ({
+      ...entry,
+      position_m: [...entry.position_m] as [number, number, number],
+      betaCoord: [...entry.betaCoord] as [number, number, number],
+      effectiveTransportVelocityCoord: [
+        ...entry.effectiveTransportVelocityCoord,
+      ] as [number, number, number],
+    })),
+    coordinateTimeSummary: { ...args.routeTimeWorldline.coordinateTimeSummary },
+    properTimeSummary: { ...args.routeTimeWorldline.properTimeSummary },
+    descriptorScheduleSummary: {
+      ...args.routeTimeWorldline.descriptorScheduleSummary,
+    },
+    routeProgressMeaning: args.routeTimeWorldline.routeProgressMeaning,
+    routeTimeStatus: args.routeTimeWorldline.routeTimeStatus,
+    nextEligibleProducts: [...args.routeTimeWorldline.nextEligibleProducts],
+    claimBoundary: [...args.routeTimeWorldline.claimBoundary],
+    falsifierConditions: [...args.routeTimeWorldline.falsifierConditions],
+    nonClaims: [...args.routeTimeWorldline.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeRouteTimeWorldlineChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2RouteTimeWorldlineMarkdown = (
+  payload: Nhm2RouteTimeWorldlineArtifact,
+): string => {
+  const progressionRows = payload.progressionSamples
+    .map(
+      (entry) =>
+        `| ${entry.progressionIndex} | ${entry.sourceSampleId} | ${entry.routeParameterValue} | ${entry.coordinateTime_s} | ${entry.coordinateTimeIncrement_s} | ${entry.properTimeIncrement_s} | ${entry.cumulativeProperTime_s} | ${entry.boundedProgressCoordinate_m} | ${entry.localDescriptorValue} | ${entry.dtau_dt} | ${entry.normalizationResidual} |`,
+    )
+    .join("\n");
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const nextEligibleProducts =
+    payload.nextEligibleProducts.length > 0
+      ? payload.nextEligibleProducts.join(",")
+      : "none";
+  return `# NHM2 Route-Time Worldline (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
+| sourceCruisePreflightContractVersion | ${payload.sourceCruisePreflightContractVersion} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| chart | ${payload.chart.label} |
+| coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
+| observerFamily | ${payload.chart.observerFamily} |
+| validityRegimeId | ${payload.chart.validityRegimeId} |
+| routeModelId | ${payload.routeModelId} |
+| routeModelMeaning | ${payload.routeModelMeaning} |
+| routeParameterName | ${payload.routeParameterName} |
+| routeParameterMeaning | ${payload.routeParameterMeaning} |
+| sourceSampleGeometryFamilyId | ${payload.sourceSampleGeometryFamilyId} |
+| progressionSampleCount | ${payload.progressionSampleCount} |
+| representativeProgressionSampleId | ${payload.representativeProgressionSampleId} |
+| coordinateTimeSummary.start | ${payload.coordinateTimeSummary.start} |
+| coordinateTimeSummary.end | ${payload.coordinateTimeSummary.end} |
+| coordinateTimeSummary.span | ${payload.coordinateTimeSummary.span} |
+| properTimeSummary.start | ${payload.properTimeSummary.start} |
+| properTimeSummary.end | ${payload.properTimeSummary.end} |
+| properTimeSummary.span | ${payload.properTimeSummary.span} |
+| descriptorScheduleSummary.representative | ${payload.descriptorScheduleSummary.representative} |
+| descriptorScheduleSummary.min | ${payload.descriptorScheduleSummary.min} |
+| descriptorScheduleSummary.max | ${payload.descriptorScheduleSummary.max} |
+| descriptorScheduleSummary.spread | ${payload.descriptorScheduleSummary.spread} |
+| transportVariationStatus | ${payload.transportVariationStatus} |
+| transportInformativenessStatus | ${payload.transportInformativenessStatus} |
+| sampleFamilyAdequacy | ${payload.sampleFamilyAdequacy} |
+| routeTimeStatus | ${payload.routeTimeStatus} |
+| nextEligibleProducts | ${nextEligibleProducts} |
+
+## Route Progress Meaning
+- ${payload.routeProgressMeaning}
+
+## Progression Samples
+| index | sourceSampleId | lambda | coordinateTime_s | coordinateTimeIncrement_s | properTimeIncrement_s | cumulativeProperTime_s | boundedProgressCoordinate_m | localDescriptorValue | dtau_dt | normalizationResidual |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+${progressionRows}
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const buildNhm2MissionTimeEstimatorArtifact = (args: {
+  generatedOn: string;
+  missionTimeEstimator: WarpMissionTimeEstimatorContractV1;
+  targetDistanceContract?: WarpMissionTargetDistanceContractV1 | null;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  sourceRouteTimeArtifactPath?: string | null;
+}): Nhm2MissionTimeEstimatorArtifact => {
+  const targetDistanceContract =
+    args.targetDistanceContract && isCertifiedWarpMissionTargetDistanceContract(args.targetDistanceContract)
+      ? args.targetDistanceContract
+      : null;
+  const artifactBase: Nhm2MissionTimeEstimatorArtifact = {
+    artifactType: "nhm2_mission_time_estimator/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a bounded NHM2 mission-time estimator over a deterministic committed local-rest target-distance contract. It does not certify max speed, viability, unconstrained ETA, or a full route dynamic.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath
+      ? normalizePath(args.sourceWorldlineArtifactPath)
+      : null,
+    sourceCruisePreflightArtifactPath: args.sourceCruisePreflightArtifactPath
+      ? normalizePath(args.sourceCruisePreflightArtifactPath)
+      : null,
+    sourceRouteTimeArtifactPath: args.sourceRouteTimeArtifactPath
+      ? normalizePath(args.sourceRouteTimeArtifactPath)
+      : null,
+    sourceTargetDistanceSnapshotPath: targetDistanceContract
+      ? normalizePath(targetDistanceContract.snapshotPath)
+      : normalizePath(args.missionTimeEstimator.targetDistance.snapshotPath),
+    contractVersion: args.missionTimeEstimator.contractVersion,
+    status: args.missionTimeEstimator.status,
+    certified: args.missionTimeEstimator.certified,
+    sourceRouteTimeWorldlineContractVersion:
+      args.missionTimeEstimator.sourceRouteTimeWorldlineContractVersion,
+    sourceCruisePreflightContractVersion:
+      args.missionTimeEstimator.sourceCruisePreflightContractVersion,
+    sourceWorldlineContractVersion:
+      args.missionTimeEstimator.sourceWorldlineContractVersion,
+    targetDistanceContractVersion:
+      args.missionTimeEstimator.targetDistanceContractVersion,
+    sourceSurface: { ...args.missionTimeEstimator.sourceSurface },
+    chart: {
+      label: args.missionTimeEstimator.chart.label,
+      coordinateMap: args.missionTimeEstimator.chart.coordinateMap ?? null,
+      observerFamily: args.missionTimeEstimator.observerFamily,
+      validityRegimeId: args.missionTimeEstimator.validityRegime.regimeId,
+    },
+    estimatorModelId: args.missionTimeEstimator.estimatorModelId,
+    estimatorModelMeaning: args.missionTimeEstimator.estimatorModelMeaning,
+    targetFrame: args.missionTimeEstimator.targetFrame,
+    targetId: args.missionTimeEstimator.targetId,
+    targetName: args.missionTimeEstimator.targetName,
+    targetDistance: { ...args.missionTimeEstimator.targetDistance },
+    routeParameterMeaning: args.missionTimeEstimator.routeParameterMeaning,
+    routeTimeStatus: args.missionTimeEstimator.routeTimeStatus,
+    sourceWorldlineStatus: args.missionTimeEstimator.sourceWorldlineStatus,
+    sourceCruisePreflightStatus:
+      args.missionTimeEstimator.sourceCruisePreflightStatus,
+    sourceRouteTimeWorldlineStatus:
+      args.missionTimeEstimator.sourceRouteTimeWorldlineStatus,
+    estimatorAssumptions: [...args.missionTimeEstimator.estimatorAssumptions],
+    coordinateTimeEstimate: {
+      ...args.missionTimeEstimator.coordinateTimeEstimate,
+      units: { ...args.missionTimeEstimator.coordinateTimeEstimate.units },
+    },
+    properTimeEstimate: {
+      ...args.missionTimeEstimator.properTimeEstimate,
+      units: { ...args.missionTimeEstimator.properTimeEstimate.units },
+    },
+    comparisonReadiness: args.missionTimeEstimator.comparisonReadiness,
+    nextEligibleProducts: [...args.missionTimeEstimator.nextEligibleProducts],
+    claimBoundary: [...args.missionTimeEstimator.claimBoundary],
+    falsifierConditions: [...args.missionTimeEstimator.falsifierConditions],
+    nonClaims: [...args.missionTimeEstimator.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeMissionTimeEstimatorChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2MissionTimeEstimatorMarkdown = (
+  payload: Nhm2MissionTimeEstimatorArtifact,
+): string => {
+  const assumptions = payload.estimatorAssumptions.map((entry) => `- ${entry}`).join("\n");
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const nextEligibleProducts =
+    payload.nextEligibleProducts.length > 0
+      ? payload.nextEligibleProducts.join(",")
+      : "none";
+  return `# NHM2 Mission-Time Estimator (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| sourceRouteTimeWorldlineContractVersion | ${payload.sourceRouteTimeWorldlineContractVersion} |
+| sourceCruisePreflightContractVersion | ${payload.sourceCruisePreflightContractVersion} |
+| sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
+| targetDistanceContractVersion | ${payload.targetDistanceContractVersion} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| chart | ${payload.chart.label} |
+| coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
+| observerFamily | ${payload.chart.observerFamily} |
+| validityRegimeId | ${payload.chart.validityRegimeId} |
+| estimatorModelId | ${payload.estimatorModelId} |
+| estimatorModelMeaning | ${payload.estimatorModelMeaning} |
+| targetId | ${payload.targetId} |
+| targetName | ${payload.targetName} |
+| targetFrame | ${payload.targetFrame} |
+| targetDistance.meters | ${payload.targetDistance.meters} |
+| targetDistance.parsecs | ${payload.targetDistance.parsecs} |
+| targetDistance.lightYears | ${payload.targetDistance.lightYears} |
+| targetDistance.epochMs | ${payload.targetDistance.epochMs} |
+| targetDistance.snapshotPath | ${payload.targetDistance.snapshotPath} |
+| routeParameterMeaning | ${payload.routeParameterMeaning} |
+| coordinateTimeEstimate.seconds | ${payload.coordinateTimeEstimate.seconds} |
+| coordinateTimeEstimate.years | ${payload.coordinateTimeEstimate.years} |
+| properTimeEstimate.seconds | ${payload.properTimeEstimate.seconds} |
+| properTimeEstimate.years | ${payload.properTimeEstimate.years} |
+| routeTimeStatus | ${payload.routeTimeStatus} |
+| sourceWorldlineStatus | ${payload.sourceWorldlineStatus} |
+| sourceCruisePreflightStatus | ${payload.sourceCruisePreflightStatus} |
+| sourceRouteTimeWorldlineStatus | ${payload.sourceRouteTimeWorldlineStatus} |
+| comparisonReadiness | ${payload.comparisonReadiness} |
+| nextEligibleProducts | ${nextEligibleProducts} |
+
+## Estimator Assumptions
+${assumptions}
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const buildNhm2MissionTimeComparisonArtifact = (args: {
+  generatedOn: string;
+  missionTimeComparison: WarpMissionTimeComparisonContractV1;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  sourceRouteTimeArtifactPath?: string | null;
+  sourceMissionTimeEstimatorArtifactPath?: string | null;
+  sourceTargetDistanceSnapshotPath?: string | null;
+}): Nhm2MissionTimeComparisonArtifact => {
+  const artifactBase: Nhm2MissionTimeComparisonArtifact = {
+    artifactType: "nhm2_mission_time_comparison/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a bounded NHM2 mission-time comparison on a deterministic committed local-rest target-distance basis. It compares warp coordinate time, warp ship proper time, and a classical no-time-dilation reference without certifying speed, viability, or a route-map ETA surface.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath
+      ? normalizePath(args.sourceWorldlineArtifactPath)
+      : null,
+    sourceCruisePreflightArtifactPath: args.sourceCruisePreflightArtifactPath
+      ? normalizePath(args.sourceCruisePreflightArtifactPath)
+      : null,
+    sourceRouteTimeArtifactPath: args.sourceRouteTimeArtifactPath
+      ? normalizePath(args.sourceRouteTimeArtifactPath)
+      : null,
+    sourceMissionTimeEstimatorArtifactPath: args.sourceMissionTimeEstimatorArtifactPath
+      ? normalizePath(args.sourceMissionTimeEstimatorArtifactPath)
+      : null,
+    sourceTargetDistanceSnapshotPath: args.sourceTargetDistanceSnapshotPath
+      ? normalizePath(args.sourceTargetDistanceSnapshotPath)
+      : null,
+    contractVersion: args.missionTimeComparison.contractVersion,
+    status: args.missionTimeComparison.status,
+    certified: args.missionTimeComparison.certified,
+    sourceMissionTimeEstimatorContractVersion:
+      args.missionTimeComparison.sourceMissionTimeEstimatorContractVersion,
+    sourceRouteTimeWorldlineContractVersion:
+      args.missionTimeComparison.sourceRouteTimeWorldlineContractVersion,
+    sourceCruisePreflightContractVersion:
+      args.missionTimeComparison.sourceCruisePreflightContractVersion,
+    sourceWorldlineContractVersion:
+      args.missionTimeComparison.sourceWorldlineContractVersion,
+    targetDistanceContractVersion:
+      args.missionTimeComparison.targetDistanceContractVersion,
+    sourceSurface: { ...args.missionTimeComparison.sourceSurface },
+    chart: {
+      label: args.missionTimeComparison.chart.label,
+      coordinateMap: args.missionTimeComparison.chart.coordinateMap ?? null,
+      observerFamily: args.missionTimeComparison.observerFamily,
+    },
+    comparisonModelId: args.missionTimeComparison.comparisonModelId,
+    comparisonModelMeaning: args.missionTimeComparison.comparisonModelMeaning,
+    targetId: args.missionTimeComparison.targetId,
+    targetName: args.missionTimeComparison.targetName,
+    targetFrame: args.missionTimeComparison.targetFrame,
+    warpCoordinateTimeEstimate: {
+      ...args.missionTimeComparison.warpCoordinateTimeEstimate,
+      units: { ...args.missionTimeComparison.warpCoordinateTimeEstimate.units },
+    },
+    warpProperTimeEstimate: {
+      ...args.missionTimeComparison.warpProperTimeEstimate,
+      units: { ...args.missionTimeComparison.warpProperTimeEstimate.units },
+    },
+    classicalReferenceTimeEstimate: {
+      ...args.missionTimeComparison.classicalReferenceTimeEstimate,
+      units: { ...args.missionTimeComparison.classicalReferenceTimeEstimate.units },
+    },
+    comparisonMetrics: { ...args.missionTimeComparison.comparisonMetrics },
+    comparisonReadiness: args.missionTimeComparison.comparisonReadiness,
+    deferredComparators: [...args.missionTimeComparison.deferredComparators],
+    claimBoundary: [...args.missionTimeComparison.claimBoundary],
+    falsifierConditions: [...args.missionTimeComparison.falsifierConditions],
+    nonClaims: [...args.missionTimeComparison.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeMissionTimeComparisonChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2MissionTimeComparisonMarkdown = (
+  payload: Nhm2MissionTimeComparisonArtifact,
+): string => {
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const deferredComparators =
+    payload.deferredComparators.length > 0
+      ? payload.deferredComparators.join(",")
+      : "none";
+  return `# NHM2 Mission-Time Comparison (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| sourceMissionTimeEstimatorContractVersion | ${payload.sourceMissionTimeEstimatorContractVersion} |
+| sourceRouteTimeWorldlineContractVersion | ${payload.sourceRouteTimeWorldlineContractVersion} |
+| sourceCruisePreflightContractVersion | ${payload.sourceCruisePreflightContractVersion} |
+| sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
+| targetDistanceContractVersion | ${payload.targetDistanceContractVersion} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| chart | ${payload.chart.label} |
+| coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
+| observerFamily | ${payload.chart.observerFamily} |
+| comparisonModelId | ${payload.comparisonModelId} |
+| comparisonModelMeaning | ${payload.comparisonModelMeaning} |
+| targetId | ${payload.targetId} |
+| targetName | ${payload.targetName} |
+| targetFrame | ${payload.targetFrame} |
+| warpCoordinateTimeEstimate.seconds | ${payload.warpCoordinateTimeEstimate.seconds} |
+| warpCoordinateTimeEstimate.years | ${payload.warpCoordinateTimeEstimate.years} |
+| warpProperTimeEstimate.seconds | ${payload.warpProperTimeEstimate.seconds} |
+| warpProperTimeEstimate.years | ${payload.warpProperTimeEstimate.years} |
+| classicalReferenceTimeEstimate.seconds | ${payload.classicalReferenceTimeEstimate.seconds} |
+| classicalReferenceTimeEstimate.years | ${payload.classicalReferenceTimeEstimate.years} |
+| comparisonMetrics.properMinusCoordinate_seconds | ${payload.comparisonMetrics.properMinusCoordinate_seconds} |
+| comparisonMetrics.properVsCoordinate_ratio | ${payload.comparisonMetrics.properVsCoordinate_ratio} |
+| comparisonMetrics.properMinusClassical_seconds | ${payload.comparisonMetrics.properMinusClassical_seconds} |
+| comparisonMetrics.properVsClassical_ratio | ${payload.comparisonMetrics.properVsClassical_ratio} |
+| comparisonMetrics.coordinateMinusClassical_seconds | ${payload.comparisonMetrics.coordinateMinusClassical_seconds} |
+| comparisonMetrics.coordinateVsClassical_ratio | ${payload.comparisonMetrics.coordinateVsClassical_ratio} |
+| comparisonMetrics.interpretationStatus | ${payload.comparisonMetrics.interpretationStatus} |
+| comparisonMetrics.differentialToleranceSeconds | ${payload.comparisonMetrics.differentialToleranceSeconds} |
+| comparisonReadiness | ${payload.comparisonReadiness} |
+| deferredComparators | ${deferredComparators} |
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const buildNhm2CruiseEnvelopeArtifact = (args: {
+  generatedOn: string;
+  cruiseEnvelope: WarpCruiseEnvelopeContractV1;
+  sourceAuditArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  sourceRouteTimeArtifactPath?: string | null;
+  sourceMissionTimeEstimatorArtifactPath?: string | null;
+  sourceMissionTimeComparisonArtifactPath?: string | null;
+}): Nhm2CruiseEnvelopeArtifact => {
+  const artifactBase: Nhm2CruiseEnvelopeArtifact = {
+    artifactType: "nhm2_cruise_envelope/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a certified bounded NHM2 cruise envelope over a fixed-chart descriptor band. It strengthens preflight by route-time and mission consistency while remaining explicitly non-speed, non-ETA, and non-viability.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    sourceCruisePreflightArtifactPath: args.sourceCruisePreflightArtifactPath
+      ? normalizePath(args.sourceCruisePreflightArtifactPath)
+      : null,
+    sourceRouteTimeArtifactPath: args.sourceRouteTimeArtifactPath
+      ? normalizePath(args.sourceRouteTimeArtifactPath)
+      : null,
+    sourceMissionTimeEstimatorArtifactPath:
+      args.sourceMissionTimeEstimatorArtifactPath
+        ? normalizePath(args.sourceMissionTimeEstimatorArtifactPath)
+        : null,
+    sourceMissionTimeComparisonArtifactPath:
+      args.sourceMissionTimeComparisonArtifactPath
+        ? normalizePath(args.sourceMissionTimeComparisonArtifactPath)
+        : null,
+    contractVersion: args.cruiseEnvelope.contractVersion,
+    status: args.cruiseEnvelope.status,
+    certified: args.cruiseEnvelope.certified,
+    sourcePreflightContractVersion:
+      args.cruiseEnvelope.sourcePreflightContractVersion,
+    sourceRouteTimeWorldlineContractVersion:
+      args.cruiseEnvelope.sourceRouteTimeWorldlineContractVersion,
+    sourceMissionTimeEstimatorContractVersion:
+      args.cruiseEnvelope.sourceMissionTimeEstimatorContractVersion,
+    sourceMissionTimeComparisonContractVersion:
+      args.cruiseEnvelope.sourceMissionTimeComparisonContractVersion,
+    sourceWorldlineContractVersion:
+      args.cruiseEnvelope.sourceWorldlineContractVersion,
+    sourceSurface: { ...args.cruiseEnvelope.sourceSurface },
+    chart: {
+      label: args.cruiseEnvelope.chart.label,
+      coordinateMap: args.cruiseEnvelope.chart.coordinateMap ?? null,
+      observerFamily: args.cruiseEnvelope.observerFamily,
+      validityRegimeId: args.cruiseEnvelope.validityRegime.regimeId,
+    },
+    cruiseEnvelopeModelId: args.cruiseEnvelope.cruiseEnvelopeModelId,
+    cruiseEnvelopeModelMeaning: args.cruiseEnvelope.cruiseEnvelopeModelMeaning,
+    envelopeQuantityId: args.cruiseEnvelope.envelopeQuantityId,
+    envelopeQuantityMeaning: args.cruiseEnvelope.envelopeQuantityMeaning,
+    envelopeQuantityUnits: args.cruiseEnvelope.envelopeQuantityUnits,
+    targetId: args.cruiseEnvelope.targetId,
+    targetName: args.cruiseEnvelope.targetName,
+    targetFrame: args.cruiseEnvelope.targetFrame,
+    sourcePreflightStatus: args.cruiseEnvelope.sourcePreflightStatus,
+    sourceRouteTimeWorldlineStatus:
+      args.cruiseEnvelope.sourceRouteTimeWorldlineStatus,
+    sourceMissionTimeEstimatorStatus:
+      args.cruiseEnvelope.sourceMissionTimeEstimatorStatus,
+    sourceMissionTimeComparisonStatus:
+      args.cruiseEnvelope.sourceMissionTimeComparisonStatus,
+    admissibleBand: { ...args.cruiseEnvelope.admissibleBand },
+    representativeValue: args.cruiseEnvelope.representativeValue,
+    admissibilityReasons: [...args.cruiseEnvelope.admissibilityReasons],
+    rejectionReasons: [...args.cruiseEnvelope.rejectionReasons],
+    comparisonConsistencyStatus:
+      args.cruiseEnvelope.comparisonConsistencyStatus,
+    comparisonInterpretationStatus:
+      args.cruiseEnvelope.comparisonInterpretationStatus,
+    comparisonConsistencyNote: args.cruiseEnvelope.comparisonConsistencyNote,
+    routeTimeStatus: args.cruiseEnvelope.routeTimeStatus,
+    missionTimeStatus: args.cruiseEnvelope.missionTimeStatus,
+    claimBoundary: [...args.cruiseEnvelope.claimBoundary],
+    falsifierConditions: [...args.cruiseEnvelope.falsifierConditions],
+    nonClaims: [...args.cruiseEnvelope.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeCruiseEnvelopeChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2CruiseEnvelopeMarkdown = (
+  payload: Nhm2CruiseEnvelopeArtifact,
+): string => {
+  const admissibilityReasons = payload.admissibilityReasons
+    .map((entry) => `- ${entry}`)
+    .join("\n");
+  const rejectionReasons = payload.rejectionReasons
+    .map((entry) => `- ${entry}`)
+    .join("\n");
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Cruise Envelope (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| sourcePreflightContractVersion | ${payload.sourcePreflightContractVersion} |
+| sourceRouteTimeWorldlineContractVersion | ${payload.sourceRouteTimeWorldlineContractVersion} |
+| sourceMissionTimeEstimatorContractVersion | ${payload.sourceMissionTimeEstimatorContractVersion} |
+| sourceMissionTimeComparisonContractVersion | ${payload.sourceMissionTimeComparisonContractVersion} |
+| sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| chart | ${payload.chart.label} |
+| coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
+| observerFamily | ${payload.chart.observerFamily} |
+| validityRegimeId | ${payload.chart.validityRegimeId} |
+| cruiseEnvelopeModelId | ${payload.cruiseEnvelopeModelId} |
+| cruiseEnvelopeModelMeaning | ${payload.cruiseEnvelopeModelMeaning} |
+| envelopeQuantityId | ${payload.envelopeQuantityId} |
+| envelopeQuantityMeaning | ${payload.envelopeQuantityMeaning} |
+| envelopeQuantityUnits | ${payload.envelopeQuantityUnits} |
+| targetId | ${payload.targetId} |
+| targetName | ${payload.targetName} |
+| targetFrame | ${payload.targetFrame} |
+| sourcePreflightStatus | ${payload.sourcePreflightStatus} |
+| sourceRouteTimeWorldlineStatus | ${payload.sourceRouteTimeWorldlineStatus} |
+| sourceMissionTimeEstimatorStatus | ${payload.sourceMissionTimeEstimatorStatus} |
+| sourceMissionTimeComparisonStatus | ${payload.sourceMissionTimeComparisonStatus} |
+| admissibleBand.min | ${payload.admissibleBand.min} |
+| admissibleBand.max | ${payload.admissibleBand.max} |
+| admissibleBand.units | ${payload.admissibleBand.units} |
+| representativeValue | ${payload.representativeValue} |
+| comparisonConsistencyStatus | ${payload.comparisonConsistencyStatus} |
+| comparisonInterpretationStatus | ${payload.comparisonInterpretationStatus} |
+| routeTimeStatus | ${payload.routeTimeStatus} |
+| missionTimeStatus | ${payload.missionTimeStatus} |
+
+## Comparison Consistency Note
+${payload.comparisonConsistencyNote}
+
+## Admissibility Reasons
+${admissibilityReasons}
+
+## Rejection Reasons
+${rejectionReasons}
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const buildNhm2InHullProperAccelerationArtifact = (args: {
+  generatedOn: string;
+  inHullProperAcceleration: WarpInHullProperAccelerationContractV1;
+  sourceAuditArtifactPath?: string | null;
+}): Nhm2InHullProperAccelerationArtifact => {
+  const artifactBase: Nhm2InHullProperAccelerationArtifact = {
+    artifactType: "nhm2_in_hull_proper_acceleration/v1",
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a bounded NHM2 in-hull proper-acceleration profile for a declared Eulerian cabin observer family. It is solve-backed and no-fallback in certified mode, but it is not a curvature-gravity or comfort/safety certificate.",
+    sourceAuditArtifactPath: args.sourceAuditArtifactPath
+      ? normalizePath(args.sourceAuditArtifactPath)
+      : null,
+    contractVersion: args.inHullProperAcceleration.contractVersion,
+    status: args.inHullProperAcceleration.status,
+    certified: args.inHullProperAcceleration.certified,
+    sourceSurface: { ...args.inHullProperAcceleration.sourceSurface },
+    chart: {
+      label: args.inHullProperAcceleration.chart.label,
+      coordinateMap: args.inHullProperAcceleration.chart.coordinateMap ?? null,
+      observerFamily: args.inHullProperAcceleration.observerFamily,
+    },
+    accelerationQuantityId: args.inHullProperAcceleration.accelerationQuantityId,
+    accelerationQuantityMeaning:
+      args.inHullProperAcceleration.accelerationQuantityMeaning,
+    accelerationUnits: args.inHullProperAcceleration.accelerationUnits,
+    samplingGeometry: {
+      ...args.inHullProperAcceleration.samplingGeometry,
+      ordering: [...args.inHullProperAcceleration.samplingGeometry.ordering],
+      axes: {
+        centerline: [
+          ...args.inHullProperAcceleration.samplingGeometry.axes.centerline,
+        ],
+        portStarboard: [
+          ...args.inHullProperAcceleration.samplingGeometry.axes.portStarboard,
+        ],
+        dorsalVentral: [
+          ...args.inHullProperAcceleration.samplingGeometry.axes.dorsalVentral,
+        ],
+      },
+      offsets_m: { ...args.inHullProperAcceleration.samplingGeometry.offsets_m },
+      samplePositions_m: Object.fromEntries(
+        Object.entries(args.inHullProperAcceleration.samplingGeometry.samplePositions_m).map(
+          ([key, value]) => [key, [...value]],
+        ),
+      ) as WarpInHullProperAccelerationContractV1["samplingGeometry"]["samplePositions_m"],
+    },
+    sampleCount: args.inHullProperAcceleration.sampleCount,
+    sampleSummaries: args.inHullProperAcceleration.sampleSummaries.map((entry) => ({
+      ...entry,
+      position_m: [...entry.position_m],
+      properAccelerationGeomVector_per_m: [
+        ...entry.properAccelerationGeomVector_per_m,
+      ],
+    })),
+    profileSummary: { ...args.inHullProperAcceleration.profileSummary },
+    resolutionAdequacy: {
+      ...args.inHullProperAcceleration.resolutionAdequacy,
+      brickDims: [...args.inHullProperAcceleration.resolutionAdequacy.brickDims],
+      voxelSize_m: [...args.inHullProperAcceleration.resolutionAdequacy.voxelSize_m],
+    },
+    fallbackUsed: args.inHullProperAcceleration.fallbackUsed,
+    claimBoundary: [...args.inHullProperAcceleration.claimBoundary],
+    falsifierConditions: [...args.inHullProperAcceleration.falsifierConditions],
+    nonClaims: [...args.inHullProperAcceleration.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeInHullProperAccelerationChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2InHullProperAccelerationMarkdown = (
+  payload: Nhm2InHullProperAccelerationArtifact,
+): string => {
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const sampleRows = payload.sampleSummaries
+    .map(
+      (entry) =>
+        `| ${entry.sampleId} | ${entry.position_m.join(", ")} | ${entry.properAccelerationGeomMagnitude_per_m} | ${entry.properAccelerationMagnitude_mps2} | ${entry.properAccelerationMagnitude_g} |`,
+    )
+    .join("\n");
+  return `# NHM2 In-Hull Proper Acceleration (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| sourceSurface | ${payload.sourceSurface.surfaceId} |
+| chart | ${payload.chart.label} |
+| coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
+| observerFamily | ${payload.chart.observerFamily} |
+| accelerationQuantityId | ${payload.accelerationQuantityId} |
+| accelerationQuantityMeaning | ${payload.accelerationQuantityMeaning} |
+| accelerationUnits | ${payload.accelerationUnits} |
+| sampleCount | ${payload.sampleCount} |
+| representative_mps2 | ${payload.profileSummary.representative_mps2} |
+| representative_g | ${payload.profileSummary.representative_g} |
+| min_mps2 | ${payload.profileSummary.min_mps2} |
+| max_mps2 | ${payload.profileSummary.max_mps2} |
+| spread_mps2 | ${payload.profileSummary.spread_mps2} |
+| resolutionAdequacy | ${payload.resolutionAdequacy.status} |
+| fallbackUsed | ${String(payload.fallbackUsed)} |
+
+## Sampling Geometry
+| field | value |
+|---|---|
+| familyId | ${payload.samplingGeometry.familyId} |
+| description | ${payload.samplingGeometry.description} |
+| coordinateFrame | ${payload.samplingGeometry.coordinateFrame} |
+| representativeSampleId | ${payload.samplingGeometry.representativeSampleId} |
+
+## Sample Profile
+| sampleId | position_m | properAccelerationGeomMagnitude_per_m | properAccelerationMagnitude_mps2 | properAccelerationMagnitude_g |
+|---|---|---:|---:|---:|
+${sampleRows}
+
+## Resolution Adequacy
+| field | value |
+|---|---|
+| criterionId | ${payload.resolutionAdequacy.criterionId} |
+| criterionMeaning | ${payload.resolutionAdequacy.criterionMeaning} |
+| brickDims | ${payload.resolutionAdequacy.brickDims.join(",")} |
+| voxelSize_m | ${payload.resolutionAdequacy.voxelSize_m.join(",")} |
+| wholeBrickAccelerationAbsMax_per_m | ${payload.resolutionAdequacy.wholeBrickAccelerationAbsMax_per_m} |
+| wholeBrickGradientAbsMax_per_m | ${payload.resolutionAdequacy.wholeBrickGradientAbsMax_per_m} |
+| allSampleMagnitudesZero | ${String(payload.resolutionAdequacy.allSampleMagnitudesZero)} |
+| expectedZeroProfileByModel | ${String(payload.resolutionAdequacy.expectedZeroProfileByModel)} |
+| note | ${payload.resolutionAdequacy.note} |
+
+## Claim Boundary
+${claimBoundary}
+
+## Falsifier Conditions
+${falsifiers}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+const BOUNDED_PROOF_SURFACE_MANIFEST_DEFINITIONS: Array<{
+  surfaceId: Exclude<WarpProofSurfaceManifestSurfaceEntryV1["surfaceId"], "proof_pack_latest">;
+  artifactType:
+    | "nhm2_warp_worldline_proof/v1"
+    | "nhm2_cruise_envelope_preflight/v1"
+    | "nhm2_route_time_worldline/v1"
+    | "nhm2_mission_time_estimator/v1"
+    | "nhm2_mission_time_comparison/v1"
+    | "nhm2_cruise_envelope/v1"
+    | "nhm2_in_hull_proper_acceleration/v1";
+  jsonPath: string;
+  mdPath: string;
+}> = [
+  {
+    surfaceId: "warp_worldline",
+    artifactType: "nhm2_warp_worldline_proof/v1",
+    jsonPath: DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    mdPath: DEFAULT_WARP_WORLDLINE_PROOF_LATEST_MD,
+  },
+  {
+    surfaceId: "cruise_preflight",
+    artifactType: "nhm2_cruise_envelope_preflight/v1",
+    jsonPath: DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+    mdPath: DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_MD,
+  },
+  {
+    surfaceId: "route_time_worldline",
+    artifactType: "nhm2_route_time_worldline/v1",
+    jsonPath: DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
+    mdPath: DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_MD,
+  },
+  {
+    surfaceId: "mission_time_estimator",
+    artifactType: "nhm2_mission_time_estimator/v1",
+    jsonPath: DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON,
+    mdPath: DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_MD,
+  },
+  {
+    surfaceId: "mission_time_comparison",
+    artifactType: "nhm2_mission_time_comparison/v1",
+    jsonPath: DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON,
+    mdPath: DEFAULT_MISSION_TIME_COMPARISON_LATEST_MD,
+  },
+  {
+    surfaceId: "cruise_envelope",
+    artifactType: "nhm2_cruise_envelope/v1",
+    jsonPath: DEFAULT_CRUISE_ENVELOPE_LATEST_JSON,
+    mdPath: DEFAULT_CRUISE_ENVELOPE_LATEST_MD,
+  },
+  {
+    surfaceId: "in_hull_proper_acceleration",
+    artifactType: "nhm2_in_hull_proper_acceleration/v1",
+    jsonPath: DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_JSON,
+    mdPath: DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_MD,
+  },
+];
+
+const resolveProofSurfaceManifestTrackedRepoEvidenceStatus = (
+  paths: string[],
+  gitRepoRootPath: string = process.cwd(),
+): WarpProofSurfaceManifestContractV1["trackedRepoEvidenceStatus"] | null => {
+  if (!paths.every((entry) => !isGitIgnored(entry, gitRepoRootPath))) {
+    return null;
+  }
+  const trackedStates = paths.map((entry) => getGitTrackedState(entry, gitRepoRootPath));
+  if (!trackedStates.every((state) => state === "tracked")) {
+    return "repo_trackable_latest_evidence";
+  }
+  const cleanLandingState = getGitCleanLandingState(paths, gitRepoRootPath);
+  if (cleanLandingState === "clean") {
+    return "repo_landed_clean_latest_evidence";
+  }
+  return "repo_tracked_latest_evidence";
+};
+
+const buildProofSurfaceManifestEntryFromArtifact = (args: {
+  surfaceId: WarpProofSurfaceManifestSurfaceEntryV1["surfaceId"];
+  artifactType: string;
+  jsonPath: string;
+  mdPath: string;
+  artifact: unknown;
+  statusOverride?: string;
+  certifiedOverride?: boolean;
+  contractVersionOverride?: string;
+}): WarpProofSurfaceManifestSurfaceEntryV1 => {
+  const record = asRecord(args.artifact);
+  const generatedOn = asText(record.generatedOn);
+  const generatedAt = asText(record.generatedAt);
+  const status = args.statusOverride ?? asText(record.status);
+  const contractVersion =
+    args.contractVersionOverride ?? asText(record.contractVersion) ?? args.artifactType;
+  const jsonChecksum =
+    (fs.existsSync(args.jsonPath) ? computeJsonFileChecksum(args.jsonPath) : null) ??
+    computeArtifactJsonChecksum(args.artifact);
+  if (
+    generatedOn == null ||
+    generatedAt == null ||
+    status == null ||
+    contractVersion == null ||
+    jsonChecksum == null
+  ) {
+    throw new Error(`invalid_proof_surface_artifact:${args.surfaceId}`);
+  }
+  if (!fs.existsSync(args.mdPath)) {
+    throw new Error(`proof_surface_report_missing:${normalizePath(args.mdPath)}`);
+  }
+  return {
+    surfaceId: args.surfaceId,
+    artifactType: args.artifactType,
+    jsonPath: normalizePath(args.jsonPath),
+    mdPath: normalizePath(args.mdPath),
+    jsonChecksum,
+    generatedOn,
+    generatedAt,
+    status,
+    certified: args.certifiedOverride ?? record.certified === true,
+    contractVersion,
+  };
+};
+
+export const buildNhm2ProofSurfaceManifestArtifact = (args: {
+  generatedOn: string;
+  proofPackPayload: ProofPackPayload;
+  proofPackLatestJsonPath?: string;
+  proofPackLatestMdPath?: string;
+  proofSurfaces?: WarpProofSurfaceManifestSurfaceEntryV1[];
+  gitRepoRootPath?: string;
+}): Nhm2ProofSurfaceManifestArtifact => {
+  const proofPackLatestJsonPath = args.proofPackLatestJsonPath ?? DEFAULT_LATEST_JSON;
+  const proofPackLatestMdPath = args.proofPackLatestMdPath ?? DEFAULT_LATEST_MD;
+  const proofSurfaces =
+    args.proofSurfaces ??
+    BOUNDED_PROOF_SURFACE_MANIFEST_DEFINITIONS.map((definition) =>
+      buildProofSurfaceManifestEntryFromArtifact({
+        ...definition,
+        artifact: readJsonArtifact<Record<string, unknown>>(
+          definition.jsonPath,
+          definition.artifactType,
+        ),
+      }),
+    ).concat(
+      buildProofSurfaceManifestEntryFromArtifact({
+        surfaceId: "proof_pack_latest",
+        artifactType: "warp_york_control_family_proof_pack/v1",
+        jsonPath: proofPackLatestJsonPath,
+        mdPath: proofPackLatestMdPath,
+        artifact: args.proofPackPayload,
+        statusOverride: "published_latest_summary",
+        certifiedOverride: true,
+        contractVersionOverride: "warp_york_control_family_proof_pack/v1",
+      }),
+    );
+  const trackedRepoEvidenceStatus = resolveProofSurfaceManifestTrackedRepoEvidenceStatus(
+    proofSurfaces.flatMap((entry) => [entry.jsonPath, entry.mdPath]),
+    args.gitRepoRootPath,
+  );
+  if (!trackedRepoEvidenceStatus) {
+    throw new Error("proof_surface_manifest_repo_evidence_not_trackable");
+  }
+  const contract = buildWarpProofSurfaceManifestContract({
+    generatedOn: args.generatedOn,
+    generatedAt: new Date().toISOString(),
+    proofSurfaces,
+    proofPackPath: normalizePath(proofPackLatestJsonPath),
+    proofPackChecksum: args.proofPackPayload.checksum,
+    trackedRepoEvidenceStatus,
+    claimBoundary: [
+      "publication/provenance manifest only",
+      "bounded NHM2 certified latest proof surfaces only",
+    ],
+    nonClaims: [
+      "does not widen transport claims",
+      "does not widen gravity claims",
+      "does not certify viability",
+    ],
+  });
+  if (!isCertifiedWarpProofSurfaceManifestContract(contract)) {
+    throw new Error("proof_surface_manifest_contract_invalid");
+  }
+  const artifactBase: Nhm2ProofSurfaceManifestArtifact = {
+    artifactType: "nhm2_proof_surface_manifest/v1",
+    generatedOn: contract.generatedOn,
+    generatedAt: contract.generatedAt,
+    boundaryStatement:
+      "This artifact records deterministic publication/provenance for the bounded NHM2 latest proof surfaces. It does not widen any transport, gravity, or viability claim.",
+    contractVersion: contract.contractVersion,
+    status: contract.status,
+    certified: contract.certified,
+    publicationMode: contract.publicationMode,
+    proofSurfaceCount: contract.proofSurfaceCount,
+    proofSurfaces: contract.proofSurfaces.map((entry) => ({ ...entry })),
+    proofPackPath: normalizePath(proofPackLatestJsonPath),
+    proofPackReportPath: normalizePath(proofPackLatestMdPath),
+    proofPackChecksum: contract.proofPackChecksum,
+    trackedRepoEvidenceStatus: contract.trackedRepoEvidenceStatus,
+    claimBoundary: [...contract.claimBoundary],
+    nonClaims: [...contract.nonClaims],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeProofSurfaceManifestChecksum(artifactBase),
+  };
+};
+
+export const renderNhm2ProofSurfaceManifestMarkdown = (
+  payload: Nhm2ProofSurfaceManifestArtifact,
+): string => {
+  const proofSurfaceRows = payload.proofSurfaces
+    .map(
+      (entry) =>
+        `| ${entry.surfaceId} | ${entry.artifactType} | ${entry.status} | ${String(entry.certified)} | ${entry.contractVersion} | ${entry.jsonChecksum} | ${entry.jsonPath} | ${entry.mdPath} |`,
+    )
+    .join("\n");
+  const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Proof Surface Manifest (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Summary
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| contractVersion | ${payload.contractVersion} |
+| status | ${payload.status} |
+| certified | ${String(payload.certified)} |
+| publicationMode | ${payload.publicationMode} |
+| proofSurfaceCount | ${payload.proofSurfaceCount} |
+| trackedRepoEvidenceStatus | ${payload.trackedRepoEvidenceStatus} |
+| proofPackPath | ${payload.proofPackPath} |
+| proofPackReportPath | ${payload.proofPackReportPath} |
+| proofPackChecksum | ${payload.proofPackChecksum} |
+
+## Proof Surfaces
+| surfaceId | artifactType | status | certified | contractVersion | jsonChecksum | jsonPath | mdPath |
+|---|---|---|---|---|---|---|---|
+${proofSurfaceRows}
+
+## Claim Boundary
+${claimBoundary}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const publishNhm2WarpWorldlineProofLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2WarpWorldlineProofArtifact;
+  cruisePreflight?: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2CruiseEnvelopePreflightArtifact;
+    routeTime?: {
+      outJsonPath: string;
+      latestJsonPath: string;
+      outMdPath: string;
+      latestMdPath: string;
+      artifact: Nhm2RouteTimeWorldlineArtifact;
+      missionTime?: {
+        outJsonPath: string;
+        latestJsonPath: string;
+        outMdPath: string;
+        latestMdPath: string;
+        artifact: Nhm2MissionTimeEstimatorArtifact;
+      };
+    };
+  };
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-worldline-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath = options?.outJsonPath ?? DEFAULT_WARP_WORLDLINE_PROOF_OUT_JSON;
+  const latestJsonPath = options?.latestJsonPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_WARP_WORLDLINE_PROOF_OUT_MD;
+  const latestMdPath = options?.latestMdPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_MD;
+  let warpWorldline: unknown = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      warpWorldline = pipeline.warpWorldline;
+    }
+  } catch {
+    warpWorldline = null;
+  }
+  if (!isCertifiedWarpWorldlineContract(warpWorldline)) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
+  }
+  if (!isCertifiedWarpWorldlineContract(warpWorldline)) {
+    throw new Error("certified_warp_worldline_missing");
+  }
+  const artifact = buildNhm2WarpWorldlineProofArtifact({
+    generatedOn: DATE_STAMP,
+    warpWorldline,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+  });
+  const markdown = renderNhm2WarpWorldlineProofMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(fs.readFileSync(DEFAULT_LATEST_JSON, "utf8")) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyWarpWorldlineSummaryToProofPackPayload({
+        payload: existingPayload,
+        warpWorldlineArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  const cruisePreflight = await publishNhm2CruiseEnvelopePreflightLatest({
+    baseUrl,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath: latestJsonPath,
+    publicationLockPath: options?.publicationLockPath,
+  });
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+    cruisePreflight,
+  };
+    },
+  });
+};
+
+export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2CruiseEnvelopePreflightArtifact;
+  routeTime?: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2RouteTimeWorldlineArtifact;
+    missionTime?: {
+      outJsonPath: string;
+      latestJsonPath: string;
+      outMdPath: string;
+      latestMdPath: string;
+      artifact: Nhm2MissionTimeEstimatorArtifact;
+    };
+  };
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-cruise-preflight-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath = options?.outJsonPath ?? DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_JSON;
+  const latestJsonPath =
+    options?.latestJsonPath ?? DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_MD;
+  const latestMdPath = options?.latestMdPath ?? DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_MD;
+  let preflight: unknown = null;
+  let warpWorldline: unknown = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      preflight = pipeline.warpCruiseEnvelopePreflight;
+      warpWorldline = pipeline.warpWorldline;
+    }
+  } catch {
+    preflight = null;
+    warpWorldline = null;
+  }
+  if (
+    !isCertifiedWarpCruiseEnvelopePreflightContract(preflight) &&
+    isCertifiedWarpWorldlineContract(warpWorldline)
+  ) {
+    preflight = buildWarpCruiseEnvelopePreflightContractFromWorldline(warpWorldline);
+  }
+  if (!isCertifiedWarpCruiseEnvelopePreflightContract(preflight)) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
+    warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
+  }
+  if (
+    !isCertifiedWarpCruiseEnvelopePreflightContract(preflight) &&
+    isCertifiedWarpWorldlineContract(warpWorldline)
+  ) {
+    preflight = buildWarpCruiseEnvelopePreflightContractFromWorldline(warpWorldline);
+  }
+  if (!isCertifiedWarpCruiseEnvelopePreflightContract(preflight)) {
+    throw new Error("certified_cruise_preflight_missing");
+  }
+
+  const artifact = buildNhm2CruiseEnvelopePreflightArtifact({
+    generatedOn: DATE_STAMP,
+    preflight,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+  });
+  const markdown = renderNhm2CruiseEnvelopePreflightMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(fs.readFileSync(DEFAULT_LATEST_JSON, "utf8")) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyCruisePreflightSummaryToProofPackPayload({
+        payload: existingPayload,
+        cruisePreflightArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  const routeTime = await publishNhm2RouteTimeWorldlineLatest({
+    baseUrl,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    sourceCruisePreflightArtifactPath: latestJsonPath,
+    publicationLockPath: options?.publicationLockPath,
+  });
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+    routeTime,
+  };
+    },
+  });
+};
+
+export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2RouteTimeWorldlineArtifact;
+  missionTime?: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2MissionTimeEstimatorArtifact;
+  };
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-route-time-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath = options?.outJsonPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_OUT_JSON;
+  const latestJsonPath = options?.latestJsonPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_OUT_MD;
+  const latestMdPath = options?.latestMdPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_MD;
+  let routeTime: unknown = null;
+  let preflight: unknown = null;
+  let warpWorldline: unknown = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      routeTime = pipeline.warpRouteTimeWorldline;
+      preflight = pipeline.warpCruiseEnvelopePreflight;
+      warpWorldline = pipeline.warpWorldline;
+    }
+  } catch {
+    routeTime = null;
+    preflight = null;
+    warpWorldline = null;
+  }
+  if (
+    !isCertifiedWarpRouteTimeWorldlineContract(routeTime) &&
+    isCertifiedWarpWorldlineContract(warpWorldline) &&
+    isCertifiedWarpCruiseEnvelopePreflightContract(preflight)
+  ) {
+    routeTime = buildWarpRouteTimeWorldlineContract({
+      worldline: warpWorldline,
+      preflight,
+    });
+  }
+  if (!isCertifiedWarpRouteTimeWorldlineContract(routeTime)) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    routeTime = (refreshedState as Record<string, unknown>).warpRouteTimeWorldline;
+    preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
+    warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
+  }
+  if (
+    !isCertifiedWarpRouteTimeWorldlineContract(routeTime) &&
+    isCertifiedWarpWorldlineContract(warpWorldline) &&
+    isCertifiedWarpCruiseEnvelopePreflightContract(preflight)
+  ) {
+    routeTime = buildWarpRouteTimeWorldlineContract({
+      worldline: warpWorldline,
+      preflight,
+    });
+  }
+  if (!isCertifiedWarpRouteTimeWorldlineContract(routeTime)) {
+    throw new Error("certified_route_time_worldline_missing");
+  }
+
+  const artifact = buildNhm2RouteTimeWorldlineArtifact({
+    generatedOn: DATE_STAMP,
+    routeTimeWorldline: routeTime,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    sourceCruisePreflightArtifactPath:
+      options?.sourceCruisePreflightArtifactPath ??
+      DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+  });
+  const markdown = renderNhm2RouteTimeWorldlineMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(
+      fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
+    ) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyRouteTimeWorldlineSummaryToProofPackPayload({
+        payload: existingPayload,
+        routeTimeWorldlineArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  const missionTime = await publishNhm2MissionTimeEstimatorLatest({
+    baseUrl,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    sourceCruisePreflightArtifactPath:
+      options?.sourceCruisePreflightArtifactPath ??
+      DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+    sourceRouteTimeArtifactPath: latestJsonPath,
+    publicationLockPath: options?.publicationLockPath,
+  });
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+    missionTime,
+  };
+    },
+  });
+};
+
+export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  sourceRouteTimeArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2MissionTimeEstimatorArtifact;
+  comparison?: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2MissionTimeComparisonArtifact;
+  };
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-mission-time-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath =
+    options?.outJsonPath ?? DEFAULT_MISSION_TIME_ESTIMATOR_OUT_JSON;
+  const latestJsonPath =
+    options?.latestJsonPath ?? DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_MISSION_TIME_ESTIMATOR_OUT_MD;
+  const latestMdPath =
+    options?.latestMdPath ?? DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_MD;
+  let missionTimeEstimator: unknown = null;
+  let routeTime: unknown = null;
+  let preflight: unknown = null;
+  let warpWorldline: unknown = null;
+  let targetDistance: WarpMissionTargetDistanceContractV1 | null = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      missionTimeEstimator = pipeline.warpMissionTimeEstimator;
+      routeTime = pipeline.warpRouteTimeWorldline;
+      preflight = pipeline.warpCruiseEnvelopePreflight;
+      warpWorldline = pipeline.warpWorldline;
+    }
+  } catch {
+    missionTimeEstimator = null;
+    routeTime = null;
+    preflight = null;
+    warpWorldline = null;
+  }
+  if (!isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    missionTimeEstimator =
+      (refreshedState as Record<string, unknown>).warpMissionTimeEstimator;
+    routeTime = (refreshedState as Record<string, unknown>).warpRouteTimeWorldline;
+    preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
+    warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
+    targetDistance =
+      pipelineModule.resolveCommittedLocalRestMissionTargetDistanceContract?.() ?? null;
+  }
+  if (
+    !isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator) &&
+    isCertifiedWarpWorldlineContract(warpWorldline) &&
+    isCertifiedWarpCruiseEnvelopePreflightContract(preflight) &&
+    isCertifiedWarpRouteTimeWorldlineContract(routeTime)
+  ) {
+    if (!targetDistance) {
+      const pipelineModule = await import("../server/energy-pipeline.ts");
+      targetDistance =
+        pipelineModule.resolveCommittedLocalRestMissionTargetDistanceContract?.() ?? null;
+    }
+    missionTimeEstimator = buildWarpMissionTimeEstimatorContract({
+      worldline: warpWorldline,
+      preflight,
+      routeTimeWorldline: routeTime,
+      targetDistance,
+    });
+  }
+  if (!isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)) {
+    throw new Error("certified_mission_time_estimator_missing");
+  }
+  if (!targetDistance) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    targetDistance =
+      pipelineModule.resolveCommittedLocalRestMissionTargetDistanceContract?.(
+        missionTimeEstimator.targetId,
+      ) ?? null;
+  }
+
+  const artifact = buildNhm2MissionTimeEstimatorArtifact({
+    generatedOn: DATE_STAMP,
+    missionTimeEstimator,
+    targetDistanceContract: targetDistance,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    sourceCruisePreflightArtifactPath:
+      options?.sourceCruisePreflightArtifactPath ??
+      DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+    sourceRouteTimeArtifactPath:
+      options?.sourceRouteTimeArtifactPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
+  });
+  const markdown = renderNhm2MissionTimeEstimatorMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(
+      fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
+    ) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyMissionTimeEstimatorSummaryToProofPackPayload({
+        payload: existingPayload,
+        missionTimeEstimatorArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  const comparison = await publishNhm2MissionTimeComparisonLatest({
+    baseUrl,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    sourceCruisePreflightArtifactPath:
+      options?.sourceCruisePreflightArtifactPath ??
+      DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+    sourceRouteTimeArtifactPath:
+      options?.sourceRouteTimeArtifactPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
+    sourceMissionTimeEstimatorArtifactPath: latestJsonPath,
+    publicationLockPath: options?.publicationLockPath,
+  });
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+    comparison,
+  };
+    },
+  });
+};
+
+export const publishNhm2MissionTimeComparisonLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  sourceRouteTimeArtifactPath?: string | null;
+  sourceMissionTimeEstimatorArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2MissionTimeComparisonArtifact;
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-mission-time-comparison-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath =
+    options?.outJsonPath ?? DEFAULT_MISSION_TIME_COMPARISON_OUT_JSON;
+  const latestJsonPath =
+    options?.latestJsonPath ?? DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_MISSION_TIME_COMPARISON_OUT_MD;
+  const latestMdPath =
+    options?.latestMdPath ?? DEFAULT_MISSION_TIME_COMPARISON_LATEST_MD;
+  let missionTimeComparison: unknown = null;
+  let missionTimeEstimator: unknown = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      missionTimeComparison = pipeline.warpMissionTimeComparison;
+      missionTimeEstimator = pipeline.warpMissionTimeEstimator;
+    }
+  } catch {
+    missionTimeComparison = null;
+    missionTimeEstimator = null;
+  }
+  if (
+    !isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison) ||
+    !isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)
+  ) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    missionTimeComparison =
+      (refreshedState as Record<string, unknown>).warpMissionTimeComparison;
+    missionTimeEstimator =
+      (refreshedState as Record<string, unknown>).warpMissionTimeEstimator;
+  }
+  if (
+    !isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison) &&
+    isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)
+  ) {
+    missionTimeComparison = buildWarpMissionTimeComparisonContract({
+      missionTimeEstimator,
+    });
+  }
+  if (!isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison)) {
+    throw new Error("certified_mission_time_comparison_missing");
+  }
+  if (!isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)) {
+    throw new Error("certified_mission_time_estimator_missing_for_comparison");
+  }
+
+  const artifact = buildNhm2MissionTimeComparisonArtifact({
+    generatedOn: DATE_STAMP,
+    missionTimeComparison,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceWorldlineArtifactPath:
+      options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+    sourceCruisePreflightArtifactPath:
+      options?.sourceCruisePreflightArtifactPath ??
+      DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+    sourceRouteTimeArtifactPath:
+      options?.sourceRouteTimeArtifactPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
+    sourceMissionTimeEstimatorArtifactPath:
+      options?.sourceMissionTimeEstimatorArtifactPath ??
+      DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON,
+    sourceTargetDistanceSnapshotPath: missionTimeEstimator.targetDistance.snapshotPath,
+  });
+  const markdown = renderNhm2MissionTimeComparisonMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(
+      fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
+    ) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyMissionTimeComparisonSummaryToProofPackPayload({
+        payload: existingPayload,
+        missionTimeComparisonArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+  };
+    },
+  });
+};
+
+export const publishNhm2CruiseEnvelopeLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  sourceCruisePreflightArtifactPath?: string | null;
+  sourceRouteTimeArtifactPath?: string | null;
+  sourceMissionTimeEstimatorArtifactPath?: string | null;
+  sourceMissionTimeComparisonArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2CruiseEnvelopeArtifact;
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-cruise-envelope-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath = options?.outJsonPath ?? DEFAULT_CRUISE_ENVELOPE_OUT_JSON;
+  const latestJsonPath =
+    options?.latestJsonPath ?? DEFAULT_CRUISE_ENVELOPE_LATEST_JSON;
+  const outMdPath = options?.outMdPath ?? DEFAULT_CRUISE_ENVELOPE_OUT_MD;
+  const latestMdPath =
+    options?.latestMdPath ?? DEFAULT_CRUISE_ENVELOPE_LATEST_MD;
+  let cruiseEnvelope: unknown = null;
+  let preflight: unknown = null;
+  let routeTime: unknown = null;
+  let missionTimeEstimator: unknown = null;
+  let missionTimeComparison: unknown = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      cruiseEnvelope = pipeline.warpCruiseEnvelope;
+      preflight = pipeline.warpCruiseEnvelopePreflight;
+      routeTime = pipeline.warpRouteTimeWorldline;
+      missionTimeEstimator = pipeline.warpMissionTimeEstimator;
+      missionTimeComparison = pipeline.warpMissionTimeComparison;
+    }
+  } catch {
+    cruiseEnvelope = null;
+    preflight = null;
+    routeTime = null;
+    missionTimeEstimator = null;
+    missionTimeComparison = null;
+  }
+  if (
+    !isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope) &&
+    isCertifiedWarpCruiseEnvelopePreflightContract(preflight) &&
+    isCertifiedWarpRouteTimeWorldlineContract(routeTime) &&
+    isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator) &&
+    isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison)
+  ) {
+    cruiseEnvelope = buildWarpCruiseEnvelopeContract({
+      preflight,
+      routeTimeWorldline: routeTime,
+      missionTimeEstimator,
+      missionTimeComparison,
+    });
+  }
+  if (!isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope)) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    cruiseEnvelope = (refreshedState as Record<string, unknown>).warpCruiseEnvelope;
+    preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
+    routeTime = (refreshedState as Record<string, unknown>).warpRouteTimeWorldline;
+    missionTimeEstimator =
+      (refreshedState as Record<string, unknown>).warpMissionTimeEstimator;
+    missionTimeComparison =
+      (refreshedState as Record<string, unknown>).warpMissionTimeComparison;
+  }
+  if (
+    !isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope) &&
+    isCertifiedWarpCruiseEnvelopePreflightContract(preflight) &&
+    isCertifiedWarpRouteTimeWorldlineContract(routeTime) &&
+    isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator) &&
+    isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison)
+  ) {
+    cruiseEnvelope = buildWarpCruiseEnvelopeContract({
+      preflight,
+      routeTimeWorldline: routeTime,
+      missionTimeEstimator,
+      missionTimeComparison,
+    });
+  }
+  if (!isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope)) {
+    throw new Error("certified_cruise_envelope_missing");
+  }
+
+  const artifact = buildNhm2CruiseEnvelopeArtifact({
+    generatedOn: DATE_STAMP,
+    cruiseEnvelope,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+    sourceCruisePreflightArtifactPath:
+      options?.sourceCruisePreflightArtifactPath ??
+      DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+    sourceRouteTimeArtifactPath:
+      options?.sourceRouteTimeArtifactPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
+    sourceMissionTimeEstimatorArtifactPath:
+      options?.sourceMissionTimeEstimatorArtifactPath ??
+      DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON,
+    sourceMissionTimeComparisonArtifactPath:
+      options?.sourceMissionTimeComparisonArtifactPath ??
+      DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON,
+  });
+  const markdown = renderNhm2CruiseEnvelopeMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(
+      fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
+    ) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyCruiseEnvelopeSummaryToProofPackPayload({
+        payload: existingPayload,
+        cruiseEnvelopeArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+  };
+    },
+  });
+};
+
+export const publishNhm2InHullProperAccelerationLatest = async (options?: {
+  baseUrl?: string;
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  sourceAuditArtifactPath?: string | null;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2InHullProperAccelerationArtifact;
+}> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-in-hull-proper-acceleration-latest",
+    fn: async () => {
+  const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const outJsonPath =
+    options?.outJsonPath ?? DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_JSON;
+  const latestJsonPath =
+    options?.latestJsonPath ?? DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_JSON;
+  const outMdPath =
+    options?.outMdPath ?? DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_MD;
+  const latestMdPath =
+    options?.latestMdPath ?? DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_MD;
+  let inHullProperAcceleration: unknown = null;
+  try {
+    const response = await withTimeoutFetch(
+      `${baseUrl}/api/helix/pipeline`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      },
+      15_000,
+    );
+    if (response.ok) {
+      const pipeline = asRecord(await response.json());
+      inHullProperAcceleration = pipeline.warpInHullProperAcceleration;
+    }
+  } catch {
+    inHullProperAcceleration = null;
+  }
+  if (!isCertifiedWarpInHullProperAccelerationContract(inHullProperAcceleration)) {
+    const pipelineModule = await import("../server/energy-pipeline.ts");
+    const baseState =
+      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    inHullProperAcceleration = (refreshedState as Record<string, unknown>)
+      .warpInHullProperAcceleration;
+  }
+  if (!isCertifiedWarpInHullProperAccelerationContract(inHullProperAcceleration)) {
+    throw new Error("certified_in_hull_proper_acceleration_missing");
+  }
+
+  const artifact = buildNhm2InHullProperAccelerationArtifact({
+    generatedOn: DATE_STAMP,
+    inHullProperAcceleration,
+    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+  });
+  const markdown = renderNhm2InHullProperAccelerationMarkdown(artifact);
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+    const existingPayload = JSON.parse(
+      fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
+    ) as ProofPackPayload;
+    if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
+      const updatedPayload = applyInHullProperAccelerationSummaryToProofPackPayload({
+        payload: existingPayload,
+        inHullProperAccelerationArtifact: artifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      const updatedMarkdown = renderMarkdown(updatedPayload);
+      fs.writeFileSync(DEFAULT_LATEST_JSON, `${JSON.stringify(updatedPayload, null, 2)}\n`);
+      fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
+    }
+  }
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+  };
+    },
+  });
+};
+
+export const publishNhm2ProofSurfaceManifestLatest = async (options?: {
+  outJsonPath?: string;
+  latestJsonPath?: string;
+  outMdPath?: string;
+  latestMdPath?: string;
+  proofPackLatestJsonPath?: string;
+  proofPackLatestMdPath?: string;
+  publicationLockPath?: string;
+}): Promise<{
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  proofPackLatestJsonPath: string;
+  proofPackLatestMdPath: string;
+  artifact: Nhm2ProofSurfaceManifestArtifact;
+  proofPackPayload: ProofPackPayload;
+}> =>
+  withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-proof-surface-manifest-latest",
+    fn: async () => {
+      const outJsonPath =
+        options?.outJsonPath ?? DEFAULT_PROOF_SURFACE_MANIFEST_OUT_JSON;
+      const latestJsonPath =
+        options?.latestJsonPath ?? DEFAULT_PROOF_SURFACE_MANIFEST_LATEST_JSON;
+      const outMdPath = options?.outMdPath ?? DEFAULT_PROOF_SURFACE_MANIFEST_OUT_MD;
+      const latestMdPath =
+        options?.latestMdPath ?? DEFAULT_PROOF_SURFACE_MANIFEST_LATEST_MD;
+      const proofPackLatestJsonPath =
+        options?.proofPackLatestJsonPath ?? DEFAULT_LATEST_JSON;
+      const proofPackLatestMdPath =
+        options?.proofPackLatestMdPath ?? DEFAULT_LATEST_MD;
+      const existingProofPackPayload = readJsonArtifact<ProofPackPayload>(
+        proofPackLatestJsonPath,
+        "warp_york_control_family_proof_pack/v1",
+      );
+      const provisionalManifest = buildNhm2ProofSurfaceManifestArtifact({
+        generatedOn: DATE_STAMP,
+        proofPackPayload: existingProofPackPayload,
+        proofPackLatestJsonPath,
+        proofPackLatestMdPath,
+      });
+      const refreshedProofPackPayload = applyProofSurfaceManifestSummaryToProofPackPayload({
+        payload: existingProofPackPayload,
+        manifestArtifact: provisionalManifest,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      writeJsonArtifact(proofPackLatestJsonPath, refreshedProofPackPayload);
+      writeMarkdownArtifact(proofPackLatestMdPath, renderMarkdown(refreshedProofPackPayload));
+      const summaryManifestArtifact = buildNhm2ProofSurfaceManifestArtifact({
+        generatedOn: DATE_STAMP,
+        proofPackPayload: refreshedProofPackPayload,
+        proofPackLatestJsonPath,
+        proofPackLatestMdPath,
+      });
+      const finalProofPackPayload = applyProofSurfaceManifestSummaryToProofPackPayload({
+        payload: refreshedProofPackPayload,
+        manifestArtifact: summaryManifestArtifact,
+        artifactPath: latestJsonPath,
+        reportPath: latestMdPath,
+      });
+      writeJsonArtifact(proofPackLatestJsonPath, finalProofPackPayload);
+      writeMarkdownArtifact(proofPackLatestMdPath, renderMarkdown(finalProofPackPayload));
+      const artifact = buildNhm2ProofSurfaceManifestArtifact({
+        generatedOn: DATE_STAMP,
+        proofPackPayload: finalProofPackPayload,
+        proofPackLatestJsonPath,
+        proofPackLatestMdPath,
+      });
+      process.stderr.write(
+        `[warp-york-control-family-proof-pack] publish_stage=proof_surface_manifest_evidence_state tracked_repo_evidence=${artifact.trackedRepoEvidenceStatus}\n`,
+      );
+      const markdown = renderNhm2ProofSurfaceManifestMarkdown(artifact);
+      writeJsonArtifact(outJsonPath, artifact);
+      writeJsonArtifact(latestJsonPath, artifact);
+      writeMarkdownArtifact(outMdPath, markdown);
+      writeMarkdownArtifact(latestMdPath, markdown);
+      return {
+        outJsonPath,
+        latestJsonPath,
+        outMdPath,
+        latestMdPath,
+        proofPackLatestJsonPath,
+        proofPackLatestMdPath,
+        artifact,
+        proofPackPayload: finalProofPackPayload,
+      };
+    },
+  });
+
+export const publishNhm2BoundedStackLatest = async (options?: {
+  baseUrl?: string;
+  publicationLockPath?: string;
+}): Promise<{
+  worldline: Awaited<ReturnType<typeof publishNhm2WarpWorldlineProofLatest>>;
+  cruiseEnvelope: Awaited<ReturnType<typeof publishNhm2CruiseEnvelopeLatest>>;
+  inHullProperAcceleration: Awaited<
+    ReturnType<typeof publishNhm2InHullProperAccelerationLatest>
+  >;
+  proofSurfaceManifest: Awaited<ReturnType<typeof publishNhm2ProofSurfaceManifestLatest>>;
+}> =>
+  withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-bounded-stack-latest",
+    fn: async () => {
+      const worldline = await publishNhm2WarpWorldlineProofLatest({
+        baseUrl: options?.baseUrl,
+        publicationLockPath: options?.publicationLockPath,
+      });
+      const cruiseEnvelope = await publishNhm2CruiseEnvelopeLatest({
+        baseUrl: options?.baseUrl,
+        publicationLockPath: options?.publicationLockPath,
+      });
+      const inHullProperAcceleration = await publishNhm2InHullProperAccelerationLatest({
+        baseUrl: options?.baseUrl,
+        publicationLockPath: options?.publicationLockPath,
+      });
+      const proofSurfaceManifest = await publishNhm2ProofSurfaceManifestLatest({
+        publicationLockPath: options?.publicationLockPath,
+      });
+      return {
+        worldline,
+        cruiseEnvelope,
+        inHullProperAcceleration,
+        proofSurfaceManifest,
+      };
+    },
+  });
+
 const computeCanonicalVisualComparisonChecksum = (
   payload: Nhm2CanonicalVisualComparisonArtifact,
 ): string =>
@@ -30943,6 +34828,204 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| reportPath | ${payload.curvatureInvariantSummary.reportPath} |`,
       ].join("\n")
     : "| curvature_invariant_suite | unavailable |";
+  const warpWorldlineRows = payload.warpWorldlineSummary
+    ? [
+        `| artifactType | ${payload.warpWorldlineSummary.artifactType} |`,
+        `| contractVersion | ${payload.warpWorldlineSummary.contractVersion} |`,
+        `| status | ${payload.warpWorldlineSummary.status} |`,
+        `| certified | ${payload.warpWorldlineSummary.certified} |`,
+        `| sourceSurface | ${payload.warpWorldlineSummary.sourceSurface} |`,
+        `| metricT00Ref | ${payload.warpWorldlineSummary.metricT00Ref} |`,
+        `| chart | ${payload.warpWorldlineSummary.chart} |`,
+        `| observerFamily | ${payload.warpWorldlineSummary.observerFamily} |`,
+        `| validityRegimeId | ${payload.warpWorldlineSummary.validityRegimeId} |`,
+        `| representativeSampleId | ${payload.warpWorldlineSummary.representativeSampleId} |`,
+        `| sampleGeometryFamilyId | ${payload.warpWorldlineSummary.sampleGeometryFamilyId} |`,
+        `| sampleCount | ${payload.warpWorldlineSummary.sampleCount} |`,
+        `| dtau_dt_representative | ${payload.warpWorldlineSummary.dtauDt.representative} |`,
+        `| dtau_dt_min | ${payload.warpWorldlineSummary.dtauDt.min} |`,
+        `| dtau_dt_max | ${payload.warpWorldlineSummary.dtauDt.max} |`,
+        `| normalizationResidualMaxAbs | ${payload.warpWorldlineSummary.normalizationResidualMaxAbs} |`,
+        `| transportVariationStatus | ${payload.warpWorldlineSummary.transportVariationStatus} |`,
+        `| transportInformativenessStatus | ${payload.warpWorldlineSummary.transportInformativenessStatus} |`,
+        `| sampleFamilyAdequacy | ${payload.warpWorldlineSummary.sampleFamilyAdequacy} |`,
+        `| flatnessInterpretation | ${payload.warpWorldlineSummary.flatnessInterpretation} |`,
+        `| certifiedTransportMeaning | ${payload.warpWorldlineSummary.certifiedTransportMeaning} |`,
+        `| eligibleNextProducts | ${payload.warpWorldlineSummary.eligibleNextProducts.join(",") || "none"} |`,
+        `| routeTimeStatus | ${payload.warpWorldlineSummary.routeTimeStatus} |`,
+        `| transportInterpretation | ${payload.warpWorldlineSummary.transportInterpretation} |`,
+        `| nonClaims | ${payload.warpWorldlineSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.warpWorldlineSummary.artifactPath} |`,
+        `| reportPath | ${payload.warpWorldlineSummary.reportPath} |`,
+      ].join("\n")
+    : "| warp_worldline_contract | unavailable |";
+  const cruisePreflightRows = payload.cruisePreflightSummary
+    ? [
+        `| artifactType | ${payload.cruisePreflightSummary.artifactType} |`,
+        `| contractVersion | ${payload.cruisePreflightSummary.contractVersion} |`,
+        `| cruisePreflightStatus | ${payload.cruisePreflightSummary.cruisePreflightStatus} |`,
+        `| certified | ${payload.cruisePreflightSummary.certified} |`,
+        `| sourceSurface | ${payload.cruisePreflightSummary.sourceSurface} |`,
+        `| chart | ${payload.cruisePreflightSummary.chart} |`,
+        `| observerFamily | ${payload.cruisePreflightSummary.observerFamily} |`,
+        `| validityRegimeId | ${payload.cruisePreflightSummary.validityRegimeId} |`,
+        `| preflightQuantityId | ${payload.cruisePreflightSummary.preflightQuantityId} |`,
+        `| preflightQuantityMeaning | ${payload.cruisePreflightSummary.preflightQuantityMeaning} |`,
+        `| candidateCount | ${payload.cruisePreflightSummary.candidateCount} |`,
+        `| admissibleCount | ${payload.cruisePreflightSummary.admissibleCount} |`,
+        `| rejectedCount | ${payload.cruisePreflightSummary.rejectedCount} |`,
+        `| boundedCruisePreflightBand.min | ${payload.cruisePreflightSummary.boundedCruisePreflightBand.min} |`,
+        `| boundedCruisePreflightBand.max | ${payload.cruisePreflightSummary.boundedCruisePreflightBand.max} |`,
+        `| boundedCruisePreflightBand.units | ${payload.cruisePreflightSummary.boundedCruisePreflightBand.units} |`,
+        `| sampleFamilyAdequacy | ${payload.cruisePreflightSummary.sampleFamilyAdequacy} |`,
+        `| transportVariationStatus | ${payload.cruisePreflightSummary.transportVariationStatus} |`,
+        `| routeTimeStatus | ${payload.cruisePreflightSummary.routeTimeStatus} |`,
+        `| eligibleNextProducts | ${payload.cruisePreflightSummary.eligibleNextProducts.join(",") || "none"} |`,
+        `| nonClaims | ${payload.cruisePreflightSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.cruisePreflightSummary.artifactPath} |`,
+        `| reportPath | ${payload.cruisePreflightSummary.reportPath} |`,
+      ].join("\n")
+    : "| cruise_preflight | unavailable |";
+  const routeTimeWorldlineRows = payload.routeTimeWorldlineSummary
+    ? [
+        `| artifactType | ${payload.routeTimeWorldlineSummary.artifactType} |`,
+        `| contractVersion | ${payload.routeTimeWorldlineSummary.contractVersion} |`,
+        `| routeTimeWorldlineStatus | ${payload.routeTimeWorldlineSummary.routeTimeWorldlineStatus} |`,
+        `| certified | ${payload.routeTimeWorldlineSummary.certified} |`,
+        `| sourceSurface | ${payload.routeTimeWorldlineSummary.sourceSurface} |`,
+        `| chart | ${payload.routeTimeWorldlineSummary.chart} |`,
+        `| observerFamily | ${payload.routeTimeWorldlineSummary.observerFamily} |`,
+        `| validityRegimeId | ${payload.routeTimeWorldlineSummary.validityRegimeId} |`,
+        `| routeModelId | ${payload.routeTimeWorldlineSummary.routeModelId} |`,
+        `| routeParameterName | ${payload.routeTimeWorldlineSummary.routeParameterName} |`,
+        `| progressionSampleCount | ${payload.routeTimeWorldlineSummary.progressionSampleCount} |`,
+        `| coordinateTimeSummary.start | ${payload.routeTimeWorldlineSummary.coordinateTimeSummary.start} |`,
+        `| coordinateTimeSummary.end | ${payload.routeTimeWorldlineSummary.coordinateTimeSummary.end} |`,
+        `| coordinateTimeSummary.span | ${payload.routeTimeWorldlineSummary.coordinateTimeSummary.span} |`,
+        `| properTimeSummary.start | ${payload.routeTimeWorldlineSummary.properTimeSummary.start} |`,
+        `| properTimeSummary.end | ${payload.routeTimeWorldlineSummary.properTimeSummary.end} |`,
+        `| properTimeSummary.span | ${payload.routeTimeWorldlineSummary.properTimeSummary.span} |`,
+        `| sampleFamilyAdequacy | ${payload.routeTimeWorldlineSummary.sampleFamilyAdequacy} |`,
+        `| transportVariationStatus | ${payload.routeTimeWorldlineSummary.transportVariationStatus} |`,
+        `| routeTimeStatus | ${payload.routeTimeWorldlineSummary.routeTimeStatus} |`,
+        `| nextEligibleProducts | ${payload.routeTimeWorldlineSummary.nextEligibleProducts.join(",") || "none"} |`,
+        `| nonClaims | ${payload.routeTimeWorldlineSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.routeTimeWorldlineSummary.artifactPath} |`,
+        `| reportPath | ${payload.routeTimeWorldlineSummary.reportPath} |`,
+      ].join("\n")
+    : "| route_time_worldline | unavailable |";
+  const missionTimeEstimatorRows = payload.missionTimeEstimatorSummary
+    ? [
+        `| artifactType | ${payload.missionTimeEstimatorSummary.artifactType} |`,
+        `| contractVersion | ${payload.missionTimeEstimatorSummary.contractVersion} |`,
+        `| missionTimeEstimatorStatus | ${payload.missionTimeEstimatorSummary.missionTimeEstimatorStatus} |`,
+        `| certified | ${payload.missionTimeEstimatorSummary.certified} |`,
+        `| sourceSurface | ${payload.missionTimeEstimatorSummary.sourceSurface} |`,
+        `| chart | ${payload.missionTimeEstimatorSummary.chart} |`,
+        `| observerFamily | ${payload.missionTimeEstimatorSummary.observerFamily} |`,
+        `| validityRegimeId | ${payload.missionTimeEstimatorSummary.validityRegimeId} |`,
+        `| estimatorModelId | ${payload.missionTimeEstimatorSummary.estimatorModelId} |`,
+        `| targetId | ${payload.missionTimeEstimatorSummary.targetId} |`,
+        `| targetName | ${payload.missionTimeEstimatorSummary.targetName} |`,
+        `| targetFrame | ${payload.missionTimeEstimatorSummary.targetFrame} |`,
+        `| coordinateTimeEstimate.seconds | ${payload.missionTimeEstimatorSummary.coordinateTimeEstimate.seconds} |`,
+        `| coordinateTimeEstimate.years | ${payload.missionTimeEstimatorSummary.coordinateTimeEstimate.years} |`,
+        `| properTimeEstimate.seconds | ${payload.missionTimeEstimatorSummary.properTimeEstimate.seconds} |`,
+        `| properTimeEstimate.years | ${payload.missionTimeEstimatorSummary.properTimeEstimate.years} |`,
+        `| routeTimeStatus | ${payload.missionTimeEstimatorSummary.routeTimeStatus} |`,
+        `| nextEligibleProducts | ${payload.missionTimeEstimatorSummary.nextEligibleProducts.join(",") || "none"} |`,
+        `| nonClaims | ${payload.missionTimeEstimatorSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.missionTimeEstimatorSummary.artifactPath} |`,
+        `| reportPath | ${payload.missionTimeEstimatorSummary.reportPath} |`,
+      ].join("\n")
+    : "| mission_time_estimator | unavailable |";
+  const missionTimeComparisonRows = payload.missionTimeComparisonSummary
+    ? [
+        `| artifactType | ${payload.missionTimeComparisonSummary.artifactType} |`,
+        `| contractVersion | ${payload.missionTimeComparisonSummary.contractVersion} |`,
+        `| missionTimeComparisonStatus | ${payload.missionTimeComparisonSummary.missionTimeComparisonStatus} |`,
+        `| certified | ${payload.missionTimeComparisonSummary.certified} |`,
+        `| sourceSurface | ${payload.missionTimeComparisonSummary.sourceSurface} |`,
+        `| chart | ${payload.missionTimeComparisonSummary.chart} |`,
+        `| observerFamily | ${payload.missionTimeComparisonSummary.observerFamily} |`,
+        `| comparisonModelId | ${payload.missionTimeComparisonSummary.comparisonModelId} |`,
+        `| targetId | ${payload.missionTimeComparisonSummary.targetId} |`,
+        `| targetName | ${payload.missionTimeComparisonSummary.targetName} |`,
+        `| targetFrame | ${payload.missionTimeComparisonSummary.targetFrame} |`,
+        `| warpCoordinateYears | ${payload.missionTimeComparisonSummary.warpCoordinateYears} |`,
+        `| warpProperYears | ${payload.missionTimeComparisonSummary.warpProperYears} |`,
+        `| classicalReferenceYears | ${payload.missionTimeComparisonSummary.classicalReferenceYears} |`,
+        `| properMinusCoordinateSeconds | ${payload.missionTimeComparisonSummary.properMinusCoordinateSeconds} |`,
+        `| properMinusClassicalSeconds | ${payload.missionTimeComparisonSummary.properMinusClassicalSeconds} |`,
+        `| comparisonInterpretationStatus | ${payload.missionTimeComparisonSummary.comparisonInterpretationStatus} |`,
+        `| comparisonReadiness | ${payload.missionTimeComparisonSummary.comparisonReadiness} |`,
+        `| deferredComparators | ${payload.missionTimeComparisonSummary.deferredComparators.join(",") || "none"} |`,
+        `| nonClaims | ${payload.missionTimeComparisonSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.missionTimeComparisonSummary.artifactPath} |`,
+        `| reportPath | ${payload.missionTimeComparisonSummary.reportPath} |`,
+      ].join("\n")
+    : "| mission_time_comparison | unavailable |";
+  const cruiseEnvelopeRows = payload.cruiseEnvelopeSummary
+    ? [
+        `| artifactType | ${payload.cruiseEnvelopeSummary.artifactType} |`,
+        `| contractVersion | ${payload.cruiseEnvelopeSummary.contractVersion} |`,
+        `| cruiseEnvelopeStatus | ${payload.cruiseEnvelopeSummary.cruiseEnvelopeStatus} |`,
+        `| certified | ${payload.cruiseEnvelopeSummary.certified} |`,
+        `| sourceSurface | ${payload.cruiseEnvelopeSummary.sourceSurface} |`,
+        `| chart | ${payload.cruiseEnvelopeSummary.chart} |`,
+        `| observerFamily | ${payload.cruiseEnvelopeSummary.observerFamily} |`,
+        `| cruiseEnvelopeModelId | ${payload.cruiseEnvelopeSummary.cruiseEnvelopeModelId} |`,
+        `| envelopeQuantityId | ${payload.cruiseEnvelopeSummary.envelopeQuantityId} |`,
+        `| targetId | ${payload.cruiseEnvelopeSummary.targetId} |`,
+        `| targetName | ${payload.cruiseEnvelopeSummary.targetName} |`,
+        `| admissibleBand.min | ${payload.cruiseEnvelopeSummary.admissibleBand.min} |`,
+        `| admissibleBand.max | ${payload.cruiseEnvelopeSummary.admissibleBand.max} |`,
+        `| admissibleBand.units | ${payload.cruiseEnvelopeSummary.admissibleBand.units} |`,
+        `| representativeValue | ${payload.cruiseEnvelopeSummary.representativeValue} |`,
+        `| comparisonConsistencyStatus | ${payload.cruiseEnvelopeSummary.comparisonConsistencyStatus} |`,
+        `| routeTimeStatus | ${payload.cruiseEnvelopeSummary.routeTimeStatus} |`,
+        `| missionTimeStatus | ${payload.cruiseEnvelopeSummary.missionTimeStatus} |`,
+        `| nonClaims | ${payload.cruiseEnvelopeSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.cruiseEnvelopeSummary.artifactPath} |`,
+        `| reportPath | ${payload.cruiseEnvelopeSummary.reportPath} |`,
+      ].join("\n")
+    : "| cruise_envelope | unavailable |";
+  const inHullProperAccelerationRows = payload.inHullProperAccelerationSummary
+    ? [
+        `| artifactType | ${payload.inHullProperAccelerationSummary.artifactType} |`,
+        `| contractVersion | ${payload.inHullProperAccelerationSummary.contractVersion} |`,
+        `| inHullProperAccelerationStatus | ${payload.inHullProperAccelerationSummary.inHullProperAccelerationStatus} |`,
+        `| certified | ${payload.inHullProperAccelerationSummary.certified} |`,
+        `| sourceSurface | ${payload.inHullProperAccelerationSummary.sourceSurface} |`,
+        `| chart | ${payload.inHullProperAccelerationSummary.chart} |`,
+        `| observerFamily | ${payload.inHullProperAccelerationSummary.observerFamily} |`,
+        `| accelerationQuantityId | ${payload.inHullProperAccelerationSummary.accelerationQuantityId} |`,
+        `| sampleCount | ${payload.inHullProperAccelerationSummary.sampleCount} |`,
+        `| representative_mps2 | ${payload.inHullProperAccelerationSummary.representative_mps2} |`,
+        `| representative_g | ${payload.inHullProperAccelerationSummary.representative_g} |`,
+        `| min_mps2 | ${payload.inHullProperAccelerationSummary.min_mps2} |`,
+        `| max_mps2 | ${payload.inHullProperAccelerationSummary.max_mps2} |`,
+        `| resolutionAdequacy | ${payload.inHullProperAccelerationSummary.resolutionAdequacy} |`,
+        `| fallbackUsed | ${payload.inHullProperAccelerationSummary.fallbackUsed} |`,
+        `| nonClaims | ${payload.inHullProperAccelerationSummary.nonClaims.join(",")} |`,
+        `| artifactPath | ${payload.inHullProperAccelerationSummary.artifactPath} |`,
+        `| reportPath | ${payload.inHullProperAccelerationSummary.reportPath} |`,
+      ].join("\n")
+    : "| in_hull_proper_acceleration | unavailable |";
+  const proofSurfaceManifestRows = payload.proofSurfaceManifestSummary
+    ? [
+        `| artifactType | ${payload.proofSurfaceManifestSummary.artifactType} |`,
+        `| contractVersion | ${payload.proofSurfaceManifestSummary.contractVersion} |`,
+        `| proofSurfaceManifestStatus | ${payload.proofSurfaceManifestSummary.proofSurfaceManifestStatus} |`,
+        `| certified | ${payload.proofSurfaceManifestSummary.certified} |`,
+        `| publicationMode | ${payload.proofSurfaceManifestSummary.publicationMode} |`,
+        `| proofSurfaceCount | ${payload.proofSurfaceManifestSummary.proofSurfaceCount} |`,
+        `| trackedRepoEvidenceStatus | ${payload.proofSurfaceManifestSummary.trackedRepoEvidenceStatus} |`,
+        `| proofPackChecksum | ${payload.proofSurfaceManifestSummary.proofPackChecksum} |`,
+        `| manifestPath | ${payload.proofSurfaceManifestSummary.manifestPath} |`,
+        `| manifestReportPath | ${payload.proofSurfaceManifestSummary.manifestReportPath} |`,
+      ].join("\n")
+    : "| proof_surface_manifest | unavailable |";
   const renderTaxonomyRows = payload.renderTaxonomySummary
     ? [
         `| authoritativeRenderCategory | ${payload.renderTaxonomySummary.authoritativeRenderCategory} |`,
@@ -31210,6 +35293,46 @@ ${shiftGeometryRows}
 |---|---|
 ${curvatureInvariantRows}
 
+## Warp Worldline Contract
+| field | value |
+|---|---|
+${warpWorldlineRows}
+
+## Cruise Envelope Preflight
+| field | value |
+|---|---|
+${cruisePreflightRows}
+
+## Route-Time Worldline
+| field | value |
+|---|---|
+${routeTimeWorldlineRows}
+
+## Mission-Time Estimator
+| field | value |
+|---|---|
+${missionTimeEstimatorRows}
+
+## Mission-Time Comparison
+| field | value |
+|---|---|
+${missionTimeComparisonRows}
+
+## Cruise Envelope
+| field | value |
+|---|---|
+${cruiseEnvelopeRows}
+
+## In-Hull Proper Acceleration
+| field | value |
+|---|---|
+${inHullProperAccelerationRows}
+
+## Proof Surface Manifest
+| field | value |
+|---|---|
+${proofSurfaceManifestRows}
+
 ## Render Taxonomy
 | field | value |
 |---|---|
@@ -31288,6 +35411,30 @@ export const buildWarpYorkControlFamilyPublishedLatestPayload = (args: {
   yorkCanonicalVisualComparisonLatestJsonPath: string;
   yorkCanonicalVisualComparisonLatestMdPath: string;
   yorkCanonicalVisualComparisonDecisionMemoPath: string;
+  warpWorldlineArtifact?: Nhm2WarpWorldlineProofArtifact | null;
+  warpWorldlineLatestJsonPath?: string;
+  warpWorldlineLatestMdPath?: string;
+  cruisePreflightArtifact?: Nhm2CruiseEnvelopePreflightArtifact | null;
+  cruisePreflightLatestJsonPath?: string;
+  cruisePreflightLatestMdPath?: string;
+  routeTimeWorldlineArtifact?: Nhm2RouteTimeWorldlineArtifact | null;
+  routeTimeWorldlineLatestJsonPath?: string;
+  routeTimeWorldlineLatestMdPath?: string;
+  missionTimeEstimatorArtifact?: Nhm2MissionTimeEstimatorArtifact | null;
+  missionTimeEstimatorLatestJsonPath?: string;
+  missionTimeEstimatorLatestMdPath?: string;
+  missionTimeComparisonArtifact?: Nhm2MissionTimeComparisonArtifact | null;
+  missionTimeComparisonLatestJsonPath?: string;
+  missionTimeComparisonLatestMdPath?: string;
+  cruiseEnvelopeArtifact?: Nhm2CruiseEnvelopeArtifact | null;
+  cruiseEnvelopeLatestJsonPath?: string;
+  cruiseEnvelopeLatestMdPath?: string;
+  inHullProperAccelerationArtifact?: Nhm2InHullProperAccelerationArtifact | null;
+  inHullProperAccelerationLatestJsonPath?: string;
+  inHullProperAccelerationLatestMdPath?: string;
+  proofSurfaceManifestArtifact?: Nhm2ProofSurfaceManifestArtifact | null;
+  proofSurfaceManifestLatestJsonPath?: string;
+  proofSurfaceManifestLatestMdPath?: string;
   generatedOn?: string;
   generatedAt?: string;
 }): {
@@ -31346,6 +35493,174 @@ export const buildWarpYorkControlFamilyPublishedLatestPayload = (args: {
     "render_taxonomy authoritative=",
     `render_taxonomy authoritative=${args.renderTaxonomyArtifact.authoritativeRenderCategory} presentation=${args.renderTaxonomyArtifact.presentationRenderCategory} comparison=${args.renderTaxonomyArtifact.comparisonRenderCategory}`,
   );
+  let warpWorldlineSummary = args.existingProofPackPayload.warpWorldlineSummary;
+  if (
+    args.warpWorldlineArtifact &&
+    args.warpWorldlineLatestJsonPath &&
+    args.warpWorldlineLatestMdPath
+  ) {
+    warpWorldlineSummary = buildWarpWorldlineProofPackSummary({
+      artifact: args.warpWorldlineArtifact,
+      artifactPath: args.warpWorldlineLatestJsonPath,
+      reportPath: args.warpWorldlineLatestMdPath,
+    });
+  }
+  if (warpWorldlineSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "warp_worldline_status=",
+      formatWarpWorldlineProofPackSummary({ summary: warpWorldlineSummary }),
+    );
+  }
+  let cruisePreflightSummary = args.existingProofPackPayload.cruisePreflightSummary;
+  if (
+    args.cruisePreflightArtifact &&
+    args.cruisePreflightLatestJsonPath &&
+    args.cruisePreflightLatestMdPath
+  ) {
+    cruisePreflightSummary = buildCruisePreflightProofPackSummary({
+      artifact: args.cruisePreflightArtifact,
+      artifactPath: args.cruisePreflightLatestJsonPath,
+      reportPath: args.cruisePreflightLatestMdPath,
+    });
+  }
+  if (cruisePreflightSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "cruise_preflight_status=",
+      formatCruisePreflightProofPackSummary({ summary: cruisePreflightSummary }),
+    );
+  }
+  let routeTimeWorldlineSummary = args.existingProofPackPayload.routeTimeWorldlineSummary;
+  if (
+    args.routeTimeWorldlineArtifact &&
+    args.routeTimeWorldlineLatestJsonPath &&
+    args.routeTimeWorldlineLatestMdPath
+  ) {
+    routeTimeWorldlineSummary = buildRouteTimeWorldlineProofPackSummary({
+      artifact: args.routeTimeWorldlineArtifact,
+      artifactPath: args.routeTimeWorldlineLatestJsonPath,
+      reportPath: args.routeTimeWorldlineLatestMdPath,
+    });
+  }
+  if (routeTimeWorldlineSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "route_time_worldline_status=",
+      formatRouteTimeWorldlineProofPackSummary({
+        summary: routeTimeWorldlineSummary,
+      }),
+    );
+  }
+  let missionTimeEstimatorSummary =
+    args.existingProofPackPayload.missionTimeEstimatorSummary;
+  if (
+    args.missionTimeEstimatorArtifact &&
+    args.missionTimeEstimatorLatestJsonPath &&
+    args.missionTimeEstimatorLatestMdPath
+  ) {
+    missionTimeEstimatorSummary = buildMissionTimeEstimatorProofPackSummary({
+      artifact: args.missionTimeEstimatorArtifact,
+      artifactPath: args.missionTimeEstimatorLatestJsonPath,
+      reportPath: args.missionTimeEstimatorLatestMdPath,
+    });
+  }
+  if (missionTimeEstimatorSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "mission_time_estimator_status=",
+      formatMissionTimeEstimatorProofPackSummary({
+        summary: missionTimeEstimatorSummary,
+      }),
+    );
+  }
+  let missionTimeComparisonSummary =
+    args.existingProofPackPayload.missionTimeComparisonSummary;
+  if (
+    args.missionTimeComparisonArtifact &&
+    args.missionTimeComparisonLatestJsonPath &&
+    args.missionTimeComparisonLatestMdPath
+  ) {
+    missionTimeComparisonSummary = buildMissionTimeComparisonProofPackSummary({
+      artifact: args.missionTimeComparisonArtifact,
+      artifactPath: args.missionTimeComparisonLatestJsonPath,
+      reportPath: args.missionTimeComparisonLatestMdPath,
+    });
+  }
+  if (missionTimeComparisonSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "mission_time_comparison_status=",
+      formatMissionTimeComparisonProofPackSummary({
+        summary: missionTimeComparisonSummary,
+      }),
+    );
+  }
+  let cruiseEnvelopeSummary = args.existingProofPackPayload.cruiseEnvelopeSummary;
+  if (
+    args.cruiseEnvelopeArtifact &&
+    args.cruiseEnvelopeLatestJsonPath &&
+    args.cruiseEnvelopeLatestMdPath
+  ) {
+    cruiseEnvelopeSummary = buildCruiseEnvelopeProofPackSummary({
+      artifact: args.cruiseEnvelopeArtifact,
+      artifactPath: args.cruiseEnvelopeLatestJsonPath,
+      reportPath: args.cruiseEnvelopeLatestMdPath,
+    });
+  }
+  if (cruiseEnvelopeSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "cruise_envelope_status=",
+      formatCruiseEnvelopeProofPackSummary({
+        summary: cruiseEnvelopeSummary,
+      }),
+    );
+  }
+  let inHullProperAccelerationSummary =
+    args.existingProofPackPayload.inHullProperAccelerationSummary;
+  if (
+    args.inHullProperAccelerationArtifact &&
+    args.inHullProperAccelerationLatestJsonPath &&
+    args.inHullProperAccelerationLatestMdPath
+  ) {
+    inHullProperAccelerationSummary = buildInHullProperAccelerationProofPackSummary({
+      artifact: args.inHullProperAccelerationArtifact,
+      artifactPath: args.inHullProperAccelerationLatestJsonPath,
+      reportPath: args.inHullProperAccelerationLatestMdPath,
+    });
+  }
+  if (inHullProperAccelerationSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "in_hull_proper_acceleration_status=",
+      formatInHullProperAccelerationProofPackSummary({
+        summary: inHullProperAccelerationSummary,
+      }),
+    );
+  }
+  let proofSurfaceManifestSummary =
+    args.existingProofPackPayload.proofSurfaceManifestSummary;
+  if (
+    args.proofSurfaceManifestArtifact &&
+    args.proofSurfaceManifestLatestJsonPath &&
+    args.proofSurfaceManifestLatestMdPath
+  ) {
+    proofSurfaceManifestSummary = buildProofSurfaceManifestProofPackSummary({
+      artifact: args.proofSurfaceManifestArtifact,
+      artifactPath: args.proofSurfaceManifestLatestJsonPath,
+      reportPath: args.proofSurfaceManifestLatestMdPath,
+    });
+  }
+  if (proofSurfaceManifestSummary) {
+    notes = upsertProofPackSummaryNote(
+      notes,
+      "proof_surface_manifest_status=",
+      formatProofSurfaceManifestProofPackSummary({
+        summary: proofSurfaceManifestSummary,
+      }),
+    );
+  }
 
   const payloadBase: ProofPackPayload = {
     ...args.existingProofPackPayload,
@@ -31392,6 +35707,14 @@ export const buildWarpYorkControlFamilyPublishedLatestPayload = (args: {
       artifactPath: normalizePath(args.curvatureInvariantVisualizationLatestJsonPath),
       reportPath: normalizePath(args.curvatureInvariantVisualizationLatestMdPath),
     },
+    ...(warpWorldlineSummary ? { warpWorldlineSummary } : {}),
+    ...(cruisePreflightSummary ? { cruisePreflightSummary } : {}),
+    ...(routeTimeWorldlineSummary ? { routeTimeWorldlineSummary } : {}),
+    ...(missionTimeEstimatorSummary ? { missionTimeEstimatorSummary } : {}),
+    ...(missionTimeComparisonSummary ? { missionTimeComparisonSummary } : {}),
+    ...(cruiseEnvelopeSummary ? { cruiseEnvelopeSummary } : {}),
+    ...(inHullProperAccelerationSummary ? { inHullProperAccelerationSummary } : {}),
+    ...(proofSurfaceManifestSummary ? { proofSurfaceManifestSummary } : {}),
     renderTaxonomySummary: { ...renderTaxonomySummary },
     finalCanonicalVisualComparisonSummary: {
       finalComparisonVerdict: args.canonicalVisualComparisonArtifact.finalComparisonVerdict,
@@ -31449,6 +35772,7 @@ export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
   yorkCanonicalVisualComparisonDecisionMemoPath?: string;
   yorkCanonicalCalibrationLatestJsonPath?: string;
   solveAuthorityLatestJsonPath?: string;
+  publicationLockPath?: string;
 }): Promise<{
   outJsonPath: string;
   outMdPath: string;
@@ -31473,6 +35797,10 @@ export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
   curvatureInvariantVisualizationArtifact: Nhm2CurvatureInvariantVisualizationArtifact;
   renderTaxonomyArtifact: RenderTaxonomyArtifact;
 }> => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "publish-invariant-latest",
+    fn: async () => {
   const latestJsonPath = options?.latestJsonPath ?? DEFAULT_LATEST_JSON;
   const latestMdPath = options?.latestMdPath ?? DEFAULT_LATEST_MD;
   const outJsonPath = options?.outJsonPath ?? DEFAULT_OUT_JSON;
@@ -31744,6 +36072,8 @@ export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
     curvatureInvariantVisualizationArtifact,
     renderTaxonomyArtifact,
   };
+    },
+  });
 };
 
 export const runWarpYorkControlFamilyProofPack = async (options?: {
@@ -31878,7 +36208,12 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   firstDivergencePath?: string;
   yorkViews?: HullScientificRenderView[];
   frameSize?: { width: number; height: number };
+  publicationLockPath?: string;
 }) => {
+  return withProofSurfacePublicationLock({
+    lockPath: options?.publicationLockPath,
+    operation: "run-full-proof-pack",
+    fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
   const frameEndpoint = options?.frameEndpoint ?? DEFAULT_FRAME_ENDPOINT;
   const compareDirectAndProxy = options?.compareDirectAndProxy === true;
@@ -35157,6 +39492,8 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     deeperReformulationArtifact,
     parameterSweepArtifact,
   };
+    },
+  });
 };
 
 const isEntryPoint = (() => {
@@ -35177,6 +39514,30 @@ if (isEntryPoint) {
     false,
   );
   const publishInvariantLatest = hasArg("--publish-invariant-latest", argv);
+  const publishWorldlineLatest = hasArg("--publish-worldline-latest", argv);
+  const publishCruisePreflightLatest = hasArg("--publish-cruise-preflight-latest", argv);
+  const publishRouteTimeLatest = hasArg("--publish-route-time-latest", argv);
+  const publishMissionTimeLatest = hasArg("--publish-mission-time-latest", argv);
+  const publishMissionTimeComparisonLatest = hasArg(
+    "--publish-mission-time-comparison-latest",
+    argv,
+  );
+  const publishCruiseEnvelopeLatest = hasArg(
+    "--publish-cruise-envelope-latest",
+    argv,
+  );
+  const publishInHullProperAccelerationLatest = hasArg(
+    "--publish-in-hull-proper-acceleration-latest",
+    argv,
+  );
+  const publishProofSurfaceManifestLatest = hasArg(
+    "--publish-proof-surface-manifest-latest",
+    argv,
+  );
+  const publishBoundedStackLatest = hasArg(
+    "--publish-bounded-stack-latest",
+    argv,
+  );
   const parsedOptions = {
     baseUrl: readArgValue("--base-url", argv),
     frameEndpoint: readArgValue("--frame-endpoint", argv),
@@ -35475,12 +39836,61 @@ if (isEntryPoint) {
     yorkViews: parseYorkViews(readArgValue("--views", argv)),
     frameSize: { width, height },
   };
-  const runner = publishInvariantLatest
-    ? publishWarpYorkControlFamilyInvariantLatest(parsedOptions)
-    : runWarpYorkControlFamilyProofPack(parsedOptions);
+  const runner = publishBoundedStackLatest
+    ? publishNhm2BoundedStackLatest({
+        baseUrl: parsedOptions.baseUrl,
+      })
+    : publishProofSurfaceManifestLatest
+      ? publishNhm2ProofSurfaceManifestLatest()
+    : publishWorldlineLatest
+    ? publishNhm2WarpWorldlineProofLatest({
+        baseUrl: parsedOptions.baseUrl,
+      })
+    : publishCruisePreflightLatest
+      ? publishNhm2CruiseEnvelopePreflightLatest({
+          baseUrl: parsedOptions.baseUrl,
+        })
+    : publishRouteTimeLatest
+      ? publishNhm2RouteTimeWorldlineLatest({
+          baseUrl: parsedOptions.baseUrl,
+        })
+    : publishMissionTimeLatest
+      ? publishNhm2MissionTimeEstimatorLatest({
+          baseUrl: parsedOptions.baseUrl,
+        })
+    : publishMissionTimeComparisonLatest
+      ? publishNhm2MissionTimeComparisonLatest({
+          baseUrl: parsedOptions.baseUrl,
+        })
+    : publishCruiseEnvelopeLatest
+      ? publishNhm2CruiseEnvelopeLatest({
+          baseUrl: parsedOptions.baseUrl,
+        })
+    : publishInHullProperAccelerationLatest
+      ? publishNhm2InHullProperAccelerationLatest({
+          baseUrl: parsedOptions.baseUrl,
+        })
+    : publishInvariantLatest
+      ? publishWarpYorkControlFamilyInvariantLatest(parsedOptions)
+      : runWarpYorkControlFamilyProofPack(parsedOptions);
   runner
-    .then((result: { payload: ProofPackPayload }) => {
-      process.stdout.write(`${JSON.stringify(result.payload, null, 2)}\n`);
+    .then((result: { payload?: ProofPackPayload; artifact?: unknown }) => {
+      process.stdout.write(
+        `${JSON.stringify(result.payload ?? result.artifact ?? result, null, 2)}\n`,
+      );
+      if (
+        publishBoundedStackLatest ||
+        publishProofSurfaceManifestLatest ||
+        publishWorldlineLatest ||
+        publishCruisePreflightLatest ||
+        publishRouteTimeLatest ||
+        publishMissionTimeLatest ||
+        publishMissionTimeComparisonLatest ||
+        publishCruiseEnvelopeLatest ||
+        publishInHullProperAccelerationLatest
+      ) {
+        process.exit(0);
+      }
     })
     .catch((error) => {
       process.stderr.write(

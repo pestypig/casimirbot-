@@ -1,4 +1,4 @@
-# Warp York Control-Family Proof Pack (2026-04-02)
+# Warp York Control-Family Proof Pack (2026-04-03)
 
 "This control-family proof pack is a render/geometry audit for York-family interpretation; it is not a physical warp feasibility claim."
 
@@ -520,6 +520,204 @@
 | artifactPath | artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md |
 
+## Warp Worldline Contract
+| field | value |
+|---|---|
+| artifactType | nhm2_warp_worldline_proof/v1 |
+| contractVersion | warp_worldline_contract/v1 |
+| status | bounded_solve_backed |
+| certified | true |
+| sourceSurface | nhm2_metric_local_comoving_transport_cross |
+| metricT00Ref | warp.metric.T00.natario_sdf.shift |
+| chart | comoving_cartesian |
+| observerFamily | ship_centerline_local_comoving |
+| validityRegimeId | nhm2_local_comoving_shell_cross |
+| representativeSampleId | centerline_center |
+| sampleGeometryFamilyId | nhm2_centerline_shell_cross |
+| sampleCount | 9 |
+| dtau_dt_representative | 1 |
+| dtau_dt_min | 1 |
+| dtau_dt_max | 1 |
+| normalizationResidualMaxAbs | 0 |
+| transportVariationStatus | descriptor_varied_dtau_flat |
+| transportInformativenessStatus | descriptor_informative_local_only |
+| sampleFamilyAdequacy | adequate_for_bounded_cruise_preflight |
+| flatnessInterpretation | The bounded local-comoving family exposes solve-backed local shift variation, but the low-g bounded regime keeps dtau_dt numerically flat. This is informative for bounded transport differentiation only, not for route-time or speed claims. |
+| certifiedTransportMeaning | bounded_local_shift_descriptor_gradient_only |
+| eligibleNextProducts | bounded_cruise_envelope_preflight |
+| routeTimeStatus | deferred |
+| transportInterpretation | bounded_local_comoving_descriptor_not_speed |
+| nonClaims | not route-time certified,not mission-time certified,not max-speed certified,not full worldline physics closure,not Lane A proof replacement |
+| artifactPath | artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-warp-worldline-proof-latest.md |
+
+## Cruise Envelope Preflight
+| field | value |
+|---|---|
+| artifactType | nhm2_cruise_envelope_preflight/v1 |
+| contractVersion | warp_cruise_envelope_preflight/v1 |
+| cruisePreflightStatus | bounded_preflight_ready |
+| certified | true |
+| sourceSurface | nhm2_metric_local_comoving_transport_cross |
+| chart | comoving_cartesian |
+| observerFamily | ship_centerline_local_comoving |
+| validityRegimeId | nhm2_bounded_cruise_preflight |
+| preflightQuantityId | bounded_local_transport_descriptor_norm |
+| preflightQuantityMeaning | Dimensionless norm ||beta_eff|| of the certified local-comoving effective transport descriptor across the shell-cross family. This is fixed-chart local descriptor support only, not a ship speed. |
+| candidateCount | 10 |
+| admissibleCount | 9 |
+| rejectedCount | 1 |
+| boundedCruisePreflightBand.min | 3.6531425984160347e-16 |
+| boundedCruisePreflightBand.max | 1.9546804721038186e-15 |
+| boundedCruisePreflightBand.units | dimensionless |
+| sampleFamilyAdequacy | adequate_for_bounded_cruise_preflight |
+| transportVariationStatus | descriptor_varied_dtau_flat |
+| routeTimeStatus | deferred |
+| eligibleNextProducts | route_time_worldline_extension |
+| nonClaims | not max-speed certified,not route-time certified,not mission-time certified,not relativistic-advantage certified,not viability-promotion evidence |
+| artifactPath | artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-cruise-envelope-preflight-latest.md |
+
+## Route-Time Worldline
+| field | value |
+|---|---|
+| artifactType | nhm2_route_time_worldline/v1 |
+| contractVersion | warp_route_time_worldline/v1 |
+| routeTimeWorldlineStatus | bounded_route_time_ready |
+| certified | true |
+| sourceSurface | nhm2_metric_local_comoving_transport_cross |
+| chart | comoving_cartesian |
+| observerFamily | ship_centerline_local_comoving |
+| validityRegimeId | nhm2_bounded_route_time_local_probe |
+| routeModelId | nhm2_bounded_local_probe_lambda |
+| routeParameterName | lambda |
+| progressionSampleCount | 5 |
+| coordinateTimeSummary.start | 0 |
+| coordinateTimeSummary.end | 0.0000033587237719787246 |
+| coordinateTimeSummary.span | 0.0000033587237719787246 |
+| properTimeSummary.start | 0 |
+| properTimeSummary.end | 0.0000033587237719787246 |
+| properTimeSummary.span | 0.0000033587237719787246 |
+| sampleFamilyAdequacy | adequate_for_bounded_cruise_preflight |
+| transportVariationStatus | descriptor_varied_dtau_flat |
+| routeTimeStatus | bounded_local_segment_certified |
+| nextEligibleProducts | mission_time_estimator |
+| nonClaims | not mission-time certified,not max-speed certified,not route ETA to a real target,not relativistic-advantage certified,not viability-promotion evidence |
+| artifactPath | artifacts/research/full-solve/nhm2-route-time-worldline-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-route-time-worldline-latest.md |
+
+## Mission-Time Estimator
+| field | value |
+|---|---|
+| artifactType | nhm2_mission_time_estimator/v1 |
+| contractVersion | warp_mission_time_estimator/v1 |
+| missionTimeEstimatorStatus | bounded_target_coupled_estimate_ready |
+| certified | true |
+| sourceSurface | nhm2_metric_local_comoving_transport_cross |
+| chart | comoving_cartesian |
+| observerFamily | ship_centerline_local_comoving |
+| validityRegimeId | nhm2_bounded_target_coupled_mission_estimator |
+| estimatorModelId | nhm2_repeated_local_probe_segment_estimator |
+| targetId | alpha-cen-a |
+| targetName | Alpha Centauri A |
+| targetFrame | heliocentric-icrs |
+| coordinateTimeEstimate.seconds | 137755965.9171795 |
+| coordinateTimeEstimate.years | 4.3652231448899625 |
+| properTimeEstimate.seconds | 137755965.9171795 |
+| properTimeEstimate.years | 4.3652231448899625 |
+| routeTimeStatus | bounded_local_segment_certified |
+| nextEligibleProducts | relativistic_vs_nonrelativistic_comparison,cruise_envelope_semantics_upgrade |
+| nonClaims | not max-speed certified,not viability-promotion evidence,not full route dynamic certified,not unconstrained ETA for arbitrary targets,not relativistic-advantage certified |
+| artifactPath | artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-mission-time-estimator-latest.md |
+
+## Mission-Time Comparison
+| field | value |
+|---|---|
+| artifactType | nhm2_mission_time_comparison/v1 |
+| contractVersion | warp_mission_time_comparison/v1 |
+| missionTimeComparisonStatus | bounded_target_coupled_comparison_ready |
+| certified | true |
+| sourceSurface | nhm2_metric_local_comoving_transport_cross |
+| chart | comoving_cartesian |
+| observerFamily | ship_centerline_local_comoving |
+| comparisonModelId | nhm2_classical_no_time_dilation_reference |
+| targetId | alpha-cen-a |
+| targetName | Alpha Centauri A |
+| targetFrame | heliocentric-icrs |
+| warpCoordinateYears | 4.3652231448899625 |
+| warpProperYears | 4.3652231448899625 |
+| classicalReferenceYears | 4.3652231448899625 |
+| properMinusCoordinateSeconds | 0 |
+| properMinusClassicalSeconds | 0 |
+| comparisonInterpretationStatus | no_certified_relativistic_differential_detected |
+| comparisonReadiness | paired_classical_reference_certified_speed_comparators_deferred |
+| deferredComparators | speed_based_nonrelativistic_reference,speed_based_flat_sr_reference,route_map_eta_surface,broad_relativistic_advantage_certification |
+| nonClaims | not max-speed certified,not viability-promotion evidence,not full route dynamic certified,not unconstrained ETA for arbitrary targets,not a speed-based relativistic or nonrelativistic comparator |
+| artifactPath | artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-mission-time-comparison-latest.md |
+
+## Cruise Envelope
+| field | value |
+|---|---|
+| artifactType | nhm2_cruise_envelope/v1 |
+| contractVersion | warp_cruise_envelope/v1 |
+| cruiseEnvelopeStatus | bounded_cruise_envelope_certified |
+| certified | true |
+| sourceSurface | nhm2_metric_local_comoving_transport_cross |
+| chart | comoving_cartesian |
+| observerFamily | ship_centerline_local_comoving |
+| cruiseEnvelopeModelId | nhm2_route_consistent_descriptor_band |
+| envelopeQuantityId | bounded_local_transport_descriptor_norm |
+| targetId | alpha-cen-a |
+| targetName | Alpha Centauri A |
+| admissibleBand.min | 3.6531425984160347e-16 |
+| admissibleBand.max | 1.9546804721038186e-15 |
+| admissibleBand.units | dimensionless |
+| representativeValue | 1.9546804721038186e-15 |
+| comparisonConsistencyStatus | consistent_with_zero_differential_comparison |
+| routeTimeStatus | bounded_local_segment_certified |
+| missionTimeStatus | bounded_target_coupled_estimate_ready |
+| nonClaims | not max-speed certified,not viability-promotion evidence,not a route-map ETA surface,not unconstrained relativistic advantage certified,not full route dynamic certified |
+| artifactPath | artifacts/research/full-solve/nhm2-cruise-envelope-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-cruise-envelope-latest.md |
+
+## In-Hull Proper Acceleration
+| field | value |
+|---|---|
+| artifactType | nhm2_in_hull_proper_acceleration/v1 |
+| contractVersion | warp_in_hull_proper_acceleration/v1 |
+| inHullProperAccelerationStatus | bounded_in_hull_profile_certified |
+| certified | true |
+| sourceSurface | nhm2_metric_in_hull_proper_acceleration_profile |
+| chart | comoving_cartesian |
+| observerFamily | eulerian_comoving_cabin |
+| accelerationQuantityId | experienced_proper_acceleration_magnitude |
+| sampleCount | 7 |
+| representative_mps2 | 0 |
+| representative_g | 0 |
+| min_mps2 | 0 |
+| max_mps2 | 0 |
+| resolutionAdequacy | adequate_constant_lapse_zero_profile |
+| fallbackUsed | false |
+| nonClaims | not curvature-gravity certified,not comfort-certified,not safety-certified,not viability-promotion evidence,not source-mechanism promotion |
+| artifactPath | artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json |
+| reportPath | docs/audits/research/warp-nhm2-in-hull-proper-acceleration-latest.md |
+
+## Proof Surface Manifest
+| field | value |
+|---|---|
+| artifactType | nhm2_proof_surface_manifest/v1 |
+| contractVersion | warp_proof_surface_manifest/v1 |
+| proofSurfaceManifestStatus | bounded_stack_publication_hardened |
+| certified | true |
+| publicationMode | bounded_stack_latest_sequential_single_writer |
+| proofSurfaceCount | 8 |
+| trackedRepoEvidenceStatus | repo_tracked_latest_evidence |
+| proofPackChecksum | 1100d08a297b1034bacf09ed2f0f999240e286076ae1af40de9d49b4b0b3b694 |
+| manifestPath | artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json |
+| manifestReportPath | docs/audits/research/warp-nhm2-proof-surface-manifest-latest.md |
+
 ## Render Taxonomy
 | field | value |
 |---|---|
@@ -621,4 +819,12 @@
 - shift_geometry_status=available case_count=4 residual_count=2 direction_overlay_status=available direction_overlay_case_distinctness=mixed constraint_context_status=deferred_units_and_policy_unresolved
 - curvature_invariant_suite_status=available surfaced_fields=kretschmann,ricci4,ricci2,weylI invariant_crosscheck_status=unpopulated momentum_density_status=deferred_not_yet_first_class
 - render_taxonomy authoritative=diagnostic_lane_a presentation=scientific_3p1_field comparison=comparison_panel
+- warp_worldline_status=bounded_solve_backed certified=true source_surface=nhm2_metric_local_comoving_transport_cross sample_count=9 route_time=deferred
+- cruise_preflight_status=bounded_preflight_ready quantity=bounded_local_transport_descriptor_norm candidate_count=10 admissible_count=9 route_time=deferred
+- route_time_worldline_status=bounded_route_time_ready route_model=nhm2_bounded_local_probe_lambda progression_samples=5 route_time=bounded_local_segment_certified
+- mission_time_estimator_status=bounded_target_coupled_estimate_ready target=alpha-cen-a route_time=bounded_local_segment_certified coordinate_years=4.3652231448899625
+- mission_time_comparison_status=bounded_target_coupled_comparison_ready target=alpha-cen-a interpretation=no_certified_relativistic_differential_detected proper_minus_coordinate_seconds=0
+- cruise_envelope_status=bounded_cruise_envelope_certified quantity=bounded_local_transport_descriptor_norm representative_value=1.9546804721038186e-15 comparison_consistency=consistent_with_zero_differential_comparison
+- in_hull_proper_acceleration_status=bounded_in_hull_profile_certified observer=eulerian_comoving_cabin representative_mps2=0 resolution=adequate_constant_lapse_zero_profile
+- proof_surface_manifest_status=bounded_stack_publication_hardened publication_mode=bounded_stack_latest_sequential_single_writer proof_surface_count=8 tracked_repo_evidence=repo_tracked_latest_evidence
 

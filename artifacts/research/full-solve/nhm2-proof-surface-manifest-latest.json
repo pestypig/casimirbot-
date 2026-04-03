@@ -1,0 +1,123 @@
+{
+  "artifactType": "nhm2_proof_surface_manifest/v1",
+  "generatedOn": "2026-04-03",
+  "generatedAt": "2026-04-03T03:25:21.426Z",
+  "boundaryStatement": "This artifact records deterministic publication/provenance for the bounded NHM2 latest proof surfaces. It does not widen any transport, gravity, or viability claim.",
+  "contractVersion": "warp_proof_surface_manifest/v1",
+  "status": "bounded_stack_publication_hardened",
+  "certified": true,
+  "publicationMode": "bounded_stack_latest_sequential_single_writer",
+  "proofSurfaceCount": 8,
+  "proofSurfaces": [
+    {
+      "surfaceId": "warp_worldline",
+      "artifactType": "nhm2_warp_worldline_proof/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-warp-worldline-proof-latest.md",
+      "jsonChecksum": "1a3a9dab5fa3e3251c30149ccc17876fc78fb4ba4257e70e13513f94753f607d",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:17.014Z",
+      "status": "bounded_solve_backed",
+      "certified": true,
+      "contractVersion": "warp_worldline_contract/v1"
+    },
+    {
+      "surfaceId": "cruise_preflight",
+      "artifactType": "nhm2_cruise_envelope_preflight/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-cruise-envelope-preflight-latest.md",
+      "jsonChecksum": "152cdc1eb9b375138a743ad4134c7b05fe450c2806d45644a2f54a0f3a930dc4",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:17.418Z",
+      "status": "bounded_preflight_ready",
+      "certified": true,
+      "contractVersion": "warp_cruise_envelope_preflight/v1"
+    },
+    {
+      "surfaceId": "route_time_worldline",
+      "artifactType": "nhm2_route_time_worldline/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-route-time-worldline-latest.md",
+      "jsonChecksum": "522583eb3f28b1881314e4e9c40f08e000768c6a0c76ead7491cdbac994c8994",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:17.658Z",
+      "status": "bounded_route_time_ready",
+      "certified": true,
+      "contractVersion": "warp_route_time_worldline/v1"
+    },
+    {
+      "surfaceId": "mission_time_estimator",
+      "artifactType": "nhm2_mission_time_estimator/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-mission-time-estimator-latest.md",
+      "jsonChecksum": "e04e98807ab511c8e8050349d1cc79739ddc520204d0de7d89555f129d0f3db4",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:17.895Z",
+      "status": "bounded_target_coupled_estimate_ready",
+      "certified": true,
+      "contractVersion": "warp_mission_time_estimator/v1"
+    },
+    {
+      "surfaceId": "mission_time_comparison",
+      "artifactType": "nhm2_mission_time_comparison/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-mission-time-comparison-latest.md",
+      "jsonChecksum": "26cac318fde58fbab79dadb4da73b1034c3af3eb29cb0c77d8a2e31719625a0b",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:18.139Z",
+      "status": "bounded_target_coupled_comparison_ready",
+      "certified": true,
+      "contractVersion": "warp_mission_time_comparison/v1"
+    },
+    {
+      "surfaceId": "cruise_envelope",
+      "artifactType": "nhm2_cruise_envelope/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-cruise-envelope-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-cruise-envelope-latest.md",
+      "jsonChecksum": "80dd3001511a792eecdacf98020060336ff8e1e12965e94887bac829deae5562",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:18.376Z",
+      "status": "bounded_cruise_envelope_certified",
+      "certified": true,
+      "contractVersion": "warp_cruise_envelope/v1"
+    },
+    {
+      "surfaceId": "in_hull_proper_acceleration",
+      "artifactType": "nhm2_in_hull_proper_acceleration/v1",
+      "jsonPath": "artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json",
+      "mdPath": "docs/audits/research/warp-nhm2-in-hull-proper-acceleration-latest.md",
+      "jsonChecksum": "772d830e8b726c2592c33107ffca7f49aec494750bc395851d4399228ddf5a55",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:18.605Z",
+      "status": "bounded_in_hull_profile_certified",
+      "certified": true,
+      "contractVersion": "warp_in_hull_proper_acceleration/v1"
+    },
+    {
+      "surfaceId": "proof_pack_latest",
+      "artifactType": "warp_york_control_family_proof_pack/v1",
+      "jsonPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      "mdPath": "docs/audits/research/warp-york-control-family-proof-pack-latest.md",
+      "jsonChecksum": "05cb914f4dea511ede14ec61aa663468e7c2a349499d4c8e91d29c6bba462a87",
+      "generatedOn": "2026-04-03",
+      "generatedAt": "2026-04-03T03:25:20.446Z",
+      "status": "published_latest_summary",
+      "certified": true,
+      "contractVersion": "warp_york_control_family_proof_pack/v1"
+    }
+  ],
+  "proofPackPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+  "proofPackReportPath": "docs/audits/research/warp-york-control-family-proof-pack-latest.md",
+  "proofPackChecksum": "1100d08a297b1034bacf09ed2f0f999240e286076ae1af40de9d49b4b0b3b694",
+  "trackedRepoEvidenceStatus": "repo_tracked_latest_evidence",
+  "claimBoundary": [
+    "publication/provenance manifest only",
+    "bounded NHM2 certified latest proof surfaces only"
+  ],
+  "nonClaims": [
+    "does not widen transport claims",
+    "does not widen gravity claims",
+    "does not certify viability"
+  ],
+  "checksum": "fb1b1226b8cf4deb58eed28b9490f44d4eed017680335a64e5089a39a2c361dc"
+}

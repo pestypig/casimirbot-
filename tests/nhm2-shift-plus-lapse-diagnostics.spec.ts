@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  calculateEnergyPipeline,
   initializePipelineState,
   setGlobalPipelineState,
   updateParameters,
@@ -320,6 +321,20 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
       ADM_GRAVITY_DIAGNOSTIC_LANE_CONVENTIONS[ADM_GRAVITY_DIAGNOSTIC_LANE_ID]
         ?.is_authoritative_for_readiness,
     ).toBe(false);
+  });
+
+  it("does not emit a certified in-hull proper-acceleration contract for the reference-only nhm2 shift-lapse family", async () => {
+    let state = initializePipelineState();
+    state = await updateParameters(
+      state,
+      buildShiftLapsePatch(state) as any,
+      { includeReadinessSignals: true },
+    );
+
+    const refreshed = await calculateEnergyPipeline(state);
+
+    expect((refreshed as any).warp?.metricT00Contract?.family).toBe("nhm2_shift_lapse");
+    expect((refreshed as any).warpInHullProperAcceleration ?? null).toBeNull();
   });
 
   it("publishes a scenario id and calibration block on the latest reduced-order artifact", () => {

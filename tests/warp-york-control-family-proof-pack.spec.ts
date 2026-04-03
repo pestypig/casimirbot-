@@ -96,6 +96,20 @@ import {
   renderNhm2ParameterSweepDecisionMemo,
   renderNhm2ParameterSweepMarkdown,
   renderNhm2CurvatureInvariantVisualizationMarkdown,
+  buildNhm2WarpWorldlineProofArtifact,
+  buildNhm2CruiseEnvelopePreflightArtifact,
+  buildNhm2RouteTimeWorldlineArtifact,
+  buildNhm2MissionTimeEstimatorArtifact,
+  buildNhm2MissionTimeComparisonArtifact,
+  buildNhm2CruiseEnvelopeArtifact,
+  buildNhm2InHullProperAccelerationArtifact,
+  renderNhm2WarpWorldlineProofMarkdown,
+  renderNhm2CruiseEnvelopePreflightMarkdown,
+  renderNhm2RouteTimeWorldlineMarkdown,
+  renderNhm2MissionTimeEstimatorMarkdown,
+  renderNhm2MissionTimeComparisonMarkdown,
+  renderNhm2CruiseEnvelopeMarkdown,
+  renderNhm2InHullProperAccelerationMarkdown,
   renderNhm2ShiftGeometryVisualizationMarkdown,
   renderNhm2YorkOptixRenderMarkdown,
   renderNhm2YorkOptixRenderMemo,
@@ -115,6 +129,15 @@ import {
   YORK_DIAGNOSTIC_BASELINE_LANE_ID,
   computeYorkDiagnosticLaneField,
 } from "../shared/york-diagnostic-lanes";
+import {
+  makeWarpCruiseEnvelopePreflightFixture,
+  makeWarpCruiseEnvelopeFixture,
+  makeWarpMissionTimeComparisonFixture,
+  makeWarpMissionTimeEstimatorFixture,
+  makeWarpInHullProperAccelerationFixture,
+  makeWarpRouteTimeWorldlineFixture,
+  makeWarpWorldlineFixture,
+} from "./helpers/warp-worldline-fixture";
 
 const REQUIRED_VIEWS: HullScientificRenderView[] = [
   "york-surface-3p1",
@@ -318,6 +341,9 @@ const makeCase = (
     causeCode: null,
   },
 });
+
+const makeWarpWorldlineContract = () => makeWarpWorldlineFixture();
+const makeWarpRouteTimeWorldlineContract = () => makeWarpRouteTimeWorldlineFixture();
 
 const makeProofPackPayloadForMarkdown = () => {
   const contract = loadYorkDiagnosticContract("configs/york-diagnostic-contract.v1.json");
@@ -8940,6 +8966,75 @@ describe("warp york control-family proof pack", () => {
     expect(payload.notes).toContain("keep-me");
   });
 
+  it("folds the bounded route-time worldline summary into the refreshed proof-pack latest payload", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const existingProofPackPayload = makeProofPackPayloadForMarkdown() as any;
+    const routeTimeArtifact = buildNhm2RouteTimeWorldlineArtifact({
+      generatedOn: "2026-04-02",
+      routeTimeWorldline: makeWarpRouteTimeWorldlineContract(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+    });
+
+    const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+      existingProofPackPayload,
+      yorkOptixRenderArtifact: fixtures.optixRenderArtifact,
+      shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+      curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
+      canonicalVisualComparisonArtifact: fixtures.canonicalVisualComparisonArtifact,
+      renderTaxonomyArtifact: fixtures.renderTaxonomyArtifact,
+      yorkOptixRenderLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      yorkOptixRenderLatestMdPath:
+        "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+      shiftGeometryVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      shiftGeometryVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+      curvatureInvariantVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      curvatureInvariantVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+      renderTaxonomyLatestJsonPath:
+        "artifacts/research/full-solve/render-taxonomy-latest.json",
+      renderTaxonomyLatestMdPath:
+        "docs/audits/research/warp-render-taxonomy-latest.md",
+      renderTaxonomyStandardMemoPath:
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      yorkCanonicalVisualComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      yorkCanonicalVisualComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      yorkCanonicalVisualComparisonDecisionMemoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+      routeTimeWorldlineArtifact: routeTimeArtifact,
+      routeTimeWorldlineLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      routeTimeWorldlineLatestMdPath:
+        "docs/audits/research/warp-nhm2-route-time-worldline-latest.md",
+    });
+
+    expect(payload.routeTimeWorldlineSummary).toMatchObject({
+      artifactType: "nhm2_route_time_worldline/v1",
+      routeTimeWorldlineStatus: "bounded_route_time_ready",
+      routeModelId: "nhm2_bounded_local_probe_lambda",
+      routeParameterName: "lambda",
+      progressionSampleCount: 5,
+      routeTimeStatus: "bounded_local_segment_certified",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-route-time-worldline-latest.md",
+    });
+    expect(
+      payload.notes.some((note) => note.startsWith("route_time_worldline_status=")),
+    ).toBe(true);
+  });
+
   it("builds a final canonical comparison artifact with canonical cases and both layers", async () => {
     const fixtures = await makeCanonicalVisualComparisonFixtures();
     const exportDir = path.join(fixtures.tempDir, "final-panel");
@@ -8991,6 +9086,177 @@ describe("warp york control-family proof pack", () => {
         }),
       ]),
     );
+  });
+
+  it("threads a bounded mission-time estimator summary into the main proof-pack latest payload", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const routeTime = makeWarpRouteTimeWorldlineFixture();
+    const missionEstimator = buildNhm2MissionTimeEstimatorArtifact({
+      generatedOn: "2026-04-02",
+      missionTimeEstimator: makeWarpMissionTimeEstimatorFixture({
+        routeTime,
+      }),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      sourceRouteTimeArtifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+    });
+    const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+      existingProofPackPayload: makeProofPackPayloadForMarkdown() as any,
+      yorkOptixRenderArtifact: fixtures.optixRenderArtifact,
+      shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+      curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
+      canonicalVisualComparisonArtifact: fixtures.canonicalVisualComparisonArtifact,
+      renderTaxonomyArtifact: fixtures.renderTaxonomyArtifact,
+      yorkOptixRenderLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      yorkOptixRenderLatestMdPath:
+        "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+      shiftGeometryVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      shiftGeometryVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+      curvatureInvariantVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      curvatureInvariantVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+      renderTaxonomyLatestJsonPath:
+        "artifacts/research/full-solve/render-taxonomy-latest.json",
+      renderTaxonomyLatestMdPath:
+        "docs/audits/research/warp-render-taxonomy-latest.md",
+      renderTaxonomyStandardMemoPath:
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      yorkCanonicalVisualComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      yorkCanonicalVisualComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      yorkCanonicalVisualComparisonDecisionMemoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+      missionTimeEstimatorArtifact: missionEstimator,
+      missionTimeEstimatorLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+      missionTimeEstimatorLatestMdPath:
+        "docs/audits/research/warp-nhm2-mission-time-estimator-latest.md",
+    });
+
+    expect(payload.missionTimeEstimatorSummary).toMatchObject({
+      artifactType: "nhm2_mission_time_estimator/v1",
+      missionTimeEstimatorStatus: "bounded_target_coupled_estimate_ready",
+      estimatorModelId: "nhm2_repeated_local_probe_segment_estimator",
+      targetId: "alpha-cen-a",
+      targetName: "Alpha Centauri A",
+      targetFrame: "heliocentric-icrs",
+      routeTimeStatus: "bounded_local_segment_certified",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-mission-time-estimator-latest.md",
+    });
+    expect(
+      payload.notes.some((note) => note.startsWith("mission_time_estimator_status=")),
+    ).toBe(true);
+  });
+
+  it("threads a bounded mission-time comparison summary into the main proof-pack latest payload", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const missionTimeComparison = buildNhm2MissionTimeComparisonArtifact({
+      generatedOn: "2026-04-02",
+      missionTimeComparison: makeWarpMissionTimeComparisonFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      sourceRouteTimeArtifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      sourceMissionTimeEstimatorArtifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+    });
+    const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+      existingProofPackPayload: makeProofPackPayloadForMarkdown() as any,
+      yorkOptixRenderArtifact: fixtures.optixRenderArtifact,
+      shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+      curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
+      canonicalVisualComparisonArtifact: fixtures.canonicalVisualComparisonArtifact,
+      renderTaxonomyArtifact: fixtures.renderTaxonomyArtifact,
+      yorkOptixRenderLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      yorkOptixRenderLatestMdPath:
+        "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+      shiftGeometryVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      shiftGeometryVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+      curvatureInvariantVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      curvatureInvariantVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+      renderTaxonomyLatestJsonPath:
+        "artifacts/research/full-solve/render-taxonomy-latest.json",
+      renderTaxonomyLatestMdPath:
+        "docs/audits/research/warp-render-taxonomy-latest.md",
+      renderTaxonomyStandardMemoPath:
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      yorkCanonicalVisualComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      yorkCanonicalVisualComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      yorkCanonicalVisualComparisonDecisionMemoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+      missionTimeComparisonArtifact: missionTimeComparison,
+      missionTimeComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json",
+      missionTimeComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-mission-time-comparison-latest.md",
+    });
+
+    expect(payload.missionTimeComparisonSummary).toMatchObject({
+      artifactType: "nhm2_mission_time_comparison/v1",
+      missionTimeComparisonStatus: "bounded_target_coupled_comparison_ready",
+      comparisonModelId: "nhm2_classical_no_time_dilation_reference",
+      targetId: "alpha-cen-a",
+      targetName: "Alpha Centauri A",
+      targetFrame: "heliocentric-icrs",
+      comparisonInterpretationStatus:
+        "bounded_relativistic_differential_detected",
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-mission-time-comparison-latest.md",
+    });
+    expect(
+      payload.notes.some((note) => note.startsWith("mission_time_comparison_status=")),
+    ).toBe(true);
+  });
+
+  it("renders a bounded mission-time comparison artifact and markdown without promoting speed claims", () => {
+    const artifact = buildNhm2MissionTimeComparisonArtifact({
+      generatedOn: "2026-04-02",
+      missionTimeComparison: makeWarpMissionTimeComparisonFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      sourceRouteTimeArtifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      sourceMissionTimeEstimatorArtifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+    });
+    const markdown = renderNhm2MissionTimeComparisonMarkdown(artifact);
+
+    expect(artifact.comparisonMetrics.interpretationStatus).toBe(
+      "bounded_relativistic_differential_detected",
+    );
+    expect(markdown).toContain("nhm2_classical_no_time_dilation_reference");
+    expect(markdown).toContain("properMinusCoordinate_seconds");
+    expect(markdown).toContain("not max-speed certified");
   });
 
   it("renders final canonical comparison markdown and memo with explicit layer separation", async () => {
@@ -9056,6 +9322,509 @@ describe("warp york control-family proof pack", () => {
       "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
     );
     expect(proofPackMarkdown).toContain("## Presentation Render Layer");
+  });
+
+  it("renders a compact worldline summary in the main proof-pack markdown without widening route-time claims", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const worldline = makeWarpWorldlineContract();
+    payload.warpWorldlineSummary = {
+      artifactType: "nhm2_warp_worldline_proof/v1",
+      contractVersion: worldline.contractVersion,
+      status: worldline.status,
+      certified: worldline.certified,
+      sourceSurface: worldline.sourceSurface.surfaceId,
+      metricT00Ref: worldline.sourceSurface.metricT00Ref,
+      chart: worldline.chart.label,
+      observerFamily: worldline.observerFamily,
+      validityRegimeId: worldline.validityRegime.regimeId,
+      representativeSampleId: worldline.representativeSampleId,
+      sampleGeometryFamilyId: worldline.sampleGeometry.familyId,
+      sampleCount: worldline.sampleCount,
+      dtauDt: {
+        representative: worldline.dtau_dt.representative,
+        min: worldline.dtau_dt.min,
+        max: worldline.dtau_dt.max,
+      },
+      normalizationResidualMaxAbs: worldline.normalizationResidual.maxAbs,
+      transportVariationStatus: worldline.transportVariation.transportVariationStatus,
+      transportInformativenessStatus: worldline.transportInformativenessStatus,
+      sampleFamilyAdequacy: worldline.sampleFamilyAdequacy,
+      flatnessInterpretation: worldline.flatnessInterpretation,
+      certifiedTransportMeaning: worldline.certifiedTransportMeaning,
+      eligibleNextProducts: [...worldline.eligibleNextProducts],
+      routeTimeStatus: "deferred",
+      transportInterpretation:
+        worldline.transportInterpretation.effectiveTransportInterpretation,
+      nonClaims: ["not route-time certified", "not mission-time certified"],
+      artifactPath: "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      reportPath: "docs/audits/research/warp-nhm2-warp-worldline-proof-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## Warp Worldline Contract");
+    expect(proofPackMarkdown).toContain("routeTimeStatus | deferred");
+    expect(proofPackMarkdown).toContain("sampleGeometryFamilyId | nhm2_centerline_shell_cross");
+    expect(proofPackMarkdown).toContain(
+      "transportVariationStatus | descriptor_and_dtau_varied",
+    );
+    expect(proofPackMarkdown).toContain("bounded_local_comoving_descriptor_not_speed");
+    expect(proofPackMarkdown).toContain("not route-time certified,not mission-time certified");
+  });
+
+  it("renders a compact cruise-preflight summary in the main proof-pack markdown without relabeling it as speed", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const preflight = makeWarpCruiseEnvelopePreflightFixture();
+    payload.cruisePreflightSummary = {
+      artifactType: "nhm2_cruise_envelope_preflight/v1",
+      contractVersion: preflight.contractVersion,
+      cruisePreflightStatus: preflight.status,
+      certified: preflight.certified,
+      sourceSurface: preflight.sourceSurface.surfaceId,
+      chart: preflight.chart.label,
+      observerFamily: preflight.observerFamily,
+      validityRegimeId: preflight.validityRegime.regimeId,
+      preflightQuantityId: preflight.preflightQuantityId,
+      preflightQuantityMeaning: preflight.preflightQuantityMeaning,
+      candidateCount: preflight.candidateCount,
+      admissibleCount: preflight.admissibleCount,
+      rejectedCount: preflight.rejectedCount,
+      boundedCruisePreflightBand: {
+        min: preflight.boundedCruisePreflightBand.min,
+        max: preflight.boundedCruisePreflightBand.max,
+        units: "dimensionless",
+      },
+      sampleFamilyAdequacy: preflight.sampleFamilyAdequacy,
+      transportVariationStatus: preflight.transportVariationStatus,
+      routeTimeStatus: preflight.routeTimeStatus,
+      eligibleNextProducts: [...preflight.eligibleNextProducts],
+      nonClaims: [...preflight.nonClaims],
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-cruise-envelope-preflight-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## Cruise Envelope Preflight");
+    expect(proofPackMarkdown).toContain(
+      "preflightQuantityId | bounded_local_transport_descriptor_norm",
+    );
+    expect(proofPackMarkdown).toContain("routeTimeStatus | deferred");
+    expect(proofPackMarkdown).toContain("eligibleNextProducts | route_time_worldline_extension");
+    expect(proofPackMarkdown).toContain("not max-speed certified,not route-time certified");
+  });
+
+  it("renders a compact route-time worldline summary in the main proof-pack markdown without producing mission-time claims", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const routeTime = makeWarpRouteTimeWorldlineContract();
+    payload.routeTimeWorldlineSummary = {
+      artifactType: "nhm2_route_time_worldline/v1",
+      contractVersion: routeTime.contractVersion,
+      routeTimeWorldlineStatus: routeTime.status,
+      certified: routeTime.certified,
+      sourceSurface: routeTime.sourceSurface.surfaceId,
+      chart: routeTime.chart.label,
+      observerFamily: routeTime.observerFamily,
+      validityRegimeId: routeTime.validityRegime.regimeId,
+      routeModelId: routeTime.routeModelId,
+      routeParameterName: routeTime.routeParameterName,
+      progressionSampleCount: routeTime.progressionSampleCount,
+      coordinateTimeSummary: {
+        start: routeTime.coordinateTimeSummary.start,
+        end: routeTime.coordinateTimeSummary.end,
+        span: routeTime.coordinateTimeSummary.span,
+        units: "s",
+      },
+      properTimeSummary: {
+        start: routeTime.properTimeSummary.start,
+        end: routeTime.properTimeSummary.end,
+        span: routeTime.properTimeSummary.span,
+        units: "s",
+      },
+      sampleFamilyAdequacy: routeTime.sampleFamilyAdequacy,
+      transportVariationStatus: routeTime.transportVariationStatus,
+      routeTimeStatus: routeTime.routeTimeStatus,
+      nextEligibleProducts: [...routeTime.nextEligibleProducts],
+      nonClaims: [...routeTime.nonClaims],
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-route-time-worldline-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## Route-Time Worldline");
+    expect(proofPackMarkdown).toContain(
+      "routeTimeWorldlineStatus | bounded_route_time_ready",
+    );
+    expect(proofPackMarkdown).toContain(
+      "routeModelId | nhm2_bounded_local_probe_lambda",
+    );
+    expect(proofPackMarkdown).toContain("routeTimeStatus | bounded_local_segment_certified");
+    expect(proofPackMarkdown).toContain("nonClaims | not mission-time certified");
+  });
+
+  it("renders a compact mission-time estimator summary in the main proof-pack markdown without promoting speed or viability claims", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const estimator = makeWarpMissionTimeEstimatorFixture();
+    payload.missionTimeEstimatorSummary = {
+      artifactType: "nhm2_mission_time_estimator/v1",
+      contractVersion: estimator.contractVersion,
+      missionTimeEstimatorStatus: estimator.status,
+      certified: estimator.certified,
+      sourceSurface: estimator.sourceSurface.surfaceId,
+      chart: estimator.chart.label,
+      observerFamily: estimator.observerFamily,
+      validityRegimeId: estimator.validityRegime.regimeId,
+      estimatorModelId: estimator.estimatorModelId,
+      targetId: estimator.targetId,
+      targetName: estimator.targetName,
+      targetFrame: estimator.targetFrame,
+      coordinateTimeEstimate: {
+        seconds: estimator.coordinateTimeEstimate.seconds,
+        years: estimator.coordinateTimeEstimate.years,
+        units: { primary: "s", secondary: "yr" },
+      },
+      properTimeEstimate: {
+        seconds: estimator.properTimeEstimate.seconds,
+        years: estimator.properTimeEstimate.years,
+        units: { primary: "s", secondary: "yr" },
+      },
+      routeTimeStatus: estimator.routeTimeStatus,
+      nextEligibleProducts: [...estimator.nextEligibleProducts],
+      nonClaims: [...estimator.nonClaims],
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-mission-time-estimator-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## Mission-Time Estimator");
+    expect(proofPackMarkdown).toContain(
+      "missionTimeEstimatorStatus | bounded_target_coupled_estimate_ready",
+    );
+    expect(proofPackMarkdown).toContain(
+      "estimatorModelId | nhm2_repeated_local_probe_segment_estimator",
+    );
+    expect(proofPackMarkdown).toContain("targetId | alpha-cen-a");
+    expect(proofPackMarkdown).toContain("nonClaims | not max-speed certified");
+  });
+
+  it("renders a compact mission-time comparison summary in the main proof-pack markdown and preserves zero-difference reporting", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const comparison = makeWarpMissionTimeComparisonFixture();
+    payload.missionTimeComparisonSummary = {
+      artifactType: "nhm2_mission_time_comparison/v1",
+      contractVersion: comparison.contractVersion,
+      missionTimeComparisonStatus: comparison.status,
+      certified: comparison.certified,
+      sourceSurface: comparison.sourceSurface.surfaceId,
+      chart: comparison.chart.label,
+      observerFamily: comparison.observerFamily,
+      comparisonModelId: comparison.comparisonModelId,
+      targetId: comparison.targetId,
+      targetName: comparison.targetName,
+      targetFrame: comparison.targetFrame,
+      warpCoordinateYears: comparison.warpCoordinateTimeEstimate.years,
+      warpProperYears: comparison.warpProperTimeEstimate.years,
+      classicalReferenceYears: comparison.classicalReferenceTimeEstimate.years,
+      properMinusCoordinateSeconds:
+        comparison.comparisonMetrics.properMinusCoordinate_seconds,
+      properMinusClassicalSeconds:
+        comparison.comparisonMetrics.properMinusClassical_seconds,
+      comparisonInterpretationStatus:
+        comparison.comparisonMetrics.interpretationStatus,
+      comparisonReadiness: comparison.comparisonReadiness,
+      deferredComparators: [...comparison.deferredComparators],
+      nonClaims: [...comparison.nonClaims],
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-mission-time-comparison-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## Mission-Time Comparison");
+    expect(proofPackMarkdown).toContain(
+      "missionTimeComparisonStatus | bounded_target_coupled_comparison_ready",
+    );
+    expect(proofPackMarkdown).toContain(
+      "comparisonModelId | nhm2_classical_no_time_dilation_reference",
+    );
+    expect(proofPackMarkdown).toContain(
+      `properMinusCoordinateSeconds | ${comparison.comparisonMetrics.properMinusCoordinate_seconds}`,
+    );
+    expect(proofPackMarkdown).toContain(
+      "comparisonInterpretationStatus | bounded_relativistic_differential_detected",
+    );
+  });
+
+  it("renders a compact cruise-envelope summary in the main proof-pack markdown without relabeling it as speed", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const cruiseEnvelope = makeWarpCruiseEnvelopeFixture();
+    payload.cruiseEnvelopeSummary = {
+      artifactType: "nhm2_cruise_envelope/v1",
+      contractVersion: cruiseEnvelope.contractVersion,
+      cruiseEnvelopeStatus: cruiseEnvelope.status,
+      certified: cruiseEnvelope.certified,
+      sourceSurface: cruiseEnvelope.sourceSurface.surfaceId,
+      chart: cruiseEnvelope.chart.label,
+      observerFamily: cruiseEnvelope.observerFamily,
+      cruiseEnvelopeModelId: cruiseEnvelope.cruiseEnvelopeModelId,
+      envelopeQuantityId: cruiseEnvelope.envelopeQuantityId,
+      targetId: cruiseEnvelope.targetId,
+      targetName: cruiseEnvelope.targetName,
+      admissibleBand: {
+        min: cruiseEnvelope.admissibleBand.min,
+        max: cruiseEnvelope.admissibleBand.max,
+        units: "dimensionless",
+      },
+      representativeValue: cruiseEnvelope.representativeValue,
+      comparisonConsistencyStatus: cruiseEnvelope.comparisonConsistencyStatus,
+      routeTimeStatus: cruiseEnvelope.routeTimeStatus,
+      missionTimeStatus: cruiseEnvelope.missionTimeStatus,
+      nonClaims: [...cruiseEnvelope.nonClaims],
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-cruise-envelope-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## Cruise Envelope");
+    expect(proofPackMarkdown).toContain(
+      "cruiseEnvelopeStatus | bounded_cruise_envelope_certified",
+    );
+    expect(proofPackMarkdown).toContain(
+      "cruiseEnvelopeModelId | nhm2_route_consistent_descriptor_band",
+    );
+    expect(proofPackMarkdown).toContain(
+      "envelopeQuantityId | bounded_local_transport_descriptor_norm",
+    );
+    expect(proofPackMarkdown).toContain("comparisonConsistencyStatus |");
+    expect(proofPackMarkdown).toContain("not max-speed certified");
+  });
+
+  it("renders a compact in-hull proper-acceleration summary in the main proof-pack markdown without relabeling it as curvature gravity", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    const inHullProperAcceleration = makeWarpInHullProperAccelerationFixture();
+    payload.inHullProperAccelerationSummary = {
+      artifactType: "nhm2_in_hull_proper_acceleration/v1",
+      contractVersion: inHullProperAcceleration.contractVersion,
+      inHullProperAccelerationStatus: inHullProperAcceleration.status,
+      certified: inHullProperAcceleration.certified,
+      sourceSurface: inHullProperAcceleration.sourceSurface.surfaceId,
+      chart: inHullProperAcceleration.chart.label,
+      observerFamily: inHullProperAcceleration.observerFamily,
+      accelerationQuantityId: inHullProperAcceleration.accelerationQuantityId,
+      sampleCount: inHullProperAcceleration.sampleCount,
+      representative_mps2: inHullProperAcceleration.profileSummary.representative_mps2,
+      representative_g: inHullProperAcceleration.profileSummary.representative_g,
+      min_mps2: inHullProperAcceleration.profileSummary.min_mps2,
+      max_mps2: inHullProperAcceleration.profileSummary.max_mps2,
+      resolutionAdequacy: inHullProperAcceleration.resolutionAdequacy.status,
+      fallbackUsed: inHullProperAcceleration.fallbackUsed,
+      nonClaims: [...inHullProperAcceleration.nonClaims],
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-in-hull-proper-acceleration-latest.md",
+    };
+    const proofPackMarkdown = renderMarkdown(payload);
+
+    expect(proofPackMarkdown).toContain("## In-Hull Proper Acceleration");
+    expect(proofPackMarkdown).toContain(
+      "inHullProperAccelerationStatus | bounded_in_hull_profile_certified",
+    );
+    expect(proofPackMarkdown).toContain(
+      "accelerationQuantityId | experienced_proper_acceleration_magnitude",
+    );
+    expect(proofPackMarkdown).toContain("fallbackUsed | false");
+    expect(proofPackMarkdown).toContain("not curvature-gravity certified");
+  });
+
+  it("threads a bounded in-hull proper-acceleration summary into the refreshed proof-pack latest payload", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const inHullProperAcceleration = buildNhm2InHullProperAccelerationArtifact({
+      generatedOn: "2026-04-02",
+      inHullProperAcceleration: makeWarpInHullProperAccelerationFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    });
+    const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+      existingProofPackPayload: makeProofPackPayloadForMarkdown() as any,
+      yorkOptixRenderArtifact: fixtures.optixRenderArtifact,
+      shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+      curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
+      canonicalVisualComparisonArtifact: fixtures.canonicalVisualComparisonArtifact,
+      renderTaxonomyArtifact: fixtures.renderTaxonomyArtifact,
+      yorkOptixRenderLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      yorkOptixRenderLatestMdPath:
+        "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+      shiftGeometryVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      shiftGeometryVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+      curvatureInvariantVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      curvatureInvariantVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+      renderTaxonomyLatestJsonPath:
+        "artifacts/research/full-solve/render-taxonomy-latest.json",
+      renderTaxonomyLatestMdPath:
+        "docs/audits/research/warp-render-taxonomy-latest.md",
+      renderTaxonomyStandardMemoPath:
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      yorkCanonicalVisualComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      yorkCanonicalVisualComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      yorkCanonicalVisualComparisonDecisionMemoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+      inHullProperAccelerationArtifact: inHullProperAcceleration,
+      inHullProperAccelerationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json",
+      inHullProperAccelerationLatestMdPath:
+        "docs/audits/research/warp-nhm2-in-hull-proper-acceleration-latest.md",
+    });
+
+    expect(payload.inHullProperAccelerationSummary).toMatchObject({
+      artifactType: "nhm2_in_hull_proper_acceleration/v1",
+      inHullProperAccelerationStatus: "bounded_in_hull_profile_certified",
+      accelerationQuantityId: "experienced_proper_acceleration_magnitude",
+      sampleCount: 7,
+      resolutionAdequacy: "adequate_direct_brick_profile",
+      fallbackUsed: false,
+      artifactPath:
+        "artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json",
+      reportPath:
+        "docs/audits/research/warp-nhm2-in-hull-proper-acceleration-latest.md",
+    });
+    expect(
+      payload.notes.some((note) => note.startsWith("in_hull_proper_acceleration_status=")),
+    ).toBe(true);
+  });
+
+  it("renders a bounded in-hull proper-acceleration artifact and markdown with explicit no-fallback semantics", () => {
+    const artifact = buildNhm2InHullProperAccelerationArtifact({
+      generatedOn: "2026-04-02",
+      inHullProperAcceleration: makeWarpInHullProperAccelerationFixture({ zeroProfile: true }),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    });
+    const markdown = renderNhm2InHullProperAccelerationMarkdown(artifact);
+
+    expect(artifact.profileSummary.interpretation).toBe(
+      "observer_defined_zero_profile_in_constant_lapse_regime",
+    );
+    expect(artifact.fallbackUsed).toBe(false);
+    expect(markdown).toContain("NHM2 In-Hull Proper Acceleration");
+    expect(markdown).toContain("experienced_proper_acceleration_magnitude");
+    expect(markdown).toContain("fallbackUsed | false");
+    expect(markdown).toContain("not a curvature-gravity or comfort/safety certificate");
+  });
+
+  it("threads a proof-surface manifest summary into the refreshed proof-pack latest payload", async () => {
+    const fixtures = await buildRenderTaxonomyFixtures();
+    const proofSurfaceManifest = {
+      artifactType: "nhm2_proof_surface_manifest/v1",
+      generatedOn: "2026-04-02",
+      generatedAt: "2026-04-02T12:00:00.000Z",
+      boundaryStatement:
+        "This artifact records deterministic publication/provenance for the bounded NHM2 latest proof surfaces. It does not widen any transport, gravity, or viability claim.",
+      contractVersion: "warp_proof_surface_manifest/v1",
+      status: "bounded_stack_publication_hardened",
+      certified: true,
+      publicationMode: "bounded_stack_latest_sequential_single_writer",
+      proofSurfaceCount: 8,
+      proofSurfaces: [],
+      proofPackPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      proofPackReportPath:
+        "docs/audits/research/warp-york-control-family-proof-pack-latest.md",
+      proofPackChecksum: "a".repeat(64),
+      trackedRepoEvidenceStatus: "repo_landed_clean_latest_evidence",
+      claimBoundary: [
+        "publication/provenance manifest only",
+        "bounded NHM2 certified latest proof surfaces only",
+      ],
+      nonClaims: [
+        "does not widen transport claims",
+        "does not widen gravity claims",
+        "does not certify viability",
+      ],
+      checksum: "b".repeat(64),
+    } as any;
+    const { payload } = buildWarpYorkControlFamilyPublishedLatestPayload({
+      existingProofPackPayload: makeProofPackPayloadForMarkdown() as any,
+      yorkOptixRenderArtifact: fixtures.optixRenderArtifact,
+      shiftGeometryArtifact: fixtures.shiftGeometryArtifact,
+      curvatureInvariantArtifact: fixtures.curvatureInvariantArtifact,
+      canonicalVisualComparisonArtifact: fixtures.canonicalVisualComparisonArtifact,
+      renderTaxonomyArtifact: fixtures.renderTaxonomyArtifact,
+      yorkOptixRenderLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-york-optix-render-latest.json",
+      yorkOptixRenderLatestMdPath:
+        "docs/audits/research/warp-nhm2-york-optix-render-latest.md",
+      shiftGeometryVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-shift-geometry-visualization-latest.json",
+      shiftGeometryVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-shift-geometry-visualization-latest.md",
+      curvatureInvariantVisualizationLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-curvature-invariant-visualization-latest.json",
+      curvatureInvariantVisualizationLatestMdPath:
+        "docs/audits/research/warp-nhm2-curvature-invariant-visualization-latest.md",
+      renderTaxonomyLatestJsonPath:
+        "artifacts/research/full-solve/render-taxonomy-latest.json",
+      renderTaxonomyLatestMdPath:
+        "docs/audits/research/warp-render-taxonomy-latest.md",
+      renderTaxonomyStandardMemoPath:
+        "docs/research/render-taxonomy-and-labeling-standard-2026-04-02.md",
+      yorkCanonicalVisualComparisonLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-canonical-visual-comparison-latest.json",
+      yorkCanonicalVisualComparisonLatestMdPath:
+        "docs/audits/research/warp-nhm2-canonical-visual-comparison-latest.md",
+      yorkCanonicalVisualComparisonDecisionMemoPath:
+        "docs/research/nhm2-canonical-visual-comparison-decision-memo-2026-03-31.md",
+      proofSurfaceManifestArtifact: proofSurfaceManifest,
+      proofSurfaceManifestLatestJsonPath:
+        "artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json",
+      proofSurfaceManifestLatestMdPath:
+        "docs/audits/research/warp-nhm2-proof-surface-manifest-latest.md",
+    });
+
+    expect(payload.proofSurfaceManifestSummary).toMatchObject({
+      artifactType: "nhm2_proof_surface_manifest/v1",
+      contractVersion: "warp_proof_surface_manifest/v1",
+      proofSurfaceManifestStatus: "bounded_stack_publication_hardened",
+      certified: true,
+      publicationMode: "bounded_stack_latest_sequential_single_writer",
+      proofSurfaceCount: 8,
+      trackedRepoEvidenceStatus: "repo_landed_clean_latest_evidence",
+      manifestPath:
+        "artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json",
+      manifestReportPath:
+        "docs/audits/research/warp-nhm2-proof-surface-manifest-latest.md",
+    });
+    expect(payload.proofSurfaceManifestSummary?.proofPackChecksum).toBe("a".repeat(64));
+    expect(
+      payload.notes.some((note) => note.startsWith("proof_surface_manifest_status=")),
+    ).toBe(true);
+
+    const markdown = renderMarkdown(payload);
+    expect(markdown).toContain("## Proof Surface Manifest");
+    expect(markdown).toContain(
+      "proofSurfaceManifestStatus | bounded_stack_publication_hardened",
+    );
+    expect(markdown).toContain("publicationMode | bounded_stack_latest_sequential_single_writer");
+    expect(markdown).toContain(
+      "trackedRepoEvidenceStatus | repo_landed_clean_latest_evidence",
+    );
+    expect(markdown).toContain(
+      "manifestPath | artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json",
+    );
   });
 
   it("builds a render taxonomy manifest with category and role metadata on every render", async () => {
@@ -9155,6 +9924,185 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain("invariantCrosscheckStatus | unpopulated");
     expect(markdown).toContain("momentumDensityStatus | deferred_not_yet_first_class");
     expect(markdown).toContain("Rodal");
+  });
+
+  it("builds and renders a bounded NHM2 warp-worldline proof artifact without widening mission claims", () => {
+    const artifact = buildNhm2WarpWorldlineProofArtifact({
+      generatedOn: "2026-04-02",
+      warpWorldline: makeWarpWorldlineContract(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    });
+    const markdown = renderNhm2WarpWorldlineProofMarkdown(artifact);
+
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        artifactType: "nhm2_warp_worldline_proof/v1",
+        certified: true,
+        sampleCount: 9,
+        representativeSampleId: "centerline_center",
+        sampleFamilyAdequacy: "adequate_for_bounded_cruise_preflight",
+      }),
+    );
+    expect(artifact.dtauDt.representative).toBeGreaterThan(0);
+    expect(artifact.normalizationResidual.maxAbs).toBeLessThanOrEqual(1e-9);
+    expect(markdown).toContain("NHM2 Warp Worldline Proof");
+    expect(markdown).toContain("not mission-time certified");
+    expect(markdown).toContain("nhm2_metric_local_comoving_transport_cross");
+    expect(markdown).toContain("sampleGeometryFamilyId | nhm2_centerline_shell_cross");
+    expect(markdown).toContain("bounded_local_comoving_descriptor_not_speed");
+    expect(markdown).toContain("## Transport Variation");
+    expect(markdown).toContain("eligibleNextProducts | bounded_cruise_envelope_preflight");
+  });
+
+  it("builds and renders a bounded NHM2 cruise-envelope preflight artifact without widening speed or mission claims", () => {
+    const artifact = buildNhm2CruiseEnvelopePreflightArtifact({
+      generatedOn: "2026-04-02",
+      preflight: makeWarpCruiseEnvelopePreflightFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+    });
+    const markdown = renderNhm2CruiseEnvelopePreflightMarkdown(artifact);
+
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        artifactType: "nhm2_cruise_envelope_preflight/v1",
+        certified: true,
+        preflightQuantityId: "bounded_local_transport_descriptor_norm",
+        candidateCount: 10,
+        admissibleCount: 9,
+        rejectedCount: 1,
+        routeTimeStatus: "deferred",
+      }),
+    );
+    expect(artifact.boundedCruisePreflightBand.max).toBeGreaterThan(
+      artifact.boundedCruisePreflightBand.min,
+    );
+    expect(markdown).toContain("NHM2 Cruise Envelope Preflight");
+    expect(markdown).toContain("bounded_local_transport_descriptor_norm");
+    expect(markdown).toContain("routeTimeStatus | deferred");
+    expect(markdown).toContain("probe_above_certified_support");
+    expect(markdown).toContain("not max-speed certified");
+  });
+
+  it("builds and renders a bounded NHM2 route-time worldline artifact without widening mission or ETA claims", () => {
+    const artifact = buildNhm2RouteTimeWorldlineArtifact({
+      generatedOn: "2026-04-02",
+      routeTimeWorldline: makeWarpRouteTimeWorldlineContract(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+    });
+    const markdown = renderNhm2RouteTimeWorldlineMarkdown(artifact);
+
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        artifactType: "nhm2_route_time_worldline/v1",
+        certified: true,
+        routeModelId: "nhm2_bounded_local_probe_lambda",
+        routeParameterName: "lambda",
+        progressionSampleCount: 5,
+        routeTimeStatus: "bounded_local_segment_certified",
+      }),
+    );
+    expect(artifact.coordinateTimeSummary.end).toBeGreaterThan(0);
+    expect(artifact.properTimeSummary.end).toBeGreaterThan(0);
+    expect(markdown).toContain("NHM2 Route-Time Worldline");
+    expect(markdown).toContain("routeModelId | nhm2_bounded_local_probe_lambda");
+    expect(markdown).toContain("routeTimeStatus | bounded_local_segment_certified");
+    expect(markdown).toContain("not mission-time certified");
+    expect(markdown).toContain("not route ETA to a real target");
+  });
+
+  it("builds and renders a bounded NHM2 mission-time estimator artifact without widening speed or viability claims", () => {
+    const artifact = buildNhm2MissionTimeEstimatorArtifact({
+      generatedOn: "2026-04-02",
+      missionTimeEstimator: makeWarpMissionTimeEstimatorFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      sourceRouteTimeArtifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+    });
+    const markdown = renderNhm2MissionTimeEstimatorMarkdown(artifact);
+
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        artifactType: "nhm2_mission_time_estimator/v1",
+        certified: true,
+        estimatorModelId: "nhm2_repeated_local_probe_segment_estimator",
+        targetId: "alpha-cen-a",
+        targetName: "Alpha Centauri A",
+        targetFrame: "heliocentric-icrs",
+        routeTimeStatus: "bounded_local_segment_certified",
+      }),
+    );
+    expect(artifact.coordinateTimeEstimate.seconds).toBeGreaterThan(0);
+    expect(artifact.properTimeEstimate.seconds).toBeGreaterThan(0);
+    expect(markdown).toContain("NHM2 Mission-Time Estimator");
+    expect(markdown).toContain(
+      "estimatorModelId | nhm2_repeated_local_probe_segment_estimator",
+    );
+    expect(markdown).toContain("targetId | alpha-cen-a");
+    expect(markdown).toContain("routeTimeStatus | bounded_local_segment_certified");
+    expect(markdown).toContain("not max-speed certified");
+    expect(markdown).toContain("not viability-promotion evidence");
+  });
+
+  it("builds and renders a certified bounded NHM2 cruise-envelope artifact without promoting vmax or viability claims", () => {
+    const artifact = buildNhm2CruiseEnvelopeArtifact({
+      generatedOn: "2026-04-02",
+      cruiseEnvelope: makeWarpCruiseEnvelopeFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceCruisePreflightArtifactPath:
+        "artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json",
+      sourceRouteTimeArtifactPath:
+        "artifacts/research/full-solve/nhm2-route-time-worldline-latest.json",
+      sourceMissionTimeEstimatorArtifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json",
+      sourceMissionTimeComparisonArtifactPath:
+        "artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json",
+    });
+    const markdown = renderNhm2CruiseEnvelopeMarkdown(artifact);
+
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        artifactType: "nhm2_cruise_envelope/v1",
+        certified: true,
+        cruiseEnvelopeModelId: "nhm2_route_consistent_descriptor_band",
+        envelopeQuantityId: "bounded_local_transport_descriptor_norm",
+        routeTimeStatus: "bounded_local_segment_certified",
+        missionTimeStatus: "bounded_target_coupled_estimate_ready",
+      }),
+    );
+    expect(artifact.admissibleBand.max).toBeGreaterThanOrEqual(
+      artifact.admissibleBand.min,
+    );
+    expect(artifact.representativeValue).toBeGreaterThanOrEqual(
+      artifact.admissibleBand.min,
+    );
+    expect(artifact.representativeValue).toBeLessThanOrEqual(
+      artifact.admissibleBand.max,
+    );
+    expect(markdown).toContain("NHM2 Cruise Envelope");
+    expect(markdown).toContain(
+      "cruiseEnvelopeModelId | nhm2_route_consistent_descriptor_band",
+    );
+    expect(markdown).toContain(
+      "envelopeQuantityId | bounded_local_transport_descriptor_norm",
+    );
+    expect(markdown).toContain("comparisonConsistencyStatus |");
+    expect(markdown).toContain("not max-speed certified");
+    expect(markdown).toContain("not viability-promotion evidence");
   });
 
   it("keeps invariant_crosscheck empty until explicit comparison products are emitted", async () => {
