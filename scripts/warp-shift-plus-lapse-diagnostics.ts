@@ -11,6 +11,7 @@ import { buildGrEvolveBrick } from "../server/gr-evolve-brick.js";
 import { computeCabinLapseDiagnosticsFromBrick } from "../shared/time-dilation-diagnostics.js";
 import {
   buildMildCabinGravityReferenceCalibration,
+  deriveWarpMetricFamilySemantics,
   evaluateWarpMetricLapseField,
 } from "../modules/warp/warp-metric-adapter.js";
 
@@ -491,6 +492,9 @@ const buildMarkdown = (payload: any) => {
     `- warpFieldType: ${payload.branch.warpFieldType}`,
     `- metricT00Ref: ${payload.branch.metricT00Ref}`,
     `- metricAdapterFamily: ${payload.branch.metricAdapterFamily}`,
+    `- familyAuthorityStatus: ${payload.branch.familyAuthorityStatus ?? "unknown"}`,
+    `- transportCertificationStatus: ${payload.branch.transportCertificationStatus ?? "unknown"}`,
+    `- familySemanticsNote: ${payload.branch.familySemanticsNote ?? "n/a"}`,
     "",
     "## Alpha Profile",
     "",
@@ -560,6 +564,9 @@ const buildMarkdown = (payload: any) => {
     "",
     "## Proof Policy",
     "",
+    `- familyAuthorityStatus: ${payload.proofPolicy.familyAuthorityStatus ?? "unknown"}`,
+    `- transportCertificationStatus: ${payload.proofPolicy.transportCertificationStatus ?? "unknown"}`,
+    `- boundedTransportFailClosed: ${payload.proofPolicy.boundedTransportFailClosed ? "yes" : "no"}`,
     ...payload.proofPolicy.disclaimer.map((line: string) => `- ${line}`),
     "",
   ];
@@ -686,6 +693,9 @@ export const buildShiftPlusLapseDiagnosticsPayload = async () => {
     lapseSummary,
     axes,
   });
+  const metricT00Contract =
+    ((state as any)?.warp?.metricT00Contract as Record<string, unknown> | undefined) ?? undefined;
+  const branchSemantics = deriveWarpMetricFamilySemantics("nhm2_shift_lapse");
   const gauge = {
     lapseMin: toFinite(lapseSummary?.alphaMin) ?? brick.channels.alpha?.min ?? summarizeChannel(brick.channels.alpha?.data).min,
     lapseMax: toFinite(lapseSummary?.alphaMax) ?? brick.channels.alpha?.max ?? summarizeChannel(brick.channels.alpha?.data).max,
@@ -709,6 +719,18 @@ export const buildShiftPlusLapseDiagnosticsPayload = async () => {
       warpFieldType: state.warpFieldType ?? state.dynamicConfig?.warpFieldType ?? null,
       metricT00Ref: (state as any)?.warp?.metricT00Ref ?? (state as any)?.natario?.metricT00Ref ?? null,
       metricAdapterFamily: (state as any)?.warp?.metricAdapter?.family ?? null,
+      familyAuthorityStatus:
+        (metricT00Contract?.familyAuthorityStatus as string | undefined) ??
+        (state as any)?.warp?.metricAdapter?.familyAuthorityStatus ??
+        branchSemantics.familyAuthorityStatus,
+      transportCertificationStatus:
+        (metricT00Contract?.transportCertificationStatus as string | undefined) ??
+        (state as any)?.warp?.metricAdapter?.transportCertificationStatus ??
+        branchSemantics.transportCertificationStatus,
+      familySemanticsNote:
+        (metricT00Contract?.familySemanticsNote as string | undefined) ??
+        (state as any)?.warp?.metricAdapter?.semanticsNote ??
+        branchSemantics.semanticsNote,
     },
     alphaProfileMetadata: {
       ...lapseSummary,
@@ -753,10 +775,21 @@ export const buildShiftPlusLapseDiagnosticsPayload = async () => {
     proofPolicy: {
       authoritativeProofSurface: "lane_a_eulerian_comoving_theta_minus_trk",
       laneAUnchanged: true,
+      familyAuthorityStatus:
+        (metricT00Contract?.familyAuthorityStatus as string | undefined) ??
+        branchSemantics.familyAuthorityStatus,
+      transportCertificationStatus:
+        (metricT00Contract?.transportCertificationStatus as string | undefined) ??
+        branchSemantics.transportCertificationStatus,
+      boundedTransportFailClosed:
+        ((metricT00Contract?.transportCertificationStatus as string | undefined) ??
+          branchSemantics.transportCertificationStatus) ===
+        "bounded_transport_fail_closed_reference_only",
       disclaimer: [
         "Diagnostic tier only.",
         "Lane A remains authoritative and unchanged.",
-        "nhm2_shift_lapse remains reference-only in this patch.",
+        "nhm2_shift_lapse is a candidate authoritative solve family in full-solve provenance/model-selection.",
+        "Bounded transport proof-bearing surfaces remain fail-closed and reference-only for nhm2_shift_lapse in this patch.",
         "Cabin gravity and wall-safety diagnostics do not supersede York proof semantics.",
         "No route-time compression claim is made from these reduced-order lapse diagnostics.",
         "Stronger centerline lapse suppression remains deferred to a later new-solve patch.",

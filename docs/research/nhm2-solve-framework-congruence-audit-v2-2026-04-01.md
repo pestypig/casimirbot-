@@ -185,7 +185,7 @@ The right criticism is “taxonomy exists, but should still be enforced and rege
 The most defensible current position is:
 - NHM2 baseline classification is artifact-backed and currently Natario-like under Lane A.
 - The repo has a real, coherent diagnostics stack for shift geometry and shift-plus-lapse comparison.
-- The mild `nhm2_shift_lapse` branch does represent local cabin gravity, a tiny local clock gradient, and wall-normal safety diagnostics, but only at diagnostic/reference tier.
+- The mild `nhm2_shift_lapse` branch does represent local cabin gravity, a tiny local clock gradient, and wall-normal safety diagnostics; it is now carried as a candidate authoritative solve family in provenance/model-selection while bounded transport proof surfaces remain fail-closed/reference-only pending the later low-expansion and transport promotion gates.
 - The repo now has a provenance-clean comparison/dashboard/presentation layer for this branch.
 - The Source→York bridge is now closed under the current serialization/readiness policy, while the remaining source/mechanism layer is explicitly formalized as a bounded reduced-order advisory lane with clear promotion blockers, an explicit promotion contract, and an explicit parity-route feasibility result that the direct metric vs reconstructed proxy route is not currently closable without derivation-class closure work.
 - The strongest remaining risks are promotion-level source/mechanism closure, model fidelity, and localized mechanism-render interpretation, not wholesale absence of artifacts.

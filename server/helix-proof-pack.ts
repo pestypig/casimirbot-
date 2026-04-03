@@ -6,6 +6,7 @@ import {
 import { GEOM_TO_SI_STRESS, SI_TO_GEOM_STRESS } from "../shared/gr-units.js";
 import { buildQuantumSemiclassicalComparisonResult } from "../shared/quantum-semiclassical-comparison.js";
 import type { ProofPack, ProofValue } from "../shared/schema.js";
+import { deriveWarpMetricFamilySemantics } from "../modules/warp/warp-metric-adapter.js";
 import { PAPER_GEO, type EnergyPipelineState } from "./energy-pipeline.js";
 import { resolveQuantumSemiclassicalSourceReplay } from "./services/quantum-semiclassical-source-replay.js";
 
@@ -861,6 +862,33 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     typeof (warpMetricContract as any)?.unitSystem === "string"
       ? String((warpMetricContract as any).unitSystem)
       : natarioMetricUnitSystem;
+  const metricFamily =
+    typeof (warpMetricContract as any)?.family === "string"
+      ? String((warpMetricContract as any).family)
+      : typeof (metricAdapterLocal as any)?.family === "string"
+        ? String((metricAdapterLocal as any).family)
+        : undefined;
+  const metricFamilySemantics = deriveWarpMetricFamilySemantics(
+    metricFamily === "natario" ||
+      metricFamily === "natario_sdf" ||
+      metricFamily === "nhm2_shift_lapse" ||
+      metricFamily === "alcubierre" ||
+      metricFamily === "vdb"
+      ? metricFamily
+      : "unknown",
+  );
+  const metricFamilyAuthorityStatus =
+    typeof (warpMetricContract as any)?.familyAuthorityStatus === "string"
+      ? String((warpMetricContract as any).familyAuthorityStatus)
+      : typeof metricAdapterLocal?.familyAuthorityStatus === "string"
+        ? String(metricAdapterLocal.familyAuthorityStatus)
+        : metricFamilySemantics.familyAuthorityStatus;
+  const metricTransportCertificationStatus =
+    typeof (warpMetricContract as any)?.transportCertificationStatus === "string"
+      ? String((warpMetricContract as any).transportCertificationStatus)
+      : typeof metricAdapterLocal?.transportCertificationStatus === "string"
+        ? String(metricAdapterLocal.transportCertificationStatus)
+        : metricFamilySemantics.transportCertificationStatus;
   const metricContractStatus =
     typeof (warpMetricContract as any)?.status === "string"
       ? String((warpMetricContract as any).status)
@@ -880,12 +908,6 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       ? String((warpMetricContract as any).chart)
       : typeof (metricAdapterLocal as any)?.chart?.label === "string"
         ? String((metricAdapterLocal as any).chart.label)
-        : undefined;
-  const metricFamily =
-    typeof (warpMetricContract as any)?.family === "string"
-      ? String((warpMetricContract as any).family)
-      : typeof (metricAdapterLocal as any)?.family === "string"
-        ? String((metricAdapterLocal as any).family)
         : undefined;
   const canonicalContract = {
     family: "natario",
@@ -969,6 +991,16 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     values.metric_t00_family = makeStringValue(
       metricFamily,
       "pipeline.warp.metricT00Contract.family",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_family_authority_status = makeStringValue(
+      metricFamilyAuthorityStatus,
+      "pipeline.warp.metricT00Contract.familyAuthorityStatus",
+      metricContractStatus !== "ok",
+    );
+    values.metric_t00_transport_certification_status = makeStringValue(
+      metricTransportCertificationStatus,
+      "pipeline.warp.metricT00Contract.transportCertificationStatus",
       metricContractStatus !== "ok",
     );
     values.metric_t00_contract_ok = resolveBoolean(

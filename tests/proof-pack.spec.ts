@@ -227,6 +227,12 @@ describe("proof pack contract", () => {
     expect(pack.values.gr_cl3_rho_gate_source?.value).toBe(
       "warp.metric.T00.nhm2.shift_lapse",
     );
+    expect(pack.values.metric_t00_family_authority_status?.value).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect(pack.values.metric_t00_transport_certification_status?.value).toBe(
+      "bounded_transport_fail_closed_reference_only",
+    );
   });
 
   it("emits the exploratory quantum semiclassical replay/comparison side by side with proof-pack geometry", async () => {

@@ -59,6 +59,16 @@ describe("natario metric-derived T00", () => {
     expect(result.metricT00Source).toBe("metric");
     expect(result.metricT00Ref).toBe("warp.metric.T00.nhm2.shift_lapse");
     expect(result.metricAdapter?.family).toBe("nhm2_shift_lapse");
+    expect(result.metricAdapter?.familyAuthorityStatus).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect(result.metricAdapter?.transportCertificationStatus).toBe(
+      "bounded_transport_fail_closed_reference_only",
+    );
+    expect(result.familyAuthorityStatus).toBe("candidate_authoritative_solve_family");
+    expect(result.transportCertificationStatus).toBe(
+      "bounded_transport_fail_closed_reference_only",
+    );
     expect(result.metricAdapter?.alpha).toBeCloseTo(0.995, 8);
     expect(result.lapseSummary).toEqual(
       expect.objectContaining({

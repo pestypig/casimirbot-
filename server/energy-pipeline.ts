@@ -81,7 +81,12 @@ import {
   type WarpInHullProperAccelerationVec3,
 } from "../shared/contracts/warp-in-hull-proper-acceleration.v1.ts";
 import type { StressEnergyStats } from "./stress-energy-brick";
-import type { WarpMetricAdapterSnapshot } from "../modules/warp/warp-metric-adapter.ts";
+import {
+  deriveWarpMetricFamilySemantics,
+  type WarpMetricAdapterSnapshot,
+  type WarpMetricFamilyAuthorityStatus,
+  type WarpMetricTransportCertificationStatus,
+} from "../modules/warp/warp-metric-adapter.ts";
 import type { CongruenceMeta } from "../types/pipeline";
 import type { SectorControlLiveEvent } from "../shared/schema.ts";
 
@@ -515,6 +520,9 @@ type MetricT00Contract = {
   reason?: string;
   sourceRef: string;
   family: string;
+  familyAuthorityStatus: WarpMetricFamilyAuthorityStatus;
+  transportCertificationStatus: WarpMetricTransportCertificationStatus;
+  familySemanticsNote: string;
   chart: string;
   observer: MetricT00Observer;
   normalization: MetricT00Normalization;
@@ -566,6 +574,15 @@ const buildMetricT00Contract = (params: {
       ? adapter.chart.label
       : "unspecified";
   const family = resolveMetricFamilyFromRef(params.metricT00Ref, adapter);
+  const familySemantics = deriveWarpMetricFamilySemantics(
+    family === "natario" ||
+      family === "natario_sdf" ||
+      family === "nhm2_shift_lapse" ||
+      family === "alcubierre" ||
+      family === "vdb"
+      ? family
+      : "unknown",
+  );
   const chartContractStatus = adapter?.chart?.contractStatus;
   let status: MetricT00ContractStatus = "ok";
   const reasons: string[] = [];
@@ -586,6 +603,9 @@ const buildMetricT00Contract = (params: {
     ...(reasons.length ? { reason: reasons.join(",") } : {}),
     sourceRef: params.metricT00Ref,
     family,
+    familyAuthorityStatus: familySemantics.familyAuthorityStatus,
+    transportCertificationStatus: familySemantics.transportCertificationStatus,
+    familySemanticsNote: familySemantics.semanticsNote,
     chart,
     observer,
     normalization,
@@ -707,6 +727,9 @@ const buildNatarioRuntimePayload = (
     metricT00UnitSystem: metricT00Contract?.unitSystem,
     metricT00ContractStatus: metricT00Contract?.status,
     metricT00ContractReason: metricT00Contract?.reason,
+    metricT00FamilyAuthorityStatus: metricT00Contract?.familyAuthorityStatus,
+    metricT00TransportCertificationStatus: metricT00Contract?.transportCertificationStatus,
+    metricT00FamilySemanticsNote: metricT00Contract?.familySemanticsNote,
     chartLabel: adapter?.chart?.label ?? "unspecified",
     chartDtGammaPolicy: adapter?.chart?.dtGammaPolicy ?? "unknown",
     chartContractStatus: adapter?.chart?.contractStatus ?? "unknown",
@@ -3483,6 +3506,9 @@ const refreshMetricT00Contract = (state: EnergyPipelineState): void => {
   warpState.metricT00Observer = contract.observer;
   warpState.metricT00Normalization = contract.normalization;
   warpState.metricT00UnitSystem = contract.unitSystem;
+  warpState.metricT00FamilyAuthorityStatus = contract.familyAuthorityStatus;
+  warpState.metricT00TransportCertificationStatus = contract.transportCertificationStatus;
+  warpState.metricT00FamilySemanticsNote = contract.familySemanticsNote;
   warpState.metricT00Contract = contract;
 };
 

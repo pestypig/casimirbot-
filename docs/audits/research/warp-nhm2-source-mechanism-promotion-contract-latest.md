@@ -1,11 +1,11 @@
-# NHM2 Source / Mechanism Promotion Contract (2026-04-02)
+# NHM2 Source / Mechanism Promotion Contract (2026-04-03)
 
 "This promotion contract defines the only routes under which the non-authoritative source/mechanism lane could ever be promoted; it does not itself promote the lane or alter Lane A."
 
 ## Source Paths
-- sourceFormulaArtifact: `C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-formula-audit-latest.json`
-- sourceToYorkArtifact: `C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json`
-- sourceMechanismMaturityArtifact: `C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-mechanism-maturity-latest.json`
+- sourceFormulaArtifact: `artifacts/research/full-solve/nhm2-source-formula-audit-latest.json`
+- sourceToYorkArtifact: `artifacts/research/full-solve/nhm2-source-to-york-provenance-latest.json`
+- sourceMechanismMaturityArtifact: `artifacts/research/full-solve/nhm2-source-mechanism-maturity-latest.json`
 
 ## Contract
 | field | value |
@@ -21,8 +21,8 @@
 | activationScope | bounded_non_authoritative_advisory_only_reference_only_cross_lane |
 | laneAUnaffected | true |
 | referenceOnlyCrossLaneScope | true |
-| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; stronger claims remain blocked and Lane A remains authoritative. |
-| consumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only. |
+| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, bounded transport proof-bearing surfaces remain fail-closed/reference-only, stronger claims remain blocked, and Lane A remains authoritative. |
+| consumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only. |
 | summary | Promotion contract keeps the parity route blocked by a derivation-class gap and activates the formal exemption route only for three bounded non-authoritative advisory claim subsets; broader promotion remains blocked. |
 
 ## Available Routes
@@ -33,13 +33,13 @@
 | parityRequired | true |
 | termsRequiringClosure | final_metricT00Si_Jm3 |
 | tolerancePolicySummary | relTol=1e-9; absTol=1e-12; rule=final_metric_numeric_parity requires delta <= max(absTol, relTol * max(|direct|, |reconstructed|, 1)). |
-| proofArtifactPath | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-formula-audit-latest.json |
+| proofArtifactPath | artifacts/research/full-solve/nhm2-source-formula-audit-latest.json |
 | routeFeasibilityStatus | blocked_by_derivation_class_difference |
 | routeBlockingClass | direct_metric_vs_reconstructed_proxy_derivation_gap |
 | dominantMismatchTerm | final_metricT00Si_Jm3 |
 | nextClosureAction | emit_authoritative_direct_metric_closure_decomposition_and_define_proxy_mapping_contract |
-| proofOfClosureArtifact | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-formula-audit-latest.json |
-| feasibilityArtifactPath | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-mechanism-parity-route-feasibility-latest.json |
+| proofOfClosureArtifact | artifacts/research/full-solve/nhm2-source-formula-audit-latest.json |
+| feasibilityArtifactPath | artifacts/research/full-solve/nhm2-source-mechanism-parity-route-feasibility-latest.json |
 | claimSetEligible | formula_equivalent_to_authoritative_direct_metric,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope |
 | claimSetBlocked | source_mechanism_lane_promotable_non_authoritative |
 | summary | Parity route is not realistically closable in current architecture without a derivation-class upgrade: the reconstructed path already matches rhoMetric_Jm3 but does not carry a mapped direct-metric closure term beyond rhoMetric, and the authoritative direct path emits final_metricT00Si_Jm3 only as an aggregate. |
@@ -58,7 +58,7 @@ Required Evidence
 | parityRequired | false |
 | termsRequiringClosure | none |
 | tolerancePolicySummary | none |
-| proofArtifactPath | C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/artifacts/research/full-solve/nhm2-source-formula-audit-latest.json |
+| proofArtifactPath | artifacts/research/full-solve/nhm2-source-formula-audit-latest.json |
 | routeFeasibilityStatus | none |
 | routeBlockingClass | none |
 | dominantMismatchTerm | none |
@@ -92,9 +92,10 @@ Required Evidence
 - Lane A remains authoritative and unchanged.
 - The exemption route is active only for the bounded advisory claim set.
 - The source/mechanism lane remains non-authoritative.
+- warp.metric.T00.nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection.
 - The reconstructed proxy path remains non-equivalent to the authoritative direct metric path.
 - Cross-lane scope remains reference_only.
-- warp.metric.T00.nhm2_shift_lapse remains reference_only.
+- Bounded transport proof-bearing surfaces for warp.metric.T00.nhm2_shift_lapse remain fail-closed and reference_only.
 
 ## Forbidden Promotions
 - formula_equivalent_to_authoritative_direct_metric
@@ -213,4 +214,3 @@ Required Evidence
 - claims_blocked_even_with_exemption=source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope; lane_a_unaffected=true.
 - exemption_route_activated=true; active_claim_set=bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison; inactive_claim_set=source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope.
 - direct_proxy_parity_route_feasibility=blocked_by_derivation_class_difference; blocking_class=direct_metric_vs_reconstructed_proxy_derivation_gap.
-

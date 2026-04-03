@@ -17,7 +17,9 @@ import {
   type WarpMetricAdapterSnapshot,
   type WarpChartLabel,
   type WarpMetricFamily,
+  type WarpMetricFamilyAuthorityStatus,
   type WarpMetricLapseSummary,
+  type WarpMetricTransportCertificationStatus,
 } from './warp-metric-adapter.ts';
 
 export type MassMode = "MODEL_DERIVED" | "TARGET_CALIBRATED" | "MEASURED_FORCE_INFERRED";
@@ -395,6 +397,9 @@ export interface NatarioWarpResult {
   thetaScaleCore_sqrtDuty?: number;
   /** CL1â€“CL2 metadata snapshot (chart + ADM assumptions + beta diagnostics). */
   metricAdapter?: WarpMetricAdapterSnapshot;
+  familyAuthorityStatus?: WarpMetricFamilyAuthorityStatus;
+  transportCertificationStatus?: WarpMetricTransportCertificationStatus;
+  familySemanticsNote?: string;
   lapseSummary?: WarpMetricLapseSummary;
 }
 
@@ -877,6 +882,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     sampleScale_m: scale_m,
     note: adapterNote,
   });
+  baseResult.familyAuthorityStatus = baseResult.metricAdapter.familyAuthorityStatus;
+  baseResult.transportCertificationStatus = baseResult.metricAdapter.transportCertificationStatus;
+  baseResult.familySemanticsNote = baseResult.metricAdapter.semanticsNote;
 
   return baseResult;
 }

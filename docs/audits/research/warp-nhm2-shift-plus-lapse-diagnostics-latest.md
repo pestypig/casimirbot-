@@ -19,6 +19,9 @@
 - warpFieldType: nhm2_shift_lapse
 - metricT00Ref: warp.metric.T00.nhm2.shift_lapse
 - metricAdapterFamily: nhm2_shift_lapse
+- familyAuthorityStatus: candidate_authoritative_solve_family
+- transportCertificationStatus: bounded_transport_fail_closed_reference_only
+- familySemanticsNote: Distinct full-solve family candidate in provenance/model-selection; bounded transport proof surfaces remain fail-closed and reference-only until later promotion gates land.
 
 ## Alpha Profile
 
@@ -88,9 +91,13 @@
 
 ## Proof Policy
 
+- familyAuthorityStatus: candidate_authoritative_solve_family
+- transportCertificationStatus: bounded_transport_fail_closed_reference_only
+- boundedTransportFailClosed: yes
 - Diagnostic tier only.
 - Lane A remains authoritative and unchanged.
-- nhm2_shift_lapse remains reference-only in this patch.
+- nhm2_shift_lapse is a candidate authoritative solve family in full-solve provenance/model-selection.
+- Bounded transport proof-bearing surfaces remain fail-closed and reference-only for nhm2_shift_lapse in this patch.
 - Cabin gravity and wall-safety diagnostics do not supersede York proof semantics.
 - No route-time compression claim is made from these reduced-order lapse diagnostics.
 - Stronger centerline lapse suppression remains deferred to a later new-solve patch.

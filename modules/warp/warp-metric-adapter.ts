@@ -16,6 +16,22 @@ export type WarpMetricFamily =
   | "vdb"
   | "unknown";
 
+export type WarpMetricFamilyAuthorityStatus =
+  | "canonical_bounded_baseline_solve_family"
+  | "candidate_authoritative_solve_family"
+  | "secondary_metric_family";
+
+export type WarpMetricTransportCertificationStatus =
+  | "bounded_transport_proof_bearing_baseline"
+  | "bounded_transport_fail_closed_reference_only"
+  | "bounded_transport_not_promoted";
+
+export type WarpMetricFamilySemantics = {
+  familyAuthorityStatus: WarpMetricFamilyAuthorityStatus;
+  transportCertificationStatus: WarpMetricTransportCertificationStatus;
+  semanticsNote: string;
+};
+
 export type WarpAlphaProfileKind = "unit" | "linear_gradient_tapered";
 export type WarpAlphaGradientAxis = "x_ship" | "y_port" | "z_zenith" | "unspecified";
 export type WarpAlphaInteriorSupportKind = "bubble_interior" | "hull_interior";
@@ -118,6 +134,9 @@ type VdbConformalDiagnostics = {
 
 export type WarpMetricAdapterSnapshot = {
   family: WarpMetricFamily;
+  familyAuthorityStatus: WarpMetricFamilyAuthorityStatus;
+  transportCertificationStatus: WarpMetricTransportCertificationStatus;
+  semanticsNote: string;
   chart: WarpChartContract;
   alpha: number;
   lapseSummary?: WarpMetricLapseSummary;
@@ -198,6 +217,55 @@ const DEFAULT_CHART_DESCRIPTIONS: Record<
     coordinateMap: "unspecified",
     notes: "chart label or coordinate map not provided",
   },
+};
+
+export const deriveWarpMetricFamilySemantics = (
+  family: WarpMetricFamily,
+): WarpMetricFamilySemantics => {
+  switch (family) {
+    case "natario_sdf":
+      return {
+        familyAuthorityStatus: "canonical_bounded_baseline_solve_family",
+        transportCertificationStatus: "bounded_transport_proof_bearing_baseline",
+        semanticsNote:
+          "Canonical bounded baseline full-solve family for the current proof-bearing transport stack.",
+      };
+    case "nhm2_shift_lapse":
+      return {
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+        semanticsNote:
+          "Distinct full-solve family candidate in provenance/model-selection; bounded transport proof surfaces remain fail-closed and reference-only until later promotion gates land.",
+      };
+    case "natario":
+      return {
+        familyAuthorityStatus: "secondary_metric_family",
+        transportCertificationStatus: "bounded_transport_not_promoted",
+        semanticsNote:
+          "Metric-derived unit-lapse Natario family retained outside the current bounded-transport baseline surface.",
+      };
+    case "alcubierre":
+      return {
+        familyAuthorityStatus: "secondary_metric_family",
+        transportCertificationStatus: "bounded_transport_not_promoted",
+        semanticsNote:
+          "Comparator metric family; not the bounded-transport baseline and not promoted for proof-bearing transport claims.",
+      };
+    case "vdb":
+      return {
+        familyAuthorityStatus: "secondary_metric_family",
+        transportCertificationStatus: "bounded_transport_not_promoted",
+        semanticsNote:
+          "Auxiliary metric family used for reference/comparison semantics, not as a promoted bounded-transport family.",
+      };
+    default:
+      return {
+        familyAuthorityStatus: "secondary_metric_family",
+        transportCertificationStatus: "bounded_transport_not_promoted",
+        semanticsNote:
+          "Metric family semantics are not promoted beyond secondary/reference use in the current bounded stack.",
+      };
+  }
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -513,6 +581,7 @@ const computeVdbConformalCorrection = (
 export const buildWarpMetricAdapterSnapshot = (
   input: WarpMetricAdapterInput,
 ): WarpMetricAdapterSnapshot => {
+  const familySemantics = deriveWarpMetricFamilySemantics(input.family);
   const requestedChart = input.chart ?? {};
   const label = requestedChart.label ?? DEFAULT_CHART.label;
   const defaultPolicy = DEFAULT_DT_GAMMA_POLICY[label];
@@ -665,6 +734,9 @@ export const buildWarpMetricAdapterSnapshot = (
 
   return {
     family: input.family,
+    familyAuthorityStatus: familySemantics.familyAuthorityStatus,
+    transportCertificationStatus: familySemantics.transportCertificationStatus,
+    semanticsNote: familySemantics.semanticsNote,
     chart,
     alpha,
     ...(lapseSummary ? { lapseSummary } : {}),

@@ -220,6 +220,8 @@ Keep existing:
 
 unchanged and canonical for the current unit-lapse family.
 
+After the current scaffolding pass, this generalized branch should be treated as a distinct full-solve family and a candidate authoritative solve family in provenance/model-selection language, while bounded transport proof surfaces remain fail-closed and reference-only until the later low-expansion gate and transport-stack promotion patches land.
+
 ### Step 2. Preserve current semantics for `epsilonTilt`
 Document and keep:
 
@@ -290,11 +292,13 @@ Goal:
 - current NHM2 is still a unit-lapse, shift-first Natario-like family
 - real Eulerian cabin gravity requires lapse gradients
 - the repo already has enough alpha plumbing to support a new diagnostics pass
+- `warp.metric.T00.nhm2.shift_lapse` can be carried as a distinct candidate authoritative solve family in provenance/model-selection without widening bounded transport claims
 
 ### Unsafe claims now
 - that current `epsilonTilt` already implements real cabin gravity
 - that mild cabin gravity and strong route-time compression are the same dial
 - that horizon safety under strong centerline lapse suppression is already characterized by the repo
+- that `warp.metric.T00.nhm2.shift_lapse` is already a proof-promoted bounded transport family
 
 ## Suggested Artifact Names For The Implementation Pass
 

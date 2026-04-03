@@ -323,7 +323,7 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
     ).toBe(false);
   });
 
-  it("does not emit a certified in-hull proper-acceleration contract for the reference-only nhm2 shift-lapse family", async () => {
+  it("keeps nhm2 shift-lapse as a candidate family while transport proof surfaces remain fail-closed", async () => {
     let state = initializePipelineState();
     state = await updateParameters(
       state,
@@ -334,6 +334,12 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
     const refreshed = await calculateEnergyPipeline(state);
 
     expect((refreshed as any).warp?.metricT00Contract?.family).toBe("nhm2_shift_lapse");
+    expect((refreshed as any).warp?.metricT00Contract?.familyAuthorityStatus).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect((refreshed as any).warp?.metricT00Contract?.transportCertificationStatus).toBe(
+      "bounded_transport_fail_closed_reference_only",
+    );
     expect((refreshed as any).warpInHullProperAcceleration ?? null).toBeNull();
   });
 
@@ -366,6 +372,19 @@ describe("nhm2 shift-plus-lapse diagnostics", () => {
       expect.objectContaining({
         brickNumericType: "float32",
         companionNumericType: "float64_analytic",
+      }),
+    );
+    expect(artifact.branch).toEqual(
+      expect.objectContaining({
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+      }),
+    );
+    expect(artifact.proofPolicy).toEqual(
+      expect.objectContaining({
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+        boundedTransportFailClosed: true,
       }),
     );
     expect(artifact.underResolutionDetected).toBe(true);

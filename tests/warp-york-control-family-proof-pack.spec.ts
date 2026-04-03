@@ -6181,7 +6181,13 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain("| sourceMechanismNonAuthoritative | true |");
     expect(markdown).toContain("| sourceMechanismFormulaEquivalent | false |");
     expect(markdown).toContain(
-      "| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only. |",
+      "| nhm2ShiftLapseFamilyAuthorityStatus | candidate_authoritative_solve_family |",
+    );
+    expect(markdown).toContain(
+      "| nhm2ShiftLapseTransportCertificationStatus | bounded_transport_fail_closed_reference_only |",
+    );
+    expect(markdown).toContain(
+      "| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only. |",
     );
     expect(markdown).toContain("| exemptionRouteStatus | satisfied |");
     expect(markdown).toContain("## Source / Mechanism Parity-Route Feasibility");
@@ -6250,7 +6256,10 @@ describe("warp york control-family proof pack", () => {
     ).toContain("nhm2_shift_lapse_proof_promotion");
     expect(
       promotionContractArtifact.sourceMechanismPromotionContract.consumerSummary,
-    ).toContain("warp.metric.T00.nhm2_shift_lapse remains reference_only");
+    ).toContain("candidate authoritative solve family in provenance/model-selection");
+    expect(
+      promotionContractArtifact.sourceMechanismPromotionContract.consumerSummary,
+    ).toContain("bounded transport proof-bearing surfaces remain fail-closed and reference_only");
     expect(
       promotionContractArtifact.sourceMechanismPromotionContract.claimMappings,
     ).toEqual(

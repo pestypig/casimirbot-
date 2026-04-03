@@ -80,6 +80,11 @@ import {
   NHM2_CAVITY_CONTRACT,
   resolveNeedleHullMark2ReducedOrderReference,
 } from "../shared/needle-hull-mark2-cavity-contract";
+import {
+  deriveWarpMetricFamilySemantics,
+  type WarpMetricFamilyAuthorityStatus,
+  type WarpMetricTransportCertificationStatus,
+} from "../modules/warp/warp-metric-adapter";
 
 const DATE_STAMP = new Date().toISOString().slice(0, 10);
 const REQUESTED_REPORT_DATE_STAMP = "2026-03-31";
@@ -4441,6 +4446,9 @@ type ProofPackSourceMechanismPromotionContractSummary = {
   sourceMechanismReferenceOnlyScope: boolean;
   sourceMechanismNonAuthoritative: boolean;
   sourceMechanismFormulaEquivalent: boolean;
+  nhm2ShiftLapseFamilyAuthorityStatus: WarpMetricFamilyAuthorityStatus;
+  nhm2ShiftLapseTransportCertificationStatus: WarpMetricTransportCertificationStatus;
+  nhm2ShiftLapseStatusSummary: string;
   sourceMechanismConsumerSummary: string;
   exemptionRouteStatus: SourceMechanismPromotionRouteStatus;
   activationScope: string;
@@ -10501,15 +10509,17 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     "source_mechanism_layer_supports_viability_promotion",
     "cross_lane_promotion_beyond_reference_only_scope",
   ];
+  const nhm2ShiftLapseFamilySemantics = deriveWarpMetricFamilySemantics("nhm2_shift_lapse");
   const activationScope =
     "bounded_non_authoritative_advisory_only_reference_only_cross_lane";
   const activationDisclaimers = [
     "Lane A remains authoritative and unchanged.",
     "The exemption route is active only for the bounded advisory claim set.",
     "The source/mechanism lane remains non-authoritative.",
+    "warp.metric.T00.nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection.",
     "The reconstructed proxy path remains non-equivalent to the authoritative direct metric path.",
     "Cross-lane scope remains reference_only.",
-    "warp.metric.T00.nhm2_shift_lapse remains reference_only.",
+    "Bounded transport proof-bearing surfaces for warp.metric.T00.nhm2_shift_lapse remain fail-closed and reference_only.",
   ];
   const forbiddenPromotions = [
     "formula_equivalent_to_authoritative_direct_metric",
@@ -10519,7 +10529,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     "nhm2_shift_lapse_proof_promotion",
   ];
   const consumerSummary =
-    "Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, and warp.metric.T00.nhm2_shift_lapse remains reference_only.";
+    "Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only.";
 
   const directProxyParityRoute: SourceMechanismPromotionRoute = {
     routeId: "direct_proxy_parity_route",
@@ -10677,7 +10687,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     activationDisclaimers,
     forbiddenPromotions,
     activationSummary:
-      "Formal exemption route is active only for the three bounded advisory claim subsets; stronger claims remain blocked and Lane A remains authoritative.",
+      "Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, bounded transport proof-bearing surfaces remain fail-closed/reference-only, stronger claims remain blocked, and Lane A remains authoritative.",
     consumerSummary,
     claimMappings,
     remainingConditions: [
@@ -10758,6 +10768,7 @@ export const buildSourceMechanismPromotionContractSummary = (args: {
   reportPath: string;
 }): ProofPackSourceMechanismPromotionContractSummary => {
   const contract = args.promotionContractArtifact.sourceMechanismPromotionContract;
+  const nhm2ShiftLapseFamilySemantics = deriveWarpMetricFamilySemantics("nhm2_shift_lapse");
   const formalExemptionRoute = contract.availableRoutes.find(
     (route) => route.routeId === "formal_exemption_route",
   );
@@ -10782,6 +10793,11 @@ export const buildSourceMechanismPromotionContractSummary = (args: {
       args.maturityArtifact.sourceMechanismMaturity.authoritativeStatus === "non_authoritative",
     sourceMechanismFormulaEquivalent:
       args.sourceFormulaAudit.formulaComparison.formulaEquivalent,
+    nhm2ShiftLapseFamilyAuthorityStatus:
+      nhm2ShiftLapseFamilySemantics.familyAuthorityStatus,
+    nhm2ShiftLapseTransportCertificationStatus:
+      nhm2ShiftLapseFamilySemantics.transportCertificationStatus,
+    nhm2ShiftLapseStatusSummary: nhm2ShiftLapseFamilySemantics.semanticsNote,
     sourceMechanismConsumerSummary: contract.consumerSummary,
     exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
     activationScope: contract.activationScope,
@@ -34758,6 +34774,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| sourceMechanismReferenceOnlyScope | ${payload.sourceMechanismPromotionContract.sourceMechanismReferenceOnlyScope} |`,
         `| sourceMechanismNonAuthoritative | ${payload.sourceMechanismPromotionContract.sourceMechanismNonAuthoritative} |`,
         `| sourceMechanismFormulaEquivalent | ${payload.sourceMechanismPromotionContract.sourceMechanismFormulaEquivalent} |`,
+        `| nhm2ShiftLapseFamilyAuthorityStatus | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseFamilyAuthorityStatus} |`,
+        `| nhm2ShiftLapseTransportCertificationStatus | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseTransportCertificationStatus} |`,
+        `| nhm2ShiftLapseStatusSummary | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseStatusSummary} |`,
         `| sourceMechanismConsumerSummary | ${payload.sourceMechanismPromotionContract.sourceMechanismConsumerSummary} |`,
         `| exemptionRouteStatus | ${payload.sourceMechanismPromotionContract.exemptionRouteStatus} |`,
         `| activationScope | ${payload.sourceMechanismPromotionContract.activationScope} |`,
@@ -37132,7 +37151,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       `source_mechanism_promotion_contract_status=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus} selected_route=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute} policy=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy}`,
   );
   notes.push(
-    `source_mechanism_consumer_scope=active_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.activeClaimSet.join(",") || "none"} blocked_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.inactiveClaimSet.join(",") || "none"} reference_only_scope=${String(sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.referenceOnlyCrossLaneScope)} formula_equivalence=${String(sourceFormulaAuditArtifact.formulaComparison.formulaEquivalent)} parity_route=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus} nhm2_shift_lapse_reference_only=true`,
+    `source_mechanism_consumer_scope=active_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.activeClaimSet.join(",") || "none"} blocked_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.inactiveClaimSet.join(",") || "none"} reference_only_scope=${String(sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.referenceOnlyCrossLaneScope)} formula_equivalence=${String(sourceFormulaAuditArtifact.formulaComparison.formulaEquivalent)} parity_route=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus} nhm2_shift_lapse_family_status=${deriveWarpMetricFamilySemantics("nhm2_shift_lapse").familyAuthorityStatus} nhm2_shift_lapse_transport_status=${deriveWarpMetricFamilySemantics("nhm2_shift_lapse").transportCertificationStatus}`,
   );
   const solveAuthorityArtifact = buildNhm2SolveAuthorityAuditArtifact({
     payload: {
