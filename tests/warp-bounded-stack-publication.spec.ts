@@ -97,6 +97,10 @@ const BOUNDARY_PROFILE_SPECS = [
   { profileId: "stage1_centerline_alpha_0p8250_v1", alpha: 0.825 },
   { profileId: "stage1_centerline_alpha_0p8225_v1", alpha: 0.8225 },
   { profileId: "stage1_centerline_alpha_0p8200_v1", alpha: 0.82 },
+  { profileId: "stage1_centerline_alpha_0p8175_v1", alpha: 0.8175 },
+  { profileId: "stage1_centerline_alpha_0p8150_v1", alpha: 0.815 },
+  { profileId: "stage1_centerline_alpha_0p8125_v1", alpha: 0.8125 },
+  { profileId: "stage1_centerline_alpha_0p8100_v1", alpha: 0.81 },
 ] as const;
 
 const withFailToken = <T extends { falsifierConditions: string[] }>(
@@ -1011,11 +1015,11 @@ describe("bounded-stack latest publication", () => {
       BOUNDARY_PROFILE_SPECS.map((entry) => entry.profileId),
     );
     expect(boundaryResultJson.testedStrongerBracketStopProfileId).toBe(
-      "stage1_centerline_alpha_0p8200_v1",
+      "stage1_centerline_alpha_0p8100_v1",
     );
-    expect(boundaryResultJson.testedStrongerBracketStopCenterlineAlpha).toBe(0.82);
+    expect(boundaryResultJson.testedStrongerBracketStopCenterlineAlpha).toBe(0.81);
     expect(boundaryResultJson.strongestProfileKeepingAllGatesPassing).toBe(
-      "stage1_centerline_alpha_0p8200_v1",
+      "stage1_centerline_alpha_0p8100_v1",
     );
     expect(boundaryResultJson.firstGateFailure).toBeNull();
     expect(boundaryResultJson.firstFailedGate).toBeNull();
@@ -1023,10 +1027,10 @@ describe("bounded-stack latest publication", () => {
       "no_failure_reached_within_tested_stronger_bracket",
     );
     expect(boundaryResultJson.marginFromReferenceProfile.toShiftLapseProfileId).toBe(
-      "stage1_centerline_alpha_0p8200_v1",
+      "stage1_centerline_alpha_0p8100_v1",
     );
     expect(boundaryResultJson.marginFromReferenceProfile.deltaCenterlineAlpha).toBeCloseTo(
-      0.175,
+      0.185,
       12,
     );
     expect(boundaryResultJson.scalingStatusWithinPassingRegion).toBe("monotonic");
@@ -1074,7 +1078,7 @@ describe("bounded-stack latest publication", () => {
     }
     expect(boundaryResultMd).toContain("no_failure_reached_within_tested_stronger_bracket");
     expect(boundaryResultMd).toContain("boundary-sweep");
-    expect(boundaryResultMd).toContain("stage1_centerline_alpha_0p8200_v1");
+    expect(boundaryResultMd).toContain("stage1_centerline_alpha_0p8100_v1");
     expect(boundaryResultMd).toContain("Trend Summary");
     expect(boundaryResultMd).toContain("Threshold Usage Summary");
     expect(boundaryResultMd).toContain("unresolved_within_tested_bracket");
