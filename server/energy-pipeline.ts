@@ -68,6 +68,7 @@ import {
   buildWarpMissionTimeComparisonContract,
   type WarpMissionTimeComparisonContractV1,
 } from "../shared/contracts/warp-mission-time-comparison.v1.ts";
+import type { WarpCatalogEtaProjectionV1 } from "../shared/contracts/warp-catalog-eta-projection.v1.ts";
 import {
   buildWarpCruiseEnvelopeContract,
   type WarpCruiseEnvelopeContractV1,
@@ -1610,6 +1611,7 @@ export interface EnergyPipelineState {
   warpRouteTimeWorldline?: WarpRouteTimeWorldlineContractV1;
   warpMissionTimeEstimator?: WarpMissionTimeEstimatorContractV1;
   warpMissionTimeComparison?: WarpMissionTimeComparisonContractV1;
+  warpCatalogEtaProjection?: WarpCatalogEtaProjectionV1;
   warpCruiseEnvelope?: WarpCruiseEnvelopeContractV1;
   warpInHullProperAcceleration?: WarpInHullProperAccelerationContractV1;
   warpViability?: {

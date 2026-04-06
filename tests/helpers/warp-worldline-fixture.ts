@@ -31,6 +31,10 @@ import {
   type WarpMissionTimeComparisonContractV1,
 } from "../../shared/contracts/warp-mission-time-comparison.v1";
 import {
+  WARP_CATALOG_ETA_PROJECTION_CONTRACT_VERSION,
+  type WarpCatalogEtaProjectionV1,
+} from "../../shared/contracts/warp-catalog-eta-projection.v1";
+import {
   buildWarpCruiseEnvelopeContract,
   type WarpCruiseEnvelopeContractV1,
 } from "../../shared/contracts/warp-cruise-envelope.v1";
@@ -554,6 +558,92 @@ export const makeWarpMissionTimeComparisonFixture = (args?: {
     throw new Error("expected bounded mission-time comparison fixture");
   }
   return comparison;
+};
+
+export const makeWarpCatalogEtaProjectionFixture = (args?: {
+  missionTimeEstimator?: WarpMissionTimeEstimatorContractV1;
+  missionTimeComparison?: WarpMissionTimeComparisonContractV1;
+  selectedLaneId?: string;
+  selectedProfileId?: string;
+  metricFamily?: string;
+  sourceSurfaceId?: string;
+}): WarpCatalogEtaProjectionV1 => {
+  const missionTimeEstimator =
+    args?.missionTimeEstimator ?? makeWarpMissionTimeEstimatorFixture();
+  const missionTimeComparison =
+    args?.missionTimeComparison ??
+    makeWarpMissionTimeComparisonFixture({ missionTimeEstimator });
+  const sourcePosition: [number, number, number] = [3, 4, 0];
+  const inputDistance = Math.hypot(...sourcePosition);
+  const mappedRadiusSeconds = 2;
+  const mappedRadiusMeters = mappedRadiusSeconds * 299_792_458;
+  const outputPosition: [number, number, number] = [
+    (sourcePosition[0] / inputDistance) * mappedRadiusMeters,
+    (sourcePosition[1] / inputDistance) * mappedRadiusMeters,
+    0,
+  ];
+  return {
+    contractVersion: WARP_CATALOG_ETA_PROJECTION_CONTRACT_VERSION,
+    status: "catalog_eta_projection_ready",
+    certified: true,
+    integrityStatus: "ok",
+    claimTier: "diagnostic_catalog_eta_surface",
+    frame: "heliocentric-icrs",
+    metricFamily: args?.metricFamily ?? missionTimeEstimator.sourceSurface.metricFamily,
+    selectedLaneId: args?.selectedLaneId ?? "nhm2_lane",
+    selectedProfileId: args?.selectedProfileId ?? "stage1_centerline_alpha_0p8200_v1",
+    defaultOperatingProfileId: "stage1_centerline_alpha_0p8200_v1",
+    supportedBandFloorProfileId: "stage1_centerline_alpha_0p8000_v1",
+    supportedBandCeilingProfileId: "stage1_centerline_alpha_0p995_v1",
+    evidenceFloorProfileId: "stage1_centerline_alpha_0p7700_v1",
+    evidenceFloorCenterlineAlpha: 0.77,
+    supportBufferDeltaCenterlineAlpha: 0.03,
+    sourceSurfaceId:
+      args?.sourceSurfaceId ?? missionTimeEstimator.sourceSurface.surfaceId,
+    sourceWorldlineContractId: "warp-worldline-latest",
+    sourceWorldlineContractVersion: missionTimeEstimator.sourceWorldlineContractVersion,
+    sourceRouteTimeWorldlineContractId: "warp-route-time-worldline-latest",
+    sourceRouteTimeWorldlineContractVersion:
+      missionTimeEstimator.sourceRouteTimeWorldlineContractVersion,
+    sourceMissionTimeEstimatorContractId: "warp-mission-time-estimator-latest",
+    sourceMissionTimeEstimatorContractVersion: missionTimeEstimator.contractVersion,
+    sourceMissionTimeComparisonContractId: "warp-mission-time-comparison-latest",
+    sourceMissionTimeComparisonContractVersion: missionTimeComparison.contractVersion,
+    targetDistanceContractId: "local-rest-target-distance-latest",
+    targetDistanceContractVersion: missionTimeEstimator.targetDistanceContractVersion,
+    targetDistanceBasis: {
+      frame: "heliocentric-icrs",
+      snapshotPath: missionTimeEstimator.targetDistance.snapshotPath,
+      snapshotEpochMs: missionTimeEstimator.targetDistance.epochMs,
+      selectionRule: missionTimeEstimator.targetDistance.selectionRule,
+    },
+    radiusMeaning: "proper_time",
+    claimBoundary: [
+      "catalog-facing ETA projection only",
+      "not a direct metric or viability promotion surface",
+    ],
+    falsifierConditions: [
+      "mission_time_estimator_contract_missing",
+      "catalog_entry_missing_from_projection",
+    ],
+    nonClaims: [
+      "not a wall-safety surface",
+      "not a lapse diagnostic surface",
+      "not a direct speed certificate",
+    ],
+    entries: [
+      {
+        id: "demo",
+        label: "Demo",
+        inputPosition_m: sourcePosition,
+        inputDistance_m: inputDistance,
+        properTimeEstimate_s: mappedRadiusSeconds,
+        coordinateTimeEstimate_s: 3,
+        mappedRadius_s: mappedRadiusSeconds,
+        outputPosition_m: outputPosition,
+      },
+    ],
+  };
 };
 
 export const makeWarpCruiseEnvelopeFixture = (args?: {
