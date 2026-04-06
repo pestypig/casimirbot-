@@ -8,22 +8,22 @@
 - referenceSelectedFamilyResultMd: `docs/audits/research/selected-family/nhm2-shift-lapse/warp-nhm2-shift-lapse-transport-result-latest.md`
 - localRobustnessSweepJson: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/sweep/nhm2-shift-lapse-profile-sweep-latest.json`
 - localRobustnessSweepMd: `docs/audits/research/selected-family/nhm2-shift-lapse/sweep/warp-nhm2-shift-lapse-profile-sweep-latest.md`
-- boundaryProfileIds: `stage1_centerline_alpha_0p9875_v1`, `stage1_centerline_alpha_0p9850_v1`, `stage1_centerline_alpha_0p9825_v1`, `stage1_centerline_alpha_0p9800_v1`, `stage1_centerline_alpha_0p9775_v1`, `stage1_centerline_alpha_0p9750_v1`, `stage1_centerline_alpha_0p9725_v1`, `stage1_centerline_alpha_0p9700_v1`, `stage1_centerline_alpha_0p9675_v1`, `stage1_centerline_alpha_0p9650_v1`, `stage1_centerline_alpha_0p9625_v1`, `stage1_centerline_alpha_0p9600_v1`, `stage1_centerline_alpha_0p9575_v1`, `stage1_centerline_alpha_0p9550_v1`, `stage1_centerline_alpha_0p9525_v1`, `stage1_centerline_alpha_0p9500_v1`, `stage1_centerline_alpha_0p9475_v1`, `stage1_centerline_alpha_0p9450_v1`, `stage1_centerline_alpha_0p9425_v1`, `stage1_centerline_alpha_0p9400_v1`, `stage1_centerline_alpha_0p9375_v1`, `stage1_centerline_alpha_0p9350_v1`, `stage1_centerline_alpha_0p9325_v1`, `stage1_centerline_alpha_0p9300_v1`, `stage1_centerline_alpha_0p9275_v1`, `stage1_centerline_alpha_0p9250_v1`, `stage1_centerline_alpha_0p9225_v1`, `stage1_centerline_alpha_0p9200_v1`, `stage1_centerline_alpha_0p9175_v1`, `stage1_centerline_alpha_0p9150_v1`, `stage1_centerline_alpha_0p9125_v1`, `stage1_centerline_alpha_0p9100_v1`, `stage1_centerline_alpha_0p9075_v1`, `stage1_centerline_alpha_0p9050_v1`, `stage1_centerline_alpha_0p9025_v1`, `stage1_centerline_alpha_0p9000_v1`, `stage1_centerline_alpha_0p8975_v1`, `stage1_centerline_alpha_0p8950_v1`, `stage1_centerline_alpha_0p8925_v1`, `stage1_centerline_alpha_0p8900_v1`, `stage1_centerline_alpha_0p8875_v1`, `stage1_centerline_alpha_0p8850_v1`, `stage1_centerline_alpha_0p8825_v1`, `stage1_centerline_alpha_0p8800_v1`, `stage1_centerline_alpha_0p8775_v1`, `stage1_centerline_alpha_0p8750_v1`, `stage1_centerline_alpha_0p8725_v1`, `stage1_centerline_alpha_0p8700_v1`, `stage1_centerline_alpha_0p8675_v1`, `stage1_centerline_alpha_0p8650_v1`, `stage1_centerline_alpha_0p8625_v1`, `stage1_centerline_alpha_0p8600_v1`, `stage1_centerline_alpha_0p8575_v1`, `stage1_centerline_alpha_0p8550_v1`, `stage1_centerline_alpha_0p8525_v1`, `stage1_centerline_alpha_0p8500_v1`, `stage1_centerline_alpha_0p8475_v1`, `stage1_centerline_alpha_0p8450_v1`, `stage1_centerline_alpha_0p8425_v1`, `stage1_centerline_alpha_0p8400_v1`, `stage1_centerline_alpha_0p8375_v1`, `stage1_centerline_alpha_0p8350_v1`, `stage1_centerline_alpha_0p8325_v1`, `stage1_centerline_alpha_0p8300_v1`, `stage1_centerline_alpha_0p8275_v1`, `stage1_centerline_alpha_0p8250_v1`, `stage1_centerline_alpha_0p8225_v1`, `stage1_centerline_alpha_0p8200_v1`, `stage1_centerline_alpha_0p8175_v1`, `stage1_centerline_alpha_0p8150_v1`, `stage1_centerline_alpha_0p8125_v1`, `stage1_centerline_alpha_0p8100_v1`, `stage1_centerline_alpha_0p8075_v1`, `stage1_centerline_alpha_0p8050_v1`, `stage1_centerline_alpha_0p8025_v1`, `stage1_centerline_alpha_0p8000_v1`, `stage1_centerline_alpha_0p7975_v1`, `stage1_centerline_alpha_0p7950_v1`, `stage1_centerline_alpha_0p7925_v1`, `stage1_centerline_alpha_0p7900_v1`, `stage1_centerline_alpha_0p7875_v1`, `stage1_centerline_alpha_0p7850_v1`, `stage1_centerline_alpha_0p7825_v1`, `stage1_centerline_alpha_0p7800_v1`, `stage1_centerline_alpha_0p7775_v1`, `stage1_centerline_alpha_0p7750_v1`, `stage1_centerline_alpha_0p7725_v1`, `stage1_centerline_alpha_0p7700_v1`
-- testedStrongerBracketStopProfileId: `stage1_centerline_alpha_0p7700_v1`
-- testedStrongerBracketStopCenterlineAlpha: `0.77`
+- boundaryProfileIds: `stage1_centerline_alpha_0p9875_v1`, `stage1_centerline_alpha_0p9850_v1`, `stage1_centerline_alpha_0p9825_v1`, `stage1_centerline_alpha_0p9800_v1`, `stage1_centerline_alpha_0p9775_v1`, `stage1_centerline_alpha_0p9750_v1`, `stage1_centerline_alpha_0p9725_v1`, `stage1_centerline_alpha_0p9700_v1`, `stage1_centerline_alpha_0p9675_v1`, `stage1_centerline_alpha_0p9650_v1`, `stage1_centerline_alpha_0p9625_v1`, `stage1_centerline_alpha_0p9600_v1`, `stage1_centerline_alpha_0p9575_v1`, `stage1_centerline_alpha_0p9550_v1`, `stage1_centerline_alpha_0p9525_v1`, `stage1_centerline_alpha_0p9500_v1`, `stage1_centerline_alpha_0p9475_v1`, `stage1_centerline_alpha_0p9450_v1`, `stage1_centerline_alpha_0p9425_v1`, `stage1_centerline_alpha_0p9400_v1`, `stage1_centerline_alpha_0p9375_v1`, `stage1_centerline_alpha_0p9350_v1`, `stage1_centerline_alpha_0p9325_v1`, `stage1_centerline_alpha_0p9300_v1`, `stage1_centerline_alpha_0p9275_v1`, `stage1_centerline_alpha_0p9250_v1`, `stage1_centerline_alpha_0p9225_v1`, `stage1_centerline_alpha_0p9200_v1`, `stage1_centerline_alpha_0p9175_v1`, `stage1_centerline_alpha_0p9150_v1`, `stage1_centerline_alpha_0p9125_v1`, `stage1_centerline_alpha_0p9100_v1`, `stage1_centerline_alpha_0p9075_v1`, `stage1_centerline_alpha_0p9050_v1`, `stage1_centerline_alpha_0p9025_v1`, `stage1_centerline_alpha_0p9000_v1`, `stage1_centerline_alpha_0p8975_v1`, `stage1_centerline_alpha_0p8950_v1`, `stage1_centerline_alpha_0p8925_v1`, `stage1_centerline_alpha_0p8900_v1`, `stage1_centerline_alpha_0p8875_v1`, `stage1_centerline_alpha_0p8850_v1`, `stage1_centerline_alpha_0p8825_v1`, `stage1_centerline_alpha_0p8800_v1`, `stage1_centerline_alpha_0p8775_v1`, `stage1_centerline_alpha_0p8750_v1`, `stage1_centerline_alpha_0p8725_v1`, `stage1_centerline_alpha_0p8700_v1`, `stage1_centerline_alpha_0p8675_v1`, `stage1_centerline_alpha_0p8650_v1`, `stage1_centerline_alpha_0p8625_v1`, `stage1_centerline_alpha_0p8600_v1`, `stage1_centerline_alpha_0p8575_v1`, `stage1_centerline_alpha_0p8550_v1`, `stage1_centerline_alpha_0p8525_v1`, `stage1_centerline_alpha_0p8500_v1`, `stage1_centerline_alpha_0p8475_v1`, `stage1_centerline_alpha_0p8450_v1`, `stage1_centerline_alpha_0p8425_v1`, `stage1_centerline_alpha_0p8400_v1`, `stage1_centerline_alpha_0p8375_v1`, `stage1_centerline_alpha_0p8350_v1`, `stage1_centerline_alpha_0p8325_v1`, `stage1_centerline_alpha_0p8300_v1`, `stage1_centerline_alpha_0p8275_v1`, `stage1_centerline_alpha_0p8250_v1`, `stage1_centerline_alpha_0p8225_v1`, `stage1_centerline_alpha_0p8200_v1`, `stage1_centerline_alpha_0p8175_v1`, `stage1_centerline_alpha_0p8150_v1`, `stage1_centerline_alpha_0p8125_v1`, `stage1_centerline_alpha_0p8100_v1`, `stage1_centerline_alpha_0p8075_v1`, `stage1_centerline_alpha_0p8050_v1`, `stage1_centerline_alpha_0p8025_v1`, `stage1_centerline_alpha_0p8000_v1`, `stage1_centerline_alpha_0p7975_v1`, `stage1_centerline_alpha_0p7950_v1`, `stage1_centerline_alpha_0p7925_v1`, `stage1_centerline_alpha_0p7900_v1`, `stage1_centerline_alpha_0p7875_v1`, `stage1_centerline_alpha_0p7850_v1`, `stage1_centerline_alpha_0p7825_v1`, `stage1_centerline_alpha_0p7800_v1`, `stage1_centerline_alpha_0p7775_v1`, `stage1_centerline_alpha_0p7750_v1`, `stage1_centerline_alpha_0p7725_v1`, `stage1_centerline_alpha_0p7700_v1`, `stage1_centerline_alpha_0p7675_v1`, `stage1_centerline_alpha_0p7650_v1`, `stage1_centerline_alpha_0p7625_v1`, `stage1_centerline_alpha_0p7600_v1`
+- testedStrongerBracketStopProfileId: `stage1_centerline_alpha_0p7600_v1`
+- testedStrongerBracketStopCenterlineAlpha: `0.76`
 - canonicalBaselineMetricT00Ref: `warp.metric.T00.natario_sdf.shift`
 - canonicalBaselineLatestAliasesChanged: false
 
 ## Boundary Result
-- strongestProfileKeepingAllGatesPassing: `stage1_centerline_alpha_0p7700_v1`
+- strongestProfileKeepingAllGatesPassing: `stage1_centerline_alpha_0p7600_v1`
 - firstGateFailure: `null`
 - firstFailedGate: `null`
 - firstGateFailureReason: `null`
 - failureBoundaryStatus: `no_failure_reached_within_tested_stronger_bracket`
 - scalingStatusWithinPassingRegion: `monotonic`
-- marginFromReferenceProfile: No first-failure boundary was reached within the tested stronger bracket. Relative to stage1_centerline_alpha_0p995_v1, the tested stronger-side passing margin extends through stage1_centerline_alpha_0p7700_v1.
-- marginFromStrongestPassingProfile: No first-failure boundary was reached beyond stage1_centerline_alpha_0p7700_v1 within the tested stronger bracket.
-- boundarySummary: No first-failure boundary was reached within the tested stronger bracket. Through stage1_centerline_alpha_0p7700_v1, every tested stronger-side profile remained gate-admitted, and the bounded timing differential scales monotonic within the passing region. The current predefined exploration stop is stage1_centerline_alpha_0p7700_v1.
+- marginFromReferenceProfile: No first-failure boundary was reached within the tested stronger bracket. Relative to stage1_centerline_alpha_0p995_v1, the tested stronger-side passing margin extends through stage1_centerline_alpha_0p7600_v1.
+- marginFromStrongestPassingProfile: No first-failure boundary was reached beyond stage1_centerline_alpha_0p7600_v1 within the tested stronger bracket.
+- boundarySummary: No first-failure boundary was reached within the tested stronger bracket. Through stage1_centerline_alpha_0p7600_v1, every tested stronger-side profile remained gate-admitted, and the bounded timing differential scales monotonic within the passing region. The current predefined exploration stop is stage1_centerline_alpha_0p7600_v1.
 
 ## Trend Summary
 - timingDifferentialTrend: `growing_monotonically_within_tested_bracket`
@@ -39,10 +39,10 @@
 - lowExpansionThetaKUsage (thetaKResidualAbs/thetaKTolerance): `0`
 - lowExpansionWorstUsage: `0`
 - lowExpansionWorstMargin: `0.001`
-- wallSafetyBetaUsage (max(betaOverAlphaMax, betaOutwardOverAlphaWallMax)): `2.869448149568188e-17`
+- wallSafetyBetaUsage (max(betaOverAlphaMax, betaOutwardOverAlphaWallMax)): `2.9072040107399763e-17`
 - wallSafetyBetaMargin: `1`
 - wallSafetyHorizonMargin: `1`
-- wallSafetyWorstUsage: `2.869448149568188e-17`
+- wallSafetyWorstUsage: `2.9072040107399763e-17`
 - wallSafetyWorstMargin: `1`
 
 ## Per-Profile Results
@@ -136,6 +136,10 @@
 | stage1_centerline_alpha_0p7750_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.775 | 0.775 | bounded_relativistic_differential_detected | -30995092.33136539 | true |
 | stage1_centerline_alpha_0p7725_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.7725 | 0.7725 | bounded_relativistic_differential_detected | -31339482.24615833 | true |
 | stage1_centerline_alpha_0p7700_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.77 | 0.77 | bounded_relativistic_differential_detected | -31683872.160951287 | true |
+| stage1_centerline_alpha_0p7675_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.7675 | 0.7675 | bounded_relativistic_differential_detected | -32028262.075744227 | true |
+| stage1_centerline_alpha_0p7650_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.765 | 0.765 | bounded_relativistic_differential_detected | -32372651.990537167 | true |
+| stage1_centerline_alpha_0p7625_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.7625 | 0.7625 | bounded_relativistic_differential_detected | -32717041.90533015 | true |
+| stage1_centerline_alpha_0p7600_v1 | bounded_transport_proof_bearing_gate_admitted | pass | pass | pass | 0.76 | 0.76 | bounded_relativistic_differential_detected | -33061431.820123076 | true |
 
 ## Headroom Indicators
 | shiftLapseProfileId | divergenceRms | divergenceTolerance | thetaKResidualAbs | thetaKTolerance | betaOutwardOverAlphaWallMax | wallHorizonMargin |
@@ -228,6 +232,10 @@
 | stage1_centerline_alpha_0p7750_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
 | stage1_centerline_alpha_0p7725_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
 | stage1_centerline_alpha_0p7700_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
+| stage1_centerline_alpha_0p7675_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
+| stage1_centerline_alpha_0p7650_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
+| stage1_centerline_alpha_0p7625_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
+| stage1_centerline_alpha_0p7600_v1 | 0 | 0.001 | 0 | 0.001 | 2.2094750204371243e-17 | 1 |
 
 ## Non-Claims
 - does not replace the canonical baseline latest aliases
