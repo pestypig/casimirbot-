@@ -1,7 +1,6 @@
 import express, { type Response } from "express";
 import { z } from "zod";
 import { buildRelativisticMapProjection } from "@shared/relativistic-map-projections";
-import { buildObservableUniverseAccordionProjection } from "@shared/observable-universe-accordion-projections";
 import { getGlobalPipelineState } from "../../energy-pipeline";
 
 const helixRelativisticMapRouter = express.Router();
@@ -46,28 +45,6 @@ const ProjectSchema = z
     }
   });
 
-const AccordionProjectSchema = z
-  .object({
-    projectionKind: z.literal("observable_universe_accordion"),
-    accordionMode: z.enum(["raw_distance", "sr_accessibility", "nhm2_accessibility"]),
-    catalog: z.array(CatalogEntrySchema).min(1),
-    frame: z.literal("heliocentric-icrs").optional(),
-    control: ControlSchema.pick({ properAcceleration_m_s2: true }).optional(),
-    selectedLaneId: z.string().min(1).optional(),
-    selectedProfileId: z.string().min(1).optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.accordionMode === "sr_accessibility" && !value.control) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "control is required when accordionMode=sr_accessibility",
-        path: ["control"],
-      });
-    }
-  });
-
-const AnyProjectSchema = z.union([ProjectSchema, AccordionProjectSchema]);
-
 helixRelativisticMapRouter.options("/project", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -75,29 +52,13 @@ helixRelativisticMapRouter.options("/project", (_req, res) => {
 
 helixRelativisticMapRouter.post("/project", (req, res) => {
   setCors(res);
-  const parsed = AnyProjectSchema.safeParse(req.body ?? {});
+  const parsed = ProjectSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ ok: false, error: "invalid-request", issues: parsed.error.issues });
     return;
   }
 
   const pipelineState = getGlobalPipelineState() as Record<string, unknown> | null;
-  if (parsed.data.projectionKind === "observable_universe_accordion") {
-    const projection = buildObservableUniverseAccordionProjection({
-      ...parsed.data,
-      frame: parsed.data.frame ?? "heliocentric-icrs",
-      warpCatalogEtaProjection: ((pipelineState as any)?.warpCatalogEtaProjection ?? null),
-      warpMissionTimeEstimator: ((pipelineState as any)?.warpMissionTimeEstimator ?? null),
-      warpMissionTimeComparison: ((pipelineState as any)?.warpMissionTimeComparison ?? null),
-    });
-    res.setHeader("Cache-Control", "no-store");
-    res.json({
-      ok: projection.status === "computed",
-      projection,
-    });
-    return;
-  }
-
   const warpWorldline =
     parsed.data.sourceModel === "flat_sr_flip_burn_control"
       ? undefined

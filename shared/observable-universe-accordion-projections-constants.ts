@@ -1,1 +1,0 @@
-export const SPEED_OF_LIGHT_MPS = 299_792_458;
