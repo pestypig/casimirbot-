@@ -8,6 +8,7 @@ import {
   updateParameters,
 } from "../server/energy-pipeline.js";
 import { buildGrEvolveBrick } from "../server/gr-evolve-brick.js";
+import { deriveWarpMetricFamilySemantics } from "../modules/warp/warp-metric-adapter.js";
 import { computeCabinLapseDiagnosticsFromBrick } from "../shared/time-dilation-diagnostics.js";
 import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 import { buildShiftPlusLapseDiagnosticsPayload } from "./warp-shift-plus-lapse-diagnostics.js";
@@ -492,6 +493,10 @@ const buildAuditMarkdown = (payload: any) => {
     `- authoritativeProofSurface: ${payload.proofPolicyComparison.authoritativeProofSurface}`,
     `- baselineBranchStatus: ${payload.proofPolicyComparison.baselineBranchStatus}`,
     `- generalizedBranchStatus: ${payload.proofPolicyComparison.generalizedBranchStatus}`,
+    `- baselineFamilyAuthorityStatus: ${payload.proofPolicyComparison.baselineFamilyAuthorityStatus}`,
+    `- generalizedFamilyAuthorityStatus: ${payload.proofPolicyComparison.generalizedFamilyAuthorityStatus}`,
+    `- baselineTransportCertificationStatus: ${payload.proofPolicyComparison.baselineTransportCertificationStatus}`,
+    `- generalizedTransportCertificationStatus: ${payload.proofPolicyComparison.generalizedTransportCertificationStatus}`,
     `- note: ${payload.proofPolicyComparison.note}`,
     "",
     "## Provenance Warnings",
@@ -520,7 +525,7 @@ const buildMemoMarkdown = (payload: any) => {
     "It is a diagnostic comparison companion only:",
     "",
     "- Lane A remains authoritative and unchanged.",
-    "- warp.metric.T00.nhm2.shift_lapse remains reference_only.",
+    "- warp.metric.T00.nhm2.shift_lapse is a candidate authoritative solve family in provenance/model-selection; proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate and is not claimed by this comparison surface.",
     "- Cabin gravity and wall safety are presented side by side but remain separate diagnostic families.",
     "- No route-time-compression claim is made.",
     "",
@@ -556,6 +561,8 @@ const buildMemoMarkdown = (payload: any) => {
     `- comparisonStatus: ${payload.comparisonStatus}`,
     `- baselineBranchStatus: ${payload.baselineBranchStatus}`,
     `- generalizedBranchStatus: ${payload.generalizedBranchStatus}`,
+    `- generalizedFamilyAuthorityStatus: ${payload.generalizedFamilyAuthorityStatus}`,
+    `- generalizedTransportCertificationStatus: ${payload.generalizedTransportCertificationStatus}`,
     `- precisionComparisonStatus: ${payload.precisionComparisonStatus}`,
     `- recommendedNextAction: ${payload.recommendedNextAction}`,
     "",
@@ -566,6 +573,8 @@ export const buildShiftPlusLapseComparisonPayload = async () => {
   const baseline = await buildBaselineCase(
     generalized.referenceCalibration?.targetCabinHeight_m ?? 2.5,
   );
+  const baselineSemantics = deriveWarpMetricFamilySemantics("natario_sdf");
+  const generalizedSemantics = deriveWarpMetricFamilySemantics("nhm2_shift_lapse");
   const baselineAlphaGradient =
     (baseline.alphaProfileMetadata?.alphaGradientVec_m_inv as
       | Vector3
@@ -724,9 +733,16 @@ export const buildShiftPlusLapseComparisonPayload = async () => {
       generalized.proofPolicy?.authoritativeProofSurface ??
       "lane_a_eulerian_comoving_theta_minus_trk",
     baselineBranchStatus: "unit_lapse_baseline_unchanged",
-    generalizedBranchStatus: "reference_only_mild_shift_plus_lapse",
+    generalizedBranchStatus:
+      "candidate_authoritative_family_transport_gate_controlled_not_claimed_here",
+    baselineFamilyAuthorityStatus: baselineSemantics.familyAuthorityStatus,
+    generalizedFamilyAuthorityStatus: generalizedSemantics.familyAuthorityStatus,
+    baselineTransportCertificationStatus:
+      baselineSemantics.transportCertificationStatus,
+    generalizedTransportCertificationStatus:
+      generalizedSemantics.transportCertificationStatus,
     laneAUnchanged: generalized.proofPolicy?.laneAUnchanged === true,
-    note: "This comparison companion does not supersede York proof semantics. It exists to compare reference-only lapse diagnostics against the current unit-lapse baseline with explicit source provenance.",
+    note: "This comparison companion does not supersede York proof semantics. It compares a candidate authoritative solve family in provenance/model-selection against the current bounded baseline while treating proof-bearing bounded transport admission for the generalized family as separately controlled by the authoritative shift-lapse transport-promotion gate, not claimed by this comparison surface.",
   };
   const allQuantities = [
     ...cabinGravityComparison.quantities,
@@ -750,21 +766,39 @@ export const buildShiftPlusLapseComparisonPayload = async () => {
     comparisonId: "nhm2_unit_lapse_vs_mild_shift_plus_lapse",
     comparisonStatus: "available",
     baselineBranchStatus: "unit_lapse_baseline_unchanged",
-    generalizedBranchStatus: "reference_only_mild_shift_plus_lapse",
+    generalizedBranchStatus:
+      "candidate_authoritative_family_transport_gate_controlled_not_claimed_here",
+    baselineFamilyAuthorityStatus: baselineSemantics.familyAuthorityStatus,
+    generalizedFamilyAuthorityStatus: generalizedSemantics.familyAuthorityStatus,
+    baselineTransportCertificationStatus:
+      baselineSemantics.transportCertificationStatus,
+    generalizedTransportCertificationStatus:
+      generalizedSemantics.transportCertificationStatus,
     precisionComparisonStatus:
       provenanceWarnings.length > 0
         ? "mixed_source_comparison_explicit"
         : "raw_source_aligned",
     recommendedNextAction:
-      "If a later visualization companion is added, keep per-quantity raw-vs-analytic badges visible and do not collapse cabin gravity and wall safety into one score.",
+      "Profile-graph presentation companions must keep per-quantity raw-vs-analytic badges visible, keep cabin gravity separate from wall safety, and avoid any field-map presentation that overstates mild-branch raw resolution.",
     scenarioId: generalized.scenarioId,
-    baselineCase: baseline,
+    baselineCase: {
+      ...baseline,
+      familyAuthorityStatus: baselineSemantics.familyAuthorityStatus,
+      transportCertificationStatus:
+        baselineSemantics.transportCertificationStatus,
+      familySemanticsNote: baselineSemantics.semanticsNote,
+    },
     generalizedCase: {
       caseId: "nhm2_shift_plus_lapse_mild_reference",
       caseLabel: "Mild Shift-Plus-Lapse Reference",
       scenarioId: generalized.scenarioId,
-      authoritativeStatus:
+      authoritativeStatus: generalizedSemantics.familyAuthorityStatus,
+      diagnosticContractAuthoritativeStatus:
         generalized.contract?.authoritativeStatus ?? "reference_only",
+      familyAuthorityStatus: generalizedSemantics.familyAuthorityStatus,
+      transportCertificationStatus:
+        generalizedSemantics.transportCertificationStatus,
+      familySemanticsNote: generalizedSemantics.semanticsNote,
       branch: generalized.branch,
       alphaProfileMetadata: generalized.alphaProfileMetadata,
       precisionContext: generalized.precisionContext,
@@ -812,7 +846,8 @@ export const buildShiftPlusLapseComparisonPayload = async () => {
       laneAUnchanged: generalized.proofPolicy?.laneAUnchanged === true,
       disclaimer: [
         "Lane A remains authoritative.",
-        "nhm2_shift_lapse remains reference-only.",
+        "nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection.",
+        "Proof-bearing bounded transport admission for nhm2_shift_lapse remains separately controlled by the authoritative shift-lapse transport-promotion gate and is not claimed by this comparison.",
         "This comparison companion does not supersede York proof semantics.",
         "Cabin gravity and wall safety are analysis diagnostics, not proof promotion.",
         "No route-time-compression claim is made.",

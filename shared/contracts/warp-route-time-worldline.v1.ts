@@ -14,6 +14,7 @@ import {
   type WarpWorldlineSourceSurface,
   type WarpWorldlineTransportProvenance,
   type WarpWorldlineVec3,
+  sameWarpWorldlineSourceSurface,
 } from "./warp-worldline-contract.v1";
 
 const SPEED_OF_LIGHT_MPS = 299_792_458;
@@ -159,21 +160,6 @@ const sameChart = (
   lhs.chartFixed === rhs.chartFixed &&
   (lhs.coordinateMap ?? null) === (rhs.coordinateMap ?? null);
 
-const sameSourceSurface = (
-  lhs: WarpWorldlineSourceSurface,
-  rhs: WarpWorldlineSourceSurface,
-): boolean =>
-  lhs.surfaceId === rhs.surfaceId &&
-  lhs.producer === rhs.producer &&
-  lhs.provenanceClass === rhs.provenanceClass &&
-  lhs.transportVectorSource === rhs.transportVectorSource &&
-  lhs.transportVectorField === rhs.transportVectorField &&
-  lhs.metricT00Ref === rhs.metricT00Ref &&
-  lhs.metricT00Source === rhs.metricT00Source &&
-  lhs.metricFamily === rhs.metricFamily &&
-  lhs.metricT00ContractStatus === rhs.metricT00ContractStatus &&
-  lhs.chartContractStatus === rhs.chartContractStatus;
-
 const finiteVec3 = (value: unknown): value is WarpWorldlineVec3 =>
   Array.isArray(value) &&
   value.length === 3 &&
@@ -265,7 +251,9 @@ export const buildWarpRouteTimeWorldlineContract = (args: {
   const worldline = args.worldline;
   const preflight = args.preflight;
 
-  if (!sameSourceSurface(worldline.sourceSurface, preflight.sourceSurface)) return null;
+  if (!sameWarpWorldlineSourceSurface(worldline.sourceSurface, preflight.sourceSurface)) {
+    return null;
+  }
   if (!sameChart(worldline.chart, preflight.chart)) return null;
   if (worldline.observerFamily !== preflight.observerFamily) return null;
   if (worldline.sampleGeometry.familyId !== preflight.sourceSampleGeometryFamilyId) {

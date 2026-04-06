@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_warp_worldline_proof/v1",
-  "generatedOn": "2026-04-03",
-  "generatedAt": "2026-04-03T03:25:17.014Z",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T19:43:59.491Z",
   "boundaryStatement": "This artifact records a bounded solve-backed NHM2 warp worldline contract for local-comoving transport diagnostics. It does not certify route time, mission time, speed, or viability.",
   "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
   "contractVersion": "warp_worldline_contract/v1",
@@ -16,8 +16,11 @@
     "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
     "metricT00Source": "metric",
     "metricFamily": "natario_sdf",
+    "familyAuthorityStatus": "canonical_bounded_baseline_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_baseline",
     "metricT00ContractStatus": "ok",
-    "chartContractStatus": "ok"
+    "chartContractStatus": "ok",
+    "shiftLapseTransportPromotionGate": null
   },
   "chart": {
     "label": "comoving_cartesian",
@@ -139,7 +142,7 @@
     "chart_not_comoving_cartesian",
     "solve_backed_transport_sample_family_missing",
     "transport_sample_family_not_shell_cross",
-    "reference_only_shift_lapse_family_selected",
+    "shift_lapse_transport_promotion_gate_not_pass",
     "dtau_dt_nonpositive",
     "normalization_residual_exceeds_tolerance"
   ],
@@ -413,5 +416,5 @@
       "normalizationResidual": 0
     }
   ],
-  "checksum": "dd702e758134fe0a1c8e569ca6bb0c7e84f6245a38f3dc3c6f6d5bc5d7fe19d0"
+  "checksum": "768f175ce5b5b9e00221c56419e16fafdf0eb063d2b38ce29ec7b4bb46a3cc97"
 }

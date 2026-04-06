@@ -49,6 +49,11 @@ type AskDebug = Record<string, unknown> & {
 type AskPayload = {
   text?: string;
   report_mode?: boolean;
+  answer_surface_mode?: "conversational" | "structured_report" | "fail_closed";
+  memory_citation?: {
+    entries?: unknown[];
+    rollout_ids?: string[];
+  };
   debug?: AskDebug;
   error?: string;
   message?: string;
@@ -923,7 +928,18 @@ const evaluateFailures = (entry: PromptCase, response: ReturnType<typeof askOnce
   if (DEBUG_SCAFFOLD_LEAK_RE.test(text)) failures.push("debug_scaffold_leak");
   if (CODE_FRAGMENT_SPILL_RE.test(text)) failures.push("code_fragment_spill");
   if (text.trim().length < (entry.min_text_chars ?? MIN_TEXT_CHARS)) failures.push(`text_too_short:${text.trim().length}`);
-  const hasCitation = /\bSources?:\s+/i.test(text) || /docs\//i.test(text) || /server\//i.test(text);
+  const memoryCitationEntries = Array.isArray(response.payload.memory_citation?.entries)
+    ? response.payload.memory_citation?.entries.length
+    : 0;
+  const memoryCitationRolloutIds = Array.isArray(response.payload.memory_citation?.rollout_ids)
+    ? response.payload.memory_citation?.rollout_ids.length
+    : 0;
+  const hasCitation =
+    /\bSources?:\s+/i.test(text) ||
+    /docs\//i.test(text) ||
+    /server\//i.test(text) ||
+    memoryCitationEntries > 0 ||
+    memoryCitationRolloutIds > 0;
   if (!hasCitation) failures.push("citation_missing");
   const objectiveStates = collectObjectiveLoopStates(debug);
   if (objectiveStates.length > 0) {

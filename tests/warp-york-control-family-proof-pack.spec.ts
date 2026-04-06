@@ -68,6 +68,7 @@ import {
   hasSufficientSignalForAlcubierreControl,
   loadYorkDiagnosticContract,
   readSourceFamilyEvidence,
+  refreshProofPackAuthoritativeLowExpansionGate,
   renderMarkdown,
   buildWarpYorkControlFamilyPublishedLatestPayload,
   resolveLaneACauseCode,
@@ -625,6 +626,24 @@ const makeProofPackPayloadForMarkdown = () => {
     checksum: "unused",
   } as any;
 };
+
+const makePassedAuthoritativeLowExpansionGate = () => ({
+  sourceCaseId: "nhm2_certified",
+  status: "pass",
+  reason: "authoritative_low_expansion_ok",
+  source: "gr_evolve_brick",
+  authoritative: true,
+  divergenceObservable: "div_beta",
+  divergenceRms: 2e-4,
+  divergenceMaxAbs: 4e-4,
+  divergenceTolerance: 1e-3,
+  thetaKConsistencyStatus: "pass",
+  thetaKResidualMaxAbs: 2e-4,
+  thetaKTolerance: 1e-3,
+  projectionDerivedStatus: "advisory_only",
+  projectionDerivedNote:
+    "Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.",
+});
 
 const makeSourceToYorkFixture = () =>
   ({
@@ -2897,6 +2916,56 @@ describe("warp york control-family proof pack", () => {
     expect(evaluated.preconditions.laneAParityClosed).toBe(true);
   });
 
+  it("forces an inconclusive Natario-like family verdict when the authoritative low-expansion gate is not passed", () => {
+    const verdict = decideControlFamilyVerdict({
+      preconditions: {
+        controlsIndependent: true,
+        allRequiredViewsRendered: true,
+        provenanceHashesPresent: true,
+        runtimeStatusProvenancePresent: true,
+        offlineRenderParityComputed: true,
+        thetaKTraceParityComputed: true,
+        snapshotIdentityComplete: true,
+        diagnosticParityClosed: true,
+        laneAParityClosed: true,
+        readyForFamilyVerdict: true,
+      },
+      controlsCalibratedByReferences: true,
+      classificationScoring: {
+        distance_to_alcubierre_reference: 0.6,
+        distance_to_low_expansion_reference: 0.1,
+        reference_margin: 0.5,
+        winning_reference: "natario_control",
+        margin_sufficient: true,
+        winning_reference_within_threshold: true,
+        distinct_by_policy: false,
+        margin_min: 0.1,
+        reference_match_threshold: 1,
+        distinctness_threshold: 2,
+        distance_metric: "weighted_feature_distance",
+        normalization_method: "contract_weighted",
+      },
+      authoritativeLowExpansionGate: {
+        sourceCaseId: "nhm2_certified",
+        status: "missing",
+        reason: "brick_native_div_beta_missing",
+        source: null,
+        authoritative: true,
+        divergenceObservable: "div_beta",
+        divergenceRms: null,
+        divergenceMaxAbs: null,
+        divergenceTolerance: 1e-3,
+        thetaKConsistencyStatus: "unknown",
+        thetaKResidualMaxAbs: null,
+        thetaKTolerance: 1e-3,
+        projectionDerivedStatus: "advisory_only",
+        projectionDerivedNote: "projection-only",
+      },
+    } as any);
+
+    expect(verdict).toBe("inconclusive");
+  });
+
   it("fail-closes when parity layer reports render parity failure", () => {
     const alcCase = makeCase("alcubierre_control", "theta-hash-alc") as any;
     alcCase.parity.status = "fail";
@@ -3217,6 +3286,36 @@ describe("warp york control-family proof pack", () => {
       "- alternateLaneCauseCode: `lane_b_family_congruent`",
     );
     expect(markdown).not.toContain("## Lane A Cause");
+  });
+
+  it("renders the authoritative low-expansion gate and keeps projection diagnostics advisory-only", () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.authoritativeLowExpansionGate = {
+      sourceCaseId: "nhm2_certified",
+      status: "pass",
+      reason: "authoritative_low_expansion_ok",
+      source: "gr_evolve_brick",
+      authoritative: true,
+      divergenceObservable: "div_beta",
+      divergenceRms: 2e-4,
+      divergenceMaxAbs: 4e-4,
+      divergenceTolerance: 1e-3,
+      thetaKConsistencyStatus: "pass",
+      thetaKResidualMaxAbs: 2e-4,
+      thetaKTolerance: 1e-3,
+      projectionDerivedStatus: "advisory_only",
+      projectionDerivedNote:
+        "Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.",
+    };
+
+    const markdown = renderMarkdown(payload);
+    expect(markdown).toContain("## Authoritative Low-Expansion Gate");
+    expect(markdown).toContain("| status | pass |");
+    expect(markdown).toContain("| source | gr_evolve_brick |");
+    expect(markdown).toContain("| projectionDerivedStatus | advisory_only |");
+    expect(markdown).toContain(
+      "authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency",
+    );
   });
 
   it("fails control independence when control URLs differ but theta hashes collide", () => {
@@ -4565,6 +4664,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
     });
     expect(scoring.winning_reference).toBe("natario_control");
     expect(verdict).toBe("nhm2_low_expansion_family");
@@ -4825,6 +4925,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
     });
     const robustness = evaluateClassificationRobustness({
       contract,
@@ -4843,6 +4944,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
       alcubierreFeatures: alcFeatures,
       natarioFeatures: natFeatures,
       nhm2Features,
@@ -4915,6 +5017,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
     });
     const robustness = evaluateClassificationRobustness({
       contract,
@@ -4933,6 +5036,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
       alcubierreFeatures: alcFeatures,
       natarioFeatures: natFeatures,
       nhm2Features,
@@ -5016,6 +5120,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
     });
     const robustness = evaluateClassificationRobustness({
       contract,
@@ -5034,6 +5139,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
       alcubierreFeatures: alcFeatures,
       natarioFeatures: natFeatures,
       nhm2Features,
@@ -5103,6 +5209,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
     });
     const robustness = evaluateClassificationRobustness({
       contract,
@@ -5121,6 +5228,7 @@ describe("warp york control-family proof pack", () => {
         downstreamRenderMismatch: false,
         guardFailures: [],
       },
+      authoritativeLowExpansionGate: makePassedAuthoritativeLowExpansionGate(),
       alcubierreFeatures: {
         theta_abs_max_raw: 9,
         theta_abs_max_display: 9,
@@ -6150,6 +6258,10 @@ describe("warp york control-family proof pack", () => {
         sourceMechanismReferenceOnlyScope: true,
         sourceMechanismNonAuthoritative: true,
         sourceMechanismFormulaEquivalent: false,
+        nhm2ShiftLapseDefaultTransportCertificationStatus:
+          "bounded_transport_fail_closed_reference_only",
+        nhm2ShiftLapseSelectedPublicationStatus:
+          "explicit_gate_admitted_selected_family_publication_available",
       }),
     );
 
@@ -6184,10 +6296,16 @@ describe("warp york control-family proof pack", () => {
       "| nhm2ShiftLapseFamilyAuthorityStatus | candidate_authoritative_solve_family |",
     );
     expect(markdown).toContain(
-      "| nhm2ShiftLapseTransportCertificationStatus | bounded_transport_fail_closed_reference_only |",
+      "| nhm2ShiftLapseDefaultTransportCertificationStatus | bounded_transport_fail_closed_reference_only |",
     );
     expect(markdown).toContain(
-      "| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only. |",
+      "| nhm2ShiftLapseSelectedPublicationStatus | explicit_gate_admitted_selected_family_publication_available |",
+    );
+    expect(markdown).toContain(
+      "| nhm2ShiftLapseSelectedPublicationSummary | Canonical latest aliases remain on warp.metric.T00.natario_sdf.shift by default, but an explicitly selected nhm2_shift_lapse solve can publish proof-bearing bounded transport artifacts when the authoritative shift-lapse transport-promotion gate passes. |",
+    );
+    expect(markdown).toContain(
+      "| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and proof-bearing bounded transport admission remains controlled separately by the authoritative shift-lapse transport-promotion gate rather than granted by this source/mechanism surface. |",
     );
     expect(markdown).toContain("| exemptionRouteStatus | satisfied |");
     expect(markdown).toContain("## Source / Mechanism Parity-Route Feasibility");
@@ -6259,7 +6377,7 @@ describe("warp york control-family proof pack", () => {
     ).toContain("candidate authoritative solve family in provenance/model-selection");
     expect(
       promotionContractArtifact.sourceMechanismPromotionContract.consumerSummary,
-    ).toContain("bounded transport proof-bearing surfaces remain fail-closed and reference_only");
+    ).toContain("transport-promotion gate");
     expect(
       promotionContractArtifact.sourceMechanismPromotionContract.claimMappings,
     ).toEqual(
@@ -9834,6 +9952,107 @@ describe("warp york control-family proof pack", () => {
     expect(markdown).toContain(
       "manifestPath | artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json",
     );
+  });
+
+  it("backfills the authoritative low-expansion gate into published latest payloads from current brick evidence", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.authoritativeLowExpansionGate = undefined;
+    payload.notes = payload.notes.filter(
+      (note: string) =>
+        !note.startsWith("authoritative_low_expansion_gate=") &&
+        note !==
+          "Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency." &&
+        note !==
+          "Natario-like morphology remains visible, but authoritative low-expansion classification is blocked until the brick-native div_beta gate passes on the same Lane A surface.",
+    );
+    const refreshed = await refreshProofPackAuthoritativeLowExpansionGate(payload, {
+      loadSnapshot: async () =>
+        ({
+          dims: [2, 2, 1],
+          voxelSize_m: [1, 1, 1],
+          resolvedUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?metricT00Ref=warp.metric.T00.natario_sdf.shift",
+          stats: {
+            divBetaRms: 1e-6,
+            divBetaMaxAbs: 1e-6,
+            divBetaSource: "gr_evolve_brick",
+          },
+          meta: {},
+          channels: {
+            theta: { data: new Float32Array([0, 0, 0, 0]) },
+            K_trace: { data: new Float32Array([0, 0, 0, 0]) },
+            div_beta: { data: new Float32Array([1e-6, -1e-6, 1e-6, -1e-6]) },
+          },
+          source: "metric",
+          chart: "comoving_cartesian",
+          metricRefHash: "metric-ref-hash",
+        }) as any,
+    });
+
+    expect(refreshed.authoritativeLowExpansionGate).toMatchObject({
+      sourceCaseId: "nhm2_certified",
+      status: "pass",
+      source: "gr_evolve_brick",
+      authoritative: true,
+      divergenceObservable: "div_beta",
+      divergenceRms: 1e-6,
+      divergenceMaxAbs: 1e-6,
+      thetaKConsistencyStatus: "pass",
+      projectionDerivedStatus: "advisory_only",
+    });
+    expect(
+      refreshed.cases.find((entry) => entry.caseId === "nhm2_certified")?.snapshotMetrics
+        ?.authoritativeLowExpansionGate,
+    ).toMatchObject({
+      status: "pass",
+      source: "gr_evolve_brick",
+      divergenceRms: 1e-6,
+    });
+    expect(
+      refreshed.notes.some((note) => note.startsWith("authoritative_low_expansion_gate=pass")),
+    ).toBe(true);
+    expect(refreshed.notes).toContain(
+      "Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.",
+    );
+    const markdown = renderMarkdown(refreshed);
+    expect(markdown).toContain("## Authoritative Low-Expansion Gate");
+    expect(markdown).toContain("status | pass");
+  });
+
+  it("marks the authoritative low-expansion gate missing when divergence is present but theta/K consistency is unavailable", async () => {
+    const payload = makeProofPackPayloadForMarkdown() as any;
+    payload.authoritativeLowExpansionGate = undefined;
+    const nhm2Case = payload.cases.find((entry: any) => entry.caseId === "nhm2_certified");
+    if (nhm2Case?.snapshotMetrics) {
+      nhm2Case.snapshotMetrics.thetaPlusKTrace = undefined;
+      nhm2Case.snapshotMetrics.authoritativeLowExpansionGate = undefined;
+    }
+    const refreshed = await refreshProofPackAuthoritativeLowExpansionGate(payload, {
+      loadSnapshot: async () =>
+        ({
+          dims: [2, 2, 1],
+          voxelSize_m: [1, 1, 1],
+          resolvedUrl: "http://127.0.0.1:5050/api/helix/gr-evolve-brick?metricT00Ref=warp.metric.T00.natario_sdf.shift",
+          stats: {
+            divBetaRms: 1e-6,
+            divBetaMaxAbs: 1e-6,
+            divBetaSource: "gr_evolve_brick",
+          },
+          meta: {},
+          channels: {
+            div_beta: { data: new Float32Array([1e-6, -1e-6, 1e-6, -1e-6]) },
+          },
+          source: "metric",
+          chart: "comoving_cartesian",
+          metricRefHash: "metric-ref-hash",
+        }) as any,
+    });
+
+    expect(refreshed.authoritativeLowExpansionGate).toMatchObject({
+      status: "missing",
+      reason: "theta_k_consistency_missing",
+      source: "gr_evolve_brick",
+      thetaKConsistencyStatus: "unknown",
+    });
   });
 
   it("builds a render taxonomy manifest with category and role metadata on every render", async () => {

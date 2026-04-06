@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_in_hull_proper_acceleration/v1",
-  "generatedOn": "2026-04-03",
-  "generatedAt": "2026-04-03T03:25:18.605Z",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T19:44:01.066Z",
   "boundaryStatement": "This artifact records a bounded NHM2 in-hull proper-acceleration profile for a declared Eulerian cabin observer family. It is solve-backed and no-fallback in certified mode, but it is not a curvature-gravity or comfort/safety certificate.",
   "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
   "contractVersion": "warp_in_hull_proper_acceleration/v1",
@@ -16,10 +16,13 @@
     "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
     "metricT00Source": "metric",
     "metricFamily": "natario_sdf",
+    "familyAuthorityStatus": "canonical_bounded_baseline_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_baseline",
     "metricT00ContractStatus": "ok",
     "chartContractStatus": "ok",
     "brickStatus": "CERTIFIED",
-    "brickSolverStatus": "CERTIFIED"
+    "brickSolverStatus": "CERTIFIED",
+    "shiftLapseTransportPromotionGate": null
   },
   "chart": {
     "label": "comoving_cartesian",
@@ -270,7 +273,7 @@
     "metric_t00_source_not_metric",
     "metric_contract_status_not_ok",
     "chart_contract_status_not_ok",
-    "reference_only_shift_lapse_family_selected",
+    "shift_lapse_transport_promotion_gate_not_pass",
     "brick_status_not_certified",
     "brick_solver_status_not_certified",
     "direct_gr_evolve_brick_channels_missing",
@@ -284,5 +287,5 @@
     "not viability-promotion evidence",
     "not source-mechanism promotion"
   ],
-  "checksum": "71ba2e81fd1b194dd4d8d29b568d27ce2432175b4224a9b6c1b47f4330e73d8a"
+  "checksum": "4334ea8baef28aba077cd2e2bad72ed7712ec53e7059a8bd98994e17956fae77"
 }

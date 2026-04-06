@@ -147,6 +147,7 @@ const seedBoundedLatestEvidenceRepo = (
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("warp proof surface manifest", () => {
@@ -329,5 +330,46 @@ describe("warp proof surface manifest", () => {
         proofPackLatestMdPath: path.join(tempDir, "proof-pack-latest.md"),
       }),
     ).rejects.toThrow(/proof_surface_publication_locked:.*publish-proof-surface-manifest-latest/);
+  });
+
+  it("falls back to the current proof-pack payload when low-expansion refresh cannot fetch live data", async () => {
+    const tempDir = seedBoundedLatestEvidenceRepo("tracked");
+    const proofPackLatestJsonPath = path.join(tempDir, SURFACE_METADATA.proof_pack_latest.jsonPath);
+    const proofPackLatestMdPath = path.join(tempDir, SURFACE_METADATA.proof_pack_latest.mdPath);
+    const repoProofPackLatestJsonPath = path.resolve(SURFACE_METADATA.proof_pack_latest.jsonPath);
+    const repoProofPackLatestMdPath = path.resolve(SURFACE_METADATA.proof_pack_latest.mdPath);
+    writeTempRepoFile(
+      tempDir,
+      SURFACE_METADATA.proof_pack_latest.jsonPath,
+      fs.readFileSync(repoProofPackLatestJsonPath, "utf8"),
+    );
+    writeTempRepoFile(
+      tempDir,
+      SURFACE_METADATA.proof_pack_latest.mdPath,
+      fs.readFileSync(repoProofPackLatestMdPath, "utf8"),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+
+    const result = await publishNhm2ProofSurfaceManifestLatest({
+      outJsonPath: path.join(tempDir, "artifacts/research/full-solve/nhm2-proof-surface-manifest-2026-04-02.json"),
+      latestJsonPath: path.join(tempDir, "artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json"),
+      outMdPath: path.join(tempDir, "docs/audits/research/warp-nhm2-proof-surface-manifest-2026-04-02.md"),
+      latestMdPath: path.join(tempDir, "docs/audits/research/warp-nhm2-proof-surface-manifest-latest.md"),
+      proofPackLatestJsonPath,
+      proofPackLatestMdPath,
+      publicationLockPath: path.join(tempDir, ".publication.lock"),
+    });
+
+    expect(result.artifact.status).toBe("bounded_stack_publication_hardened");
+    expect(result.artifact.proofSurfaceCount).toBe(
+      WARP_PROOF_SURFACE_MANIFEST_SURFACE_ORDER.length,
+    );
+    expect(fs.existsSync(result.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(result.latestMdPath)).toBe(true);
   });
 });

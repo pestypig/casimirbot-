@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_mission_time_estimator/v1",
-  "generatedOn": "2026-04-03",
-  "generatedAt": "2026-04-03T03:25:17.895Z",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T19:44:00.351Z",
   "boundaryStatement": "This artifact records a bounded NHM2 mission-time estimator over a deterministic committed local-rest target-distance contract. It does not certify max speed, viability, unconstrained ETA, or a full route dynamic.",
   "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
   "sourceWorldlineArtifactPath": "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
@@ -24,8 +24,11 @@
     "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
     "metricT00Source": "metric",
     "metricFamily": "natario_sdf",
+    "familyAuthorityStatus": "canonical_bounded_baseline_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_baseline",
     "metricT00ContractStatus": "ok",
-    "chartContractStatus": "ok"
+    "chartContractStatus": "ok",
+    "shiftLapseTransportPromotionGate": null
   },
   "chart": {
     "label": "comoving_cartesian",
@@ -104,5 +107,5 @@
     "not unconstrained ETA for arbitrary targets",
     "not relativistic-advantage certified"
   ],
-  "checksum": "bd2145ea89883e3127e1516b85692371e87fab7228fea1cd4c79db3b8dae544a"
+  "checksum": "21eedbce23a5bfa01fdd03ac36cea9133de549cc232db80e4cab12d5707dcb67"
 }

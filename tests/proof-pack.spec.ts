@@ -367,6 +367,80 @@ describe("proof pack contract", () => {
     process.env.WARP_STRICT_CONGRUENCE = strictEnv;
   });
 
+  it("emits authoritative low-expansion gate fields from brick-native div_beta", async () => {
+    const { initializePipelineState, buildProofPack } = await loadPipelineModules();
+
+    const state = initializePipelineState();
+    (state as any).theta_geom = 2e-4;
+    (state as any).theta_metric_derived = true;
+    (state as any).theta_metric_source = "pipeline.gr.theta.mean";
+    (state as any).theta_metric_reason = "gr_evolve_brick_theta_mean";
+    (state as any).theta_metric_authoritative = true;
+    (state as any).theta_metric_authoritative_source = "pipeline.gr.theta.mean";
+    (state as any).theta_metric_authoritative_reason =
+      "brick_native_theta_present";
+    (state as any).theta_geom_projection = 9e-4;
+    (state as any).theta_geom_projection_source =
+      "warp.metricAdapter.betaDiagnostics.thetaMax";
+    (state as any).theta_geom_projection_proxy = false;
+    (state as any).theta_metric_projection_available = true;
+    (state as any).theta_metric_projection_source =
+      "warp.metricAdapter.betaDiagnostics.thetaMax";
+    (state as any).theta_metric_projection_reason =
+      "projection_metric_adapter_theta_available";
+    (state as any).warp = {
+      metricAdapter: {
+        betaDiagnostics: {
+          method: "finite-diff",
+          thetaRms: 8e-4,
+          thetaMax: 9e-4,
+        },
+      },
+      metricStressDiagnostics: {
+        kTraceMean: -2e-4,
+      },
+    };
+    (state as any).gr = {
+      theta: {
+        mean: 2e-4,
+        maxAbs: 4e-4,
+        source: "gr_evolve_brick_theta",
+      },
+      kTrace: {
+        mean: -2e-4,
+        maxAbs: 4e-4,
+        source: "gr_evolve_brick",
+      },
+      divBeta: {
+        rms: 2e-4,
+        maxAbs: 4e-4,
+        source: "gr_evolve_brick",
+      },
+    };
+
+    const pack = buildProofPack(state);
+    expect(pack.values.metric_div_beta_authoritative?.value).toBe(true);
+    expect(pack.values.metric_div_beta_authoritative_reason?.value).toBe(
+      "brick_native_div_beta_present",
+    );
+    expect(pack.values.theta_metric_authoritative?.value).toBe(true);
+    expect(pack.values.theta_metric_authoritative_source?.value).toBe(
+      "pipeline.gr.theta.mean",
+    );
+    expect(pack.values.theta_geom?.value).toBe(2e-4);
+    expect(pack.values.theta_geom_projection?.value).toBe(9e-4);
+    expect(pack.values.metric_k_trace_authoritative?.value).toBe(true);
+    expect(pack.values.natario_low_expansion_authoritative_status?.value).toBe(
+      "pass",
+    );
+    expect(pack.values.natario_low_expansion_projection_status?.value).toBe(
+      "pass",
+    );
+    expect(pack.values.natario_low_expansion_projection_source?.value).toBe(
+      "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax",
+    );
+  });
+
   it("emits qi strict congruence status fields", async () => {
     const { initializePipelineState, buildProofPack } = await loadPipelineModules();
 

@@ -29,7 +29,11 @@ describe("nhm2 shift-plus-lapse comparison companion", () => {
       expect.objectContaining({
         caseId: "nhm2_shift_plus_lapse_mild_reference",
         scenarioId: "mild_cabin_gravity_reference",
-        authoritativeStatus: "reference_only",
+        authoritativeStatus: "candidate_authoritative_solve_family",
+        diagnosticContractAuthoritativeStatus: "reference_only",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus:
+          "bounded_transport_fail_closed_reference_only",
         branch: expect.objectContaining({
           metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
           warpFieldType: "nhm2_shift_lapse",
@@ -124,14 +128,20 @@ describe("nhm2 shift-plus-lapse comparison companion", () => {
       expect.objectContaining({
         authoritativeProofSurface: "lane_a_eulerian_comoving_theta_minus_trk",
         baselineBranchStatus: "unit_lapse_baseline_unchanged",
-        generalizedBranchStatus: "reference_only_mild_shift_plus_lapse",
+        generalizedBranchStatus:
+          "candidate_authoritative_family_transport_gate_controlled_not_claimed_here",
+        generalizedFamilyAuthorityStatus:
+          "candidate_authoritative_solve_family",
+        generalizedTransportCertificationStatus:
+          "bounded_transport_fail_closed_reference_only",
         laneAUnchanged: true,
       }),
     );
     expect(payload.proofPolicy.disclaimer).toEqual(
       expect.arrayContaining([
         "Lane A remains authoritative.",
-        "nhm2_shift_lapse remains reference-only.",
+        "nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection.",
+        "Proof-bearing bounded transport admission for nhm2_shift_lapse remains separately controlled by the authoritative shift-lapse transport-promotion gate and is not claimed by this comparison.",
       ]),
     );
     expect(payload.comparisonSummary?.crossCaseSourceMismatchCount).toBe(5);

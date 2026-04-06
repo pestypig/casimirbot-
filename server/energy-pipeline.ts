@@ -42,6 +42,8 @@ import {
   computeWarpWorldlineDtauDt,
   computeWarpWorldlineNormalizationResidual,
   toWarpWorldlineVec3,
+  type WarpShiftLapseTransportPromotionGate,
+  type WarpTransportCertificationStatus,
   type WarpWorldlineContractV1,
   type WarpWorldlineVec3,
 } from "../shared/contracts/warp-worldline-contract.v1.ts";
@@ -82,7 +84,9 @@ import {
 } from "../shared/contracts/warp-in-hull-proper-acceleration.v1.ts";
 import type { StressEnergyStats } from "./stress-energy-brick";
 import {
+  DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID,
   deriveWarpMetricFamilySemantics,
+  resolveWarpShiftLapseProfile,
   type WarpMetricAdapterSnapshot,
   type WarpMetricFamilyAuthorityStatus,
   type WarpMetricTransportCertificationStatus,
@@ -529,6 +533,13 @@ type MetricT00Contract = {
   unitSystem: MetricT00UnitSystem;
   derivation: string;
 };
+
+const NATARIO_EXPANSION_TOLERANCE = 1e-3;
+const THETA_K_TOLERANCE = 1e-3;
+const SHIFT_LAPSE_TRANSPORT_PROMOTION_GATE_ID =
+  "nhm2_shift_lapse_transport_promotion_gate/v1";
+const SHIFT_LAPSE_TRANSPORT_PROMOTED_STATUS =
+  "bounded_transport_proof_bearing_gate_admitted" as const satisfies WarpTransportCertificationStatus;
 
 const resolveMetricT00Observer = (metricT00Ref: string): MetricT00Observer =>
   metricT00Ref === "warp.metric.T00.vdb.regionII"
@@ -1312,6 +1323,16 @@ export type GrPipelineDiagnostics = {
     maxAbs: number;
     source: "gr_evolve_brick";
   };
+  theta?: {
+    mean: number;
+    maxAbs: number;
+    source: "gr_evolve_brick_theta" | "gr_evolve_brick_neg_k_trace";
+  };
+  kTrace?: {
+    mean: number;
+    maxAbs: number;
+    source: "gr_evolve_brick";
+  };
   stiffness?: import("./gr-evolve-brick").GrEvolveBrickStats["stiffness"];
   constraints: {
     H_constraint: GrConstraintDiagnostics;
@@ -1583,6 +1604,7 @@ export interface EnergyPipelineState {
   gr?: GrPipelineDiagnostics;
   grBaseline?: GrInvariantBaseline;
   grRequest?: GrRequestPayload;
+  shiftLapseTransportPromotionGate?: WarpShiftLapseTransportPromotionGate;
   warpWorldline?: WarpWorldlineContractV1;
   warpCruiseEnvelopePreflight?: WarpCruiseEnvelopePreflightContractV1;
   warpRouteTimeWorldline?: WarpRouteTimeWorldlineContractV1;
@@ -2393,12 +2415,14 @@ const buildSolveBackedWarpTransportSampleFamily = (args: {
   if (args.metricT00Source !== "metric") return undefined;
   if (args.adapter?.chart?.label !== "comoving_cartesian") return undefined;
   if (args.adapter?.chart?.contractStatus !== "ok") return undefined;
-  if (metricFamily !== "natario" && metricFamily !== "natario_sdf") return undefined;
   if (
-    args.metricT00Ref == null ||
-    args.metricT00Ref.includes("shift_lapse") ||
-    args.metricT00Ref.includes("nhm2_shift_lapse")
+    metricFamily !== "natario" &&
+    metricFamily !== "natario_sdf" &&
+    metricFamily !== "nhm2_shift_lapse"
   ) {
+    return undefined;
+  }
+  if (args.metricT00Ref == null) {
     return undefined;
   }
 
@@ -2552,6 +2576,270 @@ const buildSolveBackedWarpTransportSampleFamily = (args: {
   };
 };
 
+const buildShiftLapseTransportPromotionGateFromState = (
+  state: EnergyPipelineState,
+): WarpShiftLapseTransportPromotionGate | null => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const adapter = warpState?.metricAdapter as WarpMetricAdapterSnapshot | undefined;
+  const metricContract = warpState?.metricT00Contract as MetricT00Contract | undefined;
+  const metricT00Ref =
+    typeof warpState?.metricT00Ref === "string" && warpState.metricT00Ref.length > 0
+      ? String(warpState.metricT00Ref)
+      : resolveCanonicalMetricT00Ref(warpState ?? {}, adapter) ?? null;
+  const metricFamily =
+    metricContract?.family ??
+    adapter?.family ??
+    (metricT00Ref ? resolveMetricFamilyFromRef(metricT00Ref, adapter) : "unknown");
+  const shiftLapseSelected =
+    metricFamily === "nhm2_shift_lapse" ||
+    metricT00Ref?.includes("shift_lapse") === true ||
+    (state as any)?.warpFieldType === "nhm2_shift_lapse" ||
+    (state.dynamicConfig as any)?.warpFieldType === "nhm2_shift_lapse";
+  if (!shiftLapseSelected) return null;
+
+  const familySemantics = deriveWarpMetricFamilySemantics("nhm2_shift_lapse");
+  const familyAuthorityStatus =
+    metricContract?.familyAuthorityStatus ??
+    adapter?.familyAuthorityStatus ??
+    familySemantics.familyAuthorityStatus;
+  const familyTransportCertificationStatus =
+    metricContract?.transportCertificationStatus ??
+    adapter?.transportCertificationStatus ??
+    familySemantics.transportCertificationStatus;
+
+  const gr = state.gr;
+  const brickStatus =
+    typeof (gr as any)?.meta?.status === "string" ? String((gr as any).meta.status) : null;
+  const brickSolverStatus =
+    typeof gr?.solver?.health?.status === "string" ? String(gr.solver.health.status) : null;
+  const divergenceRms = toFiniteNumber(gr?.divBeta?.rms);
+  const divergenceMaxAbs = toFiniteNumber(gr?.divBeta?.maxAbs);
+  const divergenceSource =
+    typeof gr?.divBeta?.source === "string" ? String(gr.divBeta.source) : null;
+  const thetaMean = toFiniteNumber(gr?.theta?.mean);
+  const kTraceMean = toFiniteNumber(gr?.kTrace?.mean);
+  const thetaKResidualAbs =
+    thetaMean != null && kTraceMean != null ? Math.abs(thetaMean + kTraceMean) : null;
+  const thetaKConsistencyStatus: WarpShiftLapseTransportPromotionGate["thetaKConsistencyStatus"] =
+    thetaKResidualAbs == null
+      ? "unknown"
+      : thetaKResidualAbs <= THETA_K_TOLERANCE
+        ? "pass"
+        : "fail";
+  const authoritativeLowExpansionStatus:
+    WarpShiftLapseTransportPromotionGate["authoritativeLowExpansionStatus"] =
+    gr == null
+      ? "missing"
+      : brickStatus !== "CERTIFIED" || brickSolverStatus !== "CERTIFIED"
+        ? "fail"
+        : divergenceRms == null || divergenceSource == null
+          ? "missing"
+          : thetaKConsistencyStatus === "unknown"
+            ? "missing"
+            : divergenceRms <= NATARIO_EXPANSION_TOLERANCE &&
+                thetaKConsistencyStatus === "pass"
+              ? "pass"
+              : "fail";
+  const authoritativeLowExpansionReason =
+    gr == null
+      ? "authoritative_gr_diagnostics_missing"
+      : brickStatus !== "CERTIFIED"
+        ? "gr_brick_not_certified"
+        : brickSolverStatus !== "CERTIFIED"
+          ? "gr_brick_solver_not_certified"
+          : divergenceRms == null || divergenceSource == null
+            ? "brick_native_div_beta_missing"
+            : thetaKConsistencyStatus === "unknown"
+              ? "brick_native_theta_k_missing"
+              : divergenceRms > NATARIO_EXPANSION_TOLERANCE
+                ? "brick_native_divergence_constraint_failed"
+                : thetaKConsistencyStatus === "fail"
+                  ? "theta_k_consistency_failed"
+                  : "authoritative_low_expansion_ok";
+
+  const betaOverAlphaMax = toFiniteNumber(gr?.gauge?.betaOverAlphaMax);
+  const betaOutwardOverAlphaWallMax = toFiniteNumber(
+    gr?.gauge?.betaOutwardOverAlphaWallMax,
+  );
+  const wallHorizonMargin = toFiniteNumber(gr?.gauge?.wallHorizonMargin);
+  const wallSafetyStatus: WarpShiftLapseTransportPromotionGate["wallSafetyStatus"] =
+    gr == null
+      ? "missing"
+      : betaOverAlphaMax == null ||
+          betaOutwardOverAlphaWallMax == null ||
+          wallHorizonMargin == null
+        ? "missing"
+        : Math.max(betaOverAlphaMax, betaOutwardOverAlphaWallMax) < 1 &&
+            wallHorizonMargin > 0
+          ? "pass"
+          : "fail";
+  const wallSafetyReason =
+    gr == null
+      ? "authoritative_wall_safety_missing"
+      : betaOverAlphaMax == null
+        ? "beta_over_alpha_max_missing"
+        : betaOutwardOverAlphaWallMax == null
+          ? "beta_outward_over_alpha_wall_max_missing"
+          : wallHorizonMargin == null
+            ? "wall_horizon_margin_missing"
+            : Math.max(betaOverAlphaMax, betaOutwardOverAlphaWallMax) >= 1
+              ? "wall_beta_over_alpha_threshold_failed"
+              : wallHorizonMargin <= 0
+                ? "wall_horizon_margin_nonpositive"
+                : "wall_safety_guardrail_ok";
+
+  const centerlineAlpha =
+    toFiniteNumber(warpState?.lapseSummary?.alphaCenterline) ??
+    toFiniteNumber(adapter?.lapseSummary?.alphaCenterline) ??
+    (metricFamily === "nhm2_shift_lapse" ? toFiniteNumber(adapter?.alpha) : null);
+  const shiftLapseProfile =
+    metricFamily === "nhm2_shift_lapse"
+      ? resolveWarpShiftLapseProfile(
+          typeof warpState?.lapseSummary?.shiftLapseProfileId === "string"
+            ? warpState.lapseSummary.shiftLapseProfileId
+            : typeof adapter?.lapseSummary?.shiftLapseProfileId === "string"
+              ? adapter.lapseSummary.shiftLapseProfileId
+              : typeof (state.dynamicConfig as any)?.shiftLapseProfileId === "string"
+                ? String((state.dynamicConfig as any).shiftLapseProfileId)
+                : DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID,
+        )
+      : null;
+  const centerlineDtauDt = centerlineAlpha;
+  const timingStatus: WarpShiftLapseTransportPromotionGate["timingStatus"] =
+    centerlineAlpha != null ? "available" : "missing";
+  const timingReason =
+    centerlineAlpha != null
+      ? "centerline_lapse_timing_available"
+      : "centerline_lapse_timing_missing";
+
+  const status: WarpShiftLapseTransportPromotionGate["status"] =
+    familyAuthorityStatus !== "candidate_authoritative_solve_family"
+      ? "fail"
+      : authoritativeLowExpansionStatus !== "pass"
+        ? authoritativeLowExpansionStatus
+        : wallSafetyStatus !== "pass"
+          ? wallSafetyStatus
+          : "pass";
+  const reason =
+    familyAuthorityStatus !== "candidate_authoritative_solve_family"
+      ? "family_not_candidate_authoritative"
+      : authoritativeLowExpansionStatus !== "pass"
+        ? authoritativeLowExpansionReason
+        : wallSafetyStatus !== "pass"
+          ? wallSafetyReason
+          : "shift_lapse_transport_promotion_gate_pass";
+
+  return {
+    gateId: SHIFT_LAPSE_TRANSPORT_PROMOTION_GATE_ID,
+    status,
+    reason,
+    shiftLapseProfileId: shiftLapseProfile?.profileId ?? null,
+    shiftLapseProfileStage: shiftLapseProfile?.profileStage ?? null,
+    shiftLapseProfileLabel: shiftLapseProfile?.profileLabel ?? null,
+    shiftLapseProfileNote: shiftLapseProfile?.profileNote ?? null,
+    familyAuthorityStatus,
+    familyTransportCertificationStatus,
+    transportCertificationStatus:
+      status === "pass"
+        ? SHIFT_LAPSE_TRANSPORT_PROMOTED_STATUS
+        : familyTransportCertificationStatus,
+    authoritativeLowExpansionStatus,
+    authoritativeLowExpansionReason,
+    authoritativeLowExpansionSource: divergenceSource,
+    authoritativeLowExpansionObservable: "brick_native_div_beta",
+    divergenceRms,
+    divergenceMaxAbs,
+    divergenceTolerance: NATARIO_EXPANSION_TOLERANCE,
+    thetaKConsistencyStatus,
+    thetaKResidualAbs,
+    thetaKTolerance: THETA_K_TOLERANCE,
+    wallSafetyStatus,
+    wallSafetyReason,
+    betaOverAlphaMax,
+    betaOutwardOverAlphaWallMax,
+    wallHorizonMargin,
+    timingStatus,
+    timingReason,
+    centerlineAlpha,
+    centerlineDtauDt,
+  };
+};
+
+const refreshShiftLapseTransportPromotionGate = (
+  state: EnergyPipelineState,
+): void => {
+  const gate = buildShiftLapseTransportPromotionGateFromState(state);
+  if (gate) {
+    state.shiftLapseTransportPromotionGate = gate;
+    ((state as any).warp ??= {}).shiftLapseTransportPromotionGate = gate;
+    return;
+  }
+  delete (state as any).shiftLapseTransportPromotionGate;
+  if ((state as any).warp) {
+    delete (state as any).warp.shiftLapseTransportPromotionGate;
+  }
+};
+
+const resolveWarpTransportSurfaceSemantics = (args: {
+  state: EnergyPipelineState;
+  metricFamily: string;
+  metricT00Ref: string | null;
+  metricContract: MetricT00Contract | undefined;
+  adapter: WarpMetricAdapterSnapshot | undefined;
+}): {
+  shiftLapseSelected: boolean;
+  familyAuthorityStatus: WarpMetricFamilyAuthorityStatus;
+  familyTransportCertificationStatus: WarpMetricTransportCertificationStatus;
+  transportCertificationStatus: WarpTransportCertificationStatus;
+  shiftLapseTransportPromotionGate: WarpShiftLapseTransportPromotionGate | null;
+  shiftLapseTransportGatePassed: boolean;
+  shiftLapseTransportGateReason: string | null;
+} => {
+  const shiftLapseSelected =
+    args.metricFamily === "nhm2_shift_lapse" ||
+    args.metricT00Ref?.includes("shift_lapse") === true;
+  const fallbackFamily =
+    args.metricFamily === "natario" ||
+    args.metricFamily === "natario_sdf" ||
+    args.metricFamily === "nhm2_shift_lapse" ||
+    args.metricFamily === "alcubierre" ||
+    args.metricFamily === "vdb"
+      ? args.metricFamily
+      : shiftLapseSelected
+        ? "nhm2_shift_lapse"
+        : "natario";
+  const familySemantics = deriveWarpMetricFamilySemantics(fallbackFamily);
+  const familyAuthorityStatus =
+    args.metricContract?.familyAuthorityStatus ??
+    args.adapter?.familyAuthorityStatus ??
+    familySemantics.familyAuthorityStatus;
+  const familyTransportCertificationStatus =
+    args.metricContract?.transportCertificationStatus ??
+    args.adapter?.transportCertificationStatus ??
+    familySemantics.transportCertificationStatus;
+  const shiftLapseTransportPromotionGate = shiftLapseSelected
+    ? args.state.shiftLapseTransportPromotionGate ??
+      buildShiftLapseTransportPromotionGateFromState(args.state)
+    : null;
+  const shiftLapseTransportGatePassed =
+    shiftLapseTransportPromotionGate?.status === "pass";
+  return {
+    shiftLapseSelected,
+    familyAuthorityStatus,
+    familyTransportCertificationStatus,
+    transportCertificationStatus:
+      shiftLapseTransportGatePassed && shiftLapseTransportPromotionGate
+        ? shiftLapseTransportPromotionGate.transportCertificationStatus
+        : familyTransportCertificationStatus,
+    shiftLapseTransportPromotionGate,
+    shiftLapseTransportGatePassed,
+    shiftLapseTransportGateReason: shiftLapseSelected
+      ? shiftLapseTransportPromotionGate?.reason ??
+        "shift_lapse_transport_promotion_gate_missing"
+      : null,
+  };
+};
+
 export const buildWarpWorldlineContractFromState = (
   state: EnergyPipelineState,
 ): WarpWorldlineContractV1 | null => {
@@ -2574,6 +2862,13 @@ export const buildWarpWorldlineContractFromState = (
   const gammaDiag = toFiniteVec3(adapter?.gammaDiag, [Number.NaN, Number.NaN, Number.NaN]);
   const gammaDiagFinite = gammaDiag.every((value) => Number.isFinite(value));
   const metricFamily = metricContract?.family ?? adapter?.family ?? "unknown";
+  const transportSurfaceSemantics = resolveWarpTransportSurfaceSemantics({
+    state,
+    metricFamily,
+    metricT00Ref,
+    metricContract,
+    adapter,
+  });
   const transportSampleFamily = warpState?.solveBackedTransportSampleFamily as
     | SolveBackedWarpTransportSampleFamily
     | undefined;
@@ -2585,11 +2880,17 @@ export const buildWarpWorldlineContractFromState = (
   if (metricContract?.observer !== "eulerian_n") return null;
   if (metricContract?.normalization !== "si_stress") return null;
   if (metricContract?.unitSystem !== "SI") return null;
-  if (metricFamily !== "natario" && metricFamily !== "natario_sdf") return null;
   if (
-    metricT00Ref == null ||
-    metricT00Ref.includes("shift_lapse") ||
-    metricT00Ref.includes("nhm2_shift_lapse")
+    metricFamily !== "natario" &&
+    metricFamily !== "natario_sdf" &&
+    metricFamily !== "nhm2_shift_lapse"
+  ) {
+    return null;
+  }
+  if (metricT00Ref == null) return null;
+  if (
+    transportSurfaceSemantics.shiftLapseSelected &&
+    !transportSurfaceSemantics.shiftLapseTransportGatePassed
   ) {
     return null;
   }
@@ -2698,8 +2999,20 @@ export const buildWarpWorldlineContractFromState = (
       metricT00Ref,
       metricT00Source: "metric",
       metricFamily,
+      familyAuthorityStatus: transportSurfaceSemantics.familyAuthorityStatus,
+      transportCertificationStatus:
+        transportSurfaceSemantics.transportCertificationStatus,
       metricT00ContractStatus: "ok",
       chartContractStatus: "ok",
+      ...(transportSurfaceSemantics.shiftLapseTransportPromotionGate?.shiftLapseProfileId
+        ? {
+            shiftLapseProfileId:
+              transportSurfaceSemantics.shiftLapseTransportPromotionGate
+                .shiftLapseProfileId,
+          }
+        : {}),
+      shiftLapseTransportPromotionGate:
+        transportSurfaceSemantics.shiftLapseTransportPromotionGate,
     },
     chart: {
       label: chartLabel,
@@ -2804,7 +3117,7 @@ export const buildWarpWorldlineContractFromState = (
       "chart_not_comoving_cartesian",
       "solve_backed_transport_sample_family_missing",
       "transport_sample_family_not_shell_cross",
-      "reference_only_shift_lapse_family_selected",
+      "shift_lapse_transport_promotion_gate_not_pass",
       "dtau_dt_nonpositive",
       "normalization_residual_exceeds_tolerance",
     ],
@@ -3219,6 +3532,13 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
   const chartLabel = adapter?.chart?.label ?? null;
   const chartContractStatus = adapter?.chart?.contractStatus ?? null;
   const metricFamily = metricContract?.family ?? adapter?.family ?? "unknown";
+  const transportSurfaceSemantics = resolveWarpTransportSurfaceSemantics({
+    state,
+    metricFamily,
+    metricT00Ref,
+    metricContract,
+    adapter,
+  });
   if (metricT00Source !== "metric") return null;
   if (metricContract?.status !== "ok") return null;
   if (metricContract?.observer !== "eulerian_n") return null;
@@ -3226,11 +3546,17 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
   if (metricContract?.unitSystem !== "SI") return null;
   if (chartLabel !== "comoving_cartesian") return null;
   if (chartContractStatus !== "ok") return null;
-  if (metricFamily !== "natario" && metricFamily !== "natario_sdf") return null;
   if (
-    metricT00Ref == null ||
-    metricT00Ref.includes("shift_lapse") ||
-    metricT00Ref.includes("nhm2_shift_lapse")
+    metricFamily !== "natario" &&
+    metricFamily !== "natario_sdf" &&
+    metricFamily !== "nhm2_shift_lapse"
+  ) {
+    return null;
+  }
+  if (metricT00Ref == null) return null;
+  if (
+    transportSurfaceSemantics.shiftLapseSelected &&
+    !transportSurfaceSemantics.shiftLapseTransportGatePassed
   ) {
     return null;
   }
@@ -3258,10 +3584,18 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
     const brickModule = await import("./gr-evolve-brick.ts");
     brick = brickModule.buildGrEvolveBrick({
       dims: resolveInHullProperAccelerationBrickDims(state),
+      useInitialData: transportSurfaceSemantics.shiftLapseSelected,
       includeMatter: false,
       includeConstraints: false,
       includeKij: false,
       includeInvariants: false,
+      sourceParams: {
+        ...(metricT00Ref ? { metricT00Ref } : {}),
+        ...(metricT00Source ? { metricT00Source } : {}),
+        ...(transportSurfaceSemantics.shiftLapseSelected
+          ? { warpFieldType: "nhm2_shift_lapse" as const }
+          : {}),
+      },
     }) as unknown as typeof brick;
   } finally {
     if (shouldRestoreGlobalState) {
@@ -3337,6 +3671,9 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
   >;
   const alphaValues = typedSampleSummaries.map((entry) => entry.alpha);
   const alphaSpread = Math.max(...alphaValues) - Math.min(...alphaValues);
+  const brickAlphaSpread = Math.abs(
+    (brick.channels.alpha?.max ?? 0) - (brick.channels.alpha?.min ?? 0),
+  );
   const channelExtrema = summarizeInHullProperAccelerationChannelExtrema({
     accelMagMin: brick.channels.eulerian_accel_geom_mag?.min,
     accelMagMax: brick.channels.eulerian_accel_geom_mag?.max,
@@ -3350,10 +3687,11 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
   const allSampleMagnitudesZero = typedSampleSummaries.every(
     (entry) => entry.properAccelerationGeomMagnitude_per_m === 0,
   );
+  const declaredLapseProfileCompanionPresent =
+    warpState?.lapseSummary != null || adapter?.lapseSummary != null;
   const expectedZeroProfileByModel =
-    warpState?.lapseSummary == null &&
-    adapter?.lapseSummary == null &&
-    alphaSpread <= IN_HULL_PROPER_ACCELERATION_ALPHA_CONST_TOLERANCE;
+    alphaSpread <= IN_HULL_PROPER_ACCELERATION_ALPHA_CONST_TOLERANCE &&
+    brickAlphaSpread <= IN_HULL_PROPER_ACCELERATION_ALPHA_CONST_TOLERANCE;
   let resolutionAdequacyStatus:
     | "adequate_constant_lapse_zero_profile"
     | "adequate_direct_brick_profile"
@@ -3367,7 +3705,9 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
   ) {
     resolutionAdequacyStatus = "adequate_constant_lapse_zero_profile";
     resolutionAdequacyNote =
-      "Direct gr-evolve brick sampling shows a zero proper-acceleration profile across the bounded cabin-cross family, and the current NHM2 metric path has no declared lapse-profile companion. This is treated as a certified constant-lapse zero-profile result rather than as an under-resolved fallback case.";
+      declaredLapseProfileCompanionPresent
+        ? "Direct gr-evolve brick sampling shows a zero proper-acceleration profile across the bounded cabin-cross family, and the certified brick itself remains constant-lapse over the sampled region even though a higher-level lapse summary is declared. This is treated as a certified direct-brick zero-profile result rather than as a nonzero resolved cabin-gravity claim."
+        : "Direct gr-evolve brick sampling shows a zero proper-acceleration profile across the bounded cabin-cross family, and the current NHM2 metric path has no declared lapse-profile companion. This is treated as a certified constant-lapse zero-profile result rather than as an under-resolved fallback case.";
   } else if (channelExtrema.wholeBrickAccelerationAbsMax_per_m > 0) {
     resolutionAdequacyStatus = "adequate_direct_brick_profile";
     resolutionAdequacyNote =
@@ -3386,10 +3726,22 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
       metricT00Ref,
       metricT00Source: "metric",
       metricFamily,
+      familyAuthorityStatus: transportSurfaceSemantics.familyAuthorityStatus,
+      transportCertificationStatus:
+        transportSurfaceSemantics.transportCertificationStatus,
       metricT00ContractStatus: "ok",
       chartContractStatus: "ok",
       brickStatus: "CERTIFIED",
       brickSolverStatus: "CERTIFIED",
+      ...(transportSurfaceSemantics.shiftLapseTransportPromotionGate?.shiftLapseProfileId
+        ? {
+            shiftLapseProfileId:
+              transportSurfaceSemantics.shiftLapseTransportPromotionGate
+                .shiftLapseProfileId,
+          }
+        : {}),
+      shiftLapseTransportPromotionGate:
+        transportSurfaceSemantics.shiftLapseTransportPromotionGate,
     },
     chart: {
       label: "comoving_cartesian",
@@ -3437,7 +3789,7 @@ export const buildWarpInHullProperAccelerationContractFromState = async (
       "metric_t00_source_not_metric",
       "metric_contract_status_not_ok",
       "chart_contract_status_not_ok",
-      "reference_only_shift_lapse_family_selected",
+      "shift_lapse_transport_promotion_gate_not_pass",
       "brick_status_not_certified",
       "brick_solver_status_not_certified",
       "direct_gr_evolve_brick_channels_missing",
@@ -3658,41 +4010,99 @@ const refreshCl3Telemetry = (state: EnergyPipelineState): void => {
 };
 
 const refreshThetaAuditFromMetricAdapter = (state: EnergyPipelineState): void => {
+  const authoritativeTheta = state.gr?.theta;
+  const authoritativeKTrace = state.gr?.kTrace;
+  const authoritativeThetaGeomCandidate =
+    authoritativeTheta?.mean ??
+    (Number.isFinite(authoritativeKTrace?.mean)
+      ? -Number(authoritativeKTrace?.mean)
+      : undefined);
+  const authoritativeThetaGeom =
+    Number.isFinite(authoritativeThetaGeomCandidate)
+      ? Number(authoritativeThetaGeomCandidate)
+      : undefined;
+  const authoritativeThetaGeomUsable =
+    authoritativeThetaGeom != null &&
+    ((typeof authoritativeTheta?.source === "string" &&
+      authoritativeTheta.source.length > 0) ||
+      (typeof authoritativeKTrace?.source === "string" &&
+        authoritativeKTrace.source.length > 0));
+  const authoritativeThetaGeomSource = authoritativeThetaGeomUsable
+    ? authoritativeTheta?.source === "gr_evolve_brick_theta"
+      ? "pipeline.gr.theta.mean"
+      : "pipeline.gr.kTrace.mean"
+    : undefined;
   const metricBeta = (state as any).warp?.metricAdapter?.betaDiagnostics;
-  const thetaGeomCandidate = metricBeta?.thetaMax ?? metricBeta?.thetaRms;
-  const thetaGeom =
-    Number.isFinite(thetaGeomCandidate) ? Number(thetaGeomCandidate) : undefined;
-  const thetaGeomProxy = metricBeta?.method === "not-computed";
-  const thetaGeomUsable = thetaGeom != null && !thetaGeomProxy;
+  const projectionThetaGeomCandidate = metricBeta?.thetaMax ?? metricBeta?.thetaRms;
+  const projectionThetaGeom =
+    Number.isFinite(projectionThetaGeomCandidate)
+      ? Number(projectionThetaGeomCandidate)
+      : undefined;
+  const projectionThetaGeomProxy = metricBeta?.method === "not-computed";
+  const projectionThetaGeomUsable =
+    projectionThetaGeom != null && !projectionThetaGeomProxy;
   const thetaProxySource =
     (state as any).thetaCal != null
       ? "pipeline.thetaCal"
       : (state as any).thetaScaleExpected != null
         ? "pipeline.thetaScaleExpected"
         : undefined;
-  const thetaGeomSource =
-    thetaGeom != null
+  const projectionThetaGeomSource =
+    projectionThetaGeom != null
       ? metricBeta?.thetaMax != null
         ? "warp.metricAdapter.betaDiagnostics.thetaMax"
         : "warp.metricAdapter.betaDiagnostics.thetaRms"
       : undefined;
+  const thetaGeom = authoritativeThetaGeomUsable
+    ? authoritativeThetaGeom
+    : projectionThetaGeom;
+  const thetaGeomSource = authoritativeThetaGeomUsable
+    ? authoritativeThetaGeomSource
+    : projectionThetaGeomSource;
+  const thetaGeomProxy = authoritativeThetaGeomUsable ? false : projectionThetaGeomProxy;
+  const thetaGeomUsable = authoritativeThetaGeomUsable || projectionThetaGeomUsable;
   const thetaProxy = (state as any).thetaCal ?? (state as any).thetaScaleExpected;
   const thetaAudit = thetaGeomUsable ? thetaGeom : thetaProxy;
-  const thetaMetricReason = thetaGeomUsable
-    ? "metric_adapter_divergence"
-    : thetaGeom == null
+  const thetaMetricReason = authoritativeThetaGeomUsable
+    ? authoritativeTheta?.source === "gr_evolve_brick_theta"
+      ? "gr_evolve_brick_theta_mean"
+      : "gr_evolve_brick_neg_k_trace_mean"
+    : projectionThetaGeomUsable
+      ? "metric_adapter_theta_projection"
+      : projectionThetaGeom == null
       ? "missing_theta_geom"
       : "theta_geom_proxy";
 
   (state as any).theta_geom = thetaGeom;
   (state as any).theta_geom_source = thetaGeomSource;
   (state as any).theta_geom_proxy = thetaGeomProxy;
+  (state as any).theta_geom_projection = projectionThetaGeom;
+  (state as any).theta_geom_projection_source = projectionThetaGeomSource;
+  (state as any).theta_geom_projection_proxy = projectionThetaGeomProxy;
   (state as any).theta_proxy = thetaProxy;
   (state as any).theta_proxy_source = thetaProxySource;
   (state as any).theta_audit = thetaAudit;
   (state as any).theta_metric_derived = thetaGeomUsable;
   (state as any).theta_metric_source = thetaGeomUsable ? thetaGeomSource : undefined;
   (state as any).theta_metric_reason = thetaMetricReason;
+  (state as any).theta_metric_authoritative = authoritativeThetaGeomUsable;
+  (state as any).theta_metric_authoritative_source = authoritativeThetaGeomUsable
+    ? authoritativeThetaGeomSource
+    : undefined;
+  (state as any).theta_metric_authoritative_reason = authoritativeThetaGeomUsable
+    ? authoritativeTheta?.source === "gr_evolve_brick_theta"
+      ? "brick_native_theta_present"
+      : "brick_native_neg_k_trace_present"
+    : "brick_native_theta_missing";
+  (state as any).theta_metric_projection_available = projectionThetaGeomUsable;
+  (state as any).theta_metric_projection_source = projectionThetaGeomUsable
+    ? projectionThetaGeomSource
+    : undefined;
+  (state as any).theta_metric_projection_reason = projectionThetaGeomUsable
+    ? "projection_metric_adapter_theta_available"
+    : projectionThetaGeom == null
+      ? "projection_theta_missing"
+      : "projection_theta_proxy";
   (state as any).theta_source = thetaGeomUsable ? thetaGeomSource : thetaProxySource;
   if ((state as any).uniformsExplain?.thetaAudit) {
     (state as any).uniformsExplain.thetaAudit.thetaGeom = thetaGeom;
@@ -3700,9 +4110,17 @@ const refreshThetaAuditFromMetricAdapter = (state: EnergyPipelineState): void =>
       (state as any).theta_geom_source;
     (state as any).uniformsExplain.thetaAudit.thetaGeomProxy =
       (state as any).theta_geom_proxy;
+    (state as any).uniformsExplain.thetaAudit.thetaGeomProjection =
+      (state as any).theta_geom_projection;
+    (state as any).uniformsExplain.thetaAudit.thetaGeomProjectionSource =
+      (state as any).theta_geom_projection_source;
+    (state as any).uniformsExplain.thetaAudit.thetaGeomProjectionProxy =
+      (state as any).theta_geom_projection_proxy;
     (state as any).uniformsExplain.thetaAudit.thetaAudit = thetaAudit;
     (state as any).uniformsExplain.thetaAudit.thetaMetricDerived = thetaGeomUsable;
     (state as any).uniformsExplain.thetaAudit.thetaMetricReason = thetaMetricReason;
+    (state as any).uniformsExplain.thetaAudit.thetaMetricAuthoritative =
+      authoritativeThetaGeomUsable;
   }
 };
 
@@ -7043,6 +7461,7 @@ export async function calculateEnergyPipeline(
         alphaGradientVec_m_inv: (state.dynamicConfig as any)?.alphaGradientVec_m_inv,
         alphaInteriorSupportKind: (state.dynamicConfig as any)?.alphaInteriorSupportKind,
         alphaWallTaper_m: (state.dynamicConfig as any)?.alphaWallTaper_m,
+        shiftLapseProfileId: (state.dynamicConfig as any)?.shiftLapseProfileId,
         warpFieldType,
         warpGeometry: warpGeometry ?? undefined,
         warpGeometryKind
@@ -7442,6 +7861,7 @@ export async function calculateEnergyPipeline(
     });
   }
   refreshMetricT00Contract(state);
+  refreshShiftLapseTransportPromotionGate(state);
   refreshWarpWorldlineContract(state);
   refreshWarpCruiseEnvelopePreflight(state);
   refreshWarpRouteTimeWorldline(state);

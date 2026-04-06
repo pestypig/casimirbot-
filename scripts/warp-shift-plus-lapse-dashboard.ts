@@ -117,6 +117,9 @@ const OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT = path.join(
 );
 
 const DASHBOARD_LAYOUT_VERSION = "v2_measured_card_family";
+const SPEED_OF_LIGHT_MPS = 299_792_458;
+const SECONDS_PER_DAY = 86_400;
+const GRAPH_SAMPLE_COUNT = 9;
 const FONT_FAMILY = "'Segoe UI', Arial, sans-serif";
 const CARD_MARGIN = 24;
 const HEADER_HEIGHT = 106;
@@ -150,6 +153,10 @@ type DashboardCardId =
   | "cabin_gravity"
   | "wall_safety"
   | "precision_provenance";
+
+type DashboardGraphId =
+  | "cabin_gravity_profile_z"
+  | "clock_gradient_profile_z";
 
 type DashboardRow = {
   rowId: string;
@@ -191,6 +198,41 @@ type DashboardCardEntry = {
   sectionSource: string;
   layoutVersion: string;
   primary: boolean;
+};
+
+type DashboardGraphSeriesBlock = {
+  graphId: DashboardGraphId;
+  title: string;
+  quantitySymbol: string;
+  quantityUnits: string;
+  sampleAxis: string;
+  sampleAxisLabel: string;
+  sampleDomain: number[];
+  sampleCount: number;
+  baselineSeries: Array<number | null>;
+  generalizedSeries: Array<number | null>;
+  baselineSourceKind: string;
+  generalizedSourceKind: string;
+  baselineSeriesStatus: string;
+  generalizedSeriesStatus: string;
+  baselineBadgeIds: string[];
+  generalizedBadgeIds: string[];
+  sharedBadgeIds: string[];
+  underResolutionDetected: boolean;
+  graphNote: string;
+};
+
+type DashboardGraphRenderEntry = {
+  graphId: DashboardGraphId;
+  title: string;
+  path: string;
+  hash: string;
+  renderCategory: "comparison_panel";
+  renderRole: "presentation";
+  authoritativeStatus: "non_authoritative";
+  sourcePanel: DashboardPanelId;
+  sourceSeriesBlock: DashboardGraphId;
+  layoutVersion: string;
 };
 
 type SourceMechanismPolicyContext = {
@@ -294,7 +336,17 @@ type DashboardPayload = {
   renderedCardCategory: string | null;
   renderedCardRole: string | null;
   renderedCardLayoutVersion: string | null;
+  graphRenderStatus: string;
+  graphReadingOrder: DashboardGraphId[];
+  graphSeriesBlocks: DashboardGraphSeriesBlock[];
+  graphRenders: DashboardGraphRenderEntry[];
   proofPolicy: Record<string, unknown> & { dashboardNote?: string };
+  baselineBranchStatus: string;
+  generalizedBranchStatus: string;
+  baselineFamilyAuthorityStatus: string;
+  generalizedFamilyAuthorityStatus: string;
+  baselineTransportCertificationStatus: string;
+  generalizedTransportCertificationStatus: string;
   sourceMechanismPromotionContractStatus: string;
   sourceMechanismSelectedPromotionRoute: string;
   sourceMechanismExemptionRouteActivated: boolean;
@@ -336,6 +388,9 @@ type DashboardSeed = Omit<
   | "renderedCardCategory"
   | "renderedCardRole"
   | "renderedCardLayoutVersion"
+  | "graphRenderStatus"
+  | "graphReadingOrder"
+  | "graphRenders"
 >;
 
 type DashboardRenderedCardSource = {
@@ -343,6 +398,14 @@ type DashboardRenderedCardSource = {
   title: string;
   sectionSource: string;
   primary: boolean;
+  svg: string;
+  inspectionText: string;
+};
+
+type DashboardRenderedGraphSource = {
+  graphId: DashboardGraphId;
+  title: string;
+  sourcePanel: DashboardPanelId;
   svg: string;
   inspectionText: string;
 };
@@ -355,6 +418,16 @@ type CardSpec = {
   primary: boolean;
   variant: string;
   minHeight: number;
+  question: string;
+};
+
+type GraphSpec = {
+  graphId: DashboardGraphId;
+  title: string;
+  sourcePanel: DashboardPanelId;
+  width: number;
+  minHeight: number;
+  variant: "graph";
   question: string;
 };
 
@@ -430,7 +503,7 @@ const BADGES: BadgeDefinition[] = [
     badgeId: "reference_only",
     label: "reference_only",
     meaning:
-      "The generalized shift-plus-lapse branch remains diagnostic/reference-only and is not promoted to proof status.",
+      "This badge marks reference_only or fail-closed boundaries. For nhm2_shift_lapse, proof-bearing bounded transport publication is controlled separately by the authoritative shift-lapse transport-promotion gate; this dashboard does not claim that gate-passed publication.",
     displayPriority: 2,
   },
   {
@@ -546,6 +619,29 @@ const CARD_SPECS: CardSpec[] = [
   },
 ];
 
+const GRAPH_SPECS: GraphSpec[] = [
+  {
+    graphId: "cabin_gravity_profile_z",
+    title: "Local Cabin Gravity Profile",
+    sourcePanel: "cabin_gravity_panel",
+    width: 1320,
+    minHeight: 860,
+    variant: "graph",
+    question:
+      "How does local cabin gravity vary along the cabin axis in the mild shift-plus-lapse branch versus the unit-lapse baseline?",
+  },
+  {
+    graphId: "clock_gradient_profile_z",
+    title: "Local Clock Gradient Profile",
+    sourcePanel: "cabin_gravity_panel",
+    width: 1320,
+    minHeight: 880,
+    variant: "graph",
+    question:
+      "How small is the local clock-gradient profile across the cabin in the mild shift-plus-lapse branch versus the unit-lapse baseline?",
+  },
+];
+
 const CABIN_ROW_IDS = [
   "alphaCenterline",
   "alphaGradientVec_m_inv",
@@ -577,6 +673,35 @@ const DASHBOARD_FIELD_FAMILY = {
   defaultColormapFamily: null,
 };
 
+const DASHBOARD_GRAPH_FIELD_FAMILIES = [
+  {
+    fieldId: "cabin_gravity_profile_z",
+    label: "Cabin gravity profile z",
+    quantitySymbol: "g_local(z)",
+    quantityUnits: "m/s^2",
+    defaultCategory: "comparison_panel",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "How does local cabin gravity vary along the cabin axis in the mild shift-plus-lapse branch versus the unit-lapse baseline?",
+    defaultDisplayPolicyId: null,
+    defaultDisplayTransform: null,
+    defaultColormapFamily: null,
+  },
+  {
+    fieldId: "clock_gradient_profile_z",
+    label: "Clock gradient profile z",
+    quantitySymbol: "delta_tau_per_day(z)",
+    quantityUnits: "s/day",
+    defaultCategory: "comparison_panel",
+    defaultRole: "presentation",
+    primaryScientificQuestion:
+      "How small is the local clock-gradient profile across the cabin in the mild shift-plus-lapse branch versus the unit-lapse baseline?",
+    defaultDisplayPolicyId: null,
+    defaultDisplayTransform: null,
+    defaultColormapFamily: null,
+  },
+] as const;
+
 const normalizePath = (value: string) => value.replaceAll("\\", "/");
 const ensureDirForFile = (filePath: string) =>
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -592,8 +717,12 @@ const panelById = (payload: { panels: DashboardPanel[] }, panelId: DashboardPane
   payload.panels.find((panel) => panel.panelId === panelId)!;
 const cardSpecById = (cardId: DashboardCardId) =>
   CARD_SPECS.find((entry) => entry.cardId === cardId)!;
+const graphSpecById = (graphId: DashboardGraphId) =>
+  GRAPH_SPECS.find((entry) => entry.graphId === graphId)!;
 const buildCardAbsolutePath = (cardId: DashboardCardId) =>
   path.join(OUT_RENDER_DIR, `nhm2_shift_lapse-comparison_panel-${cardId}-card.png`);
+const buildGraphAbsolutePath = (graphId: DashboardGraphId) =>
+  path.join(OUT_RENDER_DIR, `nhm2_shift_lapse-comparison_panel-${graphId}-graph.png`);
 const escapeXml = (value: unknown) =>
   `${value ?? ""}`
     .replaceAll("&", "&amp;")
@@ -601,6 +730,29 @@ const escapeXml = (value: unknown) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
+
+const normalizeShiftLapseTransportNarrative = (value: string): string =>
+  value
+    .replaceAll(
+      "bounded transport proof-bearing surfaces remain fail-closed and reference-only",
+      "proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate",
+    )
+    .replaceAll(
+      "bounded transport proof-bearing surfaces remain fail-closed/reference-only",
+      "proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate",
+    )
+    .replaceAll(
+      "bounded transport proof-bearing surfaces remain fail-closed and reference_only",
+      "proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate",
+    )
+    .replaceAll(
+      "bounded transport proof-bearing surfaces remain fail-closed/reference_only",
+      "proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate",
+    )
+    .replaceAll(
+      "and its bounded transport proof-bearing surfaces remain fail-closed and reference_only.",
+      "and proof-bearing bounded transport admission remains controlled separately by the authoritative shift-lapse transport-promotion gate rather than granted by this source/mechanism surface.",
+    );
 
 const loadSourceMechanismPolicyContext = (): SourceMechanismPolicyContext => {
   const promotionArtifact = readJsonFile<any>(SOURCE_MECHANISM_PROMOTION_CONTRACT_LATEST_JSON);
@@ -624,7 +776,7 @@ const loadSourceMechanismPolicyContext = (): SourceMechanismPolicyContext => {
     forbiddenPromotions: [...contract.forbiddenPromotions],
     requiredDisclaimers: [...contract.activationDisclaimers],
     referenceOnlyScope: contract.referenceOnlyCrossLaneScope === true,
-    consumerSummary: contract.consumerSummary,
+    consumerSummary: normalizeShiftLapseTransportNarrative(contract.consumerSummary),
   };
 };
 
@@ -739,6 +891,155 @@ const sourceBadgeIds = (sourceKind: string | null | undefined): string[] => {
 const uniqueBadgeIds = (ids: Array<string | null | undefined>) =>
   [...new Set(ids.filter((id): id is string => Boolean(id)))];
 
+const axisComponentIndex = (axis: string) => {
+  switch (axis) {
+    case "x_ship":
+      return 0;
+    case "y_port":
+      return 1;
+    case "z_zenith":
+    default:
+      return 2;
+  }
+};
+
+const evenlySpacedDomain = (min: number, max: number, count: number) => {
+  if (count <= 1) return [min];
+  const step = (max - min) / (count - 1);
+  return Array.from({ length: count }, (_, index) => min + step * index);
+};
+
+const resolveCabinGraphAxis = (comparison: any) =>
+  comparison.generalizedCase?.cabinObservables?.cabinSampleAxis ??
+  comparison.generalizedCase?.alphaProfileMetadata?.alphaGradientAxis ??
+  comparison.baselineCase?.cabinObservables?.cabinSampleAxis ??
+  comparison.baselineCase?.alphaProfileMetadata?.alphaGradientAxis ??
+  "z_zenith";
+
+const resolveCabinHalfSpanM = (comparison: any) =>
+  Math.max(
+    1e-6,
+    Number(
+      comparison.generalizedCase?.cabinObservables?.cabinSampleSeparation_m ??
+        comparison.baselineCase?.cabinObservables?.cabinSampleSeparation_m ??
+        comparison.generalizedCase?.alphaProfileMetadata?.referenceCalibration
+          ?.targetCabinHeight_m ??
+        comparison.baselineCase?.alphaProfileMetadata?.referenceCalibration
+          ?.targetCabinHeight_m ??
+        2.5,
+    ) * 0.5,
+  );
+
+const buildAlphaProfileSeries = (caseEntry: any, sampleAxis: string, sampleDomain: number[]) => {
+  const centerlineAlpha = Number(
+    caseEntry?.alphaProfileMetadata?.alphaCenterline ??
+      caseEntry?.cabinObservables?.centerline_alpha ??
+      1,
+  );
+  const gradientVector = Array.isArray(caseEntry?.alphaProfileMetadata?.alphaGradientVec_m_inv)
+    ? caseEntry.alphaProfileMetadata.alphaGradientVec_m_inv
+    : [0, 0, 0];
+  const gradientIndex = axisComponentIndex(sampleAxis);
+  const gradientComponent = Number(gradientVector[gradientIndex] ?? 0);
+  return sampleDomain.map((position) => centerlineAlpha * Math.exp(gradientComponent * position));
+};
+
+const buildGravityProfileSeries = (caseEntry: any, sampleDomain: number[]) => {
+  const gravitySi = Number(caseEntry?.cabinObservables?.cabin_gravity_gradient_si ?? 0);
+  return sampleDomain.map(() => gravitySi);
+};
+
+const buildClockGradientSeries = (caseEntry: any, sampleAxis: string, sampleDomain: number[]) => {
+  const alphaSeries = buildAlphaProfileSeries(caseEntry, sampleAxis, sampleDomain);
+  const centerlineAlpha = Number(
+    caseEntry?.alphaProfileMetadata?.alphaCenterline ??
+      caseEntry?.cabinObservables?.centerline_alpha ??
+      1,
+  );
+  return alphaSeries.map((alpha) => ((alpha / Math.max(centerlineAlpha, 1e-30)) - 1) * SECONDS_PER_DAY);
+};
+
+const buildDashboardGraphSeriesBlocks = (comparison: any): DashboardGraphSeriesBlock[] => {
+  const sampleAxis = resolveCabinGraphAxis(comparison);
+  const halfSpanM = resolveCabinHalfSpanM(comparison);
+  const sampleDomain = evenlySpacedDomain(-halfSpanM, halfSpanM, GRAPH_SAMPLE_COUNT);
+  const underResolutionDetected = comparison.generalizedPrecisionContext?.underResolutionDetected === true;
+  const gravityQuantity = findQuantity(
+    comparison.cabinGravityComparison,
+    "cabin_gravity_gradient_si",
+  );
+  const clockQuantity = findQuantity(
+    comparison.cabinGravityComparison,
+    "cabin_clock_split_per_day_s",
+  );
+  const gravitySharedBadges = uniqueBadgeIds([
+    gravityQuantity?.crossCaseSourceMismatch ? "mixed_source" : null,
+    gravityQuantity?.crossCaseSourceMismatch ? "source_mismatch" : null,
+  ]);
+  const clockSharedBadges = uniqueBadgeIds([
+    clockQuantity?.crossCaseSourceMismatch ? "mixed_source" : null,
+    clockQuantity?.crossCaseSourceMismatch ? "source_mismatch" : null,
+  ]);
+  return [
+    {
+      graphId: "cabin_gravity_profile_z",
+      title: "Local Cabin Gravity Profile Along z_zenith",
+      quantitySymbol: "g_local(z)",
+      quantityUnits: "m/s^2",
+      sampleAxis,
+      sampleAxisLabel: `Cabin ${sampleAxis} offset (m)`,
+      sampleDomain,
+      sampleCount: sampleDomain.length,
+      baselineSeries: buildGravityProfileSeries(comparison.baselineCase, sampleDomain),
+      generalizedSeries: buildGravityProfileSeries(comparison.generalizedCase, sampleDomain),
+      baselineSourceKind: gravityQuantity?.baselineSourceKind ?? "brick_float32_direct",
+      generalizedSourceKind:
+        gravityQuantity?.generalizedSourceKind ?? "analytic_lapse_summary_companion",
+      baselineSeriesStatus: "sampled_raw_brick_constant_axis_profile",
+      generalizedSeriesStatus:
+        "sampled_analytic_companion_constant_log_gradient_profile",
+      baselineBadgeIds: sourceBadgeIds(gravityQuantity?.baselineSourceKind),
+      generalizedBadgeIds: sourceBadgeIds(gravityQuantity?.generalizedSourceKind),
+      sharedBadgeIds: gravitySharedBadges,
+      underResolutionDetected,
+      graphNote:
+        "Local cabin gravity proxy only. Baseline remains the raw-brick unit-lapse zero profile. The mild shift-plus-lapse branch uses the analytic companion lapse summary because float32 raw channels under-resolve the lapse gradient. Presentation-only graph; not a proof surface and not a wall-safety score.",
+    },
+    {
+      graphId: "clock_gradient_profile_z",
+      title: "Local Clock Gradient Profile Along z_zenith",
+      quantitySymbol: "delta_tau_per_day(z)",
+      quantityUnits: "s/day",
+      sampleAxis,
+      sampleAxisLabel: `Cabin ${sampleAxis} offset (m)`,
+      sampleDomain,
+      sampleCount: sampleDomain.length,
+      baselineSeries: buildClockGradientSeries(
+        comparison.baselineCase,
+        sampleAxis,
+        sampleDomain,
+      ),
+      generalizedSeries: buildClockGradientSeries(
+        comparison.generalizedCase,
+        sampleAxis,
+        sampleDomain,
+      ),
+      baselineSourceKind: clockQuantity?.baselineSourceKind ?? "brick_float32_direct",
+      generalizedSourceKind:
+        clockQuantity?.generalizedSourceKind ?? "analytic_lapse_summary_companion",
+      baselineSeriesStatus: "sampled_raw_brick_centerline_relative_profile",
+      generalizedSeriesStatus:
+        "sampled_analytic_companion_centerline_relative_profile",
+      baselineBadgeIds: sourceBadgeIds(clockQuantity?.baselineSourceKind),
+      generalizedBadgeIds: sourceBadgeIds(clockQuantity?.generalizedSourceKind),
+      sharedBadgeIds: clockSharedBadges,
+      underResolutionDetected,
+      graphNote:
+        "Local cabin clock gradient relative to the centerline only. The mild shift-plus-lapse branch is reconstructed from the analytic companion lapse summary because float32 raw channels under-resolve the lapse gradient. This is not route-time compression. Scientific notation is intentional so the tiny scale stays visually honest.",
+    },
+  ];
+};
+
 const measureBadgeWidth = (label: string) =>
   Math.max(92, measureTextWidth(label, TEXT.badge) + 24);
 
@@ -845,18 +1146,32 @@ const buildProofRows = (comparison: any): DashboardRow[] => [
     note: "Lane A remains the proof surface for formal warp comparisons and class decisions.",
   },
   {
-    rowId: "branch_status",
-    label: "Branch Status",
-    baselineValue: comparison.baselineBranchStatus,
-    generalizedValue: comparison.generalizedBranchStatus,
+    rowId: "generalized_family_status",
+    label: "Generalized Family Authority Status",
+    baselineValue: comparison.baselineFamilyAuthorityStatus,
+    generalizedValue: comparison.generalizedFamilyAuthorityStatus,
     units: "status",
-    delta: "comparison_only",
+    delta: "family_status_split",
+    baselineSourceKind: "comparison_contract",
+    generalizedSourceKind: "comparison_contract",
+    badgeId: "lane_a_unchanged",
+    badgeIds: ["lane_a_unchanged"],
+    crossCaseSourceMismatch: false,
+    note: "The generalized branch exists as a distinct candidate authoritative solve family in full-solve provenance/model-selection.",
+  },
+  {
+    rowId: "generalized_transport_status",
+    label: "Generalized Transport Certification Status",
+    baselineValue: comparison.baselineTransportCertificationStatus,
+    generalizedValue: comparison.generalizedTransportCertificationStatus,
+    units: "status",
+    delta: "transport_fail_closed",
     baselineSourceKind: "comparison_contract",
     generalizedSourceKind: "comparison_contract",
     badgeId: "reference_only",
     badgeIds: ["lane_a_unchanged", "reference_only"],
     crossCaseSourceMismatch: false,
-    note: "The baseline branch stays unchanged while the generalized branch remains reference-only.",
+    note: "The generalized family default transport certification status remains fail-closed/reference_only unless an explicitly selected solve passes the authoritative shift-lapse transport-promotion gate; this dashboard does not itself claim gate-passed proof-bearing transport publication.",
   },
 ];
 
@@ -1288,7 +1603,7 @@ const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
   const header = renderCardHeader(
     width,
     "NHM2 Shift+Lapse Dashboard Overview",
-    "Unit-lapse NHM2 baseline vs mild shift-plus-lapse reference | presentation/comparison layer only",
+    "Unit-lapse NHM2 baseline vs mild shift-plus-lapse reference | candidate family shown, transport admission gate-controlled",
     `scenario=${payload.scenarioId} | crossCaseSourceMismatchCount=${payload.comparisonSemantics.crossCaseSourceMismatchCount} | wallSafetySourceParity=${payload.comparisonSemantics.wallSafetySourceParity ? "true" : "false"}`,
     ["lane_a_unchanged", "reference_only"],
   );
@@ -1300,7 +1615,7 @@ const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
     innerWidth,
     "Dashboard Overview",
     "Use this index card to route a reviewer to the proof-status, cabin-gravity, wall-safety, and precision/provenance cards without re-deriving the comparison semantics.",
-    "This overview card is not the proof surface. It summarizes the card family while keeping Lane A authoritative and the generalized branch reference-only.",
+    "This overview card is not the proof surface. It summarizes the card family while keeping Lane A authoritative, presenting nhm2_shift_lapse as a candidate authoritative solve family, and treating proof-bearing bounded transport admission as separately controlled by the authoritative shift-lapse transport-promotion gate.",
   );
   elements.push(intro.svg);
   currentY += intro.height + SECTION_GAP;
@@ -1319,8 +1634,8 @@ const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
     },
     {
       label: "Proof Hierarchy",
-      value: "Lane A authoritative | generalized reference_only",
-      note: "The overview card remains presentation/comparison only and does not alter proof status or source/mechanism authority.",
+      value: "Lane A authoritative | candidate family | transport gate-controlled",
+      note: "The overview card remains presentation/comparison only and does not alter proof status; it separates family identity from bounded transport admission, which is controlled separately by the authoritative gate.",
       badgeIds: ["lane_a_unchanged", "reference_only"],
     },
     {
@@ -1356,7 +1671,7 @@ const renderOverviewCard = (payload: DashboardSeed, spec: CardSpec) => {
     {
       label: "Forbidden Promotions",
       value: "no formula eq | no viability | no cross-lane",
-      note: "Parity route remains blocked by derivation-class difference, and warp.metric.T00.nhm2_shift_lapse remains reference_only.",
+      note: "Parity route remains blocked by derivation-class difference, and this dashboard does not claim gate-passed proof-bearing transport publication for nhm2_shift_lapse.",
       badgeIds: ["lane_a_unchanged", "reference_only"],
     },
   ];
@@ -1421,7 +1736,7 @@ const renderPanelCard = (
   const subtitleByCard: Record<DashboardCardId, string> = {
     dashboard_overview: "",
     proof_status:
-      "Lane A authoritative | generalized branch reference_only | source/mechanism bounded advisory only",
+      "Lane A authoritative | candidate solve family | transport gate-controlled",
     cabin_gravity:
       "Local lapse diagnostics | mild reference may use analytic companion under float32 under-resolution",
     wall_safety:
@@ -1431,7 +1746,7 @@ const renderPanelCard = (
   };
   const metaByCard: Record<DashboardCardId, string> = {
     dashboard_overview: "",
-    proof_status: `scenario=${payload.scenarioId} | proof=Lane A authoritative`,
+    proof_status: `scenario=${payload.scenarioId} | proof=Lane A authoritative | family=${payload.generalizedFamilyAuthorityStatus}`,
     cabin_gravity: `scenario=${payload.scenarioId} | crossCaseSourceMismatchCount=${payload.comparisonSemantics.crossCaseSourceMismatchCount}`,
     wall_safety: `scenario=${payload.scenarioId} | wallSafetySourceParity=${payload.comparisonSemantics.wallSafetySourceParity ? "true" : "false"}`,
     precision_provenance: `scenario=${payload.scenarioId} | provenanceWarnings=${payload.provenanceWarnings.length} | parity=${payload.sourceMechanismParityRouteStatus}`,
@@ -1494,6 +1809,202 @@ const renderPanelCard = (
 const svgToInspectionText = (svg: string) =>
   svg.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
+const buildLinearTicks = (min: number, max: number, count: number) => {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [0];
+  if (Math.abs(max - min) < 1e-30) return [min];
+  const step = (max - min) / Math.max(1, count - 1);
+  return Array.from({ length: count }, (_, index) => min + step * index);
+};
+
+const formatGraphTickValue = (value: number) => {
+  const abs = Math.abs(value);
+  if (abs === 0) return "0";
+  if (abs >= 1e4 || abs < 1e-3) return value.toExponential(2).replace(/e\+?/, "e");
+  if (abs >= 100) return value.toFixed(1);
+  if (abs >= 1) return value.toFixed(3).replace(/\.?0+$/, "");
+  return value.toFixed(6).replace(/\.?0+$/, "");
+};
+
+const renderGraphSvg = (block: DashboardGraphSeriesBlock, spec: GraphSpec) => {
+  const width = spec.width;
+  const outerPadding = 56;
+  const title = renderTextLines([spec.title], outerPadding, 58, TEXT.sectionTitle);
+  const subtitle = renderTextLines(
+    [
+      `${block.quantitySymbol} | ${block.quantityUnits} | comparison_panel | presentation only`,
+      "Lane A authoritative | candidate family | transport reference_only cross-lane | transport_context absent",
+    ],
+    outerPadding,
+    92,
+    TEXT.headerMeta,
+  );
+  const baselineBadgeTitle = renderTextLines(
+    ["Baseline source"],
+    outerPadding,
+    146,
+    TEXT.blockCaption,
+  );
+  const baselineBadges = renderBadgeStrip(
+    block.baselineBadgeIds,
+    outerPadding,
+    156,
+    260,
+  );
+  const generalizedBadgeTitle = renderTextLines(
+    ["Generalized source"],
+    outerPadding + 290,
+    146,
+    TEXT.blockCaption,
+  );
+  const generalizedBadges = renderBadgeStrip(
+    block.generalizedBadgeIds,
+    outerPadding + 290,
+    156,
+    280,
+  );
+  const sharedBadgeTitle = renderTextLines(
+    ["Comparison badges"],
+    outerPadding + 600,
+    146,
+    TEXT.blockCaption,
+  );
+  const sharedBadges = renderBadgeStrip(
+    block.sharedBadgeIds,
+    outerPadding + 600,
+    156,
+    280,
+  );
+  const badgeBandHeight = Math.max(
+    baselineBadges.height,
+    generalizedBadges.height,
+    sharedBadges.height,
+  );
+  const plotLeft = 132;
+  const plotTop = 236 + badgeBandHeight;
+  const plotWidth = width - plotLeft - 72;
+  const plotHeight = 350;
+  const plotBottom = plotTop + plotHeight;
+  const plotRight = plotLeft + plotWidth;
+  const xDomainMin = block.sampleDomain[0] ?? -1;
+  const xDomainMax = block.sampleDomain[block.sampleDomain.length - 1] ?? 1;
+  const allValues = [...block.baselineSeries, ...block.generalizedSeries].filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  let yMin = allValues.length > 0 ? Math.min(...allValues) : 0;
+  let yMax = allValues.length > 0 ? Math.max(...allValues) : 1;
+  if (Math.abs(yMax - yMin) < 1e-30) {
+    const pad = Math.max(1e-12, Math.abs(yMax || 1) * 0.2);
+    yMin -= pad;
+    yMax += pad;
+  } else {
+    const pad = Math.max(1e-18, (yMax - yMin) * 0.12);
+    yMin -= pad;
+    yMax += pad;
+  }
+  if (block.graphId === "cabin_gravity_profile_z") {
+    yMin = Math.min(0, yMin);
+  }
+  const xFor = (value: number) =>
+    plotLeft +
+    ((value - xDomainMin) / Math.max(1e-30, xDomainMax - xDomainMin)) * plotWidth;
+  const yFor = (value: number) =>
+    plotBottom -
+    ((value - yMin) / Math.max(1e-30, yMax - yMin)) * plotHeight;
+  const buildPolyline = (series: Array<number | null>) =>
+    series
+      .map((value, index) =>
+        value == null
+          ? null
+          : `${xFor(block.sampleDomain[index] ?? xDomainMin)},${yFor(value)}`,
+      )
+      .filter((value): value is string => Boolean(value))
+      .join(" ");
+  const buildMarkers = (series: Array<number | null>, fill: string) =>
+    series
+      .map((value, index) =>
+        value == null
+          ? ""
+          : `<circle cx="${xFor(block.sampleDomain[index] ?? xDomainMin)}" cy="${yFor(value)}" r="4.5" fill="${fill}" stroke="#ffffff" stroke-width="1.5" />`,
+      )
+      .join("");
+  const yTicks = buildLinearTicks(yMin, yMax, 5);
+  const xTicks = buildLinearTicks(xDomainMin, xDomainMax, 5);
+  const grid = [
+    ...yTicks.map((tick) => {
+      const y = yFor(tick);
+      return [
+        `<line x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}" stroke="#d4d9df" stroke-width="1" stroke-dasharray="4 8" />`,
+        `<text x="${plotLeft - 18}" y="${y + 5}" fill="#5a6270" font-size="12" font-weight="600" font-family="${FONT_FAMILY}" text-anchor="end">${escapeXml(
+          formatGraphTickValue(tick),
+        )}</text>`,
+      ].join("");
+    }),
+    ...xTicks.map((tick) => {
+      const x = xFor(tick);
+      return [
+        `<line x1="${x}" y1="${plotTop}" x2="${x}" y2="${plotBottom}" stroke="#e1e6eb" stroke-width="1" stroke-dasharray="4 8" />`,
+        `<text x="${x}" y="${plotBottom + 28}" fill="#5a6270" font-size="12" font-weight="600" font-family="${FONT_FAMILY}" text-anchor="middle">${escapeXml(
+          formatGraphTickValue(tick),
+        )}</text>`,
+      ].join("");
+    }),
+  ].join("");
+  const zeroLine =
+    yMin <= 0 && yMax >= 0
+      ? `<line x1="${plotLeft}" y1="${yFor(0)}" x2="${plotRight}" y2="${yFor(0)}" stroke="#7d8690" stroke-width="1.5" />`
+      : "";
+  const legendY = plotTop - 30;
+  const legend = [
+    `<line x1="${plotLeft}" y1="${legendY}" x2="${plotLeft + 36}" y2="${legendY}" stroke="#536170" stroke-width="4" stroke-dasharray="10 8" stroke-linecap="round" />`,
+    `<text x="${plotLeft + 48}" y="${legendY + 5}" fill="#334150" font-size="14" font-weight="700" font-family="${FONT_FAMILY}">Baseline unit-lapse NHM2</text>`,
+    `<line x1="${plotLeft + 290}" y1="${legendY}" x2="${plotLeft + 326}" y2="${legendY}" stroke="#a14a2a" stroke-width="4" stroke-linecap="round" />`,
+    `<text x="${plotLeft + 338}" y="${legendY + 5}" fill="#334150" font-size="14" font-weight="700" font-family="${FONT_FAMILY}">Generalized mild shift-plus-lapse</text>`,
+  ].join("");
+  const yAxisLabel = `<text x="44" y="${plotTop + plotHeight / 2}" fill="#334150" font-size="14" font-weight="700" font-family="${FONT_FAMILY}" text-anchor="middle" transform="rotate(-90 44 ${plotTop + plotHeight / 2})">${escapeXml(
+    `${block.quantitySymbol} (${block.quantityUnits})`,
+  )}</text>`;
+  const xAxisLabel = `<text x="${plotLeft + plotWidth / 2}" y="${plotBottom + 56}" fill="#334150" font-size="14" font-weight="700" font-family="${FONT_FAMILY}" text-anchor="middle">${escapeXml(
+    block.sampleAxisLabel,
+  )}</text>`;
+  const noteLines = wrapText(block.graphNote, width - outerPadding * 2 - 28, TEXT.note);
+  const noteText = renderTextLines(
+    noteLines,
+    outerPadding + 14,
+    plotBottom + 98,
+    TEXT.note,
+  );
+  const noteHeight = Math.max(86, noteText.height + 28);
+  const totalHeight = Math.max(spec.minHeight, plotBottom + 98 + noteHeight + 32);
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}">
+  <rect width="${width}" height="${totalHeight}" fill="#f2efe8" />
+  ${title.svg}
+  ${subtitle.svg}
+  ${baselineBadgeTitle.svg}
+  ${baselineBadges.svg}
+  ${generalizedBadgeTitle.svg}
+  ${generalizedBadges.svg}
+  ${sharedBadgeTitle.svg}
+  ${sharedBadges.svg}
+  <rect x="${plotLeft}" y="${plotTop}" width="${plotWidth}" height="${plotHeight}" rx="18" fill="#fbfaf7" stroke="#bec7cf" stroke-width="1.5" />
+  ${grid}
+  ${zeroLine}
+  ${legend}
+  <polyline fill="none" stroke="#536170" stroke-width="4" stroke-dasharray="10 8" stroke-linejoin="round" stroke-linecap="round" points="${buildPolyline(
+    block.baselineSeries,
+  )}" />
+  <polyline fill="none" stroke="#a14a2a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" points="${buildPolyline(
+    block.generalizedSeries,
+  )}" />
+  ${buildMarkers(block.baselineSeries, "#536170")}
+  ${buildMarkers(block.generalizedSeries, "#a14a2a")}
+  ${yAxisLabel}
+  ${xAxisLabel}
+  <rect x="${outerPadding}" y="${plotBottom + 70}" width="${width - outerPadding * 2}" height="${noteHeight}" rx="18" fill="#fbfaf7" stroke="#d0d6dd" stroke-width="1.5" />
+  ${noteText.svg}
+</svg>`.trim();
+};
+
 const buildDashboardCardRenderSources = (
   payload: DashboardSeed,
 ): DashboardRenderedCardSource[] =>
@@ -1515,6 +2026,21 @@ const buildDashboardCardRenderSources = (
       title: spec.title,
       sectionSource: spec.sectionSource,
       primary: spec.primary,
+      svg,
+      inspectionText: svgToInspectionText(svg),
+    };
+  });
+
+const buildDashboardGraphRenderSources = (
+  payload: DashboardSeed,
+): DashboardRenderedGraphSource[] =>
+  payload.graphSeriesBlocks.map((block) => {
+    const spec = graphSpecById(block.graphId);
+    const svg = renderGraphSvg(block, spec);
+    return {
+      graphId: block.graphId,
+      title: spec.title,
+      sourcePanel: spec.sourcePanel,
       svg,
       inspectionText: svgToInspectionText(svg),
     };
@@ -1548,7 +2074,7 @@ const renderDashboardCardFamily = async (payload: DashboardSeed) => {
   }
   const primaryCard = renderedCards.find((card) => card.primary) ?? null;
   return {
-    dashboardSurfaceKind: "diagnostics_dashboard_json_with_rendered_card_family",
+    dashboardSurfaceKind: "diagnostics_dashboard_json_with_rendered_card_and_graph_family",
     dashboardLayoutVersion: DASHBOARD_LAYOUT_VERSION,
     renderedCardFamilyStatus: "generated",
     renderedCardReadingOrder: CARD_SPECS.map((spec) => spec.cardId),
@@ -1562,6 +2088,37 @@ const renderDashboardCardFamily = async (payload: DashboardSeed) => {
     renderedCardCategory: primaryCard?.renderCategory ?? null,
     renderedCardRole: primaryCard?.renderRole ?? null,
     renderedCardLayoutVersion: primaryCard?.layoutVersion ?? null,
+  };
+};
+
+const renderDashboardGraphFamily = async (payload: DashboardSeed) => {
+  fs.mkdirSync(OUT_RENDER_DIR, { recursive: true });
+  const graphRenders: DashboardGraphRenderEntry[] = [];
+  for (const source of buildDashboardGraphRenderSources(payload)) {
+    const spec = graphSpecById(source.graphId);
+    const png = await sharp(Buffer.from(source.svg, "utf8"))
+      .png({ compressionLevel: 9, quality: 100 })
+      .toBuffer();
+    const absPath = buildGraphAbsolutePath(spec.graphId);
+    ensureDirForFile(absPath);
+    fs.writeFileSync(absPath, png);
+    graphRenders.push({
+      graphId: spec.graphId,
+      title: spec.title,
+      path: normalizePath(path.relative(ROOT, absPath)),
+      hash: sha256(png),
+      renderCategory: "comparison_panel",
+      renderRole: "presentation",
+      authoritativeStatus: "non_authoritative",
+      sourcePanel: spec.sourcePanel,
+      sourceSeriesBlock: spec.graphId,
+      layoutVersion: DASHBOARD_LAYOUT_VERSION,
+    });
+  }
+  return {
+    graphRenderStatus: graphRenders.length > 0 ? "generated" : "missing",
+    graphReadingOrder: GRAPH_SPECS.map((spec) => spec.graphId),
+    graphRenders,
   };
 };
 
@@ -1641,8 +2198,55 @@ const buildDashboardRenderTaxonomyEntries = (dashboard: DashboardPayload): Rende
     };
   });
 
+const buildDashboardGraphRenderTaxonomyEntries = (
+  dashboard: DashboardPayload,
+): RenderTaxonomyEntry[] =>
+  dashboard.graphRenders.map((graph) => {
+    const spec = graphSpecById(graph.graphId);
+    const block = dashboard.graphSeriesBlocks.find(
+      (entry) => entry.graphId === graph.graphId,
+    )!;
+    return {
+      renderId: `nhm2_shift_lapse:comparison_panel:${graph.graphId}:graph`,
+      caseId: "nhm2_shift_lapse",
+      renderCategory: "comparison_panel",
+      renderRole: "presentation",
+      fieldId: graph.graphId,
+      variant: spec.variant,
+      canonicalPath: graph.path,
+      legacyPath: null,
+      authoritativeStatus: "non_authoritative",
+      primaryScientificQuestion: spec.question,
+      baseImagePolicy: "diagnostic_graph_canvas",
+      baseImageSource: "none",
+      inheritsTransportContext: false,
+      contextCompositionMode: "none",
+      title: spec.title,
+      subtitle:
+        "comparison_panel graph | Lane A authoritative | generalized reference_only | presentation only | transport_context absent",
+      quantitySymbol: block.quantitySymbol,
+      quantityUnits: block.quantityUnits,
+      observer: "eulerian_n",
+      foliation: "comoving_cartesian_3p1",
+      signConvention: block.graphNote,
+      laneId: `${dashboard.proofPolicy.authoritativeProofSurface ?? "lane_a_eulerian_comoving_theta_minus_trk"}`,
+      displayPolicyId: null,
+      displayRangeMin: null,
+      displayRangeMax: null,
+      displayTransform: null,
+      colormapFamily: null,
+      cameraPoseId: `diagnostics_graph_${graph.graphId}`,
+      orientationConventionId: "x_ship_y_port_z_zenith",
+    };
+  });
+
 const updateRenderTaxonomyArtifacts = (dashboard: DashboardPayload) => {
-  if (dashboard.renderedCardFamilyStatus !== "generated" || dashboard.renderedCards.length === 0) {
+  if (
+    dashboard.renderedCardFamilyStatus !== "generated" ||
+    dashboard.renderedCards.length === 0 ||
+    dashboard.graphRenderStatus !== "generated" ||
+    dashboard.graphRenders.length === 0
+  ) {
     return null;
   }
   if (!fs.existsSync(OUT_RENDER_TAXONOMY_JSON)) {
@@ -1656,20 +2260,26 @@ const updateRenderTaxonomyArtifacts = (dashboard: DashboardPayload) => {
   const renderEntries = [
     ...taxonomy.renderEntries.filter(
       (entry: RenderTaxonomyEntry) =>
-        !entry.renderId.startsWith("nhm2_shift_lapse:comparison_panel:diagnostics_dashboard:"),
+        !entry.renderId.startsWith("nhm2_shift_lapse:comparison_panel:"),
     ),
     ...buildDashboardRenderTaxonomyEntries(dashboard),
+    ...buildDashboardGraphRenderTaxonomyEntries(dashboard),
   ];
+  const graphFieldIds = new Set(DASHBOARD_GRAPH_FIELD_FAMILIES.map((entry) => entry.fieldId));
   const fieldFamilies = [
     ...taxonomy.fieldFamilies.filter(
-      (entry: any) => entry.fieldId !== DASHBOARD_FIELD_FAMILY.fieldId,
+      (entry: any) =>
+        entry.fieldId !== DASHBOARD_FIELD_FAMILY.fieldId &&
+        !graphFieldIds.has(entry.fieldId),
     ),
     DASHBOARD_FIELD_FAMILY,
+    ...DASHBOARD_GRAPH_FIELD_FAMILIES,
   ].sort((lhs: any, rhs: any) => lhs.label.localeCompare(rhs.label));
   const notes = Array.from(
     new Set([
       ...taxonomy.notes,
       "diagnostics_dashboard comparison_panel outputs now ship as a measured multi-card family on a neutral diagnostic card canvas with inline provenance badges and no transport-context inheritance.",
+      "nhm2_shift_lapse comparison_panel graph outputs now ship as provenance-aware diagnostic graphs on a neutral graph canvas with explicit raw-brick versus analytic-companion source badges and no transport-context inheritance.",
     ]),
   );
   const artifactBase = {
@@ -1722,6 +2332,7 @@ export const buildShiftPlusLapseDashboardPayload = async (
     ),
   );
   const precisionRows = buildPrecisionRows(comparison);
+  const graphSeriesBlocks = buildDashboardGraphSeriesBlocks(comparison);
   const basePayload: DashboardSeed = {
     artifactId: "nhm2_shift_plus_lapse_dashboard",
     capturedAt: new Date().toISOString(),
@@ -1740,8 +2351,16 @@ export const buildShiftPlusLapseDashboardPayload = async (
         "No formula-equivalence, viability-promotion, or cross-lane authority-expansion claim is made from this dashboard.",
       ],
       dashboardNote:
-        "This dashboard is a human-facing comparison surface only. It does not replace Lane A, it does not promote the generalized branch, and any active source/mechanism route remains bounded to non-authoritative advisory claims.",
+        "This dashboard is a human-facing comparison surface only. It does not replace Lane A. nhm2_shift_lapse is shown as a candidate authoritative solve family in full-solve provenance/model-selection while proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate, and any active source/mechanism route remains bounded to non-authoritative advisory claims.",
     },
+    baselineBranchStatus: comparison.baselineBranchStatus,
+    generalizedBranchStatus: comparison.generalizedBranchStatus,
+    baselineFamilyAuthorityStatus: comparison.baselineFamilyAuthorityStatus,
+    generalizedFamilyAuthorityStatus: comparison.generalizedFamilyAuthorityStatus,
+    baselineTransportCertificationStatus:
+      comparison.baselineTransportCertificationStatus,
+    generalizedTransportCertificationStatus:
+      comparison.generalizedTransportCertificationStatus,
     sourceMechanismPromotionContractStatus: sourceMechanism.contractStatus,
     sourceMechanismSelectedPromotionRoute: sourceMechanism.selectedPromotionRoute,
     sourceMechanismExemptionRouteActivated: sourceMechanism.exemptionRouteActivated,
@@ -1769,7 +2388,7 @@ export const buildShiftPlusLapseDashboardPayload = async (
           "Keep proof hierarchy explicit before reading any lapse or wall-safety diagnostic row.",
         rows: proofRows,
         sectionNote:
-          "Lane A remains authoritative. The generalized branch is reference-only. Source/mechanism context is bounded non-authoritative advisory only; no formula equivalence, viability promotion, or cross-lane authority expansion is implied.",
+          "Lane A remains authoritative. nhm2_shift_lapse is a candidate authoritative solve family in full-solve provenance/model-selection, while proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate and is not claimed by this dashboard. Source/mechanism context is bounded non-authoritative advisory only; no formula equivalence, viability promotion, or cross-lane authority expansion is implied.",
       },
       {
         panelId: "cabin_gravity_panel",
@@ -1807,8 +2426,10 @@ export const buildShiftPlusLapseDashboardPayload = async (
       "wall_safety_panel",
       "precision_panel",
     ],
+    graphSeriesBlocks,
   };
   const rendered = await renderDashboardCardFamily(basePayload);
+  const renderedGraphs = await renderDashboardGraphFamily(basePayload);
   return {
     ...basePayload,
     dashboardSurfaceKind: rendered.dashboardSurfaceKind,
@@ -1826,6 +2447,9 @@ export const buildShiftPlusLapseDashboardPayload = async (
     renderedCardCategory: rendered.renderedCardCategory,
     renderedCardRole: rendered.renderedCardRole,
     renderedCardLayoutVersion: rendered.renderedCardLayoutVersion,
+    graphRenderStatus: renderedGraphs.graphRenderStatus,
+    graphReadingOrder: renderedGraphs.graphReadingOrder,
+    graphRenders: renderedGraphs.graphRenders,
   };
 };
 
@@ -1867,6 +2491,28 @@ const buildRenderedCardsTable = (cards: DashboardCardEntry[]) => {
   const rows = cards.map(
     (card) =>
       `| ${card.cardId} | ${card.title} | ${card.sectionSource} | ${card.primary ? "yes" : "no"} | ${card.path} | ${card.hash} |`,
+  );
+  return [header, separator, ...rows].join("\n");
+};
+
+const buildGraphSeriesBlockTable = (blocks: DashboardGraphSeriesBlock[]) => {
+  const header =
+    "| graphId | quantity | sampleAxis | sampleCount | baseline source | generalized source | underResolutionDetected | graphNote |";
+  const separator = "| --- | --- | --- | --- | --- | --- | --- | --- |";
+  const rows = blocks.map(
+    (block) =>
+      `| ${block.graphId} | ${block.quantitySymbol} (${block.quantityUnits}) | ${block.sampleAxis} | ${block.sampleCount} | ${block.baselineSourceKind} | ${block.generalizedSourceKind} | ${block.underResolutionDetected ? "yes" : "no"} | ${block.graphNote} |`,
+  );
+  return [header, separator, ...rows].join("\n");
+};
+
+const buildGraphRendersTable = (graphs: DashboardGraphRenderEntry[]) => {
+  const header =
+    "| graphId | sourcePanel | sourceSeriesBlock | authoritativeStatus | path | hash |";
+  const separator = "| --- | --- | --- | --- | --- | --- |";
+  const rows = graphs.map(
+    (graph) =>
+      `| ${graph.graphId} | ${graph.sourcePanel} | ${graph.sourceSeriesBlock} | ${graph.authoritativeStatus} | ${graph.path} | ${graph.hash} |`,
   );
   return [header, separator, ...rows].join("\n");
 };
@@ -1937,13 +2583,15 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
     "Formula equivalence to the authoritative direct metric remains false/blocked.",
     "Viability promotion from the source/mechanism lane remains blocked.",
     "Cross-lane expansion beyond reference_only remains blocked.",
-    "warp.metric.T00.nhm2_shift_lapse remains reference_only.",
+    "warp.metric.T00.nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection while proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate and is not claimed by this dashboard.",
   ];
   const proofPanel = panelById(args.dashboard, "proof_status_panel");
   const authoritativeProofSurfaceRow =
     proofPanel.rows.find((row) => row.rowId === "authoritative_proof_surface") ?? null;
-  const branchStatusRow =
-    proofPanel.rows.find((row) => row.rowId === "branch_status") ?? null;
+  const familyStatusRow =
+    proofPanel.rows.find((row) => row.rowId === "generalized_family_status") ?? null;
+  const transportStatusRow =
+    proofPanel.rows.find((row) => row.rowId === "generalized_transport_status") ?? null;
   const proofPackSummary = args.proofPackArtifact.sourceMechanismPromotionContract ?? {};
   const proofPackSurface = evaluateSurface({
     surfaceId: "proof_pack_alias_json",
@@ -2010,7 +2658,7 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
         pass:
           typeof proofPackSummary.sourceMechanismConsumerSummary === "string" &&
           proofPackSummary.sourceMechanismConsumerSummary.includes(
-            "warp.metric.T00.nhm2_shift_lapse remains reference_only",
+            "candidate authoritative solve family",
           ),
         note: "Proof-pack alias must summarize the bounded advisory boundary explicitly.",
       },
@@ -2063,7 +2711,7 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
       {
         field: "referenceOnlyScope",
         pass: args.proofPackMarkdown.includes("| sourceMechanismReferenceOnlyScope | true |"),
-        note: "Proof-pack markdown must preserve reference_only scope.",
+        note: "Proof-pack markdown must preserve reference_only cross-lane scope.",
       },
       {
         field: "laneAAuthoritativeField",
@@ -2118,13 +2766,25 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
       {
         field: "referenceOnlyScope",
         pass: args.dashboard.sourceMechanismReferenceOnlyScope === true,
-        note: "Dashboard JSON must preserve reference_only scope.",
+        note: "Dashboard JSON must preserve reference_only cross-lane scope.",
       },
       {
-        field: "branchStatusReferenceOnly",
+        field: "generalizedFamilyAuthorityStatus",
         pass:
-          `${branchStatusRow?.generalizedValue ?? ""}`.includes("reference_only"),
-        note: "Dashboard JSON must keep the generalized branch explicitly reference_only.",
+          `${familyStatusRow?.generalizedValue ?? ""}` ===
+            "candidate_authoritative_solve_family" &&
+          args.dashboard.generalizedFamilyAuthorityStatus ===
+            "candidate_authoritative_solve_family",
+        note: "Dashboard JSON must expose nhm2_shift_lapse as a candidate authoritative solve family.",
+      },
+      {
+        field: "generalizedTransportCertificationStatus",
+        pass:
+          `${transportStatusRow?.generalizedValue ?? ""}` ===
+            "bounded_transport_fail_closed_reference_only" &&
+          args.dashboard.generalizedTransportCertificationStatus ===
+            "bounded_transport_fail_closed_reference_only",
+        note: "Dashboard JSON must keep the default generalized transport certification status fail-closed/reference_only unless a separately selected solve passes the authoritative transport-promotion gate.",
       },
       {
         field: "formulaEquivalentFalse",
@@ -2142,7 +2802,8 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
         field: "proofStatusBoundary",
         pass:
           dashboardProofNote.includes("bounded non-authoritative advisory only") &&
-          dashboardProofNote.includes("no formula equivalence"),
+          dashboardProofNote.includes("no formula equivalence") &&
+          dashboardProofNote.includes("transport-promotion gate"),
         note: "Proof-status panel note must carry the bounded-route boundary.",
       },
       {
@@ -2166,7 +2827,10 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
       },
     ],
     laneAAuthorityChecks: ["proofStatusSectionNoteLaneA", "authoritativeProofSurfaceRow"],
-    referenceOnlyChecks: ["referenceOnlyScope", "branchStatusReferenceOnly"],
+    referenceOnlyChecks: [
+      "referenceOnlyScope",
+      "generalizedTransportCertificationStatus",
+    ],
   });
   const dashboardMarkdownSurface = evaluateSurface({
     surfaceId: "shift_plus_lapse_dashboard_audit_markdown",
@@ -2201,8 +2865,14 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
       },
       {
         field: "referenceOnlySummary",
-        pass: args.dashboardAuditMarkdown.includes("reference_only"),
-        note: "Dashboard audit markdown must preserve reference_only wording.",
+        pass:
+          args.dashboardAuditMarkdown.includes(
+            "- generalizedFamilyAuthorityStatus: candidate_authoritative_solve_family",
+          ) &&
+          args.dashboardAuditMarkdown.includes(
+            "- generalizedTransportCertificationStatus: bounded_transport_fail_closed_reference_only",
+          ),
+        note: "Dashboard audit markdown must preserve the family-vs-transport split explicitly.",
       },
       {
         field: "proofNoteLaneA",
@@ -2227,6 +2897,13 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
     renderedCardSources.find((card) => card.cardId === "proof_status") ?? null;
   const precisionCard =
     renderedCardSources.find((card) => card.cardId === "precision_provenance") ?? null;
+  const renderedGraphSources = buildDashboardGraphRenderSources(args.dashboard);
+  const gravityGraph =
+    renderedGraphSources.find((graph) => graph.graphId === "cabin_gravity_profile_z") ??
+    null;
+  const clockGraph =
+    renderedGraphSources.find((graph) => graph.graphId === "clock_gradient_profile_z") ??
+    null;
   const renderedCardSurface = evaluateSurface({
     surfaceId: "shift_plus_lapse_dashboard_cards",
     surfaceType: "rendered_card_family",
@@ -2256,15 +2933,33 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
         field: "overviewReferenceOnly",
         pass:
           typeof dashboardOverviewCard?.inspectionText === "string" &&
-          dashboardOverviewCard.inspectionText.includes("reference_only"),
-        note: "Rendered overview card must preserve reference_only scope.",
+          (dashboardOverviewCard.inspectionText.includes("reference_only") ||
+            dashboardOverviewCard.inspectionText.includes("reference-only")),
+        note: "Rendered overview card must preserve reference_only transport scope.",
       },
       {
         field: "proofStatusReferenceOnly",
         pass:
           typeof proofStatusCard?.inspectionText === "string" &&
-          proofStatusCard.inspectionText.includes("reference_only"),
-        note: "Rendered proof-status card must preserve reference_only scope.",
+          (proofStatusCard?.inspectionText.includes("reference_only") ||
+            proofStatusCard?.inspectionText.includes("reference-only")),
+        note: "Rendered proof-status card must preserve reference_only transport scope.",
+      },
+      {
+        field: "overviewCandidateFamily",
+        pass:
+          typeof dashboardOverviewCard?.inspectionText === "string" &&
+          dashboardOverviewCard.inspectionText.includes(
+            "candidate authoritative solve family",
+          ),
+        note: "Rendered overview card must preserve the candidate-family distinction.",
+      },
+      {
+        field: "proofStatusCandidateFamily",
+        pass:
+          typeof proofStatusCard?.inspectionText === "string" &&
+          proofStatusCard.inspectionText.includes("candidate solve family"),
+        note: "Rendered proof-status card must preserve the candidate-family distinction.",
       },
       {
         field: "overviewNonAuthoritative",
@@ -2305,12 +3000,68 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
     laneAAuthorityChecks: ["overviewLaneAAuthority", "proofStatusLaneAAuthority"],
     referenceOnlyChecks: ["overviewReferenceOnly", "proofStatusReferenceOnly"],
   });
+  const renderedGraphSurface = evaluateSurface({
+    surfaceId: "shift_plus_lapse_dashboard_graphs",
+    surfaceType: "rendered_graph_family",
+    inspectionMode: "pre_raster_render_source",
+    dataMode: "artifact_coupled",
+    checkedTargets: ["cabin_gravity_profile_z", "clock_gradient_profile_z"],
+    checks: [
+      {
+        field: "gravityGraphLaneAAuthority",
+        pass:
+          typeof gravityGraph?.inspectionText === "string" &&
+          gravityGraph.inspectionText.includes("Lane A authoritative"),
+        note: "Rendered cabin-gravity graph must preserve Lane A authority in its header metadata.",
+      },
+      {
+        field: "clockGraphLaneAAuthority",
+        pass:
+          typeof clockGraph?.inspectionText === "string" &&
+          clockGraph.inspectionText.includes("Lane A authoritative"),
+        note: "Rendered clock-gradient graph must preserve Lane A authority in its header metadata.",
+      },
+      {
+        field: "gravityGraphReferenceOnly",
+        pass:
+          typeof gravityGraph?.inspectionText === "string" &&
+          (gravityGraph.inspectionText.includes("reference_only") ||
+            gravityGraph.inspectionText.includes("reference-only")),
+        note: "Rendered cabin-gravity graph must preserve reference_only transport scope.",
+      },
+      {
+        field: "clockGraphReferenceOnly",
+        pass:
+          typeof clockGraph?.inspectionText === "string" &&
+          (clockGraph.inspectionText.includes("reference_only") ||
+            clockGraph.inspectionText.includes("reference-only")),
+        note: "Rendered clock-gradient graph must preserve reference_only transport scope.",
+      },
+      {
+        field: "gravityGraphPresentationOnly",
+        pass:
+          typeof gravityGraph?.inspectionText === "string" &&
+          gravityGraph.inspectionText.includes("Presentation-only graph"),
+        note: "Rendered cabin-gravity graph must remain presentation-only and non-authoritative.",
+      },
+      {
+        field: "clockGraphLocalOnlyBoundary",
+        pass:
+          typeof clockGraph?.inspectionText === "string" &&
+          clockGraph.inspectionText.includes("not route-time compression"),
+        note: "Rendered clock-gradient graph must keep the local-only timing boundary explicit.",
+      },
+    ],
+    laneAAuthorityChecks: ["gravityGraphLaneAAuthority", "clockGraphLaneAAuthority"],
+    referenceOnlyChecks: ["gravityGraphReferenceOnly", "clockGraphReferenceOnly"],
+  });
   const checkedSurfaces = [
     proofPackSurface,
     proofPackMarkdownSurface,
     dashboardJsonSurface,
     dashboardMarkdownSurface,
     renderedCardSurface,
+    renderedGraphSurface,
   ];
   const conformantSurfaces = checkedSurfaces
     .filter((entry) => entry.status === "conformant")
@@ -2364,7 +3115,7 @@ export const buildSourceMechanismConsumerConformanceSummary = (args: {
       nonConformantSurfaces.length === 0 &&
       laneAAuthorityMissingOnSurfaces.length === 0 &&
       referenceOnlyMissingOnSurfaces.length === 0
-        ? `Checked proof-pack JSON/markdown, dashboard JSON/markdown, and rendered dashboard card sources preserve the bounded advisory source/mechanism route, explicit Lane A authority, and reference_only scope. ${artifactCouplingNote}`
+        ? `Checked proof-pack JSON/markdown, dashboard JSON/markdown, and rendered dashboard card/graph sources preserve the bounded advisory source/mechanism route, explicit Lane A authority, and the candidate-family versus fail-closed transport split. ${artifactCouplingNote}`
         : `Consumer surfaces still leak or omit bounded-route, Lane A, or reference_only markers on: ${[
             ...new Set([
               ...nonConformantSurfaces,
@@ -2441,6 +3192,10 @@ const buildSourceMechanismConsumerConformanceMarkdown = (
 
 const buildAuditMarkdown = (payload: DashboardPayload) => {
   const proofPanel = panelById(payload, "proof_status_panel");
+  const proofFamilyRow =
+    proofPanel.rows.find((row) => row.rowId === "generalized_family_status") ?? null;
+  const proofTransportRow =
+    proofPanel.rows.find((row) => row.rowId === "generalized_transport_status") ?? null;
   const cabinPanel = panelById(payload, "cabin_gravity_panel");
   const wallPanel = panelById(payload, "wall_safety_panel");
   const precisionPanel = panelById(payload, "precision_panel");
@@ -2467,6 +3222,7 @@ const buildAuditMarkdown = (payload: DashboardPayload) => {
     `- renderedCardStatus: ${payload.renderedCardStatus}`,
     `- renderedCardPath: ${payload.renderedCardPath ?? "null"}`,
     `- renderedCardHash: ${payload.renderedCardHash ?? "null"}`,
+    `- graphRenderStatus: ${payload.graphRenderStatus}`,
     `- legacyMonolithicCardStatus: ${payload.legacyMonolithicCardStatus}`,
     `- legacyMonolithicCardPath: ${payload.legacyMonolithicCardPath ?? "null"}`,
     "",
@@ -2474,8 +3230,10 @@ const buildAuditMarkdown = (payload: DashboardPayload) => {
     "",
     `- authoritativeProofSurface: ${payload.proofPolicy.authoritativeProofSurface}`,
     `- laneAUnchanged: ${payload.proofPolicy.laneAUnchanged ? "yes" : "no"}`,
-    `- baselineBranchStatus: ${proofPanel.rows[1]?.baselineValue ?? "n/a"}`,
-    `- generalizedBranchStatus: ${proofPanel.rows[1]?.generalizedValue ?? "n/a"}`,
+    `- baselineBranchStatus: ${payload.baselineBranchStatus}`,
+    `- generalizedBranchStatus: ${payload.generalizedBranchStatus}`,
+    `- generalizedFamilyAuthorityStatus: ${proofFamilyRow?.generalizedValue ?? payload.generalizedFamilyAuthorityStatus}`,
+    `- generalizedTransportCertificationStatus: ${proofTransportRow?.generalizedValue ?? payload.generalizedTransportCertificationStatus}`,
     `- proofNote: ${proofPanel.sectionNote}`,
     "",
     "## Source / Mechanism Consumer Boundary",
@@ -2524,6 +3282,24 @@ const buildAuditMarkdown = (payload: DashboardPayload) => {
     "",
     buildRenderedCardsTable(payload.renderedCards),
     "",
+    "## Graph Series Blocks",
+    "",
+    "- graphs are driven by explicit sampled series serialized into the dashboard JSON artifact.",
+    "- these are provenance-aware profile graphs, not raw 2D field renders.",
+    "- local clock-gradient graph remains explicitly local-only and not route-time compression.",
+    "",
+    buildGraphSeriesBlockTable(payload.graphSeriesBlocks),
+    "",
+    "## Graph Renders",
+    "",
+    `- graphRenderStatus: ${payload.graphRenderStatus}`,
+    "- graphs are presentation-only and non-authoritative.",
+    "- baseImagePolicy: diagnostic_graph_canvas",
+    "- inheritsTransportContext: false",
+    "- contextCompositionMode: none",
+    "",
+    buildGraphRendersTable(payload.graphRenders),
+    "",
     "## Provenance Warnings",
     "",
     `- provenanceWarningCount: ${payload.provenanceWarnings.length}`,
@@ -2558,52 +3334,61 @@ const buildMemoMarkdown = (payload: DashboardPayload) => {
   const cabinPanel = panelById(payload, "cabin_gravity_panel");
   const wallPanel = panelById(payload, "wall_safety_panel");
   const precisionPanel = panelById(payload, "precision_panel");
+  const cabinGravityGraph = payload.graphSeriesBlocks.find(
+    (graph) => graph.graphId === "cabin_gravity_profile_z",
+  );
+  const clockGradientGraph = payload.graphSeriesBlocks.find(
+    (graph) => graph.graphId === "clock_gradient_profile_z",
+  );
   return [
     "# NHM2 Shift-Plus-Lapse Dashboard Memo",
     "",
-    "This is a human-facing dashboard card family built directly from the provenance-aware shift-plus-lapse dashboard JSON artifact.",
+    "This is a human-facing dashboard surface built directly from the provenance-aware shift-plus-lapse dashboard JSON artifact.",
     "",
     "It does not supersede proof artifacts:",
     "",
     "- Lane A remains authoritative and unchanged.",
-    "- warp.metric.T00.nhm2.shift_lapse remains reference_only.",
+    "- warp.metric.T00.nhm2.shift_lapse is a candidate authoritative solve family in provenance/model-selection while proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate.",
     "- Cabin gravity and wall safety stay separate diagnostic families.",
-    "- Raw brick vs analytic companion provenance remains visible on-card.",
+    "- Raw brick vs analytic companion provenance remains visible on-card and on-graph.",
     "- The source/mechanism exemption route is active only for bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims.",
     "- Formula equivalence, viability promotion, authority expansion, and cross-lane expansion remain blocked.",
-    "- No field render, transport context, or volumetric imagery is introduced in this patch.",
+    "- No transport context, field-illusion heatmap, or volumetric imagery is introduced in this patch.",
     "",
-    "## Why The Monolithic Card Was Replaced",
+    "## Why Profile Graphs Were Chosen",
     "",
-    "- the previous single card forced metric values, badge strips, and notes into one overcrowded surface",
-    "- horizontal overlap and vertical clipping made the output unsuitable for serious review",
-    "- replacing it with a planned card family preserves all provenance without hiding information to make the layout fit",
+    "- the mild branch already has a real local cabin-gravity signal and a correspondingly tiny local clock gradient, but those quantities were still only visible as table rows",
+    "- the mild reference under-resolves in float32 raw channels, so a pseudo-precise field map would overstate what the brick actually resolves",
+    "- provenance-aware line graphs are the honest first render because they show the quantity, the tiny scale, and the raw-brick versus analytic-companion split without pretending to be a resolved 2D slice",
     "",
-    "## How Layout Budgeting Now Works",
+    "## What The Graphs Communicate",
     "",
-    "- text width is measured with @napi-rs/canvas before drawing",
-    "- long values, notes, and badge runs wrap to measured column widths",
-    "- row height is computed from wrapped content rather than assumed fixed",
-    "- each subject area now gets a dedicated card with its own vertical budget",
+    "- `cabin_gravity_profile_z` shows how local cabin gravity is represented along the cabin z_zenith axis and makes the mild branch's nonzero local profile legible against the unit-lapse zero baseline",
+    `- cabin gravity graph provenance: baseline=${cabinGravityGraph?.baselineSourceKind ?? "n/a"} | generalized=${cabinGravityGraph?.generalizedSourceKind ?? "n/a"}`,
+    "- `clock_gradient_profile_z` shows the local cabin timing differential relative to the centerline and keeps the tiny scale explicit in s/day",
+    `- clock gradient graph provenance: baseline=${clockGradientGraph?.baselineSourceKind ?? "n/a"} | generalized=${clockGradientGraph?.generalizedSourceKind ?? "n/a"}`,
+    "- the clock graph explicitly states that it is local cabin timing only and not route-time compression",
     "",
-    "## Why Subject Separation Improves Scientific Readability",
+    "## What Remains Deferred",
     "",
-    "- proof hierarchy is visible in a compact card rather than buried below metric clutter",
-    "- cabin gravity rows keep analytic-companion provenance explicit without sharing space with wall-safety rows",
-    "- wall safety remains readable as a brick-derived horizon proxy rather than a comfort score",
-    "- precision/provenance caveats are explained in their own card without compressing the source story",
-    "- downstream consumer surfaces now carry the same bounded source/mechanism claim boundary rather than leaving it implicit in a separate contract artifact",
-    "- the consumer-conformance artifact now checks proof-pack JSON/markdown, dashboard JSON/markdown, and current-build rendered card sources for explicit Lane A authority and reference_only preservation",
+    "- no graph in this patch is a proof surface",
+    "- no graph in this patch is a raw 2D field map",
+    "- no transport-context or mechanism overlay is added",
+    "- any future higher-resolution field-map presentation still needs a separate provenance and resolution argument before it should be shown",
+    "- the consumer-conformance artifact now checks proof-pack JSON/markdown, dashboard JSON/markdown, rendered cards, and rendered graphs for explicit Lane A authority plus the candidate-family versus fail-closed transport split",
     `- remaining limitation: ${payload.sourceMechanismConsumerConformance?.artifactCouplingNote ?? "n/a"}`,
     "",
     `- dashboardCardFamilyStatus: ${payload.renderedCardFamilyStatus}`,
+    `- graphRenderStatus: ${payload.graphRenderStatus}`,
+    `- cabinGravityGraphStatus: ${cabinGravityGraph ? "generated" : "missing"}`,
+    `- clockGradientGraphStatus: ${clockGradientGraph ? "generated" : "missing"}`,
     "- layoutPlanningStatus: measured_dynamic_multicard_layout",
     `- proofHierarchyStatus: ${proofPanel ? "lane_a_authoritative_and_visible" : "missing"}`,
-    `- provenanceBadgeStatus: ${payload.badgeLegend.length > 0 ? "visible_on_card_family" : "missing"}`,
+    `- provenanceBadgeStatus: ${payload.badgeLegend.length > 0 ? "visible_on_card_and_graph_family" : "missing"}`,
     `- consumerConformanceStatus: ${payload.sourceMechanismConsumerConformance?.consumerConformanceStatus ?? "n/a"}`,
     `- consumerConformanceDataMode: ${payload.sourceMechanismConsumerConformance?.conformanceDataMode ?? "n/a"}`,
     `- consumerConformanceStalenessRisk: ${payload.sourceMechanismConsumerConformance?.stalenessRisk ?? "n/a"}`,
-    "- recommendedNextAction: Future work is now either parity-route architecture or additional consumer/readiness hardening; do not widen the bounded advisory claim set without an explicit contract change.",
+    "- recommendedNextAction: If a future patch attempts any field-map presentation for the mild branch, require explicit resolution/provenance justification first; otherwise keep extending only profile-level presentation surfaces.",
     "",
     `- dashboardStatus: ${payload.dashboardStatus}`,
     `- proofPanelStatus: ${proofPanel ? "available" : "missing"}`,
@@ -2631,7 +3416,7 @@ const buildSourceMechanismConsumerConformanceArtifact = (args: {
     generatedOn: args.dashboard.date,
     generatedAt: new Date().toISOString(),
     boundaryStatement:
-      "This consumer-conformance artifact checks proof-pack latest aliases, current dashboard JSON/markdown outputs, and current-build rendered dashboard card sources to ensure the active bounded source/mechanism exemption route is not widened into broader promotion.",
+      "This consumer-conformance artifact checks proof-pack latest aliases, current dashboard JSON/markdown outputs, and current-build rendered dashboard card and graph sources to ensure the active bounded source/mechanism exemption route is not widened into broader promotion.",
     proofPackArtifact: normalizePath(PROOF_PACK_LATEST_JSON),
     proofPackReport: normalizePath(PROOF_PACK_LATEST_AUDIT),
     promotionContractArtifact: normalizePath(
@@ -2702,6 +3487,7 @@ export const writeShiftPlusLapseDashboardArtifacts = async (payload?: DashboardP
     outSourceMechanismConsumerConformanceJson: OUT_SOURCE_MECHANISM_CONFORMANCE_JSON,
     outSourceMechanismConsumerConformanceAudit: OUT_SOURCE_MECHANISM_CONFORMANCE_AUDIT,
     outRenderedCards: dashboard.renderedCards.map((card) => path.join(ROOT, card.path)),
+    outRenderedGraphs: dashboard.graphRenders.map((graph) => path.join(ROOT, graph.path)),
     ...taxonomyOutputs,
   };
 };

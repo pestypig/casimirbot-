@@ -5,6 +5,7 @@ import {
 } from "../shared/contracts/warp-route-time-worldline.v1";
 import {
   makeWarpCruiseEnvelopePreflightFixture,
+  makeShiftLapseWarpWorldlineFixture,
   makeWarpRouteTimeWorldlineFixture,
   makeWarpWorldlineFixture,
 } from "./helpers/warp-worldline-fixture";
@@ -79,5 +80,23 @@ describe("warp route-time worldline contract", () => {
     expect(proper).toEqual([...proper].sort((lhs, rhs) => lhs - rhs));
     expect(routeTime.nonClaims).toContain("not mission-time certified");
     expect(routeTime.nonClaims).toContain("not route ETA to a real target");
+  });
+
+  it("admits a gate-passed nhm2_shift_lapse family through the certified route-time contract", () => {
+    const worldline = makeShiftLapseWarpWorldlineFixture();
+    const preflight = makeWarpCruiseEnvelopePreflightFixture(worldline);
+    const routeTime = buildWarpRouteTimeWorldlineContract({ worldline, preflight });
+
+    expect(routeTime).not.toBeNull();
+    expect(routeTime?.sourceSurface.metricFamily).toBe("nhm2_shift_lapse");
+    expect(routeTime?.sourceSurface.familyAuthorityStatus).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect(routeTime?.sourceSurface.transportCertificationStatus).toBe(
+      "bounded_transport_proof_bearing_gate_admitted",
+    );
+    expect(routeTime?.sourceSurface.shiftLapseTransportPromotionGate?.status).toBe("pass");
+    expect(routeTime?.routeTimeStatus).toBe("bounded_local_segment_certified");
+    expect(isCertifiedWarpRouteTimeWorldlineContract(routeTime)).toBe(true);
   });
 });

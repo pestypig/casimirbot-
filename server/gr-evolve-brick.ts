@@ -28,6 +28,7 @@ import type { GrPipelineDiagnostics } from "./energy-pipeline.ts";
 import {
   DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM,
   evaluateWarpMetricLapseField,
+  resolveWarpShiftLapseProfile,
   type WarpMetricAdapterSnapshot,
   type WarpMetricLapseSummary,
 } from "../modules/warp/warp-metric-adapter.ts";
@@ -396,7 +397,14 @@ const resolveShiftLapseSummaryFromPipeline = (
     null;
   if (warpFieldType !== "nhm2_shift_lapse") return null;
   const dynamicConfig = (pipelineState as any)?.dynamicConfig ?? {};
-  const alphaCenterline = Math.max(1e-6, Number(dynamicConfig.alphaCenterline ?? 1));
+  const shiftLapseProfile = resolveWarpShiftLapseProfile(
+    typeof dynamicConfig.shiftLapseProfileId === "string"
+      ? dynamicConfig.shiftLapseProfileId
+      : null,
+  );
+  const alphaCenterline = Number.isFinite(dynamicConfig.alphaCenterline)
+    ? Math.max(1e-6, Number(dynamicConfig.alphaCenterline))
+    : shiftLapseProfile.alphaCenterlineDefault;
   const gradientVec =
     toFiniteVec3(dynamicConfig.alphaGradientVec_m_inv) ??
     [0, 0, DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM];
@@ -435,6 +443,10 @@ const resolveShiftLapseSummaryFromPipeline = (
       Number(dynamicConfig.alphaWallTaper_m ?? hull?.wallThickness_m ?? 0.45),
     ),
     diagnosticTier: "diagnostic",
+    shiftLapseProfileId: shiftLapseProfile.profileId,
+    shiftLapseProfileStage: shiftLapseProfile.profileStage,
+    shiftLapseProfileLabel: shiftLapseProfile.profileLabel,
+    shiftLapseProfileNote: shiftLapseProfile.profileNote,
     signConvention:
       "positive alphaGradientVec_m_inv raises alpha along +x_ship/+y_port/+z_zenith; diagnostic-only generalized NHM2 branch",
   };
@@ -885,6 +897,17 @@ const maxAbsFromChannel = (channel: GrEvolveBrickChannel) => {
   return Math.max(absMin, absMax);
 };
 
+const meanFromChannel = (channel: GrEvolveBrickChannel) => {
+  const data = channel.data;
+  if (!data.length) return 0;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 1) {
+    sum += data[i];
+  }
+  const mean = sum / data.length;
+  return Number.isFinite(mean) ? mean : 0;
+};
+
 const percentileFromSamples = (samples: number[], p: number) => {
   if (!samples.length) return 0;
   const sorted = [...samples].sort((a, b) => a - b);
@@ -1163,6 +1186,21 @@ export const buildGrDiagnostics = (
   const divBetaRms = brick.stats.divBetaRms;
   const divBetaMaxAbs = brick.stats.divBetaMaxAbs;
   const divBetaSource = brick.stats.divBetaSource;
+  const thetaChannel = brick.channels.theta;
+  const kTraceChannel = brick.channels.K_trace;
+  const thetaMean = thetaChannel ? meanFromChannel(thetaChannel) : undefined;
+  const thetaMaxAbs = thetaChannel ? maxAbsFromChannel(thetaChannel) : undefined;
+  const kTraceMean = kTraceChannel ? meanFromChannel(kTraceChannel) : undefined;
+  const kTraceMaxAbs = kTraceChannel ? maxAbsFromChannel(kTraceChannel) : undefined;
+  const thetaFallbackMean =
+    thetaMean ?? (Number.isFinite(kTraceMean) ? -Number(kTraceMean) : undefined);
+  const thetaFallbackMaxAbs =
+    thetaMaxAbs ?? (Number.isFinite(kTraceMaxAbs) ? Number(kTraceMaxAbs) : undefined);
+  const thetaSource = thetaChannel
+    ? ("gr_evolve_brick_theta" as const)
+    : Number.isFinite(kTraceMean)
+      ? ("gr_evolve_brick_neg_k_trace" as const)
+      : undefined;
   const betaMaxAbs = maxAbsBeta(
     brick.channels.beta_x,
     brick.channels.beta_y,
@@ -1213,6 +1251,26 @@ export const buildGrDiagnostics = (
             rms: divBetaRms,
             maxAbs: divBetaMaxAbs,
             source: divBetaSource,
+          },
+        }
+      : {}),
+    ...(Number.isFinite(thetaFallbackMean) &&
+    Number.isFinite(thetaFallbackMaxAbs) &&
+    thetaSource
+      ? {
+          theta: {
+            mean: thetaFallbackMean,
+            maxAbs: thetaFallbackMaxAbs,
+            source: thetaSource,
+          },
+        }
+      : {}),
+    ...(Number.isFinite(kTraceMean) && Number.isFinite(kTraceMaxAbs)
+      ? {
+          kTrace: {
+            mean: kTraceMean,
+            maxAbs: kTraceMaxAbs,
+            source: "gr_evolve_brick" as const,
           },
         }
       : {}),

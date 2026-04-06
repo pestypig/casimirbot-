@@ -1,0 +1,451 @@
+{
+  "artifactType": "nhm2_warp_worldline_proof/v1",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T23:11:12.751Z",
+  "boundaryStatement": "This artifact records a bounded solve-backed NHM2 warp worldline contract for local-comoving transport diagnostics. It does not certify route time, mission time, speed, or viability.",
+  "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+  "contractVersion": "warp_worldline_contract/v1",
+  "status": "bounded_solve_backed",
+  "certified": true,
+  "sourceSurface": {
+    "surfaceId": "nhm2_metric_local_comoving_transport_cross",
+    "producer": "server/energy-pipeline.ts",
+    "provenanceClass": "solve_backed",
+    "transportVectorSource": "warp.solveBackedTransportSampleFamily",
+    "transportVectorField": "shiftVectorField.evaluateShiftVector",
+    "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
+    "metricT00Source": "metric",
+    "metricFamily": "nhm2_shift_lapse",
+    "familyAuthorityStatus": "candidate_authoritative_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+    "metricT00ContractStatus": "ok",
+    "chartContractStatus": "ok",
+    "shiftLapseProfileId": "stage1_centerline_alpha_0p8900_v1",
+    "shiftLapseTransportPromotionGate": {
+      "gateId": "nhm2_shift_lapse_transport_promotion_gate/v1",
+      "status": "pass",
+      "reason": "shift_lapse_transport_promotion_gate_pass",
+      "shiftLapseProfileId": "stage1_centerline_alpha_0p8900_v1",
+      "shiftLapseProfileStage": "controlled_tuning_stage_1",
+      "shiftLapseProfileLabel": "Stage 1 centerline alpha 0.8900",
+      "shiftLapseProfileNote": "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8900 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+      "familyAuthorityStatus": "candidate_authoritative_solve_family",
+      "familyTransportCertificationStatus": "bounded_transport_fail_closed_reference_only",
+      "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+      "authoritativeLowExpansionStatus": "pass",
+      "authoritativeLowExpansionReason": "authoritative_low_expansion_ok",
+      "authoritativeLowExpansionSource": "gr_evolve_brick",
+      "authoritativeLowExpansionObservable": "brick_native_div_beta",
+      "divergenceRms": 0,
+      "divergenceMaxAbs": 0,
+      "divergenceTolerance": 0.001,
+      "thetaKConsistencyStatus": "pass",
+      "thetaKResidualAbs": 0,
+      "thetaKTolerance": 0.001,
+      "wallSafetyStatus": "pass",
+      "wallSafetyReason": "wall_safety_guardrail_ok",
+      "betaOverAlphaMax": 2.482556242640872e-17,
+      "betaOutwardOverAlphaWallMax": 2.2094750204371243e-17,
+      "wallHorizonMargin": 1,
+      "timingStatus": "available",
+      "timingReason": "centerline_lapse_timing_available",
+      "centerlineAlpha": 0.89,
+      "centerlineDtauDt": 0.89
+    }
+  },
+  "chart": {
+    "label": "comoving_cartesian",
+    "coordinateMap": "bubble-centered coordinates",
+    "observerFamily": "ship_centerline_local_comoving",
+    "timeCoordinateName": "t",
+    "positionCoordinates": [
+      "x",
+      "y",
+      "z"
+    ],
+    "validityRegimeId": "nhm2_local_comoving_shell_cross"
+  },
+  "representativeSampleId": "centerline_center",
+  "sampleGeometry": {
+    "familyId": "nhm2_centerline_shell_cross",
+    "description": "Deterministic bounded local-comoving shell-cross family: centerline aft-center-fore plus shell-proximal aft/fore/port/starboard/dorsal/ventral probes. Samples are evaluated directly from the solve-backed shift-vector field and remain bounded to local transport inspection only.",
+    "ordering": [
+      "centerline_aft",
+      "centerline_center",
+      "centerline_fore",
+      "shell_aft",
+      "shell_fore",
+      "shell_port",
+      "shell_starboard",
+      "shell_dorsal",
+      "shell_ventral"
+    ],
+    "axes": {
+      "centerline": [
+        1,
+        0,
+        0
+      ],
+      "portStarboard": [
+        0,
+        1,
+        0
+      ],
+      "dorsalVentral": [
+        0,
+        0,
+        1
+      ]
+    },
+    "offsets_m": {
+      "centerline": 251.75,
+      "shellLongitudinal": 503.4600276722667,
+      "shellTransverse": 131.96002767226668,
+      "shellVertical": 86.46002767226666,
+      "shellClearance": 0.039972327733333333
+    }
+  },
+  "transportInterpretation": {
+    "coordinateVelocityInterpretation": "zero_by_chart_choice",
+    "effectiveTransportInterpretation": "bounded_local_comoving_descriptor_not_speed",
+    "certifiedSpeedMeaning": false,
+    "note": "The comoving coordinate velocity is fixed to zero by chart choice. Effective transport is represented here only as a solve-backed bounded local shift descriptor. Even when shell-cross variation is present, it is not a certified speed, cruise envelope, or route-time answer."
+  },
+  "transportVariation": {
+    "transportVariationStatus": "descriptor_varied_dtau_flat",
+    "dtauDtSpread": {
+      "absolute": 0,
+      "flatWithinTolerance": true
+    },
+    "effectiveTransportSpread": {
+      "maxPairwiseL2": 1.593353723983399e-15,
+      "minNorm": 3.6531425984160347e-16,
+      "maxNorm": 1.9546804721038186e-15,
+      "flatWithinTolerance": false
+    },
+    "betaSpread": {
+      "maxPairwiseL2": 1.593353723983399e-15,
+      "minNorm": 3.6531425984160347e-16,
+      "maxNorm": 1.9546804721038186e-15,
+      "flatWithinTolerance": false
+    },
+    "variationTolerance": {
+      "dtauDtAbsolute": 1e-12,
+      "effectiveTransportVectorL2": 1e-18,
+      "betaVectorL2": 1e-18
+    },
+    "flatWithinTolerance": false,
+    "flatnessReason": "shell_cross_samples_reveal_shift_variation_while_dtau_stays_flat_in_bounded_regime"
+  },
+  "transportInformativenessStatus": "descriptor_informative_local_only",
+  "sampleFamilyAdequacy": "adequate_for_bounded_cruise_preflight",
+  "flatnessInterpretation": "The bounded local-comoving family exposes solve-backed local shift variation, but the low-g bounded regime keeps dtau_dt numerically flat. This is informative for bounded transport differentiation only, not for route-time or speed claims.",
+  "certifiedTransportMeaning": "bounded_local_shift_descriptor_gradient_only",
+  "eligibleNextProducts": [
+    "bounded_cruise_envelope_preflight"
+  ],
+  "nextRequiredUpgrade": "route_time_worldline_extension_after_bounded_cruise_preflight",
+  "sampleCount": 9,
+  "dtauDt": {
+    "representative": 0.89,
+    "min": 0.89,
+    "max": 0.89,
+    "units": "dimensionless"
+  },
+  "normalizationResidual": {
+    "representative": 0,
+    "maxAbs": 0,
+    "tolerance": 1e-9,
+    "relation": "alpha^2 - gamma_ij(v^i+beta^i)(v^j+beta^j) - (d tau / dt)^2"
+  },
+  "claimBoundary": [
+    "bounded solve-backed transport contract only",
+    "local-comoving shell-cross sample family only",
+    "not route-time certified",
+    "not mission-time certified",
+    "not max-speed certified",
+    "not viability-promotion evidence"
+  ],
+  "falsifierConditions": [
+    "metric_t00_source_not_metric",
+    "metric_contract_status_not_ok",
+    "chart_contract_status_not_ok",
+    "chart_not_comoving_cartesian",
+    "solve_backed_transport_sample_family_missing",
+    "transport_sample_family_not_shell_cross",
+    "shift_lapse_transport_promotion_gate_not_pass",
+    "dtau_dt_nonpositive",
+    "normalization_residual_exceeds_tolerance"
+  ],
+  "nonClaims": [
+    "not route-time certified",
+    "not mission-time certified",
+    "not max-speed certified",
+    "not full worldline physics closure",
+    "not Lane A proof replacement"
+  ],
+  "sampleSummaries": [
+    {
+      "sampleId": "centerline_aft",
+      "sampleRole": "centerline_aft",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        -251.75,
+        0,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -1.9546804721038186e-15,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -1.9546804721038186e-15,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "centerline_center",
+      "sampleRole": "centerline_center",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        0,
+        0,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -1.9546804721038186e-15,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -1.9546804721038186e-15,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "centerline_fore",
+      "sampleRole": "centerline_fore",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        251.75,
+        0,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -1.9546804721038186e-15,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -1.9546804721038186e-15,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "shell_aft",
+      "sampleRole": "shell_aft",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        -503.4600276722667,
+        0,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        4.859355146973553e-17,
+        -3.620679151750087e-16,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        4.859355146973553e-17,
+        -3.620679151750087e-16,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "shell_fore",
+      "sampleRole": "shell_fore",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        503.4600276722667,
+        0,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        -4.8593551469735516e-17,
+        -3.6206791517500797e-16,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        -4.8593551469735516e-17,
+        -3.6206791517500797e-16,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "shell_port",
+      "sampleRole": "shell_port",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        0,
+        131.96002767226668,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -5.953350122297911e-16,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -5.953350122297911e-16,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "shell_starboard",
+      "sampleRole": "shell_starboard",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        0,
+        -131.96002767226668,
+        0
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -5.138899925587988e-16,
+        0
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -5.138899925587988e-16,
+        0
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "shell_dorsal",
+      "sampleRole": "shell_dorsal",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        0,
+        0,
+        86.46002767226666
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -7.398353470421468e-16,
+        -8.144501967099243e-17
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -7.398353470421468e-16,
+        -8.144501967099243e-17
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    },
+    {
+      "sampleId": "shell_ventral",
+      "sampleRole": "shell_ventral",
+      "sourceModel": "warp_worldline_local_comoving",
+      "transportProvenance": "solve_backed_shift_vector_sample",
+      "coordinateTime_s": 0,
+      "position_m": [
+        0,
+        0,
+        -86.46002767226666
+      ],
+      "coordinateVelocity": [
+        0,
+        0,
+        0
+      ],
+      "betaCoord": [
+        0,
+        -7.398353470421502e-16,
+        8.144501967099243e-17
+      ],
+      "effectiveTransportVelocityCoord": [
+        0,
+        -7.398353470421502e-16,
+        8.144501967099243e-17
+      ],
+      "dtau_dt": 0.89,
+      "normalizationResidual": 0
+    }
+  ],
+  "checksum": "364499ec8f46b4e70cf8ba398cc202fe815928fee9834de0821c3286839e954d"
+}

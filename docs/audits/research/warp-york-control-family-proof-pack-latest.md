@@ -1,4 +1,4 @@
-# Warp York Control-Family Proof Pack (2026-04-03)
+# Warp York Control-Family Proof Pack (2026-04-05)
 
 "This control-family proof pack is a render/geometry audit for York-family interpretation; it is not a physical warp feasibility claim."
 
@@ -191,6 +191,26 @@
 | distinctness_threshold | 0.5 |
 | distance_metric | weighted_normalized_l1 |
 | normalization_method | max_abs_reference_target_with_floor |
+
+## Authoritative Low-Expansion Gate
+| field | value |
+|---|---|
+| sourceCaseId | nhm2_certified |
+| status | pass |
+| reason | authoritative_low_expansion_ok |
+| source | gr_evolve_brick |
+| authoritative | true |
+| divergenceObservable | div_beta |
+| divergenceRms | 1.5271816947557948e-35 |
+| divergenceMaxAbs | 1.0025415710984004e-33 |
+| divergenceTolerance | 0.001 |
+| thetaKConsistencyStatus | pass |
+| thetaKResidualMaxAbs | 1.5591646572837844e-31 |
+| thetaKTolerance | 0.001 |
+| projectionDerivedStatus | advisory_only |
+
+### Authoritative Low-Expansion Gate Notes
+- Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.
 
 ## Classification Robustness Summary
 | metric | value |
@@ -453,12 +473,14 @@
 | sourceMechanismNonAuthoritative | true |
 | sourceMechanismFormulaEquivalent | false |
 | nhm2ShiftLapseFamilyAuthorityStatus | candidate_authoritative_solve_family |
-| nhm2ShiftLapseTransportCertificationStatus | bounded_transport_fail_closed_reference_only |
-| nhm2ShiftLapseStatusSummary | Distinct full-solve family candidate in provenance/model-selection; bounded transport proof surfaces remain fail-closed and reference-only until later promotion gates land. |
-| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only. |
+| nhm2ShiftLapseDefaultTransportCertificationStatus | bounded_transport_fail_closed_reference_only |
+| nhm2ShiftLapseSelectedPublicationStatus | explicit_gate_admitted_selected_family_publication_available |
+| nhm2ShiftLapseSelectedPublicationSummary | Canonical latest aliases remain on warp.metric.T00.natario_sdf.shift by default, but an explicitly selected nhm2_shift_lapse solve can publish proof-bearing bounded transport artifacts when the authoritative shift-lapse transport-promotion gate passes. |
+| nhm2ShiftLapseStatusSummary | Distinct full-solve family candidate in provenance/model-selection; default canonical latest publication remains on the Natario SDF baseline, while nhm2_shift_lapse transport publication is available only through the explicit selected-family path when the authoritative shift-lapse transport-promotion gate passes. |
+| sourceMechanismConsumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and proof-bearing bounded transport admission remains controlled separately by the authoritative shift-lapse transport-promotion gate rather than granted by this source/mechanism surface. |
 | exemptionRouteStatus | satisfied |
 | activationScope | bounded_non_authoritative_advisory_only_reference_only_cross_lane |
-| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, bounded transport proof-bearing surfaces remain fail-closed/reference-only, stronger claims remain blocked, and Lane A remains authoritative. |
+| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, proof-bearing bounded transport admission is controlled separately by the authoritative shift-lapse transport-promotion gate, stronger claims remain blocked, and Lane A remains authoritative. |
 | routeFeasibilityStatus | blocked_by_derivation_class_difference |
 | routeBlockingClass | direct_metric_vs_reconstructed_proxy_derivation_gap |
 | dominantMismatchTerm | final_metricT00Si_Jm3 |
@@ -550,6 +572,15 @@
 | eligibleNextProducts | bounded_cruise_envelope_preflight |
 | routeTimeStatus | deferred |
 | transportInterpretation | bounded_local_comoving_descriptor_not_speed |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | nonClaims | not route-time certified,not mission-time certified,not max-speed certified,not full worldline physics closure,not Lane A proof replacement |
 | artifactPath | artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-warp-worldline-proof-latest.md |
@@ -576,6 +607,15 @@
 | sampleFamilyAdequacy | adequate_for_bounded_cruise_preflight |
 | transportVariationStatus | descriptor_varied_dtau_flat |
 | routeTimeStatus | deferred |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | eligibleNextProducts | route_time_worldline_extension |
 | nonClaims | not max-speed certified,not route-time certified,not mission-time certified,not relativistic-advantage certified,not viability-promotion evidence |
 | artifactPath | artifacts/research/full-solve/nhm2-cruise-envelope-preflight-latest.json |
@@ -604,6 +644,15 @@
 | sampleFamilyAdequacy | adequate_for_bounded_cruise_preflight |
 | transportVariationStatus | descriptor_varied_dtau_flat |
 | routeTimeStatus | bounded_local_segment_certified |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | nextEligibleProducts | mission_time_estimator |
 | nonClaims | not mission-time certified,not max-speed certified,not route ETA to a real target,not relativistic-advantage certified,not viability-promotion evidence |
 | artifactPath | artifacts/research/full-solve/nhm2-route-time-worldline-latest.json |
@@ -629,6 +678,15 @@
 | properTimeEstimate.seconds | 137755965.9171795 |
 | properTimeEstimate.years | 4.3652231448899625 |
 | routeTimeStatus | bounded_local_segment_certified |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | nextEligibleProducts | relativistic_vs_nonrelativistic_comparison,cruise_envelope_semantics_upgrade |
 | nonClaims | not max-speed certified,not viability-promotion evidence,not full route dynamic certified,not unconstrained ETA for arbitrary targets,not relativistic-advantage certified |
 | artifactPath | artifacts/research/full-solve/nhm2-mission-time-estimator-latest.json |
@@ -655,6 +713,15 @@
 | properMinusClassicalSeconds | 0 |
 | comparisonInterpretationStatus | no_certified_relativistic_differential_detected |
 | comparisonReadiness | paired_classical_reference_certified_speed_comparators_deferred |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | deferredComparators | speed_based_nonrelativistic_reference,speed_based_flat_sr_reference,route_map_eta_surface,broad_relativistic_advantage_certification |
 | nonClaims | not max-speed certified,not viability-promotion evidence,not full route dynamic certified,not unconstrained ETA for arbitrary targets,not a speed-based relativistic or nonrelativistic comparator |
 | artifactPath | artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json |
@@ -681,6 +748,15 @@
 | comparisonConsistencyStatus | consistent_with_zero_differential_comparison |
 | routeTimeStatus | bounded_local_segment_certified |
 | missionTimeStatus | bounded_target_coupled_estimate_ready |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | nonClaims | not max-speed certified,not viability-promotion evidence,not a route-map ETA surface,not unconstrained relativistic advantage certified,not full route dynamic certified |
 | artifactPath | artifacts/research/full-solve/nhm2-cruise-envelope-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-cruise-envelope-latest.md |
@@ -703,6 +779,15 @@
 | max_mps2 | 0 |
 | resolutionAdequacy | adequate_constant_lapse_zero_profile |
 | fallbackUsed | false |
+| familyAuthorityStatus | canonical_bounded_baseline_solve_family |
+| transportCertificationStatus | bounded_transport_proof_bearing_baseline |
+| shiftLapseTransportPromotionGateStatus | null |
+| shiftLapseTransportPromotionGateReason | null |
+| shiftLapseAuthoritativeLowExpansionStatus | null |
+| shiftLapseWallSafetyStatus | null |
+| shiftLapseTimingStatus | null |
+| shiftLapseCenterlineAlpha | null |
+| shiftLapseCenterlineDtauDt | null |
 | nonClaims | not curvature-gravity certified,not comfort-certified,not safety-certified,not viability-promotion evidence,not source-mechanism promotion |
 | artifactPath | artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json |
 | reportPath | docs/audits/research/warp-nhm2-in-hull-proper-acceleration-latest.md |
@@ -717,7 +802,7 @@
 | publicationMode | bounded_stack_latest_sequential_single_writer |
 | proofSurfaceCount | 8 |
 | trackedRepoEvidenceStatus | repo_tracked_latest_evidence |
-| proofPackChecksum | 1100d08a297b1034bacf09ed2f0f999240e286076ae1af40de9d49b4b0b3b694 |
+| proofPackChecksum | 0d4665bc70fc11178aa969868f6ffeea0ba7c45b76f64569659373d7074a6ad7 |
 | manifestPath | artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json |
 | manifestReportPath | docs/audits/research/warp-nhm2-proof-surface-manifest-latest.md |
 
@@ -792,7 +877,7 @@
 - Controls are calibration references in this proof-pack; NHM2 classification is diagnostic-local and not a full theory identity claim.
 - lane=lane_a_eulerian_comoving_theta_minus_trk observer=eulerian_n foliation=comoving_cartesian_3p1 theta_definition=theta=-trK
 - Control behavior is separated: Alcubierre-like strong signed lane vs Natario-like near-zero lane.
-- NHM2 primary York behavior aligns with low-expansion Natario-like control in this run.
+- NHM2 primary York behavior aligns with low-expansion Natario-like control in this run under the authoritative low-expansion gate.
 - Robustness status=stable_low_expansion_like dominant=nhm2_low_expansion_family fraction=1.
 - lane_a_eulerian_comoving_theta_minus_trk parity status=closed cause=null.
 - Support-overlap parity deltas are currently advisory diagnostics and do not gate Lane A pass/fail.
@@ -817,16 +902,19 @@
 - source_mechanism_parity_route_feasibility=blocked_by_derivation_class_difference blocking_class=direct_metric_vs_reconstructed_proxy_derivation_gap dominant_mismatch_term=final_metricT00Si_Jm3
 - source_mechanism_maturity=reduced_order_advisory claim_boundary_policy=bounded_advisory_non_promotable_until_explicit_promotion_contract promotion_blockers=proxy_vs_metric_term_gap,direct_vs_reconstructed_non_parity,timing_authority_optional_fields_partial,reference_only_cross_lane_scope lane_a_authoritative=true
 - source_mechanism_promotion_contract_status=active_for_bounded_claims_only selected_route=formal_exemption_route policy=parity_required_for_equivalence_or_cross_lane_promotion_exemption_limited_to_bounded_non_authoritative_claims exemption_route_status=satisfied exemption_route_activated=true active_claim_set=bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison
-- source_mechanism_consumer_scope=active_claims:bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison blocked_claims:source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope reference_only_scope=true formula_equivalence=false parity_route=blocked_by_derivation_class_difference nhm2_shift_lapse_family_status=candidate_authoritative_solve_family nhm2_shift_lapse_transport_status=bounded_transport_fail_closed_reference_only
+- source_mechanism_consumer_scope=active_claims:bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison blocked_claims:source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope reference_only_scope=true formula_equivalence=false parity_route=blocked_by_derivation_class_difference nhm2_shift_lapse_family_status=candidate_authoritative_solve_family nhm2_shift_lapse_default_transport_status=bounded_transport_fail_closed_reference_only nhm2_shift_lapse_selected_publication_status=explicit_gate_admitted_selected_family_publication_available
 - presentation_render_layer_status=available field_suite_realization_status=collapsed field_suite_readability_status=flat optix_scientific_render_available=true presentation_render_quality=failed presentation_readiness_verdict=field_realized_but_presentation_flat presentation_render_backed_by_authoritative_metric=true
 - shift_geometry_status=available case_count=4 residual_count=2 direction_overlay_status=available direction_overlay_case_distinctness=mixed constraint_context_status=deferred_units_and_policy_unresolved
 - curvature_invariant_suite_status=available surfaced_fields=kretschmann,ricci4,ricci2,weylI invariant_crosscheck_status=unpopulated momentum_density_status=deferred_not_yet_first_class
 - render_taxonomy authoritative=diagnostic_lane_a presentation=scientific_3p1_field comparison=comparison_panel
-- warp_worldline_status=bounded_solve_backed certified=true source_surface=nhm2_metric_local_comoving_transport_cross sample_count=9 route_time=deferred
-- cruise_preflight_status=bounded_preflight_ready quantity=bounded_local_transport_descriptor_norm candidate_count=10 admissible_count=9 route_time=deferred
-- route_time_worldline_status=bounded_route_time_ready route_model=nhm2_bounded_local_probe_lambda progression_samples=5 route_time=bounded_local_segment_certified
-- mission_time_estimator_status=bounded_target_coupled_estimate_ready target=alpha-cen-a route_time=bounded_local_segment_certified coordinate_years=4.3652231448899625
-- mission_time_comparison_status=bounded_target_coupled_comparison_ready target=alpha-cen-a interpretation=no_certified_relativistic_differential_detected proper_minus_coordinate_seconds=0
-- cruise_envelope_status=bounded_cruise_envelope_certified quantity=bounded_local_transport_descriptor_norm representative_value=1.9546804721038186e-15 comparison_consistency=consistent_with_zero_differential_comparison
-- in_hull_proper_acceleration_status=bounded_in_hull_profile_certified observer=eulerian_comoving_cabin representative_mps2=0 resolution=adequate_constant_lapse_zero_profile
+- warp_worldline_status=bounded_solve_backed certified=true source_surface=nhm2_metric_local_comoving_transport_cross sample_count=9 route_time=deferred transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- cruise_preflight_status=bounded_preflight_ready quantity=bounded_local_transport_descriptor_norm candidate_count=10 admissible_count=9 route_time=deferred transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- route_time_worldline_status=bounded_route_time_ready route_model=nhm2_bounded_local_probe_lambda progression_samples=5 route_time=bounded_local_segment_certified transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- mission_time_estimator_status=bounded_target_coupled_estimate_ready target=alpha-cen-a route_time=bounded_local_segment_certified coordinate_years=4.3652231448899625 transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- mission_time_comparison_status=bounded_target_coupled_comparison_ready target=alpha-cen-a interpretation=no_certified_relativistic_differential_detected proper_minus_coordinate_seconds=0 transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- cruise_envelope_status=bounded_cruise_envelope_certified quantity=bounded_local_transport_descriptor_norm representative_value=1.9546804721038186e-15 comparison_consistency=consistent_with_zero_differential_comparison transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- in_hull_proper_acceleration_status=bounded_in_hull_profile_certified observer=eulerian_comoving_cabin representative_mps2=0 resolution=adequate_constant_lapse_zero_profile transport_cert=bounded_transport_proof_bearing_baseline shift_lapse_gate=null
+- authoritative_low_expansion_gate=pass source=gr_evolve_brick divergence_rms=1.5271816947557948e-35 divergence_max_abs=1.0025415710984004e-33 theta_k_status=pass reason=authoritative_low_expansion_ok
+- Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.
 - proof_surface_manifest_status=bounded_stack_publication_hardened publication_mode=bounded_stack_latest_sequential_single_writer proof_surface_count=8 tracked_repo_evidence=repo_tracked_latest_evidence
+

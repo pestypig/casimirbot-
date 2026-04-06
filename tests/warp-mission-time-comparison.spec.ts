@@ -4,6 +4,10 @@ import {
   isCertifiedWarpMissionTimeComparisonContract,
 } from "../shared/contracts/warp-mission-time-comparison.v1";
 import {
+  makeShiftLapseTransportPromotionGateFixture,
+  makeShiftLapseWarpWorldlineFixture,
+  makeWarpCruiseEnvelopePreflightFixture,
+  makeWarpRouteTimeWorldlineFixture,
   makeWarpMissionTimeComparisonFixture,
   makeWarpMissionTimeEstimatorFixture,
 } from "./helpers/warp-worldline-fixture";
@@ -119,5 +123,79 @@ describe("warp mission-time comparison contract", () => {
         deferredComparators: ["speed_based_flat_sr_reference"],
       }),
     ).toBe(false);
+  });
+
+  it("keeps admitted nhm2_shift_lapse mission comparison bounded and honest when tau=t", () => {
+    const worldline = makeShiftLapseWarpWorldlineFixture();
+    const preflight = makeWarpCruiseEnvelopePreflightFixture(worldline);
+    const routeTime = makeWarpRouteTimeWorldlineFixture(worldline, preflight);
+    const estimator = makeWarpMissionTimeEstimatorFixture({
+      worldline,
+      preflight,
+      routeTime,
+    });
+    const comparison = buildWarpMissionTimeComparisonContract({
+      missionTimeEstimator: {
+        ...estimator,
+        properTimeEstimate: {
+          ...estimator.coordinateTimeEstimate,
+          meaning: estimator.properTimeEstimate.meaning,
+        },
+      },
+    });
+
+    expect(comparison).not.toBeNull();
+    expect(comparison?.sourceSurface.metricFamily).toBe("nhm2_shift_lapse");
+    expect(comparison?.sourceSurface.familyAuthorityStatus).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect(comparison?.sourceSurface.transportCertificationStatus).toBe(
+      "bounded_transport_proof_bearing_gate_admitted",
+    );
+    expect(comparison?.sourceSurface.shiftLapseTransportPromotionGate?.status).toBe("pass");
+    expect(comparison?.comparisonMetrics.interpretationStatus).toBe(
+      "no_certified_relativistic_differential_detected",
+    );
+    expect(comparison?.comparisonMetrics.properMinusCoordinate_seconds).toBeCloseTo(0, 12);
+    expect(comparison?.comparisonMetrics.properMinusClassical_seconds).toBeCloseTo(0, 12);
+    expect(isCertifiedWarpMissionTimeComparisonContract(comparison)).toBe(true);
+  });
+
+  it("reports a bounded differential for an admitted tuned nhm2_shift_lapse profile without adding speed semantics", () => {
+    const tunedAlpha = 0.995;
+    const worldline = makeShiftLapseWarpWorldlineFixture(
+      undefined,
+      makeShiftLapseTransportPromotionGateFixture({
+        centerlineAlpha: tunedAlpha,
+        centerlineDtauDt: tunedAlpha,
+        shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+        shiftLapseProfileStage: "controlled_tuning_stage_1",
+      }),
+    );
+    const preflight = makeWarpCruiseEnvelopePreflightFixture(worldline);
+    const routeTime = makeWarpRouteTimeWorldlineFixture(worldline, preflight);
+    const estimator = makeWarpMissionTimeEstimatorFixture({
+      worldline,
+      preflight,
+      routeTime,
+    });
+    const comparison = buildWarpMissionTimeComparisonContract({
+      missionTimeEstimator: estimator,
+    });
+
+    expect(comparison).not.toBeNull();
+    expect(comparison?.sourceSurface.metricFamily).toBe("nhm2_shift_lapse");
+    expect(comparison?.sourceSurface.shiftLapseProfileId).toBe(
+      "stage1_centerline_alpha_0p995_v1",
+    );
+    expect(comparison?.sourceSurface.shiftLapseTransportPromotionGate?.status).toBe("pass");
+    expect(comparison?.comparisonMetrics.interpretationStatus).toBe(
+      "bounded_relativistic_differential_detected",
+    );
+    expect(
+      Math.abs(comparison?.comparisonMetrics.properMinusCoordinate_seconds ?? 0),
+    ).toBeGreaterThan(0);
+    expect(comparison?.deferredComparators).toContain("speed_based_flat_sr_reference");
+    expect(isCertifiedWarpMissionTimeComparisonContract(comparison)).toBe(true);
   });
 });

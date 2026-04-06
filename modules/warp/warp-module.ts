@@ -248,6 +248,12 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   const alphaWallTaper_m = Number.isFinite(alphaWallTaperRaw)
     ? Math.max(1e-6, alphaWallTaperRaw)
     : undefined;
+  const shiftLapseProfileIdRaw =
+    (dyn as any)?.shiftLapseProfileId ?? (params as any)?.shiftLapseProfileId;
+  const shiftLapseProfileId =
+    typeof shiftLapseProfileIdRaw === "string" && shiftLapseProfileIdRaw.trim().length > 0
+      ? shiftLapseProfileIdRaw.trim()
+      : undefined;
 
   // Sector counts / duty
   const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
@@ -402,6 +408,7 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     alphaGradientVec_m_inv,
     alphaInteriorSupportKind,
     alphaWallTaper_m,
+    shiftLapseProfileId,
 
     // --- Pipeline seeds (threaded through) ---
     gammaGeo,

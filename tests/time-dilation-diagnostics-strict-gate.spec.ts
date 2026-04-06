@@ -91,7 +91,9 @@ describe("time dilation strict verification gate", () => {
     );
     expect(diagnostics.congruence.requiredFieldsOk).toBe(false);
     expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(false);
-    expect(diagnostics.natarioCanonical.reason).toBe("natario_required_fields_missing");
+    expect(diagnostics.natarioCanonical.reason).toBe(
+      "natario_authoritative_divergence_missing",
+    );
   });
 
   it("prefers brick-native div_beta proof values for Natario canonical checks when available", async () => {
@@ -120,8 +122,11 @@ describe("time dilation strict verification gate", () => {
         values: {
           natario_expansion_tolerance: { value: 1e-3, proxy: false },
           theta_geom: { value: 2e-4, proxy: false },
+          theta_metric_authoritative: { value: true, proxy: false },
           metric_k_trace_mean: { value: -2e-4, proxy: false },
+          metric_k_trace_authoritative: { value: true, proxy: false },
           theta_k_tolerance: { value: 1e-3, proxy: false },
+          metric_div_beta_authoritative: { value: true, proxy: false },
           metric_div_beta_rms: { value: 2e-4, proxy: false },
           metric_div_beta_max_abs: { value: 4e-4, proxy: false },
           metric_div_beta_source: { value: "gr_evolve_brick", proxy: false },
@@ -136,6 +141,8 @@ describe("time dilation strict verification gate", () => {
 
     expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(true);
     expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(true);
+    expect(diagnostics.natarioCanonical.authoritativeSourcePresent).toBe(true);
+    expect(diagnostics.natarioCanonical.classificationMode).toBe("authoritative");
     expect(diagnostics.natarioCanonical.checks.divBeta).toEqual(
       expect.objectContaining({
         status: "pass",
@@ -146,7 +153,7 @@ describe("time dilation strict verification gate", () => {
     );
   });
 
-  it("falls back to adapter beta diagnostics when brick-native div_beta proof values are absent", async () => {
+  it("keeps projection diagnostics visible but blocks authoritative Natario canonical pass when brick-native div_beta proof values are absent", async () => {
     stubFetch(
       {
         ...basePipeline,
@@ -183,15 +190,150 @@ describe("time dilation strict verification gate", () => {
       publish: false,
     });
 
-    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(true);
-    expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(true);
+    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(false);
+    expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(false);
+    expect(diagnostics.natarioCanonical.authoritativeSourcePresent).toBe(false);
+    expect(diagnostics.natarioCanonical.classificationMode).toBe(
+      "projection_derived_only",
+    );
+    expect(diagnostics.natarioCanonical.projectionRequiredFieldsOk).toBe(true);
+    expect(diagnostics.natarioCanonical.projectionCanonicalSatisfied).toBe(true);
+    expect(diagnostics.natarioCanonical.reason).toBe(
+      "natario_authoritative_divergence_missing_projection_only",
+    );
     expect(diagnostics.natarioCanonical.checks.divBeta).toEqual(
+      expect.objectContaining({
+        status: "unknown",
+        rms: null,
+        maxAbs: null,
+      }),
+    );
+    expect(diagnostics.natarioCanonical.checks.projectionDivBeta).toEqual(
       expect.objectContaining({
         status: "pass",
         rms: 2e-4,
         maxAbs: 4e-4,
         source: "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax",
       }),
+    );
+  });
+
+  it("surfaces brick-native divergence failure even when projection diagnostics look Natario-like", async () => {
+    stubFetch(
+      {
+        ...basePipeline,
+        viability: {
+          certificateHash: "cert:1",
+          integrityOk: true,
+          constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+        },
+        warp: {
+          metricT00Contract: { family: "natario" },
+          metricAdapter: {
+            alpha: 1,
+            gammaDiag: [1, 1, 1],
+            betaDiagnostics: {
+              method: "finite-diff",
+              thetaRms: 2e-4,
+              thetaMax: 4e-4,
+            },
+          },
+        },
+      },
+      {
+        values: {
+          natario_expansion_tolerance: { value: 1e-3, proxy: false },
+          theta_geom: { value: 2e-4, proxy: false },
+          theta_metric_authoritative: { value: true, proxy: false },
+          metric_k_trace_mean: { value: -2e-4, proxy: false },
+          metric_k_trace_authoritative: { value: true, proxy: false },
+          theta_k_tolerance: { value: 1e-3, proxy: false },
+          metric_div_beta_authoritative: { value: true, proxy: false },
+          metric_div_beta_rms: { value: 2e-2, proxy: false },
+          metric_div_beta_max_abs: { value: 4e-2, proxy: false },
+          metric_div_beta_source: { value: "gr_evolve_brick", proxy: false },
+        },
+      },
+    );
+
+    const diagnostics = await buildTimeDilationDiagnostics({
+      baseUrl: "http://example.test",
+      publish: false,
+    });
+
+    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(true);
+    expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(false);
+    expect(diagnostics.natarioCanonical.classificationMode).toBe("authoritative");
+    expect(diagnostics.natarioCanonical.reason).toBe(
+      "natario_authoritative_divergence_constraint_failed",
+    );
+    expect(diagnostics.natarioCanonical.projectionCanonicalSatisfied).toBe(true);
+    expect(diagnostics.natarioCanonical.checks.divBeta).toEqual(
+      expect.objectContaining({
+        status: "fail",
+        rms: 2e-2,
+        maxAbs: 4e-2,
+        source: "gr_evolve_brick",
+      }),
+    );
+    expect(diagnostics.natarioCanonical.checks.projectionDivBeta).toEqual(
+      expect.objectContaining({
+        status: "pass",
+        rms: 2e-4,
+        maxAbs: 4e-4,
+      }),
+    );
+  });
+
+  it("blocks authoritative Natario canonical pass when brick-native divergence is present but authoritative theta/K evidence is missing", async () => {
+    stubFetch(
+      {
+        ...basePipeline,
+        viability: {
+          certificateHash: "cert:1",
+          integrityOk: true,
+          constraints: [{ id: "FordRomanQI", severity: "HARD", passed: true }],
+        },
+        warp: {
+          metricT00Contract: { family: "natario" },
+          metricAdapter: {
+            alpha: 1,
+            gammaDiag: [1, 1, 1],
+            betaDiagnostics: {
+              method: "finite-diff",
+              thetaRms: 2e-4,
+              thetaMax: 4e-4,
+            },
+          },
+        },
+      },
+      {
+        values: {
+          natario_expansion_tolerance: { value: 1e-3, proxy: false },
+          theta_geom: { value: 2e-4, proxy: false },
+          metric_k_trace_mean: { value: -2e-4, proxy: false },
+          theta_k_tolerance: { value: 1e-3, proxy: false },
+          metric_div_beta_authoritative: { value: true, proxy: false },
+          metric_div_beta_rms: { value: 2e-4, proxy: false },
+          metric_div_beta_max_abs: { value: 4e-4, proxy: false },
+          metric_div_beta_source: { value: "gr_evolve_brick", proxy: false },
+        },
+      },
+    );
+
+    const diagnostics = await buildTimeDilationDiagnostics({
+      baseUrl: "http://example.test",
+      publish: false,
+    });
+
+    expect(diagnostics.natarioCanonical.requiredFieldsOk).toBe(false);
+    expect(diagnostics.natarioCanonical.canonicalSatisfied).toBe(false);
+    expect(diagnostics.natarioCanonical.authoritativeSourcePresent).toBe(false);
+    expect(diagnostics.natarioCanonical.classificationMode).toBe(
+      "projection_derived_only",
+    );
+    expect(diagnostics.natarioCanonical.reason).toBe(
+      "natario_authoritative_theta_k_missing_projection_only",
     );
   });
 

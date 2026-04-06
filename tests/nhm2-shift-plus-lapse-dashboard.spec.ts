@@ -12,6 +12,9 @@ const findPanel = (payload: any, panelId: string) =>
 const findRow = (panel: any, rowId: string) =>
   panel?.rows?.find((row: any) => row.rowId === rowId);
 
+const findGraphBlock = (payload: any, graphId: string) =>
+  payload.graphSeriesBlocks?.find((graph: any) => graph.graphId === graphId);
+
 describe("nhm2 shift-plus-lapse dashboard companion", () => {
   let payload: any;
 
@@ -44,6 +47,10 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
       "cabin_gravity",
       "wall_safety",
       "precision_provenance",
+    ]);
+    expect(payload.graphReadingOrder).toEqual([
+      "cabin_gravity_profile_z",
+      "clock_gradient_profile_z",
     ]);
   });
 
@@ -87,9 +94,18 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
     const cabinPanel = findPanel(payload, "cabin_gravity_panel");
     const wallPanel = findPanel(payload, "wall_safety_panel");
     const proofSurfaceRow = findRow(proofPanel, "authoritative_proof_surface");
-    const branchStatusRow = findRow(proofPanel, "branch_status");
+    const familyStatusRow = findRow(proofPanel, "generalized_family_status");
+    const transportStatusRow = findRow(
+      proofPanel,
+      "generalized_transport_status",
+    );
 
     expect(proofPanel.sectionNote).toContain("Lane A remains authoritative");
+    expect(proofPanel.sectionNote).toContain(
+      "candidate authoritative solve family",
+    );
+    expect(proofPanel.sectionNote).toContain("transport-promotion gate");
+    expect(proofPanel.sectionNote).toContain("not claimed by this dashboard");
     expect(proofPanel.sectionNote).toContain("bounded non-authoritative advisory only");
     expect(proofSurfaceRow).toEqual(
       expect.objectContaining({
@@ -97,10 +113,16 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
         generalizedValue: "lane_a_eulerian_comoving_theta_minus_trk",
       }),
     );
-    expect(branchStatusRow).toEqual(
+    expect(familyStatusRow).toEqual(
+      expect.objectContaining({
+        badgeId: "lane_a_unchanged",
+        generalizedValue: "candidate_authoritative_solve_family",
+      }),
+    );
+    expect(transportStatusRow).toEqual(
       expect.objectContaining({
         badgeId: "reference_only",
-        generalizedValue: "reference_only_mild_shift_plus_lapse",
+        generalizedValue: "bounded_transport_fail_closed_reference_only",
       }),
     );
     expect(cabinPanel.sectionNote).toContain("local lapse diagnostics");
@@ -139,8 +161,17 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
       ]),
     );
     expect(payload.sourceMechanismReferenceOnlyScope).toBe(true);
+    expect(payload.generalizedFamilyAuthorityStatus).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect(payload.generalizedTransportCertificationStatus).toBe(
+      "bounded_transport_fail_closed_reference_only",
+    );
     expect(payload.sourceMechanismConsumerSummary).toContain(
-      "warp.metric.T00.nhm2_shift_lapse remains reference_only",
+      "candidate authoritative solve family",
+    );
+    expect(payload.sourceMechanismConsumerSummary).toContain(
+      "transport-promotion gate",
     );
   });
 
@@ -171,6 +202,57 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
     );
   });
 
+  it("serializes provenance-aware graph source blocks for local cabin gravity and clock gradient", () => {
+    const gravityGraph = findGraphBlock(payload, "cabin_gravity_profile_z");
+    const clockGraph = findGraphBlock(payload, "clock_gradient_profile_z");
+
+    expect(payload.graphRenderStatus).toBe("generated");
+    expect(gravityGraph).toEqual(
+      expect.objectContaining({
+        graphId: "cabin_gravity_profile_z",
+        quantitySymbol: "g_local(z)",
+        quantityUnits: "m/s^2",
+        sampleAxis: "z_zenith",
+        sampleAxisLabel: "Cabin z_zenith offset (m)",
+        sampleCount: 9,
+        baselineSourceKind: "brick_float32_direct",
+        generalizedSourceKind: "analytic_lapse_summary_companion",
+        underResolutionDetected: true,
+      }),
+    );
+    expect(gravityGraph.sampleDomain).toHaveLength(gravityGraph.sampleCount);
+    expect(gravityGraph.baselineSeries).toHaveLength(gravityGraph.sampleCount);
+    expect(gravityGraph.generalizedSeries).toHaveLength(gravityGraph.sampleCount);
+    expect(gravityGraph.baselineBadgeIds).toContain("raw_brick");
+    expect(gravityGraph.generalizedBadgeIds).toContain("analytic_companion");
+    expect(gravityGraph.sharedBadgeIds).toEqual(
+      expect.arrayContaining(["mixed_source", "source_mismatch"]),
+    );
+    expect(gravityGraph.graphNote).toContain("Presentation-only graph");
+
+    expect(clockGraph).toEqual(
+      expect.objectContaining({
+        graphId: "clock_gradient_profile_z",
+        quantitySymbol: "delta_tau_per_day(z)",
+        quantityUnits: "s/day",
+        sampleAxis: "z_zenith",
+        sampleCount: 9,
+        baselineSourceKind: "brick_float32_direct",
+        generalizedSourceKind: "analytic_lapse_summary_companion",
+        underResolutionDetected: true,
+      }),
+    );
+    expect(clockGraph.sampleDomain).toHaveLength(clockGraph.sampleCount);
+    expect(clockGraph.baselineSeries).toHaveLength(clockGraph.sampleCount);
+    expect(clockGraph.generalizedSeries).toHaveLength(clockGraph.sampleCount);
+    expect(clockGraph.baselineBadgeIds).toContain("raw_brick");
+    expect(clockGraph.generalizedBadgeIds).toContain("analytic_companion");
+    expect(clockGraph.sharedBadgeIds).toEqual(
+      expect.arrayContaining(["mixed_source", "source_mismatch"]),
+    );
+    expect(clockGraph.graphNote).toContain("not route-time compression");
+  });
+
   it("emits a rendered card family with the overview card as primary", () => {
     const artifactPath = path.join(
       process.cwd(),
@@ -195,6 +277,7 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
     expect(artifact.renderedCardCategory).toBe("comparison_panel");
     expect(artifact.renderedCardRole).toBe("presentation");
     expect(artifact.renderedCardLayoutVersion).toBe("v2_measured_card_family");
+    expect(artifact.graphRenderStatus).toBe("generated");
     expect(artifact.layoutBudget).toEqual(
       expect.objectContaining({
         dynamicCardHeight: true,
@@ -213,7 +296,7 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
         expect.objectContaining({ badgeId: "unresolved" }),
       ]),
     );
-    expect(findRow(proofPanel, "branch_status")).toEqual(
+    expect(findRow(proofPanel, "generalized_transport_status")).toEqual(
       expect.objectContaining({
         badgeId: "reference_only",
       }),
@@ -255,11 +338,33 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
         }),
       ]),
     );
+    expect(artifact.graphRenders).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          graphId: "cabin_gravity_profile_z",
+          sourcePanel: "cabin_gravity_panel",
+          sourceSeriesBlock: "cabin_gravity_profile_z",
+          authoritativeStatus: "non_authoritative",
+        }),
+        expect.objectContaining({
+          graphId: "clock_gradient_profile_z",
+          sourcePanel: "cabin_gravity_panel",
+          sourceSeriesBlock: "clock_gradient_profile_z",
+          authoritativeStatus: "non_authoritative",
+        }),
+      ]),
+    );
     for (const card of artifact.renderedCards) {
       expect(card.hash).toMatch(/^[a-f0-9]{64}$/);
       const cardPath = path.join(process.cwd(), card.path);
       expect(fs.existsSync(cardPath)).toBe(true);
       expect(fs.statSync(cardPath).size).toBeGreaterThan(0);
+    }
+    for (const graph of artifact.graphRenders) {
+      expect(graph.hash).toMatch(/^[a-f0-9]{64}$/);
+      const graphPath = path.join(process.cwd(), graph.path);
+      expect(fs.existsSync(graphPath)).toBe(true);
+      expect(fs.statSync(graphPath).size).toBeGreaterThan(0);
     }
     expect(artifact.legacyMonolithicCardStatus).toBe("deprecated_not_generated");
     expect(artifact.sourceMechanismConsumerConformance).toEqual(
@@ -304,6 +409,18 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
             "dashboard_overview",
             "proof_status",
             "precision_provenance",
+          ],
+        }),
+        expect.objectContaining({
+          surfaceId: "shift_plus_lapse_dashboard_graphs",
+          surfaceType: "rendered_graph_family",
+          inspectionMode: "pre_raster_render_source",
+          dataMode: "artifact_coupled",
+          laneAAuthorityPresent: true,
+          referenceOnlyPresent: true,
+          checkedTargets: [
+            "cabin_gravity_profile_z",
+            "clock_gradient_profile_z",
           ],
         }),
       ]),
@@ -451,6 +568,59 @@ describe("nhm2 shift-plus-lapse dashboard companion", () => {
     expect(
       taxonomyArtifact.fieldFamilies.find(
         (family: any) => family.fieldId === "diagnostics_dashboard",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        defaultCategory: "comparison_panel",
+        defaultRole: "presentation",
+      }),
+    );
+  });
+
+  it("publishes provenance-aware graph renders into render taxonomy without transport inheritance", () => {
+    const taxonomyPath = path.join(
+      process.cwd(),
+      "artifacts",
+      "research",
+      "full-solve",
+      "render-taxonomy-latest.json",
+    );
+    const taxonomyArtifact = JSON.parse(fs.readFileSync(taxonomyPath, "utf8"));
+    const graphEntries = taxonomyArtifact.renderEntries.filter(
+      (entry: any) =>
+        String(entry.renderId).startsWith("nhm2_shift_lapse:comparison_panel:") &&
+        ["cabin_gravity_profile_z", "clock_gradient_profile_z"].includes(entry.fieldId),
+    );
+    expect(graphEntries.map((entry: any) => entry.fieldId).sort()).toEqual([
+      "cabin_gravity_profile_z",
+      "clock_gradient_profile_z",
+    ]);
+    for (const entry of graphEntries) {
+      expect(entry).toEqual(
+        expect.objectContaining({
+          renderCategory: "comparison_panel",
+          renderRole: "presentation",
+          authoritativeStatus: "non_authoritative",
+          baseImagePolicy: "diagnostic_graph_canvas",
+          baseImageSource: "none",
+          inheritsTransportContext: false,
+          contextCompositionMode: "none",
+        }),
+      );
+    }
+    expect(
+      taxonomyArtifact.fieldFamilies.find(
+        (family: any) => family.fieldId === "cabin_gravity_profile_z",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        defaultCategory: "comparison_panel",
+        defaultRole: "presentation",
+      }),
+    );
+    expect(
+      taxonomyArtifact.fieldFamilies.find(
+        (family: any) => family.fieldId === "clock_gradient_profile_z",
       ),
     ).toEqual(
       expect.objectContaining({

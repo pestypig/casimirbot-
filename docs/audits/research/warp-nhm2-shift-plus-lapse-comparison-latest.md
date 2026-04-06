@@ -39,8 +39,12 @@
 
 - authoritativeProofSurface: lane_a_eulerian_comoving_theta_minus_trk
 - baselineBranchStatus: unit_lapse_baseline_unchanged
-- generalizedBranchStatus: reference_only_mild_shift_plus_lapse
-- note: This comparison companion does not supersede York proof semantics. It exists to compare reference-only lapse diagnostics against the current unit-lapse baseline with explicit source provenance.
+- generalizedBranchStatus: candidate_authoritative_family_transport_gate_controlled_not_claimed_here
+- baselineFamilyAuthorityStatus: canonical_bounded_baseline_solve_family
+- generalizedFamilyAuthorityStatus: candidate_authoritative_solve_family
+- baselineTransportCertificationStatus: bounded_transport_proof_bearing_baseline
+- generalizedTransportCertificationStatus: bounded_transport_fail_closed_reference_only
+- note: This comparison companion does not supersede York proof semantics. It compares a candidate authoritative solve family in provenance/model-selection against the current bounded baseline while treating proof-bearing bounded transport admission for the generalized family as separately controlled by the authoritative shift-lapse transport-promotion gate, not claimed by this comparison surface.
 
 ## Provenance Warnings
 

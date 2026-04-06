@@ -50,6 +50,10 @@ const appendMissingSourcesLines = (cleaned: string, original: string): string =>
   return output.join("\n").trim();
 };
 
+type StripRunawayAnswerArtifactsOptions = {
+  preserveVisibleSources?: boolean;
+};
+
 const stripDuplicateTrailingSources = (value: string): string => {
   const lines = value.split(/\r?\n/);
   const out: string[] = [];
@@ -98,8 +102,12 @@ const stripDebugVariants = (value: string): string => {
   return out.join("\n");
 };
 
-export const stripRunawayAnswerArtifacts = (value: string): string => {
+export const stripRunawayAnswerArtifacts = (
+  value: string,
+  options?: StripRunawayAnswerArtifactsOptions,
+): string => {
   if (!value) return value;
+  const preserveVisibleSources = options?.preserveVisibleSources !== false;
   let cleaned = value;
   cleaned = cleaned.replace(/^\s*in answer,\s*use the context and evidence bullets to craft your response\.?\s*/i, "");
   cleaned = cleaned.replace(/^\s*in plain language,\s*in answer,\s*use the context and evidence bullets to craft your response\.?\s*/i, "In plain language, ");
@@ -114,7 +122,9 @@ export const stripRunawayAnswerArtifacts = (value: string): string => {
     cleaned = cleaned.slice(0, markerMatch.index);
   }
   cleaned = stripDuplicateTrailingSources(cleaned);
-  cleaned = appendMissingSourcesLines(cleaned, value);
+  if (preserveVisibleSources) {
+    cleaned = appendMissingSourcesLines(cleaned, value);
+  }
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
   return cleaned;
 };

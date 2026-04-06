@@ -5,7 +5,7 @@ This companion compares the current promoted unit-lapse NHM2 baseline against th
 It is a diagnostic comparison companion only:
 
 - Lane A remains authoritative and unchanged.
-- warp.metric.T00.nhm2.shift_lapse remains reference_only.
+- warp.metric.T00.nhm2.shift_lapse is a candidate authoritative solve family in provenance/model-selection; proof-bearing bounded transport admission remains separately controlled by the authoritative shift-lapse transport-promotion gate and is not claimed by this comparison surface.
 - Cabin gravity and wall safety are presented side by side but remain separate diagnostic families.
 - No route-time-compression claim is made.
 
@@ -40,6 +40,8 @@ The nested baseline direct-pipeline cabin block is now normalized so unresolved 
 
 - comparisonStatus: available
 - baselineBranchStatus: unit_lapse_baseline_unchanged
-- generalizedBranchStatus: reference_only_mild_shift_plus_lapse
+- generalizedBranchStatus: candidate_authoritative_family_transport_gate_controlled_not_claimed_here
+- generalizedFamilyAuthorityStatus: candidate_authoritative_solve_family
+- generalizedTransportCertificationStatus: bounded_transport_fail_closed_reference_only
 - precisionComparisonStatus: mixed_source_comparison_explicit
-- recommendedNextAction: If a later visualization companion is added, keep per-quantity raw-vs-analytic badges visible and do not collapse cabin gravity and wall safety into one score.
+- recommendedNextAction: Profile-graph presentation companions must keep per-quantity raw-vs-analytic badges visible, keep cabin gravity separate from wall safety, and avoid any field-map presentation that overstates mild-branch raw resolution.

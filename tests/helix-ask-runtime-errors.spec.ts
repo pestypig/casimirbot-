@@ -22,6 +22,7 @@ import {
   __testHelixAskDialogueFormatting,
   __testOnlyNonReportGuard,
 } from "../server/routes/agi.plan";
+import { buildHelixAskEnvelope } from "../server/services/helix-ask/envelope";
 
 const asObject = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -317,6 +318,358 @@ describe("non-report guard ordering for runtime fallback", () => {
     expect(guarded.text).not.toMatch(/Next evidence:/i);
     expect(guarded.text).toMatch(/In practical terms,/i);
     expect(guarded.text).toMatch(/^Sources:/im);
+  });
+
+  it("hides visible sources lines for conversational answers while preserving conversational mode", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "The ask route keeps the answer conversational unless the user explicitly asks for report formatting.",
+        "",
+        "Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+      ].join("\n"),
+      question: "How does Helix Ask decide whether to answer conversationally?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+      citationTokens: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.visibleSources).toBe(false);
+    expect(finalized.text).not.toMatch(/^Sources:/im);
+    expect(finalized.text).toMatch(/conversational/i);
+  });
+
+  it("keeps visible sources lines when the prompt explicitly asks for sources", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText:
+        "The route is assembled in server/routes/agi.plan.ts and explained in docs/helix-ask-flow.md.",
+      question: "Explain how Helix Ask routes requests with sources.",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+      citationTokens: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.visibleSources).toBe(true);
+    expect(finalized.explicitVisibleSourcesRequested).toBe(true);
+    expect(finalized.text).toMatch(/^Sources:/im);
+  });
+
+  it("preserves coherent conversational answers across soft composer guards", () => {
+    const preserve = __testOnlyNonReportGuard.shouldPreserveConversationalAnswer({
+      answerSurfaceMode: "conversational",
+      answerText:
+        "The route keeps the model answer in natural prose and carries provenance separately in metadata when the prompt does not ask for a report.",
+      hardComposerGuardTriggered: false,
+      promptFamily: "general_overview",
+    });
+
+    expect(preserve).toBe(true);
+  });
+
+  it("rejects malformed operator-noise answers from conversational preservation", () => {
+    const preserve = __testOnlyNonReportGuard.shouldPreserveConversationalAnswer({
+      answerSurfaceMode: "conversational",
+      answerText:
+        "The value of shift vector is at*by*is*looking*mild*norm*of*proves*regime*shift*the^3vector.",
+      hardComposerGuardTriggered: false,
+      promptFamily: "general_overview",
+    });
+
+    expect(preserve).toBe(false);
+  });
+
+  it("flattens structured fallback scaffolding in conversational surface mode", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Direct Answer:",
+        "- Helix Ask routes prompts through retrieval and synthesis.",
+        "",
+        "Mechanism Explanation:",
+        "- The routing layer decides whether repo grounding is required.",
+      ].join("\n"),
+      question: "How does Helix Ask route prompts?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts"],
+      citationTokens: ["server/routes/agi.plan.ts"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/^Direct Answer:/im);
+    expect(finalized.text).not.toMatch(/^Mechanism Explanation:/im);
+    expect(finalized.text).toMatch(/routes prompts through retrieval/i);
+    expect(finalized.text).not.toMatch(/In practical terms,/i);
+  });
+
+  it("flattens inline report labels and bracketed citations in conversational surface mode", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "The routing policy is documented in. [docs/knowledge/helix-ask-reasoning.md] - Evidence: The pipeline runs retrieval, evidence gates, and synthesis. [docs/knowledge/helix-ask-reasoning.md]",
+        "Mechanism: Follow-up prompts stay conversational unless report mode or fail-closed output is required. [server/routes/agi.plan.ts]",
+        "Missing evidence: add more direct repo anchors when confidence is weak. [docs/helix-ask-flow.md]",
+        "Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+      ].join("\n"),
+      question: "How does Helix Ask answer conversationally?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+      citationTokens: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/\[(?:docs|server)\//i);
+    expect(finalized.text).not.toMatch(/\bEvidence:/i);
+    expect(finalized.text).not.toMatch(/\bMechanism:/i);
+    expect(finalized.text).not.toMatch(/\bMissing evidence:/i);
+    expect(finalized.text).not.toMatch(/^Sources:/im);
+    expect(finalized.text).toMatch(/retrieval, evidence gates, and synthesis/i);
+    expect(finalized.text).not.toMatch(/In practical terms,/i);
+    expect(finalized.text).not.toMatch(/Remaining gap:/i);
+  });
+
+  it("drops planner-anchor scaffold sentences instead of paraphrasing them", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Canonical runtime contract (2026-02-11): warp-mechanics-tree.json: guardrail_congruent.",
+        "The shift-vector explanation. is grounded in modules/warp/natario-warp.ts, modules/warp/warp-module.ts.",
+        "The shift-vector explanation. is anchored in docs/warp-tree-dag-walk-rules.md.",
+        "Primary implementation anchors for shift-vector explanation are modules/warp/natario-warp.ts and modules/warp/warp-module.ts.",
+        "Current evidence is incomplete for shift-vector explanation; missing slots: code-path, failure-path.",
+      ].join("\n"),
+      question: "Why does the mild shift-vector regime matter to the solve?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: [
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+        "docs/warp-tree-dag-walk-rules.md",
+      ],
+      citationTokens: [
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+        "docs/warp-tree-dag-walk-rules.md",
+      ],
+    });
+
+    expect(finalized.text).not.toMatch(/Canonical runtime contract/i);
+    expect(finalized.text).not.toMatch(/grounded in/i);
+    expect(finalized.text).not.toMatch(/anchored in/i);
+    expect(finalized.text).not.toMatch(/Primary implementation anchors/i);
+    expect(finalized.text).not.toMatch(/Current evidence is incomplete/i);
+    expect(finalized.text).toMatch(/That matters because it tells the solve/i);
+    expect(finalized.text).not.toMatch(/Remaining gap: missing/i);
+  });
+
+  it("canonicalizes visible sources to a single line when explicitly requested", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Helix Ask routes prompts through retrieval and synthesis. Sources: docs/knowledge/helix-ask-reasoning.md",
+        "",
+        "Sources: server/routes/agi.plan.ts, docs/helix-ask-flow.md",
+      ].join("\n"),
+      question: "Explain how Helix Ask routes requests with sources.",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+      citationTokens: ["server/routes/agi.plan.ts", "docs/helix-ask-flow.md"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.visibleSources).toBe(true);
+    expect(finalized.text.match(/^Sources:/gim)?.length ?? 0).toBe(1);
+  });
+
+  it("keeps tree-walk blocks visible only when the prompt explicitly asks for them", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "The answer stays concise.",
+        "",
+        "Tree Walk: helix.ask",
+        "1. Walk: ask route - uses grounded retrieval (server/routes/agi.plan.ts)",
+      ].join("\n"),
+      question: "Show the tree walk for this Helix Ask answer.",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts"],
+      citationTokens: ["server/routes/agi.plan.ts"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).toMatch(/Tree Walk:/);
+    expect(finalized.text).toMatch(/1\.\s+Walk:/);
+  });
+
+  it("flattens roadmap planning headings in conversational surface mode", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Repo-Grounded Findings:",
+        "- Current repo grounding is anchored in server/routes/agi.plan.ts and server/services/helix-ask/envelope.ts.",
+        "",
+        "Implementation Roadmap:",
+        "1. Start with profiles and paywall in client/src/lib/agi/api.ts.",
+        "",
+        "Evidence Gaps:",
+        "- Missing coverage for translation runtime hooks.",
+        "",
+        "Next Anchors Needed:",
+        "- server/routes/agi.plan.ts",
+      ].join("\n"),
+      question:
+        "Ok please organize my ideas to how they could be implemented in my code base in the future. I want profiles, a paywall, a voice lane, translation, and better retrieval planning.",
+      reportModeEnabled: false,
+      intentStrategy: "repo_plan",
+      allowedPaths: [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/envelope.ts",
+        "client/src/lib/agi/api.ts",
+      ],
+      citationTokens: [
+        "server/routes/agi.plan.ts",
+        "server/services/helix-ask/envelope.ts",
+        "client/src/lib/agi/api.ts",
+      ],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/^Repo-Grounded Findings:/im);
+    expect(finalized.text).not.toMatch(/^Implementation Roadmap:/im);
+    expect(finalized.text).not.toMatch(/^Evidence Gaps:/im);
+    expect(finalized.text).not.toMatch(/^Next Anchors Needed:/im);
+    expect(finalized.text).not.toMatch(/grounded in|anchored in/i);
+    expect(finalized.text).not.toMatch(/server\/routes\/agi\.plan\.ts/i);
+    expect(finalized.text).toMatch(/Start with profiles and (?:the )?paywall/i);
+    expect(finalized.text).not.toMatch(/Missing coverage for translation runtime hooks/i);
+  });
+
+  it("drops inline roadmap scaffold paraphrases from conversational prose", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "In practical terms, the relevant implementation is grounded in client/src/data/hr-presets.ts, server/config/knowledge.ts, scripts/build-code-lattice.ts.",
+        "Implementation Roadmap: Primary implementation anchors for the future codebase plan are client/src/data/hr-presets.ts and server/config/knowledge.ts.",
+        "Current evidence is incomplete for the future codebase plan; missing slots: failure-path.",
+      ].join("\n"),
+      question:
+        "Ok please organize my ideas to how they could be implemented in my code base in the future. I want profiles, a paywall, a voice lane, translation, and better retrieval planning.",
+      reportModeEnabled: false,
+      intentStrategy: "repo_plan",
+      allowedPaths: [
+        "client/src/data/hr-presets.ts",
+        "server/config/knowledge.ts",
+        "scripts/build-code-lattice.ts",
+      ],
+      citationTokens: [
+        "client/src/data/hr-presets.ts",
+        "server/config/knowledge.ts",
+        "scripts/build-code-lattice.ts",
+      ],
+    });
+
+    expect(finalized.text).not.toMatch(/In practical terms,/i);
+    expect(finalized.text).not.toMatch(/^Implementation Roadmap:/im);
+    expect(finalized.text).not.toMatch(/grounded in/i);
+    expect(finalized.text).not.toMatch(/Primary implementation anchors/i);
+    expect(finalized.text).not.toMatch(/Current evidence is incomplete/i);
+    expect(finalized.text).not.toMatch(/Remaining gap: missing/i);
+    expect(finalized.text).toMatch(/Start with profiles and (?:the )?paywall/i);
+  });
+
+  it("flattens frontier theory headings in conversational follow-up mode", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Definitions:",
+        "- Consciousness: subjective first-person awareness with reportable internal states.",
+        "",
+        "Baseline:",
+        "- Baseline stellar model: thermonuclear plasma dynamics explain observed solar outputs.",
+        "",
+        "Hypothesis:",
+        "- Assumptions: a frontier lens may add explanatory structure beyond baseline plasma dynamics.",
+        "- Predictions: lens-specific signatures should appear in observations not captured by baseline-only models.",
+        "",
+        "Anti-hypothesis:",
+        "- Assumptions: baseline stellar physics fully explains current observations without added lens constructs.",
+        "- Falsifiers: repeatable signatures emerge that baseline models cannot explain.",
+        "",
+        "Uncertainty band:",
+        "- Diagnostic stage; uncertainty remains broad until direct falsifier evidence is resolved.",
+        "",
+        "Claim tier:",
+        "- diagnostic (frontier hypothesis mode; not certified)",
+      ].join("\n"),
+      question: "What in the reasoning ladder should we focus on since this is the case?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["docs/stellar-consciousness-ii.md"],
+      citationTokens: ["docs/stellar-consciousness-ii.md"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/^Definitions:/im);
+    expect(finalized.text).not.toMatch(/^Baseline:/im);
+    expect(finalized.text).not.toMatch(/^Hypothesis:/im);
+    expect(finalized.text).not.toMatch(/^Anti-hypothesis:/im);
+    expect(finalized.text).not.toMatch(/^Claim tier:/im);
+    expect(finalized.text).not.toMatch(/One working assumption is/i);
+    expect(finalized.text).not.toMatch(/A testable prediction is/i);
+    expect(finalized.text).not.toMatch(/Remaining gap:/i);
+    expect(finalized.text).not.toMatch(/Current claim tier:/i);
+    expect(finalized.text).toMatch(/Consciousness: subjective first-person awareness/i);
+    expect(finalized.text).toMatch(/lens-specific signatures should appear/i);
+  });
+
+  it("preserves visible fail-closed text when a hard stop already occurred", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Assembly blocked: required objective gate failed-closed.",
+        "",
+        "Open gaps / UNKNOWNs:",
+        "UNKNOWN - repo anchor",
+        "Why: missing repo evidence.",
+      ].join("\n"),
+      question: "Why did the route stop here?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: ["server/routes/agi.plan.ts"],
+      citationTokens: ["server/routes/agi.plan.ts"],
+    });
+
+    expect(finalized.mode).toBe("fail_closed");
+    expect(finalized.text).toMatch(/Assembly blocked:/i);
+    expect(finalized.text).toMatch(/Open gaps \/ UNKNOWNs:/i);
+  });
+
+  it("keeps tree walk, proof, key files, and extension in the envelope sidecar", () => {
+    const envelope = buildHelixAskEnvelope({
+      answer: "The visible answer stays natural and concise.",
+      format: "brief",
+      tier: "F3",
+      mode: "extended",
+      evidenceText: [
+        "gate: repo-convergence",
+        "status: PASS",
+        "certificate: cert:abc123",
+        "integrity_ok: true",
+        "source: server/routes/agi.plan.ts",
+      ].join("\n"),
+      traceId: "trace-envelope-sidecar",
+      treeWalk: [
+        "Tree Walk: helix.ask",
+        "1. Walk: ask route - continuity stays in metadata (server/routes/agi.plan.ts)",
+      ].join("\n"),
+      extensionText: "Additional repo context is preserved in docs/helix-ask-flow.md.",
+      extensionCitations: ["docs/helix-ask-flow.md"],
+    });
+
+    const titles = (envelope.sections ?? []).map((section) => section.title);
+    expect(envelope.answer).toBe("The visible answer stays natural and concise.");
+    expect(titles).toEqual(
+      expect.arrayContaining(["Tree Walk", "Key files", "Proof"]),
+    );
+    expect(envelope.extension?.title).toBe("Additional Repo Context");
+    expect(envelope.proof?.gate?.status).toBe("PASS");
   });
 });
 
@@ -2273,6 +2626,46 @@ describe("helix ask universal answer plan shadow", () => {
     );
   });
 
+  it("prevents false covered when retrieval confidence is zero and evidence linkage is missing", () => {
+    const states = [
+      {
+        objective_id: "obj_zero",
+        objective_label: "zero-confidence objective",
+        required_slots: ["definition"],
+        matched_slots: ["definition"],
+        status: "synthesizing",
+        attempt: 1,
+        retrieval_confidence: 0,
+      },
+    ];
+    const miniAnswers = __testHelixAskReliabilityGuards.buildHelixAskObjectiveMiniAnswers({
+      states,
+      support: [],
+      obligationCoverage: [],
+      fallbackEvidenceRefs: ["server/routes/agi.plan.ts"],
+    });
+
+    expect(miniAnswers).toHaveLength(1);
+    expect(miniAnswers[0]?.status).toBe("partial");
+    expect(miniAnswers[0]?.missing_slots).toEqual(expect.arrayContaining(["evidence"]));
+    expect(miniAnswers[0]?.evidence_refs).toEqual(["server/routes/agi.plan.ts"]);
+    expect(miniAnswers[0]?.linked_evidence_refs ?? []).toEqual([]);
+
+    const enforced =
+      __testHelixAskReliabilityGuards.enforceHelixAskObjectiveEvidenceSufficiency({
+        miniAnswers,
+        states,
+      });
+
+    expect(enforced.miniAnswers[0]?.status).toBe("blocked");
+    expect(enforced.scores[0]?.reason).toBe(
+      "objective_zero_confidence_missing_evidence_linkage",
+    );
+    expect(enforced.terminalizationReasons["obj_zero"]).toBe(
+      "objective_oes_partial_below_block_threshold",
+    );
+  });
+
   it("promotes weak partial mini-answers to blocked when objective evidence sufficiency is very low", () => {
     const enforced =
       __testHelixAskReliabilityGuards.enforceHelixAskObjectiveEvidenceSufficiency({
@@ -2474,6 +2867,32 @@ describe("helix ask universal answer plan shadow", () => {
     expect(assembled).toMatch(/Next retrieval:/i);
     expect(assembled).not.toMatch(/Remaining uncertainty:/i);
     expect(assembled).not.toMatch(/Main answer body\./);
+  });
+
+  it("preserves the conversational draft when deterministic objective assembly is only a soft fallback", () => {
+    const assembled = __testHelixAskReliabilityGuards.buildDeterministicHelixAskObjectiveAssembly({
+      miniAnswers: [
+        {
+          objective_id: "obj_1",
+          objective_label: "shift vector mild-regime meaning",
+          status: "partial",
+          matched_slots: ["mechanism"],
+          missing_slots: ["solve-connection"],
+          evidence_refs: ["server/routes/agi.plan.ts"],
+          summary: "shift vector mild-regime meaning: partially covered.",
+        },
+      ],
+      currentAnswer:
+        "The norm of the shift vector matters because it tells you how strong the coordinate transport term is inside the solve, so a mild regime means the solver is working in a perturbative, well-controlled transport limit instead of a violently advective one.",
+      blockedReason: "objective_assembly_fail_closed_missing_scoped_retrieval",
+      missingScopedRetrievalObjectiveIds: ["obj_1"],
+      visibleFailClosed: false,
+    });
+
+    expect(assembled).toMatch(/coordinate transport term/i);
+    expect(assembled).not.toMatch(/Assembly blocked:/i);
+    expect(assembled).not.toMatch(/Open gaps \/ UNKNOWNs:/i);
+    expect(assembled).not.toMatch(/UNKNOWN -/i);
   });
 
   it("sanitizes generic scaffold phrasing from UNKNOWN blocks in deterministic assembly", () => {
@@ -3652,6 +4071,65 @@ describe("helix ask universal answer plan shadow", () => {
     expect(rendered).toMatch(/modules\/warp\/natario-warp\.ts:\s+computes Natario warp-bubble fields and congruence diagnostics\./i);
     expect(rendered).toMatch(/docs\/knowledge\/warp\/natario-zero-expansion\.md/i);
     expect(rendered).not.toMatch(/^Short answer:/m);
+  });
+
+  it("keeps composer-v2 deterministic fallback conversational when natural surface is preferred", () => {
+    const question =
+      "The text proves the regime is mild by looking at the norm of the shift vector. Why is this important to the solve it belongs to?";
+    const constraints = __testHelixAskReliabilityGuards.deriveHelixAskQueryConstraints(question);
+    const envelope = __testHelixAskReliabilityGuards.buildHelixAskIntentPolicyEnvelope({
+      question,
+      intentDomain: "repo",
+      requiresRepoEvidence: true,
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      equationIntentContract: null,
+    });
+    const plan = __testHelixAskReliabilityGuards.buildHelixAskAnswerPlanShadow({
+      question,
+      intentDomain: "repo",
+      queryConstraints: constraints,
+      equationPrompt: false,
+      definitionFocus: false,
+      allowedCitations: [
+        "docs/knowledge/warp/shift-vector-expansion-scalar.md",
+        "docs/knowledge/warp/natario-zero-expansion.md",
+        "modules/warp/natario-warp.ts",
+        "modules/warp/warp-module.ts",
+      ],
+      contextFileCount: 4,
+      lockIdSeed: "ask:composer-v2-natural-surface-fallback",
+    });
+    const brief = __testHelixAskReliabilityGuards.buildHelixAskComposerV2GroundedBrief({
+      plan,
+      question,
+      existingText:
+        "The mild-shift regime matters because it keeps the shift contribution small enough that the solver stays in the intended reduced-order branch while the Natario warp solve remains numerically well behaved.",
+      evidenceText:
+        "docs/knowledge/warp/shift-vector-expansion-scalar.md explains that the norm of the shift vector is used as the regime check for whether the expansion remains mild.\nWhen that norm stays mild, the solve can stay in the reduced-order branch instead of escalating into a stronger nonlinear regime.\nmodules/warp/natario-warp.ts computes Natario warp-bubble fields and congruence diagnostics.\nmodules/warp/warp-module.ts orchestrates warp module flow and runtime solve wiring.",
+      envelope,
+    });
+    const rendered = __testHelixAskReliabilityGuards.renderHelixAskComposerV2DeterministicFallbackAnswer({
+      plan,
+      question,
+      brief,
+      existingText:
+        "The mild-shift regime matters because it keeps the shift contribution small enough that the solver stays in the intended reduced-order branch while the Natario warp solve remains numerically well behaved.",
+      reason: "required_sections_missing:test",
+      verbosity: "normal",
+      preferNaturalSurface: true,
+    });
+    expect(rendered).not.toMatch(/^Where in repo:/m);
+    expect(rendered).not.toMatch(/^Call chain:/m);
+    expect(rendered).not.toMatch(/^Sources:/m);
+    expect(rendered).not.toMatch(/grounded in/i);
+    expect(rendered).not.toMatch(/anchored in/i);
+    expect(rendered).not.toMatch(/Primary implementation anchors/i);
+    expect(rendered).not.toMatch(/Current evidence is incomplete/i);
+    expect(rendered).not.toMatch(/Remaining gap: missing/i);
+    expect(rendered).toMatch(/mild-shift regime matters/i);
+    expect(rendered).toMatch(/reduced-order branch|numerically well behaved/i);
   });
 
   it("rejects repo_grounded and reasoned_inference claims when citations are missing", () => {

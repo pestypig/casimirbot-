@@ -66,13 +66,47 @@ const withDefaultCertainty = (
   return enriched;
 };
 
-const MATH_TRIGGER =
-  /\b(solve|derivative|d\/d[a-z]|quadratic|algebra|integral|differentiate|evaluate|compute|determinant|matrix)\b|[A-Za-z_][A-Za-z0-9_]*\s*=\s*[A-Za-z_(]|[0-9]+\s*[+\-*/^=]/i;
+const MATH_FUNCTION_SIGNAL_RE =
+  /\b(?:sqrt|sin|cos|tan|log|ln|exp|det|determinant|matrix|trace)\b/i;
+const MATH_EQUATION_SIGNAL_RE =
+  /[A-Za-z0-9_)\]]\s*=\s*[A-Za-z0-9_(\[]/;
+const MATH_OPERATOR_SIGNAL_RE =
+  /(?:\d|[A-Za-z_][A-Za-z0-9_]*|\))\s*[+\-*/^]\s*(?:\d|[A-Za-z_(][A-Za-z0-9_]*|\()/;
+const MATH_MATRIX_LITERAL_RE =
+  /\[\s*\[[^\]]+\]\s*(?:,\s*\[[^\]]+\]\s*)+\]/;
+
+function looksLikeMathExpression(value: string): boolean {
+  const normalized = sanitizeMathInput(value);
+  if (!normalized) return false;
+  if (MATH_EQUATION_SIGNAL_RE.test(normalized)) return true;
+  if (MATH_OPERATOR_SIGNAL_RE.test(normalized)) return true;
+  if (/\bd\/d[A-Za-z_][A-Za-z0-9_]*\b/i.test(normalized)) return true;
+  if (MATH_FUNCTION_SIGNAL_RE.test(normalized) && (/[()]/.test(normalized) || MATH_MATRIX_LITERAL_RE.test(normalized))) {
+    return true;
+  }
+  if (/\b(?:determinant|matrix)\b/i.test(normalized)) return true;
+  return false;
+}
 
 export function isHelixAskMathQuestion(question: string): boolean {
   const trimmed = question.trim();
   if (!trimmed) return false;
-  return MATH_TRIGGER.test(trimmed);
+  const normalized = sanitizeMathInput(trimmed);
+  if (!normalized) return false;
+  if (looksLikeMathExpression(normalized)) return true;
+  if (/\b(?:derivative|differentiate|integral|d\/d[A-Za-z_][A-Za-z0-9_]*)\b/i.test(normalized)) {
+    return true;
+  }
+  if (/\bsolve\s+for\b/i.test(normalized)) {
+    return true;
+  }
+  if (/\bsolve\b/i.test(normalized) && looksLikeMathExpression(normalized)) {
+    return true;
+  }
+  if (/\b(?:evaluate|compute|calculate)\b/i.test(normalized) && looksLikeMathExpression(normalized)) {
+    return true;
+  }
+  return false;
 }
 
 type MathRegistryEntry = {
@@ -294,6 +328,7 @@ function extractEvaluableExpression(question: string): string {
     normalized.match(/\b(?:what(?:'s| is)|evaluate|compute|calculate)\s+(.+)$/i)?.[1] ?? normalized;
   const candidate = stripLeadingNoise(normalizeExpression(prompted));
   if (!candidate) return "";
+  if (!looksLikeMathExpression(candidate)) return "";
   return candidate;
 }
 

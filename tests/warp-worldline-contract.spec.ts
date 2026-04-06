@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWarpWorldlineContractFromState,
+  calculateEnergyPipeline,
   initializePipelineState,
 } from "../server/energy-pipeline";
 import {
@@ -52,7 +53,73 @@ const makeSolveBackedTransportSampleFamily = () => ({
   })),
 });
 
+const makeShiftLapseAuthoritativeGr = (overrides?: {
+  divergenceRms?: number;
+  wallHorizonMargin?: number;
+  betaOutwardOverAlphaWallMax?: number;
+  thetaMean?: number | null;
+  kTraceMean?: number | null;
+}) => ({
+  meta: { status: "CERTIFIED" },
+  solver: { health: { status: "CERTIFIED" } },
+  divBeta: {
+    rms: overrides?.divergenceRms ?? 1e-4,
+    maxAbs: 2e-4,
+    source: "gr_evolve_brick",
+  },
+  theta: {
+    mean: overrides?.thetaMean ?? 0,
+  },
+  kTrace: {
+    mean: overrides?.kTraceMean ?? 0,
+  },
+  gauge: {
+    betaOverAlphaMax: 0.2,
+    betaOutwardOverAlphaWallMax: overrides?.betaOutwardOverAlphaWallMax ?? 0.15,
+    wallHorizonMargin: overrides?.wallHorizonMargin ?? 0.4,
+  },
+});
+
 describe("warp worldline contract", () => {
+  it("emits a solve-backed transport sample family for nhm2_shift_lapse from live pipeline state", async () => {
+    const state = initializePipelineState();
+    state.warpFieldType = "nhm2_shift_lapse";
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+    };
+    (state as any).warp = {
+      ...((state as any).warp ?? {}),
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Source: "metric",
+    };
+
+    const refreshed = await calculateEnergyPipeline(state);
+    const sampleFamily = (refreshed as any)?.warp?.solveBackedTransportSampleFamily ?? null;
+
+    expect((refreshed as any)?.warp?.metricAdapter?.family).toBe("nhm2_shift_lapse");
+    expect((refreshed as any)?.warp?.metricAdapter?.lapseSummary?.shiftLapseProfileId).toBe(
+      "stage1_centerline_alpha_0p995_v1",
+    );
+    expect((refreshed as any)?.warp?.metricAdapter?.lapseSummary?.alphaCenterline).toBeCloseTo(
+      0.995,
+      12,
+    );
+    expect((refreshed as any)?.shiftLapseTransportPromotionGate?.shiftLapseProfileId).toBe(
+      "stage1_centerline_alpha_0p995_v1",
+    );
+    expect((refreshed as any)?.shiftLapseTransportPromotionGate?.centerlineDtauDt).toBeCloseTo(
+      0.995,
+      12,
+    );
+    expect(sampleFamily).not.toBeNull();
+    expect(sampleFamily.familyId).toBe("nhm2_centerline_shell_cross");
+    expect(sampleFamily.representativeSampleId).toBe("centerline_center");
+    expect(Array.isArray(sampleFamily.samples)).toBe(true);
+    expect(sampleFamily.samples).toHaveLength(9);
+  });
+
   it("builds a deterministic bounded solve-backed NHM2 worldline when the authoritative metric contract is closed", () => {
     const state = initializePipelineState();
     state.driveDir = [1, 0, 0];
@@ -113,11 +180,11 @@ describe("warp worldline contract", () => {
     expect(preflight?.preflightQuantityId).toBe("bounded_local_transport_descriptor_norm");
   });
 
-  it("refuses to emit a worldline for the reference-only shift-lapse family", () => {
+  it("fails closed for nhm2_shift_lapse when the transport-promotion gate is missing", () => {
     const state = initializePipelineState();
     (state as any).warp = {
       metricT00Source: "metric",
-      metricT00Ref: "warp.metric.T00.nhm2_shift_lapse",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
       metricT00Contract: {
         status: "ok",
         family: "nhm2_shift_lapse",
@@ -137,6 +204,110 @@ describe("warp worldline contract", () => {
       },
       solveBackedTransportSampleFamily: makeSolveBackedTransportSampleFamily(),
     };
+    state.warpFieldType = "nhm2_shift_lapse";
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    };
+
+    expect(buildWarpWorldlineContractFromState(state)).toBeNull();
+  });
+
+  it("admits nhm2_shift_lapse when the authoritative transport-promotion gate passes", () => {
+    const state = initializePipelineState();
+    (state as any).warp = {
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Contract: {
+        status: "ok",
+        family: "nhm2_shift_lapse",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+        observer: "eulerian_n",
+        normalization: "si_stress",
+        unitSystem: "SI",
+      },
+      metricAdapter: {
+        family: "nhm2_shift_lapse",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+        chart: {
+          label: "comoving_cartesian",
+          coordinateMap: "comoving_cartesian: x' = x - x_s(t), t = t",
+          contractStatus: "ok",
+        },
+        alpha: 1,
+        gammaDiag: [1, 1, 1],
+        lapseSummary: {
+          alphaCenterline: 1,
+        },
+      },
+      solveBackedTransportSampleFamily: makeSolveBackedTransportSampleFamily(),
+    };
+    state.warpFieldType = "nhm2_shift_lapse";
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    };
+    (state as any).gr = makeShiftLapseAuthoritativeGr();
+
+    const contract = buildWarpWorldlineContractFromState(state);
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sourceSurface.metricFamily).toBe("nhm2_shift_lapse");
+    expect(contract?.sourceSurface.familyAuthorityStatus).toBe(
+      "candidate_authoritative_solve_family",
+    );
+    expect(contract?.sourceSurface.transportCertificationStatus).toBe(
+      "bounded_transport_proof_bearing_gate_admitted",
+    );
+    expect(contract?.sourceSurface.shiftLapseTransportPromotionGate?.status).toBe("pass");
+    expect(
+      contract?.sourceSurface.shiftLapseTransportPromotionGate?.authoritativeLowExpansionStatus,
+    ).toBe("pass");
+    expect(contract?.sourceSurface.shiftLapseTransportPromotionGate?.wallSafetyStatus).toBe(
+      "pass",
+    );
+    const preflight = buildWarpCruiseEnvelopePreflightContractFromWorldline(contract);
+    expect(preflight?.status).toBe("bounded_preflight_ready");
+  });
+
+  it("keeps nhm2_shift_lapse fail-closed when the wall-safety sub-gate fails", () => {
+    const state = initializePipelineState();
+    (state as any).warp = {
+      metricT00Source: "metric",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Contract: {
+        status: "ok",
+        family: "nhm2_shift_lapse",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+        observer: "eulerian_n",
+        normalization: "si_stress",
+        unitSystem: "SI",
+      },
+      metricAdapter: {
+        family: "nhm2_shift_lapse",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+        chart: {
+          label: "comoving_cartesian",
+          coordinateMap: "comoving_cartesian: x' = x - x_s(t), t = t",
+          contractStatus: "ok",
+        },
+        alpha: 1,
+        gammaDiag: [1, 1, 1],
+      },
+      solveBackedTransportSampleFamily: makeSolveBackedTransportSampleFamily(),
+    };
+    state.warpFieldType = "nhm2_shift_lapse";
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    };
+    (state as any).gr = makeShiftLapseAuthoritativeGr({
+      betaOutwardOverAlphaWallMax: 1.05,
+    });
 
     expect(buildWarpWorldlineContractFromState(state)).toBeNull();
   });

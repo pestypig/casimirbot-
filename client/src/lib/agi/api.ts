@@ -111,6 +111,18 @@ export type LocalAskProof = {
   evidence?: unknown[];
 };
 
+export type HelixMemoryCitationEntry = {
+  path: string;
+  line_start?: number | null;
+  line_end?: number | null;
+  note: string;
+};
+
+export type HelixMemoryCitation = {
+  entries: HelixMemoryCitationEntry[];
+  rollout_ids: string[];
+};
+
 export type HaloBankPlace = {
   lat: number;
   lon: number;
@@ -176,12 +188,15 @@ export type HaloBankActionOutput = {
 export type LocalAskResponse = {
   text: string;
   ok?: boolean;
+  turn_id?: string | null;
+  answer_surface_mode?: "conversational" | "structured_report" | "fail_closed";
   error?: string;
   message?: string;
   needs_confirmation?: boolean;
   interpreter_confirm_prompt?: string | null;
   fail_reason?: string | null;
   fail_class?: string | null;
+  memory_citation?: HelixMemoryCitation | null;
   context_capsule?: ContextCapsuleSummary;
   mode?: "read" | "observe" | "act" | "verify";
   action?: { tool?: string; output?: unknown | HaloBankActionOutput };
@@ -986,6 +1001,7 @@ export type ConversationTurnPayload = {
   transcript: string;
   sessionId?: string;
   traceId?: string;
+  turnId?: string;
   missionId?: string;
   personaId?: string;
   sourceLanguage?: string;
@@ -1006,6 +1022,7 @@ export type ConversationTurnPayload = {
 export type ConversationTurnResponse = {
   ok?: boolean;
   traceId?: string | null;
+  turn_id?: string | null;
   sessionId?: string | null;
   transcript?: string;
   source_language?: string | null;
@@ -1231,6 +1248,7 @@ export async function runConversationTurn(
   };
   if (payload.sessionId?.trim()) body.sessionId = payload.sessionId.trim();
   if (payload.traceId?.trim()) body.traceId = payload.traceId.trim();
+  if (payload.turnId?.trim()) body.turnId = payload.turnId.trim();
   if (payload.missionId?.trim()) body.missionId = payload.missionId.trim();
   if (payload.personaId?.trim()) body.personaId = payload.personaId.trim();
   if (payload.sourceLanguage?.trim()) body.sourceLanguage = payload.sourceLanguage.trim();

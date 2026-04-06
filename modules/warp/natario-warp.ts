@@ -14,6 +14,7 @@ import type { SimulationParameters, WarpGeometry, WarpGeometryKind } from '../..
 import {
   buildWarpMetricAdapterSnapshot,
   DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM,
+  resolveWarpShiftLapseProfile,
   type WarpMetricAdapterSnapshot,
   type WarpChartLabel,
   type WarpMetricFamily,
@@ -305,6 +306,7 @@ export interface NatarioWarpParams {
   alphaGradientVec_m_inv?: [number, number, number];
   alphaInteriorSupportKind?: "bubble_interior" | "hull_interior";
   alphaWallTaper_m?: number;
+  shiftLapseProfileId?: string;
   exoticMassTarget_kg?: number;
   invariantMass_kg?: number;
   tileArea_m2_override?: number;
@@ -629,6 +631,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const quantumValidation = validateQuantumInequality(totalExoticMass, amplifiedEnergyDensity, Math.max(1e-12, (params.burstDuration||1) * 1e-6), a_m, params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg);
   const resolveLapseSummary = (): WarpMetricLapseSummary | undefined => {
     if (fieldType !== "nhm2_shift_lapse") return undefined;
+    const shiftLapseProfile = resolveWarpShiftLapseProfile(params.shiftLapseProfileId);
     const hullAxesResolved: Vec3 = params.hullAxes
       ? [
           Math.max(1e-6, params.hullAxes.a),
@@ -650,7 +653,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
         : ([0, 0, DEFAULT_MILD_CABIN_ALPHA_GRADIENT_GEOM] as Vec3);
     const alphaCenterline = Number.isFinite(params.alphaCenterline)
       ? Math.max(1e-6, params.alphaCenterline as number)
-      : 1;
+      : shiftLapseProfile.alphaCenterlineDefault;
     const supportKind =
       params.alphaInteriorSupportKind ??
       (params.warpGeometry ? "hull_interior" : "bubble_interior");
@@ -692,6 +695,10 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
       alphaInteriorSupportKind: supportKind,
       alphaWallTaper_m: wallTaper_m,
       diagnosticTier: "diagnostic",
+      shiftLapseProfileId: shiftLapseProfile.profileId,
+      shiftLapseProfileStage: shiftLapseProfile.profileStage,
+      shiftLapseProfileLabel: shiftLapseProfile.profileLabel,
+      shiftLapseProfileNote: shiftLapseProfile.profileNote,
       signConvention:
         "positive alphaGradientVec_m_inv raises alpha along +x_ship/+y_port/+z_zenith; epsilonTilt remains shift-only",
     };

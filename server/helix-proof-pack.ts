@@ -287,6 +287,8 @@ const resolveHullDims = (state: EnergyPipelineState) => {
 export function buildProofPack(state: EnergyPipelineState): ProofPack {
   const values: Record<string, ProofValue> = {};
   const notes: string[] = [];
+  const NATARIO_EXPANSION_TOLERANCE = 1e-3;
+  const THETA_K_TOLERANCE = 1e-3;
 
   values.theta_definition = makeStringValue(
     "theta := div(beta) in comoving_cartesian with Eulerian normal n",
@@ -487,14 +489,45 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
   ]);
   values.theta_pipeline_cal = makeValue(thetaPipelineCal, "1");
   const metricBeta = (state as any)?.warp?.metricAdapter?.betaDiagnostics;
-  const thetaGeom = toFiniteNumber(metricBeta?.thetaMax ?? metricBeta?.thetaRms);
-  const thetaGeomProxy = metricBeta?.method === "not-computed";
+  const projectionThetaGeom = resolveNumber([
+    {
+      value: toFiniteNumber((state as any)?.theta_geom_projection),
+      source:
+        typeof (state as any)?.theta_geom_projection_source === "string" &&
+        (state as any).theta_geom_projection_source.length > 0
+          ? String((state as any).theta_geom_projection_source)
+          : "missing",
+      proxy:
+        typeof (state as any)?.theta_geom_projection_proxy === "boolean"
+          ? Boolean((state as any).theta_geom_projection_proxy)
+          : true,
+    },
+    {
+      value: toFiniteNumber(metricBeta?.thetaMax ?? metricBeta?.thetaRms),
+      source:
+        metricBeta?.thetaMax != null
+          ? "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax"
+          : "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms",
+      proxy: metricBeta?.method === "not-computed",
+    },
+  ]);
+  const thetaGeomResolved = resolveNumber([
+    {
+      value: toFiniteNumber((state as any)?.theta_geom),
+      source:
+        typeof (state as any)?.theta_geom_source === "string" &&
+        (state as any).theta_geom_source.length > 0
+          ? String((state as any).theta_geom_source)
+          : "missing",
+      proxy:
+        typeof (state as any)?.theta_geom_proxy === "boolean"
+          ? Boolean((state as any).theta_geom_proxy)
+          : true,
+    },
+    projectionThetaGeom,
+  ]);
   const strictThetaEnabled = strictCongruenceEnabled();
-  const thetaGeomUsable = thetaGeom != null && !thetaGeomProxy;
-  const thetaGeomSource =
-    metricBeta?.thetaMax != null
-      ? "pipeline.warp.metricAdapter.betaDiagnostics.thetaMax"
-      : "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms";
+  const thetaGeomUsable = thetaGeomResolved.value != null && !thetaGeomResolved.proxy;
   const thetaPipelineProxyResolved = resolveNumber([
     { value: (state as any).thetaCal, source: "pipeline.thetaCal", proxy: true },
     { value: (state as any).thetaScaleExpected, source: "pipeline.thetaScaleExpected", proxy: true },
@@ -509,22 +542,22 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     (state as any).theta_metric_source.length > 0
       ? String((state as any).theta_metric_source)
       : thetaGeomUsable
-        ? thetaGeomSource
+        ? thetaGeomResolved.source
         : "missing";
   const thetaMetricReason =
     typeof (state as any)?.theta_metric_reason === "string" &&
     (state as any).theta_metric_reason.length > 0
       ? String((state as any).theta_metric_reason)
       : thetaGeomUsable
-        ? "metric_adapter_divergence"
-        : thetaGeom == null
+        ? "metric_theta_available"
+        : thetaGeomResolved.value == null
           ? "missing_theta_geom"
           : "theta_geom_proxy";
   const thetaAuditResolved = resolveNumber([
     thetaGeomUsable
       ? {
-          value: thetaGeom,
-          source: thetaGeomSource,
+          value: thetaGeomResolved.value,
+          source: thetaGeomResolved.source,
           proxy: false,
         }
       : {
@@ -537,16 +570,25 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
   const thetaStrictOk = strictThetaEnabled ? thetaGeomUsable : true;
   const thetaStrictReason = thetaStrictOk
     ? "ok"
-    : thetaGeom == null
+    : thetaGeomResolved.value == null
       ? "missing_theta_geom"
       : "theta_geom_proxy";
-  if (thetaGeom != null) {
+  if (thetaGeomResolved.value != null) {
     values.theta_geom = makeDerivedNumber(
-      thetaGeom,
+      thetaGeomResolved.value,
       "1/m",
-      thetaGeomSource,
-      Boolean(thetaGeomProxy),
-      "div(beta)",
+      thetaGeomResolved.source,
+      Boolean(thetaGeomResolved.proxy),
+      "theta",
+    );
+  }
+  if (projectionThetaGeom.value != null) {
+    values.theta_geom_projection = makeDerivedNumber(
+      projectionThetaGeom.value,
+      "1/m",
+      projectionThetaGeom.source,
+      Boolean(projectionThetaGeom.proxy),
+      "projection theta",
     );
   }
   values.theta_strict_mode = {
@@ -566,11 +608,11 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
   };
   values.theta_pipeline_proxy = makeValue(thetaPipelineProxyResolved, "1");
   const thetaMetricOverride = makeDerivedNumber(
-    thetaGeomUsable ? thetaGeom : null,
+    thetaGeomUsable ? thetaGeomResolved.value : null,
     "1/m",
-    thetaGeomUsable ? thetaGeomSource : "missing",
+    thetaGeomUsable ? thetaGeomResolved.source : "missing",
     !thetaGeomUsable,
-    "metric-derived override (div beta)",
+    "metric-derived override (theta)",
   );
   values.theta_raw = thetaMetricOverride;
   values.theta_cal = thetaMetricOverride;
@@ -590,6 +632,36 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
     thetaMetricReason,
     "derived:theta_metric_reason",
     !thetaMetricDerived,
+  );
+  values.theta_metric_authoritative = {
+    value: (state as any).theta_metric_authoritative === true,
+    source: "derived:theta_metric_authoritative",
+    proxy: false,
+  };
+  values.theta_metric_authoritative_source = makeStringValue(
+    (state as any).theta_metric_authoritative_source,
+    "derived:theta_metric_authoritative_source",
+    (state as any).theta_metric_authoritative !== true,
+  );
+  values.theta_metric_authoritative_reason = makeStringValue(
+    (state as any).theta_metric_authoritative_reason,
+    "derived:theta_metric_authoritative_reason",
+    (state as any).theta_metric_authoritative !== true,
+  );
+  values.theta_metric_projection_available = {
+    value: (state as any).theta_metric_projection_available === true,
+    source: "derived:theta_metric_projection_available",
+    proxy: false,
+  };
+  values.theta_metric_projection_source = makeStringValue(
+    (state as any).theta_metric_projection_source,
+    "derived:theta_metric_projection_source",
+    (state as any).theta_metric_projection_available !== true,
+  );
+  values.theta_metric_projection_reason = makeStringValue(
+    (state as any).theta_metric_projection_reason,
+    "derived:theta_metric_projection_reason",
+    (state as any).theta_metric_projection_available !== true,
   );
   if (state.gammaChain?.note) {
     values.gamma_chain_note = {
@@ -1047,6 +1119,14 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
   );
 
   const metricStressDiagnostics = (state as any)?.warp?.metricStressDiagnostics;
+  const grKTraceMean = toFiniteNumber((state as any)?.gr?.kTrace?.mean);
+  const grKTraceMaxAbs = toFiniteNumber((state as any)?.gr?.kTrace?.maxAbs);
+  const metricKTraceMean = grKTraceMean ?? toFiniteNumber(metricStressDiagnostics?.kTraceMean);
+  const metricKTraceProxy = grKTraceMean == null ? warpMetricProxy : false;
+  const metricKTraceSource =
+    grKTraceMean != null
+      ? "pipeline.gr.kTrace.mean"
+      : "pipeline.warp.metricStressDiagnostics.kTraceMean";
   if (metricStressDiagnostics) {
     values.metric_t00_sample_count = makeDerivedNumber(
       toFiniteNumber(metricStressDiagnostics.sampleCount),
@@ -1065,12 +1145,6 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       toFiniteNumber(metricStressDiagnostics.rhoSiMean),
       "J/m^3",
       "pipeline.warp.metricStressDiagnostics.rhoSiMean",
-      warpMetricProxy,
-    );
-    values.metric_k_trace_mean = makeDerivedNumber(
-      toFiniteNumber(metricStressDiagnostics.kTraceMean),
-      "1/m",
-      "pipeline.warp.metricStressDiagnostics.kTraceMean",
       warpMetricProxy,
     );
     values.metric_k_sq_mean = makeDerivedNumber(
@@ -1092,7 +1166,66 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       warpMetricProxy,
     );
   }
+  values.metric_k_trace_mean =
+    metricKTraceMean != null
+      ? makeDerivedNumber(
+          metricKTraceMean,
+          "1/m",
+          metricKTraceSource,
+          metricKTraceProxy,
+        )
+      : makeDerivedNumber(null, "1/m", "missing", true);
+  values.metric_k_trace_authoritative = {
+    value: grKTraceMean != null,
+    source: "derived:metric_k_trace_authoritative",
+    proxy: false,
+  };
+  values.metric_k_trace_authoritative_reason = makeStringValue(
+    grKTraceMean != null ? "brick_native_k_trace_present" : "brick_native_k_trace_missing",
+    "derived:metric_k_trace_authoritative_reason",
+    false,
+  );
 
+  const authoritativeThetaGeom =
+    (state as any)?.theta_metric_authoritative === true
+      ? toFiniteNumber((state as any).theta_geom)
+      : null;
+  const projectionThetaGeomForNatario =
+    projectionThetaGeom.value != null && !projectionThetaGeom.proxy
+      ? projectionThetaGeom.value
+      : (state as any)?.theta_metric_authoritative === true
+        ? null
+        : thetaGeomResolved.value;
+  const projectionDivBetaRms =
+    toFiniteNumber((state as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaRms) ??
+    toFiniteNumber((state as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaRms);
+  const projectionDivBetaMaxAbs =
+    toFiniteNumber((state as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaMax) ??
+    toFiniteNumber((state as any)?.warp?.metricAdapter?.betaDiagnostics?.divBetaMaxAbs);
+  const projectionDivBetaSource =
+    Number.isFinite((state as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaRms) ||
+    Number.isFinite((state as any)?.warp?.metricAdapter?.betaDiagnostics?.thetaMax)
+      ? "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax"
+      : "pipeline.warp.metricAdapter.betaDiagnostics.divBetaRms/divBetaMaxAbs";
+  const thetaKResidualAbs =
+    authoritativeThetaGeom != null && grKTraceMean != null
+      ? Math.abs(authoritativeThetaGeom + grKTraceMean)
+      : null;
+  const thetaKStatus: "pass" | "fail" | "unknown" = thetaKResidualAbs == null
+    ? "unknown"
+    : thetaKResidualAbs <= THETA_K_TOLERANCE
+      ? "pass"
+      : "fail";
+  const projectionThetaKResidualAbs =
+    projectionThetaGeomForNatario != null && metricKTraceMean != null
+      ? Math.abs(projectionThetaGeomForNatario + metricKTraceMean)
+      : null;
+  const projectionThetaKStatus: "pass" | "fail" | "unknown" =
+    projectionThetaKResidualAbs == null
+      ? "unknown"
+      : projectionThetaKResidualAbs <= THETA_K_TOLERANCE
+        ? "pass"
+        : "fail";
   const grDivBeta = state.gr?.divBeta;
   if (grDivBeta) {
     values.metric_div_beta_rms = makeDerivedNumber(
@@ -1113,6 +1246,98 @@ export function buildProofPack(state: EnergyPipelineState): ProofPack {
       false,
     );
   }
+  values.metric_div_beta_authoritative = {
+    value: Boolean(grDivBeta),
+    source: "derived:metric_div_beta_authoritative",
+    proxy: false,
+  };
+  values.metric_div_beta_authoritative_reason = makeStringValue(
+    grDivBeta ? "brick_native_div_beta_present" : "brick_native_div_beta_missing",
+    "derived:metric_div_beta_authoritative_reason",
+    false,
+  );
+  values.natario_expansion_tolerance = makeDerivedNumber(
+    NATARIO_EXPANSION_TOLERANCE,
+    "1/m",
+    "derived:natario_expansion_tolerance",
+    false,
+    "canonical_natario_low_expansion_tolerance",
+  );
+  values.theta_k_tolerance = makeDerivedNumber(
+    THETA_K_TOLERANCE,
+    "1/m",
+    "derived:theta_k_tolerance",
+    false,
+    "canonical_theta_plus_ktrace_tolerance",
+  );
+  const authoritativeDivBetaRms = toFiniteNumber(grDivBeta?.rms);
+  const authoritativeLowExpansionStatus:
+    | "pass"
+    | "fail"
+    | "missing_authoritative_divergence"
+    | "missing_authoritative_theta_k" =
+    authoritativeDivBetaRms == null
+      ? "missing_authoritative_divergence"
+      : authoritativeThetaGeom == null || grKTraceMean == null
+        ? "missing_authoritative_theta_k"
+      : authoritativeDivBetaRms <= NATARIO_EXPANSION_TOLERANCE &&
+          thetaKStatus === "pass"
+        ? "pass"
+        : "fail";
+  const authoritativeLowExpansionReason =
+    authoritativeDivBetaRms == null
+      ? "brick_native_div_beta_missing"
+      : authoritativeThetaGeom == null || grKTraceMean == null
+        ? "brick_native_theta_k_missing"
+      : authoritativeDivBetaRms > NATARIO_EXPANSION_TOLERANCE
+        ? "brick_native_divergence_constraint_failed"
+      : thetaKStatus === "fail"
+          ? "theta_k_consistency_failed"
+          : "authoritative_low_expansion_ok";
+  const projectionLowExpansionStatus: "pass" | "fail" | "projection_unavailable" =
+    projectionDivBetaRms == null ||
+    projectionThetaGeomForNatario == null ||
+    metricKTraceMean == null
+      ? "projection_unavailable"
+      : projectionDivBetaRms <= NATARIO_EXPANSION_TOLERANCE &&
+          projectionThetaKStatus === "pass"
+        ? "pass"
+        : "fail";
+  const projectionLowExpansionReason =
+    projectionDivBetaRms == null
+      ? "projection_beta_diagnostics_missing"
+      : projectionThetaGeomForNatario == null || metricKTraceMean == null
+        ? "projection_theta_k_missing"
+      : projectionDivBetaRms > NATARIO_EXPANSION_TOLERANCE
+        ? "projection_divergence_constraint_failed"
+        : projectionThetaKStatus === "fail"
+          ? "theta_k_consistency_failed"
+          : "projection_low_expansion_ok";
+  values.natario_low_expansion_authoritative_status = makeStringValue(
+    authoritativeLowExpansionStatus,
+    "derived:natario_low_expansion_authoritative_status",
+    authoritativeDivBetaRms == null,
+  );
+  values.natario_low_expansion_authoritative_reason = makeStringValue(
+    authoritativeLowExpansionReason,
+    "derived:natario_low_expansion_authoritative_reason",
+    authoritativeDivBetaRms == null,
+  );
+  values.natario_low_expansion_projection_status = makeStringValue(
+    projectionLowExpansionStatus,
+    "derived:natario_low_expansion_projection_status",
+    projectionDivBetaRms == null,
+  );
+  values.natario_low_expansion_projection_reason = makeStringValue(
+    projectionLowExpansionReason,
+    "derived:natario_low_expansion_projection_reason",
+    projectionDivBetaRms == null,
+  );
+  values.natario_low_expansion_projection_source = makeStringValue(
+    projectionDivBetaRms != null ? projectionDivBetaSource : null,
+    "derived:natario_low_expansion_projection_source",
+    projectionDivBetaRms == null,
+  );
 
   const cl3Threshold = resolveCl3Threshold();
   values.gr_cl3_rho_threshold = makeDerivedNumber(

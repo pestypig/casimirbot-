@@ -187,7 +187,7 @@ describe("pipeline ts/qi autoscale integration", () => {
       ).toBeGreaterThan(0);
       expect((snapshot as any).warp?.metricT00Contract?.status).toBe("ok");
       expect((snapshot as any).theta_metric_derived).toBe(true);
-      expect((snapshot as any).theta_metric_reason).toBe("metric_adapter_divergence");
+      expect((snapshot as any).theta_metric_reason).toBe("metric_adapter_theta_projection");
       expect(Number.isFinite((snapshot as any).theta_geom)).toBe(true);
       const hullTauLcMs = computeTauLcMsFromHull((snapshot as any).hull);
       if (

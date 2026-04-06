@@ -33,6 +33,22 @@ export type WarpWorldlineSampleFamilyAdequacy =
 export type WarpWorldlineCertifiedTransportMeaning =
   "bounded_local_shift_descriptor_gradient_only";
 export type WarpWorldlineEligibleNextProduct = "bounded_cruise_envelope_preflight";
+export type WarpTransportFamilyAuthorityStatus =
+  | "canonical_bounded_baseline_solve_family"
+  | "candidate_authoritative_solve_family"
+  | "secondary_metric_family";
+export type WarpTransportCertificationStatus =
+  | "bounded_transport_proof_bearing_baseline"
+  | "bounded_transport_fail_closed_reference_only"
+  | "bounded_transport_not_promoted"
+  | "bounded_transport_proof_bearing_gate_admitted";
+export type WarpShiftLapseTransportPromotionGateStatus = "pass" | "fail" | "missing";
+export type WarpShiftLapseTransportThetaKConsistencyStatus =
+  | "pass"
+  | "fail"
+  | "unknown";
+export type WarpShiftLapseTransportWallSafetyStatus = "pass" | "fail" | "missing";
+export type WarpShiftLapseTransportTimingStatus = "available" | "missing";
 
 export const WARP_WORLDLINE_SAMPLE_ORDER: WarpWorldlineSampleRole[] = [
   "centerline_aft",
@@ -46,6 +62,38 @@ export const WARP_WORLDLINE_SAMPLE_ORDER: WarpWorldlineSampleRole[] = [
   "shell_ventral",
 ];
 
+export type WarpShiftLapseTransportPromotionGate = {
+  gateId: "nhm2_shift_lapse_transport_promotion_gate/v1";
+  status: WarpShiftLapseTransportPromotionGateStatus;
+  reason: string;
+  shiftLapseProfileId?: string | null;
+  shiftLapseProfileStage?: string | null;
+  shiftLapseProfileLabel?: string | null;
+  shiftLapseProfileNote?: string | null;
+  familyAuthorityStatus: WarpTransportFamilyAuthorityStatus;
+  familyTransportCertificationStatus: WarpTransportCertificationStatus;
+  transportCertificationStatus: WarpTransportCertificationStatus;
+  authoritativeLowExpansionStatus: WarpShiftLapseTransportPromotionGateStatus;
+  authoritativeLowExpansionReason: string;
+  authoritativeLowExpansionSource: string | null;
+  authoritativeLowExpansionObservable: "brick_native_div_beta";
+  divergenceRms: number | null;
+  divergenceMaxAbs: number | null;
+  divergenceTolerance: number;
+  thetaKConsistencyStatus: WarpShiftLapseTransportThetaKConsistencyStatus;
+  thetaKResidualAbs: number | null;
+  thetaKTolerance: number;
+  wallSafetyStatus: WarpShiftLapseTransportWallSafetyStatus;
+  wallSafetyReason: string;
+  betaOverAlphaMax: number | null;
+  betaOutwardOverAlphaWallMax: number | null;
+  wallHorizonMargin: number | null;
+  timingStatus: WarpShiftLapseTransportTimingStatus;
+  timingReason: string;
+  centerlineAlpha: number | null;
+  centerlineDtauDt: number | null;
+};
+
 export type WarpWorldlineSourceSurface = {
   surfaceId: "nhm2_metric_local_comoving_transport_cross";
   producer: "server/energy-pipeline.ts";
@@ -55,8 +103,12 @@ export type WarpWorldlineSourceSurface = {
   metricT00Ref: string;
   metricT00Source: "metric";
   metricFamily: string;
+  familyAuthorityStatus: WarpTransportFamilyAuthorityStatus;
+  transportCertificationStatus: WarpTransportCertificationStatus;
   metricT00ContractStatus: "ok";
   chartContractStatus: "ok";
+  shiftLapseProfileId?: string | null;
+  shiftLapseTransportPromotionGate?: WarpShiftLapseTransportPromotionGate | null;
 };
 
 export type WarpWorldlineChart = {
@@ -227,6 +279,51 @@ const matchesTuple = (value: unknown, expected: readonly string[]): boolean =>
 const nearlyEqual = (lhs: number, rhs: number, tolerance = 1e-12): boolean =>
   Math.abs(lhs - rhs) <= tolerance;
 
+const sameOptionalNumber = (
+  lhs: number | null | undefined,
+  rhs: number | null | undefined,
+  tolerance = 1e-12,
+): boolean => {
+  if (lhs == null && rhs == null) return true;
+  if (lhs == null || rhs == null) return false;
+  return nearlyEqual(lhs, rhs, tolerance);
+};
+
+const isTransportFamilyAuthorityStatus = (
+  value: unknown,
+): value is WarpTransportFamilyAuthorityStatus =>
+  value === "canonical_bounded_baseline_solve_family" ||
+  value === "candidate_authoritative_solve_family" ||
+  value === "secondary_metric_family";
+
+const isTransportCertificationStatus = (
+  value: unknown,
+): value is WarpTransportCertificationStatus =>
+  value === "bounded_transport_proof_bearing_baseline" ||
+  value === "bounded_transport_fail_closed_reference_only" ||
+  value === "bounded_transport_not_promoted" ||
+  value === "bounded_transport_proof_bearing_gate_admitted";
+
+const isShiftLapseTransportPromotionGateStatus = (
+  value: unknown,
+): value is WarpShiftLapseTransportPromotionGateStatus =>
+  value === "pass" || value === "fail" || value === "missing";
+
+const isShiftLapseThetaKConsistencyStatus = (
+  value: unknown,
+): value is WarpShiftLapseTransportThetaKConsistencyStatus =>
+  value === "pass" || value === "fail" || value === "unknown";
+
+const isShiftLapseWallSafetyStatus = (
+  value: unknown,
+): value is WarpShiftLapseTransportWallSafetyStatus =>
+  value === "pass" || value === "fail" || value === "missing";
+
+const isShiftLapseTimingStatus = (
+  value: unknown,
+): value is WarpShiftLapseTransportTimingStatus =>
+  value === "available" || value === "missing";
+
 const dotDiag = (metricDiag: WarpWorldlineVec3, vec: WarpWorldlineVec3): number =>
   metricDiag[0] * vec[0] * vec[0] +
   metricDiag[1] * vec[1] * vec[1] +
@@ -236,6 +333,118 @@ const vecNorm = (vec: WarpWorldlineVec3): number => Math.hypot(vec[0], vec[1], v
 
 const vecDistance = (lhs: WarpWorldlineVec3, rhs: WarpWorldlineVec3): number =>
   Math.hypot(lhs[0] - rhs[0], lhs[1] - rhs[1], lhs[2] - rhs[2]);
+
+const sameShiftLapseTransportPromotionGate = (
+  lhs: WarpShiftLapseTransportPromotionGate | null | undefined,
+  rhs: WarpShiftLapseTransportPromotionGate | null | undefined,
+): boolean => {
+  if (!lhs && !rhs) return true;
+  if (!lhs || !rhs) return false;
+  return (
+    lhs.gateId === rhs.gateId &&
+    lhs.status === rhs.status &&
+    lhs.reason === rhs.reason &&
+    (lhs.shiftLapseProfileId ?? null) === (rhs.shiftLapseProfileId ?? null) &&
+    (lhs.shiftLapseProfileStage ?? null) === (rhs.shiftLapseProfileStage ?? null) &&
+    (lhs.shiftLapseProfileLabel ?? null) === (rhs.shiftLapseProfileLabel ?? null) &&
+    (lhs.shiftLapseProfileNote ?? null) === (rhs.shiftLapseProfileNote ?? null) &&
+    lhs.familyAuthorityStatus === rhs.familyAuthorityStatus &&
+    lhs.familyTransportCertificationStatus === rhs.familyTransportCertificationStatus &&
+    lhs.transportCertificationStatus === rhs.transportCertificationStatus &&
+    lhs.authoritativeLowExpansionStatus === rhs.authoritativeLowExpansionStatus &&
+    lhs.authoritativeLowExpansionReason === rhs.authoritativeLowExpansionReason &&
+    (lhs.authoritativeLowExpansionSource ?? null) ===
+      (rhs.authoritativeLowExpansionSource ?? null) &&
+    lhs.authoritativeLowExpansionObservable === rhs.authoritativeLowExpansionObservable &&
+    sameOptionalNumber(lhs.divergenceRms, rhs.divergenceRms) &&
+    sameOptionalNumber(lhs.divergenceMaxAbs, rhs.divergenceMaxAbs) &&
+    nearlyEqual(lhs.divergenceTolerance, rhs.divergenceTolerance) &&
+    lhs.thetaKConsistencyStatus === rhs.thetaKConsistencyStatus &&
+    sameOptionalNumber(lhs.thetaKResidualAbs, rhs.thetaKResidualAbs) &&
+    nearlyEqual(lhs.thetaKTolerance, rhs.thetaKTolerance) &&
+    lhs.wallSafetyStatus === rhs.wallSafetyStatus &&
+    lhs.wallSafetyReason === rhs.wallSafetyReason &&
+    sameOptionalNumber(lhs.betaOverAlphaMax, rhs.betaOverAlphaMax) &&
+    sameOptionalNumber(
+      lhs.betaOutwardOverAlphaWallMax,
+      rhs.betaOutwardOverAlphaWallMax,
+    ) &&
+    sameOptionalNumber(lhs.wallHorizonMargin, rhs.wallHorizonMargin) &&
+    lhs.timingStatus === rhs.timingStatus &&
+    lhs.timingReason === rhs.timingReason &&
+    sameOptionalNumber(lhs.centerlineAlpha, rhs.centerlineAlpha) &&
+    sameOptionalNumber(lhs.centerlineDtauDt, rhs.centerlineDtauDt)
+  );
+};
+
+export const isWarpShiftLapseTransportPromotionGate = (
+  value: unknown,
+): value is WarpShiftLapseTransportPromotionGate => {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.gateId === "nhm2_shift_lapse_transport_promotion_gate/v1" &&
+    isShiftLapseTransportPromotionGateStatus(record.status) &&
+    typeof record.reason === "string" &&
+    record.reason.length > 0 &&
+    (record.shiftLapseProfileId == null || typeof record.shiftLapseProfileId === "string") &&
+    (record.shiftLapseProfileStage == null ||
+      typeof record.shiftLapseProfileStage === "string") &&
+    (record.shiftLapseProfileLabel == null ||
+      typeof record.shiftLapseProfileLabel === "string") &&
+    (record.shiftLapseProfileNote == null ||
+      typeof record.shiftLapseProfileNote === "string") &&
+    isTransportFamilyAuthorityStatus(record.familyAuthorityStatus) &&
+    isTransportCertificationStatus(record.familyTransportCertificationStatus) &&
+    isTransportCertificationStatus(record.transportCertificationStatus) &&
+    isShiftLapseTransportPromotionGateStatus(record.authoritativeLowExpansionStatus) &&
+    typeof record.authoritativeLowExpansionReason === "string" &&
+    record.authoritativeLowExpansionReason.length > 0 &&
+    (record.authoritativeLowExpansionSource == null ||
+      typeof record.authoritativeLowExpansionSource === "string") &&
+    record.authoritativeLowExpansionObservable === "brick_native_div_beta" &&
+    (record.divergenceRms == null || finiteNonNegative(record.divergenceRms)) &&
+    (record.divergenceMaxAbs == null || finiteNonNegative(record.divergenceMaxAbs)) &&
+    finiteNonNegative(record.divergenceTolerance) &&
+    isShiftLapseThetaKConsistencyStatus(record.thetaKConsistencyStatus) &&
+    (record.thetaKResidualAbs == null || finiteNonNegative(record.thetaKResidualAbs)) &&
+    finiteNonNegative(record.thetaKTolerance) &&
+    isShiftLapseWallSafetyStatus(record.wallSafetyStatus) &&
+    typeof record.wallSafetyReason === "string" &&
+    record.wallSafetyReason.length > 0 &&
+    (record.betaOverAlphaMax == null || finiteNonNegative(record.betaOverAlphaMax)) &&
+    (record.betaOutwardOverAlphaWallMax == null ||
+      finiteNonNegative(record.betaOutwardOverAlphaWallMax)) &&
+    (record.wallHorizonMargin == null || Number.isFinite(Number(record.wallHorizonMargin))) &&
+    isShiftLapseTimingStatus(record.timingStatus) &&
+    typeof record.timingReason === "string" &&
+    record.timingReason.length > 0 &&
+    (record.centerlineAlpha == null || finitePositive(record.centerlineAlpha)) &&
+    (record.centerlineDtauDt == null || finitePositive(Number(record.centerlineDtauDt)))
+  );
+};
+
+export const sameWarpWorldlineSourceSurface = (
+  lhs: WarpWorldlineSourceSurface,
+  rhs: WarpWorldlineSourceSurface,
+): boolean =>
+  lhs.surfaceId === rhs.surfaceId &&
+  lhs.producer === rhs.producer &&
+  lhs.provenanceClass === rhs.provenanceClass &&
+  lhs.transportVectorSource === rhs.transportVectorSource &&
+  lhs.transportVectorField === rhs.transportVectorField &&
+  lhs.metricT00Ref === rhs.metricT00Ref &&
+  lhs.metricT00Source === rhs.metricT00Source &&
+  lhs.metricFamily === rhs.metricFamily &&
+  lhs.familyAuthorityStatus === rhs.familyAuthorityStatus &&
+  lhs.transportCertificationStatus === rhs.transportCertificationStatus &&
+  lhs.metricT00ContractStatus === rhs.metricT00ContractStatus &&
+  lhs.chartContractStatus === rhs.chartContractStatus &&
+  (lhs.shiftLapseProfileId ?? null) === (rhs.shiftLapseProfileId ?? null) &&
+  sameShiftLapseTransportPromotionGate(
+    lhs.shiftLapseTransportPromotionGate ?? null,
+    rhs.shiftLapseTransportPromotionGate ?? null,
+  );
 
 const maxPairwiseVecDistance = (vectors: WarpWorldlineVec3[]): number => {
   let maxDistance = 0;
@@ -419,8 +628,26 @@ export const isCertifiedWarpWorldlineContract = (
     return false;
   }
   if (sourceSurface.metricT00Source !== "metric") return false;
+  if (!isTransportFamilyAuthorityStatus(sourceSurface.familyAuthorityStatus)) return false;
+  if (!isTransportCertificationStatus(sourceSurface.transportCertificationStatus)) return false;
   if (sourceSurface.metricT00ContractStatus !== "ok") return false;
   if (sourceSurface.chartContractStatus !== "ok") return false;
+  if (
+    sourceSurface.metricFamily === "nhm2_shift_lapse" ||
+    String(sourceSurface.metricT00Ref).includes("shift_lapse")
+  ) {
+    if (
+      sourceSurface.familyAuthorityStatus !== "candidate_authoritative_solve_family" ||
+      sourceSurface.transportCertificationStatus !==
+        "bounded_transport_proof_bearing_gate_admitted" ||
+      !isWarpShiftLapseTransportPromotionGate(
+        sourceSurface.shiftLapseTransportPromotionGate ?? null,
+      ) ||
+      sourceSurface.shiftLapseTransportPromotionGate?.status !== "pass"
+    ) {
+      return false;
+    }
+  }
 
   const chart = record.chart as Record<string, unknown> | undefined;
   if (!chart) return false;

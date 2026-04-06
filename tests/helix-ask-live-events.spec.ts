@@ -102,6 +102,7 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
       debug?: {
         answer_path?: string[];
         answer_extension_appended?: boolean;
@@ -115,7 +116,8 @@ describe("Helix Ask live events", () => {
     const answerPath = payload.debug?.answer_path ?? payload.answer_path ?? [];
     const text = payload.text.trim();
     expect(text).toContain("In practice,");
-    expect(text).toContain("Sources:");
+    expect(text).not.toMatch(/^Sources:/im);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
     expect(answerPath).not.toContain("forcedAnswer:ideology");
     expect(answerPath).not.toContain("answer:forced");
     expect(answerPath).toContain("answer:llm");
@@ -146,6 +148,7 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
       debug?: {
         answer_path?: string[];
         tree_walk_mode?: string;
@@ -155,7 +158,8 @@ describe("Helix Ask live events", () => {
     const answerPath = payload.debug?.answer_path ?? [];
     const text = payload.text.trim();
     expect(text).toContain("In practice,");
-    expect(text).toContain("Sources:");
+    expect(text).not.toMatch(/^Sources:/im);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
     expect(text).toMatch(/docs\/knowledge\/ethos\/feedback-loop-hygiene\.md|docs\/ethos\/ideology\.json/i);
     expect(payload.debug?.tree_walk_mode).toBe("root_to_leaf");
     expect(payload.debug?.graph_pack_skip_reason).toBeUndefined();
@@ -203,6 +207,7 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
       debug?: {
         intent_id?: string;
         intent_strategy?: string;
@@ -223,7 +228,134 @@ describe("Helix Ask live events", () => {
     expect(payload.text).not.toMatch(/\b(?:title|heading|slug)\s*:/i);
     expect(payload.text).toMatch(/warp bubble|warp/i);
     expect(payload.text).toMatch(/mission ethos|ethos/i);
-    expect(payload.text).toMatch(/Sources:/i);
+    expect(payload.text).not.toMatch(/^Sources:/im);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
+  }, 45000);
+
+  it("keeps the mild-shift follow-up conversational while preserving sidecar artifacts", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question:
+          "The text proves the regime is mild by looking at the norm of the shift vector. Why is this important to the solve it belongs to?",
+        debug: true,
+        sessionId: "test-shift-mild-conversational",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
+      envelope?: {
+        answer?: string;
+        sections?: Array<{ title?: string; body?: string }>;
+        extension?: { title?: string; body?: string } | null;
+      } | null;
+      debug?: {
+        report_mode?: boolean;
+        answer_surface_mode?: string;
+        tree_walk_block_present?: boolean;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.answer_surface_mode).toBe("conversational");
+    expect(payload.text.length).toBeGreaterThanOrEqual(120);
+    expect(payload.text).not.toMatch(/Assembly blocked:/i);
+    expect(payload.text).not.toMatch(/Open gaps \/ UNKNOWNs:/i);
+    expect(payload.text).not.toMatch(/\bTree Walk:/i);
+    expect(payload.text).not.toMatch(/\bAdditional Repo Context\b/i);
+    expect(payload.text).not.toMatch(/\bProof:/i);
+    expect(payload.text).not.toMatch(/^Summary:/im);
+    expect(payload.text).not.toMatch(/^Evidence:/im);
+    expect(payload.text).not.toMatch(/^Definition:/im);
+    expect(payload.text).not.toMatch(/^Mechanism Explanation:/im);
+    expect(payload.text).not.toMatch(/grounded in/i);
+    expect(payload.text).not.toMatch(/anchored in/i);
+    expect(payload.text).not.toMatch(/Primary implementation anchors/i);
+    expect(payload.text).not.toMatch(/Current evidence is incomplete/i);
+    expect(payload.text).not.toMatch(/Remaining gap: missing/i);
+    expect(payload.text).toMatch(/That matters because|keeps the shift contribution small enough|reduced-order branch/i);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
+    const sectionTitles = (payload.envelope?.sections ?? []).map((section) => section.title ?? "");
+    if (payload.debug?.tree_walk_block_present) {
+      expect(sectionTitles).toContain("Tree Walk");
+    }
+    if (payload.envelope?.extension) {
+      expect(payload.envelope.extension.title).toBe("Additional Repo Context");
+    }
+  }, 45000);
+
+  it("keeps roadmap planning prompts conversational by default", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question:
+          "Ok please organize my ideas to how they could be implemented in my code base in the future. I want profiles, a paywall, a voice lane, translation, and better retrieval planning.",
+        debug: true,
+        sessionId: "test-roadmap-conversational-surface",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text: string;
+      debug?: {
+        report_mode?: boolean;
+        answer_surface_mode?: string;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.answer_surface_mode).toBe("conversational");
+    expect(payload.text).not.toMatch(/^Repo-Grounded Findings:/im);
+    expect(payload.text).not.toMatch(/^Implementation Roadmap:/im);
+    expect(payload.text).not.toMatch(/^Evidence Gaps:/im);
+    expect(payload.text).not.toMatch(/^Next Anchors Needed:/im);
+    expect(payload.text).not.toMatch(/grounded in|anchored in/i);
+    expect(payload.text).not.toMatch(/Remaining gap: missing/i);
+    expect(payload.text).not.toMatch(/^Sources:/im);
+  }, 45000);
+
+  it("keeps frontier continuity follow-ups conversational by default", async () => {
+    const sessionId = "test-frontier-conversational-followup";
+    const firstResponse = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "Is the sun conscious under Orch-OR style reasoning?",
+        debug: true,
+        sessionId,
+      }),
+    });
+    expect(firstResponse.status).toBe(200);
+
+    const followUpResponse = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "What in the reasoning ladder should we focus on since this is the case?",
+        debug: true,
+        sessionId,
+      }),
+    });
+    expect(followUpResponse.status).toBe(200);
+    const payload = (await followUpResponse.json()) as {
+      text: string;
+      debug?: {
+        report_mode?: boolean;
+        answer_surface_mode?: string;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(false);
+    expect(payload.debug?.answer_surface_mode).toBe("conversational");
+    expect(payload.text).not.toMatch(/^Definitions:/im);
+    expect(payload.text).not.toMatch(/^Baseline:/im);
+    expect(payload.text).not.toMatch(/^Hypothesis:/im);
+    expect(payload.text).not.toMatch(/^Anti-hypothesis:/im);
+    expect(payload.text).not.toMatch(/^Claim tier:/im);
+    expect(payload.text).not.toMatch(/grounded in|anchored in/i);
+    expect(payload.text).not.toMatch(/Remaining gap: missing/i);
+    expect(payload.text).not.toMatch(/^Sources:/im);
   }, 45000);
 
   it("keeps long relation prompts out of report mode unless explicitly requested", async () => {
@@ -249,11 +381,13 @@ describe("Helix Ask live events", () => {
         intent_id?: string;
       };
       text?: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
     };
     expect(payload.debug?.report_mode).toBe(false);
     expect(payload.debug?.report_mode_reason).not.toBe("long_prompt");
     expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
     expect(payload.text ?? "").toMatch(/Sources:/i);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
   }, 45000);
 
   it("does not auto-fanout relation prompts into report mode", async () => {
@@ -269,6 +403,7 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
       debug?: {
         report_mode?: boolean;
         report_mode_reason?: string;
@@ -282,7 +417,34 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
     expect(payload.debug?.relation_packet_built).toBe(true);
     expect(payload.text).not.toMatch(/Executive summary:/i);
-    expect(payload.text).toMatch(/Sources:/i);
+    expect(payload.text).not.toMatch(/^Sources:/im);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
+  }, 45000);
+
+  it("keeps structured output available for explicit report prompts", async () => {
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question:
+          "Generate a report for Helix Ask explaining how it keeps Tree Walk, Proof, and Additional Repo Context out of the default visible answer.",
+        debug: true,
+        sessionId: "test-explicit-report-mode",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      text?: string;
+      debug?: {
+        report_mode?: boolean;
+        report_mode_reason?: string;
+      };
+    };
+    expect(payload.debug?.report_mode).toBe(true);
+    expect(payload.debug?.report_mode_reason).toBe("explicit_report_request");
+    expect(payload.text ?? "").toMatch(
+      /Direct Answer:|Mechanism Explanation:|Inputs\/Outputs:|Constraints:|Common failure modes:|Sources:/i,
+    );
   }, 45000);
 
 
@@ -299,6 +461,7 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text?: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
       debug?: {
         report_mode?: boolean;
         report_mode_reason?: string;
@@ -310,7 +473,8 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.report_mode_reason).not.toBe("multi_slot");
     expect(payload.debug?.report_mode_reason).not.toBe("slot_plan");
     expect(payload.text ?? "").not.toMatch(/Executive summary:/i);
-    expect(payload.text ?? "").toMatch(/Sources:/i);
+    expect(payload.text ?? "").not.toMatch(/^Sources:/im);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
   }, 45000);
   it("routes implicit warp-in-ideology phrasing to relation intent", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {
@@ -325,6 +489,7 @@ describe("Helix Ask live events", () => {
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
       text: string;
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
       debug?: {
         intent_id?: string;
         report_mode?: boolean;
@@ -333,7 +498,8 @@ describe("Helix Ask live events", () => {
     expect(payload.debug?.intent_id).toBe("hybrid.warp_ethos_relation");
     expect(payload.debug?.intent_id).not.toBe("repo.warp_definition_docs_first");
     expect(payload.debug?.report_mode).toBe(false);
-    expect(payload.text).toMatch(/Sources:/i);
+    expect(payload.text).not.toMatch(/^Sources:/im);
+    expect(payload.memory_citation?.entries?.length ?? 0).toBeGreaterThan(0);
   }, 45000);
 
 });

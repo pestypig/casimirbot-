@@ -1152,6 +1152,7 @@ export const dynamicConfigSchema = z.object({
   alphaGradientVec_m_inv: vec3Schema.optional(),
   alphaInteriorSupportKind: warpAlphaInteriorSupportKindSchema.optional(),
   alphaWallTaper_m: z.number().positive().optional(),
+  shiftLapseProfileId: z.string().min(1).optional(),
   warpGeometry: warpGeometrySchema.optional(),
   // Optional sweep controls (single point or arrays)
   gap_nm: z.union([z.number().positive(), z.array(z.number().positive())]).optional(),

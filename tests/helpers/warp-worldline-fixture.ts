@@ -2,6 +2,9 @@ import {
   analyzeWarpWorldlineTransportVariation,
   computeWarpWorldlineDtauDt,
   computeWarpWorldlineNormalizationResidual,
+  type WarpShiftLapseTransportPromotionGate,
+  type WarpTransportCertificationStatus,
+  type WarpTransportFamilyAuthorityStatus,
   type WarpWorldlineContractV1,
   type WarpWorldlineSampleV1,
   type WarpWorldlineVec3,
@@ -49,10 +52,11 @@ const buildSample = (
   sampleId: WarpWorldlineSampleV1["sampleId"],
   position_m: WarpWorldlineVec3,
   betaCoord: WarpWorldlineVec3,
+  alpha = ALPHA,
 ): WarpWorldlineSampleV1 => {
   const dtau_dt =
     computeWarpWorldlineDtauDt({
-      alpha: ALPHA,
+      alpha,
       gammaDiag: GAMMA_DIAG,
       coordinateVelocity: COORDINATE_VELOCITY,
       betaCoord,
@@ -70,7 +74,7 @@ const buildSample = (
     effectiveTransportVelocityCoord: [...betaCoord] as WarpWorldlineVec3,
     dtau_dt,
     normalizationResidual: computeWarpWorldlineNormalizationResidual({
-      alpha: ALPHA,
+      alpha,
       gammaDiag: GAMMA_DIAG,
       coordinateVelocity: COORDINATE_VELOCITY,
       betaCoord,
@@ -89,6 +93,20 @@ export const makeInformativeWarpWorldlineSamples = (): WarpWorldlineSampleV1[] =
   buildSample("shell_starboard", [0, -1.3, 0], [0.5, -0.04, 0]),
   buildSample("shell_dorsal", [0, 0, 0.9], [0.52, 0, 0.05]),
   buildSample("shell_ventral", [0, 0, -0.9], [0.52, 0, -0.03]),
+];
+
+export const makeInformativeWarpWorldlineSamplesForAlpha = (
+  alpha: number,
+): WarpWorldlineSampleV1[] => [
+  buildSample("centerline_aft", [-2.5, 0, 0], [0.58, 0, 0], alpha),
+  buildSample("centerline_center", [0, 0, 0], [0.6, 0, 0], alpha),
+  buildSample("centerline_fore", [2.5, 0, 0], [0.62, 0, 0], alpha),
+  buildSample("shell_aft", [-4.9, 0, 0], [0.42, -0.01, 0], alpha),
+  buildSample("shell_fore", [4.9, 0, 0], [0.48, -0.02, 0], alpha),
+  buildSample("shell_port", [0, 1.3, 0], [0.5, 0.06, 0], alpha),
+  buildSample("shell_starboard", [0, -1.3, 0], [0.5, -0.04, 0], alpha),
+  buildSample("shell_dorsal", [0, 0, 0.9], [0.52, 0, 0.05], alpha),
+  buildSample("shell_ventral", [0, 0, -0.9], [0.52, 0, -0.03], alpha),
 ];
 
 export const makeFlatWarpWorldlineSamples = (): WarpWorldlineSampleV1[] =>
@@ -144,6 +162,8 @@ export const makeWarpWorldlineFixture = (
       metricT00Ref: "warp.metric.T00.natario_sdf.shift",
       metricT00Source: "metric",
       metricFamily: "natario_sdf",
+      familyAuthorityStatus: "canonical_bounded_baseline_solve_family",
+      transportCertificationStatus: "bounded_transport_proof_bearing_baseline",
       metricT00ContractStatus: "ok",
       chartContractStatus: "ok",
     },
@@ -241,6 +261,187 @@ export const makeWarpWorldlineFixture = (
     },
     claimBoundary: ["bounded solve-backed transport contract only"],
     falsifierConditions: ["normalization_residual_exceeds_tolerance"],
+  };
+};
+
+export const makeShiftLapseTransportPromotionGateFixture = (args?: {
+  status?: WarpShiftLapseTransportPromotionGate["status"];
+  reason?: string;
+  transportCertificationStatus?: WarpTransportCertificationStatus;
+  authoritativeLowExpansionStatus?: WarpShiftLapseTransportPromotionGate["authoritativeLowExpansionStatus"];
+  authoritativeLowExpansionReason?: string;
+  thetaKConsistencyStatus?: WarpShiftLapseTransportPromotionGate["thetaKConsistencyStatus"];
+  wallSafetyStatus?: WarpShiftLapseTransportPromotionGate["wallSafetyStatus"];
+  wallSafetyReason?: string;
+  timingStatus?: WarpShiftLapseTransportPromotionGate["timingStatus"];
+  timingReason?: string;
+  centerlineAlpha?: number | null;
+  centerlineDtauDt?: number | null;
+  shiftLapseProfileId?: string | null;
+  shiftLapseProfileStage?: string | null;
+  shiftLapseProfileLabel?: string | null;
+  shiftLapseProfileNote?: string | null;
+}): WarpShiftLapseTransportPromotionGate => ({
+  gateId: "nhm2_shift_lapse_transport_promotion_gate/v1",
+  status: args?.status ?? "pass",
+  reason: args?.reason ?? "shift_lapse_transport_promotion_gate_pass",
+  shiftLapseProfileId: args?.shiftLapseProfileId ?? null,
+  shiftLapseProfileStage: args?.shiftLapseProfileStage ?? null,
+  shiftLapseProfileLabel: args?.shiftLapseProfileLabel ?? null,
+  shiftLapseProfileNote: args?.shiftLapseProfileNote ?? null,
+  familyAuthorityStatus: "candidate_authoritative_solve_family",
+  familyTransportCertificationStatus: "bounded_transport_fail_closed_reference_only",
+  transportCertificationStatus:
+    args?.transportCertificationStatus ??
+    "bounded_transport_proof_bearing_gate_admitted",
+  authoritativeLowExpansionStatus: args?.authoritativeLowExpansionStatus ?? "pass",
+  authoritativeLowExpansionReason:
+    args?.authoritativeLowExpansionReason ?? "authoritative_low_expansion_ok",
+  authoritativeLowExpansionSource: "gr_evolve_brick",
+  authoritativeLowExpansionObservable: "brick_native_div_beta",
+  divergenceRms: 1e-4,
+  divergenceMaxAbs: 2e-4,
+  divergenceTolerance: 1e-3,
+  thetaKConsistencyStatus: args?.thetaKConsistencyStatus ?? "pass",
+  thetaKResidualAbs: 1e-4,
+  thetaKTolerance: 1e-3,
+  wallSafetyStatus: args?.wallSafetyStatus ?? "pass",
+  wallSafetyReason: args?.wallSafetyReason ?? "wall_safety_guardrail_ok",
+  betaOverAlphaMax: 0.2,
+  betaOutwardOverAlphaWallMax: 0.15,
+  wallHorizonMargin: 0.4,
+  timingStatus: args?.timingStatus ?? "available",
+  timingReason: args?.timingReason ?? "centerline_lapse_timing_available",
+  centerlineAlpha: args?.centerlineAlpha ?? 1,
+  centerlineDtauDt: args?.centerlineDtauDt ?? 1,
+});
+
+export const makeShiftLapseWarpWorldlineFixture = (
+  samples: WarpWorldlineSampleV1[] = makeInformativeWarpWorldlineSamples(),
+  gate: WarpShiftLapseTransportPromotionGate = makeShiftLapseTransportPromotionGateFixture(),
+): WarpWorldlineContractV1 => {
+  const analysis = analyzeWarpWorldlineTransportVariation(samples);
+  if (!analysis) {
+    throw new Error("expected non-empty worldline sample family");
+  }
+  const representativeSample =
+    samples.find((entry) => entry.sampleId === "centerline_center") ?? samples[0];
+  const dtau_dt_values = samples.map((entry) => entry.dtau_dt);
+  const residual_values = samples.map((entry) => Math.abs(entry.normalizationResidual));
+  return {
+    contractVersion: "warp_worldline_contract/v1",
+    status: "bounded_solve_backed",
+    certified: true,
+    sourceSurface: {
+      surfaceId: "nhm2_metric_local_comoving_transport_cross",
+      producer: "server/energy-pipeline.ts",
+      provenanceClass: "solve_backed",
+      transportVectorSource: "warp.solveBackedTransportSampleFamily",
+      transportVectorField: "shiftVectorField.evaluateShiftVector",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Source: "metric",
+      metricFamily: "nhm2_shift_lapse",
+      familyAuthorityStatus: "candidate_authoritative_solve_family",
+      transportCertificationStatus: "bounded_transport_proof_bearing_gate_admitted",
+      metricT00ContractStatus: "ok",
+      chartContractStatus: "ok",
+      shiftLapseProfileId: gate.shiftLapseProfileId ?? null,
+      shiftLapseTransportPromotionGate: gate,
+    },
+    chart: {
+      label: "comoving_cartesian",
+      coordinateMap: "comoving_cartesian: x' = x - x_s(t), t = t",
+      chartFixed: true,
+    },
+    observerFamily: "ship_centerline_local_comoving",
+    validityRegime: {
+      regimeId: "nhm2_local_comoving_shell_cross",
+      bounded: true,
+      chartFixed: true,
+      observerDefined: true,
+      failClosedOutsideRegime: true,
+      routeTimeCertified: false,
+      description: "bounded local-comoving centerline-plus-shell-cross sample family",
+      allowedSourceModels: ["warp_worldline_local_comoving"],
+      deferredSourceModels: ["warp_worldline_route_time"],
+      restrictions: [
+        "deterministic_centerline_shell_cross_family_only",
+        "coordinate_velocity_fixed_to_zero_in_comoving_chart",
+        "effective_transport_velocity_is_local_shift_descriptor_not_certified_speed",
+      ],
+    },
+    sampleGeometry: {
+      familyId: "nhm2_centerline_shell_cross",
+      description:
+        "Deterministic bounded local-comoving shell-cross family with centerline and shell-proximal probes.",
+      coordinateFrame: "comoving_cartesian",
+      originDefinition: "ship_center",
+      ordering: [
+        "centerline_aft",
+        "centerline_center",
+        "centerline_fore",
+        "shell_aft",
+        "shell_fore",
+        "shell_port",
+        "shell_starboard",
+        "shell_dorsal",
+        "shell_ventral",
+      ],
+      representativeSampleId: "centerline_center",
+      axes: {
+        centerline: [1, 0, 0],
+        portStarboard: [0, 1, 0],
+        dorsalVentral: [0, 0, 1],
+      },
+      offsets_m: {
+        centerline: 2.5,
+        shellLongitudinal: 4.9,
+        shellTransverse: 1.3,
+        shellVertical: 0.9,
+        shellClearance: 0.1,
+      },
+    },
+    sampleCount: samples.length,
+    representativeSampleId: "centerline_center",
+    transportInterpretation: {
+      coordinateVelocityFrame: "chart_fixed_comoving",
+      coordinateVelocityInterpretation: "zero_by_chart_choice",
+      transportTerm: "solve_backed_shift_term",
+      effectiveTransportInterpretation: "bounded_local_comoving_descriptor_not_speed",
+      certifiedSpeedMeaning: false,
+      note:
+        "Effective transport is a bounded local shift descriptor only. Even when shell-cross variation is present, it is not a certified speed or route-time answer.",
+    },
+    transportVariation: analysis.transportVariation,
+    transportInformativenessStatus: analysis.transportInformativenessStatus,
+    sampleFamilyAdequacy: analysis.sampleFamilyAdequacy,
+    flatnessInterpretation: analysis.flatnessInterpretation,
+    certifiedTransportMeaning: analysis.certifiedTransportMeaning,
+    eligibleNextProducts: analysis.eligibleNextProducts,
+    nextRequiredUpgrade: analysis.nextRequiredUpgrade,
+    samples,
+    timeCoordinateName: "t",
+    positionCoordinates: ["x", "y", "z"],
+    coordinateVelocity: COORDINATE_VELOCITY,
+    coordinateVelocityUnits: "m/s",
+    effectiveTransportVelocityCoord: [
+      ...representativeSample.effectiveTransportVelocityCoord,
+    ] as WarpWorldlineVec3,
+    dtau_dt: {
+      representative: representativeSample.dtau_dt,
+      min: Math.min(...dtau_dt_values),
+      max: Math.max(...dtau_dt_values),
+      units: "dimensionless",
+      positivityRequired: true,
+    },
+    normalizationResidual: {
+      representative: representativeSample.normalizationResidual,
+      maxAbs: Math.max(...residual_values),
+      tolerance: 1e-9,
+      relation: "alpha^2 - gamma_ij(v^i+beta^i)(v^j+beta^j) - (d tau / dt)^2",
+    },
+    claimBoundary: ["bounded solve-backed transport contract only"],
+    falsifierConditions: ["shift_lapse_transport_promotion_gate_not_pass"],
   };
 };
 
@@ -491,6 +692,8 @@ export const makeWarpInHullProperAccelerationFixture = (args?: {
       metricT00Ref: "warp.metric.T00.natario_sdf.shift",
       metricT00Source: "metric",
       metricFamily: "natario_sdf",
+      familyAuthorityStatus: "canonical_bounded_baseline_solve_family",
+      transportCertificationStatus: "bounded_transport_proof_bearing_baseline",
       metricT00ContractStatus: "ok",
       chartContractStatus: "ok",
       brickStatus: "CERTIFIED",
@@ -522,6 +725,88 @@ export const makeWarpInHullProperAccelerationFixture = (args?: {
   });
   if (!contract) {
     throw new Error("expected certified in-hull proper-acceleration fixture");
+  }
+  return contract;
+};
+
+export const makeShiftLapseWarpInHullProperAccelerationFixture = (args?: {
+  zeroProfile?: boolean;
+  directProfileMagnitudesPerM?: Partial<
+    Record<WarpInHullProperAccelerationSampleRole, number>
+  >;
+  gate?: WarpShiftLapseTransportPromotionGate;
+}): WarpInHullProperAccelerationContractV1 => {
+  const gate =
+    args?.gate ?? makeShiftLapseTransportPromotionGateFixture();
+  const geometry = makeInHullSamplingGeometry();
+  const directMagnitudes: Record<WarpInHullProperAccelerationSampleRole, number> = {
+    cabin_center: 0,
+    cabin_fore: 2e-16,
+    cabin_aft: 1.5e-16,
+    cabin_port: 8e-17,
+    cabin_starboard: 8e-17,
+    cabin_dorsal: 1.1e-16,
+    cabin_ventral: 1.1e-16,
+    ...(args?.directProfileMagnitudesPerM ?? {}),
+  };
+  const sampleSummaries = makeInHullAccelerationSamples(
+    args?.zeroProfile
+      ? {
+          cabin_center: 0,
+          cabin_fore: 0,
+          cabin_aft: 0,
+          cabin_port: 0,
+          cabin_starboard: 0,
+          cabin_dorsal: 0,
+          cabin_ventral: 0,
+        }
+      : directMagnitudes,
+  );
+  const contract = buildWarpInHullProperAccelerationContract({
+    sourceSurface: {
+      surfaceId: "nhm2_metric_in_hull_proper_acceleration_profile",
+      producer: "server/energy-pipeline.ts",
+      provenanceClass: "solve_backed",
+      brickChannelSource: "gr_evolve_brick",
+      accelerationField: "eulerian_accel_geom_*",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Source: "metric",
+      metricFamily: "nhm2_shift_lapse",
+      familyAuthorityStatus: "candidate_authoritative_solve_family",
+      transportCertificationStatus: "bounded_transport_proof_bearing_gate_admitted",
+      metricT00ContractStatus: "ok",
+      chartContractStatus: "ok",
+      brickStatus: "CERTIFIED",
+      brickSolverStatus: "CERTIFIED",
+      shiftLapseProfileId: gate.shiftLapseProfileId ?? null,
+      shiftLapseTransportPromotionGate: gate,
+    },
+    chart: {
+      label: "comoving_cartesian",
+      coordinateMap: "comoving_cartesian: x' = x - x_s(t), t = t",
+      chartFixed: true,
+    },
+    samplingGeometry: geometry,
+    sampleSummaries,
+    resolutionAdequacy: {
+      status: args?.zeroProfile
+        ? "adequate_constant_lapse_zero_profile"
+        : "adequate_direct_brick_profile",
+      criterionId: "direct_gr_evolve_brick_no_fallback_v1",
+      criterionMeaning: "Direct gr-evolve brick channels only, no analytic fallback.",
+      brickDims: [24, 24, 24],
+      voxelSize_m: [1, 1, 1],
+      wholeBrickAccelerationAbsMax_per_m: args?.zeroProfile ? 0 : 2e-16,
+      wholeBrickGradientAbsMax_per_m: args?.zeroProfile ? 0 : 2e-16,
+      allSampleMagnitudesZero: Boolean(args?.zeroProfile),
+      expectedZeroProfileByModel: Boolean(args?.zeroProfile),
+      note: args?.zeroProfile
+        ? "Constant-lapse zero profile."
+        : "Direct brick profile resolved.",
+    },
+  });
+  if (!contract) {
+    throw new Error("expected certified shift-lapse in-hull proper-acceleration fixture");
   }
   return contract;
 };

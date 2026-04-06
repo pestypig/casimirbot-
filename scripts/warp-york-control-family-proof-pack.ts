@@ -81,7 +81,11 @@ import {
   resolveNeedleHullMark2ReducedOrderReference,
 } from "../shared/needle-hull-mark2-cavity-contract";
 import {
+  DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+  STAGE1_CENTERLINE_ALPHA_ROBUSTNESS_SWEEP_PROFILE_IDS,
+  STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS,
   deriveWarpMetricFamilySemantics,
+  resolveWarpShiftLapseProfile,
   type WarpMetricFamilyAuthorityStatus,
   type WarpMetricTransportCertificationStatus,
 } from "../modules/warp/warp-metric-adapter";
@@ -93,6 +97,8 @@ const DOC_AUDIT_DIR = path.join("docs", "audits", "research");
 const DEFAULT_BASE_URL = "http://127.0.0.1:5050";
 const DEFAULT_FRAME_ENDPOINT = "http://127.0.0.1:6062/api/helix/hull-render/frame";
 const DEFAULT_PROXY_FRAME_ENDPOINT = `${DEFAULT_BASE_URL}/api/helix/hull-render/frame`;
+const NATARIO_EXPANSION_TOLERANCE = 1e-3;
+const THETA_K_TOLERANCE = 1e-3;
 const DEFAULT_NHM2_SNAPSHOT_PATH = path.join(
   FULL_SOLVE_DIR,
   "nhm2-snapshot-congruence-evidence-latest.json",
@@ -588,6 +594,98 @@ export const DEFAULT_PROOF_SURFACE_PUBLICATION_LOCK_PATH = path.join(
   FULL_SOLVE_DIR,
   ".nhm2-proof-surface-publication.lock",
 );
+const SELECTED_FAMILY_FULL_SOLVE_DIR = path.join(
+  FULL_SOLVE_DIR,
+  "selected-family",
+  "nhm2-shift-lapse",
+);
+const SELECTED_FAMILY_DOC_AUDIT_DIR = path.join(
+  DOC_AUDIT_DIR,
+  "selected-family",
+  "nhm2-shift-lapse",
+);
+const SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_JSON = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  `nhm2-shift-lapse-transport-result-${DATE_STAMP}.json`,
+);
+const SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  "nhm2-shift-lapse-transport-result-latest.json",
+);
+const SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_MD = path.join(
+  SELECTED_FAMILY_DOC_AUDIT_DIR,
+  `warp-nhm2-shift-lapse-transport-result-${DATE_STAMP}.md`,
+);
+const SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD = path.join(
+  SELECTED_FAMILY_DOC_AUDIT_DIR,
+  "warp-nhm2-shift-lapse-transport-result-latest.md",
+);
+const SELECTED_SHIFT_LAPSE_SWEEP_ARTIFACT_DIR = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  "sweep",
+);
+const SELECTED_SHIFT_LAPSE_SWEEP_AUDIT_DIR = path.join(
+  SELECTED_FAMILY_DOC_AUDIT_DIR,
+  "sweep",
+);
+const SELECTED_SHIFT_LAPSE_SWEEP_OUT_JSON = path.join(
+  SELECTED_SHIFT_LAPSE_SWEEP_ARTIFACT_DIR,
+  `nhm2-shift-lapse-profile-sweep-${DATE_STAMP}.json`,
+);
+const SELECTED_SHIFT_LAPSE_SWEEP_LATEST_JSON = path.join(
+  SELECTED_SHIFT_LAPSE_SWEEP_ARTIFACT_DIR,
+  "nhm2-shift-lapse-profile-sweep-latest.json",
+);
+const SELECTED_SHIFT_LAPSE_SWEEP_OUT_MD = path.join(
+  SELECTED_SHIFT_LAPSE_SWEEP_AUDIT_DIR,
+  `warp-nhm2-shift-lapse-profile-sweep-${DATE_STAMP}.md`,
+);
+const SELECTED_SHIFT_LAPSE_SWEEP_LATEST_MD = path.join(
+  SELECTED_SHIFT_LAPSE_SWEEP_AUDIT_DIR,
+  "warp-nhm2-shift-lapse-profile-sweep-latest.md",
+);
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_ARTIFACT_DIR = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  "boundary-sweep",
+);
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_AUDIT_DIR = path.join(
+  SELECTED_FAMILY_DOC_AUDIT_DIR,
+  "boundary-sweep",
+);
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_OUT_JSON = path.join(
+  SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_ARTIFACT_DIR,
+  `nhm2-shift-lapse-boundary-sweep-${DATE_STAMP}.json`,
+);
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_JSON = path.join(
+  SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_ARTIFACT_DIR,
+  "nhm2-shift-lapse-boundary-sweep-latest.json",
+);
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_OUT_MD = path.join(
+  SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_AUDIT_DIR,
+  `warp-nhm2-shift-lapse-boundary-sweep-${DATE_STAMP}.md`,
+);
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_MD = path.join(
+  SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_AUDIT_DIR,
+  "warp-nhm2-shift-lapse-boundary-sweep-latest.md",
+);
+const buildSelectedShiftLapsePublicationCommand = (
+  shiftLapseProfileId = DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+) =>
+  `npm run warp:full-solve:nhm2-shift-lapse:publish-selected-transport -- --shift-lapse-profile-id ${shiftLapseProfileId}`;
+const SELECTED_SHIFT_LAPSE_PUBLICATION_COMMAND =
+  buildSelectedShiftLapsePublicationCommand();
+const SELECTED_SHIFT_LAPSE_PROFILE_SWEEP_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-profile-sweep";
+const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep";
+const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
+  warpFieldType: "nhm2_shift_lapse",
+  metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+  metricT00Source: "metric",
+  requireCongruentSolve: true,
+  requireNhm2CongruentFullSolve: true,
+  shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+};
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
@@ -951,6 +1049,19 @@ type CaseSnapshotMetrics = {
     mean: number | null;
     sampleCount: number;
     consistent: boolean;
+  };
+  authoritativeLowExpansionGate?: {
+    status: "pass" | "fail" | "missing";
+    reason: string;
+    source: string | null;
+    proxy: false;
+    divergenceObservable: "div_beta";
+    divergenceRms: number | null;
+    divergenceMaxAbs: number | null;
+    divergenceTolerance: number;
+    thetaKConsistencyStatus: "pass" | "fail" | "unknown";
+    thetaKResidualMaxAbs: number | null;
+    thetaKTolerance: number;
   };
 };
 
@@ -2371,6 +2482,265 @@ type Nhm2CurvatureInvariantVisualizationArtifact = {
   renderTaxonomy: RenderTaxonomySummary | null;
   notes: string[];
   checksum?: string;
+};
+
+type ProofPackTransportSurfaceStatusSummary = {
+  familyAuthorityStatus: string | null;
+  transportCertificationStatus: string | null;
+  shiftLapseTransportPromotionGateStatus: string | null;
+  shiftLapseTransportPromotionGateReason: string | null;
+  shiftLapseAuthoritativeLowExpansionStatus: string | null;
+  shiftLapseWallSafetyStatus: string | null;
+  shiftLapseTimingStatus: string | null;
+  shiftLapseCenterlineAlpha: number | null;
+  shiftLapseCenterlineDtauDt: number | null;
+};
+
+type Nhm2ShiftLapseTransportResultArtifact = {
+  artifactType: "nhm2_shift_lapse_transport_result/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  publicationCommand: string;
+  canonicalBaselineMetricT00Ref: "warp.metric.T00.natario_sdf.shift";
+  canonicalBaselineLatestAliasesChanged: false;
+  selectedFamily: {
+    warpFieldType: "nhm2_shift_lapse";
+    metricT00Ref: "warp.metric.T00.nhm2.shift_lapse";
+    metricT00Source: "metric";
+    shiftLapseProfileId: string | null;
+    shiftLapseProfileStage: string | null;
+    shiftLapseProfileNote: string | null;
+    artifactRoot: string;
+    auditRoot: string;
+  };
+  selectedBundleArtifacts: {
+    worldlineLatestJsonPath: string;
+    cruiseEnvelopePreflightLatestJsonPath: string;
+    routeTimeWorldlineLatestJsonPath: string;
+    missionTimeEstimatorLatestJsonPath: string;
+    missionTimeComparisonLatestJsonPath: string;
+    cruiseEnvelopeLatestJsonPath: string;
+    inHullProperAccelerationLatestJsonPath: string;
+  };
+  transportCertificationStatus: string | null;
+  promotionGateStatus: string | null;
+  promotionGateReason: string | null;
+  authoritativeLowExpansionStatus: string | null;
+  authoritativeLowExpansionSource: string | null;
+  wallSafetyStatus: string | null;
+  wallSafetyReason: string | null;
+  centerlineAlpha: number | null;
+  centerlineDtauDt: number | null;
+  missionTimeInterpretationStatus: string | null;
+  properMinusCoordinate_seconds: number | null;
+  properMinusClassical_seconds: number | null;
+  boundedTimingDifferentialDetected: boolean | null;
+  measuredResultSummary: string;
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2ShiftLapseProfileSweepEntry = {
+  shiftLapseProfileId: string;
+  shiftLapseProfileStage: string | null;
+  shiftLapseProfileNote: string | null;
+  publicationCommand: string;
+  artifactRoot: string;
+  auditRoot: string;
+  transportResultLatestJsonPath: string;
+  transportResultLatestMdPath: string;
+  selectedBundleArtifacts: Nhm2ShiftLapseTransportResultArtifact["selectedBundleArtifacts"];
+  transportCertificationStatus: string | null;
+  promotionGateStatus: string | null;
+  promotionGateReason: string | null;
+  authoritativeLowExpansionStatus: string | null;
+  authoritativeLowExpansionSource: string | null;
+  wallSafetyStatus: string | null;
+  wallSafetyReason: string | null;
+  centerlineAlpha: number | null;
+  centerlineDtauDt: number | null;
+  missionTimeInterpretationStatus: string | null;
+  properMinusCoordinate_seconds: number | null;
+  properMinusClassical_seconds: number | null;
+  boundedTimingDifferentialDetected: boolean | null;
+  measuredResultSummary: string;
+};
+
+type Nhm2ShiftLapseProfileSweepFailureSummary = {
+  shiftLapseProfileId: string;
+  failedGate:
+    | "authoritative_low_expansion"
+    | "wall_safety"
+    | "transport_promotion_gate";
+  failureReason: string | null;
+} | null;
+
+type Nhm2ShiftLapseProfileSweepArtifact = {
+  artifactType: "nhm2_shift_lapse_profile_sweep/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  publicationCommand: string;
+  canonicalBaselineMetricT00Ref: "warp.metric.T00.natario_sdf.shift";
+  canonicalBaselineLatestAliasesChanged: false;
+  sweepFamilyId: "stage1_centerline_alpha_bracket_v1";
+  sweepDimension: "centerline_alpha";
+  sweepProfileIds: string[];
+  referenceSelectedFamilyResult: {
+    shiftLapseProfileId: string;
+    latestJsonPath: string;
+    latestMdPath: string;
+  };
+  firstProfileWithBoundedTimingDifferential: string | null;
+  strongestProfileKeepingAllGatesPassing: string | null;
+  firstGateFailure: Nhm2ShiftLapseProfileSweepFailureSummary;
+  robustnessStatus:
+    | "robust_over_tested_bracket"
+    | "threshold_limited_over_tested_bracket"
+    | "fragile_or_sparse_over_tested_bracket"
+    | "no_bounded_differential_detected_over_tested_bracket";
+  scalingStatus: "monotonic" | "non_monotonic" | "flat" | "insufficient_data";
+  robustnessSummary: string;
+  entries: Nhm2ShiftLapseProfileSweepEntry[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+type Nhm2ShiftLapseBoundarySweepEntry = Nhm2ShiftLapseProfileSweepEntry & {
+  betaOverAlphaMax: number | null;
+  betaOutwardOverAlphaWallMax: number | null;
+  wallHorizonMargin: number | null;
+  divergenceRms: number | null;
+  divergenceMaxAbs: number | null;
+  divergenceTolerance: number | null;
+  thetaKConsistencyStatus: string | null;
+  thetaKResidualAbs: number | null;
+  thetaKTolerance: number | null;
+};
+
+type Nhm2ShiftLapseBoundarySweepMargin = {
+  fromShiftLapseProfileId: string;
+  toShiftLapseProfileId: string | null;
+  deltaCenterlineAlpha: number | null;
+  profileStepCount: number | null;
+  status:
+    | "first_failure_delta_measured"
+    | "bounded_lower_bound_only"
+    | "no_passing_profile_available";
+  note: string;
+};
+
+type Nhm2ShiftLapseBoundaryHeadroomTrend =
+  | "flat_within_tested_bracket"
+  | "shrinking_within_tested_bracket"
+  | "improving_within_tested_bracket"
+  | "insufficient_resolution_to_characterize";
+
+type Nhm2ShiftLapseBoundaryUsageTrend =
+  | "flat_within_tested_bracket"
+  | "increasing_within_tested_bracket"
+  | "decreasing_within_tested_bracket"
+  | "insufficient_resolution_to_characterize";
+
+type Nhm2ShiftLapseBoundaryTimingTrend =
+  | "growing_monotonically_within_tested_bracket"
+  | "flat_within_tested_bracket"
+  | "non_monotonic_within_tested_bracket"
+  | "insufficient_resolution_to_characterize";
+
+type Nhm2ShiftLapseBoundarySweepArtifact = {
+  artifactType: "nhm2_shift_lapse_boundary_sweep/v1";
+  generatedOn: string;
+  generatedAt: string;
+  boundaryStatement: string;
+  publicationCommand: string;
+  canonicalBaselineMetricT00Ref: "warp.metric.T00.natario_sdf.shift";
+  canonicalBaselineLatestAliasesChanged: false;
+  boundaryFamilyId: "stage1_centerline_alpha_stronger_boundary_bracket_v1";
+  sweepDimension: "centerline_alpha";
+  referenceSelectedFamilyResult: {
+    shiftLapseProfileId: string;
+    latestJsonPath: string;
+    latestMdPath: string;
+  };
+  localRobustnessSweep: {
+    latestJsonPath: string;
+    latestMdPath: string;
+    strongestLocallyRobustProfileId: string | null;
+  };
+  boundaryProfileIds: string[];
+  testedStrongerBracketStopProfileId: string | null;
+  testedStrongerBracketStopCenterlineAlpha: number | null;
+  strongestProfileKeepingAllGatesPassing: string | null;
+  firstGateFailure: string | null;
+  firstGateFailureReason: string | null;
+  firstFailedGate:
+    | "authoritative_low_expansion"
+    | "wall_safety"
+    | "transport_promotion_gate"
+    | null;
+  failureBoundaryStatus:
+    | "first_failure_reached_within_tested_stronger_bracket"
+    | "no_failure_reached_within_tested_stronger_bracket"
+    | "no_passing_profile_in_tested_stronger_bracket";
+  marginFromReferenceProfile: Nhm2ShiftLapseBoundarySweepMargin;
+  marginFromStrongestPassingProfile: Nhm2ShiftLapseBoundarySweepMargin;
+  scalingStatusWithinPassingRegion:
+    | "monotonic"
+    | "non_monotonic"
+    | "flat"
+    | "insufficient_data";
+  timingDifferentialTrend: Nhm2ShiftLapseBoundaryTimingTrend;
+  lowExpansionUsageTrend: Nhm2ShiftLapseBoundaryUsageTrend;
+  wallSafetyUsageTrend: Nhm2ShiftLapseBoundaryUsageTrend;
+  lowExpansionDivergenceUsage: number | null;
+  lowExpansionThetaKUsage: number | null;
+  lowExpansionWorstUsage: number | null;
+  lowExpansionWorstMargin: number | null;
+  wallSafetyBetaUsage: number | null;
+  wallSafetyBetaMargin: number | null;
+  wallSafetyHorizonMargin: number | null;
+  wallSafetyWorstUsage: number | null;
+  wallSafetyWorstMargin: number | null;
+  lowExpansionHeadroomTrend: Nhm2ShiftLapseBoundaryHeadroomTrend;
+  wallSafetyHeadroomTrend: Nhm2ShiftLapseBoundaryHeadroomTrend;
+  mostLikelyFirstFailureGate:
+    | "authoritative_low_expansion"
+    | "wall_safety"
+    | "transport_promotion_gate"
+    | "unresolved_within_tested_bracket";
+  effectVsHeadroomInterpretation: string;
+  boundarySummary: string;
+  entries: Nhm2ShiftLapseBoundarySweepEntry[];
+  nonClaims: string[];
+  checksum?: string;
+};
+
+const isBoundarySweepEntryRecord = (
+  value: unknown,
+): value is Nhm2ShiftLapseBoundarySweepEntry =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { shiftLapseProfileId?: unknown }).shiftLapseProfileId === "string";
+
+const readExistingBoundarySweepEntries = (latestJsonPath: string): Nhm2ShiftLapseBoundarySweepEntry[] => {
+  if (!fs.existsSync(latestJsonPath)) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(latestJsonPath, "utf8")) as {
+      artifactType?: unknown;
+      entries?: unknown;
+    };
+    if (
+      parsed.artifactType !== "nhm2_shift_lapse_boundary_sweep/v1" ||
+      !Array.isArray(parsed.entries)
+    ) {
+      return [];
+    }
+    return parsed.entries.filter(isBoundarySweepEntryRecord);
+  } catch {
+    return [];
+  }
 };
 
 type Nhm2WarpWorldlineProofArtifact = {
@@ -4447,7 +4817,9 @@ type ProofPackSourceMechanismPromotionContractSummary = {
   sourceMechanismNonAuthoritative: boolean;
   sourceMechanismFormulaEquivalent: boolean;
   nhm2ShiftLapseFamilyAuthorityStatus: WarpMetricFamilyAuthorityStatus;
-  nhm2ShiftLapseTransportCertificationStatus: WarpMetricTransportCertificationStatus;
+  nhm2ShiftLapseDefaultTransportCertificationStatus: WarpMetricTransportCertificationStatus;
+  nhm2ShiftLapseSelectedPublicationStatus: string;
+  nhm2ShiftLapseSelectedPublicationSummary: string;
   nhm2ShiftLapseStatusSummary: string;
   sourceMechanismConsumerSummary: string;
   exemptionRouteStatus: SourceMechanismPromotionRouteStatus;
@@ -4776,6 +5148,7 @@ type ControlRequestSelectors = {
   requireCongruentSolve: boolean;
   requireNhm2CongruentFullSolve: boolean;
   warpFieldType: string | null;
+  shiftLapseProfileId: string | null;
 };
 
 type ControlDebugEntry = {
@@ -5248,6 +5621,22 @@ export type ProofPackPayload = {
   sourceMechanismMaturity?: ProofPackSourceMechanismMaturitySummary;
   sourceMechanismPromotionContract?: ProofPackSourceMechanismPromotionContractSummary;
   sourceMechanismParityRouteFeasibility?: ProofPackSourceMechanismParityRouteFeasibilitySummary;
+  authoritativeLowExpansionGate?: {
+    sourceCaseId: CaseId;
+    status: "pass" | "fail" | "missing";
+    reason: string;
+    source: string | null;
+    authoritative: true;
+    divergenceObservable: "div_beta";
+    divergenceRms: number | null;
+    divergenceMaxAbs: number | null;
+    divergenceTolerance: number;
+    thetaKConsistencyStatus: "pass" | "fail" | "unknown";
+    thetaKResidualMaxAbs: number | null;
+    thetaKTolerance: number;
+    projectionDerivedStatus: "advisory_only";
+    projectionDerivedNote: string;
+  };
   presentationRenderSummary?: {
     presentationRenderLayerStatus: YorkOptixPresentationLayerStatus;
     fieldSuiteRealizationStatus: YorkOptixFieldSuiteRealizationStatus;
@@ -5311,6 +5700,7 @@ export type ProofPackPayload = {
     eligibleNextProducts: string[];
     routeTimeStatus: "deferred";
     transportInterpretation: string;
+    transportSurfaceStatus: ProofPackTransportSurfaceStatusSummary;
     nonClaims: string[];
     artifactPath: string;
     reportPath: string;
@@ -5337,6 +5727,7 @@ export type ProofPackPayload = {
     sampleFamilyAdequacy: string;
     transportVariationStatus: string;
     routeTimeStatus: "deferred";
+    transportSurfaceStatus: ProofPackTransportSurfaceStatusSummary;
     eligibleNextProducts: string[];
     nonClaims: string[];
     artifactPath: string;
@@ -5398,6 +5789,7 @@ export type ProofPackPayload = {
       units: { primary: "s"; secondary: "yr" };
     };
     routeTimeStatus: string;
+    transportSurfaceStatus: ProofPackTransportSurfaceStatusSummary;
     nextEligibleProducts: string[];
     nonClaims: string[];
     artifactPath: string;
@@ -5422,6 +5814,7 @@ export type ProofPackPayload = {
     properMinusClassicalSeconds: number;
     comparisonInterpretationStatus: string;
     comparisonReadiness: string;
+    transportSurfaceStatus: ProofPackTransportSurfaceStatusSummary;
     deferredComparators: string[];
     nonClaims: string[];
     artifactPath: string;
@@ -5448,6 +5841,7 @@ export type ProofPackPayload = {
     comparisonConsistencyStatus: string;
     routeTimeStatus: string;
     missionTimeStatus: string;
+    transportSurfaceStatus: ProofPackTransportSurfaceStatusSummary;
     nonClaims: string[];
     artifactPath: string;
     reportPath: string;
@@ -5468,6 +5862,7 @@ export type ProofPackPayload = {
     max_mps2: number;
     resolutionAdequacy: string;
     fallbackUsed: boolean;
+    transportSurfaceStatus: ProofPackTransportSurfaceStatusSummary;
     nonClaims: string[];
     artifactPath: string;
     reportPath: string;
@@ -10519,7 +10914,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     "warp.metric.T00.nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection.",
     "The reconstructed proxy path remains non-equivalent to the authoritative direct metric path.",
     "Cross-lane scope remains reference_only.",
-    "Bounded transport proof-bearing surfaces for warp.metric.T00.nhm2_shift_lapse remain fail-closed and reference_only.",
+    "Proof-bearing bounded transport admission for warp.metric.T00.nhm2_shift_lapse is controlled separately by the authoritative shift-lapse transport-promotion gate; this source/mechanism surface does not itself grant that promotion.",
   ];
   const forbiddenPromotions = [
     "formula_equivalent_to_authoritative_direct_metric",
@@ -10529,7 +10924,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     "nhm2_shift_lapse_proof_promotion",
   ];
   const consumerSummary =
-    "Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only.";
+    "Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and proof-bearing bounded transport admission remains controlled separately by the authoritative shift-lapse transport-promotion gate rather than granted by this source/mechanism surface.";
 
   const directProxyParityRoute: SourceMechanismPromotionRoute = {
     routeId: "direct_proxy_parity_route",
@@ -10687,7 +11082,7 @@ const buildSourceMechanismPromotionContractBlock = (args: {
     activationDisclaimers,
     forbiddenPromotions,
     activationSummary:
-      "Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, bounded transport proof-bearing surfaces remain fail-closed/reference-only, stronger claims remain blocked, and Lane A remains authoritative.",
+      "Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, proof-bearing bounded transport admission is controlled separately by the authoritative shift-lapse transport-promotion gate, stronger claims remain blocked, and Lane A remains authoritative.",
     consumerSummary,
     claimMappings,
     remainingConditions: [
@@ -10772,6 +11167,10 @@ export const buildSourceMechanismPromotionContractSummary = (args: {
   const formalExemptionRoute = contract.availableRoutes.find(
     (route) => route.routeId === "formal_exemption_route",
   );
+  const nhm2ShiftLapseSelectedPublicationStatus =
+    "explicit_gate_admitted_selected_family_publication_available";
+  const nhm2ShiftLapseSelectedPublicationSummary =
+    "Canonical latest aliases remain on warp.metric.T00.natario_sdf.shift by default, but an explicitly selected nhm2_shift_lapse solve can publish proof-bearing bounded transport artifacts when the authoritative shift-lapse transport-promotion gate passes.";
   return {
     contractId: contract.contractId,
     contractStatus: contract.contractStatus,
@@ -10795,9 +11194,12 @@ export const buildSourceMechanismPromotionContractSummary = (args: {
       args.sourceFormulaAudit.formulaComparison.formulaEquivalent,
     nhm2ShiftLapseFamilyAuthorityStatus:
       nhm2ShiftLapseFamilySemantics.familyAuthorityStatus,
-    nhm2ShiftLapseTransportCertificationStatus:
+    nhm2ShiftLapseDefaultTransportCertificationStatus:
       nhm2ShiftLapseFamilySemantics.transportCertificationStatus,
-    nhm2ShiftLapseStatusSummary: nhm2ShiftLapseFamilySemantics.semanticsNote,
+    nhm2ShiftLapseSelectedPublicationStatus,
+    nhm2ShiftLapseSelectedPublicationSummary,
+    nhm2ShiftLapseStatusSummary:
+      "Distinct full-solve family candidate in provenance/model-selection; default canonical latest publication remains on the Natario SDF baseline, while nhm2_shift_lapse transport publication is available only through the explicit selected-family path when the authoritative shift-lapse transport-promotion gate passes.",
     sourceMechanismConsumerSummary: contract.consumerSummary,
     exemptionRouteStatus: formalExemptionRoute?.routeStatus ?? "not_available",
     activationScope: contract.activationScope,
@@ -16980,6 +17382,76 @@ const computeSourceFamilyEvidenceHash = (
   return hasEvidence ? computeDeterministicHash(sourceFamily) : null;
 };
 
+const computeRmsFromFloat32 = (data: Float32Array | null | undefined): number | null => {
+  if (!(data instanceof Float32Array) || data.length === 0) return null;
+  let sumSq = 0;
+  for (let i = 0; i < data.length; i += 1) sumSq += data[i] * data[i];
+  return Math.sqrt(sumSq / data.length);
+};
+
+const computeMaxAbsFromFloat32 = (data: Float32Array | null | undefined): number | null => {
+  if (!(data instanceof Float32Array) || data.length === 0) return null;
+  let out = 0;
+  for (let i = 0; i < data.length; i += 1) {
+    const value = Math.abs(data[i]);
+    if (value > out) out = value;
+  }
+  return out;
+};
+
+const buildAuthoritativeLowExpansionGateFromSnapshot = (args: {
+  snapshot: HullScientificSnapshot;
+  thetaPlusKTrace: CaseSnapshotMetrics["thetaPlusKTrace"];
+}): NonNullable<CaseSnapshotMetrics["authoritativeLowExpansionGate"]> => {
+  const stats = asRecord(args.snapshot.stats);
+  const divBetaChannel =
+    args.snapshot.channels.div_beta?.data instanceof Float32Array
+      ? args.snapshot.channels.div_beta.data
+      : null;
+  const divergenceRms =
+    toFiniteNumber(stats.divBetaRms) ?? computeRmsFromFloat32(divBetaChannel);
+  const divergenceMaxAbs =
+    toFiniteNumber(stats.divBetaMaxAbs) ?? computeMaxAbsFromFloat32(divBetaChannel);
+  const source = asText(stats.divBetaSource) ?? (divBetaChannel ? "gr_evolve_brick" : null);
+  const thetaKResidualMaxAbs = args.thetaPlusKTrace.maxAbs;
+  const thetaKConsistencyStatus: "pass" | "fail" | "unknown" =
+    thetaKResidualMaxAbs == null
+      ? "unknown"
+      : thetaKResidualMaxAbs <= THETA_K_TOLERANCE
+        ? "pass"
+        : "fail";
+  const status: "pass" | "fail" | "missing" =
+    divergenceRms == null || source == null || thetaKConsistencyStatus === "unknown"
+      ? "missing"
+      : divergenceRms <= NATARIO_EXPANSION_TOLERANCE &&
+          thetaKConsistencyStatus === "pass"
+        ? "pass"
+        : "fail";
+  const reason =
+    status === "missing"
+      ? divergenceRms == null || source == null
+        ? "brick_native_div_beta_missing"
+        : "theta_k_consistency_missing"
+      : divergenceRms != null && divergenceRms > NATARIO_EXPANSION_TOLERANCE
+        ? "brick_native_divergence_constraint_failed"
+        : thetaKConsistencyStatus === "fail"
+          ? "theta_k_consistency_failed"
+          : "authoritative_low_expansion_ok";
+  return {
+    status,
+    reason,
+    source,
+    proxy: false,
+    divergenceObservable: "div_beta",
+    divergenceRms,
+    divergenceMaxAbs,
+    divergenceTolerance: NATARIO_EXPANSION_TOLERANCE,
+    thetaKConsistencyStatus,
+    thetaKResidualMaxAbs,
+    thetaKTolerance: THETA_K_TOLERANCE,
+  };
+};
+
 const computeLaneTensorInputsHashFromSnapshot = (args: {
   snapshot: {
     channels: Record<string, { data: Float32Array } | undefined>;
@@ -17145,6 +17617,16 @@ const runCase = async (args: {
         })
       : null;
     const sourceFamily = readSourceFamilyEvidence(snapshot);
+    const thetaPlusKTrace =
+      thetaLane instanceof Float32Array && contractField instanceof Float32Array
+        ? computeThetaPlusKTraceConsistency(thetaLane, contractField)
+        : {
+            rms: null,
+            maxAbs: null,
+            mean: null,
+            sampleCount: 0,
+            consistent: false,
+          };
     snapshotMetrics = {
       dims: snapshot.dims,
       resolvedUrl: snapshot.resolvedUrl,
@@ -17212,16 +17694,11 @@ const runCase = async (args: {
             : false,
       },
       sourceFamily,
-      thetaPlusKTrace:
-        thetaLane instanceof Float32Array && contractField instanceof Float32Array
-          ? computeThetaPlusKTraceConsistency(thetaLane, contractField)
-          : {
-              rms: null,
-              maxAbs: null,
-              mean: null,
-              sampleCount: 0,
-              consistent: false,
-            },
+      thetaPlusKTrace,
+      authoritativeLowExpansionGate: buildAuthoritativeLowExpansionGateFromSnapshot({
+        snapshot,
+        thetaPlusKTrace,
+      }),
     };
     offlineYorkAudit = computeOfflineYorkAudit({
       caseId: args.caseId,
@@ -17278,6 +17755,123 @@ const runCase = async (args: {
   return {
     ...caseCore,
     classificationFeatures: buildCaseClassificationFeatures(caseCore),
+  };
+};
+
+const buildAuthoritativeLowExpansionGateSummary = (args: {
+  cases: CaseResult[];
+}): ProofPackPayload["authoritativeLowExpansionGate"] => {
+  const nhm2Case = args.cases.find((entry) => entry.caseId === "nhm2_certified") ?? null;
+  const gate = nhm2Case?.snapshotMetrics?.authoritativeLowExpansionGate ?? null;
+  if (!nhm2Case || !gate) return undefined;
+  return {
+    sourceCaseId: nhm2Case.caseId,
+    status: gate.status,
+    reason: gate.reason,
+    source: gate.source,
+    authoritative: true,
+    divergenceObservable: gate.divergenceObservable,
+    divergenceRms: gate.divergenceRms,
+    divergenceMaxAbs: gate.divergenceMaxAbs,
+    divergenceTolerance: gate.divergenceTolerance,
+    thetaKConsistencyStatus: gate.thetaKConsistencyStatus,
+    thetaKResidualMaxAbs: gate.thetaKResidualMaxAbs,
+    thetaKTolerance: gate.thetaKTolerance,
+    projectionDerivedStatus: "advisory_only",
+    projectionDerivedNote:
+      "Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.",
+  };
+};
+
+const formatAuthoritativeLowExpansionGateProofPackNote = (
+  gate: NonNullable<ProofPackPayload["authoritativeLowExpansionGate"]>,
+): string =>
+  `authoritative_low_expansion_gate=${gate.status} source=${gate.source ?? "null"} divergence_rms=${gate.divergenceRms ?? "null"} divergence_max_abs=${gate.divergenceMaxAbs ?? "null"} theta_k_status=${gate.thetaKConsistencyStatus} reason=${gate.reason}`;
+
+const AUTHORITATIVE_LOW_EXPANSION_BLOCKED_NOTE =
+  "Natario-like morphology remains visible, but authoritative low-expansion classification is blocked until the brick-native div_beta gate passes on the same Lane A surface.";
+
+export const refreshProofPackAuthoritativeLowExpansionGate = async (
+  payload: ProofPackPayload,
+  options?: {
+    loadSnapshot?: (
+      ref: HullMetricVolumeRefV1,
+      timeoutMs?: number,
+    ) => Promise<HullScientificSnapshot>;
+  },
+): Promise<ProofPackPayload> => {
+  const nhm2Index = payload.cases.findIndex((entry) => entry.caseId === "nhm2_certified");
+  if (nhm2Index < 0) return payload;
+  const nhm2Case = payload.cases[nhm2Index];
+  if (!nhm2Case?.snapshotMetrics) return payload;
+  const loadSnapshot = options?.loadSnapshot ?? loadProofPackSnapshot;
+  const snapshot = await loadSnapshot(nhm2Case.metricVolumeRef, PROOF_PACK_SNAPSHOT_TIMEOUT_MS);
+  const thetaPlusKTrace =
+    nhm2Case.snapshotMetrics.thetaPlusKTrace ??
+    (snapshot.channels.theta?.data instanceof Float32Array &&
+    snapshot.channels.K_trace?.data instanceof Float32Array
+      ? computeThetaPlusKTraceConsistency(
+          snapshot.channels.theta.data,
+          snapshot.channels.K_trace.data,
+        )
+      : {
+          rms: null,
+          maxAbs: null,
+          mean: null,
+          sampleCount: 0,
+          consistent: false,
+        });
+  const authoritativeLowExpansionGate = buildAuthoritativeLowExpansionGateFromSnapshot({
+    snapshot,
+    thetaPlusKTrace,
+  });
+  const cases = payload.cases.map((entry, index) =>
+    index !== nhm2Index
+      ? entry
+      : {
+          ...entry,
+          snapshotMetrics: entry.snapshotMetrics
+            ? {
+                ...entry.snapshotMetrics,
+                thetaPlusKTrace,
+                authoritativeLowExpansionGate,
+              }
+            : entry.snapshotMetrics,
+        },
+  );
+  const authoritativeLowExpansionGateSummary = buildAuthoritativeLowExpansionGateSummary({
+    cases,
+  });
+  let notes = payload.notes.filter(
+    (entry) =>
+      !entry.startsWith("authoritative_low_expansion_gate=") &&
+      entry !== AUTHORITATIVE_LOW_EXPANSION_BLOCKED_NOTE &&
+      entry !==
+        "Projection-derived betaDiagnostics remain visible for comparison, but authoritative Natario-like low-expansion classification is gated only by brick-native div_beta plus theta/K consistency.",
+  );
+  if (authoritativeLowExpansionGateSummary) {
+    notes.push(
+      formatAuthoritativeLowExpansionGateProofPackNote(authoritativeLowExpansionGateSummary),
+    );
+    notes.push(authoritativeLowExpansionGateSummary.projectionDerivedNote);
+    if (
+      payload.classificationScoring?.winning_reference === "natario_control" &&
+      authoritativeLowExpansionGateSummary.status !== "pass"
+    ) {
+      notes.push(AUTHORITATIVE_LOW_EXPANSION_BLOCKED_NOTE);
+    }
+  }
+  const payloadBase: ProofPackPayload = {
+    ...payload,
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    cases,
+    authoritativeLowExpansionGate: authoritativeLowExpansionGateSummary,
+    notes,
+  };
+  return {
+    ...payloadBase,
+    checksum: computeChecksum(payloadBase),
   };
 };
 
@@ -17909,6 +18503,7 @@ export const decideControlFamilyVerdict = (args: {
   controlsCalibratedByReferences: boolean;
   classificationScoring: Nhm2ReferenceScoring | null;
   yorkCongruence?: YorkCongruenceEvaluation;
+  authoritativeLowExpansionGate?: ProofPackPayload["authoritativeLowExpansionGate"];
 }): DecisionVerdict => {
   if (!args.preconditions.readyForFamilyVerdict) return "inconclusive";
   const congruenceCalibrationFailed =
@@ -17927,6 +18522,9 @@ export const decideControlFamilyVerdict = (args: {
     return NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE;
   }
   if (args.classificationScoring.winning_reference === "natario_control") {
+    if (args.authoritativeLowExpansionGate?.status !== "pass") {
+      return "inconclusive";
+    }
     return NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE;
   }
   return NHM2_DIAGNOSTIC_OUTCOME.DISTINCT_NHM2_FAMILY;
@@ -23916,6 +24514,91 @@ export const enrichCurvatureInvariantRenderTaxonomy = (args: {
   }
 };
 
+const extractTransportSurfaceStatusSummary = (
+  sourceSurface: {
+    familyAuthorityStatus?: unknown;
+    transportCertificationStatus?: unknown;
+    shiftLapseTransportPromotionGate?: {
+      status?: unknown;
+      reason?: unknown;
+      authoritativeLowExpansionStatus?: unknown;
+      wallSafetyStatus?: unknown;
+      timingStatus?: unknown;
+      centerlineAlpha?: unknown;
+      centerlineDtauDt?: unknown;
+    } | null;
+  } | null | undefined,
+): ProofPackTransportSurfaceStatusSummary => {
+  const gate =
+    sourceSurface?.shiftLapseTransportPromotionGate &&
+    typeof sourceSurface.shiftLapseTransportPromotionGate === "object"
+      ? sourceSurface.shiftLapseTransportPromotionGate
+      : null;
+  return {
+    familyAuthorityStatus:
+      typeof sourceSurface?.familyAuthorityStatus === "string"
+        ? sourceSurface.familyAuthorityStatus
+        : null,
+    transportCertificationStatus:
+      typeof sourceSurface?.transportCertificationStatus === "string"
+        ? sourceSurface.transportCertificationStatus
+        : null,
+    shiftLapseTransportPromotionGateStatus:
+      typeof gate?.status === "string" ? gate.status : null,
+    shiftLapseTransportPromotionGateReason:
+      typeof gate?.reason === "string" ? gate.reason : null,
+    shiftLapseAuthoritativeLowExpansionStatus:
+      typeof gate?.authoritativeLowExpansionStatus === "string"
+        ? gate.authoritativeLowExpansionStatus
+        : null,
+    shiftLapseWallSafetyStatus:
+      typeof gate?.wallSafetyStatus === "string" ? gate.wallSafetyStatus : null,
+    shiftLapseTimingStatus:
+      typeof gate?.timingStatus === "string" ? gate.timingStatus : null,
+    shiftLapseCenterlineAlpha:
+      typeof gate?.centerlineAlpha === "number" && Number.isFinite(gate.centerlineAlpha)
+        ? gate.centerlineAlpha
+        : null,
+    shiftLapseCenterlineDtauDt:
+      typeof gate?.centerlineDtauDt === "number" && Number.isFinite(gate.centerlineDtauDt)
+        ? gate.centerlineDtauDt
+        : null,
+  };
+};
+
+const emptyTransportSurfaceStatusSummary = (): ProofPackTransportSurfaceStatusSummary => ({
+  familyAuthorityStatus: null,
+  transportCertificationStatus: null,
+  shiftLapseTransportPromotionGateStatus: null,
+  shiftLapseTransportPromotionGateReason: null,
+  shiftLapseAuthoritativeLowExpansionStatus: null,
+  shiftLapseWallSafetyStatus: null,
+  shiftLapseTimingStatus: null,
+  shiftLapseCenterlineAlpha: null,
+  shiftLapseCenterlineDtauDt: null,
+});
+
+const resolveTransportSurfaceStatusSummary = (
+  summary: ProofPackTransportSurfaceStatusSummary | null | undefined,
+): ProofPackTransportSurfaceStatusSummary => summary ?? emptyTransportSurfaceStatusSummary();
+
+const buildTransportSurfaceStatusMarkdownRows = (
+  summary: ProofPackTransportSurfaceStatusSummary | null | undefined,
+): string[] => {
+  const resolved = resolveTransportSurfaceStatusSummary(summary);
+  return [
+    `| familyAuthorityStatus | ${resolved.familyAuthorityStatus ?? "null"} |`,
+    `| transportCertificationStatus | ${resolved.transportCertificationStatus ?? "null"} |`,
+    `| shiftLapseTransportPromotionGateStatus | ${resolved.shiftLapseTransportPromotionGateStatus ?? "null"} |`,
+    `| shiftLapseTransportPromotionGateReason | ${resolved.shiftLapseTransportPromotionGateReason ?? "null"} |`,
+    `| shiftLapseAuthoritativeLowExpansionStatus | ${resolved.shiftLapseAuthoritativeLowExpansionStatus ?? "null"} |`,
+    `| shiftLapseWallSafetyStatus | ${resolved.shiftLapseWallSafetyStatus ?? "null"} |`,
+    `| shiftLapseTimingStatus | ${resolved.shiftLapseTimingStatus ?? "null"} |`,
+    `| shiftLapseCenterlineAlpha | ${resolved.shiftLapseCenterlineAlpha ?? "null"} |`,
+    `| shiftLapseCenterlineDtauDt | ${resolved.shiftLapseCenterlineDtauDt ?? "null"} |`,
+  ];
+};
+
 const computeWarpWorldlineProofChecksum = (
   payload: Nhm2WarpWorldlineProofArtifact,
 ): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -23952,6 +24635,9 @@ const buildWarpWorldlineProofPackSummary = (args: {
   routeTimeStatus: "deferred",
   transportInterpretation:
     args.artifact.transportInterpretation.effectiveTransportInterpretation,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
   reportPath: normalizePath(args.reportPath),
@@ -23959,8 +24645,12 @@ const buildWarpWorldlineProofPackSummary = (args: {
 
 const formatWarpWorldlineProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["warpWorldlineSummary"]>;
-}): string =>
-  `warp_worldline_status=${args.summary.status} certified=${String(args.summary.certified)} source_surface=${args.summary.sourceSurface} sample_count=${args.summary.sampleCount} route_time=${args.summary.routeTimeStatus}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `warp_worldline_status=${args.summary.status} certified=${String(args.summary.certified)} source_surface=${args.summary.sourceSurface} sample_count=${args.summary.sampleCount} route_time=${args.summary.routeTimeStatus} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyWarpWorldlineSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24021,6 +24711,9 @@ const buildCruisePreflightProofPackSummary = (args: {
   sampleFamilyAdequacy: args.artifact.sampleFamilyAdequacy,
   transportVariationStatus: args.artifact.transportVariationStatus,
   routeTimeStatus: args.artifact.routeTimeStatus,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   eligibleNextProducts: [...args.artifact.eligibleNextProducts],
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
@@ -24029,8 +24722,12 @@ const buildCruisePreflightProofPackSummary = (args: {
 
 const formatCruisePreflightProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["cruisePreflightSummary"]>;
-}): string =>
-  `cruise_preflight_status=${args.summary.cruisePreflightStatus} quantity=${args.summary.preflightQuantityId} candidate_count=${args.summary.candidateCount} admissible_count=${args.summary.admissibleCount} route_time=${args.summary.routeTimeStatus}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `cruise_preflight_status=${args.summary.cruisePreflightStatus} quantity=${args.summary.preflightQuantityId} candidate_count=${args.summary.candidateCount} admissible_count=${args.summary.admissibleCount} route_time=${args.summary.routeTimeStatus} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyCruisePreflightSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24096,6 +24793,9 @@ const buildRouteTimeWorldlineProofPackSummary = (args: {
   sampleFamilyAdequacy: args.artifact.sampleFamilyAdequacy,
   transportVariationStatus: args.artifact.transportVariationStatus,
   routeTimeStatus: args.artifact.routeTimeStatus,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   nextEligibleProducts: [...args.artifact.nextEligibleProducts],
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
@@ -24104,8 +24804,12 @@ const buildRouteTimeWorldlineProofPackSummary = (args: {
 
 const formatRouteTimeWorldlineProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["routeTimeWorldlineSummary"]>;
-}): string =>
-  `route_time_worldline_status=${args.summary.routeTimeWorldlineStatus} route_model=${args.summary.routeModelId} progression_samples=${args.summary.progressionSampleCount} route_time=${args.summary.routeTimeStatus}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `route_time_worldline_status=${args.summary.routeTimeWorldlineStatus} route_model=${args.summary.routeModelId} progression_samples=${args.summary.progressionSampleCount} route_time=${args.summary.routeTimeStatus} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyRouteTimeWorldlineSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24168,6 +24872,9 @@ const buildMissionTimeEstimatorProofPackSummary = (args: {
     units: { ...args.artifact.properTimeEstimate.units },
   },
   routeTimeStatus: args.artifact.routeTimeStatus,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   nextEligibleProducts: [...args.artifact.nextEligibleProducts],
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
@@ -24176,8 +24883,12 @@ const buildMissionTimeEstimatorProofPackSummary = (args: {
 
 const formatMissionTimeEstimatorProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["missionTimeEstimatorSummary"]>;
-}): string =>
-  `mission_time_estimator_status=${args.summary.missionTimeEstimatorStatus} target=${args.summary.targetId} route_time=${args.summary.routeTimeStatus} coordinate_years=${args.summary.coordinateTimeEstimate.years}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `mission_time_estimator_status=${args.summary.missionTimeEstimatorStatus} target=${args.summary.targetId} route_time=${args.summary.routeTimeStatus} coordinate_years=${args.summary.coordinateTimeEstimate.years} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyMissionTimeEstimatorSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24238,6 +24949,9 @@ const buildMissionTimeComparisonProofPackSummary = (args: {
   comparisonInterpretationStatus:
     args.artifact.comparisonMetrics.interpretationStatus,
   comparisonReadiness: args.artifact.comparisonReadiness,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   deferredComparators: [...args.artifact.deferredComparators],
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
@@ -24246,8 +24960,12 @@ const buildMissionTimeComparisonProofPackSummary = (args: {
 
 const formatMissionTimeComparisonProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["missionTimeComparisonSummary"]>;
-}): string =>
-  `mission_time_comparison_status=${args.summary.missionTimeComparisonStatus} target=${args.summary.targetId} interpretation=${args.summary.comparisonInterpretationStatus} proper_minus_coordinate_seconds=${args.summary.properMinusCoordinateSeconds}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `mission_time_comparison_status=${args.summary.missionTimeComparisonStatus} target=${args.summary.targetId} interpretation=${args.summary.comparisonInterpretationStatus} proper_minus_coordinate_seconds=${args.summary.properMinusCoordinateSeconds} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyMissionTimeComparisonSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24307,6 +25025,9 @@ const buildCruiseEnvelopeProofPackSummary = (args: {
   comparisonConsistencyStatus: args.artifact.comparisonConsistencyStatus,
   routeTimeStatus: args.artifact.routeTimeStatus,
   missionTimeStatus: args.artifact.missionTimeStatus,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
   reportPath: normalizePath(args.reportPath),
@@ -24314,8 +25035,12 @@ const buildCruiseEnvelopeProofPackSummary = (args: {
 
 const formatCruiseEnvelopeProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["cruiseEnvelopeSummary"]>;
-}): string =>
-  `cruise_envelope_status=${args.summary.cruiseEnvelopeStatus} quantity=${args.summary.envelopeQuantityId} representative_value=${args.summary.representativeValue} comparison_consistency=${args.summary.comparisonConsistencyStatus}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `cruise_envelope_status=${args.summary.cruiseEnvelopeStatus} quantity=${args.summary.envelopeQuantityId} representative_value=${args.summary.representativeValue} comparison_consistency=${args.summary.comparisonConsistencyStatus} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyCruiseEnvelopeSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24370,6 +25095,9 @@ const buildInHullProperAccelerationProofPackSummary = (args: {
   max_mps2: args.artifact.profileSummary.max_mps2,
   resolutionAdequacy: args.artifact.resolutionAdequacy.status,
   fallbackUsed: args.artifact.fallbackUsed,
+  transportSurfaceStatus: extractTransportSurfaceStatusSummary(
+    args.artifact.sourceSurface,
+  ),
   nonClaims: [...args.artifact.nonClaims],
   artifactPath: normalizePath(args.artifactPath),
   reportPath: normalizePath(args.reportPath),
@@ -24377,8 +25105,12 @@ const buildInHullProperAccelerationProofPackSummary = (args: {
 
 const formatInHullProperAccelerationProofPackSummary = (args: {
   summary: NonNullable<ProofPackPayload["inHullProperAccelerationSummary"]>;
-}): string =>
-  `in_hull_proper_acceleration_status=${args.summary.inHullProperAccelerationStatus} observer=${args.summary.observerFamily} representative_mps2=${args.summary.representative_mps2} resolution=${args.summary.resolutionAdequacy}`;
+}): string => {
+  const transportSurfaceStatus = resolveTransportSurfaceStatusSummary(
+    args.summary.transportSurfaceStatus,
+  );
+  return `in_hull_proper_acceleration_status=${args.summary.inHullProperAccelerationStatus} observer=${args.summary.observerFamily} representative_mps2=${args.summary.representative_mps2} resolution=${args.summary.resolutionAdequacy} transport_cert=${transportSurfaceStatus.transportCertificationStatus ?? "null"} shift_lapse_gate=${transportSurfaceStatus.shiftLapseTransportPromotionGateStatus ?? "null"}`;
+};
 
 const applyInHullProperAccelerationSummaryToProofPackPayload = (args: {
   payload: ProofPackPayload;
@@ -24579,6 +25311,9 @@ export const buildNhm2WarpWorldlineProofArtifact = (args: {
 export const renderNhm2WarpWorldlineProofMarkdown = (
   payload: Nhm2WarpWorldlineProofArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const sampleRows = payload.sampleSummaries
     .map(
       (entry) =>
@@ -24606,6 +25341,7 @@ export const renderNhm2WarpWorldlineProofMarkdown = (
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
 | metricT00Ref | ${payload.sourceSurface.metricT00Ref} |
 | metricFamily | ${payload.sourceSurface.metricFamily} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
 | observerFamily | ${payload.chart.observerFamily} |
@@ -24739,6 +25475,9 @@ export const buildNhm2CruiseEnvelopePreflightArtifact = (args: {
 export const renderNhm2CruiseEnvelopePreflightMarkdown = (
   payload: Nhm2CruiseEnvelopePreflightArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const candidateRows = payload.candidateSet
     .map(
       (entry) =>
@@ -24766,6 +25505,7 @@ export const renderNhm2CruiseEnvelopePreflightMarkdown = (
 | certified | ${String(payload.certified)} |
 | sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | observerFamily | ${payload.chart.observerFamily} |
 | validityRegimeId | ${payload.chart.validityRegimeId} |
@@ -24890,6 +25630,9 @@ export const buildNhm2RouteTimeWorldlineArtifact = (args: {
 export const renderNhm2RouteTimeWorldlineMarkdown = (
   payload: Nhm2RouteTimeWorldlineArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const progressionRows = payload.progressionSamples
     .map(
       (entry) =>
@@ -24917,6 +25660,7 @@ export const renderNhm2RouteTimeWorldlineMarkdown = (
 | sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
 | sourceCruisePreflightContractVersion | ${payload.sourceCruisePreflightContractVersion} |
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
 | observerFamily | ${payload.chart.observerFamily} |
@@ -25052,6 +25796,9 @@ export const buildNhm2MissionTimeEstimatorArtifact = (args: {
 export const renderNhm2MissionTimeEstimatorMarkdown = (
   payload: Nhm2MissionTimeEstimatorArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const assumptions = payload.estimatorAssumptions.map((entry) => `- ${entry}`).join("\n");
   const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
   const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
@@ -25076,6 +25823,7 @@ export const renderNhm2MissionTimeEstimatorMarkdown = (
 | sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
 | targetDistanceContractVersion | ${payload.targetDistanceContractVersion} |
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
 | observerFamily | ${payload.chart.observerFamily} |
@@ -25202,6 +25950,9 @@ export const buildNhm2MissionTimeComparisonArtifact = (args: {
 export const renderNhm2MissionTimeComparisonMarkdown = (
   payload: Nhm2MissionTimeComparisonArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
   const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
   const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
@@ -25226,6 +25977,7 @@ export const renderNhm2MissionTimeComparisonMarkdown = (
 | sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
 | targetDistanceContractVersion | ${payload.targetDistanceContractVersion} |
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
 | observerFamily | ${payload.chart.observerFamily} |
@@ -25353,6 +26105,9 @@ export const buildNhm2CruiseEnvelopeArtifact = (args: {
 export const renderNhm2CruiseEnvelopeMarkdown = (
   payload: Nhm2CruiseEnvelopeArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const admissibilityReasons = payload.admissibilityReasons
     .map((entry) => `- ${entry}`)
     .join("\n");
@@ -25379,6 +26134,7 @@ export const renderNhm2CruiseEnvelopeMarkdown = (
 | sourceMissionTimeComparisonContractVersion | ${payload.sourceMissionTimeComparisonContractVersion} |
 | sourceWorldlineContractVersion | ${payload.sourceWorldlineContractVersion} |
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
 | observerFamily | ${payload.chart.observerFamily} |
@@ -25500,6 +26256,9 @@ export const buildNhm2InHullProperAccelerationArtifact = (args: {
 export const renderNhm2InHullProperAccelerationMarkdown = (
   payload: Nhm2InHullProperAccelerationArtifact,
 ): string => {
+  const transportSurfaceRows = buildTransportSurfaceStatusMarkdownRows(
+    extractTransportSurfaceStatusSummary(payload.sourceSurface),
+  ).join("\n");
   const claimBoundary = payload.claimBoundary.map((entry) => `- ${entry}`).join("\n");
   const falsifiers = payload.falsifierConditions.map((entry) => `- ${entry}`).join("\n");
   const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
@@ -25521,6 +26280,7 @@ export const renderNhm2InHullProperAccelerationMarkdown = (
 | status | ${payload.status} |
 | certified | ${String(payload.certified)} |
 | sourceSurface | ${payload.sourceSurface.surfaceId} |
+${transportSurfaceRows}
 | chart | ${payload.chart.label} |
 | coordinateMap | ${payload.chart.coordinateMap ?? "null"} |
 | observerFamily | ${payload.chart.observerFamily} |
@@ -25819,6 +26579,322 @@ ${nonClaims}
 `;
 };
 
+const LEGACY_SHIFT_LAPSE_TRANSPORT_FAIL_TOKEN =
+  "reference_only_shift_lapse_family_selected";
+
+const hasLegacyShiftLapseTransportFailToken = (value: unknown): boolean => {
+  if (!value || typeof value !== "object") return false;
+  const falsifierConditions = (value as { falsifierConditions?: unknown }).falsifierConditions;
+  return (
+    Array.isArray(falsifierConditions) &&
+    falsifierConditions.includes(LEGACY_SHIFT_LAPSE_TRANSPORT_FAIL_TOKEN)
+  );
+};
+
+const normalizePublicationRequestSelectors = (
+  selectors?: Partial<ControlRequestSelectors> | null,
+): ControlRequestSelectors => ({
+  metricT00Ref:
+    typeof selectors?.metricT00Ref === "string" && selectors.metricT00Ref.trim().length > 0
+      ? selectors.metricT00Ref
+      : null,
+  metricT00Source:
+    typeof selectors?.metricT00Source === "string" &&
+    selectors.metricT00Source.trim().length > 0
+      ? selectors.metricT00Source
+      : null,
+  requireCongruentSolve: selectors?.requireCongruentSolve === true,
+  requireNhm2CongruentFullSolve:
+    selectors?.requireNhm2CongruentFullSolve === true,
+  warpFieldType:
+    typeof selectors?.warpFieldType === "string" && selectors.warpFieldType.trim().length > 0
+      ? selectors.warpFieldType
+      : null,
+  shiftLapseProfileId:
+    typeof selectors?.shiftLapseProfileId === "string" &&
+    selectors.shiftLapseProfileId.trim().length > 0
+      ? selectors.shiftLapseProfileId
+      : null,
+});
+
+const hasMeaningfulPublicationRequestSelectors = (
+  selectors?: Partial<ControlRequestSelectors> | null,
+): boolean => {
+  const normalized = normalizePublicationRequestSelectors(selectors);
+  return Boolean(
+    normalized.metricT00Ref ||
+      normalized.metricT00Source ||
+      normalized.warpFieldType ||
+      normalized.shiftLapseProfileId ||
+      normalized.requireCongruentSolve ||
+      normalized.requireNhm2CongruentFullSolve,
+  );
+};
+
+const buildPipelinePublicationUrl = (
+  baseUrl: string,
+  selectors?: Partial<ControlRequestSelectors> | null,
+): string => {
+  const url = new URL("/api/helix/pipeline", normalizeBaseUrl(baseUrl));
+  const normalized = normalizePublicationRequestSelectors(selectors);
+  if (normalized.metricT00Ref) {
+    url.searchParams.set("metricT00Ref", normalized.metricT00Ref);
+  }
+  if (normalized.metricT00Source) {
+    url.searchParams.set("metricT00Source", normalized.metricT00Source);
+  }
+  if (normalized.warpFieldType) {
+    url.searchParams.set("warpFieldType", normalized.warpFieldType);
+  }
+  if (normalized.shiftLapseProfileId) {
+    url.searchParams.set("shiftLapseProfileId", normalized.shiftLapseProfileId);
+  }
+  if (normalized.requireCongruentSolve) {
+    url.searchParams.set("requireCongruentSolve", "1");
+  }
+  if (normalized.requireNhm2CongruentFullSolve) {
+    url.searchParams.set("requireNhm2CongruentFullSolve", "1");
+  }
+  return url.toString();
+};
+
+const resolvePublicationSurfaceRecord = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const sourceSurface =
+    record.sourceSurface && typeof record.sourceSurface === "object"
+      ? (record.sourceSurface as Record<string, unknown>)
+      : null;
+  return sourceSurface ?? record;
+};
+
+const resolvePublicationSurfaceWarpFieldType = (
+  sourceSurface: Record<string, unknown> | null,
+): string | null => {
+  if (!sourceSurface) return null;
+  if (
+    typeof sourceSurface.metricFamily === "string" &&
+    sourceSurface.metricFamily.trim().length > 0
+  ) {
+    return String(sourceSurface.metricFamily);
+  }
+  if (
+    typeof sourceSurface.warpFieldType === "string" &&
+    sourceSurface.warpFieldType.trim().length > 0
+  ) {
+    return String(sourceSurface.warpFieldType);
+  }
+  if (
+    typeof sourceSurface.metricT00Ref === "string" &&
+    sourceSurface.metricT00Ref.includes("shift_lapse")
+  ) {
+    return "nhm2_shift_lapse";
+  }
+  if (
+    typeof sourceSurface.metricT00Ref === "string" &&
+    sourceSurface.metricT00Ref.includes("natario_sdf")
+  ) {
+    return "natario_sdf";
+  }
+  return null;
+};
+
+const publicationSurfaceMatchesRequestSelectors = (
+  value: unknown,
+  selectors?: Partial<ControlRequestSelectors> | null,
+): boolean => {
+  if (!hasMeaningfulPublicationRequestSelectors(selectors)) return true;
+  const normalized = normalizePublicationRequestSelectors(selectors);
+  const sourceSurface = resolvePublicationSurfaceRecord(value);
+  if (!sourceSurface) return false;
+  if (
+    normalized.metricT00Ref &&
+    sourceSurface.metricT00Ref !== normalized.metricT00Ref
+  ) {
+    return false;
+  }
+  if (
+    normalized.metricT00Source &&
+    sourceSurface.metricT00Source !== normalized.metricT00Source
+  ) {
+    return false;
+  }
+  if (normalized.warpFieldType) {
+    const resolvedWarpFieldType = resolvePublicationSurfaceWarpFieldType(sourceSurface);
+    if (resolvedWarpFieldType !== normalized.warpFieldType) {
+      return false;
+    }
+  }
+  if (normalized.shiftLapseProfileId) {
+    const sourceSurfaceProfileId =
+      typeof sourceSurface.shiftLapseProfileId === "string" &&
+      sourceSurface.shiftLapseProfileId.length > 0
+        ? String(sourceSurface.shiftLapseProfileId)
+        : sourceSurface.shiftLapseTransportPromotionGate &&
+            typeof sourceSurface.shiftLapseTransportPromotionGate === "object" &&
+            typeof (sourceSurface.shiftLapseTransportPromotionGate as Record<string, unknown>)
+              .shiftLapseProfileId === "string"
+          ? String(
+              (sourceSurface.shiftLapseTransportPromotionGate as Record<string, unknown>)
+                .shiftLapseProfileId,
+            )
+          : null;
+    if (sourceSurfaceProfileId !== normalized.shiftLapseProfileId) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const selectorsRequireShiftLapseAuthoritativePublication = (
+  selectors?: Partial<ControlRequestSelectors> | null,
+): boolean => {
+  const normalized = normalizePublicationRequestSelectors(selectors);
+  return (
+    normalized.warpFieldType === "nhm2_shift_lapse" ||
+    normalized.metricT00Ref?.includes("shift_lapse") === true
+  );
+};
+
+const stateHasGateAdmittedSelectedTransportSurface = (
+  state: Record<string, unknown>,
+  selectors?: Partial<ControlRequestSelectors> | null,
+): boolean => {
+  const transportSurfaceKeys = [
+    "warpWorldline",
+    "warpCruiseEnvelopePreflight",
+    "warpRouteTimeWorldline",
+    "warpMissionTimeEstimator",
+    "warpMissionTimeComparison",
+    "warpCruiseEnvelope",
+    "warpInHullProperAcceleration",
+  ] as const;
+  return transportSurfaceKeys.some((key) => {
+    const candidate = state[key];
+    if (!candidate || typeof candidate !== "object") return false;
+    const sourceSurface = resolvePublicationSurfaceRecord(
+      candidate as Record<string, unknown>,
+    );
+    if (!sourceSurface) return false;
+    if (!publicationSurfaceMatchesRequestSelectors(sourceSurface, selectors)) {
+      return false;
+    }
+    return (
+      sourceSurface.transportCertificationStatus ===
+      "bounded_transport_proof_bearing_gate_admitted"
+    );
+  });
+};
+
+const maybeRefreshAuthoritativeShiftLapseDiagnosticsForPublication = async (
+  pipelineModule: typeof import("../server/energy-pipeline.ts"),
+  state: Record<string, unknown>,
+  selectors?: Partial<ControlRequestSelectors> | null,
+): Promise<Record<string, unknown>> => {
+  if (!selectorsRequireShiftLapseAuthoritativePublication(selectors)) {
+    return state;
+  }
+  const gate =
+    state.shiftLapseTransportPromotionGate &&
+    typeof state.shiftLapseTransportPromotionGate === "object"
+      ? (state.shiftLapseTransportPromotionGate as Record<string, unknown>)
+      : null;
+  const gateStatus = typeof gate?.status === "string" ? String(gate.status) : null;
+  const gateReason = typeof gate?.reason === "string" ? String(gate.reason) : null;
+  const gr = state.gr && typeof state.gr === "object" ? state.gr : null;
+  if (
+    gateStatus === "pass" ||
+    gr ||
+    stateHasGateAdmittedSelectedTransportSurface(state, selectors)
+  ) {
+    return state;
+  }
+  if (
+    gateReason &&
+    gateReason !== "authoritative_gr_diagnostics_missing" &&
+    gateReason !== "brick_native_div_beta_missing" &&
+    gateReason !== "brick_native_theta_k_missing" &&
+    gateReason !== "authoritative_wall_safety_missing" &&
+    gateReason !== "beta_over_alpha_max_missing" &&
+    gateReason !== "beta_outward_over_alpha_wall_max_missing" &&
+    gateReason !== "wall_horizon_margin_missing"
+  ) {
+    return state;
+  }
+  const normalized = normalizePublicationRequestSelectors(selectors);
+  const grBrickModule = await import("../server/gr-evolve-brick.ts");
+  const mutableState = state as Record<string, unknown>;
+  mutableState.grEnabled = true;
+  pipelineModule.setGlobalPipelineState?.(mutableState as any);
+  const brick = grBrickModule.buildGrEvolveBrick({
+    useInitialData: true,
+    sourceParams: {
+      metricT00Ref: normalized.metricT00Ref ?? undefined,
+      metricT00Source: normalized.metricT00Source ?? undefined,
+      warpFieldType:
+        normalized.warpFieldType === "nhm2_shift_lapse"
+          ? "nhm2_shift_lapse"
+          : undefined,
+    },
+  });
+  const metricAdapter =
+    mutableState.warp &&
+    typeof mutableState.warp === "object" &&
+    (mutableState.warp as Record<string, unknown>).metricAdapter
+      ? ((mutableState.warp as Record<string, unknown>).metricAdapter as any)
+      : null;
+  mutableState.gr = grBrickModule.buildGrDiagnostics(brick, { metricAdapter });
+  const refreshedState = await pipelineModule.calculateEnergyPipeline(mutableState as any);
+  pipelineModule.setGlobalPipelineState?.(refreshedState);
+  return refreshedState as Record<string, unknown>;
+};
+
+const refreshPipelineStateForPublication = async (
+  selectors?: Partial<ControlRequestSelectors> | null,
+): Promise<Record<string, unknown>> => {
+  const pipelineModule = await import("../server/energy-pipeline.ts");
+  const baseState =
+    pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
+  const nextState = { ...baseState } as Record<string, unknown>;
+  if (!hasMeaningfulPublicationRequestSelectors(selectors)) {
+    const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
+    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    return refreshedState as Record<string, unknown>;
+  }
+  const normalized = normalizePublicationRequestSelectors(selectors);
+  if (normalized.warpFieldType) {
+    nextState.warpFieldType = normalized.warpFieldType;
+    nextState.dynamicConfig = {
+      ...((nextState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+      warpFieldType: normalized.warpFieldType,
+    };
+  }
+  if (normalized.shiftLapseProfileId) {
+    nextState.dynamicConfig = {
+      ...((nextState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+      shiftLapseProfileId: normalized.shiftLapseProfileId,
+    };
+  }
+  if (normalized.metricT00Ref || normalized.metricT00Source) {
+    nextState.warp = {
+      ...((nextState.warp as Record<string, unknown> | undefined) ?? {}),
+      ...(normalized.metricT00Ref ? { metricT00Ref: normalized.metricT00Ref } : {}),
+      ...(normalized.metricT00Source
+        ? { metricT00Source: normalized.metricT00Source }
+        : {}),
+    };
+  }
+  const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
+  pipelineModule.setGlobalPipelineState?.(refreshedState);
+  return maybeRefreshAuthoritativeShiftLapseDiagnosticsForPublication(
+    pipelineModule,
+    refreshedState as Record<string, unknown>,
+    normalized,
+  );
+};
+
 export const publishNhm2WarpWorldlineProofLatest = async (options?: {
   baseUrl?: string;
   outJsonPath?: string;
@@ -25826,7 +26902,10 @@ export const publishNhm2WarpWorldlineProofLatest = async (options?: {
   outMdPath?: string;
   latestMdPath?: string;
   sourceAuditArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
+  publishDownstream?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -25860,6 +26939,7 @@ export const publishNhm2WarpWorldlineProofLatest = async (options?: {
     operation: "publish-worldline-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath = options?.outJsonPath ?? DEFAULT_WARP_WORLDLINE_PROOF_OUT_JSON;
   const latestJsonPath = options?.latestJsonPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON;
   const outMdPath = options?.outMdPath ?? DEFAULT_WARP_WORLDLINE_PROOF_OUT_MD;
@@ -25867,7 +26947,7 @@ export const publishNhm2WarpWorldlineProofLatest = async (options?: {
   let warpWorldline: unknown = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -25881,15 +26961,21 @@ export const publishNhm2WarpWorldlineProofLatest = async (options?: {
   } catch {
     warpWorldline = null;
   }
-  if (!isCertifiedWarpWorldlineContract(warpWorldline)) {
-    const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
-    warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
+  if (
+    !isCertifiedWarpWorldlineContract(warpWorldline) ||
+    hasLegacyShiftLapseTransportFailToken(warpWorldline) ||
+    !publicationSurfaceMatchesRequestSelectors(warpWorldline, options?.requestSelectors)
+  ) {
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
+    warpWorldline = refreshedState.warpWorldline;
   }
-  if (!isCertifiedWarpWorldlineContract(warpWorldline)) {
+  if (
+    !isCertifiedWarpWorldlineContract(warpWorldline) ||
+    hasLegacyShiftLapseTransportFailToken(warpWorldline) ||
+    !publicationSurfaceMatchesRequestSelectors(warpWorldline, options?.requestSelectors)
+  ) {
     throw new Error("certified_warp_worldline_missing");
   }
   const artifact = buildNhm2WarpWorldlineProofArtifact({
@@ -25906,7 +26992,7 @@ export const publishNhm2WarpWorldlineProofLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(fs.readFileSync(DEFAULT_LATEST_JSON, "utf8")) as ProofPackPayload;
     if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
       const updatedPayload = applyWarpWorldlineSummaryToProofPackPayload({
@@ -25920,12 +27006,16 @@ export const publishNhm2WarpWorldlineProofLatest = async (options?: {
       fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
     }
   }
-  const cruisePreflight = await publishNhm2CruiseEnvelopePreflightLatest({
-    baseUrl,
-    sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
-    sourceWorldlineArtifactPath: latestJsonPath,
-    publicationLockPath: options?.publicationLockPath,
-  });
+  const cruisePreflight =
+    options?.publishDownstream === false
+      ? undefined
+        : await publishNhm2CruiseEnvelopePreflightLatest({
+          baseUrl,
+          sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
+          sourceWorldlineArtifactPath: latestJsonPath,
+          publicationLockPath: options?.publicationLockPath,
+          requestSelectors: options?.requestSelectors,
+        });
   return {
     outJsonPath,
     latestJsonPath,
@@ -25946,7 +27036,10 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
   latestMdPath?: string;
   sourceAuditArtifactPath?: string | null;
   sourceWorldlineArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
+  publishDownstream?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -25973,6 +27066,7 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
     operation: "publish-cruise-preflight-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath = options?.outJsonPath ?? DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_JSON;
   const latestJsonPath =
     options?.latestJsonPath ?? DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON;
@@ -25982,7 +27076,7 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
   let warpWorldline: unknown = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -26004,12 +27098,13 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
   ) {
     preflight = buildWarpCruiseEnvelopePreflightContractFromWorldline(warpWorldline);
   }
-  if (!isCertifiedWarpCruiseEnvelopePreflightContract(preflight)) {
-    const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
+  if (
+    !isCertifiedWarpCruiseEnvelopePreflightContract(preflight) ||
+    !publicationSurfaceMatchesRequestSelectors(preflight, options?.requestSelectors)
+  ) {
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
     preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
     warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
   }
@@ -26019,7 +27114,10 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
   ) {
     preflight = buildWarpCruiseEnvelopePreflightContractFromWorldline(warpWorldline);
   }
-  if (!isCertifiedWarpCruiseEnvelopePreflightContract(preflight)) {
+  if (
+    !isCertifiedWarpCruiseEnvelopePreflightContract(preflight) ||
+    !publicationSurfaceMatchesRequestSelectors(preflight, options?.requestSelectors)
+  ) {
     throw new Error("certified_cruise_preflight_missing");
   }
 
@@ -26039,7 +27137,7 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(fs.readFileSync(DEFAULT_LATEST_JSON, "utf8")) as ProofPackPayload;
     if (existingPayload.artifactType === "warp_york_control_family_proof_pack/v1") {
       const updatedPayload = applyCruisePreflightSummaryToProofPackPayload({
@@ -26053,13 +27151,18 @@ export const publishNhm2CruiseEnvelopePreflightLatest = async (options?: {
       fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
     }
   }
-  const routeTime = await publishNhm2RouteTimeWorldlineLatest({
+  const routeTime =
+    options?.publishDownstream === false
+      ? undefined
+      : await publishNhm2RouteTimeWorldlineLatest({
     baseUrl,
     sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
     sourceWorldlineArtifactPath:
       options?.sourceWorldlineArtifactPath ?? DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
     sourceCruisePreflightArtifactPath: latestJsonPath,
+    updateProofPackLatest: options?.updateProofPackLatest,
     publicationLockPath: options?.publicationLockPath,
+    requestSelectors: options?.requestSelectors,
   });
   return {
     outJsonPath,
@@ -26082,7 +27185,10 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
   sourceAuditArtifactPath?: string | null;
   sourceWorldlineArtifactPath?: string | null;
   sourceCruisePreflightArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
+  publishDownstream?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -26102,6 +27208,7 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
     operation: "publish-route-time-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath = options?.outJsonPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_OUT_JSON;
   const latestJsonPath = options?.latestJsonPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON;
   const outMdPath = options?.outMdPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_OUT_MD;
@@ -26111,7 +27218,7 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
   let warpWorldline: unknown = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -26139,12 +27246,13 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
       preflight,
     });
   }
-  if (!isCertifiedWarpRouteTimeWorldlineContract(routeTime)) {
-    const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
+  if (
+    !isCertifiedWarpRouteTimeWorldlineContract(routeTime) ||
+    !publicationSurfaceMatchesRequestSelectors(routeTime, options?.requestSelectors)
+  ) {
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
     routeTime = (refreshedState as Record<string, unknown>).warpRouteTimeWorldline;
     preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
     warpWorldline = (refreshedState as Record<string, unknown>).warpWorldline;
@@ -26159,7 +27267,10 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
       preflight,
     });
   }
-  if (!isCertifiedWarpRouteTimeWorldlineContract(routeTime)) {
+  if (
+    !isCertifiedWarpRouteTimeWorldlineContract(routeTime) ||
+    !publicationSurfaceMatchesRequestSelectors(routeTime, options?.requestSelectors)
+  ) {
     throw new Error("certified_route_time_worldline_missing");
   }
 
@@ -26182,7 +27293,7 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(
       fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
     ) as ProofPackPayload;
@@ -26198,7 +27309,10 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
       fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
     }
   }
-  const missionTime = await publishNhm2MissionTimeEstimatorLatest({
+  const missionTime =
+    options?.publishDownstream === false
+      ? undefined
+      : await publishNhm2MissionTimeEstimatorLatest({
     baseUrl,
     sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
     sourceWorldlineArtifactPath:
@@ -26207,7 +27321,9 @@ export const publishNhm2RouteTimeWorldlineLatest = async (options?: {
       options?.sourceCruisePreflightArtifactPath ??
       DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
     sourceRouteTimeArtifactPath: latestJsonPath,
+    updateProofPackLatest: options?.updateProofPackLatest,
     publicationLockPath: options?.publicationLockPath,
+    requestSelectors: options?.requestSelectors,
   });
   return {
     outJsonPath,
@@ -26231,7 +27347,10 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
   sourceWorldlineArtifactPath?: string | null;
   sourceCruisePreflightArtifactPath?: string | null;
   sourceRouteTimeArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
+  publishDownstream?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -26251,6 +27370,7 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
     operation: "publish-mission-time-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath =
     options?.outJsonPath ?? DEFAULT_MISSION_TIME_ESTIMATOR_OUT_JSON;
   const latestJsonPath =
@@ -26265,7 +27385,7 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
   let targetDistance: WarpMissionTargetDistanceContractV1 | null = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -26285,12 +27405,17 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
     preflight = null;
     warpWorldline = null;
   }
-  if (!isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)) {
+  if (
+    !isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator) ||
+    !publicationSurfaceMatchesRequestSelectors(
+      missionTimeEstimator,
+      options?.requestSelectors,
+    )
+  ) {
     const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
     missionTimeEstimator =
       (refreshedState as Record<string, unknown>).warpMissionTimeEstimator;
     routeTime = (refreshedState as Record<string, unknown>).warpRouteTimeWorldline;
@@ -26317,7 +27442,13 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
       targetDistance,
     });
   }
-  if (!isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)) {
+  if (
+    !isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator) ||
+    !publicationSurfaceMatchesRequestSelectors(
+      missionTimeEstimator,
+      options?.requestSelectors,
+    )
+  ) {
     throw new Error("certified_mission_time_estimator_missing");
   }
   if (!targetDistance) {
@@ -26350,7 +27481,7 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(
       fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
     ) as ProofPackPayload;
@@ -26366,7 +27497,10 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
       fs.writeFileSync(DEFAULT_LATEST_MD, `${updatedMarkdown}\n`);
     }
   }
-  const comparison = await publishNhm2MissionTimeComparisonLatest({
+  const comparison =
+    options?.publishDownstream === false
+      ? undefined
+      : await publishNhm2MissionTimeComparisonLatest({
     baseUrl,
     sourceAuditArtifactPath: options?.sourceAuditArtifactPath ?? DEFAULT_LATEST_JSON,
     sourceWorldlineArtifactPath:
@@ -26377,7 +27511,9 @@ export const publishNhm2MissionTimeEstimatorLatest = async (options?: {
     sourceRouteTimeArtifactPath:
       options?.sourceRouteTimeArtifactPath ?? DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
     sourceMissionTimeEstimatorArtifactPath: latestJsonPath,
+    updateProofPackLatest: options?.updateProofPackLatest,
     publicationLockPath: options?.publicationLockPath,
+    requestSelectors: options?.requestSelectors,
   });
   return {
     outJsonPath,
@@ -26402,7 +27538,9 @@ export const publishNhm2MissionTimeComparisonLatest = async (options?: {
   sourceCruisePreflightArtifactPath?: string | null;
   sourceRouteTimeArtifactPath?: string | null;
   sourceMissionTimeEstimatorArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -26415,6 +27553,7 @@ export const publishNhm2MissionTimeComparisonLatest = async (options?: {
     operation: "publish-mission-time-comparison-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath =
     options?.outJsonPath ?? DEFAULT_MISSION_TIME_COMPARISON_OUT_JSON;
   const latestJsonPath =
@@ -26426,7 +27565,7 @@ export const publishNhm2MissionTimeComparisonLatest = async (options?: {
   let missionTimeEstimator: unknown = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -26444,13 +27583,15 @@ export const publishNhm2MissionTimeComparisonLatest = async (options?: {
   }
   if (
     !isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison) ||
-    !isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)
+    !isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator) ||
+    !publicationSurfaceMatchesRequestSelectors(
+      missionTimeComparison,
+      options?.requestSelectors,
+    )
   ) {
-    const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
     missionTimeComparison =
       (refreshedState as Record<string, unknown>).warpMissionTimeComparison;
     missionTimeEstimator =
@@ -26464,7 +27605,13 @@ export const publishNhm2MissionTimeComparisonLatest = async (options?: {
       missionTimeEstimator,
     });
   }
-  if (!isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison)) {
+  if (
+    !isCertifiedWarpMissionTimeComparisonContract(missionTimeComparison) ||
+    !publicationSurfaceMatchesRequestSelectors(
+      missionTimeComparison,
+      options?.requestSelectors,
+    )
+  ) {
     throw new Error("certified_mission_time_comparison_missing");
   }
   if (!isCertifiedWarpMissionTimeEstimatorContract(missionTimeEstimator)) {
@@ -26496,7 +27643,7 @@ export const publishNhm2MissionTimeComparisonLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(
       fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
     ) as ProofPackPayload;
@@ -26534,7 +27681,9 @@ export const publishNhm2CruiseEnvelopeLatest = async (options?: {
   sourceRouteTimeArtifactPath?: string | null;
   sourceMissionTimeEstimatorArtifactPath?: string | null;
   sourceMissionTimeComparisonArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -26547,6 +27696,7 @@ export const publishNhm2CruiseEnvelopeLatest = async (options?: {
     operation: "publish-cruise-envelope-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath = options?.outJsonPath ?? DEFAULT_CRUISE_ENVELOPE_OUT_JSON;
   const latestJsonPath =
     options?.latestJsonPath ?? DEFAULT_CRUISE_ENVELOPE_LATEST_JSON;
@@ -26560,7 +27710,7 @@ export const publishNhm2CruiseEnvelopeLatest = async (options?: {
   let missionTimeComparison: unknown = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -26596,12 +27746,13 @@ export const publishNhm2CruiseEnvelopeLatest = async (options?: {
       missionTimeComparison,
     });
   }
-  if (!isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope)) {
-    const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
+  if (
+    !isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope) ||
+    !publicationSurfaceMatchesRequestSelectors(cruiseEnvelope, options?.requestSelectors)
+  ) {
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
     cruiseEnvelope = (refreshedState as Record<string, unknown>).warpCruiseEnvelope;
     preflight = (refreshedState as Record<string, unknown>).warpCruiseEnvelopePreflight;
     routeTime = (refreshedState as Record<string, unknown>).warpRouteTimeWorldline;
@@ -26624,7 +27775,10 @@ export const publishNhm2CruiseEnvelopeLatest = async (options?: {
       missionTimeComparison,
     });
   }
-  if (!isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope)) {
+  if (
+    !isCertifiedWarpCruiseEnvelopeContract(cruiseEnvelope) ||
+    !publicationSurfaceMatchesRequestSelectors(cruiseEnvelope, options?.requestSelectors)
+  ) {
     throw new Error("certified_cruise_envelope_missing");
   }
 
@@ -26653,7 +27807,7 @@ export const publishNhm2CruiseEnvelopeLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(
       fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
     ) as ProofPackPayload;
@@ -26687,7 +27841,9 @@ export const publishNhm2InHullProperAccelerationLatest = async (options?: {
   outMdPath?: string;
   latestMdPath?: string;
   sourceAuditArtifactPath?: string | null;
+  updateProofPackLatest?: boolean;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
 }): Promise<{
   outJsonPath: string;
   latestJsonPath: string;
@@ -26700,6 +27856,7 @@ export const publishNhm2InHullProperAccelerationLatest = async (options?: {
     operation: "publish-in-hull-proper-acceleration-latest",
     fn: async () => {
   const baseUrl = normalizeBaseUrl(options?.baseUrl ?? DEFAULT_BASE_URL);
+  const pipelineUrl = buildPipelinePublicationUrl(baseUrl, options?.requestSelectors);
   const outJsonPath =
     options?.outJsonPath ?? DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_JSON;
   const latestJsonPath =
@@ -26711,7 +27868,7 @@ export const publishNhm2InHullProperAccelerationLatest = async (options?: {
   let inHullProperAcceleration: unknown = null;
   try {
     const response = await withTimeoutFetch(
-      `${baseUrl}/api/helix/pipeline`,
+      pipelineUrl,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -26725,16 +27882,27 @@ export const publishNhm2InHullProperAccelerationLatest = async (options?: {
   } catch {
     inHullProperAcceleration = null;
   }
-  if (!isCertifiedWarpInHullProperAccelerationContract(inHullProperAcceleration)) {
-    const pipelineModule = await import("../server/energy-pipeline.ts");
-    const baseState =
-      pipelineModule.getGlobalPipelineState?.() ?? pipelineModule.initializePipelineState();
-    const refreshedState = await pipelineModule.calculateEnergyPipeline({ ...baseState });
-    pipelineModule.setGlobalPipelineState?.(refreshedState);
-    inHullProperAcceleration = (refreshedState as Record<string, unknown>)
-      .warpInHullProperAcceleration;
+  if (
+    !isCertifiedWarpInHullProperAccelerationContract(inHullProperAcceleration) ||
+    hasLegacyShiftLapseTransportFailToken(inHullProperAcceleration) ||
+    !publicationSurfaceMatchesRequestSelectors(
+      inHullProperAcceleration,
+      options?.requestSelectors,
+    )
+  ) {
+    const refreshedState = await refreshPipelineStateForPublication(
+      options?.requestSelectors,
+    );
+    inHullProperAcceleration = refreshedState.warpInHullProperAcceleration;
   }
-  if (!isCertifiedWarpInHullProperAccelerationContract(inHullProperAcceleration)) {
+  if (
+    !isCertifiedWarpInHullProperAccelerationContract(inHullProperAcceleration) ||
+    hasLegacyShiftLapseTransportFailToken(inHullProperAcceleration) ||
+    !publicationSurfaceMatchesRequestSelectors(
+      inHullProperAcceleration,
+      options?.requestSelectors,
+    )
+  ) {
     throw new Error("certified_in_hull_proper_acceleration_missing");
   }
 
@@ -26752,7 +27920,7 @@ export const publishNhm2InHullProperAccelerationLatest = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  if (fs.existsSync(DEFAULT_LATEST_JSON)) {
+  if (options?.updateProofPackLatest !== false && fs.existsSync(DEFAULT_LATEST_JSON)) {
     const existingPayload = JSON.parse(
       fs.readFileSync(DEFAULT_LATEST_JSON, "utf8"),
     ) as ProofPackPayload;
@@ -26812,10 +27980,22 @@ export const publishNhm2ProofSurfaceManifestLatest = async (options?: {
         options?.proofPackLatestJsonPath ?? DEFAULT_LATEST_JSON;
       const proofPackLatestMdPath =
         options?.proofPackLatestMdPath ?? DEFAULT_LATEST_MD;
-      const existingProofPackPayload = readJsonArtifact<ProofPackPayload>(
+      const proofPackPayload = readJsonArtifact<ProofPackPayload>(
         proofPackLatestJsonPath,
         "warp_york_control_family_proof_pack/v1",
       );
+      let existingProofPackPayload = proofPackPayload;
+      try {
+        existingProofPackPayload = await refreshProofPackAuthoritativeLowExpansionGate(
+          proofPackPayload,
+        );
+      } catch (error) {
+        process.stderr.write(
+          `[warp-york-control-family-proof-pack] publish_stage=proof_surface_manifest_refresh_fallback reason=${
+            error instanceof Error ? error.message : String(error)
+          }\n`,
+        );
+      }
       const provisionalManifest = buildNhm2ProofSurfaceManifestArtifact({
         generatedOn: DATE_STAMP,
         proofPackPayload: existingProofPackPayload,
@@ -26871,44 +28051,1867 @@ export const publishNhm2ProofSurfaceManifestLatest = async (options?: {
     },
   });
 
+const resolveBoundedStackOutputPath = (
+  outputRootDir: string | undefined,
+  relativePath: string,
+): string | undefined => (outputRootDir ? path.join(outputRootDir, relativePath) : undefined);
+
+const resolveBoundedStackPublicationPath = (
+  options:
+    | {
+        outputRootDir?: string;
+        outputPathResolver?: ((relativePath: string) => string | undefined) | undefined;
+      }
+    | undefined,
+  relativePath: string,
+): string | undefined =>
+  options?.outputPathResolver?.(relativePath) ??
+  resolveBoundedStackOutputPath(options?.outputRootDir, relativePath);
+
 export const publishNhm2BoundedStackLatest = async (options?: {
   baseUrl?: string;
   publicationLockPath?: string;
+  requestSelectors?: Partial<ControlRequestSelectors>;
+  outputRootDir?: string;
+  outputPathResolver?: (relativePath: string) => string | undefined;
+  updateProofPackLatest?: boolean;
+  publishProofSurfaceManifest?: boolean;
+  sourceAuditArtifactPath?: string | null;
+  sourceAuditReportPath?: string | null;
 }): Promise<{
   worldline: Awaited<ReturnType<typeof publishNhm2WarpWorldlineProofLatest>>;
+  cruisePreflight: Awaited<ReturnType<typeof publishNhm2CruiseEnvelopePreflightLatest>>;
+  routeTimeWorldline: Awaited<ReturnType<typeof publishNhm2RouteTimeWorldlineLatest>>;
+  missionTimeEstimator: Awaited<ReturnType<typeof publishNhm2MissionTimeEstimatorLatest>>;
+  missionTimeComparison: Awaited<ReturnType<typeof publishNhm2MissionTimeComparisonLatest>>;
   cruiseEnvelope: Awaited<ReturnType<typeof publishNhm2CruiseEnvelopeLatest>>;
   inHullProperAcceleration: Awaited<
     ReturnType<typeof publishNhm2InHullProperAccelerationLatest>
   >;
-  proofSurfaceManifest: Awaited<ReturnType<typeof publishNhm2ProofSurfaceManifestLatest>>;
+  proofSurfaceManifest?: Awaited<ReturnType<typeof publishNhm2ProofSurfaceManifestLatest>>;
 }> =>
   withProofSurfacePublicationLock({
     lockPath: options?.publicationLockPath,
     operation: "publish-bounded-stack-latest",
     fn: async () => {
+      const sourceAuditArtifactPath =
+        options?.sourceAuditArtifactPath ??
+        resolveBoundedStackPublicationPath(options, DEFAULT_LATEST_JSON) ??
+        DEFAULT_LATEST_JSON;
       const worldline = await publishNhm2WarpWorldlineProofLatest({
         baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_WARP_WORLDLINE_PROOF_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_WARP_WORLDLINE_PROOF_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_WARP_WORLDLINE_PROOF_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        publishDownstream: false,
+        updateProofPackLatest: options?.updateProofPackLatest,
         publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
+      });
+      const cruisePreflight = await publishNhm2CruiseEnvelopePreflightLatest({
+        baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        sourceWorldlineArtifactPath: worldline.latestJsonPath,
+        publishDownstream: false,
+        updateProofPackLatest: options?.updateProofPackLatest,
+        publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
+      });
+      const routeTimeWorldline = await publishNhm2RouteTimeWorldlineLatest({
+        baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_ROUTE_TIME_WORLDLINE_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_ROUTE_TIME_WORLDLINE_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        sourceWorldlineArtifactPath: worldline.latestJsonPath,
+        sourceCruisePreflightArtifactPath: cruisePreflight.latestJsonPath,
+        publishDownstream: false,
+        updateProofPackLatest: options?.updateProofPackLatest,
+        publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
+      });
+      const missionTimeEstimator = await publishNhm2MissionTimeEstimatorLatest({
+        baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_ESTIMATOR_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_ESTIMATOR_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        sourceWorldlineArtifactPath: worldline.latestJsonPath,
+        sourceCruisePreflightArtifactPath: cruisePreflight.latestJsonPath,
+        sourceRouteTimeArtifactPath: routeTimeWorldline.latestJsonPath,
+        publishDownstream: false,
+        updateProofPackLatest: options?.updateProofPackLatest,
+        publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
+      });
+      const missionTimeComparison = await publishNhm2MissionTimeComparisonLatest({
+        baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_COMPARISON_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_COMPARISON_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_MISSION_TIME_COMPARISON_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        sourceWorldlineArtifactPath: worldline.latestJsonPath,
+        sourceCruisePreflightArtifactPath: cruisePreflight.latestJsonPath,
+        sourceRouteTimeArtifactPath: routeTimeWorldline.latestJsonPath,
+        sourceMissionTimeEstimatorArtifactPath: missionTimeEstimator.latestJsonPath,
+        updateProofPackLatest: options?.updateProofPackLatest,
+        publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
       });
       const cruiseEnvelope = await publishNhm2CruiseEnvelopeLatest({
         baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_CRUISE_ENVELOPE_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        sourceCruisePreflightArtifactPath: cruisePreflight.latestJsonPath,
+        sourceRouteTimeArtifactPath: routeTimeWorldline.latestJsonPath,
+        sourceMissionTimeEstimatorArtifactPath: missionTimeEstimator.latestJsonPath,
+        sourceMissionTimeComparisonArtifactPath: missionTimeComparison.latestJsonPath,
+        updateProofPackLatest: options?.updateProofPackLatest,
         publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
       });
       const inHullProperAcceleration = await publishNhm2InHullProperAccelerationLatest({
         baseUrl: options?.baseUrl,
+        outJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_JSON,
+        ),
+        latestJsonPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_JSON,
+        ),
+        outMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_IN_HULL_PROPER_ACCELERATION_OUT_MD,
+        ),
+        latestMdPath: resolveBoundedStackPublicationPath(
+          options,
+          DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_MD,
+        ),
+        sourceAuditArtifactPath,
+        updateProofPackLatest: options?.updateProofPackLatest,
         publicationLockPath: options?.publicationLockPath,
+        requestSelectors: options?.requestSelectors,
       });
-      const proofSurfaceManifest = await publishNhm2ProofSurfaceManifestLatest({
-        publicationLockPath: options?.publicationLockPath,
-      });
+      const proofSurfaceManifest =
+        options?.publishProofSurfaceManifest === false
+          ? undefined
+          : await publishNhm2ProofSurfaceManifestLatest({
+              outJsonPath: resolveBoundedStackPublicationPath(
+                options,
+                DEFAULT_PROOF_SURFACE_MANIFEST_OUT_JSON,
+              ),
+              latestJsonPath: resolveBoundedStackPublicationPath(
+                options,
+                DEFAULT_PROOF_SURFACE_MANIFEST_LATEST_JSON,
+              ),
+              outMdPath: resolveBoundedStackPublicationPath(
+                options,
+                DEFAULT_PROOF_SURFACE_MANIFEST_OUT_MD,
+              ),
+              latestMdPath: resolveBoundedStackPublicationPath(
+                options,
+                DEFAULT_PROOF_SURFACE_MANIFEST_LATEST_MD,
+              ),
+              proofPackLatestJsonPath: sourceAuditArtifactPath,
+              proofPackLatestMdPath:
+                options?.sourceAuditReportPath ??
+                resolveBoundedStackPublicationPath(options, DEFAULT_LATEST_MD) ??
+                DEFAULT_LATEST_MD,
+              publicationLockPath: options?.publicationLockPath,
+            });
       return {
         worldline,
+        cruisePreflight,
+        routeTimeWorldline,
+        missionTimeEstimator,
+        missionTimeComparison,
         cruiseEnvelope,
         inHullProperAcceleration,
         proofSurfaceManifest,
       };
     },
   });
+
+const computeShiftLapseTransportResultChecksum = (
+  payload: Nhm2ShiftLapseTransportResultArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const resolveSelectedFamilyPublicationPath = (
+  relativePath: string,
+  options?: {
+    artifactRootDir?: string;
+    auditRootDir?: string;
+  },
+): string => {
+  const normalized = relativePath.split(path.sep).join("/");
+  const artifactRootDir = options?.artifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  if (normalized.startsWith("artifacts/research/full-solve/")) {
+    return path.join(artifactRootDir, path.basename(relativePath));
+  }
+  if (normalized.startsWith("docs/audits/research/")) {
+    return path.join(auditRootDir, path.basename(relativePath));
+  }
+  return path.join(artifactRootDir, path.basename(relativePath));
+};
+
+const summarizeSelectedShiftLapseTimingResult = (args: {
+  centerlineDtauDt: number | null;
+  interpretationStatus: string | null;
+  shiftLapseProfileId?: string | null;
+}): string => {
+  const profilePrefix =
+    args.shiftLapseProfileId != null
+      ? `The current live nhm2_shift_lapse selected-family bounded-transport bundle for profile ${args.shiftLapseProfileId}`
+      : "The current live nhm2_shift_lapse selected-family bounded-transport bundle";
+  if (args.interpretationStatus === "bounded_relativistic_differential_detected") {
+    return `${profilePrefix} detects a bounded timing differential. This remains a bounded contract result only and does not imply broader travel-advantage or viability claims.`;
+  }
+  if (args.interpretationStatus === "no_certified_relativistic_differential_detected") {
+    if (
+      args.centerlineDtauDt != null &&
+      Math.abs(args.centerlineDtauDt - 1) <= 1e-12
+    ) {
+      return `${profilePrefix} remains timing-flat after the current controlled lapse-profile tuning attempt: centerline_dtau_dt=1 and the mission-time comparison reports no certified relativistic differential detected.`;
+    }
+    return `${profilePrefix} reports no certified relativistic differential at bounded-contract maturity.`;
+  }
+  return `${profilePrefix} does not yet expose a certified mission-time interpretation.`;
+};
+
+const buildNhm2ShiftLapseTransportResultArtifact = (args: {
+  boundedStack: Awaited<ReturnType<typeof publishNhm2BoundedStackLatest>>;
+  publicationCommand: string;
+  artifactRootDir: string;
+  auditRootDir: string;
+}): Nhm2ShiftLapseTransportResultArtifact => {
+  const worldlineArtifact = args.boundedStack.worldline.artifact;
+  const missionTimeComparisonArtifact = args.boundedStack.missionTimeComparison.artifact;
+  const gate = worldlineArtifact.sourceSurface.shiftLapseTransportPromotionGate ?? null;
+  const shiftLapseProfileId =
+    worldlineArtifact.sourceSurface.shiftLapseProfileId ??
+    gate?.shiftLapseProfileId ??
+    null;
+  const shiftLapseProfileStage = gate?.shiftLapseProfileStage ?? null;
+  const shiftLapseProfileNote = gate?.shiftLapseProfileNote ?? null;
+  const interpretationStatus =
+    missionTimeComparisonArtifact.comparisonMetrics.interpretationStatus ?? null;
+  const properMinusCoordinateSeconds =
+    missionTimeComparisonArtifact.comparisonMetrics.properMinusCoordinate_seconds ?? null;
+  const properMinusClassicalSeconds =
+    missionTimeComparisonArtifact.comparisonMetrics.properMinusClassical_seconds ?? null;
+  const boundedTimingDifferentialDetected =
+    interpretationStatus === "bounded_relativistic_differential_detected"
+      ? true
+      : interpretationStatus === "no_certified_relativistic_differential_detected"
+        ? false
+        : null;
+  const artifactBase: Nhm2ShiftLapseTransportResultArtifact = {
+    artifactType: "nhm2_shift_lapse_transport_result/v1",
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records the current live nhm2_shift_lapse selected-family bounded-transport publication result. It does not replace the canonical baseline latest aliases and does not widen speed, ETA, viability, gravity, or horizon claims.",
+    publicationCommand: args.publicationCommand,
+    canonicalBaselineMetricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    canonicalBaselineLatestAliasesChanged: false,
+    selectedFamily: {
+      warpFieldType: "nhm2_shift_lapse",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Source: "metric",
+      shiftLapseProfileId,
+      shiftLapseProfileStage,
+      shiftLapseProfileNote,
+      artifactRoot: normalizePath(args.artifactRootDir),
+      auditRoot: normalizePath(args.auditRootDir),
+    },
+    selectedBundleArtifacts: {
+      worldlineLatestJsonPath: normalizePath(args.boundedStack.worldline.latestJsonPath),
+      cruiseEnvelopePreflightLatestJsonPath: normalizePath(
+        args.boundedStack.cruisePreflight.latestJsonPath,
+      ),
+      routeTimeWorldlineLatestJsonPath: normalizePath(
+        args.boundedStack.routeTimeWorldline.latestJsonPath,
+      ),
+      missionTimeEstimatorLatestJsonPath: normalizePath(
+        args.boundedStack.missionTimeEstimator.latestJsonPath,
+      ),
+      missionTimeComparisonLatestJsonPath: normalizePath(
+        args.boundedStack.missionTimeComparison.latestJsonPath,
+      ),
+      cruiseEnvelopeLatestJsonPath: normalizePath(
+        args.boundedStack.cruiseEnvelope.latestJsonPath,
+      ),
+      inHullProperAccelerationLatestJsonPath: normalizePath(
+        args.boundedStack.inHullProperAcceleration.latestJsonPath,
+      ),
+    },
+    transportCertificationStatus:
+      worldlineArtifact.sourceSurface.transportCertificationStatus ?? null,
+    promotionGateStatus: gate?.status ?? null,
+    promotionGateReason: gate?.reason ?? null,
+    authoritativeLowExpansionStatus: gate?.authoritativeLowExpansionStatus ?? null,
+    authoritativeLowExpansionSource: gate?.authoritativeLowExpansionSource ?? null,
+    wallSafetyStatus: gate?.wallSafetyStatus ?? null,
+    wallSafetyReason: gate?.wallSafetyReason ?? null,
+    centerlineAlpha: gate?.centerlineAlpha ?? null,
+    centerlineDtauDt: gate?.centerlineDtauDt ?? null,
+    missionTimeInterpretationStatus: interpretationStatus,
+    properMinusCoordinate_seconds: properMinusCoordinateSeconds,
+    properMinusClassical_seconds: properMinusClassicalSeconds,
+    boundedTimingDifferentialDetected,
+    measuredResultSummary: summarizeSelectedShiftLapseTimingResult({
+      centerlineDtauDt: gate?.centerlineDtauDt ?? null,
+      interpretationStatus,
+      shiftLapseProfileId,
+    }),
+    nonClaims: [
+      "does not replace the canonical baseline latest aliases",
+      "does not certify speed or ETA",
+      "does not widen viability claims",
+      "does not convert wall-safety guardrails into a theorem-level horizon claim",
+      "does not widen source/mechanism authority",
+    ],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeShiftLapseTransportResultChecksum(artifactBase),
+  };
+};
+
+const renderNhm2ShiftLapseTransportResultMarkdown = (
+  payload: Nhm2ShiftLapseTransportResultArtifact,
+): string => {
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Shift+Lapse Selected-Family Transport Result (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Reproduce
+- publicationCommand: \`${payload.publicationCommand}\`
+- selectedArtifactRoot: \`${payload.selectedFamily.artifactRoot}\`
+- selectedAuditRoot: \`${payload.selectedFamily.auditRoot}\`
+- shiftLapseProfileId: \`${payload.selectedFamily.shiftLapseProfileId ?? "null"}\`
+- shiftLapseProfileStage: \`${payload.selectedFamily.shiftLapseProfileStage ?? "null"}\`
+- shiftLapseProfileNote: ${payload.selectedFamily.shiftLapseProfileNote ?? "null"}
+- canonicalBaselineMetricT00Ref: \`${payload.canonicalBaselineMetricT00Ref}\`
+- canonicalBaselineLatestAliasesChanged: ${String(payload.canonicalBaselineLatestAliasesChanged)}
+
+## Measured Result
+| field | value |
+|---|---|
+| artifactType | ${payload.artifactType} |
+| selectedFamily.warpFieldType | ${payload.selectedFamily.warpFieldType} |
+| selectedFamily.metricT00Ref | ${payload.selectedFamily.metricT00Ref} |
+| selectedFamily.metricT00Source | ${payload.selectedFamily.metricT00Source} |
+| selectedFamily.shiftLapseProfileId | ${payload.selectedFamily.shiftLapseProfileId ?? "null"} |
+| selectedFamily.shiftLapseProfileStage | ${payload.selectedFamily.shiftLapseProfileStage ?? "null"} |
+| transportCertificationStatus | ${payload.transportCertificationStatus ?? "null"} |
+| promotionGateStatus | ${payload.promotionGateStatus ?? "null"} |
+| promotionGateReason | ${payload.promotionGateReason ?? "null"} |
+| authoritativeLowExpansionStatus | ${payload.authoritativeLowExpansionStatus ?? "null"} |
+| authoritativeLowExpansionSource | ${payload.authoritativeLowExpansionSource ?? "null"} |
+| wallSafetyStatus | ${payload.wallSafetyStatus ?? "null"} |
+| wallSafetyReason | ${payload.wallSafetyReason ?? "null"} |
+| centerlineAlpha | ${payload.centerlineAlpha ?? "null"} |
+| centerlineDtauDt | ${payload.centerlineDtauDt ?? "null"} |
+| missionTimeInterpretationStatus | ${payload.missionTimeInterpretationStatus ?? "null"} |
+| properMinusCoordinate_seconds | ${payload.properMinusCoordinate_seconds ?? "null"} |
+| properMinusClassical_seconds | ${payload.properMinusClassical_seconds ?? "null"} |
+| boundedTimingDifferentialDetected | ${payload.boundedTimingDifferentialDetected == null ? "null" : String(payload.boundedTimingDifferentialDetected)} |
+| measuredResultSummary | ${payload.measuredResultSummary} |
+
+## Selected Bundle Paths
+| artifact | latestJsonPath |
+|---|---|
+| worldline | ${payload.selectedBundleArtifacts.worldlineLatestJsonPath} |
+| cruiseEnvelopePreflight | ${payload.selectedBundleArtifacts.cruiseEnvelopePreflightLatestJsonPath} |
+| routeTimeWorldline | ${payload.selectedBundleArtifacts.routeTimeWorldlineLatestJsonPath} |
+| missionTimeEstimator | ${payload.selectedBundleArtifacts.missionTimeEstimatorLatestJsonPath} |
+| missionTimeComparison | ${payload.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath} |
+| cruiseEnvelope | ${payload.selectedBundleArtifacts.cruiseEnvelopeLatestJsonPath} |
+| inHullProperAcceleration | ${payload.selectedBundleArtifacts.inHullProperAccelerationLatestJsonPath} |
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
+  baseUrl?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  publicationLockPath?: string;
+  shiftLapseProfileId?: string;
+}): Promise<{
+  boundedStack: Awaited<ReturnType<typeof publishNhm2BoundedStackLatest>>;
+  transportResult: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2ShiftLapseTransportResultArtifact;
+  };
+}> => {
+  const artifactRootDir = options?.artifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  const shiftLapseProfileId =
+    typeof options?.shiftLapseProfileId === "string" &&
+    options.shiftLapseProfileId.trim().length > 0
+      ? options.shiftLapseProfileId
+      : SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS.shiftLapseProfileId ??
+        DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID;
+  const boundedStack = await publishNhm2BoundedStackLatest({
+    baseUrl: options?.baseUrl,
+    publicationLockPath:
+      options?.publicationLockPath ??
+      path.join(artifactRootDir, ".nhm2-selected-family-bounded-stack.lock"),
+    requestSelectors: {
+      ...SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS,
+      shiftLapseProfileId,
+    },
+    outputPathResolver: (relativePath) =>
+      resolveSelectedFamilyPublicationPath(relativePath, {
+        artifactRootDir,
+        auditRootDir,
+      }),
+    updateProofPackLatest: false,
+    publishProofSurfaceManifest: false,
+    sourceAuditArtifactPath: DEFAULT_LATEST_JSON,
+    sourceAuditReportPath: DEFAULT_LATEST_MD,
+  });
+  const artifact = buildNhm2ShiftLapseTransportResultArtifact({
+    boundedStack,
+    publicationCommand: buildSelectedShiftLapsePublicationCommand(shiftLapseProfileId),
+    artifactRootDir,
+    auditRootDir,
+  });
+  const markdown = renderNhm2ShiftLapseTransportResultMarkdown(artifact);
+  const outJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_JSON),
+  );
+  const latestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  );
+  const outMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_MD),
+  );
+  const latestMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD),
+  );
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  return {
+    boundedStack,
+    transportResult: {
+      outJsonPath,
+      latestJsonPath,
+      outMdPath,
+      latestMdPath,
+      artifact,
+    },
+  };
+};
+
+const resolveSelectedShiftLapseSweepProfileArtifactRoot = (
+  sweepArtifactRootDir: string,
+  profileId: string,
+): string => path.join(sweepArtifactRootDir, profileId);
+
+const resolveSelectedShiftLapseSweepProfileAuditRoot = (
+  sweepAuditRootDir: string,
+  profileId: string,
+): string => path.join(sweepAuditRootDir, profileId);
+
+const isPassingSelectedShiftLapseSweepEntry = (
+  entry: Nhm2ShiftLapseProfileSweepEntry,
+): boolean =>
+  entry.transportCertificationStatus === "bounded_transport_proof_bearing_gate_admitted" &&
+  entry.promotionGateStatus === "pass" &&
+  entry.authoritativeLowExpansionStatus === "pass" &&
+  entry.wallSafetyStatus === "pass";
+
+const resolveSelectedShiftLapseSweepDifferentialMagnitude = (
+  entry: Nhm2ShiftLapseProfileSweepEntry,
+): number | null =>
+  entry.centerlineDtauDt != null ? Math.abs(1 - entry.centerlineDtauDt) : null;
+
+const computeShiftLapseProfileSweepChecksum = (
+  payload: Nhm2ShiftLapseProfileSweepArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const summarizeSelectedShiftLapseProfileSweep = (args: {
+  entries: Nhm2ShiftLapseProfileSweepEntry[];
+}): Pick<
+  Nhm2ShiftLapseProfileSweepArtifact,
+  | "firstProfileWithBoundedTimingDifferential"
+  | "strongestProfileKeepingAllGatesPassing"
+  | "firstGateFailure"
+  | "robustnessStatus"
+  | "scalingStatus"
+  | "robustnessSummary"
+> => {
+  const passingEntries = args.entries.filter(isPassingSelectedShiftLapseSweepEntry);
+  const passingDifferentialEntries = passingEntries.filter(
+    (entry) => entry.boundedTimingDifferentialDetected === true,
+  );
+  const firstProfileWithBoundedTimingDifferential =
+    passingDifferentialEntries[0]?.shiftLapseProfileId ?? null;
+  const strongestProfileKeepingAllGatesPassing =
+    passingEntries.length > 0 ? passingEntries[passingEntries.length - 1].shiftLapseProfileId : null;
+  const firstGateFailure =
+    args.entries.find((entry) => !isPassingSelectedShiftLapseSweepEntry(entry)) ?? null;
+  const firstGateFailureSummary: Nhm2ShiftLapseProfileSweepFailureSummary = firstGateFailure
+    ? firstGateFailure.authoritativeLowExpansionStatus !== "pass"
+      ? {
+          shiftLapseProfileId: firstGateFailure.shiftLapseProfileId,
+          failedGate: "authoritative_low_expansion",
+          failureReason:
+            firstGateFailure.promotionGateReason ?? firstGateFailure.promotionGateStatus,
+        }
+      : firstGateFailure.wallSafetyStatus !== "pass"
+        ? {
+            shiftLapseProfileId: firstGateFailure.shiftLapseProfileId,
+            failedGate: "wall_safety",
+            failureReason: firstGateFailure.wallSafetyReason ?? firstGateFailure.promotionGateReason,
+          }
+        : {
+            shiftLapseProfileId: firstGateFailure.shiftLapseProfileId,
+            failedGate: "transport_promotion_gate",
+            failureReason:
+              firstGateFailure.promotionGateReason ??
+              firstGateFailure.transportCertificationStatus,
+          }
+    : null;
+  const passingMagnitudeSeries = passingEntries
+    .map(resolveSelectedShiftLapseSweepDifferentialMagnitude)
+    .filter((value): value is number => value != null);
+  const scalingStatus: Nhm2ShiftLapseProfileSweepArtifact["scalingStatus"] =
+    passingMagnitudeSeries.length < 2
+      ? "insufficient_data"
+      : passingMagnitudeSeries.every((value) => value <= 1e-12)
+        ? "flat"
+        : passingMagnitudeSeries.every(
+              (value, index) => index === 0 || value + 1e-12 >= passingMagnitudeSeries[index - 1],
+            )
+          ? "monotonic"
+          : "non_monotonic";
+  const firstDifferentialPassingIndex = passingEntries.findIndex(
+    (entry) => entry.boundedTimingDifferentialDetected === true,
+  );
+  const hasThresholdOnset = firstDifferentialPassingIndex > 0;
+  let robustnessStatus: Nhm2ShiftLapseProfileSweepArtifact["robustnessStatus"];
+  let robustnessSummary: string;
+  if (passingDifferentialEntries.length === 0) {
+    robustnessStatus = "no_bounded_differential_detected_over_tested_bracket";
+    robustnessSummary =
+      "No tested profile in the selected-family robustness bracket produced a bounded timing differential while all authoritative gates remained passing.";
+  } else if (passingDifferentialEntries.length === 1 || scalingStatus === "non_monotonic") {
+    robustnessStatus = "fragile_or_sparse_over_tested_bracket";
+    robustnessSummary =
+      `The bounded timing differential is currently fragile over the tested bracket: ${firstProfileWithBoundedTimingDifferential ?? "only one tested profile"} shows a gate-admitted differential, but the nearby profile coverage is too sparse or non-monotonic to claim broader robustness.`;
+  } else if (hasThresholdOnset || firstGateFailureSummary) {
+    robustnessStatus = "threshold_limited_over_tested_bracket";
+    const thresholdClauses = [
+      hasThresholdOnset && firstProfileWithBoundedTimingDifferential
+        ? `the first gate-admitted bounded timing differential appears at ${firstProfileWithBoundedTimingDifferential}`
+        : null,
+      firstGateFailureSummary
+        ? `the first stronger tested gate failure appears at ${firstGateFailureSummary.shiftLapseProfileId} via ${firstGateFailureSummary.failedGate}`
+        : null,
+    ].filter((entry): entry is string => entry != null);
+    robustnessSummary = `The bounded timing differential is threshold-like over the tested bracket: ${thresholdClauses.join("; ")}. Within the passing portion of the bracket, the effect scales monotonically with the tuned centerline-alpha dial.`;
+  } else {
+    robustnessStatus = "robust_over_tested_bracket";
+    robustnessSummary =
+      "Across the tested selected-family bracket, every tested profile remained gate-admitted and the bounded timing differential scales monotonically with the tuned centerline-alpha dial.";
+  }
+  return {
+    firstProfileWithBoundedTimingDifferential,
+    strongestProfileKeepingAllGatesPassing,
+    firstGateFailure: firstGateFailureSummary,
+    robustnessStatus,
+    scalingStatus,
+    robustnessSummary,
+  };
+};
+
+export const buildNhm2ShiftLapseProfileSweepArtifact = (args: {
+  entries: Nhm2ShiftLapseProfileSweepEntry[];
+}): Nhm2ShiftLapseProfileSweepArtifact => {
+  const sweepSummary = summarizeSelectedShiftLapseProfileSweep({
+    entries: args.entries,
+  });
+  const artifactBase: Nhm2ShiftLapseProfileSweepArtifact = {
+    artifactType: "nhm2_shift_lapse_profile_sweep/v1",
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a small robustness sweep around the tuned nhm2_shift_lapse selected-family bounded-transport result. It does not replace canonical baseline latest aliases and does not widen speed, ETA, viability, gravity, or horizon claims.",
+    publicationCommand: SELECTED_SHIFT_LAPSE_PROFILE_SWEEP_COMMAND,
+    canonicalBaselineMetricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    canonicalBaselineLatestAliasesChanged: false,
+    sweepFamilyId: "stage1_centerline_alpha_bracket_v1",
+    sweepDimension: "centerline_alpha",
+    sweepProfileIds: args.entries.map((entry) => entry.shiftLapseProfileId),
+    referenceSelectedFamilyResult: {
+      shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      latestJsonPath: normalizePath(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+      latestMdPath: normalizePath(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD),
+    },
+    firstProfileWithBoundedTimingDifferential:
+      sweepSummary.firstProfileWithBoundedTimingDifferential,
+    strongestProfileKeepingAllGatesPassing:
+      sweepSummary.strongestProfileKeepingAllGatesPassing,
+    firstGateFailure: sweepSummary.firstGateFailure,
+    robustnessStatus: sweepSummary.robustnessStatus,
+    scalingStatus: sweepSummary.scalingStatus,
+    robustnessSummary: sweepSummary.robustnessSummary,
+    entries: args.entries,
+    nonClaims: [
+      "does not replace the canonical baseline latest aliases",
+      "does not certify speed or ETA",
+      "does not widen viability claims",
+      "does not convert wall-safety guardrails into a theorem-level horizon claim",
+      "does not widen source/mechanism authority",
+    ],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeShiftLapseProfileSweepChecksum(artifactBase),
+  };
+};
+
+const renderNhm2ShiftLapseProfileSweepMarkdown = (
+  payload: Nhm2ShiftLapseProfileSweepArtifact,
+): string => {
+  const resultRows = payload.entries
+    .map(
+      (entry) =>
+        `| ${entry.shiftLapseProfileId} | ${entry.transportCertificationStatus ?? "null"} | ${entry.promotionGateStatus ?? "null"} | ${entry.authoritativeLowExpansionStatus ?? "null"} | ${entry.wallSafetyStatus ?? "null"} | ${entry.centerlineAlpha ?? "null"} | ${entry.centerlineDtauDt ?? "null"} | ${entry.missionTimeInterpretationStatus ?? "null"} | ${entry.properMinusCoordinate_seconds ?? "null"} | ${entry.boundedTimingDifferentialDetected == null ? "null" : String(entry.boundedTimingDifferentialDetected)} |`,
+    )
+    .join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  const firstGateFailure =
+    payload.firstGateFailure == null
+      ? "- firstGateFailure: none in the tested bracket"
+      : `- firstGateFailure: \`${payload.firstGateFailure.shiftLapseProfileId}\` via \`${payload.firstGateFailure.failedGate}\` (${payload.firstGateFailure.failureReason ?? "no explicit reason"})`;
+  return `# NHM2 Shift+Lapse Selected-Family Profile Sweep (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Reproduce
+- publicationCommand: \`${payload.publicationCommand}\`
+- sweepFamilyId: \`${payload.sweepFamilyId}\`
+- sweepDimension: \`${payload.sweepDimension}\`
+- sweepProfileIds: ${payload.sweepProfileIds.map((entry) => `\`${entry}\``).join(", ")}
+- referenceSelectedFamilyResultJson: \`${payload.referenceSelectedFamilyResult.latestJsonPath}\`
+- referenceSelectedFamilyResultMd: \`${payload.referenceSelectedFamilyResult.latestMdPath}\`
+- canonicalBaselineMetricT00Ref: \`${payload.canonicalBaselineMetricT00Ref}\`
+- canonicalBaselineLatestAliasesChanged: ${String(payload.canonicalBaselineLatestAliasesChanged)}
+
+## Aggregate Result
+- robustnessStatus: \`${payload.robustnessStatus}\`
+- scalingStatus: \`${payload.scalingStatus}\`
+- firstProfileWithBoundedTimingDifferential: \`${payload.firstProfileWithBoundedTimingDifferential ?? "null"}\`
+- strongestProfileKeepingAllGatesPassing: \`${payload.strongestProfileKeepingAllGatesPassing ?? "null"}\`
+${firstGateFailure}
+- robustnessSummary: ${payload.robustnessSummary}
+
+## Per-Profile Results
+| shiftLapseProfileId | transportCertificationStatus | promotionGateStatus | authoritativeLowExpansionStatus | wallSafetyStatus | centerlineAlpha | centerlineDtauDt | missionTimeInterpretationStatus | properMinusCoordinate_seconds | boundedTimingDifferentialDetected |
+|---|---|---|---|---|---|---|---|---|---|
+${resultRows}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const publishNhm2ShiftLapseProfileSweep = async (options?: {
+  baseUrl?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  profileIds?: string[];
+}): Promise<{
+  entries: Nhm2ShiftLapseProfileSweepEntry[];
+  sweepArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2ShiftLapseProfileSweepArtifact;
+  };
+}> => {
+  const artifactRootDir = options?.artifactRootDir ?? SELECTED_SHIFT_LAPSE_SWEEP_ARTIFACT_DIR;
+  const auditRootDir = options?.auditRootDir ?? SELECTED_SHIFT_LAPSE_SWEEP_AUDIT_DIR;
+  const profileIds =
+    options?.profileIds != null && options.profileIds.length > 0
+      ? options.profileIds.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+      : [...STAGE1_CENTERLINE_ALPHA_ROBUSTNESS_SWEEP_PROFILE_IDS];
+  const entries: Nhm2ShiftLapseProfileSweepEntry[] = [];
+  for (const profileId of profileIds) {
+    const resolvedProfile = resolveWarpShiftLapseProfile(profileId);
+    const profileArtifactRoot = resolveSelectedShiftLapseSweepProfileArtifactRoot(
+      artifactRootDir,
+      profileId,
+    );
+    const profileAuditRoot = resolveSelectedShiftLapseSweepProfileAuditRoot(
+      auditRootDir,
+      profileId,
+    );
+    const published = await publishNhm2ShiftLapseSelectedTransportBundle({
+      baseUrl: options?.baseUrl,
+      artifactRootDir: profileArtifactRoot,
+      auditRootDir: profileAuditRoot,
+      publicationLockPath: path.join(
+        profileArtifactRoot,
+        ".nhm2-selected-family-bounded-stack.lock",
+      ),
+      shiftLapseProfileId: profileId,
+    });
+    const transportResult = published.transportResult.artifact;
+    entries.push({
+      shiftLapseProfileId: transportResult.selectedFamily.shiftLapseProfileId ?? profileId,
+      shiftLapseProfileStage:
+        transportResult.selectedFamily.shiftLapseProfileStage ?? resolvedProfile.profileStage,
+      shiftLapseProfileNote:
+        transportResult.selectedFamily.shiftLapseProfileNote ?? resolvedProfile.profileNote,
+      publicationCommand: buildSelectedShiftLapsePublicationCommand(profileId),
+      artifactRoot: normalizePath(profileArtifactRoot),
+      auditRoot: normalizePath(profileAuditRoot),
+      transportResultLatestJsonPath: normalizePath(published.transportResult.latestJsonPath),
+      transportResultLatestMdPath: normalizePath(published.transportResult.latestMdPath),
+      selectedBundleArtifacts: transportResult.selectedBundleArtifacts,
+      transportCertificationStatus: transportResult.transportCertificationStatus,
+      promotionGateStatus: transportResult.promotionGateStatus,
+      promotionGateReason: transportResult.promotionGateReason,
+      authoritativeLowExpansionStatus: transportResult.authoritativeLowExpansionStatus,
+      authoritativeLowExpansionSource: transportResult.authoritativeLowExpansionSource,
+      wallSafetyStatus: transportResult.wallSafetyStatus,
+      wallSafetyReason: transportResult.wallSafetyReason,
+      centerlineAlpha: transportResult.centerlineAlpha,
+      centerlineDtauDt: transportResult.centerlineDtauDt,
+      missionTimeInterpretationStatus: transportResult.missionTimeInterpretationStatus,
+      properMinusCoordinate_seconds: transportResult.properMinusCoordinate_seconds,
+      properMinusClassical_seconds: transportResult.properMinusClassical_seconds,
+      boundedTimingDifferentialDetected: transportResult.boundedTimingDifferentialDetected,
+      measuredResultSummary: transportResult.measuredResultSummary,
+    });
+  }
+  const artifact = buildNhm2ShiftLapseProfileSweepArtifact({ entries });
+  const markdown = renderNhm2ShiftLapseProfileSweepMarkdown(artifact);
+  const outJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_OUT_JSON),
+  );
+  const latestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_JSON),
+  );
+  const outMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_OUT_MD),
+  );
+  const latestMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_MD),
+  );
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(
+    latestJsonPath,
+    `${JSON.stringify(artifact, null, 2)}\n`,
+  );
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  return {
+    entries,
+    sweepArtifact: {
+      outJsonPath,
+      latestJsonPath,
+      outMdPath,
+      latestMdPath,
+      artifact,
+    },
+  };
+};
+
+const resolveSelectedShiftLapseBoundaryProfileArtifactRoot = (
+  boundaryArtifactRootDir: string,
+  profileId: string,
+): string => path.join(boundaryArtifactRootDir, profileId);
+
+const resolveSelectedShiftLapseBoundaryProfileAuditRoot = (
+  boundaryAuditRootDir: string,
+  profileId: string,
+): string => path.join(boundaryAuditRootDir, profileId);
+
+const resolveSelectedShiftLapseTransportResultOutputPaths = (
+  artifactRootDir: string,
+  auditRootDir: string,
+): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+} => ({
+  outJsonPath: path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_JSON),
+  ),
+  latestJsonPath: path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  ),
+  outMdPath: path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_OUT_MD),
+  ),
+  latestMdPath: path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD),
+  ),
+});
+
+const resolveSelectedShiftLapseSelectedBundleArtifactPaths = (
+  artifactRootDir: string,
+): Nhm2ShiftLapseTransportResultArtifact["selectedBundleArtifacts"] => ({
+  worldlineLatestJsonPath: normalizePath(
+    path.join(artifactRootDir, path.basename(DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON)),
+  ),
+  cruiseEnvelopePreflightLatestJsonPath: normalizePath(
+    path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_CRUISE_ENVELOPE_PREFLIGHT_LATEST_JSON),
+    ),
+  ),
+  routeTimeWorldlineLatestJsonPath: normalizePath(
+    path.join(artifactRootDir, path.basename(DEFAULT_ROUTE_TIME_WORLDLINE_LATEST_JSON)),
+  ),
+  missionTimeEstimatorLatestJsonPath: normalizePath(
+    path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_MISSION_TIME_ESTIMATOR_LATEST_JSON),
+    ),
+  ),
+  missionTimeComparisonLatestJsonPath: normalizePath(
+    path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON),
+    ),
+  ),
+  cruiseEnvelopeLatestJsonPath: normalizePath(
+    path.join(artifactRootDir, path.basename(DEFAULT_CRUISE_ENVELOPE_LATEST_JSON)),
+  ),
+  inHullProperAccelerationLatestJsonPath: normalizePath(
+    path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_IN_HULL_PROPER_ACCELERATION_LATEST_JSON),
+    ),
+  ),
+});
+
+const resolveSelectedShiftLapsePromotionGateFromState = (
+  state: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  if (
+    state.shiftLapseTransportPromotionGate &&
+    typeof state.shiftLapseTransportPromotionGate === "object"
+  ) {
+    return state.shiftLapseTransportPromotionGate as Record<string, unknown>;
+  }
+  const worldlineSourceSurface = resolvePublicationSurfaceRecord(state.warpWorldline);
+  if (
+    worldlineSourceSurface?.shiftLapseTransportPromotionGate &&
+    typeof worldlineSourceSurface.shiftLapseTransportPromotionGate === "object"
+  ) {
+    return worldlineSourceSurface.shiftLapseTransportPromotionGate as Record<
+      string,
+      unknown
+    >;
+  }
+  return null;
+};
+
+const buildNhm2ShiftLapseBoundaryEntryFromPublicationState = (args: {
+  state: Record<string, unknown>;
+  profileId: string;
+  artifactRootDir: string;
+  auditRootDir: string;
+}): Nhm2ShiftLapseBoundarySweepEntry => {
+  const gate = resolveSelectedShiftLapsePromotionGateFromState(args.state);
+  const worldlineSourceSurface = resolvePublicationSurfaceRecord(args.state.warpWorldline);
+  const missionTimeComparison =
+    args.state.warpMissionTimeComparison &&
+    typeof args.state.warpMissionTimeComparison === "object"
+      ? (args.state.warpMissionTimeComparison as Record<string, unknown>)
+      : null;
+  const comparisonMetrics =
+    missionTimeComparison?.comparisonMetrics &&
+    typeof missionTimeComparison.comparisonMetrics === "object"
+      ? (missionTimeComparison.comparisonMetrics as Record<string, unknown>)
+      : null;
+  const resolvedProfile = resolveWarpShiftLapseProfile(args.profileId);
+  const outputPaths = resolveSelectedShiftLapseTransportResultOutputPaths(
+    args.artifactRootDir,
+    args.auditRootDir,
+  );
+  const selectedBundleArtifacts =
+    resolveSelectedShiftLapseSelectedBundleArtifactPaths(args.artifactRootDir);
+  const shiftLapseProfileId =
+    typeof gate?.shiftLapseProfileId === "string" && gate.shiftLapseProfileId.length > 0
+      ? String(gate.shiftLapseProfileId)
+      : typeof worldlineSourceSurface?.shiftLapseProfileId === "string" &&
+          worldlineSourceSurface.shiftLapseProfileId.length > 0
+        ? String(worldlineSourceSurface.shiftLapseProfileId)
+        : args.profileId;
+  const shiftLapseProfileStage =
+    typeof gate?.shiftLapseProfileStage === "string" ? String(gate.shiftLapseProfileStage) : resolvedProfile.profileStage;
+  const shiftLapseProfileNote =
+    typeof gate?.shiftLapseProfileNote === "string" ? String(gate.shiftLapseProfileNote) : resolvedProfile.profileNote;
+  const transportCertificationStatus =
+    typeof worldlineSourceSurface?.transportCertificationStatus === "string"
+      ? String(worldlineSourceSurface.transportCertificationStatus)
+      : typeof gate?.transportCertificationStatus === "string"
+        ? String(gate.transportCertificationStatus)
+        : null;
+  const promotionGateStatus =
+    typeof gate?.status === "string" ? String(gate.status) : null;
+  const promotionGateReason =
+    typeof gate?.reason === "string" ? String(gate.reason) : null;
+  const authoritativeLowExpansionStatus =
+    typeof gate?.authoritativeLowExpansionStatus === "string"
+      ? String(gate.authoritativeLowExpansionStatus)
+      : null;
+  const authoritativeLowExpansionSource =
+    typeof gate?.authoritativeLowExpansionSource === "string"
+      ? String(gate.authoritativeLowExpansionSource)
+      : null;
+  const wallSafetyStatus =
+    typeof gate?.wallSafetyStatus === "string" ? String(gate.wallSafetyStatus) : null;
+  const wallSafetyReason =
+    typeof gate?.wallSafetyReason === "string" ? String(gate.wallSafetyReason) : null;
+  const centerlineAlpha = toFiniteNumber(gate?.centerlineAlpha);
+  const centerlineDtauDt = toFiniteNumber(gate?.centerlineDtauDt);
+  const missionTimeInterpretationStatus =
+    typeof comparisonMetrics?.interpretationStatus === "string"
+      ? String(comparisonMetrics.interpretationStatus)
+      : null;
+  const properMinusCoordinate_seconds = toFiniteNumber(
+    comparisonMetrics?.properMinusCoordinate_seconds,
+  );
+  const properMinusClassical_seconds = toFiniteNumber(
+    comparisonMetrics?.properMinusClassical_seconds,
+  );
+  const boundedTimingDifferentialDetected =
+    missionTimeInterpretationStatus === "bounded_relativistic_differential_detected"
+      ? true
+      : missionTimeInterpretationStatus ===
+            "no_certified_relativistic_differential_detected"
+        ? false
+        : null;
+  return {
+    shiftLapseProfileId,
+    shiftLapseProfileStage,
+    shiftLapseProfileNote,
+    publicationCommand: buildSelectedShiftLapsePublicationCommand(args.profileId),
+    artifactRoot: normalizePath(args.artifactRootDir),
+    auditRoot: normalizePath(args.auditRootDir),
+    transportResultLatestJsonPath: normalizePath(outputPaths.latestJsonPath),
+    transportResultLatestMdPath: normalizePath(outputPaths.latestMdPath),
+    selectedBundleArtifacts,
+    transportCertificationStatus,
+    promotionGateStatus,
+    promotionGateReason,
+    authoritativeLowExpansionStatus,
+    authoritativeLowExpansionSource,
+    wallSafetyStatus,
+    wallSafetyReason,
+    centerlineAlpha,
+    centerlineDtauDt,
+    missionTimeInterpretationStatus,
+    properMinusCoordinate_seconds,
+    properMinusClassical_seconds,
+    boundedTimingDifferentialDetected,
+    measuredResultSummary: summarizeSelectedShiftLapseTimingResult({
+      centerlineDtauDt,
+      interpretationStatus: missionTimeInterpretationStatus,
+      shiftLapseProfileId,
+    }),
+    betaOverAlphaMax: toFiniteNumber(gate?.betaOverAlphaMax),
+    betaOutwardOverAlphaWallMax: toFiniteNumber(gate?.betaOutwardOverAlphaWallMax),
+    wallHorizonMargin: toFiniteNumber(gate?.wallHorizonMargin),
+    divergenceRms: toFiniteNumber(gate?.divergenceRms),
+    divergenceMaxAbs: toFiniteNumber(gate?.divergenceMaxAbs),
+    divergenceTolerance: toFiniteNumber(gate?.divergenceTolerance),
+    thetaKConsistencyStatus:
+      typeof gate?.thetaKConsistencyStatus === "string"
+        ? String(gate.thetaKConsistencyStatus)
+        : null,
+    thetaKResidualAbs: toFiniteNumber(gate?.thetaKResidualAbs),
+    thetaKTolerance: toFiniteNumber(gate?.thetaKTolerance),
+  };
+};
+
+const summarizeSelectedShiftLapseBoundaryFailure = (
+  entry: Nhm2ShiftLapseBoundarySweepEntry | null,
+): Nhm2ShiftLapseProfileSweepFailureSummary =>
+  entry == null
+    ? null
+    : entry.authoritativeLowExpansionStatus !== "pass"
+      ? {
+          shiftLapseProfileId: entry.shiftLapseProfileId,
+          failedGate: "authoritative_low_expansion",
+          failureReason: entry.promotionGateReason ?? entry.authoritativeLowExpansionStatus,
+        }
+      : entry.wallSafetyStatus !== "pass"
+        ? {
+            shiftLapseProfileId: entry.shiftLapseProfileId,
+            failedGate: "wall_safety",
+            failureReason: entry.wallSafetyReason ?? entry.promotionGateReason,
+          }
+        : {
+            shiftLapseProfileId: entry.shiftLapseProfileId,
+            failedGate: "transport_promotion_gate",
+            failureReason: entry.promotionGateReason ?? entry.transportCertificationStatus,
+          };
+
+const computeShiftLapseBoundarySweepChecksum = (
+  payload: Nhm2ShiftLapseBoundarySweepArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const BOUNDARY_TREND_EPSILON = 1e-12;
+
+const filterFiniteTrendValues = (values: Array<number | null | undefined>): number[] =>
+  values.filter((value): value is number => Number.isFinite(value));
+
+const maxFiniteTrendValue = (
+  values: Array<number | null | undefined>,
+): number | null => {
+  const series = filterFiniteTrendValues(values);
+  return series.length > 0 ? Math.max(...series) : null;
+};
+
+const minFiniteTrendValue = (
+  values: Array<number | null | undefined>,
+): number | null => {
+  const series = filterFiniteTrendValues(values);
+  return series.length > 0 ? Math.min(...series) : null;
+};
+
+const isEffectivelyFlatSeries = (values: number[], epsilon = BOUNDARY_TREND_EPSILON): boolean =>
+  values.length < 2 || values.every((value) => Math.abs(value - values[0]!) <= epsilon);
+
+const isMonotonicNonDecreasing = (
+  values: number[],
+  epsilon = BOUNDARY_TREND_EPSILON,
+): boolean => values.every((value, index) => index === 0 || value + epsilon >= values[index - 1]!);
+
+const isMonotonicNonIncreasing = (
+  values: number[],
+  epsilon = BOUNDARY_TREND_EPSILON,
+): boolean => values.every((value, index) => index === 0 || value <= values[index - 1]! + epsilon);
+
+const classifyHigherIsWorseBoundaryTrend = (
+  values: Array<number | null | undefined>,
+): Nhm2ShiftLapseBoundaryHeadroomTrend => {
+  const series = filterFiniteTrendValues(values);
+  if (series.length < 2) return "insufficient_resolution_to_characterize";
+  if (isEffectivelyFlatSeries(series)) return "flat_within_tested_bracket";
+  if (isMonotonicNonDecreasing(series)) return "shrinking_within_tested_bracket";
+  if (isMonotonicNonIncreasing(series)) return "improving_within_tested_bracket";
+  return "insufficient_resolution_to_characterize";
+};
+
+const classifyLowerIsWorseBoundaryTrend = (
+  values: Array<number | null | undefined>,
+): Nhm2ShiftLapseBoundaryHeadroomTrend => {
+  const series = filterFiniteTrendValues(values);
+  if (series.length < 2) return "insufficient_resolution_to_characterize";
+  if (isEffectivelyFlatSeries(series)) return "flat_within_tested_bracket";
+  if (isMonotonicNonIncreasing(series)) return "shrinking_within_tested_bracket";
+  if (isMonotonicNonDecreasing(series)) return "improving_within_tested_bracket";
+  return "insufficient_resolution_to_characterize";
+};
+
+const combineBoundaryHeadroomTrends = (
+  trends: Nhm2ShiftLapseBoundaryHeadroomTrend[],
+): Nhm2ShiftLapseBoundaryHeadroomTrend => {
+  const informativeTrends = trends.filter(
+    (trend) => trend !== "insufficient_resolution_to_characterize",
+  );
+  if (informativeTrends.length === 0) return "insufficient_resolution_to_characterize";
+  if (informativeTrends.every((trend) => trend === "flat_within_tested_bracket")) {
+    return "flat_within_tested_bracket";
+  }
+  const hasShrinking = informativeTrends.includes("shrinking_within_tested_bracket");
+  const hasImproving = informativeTrends.includes("improving_within_tested_bracket");
+  if (hasShrinking && !hasImproving) return "shrinking_within_tested_bracket";
+  if (hasImproving && !hasShrinking) return "improving_within_tested_bracket";
+  return "insufficient_resolution_to_characterize";
+};
+
+const resolveNormalizedToleranceSeries = (args: {
+  values: Array<number | null | undefined>;
+  tolerances: Array<number | null | undefined>;
+}): Array<number | null> =>
+  args.values.map((value, index) => {
+    const tolerance = args.tolerances[index];
+    if (!Number.isFinite(value) || !Number.isFinite(tolerance) || tolerance == null || tolerance <= 0) {
+      return null;
+    }
+    return value / tolerance;
+  });
+
+const classifyHigherIsWorseBoundaryUsageTrend = (
+  values: Array<number | null | undefined>,
+): Nhm2ShiftLapseBoundaryUsageTrend => {
+  const series = filterFiniteTrendValues(values);
+  if (series.length < 2) return "insufficient_resolution_to_characterize";
+  if (isEffectivelyFlatSeries(series)) return "flat_within_tested_bracket";
+  if (isMonotonicNonDecreasing(series)) return "increasing_within_tested_bracket";
+  if (isMonotonicNonIncreasing(series)) return "decreasing_within_tested_bracket";
+  return "insufficient_resolution_to_characterize";
+};
+
+const resolveThresholdMargin = (
+  threshold: number | null | undefined,
+  value: number | null | undefined,
+): number | null =>
+  Number.isFinite(threshold) && Number.isFinite(value) ? threshold - value : null;
+
+const resolveBoundaryLowExpansionUsage = (
+  entry: Nhm2ShiftLapseBoundarySweepEntry,
+): {
+  divergenceUsage: number | null;
+  thetaKUsage: number | null;
+  worstUsage: number | null;
+  worstMargin: number | null;
+} => {
+  const divergenceUsage = resolveNormalizedToleranceSeries({
+    values: [entry.divergenceRms],
+    tolerances: [entry.divergenceTolerance],
+  })[0];
+  const thetaKUsage = resolveNormalizedToleranceSeries({
+    values: [entry.thetaKResidualAbs],
+    tolerances: [entry.thetaKTolerance],
+  })[0];
+  return {
+    divergenceUsage,
+    thetaKUsage,
+    worstUsage: maxFiniteTrendValue([divergenceUsage, thetaKUsage]),
+    worstMargin: minFiniteTrendValue([
+      resolveThresholdMargin(entry.divergenceTolerance, entry.divergenceRms),
+      resolveThresholdMargin(entry.thetaKTolerance, entry.thetaKResidualAbs),
+    ]),
+  };
+};
+
+const resolveBoundaryWallSafetyUsage = (
+  entry: Nhm2ShiftLapseBoundarySweepEntry,
+): {
+  betaUsage: number | null;
+  betaMargin: number | null;
+  horizonMargin: number | null;
+  worstUsage: number | null;
+  worstMargin: number | null;
+} => {
+  const betaUsage = maxFiniteTrendValue([
+    entry.betaOverAlphaMax,
+    entry.betaOutwardOverAlphaWallMax,
+  ]);
+  const betaMargin =
+    betaUsage == null ? null : resolveThresholdMargin(1, betaUsage);
+  const horizonMargin = entry.wallHorizonMargin;
+  return {
+    betaUsage,
+    betaMargin,
+    horizonMargin,
+    worstUsage: betaUsage,
+    worstMargin: minFiniteTrendValue([betaMargin, horizonMargin]),
+  };
+};
+
+const classifyBoundaryTimingDifferentialTrend = (
+  entries: Nhm2ShiftLapseBoundarySweepEntry[],
+): Nhm2ShiftLapseBoundaryTimingTrend => {
+  const magnitudeSeries = entries
+    .map(resolveSelectedShiftLapseSweepDifferentialMagnitude)
+    .filter((value): value is number => value != null);
+  if (magnitudeSeries.length < 2) return "insufficient_resolution_to_characterize";
+  if (magnitudeSeries.every((value) => value <= BOUNDARY_TREND_EPSILON)) {
+    return "flat_within_tested_bracket";
+  }
+  if (isEffectivelyFlatSeries(magnitudeSeries)) return "flat_within_tested_bracket";
+  return isMonotonicNonDecreasing(magnitudeSeries)
+    ? "growing_monotonically_within_tested_bracket"
+    : "non_monotonic_within_tested_bracket";
+};
+
+const buildBoundaryEffectVsHeadroomInterpretation = (args: {
+  timingDifferentialTrend: Nhm2ShiftLapseBoundaryTimingTrend;
+  lowExpansionUsageTrend: Nhm2ShiftLapseBoundaryUsageTrend;
+  wallSafetyUsageTrend: Nhm2ShiftLapseBoundaryUsageTrend;
+  lowExpansionHeadroomTrend: Nhm2ShiftLapseBoundaryHeadroomTrend;
+  wallSafetyHeadroomTrend: Nhm2ShiftLapseBoundaryHeadroomTrend;
+}): string => {
+  const timingDescriptor =
+    args.timingDifferentialTrend === "growing_monotonically_within_tested_bracket"
+      ? "The bounded timing differential grows monotonically"
+      : args.timingDifferentialTrend === "flat_within_tested_bracket"
+        ? "No visible bounded timing-differential growth is detected"
+        : args.timingDifferentialTrend === "non_monotonic_within_tested_bracket"
+          ? "The bounded timing differential varies non-monotonically"
+          : "The tested stronger-side bracket does not have enough passing data to characterize timing-differential growth";
+  const lowExpansionUsageDescriptor =
+    args.lowExpansionUsageTrend === "increasing_within_tested_bracket"
+      ? "low-expansion threshold usage increases"
+      : args.lowExpansionUsageTrend === "decreasing_within_tested_bracket"
+        ? "low-expansion threshold usage decreases"
+        : args.lowExpansionUsageTrend === "flat_within_tested_bracket"
+          ? "low-expansion threshold usage remains flat"
+          : "low-expansion threshold usage is unresolved at the current resolution";
+  const wallSafetyUsageDescriptor =
+    args.wallSafetyUsageTrend === "increasing_within_tested_bracket"
+      ? "wall-safety threshold usage increases"
+      : args.wallSafetyUsageTrend === "decreasing_within_tested_bracket"
+        ? "wall-safety threshold usage decreases"
+        : args.wallSafetyUsageTrend === "flat_within_tested_bracket"
+          ? "wall-safety threshold usage remains flat"
+          : "wall-safety threshold usage is unresolved at the current resolution";
+  const headroomQualifier =
+    args.lowExpansionHeadroomTrend === "flat_within_tested_bracket" &&
+    args.wallSafetyHeadroomTrend === "flat_within_tested_bracket"
+      ? " Raw headroom signals remain flat within the tested bracket."
+      : "";
+  return `${timingDescriptor} within the tested stronger-side bracket while ${lowExpansionUsageDescriptor} and ${wallSafetyUsageDescriptor} within the tested bracket.${headroomQualifier}`;
+};
+
+const buildShiftLapseBoundarySweepMargin = (args: {
+  fromShiftLapseProfileId: string;
+  boundaryProfileIds: string[];
+  toShiftLapseProfileId: string | null;
+  fromCenterlineAlpha: number | null;
+  toCenterlineAlpha: number | null;
+  noPassingProfileNote: string;
+  noFailureNote: string;
+  firstFailureNote: string;
+}): Nhm2ShiftLapseBoundarySweepMargin => {
+  if (args.toShiftLapseProfileId == null) {
+    return {
+      fromShiftLapseProfileId: args.fromShiftLapseProfileId,
+      toShiftLapseProfileId: null,
+      deltaCenterlineAlpha: null,
+      profileStepCount: null,
+      status: "no_passing_profile_available",
+      note: args.noPassingProfileNote,
+    };
+  }
+  const boundaryIndex = args.boundaryProfileIds.indexOf(args.toShiftLapseProfileId);
+  const deltaCenterlineAlpha =
+    args.fromCenterlineAlpha != null && args.toCenterlineAlpha != null
+      ? Math.abs(args.fromCenterlineAlpha - args.toCenterlineAlpha)
+      : null;
+  return {
+    fromShiftLapseProfileId: args.fromShiftLapseProfileId,
+    toShiftLapseProfileId: args.toShiftLapseProfileId,
+    deltaCenterlineAlpha,
+    profileStepCount: boundaryIndex >= 0 ? boundaryIndex + 1 : null,
+    status:
+      args.firstFailureNote.length > 0
+        ? "first_failure_delta_measured"
+        : "bounded_lower_bound_only",
+    note: args.firstFailureNote.length > 0 ? args.firstFailureNote : args.noFailureNote,
+  };
+};
+
+export const buildNhm2ShiftLapseBoundarySweepArtifact = (args: {
+  entries: Nhm2ShiftLapseBoundarySweepEntry[];
+}): Nhm2ShiftLapseBoundarySweepArtifact => {
+  const testedStopEntry =
+    args.entries.length > 0 ? args.entries[args.entries.length - 1] : null;
+  const passingEntries = args.entries.filter(isPassingSelectedShiftLapseSweepEntry);
+  const strongestPassingEntry =
+    passingEntries.length > 0 ? passingEntries[passingEntries.length - 1] : null;
+  const firstGateFailureEntry =
+    args.entries.find((entry) => !isPassingSelectedShiftLapseSweepEntry(entry)) ?? null;
+  const firstGateFailureSummary =
+    summarizeSelectedShiftLapseBoundaryFailure(firstGateFailureEntry);
+  const passingMagnitudeSeries = passingEntries
+    .map(resolveSelectedShiftLapseSweepDifferentialMagnitude)
+    .filter((value): value is number => value != null);
+  const lowExpansionUsageSummaries = passingEntries.map(resolveBoundaryLowExpansionUsage);
+  const wallSafetyUsageSummaries = passingEntries.map(resolveBoundaryWallSafetyUsage);
+  const scalingStatusWithinPassingRegion: Nhm2ShiftLapseBoundarySweepArtifact["scalingStatusWithinPassingRegion"] =
+    passingMagnitudeSeries.length < 2
+      ? "insufficient_data"
+      : passingMagnitudeSeries.every((value) => value <= 1e-12)
+        ? "flat"
+        : passingMagnitudeSeries.every(
+              (value, index) => index === 0 || value + 1e-12 >= passingMagnitudeSeries[index - 1],
+            )
+          ? "monotonic"
+          : "non_monotonic";
+  const timingDifferentialTrend = classifyBoundaryTimingDifferentialTrend(passingEntries);
+  const lowExpansionUsageTrend = classifyHigherIsWorseBoundaryUsageTrend(
+    lowExpansionUsageSummaries.map((entry) => entry.worstUsage),
+  );
+  const wallSafetyUsageTrend = classifyHigherIsWorseBoundaryUsageTrend(
+    wallSafetyUsageSummaries.map((entry) => entry.worstUsage),
+  );
+  const lowExpansionDivergenceUsage = maxFiniteTrendValue(
+    lowExpansionUsageSummaries.map((entry) => entry.divergenceUsage),
+  );
+  const lowExpansionThetaKUsage = maxFiniteTrendValue(
+    lowExpansionUsageSummaries.map((entry) => entry.thetaKUsage),
+  );
+  const lowExpansionWorstUsage = maxFiniteTrendValue(
+    lowExpansionUsageSummaries.map((entry) => entry.worstUsage),
+  );
+  const lowExpansionWorstMargin = minFiniteTrendValue(
+    lowExpansionUsageSummaries.map((entry) => entry.worstMargin),
+  );
+  const wallSafetyBetaUsage = maxFiniteTrendValue(
+    wallSafetyUsageSummaries.map((entry) => entry.betaUsage),
+  );
+  const wallSafetyBetaMargin = minFiniteTrendValue(
+    wallSafetyUsageSummaries.map((entry) => entry.betaMargin),
+  );
+  const wallSafetyHorizonMargin = minFiniteTrendValue(
+    wallSafetyUsageSummaries.map((entry) => entry.horizonMargin),
+  );
+  const wallSafetyWorstUsage = maxFiniteTrendValue(
+    wallSafetyUsageSummaries.map((entry) => entry.worstUsage),
+  );
+  const wallSafetyWorstMargin = minFiniteTrendValue(
+    wallSafetyUsageSummaries.map((entry) => entry.worstMargin),
+  );
+  const lowExpansionHeadroomTrend = combineBoundaryHeadroomTrends([
+    classifyHigherIsWorseBoundaryTrend(
+      resolveNormalizedToleranceSeries({
+        values: passingEntries.map((entry) => entry.divergenceRms),
+        tolerances: passingEntries.map((entry) => entry.divergenceTolerance),
+      }),
+    ),
+    classifyHigherIsWorseBoundaryTrend(
+      resolveNormalizedToleranceSeries({
+        values: passingEntries.map((entry) => entry.divergenceMaxAbs),
+        tolerances: passingEntries.map((entry) => entry.divergenceTolerance),
+      }),
+    ),
+    classifyHigherIsWorseBoundaryTrend(
+      resolveNormalizedToleranceSeries({
+        values: passingEntries.map((entry) => entry.thetaKResidualAbs),
+        tolerances: passingEntries.map((entry) => entry.thetaKTolerance),
+      }),
+    ),
+  ]);
+  const wallSafetyHeadroomTrend = combineBoundaryHeadroomTrends([
+    classifyHigherIsWorseBoundaryTrend(
+      passingEntries.map((entry) => entry.betaOutwardOverAlphaWallMax),
+    ),
+    classifyLowerIsWorseBoundaryTrend(
+      passingEntries.map((entry) => entry.wallHorizonMargin),
+    ),
+  ]);
+  const mostLikelyFirstFailureGate: Nhm2ShiftLapseBoundarySweepArtifact["mostLikelyFirstFailureGate"] =
+    firstGateFailureSummary?.failedGate ??
+    (lowExpansionUsageTrend === "increasing_within_tested_bracket" &&
+    wallSafetyUsageTrend !== "increasing_within_tested_bracket"
+      ? "authoritative_low_expansion"
+      : wallSafetyUsageTrend === "increasing_within_tested_bracket" &&
+          lowExpansionUsageTrend !== "increasing_within_tested_bracket"
+        ? "wall_safety"
+        : "unresolved_within_tested_bracket");
+  const effectVsHeadroomInterpretation = buildBoundaryEffectVsHeadroomInterpretation({
+    timingDifferentialTrend,
+    lowExpansionUsageTrend,
+    wallSafetyUsageTrend,
+    lowExpansionHeadroomTrend,
+    wallSafetyHeadroomTrend,
+  });
+  const referenceProfile = resolveWarpShiftLapseProfile(DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID);
+  const strongestPassingProfileId = strongestPassingEntry?.shiftLapseProfileId ?? null;
+  const strongestPassingAlpha = strongestPassingEntry?.centerlineAlpha ?? null;
+  const firstFailureProfileId = firstGateFailureSummary?.shiftLapseProfileId ?? null;
+  const firstFailureAlpha = firstGateFailureEntry?.centerlineAlpha ?? null;
+  const failureBoundaryStatus: Nhm2ShiftLapseBoundarySweepArtifact["failureBoundaryStatus"] =
+    strongestPassingEntry == null
+      ? firstGateFailureSummary != null
+        ? "first_failure_reached_within_tested_stronger_bracket"
+        : "no_passing_profile_in_tested_stronger_bracket"
+      : firstGateFailureSummary != null
+        ? "first_failure_reached_within_tested_stronger_bracket"
+        : "no_failure_reached_within_tested_stronger_bracket";
+  const marginFromReferenceProfile = buildShiftLapseBoundarySweepMargin({
+    fromShiftLapseProfileId: referenceProfile.profileId,
+    boundaryProfileIds: args.entries.map((entry) => entry.shiftLapseProfileId),
+    toShiftLapseProfileId:
+      firstFailureProfileId ?? strongestPassingProfileId,
+    fromCenterlineAlpha: referenceProfile.alphaCenterlineDefault,
+    toCenterlineAlpha:
+      firstFailureProfileId != null ? firstFailureAlpha : strongestPassingAlpha,
+    noPassingProfileNote:
+      "No stronger-side passing profile was recorded in the tested boundary bracket.",
+    noFailureNote:
+      strongestPassingProfileId == null
+        ? "No stronger-side passing profile was recorded in the tested boundary bracket."
+        : `No first-failure boundary was reached within the tested stronger bracket. Relative to ${referenceProfile.profileId}, the tested stronger-side passing margin extends through ${strongestPassingProfileId}.`,
+    firstFailureNote:
+      firstGateFailureSummary == null
+        ? ""
+        : `Relative to ${referenceProfile.profileId}, the first tested stronger-side failure occurs at ${firstFailureProfileId} via ${firstGateFailureSummary.failedGate}.`,
+  });
+  const marginFromStrongestPassingProfile: Nhm2ShiftLapseBoundarySweepArtifact["marginFromStrongestPassingProfile"] =
+    strongestPassingProfileId == null
+      ? {
+          fromShiftLapseProfileId: referenceProfile.profileId,
+          toShiftLapseProfileId: null,
+          deltaCenterlineAlpha: null,
+          profileStepCount: null,
+          status: "no_passing_profile_available",
+          note: "No passing stronger-side profile exists inside the tested boundary bracket.",
+        }
+      : {
+          fromShiftLapseProfileId: strongestPassingProfileId,
+          toShiftLapseProfileId: firstFailureProfileId,
+          deltaCenterlineAlpha:
+            strongestPassingAlpha != null && firstFailureAlpha != null
+              ? Math.abs(strongestPassingAlpha - firstFailureAlpha)
+              : null,
+          profileStepCount:
+            firstFailureProfileId == null
+              ? null
+              : Math.max(
+                  0,
+                  args.entries.findIndex(
+                    (entry) => entry.shiftLapseProfileId === firstFailureProfileId,
+                  ) -
+                    args.entries.findIndex(
+                      (entry) => entry.shiftLapseProfileId === strongestPassingProfileId,
+                    ),
+                ),
+          status:
+            firstGateFailureSummary == null
+              ? "bounded_lower_bound_only"
+              : "first_failure_delta_measured",
+          note:
+            firstGateFailureSummary == null
+              ? `No first-failure boundary was reached beyond ${strongestPassingProfileId} within the tested stronger bracket.`
+              : `The nearest tested stronger-side failure beyond ${strongestPassingProfileId} occurs at ${firstFailureProfileId} via ${firstGateFailureSummary.failedGate}.`,
+        };
+  const boundarySummary =
+    firstGateFailureSummary == null
+      ? strongestPassingProfileId == null
+        ? "The tested stronger-side bracket did not yield a gate-admitted profile, so no passing-region boundary margin can be quoted."
+        : `No first-failure boundary was reached within the tested stronger bracket. Through ${strongestPassingProfileId}, every tested stronger-side profile remained gate-admitted, and the bounded timing differential scales ${scalingStatusWithinPassingRegion} within the passing region. The current predefined exploration stop is ${testedStopEntry?.shiftLapseProfileId ?? strongestPassingProfileId}.`
+      : strongestPassingProfileId == null
+        ? `The first tested stronger-side boundary point already fails via ${firstGateFailureSummary.failedGate} at ${firstGateFailureSummary.shiftLapseProfileId}.`
+        : `The stronger-side boundary sweep reaches its first gate failure at ${firstGateFailureSummary.shiftLapseProfileId} via ${firstGateFailureSummary.failedGate}. Up to ${strongestPassingProfileId}, the bounded timing differential scales ${scalingStatusWithinPassingRegion} within the passing region.`;
+  const artifactBase: Nhm2ShiftLapseBoundarySweepArtifact = {
+    artifactType: "nhm2_shift_lapse_boundary_sweep/v1",
+    generatedOn: DATE_STAMP,
+    generatedAt: new Date().toISOString(),
+    boundaryStatement:
+      "This artifact records a small stronger-side boundary sweep beyond the locally robust nhm2_shift_lapse selected-family bracket. It does not replace canonical baseline latest aliases and does not widen speed, ETA, viability, gravity, or horizon claims.",
+    publicationCommand: SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_COMMAND,
+    canonicalBaselineMetricT00Ref: "warp.metric.T00.natario_sdf.shift",
+    canonicalBaselineLatestAliasesChanged: false,
+    boundaryFamilyId: "stage1_centerline_alpha_stronger_boundary_bracket_v1",
+    sweepDimension: "centerline_alpha",
+    referenceSelectedFamilyResult: {
+      shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      latestJsonPath: normalizePath(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+      latestMdPath: normalizePath(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD),
+    },
+    localRobustnessSweep: {
+      latestJsonPath: normalizePath(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_JSON),
+      latestMdPath: normalizePath(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_MD),
+      strongestLocallyRobustProfileId:
+        STAGE1_CENTERLINE_ALPHA_ROBUSTNESS_SWEEP_PROFILE_IDS[
+          STAGE1_CENTERLINE_ALPHA_ROBUSTNESS_SWEEP_PROFILE_IDS.length - 1
+        ] ?? null,
+    },
+    boundaryProfileIds: args.entries.map((entry) => entry.shiftLapseProfileId),
+    testedStrongerBracketStopProfileId: testedStopEntry?.shiftLapseProfileId ?? null,
+    testedStrongerBracketStopCenterlineAlpha: testedStopEntry?.centerlineAlpha ?? null,
+    strongestProfileKeepingAllGatesPassing: strongestPassingProfileId,
+    firstGateFailure: firstFailureProfileId,
+    firstGateFailureReason: firstGateFailureSummary?.failureReason ?? null,
+    firstFailedGate: firstGateFailureSummary?.failedGate ?? null,
+    failureBoundaryStatus,
+    marginFromReferenceProfile,
+    marginFromStrongestPassingProfile,
+    scalingStatusWithinPassingRegion,
+    timingDifferentialTrend,
+    lowExpansionUsageTrend,
+    wallSafetyUsageTrend,
+    lowExpansionDivergenceUsage,
+    lowExpansionThetaKUsage,
+    lowExpansionWorstUsage,
+    lowExpansionWorstMargin,
+    wallSafetyBetaUsage,
+    wallSafetyBetaMargin,
+    wallSafetyHorizonMargin,
+    wallSafetyWorstUsage,
+    wallSafetyWorstMargin,
+    lowExpansionHeadroomTrend,
+    wallSafetyHeadroomTrend,
+    mostLikelyFirstFailureGate,
+    effectVsHeadroomInterpretation,
+    boundarySummary,
+    entries: args.entries,
+    nonClaims: [
+      "does not replace the canonical baseline latest aliases",
+      "does not certify speed or ETA",
+      "does not widen viability claims",
+      "does not convert wall-safety guardrails into a theorem-level horizon claim",
+      "does not widen source/mechanism authority",
+    ],
+  };
+  return {
+    ...artifactBase,
+    checksum: computeShiftLapseBoundarySweepChecksum(artifactBase),
+  };
+};
+
+const renderNhm2ShiftLapseBoundarySweepMarkdown = (
+  payload: Nhm2ShiftLapseBoundarySweepArtifact,
+): string => {
+  const resultRows = payload.entries
+    .map(
+      (entry) =>
+        `| ${entry.shiftLapseProfileId} | ${entry.transportCertificationStatus ?? "null"} | ${entry.promotionGateStatus ?? "null"} | ${entry.authoritativeLowExpansionStatus ?? "null"} | ${entry.wallSafetyStatus ?? "null"} | ${entry.centerlineAlpha ?? "null"} | ${entry.centerlineDtauDt ?? "null"} | ${entry.missionTimeInterpretationStatus ?? "null"} | ${entry.properMinusCoordinate_seconds ?? "null"} | ${entry.boundedTimingDifferentialDetected == null ? "null" : String(entry.boundedTimingDifferentialDetected)} |`,
+    )
+    .join("\n");
+  const headroomRows = payload.entries
+    .map(
+      (entry) =>
+        `| ${entry.shiftLapseProfileId} | ${entry.divergenceRms ?? "null"} | ${entry.divergenceTolerance ?? "null"} | ${entry.thetaKResidualAbs ?? "null"} | ${entry.thetaKTolerance ?? "null"} | ${entry.betaOutwardOverAlphaWallMax ?? "null"} | ${entry.wallHorizonMargin ?? "null"} |`,
+    )
+    .join("\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Shift+Lapse Stronger-Side Boundary Sweep (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Reproduce
+- publicationCommand: \`${payload.publicationCommand}\`
+- referenceSelectedFamilyResultJson: \`${payload.referenceSelectedFamilyResult.latestJsonPath}\`
+- referenceSelectedFamilyResultMd: \`${payload.referenceSelectedFamilyResult.latestMdPath}\`
+- localRobustnessSweepJson: \`${payload.localRobustnessSweep.latestJsonPath}\`
+- localRobustnessSweepMd: \`${payload.localRobustnessSweep.latestMdPath}\`
+- boundaryProfileIds: ${payload.boundaryProfileIds.map((entry) => `\`${entry}\``).join(", ")}
+- testedStrongerBracketStopProfileId: \`${payload.testedStrongerBracketStopProfileId ?? "null"}\`
+- testedStrongerBracketStopCenterlineAlpha: \`${payload.testedStrongerBracketStopCenterlineAlpha ?? "null"}\`
+- canonicalBaselineMetricT00Ref: \`${payload.canonicalBaselineMetricT00Ref}\`
+- canonicalBaselineLatestAliasesChanged: ${String(payload.canonicalBaselineLatestAliasesChanged)}
+
+## Boundary Result
+- strongestProfileKeepingAllGatesPassing: \`${payload.strongestProfileKeepingAllGatesPassing ?? "null"}\`
+- firstGateFailure: \`${payload.firstGateFailure ?? "null"}\`
+- firstFailedGate: \`${payload.firstFailedGate ?? "null"}\`
+- firstGateFailureReason: \`${payload.firstGateFailureReason ?? "null"}\`
+- failureBoundaryStatus: \`${payload.failureBoundaryStatus}\`
+- scalingStatusWithinPassingRegion: \`${payload.scalingStatusWithinPassingRegion}\`
+- marginFromReferenceProfile: ${payload.marginFromReferenceProfile.note}
+- marginFromStrongestPassingProfile: ${payload.marginFromStrongestPassingProfile.note}
+- boundarySummary: ${payload.boundarySummary}
+
+## Trend Summary
+- timingDifferentialTrend: \`${payload.timingDifferentialTrend}\`
+- lowExpansionUsageTrend: \`${payload.lowExpansionUsageTrend}\`
+- wallSafetyUsageTrend: \`${payload.wallSafetyUsageTrend}\`
+- lowExpansionHeadroomTrend: \`${payload.lowExpansionHeadroomTrend}\`
+- wallSafetyHeadroomTrend: \`${payload.wallSafetyHeadroomTrend}\`
+- mostLikelyFirstFailureGate: \`${payload.mostLikelyFirstFailureGate}\`
+- effectVsHeadroomInterpretation: ${payload.effectVsHeadroomInterpretation}
+
+## Threshold Usage Summary
+- lowExpansionDivergenceUsage (divergenceRms/divergenceTolerance): \`${payload.lowExpansionDivergenceUsage ?? "null"}\`
+- lowExpansionThetaKUsage (thetaKResidualAbs/thetaKTolerance): \`${payload.lowExpansionThetaKUsage ?? "null"}\`
+- lowExpansionWorstUsage: \`${payload.lowExpansionWorstUsage ?? "null"}\`
+- lowExpansionWorstMargin: \`${payload.lowExpansionWorstMargin ?? "null"}\`
+- wallSafetyBetaUsage (max(betaOverAlphaMax, betaOutwardOverAlphaWallMax)): \`${payload.wallSafetyBetaUsage ?? "null"}\`
+- wallSafetyBetaMargin: \`${payload.wallSafetyBetaMargin ?? "null"}\`
+- wallSafetyHorizonMargin: \`${payload.wallSafetyHorizonMargin ?? "null"}\`
+- wallSafetyWorstUsage: \`${payload.wallSafetyWorstUsage ?? "null"}\`
+- wallSafetyWorstMargin: \`${payload.wallSafetyWorstMargin ?? "null"}\`
+
+## Per-Profile Results
+| shiftLapseProfileId | transportCertificationStatus | promotionGateStatus | authoritativeLowExpansionStatus | wallSafetyStatus | centerlineAlpha | centerlineDtauDt | missionTimeInterpretationStatus | properMinusCoordinate_seconds | boundedTimingDifferentialDetected |
+|---|---|---|---|---|---|---|---|---|---|
+${resultRows}
+
+## Headroom Indicators
+| shiftLapseProfileId | divergenceRms | divergenceTolerance | thetaKResidualAbs | thetaKTolerance | betaOutwardOverAlphaWallMax | wallHorizonMargin |
+|---|---|---|---|---|---|---|
+${headroomRows}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
+  baseUrl?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  profileIds?: string[];
+}): Promise<{
+  entries: Nhm2ShiftLapseBoundarySweepEntry[];
+  boundaryArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2ShiftLapseBoundarySweepArtifact;
+  };
+}> => {
+  const artifactRootDir =
+    options?.artifactRootDir ?? SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_ARTIFACT_DIR;
+  const auditRootDir =
+    options?.auditRootDir ?? SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_AUDIT_DIR;
+  const latestBoundaryJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_JSON),
+  );
+  const requestedProfileIds =
+    options?.profileIds != null && options.profileIds.length > 0
+      ? options.profileIds.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+      : [...STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS];
+  const existingEntries =
+    options?.profileIds != null && options.profileIds.length > 0
+      ? []
+      : readExistingBoundarySweepEntries(latestBoundaryJsonPath).filter((entry) =>
+          requestedProfileIds.includes(entry.shiftLapseProfileId),
+        );
+  const existingFirstFailure =
+    existingEntries.find((entry) => !isPassingSelectedShiftLapseSweepEntry(entry)) ?? null;
+  const completedProfileIds = new Set(
+    existingEntries.map((entry) => entry.shiftLapseProfileId),
+  );
+  const entries: Nhm2ShiftLapseBoundarySweepEntry[] = [...existingEntries];
+  const profileIds =
+    existingFirstFailure != null
+      ? []
+      : requestedProfileIds.filter((profileId) => !completedProfileIds.has(profileId));
+  for (const profileId of profileIds) {
+    const resolvedProfile = resolveWarpShiftLapseProfile(profileId);
+    const profileArtifactRoot = resolveSelectedShiftLapseBoundaryProfileArtifactRoot(
+      artifactRootDir,
+      profileId,
+    );
+    const profileAuditRoot = resolveSelectedShiftLapseBoundaryProfileAuditRoot(
+      auditRootDir,
+      profileId,
+    );
+    const requestSelectors = {
+      ...SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS,
+      shiftLapseProfileId: profileId,
+    } satisfies Partial<ControlRequestSelectors>;
+    const refreshedState = await refreshPipelineStateForPublication(requestSelectors);
+    if (!stateHasGateAdmittedSelectedTransportSurface(refreshedState, requestSelectors)) {
+      entries.push(
+        buildNhm2ShiftLapseBoundaryEntryFromPublicationState({
+          state: refreshedState,
+          profileId,
+          artifactRootDir: profileArtifactRoot,
+          auditRootDir: profileAuditRoot,
+        }),
+      );
+      break;
+    }
+    const published = await publishNhm2ShiftLapseSelectedTransportBundle({
+      baseUrl: options?.baseUrl,
+      artifactRootDir: profileArtifactRoot,
+      auditRootDir: profileAuditRoot,
+      publicationLockPath: path.join(
+        profileArtifactRoot,
+        ".nhm2-selected-family-boundary-sweep.lock",
+      ),
+      shiftLapseProfileId: profileId,
+    });
+    const transportResult = published.transportResult.artifact;
+    const gate =
+      published.boundedStack.worldline.artifact.sourceSurface.shiftLapseTransportPromotionGate ??
+      null;
+    entries.push({
+      shiftLapseProfileId: transportResult.selectedFamily.shiftLapseProfileId ?? profileId,
+      shiftLapseProfileStage:
+        transportResult.selectedFamily.shiftLapseProfileStage ?? resolvedProfile.profileStage,
+      shiftLapseProfileNote:
+        transportResult.selectedFamily.shiftLapseProfileNote ?? resolvedProfile.profileNote,
+      publicationCommand: buildSelectedShiftLapsePublicationCommand(profileId),
+      artifactRoot: normalizePath(profileArtifactRoot),
+      auditRoot: normalizePath(profileAuditRoot),
+      transportResultLatestJsonPath: normalizePath(published.transportResult.latestJsonPath),
+      transportResultLatestMdPath: normalizePath(published.transportResult.latestMdPath),
+      selectedBundleArtifacts: transportResult.selectedBundleArtifacts,
+      transportCertificationStatus: transportResult.transportCertificationStatus,
+      promotionGateStatus: transportResult.promotionGateStatus,
+      promotionGateReason: transportResult.promotionGateReason,
+      authoritativeLowExpansionStatus: transportResult.authoritativeLowExpansionStatus,
+      authoritativeLowExpansionSource: transportResult.authoritativeLowExpansionSource,
+      wallSafetyStatus: transportResult.wallSafetyStatus,
+      wallSafetyReason: transportResult.wallSafetyReason,
+      centerlineAlpha: transportResult.centerlineAlpha,
+      centerlineDtauDt: transportResult.centerlineDtauDt,
+      missionTimeInterpretationStatus: transportResult.missionTimeInterpretationStatus,
+      properMinusCoordinate_seconds: transportResult.properMinusCoordinate_seconds,
+      properMinusClassical_seconds: transportResult.properMinusClassical_seconds,
+      boundedTimingDifferentialDetected: transportResult.boundedTimingDifferentialDetected,
+      measuredResultSummary: transportResult.measuredResultSummary,
+      betaOverAlphaMax: gate?.betaOverAlphaMax ?? null,
+      betaOutwardOverAlphaWallMax: gate?.betaOutwardOverAlphaWallMax ?? null,
+      wallHorizonMargin: gate?.wallHorizonMargin ?? null,
+      divergenceRms: gate?.divergenceRms ?? null,
+      divergenceMaxAbs: gate?.divergenceMaxAbs ?? null,
+      divergenceTolerance: gate?.divergenceTolerance ?? null,
+      thetaKConsistencyStatus: gate?.thetaKConsistencyStatus ?? null,
+      thetaKResidualAbs: gate?.thetaKResidualAbs ?? null,
+      thetaKTolerance: gate?.thetaKTolerance ?? null,
+    });
+    if (!isPassingSelectedShiftLapseSweepEntry(entries[entries.length - 1]!)) {
+      break;
+    }
+  }
+  const artifact = buildNhm2ShiftLapseBoundarySweepArtifact({ entries });
+  const markdown = renderNhm2ShiftLapseBoundarySweepMarkdown(artifact);
+  const outJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_OUT_JSON),
+  );
+  const latestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_JSON),
+  );
+  const outMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_OUT_MD),
+  );
+  const latestMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_MD),
+  );
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  return {
+    entries,
+    boundaryArtifact: {
+      outJsonPath,
+      latestJsonPath,
+      outMdPath,
+      latestMdPath,
+      artifact,
+    },
+  };
+};
 
 const computeCanonicalVisualComparisonChecksum = (
   payload: Nhm2CanonicalVisualComparisonArtifact,
@@ -33196,6 +36199,7 @@ export const evaluateClassificationRobustness = (args: {
   preconditions: ProofPackPreconditions;
   controlsCalibratedByReferences: boolean;
   yorkCongruence: YorkCongruenceEvaluation;
+  authoritativeLowExpansionGate?: ProofPackPayload["authoritativeLowExpansionGate"];
   alcubierreFeatures: CaseClassificationFeatures;
   natarioFeatures: CaseClassificationFeatures;
   nhm2Features: CaseClassificationFeatures;
@@ -33333,6 +36337,7 @@ export const evaluateClassificationRobustness = (args: {
             controlsCalibratedByReferences: args.controlsCalibratedByReferences,
             classificationScoring: scoring,
             yorkCongruence: args.yorkCongruence,
+            authoritativeLowExpansionGate: args.authoritativeLowExpansionGate,
           });
     variantResults.push({
       variant_id: variant.variant_id,
@@ -33893,17 +36898,22 @@ const evaluateDiagnosticLane = (args: {
     natarioFeatures: nat.classificationFeatures,
     nhm2Features: nhm2.classificationFeatures,
   });
+  const authoritativeLowExpansionGate = buildAuthoritativeLowExpansionGateSummary({
+    cases: args.cases,
+  });
   const verdict = decideControlFamilyVerdict({
     preconditions,
     controlsCalibratedByReferences,
     classificationScoring,
     yorkCongruence,
+    authoritativeLowExpansionGate,
   });
   const classificationRobustness = evaluateClassificationRobustness({
     contract: args.contract,
     preconditions,
     controlsCalibratedByReferences,
     yorkCongruence,
+    authoritativeLowExpansionGate,
     alcubierreFeatures: alc.classificationFeatures,
     natarioFeatures: nat.classificationFeatures,
     nhm2Features: nhm2.classificationFeatures,
@@ -33946,7 +36956,19 @@ const evaluateDiagnosticLane = (args: {
     notes.push("Renderer calibration is not established by controls for this run; verdict remains inconclusive by contract.");
   }
   if (verdict === NHM2_DIAGNOSTIC_OUTCOME.LOW_EXPANSION_LIKE) {
-    notes.push("NHM2 primary York behavior aligns with low-expansion Natario-like control in this run.");
+    notes.push(
+      "NHM2 primary York behavior aligns with low-expansion Natario-like control in this run under the authoritative low-expansion gate.",
+    );
+  }
+  if (authoritativeLowExpansionGate) {
+    notes.push(formatAuthoritativeLowExpansionGateProofPackNote(authoritativeLowExpansionGate));
+    notes.push(authoritativeLowExpansionGate.projectionDerivedNote);
+  }
+  if (
+    classificationScoring?.winning_reference === "natario_control" &&
+    authoritativeLowExpansionGate?.status !== "pass"
+  ) {
+    notes.push(AUTHORITATIVE_LOW_EXPANSION_BLOCKED_NOTE);
   }
   if (verdict === NHM2_DIAGNOSTIC_OUTCOME.ALCUBIERRE_LIKE) {
     notes.push("NHM2 primary York behavior aligns with the Alcubierre-like calibration reference in this run.");
@@ -34440,6 +37462,26 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
   const scoringRows = scoring
     ? `| distance_to_alcubierre_reference | ${scoring.distance_to_alcubierre_reference ?? "null"} |\n| distance_to_low_expansion_reference | ${scoring.distance_to_low_expansion_reference ?? "null"} |\n| reference_margin | ${scoring.reference_margin ?? "null"} |\n| winning_reference | ${scoring.winning_reference ?? "null"} |\n| margin_sufficient | ${scoring.margin_sufficient} |\n| winning_reference_within_threshold | ${scoring.winning_reference_within_threshold} |\n| distinct_by_policy | ${scoring.distinct_by_policy} |\n| margin_min | ${scoring.margin_min} |\n| reference_match_threshold | ${scoring.reference_match_threshold} |\n| distinctness_threshold | ${scoring.distinctness_threshold} |\n| distance_metric | ${scoring.distance_metric} |\n| normalization_method | ${scoring.normalization_method} |`
     : "| unavailable | unavailable |";
+  const authoritativeLowExpansionGateRows = payload.authoritativeLowExpansionGate
+    ? [
+        `| sourceCaseId | ${payload.authoritativeLowExpansionGate.sourceCaseId} |`,
+        `| status | ${payload.authoritativeLowExpansionGate.status} |`,
+        `| reason | ${payload.authoritativeLowExpansionGate.reason} |`,
+        `| source | ${payload.authoritativeLowExpansionGate.source ?? "null"} |`,
+        `| authoritative | ${payload.authoritativeLowExpansionGate.authoritative} |`,
+        `| divergenceObservable | ${payload.authoritativeLowExpansionGate.divergenceObservable} |`,
+        `| divergenceRms | ${payload.authoritativeLowExpansionGate.divergenceRms ?? "null"} |`,
+        `| divergenceMaxAbs | ${payload.authoritativeLowExpansionGate.divergenceMaxAbs ?? "null"} |`,
+        `| divergenceTolerance | ${payload.authoritativeLowExpansionGate.divergenceTolerance} |`,
+        `| thetaKConsistencyStatus | ${payload.authoritativeLowExpansionGate.thetaKConsistencyStatus} |`,
+        `| thetaKResidualMaxAbs | ${payload.authoritativeLowExpansionGate.thetaKResidualMaxAbs ?? "null"} |`,
+        `| thetaKTolerance | ${payload.authoritativeLowExpansionGate.thetaKTolerance} |`,
+        `| projectionDerivedStatus | ${payload.authoritativeLowExpansionGate.projectionDerivedStatus} |`,
+      ].join("\n")
+    : "| authoritative_low_expansion_gate | unavailable |";
+  const authoritativeLowExpansionGateNote = payload.authoritativeLowExpansionGate
+    ? `- ${payload.authoritativeLowExpansionGate.projectionDerivedNote}`
+    : "- unavailable";
   const robustness = payload.classificationRobustness;
   const robustnessSummaryRows = robustness
     ? `| baselineVerdict | ${robustness.baselineVerdict} |\n| stabilityStatus | ${robustness.stabilityStatus} |\n| dominantVerdict | ${robustness.dominantVerdict ?? "null"} |\n| dominantFraction | ${robustness.dominantFraction} |\n| stableVerdict | ${robustness.stableVerdict ?? "null"} |\n| totalVariants | ${robustness.totalVariants} |\n| evaluatedVariants | ${robustness.evaluatedVariants} |\n| stable_fraction_min | ${robustness.stabilityPolicy.stable_fraction_min} |\n| marginal_fraction_min | ${robustness.stabilityPolicy.marginal_fraction_min} |\n| count_nhm2_alcubierre_like_family | ${robustness.verdictCounts.nhm2_alcubierre_like_family} |\n| count_nhm2_low_expansion_family | ${robustness.verdictCounts.nhm2_low_expansion_family} |\n| count_nhm2_distinct_family | ${robustness.verdictCounts.nhm2_distinct_family} |\n| count_inconclusive | ${robustness.verdictCounts.inconclusive} |`
@@ -34775,7 +37817,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| sourceMechanismNonAuthoritative | ${payload.sourceMechanismPromotionContract.sourceMechanismNonAuthoritative} |`,
         `| sourceMechanismFormulaEquivalent | ${payload.sourceMechanismPromotionContract.sourceMechanismFormulaEquivalent} |`,
         `| nhm2ShiftLapseFamilyAuthorityStatus | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseFamilyAuthorityStatus} |`,
-        `| nhm2ShiftLapseTransportCertificationStatus | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseTransportCertificationStatus} |`,
+        `| nhm2ShiftLapseDefaultTransportCertificationStatus | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseDefaultTransportCertificationStatus} |`,
+        `| nhm2ShiftLapseSelectedPublicationStatus | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseSelectedPublicationStatus} |`,
+        `| nhm2ShiftLapseSelectedPublicationSummary | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseSelectedPublicationSummary} |`,
         `| nhm2ShiftLapseStatusSummary | ${payload.sourceMechanismPromotionContract.nhm2ShiftLapseStatusSummary} |`,
         `| sourceMechanismConsumerSummary | ${payload.sourceMechanismPromotionContract.sourceMechanismConsumerSummary} |`,
         `| exemptionRouteStatus | ${payload.sourceMechanismPromotionContract.exemptionRouteStatus} |`,
@@ -34873,6 +37917,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| eligibleNextProducts | ${payload.warpWorldlineSummary.eligibleNextProducts.join(",") || "none"} |`,
         `| routeTimeStatus | ${payload.warpWorldlineSummary.routeTimeStatus} |`,
         `| transportInterpretation | ${payload.warpWorldlineSummary.transportInterpretation} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.warpWorldlineSummary.transportSurfaceStatus,
+        ),
         `| nonClaims | ${payload.warpWorldlineSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.warpWorldlineSummary.artifactPath} |`,
         `| reportPath | ${payload.warpWorldlineSummary.reportPath} |`,
@@ -34899,6 +37946,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| sampleFamilyAdequacy | ${payload.cruisePreflightSummary.sampleFamilyAdequacy} |`,
         `| transportVariationStatus | ${payload.cruisePreflightSummary.transportVariationStatus} |`,
         `| routeTimeStatus | ${payload.cruisePreflightSummary.routeTimeStatus} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.cruisePreflightSummary.transportSurfaceStatus,
+        ),
         `| eligibleNextProducts | ${payload.cruisePreflightSummary.eligibleNextProducts.join(",") || "none"} |`,
         `| nonClaims | ${payload.cruisePreflightSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.cruisePreflightSummary.artifactPath} |`,
@@ -34927,6 +37977,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| sampleFamilyAdequacy | ${payload.routeTimeWorldlineSummary.sampleFamilyAdequacy} |`,
         `| transportVariationStatus | ${payload.routeTimeWorldlineSummary.transportVariationStatus} |`,
         `| routeTimeStatus | ${payload.routeTimeWorldlineSummary.routeTimeStatus} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.routeTimeWorldlineSummary.transportSurfaceStatus,
+        ),
         `| nextEligibleProducts | ${payload.routeTimeWorldlineSummary.nextEligibleProducts.join(",") || "none"} |`,
         `| nonClaims | ${payload.routeTimeWorldlineSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.routeTimeWorldlineSummary.artifactPath} |`,
@@ -34952,6 +38005,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| properTimeEstimate.seconds | ${payload.missionTimeEstimatorSummary.properTimeEstimate.seconds} |`,
         `| properTimeEstimate.years | ${payload.missionTimeEstimatorSummary.properTimeEstimate.years} |`,
         `| routeTimeStatus | ${payload.missionTimeEstimatorSummary.routeTimeStatus} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.missionTimeEstimatorSummary.transportSurfaceStatus,
+        ),
         `| nextEligibleProducts | ${payload.missionTimeEstimatorSummary.nextEligibleProducts.join(",") || "none"} |`,
         `| nonClaims | ${payload.missionTimeEstimatorSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.missionTimeEstimatorSummary.artifactPath} |`,
@@ -34978,6 +38034,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| properMinusClassicalSeconds | ${payload.missionTimeComparisonSummary.properMinusClassicalSeconds} |`,
         `| comparisonInterpretationStatus | ${payload.missionTimeComparisonSummary.comparisonInterpretationStatus} |`,
         `| comparisonReadiness | ${payload.missionTimeComparisonSummary.comparisonReadiness} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.missionTimeComparisonSummary.transportSurfaceStatus,
+        ),
         `| deferredComparators | ${payload.missionTimeComparisonSummary.deferredComparators.join(",") || "none"} |`,
         `| nonClaims | ${payload.missionTimeComparisonSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.missionTimeComparisonSummary.artifactPath} |`,
@@ -35004,6 +38063,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| comparisonConsistencyStatus | ${payload.cruiseEnvelopeSummary.comparisonConsistencyStatus} |`,
         `| routeTimeStatus | ${payload.cruiseEnvelopeSummary.routeTimeStatus} |`,
         `| missionTimeStatus | ${payload.cruiseEnvelopeSummary.missionTimeStatus} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.cruiseEnvelopeSummary.transportSurfaceStatus,
+        ),
         `| nonClaims | ${payload.cruiseEnvelopeSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.cruiseEnvelopeSummary.artifactPath} |`,
         `| reportPath | ${payload.cruiseEnvelopeSummary.reportPath} |`,
@@ -35026,6 +38088,9 @@ export const renderMarkdown = (payload: ProofPackPayload): string => {
         `| max_mps2 | ${payload.inHullProperAccelerationSummary.max_mps2} |`,
         `| resolutionAdequacy | ${payload.inHullProperAccelerationSummary.resolutionAdequacy} |`,
         `| fallbackUsed | ${payload.inHullProperAccelerationSummary.fallbackUsed} |`,
+        ...buildTransportSurfaceStatusMarkdownRows(
+          payload.inHullProperAccelerationSummary.transportSurfaceStatus,
+        ),
         `| nonClaims | ${payload.inHullProperAccelerationSummary.nonClaims.join(",")} |`,
         `| artifactPath | ${payload.inHullProperAccelerationSummary.artifactPath} |`,
         `| reportPath | ${payload.inHullProperAccelerationSummary.reportPath} |`,
@@ -35192,6 +38257,14 @@ ${classificationFeatureRows}
 | metric | value |
 |---|---|
 ${scoringRows}
+
+## Authoritative Low-Expansion Gate
+| field | value |
+|---|---|
+${authoritativeLowExpansionGateRows}
+
+### Authoritative Low-Expansion Gate Notes
+${authoritativeLowExpansionGateNote}
 
 ## Classification Robustness Summary
 | metric | value |
@@ -35885,9 +38958,11 @@ export const publishWarpYorkControlFamilyInvariantLatest = async (options?: {
   process.stderr.write(
     "[warp-york-control-family-proof-pack] publish_stage=load_existing_latest_artifacts\n",
   );
-  const existingProofPackPayload = readJsonArtifact<ProofPackPayload>(
-    latestJsonPath,
-    "warp_york_control_family_proof_pack/v1",
+  const existingProofPackPayload = await refreshProofPackAuthoritativeLowExpansionGate(
+    readJsonArtifact<ProofPackPayload>(
+      latestJsonPath,
+      "warp_york_control_family_proof_pack/v1",
+    ),
   );
   const yorkFixedScaleComparisonArtifact =
     readJsonArtifact<WarpYorkFixedScaleComparisonArtifact>(
@@ -36668,6 +39743,9 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   });
 
   const cases = baselineEvaluation.cases;
+  const authoritativeLowExpansionGate = buildAuthoritativeLowExpansionGateSummary({
+    cases,
+  });
   const controlDebug = baselineEvaluation.controlDebug;
   const preconditions = baselineEvaluation.preconditions;
   const laneAParity = baselineEvaluation.laneAParity;
@@ -36678,6 +39756,11 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
   const classificationRobustness = baselineEvaluation.classificationRobustness;
   const verdict = baselineEvaluation.verdict;
   const notes = [...baselineEvaluation.notes];
+  if (authoritativeLowExpansionGate) {
+    notes.push(
+      `authoritative_low_expansion_gate=${authoritativeLowExpansionGate.status} source=${authoritativeLowExpansionGate.source ?? "null"} divergence_rms=${authoritativeLowExpansionGate.divergenceRms ?? "null"} divergence_max_abs=${authoritativeLowExpansionGate.divergenceMaxAbs ?? "null"} theta_k_status=${authoritativeLowExpansionGate.thetaKConsistencyStatus} reason=${authoritativeLowExpansionGate.reason}`,
+    );
+  }
   notes.push(
     `Classification contract ${diagnosticContract.contract_id}@v${diagnosticContract.version} uses ${diagnosticContract.decision_policy.distance_metric} with margin=${diagnosticContract.decision_policy.reference_margin_min}.`,
   );
@@ -37151,7 +40234,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
       `source_mechanism_promotion_contract_status=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.contractStatus} selected_route=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.selectedPromotionRoute} policy=${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.promotionDecisionPolicy}`,
   );
   notes.push(
-    `source_mechanism_consumer_scope=active_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.activeClaimSet.join(",") || "none"} blocked_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.inactiveClaimSet.join(",") || "none"} reference_only_scope=${String(sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.referenceOnlyCrossLaneScope)} formula_equivalence=${String(sourceFormulaAuditArtifact.formulaComparison.formulaEquivalent)} parity_route=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus} nhm2_shift_lapse_family_status=${deriveWarpMetricFamilySemantics("nhm2_shift_lapse").familyAuthorityStatus} nhm2_shift_lapse_transport_status=${deriveWarpMetricFamilySemantics("nhm2_shift_lapse").transportCertificationStatus}`,
+    `source_mechanism_consumer_scope=active_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.activeClaimSet.join(",") || "none"} blocked_claims:${sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.inactiveClaimSet.join(",") || "none"} reference_only_scope=${String(sourceMechanismPromotionContractArtifact.sourceMechanismPromotionContract.referenceOnlyCrossLaneScope)} formula_equivalence=${String(sourceFormulaAuditArtifact.formulaComparison.formulaEquivalent)} parity_route=${sourceMechanismParityRouteFeasibilityArtifact.sourceMechanismParityRouteFeasibility.feasibilityStatus} nhm2_shift_lapse_family_status=${deriveWarpMetricFamilySemantics("nhm2_shift_lapse").familyAuthorityStatus} nhm2_shift_lapse_default_transport_status=${deriveWarpMetricFamilySemantics("nhm2_shift_lapse").transportCertificationStatus} nhm2_shift_lapse_selected_publication_status=explicit_gate_admitted_selected_family_publication_available`,
   );
   const solveAuthorityArtifact = buildNhm2SolveAuthorityAuditArtifact({
     payload: {
@@ -38591,6 +41674,7 @@ export const runWarpYorkControlFamilyProofPack = async (options?: {
     classificationScoring,
     classificationRobustness,
     verdict,
+    authoritativeLowExpansionGate,
     sourceToYorkBridge: sourceToYorkBridgeSummary,
     timingAuthorityAudit: {
       timingAuthorityClosed: timingAuthorityAuditArtifact.timingReadiness.timingAuthorityClosed,
@@ -39557,8 +42641,21 @@ if (isEntryPoint) {
     "--publish-bounded-stack-latest",
     argv,
   );
+  const publishSelectedShiftLapseTransport = hasArg(
+    "--publish-selected-shift-lapse-transport",
+    argv,
+  );
+  const publishSelectedShiftLapseProfileSweep = hasArg(
+    "--publish-selected-shift-lapse-profile-sweep",
+    argv,
+  );
+  const publishSelectedShiftLapseBoundarySweep = hasArg(
+    "--publish-selected-shift-lapse-boundary-sweep",
+    argv,
+  );
   const parsedOptions = {
     baseUrl: readArgValue("--base-url", argv),
+    shiftLapseProfileId: readArgValue("--shift-lapse-profile-id", argv),
     frameEndpoint: readArgValue("--frame-endpoint", argv),
     proxyFrameEndpoint: readArgValue("--proxy-frame-endpoint", argv),
     compareDirectAndProxy,
@@ -39852,42 +42949,97 @@ if (isEntryPoint) {
     solveAuthorityLatestMdPath: readArgValue("--solve-authority-latest-md", argv),
     waveAEvidencePackPath: readArgValue("--wave-a-evidence-pack", argv),
     firstDivergencePath: readArgValue("--first-divergence", argv),
+    publicationWarpFieldType: readArgValue("--publication-warp-field-type", argv),
+    publicationMetricT00Ref: readArgValue("--publication-metric-t00-ref", argv),
+    publicationMetricT00Source: readArgValue("--publication-metric-t00-source", argv),
+    publicationShiftLapseProfileId: readArgValue(
+      "--publication-shift-lapse-profile-id",
+      argv,
+    ),
+    publicationRequireCongruentSolve: parseBooleanArg(
+      readArgValue("--publication-require-congruent-solve", argv),
+      false,
+    ),
+    publicationRequireNhm2CongruentFullSolve: parseBooleanArg(
+      readArgValue("--publication-require-nhm2-congruent-full-solve", argv),
+      false,
+    ),
     yorkViews: parseYorkViews(readArgValue("--views", argv)),
     frameSize: { width, height },
   };
-  const runner = publishBoundedStackLatest
+  const publicationRequestSelectors = hasMeaningfulPublicationRequestSelectors({
+    metricT00Ref: parsedOptions.publicationMetricT00Ref,
+    metricT00Source: parsedOptions.publicationMetricT00Source,
+    shiftLapseProfileId: parsedOptions.publicationShiftLapseProfileId,
+    requireCongruentSolve: parsedOptions.publicationRequireCongruentSolve,
+    requireNhm2CongruentFullSolve:
+      parsedOptions.publicationRequireNhm2CongruentFullSolve,
+    warpFieldType: parsedOptions.publicationWarpFieldType,
+  })
+    ? {
+        metricT00Ref: parsedOptions.publicationMetricT00Ref,
+        metricT00Source: parsedOptions.publicationMetricT00Source,
+        shiftLapseProfileId: parsedOptions.publicationShiftLapseProfileId,
+        requireCongruentSolve: parsedOptions.publicationRequireCongruentSolve,
+        requireNhm2CongruentFullSolve:
+          parsedOptions.publicationRequireNhm2CongruentFullSolve,
+        warpFieldType: parsedOptions.publicationWarpFieldType,
+      }
+    : undefined;
+  const runner = publishSelectedShiftLapseTransport
+    ? publishNhm2ShiftLapseSelectedTransportBundle({
+        baseUrl: parsedOptions.baseUrl,
+        shiftLapseProfileId: parsedOptions.shiftLapseProfileId,
+      })
+    : publishSelectedShiftLapseProfileSweep
+    ? publishNhm2ShiftLapseProfileSweep({
+        baseUrl: parsedOptions.baseUrl,
+      })
+    : publishSelectedShiftLapseBoundarySweep
+    ? publishNhm2ShiftLapseBoundarySweep({
+        baseUrl: parsedOptions.baseUrl,
+      })
+    : publishBoundedStackLatest
     ? publishNhm2BoundedStackLatest({
         baseUrl: parsedOptions.baseUrl,
+        requestSelectors: publicationRequestSelectors,
       })
     : publishProofSurfaceManifestLatest
       ? publishNhm2ProofSurfaceManifestLatest()
     : publishWorldlineLatest
     ? publishNhm2WarpWorldlineProofLatest({
         baseUrl: parsedOptions.baseUrl,
+        requestSelectors: publicationRequestSelectors,
       })
     : publishCruisePreflightLatest
       ? publishNhm2CruiseEnvelopePreflightLatest({
           baseUrl: parsedOptions.baseUrl,
+          requestSelectors: publicationRequestSelectors,
         })
     : publishRouteTimeLatest
       ? publishNhm2RouteTimeWorldlineLatest({
           baseUrl: parsedOptions.baseUrl,
+          requestSelectors: publicationRequestSelectors,
         })
     : publishMissionTimeLatest
       ? publishNhm2MissionTimeEstimatorLatest({
           baseUrl: parsedOptions.baseUrl,
+          requestSelectors: publicationRequestSelectors,
         })
     : publishMissionTimeComparisonLatest
       ? publishNhm2MissionTimeComparisonLatest({
           baseUrl: parsedOptions.baseUrl,
+          requestSelectors: publicationRequestSelectors,
         })
     : publishCruiseEnvelopeLatest
       ? publishNhm2CruiseEnvelopeLatest({
           baseUrl: parsedOptions.baseUrl,
+          requestSelectors: publicationRequestSelectors,
         })
     : publishInHullProperAccelerationLatest
       ? publishNhm2InHullProperAccelerationLatest({
           baseUrl: parsedOptions.baseUrl,
+          requestSelectors: publicationRequestSelectors,
         })
     : publishInvariantLatest
       ? publishWarpYorkControlFamilyInvariantLatest(parsedOptions)
@@ -39898,6 +43050,9 @@ if (isEntryPoint) {
         `${JSON.stringify(result.payload ?? result.artifact ?? result, null, 2)}\n`,
       );
       if (
+        publishSelectedShiftLapseTransport ||
+        publishSelectedShiftLapseProfileSweep ||
+        publishSelectedShiftLapseBoundarySweep ||
         publishBoundedStackLatest ||
         publishProofSurfaceManifestLatest ||
         publishWorldlineLatest ||

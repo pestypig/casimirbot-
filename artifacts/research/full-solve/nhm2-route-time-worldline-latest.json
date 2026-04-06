@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_route_time_worldline/v1",
-  "generatedOn": "2026-04-03",
-  "generatedAt": "2026-04-03T03:25:17.658Z",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T19:43:59.991Z",
   "boundaryStatement": "This artifact records a bounded NHM2 route-time worldline extension over a certified local probe segment. It does not certify mission time, target ETA, max speed, relativistic advantage, or viability.",
   "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
   "sourceWorldlineArtifactPath": "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
@@ -20,8 +20,11 @@
     "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
     "metricT00Source": "metric",
     "metricFamily": "natario_sdf",
+    "familyAuthorityStatus": "canonical_bounded_baseline_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_baseline",
     "metricT00ContractStatus": "ok",
-    "chartContractStatus": "ok"
+    "chartContractStatus": "ok",
+    "shiftLapseTransportPromotionGate": null
   },
   "chart": {
     "label": "comoving_cartesian",
@@ -252,5 +255,5 @@
     "not relativistic-advantage certified",
     "not viability-promotion evidence"
   ],
-  "checksum": "1310a9ea6cbeeb25acc3bc980b1ec5ba358d9c57160ef7327b5720d2f6ff274a"
+  "checksum": "e675d508eb22cce4ae530bd6f30fd31fc8d009156a8efc24e68be497a75659d1"
 }

@@ -1,0 +1,144 @@
+{
+  "artifactType": "nhm2_mission_time_comparison/v1",
+  "generatedOn": "2026-04-06",
+  "generatedAt": "2026-04-06T01:28:52.733Z",
+  "boundaryStatement": "This artifact records a bounded NHM2 mission-time comparison on a deterministic committed local-rest target-distance basis. It compares warp coordinate time, warp ship proper time, and a classical no-time-dilation reference without certifying speed, viability, or a route-map ETA surface.",
+  "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+  "sourceWorldlineArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p8700_v1/nhm2-warp-worldline-proof-latest.json",
+  "sourceCruisePreflightArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p8700_v1/nhm2-cruise-envelope-preflight-latest.json",
+  "sourceRouteTimeArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p8700_v1/nhm2-route-time-worldline-latest.json",
+  "sourceMissionTimeEstimatorArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/stage1_centerline_alpha_0p8700_v1/nhm2-mission-time-estimator-latest.json",
+  "sourceTargetDistanceSnapshotPath": "server/_generated/local-rest_epoch-1763696773601_r-200pc_012fd60ec17881cc.json",
+  "contractVersion": "warp_mission_time_comparison/v1",
+  "status": "bounded_target_coupled_comparison_ready",
+  "certified": true,
+  "sourceMissionTimeEstimatorContractVersion": "warp_mission_time_estimator/v1",
+  "sourceRouteTimeWorldlineContractVersion": "warp_route_time_worldline/v1",
+  "sourceCruisePreflightContractVersion": "warp_cruise_envelope_preflight/v1",
+  "sourceWorldlineContractVersion": "warp_worldline_contract/v1",
+  "targetDistanceContractVersion": "local_rest_target_distance_contract/v1",
+  "sourceSurface": {
+    "surfaceId": "nhm2_metric_local_comoving_transport_cross",
+    "producer": "server/energy-pipeline.ts",
+    "provenanceClass": "solve_backed",
+    "transportVectorSource": "warp.solveBackedTransportSampleFamily",
+    "transportVectorField": "shiftVectorField.evaluateShiftVector",
+    "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
+    "metricT00Source": "metric",
+    "metricFamily": "nhm2_shift_lapse",
+    "familyAuthorityStatus": "candidate_authoritative_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+    "metricT00ContractStatus": "ok",
+    "chartContractStatus": "ok",
+    "shiftLapseProfileId": "stage1_centerline_alpha_0p8700_v1",
+    "shiftLapseTransportPromotionGate": {
+      "gateId": "nhm2_shift_lapse_transport_promotion_gate/v1",
+      "status": "pass",
+      "reason": "shift_lapse_transport_promotion_gate_pass",
+      "shiftLapseProfileId": "stage1_centerline_alpha_0p8700_v1",
+      "shiftLapseProfileStage": "controlled_tuning_stage_1",
+      "shiftLapseProfileLabel": "Stage 1 centerline alpha 0.8700",
+      "shiftLapseProfileNote": "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8700 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+      "familyAuthorityStatus": "candidate_authoritative_solve_family",
+      "familyTransportCertificationStatus": "bounded_transport_fail_closed_reference_only",
+      "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+      "authoritativeLowExpansionStatus": "pass",
+      "authoritativeLowExpansionReason": "authoritative_low_expansion_ok",
+      "authoritativeLowExpansionSource": "gr_evolve_brick",
+      "authoritativeLowExpansionObservable": "brick_native_div_beta",
+      "divergenceRms": 0,
+      "divergenceMaxAbs": 0,
+      "divergenceTolerance": 0.001,
+      "thetaKConsistencyStatus": "pass",
+      "thetaKResidualAbs": 0,
+      "thetaKTolerance": 0.001,
+      "wallSafetyStatus": "pass",
+      "wallSafetyReason": "wall_safety_guardrail_ok",
+      "betaOverAlphaMax": 2.5396264463531513e-17,
+      "betaOutwardOverAlphaWallMax": 2.2094750204371243e-17,
+      "wallHorizonMargin": 1,
+      "timingStatus": "available",
+      "timingReason": "centerline_lapse_timing_available",
+      "centerlineAlpha": 0.87,
+      "centerlineDtauDt": 0.87
+    }
+  },
+  "chart": {
+    "label": "comoving_cartesian",
+    "coordinateMap": "bubble-centered coordinates",
+    "observerFamily": "ship_centerline_local_comoving"
+  },
+  "comparisonModelId": "nhm2_classical_no_time_dilation_reference",
+  "comparisonModelMeaning": "Compare the certified bounded NHM2 warp mission coordinate time and ship proper time against a classical no-time-dilation reference that uses the exact same target-distance-coupled mission-estimator basis and sets tau=t. This comparison reports only the certified proper-time differential, if any, and does not introduce speed-based relativistic or nonrelativistic semantics.",
+  "targetId": "alpha-cen-a",
+  "targetName": "Alpha Centauri A",
+  "targetFrame": "heliocentric-icrs",
+  "warpCoordinateTimeEstimate": {
+    "seconds": 137755965.9171795,
+    "years": 4.3652231448899625,
+    "units": {
+      "primary": "s",
+      "secondary": "yr"
+    },
+    "meaning": "Estimated coordinate time from repeated bounded local route-time schedule over the committed target distance."
+  },
+  "warpProperTimeEstimate": {
+    "seconds": 119847690.34794618,
+    "years": 3.7977441360542685,
+    "units": {
+      "primary": "s",
+      "secondary": "yr"
+    },
+    "meaning": "Estimated ship proper time from repeated bounded local route-time schedule over the committed target distance."
+  },
+  "classicalReferenceTimeEstimate": {
+    "seconds": 137755965.9171795,
+    "years": 4.3652231448899625,
+    "units": {
+      "primary": "s",
+      "secondary": "yr"
+    },
+    "meaning": "Classical no-time-dilation reference on the same target-coupled bounded mission-estimator basis: impose tau=t over the repeated certified local route-time schedule without introducing any speed-based comparator semantics."
+  },
+  "comparisonMetrics": {
+    "properMinusCoordinate_seconds": -17908275.569233313,
+    "properVsCoordinate_ratio": 0.8700000000000001,
+    "properMinusClassical_seconds": -17908275.569233313,
+    "properVsClassical_ratio": 0.8700000000000001,
+    "coordinateMinusClassical_seconds": 0,
+    "coordinateVsClassical_ratio": 1,
+    "interpretationStatus": "bounded_relativistic_differential_detected",
+    "differentialToleranceSeconds": 0.0001377559659171795
+  },
+  "comparisonReadiness": "paired_classical_reference_certified_speed_comparators_deferred",
+  "deferredComparators": [
+    "speed_based_nonrelativistic_reference",
+    "speed_based_flat_sr_reference",
+    "route_map_eta_surface",
+    "broad_relativistic_advantage_certification"
+  ],
+  "claimBoundary": [
+    "bounded mission-time comparison only",
+    "target-coupled through the certified mission-time estimator basis only",
+    "classical comparator is tau=t on the same certified target-distance schedule only",
+    "not max-speed certified",
+    "not viability-promotion evidence",
+    "not a route-map ETA surface",
+    "not a broad relativistic-advantage certificate"
+  ],
+  "falsifierConditions": [
+    "certified_mission_time_estimator_missing",
+    "comparison_readiness_not_granted_by_mission_estimator",
+    "target_distance_contract_provenance_missing",
+    "comparison_time_estimate_nonfinite",
+    "speed_based_comparator_requested_without_certified_speed_semantics"
+  ],
+  "nonClaims": [
+    "not max-speed certified",
+    "not viability-promotion evidence",
+    "not full route dynamic certified",
+    "not unconstrained ETA for arbitrary targets",
+    "not a speed-based relativistic or nonrelativistic comparator"
+  ],
+  "checksum": "ce4e3e8c7519e5df9272cd240c926b502c60c351e54811b0f00b4f9caf954cdd"
+}

@@ -1,3 +1,10 @@
+import {
+  isWarpShiftLapseTransportPromotionGate,
+  type WarpShiftLapseTransportPromotionGate,
+  type WarpTransportCertificationStatus,
+  type WarpTransportFamilyAuthorityStatus,
+} from "./warp-worldline-contract.v1";
+
 const SPEED_OF_LIGHT_MPS = 299_792_458;
 const STANDARD_GRAVITY_MPS2 = 9.80665;
 
@@ -37,10 +44,14 @@ export type WarpInHullProperAccelerationSourceSurface = {
   metricT00Ref: string;
   metricT00Source: "metric";
   metricFamily: string;
+  familyAuthorityStatus: WarpTransportFamilyAuthorityStatus;
+  transportCertificationStatus: WarpTransportCertificationStatus;
   metricT00ContractStatus: "ok";
   chartContractStatus: "ok";
   brickStatus: "CERTIFIED";
   brickSolverStatus: "CERTIFIED";
+  shiftLapseProfileId?: string | null;
+  shiftLapseTransportPromotionGate?: WarpShiftLapseTransportPromotionGate | null;
 };
 
 export type WarpInHullProperAccelerationChart = {
@@ -296,7 +307,7 @@ export const buildWarpInHullProperAccelerationContract = (args: {
     "brick_status_not_certified",
     "brick_solver_status_not_certified",
     "metric_t00_source_not_metric",
-    "reference_only_shift_lapse_family_selected",
+    "shift_lapse_transport_promotion_gate_not_pass",
     "fallback_used_in_certified_mode",
     "under_resolved_direct_brick_profile",
   ];
@@ -399,6 +410,40 @@ export const isCertifiedWarpInHullProperAccelerationContract = (
   }
   if (typeof sourceSurface.metricFamily !== "string" || sourceSurface.metricFamily.length === 0) {
     return false;
+  }
+  if (
+    sourceSurface.familyAuthorityStatus !== "canonical_bounded_baseline_solve_family" &&
+    sourceSurface.familyAuthorityStatus !== "candidate_authoritative_solve_family" &&
+    sourceSurface.familyAuthorityStatus !== "secondary_metric_family"
+  ) {
+    return false;
+  }
+  if (
+    sourceSurface.transportCertificationStatus !==
+      "bounded_transport_proof_bearing_baseline" &&
+    sourceSurface.transportCertificationStatus !==
+      "bounded_transport_fail_closed_reference_only" &&
+    sourceSurface.transportCertificationStatus !== "bounded_transport_not_promoted" &&
+    sourceSurface.transportCertificationStatus !==
+      "bounded_transport_proof_bearing_gate_admitted"
+  ) {
+    return false;
+  }
+  if (
+    sourceSurface.metricFamily === "nhm2_shift_lapse" ||
+    String(sourceSurface.metricT00Ref).includes("shift_lapse")
+  ) {
+    if (
+      sourceSurface.familyAuthorityStatus !== "candidate_authoritative_solve_family" ||
+      sourceSurface.transportCertificationStatus !==
+        "bounded_transport_proof_bearing_gate_admitted" ||
+      !isWarpShiftLapseTransportPromotionGate(
+        sourceSurface.shiftLapseTransportPromotionGate ?? null,
+      ) ||
+      sourceSurface.shiftLapseTransportPromotionGate?.status !== "pass"
+    ) {
+      return false;
+    }
   }
 
   const chart = record.chart as Record<string, unknown> | undefined;

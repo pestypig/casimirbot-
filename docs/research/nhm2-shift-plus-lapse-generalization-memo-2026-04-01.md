@@ -220,7 +220,37 @@ Keep existing:
 
 unchanged and canonical for the current unit-lapse family.
 
-After the current scaffolding pass, this generalized branch should be treated as a distinct full-solve family and a candidate authoritative solve family in provenance/model-selection language, while bounded transport proof surfaces remain fail-closed and reference-only until the later low-expansion gate and transport-stack promotion patches land.
+After the current scaffolding pass, this generalized branch should be treated as a distinct full-solve family and a candidate authoritative solve family in provenance/model-selection language, while proof-bearing bounded transport publication remains conditional on the explicit authoritative shift-lapse transport-promotion gate rather than implied by family identity alone.
+
+### Reproducible selected-family bounded transport publication
+
+The repo now has an operator-facing command for live selected-family bounded transport publication without replacing the canonical baseline latest aliases:
+
+- `npm run warp:full-solve:nhm2-shift-lapse:publish-selected-transport`
+
+This command writes the selected-family bundle under:
+
+- `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/`
+- `docs/audits/research/selected-family/nhm2-shift-lapse/`
+
+It does not overwrite the canonical baseline latest aliases, which remain on:
+
+- `warp.metric.T00.natario_sdf.shift`
+
+The single summary surface for the current live selected-family result is:
+
+- `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json`
+- `docs/audits/research/selected-family/nhm2-shift-lapse/warp-nhm2-shift-lapse-transport-result-latest.md`
+
+Current live selected-family result at bounded-contract maturity:
+
+- authoritative low-expansion gate: `pass`
+- wall-safety status: `pass`
+- `centerline_dtau_dt = 1`
+- mission-time interpretation: `no_certified_relativistic_differential_detected`
+- bounded timing differential detected: `false`
+
+This means the current live `nhm2_shift_lapse` selected-family solve is gate-admitted into the bounded transport bundle, but it remains timing-flat in the current measured publication state. That is a bounded contract result only; it does not imply speed, ETA, or broader viability claims.
 
 ### Step 2. Preserve current semantics for `epsilonTilt`
 Document and keep:

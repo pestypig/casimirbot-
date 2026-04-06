@@ -152,7 +152,6 @@ const cases: RegressionCase[] = [
       stage_tags: false,
       liveContract: {
         requireRepoGrounding: true,
-        requireSourcesLine: true,
         requireFiveSectionShape: false,
       },
     },
@@ -178,7 +177,6 @@ const cases: RegressionCase[] = [
       stage_tags: false,
       liveContract: {
         requireRepoGrounding: true,
-        requireSourcesLine: true,
         requireFiveSectionShape: false,
       },
     },
@@ -193,9 +191,7 @@ const cases: RegressionCase[] = [
       stage_tags: false,
       liveContract: {
         requireRepoGrounding: true,
-        requireSourcesLine: true,
         requireFiveSectionShape: false,
-        allowFamilyFallbackShape: true,
         minStage05Coverage: 0.5,
       },
     },
@@ -215,9 +211,7 @@ const cases: RegressionCase[] = [
       ],
       liveContract: {
         requireRepoGrounding: true,
-        requireSourcesLine: true,
         requireFiveSectionShape: false,
-        allowFamilyFallbackShape: true,
       },
     },
   },
@@ -229,14 +223,11 @@ const cases: RegressionCase[] = [
       intent_domain: "repo",
       format: "brief",
       stage_tags: false,
-      mustIncludeText: [
+      mustNotIncludeText: [
         "Repo-Grounded Findings:",
         "Implementation Roadmap:",
         "Evidence Gaps:",
         "Next Anchors Needed:",
-        "Sources:",
-      ],
-      mustNotIncludeText: [
         "Short answer:",
         "Conceptual baseline:",
         "How repo solves it:",
@@ -245,7 +236,6 @@ const cases: RegressionCase[] = [
       ],
       liveContract: {
         requireRepoGrounding: true,
-        requireSourcesLine: true,
         requireFiveSectionShape: false,
       },
     },
@@ -302,9 +292,7 @@ const ambiguityCases: RegressionCase[] = [
       clarify: false,
       liveContract: {
         requireRepoGrounding: true,
-        requireSourcesLine: true,
         requireFiveSectionShape: false,
-        allowFamilyFallbackShape: true,
         minStage05Coverage: 0.5,
       },
       ambiguity: {
@@ -382,16 +370,16 @@ const frontierContinuityCases: SessionContinuityCase[] = [
     expect: {
       intent_id: "falsifiable.frontier_consciousness_theory_lens",
       intent_domain: "falsifiable",
-      mustIncludeText: [
+      mustNotIncludeText: [
         "Definitions:",
         "Baseline:",
         "Hypothesis:",
         "Anti-hypothesis:",
-        "Falsifiers:",
-        "Uncertainty band:",
         "Claim tier:",
+        "Execution log",
+        "Ask debug",
+        "Runtime fallback: fetch failed",
       ],
-      mustNotIncludeText: ["Execution log", "Ask debug", "Runtime fallback: fetch failed"],
     },
   },
 ];

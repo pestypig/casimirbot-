@@ -21,6 +21,7 @@ import {
 } from "./warp-mission-time-comparison.v1";
 import {
   WARP_WORLDLINE_CONTRACT_VERSION,
+  sameWarpWorldlineSourceSurface,
   type WarpWorldlineChart,
   type WarpWorldlineSourceSurface,
 } from "./warp-worldline-contract.v1";
@@ -112,21 +113,6 @@ const sameChart = (
   lhs.chartFixed === rhs.chartFixed &&
   (lhs.coordinateMap ?? null) === (rhs.coordinateMap ?? null);
 
-const sameSourceSurface = (
-  lhs: WarpWorldlineSourceSurface,
-  rhs: WarpWorldlineSourceSurface,
-): boolean =>
-  lhs.surfaceId === rhs.surfaceId &&
-  lhs.producer === rhs.producer &&
-  lhs.provenanceClass === rhs.provenanceClass &&
-  lhs.transportVectorSource === rhs.transportVectorSource &&
-  lhs.transportVectorField === rhs.transportVectorField &&
-  lhs.metricT00Ref === rhs.metricT00Ref &&
-  lhs.metricT00Source === rhs.metricT00Source &&
-  lhs.metricFamily === rhs.metricFamily &&
-  lhs.metricT00ContractStatus === rhs.metricT00ContractStatus &&
-  lhs.chartContractStatus === rhs.chartContractStatus;
-
 const matchesStringArray = (
   value: unknown,
   expected: readonly string[],
@@ -162,9 +148,15 @@ export const buildWarpCruiseEnvelopeContract = (args: {
   const missionTime = args.missionTimeEstimator;
   const comparison = args.missionTimeComparison;
 
-  if (!sameSourceSurface(preflight.sourceSurface, routeTime.sourceSurface)) return null;
-  if (!sameSourceSurface(preflight.sourceSurface, missionTime.sourceSurface)) return null;
-  if (!sameSourceSurface(preflight.sourceSurface, comparison.sourceSurface)) return null;
+  if (!sameWarpWorldlineSourceSurface(preflight.sourceSurface, routeTime.sourceSurface)) {
+    return null;
+  }
+  if (!sameWarpWorldlineSourceSurface(preflight.sourceSurface, missionTime.sourceSurface)) {
+    return null;
+  }
+  if (!sameWarpWorldlineSourceSurface(preflight.sourceSurface, comparison.sourceSurface)) {
+    return null;
+  }
   if (!sameChart(preflight.chart, routeTime.chart)) return null;
   if (!sameChart(preflight.chart, missionTime.chart)) return null;
   if (!sameChart(preflight.chart, comparison.chart)) return null;

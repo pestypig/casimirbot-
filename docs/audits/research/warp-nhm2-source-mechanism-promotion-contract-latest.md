@@ -1,4 +1,4 @@
-# NHM2 Source / Mechanism Promotion Contract (2026-04-03)
+# NHM2 Source / Mechanism Promotion Contract (2026-04-04)
 
 "This promotion contract defines the only routes under which the non-authoritative source/mechanism lane could ever be promoted; it does not itself promote the lane or alter Lane A."
 
@@ -21,8 +21,8 @@
 | activationScope | bounded_non_authoritative_advisory_only_reference_only_cross_lane |
 | laneAUnaffected | true |
 | referenceOnlyCrossLaneScope | true |
-| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, bounded transport proof-bearing surfaces remain fail-closed/reference-only, stronger claims remain blocked, and Lane A remains authoritative. |
-| consumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and its bounded transport proof-bearing surfaces remain fail-closed and reference_only. |
+| activationSummary | Formal exemption route is active only for the three bounded advisory claim subsets; warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, proof-bearing bounded transport admission is controlled separately by the authoritative shift-lapse transport-promotion gate, stronger claims remain blocked, and Lane A remains authoritative. |
+| consumerSummary | Only the bounded non-authoritative source annotation, mechanism context, and reduced-order comparison claims are active; formula equivalence remains false, the parity route remains blocked, viability and cross-lane promotions remain blocked, the source/mechanism lane remains non-authoritative, warp.metric.T00.nhm2_shift_lapse is treated as a candidate authoritative solve family in provenance/model-selection, and proof-bearing bounded transport admission remains controlled separately by the authoritative shift-lapse transport-promotion gate rather than granted by this source/mechanism surface. |
 | summary | Promotion contract keeps the parity route blocked by a derivation-class gap and activates the formal exemption route only for three bounded non-authoritative advisory claim subsets; broader promotion remains blocked. |
 
 ## Available Routes
@@ -95,7 +95,7 @@ Required Evidence
 - warp.metric.T00.nhm2_shift_lapse is a candidate authoritative solve family in provenance/model-selection.
 - The reconstructed proxy path remains non-equivalent to the authoritative direct metric path.
 - Cross-lane scope remains reference_only.
-- Bounded transport proof-bearing surfaces for warp.metric.T00.nhm2_shift_lapse remain fail-closed and reference_only.
+- Proof-bearing bounded transport admission for warp.metric.T00.nhm2_shift_lapse is controlled separately by the authoritative shift-lapse transport-promotion gate; this source/mechanism surface does not itself grant that promotion.
 
 ## Forbidden Promotions
 - formula_equivalent_to_authoritative_direct_metric
@@ -214,3 +214,4 @@ Required Evidence
 - claims_blocked_even_with_exemption=source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope; lane_a_unaffected=true.
 - exemption_route_activated=true; active_claim_set=bounded_non_authoritative_source_annotation,bounded_non_authoritative_mechanism_context,bounded_non_authoritative_reduced_order_comparison; inactive_claim_set=source_mechanism_lane_promotable_non_authoritative,formula_equivalent_to_authoritative_direct_metric,source_mechanism_lane_authoritative,source_mechanism_layer_supports_viability_promotion,cross_lane_promotion_beyond_reference_only_scope.
 - direct_proxy_parity_route_feasibility=blocked_by_derivation_class_difference; blocking_class=direct_metric_vs_reconstructed_proxy_derivation_gap.
+

@@ -10,6 +10,7 @@ import {
 } from "./warp-route-time-worldline.v1";
 import {
   WARP_WORLDLINE_CONTRACT_VERSION,
+  sameWarpWorldlineSourceSurface,
   type WarpWorldlineChart,
   type WarpWorldlineContractV1,
   type WarpWorldlineSourceSurface,
@@ -147,21 +148,6 @@ const sameChart = (
   lhs.chartFixed === rhs.chartFixed &&
   (lhs.coordinateMap ?? null) === (rhs.coordinateMap ?? null);
 
-const sameSourceSurface = (
-  lhs: WarpWorldlineSourceSurface,
-  rhs: WarpWorldlineSourceSurface,
-): boolean =>
-  lhs.surfaceId === rhs.surfaceId &&
-  lhs.producer === rhs.producer &&
-  lhs.provenanceClass === rhs.provenanceClass &&
-  lhs.transportVectorSource === rhs.transportVectorSource &&
-  lhs.transportVectorField === rhs.transportVectorField &&
-  lhs.metricT00Ref === rhs.metricT00Ref &&
-  lhs.metricT00Source === rhs.metricT00Source &&
-  lhs.metricFamily === rhs.metricFamily &&
-  lhs.metricT00ContractStatus === rhs.metricT00ContractStatus &&
-  lhs.chartContractStatus === rhs.chartContractStatus;
-
 const matchesStringArray = (
   value: unknown,
   expected: readonly string[],
@@ -191,8 +177,12 @@ export const buildWarpMissionTimeEstimatorContract = (args: {
   const routeTime = args.routeTimeWorldline;
   const targetDistance = args.targetDistance;
 
-  if (!sameSourceSurface(worldline.sourceSurface, preflight.sourceSurface)) return null;
-  if (!sameSourceSurface(worldline.sourceSurface, routeTime.sourceSurface)) return null;
+  if (!sameWarpWorldlineSourceSurface(worldline.sourceSurface, preflight.sourceSurface)) {
+    return null;
+  }
+  if (!sameWarpWorldlineSourceSurface(worldline.sourceSurface, routeTime.sourceSurface)) {
+    return null;
+  }
   if (!sameChart(worldline.chart, preflight.chart)) return null;
   if (!sameChart(worldline.chart, routeTime.chart)) return null;
   if (worldline.observerFamily !== preflight.observerFamily) return null;

@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_mission_time_comparison/v1",
-  "generatedOn": "2026-04-03",
-  "generatedAt": "2026-04-03T03:25:18.139Z",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T19:44:00.599Z",
   "boundaryStatement": "This artifact records a bounded NHM2 mission-time comparison on a deterministic committed local-rest target-distance basis. It compares warp coordinate time, warp ship proper time, and a classical no-time-dilation reference without certifying speed, viability, or a route-map ETA surface.",
   "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
   "sourceWorldlineArtifactPath": "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
@@ -26,8 +26,11 @@
     "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
     "metricT00Source": "metric",
     "metricFamily": "natario_sdf",
+    "familyAuthorityStatus": "canonical_bounded_baseline_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_baseline",
     "metricT00ContractStatus": "ok",
-    "chartContractStatus": "ok"
+    "chartContractStatus": "ok",
+    "shiftLapseTransportPromotionGate": null
   },
   "chart": {
     "label": "comoving_cartesian",
@@ -106,5 +109,5 @@
     "not unconstrained ETA for arbitrary targets",
     "not a speed-based relativistic or nonrelativistic comparator"
   ],
-  "checksum": "761b1e17e00751ffa817cbde5e8a830e308cc4901beee5a6a84de52db6b4bfe1"
+  "checksum": "3a2a77d166de04020886cb8123c4014afd1fb8724e53bcb7664f3a72ce8906ee"
 }

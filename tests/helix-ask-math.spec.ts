@@ -17,6 +17,12 @@ describe("Helix Ask math solver", () => {
     expect(isHelixAskMathQuestion(conceptual)).toBe(false);
   });
 
+  it("does not classify conceptual prompts that only mention a solve in prose as math", () => {
+    const conceptual =
+      "The text proves the regime is mild by looking at the norm of the shift vector. Why is this important to the solve it belongs to?";
+    expect(isHelixAskMathQuestion(conceptual)).toBe(false);
+  });
+
   it("solves linear equations with implicit multiplication", async () => {
     const result = await solveHelixAskMathQuestion(
       "Solve for x: 2x + 5 = 17. Explain briefly",
@@ -43,6 +49,13 @@ describe("Helix Ask math solver", () => {
     expect(result?.final).toBe("4");
     expect(buildHelixAskMathAnswer(result!)).toContain("2 + 2");
     expect(buildHelixAskMathAnswer(result!)).toContain("4");
+  });
+
+  it("returns null for conceptual prose that is not an actual math expression", async () => {
+    const result = await solveHelixAskMathQuestion(
+      "The text proves the regime is mild by looking at the norm of the shift vector. Why is this important to the solve it belongs to?",
+    );
+    expect(result).toBeNull();
   });
 
   it("solves small systems of equations", async () => {

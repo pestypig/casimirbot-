@@ -6,11 +6,14 @@ The York graphs are not broken in the original sense that motivated the debug ef
 
 Current closed-state answer:
 - authoritative lane: `lane_a_eulerian_comoving_theta_minus_trk`
+- authoritative low-expansion gate: `pass`
+- authoritative low-expansion source: `gr_evolve_brick`
+- authoritative low-expansion contract: brick-native `div_beta` plus brick theta/K consistency
 - `mechanismChainReady = true`
 - render verdict: `render_matches_authoritative_geometry`
 - fixed-scale export integrity: `valid = true`
 - visual metric source stage: `pre_png_color_buffer`
-- morphology class: `Natario-like low-expansion`
+- morphology class: `Natario-like low-expansion under the authoritative gate`
 - NASA Figure 1 closeness: `no`
 
 ## What was ruled out
@@ -25,6 +28,7 @@ Current closed-state answer:
 ## What the evidence supports
 
 - Lane A faithfully represents the closed mechanism chain
+- the current run satisfies the authoritative low-expansion gate on the brick-native GR surface
 - NHM2 is much closer to the Natario-like low-expansion control than to the Alcubierre control
 - NHM2 does not reproduce the Alcubierre or NASA Figure 1 fore/aft lobe class
 
@@ -40,7 +44,7 @@ Key numbers:
 Supported:
 - repo-local mechanism-chain closure
 - authoritative Lane A render fidelity
-- Natario-like low-expansion comparison result
+- gate-backed Natario-like low-expansion comparison result
 - non-reproduction of the Alcubierre or NASA Figure 1 class
 
 Not supported:

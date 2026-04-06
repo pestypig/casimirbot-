@@ -1,0 +1,322 @@
+{
+  "artifactType": "nhm2_in_hull_proper_acceleration/v1",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T17:02:44.091Z",
+  "boundaryStatement": "This artifact records a bounded NHM2 in-hull proper-acceleration profile for a declared Eulerian cabin observer family. It is solve-backed and no-fallback in certified mode, but it is not a curvature-gravity or comfort/safety certificate.",
+  "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+  "contractVersion": "warp_in_hull_proper_acceleration/v1",
+  "status": "bounded_in_hull_profile_certified",
+  "certified": true,
+  "sourceSurface": {
+    "surfaceId": "nhm2_metric_in_hull_proper_acceleration_profile",
+    "producer": "server/energy-pipeline.ts",
+    "provenanceClass": "solve_backed",
+    "brickChannelSource": "gr_evolve_brick",
+    "accelerationField": "eulerian_accel_geom_*",
+    "metricT00Ref": "warp.metric.T00.nhm2.shift_lapse",
+    "metricT00Source": "metric",
+    "metricFamily": "nhm2_shift_lapse",
+    "familyAuthorityStatus": "candidate_authoritative_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+    "metricT00ContractStatus": "ok",
+    "chartContractStatus": "ok",
+    "brickStatus": "CERTIFIED",
+    "brickSolverStatus": "CERTIFIED",
+    "shiftLapseProfileId": "stage1_centerline_alpha_0p9725_v1",
+    "shiftLapseTransportPromotionGate": {
+      "gateId": "nhm2_shift_lapse_transport_promotion_gate/v1",
+      "status": "pass",
+      "reason": "shift_lapse_transport_promotion_gate_pass",
+      "shiftLapseProfileId": "stage1_centerline_alpha_0p9725_v1",
+      "shiftLapseProfileStage": "controlled_tuning_stage_1",
+      "shiftLapseProfileLabel": "Stage 1 centerline alpha 0.9725",
+      "shiftLapseProfileNote": "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.9725 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+      "familyAuthorityStatus": "candidate_authoritative_solve_family",
+      "familyTransportCertificationStatus": "bounded_transport_fail_closed_reference_only",
+      "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+      "authoritativeLowExpansionStatus": "pass",
+      "authoritativeLowExpansionReason": "authoritative_low_expansion_ok",
+      "authoritativeLowExpansionSource": "gr_evolve_brick",
+      "authoritativeLowExpansionObservable": "brick_native_div_beta",
+      "divergenceRms": 0,
+      "divergenceMaxAbs": 0,
+      "divergenceTolerance": 0.001,
+      "thetaKConsistencyStatus": "pass",
+      "thetaKResidualAbs": 0,
+      "thetaKTolerance": 0.001,
+      "wallSafetyStatus": "pass",
+      "wallSafetyReason": "wall_safety_guardrail_ok",
+      "betaOverAlphaMax": 2.271953687252203e-17,
+      "betaOutwardOverAlphaWallMax": 2.2094750204371243e-17,
+      "wallHorizonMargin": 1,
+      "timingStatus": "available",
+      "timingReason": "centerline_lapse_timing_available",
+      "centerlineAlpha": 0.9725,
+      "centerlineDtauDt": 0.9725
+    }
+  },
+  "chart": {
+    "label": "comoving_cartesian",
+    "coordinateMap": "bubble-centered coordinates",
+    "observerFamily": "eulerian_comoving_cabin"
+  },
+  "accelerationQuantityId": "experienced_proper_acceleration_magnitude",
+  "accelerationQuantityMeaning": "Proper-acceleration magnitude experienced by Eulerian observers fixed to bounded cabin sample points in the comoving Cartesian chart. The solve-backed quantity is taken directly from brick-resolved eulerian_accel_geom_i = partial_i alpha / alpha and converted to SI via c^2. This is observer-defined experienced acceleration, not curvature gravity.",
+  "accelerationUnits": "m/s^2",
+  "samplingGeometry": {
+    "familyId": "nhm2_cabin_cross",
+    "description": "Deterministic bounded cabin-cross sample family in the comoving Cartesian chart: center, fore, aft, port, starboard, dorsal, and ventral interior points. This family is for observer-defined experienced proper acceleration only.",
+    "coordinateFrame": "comoving_cartesian",
+    "originDefinition": "ship_center",
+    "ordering": [
+      "cabin_center",
+      "cabin_fore",
+      "cabin_aft",
+      "cabin_port",
+      "cabin_starboard",
+      "cabin_dorsal",
+      "cabin_ventral"
+    ],
+    "representativeSampleId": "cabin_center",
+    "axes": {
+      "centerline": [
+        1,
+        0,
+        0
+      ],
+      "portStarboard": [
+        0,
+        1,
+        0
+      ],
+      "dorsalVentral": [
+        0,
+        0,
+        1
+      ]
+    },
+    "offsets_m": {
+      "centerline": 125.875,
+      "transverse": 33,
+      "vertical": 21.625,
+      "interiorClearance": 0.07994465546666667
+    },
+    "samplePositions_m": {
+      "cabin_center": [
+        0,
+        0,
+        0
+      ],
+      "cabin_fore": [
+        125.875,
+        0,
+        0
+      ],
+      "cabin_aft": [
+        -125.875,
+        0,
+        0
+      ],
+      "cabin_port": [
+        0,
+        33,
+        0
+      ],
+      "cabin_starboard": [
+        0,
+        -33,
+        0
+      ],
+      "cabin_dorsal": [
+        0,
+        0,
+        21.625
+      ],
+      "cabin_ventral": [
+        0,
+        0,
+        -21.625
+      ]
+    }
+  },
+  "sampleCount": 7,
+  "sampleSummaries": [
+    {
+      "sampleId": "cabin_center",
+      "sampleRole": "cabin_center",
+      "position_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    },
+    {
+      "sampleId": "cabin_fore",
+      "sampleRole": "cabin_fore",
+      "position_m": [
+        125.875,
+        0,
+        0
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    },
+    {
+      "sampleId": "cabin_aft",
+      "sampleRole": "cabin_aft",
+      "position_m": [
+        -125.875,
+        0,
+        0
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    },
+    {
+      "sampleId": "cabin_port",
+      "sampleRole": "cabin_port",
+      "position_m": [
+        0,
+        33,
+        0
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    },
+    {
+      "sampleId": "cabin_starboard",
+      "sampleRole": "cabin_starboard",
+      "position_m": [
+        0,
+        -33,
+        0
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    },
+    {
+      "sampleId": "cabin_dorsal",
+      "sampleRole": "cabin_dorsal",
+      "position_m": [
+        0,
+        0,
+        21.625
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    },
+    {
+      "sampleId": "cabin_ventral",
+      "sampleRole": "cabin_ventral",
+      "position_m": [
+        0,
+        0,
+        -21.625
+      ],
+      "properAccelerationGeomVector_per_m": [
+        0,
+        0,
+        0
+      ],
+      "properAccelerationGeomMagnitude_per_m": 0,
+      "properAccelerationMagnitude_mps2": 0,
+      "properAccelerationMagnitude_g": 0
+    }
+  ],
+  "profileSummary": {
+    "representativeSampleId": "cabin_center",
+    "interpretation": "observer_defined_direct_brick_profile",
+    "min_mps2": 0,
+    "max_mps2": 0,
+    "representative_mps2": 0,
+    "spread_mps2": 0,
+    "min_g": 0,
+    "max_g": 0,
+    "representative_g": 0,
+    "spread_g": 0
+  },
+  "resolutionAdequacy": {
+    "status": "adequate_direct_brick_profile",
+    "criterionId": "direct_gr_evolve_brick_no_fallback_v1",
+    "criterionMeaning": "Certified mode samples direct gr-evolve brick Eulerian-acceleration channels only. A zero profile is certifiable only when the whole sampled brick reports zero acceleration/gradient extrema and the solve path exposes no declared lapse-profile companion. Otherwise a certified profile requires direct nonzero brick acceleration support; unresolved zero channels fail closed.",
+    "brickDims": [
+      128,
+      128,
+      128
+    ],
+    "voxelSize_m": [
+      7.8671875,
+      2.0625,
+      1.3515625
+    ],
+    "wholeBrickAccelerationAbsMax_per_m": 0.012635566294193268,
+    "wholeBrickGradientAbsMax_per_m": 0.010173400864005089,
+    "allSampleMagnitudesZero": true,
+    "expectedZeroProfileByModel": false,
+    "note": "Direct gr-evolve brick sampling resolves a nonzero interior Eulerian proper-acceleration profile on the bounded cabin-cross family without analytic fallback."
+  },
+  "fallbackUsed": false,
+  "claimBoundary": [
+    "bounded in-hull observer-defined proper acceleration only",
+    "experienced acceleration for Eulerian cabin observers only",
+    "not a curvature-gravity certificate",
+    "not a comfort or safety certification by itself"
+  ],
+  "falsifierConditions": [
+    "metric_t00_source_not_metric",
+    "metric_contract_status_not_ok",
+    "chart_contract_status_not_ok",
+    "shift_lapse_transport_promotion_gate_not_pass",
+    "brick_status_not_certified",
+    "brick_solver_status_not_certified",
+    "direct_gr_evolve_brick_channels_missing",
+    "under_resolved_direct_brick_profile",
+    "analytic_fallback_requested_for_certified_mode"
+  ],
+  "nonClaims": [
+    "not curvature-gravity certified",
+    "not comfort-certified",
+    "not safety-certified",
+    "not viability-promotion evidence",
+    "not source-mechanism promotion"
+  ],
+  "checksum": "d54c9a71d334247f2afcd37b976727cbed72da62e7705f98156be903ba2fd7e6"
+}

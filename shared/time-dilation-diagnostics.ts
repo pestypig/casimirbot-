@@ -245,8 +245,25 @@ export type TimeDilationDiagnostics = {
   natarioCanonical: {
     requiredFieldsOk: boolean;
     canonicalSatisfied: boolean;
+    authoritativeSourcePresent?: boolean;
+    classificationMode?:
+      | "authoritative"
+      | "projection_derived_only"
+      | "blocked_missing_authoritative_divergence"
+      | "blocked_missing_authoritative_theta_k";
+    authoritativeReason?: string | null;
+    projectionRequiredFieldsOk?: boolean;
+    projectionCanonicalSatisfied?: boolean;
+    projectionReason?: string | null;
     checks: {
       divBeta: {
+        status: "pass" | "fail" | "unknown";
+        rms: number | null;
+        maxAbs: number | null;
+        tolerance: number | null;
+        source: string;
+      };
+      projectionDivBeta?: {
         status: "pass" | "fail" | "unknown";
         rms: number | null;
         maxAbs: number | null;
@@ -1132,13 +1149,32 @@ const resolveNatarioBetaDivergenceDiagnostics = (
   proofPack: ProofPack | null,
   pipeline: any,
 ): {
-  rms: number | null;
-  maxAbs: number | null;
-  source: string;
+  authoritative: {
+    available: boolean;
+    rms: number | null;
+    maxAbs: number | null;
+    source: string;
+    reason: string | null;
+  };
+  projection: {
+    available: boolean;
+    rms: number | null;
+    maxAbs: number | null;
+    source: string;
+    reason: string | null;
+  };
 } => {
   const proofRmsEntry = getProofValue(proofPack, "metric_div_beta_rms");
   const proofMaxAbsEntry = getProofValue(proofPack, "metric_div_beta_max_abs");
   const proofSourceEntry = getProofValue(proofPack, "metric_div_beta_source");
+  const proofAuthoritative =
+    boolFromProof(proofPack, "metric_div_beta_authoritative") ??
+    ((proofRmsEntry && !proofRmsEntry.proxy) || (proofMaxAbsEntry && !proofMaxAbsEntry.proxy)
+      ? true
+      : null);
+  const proofAuthoritativeReason =
+    readProofString(proofPack, "metric_div_beta_authoritative_reason") ??
+    (proofAuthoritative === true ? "brick_native_div_beta_present" : null);
   const proofRms = proofRmsEntry && !proofRmsEntry.proxy
     ? toNumber(proofRmsEntry.value)
     : null;
@@ -1149,27 +1185,161 @@ const resolveNatarioBetaDivergenceDiagnostics = (
     proofSourceEntry && !proofSourceEntry.proxy && proofSourceEntry.value != null
       ? String(proofSourceEntry.value)
       : "proof.metric_div_beta_rms/metric_div_beta_max_abs";
-  if (proofRms != null || proofMaxAbs != null) {
-    return {
-      rms: proofRms,
-      maxAbs: proofMaxAbs,
-      source: proofSource,
-    };
-  }
+  const authoritativeAvailable =
+    proofAuthoritative === true && (proofRms != null || proofMaxAbs != null);
+
   const betaDiagnostics = (pipeline as any)?.warp?.metricAdapter?.betaDiagnostics ?? null;
   const thetaRms = toNumber(betaDiagnostics?.thetaRms);
   const thetaMax = toNumber(betaDiagnostics?.thetaMax);
-  if (thetaRms != null || thetaMax != null) {
-    return {
-      rms: thetaRms,
-      maxAbs: thetaMax,
-      source: "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax",
-    };
-  }
+  const projectionFromTheta = thetaRms != null || thetaMax != null;
+  const projectionRms = projectionFromTheta
+    ? thetaRms
+    : toNumber(betaDiagnostics?.divBetaRms);
+  const projectionMaxAbs = projectionFromTheta
+    ? thetaMax
+    : toNumber(betaDiagnostics?.divBetaMaxAbs);
+  const projectionSource = projectionFromTheta
+    ? "pipeline.warp.metricAdapter.betaDiagnostics.thetaRms/thetaMax"
+    : "pipeline.warp.metricAdapter.betaDiagnostics.divBetaRms/divBetaMaxAbs";
+  const projectionAvailable = projectionRms != null || projectionMaxAbs != null;
+
   return {
-    rms: toNumber(betaDiagnostics?.divBetaRms),
-    maxAbs: toNumber(betaDiagnostics?.divBetaMaxAbs),
-    source: "pipeline.warp.metricAdapter.betaDiagnostics.divBetaRms/divBetaMaxAbs",
+    authoritative: {
+      available: authoritativeAvailable,
+      rms: proofRms,
+      maxAbs: proofMaxAbs,
+      source: proofSource,
+      reason: authoritativeAvailable
+        ? proofAuthoritativeReason
+        : proofAuthoritative === false
+          ? "metric_div_beta_explicitly_non_authoritative"
+          : "metric_div_beta_authoritative_missing",
+    },
+    projection: {
+      available: projectionAvailable,
+      rms: projectionRms,
+      maxAbs: projectionMaxAbs,
+      source: projectionSource,
+      reason: projectionAvailable ? "projection_beta_diagnostics_available" : "projection_beta_diagnostics_missing",
+    },
+  };
+};
+
+const resolveNatarioThetaDiagnostics = (
+  proofPack: ProofPack | null,
+): {
+  authoritative: {
+    available: boolean;
+    value: number | null;
+    source: string;
+    reason: string | null;
+  };
+  projection: {
+    available: boolean;
+    value: number | null;
+    source: string;
+    reason: string | null;
+  };
+} => {
+  const thetaGeomEntry = getProofValue(proofPack, "theta_geom");
+  const thetaProjectionEntry = getProofValue(proofPack, "theta_geom_projection");
+  const thetaMetricAuthoritative = boolFromProof(proofPack, "theta_metric_authoritative");
+  const thetaMetricAuthoritativeSource =
+    readProofString(proofPack, "theta_metric_authoritative_source") ??
+    (thetaGeomEntry && !thetaGeomEntry.proxy
+      ? String(thetaGeomEntry.source ?? "proof.theta_geom")
+      : "proof.theta_geom");
+  const thetaMetricProjectionSource =
+    readProofString(proofPack, "theta_metric_projection_source") ??
+    (thetaProjectionEntry && !thetaProjectionEntry.proxy
+      ? String(thetaProjectionEntry.source ?? "proof.theta_geom_projection")
+      : thetaGeomEntry && !thetaGeomEntry.proxy
+        ? String(thetaGeomEntry.source ?? "proof.theta_geom")
+        : "proof.theta_geom_projection");
+  const authoritativeValue =
+    thetaMetricAuthoritative === true && thetaGeomEntry && !thetaGeomEntry.proxy
+      ? toNumber(thetaGeomEntry.value)
+      : null;
+  const projectionValue =
+    thetaProjectionEntry && !thetaProjectionEntry.proxy
+      ? toNumber(thetaProjectionEntry.value)
+      : thetaGeomEntry && !thetaGeomEntry.proxy
+        ? toNumber(thetaGeomEntry.value)
+        : null;
+  return {
+    authoritative: {
+      available: authoritativeValue != null,
+      value: authoritativeValue,
+      source: thetaMetricAuthoritativeSource,
+      reason:
+        authoritativeValue != null
+          ? "authoritative_theta_available"
+          : thetaMetricAuthoritative === false
+            ? "theta_explicitly_non_authoritative"
+            : "authoritative_theta_missing",
+    },
+    projection: {
+      available: projectionValue != null,
+      value: projectionValue,
+      source: thetaMetricProjectionSource,
+      reason:
+        projectionValue != null
+          ? "projection_theta_available"
+          : "projection_theta_missing",
+    },
+  };
+};
+
+const resolveNatarioKTraceDiagnostics = (
+  proofPack: ProofPack | null,
+): {
+  authoritative: {
+    available: boolean;
+    value: number | null;
+    source: string;
+    reason: string | null;
+  };
+  projection: {
+    available: boolean;
+    value: number | null;
+    source: string;
+    reason: string | null;
+  };
+} => {
+  const kTraceEntry = getProofValue(proofPack, "metric_k_trace_mean");
+  const kTraceValue = kTraceEntry && !kTraceEntry.proxy ? toNumber(kTraceEntry.value) : null;
+  const kTraceAuthoritative =
+    boolFromProof(proofPack, "metric_k_trace_authoritative") ??
+    (kTraceEntry && !kTraceEntry.proxy && String(kTraceEntry.source ?? "").startsWith("pipeline.gr.")
+      ? true
+      : null);
+  const authoritativeSource =
+    readProofString(proofPack, "metric_k_trace_authoritative_source") ??
+    (kTraceEntry && !kTraceEntry.proxy
+      ? String(kTraceEntry.source ?? "proof.metric_k_trace_mean")
+      : "proof.metric_k_trace_mean");
+  const projectionSource =
+    kTraceEntry && !kTraceEntry.proxy
+      ? String(kTraceEntry.source ?? "proof.metric_k_trace_mean")
+      : "proof.metric_k_trace_mean";
+  return {
+    authoritative: {
+      available: kTraceAuthoritative === true && kTraceValue != null,
+      value: kTraceAuthoritative === true ? kTraceValue : null,
+      source: authoritativeSource,
+      reason:
+        kTraceAuthoritative === true && kTraceValue != null
+          ? "authoritative_k_trace_available"
+          : kTraceAuthoritative === false
+            ? "k_trace_explicitly_non_authoritative"
+            : "authoritative_k_trace_missing",
+    },
+    projection: {
+      available: kTraceValue != null,
+      value: kTraceValue,
+      source: projectionSource,
+      reason: kTraceValue != null ? "projection_k_trace_available" : "projection_k_trace_missing",
+    },
   };
 };
 
@@ -1448,11 +1618,14 @@ export async function buildTimeDilationDiagnostics(
   };
   const strictMetricMissing = latticeMetricOnly
     ? requirePresent("metric_t00_rho_si_mean") ||
+      requirePresent("metric_div_beta_rms") ||
       requirePresent("metric_k_trace_mean") ||
       requirePresent("metric_k_sq_mean") ||
       requirePresent("theta_geom") ||
       requireTrue("metric_t00_contract_ok") ||
-      requireTrue("theta_metric_derived") ||
+      requireTrue("metric_div_beta_authoritative") ||
+      requireTrue("theta_metric_authoritative") ||
+      requireTrue("metric_k_trace_authoritative") ||
       requireTrue("qi_metric_derived") ||
       requireTrue("ts_metric_derived")
     : false;
@@ -1954,16 +2127,29 @@ export async function buildTimeDilationDiagnostics(
   };
 
   const natarioBetaDivergence = resolveNatarioBetaDivergenceDiagnostics(proofPack, pipeline);
-  const divBetaRms = natarioBetaDivergence.rms;
-  const divBetaMaxAbs = natarioBetaDivergence.maxAbs;
+  const authoritativeDivBeta = natarioBetaDivergence.authoritative;
+  const projectionDivBeta = natarioBetaDivergence.projection;
+  const natarioTheta = resolveNatarioThetaDiagnostics(proofPack);
+  const authoritativeTheta = natarioTheta.authoritative;
+  const projectionTheta = natarioTheta.projection;
+  const natarioKTrace = resolveNatarioKTraceDiagnostics(proofPack);
+  const authoritativeKTrace = natarioKTrace.authoritative;
+  const projectionKTrace = natarioKTrace.projection;
+  const divBetaRms = authoritativeDivBeta.rms;
+  const divBetaMaxAbs = authoritativeDivBeta.maxAbs;
   const natarioExpansionTolerance = toNumber(readProofString(proofPack, "natario_expansion_tolerance")) ?? 1e-3;
   const divBetaStatus: "pass" | "fail" | "unknown" = divBetaRms == null
     ? "unknown"
     : divBetaRms <= natarioExpansionTolerance
       ? "pass"
       : "fail";
-  const thetaGeom = toNumber(readProofString(proofPack, "theta_geom"));
-  const kTrace = toNumber(readProofString(proofPack, "metric_k_trace_mean"));
+  const projectionDivBetaStatus: "pass" | "fail" | "unknown" = projectionDivBeta.rms == null
+    ? "unknown"
+    : projectionDivBeta.rms <= natarioExpansionTolerance
+      ? "pass"
+      : "fail";
+  const thetaGeom = authoritativeTheta.value;
+  const kTrace = authoritativeKTrace.value;
   const thetaKTolerance = toNumber(readProofString(proofPack, "theta_k_tolerance")) ?? 1e-3;
   const thetaKResidualAbs = thetaGeom != null && kTrace != null ? Math.abs(thetaGeom + kTrace) : null;
   const thetaKStatus: "pass" | "fail" | "unknown" = thetaKResidualAbs == null
@@ -1971,17 +2157,66 @@ export async function buildTimeDilationDiagnostics(
     : thetaKResidualAbs <= thetaKTolerance
       ? "pass"
       : "fail";
-  const natarioRequiredFieldsOk = thetaGeom != null && kTrace != null && divBetaRms != null;
-  const natarioCanonicalSatisfied = natarioRequiredFieldsOk && divBetaStatus === "pass" && thetaKStatus === "pass";
+  const projectionThetaKResidualAbs =
+    projectionTheta.value != null && projectionKTrace.value != null
+      ? Math.abs(projectionTheta.value + projectionKTrace.value)
+      : null;
+  const projectionThetaKStatus: "pass" | "fail" | "unknown" =
+    projectionThetaKResidualAbs == null
+      ? "unknown"
+      : projectionThetaKResidualAbs <= thetaKTolerance
+        ? "pass"
+        : "fail";
+  const natarioRequiredFieldsOk =
+    authoritativeTheta.available &&
+    authoritativeKTrace.available &&
+    authoritativeDivBeta.available &&
+    divBetaRms != null;
+  const projectionRequiredFieldsOk =
+    projectionTheta.available &&
+    projectionKTrace.available &&
+    projectionDivBeta.available &&
+    projectionDivBeta.rms != null;
+  const natarioCanonicalSatisfied =
+    natarioRequiredFieldsOk &&
+    divBetaStatus === "pass" &&
+    thetaKStatus === "pass";
+  const projectionCanonicalSatisfied =
+    projectionRequiredFieldsOk &&
+    projectionDivBetaStatus === "pass" &&
+    projectionThetaKStatus === "pass";
   const natarioReason = natarioCanonicalSatisfied
     ? null
     : !natarioRequiredFieldsOk
-      ? "natario_required_fields_missing"
+      ? projectionRequiredFieldsOk
+        ? !authoritativeDivBeta.available
+          ? "natario_authoritative_divergence_missing_projection_only"
+          : "natario_authoritative_theta_k_missing_projection_only"
+        : !authoritativeDivBeta.available
+          ? "natario_authoritative_divergence_missing"
+          : "natario_authoritative_theta_k_missing"
       : divBetaStatus === "fail"
-        ? "natario_divergence_constraint_failed"
+        ? "natario_authoritative_divergence_constraint_failed"
         : thetaKStatus === "fail"
           ? "natario_theta_k_consistency_failed"
           : "natario_constraints_unknown";
+  const projectionReason = projectionCanonicalSatisfied
+    ? null
+    : !projectionRequiredFieldsOk
+      ? "natario_projection_theta_k_missing"
+      : projectionDivBetaStatus === "fail"
+        ? "natario_projection_divergence_constraint_failed"
+        : projectionThetaKStatus === "fail"
+          ? "natario_theta_k_consistency_failed"
+          : "natario_projection_constraints_unknown";
+  const natarioClassificationMode =
+    natarioCanonicalSatisfied || natarioRequiredFieldsOk
+      ? "authoritative"
+      : projectionRequiredFieldsOk
+        ? "projection_derived_only"
+        : !authoritativeDivBeta.available
+          ? "blocked_missing_authoritative_divergence"
+          : "blocked_missing_authoritative_theta_k";
   const certifiedWarpWorldline = resolveCertifiedWarpWorldline(pipeline);
   const certifiedWarpRouteTimeWorldline =
     resolveCertifiedWarpRouteTimeWorldline(pipeline);
@@ -2304,13 +2539,29 @@ export async function buildTimeDilationDiagnostics(
     natarioCanonical: {
       requiredFieldsOk: natarioRequiredFieldsOk,
       canonicalSatisfied: natarioCanonicalSatisfied,
+      authoritativeSourcePresent:
+        authoritativeDivBeta.available &&
+        authoritativeTheta.available &&
+        authoritativeKTrace.available,
+      classificationMode: natarioClassificationMode,
+      authoritativeReason: natarioReason,
+      projectionRequiredFieldsOk,
+      projectionCanonicalSatisfied,
+      projectionReason,
       checks: {
         divBeta: {
           status: divBetaStatus,
           rms: divBetaRms,
           maxAbs: divBetaMaxAbs,
           tolerance: natarioExpansionTolerance,
-          source: natarioBetaDivergence.source,
+          source: authoritativeDivBeta.source,
+        },
+        projectionDivBeta: {
+          status: projectionDivBetaStatus,
+          rms: projectionDivBeta.rms,
+          maxAbs: projectionDivBeta.maxAbs,
+          tolerance: natarioExpansionTolerance,
+          source: projectionDivBeta.source,
         },
         thetaKConsistency: {
           status: thetaKStatus,
@@ -2318,7 +2569,7 @@ export async function buildTimeDilationDiagnostics(
           kTrace,
           residualAbs: thetaKResidualAbs,
           tolerance: thetaKTolerance,
-          source: "pipeline.theta_geom + proof.metric_k_trace_mean",
+          source: `${authoritativeTheta.source} + ${authoritativeKTrace.source}`,
         },
       },
       reason: natarioReason,

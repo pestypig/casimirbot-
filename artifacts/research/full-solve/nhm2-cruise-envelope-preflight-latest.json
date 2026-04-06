@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_cruise_envelope_preflight/v1",
-  "generatedOn": "2026-04-03",
-  "generatedAt": "2026-04-03T03:25:17.418Z",
+  "generatedOn": "2026-04-05",
+  "generatedAt": "2026-04-05T19:43:59.743Z",
   "boundaryStatement": "This artifact records a bounded NHM2 cruise-envelope preflight over the certified local-comoving shell-cross worldline family. It does not certify max speed, route time, mission time, relativistic advantage, or viability.",
   "sourceAuditArtifactPath": "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
   "sourceWorldlineArtifactPath": "artifacts/research/full-solve/nhm2-warp-worldline-proof-latest.json",
@@ -18,8 +18,11 @@
     "metricT00Ref": "warp.metric.T00.natario_sdf.shift",
     "metricT00Source": "metric",
     "metricFamily": "natario_sdf",
+    "familyAuthorityStatus": "canonical_bounded_baseline_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_baseline",
     "metricT00ContractStatus": "ok",
-    "chartContractStatus": "ok"
+    "chartContractStatus": "ok",
+    "shiftLapseTransportPromotionGate": null
   },
   "chart": {
     "label": "comoving_cartesian",
@@ -389,5 +392,5 @@
     "not relativistic-advantage certified",
     "not viability-promotion evidence"
   ],
-  "checksum": "d40068fe92f8764ed4d23130c78f133a8cca97788321256631627066ea73eb7b"
+  "checksum": "365211ea95caf1cfb35501c9bb249e0f322dbdb0ac377588fba92c846cd76ffd"
 }
