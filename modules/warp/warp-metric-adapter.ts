@@ -112,7 +112,23 @@ export type WarpShiftLapseProfileId =
   | "stage1_centerline_alpha_0p8175_v1"
   | "stage1_centerline_alpha_0p8150_v1"
   | "stage1_centerline_alpha_0p8125_v1"
-  | "stage1_centerline_alpha_0p8100_v1";
+  | "stage1_centerline_alpha_0p8100_v1"
+  | "stage1_centerline_alpha_0p8075_v1"
+  | "stage1_centerline_alpha_0p8050_v1"
+  | "stage1_centerline_alpha_0p8025_v1"
+  | "stage1_centerline_alpha_0p8000_v1"
+  | "stage1_centerline_alpha_0p7975_v1"
+  | "stage1_centerline_alpha_0p7950_v1"
+  | "stage1_centerline_alpha_0p7925_v1"
+  | "stage1_centerline_alpha_0p7900_v1"
+  | "stage1_centerline_alpha_0p7875_v1"
+  | "stage1_centerline_alpha_0p7850_v1"
+  | "stage1_centerline_alpha_0p7825_v1"
+  | "stage1_centerline_alpha_0p7800_v1"
+  | "stage1_centerline_alpha_0p7775_v1"
+  | "stage1_centerline_alpha_0p7750_v1"
+  | "stage1_centerline_alpha_0p7725_v1"
+  | "stage1_centerline_alpha_0p7700_v1";
 export type WarpShiftLapseProfileStage =
   | "baseline_reference_profile"
   | "controlled_tuning_stage_1";
@@ -275,6 +291,22 @@ export const STAGE1_CENTERLINE_ALPHA_STRONGER_BOUNDARY_SWEEP_PROFILE_IDS: WarpSh
     "stage1_centerline_alpha_0p8150_v1",
     "stage1_centerline_alpha_0p8125_v1",
     "stage1_centerline_alpha_0p8100_v1",
+    "stage1_centerline_alpha_0p8075_v1",
+    "stage1_centerline_alpha_0p8050_v1",
+    "stage1_centerline_alpha_0p8025_v1",
+    "stage1_centerline_alpha_0p8000_v1",
+    "stage1_centerline_alpha_0p7975_v1",
+    "stage1_centerline_alpha_0p7950_v1",
+    "stage1_centerline_alpha_0p7925_v1",
+    "stage1_centerline_alpha_0p7900_v1",
+    "stage1_centerline_alpha_0p7875_v1",
+    "stage1_centerline_alpha_0p7850_v1",
+    "stage1_centerline_alpha_0p7825_v1",
+    "stage1_centerline_alpha_0p7800_v1",
+    "stage1_centerline_alpha_0p7775_v1",
+    "stage1_centerline_alpha_0p7750_v1",
+    "stage1_centerline_alpha_0p7725_v1",
+    "stage1_centerline_alpha_0p7700_v1",
   ];
 
 const WARP_SHIFT_LAPSE_PROFILE_TABLE: Record<
@@ -896,6 +928,134 @@ const WARP_SHIFT_LAPSE_PROFILE_TABLE: Record<
     profileNote:
       "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8100 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
     alphaCenterlineDefault: 0.81,
+  },
+  stage1_centerline_alpha_0p8075_v1: {
+    profileId: "stage1_centerline_alpha_0p8075_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.8075",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8075 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.8075,
+  },
+  stage1_centerline_alpha_0p8050_v1: {
+    profileId: "stage1_centerline_alpha_0p8050_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.8050",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8050 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.805,
+  },
+  stage1_centerline_alpha_0p8025_v1: {
+    profileId: "stage1_centerline_alpha_0p8025_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.8025",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8025 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.8025,
+  },
+  stage1_centerline_alpha_0p8000_v1: {
+    profileId: "stage1_centerline_alpha_0p8000_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.8000",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.8000 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.8,
+  },
+  stage1_centerline_alpha_0p7975_v1: {
+    profileId: "stage1_centerline_alpha_0p7975_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7975",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7975 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7975,
+  },
+  stage1_centerline_alpha_0p7950_v1: {
+    profileId: "stage1_centerline_alpha_0p7950_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7950",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7950 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.795,
+  },
+  stage1_centerline_alpha_0p7925_v1: {
+    profileId: "stage1_centerline_alpha_0p7925_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7925",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7925 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7925,
+  },
+  stage1_centerline_alpha_0p7900_v1: {
+    profileId: "stage1_centerline_alpha_0p7900_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7900",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7900 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.79,
+  },
+  stage1_centerline_alpha_0p7875_v1: {
+    profileId: "stage1_centerline_alpha_0p7875_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7875",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7875 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7875,
+  },
+  stage1_centerline_alpha_0p7850_v1: {
+    profileId: "stage1_centerline_alpha_0p7850_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7850",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7850 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.785,
+  },
+  stage1_centerline_alpha_0p7825_v1: {
+    profileId: "stage1_centerline_alpha_0p7825_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7825",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7825 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7825,
+  },
+  stage1_centerline_alpha_0p7800_v1: {
+    profileId: "stage1_centerline_alpha_0p7800_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7800",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7800 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.78,
+  },
+  stage1_centerline_alpha_0p7775_v1: {
+    profileId: "stage1_centerline_alpha_0p7775_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7775",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7775 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7775,
+  },
+  stage1_centerline_alpha_0p7750_v1: {
+    profileId: "stage1_centerline_alpha_0p7750_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7750",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7750 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.775,
+  },
+  stage1_centerline_alpha_0p7725_v1: {
+    profileId: "stage1_centerline_alpha_0p7725_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7725",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7725 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.7725,
+  },
+  stage1_centerline_alpha_0p7700_v1: {
+    profileId: "stage1_centerline_alpha_0p7700_v1",
+    profileStage: "controlled_tuning_stage_1",
+    profileLabel: "Stage 1 centerline alpha 0.7700",
+    profileNote:
+      "Controlled stage-1 NHM2 shift+lapse stronger-side boundary extension profile: centerline alpha is reduced to 0.7700 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+    alphaCenterlineDefault: 0.77,
   },
 };
 

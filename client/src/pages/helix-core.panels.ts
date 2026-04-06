@@ -70,6 +70,7 @@ const API = {
   helixSnapshot: "GET /api/helix/snapshot",
   helixMetrics: "GET /api/helix/metrics",
   helixDisplacement: "GET /api/helix/displacement",
+  helixRelativisticMapProject: "POST /api/helix/relativistic-map/project",
   helixSpectrumRead: "GET /api/helix/spectrum",
   helixSpectrumWrite: "POST /api/helix/spectrum",
   grAgentLoop: "GET /api/helix/gr-agent-loop",
@@ -211,7 +212,14 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "hull-metrics-vis": ["hull metrics", "natario", "alcubierre", "glb preview", "wireframe"],
   "collapse-benchmark-hud": ["collapse benchmark", "tau", "L_present", "kappa", "lattice hash", "relativity"],
   "remove-bg-edges": ["background removal", "png alpha", "canny", "grabcut", "opencv", "mask"],
-  "time-dilation-lattice": ["time dilation", "spacetime lattice", "clock rate", "alpha", "grid warp"]
+  "time-dilation-lattice": ["time dilation", "spacetime lattice", "clock rate", "alpha", "grid warp"],
+  "observable-universe-accordion": [
+    "observable universe",
+    "accordion map",
+    "heliocentric icrs",
+    "sr accessibility",
+    "catalog eta projection"
+  ]
 };
 
 function lazyPanel<T extends Record<string, unknown>>(
@@ -643,6 +651,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultPosition: { x: 340, y: 520 },
     endpoints: [API.pipelineGet],
     keywords: PANEL_KEYWORDS["time-dilation-lattice"]
+  },
+  {
+    id: "observable-universe-accordion",
+    title: "Observable Universe Accordion",
+    icon: Globe2,
+    loader: lazyPanel(() => import("@/components/ObservableUniverseAccordionPanel")),
+    defaultSize: { w: 1120, h: 720 },
+    defaultPosition: { x: 360, y: 540 },
+    endpoints: [API.helixRelativisticMapProject],
+    keywords: PANEL_KEYWORDS["observable-universe-accordion"]
   },
   {
     id: "curvature-ledger",

@@ -101,6 +101,22 @@ const BOUNDARY_PROFILE_SPECS = [
   { profileId: "stage1_centerline_alpha_0p8150_v1", alpha: 0.815 },
   { profileId: "stage1_centerline_alpha_0p8125_v1", alpha: 0.8125 },
   { profileId: "stage1_centerline_alpha_0p8100_v1", alpha: 0.81 },
+  { profileId: "stage1_centerline_alpha_0p8075_v1", alpha: 0.8075 },
+  { profileId: "stage1_centerline_alpha_0p8050_v1", alpha: 0.805 },
+  { profileId: "stage1_centerline_alpha_0p8025_v1", alpha: 0.8025 },
+  { profileId: "stage1_centerline_alpha_0p8000_v1", alpha: 0.8 },
+  { profileId: "stage1_centerline_alpha_0p7975_v1", alpha: 0.7975 },
+  { profileId: "stage1_centerline_alpha_0p7950_v1", alpha: 0.795 },
+  { profileId: "stage1_centerline_alpha_0p7925_v1", alpha: 0.7925 },
+  { profileId: "stage1_centerline_alpha_0p7900_v1", alpha: 0.79 },
+  { profileId: "stage1_centerline_alpha_0p7875_v1", alpha: 0.7875 },
+  { profileId: "stage1_centerline_alpha_0p7850_v1", alpha: 0.785 },
+  { profileId: "stage1_centerline_alpha_0p7825_v1", alpha: 0.7825 },
+  { profileId: "stage1_centerline_alpha_0p7800_v1", alpha: 0.78 },
+  { profileId: "stage1_centerline_alpha_0p7775_v1", alpha: 0.7775 },
+  { profileId: "stage1_centerline_alpha_0p7750_v1", alpha: 0.775 },
+  { profileId: "stage1_centerline_alpha_0p7725_v1", alpha: 0.7725 },
+  { profileId: "stage1_centerline_alpha_0p7700_v1", alpha: 0.77 },
 ] as const;
 
 const withFailToken = <T extends { falsifierConditions: string[] }>(
@@ -1015,11 +1031,11 @@ describe("bounded-stack latest publication", () => {
       BOUNDARY_PROFILE_SPECS.map((entry) => entry.profileId),
     );
     expect(boundaryResultJson.testedStrongerBracketStopProfileId).toBe(
-      "stage1_centerline_alpha_0p8100_v1",
+      "stage1_centerline_alpha_0p7700_v1",
     );
-    expect(boundaryResultJson.testedStrongerBracketStopCenterlineAlpha).toBe(0.81);
+    expect(boundaryResultJson.testedStrongerBracketStopCenterlineAlpha).toBe(0.77);
     expect(boundaryResultJson.strongestProfileKeepingAllGatesPassing).toBe(
-      "stage1_centerline_alpha_0p8100_v1",
+      "stage1_centerline_alpha_0p7700_v1",
     );
     expect(boundaryResultJson.firstGateFailure).toBeNull();
     expect(boundaryResultJson.firstFailedGate).toBeNull();
@@ -1027,10 +1043,10 @@ describe("bounded-stack latest publication", () => {
       "no_failure_reached_within_tested_stronger_bracket",
     );
     expect(boundaryResultJson.marginFromReferenceProfile.toShiftLapseProfileId).toBe(
-      "stage1_centerline_alpha_0p8100_v1",
+      "stage1_centerline_alpha_0p7700_v1",
     );
     expect(boundaryResultJson.marginFromReferenceProfile.deltaCenterlineAlpha).toBeCloseTo(
-      0.185,
+      0.225,
       12,
     );
     expect(boundaryResultJson.scalingStatusWithinPassingRegion).toBe("monotonic");
@@ -1078,7 +1094,7 @@ describe("bounded-stack latest publication", () => {
     }
     expect(boundaryResultMd).toContain("no_failure_reached_within_tested_stronger_bracket");
     expect(boundaryResultMd).toContain("boundary-sweep");
-    expect(boundaryResultMd).toContain("stage1_centerline_alpha_0p8100_v1");
+    expect(boundaryResultMd).toContain("stage1_centerline_alpha_0p7700_v1");
     expect(boundaryResultMd).toContain("Trend Summary");
     expect(boundaryResultMd).toContain("Threshold Usage Summary");
     expect(boundaryResultMd).toContain("unresolved_within_tested_bracket");
