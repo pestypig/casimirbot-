@@ -69,8 +69,28 @@ import {
 } from "../shared/contracts/nhm2-envelope-perturbation-suite.v1";
 import {
   buildNhm2ShiftVsLapseDecompositionArtifact,
+  isNhm2ShiftVsLapseDecompositionArtifact,
   type Nhm2ShiftVsLapseDecompositionArtifact,
 } from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
+import {
+  buildNhm2FullLoopAuditContract,
+  isNhm2FullLoopAuditContract,
+  type Nhm2FullLoopAuditArtifactRef,
+  type Nhm2FullLoopAuditClaimTier,
+  type Nhm2FullLoopAuditContractV1,
+  type Nhm2FullLoopAuditReasonCode,
+  type Nhm2FullLoopAuditSectionId,
+  type Nhm2FullLoopAuditSectionsInput,
+  type Nhm2FullLoopAuditState,
+} from "../shared/contracts/nhm2-full-loop-audit.v1";
+import {
+  isNhm2StrictSignalReadinessArtifact,
+  type Nhm2StrictSignalReadinessArtifact,
+} from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import {
+  isNhm2ObserverAuditArtifact,
+  type Nhm2ObserverAuditArtifact,
+} from "../shared/contracts/nhm2-observer-audit.v1";
 import {
   isCertifiedWarpWorldlineContract,
   type WarpWorldlineContractV1,
@@ -574,6 +594,22 @@ const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-shift-vs-lapse-decomposition-latest.md",
 );
+const DEFAULT_FULL_LOOP_AUDIT_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-full-loop-audit-${DATE_STAMP}.json`,
+);
+const DEFAULT_FULL_LOOP_AUDIT_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-full-loop-audit-latest.json",
+);
+const DEFAULT_FULL_LOOP_AUDIT_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-full-loop-audit-${DATE_STAMP}.md`,
+);
+const DEFAULT_FULL_LOOP_AUDIT_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-full-loop-audit-latest.md",
+);
 const DEFAULT_ENVELOPE_PERTURBATION_SUITE_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-envelope-perturbation-suite-${DATE_STAMP}.json`,
@@ -752,6 +788,8 @@ const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep";
 const SELECTED_SHIFT_LAPSE_ENVELOPE_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite";
+const SELECTED_SHIFT_LAPSE_FULL_LOOP_AUDIT_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit";
 const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
   warpFieldType: "nhm2_shift_lapse",
   metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
@@ -760,6 +798,18 @@ const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
   requireNhm2CongruentFullSolve: true,
   shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
 };
+const DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-strict-signal-readiness-latest.json",
+);
+const DEFAULT_SOURCE_CLOSURE_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-source-closure-latest.json",
+);
+const DEFAULT_OBSERVER_AUDIT_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-observer-audit-latest.json",
+);
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
@@ -6496,6 +6546,416 @@ const getGitCleanLandingState = (
     return "unknown";
   }
 };
+
+type Nhm2FullLoopChecklistParseStatus = "pass" | "missing" | "fail" | "n/a";
+type Nhm2FullLoopChecklistMatchStatus = "pass" | "fail" | "n/a";
+
+type Nhm2FullLoopArtifactInspection<T> = {
+  expectedPath: string;
+  exists: boolean;
+  parsed: T | null;
+  parseStatus: Nhm2FullLoopChecklistParseStatus;
+  laneProfileMatch: Nhm2FullLoopChecklistMatchStatus;
+  mismatchReasons: string[];
+  artifactRef: Nhm2FullLoopAuditArtifactRef | null;
+};
+
+type Nhm2FullLoopSectionChecklistRow = {
+  sectionId: Nhm2FullLoopAuditSectionId;
+  expectedEvidence: string[];
+  foundRefs: string[];
+  contractParseStatus: Nhm2FullLoopChecklistParseStatus;
+  laneProfileMatch: Nhm2FullLoopChecklistMatchStatus;
+  mismatchStatus: string;
+  sectionState: Nhm2FullLoopAuditState;
+  blockingReasons: Nhm2FullLoopAuditReasonCode[];
+};
+
+type Nhm2FullLoopSectionEvaluation<Id extends Nhm2FullLoopAuditSectionId> = {
+  section: Nhm2FullLoopAuditSectionsInput[Id];
+  checklist: Nhm2FullLoopSectionChecklistRow;
+};
+
+const FULL_LOOP_AUDIT_STAGE_SURFACES: Array<{
+  module: string;
+  stage: Nhm2FullLoopAuditClaimTier;
+}> = [
+  { module: "modules/warp/natario-warp.ts", stage: "reduced-order" },
+  { module: "server/stress-energy-brick.ts", stage: "reduced-order" },
+  { module: "server/gr-evolve-brick.ts", stage: "diagnostic" },
+  { module: "tools/warpViability.ts", stage: "diagnostic" },
+  { module: "tools/warpViabilityCertificate.ts", stage: "certified" },
+];
+
+const expectedEvidenceStatus = (
+  inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>,
+): Nhm2FullLoopChecklistParseStatus => {
+  if (inspections.length === 0) return "missing";
+  if (inspections.some((entry) => entry.parseStatus === "fail")) return "fail";
+  if (inspections.some((entry) => entry.parseStatus === "missing")) return "missing";
+  if (inspections.every((entry) => entry.parseStatus === "n/a")) return "n/a";
+  return "pass";
+};
+
+const aggregateLaneProfileMatch = (
+  inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>,
+): Nhm2FullLoopChecklistMatchStatus => {
+  const meaningful = inspections.filter(
+    (entry) => entry.parseStatus === "pass" && entry.laneProfileMatch !== "n/a",
+  );
+  if (meaningful.length === 0) return "n/a";
+  return meaningful.every((entry) => entry.laneProfileMatch === "pass")
+    ? "pass"
+    : "fail";
+};
+
+const uniqueTextList = (values: Iterable<string>): string[] =>
+  [...new Set(Array.from(values).filter((entry) => entry.trim().length > 0))];
+
+const resolveArtifactContractVersionLike = (value: unknown): string | null => {
+  const record = asRecord(value);
+  return (
+    asText(record.contractVersion) ??
+    asText(record.schemaVersion) ??
+    asText(record.artifactType)
+  );
+};
+
+const resolveArtifactStatusLike = (value: unknown): string | null => {
+  const record = asRecord(value);
+  return (
+    asText(record.status) ??
+    asText(record.transportCertificationStatus) ??
+    asText(record.promotionGateStatus)
+  );
+};
+
+const resolveArtifactProfileId = (value: unknown): string | null => {
+  const record = asRecord(value);
+  const sourceSurface = resolvePublicationSurfaceRecord(value);
+  const gate =
+    sourceSurface?.shiftLapseTransportPromotionGate &&
+    typeof sourceSurface.shiftLapseTransportPromotionGate === "object"
+      ? (sourceSurface.shiftLapseTransportPromotionGate as Record<string, unknown>)
+      : null;
+  const profile = asRecord(record.profile);
+  const family = asRecord(record.family);
+  const selectedFamily = asRecord(record.selectedFamily);
+  return (
+    asText(sourceSurface?.shiftLapseProfileId) ??
+    asText(gate?.shiftLapseProfileId) ??
+    asText(profile.shiftLapseProfileId) ??
+    asText(family.shiftLapseProfileId) ??
+    asText(selectedFamily.shiftLapseProfileId) ??
+    asText(record.shiftLapseProfileId)
+  );
+};
+
+const resolveArtifactFamilyId = (value: unknown): string | null => {
+  const record = asRecord(value);
+  const sourceSurface = resolvePublicationSurfaceRecord(value);
+  const family = asRecord(record.family);
+  const profile = asRecord(record.profile);
+  const selectedFamily = asRecord(record.selectedFamily);
+  return (
+    resolvePublicationSurfaceWarpFieldType(sourceSurface) ??
+    asText(profile.familyId) ??
+    asText(family.warpFieldType) ??
+    asText(family.familyId) ??
+    asText(selectedFamily.warpFieldType) ??
+    asText(selectedFamily.metricFamily) ??
+    asText(record.metricFamily) ??
+    asText(record.familyId)
+  );
+};
+
+const makeFullLoopAuditRef = (args: {
+  artifactId: string;
+  path: string;
+  value?: unknown;
+  contractVersion?: string | null;
+  status?: string | null;
+}): Nhm2FullLoopAuditArtifactRef => ({
+  artifactId: args.artifactId,
+  path: normalizePath(args.path),
+  contractVersion:
+    args.contractVersion ??
+    (args.value != null ? resolveArtifactContractVersionLike(args.value) : null),
+  status:
+    args.status ?? (args.value != null ? resolveArtifactStatusLike(args.value) : null),
+});
+
+const makeExistingFileInspection = (
+  expectedPath: string,
+  artifactId: string,
+): Nhm2FullLoopArtifactInspection<never> => {
+  const exists = fs.existsSync(expectedPath);
+  return {
+    expectedPath: normalizePath(expectedPath),
+    exists,
+    parsed: null,
+    parseStatus: exists ? "n/a" : "missing",
+    laneProfileMatch: "n/a",
+    mismatchReasons: exists ? [] : ["missing_artifact"],
+    artifactRef: exists
+      ? makeFullLoopAuditRef({
+          artifactId,
+          path: expectedPath,
+          contractVersion: null,
+          status: null,
+        })
+      : null,
+  };
+};
+
+const isNhm2SourceClosureArtifactLike = (
+  value: unknown,
+): value is {
+  artifactId: string;
+  schemaVersion: string;
+  status: string;
+  tensorRefs: { metricRequired: string | null; tileEffective: string | null };
+  residualNorms: { relL2: number | null; relLInf: number | null };
+  sampledSummaries: { regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }> };
+  reasonCodes: string[];
+} => {
+  const record = asRecord(value);
+  return (
+    record.artifactId === "nhm2_source_closure" &&
+    record.schemaVersion === "nhm2_source_closure/v1" &&
+    asText(record.status) != null &&
+    record.tensorRefs != null &&
+    record.residualNorms != null &&
+    Array.isArray(record.reasonCodes)
+  );
+};
+
+const inspectPublishedAuditArtifact = <T>(args: {
+  expectedPath: string;
+  artifactId: string;
+  expectedArtifactType?: string;
+  validator?: (value: unknown) => value is T;
+  expectedProfileId?: string | null;
+  expectedFamilyId?: string | null;
+  pathChecks?: Array<{
+    actualPath: string | null;
+    expectedPath: string | null;
+    mismatchCode: string;
+  }>;
+}): Nhm2FullLoopArtifactInspection<T> => {
+  const expectedPath = normalizePath(args.expectedPath);
+  if (!fs.existsSync(args.expectedPath)) {
+    return {
+      expectedPath,
+      exists: false,
+      parsed: null,
+      parseStatus: "missing",
+      laneProfileMatch: "n/a",
+      mismatchReasons: ["missing_artifact"],
+      artifactRef: null,
+    };
+  }
+
+  let parsedUnknown: unknown;
+  try {
+    parsedUnknown = readJsonArtifact<unknown>(args.expectedPath, args.expectedArtifactType);
+  } catch (error) {
+    return {
+      expectedPath,
+      exists: true,
+      parsed: null,
+      parseStatus: "fail",
+      laneProfileMatch: "n/a",
+      mismatchReasons: [
+        `parse_failed:${error instanceof Error ? error.message : String(error)}`,
+      ],
+      artifactRef: null,
+    };
+  }
+
+  if (args.validator && !args.validator(parsedUnknown)) {
+    return {
+      expectedPath,
+      exists: true,
+      parsed: null,
+      parseStatus: "fail",
+      laneProfileMatch: "n/a",
+      mismatchReasons: ["contract_validation_failed"],
+      artifactRef: null,
+    };
+  }
+
+  const mismatchReasons: string[] = [];
+  if (args.expectedProfileId != null) {
+    const actualProfileId = resolveArtifactProfileId(parsedUnknown);
+    if (actualProfileId == null) {
+      mismatchReasons.push("profile_missing");
+    } else if (actualProfileId !== args.expectedProfileId) {
+      mismatchReasons.push(
+        `profile_mismatch:${actualProfileId}:${args.expectedProfileId}`,
+      );
+    }
+  }
+  if (args.expectedFamilyId != null) {
+    const actualFamilyId = resolveArtifactFamilyId(parsedUnknown);
+    if (actualFamilyId == null) {
+      mismatchReasons.push("family_missing");
+    } else if (actualFamilyId !== args.expectedFamilyId) {
+      mismatchReasons.push(
+        `family_mismatch:${actualFamilyId}:${args.expectedFamilyId}`,
+      );
+    }
+  }
+  for (const check of args.pathChecks ?? []) {
+    if (check.expectedPath == null) continue;
+    const expected = normalizePath(check.expectedPath);
+    const actual = check.actualPath ? normalizePath(check.actualPath) : null;
+    if (actual == null) {
+      mismatchReasons.push(`${check.mismatchCode}:missing`);
+      continue;
+    }
+    if (actual !== expected) {
+      mismatchReasons.push(`${check.mismatchCode}:${actual}:${expected}`);
+    }
+  }
+
+  return {
+    expectedPath,
+    exists: true,
+    parsed: parsedUnknown as T,
+    parseStatus: "pass",
+    laneProfileMatch:
+      mismatchReasons.some(
+        (entry) =>
+          entry.startsWith("profile_") ||
+          entry.startsWith("family_") ||
+          entry.includes("_path_mismatch"),
+      )
+        ? "fail"
+        : args.expectedProfileId != null || args.expectedFamilyId != null
+          ? "pass"
+          : "n/a",
+    mismatchReasons,
+    artifactRef: makeFullLoopAuditRef({
+      artifactId: args.artifactId,
+      path: args.expectedPath,
+      value: parsedUnknown,
+    }),
+  };
+};
+
+const buildFullLoopSectionChecklist = (args: {
+  sectionId: Nhm2FullLoopAuditSectionId;
+  expectedEvidence: string[];
+  inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>;
+  sectionState: Nhm2FullLoopAuditState;
+  blockingReasons: Nhm2FullLoopAuditReasonCode[];
+}): Nhm2FullLoopSectionChecklistRow => ({
+  sectionId: args.sectionId,
+  expectedEvidence: [...args.expectedEvidence],
+  foundRefs: args.inspections
+    .map((entry) => entry.artifactRef?.path ?? null)
+    .filter((entry): entry is string => entry != null),
+  contractParseStatus: expectedEvidenceStatus(args.inspections),
+  laneProfileMatch: aggregateLaneProfileMatch(args.inspections),
+  mismatchStatus:
+    uniqueTextList(args.inspections.flatMap((entry) => entry.mismatchReasons)).join(",") ||
+    "ok",
+  sectionState: args.sectionState,
+  blockingReasons: [...args.blockingReasons],
+});
+
+const formatChecklistValue = (values: string[]): string =>
+  values.length > 0 ? values.map((entry) => entry.replace(/\|/g, "\\|")).join("<br/>") : "none";
+
+const normalizeFullLoopAuditState = (
+  value: unknown,
+): Nhm2FullLoopAuditState | null =>
+  value === "pass" || value === "fail" || value === "review" || value === "unavailable"
+    ? value
+    : null;
+
+const collectFullLoopArtifactRefs = (
+  inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>,
+): Nhm2FullLoopAuditArtifactRef[] =>
+  inspections
+    .map((entry) => entry.artifactRef ?? null)
+    .filter((entry): entry is Nhm2FullLoopAuditArtifactRef => entry != null);
+
+const hasInspectionMismatch = (
+  inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>,
+): boolean =>
+  inspections.some(
+    (entry) =>
+      entry.laneProfileMatch === "fail" || entry.mismatchReasons.length > 0,
+  );
+
+const hasInspectionMissingOrFailed = (
+  inspections: Array<Nhm2FullLoopArtifactInspection<unknown>>,
+): boolean =>
+  inspections.some(
+    (entry) => entry.parseStatus === "missing" || entry.parseStatus === "fail",
+  );
+
+const appendInspectionMismatch = (
+  inspection: Nhm2FullLoopArtifactInspection<unknown>,
+  reason: string,
+): void => {
+  if (!inspection.mismatchReasons.includes(reason)) {
+    inspection.mismatchReasons.push(reason);
+  }
+};
+
+const appendInspectionPathMismatch = (args: {
+  inspection: Nhm2FullLoopArtifactInspection<unknown>;
+  actualPath: string | null;
+  expectedPath: string | null;
+  mismatchCode: string;
+}): void => {
+  if (args.expectedPath == null) return;
+  const expected = normalizePath(args.expectedPath);
+  const actual = args.actualPath ? normalizePath(args.actualPath) : null;
+  if (actual == null) {
+    appendInspectionMismatch(args.inspection, `${args.mismatchCode}:missing`);
+    return;
+  }
+  if (actual !== expected) {
+    appendInspectionMismatch(
+      args.inspection,
+      `${args.mismatchCode}:${actual}:${expected}`,
+    );
+  }
+};
+
+const readNestedText = (value: unknown, keys: string[]): string | null => {
+  let cursor: unknown = value;
+  for (const key of keys) {
+    cursor = asRecord(cursor)[key];
+  }
+  return asText(cursor);
+};
+
+const appendArtifactPathCheck = (args: {
+  inspection: Nhm2FullLoopArtifactInspection<unknown>;
+  value: unknown;
+  keyPath: string[];
+  expectedPath: string | null;
+  mismatchCode: string;
+}): void =>
+  appendInspectionPathMismatch({
+    inspection: args.inspection,
+    actualPath: readNestedText(args.value, args.keyPath),
+    expectedPath: args.expectedPath,
+    mismatchCode: args.mismatchCode,
+  });
+
+const resolveInspectionChecksum = (
+  inspection: Nhm2FullLoopArtifactInspection<unknown>,
+): string | null =>
+  inspection.parseStatus === "pass"
+    ? asText(asRecord(inspection.parsed).checksum) ??
+      computeJsonFileChecksum(inspection.expectedPath)
+    : null;
 
 let activeProofSurfacePublicationLock:
   | {
@@ -31408,6 +31868,1372 @@ export const publishNhm2ShiftLapseEnvelopeSuite = async (options?: {
   };
 };
 
+const resolvePublishedShiftLapseGate = (
+  value: unknown,
+): Record<string, unknown> | null => {
+  const sourceSurface = resolvePublicationSurfaceRecord(value);
+  return sourceSurface?.shiftLapseTransportPromotionGate &&
+    typeof sourceSurface.shiftLapseTransportPromotionGate === "object"
+    ? (sourceSurface.shiftLapseTransportPromotionGate as Record<string, unknown>)
+    : null;
+};
+
+const resolveRepresentativeProperAccelerationMps2 = (
+  artifact: Nhm2InHullProperAccelerationArtifact,
+): number | null => {
+  const representativeSampleId =
+    artifact.samplingGeometry?.representativeSampleId ?? "cabin_center";
+  const samples = Array.isArray((artifact as Record<string, unknown>).samples)
+    ? ((artifact as Record<string, unknown>).samples as Array<Record<string, unknown>>)
+    : [];
+  const representative =
+    samples.find((entry) => asText(entry.sampleId) === representativeSampleId) ??
+    samples.find((entry) => asText(entry.sampleRole) === representativeSampleId) ??
+    null;
+  return toFiniteNumber(representative?.properAccelerationMagnitude_mps2);
+};
+
+const renderNhm2FullLoopAuditMarkdown = (args: {
+  audit: Nhm2FullLoopAuditContractV1;
+  selectedProfileId: string | null;
+  checklistRows: Nhm2FullLoopSectionChecklistRow[];
+}): string => {
+  const rows = args.checklistRows
+    .map(
+      (row) =>
+        `| ${row.sectionId} | ${formatChecklistValue(row.expectedEvidence)} | ${formatChecklistValue(row.foundRefs)} | ${row.contractParseStatus} | ${row.laneProfileMatch} | ${row.mismatchStatus || "ok"} | ${row.sectionState} | ${row.blockingReasons.length > 0 ? row.blockingReasons.join(", ") : "none"} |`,
+    )
+    .join("\n");
+  const tierRows = Object.values(args.audit.claimTierReadiness)
+    .map(
+      (entry) =>
+        `| ${entry.tier} | ${entry.state} | ${entry.satisfiedSections.join(", ") || "none"} | ${entry.blockingReasons.join(", ") || "none"} |`,
+    )
+    .join("\n");
+  return `# NHM2 Full-Loop Audit (${DATE_STAMP})
+
+"This checklist audits the currently selected nhm2_shift_lapse profile against the existing NHM2 full-loop contract using emitted artifact evidence only. Missing or mismatched publication surfaces remain explicit blockers and do not widen route ETA, transport, gravity, or viability claims."
+
+## Summary
+| field | value |
+|---|---|
+| contractVersion | ${args.audit.contractVersion} |
+| auditId | ${args.audit.auditId} |
+| laneId | ${args.audit.laneId} |
+| generatedAt | ${args.audit.generatedAt} |
+| selectedProfileId | ${args.selectedProfileId ?? "null"} |
+| publicationCommand | ${SELECTED_SHIFT_LAPSE_FULL_LOOP_AUDIT_COMMAND} |
+| currentClaimTier | ${args.audit.currentClaimTier} |
+| maximumClaimTier | ${args.audit.maximumClaimTier} |
+| highestPassingClaimTier | ${args.audit.highestPassingClaimTier ?? "null"} |
+| overallState | ${args.audit.overallState} |
+| blockingReasons | ${args.audit.blockingReasons.join(", ") || "none"} |
+
+## Tier Readiness
+| tier | state | satisfiedSections | blockingReasons |
+|---|---|---|---|
+${tierRows}
+
+## Closure Checklist
+| section | expected evidence | found artifact/ref | contract parse status | lane/profile match | stale/mismatch status | section state | blocking reasons |
+|---|---|---|---|---|---|---|---|
+${rows}
+`;
+};
+
+const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  envelopeArtifact:
+    | Awaited<ReturnType<typeof publishNhm2ShiftLapseEnvelopeSuite>>["envelopeArtifact"]
+    | null;
+  auditArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2FullLoopAuditContractV1;
+  };
+}> => {
+  const selectedFamilyArtifactRootDir =
+    options?.selectedFamilyArtifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const selectedFamilyAuditRootDir =
+    options?.selectedFamilyAuditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+  const selectedTransportLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  );
+  const selectedTransport =
+    options?.reuseExistingSelectedArtifacts === true &&
+    fs.existsSync(selectedTransportLatestJsonPath)
+      ? readExistingSelectedShiftLapseTransportBundleForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseSelectedTransportBundle({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: selectedFamilyArtifactRootDir,
+          auditRootDir: selectedFamilyAuditRootDir,
+        });
+
+  const selectedTransportArtifact = selectedTransport.transportResult.artifact;
+  const selectedProfileId =
+    selectedTransportArtifact.selectedFamily.shiftLapseProfileId ?? null;
+  const selectedProfileStage =
+    selectedTransportArtifact.selectedFamily.shiftLapseProfileStage ?? null;
+  const selectedFamilyId =
+    selectedTransportArtifact.selectedFamily.warpFieldType ?? "nhm2_shift_lapse";
+  const selectedBundle = selectedTransportArtifact.selectedBundleArtifacts;
+
+  const expectedSelectedProfileSweepLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    "sweep",
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_JSON),
+  );
+  const expectedSelectedBoundarySweepLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    "boundary-sweep",
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_JSON),
+  );
+  const rootEnvelopeLatestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_ENVELOPE_PERTURBATION_SUITE_LATEST_JSON),
+  );
+  const selectedEnvelopeLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    "envelope",
+    path.basename(SELECTED_SHIFT_LAPSE_ENVELOPE_LATEST_JSON),
+  );
+  let envelopePublication:
+    | Awaited<ReturnType<typeof publishNhm2ShiftLapseEnvelopeSuite>>
+    | null = null;
+  if (
+    !fs.existsSync(rootEnvelopeLatestJsonPath) ||
+    !fs.existsSync(selectedEnvelopeLatestJsonPath)
+  ) {
+    envelopePublication = await publishNhm2ShiftLapseEnvelopeSuite({
+      baseUrl: options?.baseUrl,
+      selectedFamilyArtifactRootDir,
+      selectedFamilyAuditRootDir,
+      artifactRootDir: path.join(selectedFamilyArtifactRootDir, "envelope"),
+      auditRootDir: path.join(selectedFamilyAuditRootDir, "envelope"),
+      reuseExistingSelectedArtifacts: true,
+    });
+  }
+
+  const transportInspection =
+    inspectPublishedAuditArtifact<Nhm2ShiftLapseTransportResultArtifact>({
+      expectedPath: selectedTransportLatestJsonPath,
+      artifactId: "nhm2_shift_lapse_transport_result",
+      expectedArtifactType: "nhm2_shift_lapse_transport_result/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const worldlineInspection =
+    inspectPublishedAuditArtifact<Nhm2WarpWorldlineProofArtifact>({
+      expectedPath: selectedBundle.worldlineLatestJsonPath,
+      artifactId: "nhm2_warp_worldline_proof",
+      expectedArtifactType: "nhm2_warp_worldline_proof/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const cruisePreflightInspection =
+    inspectPublishedAuditArtifact<Nhm2CruiseEnvelopePreflightArtifact>({
+      expectedPath: selectedBundle.cruiseEnvelopePreflightLatestJsonPath,
+      artifactId: "nhm2_cruise_envelope_preflight",
+      expectedArtifactType: "nhm2_cruise_envelope_preflight/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const routeTimeInspection =
+    inspectPublishedAuditArtifact<Nhm2RouteTimeWorldlineArtifact>({
+      expectedPath: selectedBundle.routeTimeWorldlineLatestJsonPath,
+      artifactId: "nhm2_route_time_worldline",
+      expectedArtifactType: "nhm2_route_time_worldline/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const missionTimeEstimatorInspection =
+    inspectPublishedAuditArtifact<Nhm2MissionTimeEstimatorArtifact>({
+      expectedPath: selectedBundle.missionTimeEstimatorLatestJsonPath,
+      artifactId: "nhm2_mission_time_estimator",
+      expectedArtifactType: "nhm2_mission_time_estimator/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const missionTimeComparisonInspection =
+    inspectPublishedAuditArtifact<Nhm2MissionTimeComparisonArtifact>({
+      expectedPath: selectedBundle.missionTimeComparisonLatestJsonPath,
+      artifactId: "nhm2_mission_time_comparison",
+      expectedArtifactType: "nhm2_mission_time_comparison/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const cruiseEnvelopeInspection =
+    inspectPublishedAuditArtifact<Nhm2CruiseEnvelopeArtifact>({
+      expectedPath: selectedBundle.cruiseEnvelopeLatestJsonPath,
+      artifactId: "nhm2_cruise_envelope",
+      expectedArtifactType: "nhm2_cruise_envelope/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const inHullProperAccelerationInspection =
+    inspectPublishedAuditArtifact<Nhm2InHullProperAccelerationArtifact>({
+      expectedPath: selectedBundle.inHullProperAccelerationLatestJsonPath,
+      artifactId: "nhm2_in_hull_proper_acceleration",
+      expectedArtifactType: "nhm2_in_hull_proper_acceleration/v1",
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const selectedDecompositionInspection =
+    inspectPublishedAuditArtifact<Nhm2ShiftVsLapseDecompositionArtifact>({
+      expectedPath: selectedBundle.shiftVsLapseDecompositionLatestJsonPath,
+      artifactId: "nhm2_shift_vs_lapse_decomposition_selected",
+      validator: isNhm2ShiftVsLapseDecompositionArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const rootDecompositionInspection =
+    inspectPublishedAuditArtifact<Nhm2ShiftVsLapseDecompositionArtifact>({
+      expectedPath: path.join(
+        artifactRootDir,
+        path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON),
+      ),
+      artifactId: "nhm2_shift_vs_lapse_decomposition_root",
+      validator: isNhm2ShiftVsLapseDecompositionArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const selectedEnvelopeInspection =
+    inspectPublishedAuditArtifact<Nhm2EnvelopePerturbationArtifact>({
+      expectedPath: selectedEnvelopeLatestJsonPath,
+      artifactId: "nhm2_envelope_perturbation_suite_selected",
+      validator: isNhm2EnvelopePerturbationArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const rootEnvelopeInspection =
+    inspectPublishedAuditArtifact<Nhm2EnvelopePerturbationArtifact>({
+      expectedPath: rootEnvelopeLatestJsonPath,
+      artifactId: "nhm2_envelope_perturbation_suite_root",
+      validator: isNhm2EnvelopePerturbationArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const strictSignalInspection =
+    inspectPublishedAuditArtifact<Nhm2StrictSignalReadinessArtifact>({
+      expectedPath: DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON,
+      artifactId: "nhm2_strict_signal_readiness",
+      validator: isNhm2StrictSignalReadinessArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const sourceClosureInspection = inspectPublishedAuditArtifact<{
+    status: string;
+    reasonCodes: string[];
+    tensorRefs: { metricRequired: string | null; tileEffective: string | null };
+    residualNorms: { relL2: number | null; relLInf: number | null };
+    sampledSummaries: {
+      regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
+    };
+  }>({
+    expectedPath: DEFAULT_SOURCE_CLOSURE_LATEST_JSON,
+    artifactId: "nhm2_source_closure",
+    validator: isNhm2SourceClosureArtifactLike,
+    expectedProfileId: selectedProfileId,
+    expectedFamilyId: selectedFamilyId,
+  });
+  const observerAuditInspection =
+    inspectPublishedAuditArtifact<Nhm2ObserverAuditArtifact>({
+      expectedPath: DEFAULT_OBSERVER_AUDIT_LATEST_JSON,
+      artifactId: "nhm2_observer_audit",
+      validator: isNhm2ObserverAuditArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+
+  const closedLoopDocInspection = makeExistingFileInspection(
+    "docs/nhm2-closed-loop.md",
+    "nhm2_closed_loop_doc",
+  );
+  const auditChecklistDocInspection = makeExistingFileInspection(
+    "docs/nhm2-audit-checklist.md",
+    "nhm2_audit_checklist_doc",
+  );
+  const mathStatusInspection = makeExistingFileInspection(
+    "MATH_STATUS.md",
+    "math_status",
+  );
+  const proofSurfaceManifestContractInspection = makeExistingFileInspection(
+    "shared/contracts/warp-proof-surface-manifest.v1.ts",
+    "warp_proof_surface_manifest_contract",
+  );
+
+  appendArtifactPathCheck({
+    inspection: cruisePreflightInspection,
+    value: cruisePreflightInspection.parsed,
+    keyPath: ["sourceWorldlineArtifactPath"],
+    expectedPath: selectedBundle.worldlineLatestJsonPath,
+    mismatchCode: "preflight_worldline_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: routeTimeInspection,
+    value: routeTimeInspection.parsed,
+    keyPath: ["sourceWorldlineArtifactPath"],
+    expectedPath: selectedBundle.worldlineLatestJsonPath,
+    mismatchCode: "route_worldline_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: routeTimeInspection,
+    value: routeTimeInspection.parsed,
+    keyPath: ["sourceCruisePreflightArtifactPath"],
+    expectedPath: selectedBundle.cruiseEnvelopePreflightLatestJsonPath,
+    mismatchCode: "route_preflight_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeEstimatorInspection,
+    value: missionTimeEstimatorInspection.parsed,
+    keyPath: ["sourceWorldlineArtifactPath"],
+    expectedPath: selectedBundle.worldlineLatestJsonPath,
+    mismatchCode: "estimator_worldline_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeEstimatorInspection,
+    value: missionTimeEstimatorInspection.parsed,
+    keyPath: ["sourceCruisePreflightArtifactPath"],
+    expectedPath: selectedBundle.cruiseEnvelopePreflightLatestJsonPath,
+    mismatchCode: "estimator_preflight_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeEstimatorInspection,
+    value: missionTimeEstimatorInspection.parsed,
+    keyPath: ["sourceRouteTimeArtifactPath"],
+    expectedPath: selectedBundle.routeTimeWorldlineLatestJsonPath,
+    mismatchCode: "estimator_route_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeComparisonInspection,
+    value: missionTimeComparisonInspection.parsed,
+    keyPath: ["sourceWorldlineArtifactPath"],
+    expectedPath: selectedBundle.worldlineLatestJsonPath,
+    mismatchCode: "comparison_worldline_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeComparisonInspection,
+    value: missionTimeComparisonInspection.parsed,
+    keyPath: ["sourceCruisePreflightArtifactPath"],
+    expectedPath: selectedBundle.cruiseEnvelopePreflightLatestJsonPath,
+    mismatchCode: "comparison_preflight_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeComparisonInspection,
+    value: missionTimeComparisonInspection.parsed,
+    keyPath: ["sourceRouteTimeArtifactPath"],
+    expectedPath: selectedBundle.routeTimeWorldlineLatestJsonPath,
+    mismatchCode: "comparison_route_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: missionTimeComparisonInspection,
+    value: missionTimeComparisonInspection.parsed,
+    keyPath: ["sourceMissionTimeEstimatorArtifactPath"],
+    expectedPath: selectedBundle.missionTimeEstimatorLatestJsonPath,
+    mismatchCode: "comparison_estimator_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: cruiseEnvelopeInspection,
+    value: cruiseEnvelopeInspection.parsed,
+    keyPath: ["sourceCruisePreflightArtifactPath"],
+    expectedPath: selectedBundle.cruiseEnvelopePreflightLatestJsonPath,
+    mismatchCode: "cruise_preflight_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: cruiseEnvelopeInspection,
+    value: cruiseEnvelopeInspection.parsed,
+    keyPath: ["sourceRouteTimeArtifactPath"],
+    expectedPath: selectedBundle.routeTimeWorldlineLatestJsonPath,
+    mismatchCode: "cruise_route_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: cruiseEnvelopeInspection,
+    value: cruiseEnvelopeInspection.parsed,
+    keyPath: ["sourceMissionTimeEstimatorArtifactPath"],
+    expectedPath: selectedBundle.missionTimeEstimatorLatestJsonPath,
+    mismatchCode: "cruise_estimator_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: cruiseEnvelopeInspection,
+    value: cruiseEnvelopeInspection.parsed,
+    keyPath: ["sourceMissionTimeComparisonArtifactPath"],
+    expectedPath: selectedBundle.missionTimeComparisonLatestJsonPath,
+    mismatchCode: "cruise_comparison_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: selectedDecompositionInspection,
+    value: selectedDecompositionInspection.parsed,
+    keyPath: ["sourceArtifacts", "missionTimeComparison"],
+    expectedPath: selectedBundle.missionTimeComparisonLatestJsonPath,
+    mismatchCode: "selected_decomposition_comparison_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: selectedDecompositionInspection,
+    value: selectedDecompositionInspection.parsed,
+    keyPath: ["sourceArtifacts", "worldline"],
+    expectedPath: selectedBundle.worldlineLatestJsonPath,
+    mismatchCode: "selected_decomposition_worldline_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: rootDecompositionInspection,
+    value: rootDecompositionInspection.parsed,
+    keyPath: ["sourceArtifacts", "missionTimeComparison"],
+    expectedPath: selectedBundle.missionTimeComparisonLatestJsonPath,
+    mismatchCode: "root_decomposition_comparison_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: rootDecompositionInspection,
+    value: rootDecompositionInspection.parsed,
+    keyPath: ["sourceArtifacts", "worldline"],
+    expectedPath: selectedBundle.worldlineLatestJsonPath,
+    mismatchCode: "root_decomposition_worldline_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: selectedEnvelopeInspection,
+    value: selectedEnvelopeInspection.parsed,
+    keyPath: ["family", "referenceTransportResultPath"],
+    expectedPath: selectedTransportLatestJsonPath,
+    mismatchCode: "selected_envelope_transport_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: selectedEnvelopeInspection,
+    value: selectedEnvelopeInspection.parsed,
+    keyPath: ["family", "referenceProfileSweepPath"],
+    expectedPath: expectedSelectedProfileSweepLatestJsonPath,
+    mismatchCode: "selected_envelope_profile_sweep_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: selectedEnvelopeInspection,
+    value: selectedEnvelopeInspection.parsed,
+    keyPath: ["family", "referenceBoundarySweepPath"],
+    expectedPath: expectedSelectedBoundarySweepLatestJsonPath,
+    mismatchCode: "selected_envelope_boundary_sweep_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: rootEnvelopeInspection,
+    value: rootEnvelopeInspection.parsed,
+    keyPath: ["family", "referenceTransportResultPath"],
+    expectedPath: selectedTransportLatestJsonPath,
+    mismatchCode: "root_envelope_transport_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: rootEnvelopeInspection,
+    value: rootEnvelopeInspection.parsed,
+    keyPath: ["family", "referenceProfileSweepPath"],
+    expectedPath: expectedSelectedProfileSweepLatestJsonPath,
+    mismatchCode: "root_envelope_profile_sweep_path_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: rootEnvelopeInspection,
+    value: rootEnvelopeInspection.parsed,
+    keyPath: ["family", "referenceBoundarySweepPath"],
+    expectedPath: expectedSelectedBoundarySweepLatestJsonPath,
+    mismatchCode: "root_envelope_boundary_sweep_path_mismatch",
+  });
+
+  const rootEnvelopeChecksum = resolveInspectionChecksum(rootEnvelopeInspection);
+  const selectedEnvelopeChecksum = resolveInspectionChecksum(selectedEnvelopeInspection);
+  if (
+    rootEnvelopeChecksum != null &&
+    selectedEnvelopeChecksum != null &&
+    rootEnvelopeChecksum !== selectedEnvelopeChecksum
+  ) {
+    appendInspectionMismatch(
+      rootEnvelopeInspection,
+      "root_selected_envelope_checksum_mismatch",
+    );
+    appendInspectionMismatch(
+      selectedEnvelopeInspection,
+      "root_selected_envelope_checksum_mismatch",
+    );
+  }
+
+  const rootDecompositionChecksum = resolveInspectionChecksum(rootDecompositionInspection);
+  const selectedDecompositionChecksum = resolveInspectionChecksum(
+    selectedDecompositionInspection,
+  );
+  if (
+    rootDecompositionChecksum != null &&
+    selectedDecompositionChecksum != null &&
+    rootDecompositionChecksum !== selectedDecompositionChecksum
+  ) {
+    appendInspectionMismatch(
+      rootDecompositionInspection,
+      "root_selected_decomposition_checksum_mismatch",
+    );
+    appendInspectionMismatch(
+      selectedDecompositionInspection,
+      "root_selected_decomposition_checksum_mismatch",
+    );
+  }
+
+  const transportArtifact =
+    transportInspection.parseStatus === "pass"
+      ? (transportInspection.parsed as Nhm2ShiftLapseTransportResultArtifact)
+      : null;
+  const worldlineArtifact =
+    worldlineInspection.parseStatus === "pass"
+      ? (worldlineInspection.parsed as Nhm2WarpWorldlineProofArtifact)
+      : null;
+  const routeTimeArtifact =
+    routeTimeInspection.parseStatus === "pass"
+      ? (routeTimeInspection.parsed as Nhm2RouteTimeWorldlineArtifact)
+      : null;
+  const missionTimeEstimatorArtifact =
+    missionTimeEstimatorInspection.parseStatus === "pass"
+      ? (missionTimeEstimatorInspection.parsed as Nhm2MissionTimeEstimatorArtifact)
+      : null;
+  const missionTimeComparisonArtifact =
+    missionTimeComparisonInspection.parseStatus === "pass"
+      ? (missionTimeComparisonInspection.parsed as Nhm2MissionTimeComparisonArtifact)
+      : null;
+  const cruiseEnvelopeArtifact =
+    cruiseEnvelopeInspection.parseStatus === "pass"
+      ? (cruiseEnvelopeInspection.parsed as Nhm2CruiseEnvelopeArtifact)
+      : null;
+  const inHullProperAccelerationArtifact =
+    inHullProperAccelerationInspection.parseStatus === "pass"
+      ? (inHullProperAccelerationInspection.parsed as Nhm2InHullProperAccelerationArtifact)
+      : null;
+  const strictSignalArtifact =
+    strictSignalInspection.parseStatus === "pass"
+      ? (strictSignalInspection.parsed as Nhm2StrictSignalReadinessArtifact)
+      : null;
+  const sourceClosureArtifact =
+    sourceClosureInspection.parseStatus === "pass"
+      ? (sourceClosureInspection.parsed as {
+          status: string;
+          reasonCodes: string[];
+          tensorRefs: { metricRequired: string | null; tileEffective: string | null };
+          residualNorms: { relL2: number | null; relLInf: number | null };
+          sampledSummaries: {
+            regions: Array<{
+              regionId: string;
+              residualNorms?: { relLInf?: number | null };
+            }>;
+          };
+        })
+      : null;
+  const observerAuditArtifact =
+    observerAuditInspection.parseStatus === "pass"
+      ? (observerAuditInspection.parsed as Nhm2ObserverAuditArtifact)
+      : null;
+  const selectedDecompositionArtifact =
+    selectedDecompositionInspection.parseStatus === "pass"
+      ? (selectedDecompositionInspection.parsed as Nhm2ShiftVsLapseDecompositionArtifact)
+      : null;
+  const rootDecompositionArtifact =
+    rootDecompositionInspection.parseStatus === "pass"
+      ? (rootDecompositionInspection.parsed as Nhm2ShiftVsLapseDecompositionArtifact)
+      : null;
+  const selectedEnvelopeArtifact =
+    selectedEnvelopeInspection.parseStatus === "pass"
+      ? (selectedEnvelopeInspection.parsed as Nhm2EnvelopePerturbationArtifact)
+      : null;
+  const rootEnvelopeArtifact =
+    rootEnvelopeInspection.parseStatus === "pass"
+      ? (rootEnvelopeInspection.parsed as Nhm2EnvelopePerturbationArtifact)
+      : null;
+
+  const shiftGate =
+    (worldlineArtifact ? resolvePublishedShiftLapseGate(worldlineArtifact) : null) ??
+    (missionTimeComparisonArtifact
+      ? resolvePublishedShiftLapseGate(missionTimeComparisonArtifact)
+      : null) ??
+    null;
+  const primaryDecompositionArtifact =
+    selectedDecompositionArtifact ?? rootDecompositionArtifact;
+  const primaryEnvelopeArtifact = rootEnvelopeArtifact ?? selectedEnvelopeArtifact;
+
+  const familySemanticsInspections = [
+    transportInspection,
+    closedLoopDocInspection,
+    auditChecklistDocInspection,
+  ];
+  const claimTierInspections = [
+    transportInspection,
+    mathStatusInspection,
+    proofSurfaceManifestContractInspection,
+  ];
+  const lapseProvenanceInspections = [
+    transportInspection,
+    worldlineInspection,
+    missionTimeComparisonInspection,
+  ];
+  const strictSignalInspections = [strictSignalInspection];
+  const sourceClosureInspections = [sourceClosureInspection];
+  const observerAuditInspections = [observerAuditInspection];
+  const grStabilityInspections = [
+    transportInspection,
+    rootEnvelopeInspection,
+    selectedEnvelopeInspection,
+    inHullProperAccelerationInspection,
+  ];
+  const missionTimeInspections = [
+    worldlineInspection,
+    cruisePreflightInspection,
+    routeTimeInspection,
+    missionTimeEstimatorInspection,
+    missionTimeComparisonInspection,
+  ];
+  const decompositionInspections = [
+    selectedDecompositionInspection,
+    rootDecompositionInspection,
+  ];
+  const uncertaintyInspections = [rootEnvelopeInspection, selectedEnvelopeInspection];
+
+  const familySemanticsReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (selectedProfileId == null) familySemanticsReasons.push("lapse_profile_missing");
+  if (
+    transportInspection.parseStatus !== "pass" ||
+    hasInspectionMismatch([transportInspection])
+  ) {
+    familySemanticsReasons.push("insufficient_provenance");
+  }
+  const familySemanticsState: Nhm2FullLoopAuditState =
+    transportInspection.parseStatus !== "pass"
+      ? "unavailable"
+      : familySemanticsReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const claimTierReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (
+    transportInspection.parseStatus !== "pass" ||
+    hasInspectionMismatch([transportInspection])
+  ) {
+    claimTierReasons.push("insufficient_provenance");
+  }
+  const claimTierState: Nhm2FullLoopAuditState =
+    transportInspection.parseStatus !== "pass"
+      ? "unavailable"
+      : claimTierReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const metricFamily =
+    worldlineArtifact?.sourceSurface.metricFamily ??
+    missionTimeComparisonArtifact?.sourceSurface.metricFamily ??
+    selectedFamilyId;
+  const familyAuthorityStatus =
+    asText(shiftGate?.familyAuthorityStatus) ??
+    worldlineArtifact?.sourceSurface.familyAuthorityStatus ??
+    missionTimeComparisonArtifact?.sourceSurface.familyAuthorityStatus ??
+    missionTimeEstimatorArtifact?.sourceSurface.familyAuthorityStatus ??
+    null;
+  const transportCertificationStatus =
+    transportArtifact?.transportCertificationStatus ??
+    asText(shiftGate?.transportCertificationStatus) ??
+    worldlineArtifact?.sourceSurface.transportCertificationStatus ??
+    missionTimeComparisonArtifact?.sourceSurface.transportCertificationStatus ??
+    null;
+  const metricT00ContractStatus =
+    worldlineArtifact?.sourceSurface.metricT00ContractStatus ??
+    missionTimeComparisonArtifact?.sourceSurface.metricT00ContractStatus ??
+    missionTimeEstimatorArtifact?.sourceSurface.metricT00ContractStatus ??
+    null;
+  const chartContractStatus =
+    worldlineArtifact?.sourceSurface.chartContractStatus ??
+    missionTimeComparisonArtifact?.sourceSurface.chartContractStatus ??
+    missionTimeEstimatorArtifact?.sourceSurface.chartContractStatus ??
+    null;
+  const lapseProvenanceReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (selectedProfileId == null) lapseProvenanceReasons.push("lapse_profile_missing");
+  if (
+    (metricT00ContractStatus != null && metricT00ContractStatus !== "ok") ||
+    (chartContractStatus != null && chartContractStatus !== "ok")
+  ) {
+    lapseProvenanceReasons.push("metric_contract_missing");
+  }
+  if (
+    hasInspectionMissingOrFailed(lapseProvenanceInspections) ||
+    hasInspectionMismatch(lapseProvenanceInspections) ||
+    familyAuthorityStatus == null ||
+    transportCertificationStatus == null
+  ) {
+    lapseProvenanceReasons.push("insufficient_provenance");
+  }
+  const lapseProvenanceState: Nhm2FullLoopAuditState =
+    lapseProvenanceReasons.includes("metric_contract_missing")
+      ? "fail"
+      : hasInspectionMissingOrFailed(lapseProvenanceInspections)
+        ? "unavailable"
+        : lapseProvenanceReasons.length > 0
+          ? "review"
+          : "pass";
+
+  const strictSignalReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (strictSignalArtifact != null) {
+    if (strictSignalArtifact.reasonCodes.includes("strict_signal_missing")) {
+      strictSignalReasons.push("strict_signal_missing");
+    }
+    if (strictSignalArtifact.reasonCodes.includes("insufficient_provenance")) {
+      strictSignalReasons.push("insufficient_provenance");
+    }
+    if (strictSignalArtifact.reasonCodes.includes("qei_applicability_non_pass")) {
+      strictSignalReasons.push("qei_applicability_non_pass");
+    }
+    if (hasInspectionMismatch(strictSignalInspections)) {
+      strictSignalReasons.push("insufficient_provenance");
+    }
+  } else {
+    strictSignalReasons.push("strict_signal_missing");
+  }
+  const strictSignalState: Nhm2FullLoopAuditState =
+    strictSignalArtifact == null
+      ? "unavailable"
+      : hasInspectionMismatch(strictSignalInspections)
+        ? "review"
+        : normalizeFullLoopAuditState(strictSignalArtifact.status) ?? "review";
+
+  const sourceClosureReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (sourceClosureArtifact != null) {
+    if (
+      sourceClosureArtifact.reasonCodes.some((entry) =>
+        [
+          "metric_tensor_missing",
+          "tile_tensor_missing",
+          "metric_tensor_incomplete",
+          "tile_tensor_incomplete",
+        ].includes(entry),
+      )
+    ) {
+      sourceClosureReasons.push("source_closure_missing");
+    }
+    if (sourceClosureArtifact.reasonCodes.includes("tensor_residual_exceeded")) {
+      sourceClosureReasons.push("source_closure_residual_exceeded");
+    }
+    if (sourceClosureArtifact.reasonCodes.includes("assumption_drift")) {
+      sourceClosureReasons.push("policy_review_required");
+    }
+    if (hasInspectionMismatch(sourceClosureInspections)) {
+      sourceClosureReasons.push("insufficient_provenance");
+    }
+  } else {
+    sourceClosureReasons.push("source_closure_missing");
+  }
+  const sourceClosureState: Nhm2FullLoopAuditState =
+    sourceClosureArtifact == null
+      ? "unavailable"
+      : hasInspectionMismatch(sourceClosureInspections)
+        ? "review"
+        : normalizeFullLoopAuditState(sourceClosureArtifact.status) ?? "review";
+
+  const observerAuditReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (observerAuditArtifact != null) {
+    if (
+      observerAuditArtifact.reasonCodes.some((entry) =>
+        [
+          "metric_tensor_missing",
+          "tile_tensor_missing",
+          "metric_audit_incomplete",
+          "tile_audit_incomplete",
+        ].includes(entry),
+      )
+    ) {
+      observerAuditReasons.push("observer_audit_incomplete");
+    }
+    if (observerAuditArtifact.reasonCodes.includes("observer_condition_failed")) {
+      observerAuditReasons.push("observer_blocking_violation");
+    }
+    if (observerAuditArtifact.reasonCodes.includes("surrogate_model_limited")) {
+      observerAuditReasons.push("policy_review_required");
+    }
+    if (hasInspectionMismatch(observerAuditInspections)) {
+      observerAuditReasons.push("insufficient_provenance");
+    }
+  } else {
+    observerAuditReasons.push("observer_audit_incomplete");
+  }
+  const observerAuditState: Nhm2FullLoopAuditState =
+    observerAuditArtifact == null
+      ? "unavailable"
+      : hasInspectionMismatch(observerAuditInspections)
+        ? "review"
+        : normalizeFullLoopAuditState(observerAuditArtifact.status) ?? "review";
+
+  const envelopeSuites = primaryEnvelopeArtifact?.suites ?? [];
+  const envelopeCases = envelopeSuites.flatMap((entry) => entry.cases);
+  const solverStatuses = uniqueTextList(
+    envelopeCases
+      .map((entry) => asText(asRecord(entry.solverHealth).status))
+      .filter((entry): entry is string => entry != null),
+  );
+  const grStabilityReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (
+    transportArtifact?.authoritativeLowExpansionStatus === "fail" ||
+    envelopeCases.some((entry) => asText(asRecord(entry.lowExpansion).status) === "fail")
+  ) {
+    grStabilityReasons.push("expansion_leakage_unbounded");
+  }
+  if (
+    hasInspectionMissingOrFailed(grStabilityInspections) ||
+    hasInspectionMismatch(grStabilityInspections) ||
+    primaryEnvelopeArtifact == null ||
+    primaryEnvelopeArtifact.status !== "pass" ||
+    primaryEnvelopeArtifact.completeness !== "complete" ||
+    transportArtifact?.authoritativeLowExpansionStatus !== "pass" ||
+    transportArtifact?.wallSafetyStatus !== "pass"
+  ) {
+    grStabilityReasons.push("policy_review_required");
+  }
+  const grStabilityState: Nhm2FullLoopAuditState =
+    grStabilityReasons.includes("expansion_leakage_unbounded")
+      ? "fail"
+      : grStabilityReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const missionTimeReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (hasInspectionMissingOrFailed(missionTimeInspections)) {
+    missionTimeReasons.push("mission_output_missing");
+  }
+  if (hasInspectionMismatch(missionTimeInspections)) {
+    missionTimeReasons.push("insufficient_provenance");
+  }
+  if (
+    worldlineArtifact?.certified !== true ||
+    routeTimeArtifact?.certified !== true ||
+    missionTimeEstimatorArtifact?.certified !== true ||
+    missionTimeComparisonArtifact?.certified !== true
+  ) {
+    missionTimeReasons.push("mission_output_not_certified");
+  }
+  const missionTimeState: Nhm2FullLoopAuditState =
+    hasInspectionMissingOrFailed(missionTimeInspections)
+      ? "unavailable"
+      : missionTimeReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const decompositionReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (hasInspectionMissingOrFailed(decompositionInspections)) {
+    decompositionReasons.push("shift_lapse_decomposition_missing");
+  }
+  if (hasInspectionMismatch(decompositionInspections)) {
+    decompositionReasons.push("insufficient_provenance");
+  }
+  if (primaryDecompositionArtifact != null) {
+    if (
+      primaryDecompositionArtifact.reasonCodes.some((entry) =>
+        [
+          "shift_transport_time_missing",
+          "proper_time_missing",
+          "classical_reference_time_missing",
+          "lapse_dial_missing",
+        ].includes(entry),
+      )
+    ) {
+      decompositionReasons.push("shift_lapse_decomposition_missing");
+    }
+    if (primaryDecompositionArtifact.reasonCodes.includes("residual_exceeds_tolerance")) {
+      decompositionReasons.push("policy_review_required");
+    }
+  } else {
+    decompositionReasons.push("shift_lapse_decomposition_missing");
+  }
+  const decompositionState: Nhm2FullLoopAuditState =
+    primaryDecompositionArtifact == null
+      ? "unavailable"
+      : decompositionReasons.length > 0
+        ? "review"
+        : normalizeFullLoopAuditState(primaryDecompositionArtifact.status) ?? "review";
+
+  const uncertaintyReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (primaryEnvelopeArtifact == null) uncertaintyReasons.push("perturbation_suite_missing");
+  if (
+    primaryEnvelopeArtifact == null ||
+    primaryEnvelopeArtifact.reproducibility.deterministicCaseOrder !== true ||
+    primaryEnvelopeArtifact.reproducibility.caseGenerationPolicyId.length === 0 ||
+    primaryEnvelopeArtifact.reproducibility.sourceArtifactPaths.length === 0
+  ) {
+    uncertaintyReasons.push("reproducibility_missing");
+  }
+  if (hasInspectionMismatch(uncertaintyInspections)) {
+    uncertaintyReasons.push("insufficient_provenance");
+  }
+  if (
+    primaryEnvelopeArtifact != null &&
+    (primaryEnvelopeArtifact.status !== "pass" ||
+      primaryEnvelopeArtifact.completeness !== "complete")
+  ) {
+    uncertaintyReasons.push("policy_review_required");
+  }
+  const uncertaintyState: Nhm2FullLoopAuditState =
+    primaryEnvelopeArtifact == null || uncertaintyReasons.includes("reproducibility_missing")
+      ? "unavailable"
+      : primaryEnvelopeArtifact.status === "fail"
+        ? "fail"
+        : uncertaintyReasons.length > 0
+          ? "review"
+          : "pass";
+
+  const certificatePolicyReasons: Nhm2FullLoopAuditReasonCode[] = ["certificate_missing"];
+  const certificatePolicyState: Nhm2FullLoopAuditState = "unavailable";
+
+  const toObserverFamilyAudit = (
+    tensor:
+      | Nhm2ObserverAuditArtifact["tensors"]["metricRequired"]
+      | Nhm2ObserverAuditArtifact["tensors"]["tileEffective"]
+      | null,
+  ) => ({
+    state:
+      tensor == null
+        ? ("unavailable" as Nhm2FullLoopAuditState)
+        : normalizeFullLoopAuditState(tensor.status) ?? "review",
+    wecMinOverAllTimelike:
+      tensor?.conditions.wec.robustMin ?? tensor?.conditions.wec.eulerianMin ?? null,
+    necMinOverAllNull:
+      tensor?.conditions.nec.robustMin ?? tensor?.conditions.nec.eulerianMin ?? null,
+    decStatus: tensor?.conditions.dec.status ?? null,
+    secStatus: tensor?.conditions.sec.status ?? null,
+    observerWorstCaseLocation:
+      tensor?.conditions.wec.worstCase.source ??
+      tensor?.conditions.nec.worstCase.source ??
+      tensor?.conditions.dec.worstCase.source ??
+      tensor?.conditions.sec.worstCase.source ??
+      null,
+    typeIFraction: tensor?.typeI.fraction ?? null,
+    missedViolationFraction:
+      tensor?.conditions.wec.missedViolationFraction ??
+      tensor?.conditions.nec.missedViolationFraction ??
+      tensor?.conditions.dec.missedViolationFraction ??
+      tensor?.conditions.sec.missedViolationFraction ??
+      null,
+    maxRobustMinusEulerian:
+      tensor?.consistency.maxRobustMinusEulerian ??
+      tensor?.conditions.wec.maxRobustMinusEulerian ??
+      tensor?.conditions.nec.maxRobustMinusEulerian ??
+      tensor?.conditions.dec.maxRobustMinusEulerian ??
+      tensor?.conditions.sec.maxRobustMinusEulerian ??
+      null,
+  });
+
+  const sourceClosureRegions = sourceClosureArtifact?.sampledSummaries.regions ?? [];
+  const envelopeHashConsistencyStatus =
+    rootEnvelopeChecksum != null && selectedEnvelopeChecksum != null
+      ? rootEnvelopeChecksum === selectedEnvelopeChecksum
+        ? "consistent"
+        : "mismatch"
+      : rootEnvelopeChecksum != null || selectedEnvelopeChecksum != null
+        ? "single_surface_only"
+        : null;
+  const decompositionHashConsistencyStatus =
+    rootDecompositionChecksum != null && selectedDecompositionChecksum != null
+      ? rootDecompositionChecksum === selectedDecompositionChecksum
+        ? "consistent"
+        : "mismatch"
+      : rootDecompositionChecksum != null || selectedDecompositionChecksum != null
+        ? "single_surface_only"
+        : null;
+  const combinedArtifactHashConsistencyStatus =
+    envelopeHashConsistencyStatus === "mismatch" ||
+    decompositionHashConsistencyStatus === "mismatch"
+      ? "mismatch"
+      : envelopeHashConsistencyStatus ??
+        decompositionHashConsistencyStatus ??
+        null;
+
+  const sections: Nhm2FullLoopAuditSectionsInput = {
+    family_semantics: {
+      sectionId: "family_semantics",
+      state: familySemanticsState,
+      reasons: familySemanticsReasons,
+      artifactRefs: collectFullLoopArtifactRefs(familySemanticsInspections),
+      familyId: selectedFamilyId,
+      baseFamily: "natario_zero_expansion",
+      lapseExtension: selectedFamilyId.includes("shift_lapse"),
+      selectedProfileId,
+      semanticBoundaries: [
+        "Natario-style zero-expansion base family",
+        "NHM2 selected-family publication keeps shift-family semantics while exposing a bounded lapse-profile dial",
+      ],
+      nonClaims: [
+        "does not redefine generic warp viability or certificate semantics",
+        "does not widen route ETA, transport, gravity, or viability claims",
+      ],
+    },
+    claim_tier: {
+      sectionId: "claim_tier",
+      state: claimTierState,
+      reasons: claimTierReasons,
+      artifactRefs: collectFullLoopArtifactRefs(claimTierInspections),
+      currentTier: "diagnostic",
+      maximumClaimTier: "reduced-order",
+      viabilityStatus: "UNKNOWN",
+      promotionReason: "insufficient_provenance",
+      surfaceStages: FULL_LOOP_AUDIT_STAGE_SURFACES,
+    },
+    lapse_provenance: {
+      sectionId: "lapse_provenance",
+      state: lapseProvenanceState,
+      reasons: lapseProvenanceReasons,
+      artifactRefs: collectFullLoopArtifactRefs(lapseProvenanceInspections),
+      metricFamily,
+      shiftLapseProfileId: selectedProfileId,
+      shiftLapseProfileStage: selectedProfileStage,
+      familyAuthorityStatus,
+      transportCertificationStatus,
+      metricT00ContractStatus,
+      chartContractStatus,
+    },
+    strict_signal_readiness: {
+      sectionId: "strict_signal_readiness",
+      state: strictSignalState,
+      reasons: strictSignalReasons,
+      artifactRefs: collectFullLoopArtifactRefs(strictSignalInspections),
+      strictModeEnabled: true,
+      thetaMetricDerived: strictSignalArtifact?.promotionInputs.thetaMetricDerived ?? null,
+      tsMetricDerived: strictSignalArtifact?.promotionInputs.tsMetricDerived ?? null,
+      qiMetricDerived: strictSignalArtifact?.promotionInputs.qiMetricDerived ?? null,
+      qiApplicabilityStatus:
+        strictSignalArtifact?.promotionInputs.qiApplicabilityStatus ?? null,
+      missingSignals: strictSignalArtifact?.missingSignals ?? ["theta", "ts", "qi"],
+    },
+    source_closure: {
+      sectionId: "source_closure",
+      state: sourceClosureState,
+      reasons: sourceClosureReasons,
+      artifactRefs: collectFullLoopArtifactRefs(sourceClosureInspections),
+      metricTensorRef: sourceClosureArtifact?.tensorRefs.metricRequired ?? null,
+      tileEffectiveTensorRef: sourceClosureArtifact?.tensorRefs.tileEffective ?? null,
+      residualRms: sourceClosureArtifact?.residualNorms.relL2 ?? null,
+      residualMax: sourceClosureArtifact?.residualNorms.relLInf ?? null,
+      residualByRegion: {
+        hull:
+          sourceClosureRegions.find((entry) => entry.regionId === "hull")?.residualNorms
+            ?.relLInf ?? null,
+        wall:
+          sourceClosureRegions.find((entry) => entry.regionId === "wall")?.residualNorms
+            ?.relLInf ?? null,
+        exteriorShell:
+          sourceClosureRegions.find((entry) => entry.regionId === "exterior_shell")
+            ?.residualNorms?.relLInf ?? null,
+      },
+      toleranceRef: "tensor_residual_relLInf",
+      assumptionsDrifted:
+        sourceClosureArtifact?.reasonCodes.includes("assumption_drift") ?? null,
+    },
+    observer_audit: {
+      sectionId: "observer_audit",
+      state: observerAuditState,
+      reasons: observerAuditReasons,
+      artifactRefs: collectFullLoopArtifactRefs(observerAuditInspections),
+      metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
+      tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
+    },
+    gr_stability_safety: {
+      sectionId: "gr_stability_safety",
+      state: grStabilityState,
+      reasons: grStabilityReasons,
+      artifactRefs: collectFullLoopArtifactRefs(grStabilityInspections),
+      solverHealth:
+        solverStatuses.length === 0
+          ? null
+          : solverStatuses.length === 1
+            ? solverStatuses[0]
+            : "mixed",
+      perturbationFamilies: primaryEnvelopeArtifact?.suiteOrder ?? [],
+      H_rms: null,
+      M_rms: null,
+      H_maxAbs: null,
+      M_maxAbs: null,
+      centerlineProperAcceleration_mps2:
+        inHullProperAccelerationArtifact != null
+          ? resolveRepresentativeProperAccelerationMps2(inHullProperAccelerationArtifact)
+          : null,
+      wallNormalSafetyMargin: toFiniteNumber(shiftGate?.wallHorizonMargin),
+      blueshiftMax: null,
+      stabilityWorstCase:
+        primaryEnvelopeArtifact?.summary.negativeCaseIds[0] ??
+        primaryEnvelopeArtifact?.summary.incompleteCaseIds[0] ??
+        null,
+      safetyWorstCaseLocation:
+        inHullProperAccelerationArtifact?.samplingGeometry.representativeSampleId ?? null,
+    },
+    mission_time_outputs: {
+      sectionId: "mission_time_outputs",
+      state: missionTimeState,
+      reasons: missionTimeReasons,
+      artifactRefs: collectFullLoopArtifactRefs(missionTimeInspections),
+      worldlineStatus: worldlineArtifact?.status ?? null,
+      routeTimeStatus: routeTimeArtifact?.routeTimeStatus ?? routeTimeArtifact?.status ?? null,
+      missionTimeEstimatorStatus: missionTimeEstimatorArtifact?.status ?? null,
+      missionTimeComparisonStatus: missionTimeComparisonArtifact?.status ?? null,
+      targetId:
+        missionTimeComparisonArtifact?.targetId ??
+        missionTimeEstimatorArtifact?.targetId ??
+        null,
+      coordinateTimeEstimateSeconds:
+        missionTimeComparisonArtifact?.warpCoordinateTimeEstimate.seconds ??
+        missionTimeEstimatorArtifact?.coordinateTimeEstimate.seconds ??
+        null,
+      properTimeEstimateSeconds:
+        missionTimeComparisonArtifact?.warpProperTimeEstimate.seconds ??
+        missionTimeEstimatorArtifact?.properTimeEstimate.seconds ??
+        null,
+      properMinusCoordinateSeconds:
+        missionTimeComparisonArtifact?.comparisonMetrics.properMinusCoordinate_seconds ?? null,
+      comparatorId: missionTimeComparisonArtifact?.comparisonModelId ?? null,
+    },
+    shift_vs_lapse_decomposition: {
+      sectionId: "shift_vs_lapse_decomposition",
+      state: decompositionState,
+      reasons: decompositionReasons,
+      artifactRefs: collectFullLoopArtifactRefs(decompositionInspections),
+      shiftDrivenContribution:
+        primaryDecompositionArtifact?.decomposition
+          .fixedShiftFamilyTransportContributionSeconds ?? null,
+      lapseDrivenContribution:
+        primaryDecompositionArtifact?.decomposition
+          .lapseProfileClockRateContributionSeconds ?? null,
+      expansionLeakageBound: toFiniteNumber(shiftGate?.divergenceTolerance),
+      thetaFlatnessStatus:
+        worldlineArtifact?.transportVariation.dtauDtSpread.flatWithinTolerance === true
+          ? "pass"
+          : worldlineArtifact?.transportVariation.dtauDtSpread.flatWithinTolerance ===
+              false
+            ? "review"
+            : null,
+      divBetaFlatnessStatus: worldlineArtifact?.transportVariation.flatnessReason ?? null,
+      natarioBaselineComparisonRef:
+        transportArtifact?.canonicalBaselineMetricT00Ref ?? null,
+    },
+    uncertainty_perturbation_reproducibility: {
+      sectionId: "uncertainty_perturbation_reproducibility",
+      state: uncertaintyState,
+      reasons: uncertaintyReasons,
+      artifactRefs: collectFullLoopArtifactRefs(uncertaintyInspections),
+      precisionAgreementStatus:
+        primaryEnvelopeArtifact?.suites.find(
+          (entry) => entry.suiteId === "resolution_sensitivity",
+        )?.status ?? null,
+      meshConvergenceOrder: null,
+      boundaryConditionSensitivity: null,
+      smoothingKernelSensitivity: null,
+      coldStartReproductionStatus:
+        primaryEnvelopeArtifact?.reproducibility.deterministicCaseOrder === true
+          ? "deterministic_case_order_recorded"
+          : null,
+      independentReproductionStatus: null,
+      artifactHashConsistencyStatus: combinedArtifactHashConsistencyStatus,
+    },
+    certificate_policy_result: {
+      sectionId: "certificate_policy_result",
+      state: certificatePolicyState,
+      reasons: certificatePolicyReasons,
+      artifactRefs: [],
+      viabilityStatus: "UNKNOWN",
+      hardConstraintPass: null,
+      firstHardFailureId: null,
+      certificateStatus: null,
+      certificateHash: null,
+      certificateIntegrity: "unavailable",
+      promotionTier: null,
+      promotionReason: "certificate_missing",
+    },
+  };
+
+  const audit = buildNhm2FullLoopAuditContract({
+    generatedAt: new Date().toISOString(),
+    sections,
+  });
+  if (!isNhm2FullLoopAuditContract(audit)) {
+    throw new Error("nhm2_full_loop_audit_contract_invalid");
+  }
+
+  const checklistRows = [
+    buildFullLoopSectionChecklist({
+      sectionId: "family_semantics",
+      expectedEvidence: [
+        "selected-family transport result contract",
+        "docs/nhm2-closed-loop.md",
+        "docs/nhm2-audit-checklist.md",
+      ],
+      inspections: familySemanticsInspections,
+      sectionState: audit.sections.family_semantics.state,
+      blockingReasons: audit.sections.family_semantics.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "claim_tier",
+      expectedEvidence: [
+        "selected-family bounded transport artifact",
+        "MATH_STATUS.md",
+        "shared/contracts/warp-proof-surface-manifest.v1.ts",
+      ],
+      inspections: claimTierInspections,
+      sectionState: audit.sections.claim_tier.state,
+      blockingReasons: audit.sections.claim_tier.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "lapse_provenance",
+      expectedEvidence: [
+        "selected-family transport result contract",
+        "selected-family worldline contract",
+        "selected-family mission-time comparison contract",
+      ],
+      inspections: lapseProvenanceInspections,
+      sectionState: audit.sections.lapse_provenance.state,
+      blockingReasons: audit.sections.lapse_provenance.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "strict_signal_readiness",
+      expectedEvidence: ["published nhm2 strict-signal readiness contract"],
+      inspections: strictSignalInspections,
+      sectionState: audit.sections.strict_signal_readiness.state,
+      blockingReasons: audit.sections.strict_signal_readiness.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "source_closure",
+      expectedEvidence: ["published nhm2 source-closure tensor contract"],
+      inspections: sourceClosureInspections,
+      sectionState: audit.sections.source_closure.state,
+      blockingReasons: audit.sections.source_closure.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "observer_audit",
+      expectedEvidence: ["published nhm2 observer audit contract"],
+      inspections: observerAuditInspections,
+      sectionState: audit.sections.observer_audit.state,
+      blockingReasons: audit.sections.observer_audit.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "gr_stability_safety",
+      expectedEvidence: [
+        "selected-family transport gate evidence",
+        "root NHM2 envelope perturbation suite",
+        "selected-family envelope perturbation suite",
+        "selected-family in-hull proper-acceleration contract",
+      ],
+      inspections: grStabilityInspections,
+      sectionState: audit.sections.gr_stability_safety.state,
+      blockingReasons: audit.sections.gr_stability_safety.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "mission_time_outputs",
+      expectedEvidence: [
+        "selected-family worldline contract",
+        "selected-family cruise-envelope preflight contract",
+        "selected-family route-time contract",
+        "selected-family mission-time estimator contract",
+        "selected-family mission-time comparison contract",
+      ],
+      inspections: missionTimeInspections,
+      sectionState: audit.sections.mission_time_outputs.state,
+      blockingReasons: audit.sections.mission_time_outputs.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "shift_vs_lapse_decomposition",
+      expectedEvidence: [
+        "selected-family shift-vs-lapse decomposition contract",
+        "root shift-vs-lapse decomposition contract",
+      ],
+      inspections: decompositionInspections,
+      sectionState: audit.sections.shift_vs_lapse_decomposition.state,
+      blockingReasons: audit.sections.shift_vs_lapse_decomposition.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "uncertainty_perturbation_reproducibility",
+      expectedEvidence: [
+        "root NHM2 envelope perturbation suite",
+        "selected-family NHM2 envelope perturbation suite",
+      ],
+      inspections: uncertaintyInspections,
+      sectionState: audit.sections.uncertainty_perturbation_reproducibility.state,
+      blockingReasons:
+        audit.sections.uncertainty_perturbation_reproducibility.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "certificate_policy_result",
+      expectedEvidence: ["published certificate-adjacent NHM2 policy artifact"],
+      inspections: [],
+      sectionState: audit.sections.certificate_policy_result.state,
+      blockingReasons: audit.sections.certificate_policy_result.reasons,
+    }),
+  ];
+
+  const markdown = renderNhm2FullLoopAuditMarkdown({
+    audit,
+    selectedProfileId,
+    checklistRows,
+  });
+  const outJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_FULL_LOOP_AUDIT_OUT_JSON),
+  );
+  const latestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_FULL_LOOP_AUDIT_LATEST_JSON),
+  );
+  const outMdPath = path.join(
+    auditRootDir,
+    path.basename(DEFAULT_FULL_LOOP_AUDIT_OUT_MD),
+  );
+  const latestMdPath = path.join(
+    auditRootDir,
+    path.basename(DEFAULT_FULL_LOOP_AUDIT_LATEST_MD),
+  );
+  writePublishedArtifactSurface({
+    artifact: audit,
+    markdown,
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+  });
+  return {
+    selectedTransport,
+    envelopeArtifact: envelopePublication?.envelopeArtifact ?? null,
+    auditArtifact: {
+      outJsonPath,
+      latestJsonPath,
+      outMdPath,
+      latestMdPath,
+      artifact: audit,
+    },
+  };
+};
+
+export const publishNhm2ShiftLapseFullLoopAudit = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  envelopeArtifact:
+    | Awaited<ReturnType<typeof publishNhm2ShiftLapseEnvelopeSuite>>["envelopeArtifact"]
+    | null;
+  auditArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2FullLoopAuditContractV1;
+  };
+}> =>
+  withProofSurfacePublicationLock({
+    operation: "publish-selected-shift-lapse-full-loop-audit",
+    fn: async () => publishNhm2ShiftLapseFullLoopAuditImpl(options),
+  });
+
 const computeCanonicalVisualComparisonChecksum = (
   payload: Nhm2CanonicalVisualComparisonArtifact,
 ): string =>
@@ -44152,6 +45978,10 @@ if (isEntryPoint) {
     "--publish-selected-shift-lapse-envelope-suite",
     argv,
   );
+  const publishSelectedShiftLapseFullLoopAudit = hasArg(
+    "--publish-selected-shift-lapse-full-loop-audit",
+    argv,
+  );
   const parsedOptions = {
     baseUrl: readArgValue("--base-url", argv),
     shiftLapseProfileId: readArgValue("--shift-lapse-profile-id", argv),
@@ -44508,6 +46338,12 @@ if (isEntryPoint) {
         reuseExistingSelectedArtifacts:
           parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
       })
+    : publishSelectedShiftLapseFullLoopAudit
+    ? publishNhm2ShiftLapseFullLoopAudit({
+        baseUrl: parsedOptions.baseUrl,
+        reuseExistingSelectedArtifacts:
+          parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
+      })
     : publishBoundedStackLatest
     ? publishNhm2BoundedStackLatest({
         baseUrl: parsedOptions.baseUrl,
@@ -44562,6 +46398,8 @@ if (isEntryPoint) {
         publishSelectedShiftLapseTransport ||
         publishSelectedShiftLapseProfileSweep ||
         publishSelectedShiftLapseBoundarySweep ||
+        publishSelectedShiftLapseEnvelopeSuite ||
+        publishSelectedShiftLapseFullLoopAudit ||
         publishBoundedStackLatest ||
         publishProofSurfaceManifestLatest ||
         publishWorldlineLatest ||

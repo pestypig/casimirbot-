@@ -53,6 +53,7 @@ import { reduceTilesToSample, type RawTileInput } from "./qi/qi-saturation";
 import { qiControllerRouter, startQiController } from "./modules/qi/qi-controller.js";
 import { codeLatticeRouter } from "./routes/code-lattice";
 import { stellarRouter } from "./routes/stellar";
+import { starSimRouter } from "./routes/star-sim";
 import { starRouter } from "./routes/star";
 import { neuroRouter } from "./routes/neuro";
 import type { SimResult, Schedule, Flow, Faults, ClockModel } from "@shared/tsn-sim";
@@ -232,6 +233,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     app.use("/api/code-lattice", codeLatticeRouter);
     app.use(trainStatusRouter);
     app.use("/api/stellar", stellarRouter);
+    app.use("/api/star-sim", starSimRouter);
     app.use("/api/benchmarks/collapse", collapseBenchmarksRouter);
     app.use("/api/physics/warp", warpViabilityRouter);
     app.use("/api/physics/curvature", curvatureRouter);
