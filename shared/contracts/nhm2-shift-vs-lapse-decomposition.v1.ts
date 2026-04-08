@@ -115,6 +115,11 @@ const EPS = 1e-12;
 const asText = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
+const toRepoStylePath = (value: unknown): string | null => {
+  const text = asText(value);
+  return text ? text.replace(/\\/g, "/") : null;
+};
+
 const toFinite = (value: unknown): number | null => {
   if (value == null) return null;
   const n = Number(value);
@@ -257,8 +262,10 @@ export const buildNhm2ShiftVsLapseDecompositionArtifact = (
       shiftLapseProfileNote: asText(input.shiftLapseProfileNote),
     },
     sourceArtifacts: {
-      missionTimeComparison: asText(input.sourceMissionTimeComparisonArtifactPath),
-      worldline: asText(input.sourceWorldlineArtifactPath),
+      missionTimeComparison: toRepoStylePath(
+        input.sourceMissionTimeComparisonArtifactPath,
+      ),
+      worldline: toRepoStylePath(input.sourceWorldlineArtifactPath),
     },
     method: {
       decompositionModelId:

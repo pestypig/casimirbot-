@@ -29,12 +29,15 @@ const buildApp = async () => {
 
 const historyTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-conversation-history-route-"));
 const historyLogPath = path.join(historyTempDir, "helix-conversation-history.jsonl");
+const threadLedgerPath = path.join(historyTempDir, "helix-thread-ledger.jsonl");
 
 describe("conversation-turn route", () => {
   beforeEach(() => {
     process.env.ENABLE_AGI = "1";
     process.env.HELIX_ASK_CONVERSATION_HISTORY_AUDIT_PATH = historyLogPath;
     process.env.HELIX_ASK_CONVERSATION_HISTORY_PERSIST = "1";
+    process.env.HELIX_THREAD_LEDGER_PATH = threadLedgerPath;
+    process.env.HELIX_THREAD_PERSIST = "1";
     llmLocalHandlerMock.mockReset();
   });
 
@@ -48,9 +51,15 @@ describe("conversation-turn route", () => {
     const { __resetConversationHistoryStore } = await import(
       "../server/services/helix-ask/conversation-history"
     );
+    const { __resetHelixThreadLedgerStore } = await import(
+      "../server/services/helix-thread/ledger"
+    );
     __resetConversationHistoryStore();
+    __resetHelixThreadLedgerStore();
     delete process.env.HELIX_ASK_CONVERSATION_HISTORY_AUDIT_PATH;
     delete process.env.HELIX_ASK_CONVERSATION_HISTORY_PERSIST;
+    delete process.env.HELIX_THREAD_LEDGER_PATH;
+    delete process.env.HELIX_THREAD_PERSIST;
   });
 
   afterAll(() => {
@@ -172,6 +181,29 @@ describe("conversation-turn route", () => {
       transcript: "Please verify this claim and give me pass/fail evidence.",
     }).expect(200);
 
+    const { __resetConversationHistoryStore } = await import(
+      "../server/services/helix-ask/conversation-history"
+    );
+    const { getHelixThreadLedgerEvents } = await import(
+      "../server/services/helix-thread/ledger"
+    );
+    expect(
+      getHelixThreadLedgerEvents({ sessionId: "session-history-seed" }).map(
+        (entry) => entry.event_type,
+      ),
+    ).toEqual([
+      "conversation_turn_started",
+      "conversation_turn_classified",
+      "conversation_turn_brief_ready",
+      "conversation_turn_completed",
+    ]);
+    __resetConversationHistoryStore();
+    for (const name of fs.readdirSync(historyTempDir)) {
+      if (name.startsWith("helix-conversation-history") && name.endsWith(".jsonl")) {
+        fs.rmSync(path.join(historyTempDir, name), { force: true });
+      }
+    }
+
     const followUp = await request(app).post("/api/agi/ask/conversation-turn").send({
       sessionId: "session-history-seed",
       traceId: "turn-history-2",
@@ -244,6 +276,21 @@ describe("conversation-turn route", () => {
     expect(restartedClassifierPrompt).toContain(
       "dottie: I am explaining the current evidence trail in a conversational follow-up.",
     );
+    const { getHelixThreadLedgerEvents } = await import("../server/services/helix-thread/ledger");
+    expect(
+      getHelixThreadLedgerEvents({ sessionId: "session-history-restart" }).map(
+        (entry) => entry.event_type,
+      ),
+    ).toEqual([
+      "conversation_turn_started",
+      "conversation_turn_classified",
+      "conversation_turn_brief_ready",
+      "conversation_turn_completed",
+      "conversation_turn_started",
+      "conversation_turn_classified",
+      "conversation_turn_brief_ready",
+      "conversation_turn_completed",
+    ]);
   }, 20000);
 
   it("rejects clarifier-style brief text for observe turns even when JSON is valid", async () => {

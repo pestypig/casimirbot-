@@ -87,6 +87,8 @@ client/public/originals/*
 !/artifacts/research/full-solve/nhm2-mission-time-comparison-latest.json
 !/artifacts/research/full-solve/nhm2-cruise-envelope-latest.json
 !/artifacts/research/full-solve/nhm2-in-hull-proper-acceleration-latest.json
+!/artifacts/research/full-solve/nhm2-shift-vs-lapse-decomposition-latest.json
+!/artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json
 !/artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json
 !/artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json
 /models/

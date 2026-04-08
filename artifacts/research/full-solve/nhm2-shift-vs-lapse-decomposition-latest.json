@@ -1,0 +1,46 @@
+{
+  "artifactId": "nhm2_shift_vs_lapse_decomposition",
+  "schemaVersion": "nhm2_shift_vs_lapse_decomposition/v1",
+  "status": "pass",
+  "completeness": "complete",
+  "reasonCodes": [],
+  "profile": {
+    "familyId": "nhm2_shift_lapse",
+    "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
+    "shiftLapseProfileStage": "controlled_tuning_stage_1",
+    "shiftLapseProfileNote": "Controlled stage-1 NHM2 shift+lapse tuning profile: centerline alpha is reduced to 0.995 while the existing mild diagnostic gradient, support, and taper settings remain unchanged."
+  },
+  "sourceArtifacts": {
+    "missionTimeComparison": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+    "worldline": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json"
+  },
+  "method": {
+    "decompositionModelId": "fixed_shift_transport_plus_centerline_lapse_projection",
+    "approximationStatus": "approximate",
+    "note": "The fixed shift-family transport contribution is the bounded warp coordinate transport time. The lapse contribution is projected from the metric-derived centerline lapse dial, and any nonuniform or off-center clocking drift remains in the residual term.",
+    "residualToleranceSeconds": 0.0001377559659171795
+  },
+  "lapseDial": {
+    "centerlineAlpha": 0.995,
+    "centerlineDtauDt": 0.995,
+    "projectionSource": "centerline_dtau_dt",
+    "projectionRatio": 0.995
+  },
+  "timing": {
+    "interpretationStatus": "bounded_relativistic_differential_detected",
+    "warpCoordinateTimeSeconds": 137755965.9171795,
+    "warpProperTimeSeconds": 137067186.0875936,
+    "classicalReferenceTimeSeconds": 137755965.9171795,
+    "reportedProperMinusCoordinateSeconds": -688779.8295859098,
+    "reportedProperVsCoordinateRatio": 0.9949999999999999,
+    "coordinateMinusClassicalSeconds": 0
+  },
+  "decomposition": {
+    "fixedShiftFamilyTransportContributionSeconds": 137755965.9171795,
+    "lapseProfileClockRateContributionSeconds": -688779.8295858981,
+    "residualUnexplainedContributionSeconds": 0,
+    "reconstructedProperTimeSeconds": 137067186.0875936,
+    "totalMissionTimeDifferentialSeconds": -688779.8295859098,
+    "lapseDialTrackedFraction": 0.9999999999999829
+  }
+}

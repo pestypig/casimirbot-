@@ -1,6 +1,12 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import express from "express";
 import type { Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+const threadTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-ask-live-thread-"));
+const threadLedgerPath = path.join(threadTempDir, "helix-thread-ledger.jsonl");
 
 describe("Helix Ask live events", () => {
   let server: Server;
@@ -11,6 +17,8 @@ describe("Helix Ask live events", () => {
     process.env.HELIX_ASK_MICRO_PASS = "0";
     process.env.HELIX_ASK_MICRO_PASS_AUTO = "0";
     process.env.HELIX_ASK_TWO_PASS = "0";
+    process.env.HELIX_THREAD_LEDGER_PATH = threadLedgerPath;
+    process.env.HELIX_THREAD_PERSIST = "1";
     vi.resetModules();
     const { planRouter } = await import("../server/routes/agi.plan");
     const app = express();
@@ -35,7 +43,48 @@ describe("Helix Ask live events", () => {
         resolve();
       }
     });
+    const { __resetHelixThreadLedgerStore } = await import(
+      "../server/services/helix-thread/ledger"
+    );
+    __resetHelixThreadLedgerStore();
+    fs.rmSync(threadTempDir, { recursive: true, force: true });
+    delete process.env.HELIX_THREAD_LEDGER_PATH;
+    delete process.env.HELIX_THREAD_PERSIST;
   });
+
+  it("dual-writes /ask lifecycle events into the helix thread ledger", async () => {
+    const sessionId = "test-ask-thread-dualwrite";
+    const response = await fetch(`${baseUrl}/api/agi/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: "How does Helix Ask keep conversation replay deterministic?",
+        debug: true,
+        sessionId,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      debug?: { answer_surface_mode?: string };
+      memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
+    };
+    const { getHelixThreadLedgerEvents } = await import("../server/services/helix-thread/ledger");
+    const events = getHelixThreadLedgerEvents({ sessionId });
+    const eventTypes = events.map((entry) => entry.event_type);
+    const completedEvent = [...events]
+      .reverse()
+      .find((entry) => entry.event_type === "ask_completed");
+
+    expect(eventTypes).toContain("ask_started");
+    expect(eventTypes).toContain("ask_completed");
+    expect(completedEvent?.route).toBe("/ask");
+    expect(completedEvent?.answer_surface_mode ?? null).toBe(
+      payload.debug?.answer_surface_mode ?? null,
+    );
+    expect(completedEvent?.memory_citation?.entries?.length ?? 0).toBeGreaterThanOrEqual(
+      payload.memory_citation?.entries?.length ?? 0,
+    );
+  }, 45000);
 
   it("emits ladder stages in live events for a repo definition prompt", async () => {
     const response = await fetch(`${baseUrl}/api/agi/ask`, {

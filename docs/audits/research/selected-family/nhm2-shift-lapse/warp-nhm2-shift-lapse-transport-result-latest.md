@@ -33,6 +33,13 @@
 | missionTimeInterpretationStatus | bounded_relativistic_differential_detected |
 | properMinusCoordinate_seconds | -688779.8295859098 |
 | properMinusClassical_seconds | -688779.8295859098 |
+| shiftVsLapseDecompositionLatestJsonPath | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-vs-lapse-decomposition-latest.json |
+| shiftVsLapseDecompositionStatus | pass |
+| shiftVsLapseApproximationStatus | approximate |
+| shiftTransportContribution_seconds | 137755965.9171795 |
+| lapseClockRateContribution_seconds | -688779.8295858981 |
+| shiftVsLapseResidual_seconds | 0 |
+| lapseDialTrackedFraction | 0.9999999999999829 |
 | boundedTimingDifferentialDetected | true |
 | measuredResultSummary | The current live nhm2_shift_lapse selected-family bounded-transport bundle for profile stage1_centerline_alpha_0p995_v1 detects a bounded timing differential. This remains a bounded contract result only and does not imply broader travel-advantage or viability claims. |
 
@@ -44,6 +51,7 @@
 | routeTimeWorldline | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-route-time-worldline-latest.json |
 | missionTimeEstimator | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-estimator-latest.json |
 | missionTimeComparison | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json |
+| shiftVsLapseDecomposition | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-vs-lapse-decomposition-latest.json |
 | cruiseEnvelope | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-cruise-envelope-latest.json |
 | inHullProperAcceleration | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-in-hull-proper-acceleration-latest.json |
 

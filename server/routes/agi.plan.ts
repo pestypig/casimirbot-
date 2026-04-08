@@ -305,19 +305,26 @@ import {
   type HelixAskJobRecord,
 } from "../services/helix-ask/job-store";
 import {
-  getHelixAskSessionMemory,
-  getHelixAskSessionGraphLock,
-  setHelixAskSessionGraphLock,
-  clearHelixAskSessionGraphLock,
-  recordHelixAskSessionMemory,
+  getHelixThreadSessionMemory,
+  getHelixThreadSessionGraphLock,
+  setHelixThreadSessionGraphLock,
+  clearHelixThreadSessionGraphLock,
+  recordHelixThreadCarryForward,
   type HelixAskSessionMemory,
-} from "../services/helix-ask/session-memory";
+} from "../services/helix-thread/carry-forward";
 import {
   appendConversationHistoryEvent,
   buildHelixAskMemoryCitation,
   buildRecentTurnsFromConversationHistory,
+  type HelixConversationHistoryEventInput,
   type HelixAskMemoryCitation,
 } from "../services/helix-ask/conversation-history";
+import { appendHelixThreadEvent } from "../services/helix-thread/ledger";
+import { buildRecentTurnsFromHelixThread } from "../services/helix-thread/reducer";
+import {
+  type HelixThreadAnswerSurfaceMode,
+  type HelixThreadMemoryCitation,
+} from "../services/helix-thread/types";
 import {
   type CapsuleConstraintBundle,
   buildContextCapsuleFromTrace,
@@ -38494,7 +38501,7 @@ planRouter.get("/helix-ask/graph-lock", (req, res) => {
   if (!sessionId) {
     return res.status(400).json({ error: "bad_request", message: "sessionId required" });
   }
-  const treeIds = getHelixAskSessionGraphLock(sessionId);
+  const treeIds = getHelixThreadSessionGraphLock(sessionId);
   return res.json({ sessionId, treeIds, locked: treeIds.length > 0 });
 });
 
@@ -38509,14 +38516,14 @@ planRouter.post("/helix-ask/graph-lock", (req, res) => {
   const sessionId = parsed.data.sessionId.trim();
   const mode = parsed.data.mode ?? "replace";
   if (mode === "clear") {
-    clearHelixAskSessionGraphLock(sessionId);
+    clearHelixThreadSessionGraphLock(sessionId);
     return res.json({ ok: true, sessionId, treeIds: [], locked: false, mode: "clear" });
   }
   const treeIds = parsed.data.treeIds ?? [];
   if (treeIds.length === 0) {
     return res.status(400).json({ error: "bad_request", message: "treeIds required" });
   }
-  const next = setHelixAskSessionGraphLock({
+  const next = setHelixThreadSessionGraphLock({
     sessionId,
     treeIds,
     mode: mode === "merge" ? "merge" : "replace",
@@ -38534,7 +38541,7 @@ planRouter.delete("/helix-ask/graph-lock", (req, res) => {
   if (!sessionId) {
     return res.status(400).json({ error: "bad_request", message: "sessionId required" });
   }
-  clearHelixAskSessionGraphLock(sessionId);
+  clearHelixThreadSessionGraphLock(sessionId);
   return res.json({ ok: true, sessionId, treeIds: [], locked: false });
 });
 
@@ -39507,6 +39514,69 @@ const resolveHelixAskConversationHistoryFinalGateOutcomeForAsk = (args: {
   return "passed";
 };
 
+type HelixAskDualHistoryEventInput = HelixConversationHistoryEventInput & {
+  thread_id?: string | null;
+  answer_surface_mode?: HelixThreadAnswerSurfaceMode | null;
+  memory_citation?: HelixThreadMemoryCitation | null;
+};
+
+const normalizeHelixThreadAnswerSurfaceMode = (
+  value: unknown,
+): HelixThreadAnswerSurfaceMode | null =>
+  value === "conversational" ||
+  value === "structured_report" ||
+  value === "fail_closed"
+    ? value
+    : null;
+
+const appendHelixAskDualHistoryEvent = (
+  input: HelixAskDualHistoryEventInput,
+): ReturnType<typeof appendConversationHistoryEvent> => {
+  try {
+    appendHelixThreadEvent({
+      thread_id: input.thread_id,
+      route: input.route,
+      event_type: input.event_type,
+      turn_id: input.turn_id,
+      session_id: input.session_id,
+      trace_id: input.trace_id,
+      user_text: input.user_text,
+      assistant_text: input.assistant_text,
+      classifier_result: input.classifier_result,
+      route_reason: input.route_reason,
+      brief_status: input.brief_status,
+      final_gate_outcome: input.final_gate_outcome,
+      fail_reason: input.fail_reason,
+      answer_surface_mode: normalizeHelixThreadAnswerSurfaceMode(
+        input.answer_surface_mode,
+      ),
+      memory_citation: input.memory_citation ?? null,
+      meta: input.meta,
+      event_id: input.event_id,
+      ts: input.ts,
+    });
+  } catch {
+    // Keep legacy history as the compatibility floor during the Phase 1 shadow cutover.
+  }
+  return appendConversationHistoryEvent({
+    route: input.route,
+    event_type: input.event_type,
+    turn_id: input.turn_id,
+    session_id: input.session_id,
+    trace_id: input.trace_id,
+    user_text: input.user_text,
+    assistant_text: input.assistant_text,
+    classifier_result: input.classifier_result,
+    route_reason: input.route_reason,
+    brief_status: input.brief_status,
+    final_gate_outcome: input.final_gate_outcome,
+    fail_reason: input.fail_reason,
+    meta: input.meta,
+    event_id: input.event_id,
+    ts: input.ts,
+  });
+};
+
 type HelixAskObjectiveLoopState = {
   objective_id: string;
   objective_label: string;
@@ -40388,7 +40458,7 @@ const executeHelixAsk = async ({
       });
       capsuleConstraintBundle = contextCapsuleMemoryPatchSummary.constraintBundle;
       if (contextCapsuleMemoryPatchSummary.appliedCapsuleIds.length > 0) {
-        recordHelixAskSessionMemory({
+        recordHelixThreadCarryForward({
           sessionId: askSessionId,
           pinnedFiles: contextCapsuleMemoryPatchSummary.pinnedFiles,
           resolvedConcepts: contextCapsuleMemoryPatchSummary.resolvedConcepts,
@@ -42654,7 +42724,7 @@ const executeHelixAsk = async ({
       : listConceptCandidates(slotPreviewSeedFocused, 4);
     sessionMemoryForTags =
       HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
-        ? getHelixAskSessionMemory(parsed.data.sessionId)
+        ? getHelixThreadSessionMemory(parsed.data.sessionId)
         : null;
     sessionMemory = sessionMemoryForTags;
     memorySeedSlots = buildMemorySeedSlots(slotPreviewSeedFocused, sessionMemory);
@@ -43693,7 +43763,7 @@ const executeHelixAsk = async ({
     if (!sessionMemoryForTags) {
       sessionMemoryForTags =
         HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId
-          ? getHelixAskSessionMemory(parsed.data.sessionId)
+          ? getHelixThreadSessionMemory(parsed.data.sessionId)
           : null;
     }
       if (sessionMemoryForTags?.recentTopics?.length) {
@@ -45025,7 +45095,7 @@ const executeHelixAsk = async ({
       HELIX_ASK_FRONTIER_SESSION_LOCK &&
       (frontierTheoryLensRequested || frontierSessionLensLocked || frontierSessionResetRequested)
     ) {
-      recordHelixAskSessionMemory({
+      recordHelixThreadCarryForward({
         sessionId: parsed.data.sessionId,
         userPrefs: {
           frontierLensLock: frontierSessionLockNext,
@@ -51527,7 +51597,7 @@ const executeHelixAsk = async ({
             preferredResponseLanguage: responseLanguage,
           };
           if (slotsToRecord.length > 0 || contextFiles.length > 0 || resolvedConcepts.length > 0) {
-            recordHelixAskSessionMemory({
+            recordHelixThreadCarryForward({
               sessionId: parsed.data.sessionId,
               slots: slotsToRecord,
               pinnedFiles: contextFiles,
@@ -53732,7 +53802,7 @@ const executeHelixAsk = async ({
                 "I couldn't complete required Stage-0.5 evidence summaries. Please narrow by module/path/symbol and retry."
               : "";
           if (HELIX_ASK_SESSION_MEMORY && parsed.data.sessionId && clarifySlots.length > 0) {
-            recordHelixAskSessionMemory({
+            recordHelixThreadCarryForward({
               sessionId: parsed.data.sessionId,
             lastClarifySlots: clarifySlots,
             openSlots: clarifySlots,
@@ -67608,11 +67678,21 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     : null;
   const recentTurns =
     providedRecentTurns ??
-    buildRecentTurnsFromConversationHistory({
-      sessionId,
-      limit: HELIX_ASK_CONVERSATION_RECENT_TURNS,
-      excludeTurnId: turnId,
-    });
+    (() => {
+      const threadRecentTurns = buildRecentTurnsFromHelixThread({
+        sessionId,
+        limit: HELIX_ASK_CONVERSATION_RECENT_TURNS,
+        excludeTurnId: turnId,
+      });
+      if (threadRecentTurns.length > 0) {
+        return threadRecentTurns;
+      }
+      return buildRecentTurnsFromConversationHistory({
+        sessionId,
+        limit: HELIX_ASK_CONVERSATION_RECENT_TURNS,
+        excludeTurnId: turnId,
+      });
+    })();
   const model = HELIX_CONVERSATION_MODEL();
   const requestStartedAt = Date.now();
   let sourceLanguage = normalizeLanguageTag(parsed.data.sourceLanguage ?? null) ?? null;
@@ -67635,7 +67715,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     normalizeLanguageTag(parsed.data.responseLanguage ?? null) ??
     normalizeLanguageTag(parsed.data.preferredResponseLanguage ?? null);
   const conversationSessionMemory =
-    HELIX_ASK_SESSION_MEMORY && sessionId ? getHelixAskSessionMemory(sessionId) : null;
+    HELIX_ASK_SESSION_MEMORY && sessionId ? getHelixThreadSessionMemory(sessionId) : null;
   const sessionPinnedResponseLanguage =
     explicitResponseLanguageOverride
       ? null
@@ -67651,7 +67731,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     autoPinnedResponseLanguageCandidate &&
     autoPinnedResponseLanguageCandidate !== sessionPinnedResponseLanguage
   ) {
-    recordHelixAskSessionMemory({
+    recordHelixThreadCarryForward({
       sessionId,
       userPrefs: {
         preferredResponseLanguage: autoPinnedResponseLanguageCandidate,
@@ -67705,7 +67785,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       ? interpreterArtifact.selected_pivot.text.trim()
       : transcript;
 
-  appendConversationHistoryEvent({
+  appendHelixAskDualHistoryEvent({
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_started",
     turn_id: turnId,
@@ -67831,7 +67911,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       exploration_turn: routeDecision.explorationTurn,
     },
   });
-  appendConversationHistoryEvent({
+  appendHelixAskDualHistoryEvent({
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_classified",
     turn_id: turnId,
@@ -67957,7 +68037,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       repair_succeeded: briefRepairSucceeded,
     },
   });
-  appendConversationHistoryEvent({
+  appendHelixAskDualHistoryEvent({
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_brief_ready",
     turn_id: turnId,
@@ -68038,7 +68118,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       : needsConfirmation
         ? "confirmation_required"
         : routeDecision.routeReasonCode;
-  appendConversationHistoryEvent({
+  appendHelixAskDualHistoryEvent({
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_completed",
     turn_id: turnId,
@@ -68130,7 +68210,7 @@ planRouter.post("/ask", async (req, res) => {
   const askStartedAtMs = Date.now();
   const sessionId = parsed.data.sessionId?.trim() || undefined;
   const askSessionMemory =
-    HELIX_ASK_SESSION_MEMORY && sessionId ? getHelixAskSessionMemory(sessionId) : null;
+    HELIX_ASK_SESSION_MEMORY && sessionId ? getHelixThreadSessionMemory(sessionId) : null;
   let requestData: z.infer<typeof LocalAskRequest> = { ...parsed.data };
   requestData.traceId =
     typeof requestData.traceId === "string" && requestData.traceId.trim()
@@ -68160,7 +68240,7 @@ planRouter.post("/ask", async (req, res) => {
     autoPinnedResponseLanguageCandidate &&
     autoPinnedResponseLanguageCandidate !== sessionPinnedResponseLanguage
   ) {
-    recordHelixAskSessionMemory({
+    recordHelixThreadCarryForward({
       sessionId,
       userPrefs: {
         preferredResponseLanguage: autoPinnedResponseLanguageCandidate,
@@ -68359,7 +68439,7 @@ planRouter.post("/ask", async (req, res) => {
     enabled: HELIX_ASK_HTTP_KEEPALIVE && requestData.dryRun !== true,
     intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
   });
-  appendConversationHistoryEvent({
+  appendHelixAskDualHistoryEvent({
     route: "/ask",
     event_type: "ask_started",
     turn_id: askTurnId,
@@ -68598,7 +68678,7 @@ planRouter.post("/ask", async (req, res) => {
             : "ask_failed";
       const assistantText =
         status < 400 ? extractHelixAskResponseTextForHistory(payloadRecord) : null;
-      appendConversationHistoryEvent({
+      appendHelixAskDualHistoryEvent({
         route: "/ask",
         event_type: eventType,
         turn_id: askTurnId,
@@ -68629,6 +68709,11 @@ planRouter.post("/ask", async (req, res) => {
           http_status: status,
           has_memory_citation: Boolean(payloadRecord?.memory_citation),
         },
+        answer_surface_mode: normalizeHelixThreadAnswerSurfaceMode(
+          payloadRecord?.answer_surface_mode,
+        ),
+        memory_citation:
+          (payloadRecord?.memory_citation as HelixThreadMemoryCitation | null | undefined) ?? null,
       });
     }
     if (status >= 500) {
@@ -68800,7 +68885,7 @@ planRouter.post("/ask/jobs", async (req, res) => {
   }
   const sessionId = parsed.data.sessionId?.trim() || undefined;
   const askSessionMemory =
-    HELIX_ASK_SESSION_MEMORY && sessionId ? getHelixAskSessionMemory(sessionId) : null;
+    HELIX_ASK_SESSION_MEMORY && sessionId ? getHelixThreadSessionMemory(sessionId) : null;
   let request: z.infer<typeof LocalAskRequest> = { ...parsed.data };
   const explicitResponseLanguageOverride = hasExplicitResponseLanguageOverride(request);
   const sessionPinnedResponseLanguage = resolveSessionPinnedResponseLanguage({
@@ -68821,7 +68906,7 @@ planRouter.post("/ask/jobs", async (req, res) => {
     autoPinnedResponseLanguageCandidate &&
     autoPinnedResponseLanguageCandidate !== sessionPinnedResponseLanguage
   ) {
-    recordHelixAskSessionMemory({
+    recordHelixThreadCarryForward({
       sessionId,
       userPrefs: {
         preferredResponseLanguage: autoPinnedResponseLanguageCandidate,

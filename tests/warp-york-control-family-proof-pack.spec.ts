@@ -3,6 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
+import {
+  buildNhm2EnvelopePerturbationArtifact,
+} from "../shared/contracts/nhm2-envelope-perturbation-suite.v1";
+import {
+  buildNhm2ShiftVsLapseDecompositionArtifact,
+} from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
 import {
   buildWarpRodcSnapshot,
@@ -104,6 +110,10 @@ import {
   buildNhm2MissionTimeComparisonArtifact,
   buildNhm2CruiseEnvelopeArtifact,
   buildNhm2InHullProperAccelerationArtifact,
+  buildNhm2ShiftLapseTransportResultArtifact,
+  computeNhm2EnvelopePerturbationChecksum,
+  publishNhm2EnvelopePerturbationResearchSurface,
+  publishNhm2ShiftVsLapseDecompositionResearchSurface,
   renderNhm2WarpWorldlineProofMarkdown,
   renderNhm2CruiseEnvelopePreflightMarkdown,
   renderNhm2RouteTimeWorldlineMarkdown,
@@ -131,6 +141,8 @@ import {
   computeYorkDiagnosticLaneField,
 } from "../shared/york-diagnostic-lanes";
 import {
+  makeShiftLapseTransportPromotionGateFixture,
+  makeShiftLapseWarpWorldlineFixture,
   makeWarpCruiseEnvelopePreflightFixture,
   makeWarpCruiseEnvelopeFixture,
   makeWarpMissionTimeComparisonFixture,
@@ -341,6 +353,281 @@ const makeCase = (
     status: "pass",
     causeCode: null,
   },
+});
+
+describe("nhm2 publication completion surfaces", () => {
+  it("writes the dedicated root shift-vs-lapse decomposition surface without widening claims", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-root-decomp-"));
+    const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
+    const auditRootDir = path.join(tempDir, "docs/audits/research");
+    const artifact = buildNhm2ShiftVsLapseDecompositionArtifact({
+      familyId: "nhm2_shift_lapse",
+      shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+      sourceMissionTimeComparisonArtifactPath:
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+      centerlineAlpha: 0.995,
+      centerlineDtauDt: 0.995,
+      interpretationStatus: "bounded_relativistic_differential_detected",
+      warpCoordinateTimeSeconds: 100,
+      warpProperTimeSeconds: 99.5,
+      classicalReferenceTimeSeconds: 100,
+      properMinusCoordinateSeconds: -0.5,
+      properVsCoordinateRatio: 0.995,
+      coordinateMinusClassicalSeconds: 0,
+      residualToleranceSeconds: 1e-9,
+    });
+
+    const published = publishNhm2ShiftVsLapseDecompositionResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    });
+
+    expect(path.basename(published.latestJsonPath)).toBe(
+      "nhm2-shift-vs-lapse-decomposition-latest.json",
+    );
+    expect(path.basename(published.latestMdPath)).toBe(
+      "warp-nhm2-shift-vs-lapse-decomposition-latest.md",
+    );
+    expect(fs.existsSync(published.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.latestMdPath)).toBe(true);
+
+    const json = JSON.parse(
+      fs.readFileSync(published.latestJsonPath, "utf8"),
+    ) as Record<string, any>;
+    expect(json.profile?.shiftLapseProfileId).toBe(
+      "stage1_centerline_alpha_0p995_v1",
+    );
+    expect(json.decomposition?.lapseDialTrackedFraction).toBeCloseTo(1);
+
+    const markdown = fs.readFileSync(published.latestMdPath, "utf8");
+    expect(markdown).toContain("bounded NHM2 mission-time result");
+    expect(markdown).toContain("approximate projection");
+    expect(markdown).not.toMatch(/certify speed|ETA surface|viability/i);
+  });
+
+  it("writes the dedicated root envelope perturbation surface and preserves bounded wording", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-root-envelope-"));
+    const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
+    const auditRootDir = path.join(tempDir, "docs/audits/research");
+    const artifactBase = buildNhm2EnvelopePerturbationArtifact({
+      generatedOn: "2026-04-08",
+      boundaryStatement:
+        "This artifact records reproducible NHM2 envelope evidence over the selected nhm2_shift_lapse family. It names perturbation suites, preserves negative outcomes, and does not widen speed, viability, or ETA claims.",
+      publicationCommand:
+        "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite",
+      family: {
+        warpFieldType: "nhm2_shift_lapse",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricT00Source: "metric",
+        shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+        shiftLapseProfileStage: "controlled_tuning_stage_1",
+        referenceTransportResultPath:
+          "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+        referenceProfileSweepPath:
+          "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/sweep/nhm2-shift-lapse-profile-sweep-latest.json",
+        referenceBoundarySweepPath:
+          "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/nhm2-shift-lapse-boundary-sweep-latest.json",
+      },
+      suites: [
+        {
+          suiteId: "resolution_sensitivity",
+          referenceCaseId: "resolution_096",
+          cases: [
+            {
+              caseId: "resolution_096",
+              label: "96^3 reference brick",
+              suiteId: "resolution_sensitivity",
+              axis: "resolution",
+              provenance: "direct_gr_perturbation",
+              transport: {
+                transportCertificationStatus:
+                  "bounded_transport_proof_bearing_gate_admitted",
+              },
+              lowExpansion: { status: "pass" },
+              wallSafety: { status: "pass" },
+              solverHealth: { status: "CERTIFIED" },
+              missionTime: { source: "live_pipeline_contracts" },
+            },
+          ],
+        },
+      ],
+      reproducibility: {
+        caseGenerationPolicyId: "nhm2_selected_family_envelope_v1",
+        publicationCommand:
+          "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite",
+        supportingCommands: [
+          "npm run warp:full-solve:nhm2-shift-lapse:publish-selected-transport",
+          "npm run warp:full-solve:nhm2-shift-lapse:publish-profile-sweep",
+          "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep",
+        ],
+        sourceArtifactPaths: [
+          "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+          "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/sweep/nhm2-shift-lapse-profile-sweep-latest.json",
+          "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/boundary-sweep/nhm2-shift-lapse-boundary-sweep-latest.json",
+        ],
+      },
+      nonClaims: [
+        "does not widen speed claims",
+        "does not widen ETA claims",
+        "does not widen viability claims",
+        "negative and incomplete perturbation cases remain first-class evidence",
+      ],
+    });
+    const artifact = {
+      ...artifactBase,
+      checksum: computeNhm2EnvelopePerturbationChecksum(artifactBase),
+    };
+
+    const published = publishNhm2EnvelopePerturbationResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    });
+
+    expect(path.basename(published.latestJsonPath)).toBe(
+      "nhm2-envelope-perturbation-suite-latest.json",
+    );
+    expect(path.basename(published.latestMdPath)).toBe(
+      "warp-nhm2-envelope-perturbation-suite-latest.md",
+    );
+    expect(fs.existsSync(published.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.latestMdPath)).toBe(true);
+
+    const json = JSON.parse(
+      fs.readFileSync(published.latestJsonPath, "utf8"),
+    ) as Record<string, any>;
+    expect(json.family?.shiftLapseProfileId).toBe("stage1_centerline_alpha_0p995_v1");
+    expect(json.summary?.suiteCount).toBe(1);
+
+    const markdown = fs.readFileSync(published.latestMdPath, "utf8");
+    expect(markdown).toContain("does not widen speed claims");
+    expect(markdown).toContain("does not widen ETA claims");
+    expect(markdown).toContain(
+      "negative and incomplete perturbation cases remain first-class evidence",
+    );
+  });
+
+  it("builds selected-family transport results with decomposition-linked fields populated", () => {
+    const gate = makeShiftLapseTransportPromotionGateFixture({
+      centerlineAlpha: 0.995,
+      centerlineDtauDt: 0.995,
+      shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+      shiftLapseProfileStage: "controlled_tuning_stage_1",
+      shiftLapseProfileNote:
+        "Controlled stage-1 NHM2 shift+lapse tuning profile.",
+    });
+    const worldlineArtifact = buildNhm2WarpWorldlineProofArtifact({
+      generatedOn: "2026-04-08",
+      warpWorldline: makeShiftLapseWarpWorldlineFixture(undefined, gate),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+    });
+    const missionTimeComparisonArtifact = buildNhm2MissionTimeComparisonArtifact({
+      generatedOn: "2026-04-08",
+      missionTimeComparison: makeWarpMissionTimeComparisonFixture(),
+      sourceAuditArtifactPath:
+        "artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+    });
+    missionTimeComparisonArtifact.sourceSurface.metricFamily = "nhm2_shift_lapse";
+    missionTimeComparisonArtifact.sourceSurface.shiftLapseProfileId =
+      "stage1_centerline_alpha_0p995_v1";
+    missionTimeComparisonArtifact.sourceSurface.shiftLapseTransportPromotionGate = gate;
+    missionTimeComparisonArtifact.comparisonMetrics.interpretationStatus =
+      "bounded_relativistic_differential_detected";
+    missionTimeComparisonArtifact.comparisonMetrics.properMinusCoordinate_seconds = -0.5;
+    missionTimeComparisonArtifact.comparisonMetrics.properMinusClassical_seconds = -0.5;
+
+    const decomposition = buildNhm2ShiftVsLapseDecompositionArtifact({
+      familyId: "nhm2_shift_lapse",
+      shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+      shiftLapseProfileStage: "controlled_tuning_stage_1",
+      sourceMissionTimeComparisonArtifactPath:
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+      sourceWorldlineArtifactPath:
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+      centerlineAlpha: 0.995,
+      centerlineDtauDt: 0.995,
+      interpretationStatus: "bounded_relativistic_differential_detected",
+      warpCoordinateTimeSeconds: 100,
+      warpProperTimeSeconds: 99.5,
+      classicalReferenceTimeSeconds: 100,
+      properMinusCoordinateSeconds: -0.5,
+      properVsCoordinateRatio: 0.995,
+      coordinateMinusClassicalSeconds: 0,
+      residualToleranceSeconds: 1e-9,
+    });
+
+    const transportResult = buildNhm2ShiftLapseTransportResultArtifact({
+      boundedStack: {
+        worldline: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+          artifact: worldlineArtifact,
+        },
+        cruisePreflight: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-cruise-envelope-preflight-latest.json",
+        },
+        routeTimeWorldline: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-route-time-worldline-latest.json",
+        },
+        missionTimeEstimator: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-estimator-latest.json",
+        },
+        missionTimeComparison: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+          artifact: missionTimeComparisonArtifact,
+        },
+        cruiseEnvelope: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-cruise-envelope-latest.json",
+        },
+        inHullProperAcceleration: {
+          latestJsonPath:
+            "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-in-hull-proper-acceleration-latest.json",
+        },
+      } as any,
+      publicationCommand:
+        "npm run warp:full-solve:nhm2-shift-lapse:publish-selected-transport -- --shift-lapse-profile-id stage1_centerline_alpha_0p995_v1",
+      artifactRootDir: "artifacts/research/full-solve/selected-family/nhm2-shift-lapse",
+      auditRootDir: "docs/audits/research/selected-family/nhm2-shift-lapse",
+      shiftVsLapseDecomposition: decomposition,
+      shiftVsLapseDecompositionLatestJsonPath:
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-vs-lapse-decomposition-latest.json",
+    });
+
+    expect(
+      transportResult.selectedBundleArtifacts.shiftVsLapseDecompositionLatestJsonPath,
+    ).toContain("nhm2-shift-vs-lapse-decomposition-latest.json");
+    expect(transportResult.shiftVsLapseDecompositionLatestJsonPath).toBe(
+      transportResult.selectedBundleArtifacts.shiftVsLapseDecompositionLatestJsonPath,
+    );
+    expect(transportResult.shiftVsLapseDecompositionStatus).toBe(
+      decomposition.status,
+    );
+    expect(transportResult.shiftTransportContribution_seconds).toBeCloseTo(
+      decomposition.decomposition.fixedShiftFamilyTransportContributionSeconds ?? 0,
+    );
+    expect(transportResult.lapseClockRateContribution_seconds).toBeCloseTo(
+      decomposition.decomposition.lapseProfileClockRateContributionSeconds ?? 0,
+    );
+    expect(transportResult.shiftVsLapseResidual_seconds).toBeCloseTo(
+      decomposition.decomposition.residualUnexplainedContributionSeconds ?? 0,
+    );
+    expect(transportResult.lapseDialTrackedFraction).toBeCloseTo(
+      decomposition.decomposition.lapseDialTrackedFraction ?? 0,
+    );
+    expect(transportResult.nonClaims).toContain("does not certify speed or ETA");
+    expect(transportResult.nonClaims).toContain("does not widen viability claims");
+  });
 });
 
 const makeWarpWorldlineContract = () => makeWarpWorldlineFixture();

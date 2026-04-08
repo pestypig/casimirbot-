@@ -574,6 +574,22 @@ const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-shift-vs-lapse-decomposition-latest.md",
 );
+const DEFAULT_ENVELOPE_PERTURBATION_SUITE_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-envelope-perturbation-suite-${DATE_STAMP}.json`,
+);
+const DEFAULT_ENVELOPE_PERTURBATION_SUITE_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-envelope-perturbation-suite-latest.json",
+);
+const DEFAULT_ENVELOPE_PERTURBATION_SUITE_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-envelope-perturbation-suite-${DATE_STAMP}.md`,
+);
+const DEFAULT_ENVELOPE_PERTURBATION_SUITE_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-envelope-perturbation-suite-latest.md",
+);
 const DEFAULT_CRUISE_ENVELOPE_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-cruise-envelope-${DATE_STAMP}.json`,
@@ -2596,6 +2612,7 @@ type Nhm2ShiftLapseTransportResultArtifact = {
   missionTimeInterpretationStatus: string | null;
   properMinusCoordinate_seconds: number | null;
   properMinusClassical_seconds: number | null;
+  shiftVsLapseDecompositionLatestJsonPath: string;
   shiftVsLapseDecompositionStatus: Nhm2ShiftVsLapseDecompositionArtifact["status"];
   shiftVsLapseApproximationStatus:
     Nhm2ShiftVsLapseDecompositionArtifact["method"]["approximationStatus"];
@@ -6325,6 +6342,72 @@ const writeMarkdownArtifact = (filePath: string, markdown: string): void => {
   ensureDirForFile(filePath);
   fs.writeFileSync(filePath, `${markdown}\n`);
 };
+
+const writePublishedArtifactSurface = <T>(args: {
+  artifact: T;
+  markdown: string;
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: T;
+} => {
+  writeJsonArtifact(args.outJsonPath, args.artifact);
+  writeJsonArtifact(args.latestJsonPath, args.artifact);
+  writeMarkdownArtifact(args.outMdPath, args.markdown);
+  writeMarkdownArtifact(args.latestMdPath, args.markdown);
+  return {
+    outJsonPath: args.outJsonPath,
+    latestJsonPath: args.latestJsonPath,
+    outMdPath: args.outMdPath,
+    latestMdPath: args.latestMdPath,
+    artifact: args.artifact,
+  };
+};
+
+const matchesPublicationRoot = (
+  candidatePath: string,
+  expectedPath: string,
+): boolean => path.resolve(candidatePath) === path.resolve(expectedPath);
+
+const shouldPublishSelectedShiftLapseDedicatedResearchSurface = (args: {
+  artifactRootDir: string;
+  auditRootDir: string;
+  shiftLapseProfileId: string;
+}): boolean =>
+  matchesPublicationRoot(args.artifactRootDir, SELECTED_FAMILY_FULL_SOLVE_DIR) &&
+  matchesPublicationRoot(args.auditRootDir, SELECTED_FAMILY_DOC_AUDIT_DIR) &&
+  args.shiftLapseProfileId === DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID;
+
+const shouldPublishSelectedShiftLapseEnvelopeDedicatedResearchSurface = (args: {
+  selectedFamilyArtifactRootDir: string;
+  selectedFamilyAuditRootDir: string;
+  artifactRootDir: string;
+  auditRootDir: string;
+  shiftLapseProfileId: string | null;
+}): boolean =>
+  matchesPublicationRoot(
+    args.selectedFamilyArtifactRootDir,
+    SELECTED_FAMILY_FULL_SOLVE_DIR,
+  ) &&
+  matchesPublicationRoot(
+    args.selectedFamilyAuditRootDir,
+    SELECTED_FAMILY_DOC_AUDIT_DIR,
+  ) &&
+  matchesPublicationRoot(
+    args.artifactRootDir,
+    SELECTED_SHIFT_LAPSE_ENVELOPE_ARTIFACT_DIR,
+  ) &&
+  matchesPublicationRoot(
+    args.auditRootDir,
+    SELECTED_SHIFT_LAPSE_ENVELOPE_AUDIT_DIR,
+  ) &&
+  args.shiftLapseProfileId === DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID;
 
 const computeArtifactJsonChecksum = (value: unknown): string | null => {
   const checksum = asText(asRecord(value).checksum);
@@ -26277,6 +26360,42 @@ const buildNhm2ShiftVsLapseDecompositionArtifactFromMissionTimeComparison = (arg
   });
 };
 
+export const publishNhm2ShiftVsLapseDecompositionResearchSurface = (args: {
+  artifact: Nhm2ShiftVsLapseDecompositionArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2ShiftVsLapseDecompositionArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  const markdown = renderNhm2ShiftVsLapseDecompositionMarkdown(args.artifact);
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown,
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD),
+    ),
+  });
+};
+
 const publishNhm2ShiftVsLapseDecompositionLatest = (args: {
   artifactRootDir: string;
   auditRootDir: string;
@@ -26296,38 +26415,11 @@ const publishNhm2ShiftVsLapseDecompositionLatest = (args: {
       args.sourceMissionTimeComparisonArtifactPath,
     sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath,
   });
-  const markdown = renderNhm2ShiftVsLapseDecompositionMarkdown(artifact);
-  const outJsonPath = path.join(
-    args.artifactRootDir,
-    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_JSON),
-  );
-  const latestJsonPath = path.join(
-    args.artifactRootDir,
-    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON),
-  );
-  const outMdPath = path.join(
-    args.auditRootDir,
-    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_MD),
-  );
-  const latestMdPath = path.join(
-    args.auditRootDir,
-    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD),
-  );
-  ensureDirForFile(outJsonPath);
-  ensureDirForFile(latestJsonPath);
-  ensureDirForFile(outMdPath);
-  ensureDirForFile(latestMdPath);
-  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
-  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
-  fs.writeFileSync(outMdPath, `${markdown}\n`);
-  fs.writeFileSync(latestMdPath, `${markdown}\n`);
-  return {
-    outJsonPath,
-    latestJsonPath,
-    outMdPath,
-    latestMdPath,
+  return publishNhm2ShiftVsLapseDecompositionResearchSurface({
     artifact,
-  };
+    artifactRootDir: args.artifactRootDir,
+    auditRootDir: args.auditRootDir,
+  });
 };
 
 export const buildNhm2CruiseEnvelopeArtifact = (args: {
@@ -28680,7 +28772,7 @@ const summarizeSelectedShiftLapseTimingResult = (args: {
   return `${profilePrefix} does not yet expose a certified mission-time interpretation.`;
 };
 
-const buildNhm2ShiftLapseTransportResultArtifact = (args: {
+export const buildNhm2ShiftLapseTransportResultArtifact = (args: {
   boundedStack: Awaited<ReturnType<typeof publishNhm2BoundedStackLatest>>;
   publicationCommand: string;
   artifactRootDir: string;
@@ -28765,6 +28857,9 @@ const buildNhm2ShiftLapseTransportResultArtifact = (args: {
     missionTimeInterpretationStatus: interpretationStatus,
     properMinusCoordinate_seconds: properMinusCoordinateSeconds,
     properMinusClassical_seconds: properMinusClassicalSeconds,
+    shiftVsLapseDecompositionLatestJsonPath: normalizePath(
+      args.shiftVsLapseDecompositionLatestJsonPath,
+    ),
     shiftVsLapseDecompositionStatus: args.shiftVsLapseDecomposition.status,
     shiftVsLapseApproximationStatus:
       args.shiftVsLapseDecomposition.method.approximationStatus,
@@ -28838,6 +28933,7 @@ const renderNhm2ShiftLapseTransportResultMarkdown = (
 | missionTimeInterpretationStatus | ${payload.missionTimeInterpretationStatus ?? "null"} |
 | properMinusCoordinate_seconds | ${payload.properMinusCoordinate_seconds ?? "null"} |
 | properMinusClassical_seconds | ${payload.properMinusClassical_seconds ?? "null"} |
+| shiftVsLapseDecompositionLatestJsonPath | ${payload.shiftVsLapseDecompositionLatestJsonPath} |
 | shiftVsLapseDecompositionStatus | ${payload.shiftVsLapseDecompositionStatus} |
 | shiftVsLapseApproximationStatus | ${payload.shiftVsLapseApproximationStatus} |
 | shiftTransportContribution_seconds | ${payload.shiftTransportContribution_seconds ?? "null"} |
@@ -28922,6 +29018,19 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
       boundedStack.missionTimeComparison.latestJsonPath,
     sourceWorldlineArtifactPath: boundedStack.worldline.latestJsonPath,
   });
+  if (
+    shouldPublishSelectedShiftLapseDedicatedResearchSurface({
+      artifactRootDir,
+      auditRootDir,
+      shiftLapseProfileId,
+    })
+  ) {
+    publishNhm2ShiftVsLapseDecompositionResearchSurface({
+      artifact: shiftVsLapseDecomposition.artifact,
+      artifactRootDir: FULL_SOLVE_DIR,
+      auditRootDir: DOC_AUDIT_DIR,
+    });
+  }
   const artifact = buildNhm2ShiftLapseTransportResultArtifact({
     boundedStack,
     publicationCommand: buildSelectedShiftLapsePublicationCommand(shiftLapseProfileId),
@@ -30280,7 +30389,7 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
   };
 };
 
-const computeNhm2EnvelopePerturbationChecksum = (
+export const computeNhm2EnvelopePerturbationChecksum = (
   payload: Nhm2EnvelopePerturbationArtifact,
 ): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 
@@ -31025,6 +31134,42 @@ ${nonClaims}
 `;
 };
 
+export const publishNhm2EnvelopePerturbationResearchSurface = (args: {
+  artifact: Nhm2EnvelopePerturbationPublishedArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2EnvelopePerturbationPublishedArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  const markdown = renderNhm2EnvelopePerturbationMarkdown(args.artifact);
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown,
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_ENVELOPE_PERTURBATION_SUITE_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_ENVELOPE_PERTURBATION_SUITE_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_ENVELOPE_PERTURBATION_SUITE_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_ENVELOPE_PERTURBATION_SUITE_LATEST_MD),
+    ),
+  });
+};
+
 export const publishNhm2ShiftLapseEnvelopeSuite = async (options?: {
   baseUrl?: string;
   selectedFamilyArtifactRootDir?: string;
@@ -31233,6 +31378,22 @@ export const publishNhm2ShiftLapseEnvelopeSuite = async (options?: {
   fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
   fs.writeFileSync(outMdPath, `${markdown}\n`);
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  if (
+    shouldPublishSelectedShiftLapseEnvelopeDedicatedResearchSurface({
+      selectedFamilyArtifactRootDir,
+      selectedFamilyAuditRootDir,
+      artifactRootDir,
+      auditRootDir,
+      shiftLapseProfileId:
+        selectedTransport.transportResult.artifact.selectedFamily.shiftLapseProfileId,
+    })
+  ) {
+    publishNhm2EnvelopePerturbationResearchSurface({
+      artifact,
+      artifactRootDir: FULL_SOLVE_DIR,
+      auditRootDir: DOC_AUDIT_DIR,
+    });
+  }
   return {
     selectedTransport,
     profileSweep,

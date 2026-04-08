@@ -50,6 +50,38 @@ describe("nhm2 shift-vs-lapse decomposition artifact", () => {
     expect(isNhm2ShiftVsLapseDecompositionArtifact(artifact)).toBe(true);
   });
 
+  it("normalizes source artifact paths to forward slashes without dropping nulls", () => {
+    const artifact = buildNhm2ShiftVsLapseDecompositionArtifact({
+      sourceMissionTimeComparisonArtifactPath:
+        "artifacts\\research\\full-solve\\selected-family\\nhm2-shift-lapse\\nhm2-mission-time-comparison-latest.json",
+      sourceWorldlineArtifactPath:
+        "C:\\repo\\artifacts\\research\\full-solve\\selected-family\\nhm2-shift-lapse\\nhm2-warp-worldline-proof-latest.json",
+      centerlineDtauDt: 0.995,
+      warpCoordinateTimeSeconds: 100,
+      warpProperTimeSeconds: 99.5,
+      classicalReferenceTimeSeconds: 100,
+    });
+
+    expect(artifact.sourceArtifacts.missionTimeComparison).toBe(
+      "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+    );
+    expect(artifact.sourceArtifacts.worldline).toBe(
+      "C:/repo/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+    );
+
+    const missing = buildNhm2ShiftVsLapseDecompositionArtifact({
+      sourceMissionTimeComparisonArtifactPath: null,
+      sourceWorldlineArtifactPath: "   ",
+      centerlineDtauDt: 0.995,
+      warpCoordinateTimeSeconds: 100,
+      warpProperTimeSeconds: 99.5,
+      classicalReferenceTimeSeconds: 100,
+    });
+
+    expect(missing.sourceArtifacts.missionTimeComparison).toBeNull();
+    expect(missing.sourceArtifacts.worldline).toBeNull();
+  });
+
   it("labels the decomposition as review when the lapse dial leaves a residual", () => {
     const artifact = buildNhm2ShiftVsLapseDecompositionArtifact({
       shiftLapseProfileId: "stage1_centerline_alpha_0p9900_v1",
