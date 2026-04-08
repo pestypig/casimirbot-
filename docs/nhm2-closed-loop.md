@@ -2,6 +2,8 @@
 
 This page collects the current repository position for the NHM2 shift+lapse lane so docs, UI copy, and review notes stay aligned with the repo's own claim ladder.
 
+For the concrete audit contract that turns this narrative into artifact names and pass/fail semantics, see [`docs/nhm2-audit-checklist.md`](./nhm2-audit-checklist.md).
+
 ## Executive Summary
 
 NHM2 should currently be described as a lapse-extended candidate research lane built on a Natario-style zero-expansion transport core, not as a closed-loop certified transport solution.
