@@ -8,21 +8,21 @@
 | contractVersion | nhm2_full_loop_audit/v1 |
 | auditId | nhm2_full_loop |
 | laneId | nhm2_shift_lapse |
-| generatedAt | 2026-04-08T21:18:55.661Z |
+| generatedAt | 2026-04-08T21:56:39.953Z |
 | selectedProfileId | stage1_centerline_alpha_0p995_v1 |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit |
 | currentClaimTier | diagnostic |
 | maximumClaimTier | reduced-order |
 | highestPassingClaimTier | diagnostic |
-| overallState | unavailable |
+| overallState | fail |
 | blockingReasons | strict_signal_missing, source_closure_missing, observer_audit_incomplete, certificate_missing, policy_review_required |
 
 ## Tier Readiness
 | tier | state | satisfiedSections | blockingReasons |
 |---|---|---|---|
 | diagnostic | pass | family_semantics, claim_tier, lapse_provenance, mission_time_outputs | none |
-| reduced-order | unavailable | family_semantics, claim_tier, lapse_provenance, mission_time_outputs, shift_vs_lapse_decomposition | strict_signal_missing, source_closure_missing, observer_audit_incomplete, policy_review_required |
-| certified | unavailable | family_semantics, claim_tier, lapse_provenance, mission_time_outputs, shift_vs_lapse_decomposition | strict_signal_missing, source_closure_missing, observer_audit_incomplete, certificate_missing, policy_review_required |
+| reduced-order | fail | family_semantics, claim_tier, lapse_provenance, mission_time_outputs, shift_vs_lapse_decomposition | strict_signal_missing, source_closure_missing, observer_audit_incomplete, policy_review_required |
+| certified | fail | family_semantics, claim_tier, lapse_provenance, mission_time_outputs, shift_vs_lapse_decomposition | strict_signal_missing, source_closure_missing, observer_audit_incomplete, certificate_missing, policy_review_required |
 
 ## Closure Checklist
 | section | expected evidence | found artifact/ref | contract parse status | lane/profile match | stale/mismatch status | section state | blocking reasons |
@@ -30,7 +30,7 @@
 | family_semantics | selected-family transport result contract<br/>docs/nhm2-closed-loop.md<br/>docs/nhm2-audit-checklist.md | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json<br/>docs/nhm2-closed-loop.md<br/>docs/nhm2-audit-checklist.md | pass | pass | ok | pass | none |
 | claim_tier | selected-family bounded transport artifact<br/>MATH_STATUS.md<br/>shared/contracts/warp-proof-surface-manifest.v1.ts | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json<br/>MATH_STATUS.md<br/>shared/contracts/warp-proof-surface-manifest.v1.ts | pass | pass | ok | pass | none |
 | lapse_provenance | selected-family transport result contract<br/>selected-family worldline contract<br/>selected-family mission-time comparison contract | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json | pass | pass | ok | pass | none |
-| strict_signal_readiness | published nhm2 strict-signal readiness contract | none | missing | n/a | missing_artifact | unavailable | strict_signal_missing |
+| strict_signal_readiness | published nhm2 strict-signal readiness contract | artifacts/research/full-solve/nhm2-strict-signal-readiness-latest.json | pass | pass | ok | fail | strict_signal_missing |
 | source_closure | published nhm2 source-closure tensor contract | none | missing | n/a | missing_artifact | unavailable | source_closure_missing |
 | observer_audit | published nhm2 observer audit contract | none | missing | n/a | missing_artifact | unavailable | observer_audit_incomplete |
 | gr_stability_safety | selected-family transport gate evidence<br/>root NHM2 envelope perturbation suite<br/>selected-family envelope perturbation suite<br/>selected-family in-hull proper-acceleration contract | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json<br/>artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope/nhm2-envelope-perturbation-suite-latest.json<br/>artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-in-hull-proper-acceleration-latest.json | pass | pass | ok | review | policy_review_required |

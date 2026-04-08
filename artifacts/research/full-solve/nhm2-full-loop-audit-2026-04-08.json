@@ -1,0 +1,549 @@
+{
+  "contractVersion": "nhm2_full_loop_audit/v1",
+  "auditId": "nhm2_full_loop",
+  "laneId": "nhm2_shift_lapse",
+  "generatedAt": "2026-04-08T21:56:39.953Z",
+  "sectionOrder": [
+    "family_semantics",
+    "claim_tier",
+    "lapse_provenance",
+    "strict_signal_readiness",
+    "source_closure",
+    "observer_audit",
+    "gr_stability_safety",
+    "mission_time_outputs",
+    "shift_vs_lapse_decomposition",
+    "uncertainty_perturbation_reproducibility",
+    "certificate_policy_result"
+  ],
+  "sections": {
+    "family_semantics": {
+      "sectionId": "family_semantics",
+      "state": "pass",
+      "reasons": [],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_shift_lapse_transport_result",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+          "contractVersion": "nhm2_shift_lapse_transport_result/v1",
+          "status": "bounded_transport_proof_bearing_gate_admitted"
+        },
+        {
+          "artifactId": "nhm2_closed_loop_doc",
+          "path": "docs/nhm2-closed-loop.md",
+          "contractVersion": null,
+          "status": null
+        },
+        {
+          "artifactId": "nhm2_audit_checklist_doc",
+          "path": "docs/nhm2-audit-checklist.md",
+          "contractVersion": null,
+          "status": null
+        }
+      ],
+      "familyId": "nhm2_shift_lapse",
+      "baseFamily": "natario_zero_expansion",
+      "lapseExtension": true,
+      "selectedProfileId": "stage1_centerline_alpha_0p995_v1",
+      "semanticBoundaries": [
+        "Natario-style zero-expansion base family",
+        "NHM2 selected-family publication keeps shift-family semantics while exposing a bounded lapse-profile dial"
+      ],
+      "nonClaims": [
+        "does not redefine generic warp viability or certificate semantics",
+        "does not widen route ETA, transport, gravity, or viability claims"
+      ],
+      "supportedClaimTiers": [
+        "diagnostic",
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "claim_tier": {
+      "sectionId": "claim_tier",
+      "state": "pass",
+      "reasons": [],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_shift_lapse_transport_result",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+          "contractVersion": "nhm2_shift_lapse_transport_result/v1",
+          "status": "bounded_transport_proof_bearing_gate_admitted"
+        },
+        {
+          "artifactId": "math_status",
+          "path": "MATH_STATUS.md",
+          "contractVersion": null,
+          "status": null
+        },
+        {
+          "artifactId": "warp_proof_surface_manifest_contract",
+          "path": "shared/contracts/warp-proof-surface-manifest.v1.ts",
+          "contractVersion": null,
+          "status": null
+        }
+      ],
+      "currentTier": "diagnostic",
+      "maximumClaimTier": "reduced-order",
+      "viabilityStatus": "UNKNOWN",
+      "promotionReason": "insufficient_provenance",
+      "surfaceStages": [
+        {
+          "module": "modules/warp/natario-warp.ts",
+          "stage": "reduced-order"
+        },
+        {
+          "module": "server/stress-energy-brick.ts",
+          "stage": "reduced-order"
+        },
+        {
+          "module": "server/gr-evolve-brick.ts",
+          "stage": "diagnostic"
+        },
+        {
+          "module": "tools/warpViability.ts",
+          "stage": "diagnostic"
+        },
+        {
+          "module": "tools/warpViabilityCertificate.ts",
+          "stage": "certified"
+        }
+      ],
+      "supportedClaimTiers": [
+        "diagnostic",
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "lapse_provenance": {
+      "sectionId": "lapse_provenance",
+      "state": "pass",
+      "reasons": [],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_shift_lapse_transport_result",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+          "contractVersion": "nhm2_shift_lapse_transport_result/v1",
+          "status": "bounded_transport_proof_bearing_gate_admitted"
+        },
+        {
+          "artifactId": "nhm2_warp_worldline_proof",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+          "contractVersion": "warp_worldline_contract/v1",
+          "status": "bounded_solve_backed"
+        },
+        {
+          "artifactId": "nhm2_mission_time_comparison",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+          "contractVersion": "warp_mission_time_comparison/v1",
+          "status": "bounded_target_coupled_comparison_ready"
+        }
+      ],
+      "metricFamily": "nhm2_shift_lapse",
+      "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
+      "shiftLapseProfileStage": "controlled_tuning_stage_1",
+      "familyAuthorityStatus": "candidate_authoritative_solve_family",
+      "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+      "metricT00ContractStatus": "ok",
+      "chartContractStatus": "ok",
+      "supportedClaimTiers": [
+        "diagnostic",
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "strict_signal_readiness": {
+      "sectionId": "strict_signal_readiness",
+      "state": "fail",
+      "reasons": [
+        "strict_signal_missing"
+      ],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_strict_signal_readiness",
+          "path": "artifacts/research/full-solve/nhm2-strict-signal-readiness-latest.json",
+          "contractVersion": "nhm2_strict_signal_readiness/v1",
+          "status": "fail"
+        }
+      ],
+      "strictModeEnabled": true,
+      "thetaMetricDerived": false,
+      "tsMetricDerived": false,
+      "qiMetricDerived": false,
+      "qiApplicabilityStatus": null,
+      "missingSignals": [
+        "theta",
+        "ts",
+        "qi"
+      ],
+      "supportedClaimTiers": [
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "source_closure": {
+      "sectionId": "source_closure",
+      "state": "unavailable",
+      "reasons": [
+        "source_closure_missing"
+      ],
+      "artifactRefs": [],
+      "metricTensorRef": null,
+      "tileEffectiveTensorRef": null,
+      "residualRms": null,
+      "residualMax": null,
+      "residualByRegion": {
+        "hull": null,
+        "wall": null,
+        "exteriorShell": null
+      },
+      "toleranceRef": "tensor_residual_relLInf",
+      "assumptionsDrifted": null,
+      "supportedClaimTiers": [
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "observer_audit": {
+      "sectionId": "observer_audit",
+      "state": "unavailable",
+      "reasons": [
+        "observer_audit_incomplete"
+      ],
+      "artifactRefs": [],
+      "metric": {
+        "state": "unavailable",
+        "wecMinOverAllTimelike": null,
+        "necMinOverAllNull": null,
+        "decStatus": null,
+        "secStatus": null,
+        "observerWorstCaseLocation": null,
+        "typeIFraction": null,
+        "missedViolationFraction": null,
+        "maxRobustMinusEulerian": null
+      },
+      "tile": {
+        "state": "unavailable",
+        "wecMinOverAllTimelike": null,
+        "necMinOverAllNull": null,
+        "decStatus": null,
+        "secStatus": null,
+        "observerWorstCaseLocation": null,
+        "typeIFraction": null,
+        "missedViolationFraction": null,
+        "maxRobustMinusEulerian": null
+      },
+      "supportedClaimTiers": [
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "gr_stability_safety": {
+      "sectionId": "gr_stability_safety",
+      "state": "review",
+      "reasons": [
+        "policy_review_required"
+      ],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_shift_lapse_transport_result",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+          "contractVersion": "nhm2_shift_lapse_transport_result/v1",
+          "status": "bounded_transport_proof_bearing_gate_admitted"
+        },
+        {
+          "artifactId": "nhm2_envelope_perturbation_suite_root",
+          "path": "artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json",
+          "contractVersion": "nhm2_envelope_perturbation_suite/v1",
+          "status": "review"
+        },
+        {
+          "artifactId": "nhm2_envelope_perturbation_suite_selected",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope/nhm2-envelope-perturbation-suite-latest.json",
+          "contractVersion": "nhm2_envelope_perturbation_suite/v1",
+          "status": "review"
+        },
+        {
+          "artifactId": "nhm2_in_hull_proper_acceleration",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-in-hull-proper-acceleration-latest.json",
+          "contractVersion": "warp_in_hull_proper_acceleration/v1",
+          "status": "bounded_in_hull_profile_certified"
+        }
+      ],
+      "solverHealth": "CERTIFIED",
+      "perturbationFamilies": [
+        "resolution_sensitivity",
+        "boundary_condition_sensitivity",
+        "local_lapse_profile_perturbations",
+        "stronger_boundary_lapse_perturbations"
+      ],
+      "H_rms": null,
+      "M_rms": null,
+      "H_maxAbs": null,
+      "M_maxAbs": null,
+      "centerlineProperAcceleration_mps2": null,
+      "wallNormalSafetyMargin": 1,
+      "blueshiftMax": null,
+      "stabilityWorstCase": "profile_stage1_centerline_alpha_0p9975_v1",
+      "safetyWorstCaseLocation": "cabin_center",
+      "supportedClaimTiers": [
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "mission_time_outputs": {
+      "sectionId": "mission_time_outputs",
+      "state": "pass",
+      "reasons": [],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_warp_worldline_proof",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+          "contractVersion": "warp_worldline_contract/v1",
+          "status": "bounded_solve_backed"
+        },
+        {
+          "artifactId": "nhm2_cruise_envelope_preflight",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-cruise-envelope-preflight-latest.json",
+          "contractVersion": "warp_cruise_envelope_preflight/v1",
+          "status": "bounded_preflight_ready"
+        },
+        {
+          "artifactId": "nhm2_route_time_worldline",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-route-time-worldline-latest.json",
+          "contractVersion": "warp_route_time_worldline/v1",
+          "status": "bounded_route_time_ready"
+        },
+        {
+          "artifactId": "nhm2_mission_time_estimator",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-estimator-latest.json",
+          "contractVersion": "warp_mission_time_estimator/v1",
+          "status": "bounded_target_coupled_estimate_ready"
+        },
+        {
+          "artifactId": "nhm2_mission_time_comparison",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-mission-time-comparison-latest.json",
+          "contractVersion": "warp_mission_time_comparison/v1",
+          "status": "bounded_target_coupled_comparison_ready"
+        }
+      ],
+      "worldlineStatus": "bounded_solve_backed",
+      "routeTimeStatus": "bounded_local_segment_certified",
+      "missionTimeEstimatorStatus": "bounded_target_coupled_estimate_ready",
+      "missionTimeComparisonStatus": "bounded_target_coupled_comparison_ready",
+      "targetId": "alpha-cen-a",
+      "coordinateTimeEstimateSeconds": 137755965.9171795,
+      "properTimeEstimateSeconds": 137067186.0875936,
+      "properMinusCoordinateSeconds": -688779.8295859098,
+      "comparatorId": "nhm2_classical_no_time_dilation_reference",
+      "supportedClaimTiers": [
+        "diagnostic",
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "shift_vs_lapse_decomposition": {
+      "sectionId": "shift_vs_lapse_decomposition",
+      "state": "pass",
+      "reasons": [],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_shift_vs_lapse_decomposition_selected",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-vs-lapse-decomposition-latest.json",
+          "contractVersion": "nhm2_shift_vs_lapse_decomposition/v1",
+          "status": "pass"
+        },
+        {
+          "artifactId": "nhm2_shift_vs_lapse_decomposition_root",
+          "path": "artifacts/research/full-solve/nhm2-shift-vs-lapse-decomposition-latest.json",
+          "contractVersion": "nhm2_shift_vs_lapse_decomposition/v1",
+          "status": "pass"
+        }
+      ],
+      "shiftDrivenContribution": 137755965.9171795,
+      "lapseDrivenContribution": -688779.8295858981,
+      "expansionLeakageBound": 0.001,
+      "thetaFlatnessStatus": "pass",
+      "divBetaFlatnessStatus": "shell_cross_samples_reveal_shift_variation_while_dtau_stays_flat_in_bounded_regime",
+      "natarioBaselineComparisonRef": "warp.metric.T00.natario_sdf.shift",
+      "supportedClaimTiers": [
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "uncertainty_perturbation_reproducibility": {
+      "sectionId": "uncertainty_perturbation_reproducibility",
+      "state": "review",
+      "reasons": [
+        "policy_review_required"
+      ],
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_envelope_perturbation_suite_root",
+          "path": "artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json",
+          "contractVersion": "nhm2_envelope_perturbation_suite/v1",
+          "status": "review"
+        },
+        {
+          "artifactId": "nhm2_envelope_perturbation_suite_selected",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope/nhm2-envelope-perturbation-suite-latest.json",
+          "contractVersion": "nhm2_envelope_perturbation_suite/v1",
+          "status": "review"
+        }
+      ],
+      "precisionAgreementStatus": "pass",
+      "meshConvergenceOrder": null,
+      "boundaryConditionSensitivity": null,
+      "smoothingKernelSensitivity": null,
+      "coldStartReproductionStatus": "deterministic_case_order_recorded",
+      "independentReproductionStatus": null,
+      "artifactHashConsistencyStatus": "consistent",
+      "supportedClaimTiers": [
+        "reduced-order",
+        "certified"
+      ]
+    },
+    "certificate_policy_result": {
+      "sectionId": "certificate_policy_result",
+      "state": "unavailable",
+      "reasons": [
+        "certificate_missing"
+      ],
+      "artifactRefs": [],
+      "viabilityStatus": "UNKNOWN",
+      "hardConstraintPass": null,
+      "firstHardFailureId": null,
+      "certificateStatus": null,
+      "certificateHash": null,
+      "certificateIntegrity": "unavailable",
+      "promotionTier": null,
+      "promotionReason": "certificate_missing",
+      "supportedClaimTiers": [
+        "certified"
+      ]
+    }
+  },
+  "claimTierSectionMap": {
+    "diagnostic": [
+      "family_semantics",
+      "claim_tier",
+      "lapse_provenance",
+      "mission_time_outputs"
+    ],
+    "reduced-order": [
+      "family_semantics",
+      "claim_tier",
+      "lapse_provenance",
+      "strict_signal_readiness",
+      "source_closure",
+      "observer_audit",
+      "gr_stability_safety",
+      "mission_time_outputs",
+      "shift_vs_lapse_decomposition",
+      "uncertainty_perturbation_reproducibility"
+    ],
+    "certified": [
+      "family_semantics",
+      "claim_tier",
+      "lapse_provenance",
+      "strict_signal_readiness",
+      "source_closure",
+      "observer_audit",
+      "gr_stability_safety",
+      "mission_time_outputs",
+      "shift_vs_lapse_decomposition",
+      "uncertainty_perturbation_reproducibility",
+      "certificate_policy_result"
+    ]
+  },
+  "claimTierReadiness": {
+    "diagnostic": {
+      "tier": "diagnostic",
+      "state": "pass",
+      "requiredSections": [
+        "family_semantics",
+        "claim_tier",
+        "lapse_provenance",
+        "mission_time_outputs"
+      ],
+      "satisfiedSections": [
+        "family_semantics",
+        "claim_tier",
+        "lapse_provenance",
+        "mission_time_outputs"
+      ],
+      "blockingReasons": []
+    },
+    "reduced-order": {
+      "tier": "reduced-order",
+      "state": "fail",
+      "requiredSections": [
+        "family_semantics",
+        "claim_tier",
+        "lapse_provenance",
+        "strict_signal_readiness",
+        "source_closure",
+        "observer_audit",
+        "gr_stability_safety",
+        "mission_time_outputs",
+        "shift_vs_lapse_decomposition",
+        "uncertainty_perturbation_reproducibility"
+      ],
+      "satisfiedSections": [
+        "family_semantics",
+        "claim_tier",
+        "lapse_provenance",
+        "mission_time_outputs",
+        "shift_vs_lapse_decomposition"
+      ],
+      "blockingReasons": [
+        "strict_signal_missing",
+        "source_closure_missing",
+        "observer_audit_incomplete",
+        "policy_review_required"
+      ]
+    },
+    "certified": {
+      "tier": "certified",
+      "state": "fail",
+      "requiredSections": [
+        "family_semantics",
+        "claim_tier",
+        "lapse_provenance",
+        "strict_signal_readiness",
+        "source_closure",
+        "observer_audit",
+        "gr_stability_safety",
+        "mission_time_outputs",
+        "shift_vs_lapse_decomposition",
+        "uncertainty_perturbation_reproducibility",
+        "certificate_policy_result"
+      ],
+      "satisfiedSections": [
+        "family_semantics",
+        "claim_tier",
+        "lapse_provenance",
+        "mission_time_outputs",
+        "shift_vs_lapse_decomposition"
+      ],
+      "blockingReasons": [
+        "strict_signal_missing",
+        "source_closure_missing",
+        "observer_audit_incomplete",
+        "certificate_missing",
+        "policy_review_required"
+      ]
+    }
+  },
+  "currentClaimTier": "diagnostic",
+  "maximumClaimTier": "reduced-order",
+  "highestPassingClaimTier": "diagnostic",
+  "overallState": "fail",
+  "blockingReasons": [
+    "strict_signal_missing",
+    "source_closure_missing",
+    "observer_audit_incomplete",
+    "certificate_missing",
+    "policy_review_required"
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "artifactId": "nhm2_strict_signal_readiness",
+  "schemaVersion": "nhm2_strict_signal_readiness/v1",
+  "status": "fail",
+  "completeness": "incomplete",
+  "reasonCodes": [
+    "strict_signal_missing"
+  ],
+  "strictModeEnabled": true,
+  "family": {
+    "familyId": "nhm2_shift_lapse",
+    "familyAuthorityStatus": "candidate_authoritative_solve_family",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
+    "lapseSummary": {
+      "alphaCenterline": 0.995,
+      "alphaMin": null,
+      "alphaMax": null,
+      "alphaProfileKind": null,
+      "alphaGradientAxis": null,
+      "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
+      "shiftLapseProfileStage": "controlled_tuning_stage_1",
+      "shiftLapseProfileLabel": "Stage 1 centerline alpha 0.995",
+      "shiftLapseProfileNote": "Controlled stage-1 NHM2 shift+lapse tuning profile: centerline alpha is reduced to 0.995 while the existing mild diagnostic gradient, support, and taper settings remain unchanged.",
+      "signConvention": null
+    }
+  },
+  "signals": {
+    "theta": {
+      "signalId": "theta",
+      "status": "unavailable",
+      "metricDerived": null,
+      "provenance": "missing",
+      "sourcePath": null,
+      "reasonCode": "strict_signal_missing",
+      "reason": "No emitted selected-profile artifact currently publishes theta metric-derivation provenance."
+    },
+    "ts": {
+      "signalId": "ts",
+      "status": "unavailable",
+      "metricDerived": null,
+      "provenance": "missing",
+      "sourcePath": null,
+      "reasonCode": "strict_signal_missing",
+      "reason": "No emitted selected-profile artifact currently publishes TS metric-derivation provenance."
+    },
+    "qi": {
+      "signalId": "qi",
+      "status": "unavailable",
+      "metricDerived": null,
+      "provenance": "missing",
+      "sourcePath": null,
+      "rhoSource": null,
+      "reasonCode": "strict_signal_missing",
+      "reason": "No emitted selected-profile artifact currently publishes QI metric-derivation provenance or applicability status.",
+      "applicabilityStatus": null,
+      "applicabilityReasonCode": "strict_signal_missing"
+    }
+  },
+  "missingSignals": [
+    "theta",
+    "ts",
+    "qi"
+  ],
+  "proxySignals": [],
+  "promotionInputs": {
+    "thetaMetricDerived": false,
+    "tsMetricDerived": false,
+    "qiMetricDerived": false,
+    "qiApplicabilityStatus": null
+  },
+  "readiness": {
+    "promotionSignalReady": false,
+    "certifiedPromotionReady": false
+  }
+}
