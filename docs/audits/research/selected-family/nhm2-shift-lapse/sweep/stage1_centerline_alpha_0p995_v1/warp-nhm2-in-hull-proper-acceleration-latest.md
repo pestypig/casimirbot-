@@ -1,4 +1,4 @@
-# NHM2 In-Hull Proper Acceleration (2026-04-05)
+# NHM2 In-Hull Proper Acceleration (2026-04-08)
 
 "This artifact records a bounded NHM2 in-hull proper-acceleration profile for a declared Eulerian cabin observer family. It is solve-backed and no-fallback in certified mode, but it is not a curvature-gravity or comfort/safety certificate."
 

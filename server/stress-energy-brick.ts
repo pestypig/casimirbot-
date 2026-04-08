@@ -55,6 +55,25 @@ export interface StressEnergyChannel {
   max: number;
 }
 
+export interface StressEnergyTensorSummary {
+  T00: number;
+  T11: number;
+  T22: number;
+  T33: number;
+}
+
+export interface StressEnergyTensorRegionSummary {
+  regionId: "global" | "hull" | "wall" | "exterior_shell";
+  sampleCount: number;
+  tensor: StressEnergyTensorSummary;
+  note?: string;
+}
+
+export interface StressEnergyTensorSampledSummaries {
+  pressureModel: "isotropic_pressure_proxy";
+  regions: StressEnergyTensorRegionSummary[];
+}
+
 export interface StressEnergyStats {
   totalEnergy_J: number;
   avgT00: number;
@@ -71,6 +90,7 @@ export interface StressEnergyStats {
   natario?: NatarioDiagnostics;
   conservation?: StressEnergyConservationStats;
   mapping?: StressEnergyMappingStats;
+  tensorSampledSummaries?: StressEnergyTensorSampledSummaries;
   observerRobust?: ObserverRobustDiagnostics;
 }
 
@@ -202,6 +222,44 @@ const ALCUBIERRE_K_TOL = 1e-4;
 const DEFAULT_OBSERVER_RAPIDITY_CAP = 2.5;
 const DEFAULT_HAWKING_ELLIS_TYPE_I_TOL = 1e-9;
 const STRESS_ENERGY_CHANNEL_ORDER = ["t00", "Sx", "Sy", "Sz", "divS"] as const;
+
+type TensorRegionAccumulator = {
+  count: number;
+  sumT00: number;
+};
+
+const createTensorRegionAccumulator = (): TensorRegionAccumulator => ({
+  count: 0,
+  sumT00: 0,
+});
+
+const buildTensorSummaryFromMeanT00 = (
+  meanT00: number,
+  pressureFactor: number,
+): StressEnergyTensorSummary => ({
+  T00: meanT00,
+  T11: meanT00 * pressureFactor,
+  T22: meanT00 * pressureFactor,
+  T33: meanT00 * pressureFactor,
+});
+
+const buildTensorRegionSummary = (
+  regionId: StressEnergyTensorRegionSummary["regionId"],
+  accumulator: TensorRegionAccumulator,
+  pressureFactor: number,
+  note?: string,
+): StressEnergyTensorRegionSummary | null => {
+  if (accumulator.count <= 0) return null;
+  return {
+    regionId,
+    sampleCount: accumulator.count,
+    tensor: buildTensorSummaryFromMeanT00(
+      accumulator.sumT00 / accumulator.count,
+      pressureFactor,
+    ),
+    ...(note ? { note } : {}),
+  };
+};
 
 type StressEnergyFamilyId =
   | "alcubierre_control"
@@ -1473,6 +1531,14 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
   let t00Min = Number.POSITIVE_INFINITY;
   let t00Max = Number.NEGATIVE_INFINITY;
   let sumT00 = 0;
+  const pressureFactor = -1;
+  const exteriorShellLimit = wallSigma * 3;
+  const tensorRegions = {
+    global: createTensorRegionAccumulator(),
+    hull: createTensorRegionAccumulator(),
+    wall: createTensorRegionAccumulator(),
+    exterior_shell: createTensorRegionAccumulator(),
+  };
 
   idx = 0;
   for (let z = 0; z < nz; z++) {
@@ -1491,13 +1557,26 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const pLen = Math.hypot(px, py, pz);
         const dir = pLen > 1e-9 ? ([px / pLen, py / pLen, pz / pLen] as Vec3) : ([0, 0, 0] as Vec3);
         const radius = resolveHullRadius(dir, axes, radialMap);
+        const centerDist = pLen - radius;
+        tensorRegions.global.count += 1;
+        tensorRegions.global.sumT00 += density;
+        if (centerDist < -wallSigma) {
+          tensorRegions.hull.count += 1;
+          tensorRegions.hull.sumT00 += density;
+        } else if (Math.abs(centerDist) <= wallSigma) {
+          tensorRegions.wall.count += 1;
+          tensorRegions.wall.sumT00 += density;
+        } else if (centerDist > wallSigma && centerDist <= exteriorShellLimit) {
+          tensorRegions.exterior_shell.count += 1;
+          tensorRegions.exterior_shell.sumT00 += density;
+        }
         const normal = radialMap ? dir : ellipsoidNormal(pos, axesSq);
         const betaDir = blendDirections(normal, driveDirUnit, familyDirectionBlend);
         const structural = computeNhm2StructuralScalars({
           px,
           py,
           pz,
-          centerDist: pLen - radius,
+          centerDist,
           wallSigma,
           axes,
         });
@@ -1763,7 +1842,6 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     totalEnergy_J,
     netFluxSum,
   );
-  const pressureFactor = -1;
   const observerRobust = computeObserverRobustDiagnostics({
     t00,
     sx: Sx,
@@ -1774,6 +1852,35 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
     typeITolerance: observerTypeITolerance,
     canonicalNullDir: driveDirUnit ?? [1, 0, 0],
   });
+  const tensorSampledSummaries = {
+    pressureModel: "isotropic_pressure_proxy" as const,
+    regions: [
+      buildTensorRegionSummary(
+        "global",
+        tensorRegions.global,
+        pressureFactor,
+        "global cycle-averaged diagonal tensor summary",
+      ),
+      buildTensorRegionSummary(
+        "hull",
+        tensorRegions.hull,
+        pressureFactor,
+        "inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy",
+      ),
+      buildTensorRegionSummary(
+        "wall",
+        tensorRegions.wall,
+        pressureFactor,
+        "wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy",
+      ),
+      buildTensorRegionSummary(
+        "exterior_shell",
+        tensorRegions.exterior_shell,
+        pressureFactor,
+        "exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy",
+      ),
+    ].filter((value): value is StressEnergyTensorRegionSummary => value != null),
+  };
 
   const stats: StressEnergyStats = {
     totalEnergy_J,
@@ -1821,6 +1928,7 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
       sourceRedesignMode: familyContext.sourceRedesignMode ?? null,
       sourceReformulationMode: familyContext.sourceReformulationMode ?? null,
     },
+    tensorSampledSummaries,
     observerRobust,
   };
 

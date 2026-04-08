@@ -40,6 +40,7 @@ Stage 3 (Certified / Policy-gated)
 | WARP_CORE | modules/warp/warp-module.ts | Stage 1 | Warp module wrapper + diagnostics. | tests/theory-checks.spec.ts |
 | PIPELINE | server/energy-pipeline.ts | Stage 1 | Energy pipeline core (mixed proxies + calibration). | tests/pipeline-ts-qi-guard.spec.ts |
 | WARP_EVAL | tools/warpViability.ts | Stage 2 | Warp viability evaluation from pipeline + guardrails. | tools/__tests__/warpViability.spec.ts, WARP_AGENTS.md |
+| WARP_AUDIT | shared/contracts/nhm2-full-loop-audit.v1.ts | Stage 2 | Typed NHM2 full-loop audit contract for claim-tier readiness, failure surfaces, and separate NHM2 policy-layer reporting without redefining generic warp certification. | tests/nhm2-full-loop-audit-contract.spec.ts, WARP_AGENTS.md |
 | WARP_POLICY | modules/physics/warpAgents.ts | Stage 1 | Warp guardrail definitions (policy registry). | tests/theory-checks.spec.ts, WARP_AGENTS.md |
 | WARP_CERT | tools/warpViabilityCertificate.ts | Stage 3 | Certificate issuance (policy-gated). | tests/theory-checks.spec.ts |
 | WARP_CERT | tools/verifyCertificate.ts | Stage 3 | Certificate integrity verification. | tests/theory-checks.spec.ts |

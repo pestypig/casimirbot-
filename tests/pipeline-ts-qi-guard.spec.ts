@@ -229,6 +229,105 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect((snapshot as any).qi?.repayment_label).toBe("repayment_heuristic");
   });
 
+  it("emits NHM2 strict-signal readiness into the pipeline and natario payloads", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const state = initializePipelineState();
+    state.warpFieldType = "nhm2_shift_lapse" as any;
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    } as any;
+
+    const snapshot = await calculateEnergyPipeline(state);
+    const artifact = (snapshot as any).nhm2StrictSignalReadiness;
+
+    expect(artifact).toBeTruthy();
+    expect((snapshot as any).natario?.nhm2StrictSignalReadiness).toEqual(artifact);
+    expect(artifact.family.familyId).toBe("nhm2_shift_lapse");
+    expect(artifact.family.lapseSummary?.shiftLapseProfileId).toBeTruthy();
+    expect(artifact.signals.theta.metricDerived).toBe(
+      (snapshot as any).theta_metric_derived === true,
+    );
+    expect(artifact.signals.ts.metricDerived).toBe(
+      (snapshot as any).tsMetricDerived === true,
+    );
+    expect(artifact.signals.qi.metricDerived).toBe(
+      (snapshot as any).qiGuardrail?.metricDerived === true,
+    );
+    expect(artifact.signals.qi.applicabilityStatus).toBe(
+      (snapshot as any).qiGuardrail?.applicabilityStatus ?? null,
+    );
+  });
+
+  it("labels NHM2 hardware-timed strict signals as proxy instead of metric-derived", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const state = initializePipelineState();
+    state.warpFieldType = "nhm2_shift_lapse" as any;
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    } as any;
+    state.hardwareTruth = {
+      ...(state.hardwareTruth ?? {}),
+      sectorState: {
+        sectorsTotal: Number(state.sectorCount ?? 400),
+        sectorsLive: Number(state.concurrentSectors ?? 1),
+        dwell_ms: 1,
+        burst_ms: 0.02,
+        tauLC_ms: 0.003,
+      } as any,
+    };
+
+    const snapshot = await calculateEnergyPipeline(state);
+    const artifact = (snapshot as any).nhm2StrictSignalReadiness;
+
+    expect(artifact.status).toBe("fail");
+    expect(artifact.signals.ts.metricDerived).toBe(false);
+    expect(artifact.signals.ts.provenance).toBe("proxy");
+    expect(artifact.signals.ts.sourcePath).toBe("hardware_timing");
+    expect(artifact.signals.ts.reasonCode).toBe("hardware_timing");
+    expect(artifact.signals.qi.provenance).toBe("proxy");
+  });
+
+  it("emits NHM2 observer audit for both metric-required and tile-effective tensors with explicit limits", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const state = initializePipelineState();
+    state.warpFieldType = "nhm2_shift_lapse" as any;
+    state.dynamicConfig = {
+      ...(state.dynamicConfig ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+    } as any;
+
+    const snapshot = await calculateEnergyPipeline(state);
+    const artifact = (snapshot as any).nhm2ObserverAudit;
+
+    expect(artifact).toBeTruthy();
+    expect((snapshot as any).natario?.nhm2ObserverAudit).toEqual(artifact);
+    expect(artifact.familyId).toBe("nhm2_shift_lapse");
+    expect(artifact.tensors.metricRequired.tensorRef).toContain("warp.metric");
+    expect(artifact.tensors.metricRequired.fluxDiagnostics.status).toBe(
+      "assumed_zero",
+    );
+    expect(artifact.tensors.metricRequired.model.pressureModel).toBe(
+      "diagonal_tensor_components",
+    );
+    expect(artifact.tensors.metricRequired.model.limitationNotes.length).toBeGreaterThan(0);
+    expect(artifact.tensors.tileEffective.tensorRef).toBe(
+      "warp.tileEffectiveStressEnergy",
+    );
+    expect(["available", "unavailable"]).toContain(
+      artifact.tensors.tileEffective.fluxDiagnostics.status,
+    );
+    expect([
+      "isotropic_pressure_proxy",
+      "diagonal_tensor_components",
+    ]).toContain(artifact.tensors.tileEffective.model.pressureModel);
+    expect(typeof artifact.tensors.tileEffective.typeI.fraction).toBe("number");
+  });
+
   it("preserves configured QI tau/sampler for guard evaluation after telemetry refresh", async () => {
     process.env.WARP_STRICT_CONGRUENCE = "1";
     const { initializePipelineState, updateParameters, evaluateQiGuardrail } = await loadPipeline();

@@ -1,4 +1,4 @@
-# NHM2 Warp Worldline Proof (2026-04-05)
+# NHM2 Warp Worldline Proof (2026-04-08)
 
 "This artifact records a bounded solve-backed NHM2 warp worldline contract for local-comoving transport diagnostics. It does not certify route time, mission time, speed, or viability."
 

@@ -8,6 +8,7 @@ import {
 import type {
   ConstraintResult,
   ConstraintSeverity,
+  WarpNhm2FullLoopPolicyLayer,
   ViabilityResult,
   ViabilityStatus,
   WarpConfig,
@@ -18,6 +19,52 @@ import type { PipelineSnapshot } from "../types/pipeline";
 import { findWarpConstraint, loadWarpAgentsConfig, resolveConstraintSeverity } from "../modules/physics/warpAgents";
 import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
 import { WARP_TS_RATIO_MIN } from "../shared/clocking";
+import {
+  buildNhm2FullLoopAuditContract,
+  type Nhm2FullLoopAuditArtifactRef,
+  type Nhm2FullLoopAuditClaimTier,
+  type Nhm2FullLoopAuditReasonCode,
+  type Nhm2FullLoopAuditSectionsInput,
+  type Nhm2FullLoopAuditState,
+} from "../shared/contracts/nhm2-full-loop-audit.v1";
+import {
+  isNhm2ObserverAuditArtifact,
+  type Nhm2ObserverAuditArtifact,
+  type Nhm2ObserverAuditCondition,
+} from "../shared/contracts/nhm2-observer-audit.v1";
+import {
+  NHM2_SOURCE_CLOSURE_ARTIFACT_ID,
+  NHM2_SOURCE_CLOSURE_SCHEMA_VERSION,
+  type Nhm2SourceClosureArtifact,
+} from "../shared/contracts/nhm2-source-closure.v1";
+import {
+  isNhm2StrictSignalReadinessArtifact,
+  type Nhm2StrictSignalReadinessArtifact,
+} from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import {
+  isNhm2ShiftVsLapseDecompositionArtifact,
+  type Nhm2ShiftVsLapseDecompositionArtifact,
+} from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
+import {
+  isNhm2EnvelopePerturbationArtifact,
+  type Nhm2EnvelopePerturbationArtifact,
+} from "../shared/contracts/nhm2-envelope-perturbation-suite.v1";
+import {
+  isCertifiedWarpMissionTimeEstimatorContract,
+  type WarpMissionTimeEstimatorContractV1,
+} from "../shared/contracts/warp-mission-time-estimator.v1";
+import {
+  isCertifiedWarpMissionTimeComparisonContract,
+  type WarpMissionTimeComparisonContractV1,
+} from "../shared/contracts/warp-mission-time-comparison.v1";
+import {
+  isCertifiedWarpCruiseEnvelopeContract,
+  type WarpCruiseEnvelopeContractV1,
+} from "../shared/contracts/warp-cruise-envelope.v1";
+import {
+  isWarpShiftLapseTransportPromotionGate,
+  type WarpShiftLapseTransportPromotionGate,
+} from "../shared/contracts/warp-worldline-contract.v1";
 
 export type { ConstraintResult, ConstraintSeverity, ViabilityResult, ViabilityStatus, WarpConfig };
 
@@ -521,6 +568,827 @@ const resolveProvenanceClass = (value: unknown): ProvenanceClass => {
     return "inferred";
   }
   return "proxy";
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value != null && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
+const uniqueList = <T>(values: readonly T[]): T[] => Array.from(new Set(values));
+
+const asNonEmptyString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const normalizeAuditClaimTier = (value: unknown): Nhm2FullLoopAuditClaimTier =>
+  value === "certified" || value === "reduced-order" || value === "diagnostic"
+    ? value
+    : "diagnostic";
+
+const normalizeAuditState = (value: unknown): Nhm2FullLoopAuditState | null =>
+  value === "pass" || value === "fail" || value === "review" || value === "unavailable"
+    ? value
+    : null;
+
+const isNhm2SourceClosureArtifactLike = (
+  value: unknown,
+): value is Nhm2SourceClosureArtifact => {
+  const record = asRecord(value);
+  return (
+    record?.artifactId === NHM2_SOURCE_CLOSURE_ARTIFACT_ID &&
+    record?.schemaVersion === NHM2_SOURCE_CLOSURE_SCHEMA_VERSION &&
+    normalizeAuditState(record?.status) != null &&
+    (record?.completeness === "complete" || record?.completeness === "incomplete")
+  );
+};
+
+const makeAuditRef = (
+  artifactId: string,
+  path: string,
+  contractVersion: string | null = null,
+  status: string | null = null,
+): Nhm2FullLoopAuditArtifactRef => ({
+  artifactId,
+  path,
+  contractVersion,
+  status,
+});
+
+const mapPromotionReasonToAuditReason = (
+  reason: PromotionDecision["reason"] | null | undefined,
+): Nhm2FullLoopAuditReasonCode | null => {
+  switch (reason) {
+    case "insufficient_provenance":
+      return "insufficient_provenance";
+    case "hard_constraint_failed":
+      return "hard_constraint_failed";
+    case "status_non_admissible":
+      return "status_non_admissible";
+    case "strict_signal_missing":
+      return "strict_signal_missing";
+    case "strict_mode_disabled":
+      return "policy_review_required";
+    default:
+      return null;
+  }
+};
+
+const isNhm2FamilyId = (value: unknown): value is string =>
+  typeof value === "string" && value.toLowerCase().startsWith("nhm2");
+
+const coerceObserverStatus = (
+  condition: Nhm2ObserverAuditCondition | null | undefined,
+): string | null => {
+  const status = asNonEmptyString(condition?.status);
+  return status != null ? status.toUpperCase() : null;
+};
+
+const maxNullableNumber = (values: Array<number | null | undefined>): number | null => {
+  const finiteValues = values.filter((value): value is number => Number.isFinite(value));
+  if (finiteValues.length === 0) return null;
+  return Math.max(...finiteValues);
+};
+
+const inferObserverWorstCaseLocation = (
+  artifact: Nhm2ObserverAuditArtifact["tensors"]["metricRequired"],
+): string | null => {
+  for (const key of ["wec", "nec", "sec", "dec"] as const) {
+    const source = asNonEmptyString(artifact.conditions[key]?.worstCase?.source);
+    if (source != null) return source;
+  }
+  return null;
+};
+
+const buildObserverFamilyAudit = (
+  artifact: Nhm2ObserverAuditArtifact["tensors"]["metricRequired"],
+) => ({
+  state: normalizeAuditState(artifact.status) ?? "review",
+  wecMinOverAllTimelike: finiteOrUndefined(artifact.conditions.wec?.robustMin),
+  necMinOverAllNull: finiteOrUndefined(artifact.conditions.nec?.robustMin),
+  decStatus: coerceObserverStatus(artifact.conditions.dec),
+  secStatus: coerceObserverStatus(artifact.conditions.sec),
+  observerWorstCaseLocation: inferObserverWorstCaseLocation(artifact),
+  typeIFraction: finiteOrUndefined(artifact.typeI?.fraction),
+  missedViolationFraction: maxNullableNumber(
+    (["wec", "nec", "sec", "dec"] as const).map(
+      (key) => artifact.conditions[key]?.missedViolationFraction,
+    ),
+  ),
+  maxRobustMinusEulerian:
+    finiteOrUndefined(artifact.consistency?.maxRobustMinusEulerian) ??
+    maxNullableNumber(
+      (["wec", "nec", "sec", "dec"] as const).map(
+        (key) => artifact.conditions[key]?.maxRobustMinusEulerian,
+      ),
+    ),
+});
+
+const buildNhm2FullLoopPolicyLayer = (args: {
+  snapshot: WarpViabilitySnapshot;
+  pipeline: EnergyPipelineState;
+  status: ViabilityStatus;
+  constraints: ConstraintResult[];
+  strictMode: boolean;
+  warpMetricFamily?: string;
+  warpMechanicsClaimTier: ClaimTier;
+  promotionDecision: PromotionDecision;
+  thetaMetricDerived: boolean;
+  tsMetricDerived: boolean;
+  qiMetricDerived: boolean;
+  qiApplicabilityStatus?: string;
+  nhm2ObserverAudit: unknown;
+  nhm2SourceClosure: unknown;
+  nhm2StrictSignalReadiness: unknown;
+}): WarpNhm2FullLoopPolicyLayer | undefined => {
+  const strictSignal = isNhm2StrictSignalReadinessArtifact(args.nhm2StrictSignalReadiness)
+    ? args.nhm2StrictSignalReadiness
+    : null;
+  const sourceClosure = isNhm2SourceClosureArtifactLike(args.nhm2SourceClosure)
+    ? args.nhm2SourceClosure
+    : null;
+  const observerAudit = isNhm2ObserverAuditArtifact(args.nhm2ObserverAudit)
+    ? args.nhm2ObserverAudit
+    : null;
+
+  const decompositionCandidate =
+    (args.pipeline as any).nhm2ShiftVsLapseDecomposition ??
+    (args.snapshot as any).nhm2ShiftVsLapseDecomposition ??
+    (args.snapshot as any).nhm2_shift_vs_lapse_decomposition;
+  const decomposition = isNhm2ShiftVsLapseDecompositionArtifact(decompositionCandidate)
+    ? decompositionCandidate
+    : null;
+
+  const envelopeCandidate =
+    (args.pipeline as any).nhm2EnvelopePerturbationSuite ??
+    (args.pipeline as any).nhm2EnvelopePerturbation ??
+    (args.snapshot as any).nhm2EnvelopePerturbationSuite ??
+    (args.snapshot as any).nhm2_envelope_perturbation_suite;
+  const envelope = isNhm2EnvelopePerturbationArtifact(envelopeCandidate)
+    ? envelopeCandidate
+    : null;
+
+  const rawMissionTimeEstimator = (args.pipeline as any).warpMissionTimeEstimator;
+  const missionTimeEstimator = isCertifiedWarpMissionTimeEstimatorContract(
+    rawMissionTimeEstimator,
+  )
+    ? (rawMissionTimeEstimator as WarpMissionTimeEstimatorContractV1)
+    : null;
+  const rawMissionTimeComparison = (args.pipeline as any).warpMissionTimeComparison;
+  const missionTimeComparison = isCertifiedWarpMissionTimeComparisonContract(
+    rawMissionTimeComparison,
+  )
+    ? (rawMissionTimeComparison as WarpMissionTimeComparisonContractV1)
+    : null;
+  const rawCruiseEnvelope = (args.pipeline as any).warpCruiseEnvelope;
+  const cruiseEnvelope = isCertifiedWarpCruiseEnvelopeContract(rawCruiseEnvelope)
+    ? (rawCruiseEnvelope as WarpCruiseEnvelopeContractV1)
+    : null;
+
+  const shiftGateCandidate =
+    (args.pipeline as any).shiftLapseTransportPromotionGate ??
+    missionTimeEstimator?.sourceSurface.shiftLapseTransportPromotionGate ??
+    null;
+  const shiftGate = isWarpShiftLapseTransportPromotionGate(shiftGateCandidate)
+    ? (shiftGateCandidate as WarpShiftLapseTransportPromotionGate)
+    : null;
+
+  const familyId =
+    [
+      strictSignal?.family.familyId,
+      args.warpMetricFamily,
+      missionTimeEstimator?.sourceSurface.metricFamily,
+      missionTimeComparison?.sourceSurface.metricFamily,
+      cruiseEnvelope?.sourceSurface.metricFamily,
+      decomposition?.profile.familyId,
+    ].find(isNhm2FamilyId) ?? null;
+  if (familyId == null) return undefined;
+
+  const lapseSummary = strictSignal?.family.lapseSummary ?? null;
+  const selectedProfileId =
+    [
+      lapseSummary?.shiftLapseProfileId,
+      shiftGate?.shiftLapseProfileId,
+      missionTimeEstimator?.sourceSurface.shiftLapseProfileId,
+      decomposition?.profile.shiftLapseProfileId,
+      envelope?.family.shiftLapseProfileId,
+    ].map(asNonEmptyString).find((value): value is string => value != null) ?? null;
+  const selectedProfileStage =
+    [
+      lapseSummary?.shiftLapseProfileStage,
+      shiftGate?.shiftLapseProfileStage,
+      decomposition?.profile.shiftLapseProfileStage,
+      envelope?.family.shiftLapseProfileStage,
+    ].map(asNonEmptyString).find((value): value is string => value != null) ?? null;
+  const familyAuthorityStatus =
+    [
+      strictSignal?.family.familyAuthorityStatus,
+      shiftGate?.familyAuthorityStatus,
+      missionTimeEstimator?.sourceSurface.familyAuthorityStatus,
+    ].map(asNonEmptyString).find((value): value is string => value != null) ?? null;
+  const transportCertificationStatus =
+    [
+      strictSignal?.family.transportCertificationStatus,
+      shiftGate?.transportCertificationStatus,
+      missionTimeEstimator?.sourceSurface.transportCertificationStatus,
+    ].map(asNonEmptyString).find((value): value is string => value != null) ?? null;
+  const metricT00ContractStatus =
+    asNonEmptyString((args.snapshot as any).rho_delta_metric_contract_status) ??
+    missionTimeEstimator?.sourceSurface.metricT00ContractStatus ??
+    null;
+  const chartContractStatus =
+    asNonEmptyString((args.snapshot as any).theta_chart_contract_status) ??
+    missionTimeEstimator?.sourceSurface.chartContractStatus ??
+    null;
+
+  const firstHardFailure =
+    args.constraints.find((entry) => entry.severity === "HARD" && !entry.passed) ?? null;
+  const hardConstraintPass = firstHardFailure == null;
+  const currentClaimTier = normalizeAuditClaimTier(
+    (args.snapshot as any).warp_mechanics_claim_tier ?? args.warpMechanicsClaimTier,
+  );
+  const maximumClaimTier: Nhm2FullLoopAuditClaimTier =
+    currentClaimTier === "certified" ? "certified" : "reduced-order";
+
+  const claimReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  const mappedPromotionReason = mapPromotionReasonToAuditReason(args.promotionDecision.reason);
+  if (mappedPromotionReason != null) claimReasons.push(mappedPromotionReason);
+  if (!hardConstraintPass) claimReasons.push("hard_constraint_failed");
+  if (args.status !== "ADMISSIBLE") claimReasons.push("status_non_admissible");
+  const uniqueClaimReasons = uniqueList(claimReasons);
+  const claimState: Nhm2FullLoopAuditState =
+    uniqueClaimReasons.includes("hard_constraint_failed") ||
+    uniqueClaimReasons.includes("status_non_admissible")
+      ? "fail"
+      : uniqueClaimReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const lapseReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (selectedProfileId == null) lapseReasons.push("lapse_profile_missing");
+  if (metricT00ContractStatus != null && metricT00ContractStatus !== "ok") {
+    lapseReasons.push("metric_contract_missing");
+  }
+  if (chartContractStatus != null && chartContractStatus !== "ok") {
+    lapseReasons.push("metric_contract_missing");
+  }
+  if (familyAuthorityStatus == null || transportCertificationStatus == null) {
+    lapseReasons.push("insufficient_provenance");
+  }
+  const uniqueLapseReasons = uniqueList(lapseReasons);
+  const lapseState: Nhm2FullLoopAuditState =
+    uniqueLapseReasons.includes("metric_contract_missing")
+      ? "fail"
+      : uniqueLapseReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const strictSignalReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  const missingSignals =
+    strictSignal?.missingSignals != null
+      ? [...strictSignal.missingSignals]
+      : ([
+          ...(args.thetaMetricDerived ? [] : ["theta"]),
+          ...(args.tsMetricDerived ? [] : ["ts"]),
+          ...(args.qiMetricDerived ? [] : ["qi"]),
+        ] as Array<"theta" | "ts" | "qi">);
+  if (!args.strictMode) strictSignalReasons.push("policy_review_required");
+  if (strictSignal) {
+    for (const reasonCode of strictSignal.reasonCodes) {
+      switch (reasonCode) {
+        case "strict_signal_missing":
+          strictSignalReasons.push("strict_signal_missing");
+          break;
+        case "insufficient_provenance":
+          strictSignalReasons.push("insufficient_provenance");
+          break;
+        case "qei_applicability_non_pass":
+          strictSignalReasons.push("qei_applicability_non_pass");
+          break;
+      }
+    }
+  } else if (missingSignals.length > 0) {
+    strictSignalReasons.push("strict_signal_missing");
+  }
+  const uniqueStrictSignalReasons = uniqueList(strictSignalReasons);
+  const strictSignalState: Nhm2FullLoopAuditState =
+    !args.strictMode && uniqueStrictSignalReasons.length === 1
+      ? "review"
+      : strictSignal != null
+        ? (normalizeAuditState(strictSignal.status) ?? "review")
+        : missingSignals.length > 0
+          ? "unavailable"
+          : "pass";
+
+  const sourceClosureReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (sourceClosure) {
+    for (const reasonCode of sourceClosure.reasonCodes) {
+      switch (reasonCode) {
+        case "tensor_residual_exceeded":
+          sourceClosureReasons.push("source_closure_residual_exceeded");
+          break;
+        case "metric_tensor_missing":
+        case "tile_tensor_missing":
+        case "metric_tensor_incomplete":
+        case "tile_tensor_incomplete":
+          sourceClosureReasons.push("source_closure_missing");
+          break;
+        case "assumption_drift":
+          sourceClosureReasons.push("policy_review_required");
+          break;
+      }
+    }
+  } else {
+    sourceClosureReasons.push("source_closure_missing");
+  }
+  const uniqueSourceClosureReasons = uniqueList(sourceClosureReasons);
+  const sourceClosureState: Nhm2FullLoopAuditState =
+    sourceClosure != null
+      ? (normalizeAuditState(sourceClosure.status) ?? "review")
+      : "unavailable";
+  const sourceClosureRegions = sourceClosure?.sampledSummaries?.regions ?? [];
+  const findRegionResidual = (regionId: string): number | null =>
+    finiteOrUndefined(
+      sourceClosureRegions.find((entry) => entry.regionId === regionId)?.residualNorms?.relLInf,
+    ) ?? null;
+
+  const observerReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (observerAudit) {
+    for (const reasonCode of observerAudit.reasonCodes) {
+      switch (reasonCode) {
+        case "metric_tensor_missing":
+        case "tile_tensor_missing":
+        case "metric_audit_incomplete":
+        case "tile_audit_incomplete":
+          observerReasons.push("observer_audit_incomplete");
+          break;
+        case "observer_condition_failed":
+          observerReasons.push("observer_blocking_violation");
+          break;
+        case "surrogate_model_limited":
+          observerReasons.push("policy_review_required");
+          break;
+      }
+    }
+  } else {
+    observerReasons.push("observer_audit_incomplete");
+  }
+  const uniqueObserverReasons = uniqueList(observerReasons);
+  const observerState: Nhm2FullLoopAuditState =
+    observerAudit != null
+      ? (normalizeAuditState(observerAudit.status) ?? "review")
+      : "unavailable";
+
+  const HConstraint = asRecord((args.pipeline as any).gr?.constraints?.H_constraint);
+  const MConstraint = asRecord((args.pipeline as any).gr?.constraints?.M_constraint);
+  const H_rms = finiteOrUndefined(HConstraint?.rms) ?? null;
+  const M_rms = finiteOrUndefined(MConstraint?.rms) ?? null;
+  const H_maxAbs = finiteOrUndefined(HConstraint?.maxAbs) ?? null;
+  const M_maxAbs = finiteOrUndefined(MConstraint?.maxAbs) ?? null;
+  const grStabilityReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (shiftGate?.authoritativeLowExpansionStatus === "fail") {
+    grStabilityReasons.push("expansion_leakage_unbounded");
+  }
+  const grDiagnosticsTrip =
+    (H_rms != null && H_rms > GR_GUARDRAIL_THRESHOLDS.H_rms) ||
+    (M_rms != null && M_rms > GR_GUARDRAIL_THRESHOLDS.M_rms) ||
+    (H_maxAbs != null && H_maxAbs > 0.1) ||
+    (M_maxAbs != null && M_maxAbs > 0.01);
+  if (
+    grDiagnosticsTrip ||
+    shiftGate?.status === "fail" ||
+    shiftGate?.wallSafetyStatus === "fail" ||
+    shiftGate?.timingStatus === "fail" ||
+    shiftGate?.authoritativeLowExpansionStatus === "missing" ||
+    (cruiseEnvelope == null && shiftGate == null)
+  ) {
+    grStabilityReasons.push("policy_review_required");
+  }
+  const uniqueGrStabilityReasons = uniqueList(grStabilityReasons);
+  const grStabilityState: Nhm2FullLoopAuditState =
+    uniqueGrStabilityReasons.includes("expansion_leakage_unbounded")
+      ? "fail"
+      : uniqueGrStabilityReasons.length > 0
+        ? "review"
+        : "pass";
+
+  const missionTimeReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (missionTimeEstimator == null || missionTimeComparison == null) {
+    missionTimeReasons.push(
+      rawMissionTimeEstimator != null || rawMissionTimeComparison != null
+        ? "mission_output_not_certified"
+        : "mission_output_missing",
+    );
+  }
+  const uniqueMissionTimeReasons = uniqueList(missionTimeReasons);
+  const missionTimeState: Nhm2FullLoopAuditState =
+    missionTimeEstimator != null && missionTimeComparison != null
+      ? "pass"
+      : rawMissionTimeEstimator != null || rawMissionTimeComparison != null
+        ? "review"
+        : "unavailable";
+
+  const decompositionReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (decomposition) {
+    if (
+      decomposition.reasonCodes.includes("shift_transport_time_missing") ||
+      decomposition.reasonCodes.includes("proper_time_missing") ||
+      decomposition.reasonCodes.includes("classical_reference_time_missing") ||
+      decomposition.reasonCodes.includes("lapse_dial_missing")
+    ) {
+      decompositionReasons.push("shift_lapse_decomposition_missing");
+    }
+    if (decomposition.reasonCodes.includes("residual_exceeds_tolerance")) {
+      decompositionReasons.push("policy_review_required");
+    }
+  } else {
+    decompositionReasons.push("shift_lapse_decomposition_missing");
+  }
+  const uniqueDecompositionReasons = uniqueList(decompositionReasons);
+  const decompositionState: Nhm2FullLoopAuditState =
+    decomposition != null
+      ? (normalizeAuditState(decomposition.status) ?? "review")
+      : "unavailable";
+
+  const boundarySuite = envelope?.suites.find((suite) => suite.axis === "boundary_condition") ?? null;
+  const reproducibilityReady =
+    envelope != null &&
+    envelope.reproducibility.deterministicCaseOrder === true &&
+    asNonEmptyString(envelope.reproducibility.caseGenerationPolicyId) != null &&
+    envelope.reproducibility.sourceArtifactPaths.length > 0;
+  const uncertaintyReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (envelope == null) uncertaintyReasons.push("perturbation_suite_missing");
+  if (!reproducibilityReady) uncertaintyReasons.push("reproducibility_missing");
+  if (envelope != null && envelope.status !== "pass") {
+    uncertaintyReasons.push("policy_review_required");
+  }
+  const uniqueUncertaintyReasons = uniqueList(uncertaintyReasons);
+  const uncertaintyState: Nhm2FullLoopAuditState =
+    uniqueUncertaintyReasons.includes("perturbation_suite_missing") ||
+    uniqueUncertaintyReasons.includes("reproducibility_missing")
+      ? "unavailable"
+      : envelope?.status === "fail"
+        ? "fail"
+        : envelope?.status === "review"
+          ? "review"
+          : "pass";
+
+  const certificateReasons: Nhm2FullLoopAuditReasonCode[] = ["certificate_missing"];
+  if (!hardConstraintPass) certificateReasons.push("hard_constraint_failed");
+  if (args.status !== "ADMISSIBLE") certificateReasons.push("status_non_admissible");
+  const uniqueCertificateReasons = uniqueList(certificateReasons);
+
+  const sections: Nhm2FullLoopAuditSectionsInput = {
+    family_semantics: {
+      sectionId: "family_semantics",
+      state: "pass",
+      reasons: [],
+      artifactRefs: [
+        makeAuditRef("nhm2_closed_loop_doc", "docs/nhm2-closed-loop.md"),
+        makeAuditRef("nhm2_audit_checklist_doc", "docs/nhm2-audit-checklist.md"),
+      ],
+      familyId,
+      baseFamily: "natario_zero_expansion",
+      lapseExtension: familyId.includes("shift_lapse"),
+      selectedProfileId,
+      semanticBoundaries: [
+        "Natario-style zero-expansion base family",
+        "NHM2 lapse extension preserves shift-family semantics without redefining generic warp certification",
+      ],
+      nonClaims: [
+        "generic warp viability remains separate from NHM2 full-loop audit policy",
+        "NHM2 full-loop audit does not certify transport outside emitted contract surfaces",
+      ],
+    },
+    claim_tier: {
+      sectionId: "claim_tier",
+      state: claimState,
+      reasons: uniqueClaimReasons,
+      artifactRefs: [
+        makeAuditRef("warp_viability", "tools/warpViability.ts"),
+        makeAuditRef("math_status", "MATH_STATUS.md"),
+      ],
+      currentTier: currentClaimTier,
+      maximumClaimTier,
+      viabilityStatus: args.status,
+      promotionReason: mappedPromotionReason,
+      surfaceStages: [
+        { module: "modules/warp/natario-warp.ts", stage: "reduced-order" },
+        { module: "server/stress-energy-brick.ts", stage: "reduced-order" },
+        { module: "server/gr-evolve-brick.ts", stage: "diagnostic" },
+        { module: "tools/warpViability.ts", stage: "diagnostic" },
+        { module: "tools/warpViabilityCertificate.ts", stage: "certified" },
+      ],
+    },
+    lapse_provenance: {
+      sectionId: "lapse_provenance",
+      state: lapseState,
+      reasons: uniqueLapseReasons,
+      artifactRefs: [
+        makeAuditRef("warp_metric_adapter", "modules/warp/warp-metric-adapter.ts"),
+      ],
+      metricFamily: familyId,
+      shiftLapseProfileId: selectedProfileId,
+      shiftLapseProfileStage: selectedProfileStage,
+      familyAuthorityStatus,
+      transportCertificationStatus,
+      metricT00ContractStatus,
+      chartContractStatus,
+    },
+    strict_signal_readiness: {
+      sectionId: "strict_signal_readiness",
+      state: strictSignalState,
+      reasons: uniqueStrictSignalReasons,
+      artifactRefs: strictSignal
+        ? [
+            makeAuditRef(
+              strictSignal.artifactId,
+              "runtime://pipeline/nhm2StrictSignalReadiness",
+              strictSignal.schemaVersion,
+              strictSignal.status,
+            ),
+          ]
+        : [makeAuditRef("warp_viability", "tools/warpViability.ts")],
+      strictModeEnabled: args.strictMode,
+      thetaMetricDerived:
+        strictSignal?.promotionInputs.thetaMetricDerived ?? args.thetaMetricDerived,
+      tsMetricDerived: strictSignal?.promotionInputs.tsMetricDerived ?? args.tsMetricDerived,
+      qiMetricDerived: strictSignal?.promotionInputs.qiMetricDerived ?? args.qiMetricDerived,
+      qiApplicabilityStatus:
+        strictSignal?.promotionInputs.qiApplicabilityStatus ??
+        asNonEmptyString(args.qiApplicabilityStatus),
+      missingSignals,
+    },
+    source_closure: {
+      sectionId: "source_closure",
+      state: sourceClosureState,
+      reasons: uniqueSourceClosureReasons,
+      artifactRefs: sourceClosure
+        ? [
+            makeAuditRef(
+              sourceClosure.artifactId,
+              "runtime://pipeline/nhm2SourceClosure",
+              sourceClosure.schemaVersion,
+              sourceClosure.status,
+            ),
+          ]
+        : [makeAuditRef("energy_pipeline", "server/energy-pipeline.ts")],
+      metricTensorRef: sourceClosure?.tensorRefs.metricRequired ?? null,
+      tileEffectiveTensorRef: sourceClosure?.tensorRefs.tileEffective ?? null,
+      residualRms: finiteOrUndefined(sourceClosure?.residualNorms.relL2) ?? null,
+      residualMax: finiteOrUndefined(sourceClosure?.residualNorms.relLInf) ?? null,
+      residualByRegion: {
+        hull: findRegionResidual("hull"),
+        wall: findRegionResidual("wall"),
+        exteriorShell: findRegionResidual("exteriorShell"),
+      },
+      toleranceRef:
+        sourceClosure?.residualNorms.toleranceRelLInf != null
+          ? `nhm2_source_closure_rel_linf<=${sourceClosure.residualNorms.toleranceRelLInf}`
+          : null,
+      assumptionsDrifted:
+        typeof sourceClosure?.assumptionsDrifted === "boolean"
+          ? sourceClosure.assumptionsDrifted
+          : null,
+    },
+    observer_audit: {
+      sectionId: "observer_audit",
+      state: observerState,
+      reasons: uniqueObserverReasons,
+      artifactRefs: observerAudit
+        ? [
+            makeAuditRef(
+              observerAudit.artifactId,
+              "runtime://pipeline/nhm2ObserverAudit",
+              observerAudit.schemaVersion,
+              observerAudit.status,
+            ),
+          ]
+        : [makeAuditRef("stress_energy_brick", "server/stress-energy-brick.ts")],
+      metric: observerAudit
+        ? buildObserverFamilyAudit(observerAudit.tensors.metricRequired)
+        : {
+            state: "unavailable",
+            wecMinOverAllTimelike: null,
+            necMinOverAllNull: null,
+            decStatus: null,
+            secStatus: null,
+            observerWorstCaseLocation: null,
+            typeIFraction: null,
+            missedViolationFraction: null,
+            maxRobustMinusEulerian: null,
+          },
+      tile: observerAudit
+        ? buildObserverFamilyAudit(observerAudit.tensors.tileEffective)
+        : {
+            state: "unavailable",
+            wecMinOverAllTimelike: null,
+            necMinOverAllNull: null,
+            decStatus: null,
+            secStatus: null,
+            observerWorstCaseLocation: null,
+            typeIFraction: null,
+            missedViolationFraction: null,
+            maxRobustMinusEulerian: null,
+          },
+    },
+    gr_stability_safety: {
+      sectionId: "gr_stability_safety",
+      state: grStabilityState,
+      reasons: uniqueGrStabilityReasons,
+      artifactRefs: [
+        makeAuditRef("gr_evolve_brick", "server/gr-evolve-brick.ts"),
+        ...(shiftGate
+          ? [
+              makeAuditRef(
+                shiftGate.gateId,
+                "runtime://pipeline/shiftLapseTransportPromotionGate",
+                shiftGate.gateId,
+                shiftGate.status,
+              ),
+            ]
+          : []),
+      ],
+      solverHealth:
+        envelope?.status ??
+        (grDiagnosticsTrip ? "constraint_threshold_exceeded" : shiftGate?.status ?? null),
+      perturbationFamilies: envelope
+        ? envelope.suiteOrder.map((suiteId) => String(suiteId))
+        : shiftGate
+          ? ["nhm2_shift_lapse_transport_promotion_gate"]
+          : [],
+      H_rms,
+      M_rms,
+      H_maxAbs,
+      M_maxAbs,
+      centerlineProperAcceleration_mps2:
+        finiteOrUndefined(
+          (args.pipeline as any).warpInHullProperAcceleration?.summary?.centerlineProperAcceleration_mps2 ??
+            (args.pipeline as any).warpInHullProperAcceleration?.centerlineProperAcceleration_mps2,
+        ) ?? null,
+      wallNormalSafetyMargin:
+        finiteOrUndefined(shiftGate?.wallHorizonMargin) ??
+        finiteOrUndefined(
+          (args.snapshot as any).grGuardrails?.combinedShiftLapseSafety?.wallHorizonMargin,
+        ) ??
+        null,
+      blueshiftMax:
+        finiteOrUndefined(shiftGate?.betaOverAlphaMax) ??
+        finiteOrUndefined(
+          (args.snapshot as any).grGuardrails?.combinedShiftLapseSafety?.betaOverAlphaMax,
+        ) ??
+        null,
+      stabilityWorstCase:
+        shiftGate?.authoritativeLowExpansionStatus === "fail"
+          ? "authoritative_low_expansion"
+          : grDiagnosticsTrip
+            ? "gr_constraint_gate"
+            : shiftGate?.status === "fail"
+              ? "transport_promotion_gate"
+              : null,
+      safetyWorstCaseLocation:
+        shiftGate?.wallSafetyStatus === "fail"
+          ? "wall"
+          : shiftGate?.authoritativeLowExpansionStatus === "fail"
+            ? "shell"
+            : null,
+    },
+    mission_time_outputs: {
+      sectionId: "mission_time_outputs",
+      state: missionTimeState,
+      reasons: uniqueMissionTimeReasons,
+      artifactRefs: [
+        ...(missionTimeEstimator
+          ? [
+              makeAuditRef(
+                "warp_mission_time_estimator",
+                "runtime://pipeline/warpMissionTimeEstimator",
+                missionTimeEstimator.contractVersion,
+                missionTimeEstimator.status,
+              ),
+            ]
+          : []),
+        ...(missionTimeComparison
+          ? [
+              makeAuditRef(
+                "warp_mission_time_comparison",
+                "runtime://pipeline/warpMissionTimeComparison",
+                missionTimeComparison.contractVersion,
+                missionTimeComparison.status,
+              ),
+            ]
+          : []),
+      ],
+      worldlineStatus: missionTimeEstimator?.sourceWorldlineStatus ?? null,
+      routeTimeStatus: missionTimeEstimator?.routeTimeStatus ?? null,
+      missionTimeEstimatorStatus: missionTimeEstimator?.status ?? null,
+      missionTimeComparisonStatus: missionTimeComparison?.status ?? null,
+      targetId: missionTimeEstimator?.targetId ?? missionTimeComparison?.targetId ?? null,
+      coordinateTimeEstimateSeconds:
+        finiteOrUndefined(
+          missionTimeEstimator?.coordinateTimeEstimate.seconds ??
+            missionTimeComparison?.warpCoordinateTimeEstimate.seconds,
+        ) ?? null,
+      properTimeEstimateSeconds:
+        finiteOrUndefined(
+          missionTimeEstimator?.properTimeEstimate.seconds ??
+            missionTimeComparison?.warpProperTimeEstimate.seconds,
+        ) ?? null,
+      properMinusCoordinateSeconds:
+        finiteOrUndefined(
+          missionTimeComparison?.comparisonMetrics.properMinusCoordinate_seconds,
+        ) ?? null,
+      comparatorId: missionTimeComparison?.comparisonModelId ?? null,
+    },
+    shift_vs_lapse_decomposition: {
+      sectionId: "shift_vs_lapse_decomposition",
+      state: decompositionState,
+      reasons: uniqueDecompositionReasons,
+      artifactRefs: decomposition
+        ? [
+            makeAuditRef(
+              decomposition.artifactId,
+              "runtime://pipeline/nhm2ShiftVsLapseDecomposition",
+              decomposition.schemaVersion,
+              decomposition.status,
+            ),
+          ]
+        : [makeAuditRef("nhm2_shift_vs_lapse_publisher", "scripts/warp-york-control-family-proof-pack.ts")],
+      shiftDrivenContribution:
+        finiteOrUndefined(
+          decomposition?.decomposition.fixedShiftFamilyTransportContributionSeconds,
+        ) ?? null,
+      lapseDrivenContribution:
+        finiteOrUndefined(
+          decomposition?.decomposition.lapseProfileClockRateContributionSeconds,
+        ) ?? null,
+      expansionLeakageBound:
+        finiteOrUndefined(
+          Math.abs(
+            decomposition?.decomposition.residualUnexplainedContributionSeconds ?? Number.NaN,
+          ),
+        ) ?? null,
+      thetaFlatnessStatus: shiftGate?.thetaKConsistencyStatus ?? null,
+      divBetaFlatnessStatus: shiftGate?.authoritativeLowExpansionStatus ?? null,
+      natarioBaselineComparisonRef:
+        decomposition?.sourceArtifacts.missionTimeComparison ??
+        decomposition?.sourceArtifacts.worldline ??
+        null,
+    },
+    uncertainty_perturbation_reproducibility: {
+      sectionId: "uncertainty_perturbation_reproducibility",
+      state: uncertaintyState,
+      reasons: uniqueUncertaintyReasons,
+      artifactRefs: envelope
+        ? [
+            makeAuditRef(
+              envelope.artifactId,
+              "runtime://pipeline/nhm2EnvelopePerturbationSuite",
+              envelope.schemaVersion,
+              envelope.status,
+            ),
+          ]
+        : [makeAuditRef("nhm2_envelope_publisher", "scripts/warp-york-control-family-proof-pack.ts")],
+      precisionAgreementStatus: envelope?.status ?? null,
+      meshConvergenceOrder: null,
+      boundaryConditionSensitivity:
+        finiteOrUndefined(boundarySuite?.worstWallSafetyMargin) ?? null,
+      smoothingKernelSensitivity: null,
+      coldStartReproductionStatus:
+        reproducibilityReady ? "deterministic_case_order" : null,
+      independentReproductionStatus:
+        reproducibilityReady ? "source_artifact_paths_listed" : null,
+      artifactHashConsistencyStatus:
+        reproducibilityReady ? "source_artifact_paths_listed" : null,
+    },
+    certificate_policy_result: {
+      sectionId: "certificate_policy_result",
+      state: "unavailable",
+      reasons: uniqueCertificateReasons,
+      artifactRefs: [makeAuditRef("warp_certificate", "tools/warpViabilityCertificate.ts")],
+      viabilityStatus: args.status,
+      hardConstraintPass,
+      firstHardFailureId: firstHardFailure?.id ?? null,
+      certificateStatus: null,
+      certificateHash: null,
+      certificateIntegrity: "unavailable",
+      promotionTier: currentClaimTier,
+      promotionReason: mappedPromotionReason,
+    },
+  };
+
+  const artifact = buildNhm2FullLoopAuditContract({
+    generatedAt: new Date().toISOString(),
+    sections,
+  });
+  if (artifact == null) return undefined;
+
+  return {
+    policyId: "nhm2_full_loop_audit",
+    state: artifact.overallState,
+    currentClaimTier: artifact.currentClaimTier,
+    maximumClaimTier: artifact.maximumClaimTier,
+    highestPassingClaimTier: artifact.highestPassingClaimTier,
+    blockingReasons: [...artifact.blockingReasons],
+    artifact,
+  };
 };
 
 const constraint = (
@@ -1036,9 +1904,16 @@ export async function evaluateWarpViability(
       ? "metric_source_missing"
       : cl3MissingParts.includes("missing_metric_contract")
         ? "metric_contract_missing"
-      : cl3MissingParts.includes("missing_rho_constraint")
+        : cl3MissingParts.includes("missing_rho_constraint")
         ? "constraint_rho_missing"
         : undefined;
+  const nhm2ObserverAudit =
+    (pipeline as any)?.nhm2ObserverAudit ??
+    (pipeline as any)?.natario?.nhm2ObserverAudit;
+  const nhm2SourceClosure = (pipeline as any)?.nhm2SourceClosure;
+  const nhm2StrictSignalReadiness =
+    (pipeline as any)?.nhm2StrictSignalReadiness ??
+    (pipeline as any)?.natario?.nhm2StrictSignalReadiness;
 
   const warpMechanicsProvenanceClass: ProvenanceClass =
     thetaProvenanceClass === "measured" &&
@@ -1381,6 +2256,175 @@ export async function evaluateWarpViability(
       warpMetricT00Geom != null ? warpMetricContractReason : undefined,
     rho_delta_metric_contract_ok:
       warpMetricT00Geom != null ? warpMetricContractOk : undefined,
+    nhm2_observer_audit: nhm2ObserverAudit,
+    nhm2_observer_audit_status:
+      typeof nhm2ObserverAudit?.status === "string"
+        ? String(nhm2ObserverAudit.status)
+        : undefined,
+    nhm2_observer_audit_completeness:
+      typeof nhm2ObserverAudit?.completeness === "string"
+        ? String(nhm2ObserverAudit.completeness)
+        : undefined,
+    nhm2_observer_audit_reason_codes:
+      Array.isArray(nhm2ObserverAudit?.reasonCodes)
+        ? (nhm2ObserverAudit.reasonCodes as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
+    nhm2_metric_observer_status:
+      typeof nhm2ObserverAudit?.tensors?.metricRequired?.status === "string"
+        ? String(nhm2ObserverAudit.tensors.metricRequired.status)
+        : undefined,
+    nhm2_metric_observer_wec_min:
+      finiteOrUndefined(
+        nhm2ObserverAudit?.tensors?.metricRequired?.conditions?.wec?.robustMin,
+      ),
+    nhm2_metric_observer_nec_min:
+      finiteOrUndefined(
+        nhm2ObserverAudit?.tensors?.metricRequired?.conditions?.nec?.robustMin,
+      ),
+    nhm2_metric_observer_flux_status:
+      typeof nhm2ObserverAudit?.tensors?.metricRequired?.fluxDiagnostics?.status ===
+      "string"
+        ? String(nhm2ObserverAudit.tensors.metricRequired.fluxDiagnostics.status)
+        : undefined,
+    nhm2_metric_observer_pressure_model:
+      typeof nhm2ObserverAudit?.tensors?.metricRequired?.model?.pressureModel ===
+      "string"
+        ? String(nhm2ObserverAudit.tensors.metricRequired.model.pressureModel)
+        : undefined,
+    nhm2_tile_observer_status:
+      typeof nhm2ObserverAudit?.tensors?.tileEffective?.status === "string"
+        ? String(nhm2ObserverAudit.tensors.tileEffective.status)
+        : undefined,
+    nhm2_tile_observer_wec_min:
+      finiteOrUndefined(
+        nhm2ObserverAudit?.tensors?.tileEffective?.conditions?.wec?.robustMin,
+      ),
+    nhm2_tile_observer_nec_min:
+      finiteOrUndefined(
+        nhm2ObserverAudit?.tensors?.tileEffective?.conditions?.nec?.robustMin,
+      ),
+    nhm2_tile_observer_type_i_fraction:
+      finiteOrUndefined(
+        nhm2ObserverAudit?.tensors?.tileEffective?.typeI?.fraction,
+      ),
+    nhm2_tile_observer_flux_status:
+      typeof nhm2ObserverAudit?.tensors?.tileEffective?.fluxDiagnostics?.status ===
+      "string"
+        ? String(nhm2ObserverAudit.tensors.tileEffective.fluxDiagnostics.status)
+        : undefined,
+    nhm2_tile_observer_pressure_model:
+      typeof nhm2ObserverAudit?.tensors?.tileEffective?.model?.pressureModel ===
+      "string"
+        ? String(nhm2ObserverAudit.tensors.tileEffective.model.pressureModel)
+        : undefined,
+    nhm2_strict_signal_readiness: nhm2StrictSignalReadiness,
+    nhm2_strict_signal_status:
+      typeof nhm2StrictSignalReadiness?.status === "string"
+        ? String(nhm2StrictSignalReadiness.status)
+        : undefined,
+    nhm2_strict_signal_completeness:
+      typeof nhm2StrictSignalReadiness?.completeness === "string"
+        ? String(nhm2StrictSignalReadiness.completeness)
+        : undefined,
+    nhm2_strict_signal_reason_codes:
+      Array.isArray(nhm2StrictSignalReadiness?.reasonCodes)
+        ? (nhm2StrictSignalReadiness.reasonCodes as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
+    nhm2_strict_signal_ready:
+      nhm2StrictSignalReadiness?.readiness?.promotionSignalReady === true,
+    nhm2_strict_signal_certified_ready:
+      nhm2StrictSignalReadiness?.readiness?.certifiedPromotionReady === true,
+    nhm2_theta_signal_status:
+      typeof nhm2StrictSignalReadiness?.signals?.theta?.status === "string"
+        ? String(nhm2StrictSignalReadiness.signals.theta.status)
+        : undefined,
+    nhm2_theta_metric_derived:
+      typeof nhm2StrictSignalReadiness?.signals?.theta?.metricDerived === "boolean"
+        ? Boolean(nhm2StrictSignalReadiness.signals.theta.metricDerived)
+        : undefined,
+    nhm2_theta_signal_provenance:
+      typeof nhm2StrictSignalReadiness?.signals?.theta?.provenance === "string"
+        ? String(nhm2StrictSignalReadiness.signals.theta.provenance)
+        : undefined,
+    nhm2_theta_signal_source:
+      typeof nhm2StrictSignalReadiness?.signals?.theta?.sourcePath === "string"
+        ? String(nhm2StrictSignalReadiness.signals.theta.sourcePath)
+        : undefined,
+    nhm2_theta_signal_reason_code:
+      typeof nhm2StrictSignalReadiness?.signals?.theta?.reasonCode === "string"
+        ? String(nhm2StrictSignalReadiness.signals.theta.reasonCode)
+        : undefined,
+    nhm2_ts_signal_status:
+      typeof nhm2StrictSignalReadiness?.signals?.ts?.status === "string"
+        ? String(nhm2StrictSignalReadiness.signals.ts.status)
+        : undefined,
+    nhm2_ts_metric_derived:
+      typeof nhm2StrictSignalReadiness?.signals?.ts?.metricDerived === "boolean"
+        ? Boolean(nhm2StrictSignalReadiness.signals.ts.metricDerived)
+        : undefined,
+    nhm2_ts_signal_provenance:
+      typeof nhm2StrictSignalReadiness?.signals?.ts?.provenance === "string"
+        ? String(nhm2StrictSignalReadiness.signals.ts.provenance)
+        : undefined,
+    nhm2_ts_signal_source:
+      typeof nhm2StrictSignalReadiness?.signals?.ts?.sourcePath === "string"
+        ? String(nhm2StrictSignalReadiness.signals.ts.sourcePath)
+        : undefined,
+    nhm2_ts_signal_reason_code:
+      typeof nhm2StrictSignalReadiness?.signals?.ts?.reasonCode === "string"
+        ? String(nhm2StrictSignalReadiness.signals.ts.reasonCode)
+        : undefined,
+    nhm2_qi_signal_status:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.status === "string"
+        ? String(nhm2StrictSignalReadiness.signals.qi.status)
+        : undefined,
+    nhm2_qi_metric_derived:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.metricDerived === "boolean"
+        ? Boolean(nhm2StrictSignalReadiness.signals.qi.metricDerived)
+        : undefined,
+    nhm2_qi_signal_provenance:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.provenance === "string"
+        ? String(nhm2StrictSignalReadiness.signals.qi.provenance)
+        : undefined,
+    nhm2_qi_signal_source:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.sourcePath === "string"
+        ? String(nhm2StrictSignalReadiness.signals.qi.sourcePath)
+        : undefined,
+    nhm2_qi_signal_reason_code:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.reasonCode === "string"
+        ? String(nhm2StrictSignalReadiness.signals.qi.reasonCode)
+        : undefined,
+    nhm2_qi_applicability_status:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.applicabilityStatus === "string"
+        ? String(nhm2StrictSignalReadiness.signals.qi.applicabilityStatus)
+        : undefined,
+    nhm2_qi_applicability_reason_code:
+      typeof nhm2StrictSignalReadiness?.signals?.qi?.applicabilityReasonCode === "string"
+        ? String(nhm2StrictSignalReadiness.signals.qi.applicabilityReasonCode)
+        : undefined,
+    nhm2_source_closure: nhm2SourceClosure,
+    nhm2_source_closure_status:
+      typeof nhm2SourceClosure?.status === "string" ? String(nhm2SourceClosure.status) : undefined,
+    nhm2_source_closure_completeness:
+      typeof nhm2SourceClosure?.completeness === "string"
+        ? String(nhm2SourceClosure.completeness)
+        : undefined,
+    nhm2_source_closure_reason_codes:
+      Array.isArray(nhm2SourceClosure?.reasonCodes)
+        ? (nhm2SourceClosure.reasonCodes as unknown[])
+            .filter((item) => typeof item === "string" && item.length > 0)
+            .join("|")
+        : undefined,
+    nhm2_source_closure_rel_linf:
+      finiteOrUndefined(nhm2SourceClosure?.residualNorms?.relLInf),
+    nhm2_source_closure_t00_rel:
+      finiteOrUndefined(nhm2SourceClosure?.scalarProjections?.metricVsTileT00Rel),
+    nhm2_source_closure_cl3_secondary:
+      nhm2SourceClosure?.distinction?.scalarCongruenceSecondary === true,
     theta_chart_contract_status: thetaChartContractStatus,
     theta_chart_contract_ok: thetaContractPass,
     telemetrySource: liveSnapshot ? opts.telemetrySource ?? "pipeline-live" : opts.telemetrySource ?? "solver",
@@ -1820,11 +2864,52 @@ export async function evaluateWarpViability(
   snapshot.warp_mechanics_promotion_counterexample_class =
     promotionReplayPack.outcome.counterexample_class;
   snapshot.warp_mechanics_promotion_replay = promotionReplayPack;
+  const nhm2FullLoopPolicyLayer = buildNhm2FullLoopPolicyLayer({
+    snapshot,
+    pipeline,
+    status,
+    constraints: results,
+    strictMode: strictCongruence,
+    warpMetricFamily,
+    warpMechanicsClaimTier: promotionDecisionFinal.tier,
+    promotionDecision: promotionDecisionFinal,
+    thetaMetricDerived,
+    tsMetricDerived,
+    qiMetricDerived,
+    qiApplicabilityStatus: qiGuard?.applicabilityStatus,
+    nhm2ObserverAudit,
+    nhm2SourceClosure,
+    nhm2StrictSignalReadiness,
+  });
+  if (nhm2FullLoopPolicyLayer) {
+    snapshot.nhm2_full_loop_policy_id = nhm2FullLoopPolicyLayer.policyId;
+    snapshot.nhm2_full_loop_audit_status = nhm2FullLoopPolicyLayer.state;
+    snapshot.nhm2_full_loop_current_claim_tier =
+      nhm2FullLoopPolicyLayer.currentClaimTier;
+    snapshot.nhm2_full_loop_maximum_claim_tier =
+      nhm2FullLoopPolicyLayer.maximumClaimTier;
+    snapshot.nhm2_full_loop_highest_passing_claim_tier =
+      nhm2FullLoopPolicyLayer.highestPassingClaimTier ?? undefined;
+    snapshot.nhm2_full_loop_blocking_reasons =
+      nhm2FullLoopPolicyLayer.blockingReasons.length > 0
+        ? nhm2FullLoopPolicyLayer.blockingReasons.join("|")
+        : undefined;
+    snapshot.nhm2_full_loop_certificate_section_status =
+      nhm2FullLoopPolicyLayer.artifact.sections.certificate_policy_result.state;
+    snapshot.nhm2_full_loop_decomposition_status =
+      nhm2FullLoopPolicyLayer.artifact.sections.shift_vs_lapse_decomposition.state;
+    snapshot.nhm2_full_loop_uncertainty_status =
+      nhm2FullLoopPolicyLayer.artifact.sections
+        .uncertainty_perturbation_reproducibility.state;
+  }
 
   return {
     status,
     constraints: results,
     snapshot,
+    policyLayers: nhm2FullLoopPolicyLayer
+      ? { nhm2_full_loop_audit: nhm2FullLoopPolicyLayer }
+      : undefined,
     mitigation: tsAutoscaleResampled ? ["TS_autoscale_resampled"] : undefined,
     citations: [
       "docs/alcubierre-alignment.md",

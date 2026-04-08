@@ -1,4 +1,4 @@
-# NHM2 Cruise Envelope (2026-04-05)
+# NHM2 Cruise Envelope (2026-04-08)
 
 "This artifact records a certified bounded NHM2 cruise envelope over a fixed-chart descriptor band. It strengthens preflight by route-time and mission consistency while remaining explicitly non-speed, non-ETA, and non-viability."
 

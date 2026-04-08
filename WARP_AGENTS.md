@@ -5,6 +5,11 @@ This file defines the physics prerequisites and guardrails for warp-related task
 The system **MUST NOT** declare any configuration "physically viable" unless all HARD
 constraints pass and the viability oracle has produced an `ADMISSIBLE` status.
 
+NHM2-specific full-loop policy is a separate audit overlay. Passing or failing the
+`nhm2_full_loop_audit` layer does not, by itself, redefine the generic warp
+viability or certificate semantics in this file unless a future policy change
+explicitly tightens them.
+
 ```json warp-agents
 {
   "version": 1,

@@ -60,6 +60,18 @@ describe("stress-energy brick builder", () => {
     expect(brick.stats.mapping?.proxy).toBe(true);
   });
 
+  it("emits sampled tensor summaries for NHM2 source-closure review", () => {
+    const brick = buildStressEnergyBrick(baseParams);
+    const summaries = brick.stats.tensorSampledSummaries;
+    expect(summaries?.pressureModel).toBe("isotropic_pressure_proxy");
+    const regionIds = summaries?.regions.map((region) => region.regionId) ?? [];
+    expect(regionIds).toContain("global");
+    expect(regionIds.length).toBeGreaterThan(1);
+    const global = summaries?.regions.find((region) => region.regionId === "global");
+    expect(global?.tensor.T00).toBeCloseTo(brick.stats.avgT00, 5);
+    expect(global?.tensor.T11).toBeCloseTo(-brick.stats.avgT00, 5);
+  });
+
   it("computes observer-robust energy-condition margins", () => {
     const brick = buildStressEnergyBrick(baseParams);
     const robust = brick.stats.observerRobust;

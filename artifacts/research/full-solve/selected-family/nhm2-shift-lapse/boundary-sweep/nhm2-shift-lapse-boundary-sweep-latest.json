@@ -1,7 +1,7 @@
 {
   "artifactType": "nhm2_shift_lapse_boundary_sweep/v1",
-  "generatedOn": "2026-04-06",
-  "generatedAt": "2026-04-06T21:40:41.067Z",
+  "generatedOn": "2026-04-08",
+  "generatedAt": "2026-04-08T04:25:41.159Z",
   "boundaryStatement": "This artifact records a small stronger-side boundary sweep beyond the locally robust nhm2_shift_lapse selected-family bracket. It does not replace canonical baseline latest aliases and does not widen speed, ETA, viability, gravity, or horizon claims.",
   "publicationCommand": "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep",
   "canonicalBaselineMetricT00Ref": "warp.metric.T00.natario_sdf.shift",
@@ -4542,5 +4542,5 @@
     "does not convert wall-safety guardrails into a theorem-level horizon claim",
     "does not widen source/mechanism authority"
   ],
-  "checksum": "285495d5a01afd128c74c636375d40183165cb80a5b66ee0d92f791cdb6315db"
+  "checksum": "a6a63bb5228fb978a5121248fdf009cb3d93315ea1ab0e1093820faf3913917d"
 }

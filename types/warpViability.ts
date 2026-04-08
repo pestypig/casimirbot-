@@ -1,4 +1,10 @@
 import type { PhysicsCertificate } from "./physicsCertificate";
+import type {
+  Nhm2FullLoopAuditClaimTier,
+  Nhm2FullLoopAuditContractV1,
+  Nhm2FullLoopAuditReasonCode,
+  Nhm2FullLoopAuditState,
+} from "../shared/contracts/nhm2-full-loop-audit.v1";
 
 export type ViabilityStatus = "ADMISSIBLE" | "MARGINAL" | "INADMISSIBLE" | "NOT_CERTIFIED";
 export type ConstraintSeverity = "HARD" | "SOFT";
@@ -101,14 +107,30 @@ export interface WarpViabilityPayload {
   config: WarpConfig;
   constraints: ViabilityConstraint[];
   snapshot: WarpSnapshot;
+  policyLayers?: WarpViabilityPolicyLayers;
   citations?: string[];
   mitigation?: string[];
+}
+
+export interface WarpNhm2FullLoopPolicyLayer {
+  policyId: "nhm2_full_loop_audit";
+  state: Nhm2FullLoopAuditState;
+  currentClaimTier: Nhm2FullLoopAuditClaimTier;
+  maximumClaimTier: Nhm2FullLoopAuditClaimTier;
+  highestPassingClaimTier: Nhm2FullLoopAuditClaimTier | null;
+  blockingReasons: Nhm2FullLoopAuditReasonCode[];
+  artifact: Nhm2FullLoopAuditContractV1;
+}
+
+export interface WarpViabilityPolicyLayers {
+  nhm2_full_loop_audit?: WarpNhm2FullLoopPolicyLayer;
 }
 
 export interface ViabilityResult {
   status: ViabilityStatus;
   constraints: ViabilityConstraint[];
   snapshot: WarpSnapshot;
+  policyLayers?: WarpViabilityPolicyLayers;
   citations?: string[];
   config?: WarpConfig;
   certificate?: WarpViabilityCertificate | null;

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-04-08T00:30:43.540Z",
-  "registryCount": 78,
+  "generatedAt": "2026-04-08T06:00:07.564Z",
+  "registryCount": 79,
   "coverage": {
     "exploratory": {
       "count": 18,
@@ -60,7 +60,7 @@
       ]
     },
     "diagnostic": {
-      "count": 24,
+      "count": 25,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -75,6 +75,7 @@
         "server/gr/evolution/initial-data.ts",
         "server/gr/gr-constraint-network.ts",
         "tools/warpViability.ts",
+        "shared/contracts/nhm2-full-loop-audit.v1.ts",
         "server/services/observability/training-trace-store.ts",
         "server/routes/training-trace.ts",
         "server/services/observability/gr-agent-loop-store.ts",
@@ -160,7 +161,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 78,
+    "entriesWithUnits": 79,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -174,8 +175,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 24,
-        "withUnits": 24,
+        "total": 25,
+        "withUnits": 25,
         "missing": []
       },
       "certified": {
@@ -196,8 +197,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 676,
-    "edgeCount": 1500
+    "nodeCount": 682,
+    "edgeCount": 1503
   },
   "evidenceProfiles": [
     {

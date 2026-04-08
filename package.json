@@ -168,6 +168,7 @@
     "warp:full-solve:nhm2-shift-lapse:publish-selected-transport": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-transport --shift-lapse-profile-id stage1_centerline_alpha_0p995_v1",
     "warp:full-solve:nhm2-shift-lapse:publish-profile-sweep": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-profile-sweep",
     "warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-boundary-sweep",
+    "warp:full-solve:nhm2-shift-lapse:publish-envelope-suite": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-envelope-suite",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",
     "warp:deliverable:bundle": "tsx scripts/warp-deliverable-bundle.ts",

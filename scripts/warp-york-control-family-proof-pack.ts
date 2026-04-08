@@ -59,6 +59,19 @@ import {
   type WarpProofSurfaceManifestSurfaceEntryV1,
 } from "../shared/contracts/warp-proof-surface-manifest.v1";
 import {
+  buildNhm2EnvelopePerturbationArtifact,
+  isNhm2EnvelopePerturbationArtifact,
+  type BuildNhm2EnvelopePerturbationCaseInput,
+  type Nhm2EnvelopePerturbationArtifact,
+  type Nhm2EnvelopePerturbationReasonCode,
+  type Nhm2EnvelopePerturbationStatus,
+  type Nhm2EnvelopePerturbationSuiteId,
+} from "../shared/contracts/nhm2-envelope-perturbation-suite.v1";
+import {
+  buildNhm2ShiftVsLapseDecompositionArtifact,
+  type Nhm2ShiftVsLapseDecompositionArtifact,
+} from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
+import {
   isCertifiedWarpWorldlineContract,
   type WarpWorldlineContractV1,
 } from "../shared/contracts/warp-worldline-contract.v1";
@@ -99,6 +112,9 @@ const DEFAULT_FRAME_ENDPOINT = "http://127.0.0.1:6062/api/helix/hull-render/fram
 const DEFAULT_PROXY_FRAME_ENDPOINT = `${DEFAULT_BASE_URL}/api/helix/hull-render/frame`;
 const NATARIO_EXPANSION_TOLERANCE = 1e-3;
 const THETA_K_TOLERANCE = 1e-3;
+const GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT = 0.01;
+const GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT = 2;
+const GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT = 2;
 const DEFAULT_NHM2_SNAPSHOT_PATH = path.join(
   FULL_SOLVE_DIR,
   "nhm2-snapshot-congruence-evidence-latest.json",
@@ -542,6 +558,22 @@ const DEFAULT_MISSION_TIME_COMPARISON_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-mission-time-comparison-latest.md",
 );
+const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-shift-vs-lapse-decomposition-${DATE_STAMP}.json`,
+);
+const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-shift-vs-lapse-decomposition-latest.json",
+);
+const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-shift-vs-lapse-decomposition-${DATE_STAMP}.md`,
+);
+const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-shift-vs-lapse-decomposition-latest.md",
+);
 const DEFAULT_CRUISE_ENVELOPE_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-cruise-envelope-${DATE_STAMP}.json`,
@@ -668,6 +700,30 @@ const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_MD = path.join(
   SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_AUDIT_DIR,
   "warp-nhm2-shift-lapse-boundary-sweep-latest.md",
 );
+const SELECTED_SHIFT_LAPSE_ENVELOPE_ARTIFACT_DIR = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  "envelope",
+);
+const SELECTED_SHIFT_LAPSE_ENVELOPE_AUDIT_DIR = path.join(
+  SELECTED_FAMILY_DOC_AUDIT_DIR,
+  "envelope",
+);
+const SELECTED_SHIFT_LAPSE_ENVELOPE_OUT_JSON = path.join(
+  SELECTED_SHIFT_LAPSE_ENVELOPE_ARTIFACT_DIR,
+  `nhm2-envelope-perturbation-suite-${DATE_STAMP}.json`,
+);
+const SELECTED_SHIFT_LAPSE_ENVELOPE_LATEST_JSON = path.join(
+  SELECTED_SHIFT_LAPSE_ENVELOPE_ARTIFACT_DIR,
+  "nhm2-envelope-perturbation-suite-latest.json",
+);
+const SELECTED_SHIFT_LAPSE_ENVELOPE_OUT_MD = path.join(
+  SELECTED_SHIFT_LAPSE_ENVELOPE_AUDIT_DIR,
+  `warp-nhm2-envelope-perturbation-suite-${DATE_STAMP}.md`,
+);
+const SELECTED_SHIFT_LAPSE_ENVELOPE_LATEST_MD = path.join(
+  SELECTED_SHIFT_LAPSE_ENVELOPE_AUDIT_DIR,
+  "warp-nhm2-envelope-perturbation-suite-latest.md",
+);
 const buildSelectedShiftLapsePublicationCommand = (
   shiftLapseProfileId = DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
 ) =>
@@ -678,6 +734,8 @@ const SELECTED_SHIFT_LAPSE_PROFILE_SWEEP_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-profile-sweep";
 const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep";
+const SELECTED_SHIFT_LAPSE_ENVELOPE_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite";
 const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
   warpFieldType: "nhm2_shift_lapse",
   metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
@@ -2496,6 +2554,17 @@ type ProofPackTransportSurfaceStatusSummary = {
   shiftLapseCenterlineDtauDt: number | null;
 };
 
+type Nhm2ShiftLapseSelectedBundleArtifacts = {
+  worldlineLatestJsonPath: string;
+  cruiseEnvelopePreflightLatestJsonPath: string;
+  routeTimeWorldlineLatestJsonPath: string;
+  missionTimeEstimatorLatestJsonPath: string;
+  missionTimeComparisonLatestJsonPath: string;
+  shiftVsLapseDecompositionLatestJsonPath: string;
+  cruiseEnvelopeLatestJsonPath: string;
+  inHullProperAccelerationLatestJsonPath: string;
+};
+
 type Nhm2ShiftLapseTransportResultArtifact = {
   artifactType: "nhm2_shift_lapse_transport_result/v1";
   generatedOn: string;
@@ -2514,15 +2583,7 @@ type Nhm2ShiftLapseTransportResultArtifact = {
     artifactRoot: string;
     auditRoot: string;
   };
-  selectedBundleArtifacts: {
-    worldlineLatestJsonPath: string;
-    cruiseEnvelopePreflightLatestJsonPath: string;
-    routeTimeWorldlineLatestJsonPath: string;
-    missionTimeEstimatorLatestJsonPath: string;
-    missionTimeComparisonLatestJsonPath: string;
-    cruiseEnvelopeLatestJsonPath: string;
-    inHullProperAccelerationLatestJsonPath: string;
-  };
+  selectedBundleArtifacts: Nhm2ShiftLapseSelectedBundleArtifacts;
   transportCertificationStatus: string | null;
   promotionGateStatus: string | null;
   promotionGateReason: string | null;
@@ -2535,6 +2596,13 @@ type Nhm2ShiftLapseTransportResultArtifact = {
   missionTimeInterpretationStatus: string | null;
   properMinusCoordinate_seconds: number | null;
   properMinusClassical_seconds: number | null;
+  shiftVsLapseDecompositionStatus: Nhm2ShiftVsLapseDecompositionArtifact["status"];
+  shiftVsLapseApproximationStatus:
+    Nhm2ShiftVsLapseDecompositionArtifact["method"]["approximationStatus"];
+  shiftTransportContribution_seconds: number | null;
+  lapseClockRateContribution_seconds: number | null;
+  shiftVsLapseResidual_seconds: number | null;
+  lapseDialTrackedFraction: number | null;
   boundedTimingDifferentialDetected: boolean | null;
   measuredResultSummary: string;
   nonClaims: string[];
@@ -2716,6 +2784,104 @@ type Nhm2ShiftLapseBoundarySweepArtifact = {
   nonClaims: string[];
   checksum?: string;
 };
+
+type Nhm2EnvelopePerturbationPublishedArtifact =
+  Nhm2EnvelopePerturbationArtifact & { checksum: string };
+
+type Nhm2EnvelopeDirectPerturbationCaseSpec = {
+  caseId: string;
+  label: string;
+  suiteId: "resolution_sensitivity" | "boundary_condition_sensitivity";
+  axis: "resolution" | "boundary_condition";
+  dimension: string;
+  valueId: string;
+  valueLabel: string;
+  numericValue: number | null;
+  baseline: boolean;
+  dims?: [number, number, number];
+  boundary?: {
+    mode?: "clamp" | "periodic" | "outflow" | "sommerfeld";
+    spongeCells?: number;
+  };
+};
+
+const NHM2_ENVELOPE_RESOLUTION_CASE_SPECS: Nhm2EnvelopeDirectPerturbationCaseSpec[] = [
+  {
+    caseId: "resolution_064",
+    label: "64^3 coarse brick",
+    suiteId: "resolution_sensitivity",
+    axis: "resolution",
+    dimension: "grid_dims",
+    valueId: "64x64x64",
+    valueLabel: "64 x 64 x 64",
+    numericValue: 64,
+    baseline: false,
+    dims: [64, 64, 64],
+  },
+  {
+    caseId: "resolution_096",
+    label: "96^3 reference brick",
+    suiteId: "resolution_sensitivity",
+    axis: "resolution",
+    dimension: "grid_dims",
+    valueId: "96x96x96",
+    valueLabel: "96 x 96 x 96",
+    numericValue: 96,
+    baseline: true,
+    dims: [96, 96, 96],
+  },
+  {
+    caseId: "resolution_128",
+    label: "128^3 fine brick",
+    suiteId: "resolution_sensitivity",
+    axis: "resolution",
+    dimension: "grid_dims",
+    valueId: "128x128x128",
+    valueLabel: "128 x 128 x 128",
+    numericValue: 128,
+    baseline: false,
+    dims: [128, 128, 128],
+  },
+];
+
+const NHM2_ENVELOPE_BOUNDARY_CASE_SPECS: Nhm2EnvelopeDirectPerturbationCaseSpec[] = [
+  {
+    caseId: "boundary_clamp",
+    label: "Clamp boundary",
+    suiteId: "boundary_condition_sensitivity",
+    axis: "boundary_condition",
+    dimension: "boundary_mode",
+    valueId: "clamp",
+    valueLabel: "Clamp",
+    numericValue: null,
+    baseline: true,
+    boundary: { mode: "clamp" },
+  },
+  {
+    caseId: "boundary_outflow",
+    label: "Outflow boundary",
+    suiteId: "boundary_condition_sensitivity",
+    axis: "boundary_condition",
+    dimension: "boundary_mode",
+    valueId: "outflow",
+    valueLabel: "Outflow",
+    numericValue: null,
+    baseline: false,
+    boundary: { mode: "outflow" },
+  },
+  {
+    caseId: "boundary_sommerfeld",
+    label: "Sommerfeld boundary",
+    suiteId: "boundary_condition_sensitivity",
+    axis: "boundary_condition",
+    dimension: "boundary_mode",
+    valueId: "sommerfeld",
+    valueLabel: "Sommerfeld",
+    numericValue: null,
+    baseline: false,
+    boundary: { mode: "sommerfeld", spongeCells: 6 },
+  },
+];
 
 const isBoundarySweepEntryRecord = (
   value: unknown,
@@ -6138,6 +6304,16 @@ const readJsonArtifact = <T>(filePath: string, expectedArtifactType?: string): T
     );
   }
   return parsed;
+};
+
+const readJsonArtifactIfPresent = <T>(
+  filePath: string,
+  expectedArtifactType?: string,
+): T | null => {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return readJsonArtifact<T>(filePath, expectedArtifactType);
 };
 
 const writeJsonArtifact = (filePath: string, value: unknown): void => {
@@ -26014,6 +26190,146 @@ ${nonClaims}
 `;
 };
 
+const renderNhm2ShiftVsLapseDecompositionMarkdown = (
+  payload: Nhm2ShiftVsLapseDecompositionArtifact,
+): string => `# NHM2 Shift-vs-Lapse Decomposition (${DATE_STAMP})
+
+"This artifact decomposes the bounded NHM2 mission-time result for one selected shift+lapse profile into fixed shift-family transport time, lapse-dial clock-rate contribution, and residual remainder. The lapse term is an approximate projection from the metric-derived centerline lapse dial; any unexplained drift is preserved in the residual."
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| status | ${payload.status} |
+| completeness | ${payload.completeness} |
+| profile.familyId | ${payload.profile.familyId} |
+| profile.shiftLapseProfileId | ${payload.profile.shiftLapseProfileId ?? "null"} |
+| profile.shiftLapseProfileStage | ${payload.profile.shiftLapseProfileStage ?? "null"} |
+| sourceArtifacts.missionTimeComparison | ${payload.sourceArtifacts.missionTimeComparison ?? "null"} |
+| sourceArtifacts.worldline | ${payload.sourceArtifacts.worldline ?? "null"} |
+| method.decompositionModelId | ${payload.method.decompositionModelId} |
+| method.approximationStatus | ${payload.method.approximationStatus} |
+| method.residualToleranceSeconds | ${payload.method.residualToleranceSeconds ?? "null"} |
+| lapseDial.centerlineAlpha | ${payload.lapseDial.centerlineAlpha ?? "null"} |
+| lapseDial.centerlineDtauDt | ${payload.lapseDial.centerlineDtauDt ?? "null"} |
+| lapseDial.projectionSource | ${payload.lapseDial.projectionSource} |
+| lapseDial.projectionRatio | ${payload.lapseDial.projectionRatio ?? "null"} |
+| timing.interpretationStatus | ${payload.timing.interpretationStatus ?? "null"} |
+| timing.warpCoordinateTimeSeconds | ${payload.timing.warpCoordinateTimeSeconds ?? "null"} |
+| timing.warpProperTimeSeconds | ${payload.timing.warpProperTimeSeconds ?? "null"} |
+| timing.classicalReferenceTimeSeconds | ${payload.timing.classicalReferenceTimeSeconds ?? "null"} |
+| timing.reportedProperMinusCoordinateSeconds | ${payload.timing.reportedProperMinusCoordinateSeconds ?? "null"} |
+| timing.reportedProperVsCoordinateRatio | ${payload.timing.reportedProperVsCoordinateRatio ?? "null"} |
+| decomposition.fixedShiftFamilyTransportContributionSeconds | ${payload.decomposition.fixedShiftFamilyTransportContributionSeconds ?? "null"} |
+| decomposition.lapseProfileClockRateContributionSeconds | ${payload.decomposition.lapseProfileClockRateContributionSeconds ?? "null"} |
+| decomposition.residualUnexplainedContributionSeconds | ${payload.decomposition.residualUnexplainedContributionSeconds ?? "null"} |
+| decomposition.reconstructedProperTimeSeconds | ${payload.decomposition.reconstructedProperTimeSeconds ?? "null"} |
+| decomposition.totalMissionTimeDifferentialSeconds | ${payload.decomposition.totalMissionTimeDifferentialSeconds ?? "null"} |
+| decomposition.lapseDialTrackedFraction | ${payload.decomposition.lapseDialTrackedFraction ?? "null"} |
+
+## Method Note
+${payload.method.note}
+
+## Reason Codes
+${payload.reasonCodes.length > 0 ? payload.reasonCodes.map((entry) => `- ${entry}`).join("\n") : "- none"}
+`;
+
+const buildNhm2ShiftVsLapseDecompositionArtifactFromMissionTimeComparison = (args: {
+  missionTimeComparison: Nhm2MissionTimeComparisonArtifact;
+  sourceMissionTimeComparisonArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+}): Nhm2ShiftVsLapseDecompositionArtifact => {
+  const gate = args.missionTimeComparison.sourceSurface.shiftLapseTransportPromotionGate;
+  return buildNhm2ShiftVsLapseDecompositionArtifact({
+    familyId: args.missionTimeComparison.sourceSurface.metricFamily ?? "nhm2_shift_lapse",
+    shiftLapseProfileId:
+      args.missionTimeComparison.sourceSurface.shiftLapseProfileId ??
+      gate?.shiftLapseProfileId ??
+      null,
+    shiftLapseProfileStage: gate?.shiftLapseProfileStage ?? null,
+    shiftLapseProfileNote: gate?.shiftLapseProfileNote ?? null,
+    sourceMissionTimeComparisonArtifactPath:
+      args.sourceMissionTimeComparisonArtifactPath,
+    sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath,
+    centerlineAlpha: gate?.centerlineAlpha ?? null,
+    centerlineDtauDt: gate?.centerlineDtauDt ?? null,
+    interpretationStatus:
+      args.missionTimeComparison.comparisonMetrics.interpretationStatus ?? null,
+    warpCoordinateTimeSeconds:
+      args.missionTimeComparison.warpCoordinateTimeEstimate.seconds ?? null,
+    warpProperTimeSeconds:
+      args.missionTimeComparison.warpProperTimeEstimate.seconds ?? null,
+    classicalReferenceTimeSeconds:
+      args.missionTimeComparison.classicalReferenceTimeEstimate.seconds ?? null,
+    properMinusCoordinateSeconds:
+      args.missionTimeComparison.comparisonMetrics.properMinusCoordinate_seconds ??
+      null,
+    properVsCoordinateRatio:
+      args.missionTimeComparison.comparisonMetrics.properVsCoordinate_ratio ??
+      null,
+    coordinateMinusClassicalSeconds:
+      args.missionTimeComparison.comparisonMetrics.coordinateMinusClassical_seconds ??
+      null,
+    residualToleranceSeconds:
+      args.missionTimeComparison.comparisonMetrics.differentialToleranceSeconds ??
+      null,
+  });
+};
+
+const publishNhm2ShiftVsLapseDecompositionLatest = (args: {
+  artifactRootDir: string;
+  auditRootDir: string;
+  missionTimeComparison: Nhm2MissionTimeComparisonArtifact;
+  sourceMissionTimeComparisonArtifactPath?: string | null;
+  sourceWorldlineArtifactPath?: string | null;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2ShiftVsLapseDecompositionArtifact;
+} => {
+  const artifact = buildNhm2ShiftVsLapseDecompositionArtifactFromMissionTimeComparison({
+    missionTimeComparison: args.missionTimeComparison,
+    sourceMissionTimeComparisonArtifactPath:
+      args.sourceMissionTimeComparisonArtifactPath,
+    sourceWorldlineArtifactPath: args.sourceWorldlineArtifactPath,
+  });
+  const markdown = renderNhm2ShiftVsLapseDecompositionMarkdown(artifact);
+  const outJsonPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_JSON),
+  );
+  const latestJsonPath = path.join(
+    args.artifactRootDir,
+    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON),
+  );
+  const outMdPath = path.join(
+    args.auditRootDir,
+    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_OUT_MD),
+  );
+  const latestMdPath = path.join(
+    args.auditRootDir,
+    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD),
+  );
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  return {
+    outJsonPath,
+    latestJsonPath,
+    outMdPath,
+    latestMdPath,
+    artifact,
+  };
+};
+
 export const buildNhm2CruiseEnvelopeArtifact = (args: {
   generatedOn: string;
   cruiseEnvelope: WarpCruiseEnvelopeContractV1;
@@ -28369,6 +28685,8 @@ const buildNhm2ShiftLapseTransportResultArtifact = (args: {
   publicationCommand: string;
   artifactRootDir: string;
   auditRootDir: string;
+  shiftVsLapseDecomposition: Nhm2ShiftVsLapseDecompositionArtifact;
+  shiftVsLapseDecompositionLatestJsonPath: string;
 }): Nhm2ShiftLapseTransportResultArtifact => {
   const worldlineArtifact = args.boundedStack.worldline.artifact;
   const missionTimeComparisonArtifact = args.boundedStack.missionTimeComparison.artifact;
@@ -28424,6 +28742,9 @@ const buildNhm2ShiftLapseTransportResultArtifact = (args: {
       missionTimeComparisonLatestJsonPath: normalizePath(
         args.boundedStack.missionTimeComparison.latestJsonPath,
       ),
+      shiftVsLapseDecompositionLatestJsonPath: normalizePath(
+        args.shiftVsLapseDecompositionLatestJsonPath,
+      ),
       cruiseEnvelopeLatestJsonPath: normalizePath(
         args.boundedStack.cruiseEnvelope.latestJsonPath,
       ),
@@ -28444,6 +28765,20 @@ const buildNhm2ShiftLapseTransportResultArtifact = (args: {
     missionTimeInterpretationStatus: interpretationStatus,
     properMinusCoordinate_seconds: properMinusCoordinateSeconds,
     properMinusClassical_seconds: properMinusClassicalSeconds,
+    shiftVsLapseDecompositionStatus: args.shiftVsLapseDecomposition.status,
+    shiftVsLapseApproximationStatus:
+      args.shiftVsLapseDecomposition.method.approximationStatus,
+    shiftTransportContribution_seconds:
+      args.shiftVsLapseDecomposition.decomposition
+        .fixedShiftFamilyTransportContributionSeconds,
+    lapseClockRateContribution_seconds:
+      args.shiftVsLapseDecomposition.decomposition
+        .lapseProfileClockRateContributionSeconds,
+    shiftVsLapseResidual_seconds:
+      args.shiftVsLapseDecomposition.decomposition
+        .residualUnexplainedContributionSeconds,
+    lapseDialTrackedFraction:
+      args.shiftVsLapseDecomposition.decomposition.lapseDialTrackedFraction,
     boundedTimingDifferentialDetected,
     measuredResultSummary: summarizeSelectedShiftLapseTimingResult({
       centerlineDtauDt: gate?.centerlineDtauDt ?? null,
@@ -28503,6 +28838,12 @@ const renderNhm2ShiftLapseTransportResultMarkdown = (
 | missionTimeInterpretationStatus | ${payload.missionTimeInterpretationStatus ?? "null"} |
 | properMinusCoordinate_seconds | ${payload.properMinusCoordinate_seconds ?? "null"} |
 | properMinusClassical_seconds | ${payload.properMinusClassical_seconds ?? "null"} |
+| shiftVsLapseDecompositionStatus | ${payload.shiftVsLapseDecompositionStatus} |
+| shiftVsLapseApproximationStatus | ${payload.shiftVsLapseApproximationStatus} |
+| shiftTransportContribution_seconds | ${payload.shiftTransportContribution_seconds ?? "null"} |
+| lapseClockRateContribution_seconds | ${payload.lapseClockRateContribution_seconds ?? "null"} |
+| shiftVsLapseResidual_seconds | ${payload.shiftVsLapseResidual_seconds ?? "null"} |
+| lapseDialTrackedFraction | ${payload.lapseDialTrackedFraction ?? "null"} |
 | boundedTimingDifferentialDetected | ${payload.boundedTimingDifferentialDetected == null ? "null" : String(payload.boundedTimingDifferentialDetected)} |
 | measuredResultSummary | ${payload.measuredResultSummary} |
 
@@ -28514,6 +28855,7 @@ const renderNhm2ShiftLapseTransportResultMarkdown = (
 | routeTimeWorldline | ${payload.selectedBundleArtifacts.routeTimeWorldlineLatestJsonPath} |
 | missionTimeEstimator | ${payload.selectedBundleArtifacts.missionTimeEstimatorLatestJsonPath} |
 | missionTimeComparison | ${payload.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath} |
+| shiftVsLapseDecomposition | ${payload.selectedBundleArtifacts.shiftVsLapseDecompositionLatestJsonPath} |
 | cruiseEnvelope | ${payload.selectedBundleArtifacts.cruiseEnvelopeLatestJsonPath} |
 | inHullProperAcceleration | ${payload.selectedBundleArtifacts.inHullProperAccelerationLatestJsonPath} |
 
@@ -28530,6 +28872,13 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
   shiftLapseProfileId?: string;
 }): Promise<{
   boundedStack: Awaited<ReturnType<typeof publishNhm2BoundedStackLatest>>;
+  shiftVsLapseDecomposition: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2ShiftVsLapseDecompositionArtifact;
+  };
   transportResult: {
     outJsonPath: string;
     latestJsonPath: string;
@@ -28565,11 +28914,22 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
     sourceAuditArtifactPath: DEFAULT_LATEST_JSON,
     sourceAuditReportPath: DEFAULT_LATEST_MD,
   });
+  const shiftVsLapseDecomposition = publishNhm2ShiftVsLapseDecompositionLatest({
+    artifactRootDir,
+    auditRootDir,
+    missionTimeComparison: boundedStack.missionTimeComparison.artifact,
+    sourceMissionTimeComparisonArtifactPath:
+      boundedStack.missionTimeComparison.latestJsonPath,
+    sourceWorldlineArtifactPath: boundedStack.worldline.latestJsonPath,
+  });
   const artifact = buildNhm2ShiftLapseTransportResultArtifact({
     boundedStack,
     publicationCommand: buildSelectedShiftLapsePublicationCommand(shiftLapseProfileId),
     artifactRootDir,
     auditRootDir,
+    shiftVsLapseDecomposition: shiftVsLapseDecomposition.artifact,
+    shiftVsLapseDecompositionLatestJsonPath:
+      shiftVsLapseDecomposition.latestJsonPath,
   });
   const markdown = renderNhm2ShiftLapseTransportResultMarkdown(artifact);
   const outJsonPath = path.join(
@@ -28598,6 +28958,7 @@ export const publishNhm2ShiftLapseSelectedTransportBundle = async (options?: {
   fs.writeFileSync(latestMdPath, `${markdown}\n`);
   return {
     boundedStack,
+    shiftVsLapseDecomposition,
     transportResult: {
       outJsonPath,
       latestJsonPath,
@@ -28974,7 +29335,7 @@ const resolveSelectedShiftLapseTransportResultOutputPaths = (
 
 const resolveSelectedShiftLapseSelectedBundleArtifactPaths = (
   artifactRootDir: string,
-): Nhm2ShiftLapseTransportResultArtifact["selectedBundleArtifacts"] => ({
+): Nhm2ShiftLapseSelectedBundleArtifacts => ({
   worldlineLatestJsonPath: normalizePath(
     path.join(artifactRootDir, path.basename(DEFAULT_WARP_WORLDLINE_PROOF_LATEST_JSON)),
   ),
@@ -28997,6 +29358,12 @@ const resolveSelectedShiftLapseSelectedBundleArtifactPaths = (
     path.join(
       artifactRootDir,
       path.basename(DEFAULT_MISSION_TIME_COMPARISON_LATEST_JSON),
+    ),
+  ),
+  shiftVsLapseDecompositionLatestJsonPath: normalizePath(
+    path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON),
     ),
   ),
   cruiseEnvelopeLatestJsonPath: normalizePath(
@@ -29904,6 +30271,973 @@ export const publishNhm2ShiftLapseBoundarySweep = async (options?: {
   return {
     entries,
     boundaryArtifact: {
+      outJsonPath,
+      latestJsonPath,
+      outMdPath,
+      latestMdPath,
+      artifact,
+    },
+  };
+};
+
+const computeNhm2EnvelopePerturbationChecksum = (
+  payload: Nhm2EnvelopePerturbationArtifact,
+): string => crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+
+const clonePlainData = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const asRecordOrNull = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
+const buildEnvelopeLowExpansionSummary = (
+  gate: Record<string, unknown> | null,
+): BuildNhm2EnvelopePerturbationCaseInput["lowExpansion"] => {
+  const divergenceRms = toFiniteNumber(gate?.divergenceRms);
+  const divergenceMaxAbs = toFiniteNumber(gate?.divergenceMaxAbs);
+  const divergenceTolerance = toFiniteNumber(gate?.divergenceTolerance);
+  const thetaKResidualAbs = toFiniteNumber(gate?.thetaKResidualAbs);
+  const thetaKTolerance = toFiniteNumber(gate?.thetaKTolerance);
+  const normalizedUsages = [
+    divergenceRms != null && divergenceTolerance != null && divergenceTolerance > 0
+      ? divergenceRms / divergenceTolerance
+      : null,
+    thetaKResidualAbs != null && thetaKTolerance != null && thetaKTolerance > 0
+      ? thetaKResidualAbs / thetaKTolerance
+      : null,
+  ].filter((entry): entry is number => entry != null && Number.isFinite(entry));
+  const margins = [
+    divergenceTolerance != null && divergenceRms != null
+      ? divergenceTolerance - divergenceRms
+      : null,
+    thetaKTolerance != null && thetaKResidualAbs != null
+      ? thetaKTolerance - thetaKResidualAbs
+      : null,
+  ].filter((entry): entry is number => entry != null && Number.isFinite(entry));
+  return {
+    status:
+      typeof gate?.authoritativeLowExpansionStatus === "string"
+        ? String(gate.authoritativeLowExpansionStatus)
+        : null,
+    source:
+      typeof gate?.authoritativeLowExpansionSource === "string"
+        ? String(gate.authoritativeLowExpansionSource)
+        : null,
+    divergenceRms,
+    divergenceMaxAbs,
+    divergenceTolerance,
+    thetaKConsistencyStatus:
+      typeof gate?.thetaKConsistencyStatus === "string"
+        ? String(gate.thetaKConsistencyStatus)
+        : null,
+    thetaKResidualAbs,
+    thetaKTolerance,
+    worstUsage: normalizedUsages.length > 0 ? Math.max(...normalizedUsages) : null,
+    worstMargin: margins.length > 0 ? Math.min(...margins) : null,
+  };
+};
+
+const buildEnvelopeWallSafetySummary = (
+  gate: Record<string, unknown> | null,
+): BuildNhm2EnvelopePerturbationCaseInput["wallSafety"] => {
+  const betaOverAlphaMax = toFiniteNumber(gate?.betaOverAlphaMax);
+  const betaOutwardOverAlphaWallMax = toFiniteNumber(gate?.betaOutwardOverAlphaWallMax);
+  const wallHorizonMargin = toFiniteNumber(gate?.wallHorizonMargin);
+  const betaUsageCandidates = [betaOverAlphaMax, betaOutwardOverAlphaWallMax].filter(
+    (entry): entry is number => entry != null && Number.isFinite(entry),
+  );
+  const betaUsage =
+    betaUsageCandidates.length > 0 ? Math.max(...betaUsageCandidates) : null;
+  const betaMargin = betaUsage != null ? 1 - betaUsage : null;
+  const worstMarginCandidates = [betaMargin, wallHorizonMargin].filter(
+    (entry): entry is number => entry != null && Number.isFinite(entry),
+  );
+  return {
+    status:
+      typeof gate?.wallSafetyStatus === "string"
+        ? String(gate.wallSafetyStatus)
+        : null,
+    reason:
+      typeof gate?.wallSafetyReason === "string"
+        ? String(gate.wallSafetyReason)
+        : null,
+    betaOverAlphaMax,
+    betaOutwardOverAlphaWallMax,
+    wallHorizonMargin,
+    worstUsage: betaUsage,
+    worstMargin:
+      worstMarginCandidates.length > 0 ? Math.min(...worstMarginCandidates) : null,
+  };
+};
+
+const buildEnvelopeSolverHealthSummary = (
+  gr: Record<string, unknown> | null,
+): BuildNhm2EnvelopePerturbationCaseInput["solverHealth"] => {
+  const solver = asRecordOrNull(gr?.solver) ?? null;
+  const health = asRecordOrNull(solver?.health) ?? null;
+  const totalClampFraction = toFiniteNumber(health?.totalClampFraction);
+  const maxAlphaBeforeClamp = toFiniteNumber(health?.maxAlphaBeforeClamp);
+  const maxKBeforeClamp = toFiniteNumber(health?.maxKBeforeClamp);
+  return {
+    status: typeof health?.status === "string" ? String(health.status) : null,
+    reasons: Array.isArray(health?.reasons)
+      ? health.reasons
+          .map((entry) => (typeof entry === "string" ? entry : null))
+          .filter((entry): entry is string => entry != null)
+      : [],
+    alphaClampFraction: toFiniteNumber(health?.alphaClampFraction),
+    kClampFraction: toFiniteNumber(health?.kClampFraction),
+    totalClampFraction,
+    maxAlphaBeforeClamp,
+    maxKBeforeClamp,
+    clampFractionLimit: GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT,
+    alphaMultiplierLimit: GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT,
+    kMultiplierLimit: GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT,
+    clampFractionHeadroom:
+      totalClampFraction != null
+        ? GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT - totalClampFraction
+        : null,
+    alphaMultiplierHeadroom:
+      maxAlphaBeforeClamp != null
+        ? GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT - maxAlphaBeforeClamp
+        : null,
+    kMultiplierHeadroom:
+      maxKBeforeClamp != null
+        ? GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT - maxKBeforeClamp
+        : null,
+  };
+};
+
+const buildEnvelopeMissionTimeSummary = (args: {
+  estimator: Record<string, unknown> | null;
+  comparison: Record<string, unknown> | null;
+  source:
+    | "live_pipeline_contracts"
+    | "selected_bundle_contracts_reused"
+    | "missing";
+}): BuildNhm2EnvelopePerturbationCaseInput["missionTime"] => {
+  const comparisonMetrics = asRecordOrNull(args.comparison?.comparisonMetrics) ?? null;
+  const warpCoordinateTimeEstimate =
+    asRecordOrNull(args.comparison?.warpCoordinateTimeEstimate) ?? null;
+  const warpProperTimeEstimate =
+    asRecordOrNull(args.comparison?.warpProperTimeEstimate) ?? null;
+  const classicalReferenceTimeEstimate =
+    asRecordOrNull(args.comparison?.classicalReferenceTimeEstimate) ?? null;
+  const estimatorCoordinateTime =
+    asRecordOrNull(args.estimator?.coordinateTimeEstimate) ?? null;
+  const estimatorProperTime = asRecordOrNull(args.estimator?.properTimeEstimate) ?? null;
+  return {
+    source: args.source,
+    estimatorStatus:
+      typeof args.estimator?.status === "string" ? String(args.estimator.status) : null,
+    comparisonStatus:
+      typeof args.comparison?.status === "string" ? String(args.comparison.status) : null,
+    interpretationStatus:
+      typeof comparisonMetrics?.interpretationStatus === "string"
+        ? String(comparisonMetrics.interpretationStatus)
+        : null,
+    coordinateYears:
+      toFiniteNumber(warpCoordinateTimeEstimate?.years) ??
+      toFiniteNumber(estimatorCoordinateTime?.years),
+    properYears:
+      toFiniteNumber(warpProperTimeEstimate?.years) ??
+      toFiniteNumber(estimatorProperTime?.years),
+    classicalYears: toFiniteNumber(classicalReferenceTimeEstimate?.years),
+    properMinusCoordinateSeconds: toFiniteNumber(
+      comparisonMetrics?.properMinusCoordinate_seconds,
+    ),
+    properMinusClassicalSeconds: toFiniteNumber(
+      comparisonMetrics?.properMinusClassical_seconds,
+    ),
+    sourceArtifactPath: null,
+    reportPath: null,
+  };
+};
+
+const deriveEnvelopeCaseAssessment = (args: {
+  transportCertificationStatus: string | null;
+  lowExpansionStatus: string | null;
+  wallSafetyStatus: string | null;
+  solverHealthStatus: string | null;
+  missionTimeSource: "live_pipeline_contracts" | "selected_bundle_contracts_reused" | "missing";
+}): {
+  status: Nhm2EnvelopePerturbationStatus;
+  completeness: "complete" | "incomplete";
+  reasonCodes: Nhm2EnvelopePerturbationReasonCode[];
+} => {
+  const reasonCodes = new Set<Nhm2EnvelopePerturbationReasonCode>();
+  if (
+    args.transportCertificationStatus != null &&
+    args.transportCertificationStatus !== "bounded_transport_proof_bearing_gate_admitted"
+  ) {
+    reasonCodes.add("transport_not_admitted");
+  }
+  if (args.lowExpansionStatus === "fail") {
+    reasonCodes.add("authoritative_low_expansion_failed");
+  } else if (args.lowExpansionStatus == null || args.lowExpansionStatus === "missing") {
+    reasonCodes.add("authoritative_low_expansion_missing");
+  }
+  if (args.wallSafetyStatus === "fail") {
+    reasonCodes.add("wall_safety_failed");
+  } else if (args.wallSafetyStatus == null || args.wallSafetyStatus === "missing") {
+    reasonCodes.add("wall_safety_missing");
+  }
+  if (args.solverHealthStatus === "UNSTABLE") {
+    reasonCodes.add("solver_health_unstable");
+  } else if (args.solverHealthStatus == null) {
+    reasonCodes.add("solver_health_missing");
+  }
+  if (args.missionTimeSource === "missing") {
+    reasonCodes.add("mission_time_missing");
+  } else if (args.missionTimeSource === "selected_bundle_contracts_reused") {
+    reasonCodes.add("mission_time_reused_from_selected_bundle");
+  }
+  const completeness =
+    args.lowExpansionStatus == null ||
+    args.wallSafetyStatus == null ||
+    args.missionTimeSource === "missing" ||
+    args.solverHealthStatus == null
+      ? "incomplete"
+      : "complete";
+  const status: Nhm2EnvelopePerturbationStatus =
+    reasonCodes.has("transport_not_admitted") ||
+    reasonCodes.has("authoritative_low_expansion_failed") ||
+    reasonCodes.has("wall_safety_failed") ||
+    reasonCodes.has("solver_health_unstable")
+      ? "fail"
+      : reasonCodes.has("authoritative_low_expansion_missing") ||
+          reasonCodes.has("wall_safety_missing") ||
+          reasonCodes.has("mission_time_missing")
+        ? "unavailable"
+        : args.solverHealthStatus === "NOT_CERTIFIED" ||
+            args.missionTimeSource === "selected_bundle_contracts_reused"
+          ? "review"
+          : "pass";
+  if (status === "fail") {
+    reasonCodes.add("negative_result_preserved");
+  }
+  return {
+    status,
+    completeness,
+    reasonCodes: Array.from(reasonCodes),
+  };
+};
+
+const buildEnvelopeCaseSummary = (args: {
+  label: string;
+  status: Nhm2EnvelopePerturbationStatus;
+  transportCertificationStatus: string | null;
+  interpretationStatus: string | null;
+  solverHealthStatus: string | null;
+}): string =>
+  `${args.label}: transport=${args.transportCertificationStatus ?? "null"} mission_time=${args.interpretationStatus ?? "null"} solver=${args.solverHealthStatus ?? "null"} status=${args.status}`;
+
+const buildEnvelopePublishedEntryGate = (
+  entry: Nhm2ShiftLapseProfileSweepEntry | Nhm2ShiftLapseBoundarySweepEntry,
+): Record<string, unknown> => ({
+  authoritativeLowExpansionStatus: entry.authoritativeLowExpansionStatus ?? null,
+  authoritativeLowExpansionSource: entry.authoritativeLowExpansionSource ?? null,
+  divergenceRms: entry.divergenceRms ?? null,
+  divergenceMaxAbs: entry.divergenceMaxAbs ?? null,
+  divergenceTolerance: entry.divergenceTolerance ?? null,
+  thetaKConsistencyStatus: entry.thetaKConsistencyStatus ?? null,
+  thetaKResidualAbs: entry.thetaKResidualAbs ?? null,
+  thetaKTolerance: entry.thetaKTolerance ?? null,
+  wallSafetyStatus: entry.wallSafetyStatus ?? null,
+  wallSafetyReason: entry.wallSafetyReason ?? null,
+  betaOverAlphaMax: entry.betaOverAlphaMax ?? null,
+  betaOutwardOverAlphaWallMax: entry.betaOutwardOverAlphaWallMax ?? null,
+  wallHorizonMargin: entry.wallHorizonMargin ?? null,
+});
+
+const buildEnvelopeCaseFromPublishedEntry = (args: {
+  entry: Nhm2ShiftLapseProfileSweepEntry | Nhm2ShiftLapseBoundarySweepEntry;
+  suiteId: Nhm2EnvelopePerturbationSuiteId;
+  caseId: string;
+  label: string;
+  boundaryMode?: string | null;
+}): BuildNhm2EnvelopePerturbationCaseInput => {
+  const worldlineArtifact = readJsonArtifactIfPresent<Record<string, unknown>>(
+    args.entry.selectedBundleArtifacts.worldlineLatestJsonPath,
+  );
+  const estimatorArtifact = readJsonArtifactIfPresent<Record<string, unknown>>(
+    args.entry.selectedBundleArtifacts.missionTimeEstimatorLatestJsonPath,
+  );
+  const comparisonArtifact = readJsonArtifactIfPresent<Record<string, unknown>>(
+    args.entry.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath,
+  );
+  const sourceSurface = resolvePublicationSurfaceRecord(worldlineArtifact);
+  const gate =
+    sourceSurface?.shiftLapseTransportPromotionGate &&
+    typeof sourceSurface.shiftLapseTransportPromotionGate === "object"
+      ? (sourceSurface.shiftLapseTransportPromotionGate as Record<string, unknown>)
+      : buildEnvelopePublishedEntryGate(args.entry);
+  const lowExpansion = buildEnvelopeLowExpansionSummary(gate);
+  const wallSafety = buildEnvelopeWallSafetySummary(gate);
+  const missionTimeSource =
+    estimatorArtifact != null || comparisonArtifact != null
+      ? "live_pipeline_contracts"
+      : args.entry.missionTimeInterpretationStatus != null ||
+          args.entry.properMinusCoordinate_seconds != null ||
+          args.entry.properMinusClassical_seconds != null ||
+          args.entry.boundedTimingDifferentialDetected != null
+        ? "selected_bundle_contracts_reused"
+        : "missing";
+  const missionTimeBase = buildEnvelopeMissionTimeSummary({
+    estimator: estimatorArtifact,
+    comparison: comparisonArtifact,
+    source: missionTimeSource,
+  });
+  const missionTime = {
+    ...missionTimeBase,
+    interpretationStatus:
+      missionTimeBase.interpretationStatus ?? args.entry.missionTimeInterpretationStatus ?? null,
+    properMinusCoordinateSeconds:
+      missionTimeBase.properMinusCoordinateSeconds ?? args.entry.properMinusCoordinate_seconds,
+    properMinusClassicalSeconds:
+      missionTimeBase.properMinusClassicalSeconds ?? args.entry.properMinusClassical_seconds,
+    sourceArtifactPath:
+      comparisonArtifact != null
+        ? normalizePath(args.entry.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath)
+        : null,
+    reportPath: normalizePath(args.entry.transportResultLatestMdPath),
+  };
+  const assessment = deriveEnvelopeCaseAssessment({
+    transportCertificationStatus: args.entry.transportCertificationStatus ?? null,
+    lowExpansionStatus: lowExpansion?.status ?? null,
+    wallSafetyStatus: wallSafety?.status ?? null,
+    solverHealthStatus: null,
+    missionTimeSource: missionTime.source,
+  });
+  return {
+    caseId: args.caseId,
+    label: args.label,
+    suiteId: args.suiteId,
+    axis: "lapse_profile",
+    provenance: "published_selected_bundle",
+    status: assessment.status,
+    completeness: assessment.completeness,
+    reasonCodes: assessment.reasonCodes,
+    summary: buildEnvelopeCaseSummary({
+      label: args.label,
+      status: assessment.status,
+      transportCertificationStatus: args.entry.transportCertificationStatus ?? null,
+      interpretationStatus: missionTime.interpretationStatus ?? null,
+      solverHealthStatus: null,
+    }),
+    selectors: {
+      ...SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS,
+      shiftLapseProfileId: args.entry.shiftLapseProfileId,
+    },
+    perturbation: {
+      dimension: "centerline_alpha",
+      valueId: args.entry.shiftLapseProfileId,
+      valueLabel: args.entry.shiftLapseProfileId,
+      numericValue: args.entry.centerlineAlpha ?? null,
+      baseline:
+        args.entry.shiftLapseProfileId === DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+    },
+    grid: {
+      dims: null,
+      voxelSize_m: null,
+      boundaryMode: args.boundaryMode ?? null,
+      spongeCells: null,
+    },
+    transport: {
+      transportCertificationStatus: args.entry.transportCertificationStatus ?? null,
+      promotionGateStatus: args.entry.promotionGateStatus ?? null,
+      promotionGateReason: args.entry.promotionGateReason ?? null,
+      centerlineAlpha: args.entry.centerlineAlpha ?? null,
+      centerlineDtauDt: args.entry.centerlineDtauDt ?? null,
+      boundedTimingDifferentialDetected:
+        args.entry.boundedTimingDifferentialDetected ?? null,
+      missionTimeInterpretationStatus:
+        args.entry.missionTimeInterpretationStatus ?? null,
+    },
+    lowExpansion,
+    wallSafety,
+    solverHealth: {
+      status: null,
+      reasons: [],
+      alphaClampFraction: null,
+      kClampFraction: null,
+      totalClampFraction: null,
+      maxAlphaBeforeClamp: null,
+      maxKBeforeClamp: null,
+      clampFractionLimit: GR_SOLVER_HEALTH_CLAMP_FRACTION_LIMIT,
+      alphaMultiplierLimit: GR_SOLVER_HEALTH_ALPHA_MULTIPLIER_LIMIT,
+      kMultiplierLimit: GR_SOLVER_HEALTH_K_MULTIPLIER_LIMIT,
+      clampFractionHeadroom: null,
+      alphaMultiplierHeadroom: null,
+      kMultiplierHeadroom: null,
+    },
+    missionTime,
+    artifactRefs: {
+      transportResultLatestJsonPath: args.entry.transportResultLatestJsonPath,
+      transportResultLatestMdPath: args.entry.transportResultLatestMdPath,
+      worldlineLatestJsonPath: args.entry.selectedBundleArtifacts.worldlineLatestJsonPath,
+      missionTimeEstimatorLatestJsonPath:
+        args.entry.selectedBundleArtifacts.missionTimeEstimatorLatestJsonPath,
+      missionTimeComparisonLatestJsonPath:
+        args.entry.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath,
+    },
+  };
+};
+
+const runEnvelopeDirectPerturbationCase = async (args: {
+  baseState: Record<string, unknown>;
+  spec: Nhm2EnvelopeDirectPerturbationCaseSpec;
+}): Promise<BuildNhm2EnvelopePerturbationCaseInput> => {
+  const pipelineModule = await import("../server/energy-pipeline.ts");
+  const grBrickModule = await import("../server/gr-evolve-brick.ts");
+  const mutableState = clonePlainData(args.baseState);
+  mutableState.grEnabled = true;
+  pipelineModule.setGlobalPipelineState?.(mutableState as any);
+  const metricAdapter =
+    mutableState.warp &&
+    typeof mutableState.warp === "object" &&
+    (mutableState.warp as Record<string, unknown>).metricAdapter
+      ? ((mutableState.warp as Record<string, unknown>).metricAdapter as any)
+      : null;
+  const brick = grBrickModule.buildGrEvolveBrick({
+    useInitialData: true,
+    dims: args.spec.dims,
+    boundary: args.spec.boundary,
+    sourceParams: {
+      metricT00Ref: SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS.metricT00Ref ?? undefined,
+      metricT00Source:
+        SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS.metricT00Source ?? undefined,
+      warpFieldType: "nhm2_shift_lapse",
+    },
+  });
+  mutableState.gr = grBrickModule.buildGrDiagnostics(brick, { metricAdapter });
+  const refreshedState = (await pipelineModule.calculateEnergyPipeline(
+    mutableState as any,
+  )) as Record<string, unknown>;
+  pipelineModule.setGlobalPipelineState?.(refreshedState);
+  const gate = resolveSelectedShiftLapsePromotionGateFromState(refreshedState);
+  const gr = asRecordOrNull(refreshedState.gr);
+  const grGrid = asRecordOrNull(gr?.grid);
+  const lowExpansion = buildEnvelopeLowExpansionSummary(gate);
+  const wallSafety = buildEnvelopeWallSafetySummary(gate);
+  const solverHealth = buildEnvelopeSolverHealthSummary(gr);
+  const missionTime = buildEnvelopeMissionTimeSummary({
+    estimator: asRecordOrNull(refreshedState.warpMissionTimeEstimator),
+    comparison: asRecordOrNull(refreshedState.warpMissionTimeComparison),
+    source:
+      refreshedState.warpMissionTimeEstimator && refreshedState.warpMissionTimeComparison
+        ? "live_pipeline_contracts"
+        : "missing",
+  });
+  const assessment = deriveEnvelopeCaseAssessment({
+    transportCertificationStatus:
+      typeof gate?.transportCertificationStatus === "string"
+        ? String(gate.transportCertificationStatus)
+        : null,
+    lowExpansionStatus: lowExpansion?.status ?? null,
+    wallSafetyStatus: wallSafety?.status ?? null,
+    solverHealthStatus: solverHealth?.status ?? null,
+    missionTimeSource: missionTime.source,
+  });
+  return {
+    caseId: args.spec.caseId,
+    label: args.spec.label,
+    suiteId: args.spec.suiteId,
+    axis: args.spec.axis,
+    provenance: "direct_gr_perturbation",
+    status: assessment.status,
+    completeness: assessment.completeness,
+    reasonCodes: assessment.reasonCodes,
+    summary: buildEnvelopeCaseSummary({
+      label: args.spec.label,
+      status: assessment.status,
+      transportCertificationStatus:
+        typeof gate?.transportCertificationStatus === "string"
+          ? String(gate.transportCertificationStatus)
+          : null,
+      interpretationStatus: missionTime.interpretationStatus ?? null,
+      solverHealthStatus: solverHealth.status ?? null,
+    }),
+    selectors: { ...SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS },
+    perturbation: {
+      dimension: args.spec.dimension,
+      valueId: args.spec.valueId,
+      valueLabel: args.spec.valueLabel,
+      numericValue: args.spec.numericValue,
+      baseline: args.spec.baseline,
+    },
+    grid: {
+      dims: Array.isArray(grGrid?.dims)
+        ? (grGrid?.dims as [number, number, number])
+        : args.spec.dims ?? null,
+      voxelSize_m: Array.isArray(grGrid?.voxelSize_m)
+        ? (grGrid?.voxelSize_m as [number, number, number])
+        : null,
+      boundaryMode: args.spec.boundary?.mode ?? "clamp",
+      spongeCells: args.spec.boundary?.spongeCells ?? null,
+    },
+    transport: {
+      transportCertificationStatus:
+        typeof gate?.transportCertificationStatus === "string"
+          ? String(gate.transportCertificationStatus)
+          : null,
+      promotionGateStatus:
+        typeof gate?.status === "string" ? String(gate.status) : null,
+      promotionGateReason:
+        typeof gate?.reason === "string" ? String(gate.reason) : null,
+      centerlineAlpha: toFiniteNumber(gate?.centerlineAlpha),
+      centerlineDtauDt: toFiniteNumber(gate?.centerlineDtauDt),
+      boundedTimingDifferentialDetected:
+        missionTime.interpretationStatus === "bounded_relativistic_differential_detected"
+          ? true
+          : missionTime.interpretationStatus ===
+              "no_certified_relativistic_differential_detected"
+            ? false
+            : null,
+      missionTimeInterpretationStatus: missionTime.interpretationStatus ?? null,
+    },
+    lowExpansion,
+    wallSafety,
+    solverHealth,
+    missionTime,
+    artifactRefs: {
+      transportResultLatestJsonPath: null,
+      transportResultLatestMdPath: null,
+      worldlineLatestJsonPath: null,
+      missionTimeEstimatorLatestJsonPath: null,
+      missionTimeComparisonLatestJsonPath: null,
+    },
+  };
+};
+
+const readExistingSelectedShiftLapseTransportBundleForEnvelope = (args: {
+  selectedFamilyArtifactRootDir: string;
+  selectedFamilyAuditRootDir: string;
+}): Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>> => {
+  const latestJsonPath = path.join(
+    args.selectedFamilyArtifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  );
+  const latestMdPath = path.join(
+    args.selectedFamilyAuditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD),
+  );
+  const decompositionLatestJsonPath = path.join(
+    args.selectedFamilyArtifactRootDir,
+    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_JSON),
+  );
+  const decompositionLatestMdPath = path.join(
+    args.selectedFamilyAuditRootDir,
+    path.basename(DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD),
+  );
+  const transportResultArtifact =
+    readJsonArtifact<Nhm2ShiftLapseTransportResultArtifact>(latestJsonPath);
+  const selectedFamily =
+    transportResultArtifact.selectedFamily &&
+    typeof transportResultArtifact.selectedFamily === "object"
+      ? transportResultArtifact.selectedFamily
+      : {
+          shiftLapseProfileId: null,
+          shiftLapseProfileStage: null,
+          shiftLapseProfileNote: null,
+        };
+  const selectedBundleArtifacts =
+    transportResultArtifact.selectedBundleArtifacts &&
+    typeof transportResultArtifact.selectedBundleArtifacts === "object"
+      ? transportResultArtifact.selectedBundleArtifacts
+      : {
+          worldlineLatestJsonPath: null,
+          missionTimeComparisonLatestJsonPath: null,
+        };
+  const fallbackProperTimeSeconds =
+    typeof transportResultArtifact.shiftTransportContribution_seconds === "number" &&
+    typeof transportResultArtifact.lapseClockRateContribution_seconds === "number" &&
+    typeof transportResultArtifact.shiftVsLapseResidual_seconds === "number"
+      ? transportResultArtifact.shiftTransportContribution_seconds +
+        transportResultArtifact.lapseClockRateContribution_seconds +
+        transportResultArtifact.shiftVsLapseResidual_seconds
+      : null;
+  const decompositionArtifact =
+    readJsonArtifactIfPresent<Nhm2ShiftVsLapseDecompositionArtifact>(
+      decompositionLatestJsonPath,
+    ) ??
+    buildNhm2ShiftVsLapseDecompositionArtifact({
+      familyId: "nhm2_shift_lapse",
+      shiftLapseProfileId: selectedFamily.shiftLapseProfileId ?? null,
+      shiftLapseProfileStage: selectedFamily.shiftLapseProfileStage ?? null,
+      shiftLapseProfileNote: selectedFamily.shiftLapseProfileNote ?? null,
+      sourceMissionTimeComparisonArtifactPath:
+        selectedBundleArtifacts.missionTimeComparisonLatestJsonPath ?? null,
+      sourceWorldlineArtifactPath:
+        selectedBundleArtifacts.worldlineLatestJsonPath ?? null,
+      centerlineAlpha: transportResultArtifact.centerlineAlpha,
+      centerlineDtauDt: transportResultArtifact.centerlineDtauDt,
+      interpretationStatus:
+        transportResultArtifact.missionTimeInterpretationStatus ?? null,
+      warpCoordinateTimeSeconds:
+        transportResultArtifact.shiftTransportContribution_seconds,
+      warpProperTimeSeconds: fallbackProperTimeSeconds,
+      classicalReferenceTimeSeconds:
+        transportResultArtifact.shiftTransportContribution_seconds,
+      properMinusCoordinateSeconds:
+        transportResultArtifact.properMinusCoordinate_seconds,
+    });
+  return {
+    boundedStack: {} as Awaited<
+      ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>
+    >["boundedStack"],
+    shiftVsLapseDecomposition: {
+      outJsonPath: decompositionLatestJsonPath,
+      latestJsonPath: decompositionLatestJsonPath,
+      outMdPath: decompositionLatestMdPath,
+      latestMdPath: decompositionLatestMdPath,
+      artifact: decompositionArtifact,
+    },
+    transportResult: {
+      outJsonPath: latestJsonPath,
+      latestJsonPath,
+      outMdPath: latestMdPath,
+      latestMdPath,
+      artifact: transportResultArtifact,
+    },
+  };
+};
+
+const readExistingSelectedShiftLapseProfileSweepForEnvelope = (args: {
+  selectedFamilyArtifactRootDir: string;
+  selectedFamilyAuditRootDir: string;
+}): Awaited<ReturnType<typeof publishNhm2ShiftLapseProfileSweep>> => {
+  const latestJsonPath = path.join(
+    args.selectedFamilyArtifactRootDir,
+    "sweep",
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_JSON),
+  );
+  const latestMdPath = path.join(
+    args.selectedFamilyAuditRootDir,
+    "sweep",
+    path.basename(SELECTED_SHIFT_LAPSE_SWEEP_LATEST_MD),
+  );
+  const artifact = readJsonArtifact<Nhm2ShiftLapseProfileSweepArtifact>(latestJsonPath);
+  return {
+    entries: artifact.entries,
+    sweepArtifact: {
+      outJsonPath: latestJsonPath,
+      latestJsonPath,
+      outMdPath: latestMdPath,
+      latestMdPath,
+      artifact,
+    },
+  };
+};
+
+const readExistingSelectedShiftLapseBoundarySweepForEnvelope = (args: {
+  selectedFamilyArtifactRootDir: string;
+  selectedFamilyAuditRootDir: string;
+}): Awaited<ReturnType<typeof publishNhm2ShiftLapseBoundarySweep>> => {
+  const latestJsonPath = path.join(
+    args.selectedFamilyArtifactRootDir,
+    "boundary-sweep",
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_JSON),
+  );
+  const latestMdPath = path.join(
+    args.selectedFamilyAuditRootDir,
+    "boundary-sweep",
+    path.basename(SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_LATEST_MD),
+  );
+  const artifact = readJsonArtifact<Nhm2ShiftLapseBoundarySweepArtifact>(latestJsonPath);
+  return {
+    entries: artifact.entries,
+    boundaryArtifact: {
+      outJsonPath: latestJsonPath,
+      latestJsonPath,
+      outMdPath: latestMdPath,
+      latestMdPath,
+      artifact,
+    },
+  };
+};
+
+const renderNhm2EnvelopePerturbationMarkdown = (
+  payload: Nhm2EnvelopePerturbationPublishedArtifact,
+): string => {
+  const suiteSections = payload.suites
+    .map((suite) => {
+      const rows = suite.cases
+        .map(
+          (entry) =>
+            `| ${entry.caseId} | ${entry.label} | ${entry.status} | ${entry.completeness} | ${entry.perturbation.valueLabel ?? "null"} | ${entry.transport.transportCertificationStatus ?? "null"} | ${entry.lowExpansion.status ?? "null"} | ${entry.wallSafety.status ?? "null"} | ${entry.solverHealth.status ?? "null"} | ${entry.missionTime.interpretationStatus ?? "null"} | ${entry.wallSafety.worstMargin ?? "null"} | ${entry.solverHealth.clampFractionHeadroom ?? "null"} |`,
+        )
+        .join("\n");
+      return `## ${suite.suiteLabel}
+
+- suiteId: \`${suite.suiteId}\`
+- axis: \`${suite.axis}\`
+- referenceCaseId: \`${suite.referenceCaseId ?? "null"}\`
+- status: \`${suite.status}\`
+- completeness: \`${suite.completeness}\`
+- caseCount: \`${suite.caseCount}\`
+- worstWallSafetyMargin: \`${suite.worstWallSafetyMargin ?? "null"}\`
+- tightestSolverHealthClampHeadroom: \`${suite.tightestSolverHealthClampHeadroom ?? "null"}\`
+- missionTimeInterpretationStatuses: ${suite.missionTimeInterpretationStatuses.length > 0 ? suite.missionTimeInterpretationStatuses.map((entry) => `\`${entry}\``).join(", ") : "none"}
+- summary: ${suite.summary ?? "null"}
+
+| caseId | label | status | completeness | perturbation | transport | lowExpansion | wallSafety | solverHealth | missionTime | wallSafetyMargin | solverClampHeadroom |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+${rows}`;
+    })
+    .join("\n\n");
+  const nonClaims = payload.nonClaims.map((entry) => `- ${entry}`).join("\n");
+  return `# NHM2 Envelope And Perturbation Suite (${payload.generatedOn})
+
+"${payload.boundaryStatement}"
+
+## Reproduce
+- publicationCommand: \`${payload.publicationCommand ?? "null"}\`
+- family.metricT00Ref: \`${payload.family.metricT00Ref ?? "null"}\`
+- family.shiftLapseProfileId: \`${payload.family.shiftLapseProfileId ?? "null"}\`
+- referenceTransportResultPath: \`${payload.family.referenceTransportResultPath ?? "null"}\`
+- referenceProfileSweepPath: \`${payload.family.referenceProfileSweepPath ?? "null"}\`
+- referenceBoundarySweepPath: \`${payload.family.referenceBoundarySweepPath ?? "null"}\`
+- deterministicCaseOrder: ${String(payload.reproducibility.deterministicCaseOrder)}
+- caseGenerationPolicyId: \`${payload.reproducibility.caseGenerationPolicyId}\`
+- supportingCommands: ${payload.reproducibility.supportingCommands.map((entry) => `\`${entry}\``).join(", ")}
+- checksum: \`${payload.checksum}\`
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| status | ${payload.status} |
+| completeness | ${payload.completeness} |
+| suiteCount | ${payload.summary.suiteCount} |
+| caseCount | ${payload.summary.caseCount} |
+| pass | ${payload.summary.statusCounts.pass} |
+| fail | ${payload.summary.statusCounts.fail} |
+| review | ${payload.summary.statusCounts.review} |
+| unavailable | ${payload.summary.statusCounts.unavailable} |
+| worstWallSafetyMargin | ${payload.summary.worstWallSafetyMargin ?? "null"} |
+| tightestSolverHealthClampHeadroom | ${payload.summary.tightestSolverHealthClampHeadroom ?? "null"} |
+
+${suiteSections}
+
+## Non-Claims
+${nonClaims}
+`;
+};
+
+export const publishNhm2ShiftLapseEnvelopeSuite = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  profileSweep: Awaited<ReturnType<typeof publishNhm2ShiftLapseProfileSweep>>;
+  boundarySweep: Awaited<ReturnType<typeof publishNhm2ShiftLapseBoundarySweep>>;
+  envelopeArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2EnvelopePerturbationPublishedArtifact;
+  };
+}> => {
+  const selectedFamilyArtifactRootDir =
+    options?.selectedFamilyArtifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const selectedFamilyAuditRootDir =
+    options?.selectedFamilyAuditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  const artifactRootDir =
+    options?.artifactRootDir ?? SELECTED_SHIFT_LAPSE_ENVELOPE_ARTIFACT_DIR;
+  const auditRootDir =
+    options?.auditRootDir ?? SELECTED_SHIFT_LAPSE_ENVELOPE_AUDIT_DIR;
+  const selectedTransport =
+    options?.reuseExistingSelectedArtifacts === true
+      ? readExistingSelectedShiftLapseTransportBundleForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseSelectedTransportBundle({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: selectedFamilyArtifactRootDir,
+          auditRootDir: selectedFamilyAuditRootDir,
+          publicationLockPath: path.join(
+            selectedFamilyArtifactRootDir,
+            ".nhm2-selected-family-bounded-stack.lock",
+          ),
+        });
+  const profileSweep =
+    options?.reuseExistingSelectedArtifacts === true
+      ? readExistingSelectedShiftLapseProfileSweepForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseProfileSweep({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: path.join(selectedFamilyArtifactRootDir, "sweep"),
+          auditRootDir: path.join(selectedFamilyAuditRootDir, "sweep"),
+        });
+  const boundarySweep =
+    options?.reuseExistingSelectedArtifacts === true
+      ? readExistingSelectedShiftLapseBoundarySweepForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseBoundarySweep({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: path.join(selectedFamilyArtifactRootDir, "boundary-sweep"),
+          auditRootDir: path.join(selectedFamilyAuditRootDir, "boundary-sweep"),
+        });
+  const baseState = await refreshPipelineStateForPublication(
+    SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS,
+  );
+  const resolutionCases: BuildNhm2EnvelopePerturbationCaseInput[] = [];
+  for (const spec of NHM2_ENVELOPE_RESOLUTION_CASE_SPECS) {
+    resolutionCases.push(
+      await runEnvelopeDirectPerturbationCase({
+        baseState,
+        spec,
+      }),
+    );
+  }
+  const boundaryConditionCases: BuildNhm2EnvelopePerturbationCaseInput[] = [];
+  for (const spec of NHM2_ENVELOPE_BOUNDARY_CASE_SPECS) {
+    boundaryConditionCases.push(
+      await runEnvelopeDirectPerturbationCase({
+        baseState,
+        spec,
+      }),
+    );
+  }
+  const localProfileCases = profileSweep.entries.map((entry) =>
+    buildEnvelopeCaseFromPublishedEntry({
+      entry,
+      suiteId: "local_lapse_profile_perturbations",
+      caseId: `profile_${entry.shiftLapseProfileId}`,
+      label: `Profile ${entry.shiftLapseProfileId}`,
+      boundaryMode: "clamp",
+    }),
+  );
+  const strongerBoundaryCases = boundarySweep.entries.map((entry) =>
+    buildEnvelopeCaseFromPublishedEntry({
+      entry,
+      suiteId: "stronger_boundary_lapse_perturbations",
+      caseId: `stronger_${entry.shiftLapseProfileId}`,
+      label: `Stronger boundary ${entry.shiftLapseProfileId}`,
+      boundaryMode: "clamp",
+    }),
+  );
+  const artifactBase = buildNhm2EnvelopePerturbationArtifact({
+    generatedOn: DATE_STAMP,
+    boundaryStatement:
+      "This artifact records reproducible NHM2 envelope evidence over the selected nhm2_shift_lapse family. It names perturbation suites, preserves negative outcomes, and does not widen speed, viability, or ETA claims.",
+    publicationCommand: SELECTED_SHIFT_LAPSE_ENVELOPE_COMMAND,
+    family: {
+      warpFieldType: "nhm2_shift_lapse",
+      metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+      metricT00Source: "metric",
+      shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      shiftLapseProfileStage: "controlled_tuning_stage_1",
+      referenceTransportResultPath: normalizePath(
+        selectedTransport.transportResult.latestJsonPath,
+      ),
+      referenceProfileSweepPath: normalizePath(profileSweep.sweepArtifact.latestJsonPath),
+      referenceBoundarySweepPath: normalizePath(
+        boundarySweep.boundaryArtifact.latestJsonPath,
+      ),
+    },
+    suites: [
+      {
+        suiteId: "resolution_sensitivity",
+        referenceCaseId:
+          NHM2_ENVELOPE_RESOLUTION_CASE_SPECS.find((entry) => entry.baseline)?.caseId ??
+          null,
+        summary:
+          "Deterministic direct-GR brick reruns over the selected family with fixed selectors and varying brick resolution.",
+        cases: resolutionCases,
+      },
+      {
+        suiteId: "boundary_condition_sensitivity",
+        referenceCaseId:
+          NHM2_ENVELOPE_BOUNDARY_CASE_SPECS.find((entry) => entry.baseline)?.caseId ??
+          null,
+        summary:
+          "Deterministic direct-GR brick reruns over the selected family with the boundary mode perturbed while keeping the selected profile fixed.",
+        cases: boundaryConditionCases,
+      },
+      {
+        suiteId: "local_lapse_profile_perturbations",
+        referenceCaseId: `profile_${DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID}`,
+        summary: profileSweep.sweepArtifact.artifact.robustnessSummary,
+        cases: localProfileCases,
+      },
+      {
+        suiteId: "stronger_boundary_lapse_perturbations",
+        referenceCaseId:
+          strongerBoundaryCases[0]?.caseId ?? null,
+        summary: boundarySweep.boundaryArtifact.artifact.boundarySummary,
+        cases: strongerBoundaryCases,
+      },
+    ],
+    reproducibility: {
+      caseGenerationPolicyId: "nhm2_selected_family_envelope_v1",
+      publicationCommand: SELECTED_SHIFT_LAPSE_ENVELOPE_COMMAND,
+      supportingCommands: [
+        SELECTED_SHIFT_LAPSE_PUBLICATION_COMMAND,
+        SELECTED_SHIFT_LAPSE_PROFILE_SWEEP_COMMAND,
+        SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_COMMAND,
+      ],
+      sourceArtifactPaths: [
+        normalizePath(selectedTransport.transportResult.latestJsonPath),
+        normalizePath(profileSweep.sweepArtifact.latestJsonPath),
+        normalizePath(boundarySweep.boundaryArtifact.latestJsonPath),
+      ],
+    },
+    nonClaims: [
+      "does not widen speed claims",
+      "does not widen ETA claims",
+      "does not widen viability claims",
+      "negative and incomplete perturbation cases remain first-class evidence",
+    ],
+  });
+  if (!isNhm2EnvelopePerturbationArtifact(artifactBase)) {
+    throw new Error("nhm2_envelope_perturbation_contract_invalid");
+  }
+  const artifact: Nhm2EnvelopePerturbationPublishedArtifact = {
+    ...artifactBase,
+    checksum: computeNhm2EnvelopePerturbationChecksum(artifactBase),
+  };
+  const markdown = renderNhm2EnvelopePerturbationMarkdown(artifact);
+  const outJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_ENVELOPE_OUT_JSON),
+  );
+  const latestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_ENVELOPE_LATEST_JSON),
+  );
+  const outMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_ENVELOPE_OUT_MD),
+  );
+  const latestMdPath = path.join(
+    auditRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_ENVELOPE_LATEST_MD),
+  );
+  ensureDirForFile(outJsonPath);
+  ensureDirForFile(latestJsonPath);
+  ensureDirForFile(outMdPath);
+  ensureDirForFile(latestMdPath);
+  fs.writeFileSync(outJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(latestJsonPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  fs.writeFileSync(outMdPath, `${markdown}\n`);
+  fs.writeFileSync(latestMdPath, `${markdown}\n`);
+  return {
+    selectedTransport,
+    profileSweep,
+    boundarySweep,
+    envelopeArtifact: {
       outJsonPath,
       latestJsonPath,
       outMdPath,
@@ -42653,6 +43987,10 @@ if (isEntryPoint) {
     "--publish-selected-shift-lapse-boundary-sweep",
     argv,
   );
+  const publishSelectedShiftLapseEnvelopeSuite = hasArg(
+    "--publish-selected-shift-lapse-envelope-suite",
+    argv,
+  );
   const parsedOptions = {
     baseUrl: readArgValue("--base-url", argv),
     shiftLapseProfileId: readArgValue("--shift-lapse-profile-id", argv),
@@ -42964,6 +44302,10 @@ if (isEntryPoint) {
       readArgValue("--publication-require-nhm2-congruent-full-solve", argv),
       false,
     ),
+    reuseExistingSelectedShiftLapseArtifacts: parseBooleanArg(
+      readArgValue("--reuse-existing-selected-shift-lapse-artifacts", argv),
+      false,
+    ),
     yorkViews: parseYorkViews(readArgValue("--views", argv)),
     frameSize: { width, height },
   };
@@ -42998,6 +44340,12 @@ if (isEntryPoint) {
     : publishSelectedShiftLapseBoundarySweep
     ? publishNhm2ShiftLapseBoundarySweep({
         baseUrl: parsedOptions.baseUrl,
+      })
+    : publishSelectedShiftLapseEnvelopeSuite
+    ? publishNhm2ShiftLapseEnvelopeSuite({
+        baseUrl: parsedOptions.baseUrl,
+        reuseExistingSelectedArtifacts:
+          parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
       })
     : publishBoundedStackLatest
     ? publishNhm2BoundedStackLatest({

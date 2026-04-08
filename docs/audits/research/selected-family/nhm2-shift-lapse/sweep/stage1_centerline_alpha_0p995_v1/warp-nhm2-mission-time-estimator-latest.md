@@ -1,4 +1,4 @@
-# NHM2 Mission-Time Estimator (2026-04-05)
+# NHM2 Mission-Time Estimator (2026-04-08)
 
 "This artifact records a bounded NHM2 mission-time estimator over a deterministic committed local-rest target-distance contract. It does not certify max speed, viability, unconstrained ETA, or a full route dynamic."
 

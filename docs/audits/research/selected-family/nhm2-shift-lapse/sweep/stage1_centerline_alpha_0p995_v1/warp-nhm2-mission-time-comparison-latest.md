@@ -1,4 +1,4 @@
-# NHM2 Mission-Time Comparison (2026-04-05)
+# NHM2 Mission-Time Comparison (2026-04-08)
 
 "This artifact records a bounded NHM2 mission-time comparison on a deterministic committed local-rest target-distance basis. It compares warp coordinate time, warp ship proper time, and a classical no-time-dilation reference without certifying speed, viability, or a route-map ETA surface."
 

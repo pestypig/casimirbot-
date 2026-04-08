@@ -1,4 +1,4 @@
-# NHM2 Cruise Envelope Preflight (2026-04-05)
+# NHM2 Cruise Envelope Preflight (2026-04-08)
 
 "This artifact records a bounded NHM2 cruise-envelope preflight over the certified local-comoving shell-cross worldline family. It does not certify max speed, route time, mission time, relativistic advantage, or viability."
 

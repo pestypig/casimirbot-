@@ -424,6 +424,7 @@ const makeShiftLapseProfileSweepEntryFixture = (args: {
     routeTimeWorldlineLatestJsonPath: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/${rootSegment}/${args.profileId}/nhm2-route-time-worldline-latest.json`,
     missionTimeEstimatorLatestJsonPath: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/${rootSegment}/${args.profileId}/nhm2-mission-time-estimator-latest.json`,
     missionTimeComparisonLatestJsonPath: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/${rootSegment}/${args.profileId}/nhm2-mission-time-comparison-latest.json`,
+    shiftVsLapseDecompositionLatestJsonPath: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/${rootSegment}/${args.profileId}/nhm2-shift-vs-lapse-decomposition-latest.json`,
     cruiseEnvelopeLatestJsonPath: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/${rootSegment}/${args.profileId}/nhm2-cruise-envelope-latest.json`,
     inHullProperAccelerationLatestJsonPath: `artifacts/research/full-solve/selected-family/nhm2-shift-lapse/${rootSegment}/${args.profileId}/nhm2-in-hull-proper-acceleration-latest.json`,
   },
@@ -486,6 +487,7 @@ afterEach(() => {
   vi.resetModules();
   vi.unstubAllGlobals();
   vi.doUnmock("../server/energy-pipeline.ts");
+  vi.doUnmock("../server/gr-evolve-brick.ts");
 });
 
 describe("bounded-stack latest publication", () => {
@@ -792,11 +794,67 @@ describe("bounded-stack latest publication", () => {
     expect(selectedResultJson.missionTimeInterpretationStatus).toBe(
       "bounded_relativistic_differential_detected",
     );
+    expect(selectedResultJson.shiftVsLapseApproximationStatus).toBe(
+      "approximate",
+    );
     expect(selectedResultJson.boundedTimingDifferentialDetected).toBe(true);
     expect(String(selectedResultJson.measuredResultSummary)).toContain(
       "bounded timing differential",
     );
     expect(String(selectedResultJson.measuredResultSummary)).not.toMatch(/speed|ETA/i);
+    expect(
+      selectedResultJson.selectedBundleArtifacts
+        ?.shiftVsLapseDecompositionLatestJsonPath,
+    ).toContain("nhm2-shift-vs-lapse-decomposition-latest.json");
+
+    const selectedDecompositionJson = readJsonFile<Record<string, any>>(
+      path.join(
+        selectedArtifactRoot,
+        "nhm2-shift-vs-lapse-decomposition-latest.json",
+      ),
+    );
+    expect(["pass", "review"]).toContain(selectedDecompositionJson.status);
+    expect(selectedDecompositionJson.profile?.shiftLapseProfileId).toBe(
+      SELECTED_SHIFT_LAPSE_PROFILE_ID,
+    );
+    expect(selectedDecompositionJson.lapseDial?.projectionSource).toBe(
+      "centerline_dtau_dt",
+    );
+    expect(selectedResultJson.shiftVsLapseDecompositionStatus).toBe(
+      selectedDecompositionJson.status,
+    );
+    expect(selectedResultJson.shiftTransportContribution_seconds).toBeCloseTo(
+      selectedDecompositionJson.decomposition
+        ?.fixedShiftFamilyTransportContributionSeconds,
+    );
+    expect(selectedResultJson.lapseClockRateContribution_seconds).toBeCloseTo(
+      selectedDecompositionJson.decomposition
+        ?.lapseProfileClockRateContributionSeconds,
+    );
+    expect(selectedResultJson.shiftVsLapseResidual_seconds).toBeCloseTo(
+      selectedDecompositionJson.decomposition
+        ?.residualUnexplainedContributionSeconds,
+    );
+    expect(selectedResultJson.lapseDialTrackedFraction).toBeCloseTo(
+      selectedDecompositionJson.decomposition?.lapseDialTrackedFraction,
+    );
+    expect(
+      selectedDecompositionJson.decomposition
+        ?.lapseProfileClockRateContributionSeconds,
+    ).toBeLessThan(0);
+    expect(
+      Math.abs(
+        Number(
+          selectedDecompositionJson.decomposition
+            ?.residualUnexplainedContributionSeconds,
+        ),
+      ),
+    ).toBeGreaterThanOrEqual(0);
+    if (selectedDecompositionJson.status === "review") {
+      expect(selectedDecompositionJson.reasonCodes).toContain(
+        "residual_exceeds_tolerance",
+      );
+    }
 
     const selectedResultMd = fs.readFileSync(
       path.join(
@@ -810,6 +868,22 @@ describe("bounded-stack latest publication", () => {
     expect(selectedResultMd).toContain(SELECTED_SHIFT_LAPSE_PROFILE_ID);
     expect(selectedResultMd).toContain(
       "npm run warp:full-solve:nhm2-shift-lapse:publish-selected-transport",
+    );
+    expect(selectedResultMd).toContain("shiftVsLapseDecomposition");
+
+    const selectedDecompositionMd = fs.readFileSync(
+      path.join(
+        selectedAuditRoot,
+        "warp-nhm2-shift-vs-lapse-decomposition-latest.md",
+      ),
+      "utf8",
+    );
+    expect(selectedDecompositionMd).toContain("approximate");
+    expect(selectedDecompositionMd).toContain(
+      "fixedShiftFamilyTransportContributionSeconds",
+    );
+    expect(selectedDecompositionMd).toContain(
+      "lapseProfileClockRateContributionSeconds",
     );
 
     const canonicalWorldlineAfter = fs.readFileSync(canonicalWorldlineLatestPath, "utf8");
@@ -1262,6 +1336,549 @@ describe("bounded-stack latest publication", () => {
         ),
       ),
     ).toBe(false);
+  });
+
+  it("publishes a selected-family envelope suite with direct GR perturbation cases and explicit mixed outcomes", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-envelope-suite-"));
+    const cloneState = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+    const stateByProfile = new Map(
+      [...SWEEP_PROFILE_SPECS, ...BOUNDARY_PROFILE_SPECS].map((spec) => [
+        spec.profileId,
+        makeShiftLapseSweepTimingPipelineState({
+          profileId: spec.profileId,
+          alpha: spec.alpha,
+        }),
+      ]),
+    );
+    const defaultSelectedState = makeShiftLapseSweepTimingPipelineState({
+      profileId: SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      alpha: TUNED_CENTERLINE_ALPHA,
+    });
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(makeFreshPipelineState()), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const applyGateFromDiagnostics = (
+      state: Record<string, any>,
+      gr: Record<string, any>,
+    ) => {
+      const divBetaRms = Number(gr?.divBeta?.rms ?? 0);
+      const betaUsage = Math.max(
+        Number(gr?.gauge?.betaOverAlphaMax ?? 0),
+        Number(gr?.gauge?.betaOutwardOverAlphaWallMax ?? 0),
+      );
+      const wallHorizonMargin = Number(gr?.gauge?.wallHorizonMargin ?? 0);
+      const lowExpansionStatus = divBetaRms <= 1e-3 ? "pass" : "fail";
+      const wallSafetyStatus =
+        betaUsage <= 1 && wallHorizonMargin > 0 ? "pass" : "fail";
+      const gateStatus =
+        lowExpansionStatus === "pass" && wallSafetyStatus === "pass"
+          ? "pass"
+          : "fail";
+      const transportCertificationStatus =
+        gateStatus === "pass"
+          ? "bounded_transport_proof_bearing_gate_admitted"
+          : "bounded_transport_fail_closed_reference_only";
+      const reason =
+        lowExpansionStatus !== "pass"
+          ? "brick_native_divergence_constraint_failed"
+          : wallSafetyStatus !== "pass"
+            ? "wall_safety_guardrail_not_satisfied"
+            : "shift_lapse_transport_promotion_gate_pass";
+      const gate = {
+        ...(state.shiftLapseTransportPromotionGate ?? {}),
+        status: gateStatus,
+        reason,
+        transportCertificationStatus,
+        authoritativeLowExpansionStatus: lowExpansionStatus,
+        authoritativeLowExpansionSource: "gr_evolve_brick",
+        divergenceRms: divBetaRms,
+        divergenceMaxAbs: Number(gr?.divBeta?.maxAbs ?? divBetaRms * 2),
+        divergenceTolerance: 1e-3,
+        thetaKConsistencyStatus: lowExpansionStatus === "pass" ? "pass" : "fail",
+        thetaKResidualAbs: divBetaRms,
+        thetaKTolerance: 1e-3,
+        wallSafetyStatus,
+        wallSafetyReason:
+          wallSafetyStatus === "pass"
+            ? "wall_safety_guardrail_ok"
+            : "wall_safety_guardrail_not_satisfied",
+        betaOverAlphaMax: Number(gr?.gauge?.betaOverAlphaMax ?? 0),
+        betaOutwardOverAlphaWallMax: Number(
+          gr?.gauge?.betaOutwardOverAlphaWallMax ?? 0,
+        ),
+        wallHorizonMargin,
+      };
+      state.shiftLapseTransportPromotionGate = gate;
+      const sourceSurfaces = [
+        state.warpWorldline?.sourceSurface,
+        state.warpCruiseEnvelopePreflight?.sourceSurface,
+        state.warpRouteTimeWorldline?.sourceSurface,
+        state.warpMissionTimeEstimator?.sourceSurface,
+        state.warpMissionTimeComparison?.sourceSurface,
+        state.warpCruiseEnvelope?.sourceSurface,
+        state.warpInHullProperAcceleration?.sourceSurface,
+      ].filter((entry): entry is Record<string, any> => Boolean(entry));
+      for (const sourceSurface of sourceSurfaces) {
+        sourceSurface.transportCertificationStatus = transportCertificationStatus;
+        sourceSurface.shiftLapseTransportPromotionGate = {
+          ...(sourceSurface.shiftLapseTransportPromotionGate ?? {}),
+          ...gate,
+        };
+      }
+    };
+    vi.doMock("../server/energy-pipeline.ts", () => ({
+      initializePipelineState: vi.fn(() => ({})),
+      getGlobalPipelineState: vi.fn(() => ({})),
+      calculateEnergyPipeline: vi.fn(async (state: Record<string, any>) => {
+        const profileId = String(
+          state?.dynamicConfig?.shiftLapseProfileId ?? SELECTED_SHIFT_LAPSE_PROFILE_ID,
+        );
+        const nextState = cloneState(
+          stateByProfile.get(profileId) ?? defaultSelectedState,
+        ) as Record<string, any>;
+        if (state?.gr) {
+          nextState.gr = state.gr;
+          applyGateFromDiagnostics(nextState, state.gr as Record<string, any>);
+        }
+        return nextState;
+      }),
+      setGlobalPipelineState: vi.fn(),
+      resolveCommittedLocalRestMissionTargetDistanceContract: vi.fn(() =>
+        makeWarpMissionTargetDistanceFixture(),
+      ),
+    }));
+    vi.doMock("../server/gr-evolve-brick.ts", () => ({
+      buildGrEvolveBrick: vi.fn((input: Record<string, any>) => ({
+        dims: input?.dims ?? [96, 96, 96],
+        boundary: input?.boundary ?? { mode: "clamp" },
+      })),
+      buildGrDiagnostics: vi.fn((brick: Record<string, any>) => {
+        const dim = Number(brick?.dims?.[0] ?? 96);
+        const boundaryMode = String(brick?.boundary?.mode ?? "clamp");
+        const betaUsage =
+          boundaryMode === "outflow" ? 1.2 : boundaryMode === "sommerfeld" ? 0.7 : 0.2;
+        const wallHorizonMargin =
+          boundaryMode === "outflow" ? -0.05 : boundaryMode === "sommerfeld" ? 0.25 : 0.4;
+        const divBetaRms = boundaryMode === "outflow" ? 2e-3 : 2e-4;
+        const solverStatus = dim === 64 ? "NOT_CERTIFIED" : "CERTIFIED";
+        const totalClampFraction = dim === 64 ? 0.012 : 0.002;
+        return {
+          grid: { dims: brick.dims, voxelSize_m: [1, 1, 1] },
+          solver: {
+            health: {
+              status: solverStatus,
+              reasons:
+                solverStatus === "NOT_CERTIFIED" ? ["clamp fraction high"] : [],
+              alphaClampFraction: totalClampFraction / 2,
+              kClampFraction: totalClampFraction / 2,
+              totalClampFraction,
+              maxAlphaBeforeClamp: dim === 64 ? 2.1 : 1.2,
+              maxKBeforeClamp: dim === 64 ? 2.05 : 1.1,
+            },
+          },
+          gauge: {
+            betaOverAlphaMax: betaUsage,
+            betaOutwardOverAlphaWallMax: betaUsage,
+            wallHorizonMargin,
+          },
+          divBeta: {
+            rms: divBetaRms,
+            maxAbs: divBetaRms * 2,
+            source: "gr_evolve_brick",
+          },
+        };
+      }),
+    }));
+
+    const {
+      publishNhm2ShiftLapseEnvelopeSuite,
+    } = await import("../scripts/warp-york-control-family-proof-pack");
+    const {
+      isNhm2EnvelopePerturbationArtifact,
+    } = await import("../shared/contracts/nhm2-envelope-perturbation-suite.v1");
+
+    const published = await publishNhm2ShiftLapseEnvelopeSuite({
+      baseUrl: "http://example.test",
+      selectedFamilyArtifactRootDir: path.join(
+        tempDir,
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse",
+      ),
+      selectedFamilyAuditRootDir: path.join(
+        tempDir,
+        "docs/audits/research/selected-family/nhm2-shift-lapse",
+      ),
+      artifactRootDir: path.join(
+        tempDir,
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope",
+      ),
+      auditRootDir: path.join(
+        tempDir,
+        "docs/audits/research/selected-family/nhm2-shift-lapse/envelope",
+      ),
+    });
+
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
+    expect(
+      isNhm2EnvelopePerturbationArtifact(published.envelopeArtifact.artifact),
+    ).toBe(true);
+    expect(published.envelopeArtifact.artifact.suiteOrder).toEqual([
+      "resolution_sensitivity",
+      "boundary_condition_sensitivity",
+      "local_lapse_profile_perturbations",
+      "stronger_boundary_lapse_perturbations",
+    ]);
+
+    const resolutionSuite = published.envelopeArtifact.artifact.suites.find(
+      (entry) => entry.suiteId === "resolution_sensitivity",
+    );
+    expect(resolutionSuite?.caseCount).toBe(3);
+    expect(
+      resolutionSuite?.cases.find((entry) => entry.caseId === "resolution_064")?.status,
+    ).toBe("review");
+
+    const boundarySuite = published.envelopeArtifact.artifact.suites.find(
+      (entry) => entry.suiteId === "boundary_condition_sensitivity",
+    );
+    expect(
+      boundarySuite?.cases.find((entry) => entry.caseId === "boundary_outflow")?.status,
+    ).toBe("fail");
+    expect(
+      boundarySuite?.cases.find((entry) => entry.caseId === "boundary_outflow")?.reasonCodes,
+    ).toContain("negative_result_preserved");
+
+    const localProfileSuite = published.envelopeArtifact.artifact.suites.find(
+      (entry) => entry.suiteId === "local_lapse_profile_perturbations",
+    );
+    expect(localProfileSuite?.caseOrder).toContain(
+      `profile_${SELECTED_SHIFT_LAPSE_PROFILE_ID}`,
+    );
+
+    const envelopeMarkdown = fs.readFileSync(
+      published.envelopeArtifact.latestMdPath,
+      "utf8",
+    );
+    expect(envelopeMarkdown).toContain("Resolution Sensitivity");
+    expect(envelopeMarkdown).toContain("Boundary-Condition Sensitivity");
+    expect(envelopeMarkdown).toContain("Stronger-Boundary Lapse Perturbations");
+  });
+
+  it("publishes reuse-mode envelope evidence without crashing when selected-bundle child artifacts are missing", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "warp-envelope-reuse-"));
+    const cloneState = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+    const defaultSelectedState = makeShiftLapseSweepTimingPipelineState({
+      profileId: SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      alpha: TUNED_CENTERLINE_ALPHA,
+    });
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(makeFreshPipelineState()), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const applyGateFromDiagnostics = (
+      state: Record<string, any>,
+      gr: Record<string, any>,
+    ) => {
+      const divBetaRms = Number(gr?.divBeta?.rms ?? 0);
+      const betaUsage = Math.max(
+        Number(gr?.gauge?.betaOverAlphaMax ?? 0),
+        Number(gr?.gauge?.betaOutwardOverAlphaWallMax ?? 0),
+      );
+      const wallHorizonMargin = Number(gr?.gauge?.wallHorizonMargin ?? 0);
+      const lowExpansionStatus = divBetaRms <= 1e-3 ? "pass" : "fail";
+      const wallSafetyStatus =
+        betaUsage <= 1 && wallHorizonMargin > 0 ? "pass" : "fail";
+      const gateStatus =
+        lowExpansionStatus === "pass" && wallSafetyStatus === "pass"
+          ? "pass"
+          : "fail";
+      const transportCertificationStatus =
+        gateStatus === "pass"
+          ? "bounded_transport_proof_bearing_gate_admitted"
+          : "bounded_transport_fail_closed_reference_only";
+      const reason =
+        lowExpansionStatus !== "pass"
+          ? "brick_native_divergence_constraint_failed"
+          : wallSafetyStatus !== "pass"
+            ? "wall_safety_guardrail_not_satisfied"
+            : "shift_lapse_transport_promotion_gate_pass";
+      state.shiftLapseTransportPromotionGate = {
+        ...(state.shiftLapseTransportPromotionGate ?? {}),
+        status: gateStatus,
+        reason,
+        transportCertificationStatus,
+        authoritativeLowExpansionStatus: lowExpansionStatus,
+        authoritativeLowExpansionSource: "gr_evolve_brick",
+        divergenceRms: divBetaRms,
+        divergenceMaxAbs: Number(gr?.divBeta?.maxAbs ?? divBetaRms * 2),
+        divergenceTolerance: 1e-3,
+        thetaKConsistencyStatus: lowExpansionStatus === "pass" ? "pass" : "fail",
+        thetaKResidualAbs: divBetaRms,
+        thetaKTolerance: 1e-3,
+        wallSafetyStatus,
+        wallSafetyReason:
+          wallSafetyStatus === "pass"
+            ? "wall_safety_guardrail_ok"
+            : "wall_safety_guardrail_not_satisfied",
+        betaOverAlphaMax: Number(gr?.gauge?.betaOverAlphaMax ?? 0),
+        betaOutwardOverAlphaWallMax: Number(
+          gr?.gauge?.betaOutwardOverAlphaWallMax ?? 0,
+        ),
+        wallHorizonMargin,
+      };
+    };
+    vi.doMock("../server/energy-pipeline.ts", () => ({
+      initializePipelineState: vi.fn(() => ({})),
+      getGlobalPipelineState: vi.fn(() => ({})),
+      calculateEnergyPipeline: vi.fn(async (state: Record<string, any>) => {
+        const nextState = cloneState(defaultSelectedState) as Record<string, any>;
+        if (state?.gr) {
+          nextState.gr = state.gr;
+          applyGateFromDiagnostics(nextState, state.gr as Record<string, any>);
+        }
+        return nextState;
+      }),
+      setGlobalPipelineState: vi.fn(),
+      resolveCommittedLocalRestMissionTargetDistanceContract: vi.fn(() =>
+        makeWarpMissionTargetDistanceFixture(),
+      ),
+    }));
+    vi.doMock("../server/gr-evolve-brick.ts", () => ({
+      buildGrEvolveBrick: vi.fn((input: Record<string, any>) => ({
+        dims: input?.dims ?? [96, 96, 96],
+        boundary: input?.boundary ?? { mode: "clamp" },
+      })),
+      buildGrDiagnostics: vi.fn((brick: Record<string, any>) => ({
+        grid: { dims: brick.dims, voxelSize_m: [1, 1, 1] },
+        solver: {
+          health: {
+            status: "CERTIFIED",
+            reasons: [],
+            alphaClampFraction: 0.001,
+            kClampFraction: 0.001,
+            totalClampFraction: 0.002,
+            maxAlphaBeforeClamp: 1.1,
+            maxKBeforeClamp: 1.05,
+          },
+        },
+        gauge: {
+          betaOverAlphaMax: 0.2,
+          betaOutwardOverAlphaWallMax: 0.2,
+          wallHorizonMargin: 0.4,
+        },
+        divBeta: {
+          rms: 2e-4,
+          maxAbs: 4e-4,
+          source: "gr_evolve_brick",
+        },
+      })),
+    }));
+
+    const {
+      buildNhm2ShiftLapseProfileSweepArtifact,
+      buildNhm2ShiftLapseBoundarySweepArtifact,
+      publishNhm2ShiftLapseEnvelopeSuite,
+    } = await import("../scripts/warp-york-control-family-proof-pack");
+
+    const selectedFamilyArtifactRootDir = path.join(
+      tempDir,
+      "artifacts/research/full-solve/selected-family/nhm2-shift-lapse",
+    );
+    const selectedFamilyAuditRootDir = path.join(
+      tempDir,
+      "docs/audits/research/selected-family/nhm2-shift-lapse",
+    );
+    const selectedEntryFixture = makeShiftLapseProfileSweepEntryFixture({
+      profileId: SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      alpha: TUNED_CENTERLINE_ALPHA,
+    });
+    const boundaryEntryFixture = makeShiftLapseProfileSweepEntryFixture({
+      profileId: SELECTED_SHIFT_LAPSE_PROFILE_ID,
+      alpha: TUNED_CENTERLINE_ALPHA,
+      rootSegment: "boundary-sweep",
+    });
+    const rebaseEntryPaths = <
+      T extends ReturnType<typeof makeShiftLapseProfileSweepEntryFixture>,
+    >(
+      entry: T,
+      rootSegment: "sweep" | "boundary-sweep",
+    ): T => ({
+      ...entry,
+      artifactRoot: path.join(selectedFamilyArtifactRootDir, rootSegment, entry.shiftLapseProfileId),
+      auditRoot: path.join(selectedFamilyAuditRootDir, rootSegment, entry.shiftLapseProfileId),
+      transportResultLatestJsonPath: path.join(
+        selectedFamilyArtifactRootDir,
+        rootSegment,
+        entry.shiftLapseProfileId,
+        "nhm2-shift-lapse-transport-result-latest.json",
+      ),
+      transportResultLatestMdPath: path.join(
+        selectedFamilyAuditRootDir,
+        rootSegment,
+        entry.shiftLapseProfileId,
+        "warp-nhm2-shift-lapse-transport-result-latest.md",
+      ),
+      selectedBundleArtifacts: {
+        worldlineLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-warp-worldline-proof-latest.json",
+        ),
+        cruiseEnvelopePreflightLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-cruise-envelope-preflight-latest.json",
+        ),
+        routeTimeWorldlineLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-route-time-worldline-latest.json",
+        ),
+        missionTimeEstimatorLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-mission-time-estimator-latest.json",
+        ),
+        missionTimeComparisonLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-mission-time-comparison-latest.json",
+        ),
+        shiftVsLapseDecompositionLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-shift-vs-lapse-decomposition-latest.json",
+        ),
+        cruiseEnvelopeLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-cruise-envelope-latest.json",
+        ),
+        inHullProperAccelerationLatestJsonPath: path.join(
+          selectedFamilyArtifactRootDir,
+          rootSegment,
+          entry.shiftLapseProfileId,
+          "nhm2-in-hull-proper-acceleration-latest.json",
+        ),
+      },
+    });
+    const selectedEntry = rebaseEntryPaths(selectedEntryFixture, "sweep");
+    const boundaryEntry = rebaseEntryPaths(boundaryEntryFixture, "boundary-sweep");
+
+    const transportLatestJsonPath = path.join(
+      selectedFamilyArtifactRootDir,
+      "nhm2-shift-lapse-transport-result-latest.json",
+    );
+    const transportLatestMdPath = path.join(
+      selectedFamilyAuditRootDir,
+      "warp-nhm2-shift-lapse-transport-result-latest.md",
+    );
+    fs.mkdirSync(path.dirname(transportLatestJsonPath), { recursive: true });
+    fs.mkdirSync(path.dirname(transportLatestMdPath), { recursive: true });
+    fs.writeFileSync(
+      transportLatestJsonPath,
+      `${JSON.stringify(
+        {
+          artifactType: "nhm2_shift_lapse_transport_result/v1",
+          selectedBundleArtifacts: selectedEntry.selectedBundleArtifacts,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    fs.writeFileSync(transportLatestMdPath, "# transport\n");
+
+    const sweepLatestJsonPath = path.join(
+      selectedFamilyArtifactRootDir,
+      "sweep",
+      "nhm2-shift-lapse-profile-sweep-latest.json",
+    );
+    const sweepLatestMdPath = path.join(
+      selectedFamilyAuditRootDir,
+      "sweep",
+      "warp-nhm2-shift-lapse-profile-sweep-latest.md",
+    );
+    fs.mkdirSync(path.dirname(sweepLatestJsonPath), { recursive: true });
+    fs.mkdirSync(path.dirname(sweepLatestMdPath), { recursive: true });
+    fs.writeFileSync(
+      sweepLatestJsonPath,
+      `${JSON.stringify(
+        buildNhm2ShiftLapseProfileSweepArtifact({
+          entries: [selectedEntry],
+        }),
+        null,
+        2,
+      )}\n`,
+    );
+    fs.writeFileSync(sweepLatestMdPath, "# sweep\n");
+
+    const boundaryLatestJsonPath = path.join(
+      selectedFamilyArtifactRootDir,
+      "boundary-sweep",
+      "nhm2-shift-lapse-boundary-sweep-latest.json",
+    );
+    const boundaryLatestMdPath = path.join(
+      selectedFamilyAuditRootDir,
+      "boundary-sweep",
+      "warp-nhm2-shift-lapse-boundary-sweep-latest.md",
+    );
+    fs.mkdirSync(path.dirname(boundaryLatestJsonPath), { recursive: true });
+    fs.mkdirSync(path.dirname(boundaryLatestMdPath), { recursive: true });
+    fs.writeFileSync(
+      boundaryLatestJsonPath,
+      `${JSON.stringify(
+        buildNhm2ShiftLapseBoundarySweepArtifact({
+          entries: [boundaryEntry],
+        }),
+        null,
+        2,
+      )}\n`,
+    );
+    fs.writeFileSync(boundaryLatestMdPath, "# boundary\n");
+
+    const published = await publishNhm2ShiftLapseEnvelopeSuite({
+      baseUrl: "http://example.test",
+      selectedFamilyArtifactRootDir,
+      selectedFamilyAuditRootDir,
+      artifactRootDir: path.join(
+        tempDir,
+        "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/envelope",
+      ),
+      auditRootDir: path.join(
+        tempDir,
+        "docs/audits/research/selected-family/nhm2-shift-lapse/envelope",
+      ),
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const localProfileSuite = published.envelopeArtifact.artifact.suites.find(
+      (entry) => entry.suiteId === "local_lapse_profile_perturbations",
+    );
+    const reusedCase = localProfileSuite?.cases.find(
+      (entry) => entry.caseId === `profile_${SELECTED_SHIFT_LAPSE_PROFILE_ID}`,
+    );
+    expect(reusedCase?.lowExpansion.status).toBe("pass");
+    expect(reusedCase?.wallSafety.status).toBe("pass");
+    expect(reusedCase?.missionTime.source).toBe("selected_bundle_contracts_reused");
+    expect(reusedCase?.status).toBe("review");
+    expect(reusedCase?.reasonCodes).toContain("mission_time_reused_from_selected_bundle");
+    expect(reusedCase?.artifactRefs.worldlineLatestJsonPath).toBe(
+      selectedEntry.selectedBundleArtifacts.worldlineLatestJsonPath,
+    );
+    expect(fs.existsSync(published.envelopeArtifact.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.envelopeArtifact.latestMdPath)).toBe(true);
   });
 
   it("reports a wall-safety first failure honestly in the boundary summary", async () => {

@@ -1,4 +1,4 @@
-# NHM2 Route-Time Worldline (2026-04-05)
+# NHM2 Route-Time Worldline (2026-04-08)
 
 "This artifact records a bounded NHM2 route-time worldline extension over a certified local probe segment. It does not certify mission time, target ETA, max speed, relativistic advantage, or viability."
 

@@ -82,6 +82,25 @@ import {
   type WarpInHullProperAccelerationSamplingGeometry,
   type WarpInHullProperAccelerationVec3,
 } from "../shared/contracts/warp-in-hull-proper-acceleration.v1.ts";
+import {
+  buildNhm2ObserverAuditArtifact,
+  type BuildNhm2ObserverAuditTensorInput,
+  type Nhm2ObserverAuditArtifact,
+} from "../shared/contracts/nhm2-observer-audit.v1.ts";
+import {
+  NHM2_SOURCE_CLOSURE_COMPONENTS,
+  buildNhm2SourceClosureArtifact,
+  normalizeNhm2SourceClosureTensor,
+  type Nhm2SourceClosureArtifact,
+  type Nhm2SourceClosureComponent,
+  type Nhm2SourceClosureSampledSummaryInput,
+  type Nhm2SourceClosureTensor,
+} from "../shared/contracts/nhm2-source-closure.v1.ts";
+import {
+  buildNhm2StrictSignalReadinessArtifact,
+  type Nhm2StrictSignalReadinessArtifact,
+  type Nhm2StrictSignalReadinessProvenance,
+} from "../shared/contracts/nhm2-strict-signal-readiness.v1.ts";
 import type { StressEnergyStats } from "./stress-energy-brick";
 import {
   DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID,
@@ -99,6 +118,7 @@ const DEFAULT_MODULATION_FREQ_GHZ = 15;
 const DEFAULT_WALL_THICKNESS_M = C / (DEFAULT_MODULATION_FREQ_GHZ * 1e9);
 const STROBE_DUTY_WINDOW_MS_DEFAULT = 12_000;
 const STROBE_DUTY_STALE_MS = 20_000;
+const DEFAULT_NHM2_SOURCE_CLOSURE_REL_LINF_MAX = 0.1;
 
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
@@ -478,6 +498,9 @@ const toFiniteNumber = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const asText = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
 const toFiniteVec3 = (
   value: unknown,
   fallback: [number, number, number],
@@ -658,6 +681,8 @@ const buildNatarioRuntimePayload = (
       (state as any).beta_avg,
     ) ?? 0;
   const shiftBeta = toFiniteVec3((fallback as any)?.shiftBeta, [shiftAmplitude, 0, 0]);
+  const metricStress = (warp.metricStressEnergy ?? {}) as Record<string, unknown>;
+  const tileEffectiveStress = (warp.tileEffectiveStressEnergy ?? {}) as Record<string, unknown>;
   const stress = (warp.stressEnergyTensor ??
     (state as any).stressEnergy ??
     (fallback as any)?.stressEnergyTensor ??
@@ -671,7 +696,11 @@ const buildNatarioRuntimePayload = (
     typeof warp.stressEnergySource === "string" && warp.stressEnergySource.length > 0
       ? String(warp.stressEnergySource)
       : undefined;
-  const metricT00 = firstFinite(warp.metricT00, stress.T00 as number | undefined);
+  const metricT00 = firstFinite(
+    warp.metricT00,
+    metricStress.T00 as number | undefined,
+    stress.T00 as number | undefined,
+  );
   const metricMode =
     metricT00 != null &&
     (metricT00SourceRaw === "metric" ||
@@ -708,6 +737,20 @@ const buildNatarioRuntimePayload = (
   const t11 = toFiniteNumber(stress.T11) ?? 0;
   const t22 = toFiniteNumber(stress.T22) ?? 0;
   const t33 = toFiniteNumber(stress.T33) ?? 0;
+  const metricStressEnergy = {
+    T00: toFiniteNumber(metricStress.T00),
+    T11: toFiniteNumber(metricStress.T11),
+    T22: toFiniteNumber(metricStress.T22),
+    T33: toFiniteNumber(metricStress.T33),
+  };
+  const tileEffectiveStressEnergy = {
+    T00: toFiniteNumber(tileEffectiveStress.T00),
+    T11: toFiniteNumber(tileEffectiveStress.T11),
+    T22: toFiniteNumber(tileEffectiveStress.T22),
+    T33: toFiniteNumber(tileEffectiveStress.T33),
+  };
+  const nhm2ObserverAudit = state.nhm2ObserverAudit;
+  const nhm2StrictSignalReadiness = state.nhm2StrictSignalReadiness;
 
   return {
     ...(fallback ?? {}),
@@ -729,6 +772,16 @@ const buildNatarioRuntimePayload = (
       (metricMode
         ? "metric"
         : "proxy"),
+    metricStressEnergy,
+    tileEffectiveStressEnergy,
+    tileEffectiveStressSource:
+      typeof warp.tileEffectiveStressSource === "string"
+        ? String(warp.tileEffectiveStressSource)
+        : undefined,
+    ...(nhm2ObserverAudit ? { nhm2ObserverAudit } : {}),
+    ...(nhm2StrictSignalReadiness
+      ? { nhm2StrictSignalReadiness }
+      : {}),
     metricT00,
     metricT00Source: metricT00Source ?? undefined,
     metricT00Ref,
@@ -1695,6 +1748,9 @@ export interface EnergyPipelineState {
   curvatureMeta?: CongruenceMeta;
   stressMeta?: CongruenceMeta;
   metricConstraint?: MetricConstraintAudit;
+  nhm2ObserverAudit?: Nhm2ObserverAuditArtifact;
+  nhm2SourceClosure?: Nhm2SourceClosureArtifact;
+  nhm2StrictSignalReadiness?: Nhm2StrictSignalReadinessArtifact;
 }
 
 export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayload => {
@@ -3919,6 +3975,625 @@ const refreshMetricConstraintAudit = (state: EnergyPipelineState): void => {
     unitSystem: unitSystemRaw,
     rho_constraint,
   };
+};
+
+const hasAnySourceClosureTensorComponent = (
+  tensor: Nhm2SourceClosureTensor | null | undefined,
+): tensor is Nhm2SourceClosureTensor =>
+  tensor != null &&
+  NHM2_SOURCE_CLOSURE_COMPONENTS.some((component) => tensor[component] != null);
+
+const extractNhm2SourceClosureTensor = (value: unknown): Nhm2SourceClosureTensor | null => {
+  if (!value || typeof value !== "object") return null;
+  const tensor = normalizeNhm2SourceClosureTensor(
+    value as Partial<Record<Nhm2SourceClosureComponent, unknown>>,
+  );
+  return hasAnySourceClosureTensorComponent(tensor) ? tensor : null;
+};
+
+const resolveNhm2SourceClosureTolerance = (): number => {
+  const configured = Number(process.env.WARP_NHM2_SOURCE_CLOSURE_REL_LINF_MAX);
+  return Number.isFinite(configured) && configured >= 0
+    ? Number(configured)
+    : DEFAULT_NHM2_SOURCE_CLOSURE_REL_LINF_MAX;
+};
+
+const magnitudeVec3 = (value: [number, number, number]): number =>
+  Math.hypot(value[0], value[1], value[2]);
+
+const normalizeVec3OrNull = (
+  value: [number, number, number] | null,
+): [number, number, number] | null => {
+  if (value == null) return null;
+  const mag = magnitudeVec3(value);
+  return mag > 1e-12
+    ? ([value[0] / mag, value[1] / mag, value[2] / mag] as [
+        number,
+        number,
+        number,
+      ])
+    : null;
+};
+
+const buildObserverConditionInput = (args: {
+  eulerian: number;
+  robust: number;
+  direction: [number, number, number] | null;
+  rapidity?: number | null;
+  source: string;
+}) => {
+  const severityGain = args.robust - args.eulerian;
+  return {
+    eulerianMin: args.eulerian,
+    eulerianMean: args.eulerian,
+    robustMin: args.robust,
+    robustMean: args.robust,
+    eulerianViolationFraction: args.eulerian < 0 ? 1 : 0,
+    robustViolationFraction: args.robust < 0 ? 1 : 0,
+    missedViolationFraction: args.robust < 0 && args.eulerian >= 0 ? 1 : 0,
+    severityGainMin: severityGain,
+    severityGainMean: severityGain,
+    maxRobustMinusEulerian: severityGain,
+    worstCase: {
+      index: 0,
+      value: args.robust,
+      direction: args.direction,
+      rapidity:
+        Number.isFinite(args.rapidity) && args.rapidity != null
+          ? Number(args.rapidity)
+          : null,
+      source: args.source,
+    },
+  };
+};
+
+const buildDiagonalObserverConditions = (
+  rho: number,
+  px: number,
+  py: number,
+  pz: number,
+): {
+  conditions: NonNullable<BuildNhm2ObserverAuditTensorInput["conditions"]>;
+  consistency: NonNullable<BuildNhm2ObserverAuditTensorInput["consistency"]>;
+} => {
+  const canonicalDir: [number, number, number] = [1, 0, 0];
+  const pressures = [px, py, pz] as const;
+  const axisDirs: [number, number, number][] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ];
+  const minPressureIndex = pressures.reduce(
+    (best, value, index, all) => (value < all[best] ? index : best),
+    0,
+  );
+  const maxAbsPressureIndex = pressures.reduce(
+    (best, value, index, all) =>
+      Math.abs(value) > Math.abs(all[best]) ? index : best,
+    0,
+  );
+  const canonicalProjection =
+    px * canonicalDir[0] * canonicalDir[0] +
+    py * canonicalDir[1] * canonicalDir[1] +
+    pz * canonicalDir[2] * canonicalDir[2];
+  const trace = px + py + pz;
+  const necRobust = rho + pressures[minPressureIndex];
+  const necEulerian = rho + canonicalProjection;
+  const wecRobust = Math.min(rho, necRobust);
+  const secRobust = Math.min(rho + px, rho + py, rho + pz, rho + trace);
+  const decRobust = Math.min(
+    rho,
+    rho - Math.abs(px),
+    rho - Math.abs(py),
+    rho - Math.abs(pz),
+  );
+  const secEulerian = 0.5 * (rho + trace);
+  const maxRobustMinusEulerian = Math.max(
+    necRobust - necEulerian,
+    wecRobust - rho,
+    secRobust - secEulerian,
+    decRobust - rho,
+  );
+
+  return {
+    conditions: {
+      nec: buildObserverConditionInput({
+        eulerian: necEulerian,
+        robust: necRobust,
+        direction: axisDirs[minPressureIndex],
+        source: "algebraic_type_i",
+      }),
+      wec: buildObserverConditionInput({
+        eulerian: rho,
+        robust: wecRobust,
+        direction: wecRobust === rho ? canonicalDir : axisDirs[minPressureIndex],
+        source: "algebraic_type_i",
+      }),
+      sec: buildObserverConditionInput({
+        eulerian: secEulerian,
+        robust: secRobust,
+        direction:
+          secRobust === rho + trace ? canonicalDir : axisDirs[minPressureIndex],
+        source: "algebraic_type_i",
+      }),
+      dec: buildObserverConditionInput({
+        eulerian: rho,
+        robust: decRobust,
+        direction:
+          decRobust === rho ? canonicalDir : axisDirs[maxAbsPressureIndex],
+        source: "algebraic_type_i",
+      }),
+    },
+    consistency: {
+      robustNotGreaterThanEulerian: maxRobustMinusEulerian <= 1e-8,
+      maxRobustMinusEulerian,
+    },
+  };
+};
+
+const buildDiagonalMetricObserverAuditTensorInput = (
+  state: EnergyPipelineState,
+): BuildNhm2ObserverAuditTensorInput => {
+  const { warpState, metricT00Ref } = resolveNhm2ArtifactContext(state);
+  const metricTensor =
+    extractNhm2SourceClosureTensor(warpState?.metricStressEnergy) ??
+    extractNhm2SourceClosureTensor(
+      warpState?.metricT00Source === "metric" || warpState?.stressEnergySource === "metric"
+        ? warpState?.stressEnergyTensor
+        : null,
+    );
+  const tensorRef = metricT00Ref ?? "warp.metricStressEnergy";
+  const rapidityCap =
+    toFiniteNumber(
+      (state.gr?.matter?.stressEnergy as StressEnergyStats | undefined)?.observerRobust?.rapidityCap,
+    ) ?? 2.5;
+  const rapidityCapBeta = Math.tanh(rapidityCap);
+  const limitationNotes = [
+    "Metric-required observer audit uses diagonal T_ab components only; T0i flux terms were not supplied and were treated as zero.",
+    "Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search.",
+  ];
+  const structuralMissing = ["metric_t0i_missing", "metric_tij_off_diagonal_missing"];
+
+  if (metricTensor == null) {
+    return {
+      tensorRef,
+      model: {
+        pressureModel: "diagonal_tensor_components",
+        fluxHandling: "assumed_zero_from_missing_t0i",
+        shearHandling: "assumed_zero_from_missing_tij",
+        limitationNotes,
+        note:
+          "Metric-required tensor was unavailable for observer audit; no diagonal or off-diagonal source tensor was emitted.",
+      },
+      fluxDiagnostics: {
+        status: "unavailable",
+        meanMagnitude: null,
+        maxMagnitude: null,
+        netMagnitude: null,
+        netDirection: null,
+        note: "Metric-required tensor unavailable.",
+      },
+      missingInputs: ["metric_tensor_missing", ...structuralMissing],
+    };
+  }
+
+  const rho = metricTensor.T00;
+  const px = metricTensor.T11;
+  const py = metricTensor.T22;
+  const pz = metricTensor.T33;
+  const diagonalMissing: string[] = [];
+  if (rho == null) diagonalMissing.push("metric_T00_missing");
+  if (px == null) diagonalMissing.push("metric_T11_missing");
+  if (py == null) diagonalMissing.push("metric_T22_missing");
+  if (pz == null) diagonalMissing.push("metric_T33_missing");
+
+  if (rho == null || px == null || py == null || pz == null) {
+    return {
+      tensorRef,
+      sampleCount: 1,
+      rapidityCap,
+      rapidityCapBeta,
+      model: {
+        pressureModel: "diagonal_tensor_components",
+        fluxHandling: "assumed_zero_from_missing_t0i",
+        shearHandling: "assumed_zero_from_missing_tij",
+        limitationNotes,
+        note:
+          "Metric-required tensor was emitted with incomplete diagonal components; observer minima could not be evaluated completely.",
+      },
+      fluxDiagnostics: {
+        status: "assumed_zero",
+        meanMagnitude: 0,
+        maxMagnitude: 0,
+        netMagnitude: 0,
+        netDirection: null,
+        note:
+          "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
+      },
+      missingInputs: [...diagonalMissing, ...structuralMissing],
+    };
+  }
+  const diagonal = buildDiagonalObserverConditions(rho, px, py, pz);
+
+  return {
+    tensorRef,
+    sampleCount: 1,
+    rapidityCap,
+    rapidityCapBeta,
+    typeI: {
+      count: 1,
+      fraction: 1,
+      tolerance: 0,
+    },
+    conditions: diagonal.conditions,
+    fluxDiagnostics: {
+      status: "assumed_zero",
+      meanMagnitude: 0,
+      maxMagnitude: 0,
+      netMagnitude: 0,
+      netDirection: null,
+      note:
+        "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path.",
+    },
+    consistency: diagonal.consistency,
+    model: {
+      pressureModel: "diagonal_tensor_components",
+      fluxHandling: "assumed_zero_from_missing_t0i",
+      shearHandling: "assumed_zero_from_missing_tij",
+      limitationNotes,
+      note:
+        "Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep.",
+    },
+    missingInputs: structuralMissing,
+  };
+};
+
+const buildTileObserverAuditTensorInput = (
+  state: EnergyPipelineState,
+): BuildNhm2ObserverAuditTensorInput => {
+  const warpState = (state as any).warp as Record<string, unknown> | undefined;
+  const stressStats = (state.gr?.matter?.stressEnergy ??
+    null) as StressEnergyStats | null;
+  const tileTensor =
+    extractNhm2SourceClosureTensor(warpState?.tileEffectiveStressEnergy) ??
+    extractNhm2SourceClosureTensor((state as any)?.tileEffectiveStressEnergy);
+  const observerRobust = stressStats?.observerRobust;
+  const globalRegion = stressStats?.tensorSampledSummaries?.regions?.find(
+    (region) => region.regionId === "global",
+  );
+  const netFlux = Array.isArray(stressStats?.netFlux)
+    ? toFiniteVec3(stressStats.netFlux, [0, 0, 0])
+    : [0, 0, 0];
+  const netMagnitude = magnitudeVec3(netFlux);
+  const diagonalReady =
+    tileTensor?.T00 != null &&
+    tileTensor?.T11 != null &&
+    tileTensor?.T22 != null &&
+    tileTensor?.T33 != null;
+  const diagonal =
+    diagonalReady && tileTensor != null
+      ? buildDiagonalObserverConditions(
+          tileTensor.T00 as number,
+          tileTensor.T11 as number,
+          tileTensor.T22 as number,
+          tileTensor.T33 as number,
+        )
+      : null;
+  return {
+    tensorRef: "warp.tileEffectiveStressEnergy",
+    sampleCount: globalRegion?.sampleCount ?? null,
+    rapidityCap:
+      toFiniteNumber(observerRobust?.rapidityCap) ??
+      (diagonalReady ? 2.5 : null),
+    rapidityCapBeta:
+      toFiniteNumber(observerRobust?.rapidityCapBeta) ??
+      (diagonalReady ? Math.tanh(2.5) : null),
+    typeI: {
+      count:
+        toFiniteNumber(observerRobust?.typeI?.count) ??
+        (diagonalReady ? 1 : null),
+      fraction:
+        toFiniteNumber(observerRobust?.typeI?.fraction) ??
+        (diagonalReady ? 1 : null),
+      tolerance:
+        toFiniteNumber(observerRobust?.typeI?.tolerance) ??
+        (diagonalReady ? 0 : null),
+    },
+    conditions: observerRobust
+      ? {
+          nec: observerRobust.nec,
+          wec: observerRobust.wec,
+          sec: observerRobust.sec,
+          dec: observerRobust.dec,
+        }
+      : diagonal?.conditions,
+    fluxDiagnostics: {
+      status:
+        observerRobust != null || stressStats != null
+          ? "available"
+          : diagonalReady
+            ? "unavailable"
+            : "unavailable",
+      meanMagnitude: toFiniteNumber(stressStats?.avgFluxMagnitude) ?? null,
+      maxMagnitude: null,
+      netMagnitude: Number.isFinite(netMagnitude) ? netMagnitude : null,
+      netDirection: normalizeVec3OrNull(
+        Number.isFinite(netMagnitude) && netMagnitude > 1e-12 ? netFlux : null,
+      ),
+      note:
+        observerRobust != null || stressStats != null
+          ? "Flux diagnostics come from the tile-effective brick S_i channels."
+          : diagonalReady
+            ? "Tile-effective tensor fell back to diagonal-only observer audit; flux direction diagnostics were unavailable because S_i channels were not emitted."
+            : "Tile-effective observer diagnostics were not emitted by the GR matter brick.",
+    },
+    consistency: observerRobust
+      ? {
+          robustNotGreaterThanEulerian:
+            observerRobust.consistency?.robustNotGreaterThanEulerian,
+          maxRobustMinusEulerian:
+            toFiniteNumber(observerRobust.consistency?.maxRobustMinusEulerian) ?? null,
+        }
+      : diagonal?.consistency,
+    model: {
+      pressureModel:
+        observerRobust != null || stressStats != null
+          ? "isotropic_pressure_proxy"
+          : diagonalReady
+            ? "diagonal_tensor_components"
+            : "isotropic_pressure_proxy",
+      fluxHandling:
+        observerRobust != null || stressStats != null
+          ? "voxel_flux_field"
+          : "missing_t0i_flux_channels",
+      shearHandling:
+        observerRobust != null || stressStats != null
+          ? "not_modeled_in_proxy"
+          : "assumed_zero_from_missing_tij",
+      limitationNotes:
+        observerRobust != null || stressStats != null
+          ? [
+              "Tile-effective observer audit uses the brick isotropic-pressure proxy (p = pressureFactor * rho).",
+              "Voxel flux S_i is resolved, but anisotropic pressure/shear terms are not promoted as full tensor truth in this artifact.",
+            ]
+          : [
+              "Tile-effective tensor fell back to a diagonal-only observer audit because GR brick flux diagnostics were unavailable.",
+              "This fallback does not supply flux magnitude search over T0i terms.",
+            ],
+      note:
+        typeof warpState?.tileEffectiveStressSource === "string"
+          ? `Tile-effective tensor source: ${String(warpState.tileEffectiveStressSource)}`
+          : observerRobust != null || stressStats != null
+            ? "Tile-effective observer audit comes from the GR matter brick surrogate."
+            : "Tile-effective observer audit used the emitted diagonal tensor fallback.",
+    },
+    missingInputs:
+      observerRobust != null
+        ? []
+        : diagonalReady
+          ? ["tile_t0i_flux_channels_missing"]
+          : ["tile_observer_diagnostics_missing"],
+  };
+};
+
+const collectNhm2SourceClosureSampledSummaries = (
+  state: EnergyPipelineState,
+  globalTileTensor: Nhm2SourceClosureTensor | null,
+): Nhm2SourceClosureSampledSummaryInput[] => {
+  const regions = state.gr?.matter?.stressEnergy?.tensorSampledSummaries?.regions;
+  if (Array.isArray(regions) && regions.length > 0) {
+    return regions.map((region) => ({
+      regionId: region.regionId,
+      sampleCount: region.sampleCount,
+      tileTensor: region.tensor,
+      note: region.note ?? null,
+    }));
+  }
+  if (globalTileTensor) {
+    return [
+      {
+        regionId: "global",
+        sampleCount: null,
+        tileTensor: globalTileTensor,
+        note: "global tensor summary fallback",
+      },
+    ];
+  }
+  return [];
+};
+
+const resolveNhm2ArtifactContext = (state: EnergyPipelineState) => {
+  const warpState = (state as any).warp as Record<string, any> | undefined;
+  const adapter = (warpState?.metricAdapter ?? null) as WarpMetricAdapterSnapshot | null;
+  const metricT00Ref = asText(warpState?.metricT00Ref);
+  const metricFamily =
+    adapter?.family ??
+    (metricT00Ref ? resolveMetricFamilyFromRef(metricT00Ref, adapter ?? undefined) : "unknown");
+  const nhm2Active =
+    metricFamily === "nhm2_shift_lapse" ||
+    (state as any)?.warpFieldType === "nhm2_shift_lapse" ||
+    (state.dynamicConfig as any)?.warpFieldType === "nhm2_shift_lapse";
+  return { warpState, adapter, metricT00Ref, metricFamily, nhm2Active };
+};
+
+const NHM2_TS_MISSING_SOURCE_CODES = new Set([
+  "timing_missing",
+  "hull_missing",
+  "metric_adapter_missing",
+  "chart_unknown",
+  "gamma_diag_missing",
+]);
+
+const resolveNhm2ThetaStrictSignalInput = (state: EnergyPipelineState) => {
+  const thetaMetricDerived =
+    typeof (state as any).theta_metric_derived === "boolean"
+      ? Boolean((state as any).theta_metric_derived)
+      : null;
+  const thetaMetricSource = asText((state as any).theta_metric_source);
+  const thetaSource =
+    thetaMetricDerived === true
+      ? thetaMetricSource
+      : asText((state as any).theta_source) ?? asText((state as any).theta_proxy_source);
+  const reasonCode =
+    thetaMetricDerived === true
+      ? null
+      : asText((state as any).theta_metric_reason) ??
+        (thetaSource == null ? "missing_theta_geom" : "theta_geom_proxy");
+  const provenance: Nhm2StrictSignalReadinessProvenance =
+    thetaMetricDerived === true
+      ? "metric"
+      : thetaSource != null
+        ? "proxy"
+        : "missing";
+  return {
+    metricDerived: thetaMetricDerived,
+    provenance,
+    sourcePath: thetaSource,
+    reasonCode,
+    reason: reasonCode,
+  };
+};
+
+const resolveNhm2TsStrictSignalInput = (state: EnergyPipelineState) => {
+  const tsMetricDerived =
+    typeof state.tsMetricDerived === "boolean" ? Boolean(state.tsMetricDerived) : null;
+  const tsSourceRaw = asText(state.tsMetricDerivedSource);
+  const sourceMissing =
+    tsSourceRaw == null || NHM2_TS_MISSING_SOURCE_CODES.has(tsSourceRaw);
+  const provenance: Nhm2StrictSignalReadinessProvenance =
+    tsMetricDerived === true
+      ? "metric"
+      : sourceMissing
+        ? "missing"
+        : "proxy";
+  return {
+    metricDerived: tsMetricDerived,
+    provenance,
+    sourcePath: provenance === "proxy" || tsMetricDerived === true ? tsSourceRaw : null,
+    reasonCode: tsMetricDerived === true ? null : tsSourceRaw ?? "timing_missing",
+    reason:
+      tsMetricDerived === true ? null : asText(state.tsMetricDerivedReason),
+  };
+};
+
+const resolveNhm2QiStrictSignalInput = (state: EnergyPipelineState) => {
+  const qiGuard =
+    ((state as any).qiGuardrail &&
+    typeof (state as any).qiGuardrail === "object"
+      ? (state as any).qiGuardrail
+      : null) as Record<string, unknown> | null;
+  const metricDerived =
+    typeof qiGuard?.metricDerived === "boolean"
+      ? Boolean(qiGuard.metricDerived)
+      : null;
+  const rhoSource = asText(qiGuard?.rhoSource);
+  const sourceRaw = asText(qiGuard?.metricDerivedSource) ?? rhoSource;
+  const sourceMissing =
+    sourceRaw == null || sourceRaw === "unknown" || sourceRaw === "metric-missing";
+  const provenance: Nhm2StrictSignalReadinessProvenance =
+    metricDerived === true
+      ? "metric"
+      : sourceMissing
+        ? "missing"
+        : "proxy";
+  const reasonCode =
+    metricDerived === true
+      ? null
+      : asText(qiGuard?.metricDerivedReason) ??
+        (sourceMissing ? "strict_signal_missing" : "insufficient_provenance");
+  return {
+    metricDerived,
+    provenance,
+    sourcePath: provenance === "proxy" || metricDerived === true ? sourceRaw : null,
+    rhoSource,
+    reasonCode,
+    reason: metricDerived === true ? null : asText(qiGuard?.metricDerivedReason) ?? reasonCode,
+    applicabilityStatus: asText(qiGuard?.applicabilityStatus),
+    applicabilityReasonCode: asText(qiGuard?.applicabilityReasonCode),
+  };
+};
+
+const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
+  const { warpState, metricT00Ref, nhm2Active } = resolveNhm2ArtifactContext(state);
+
+  if (!nhm2Active) {
+    delete state.nhm2SourceClosure;
+    return;
+  }
+
+  const metricRequiredTensor =
+    extractNhm2SourceClosureTensor(warpState?.metricStressEnergy) ??
+    extractNhm2SourceClosureTensor(
+      warpState?.metricT00Source === "metric" || warpState?.stressEnergySource === "metric"
+        ? warpState?.stressEnergyTensor
+        : null,
+    );
+  const tileEffectiveTensor =
+    extractNhm2SourceClosureTensor(warpState?.tileEffectiveStressEnergy) ??
+    extractNhm2SourceClosureTensor((state as any)?.tileEffectiveStressEnergy);
+  const metricTensorRef =
+    metricRequiredTensor != null
+      ? metricT00Ref ?? "warp.metricStressEnergy"
+      : "warp.metricStressEnergy";
+  const tileEffectiveTensorRef =
+    tileEffectiveTensor != null ? "warp.tileEffectiveStressEnergy" : "warp.tileEffectiveStressEnergy";
+  const sampledSummaries = collectNhm2SourceClosureSampledSummaries(
+    state,
+    tileEffectiveTensor,
+  );
+
+  state.nhm2SourceClosure = buildNhm2SourceClosureArtifact({
+    metricTensorRef,
+    tileEffectiveTensorRef,
+    metricRequiredTensor,
+    tileEffectiveTensor,
+    sampledSummaries,
+    toleranceRelLInf: resolveNhm2SourceClosureTolerance(),
+    scalarCl3RhoDeltaRel:
+      Number.isFinite(state.rho_delta_metric_mean) ? Number(state.rho_delta_metric_mean) : null,
+    assumptionsDrifted: null,
+  });
+};
+
+const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
+  const { nhm2Active } = resolveNhm2ArtifactContext(state);
+
+  if (!nhm2Active) {
+    delete state.nhm2ObserverAudit;
+    return;
+  }
+
+  state.nhm2ObserverAudit = buildNhm2ObserverAuditArtifact({
+    familyId: "nhm2_shift_lapse",
+    metricRequired: buildDiagonalMetricObserverAuditTensorInput(state),
+    tileEffective: buildTileObserverAuditTensorInput(state),
+  });
+};
+
+const refreshNhm2StrictSignalReadiness = (state: EnergyPipelineState): void => {
+  const { warpState, adapter, nhm2Active } = resolveNhm2ArtifactContext(state);
+
+  if (!nhm2Active) {
+    delete state.nhm2StrictSignalReadiness;
+    return;
+  }
+
+  state.nhm2StrictSignalReadiness = buildNhm2StrictSignalReadinessArtifact({
+    familyId: "nhm2_shift_lapse",
+    familyAuthorityStatus:
+      asText(adapter?.familyAuthorityStatus) ?? asText(warpState?.familyAuthorityStatus),
+    transportCertificationStatus:
+      asText(adapter?.transportCertificationStatus) ??
+      asText(warpState?.transportCertificationStatus),
+    lapseSummary:
+      (warpState?.lapseSummary as Record<string, unknown> | null | undefined) ??
+      (adapter?.lapseSummary as Record<string, unknown> | null | undefined) ??
+      null,
+    strictModeEnabled: strictCongruenceEnabled(),
+    theta: resolveNhm2ThetaStrictSignalInput(state),
+    ts: resolveNhm2TsStrictSignalInput(state),
+    qi: resolveNhm2QiStrictSignalInput(state),
+  });
 };
 
 const refreshCl3Telemetry = (state: EnergyPipelineState): void => {
@@ -7871,6 +8546,7 @@ export async function calculateEnergyPipeline(
   await refreshWarpInHullProperAcceleration(state);
   refreshMetricConstraintAudit(state);
   refreshCl3Telemetry(state);
+  refreshNhm2SourceClosure(state);
   refreshThetaAuditFromMetricAdapter(state);
   refreshCongruenceMeta(state);
   refreshUniversalCoverageStatus(state);
@@ -7971,6 +8647,8 @@ export async function calculateEnergyPipeline(
     state.curvatureLimit = state.fordRomanCompliance;
     state.overallStatus = qiStatusLate.overallStatus;
   }
+  refreshNhm2StrictSignalReadiness(state);
+  refreshNhm2ObserverAudit(state);
   // Canonical Natario payload now mirrors solved warp metric output.
   // Legacy inverse/proxy Natario is retained under `natarioLegacy` for diagnostics.
   (state as any).natario = buildNatarioRuntimePayload(
@@ -10637,12 +11315,43 @@ export async function computeEnergySnapshot(sim: any) {
   chartContractStatus: typeof (result as any).natario?.chartContractStatus === "string"
     ? String((result as any).natario.chartContractStatus)
     : undefined,
+  lapseSummary: (result as any).natario?.lapseSummary,
+  metricT00FamilyAuthorityStatus:
+    typeof (result as any).natario?.metricT00FamilyAuthorityStatus === "string"
+      ? String((result as any).natario.metricT00FamilyAuthorityStatus)
+      : undefined,
+  metricT00TransportCertificationStatus:
+    typeof (result as any).natario?.metricT00TransportCertificationStatus === "string"
+      ? String((result as any).natario.metricT00TransportCertificationStatus)
+      : undefined,
+  metricT00FamilySemanticsNote:
+    typeof (result as any).natario?.metricT00FamilySemanticsNote === "string"
+      ? String((result as any).natario.metricT00FamilySemanticsNote)
+      : undefined,
   stressEnergyTensor: {
     T00: finite((result as any).natario?.stressEnergyTensor?.T00),
     T11: finite((result as any).natario?.stressEnergyTensor?.T11),
     T22: finite((result as any).natario?.stressEnergyTensor?.T22),
     T33: finite((result as any).natario?.stressEnergyTensor?.T33),
   },
+  metricStressEnergy: {
+    T00: finite((result as any).natario?.metricStressEnergy?.T00),
+    T11: finite((result as any).natario?.metricStressEnergy?.T11),
+    T22: finite((result as any).natario?.metricStressEnergy?.T22),
+    T33: finite((result as any).natario?.metricStressEnergy?.T33),
+  },
+  tileEffectiveStressEnergy: {
+    T00: finite((result as any).natario?.tileEffectiveStressEnergy?.T00),
+    T11: finite((result as any).natario?.tileEffectiveStressEnergy?.T11),
+    T22: finite((result as any).natario?.tileEffectiveStressEnergy?.T22),
+    T33: finite((result as any).natario?.tileEffectiveStressEnergy?.T33),
+  },
+  nhm2ObserverAudit:
+    (result as any).natario?.nhm2ObserverAudit ??
+    (result as any).nhm2ObserverAudit,
+  nhm2StrictSignalReadiness:
+    (result as any).natario?.nhm2StrictSignalReadiness ??
+    (result as any).nhm2StrictSignalReadiness,
   };
 
   // --- Compatibility aliases: accept alternate server keys and provide both forms ---

@@ -372,6 +372,9 @@ export interface NatarioWarpResult {
   momentumFlux: number;                 // kgâ‹…m/sÂ² - booster shell
   stressEnergyTensor: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
   stressEnergySource?: StressEnergySource;
+  metricStressEnergy?: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
+  tileEffectiveStressEnergy?: { T00:number; T11:number; T22:number; T33:number; isNullEnergyConditionSatisfied: boolean };
+  tileEffectiveStressSource?: StressEnergySource;
   metricT00?: number;
   metricT00Source?: StressEnergySource;
   metricT00Ref?: string;
@@ -805,6 +808,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     momentumFlux: momentum.momentumFlux,
     stressEnergyTensor: stress,
     stressEnergySource,
+    ...(metricStress ? { metricStressEnergy: metricStress } : {}),
+    ...(pipelineStress ? { tileEffectiveStressEnergy: pipelineStress } : {}),
+    tileEffectiveStressSource: pipelineStress ? "pipeline" : "proxy",
     metricT00,
     metricT00Source,
     metricT00Ref,

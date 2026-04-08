@@ -33,6 +33,16 @@ vi.mock("../modules/physics/warpAgents", () => ({
 }));
 
 import { evaluateWarpViability } from "../tools/warpViability";
+import { buildNhm2ObserverAuditArtifact } from "../shared/contracts/nhm2-observer-audit.v1";
+import { buildNhm2SourceClosureArtifact } from "../shared/contracts/nhm2-source-closure.v1";
+import { buildNhm2StrictSignalReadinessArtifact } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
+import {
+  makeShiftLapseTransportPromotionGateFixture,
+  makeShiftLapseWarpWorldlineFixture,
+  makeWarpMissionTimeComparisonFixture,
+  makeWarpMissionTimeEstimatorFixture,
+} from "./helpers/warp-worldline-fixture";
 
 const makePipeline = (overrides: Record<string, unknown> = {}) => ({
   currentMode: "hover",
@@ -75,6 +85,157 @@ const makePipeline = (overrides: Record<string, unknown> = {}) => ({
   },
   ...overrides,
 });
+
+const buildPassingObserverAudit = () =>
+  buildNhm2ObserverAuditArtifact({
+    familyId: "nhm2_shift_lapse",
+    metricRequired: {
+      tensorRef: "warp.metricStressEnergy",
+      rapidityCap: 2.5,
+      rapidityCapBeta: Math.tanh(2.5),
+      typeI: { count: 64, fraction: 1, tolerance: 1e-9 },
+      conditions: {
+        nec: {
+          eulerianMin: 0.2,
+          eulerianMean: 0.2,
+          robustMin: 0.15,
+          robustMean: 0.15,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.05,
+          severityGainMean: -0.05,
+          maxRobustMinusEulerian: -0.05,
+          worstCase: { index: 0, value: 0.15, direction: [1, 0, 0], rapidity: 0.4, source: "capped_search" },
+        },
+        wec: {
+          eulerianMin: 0.2,
+          eulerianMean: 0.2,
+          robustMin: 0.14,
+          robustMean: 0.14,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.06,
+          severityGainMean: -0.06,
+          maxRobustMinusEulerian: -0.06,
+          worstCase: { index: 0, value: 0.14, direction: [1, 0, 0], rapidity: 0.4, source: "capped_search" },
+        },
+        sec: {
+          eulerianMin: 0.18,
+          eulerianMean: 0.18,
+          robustMin: 0.12,
+          robustMean: 0.12,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.06,
+          severityGainMean: -0.06,
+          maxRobustMinusEulerian: -0.06,
+          worstCase: { index: 0, value: 0.12, direction: [1, 0, 0], rapidity: 0.4, source: "capped_search" },
+        },
+        dec: {
+          eulerianMin: 0.16,
+          eulerianMean: 0.16,
+          robustMin: 0.11,
+          robustMean: 0.11,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.05,
+          severityGainMean: -0.05,
+          maxRobustMinusEulerian: -0.05,
+          worstCase: { index: 0, value: 0.11, direction: [1, 0, 0], rapidity: 0.4, source: "capped_search" },
+        },
+      },
+      fluxDiagnostics: {
+        status: "available",
+        meanMagnitude: 0.05,
+        maxMagnitude: 0.1,
+        netMagnitude: 0.01,
+        netDirection: [1, 0, 0],
+      },
+      model: {
+        pressureModel: "diagonal_tensor_components",
+        fluxHandling: "explicit_metric_tensor_flux",
+        shearHandling: "explicit_metric_tensor_shear",
+        limitationNotes: [],
+      },
+    },
+    tileEffective: {
+      tensorRef: "warp.tileEffectiveStressEnergy",
+      rapidityCap: 2.5,
+      rapidityCapBeta: Math.tanh(2.5),
+      typeI: { count: 64, fraction: 1, tolerance: 1e-9 },
+      conditions: {
+        nec: {
+          eulerianMin: 0.18,
+          eulerianMean: 0.18,
+          robustMin: 0.12,
+          robustMean: 0.12,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.06,
+          severityGainMean: -0.06,
+          maxRobustMinusEulerian: -0.06,
+          worstCase: { index: 1, value: 0.12, direction: [0, 1, 0], rapidity: 0.5, source: "capped_search" },
+        },
+        wec: {
+          eulerianMin: 0.17,
+          eulerianMean: 0.17,
+          robustMin: 0.11,
+          robustMean: 0.11,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.06,
+          severityGainMean: -0.06,
+          maxRobustMinusEulerian: -0.06,
+          worstCase: { index: 1, value: 0.11, direction: [0, 1, 0], rapidity: 0.5, source: "capped_search" },
+        },
+        sec: {
+          eulerianMin: 0.16,
+          eulerianMean: 0.16,
+          robustMin: 0.1,
+          robustMean: 0.1,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.06,
+          severityGainMean: -0.06,
+          maxRobustMinusEulerian: -0.06,
+          worstCase: { index: 1, value: 0.1, direction: [0, 1, 0], rapidity: 0.5, source: "capped_search" },
+        },
+        dec: {
+          eulerianMin: 0.14,
+          eulerianMean: 0.14,
+          robustMin: 0.09,
+          robustMean: 0.09,
+          eulerianViolationFraction: 0,
+          robustViolationFraction: 0,
+          missedViolationFraction: 0,
+          severityGainMin: -0.05,
+          severityGainMean: -0.05,
+          maxRobustMinusEulerian: -0.05,
+          worstCase: { index: 1, value: 0.09, direction: [0, 1, 0], rapidity: 0.5, source: "capped_search" },
+        },
+      },
+      fluxDiagnostics: {
+        status: "available",
+        meanMagnitude: 0.06,
+        maxMagnitude: 0.12,
+        netMagnitude: 0.02,
+        netDirection: [0, 1, 0],
+      },
+      model: {
+        pressureModel: "voxel_tensor_components",
+        fluxHandling: "voxel_flux_field",
+        shearHandling: "voxel_shear_field",
+        limitationNotes: [],
+      },
+    },
+  });
 
 describe("warp viability congruence wiring", () => {
   const strictEnv = process.env.WARP_STRICT_CONGRUENCE;
@@ -310,6 +471,516 @@ describe("warp viability congruence wiring", () => {
           "Combined shift/lapse safety remains advisory-only for this diagnostics-first branch.",
       }),
     );
+  });
+
+  it("surfaces tensor closure separately from CL3 scalar congruence", async () => {
+    runtime.pipeline = makePipeline({
+      gr: {
+        constraints: {
+          rho_constraint: { mean: -100 * SI_TO_GEOM_STRESS, rms: 0.1, maxAbs: 0.2 },
+          H_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+          M_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+        },
+        matter: { stressEnergy: { avgT00: -100 } },
+        gauge: { lapseMin: 1, betaMaxAbs: 0.1 },
+      },
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricT00Observer: "eulerian_n",
+        metricT00Normalization: "si_stress",
+        metricT00UnitSystem: "SI",
+        metricT00ContractStatus: "ok",
+        metricAdapter: {
+          family: "nhm2_shift_lapse",
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+      nhm2SourceClosure: buildNhm2SourceClosureArtifact({
+        metricTensorRef: "warp.metricStressEnergy",
+        tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+        metricRequiredTensor: {
+          T00: -100,
+          T11: 100,
+          T22: 100,
+          T33: 100,
+        },
+        tileEffectiveTensor: {
+          T00: -100,
+          T11: 60,
+          T22: 55,
+          T33: 50,
+        },
+        toleranceRelLInf: 0.1,
+        scalarCl3RhoDeltaRel: 0,
+      }),
+    });
+
+    const result = await evaluateWarpViability({});
+    const cl3 = result.constraints.find((c) => c.id === "CL3_RhoDelta");
+
+    expect(cl3?.passed).toBe(true);
+    expect((result.snapshot as any).nhm2_source_closure_status).toBe("fail");
+    expect((result.snapshot as any).nhm2_source_closure_completeness).toBe("complete");
+    expect((result.snapshot as any).nhm2_source_closure_reason_codes).toContain(
+      "tensor_residual_exceeded",
+    );
+    expect((result.snapshot as any).nhm2_source_closure_t00_rel).toBe(0);
+    expect((result.snapshot as any).nhm2_source_closure_cl3_secondary).toBe(true);
+  });
+
+  it("surfaces the emitted NHM2 observer artifact with dual tensor states and model labels", async () => {
+    runtime.pipeline = makePipeline({
+      nhm2ObserverAudit: buildNhm2ObserverAuditArtifact({
+        metricRequired: {
+          tensorRef: "warp.metricStressEnergy",
+          rapidityCap: 2.5,
+          rapidityCapBeta: Math.tanh(2.5),
+          conditions: {
+            nec: {
+              eulerianMin: 0.3,
+              eulerianMean: 0.3,
+              robustMin: 0.2,
+              robustMean: 0.2,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 0,
+              missedViolationFraction: 0,
+              severityGainMin: -0.1,
+              severityGainMean: -0.1,
+              maxRobustMinusEulerian: -0.1,
+              worstCase: {
+                index: 0,
+                value: 0.2,
+                direction: [1, 0, 0],
+                rapidity: null,
+                source: "algebraic_type_i",
+              },
+            },
+            wec: {
+              eulerianMin: 0.2,
+              eulerianMean: 0.2,
+              robustMin: 0.15,
+              robustMean: 0.15,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 0,
+              missedViolationFraction: 0,
+              severityGainMin: -0.05,
+              severityGainMean: -0.05,
+              maxRobustMinusEulerian: -0.05,
+              worstCase: {
+                index: 0,
+                value: 0.15,
+                direction: [1, 0, 0],
+                rapidity: null,
+                source: "algebraic_type_i",
+              },
+            },
+            sec: {
+              eulerianMin: 0.18,
+              eulerianMean: 0.18,
+              robustMin: 0.12,
+              robustMean: 0.12,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 0,
+              missedViolationFraction: 0,
+              severityGainMin: -0.06,
+              severityGainMean: -0.06,
+              maxRobustMinusEulerian: -0.06,
+              worstCase: {
+                index: 0,
+                value: 0.12,
+                direction: [1, 0, 0],
+                rapidity: null,
+                source: "algebraic_type_i",
+              },
+            },
+            dec: {
+              eulerianMin: 0.14,
+              eulerianMean: 0.14,
+              robustMin: 0.1,
+              robustMean: 0.1,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 0,
+              missedViolationFraction: 0,
+              severityGainMin: -0.04,
+              severityGainMean: -0.04,
+              maxRobustMinusEulerian: -0.04,
+              worstCase: {
+                index: 0,
+                value: 0.1,
+                direction: [1, 0, 0],
+                rapidity: null,
+                source: "algebraic_type_i",
+              },
+            },
+          },
+          fluxDiagnostics: {
+            status: "assumed_zero",
+            meanMagnitude: 0,
+            maxMagnitude: 0,
+            netMagnitude: 0,
+            netDirection: null,
+          },
+          model: {
+            pressureModel: "diagonal_tensor_components",
+            fluxHandling: "assumed_zero_from_missing_t0i",
+            shearHandling: "assumed_zero_from_missing_tij",
+            limitationNotes: ["metric diagonal-only observer audit"],
+          },
+          missingInputs: ["metric_t0i_missing"],
+        },
+        tileEffective: {
+          tensorRef: "warp.tileEffectiveStressEnergy",
+          typeI: { count: 100, fraction: 0.9, tolerance: 1e-9 },
+          conditions: {
+            nec: {
+              eulerianMin: 0.12,
+              eulerianMean: 0.12,
+              robustMin: 0.08,
+              robustMean: 0.08,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 0,
+              missedViolationFraction: 0,
+              severityGainMin: -0.04,
+              severityGainMean: -0.04,
+              maxRobustMinusEulerian: -0.04,
+              worstCase: {
+                index: 2,
+                value: 0.08,
+                direction: [0, 1, 0],
+                rapidity: 0.7,
+                source: "capped_search",
+              },
+            },
+            wec: {
+              eulerianMin: 0.1,
+              eulerianMean: 0.1,
+              robustMin: -0.05,
+              robustMean: -0.05,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 1,
+              missedViolationFraction: 1,
+              severityGainMin: -0.15,
+              severityGainMean: -0.15,
+              maxRobustMinusEulerian: -0.15,
+              worstCase: {
+                index: 2,
+                value: -0.05,
+                direction: [0, 1, 0],
+                rapidity: 0.7,
+                source: "capped_search",
+              },
+            },
+            sec: {
+              eulerianMin: 0.09,
+              eulerianMean: 0.09,
+              robustMin: 0.01,
+              robustMean: 0.01,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 0,
+              missedViolationFraction: 0,
+              severityGainMin: -0.08,
+              severityGainMean: -0.08,
+              maxRobustMinusEulerian: -0.08,
+              worstCase: {
+                index: 2,
+                value: 0.01,
+                direction: [0, 1, 0],
+                rapidity: 0.7,
+                source: "capped_search",
+              },
+            },
+            dec: {
+              eulerianMin: 0.07,
+              eulerianMean: 0.07,
+              robustMin: -0.02,
+              robustMean: -0.02,
+              eulerianViolationFraction: 0,
+              robustViolationFraction: 1,
+              missedViolationFraction: 1,
+              severityGainMin: -0.09,
+              severityGainMean: -0.09,
+              maxRobustMinusEulerian: -0.09,
+              worstCase: {
+                index: 2,
+                value: -0.02,
+                direction: [0, 1, 0],
+                rapidity: 0.7,
+                source: "capped_search",
+              },
+            },
+          },
+          fluxDiagnostics: {
+            status: "available",
+            meanMagnitude: 0.4,
+            maxMagnitude: 1.1,
+            netMagnitude: 0.02,
+            netDirection: [0, 1, 0],
+          },
+          model: {
+            pressureModel: "isotropic_pressure_proxy",
+            fluxHandling: "voxel_flux_field",
+            shearHandling: "not_modeled_in_proxy",
+            limitationNotes: ["isotropic pressure proxy"],
+          },
+        },
+      }),
+    });
+
+    const result = await evaluateWarpViability({});
+
+    expect((result.snapshot as any).nhm2_observer_audit_status).toBe("fail");
+    expect((result.snapshot as any).nhm2_observer_audit_completeness).toBe(
+      "incomplete",
+    );
+    expect((result.snapshot as any).nhm2_metric_observer_status).toBe("review");
+    expect((result.snapshot as any).nhm2_metric_observer_flux_status).toBe(
+      "assumed_zero",
+    );
+    expect((result.snapshot as any).nhm2_metric_observer_pressure_model).toBe(
+      "diagonal_tensor_components",
+    );
+    expect((result.snapshot as any).nhm2_tile_observer_status).toBe("fail");
+    expect((result.snapshot as any).nhm2_tile_observer_type_i_fraction).toBe(0.9);
+    expect((result.snapshot as any).nhm2_tile_observer_flux_status).toBe(
+      "available",
+    );
+    expect((result.snapshot as any).nhm2_tile_observer_pressure_model).toBe(
+      "isotropic_pressure_proxy",
+    );
+  });
+
+  it("surfaces the emitted NHM2 strict-signal artifact without inferring proxy or missing states", async () => {
+    runtime.pipeline = makePipeline({
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricAdapter: {
+          family: "nhm2_shift_lapse",
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+      nhm2StrictSignalReadiness: buildNhm2StrictSignalReadinessArtifact({
+        strictModeEnabled: true,
+        familyId: "nhm2_shift_lapse",
+        theta: {
+          metricDerived: false,
+          provenance: "proxy",
+          sourcePath: "pipeline.thetaCal",
+          reasonCode: "theta_geom_proxy",
+        },
+        ts: {
+          metricDerived: false,
+          provenance: "proxy",
+          sourcePath: "hardware_timing",
+          reasonCode: "hardware_timing",
+          reason: "clocking provenance is hardware telemetry",
+        },
+        qi: {
+          metricDerived: null,
+          provenance: "missing",
+          sourcePath: null,
+          rhoSource: null,
+          reasonCode: "strict_signal_missing",
+          applicabilityStatus: null,
+        },
+      }),
+    });
+
+    const result = await evaluateWarpViability({});
+
+    expect((result.snapshot as any).nhm2_strict_signal_status).toBe("fail");
+    expect((result.snapshot as any).nhm2_strict_signal_completeness).toBe("incomplete");
+    expect((result.snapshot as any).nhm2_theta_signal_provenance).toBe("proxy");
+    expect((result.snapshot as any).nhm2_theta_signal_source).toBe("pipeline.thetaCal");
+    expect((result.snapshot as any).nhm2_theta_signal_reason_code).toBe("theta_geom_proxy");
+    expect((result.snapshot as any).nhm2_ts_signal_provenance).toBe("proxy");
+    expect((result.snapshot as any).nhm2_ts_signal_source).toBe("hardware_timing");
+    expect((result.snapshot as any).nhm2_ts_signal_reason_code).toBe("hardware_timing");
+    expect((result.snapshot as any).nhm2_qi_signal_status).toBe("unavailable");
+    expect((result.snapshot as any).nhm2_qi_signal_provenance).toBe("missing");
+    expect((result.snapshot as any).nhm2_qi_applicability_status).toBeUndefined();
+    expect((result.snapshot as any).nhm2_strict_signal_ready).toBe(false);
+  });
+
+  it("emits a separate NHM2 full-loop audit layer with explicit missing evidence blockers", async () => {
+    const gate = makeShiftLapseTransportPromotionGateFixture({
+      shiftLapseProfileId: "stage1_centerline_alpha_0p9625_v1",
+      shiftLapseProfileStage: "stage1",
+      shiftLapseProfileLabel: "alpha=0.9625",
+      shiftLapseProfileNote: "selected family profile",
+      centerlineAlpha: 0.9625,
+      centerlineDtauDt: 0.9625,
+    });
+    const worldline = makeShiftLapseWarpWorldlineFixture(undefined, gate);
+    const missionTimeEstimator = makeWarpMissionTimeEstimatorFixture({ worldline });
+    const missionTimeComparison = makeWarpMissionTimeComparisonFixture({
+      missionTimeEstimator,
+    });
+
+    runtime.pipeline = makePipeline({
+      gr: {
+        constraints: {
+          rho_constraint: { mean: -100 * SI_TO_GEOM_STRESS, rms: 1e-4, maxAbs: 1e-4 },
+          H_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+          M_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+        },
+        matter: { stressEnergy: { avgT00: -100 } },
+        gauge: {
+          lapseMin: 1,
+          betaMaxAbs: 0.1,
+          betaOverAlphaMax: 0.2,
+          betaOverAlphaP98: 0.18,
+          betaOutwardOverAlphaWallMax: 0.15,
+          betaOutwardOverAlphaWallP98: 0.12,
+          wallHorizonMargin: 0.4,
+        },
+      },
+      qiGuardrail: {
+        marginRatio: 0.2,
+        lhs_Jm3: -1,
+        bound_Jm3: -5,
+        rhoSource: "warp.metric.T00.nhm2.shift_lapse",
+        applicabilityStatus: "PASS",
+      },
+      shiftLapseTransportPromotionGate: gate,
+      warpMissionTimeEstimator: missionTimeEstimator,
+      warpMissionTimeComparison: missionTimeComparison,
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricT00Observer: "eulerian_n",
+        metricT00Normalization: "si_stress",
+        metricT00UnitSystem: "SI",
+        metricT00ContractStatus: "ok",
+        metricAdapter: {
+          family: "nhm2_shift_lapse",
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+      nhm2StrictSignalReadiness: buildNhm2StrictSignalReadinessArtifact({
+        strictModeEnabled: true,
+        familyId: "nhm2_shift_lapse",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_proof_bearing_gate_admitted",
+        lapseSummary: {
+          alphaCenterline: 0.9625,
+          alphaMin: 0.95,
+          alphaMax: 1,
+          alphaProfileKind: "selected_profile",
+          alphaGradientAxis: "centerline",
+          shiftLapseProfileId: gate.shiftLapseProfileId,
+          shiftLapseProfileStage: gate.shiftLapseProfileStage,
+          shiftLapseProfileLabel: gate.shiftLapseProfileLabel,
+          shiftLapseProfileNote: gate.shiftLapseProfileNote,
+          signConvention: "dtau_dt_equals_alpha_for_zero_coordinate_velocity",
+        },
+        theta: {
+          metricDerived: true,
+          provenance: "metric",
+          sourcePath: "warp.metricAdapter.betaDiagnostics.thetaMax",
+        },
+        ts: {
+          metricDerived: true,
+          provenance: "metric",
+          sourcePath: "warp.metricAdapter.ts",
+        },
+        qi: {
+          metricDerived: true,
+          provenance: "metric",
+          sourcePath: "qiGuardrail",
+          rhoSource: "warp.metric.T00.nhm2.shift_lapse",
+          applicabilityStatus: "PASS",
+        },
+      }),
+      nhm2SourceClosure: buildNhm2SourceClosureArtifact({
+        metricTensorRef: "warp.metricStressEnergy",
+        tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+        metricRequiredTensor: {
+          T00: -100,
+          T11: 30,
+          T22: 30,
+          T33: 30,
+        },
+        tileEffectiveTensor: {
+          T00: -100,
+          T11: 30,
+          T22: 30,
+          T33: 30,
+        },
+        toleranceRelLInf: 0.1,
+        scalarCl3RhoDeltaRel: 0,
+      }),
+      nhm2ObserverAudit: buildPassingObserverAudit(),
+    });
+
+    const result = await evaluateWarpViability({});
+    const layer = result.policyLayers?.nhm2_full_loop_audit;
+
+    expect(layer).toBeTruthy();
+    expect(layer?.policyId).toBe("nhm2_full_loop_audit");
+    expect(layer?.artifact.sections.mission_time_outputs.state).toBe("pass");
+    expect(layer?.artifact.sections.strict_signal_readiness.state).toBe("pass");
+    expect(layer?.artifact.sections.source_closure.state).toBe("pass");
+    expect(layer?.artifact.sections.observer_audit.state).toBe("pass");
+    expect(layer?.artifact.sections.shift_vs_lapse_decomposition.reasons).toContain(
+      "shift_lapse_decomposition_missing",
+    );
+    expect(
+      layer?.artifact.sections.uncertainty_perturbation_reproducibility.reasons,
+    ).toEqual(
+      expect.arrayContaining(["perturbation_suite_missing", "reproducibility_missing"]),
+    );
+    expect((result.snapshot as any).nhm2_full_loop_audit_status).toBe(layer?.state);
+    expect((result.snapshot as any).nhm2_full_loop_blocking_reasons).toContain(
+      "shift_lapse_decomposition_missing",
+    );
+  });
+
+  it("does not emit an NHM2 full-loop policy layer for generic non-NHM2 runs", async () => {
+    runtime.pipeline = makePipeline({
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.natario.shift",
+        metricT00Observer: "eulerian_n",
+        metricT00Normalization: "si_stress",
+        metricT00UnitSystem: "SI",
+        metricT00ContractStatus: "ok",
+        metricAdapter: {
+          family: "natario",
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+      gr: {
+        constraints: {
+          rho_constraint: { mean: -100 * SI_TO_GEOM_STRESS, rms: 1e-4, maxAbs: 1e-4 },
+          H_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+          M_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+        },
+        matter: { stressEnergy: { avgT00: -100 } },
+        gauge: { lapseMin: 1, betaMaxAbs: 0.1 },
+      },
+      qiGuardrail: {
+        marginRatio: 0.2,
+        lhs_Jm3: -1,
+        bound_Jm3: -5,
+        rhoSource: "warp.metric.T00.natario.shift",
+        applicabilityStatus: "PASS",
+      },
+    });
+
+    const result = await evaluateWarpViability({});
+
+    expect(result.policyLayers).toBeUndefined();
+    expect((result.snapshot as any).nhm2_full_loop_audit_status).toBeUndefined();
   });
 
   it("fails FordRomanQI on proxy rho source in strict mode", async () => {
