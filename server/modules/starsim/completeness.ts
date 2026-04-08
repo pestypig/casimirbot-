@@ -8,6 +8,14 @@ import type {
 } from "./contract";
 
 const isPresent = (field: CanonicalField<unknown>): boolean => field.status !== "missing";
+const PHYS_ORDER: Record<PhysClass, number> = {
+  P0: 0,
+  P1: 1,
+  P2: 2,
+  P3: 3,
+  P4: 4,
+  P5: 5,
+};
 
 const flattenFields = (star: CanonicalStar): Array<[string, CanonicalField<unknown>]> => {
   const entries: Array<[string, CanonicalField<unknown>]> = [];
@@ -79,8 +87,12 @@ export function deriveObsClass(star: CanonicalStar): ObsClass {
     isPresent(star.fields.surface.resolved_surface_ref)
     || isPresent(star.fields.surface.granulation_timescale_min)
     || star.target.is_solar_calibrator;
+  const hasOrbitalContext =
+    isPresent(star.fields.orbital_context.naif_body_id)
+    || isPresent(star.fields.orbital_context.ephemeris_source)
+    || isPresent(star.fields.orbital_context.companion_count);
 
-  if (hasResolvedSurface && (hasMagnetic || isPresent(star.fields.orbital_context.naif_body_id))) return "O5";
+  if (hasResolvedSurface && hasMagnetic && hasOrbitalContext) return "O5";
   if (hasMagnetic) return "O4";
   if (hasSeismology) return "O3";
   if (hasTimeSeries) return "O2";
@@ -89,19 +101,34 @@ export function deriveObsClass(star: CanonicalStar): ObsClass {
   return "O0";
 }
 
-export function derivePhysClass(lanes: StarSimLaneResult[]): PhysClass {
-  let level = 0;
-  for (const lane of lanes) {
-    if (lane.availability !== "available") continue;
-    if (lane.requested_lane === "structure_1d") {
-      level = Math.max(level, 1);
-    }
-    if (lane.requested_lane === "activity") {
-      level = Math.max(level, 4);
-    }
-    if (lane.requested_lane === "barycenter" && lane.maturity === "ephemeris_exact") {
-      level = Math.max(level, 5);
-    }
-  }
-  return `P${level}` as PhysClass;
+export function maxPhysClass(classes: Array<PhysClass | null | undefined>): PhysClass {
+  return classes.reduce<PhysClass>((best, candidate) => {
+    if (!candidate) return best;
+    return PHYS_ORDER[candidate] > PHYS_ORDER[best] ? candidate : best;
+  }, "P0");
+}
+
+export function minPhysClass(classes: Array<PhysClass | null | undefined>): PhysClass | null {
+  const filtered = classes.filter((candidate): candidate is PhysClass => Boolean(candidate));
+  if (filtered.length === 0) return null;
+  return filtered.reduce<PhysClass>((best, candidate) =>
+    PHYS_ORDER[candidate] < PHYS_ORDER[best] ? candidate : best,
+  );
+}
+
+export function derivePhysDepthSummary(lanes: StarSimLaneResult[]): {
+  max_lane_depth: PhysClass;
+  requested_lane_depth: PhysClass | null;
+  requested_lane_status: "complete" | "partial" | "blocked";
+} {
+  const available = lanes.filter((lane) => lane.status === "available");
+  const availablePhysics = available.filter((lane) => lane.phys_class !== "P0");
+  const blockers = lanes.some((lane) => lane.status === "unavailable" || lane.status === "failed");
+  const partial = !blockers && lanes.some((lane) => lane.status === "not_applicable");
+
+  return {
+    max_lane_depth: maxPhysClass(available.map((lane) => lane.phys_class)),
+    requested_lane_depth: blockers ? null : minPhysClass(availablePhysics.map((lane) => lane.phys_class)),
+    requested_lane_status: blockers ? "blocked" : partial ? "partial" : "complete",
+  };
 }

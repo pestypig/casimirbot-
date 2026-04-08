@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const fieldStatusSchema = z.enum(["observed", "fit", "prior", "default", "missing"]);
+export const fieldStatusSchema = z.enum(["observed", "fit", "prior", "default", "inferred", "missing"]);
 export const maturitySchema = z.enum([
   "teaching",
   "reduced_order",
@@ -10,6 +10,8 @@ export const maturitySchema = z.enum([
   "ephemeris_exact",
 ]);
 export const requestedLaneSchema = z.enum(["classification", "structure_1d", "activity", "barycenter"]);
+export const laneStatusSchema = z.enum(["available", "unavailable", "not_applicable", "failed"]);
+export const executionKindSchema = z.enum(["simulation", "diagnostic", "replay", "analytic", "fit"]);
 
 const sectionMetaShape = {
   source: z.string().optional(),
@@ -144,16 +146,20 @@ export type StarSimRequest = z.infer<typeof starSimRequestSchema>;
 export type FieldStatus = z.infer<typeof fieldStatusSchema>;
 export type Maturity = z.infer<typeof maturitySchema>;
 export type RequestedLane = z.infer<typeof requestedLaneSchema>;
+export type LaneStatus = z.infer<typeof laneStatusSchema>;
+export type ExecutionKind = z.infer<typeof executionKindSchema>;
 export type ObsClass = "O0" | "O1" | "O2" | "O3" | "O4" | "O5";
 export type PhysClass = "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
 
 export interface CanonicalField<T = unknown> {
   value: T | null;
+  raw_value: unknown | null;
   unit: string | null;
   uncertainty: number | null;
   source: string | null;
   status: FieldStatus;
   provenance_ref: string | null;
+  normalization: string | null;
 }
 
 export interface CanonicalStarTarget {
@@ -242,7 +248,11 @@ export interface StarSimLaneResult {
   solver_id: string;
   label: string;
   availability: "available" | "unavailable";
+  status: LaneStatus;
+  status_reason?: string;
+  execution_kind: ExecutionKind;
   maturity: Maturity;
+  phys_class: PhysClass;
   assumptions: string[];
   domain_validity: Record<string, unknown>;
   observables_used: string[];
@@ -272,20 +282,37 @@ export interface StarSimCongruence {
     lane_id: string;
     requested_lane: RequestedLane;
     availability: "available" | "unavailable";
+    status: LaneStatus;
     evidence_fit: number;
     domain_penalty: number;
     maturity_weight: number;
-    lane_score: number;
+    lane_score: number | null;
   }>;
   overall_score: number;
+  overall_available_score: number;
+  overall_requested_score: number;
+  requested_blockers: RequestedLane[];
+  not_applicable_requested_lanes: RequestedLane[];
 }
 
 export interface StarSimResponse {
   schema_version: "star-sim-v1";
+  meta: {
+    contract_version: "star-sim-v1";
+    normalization_version: "star-sim.canonicalize/2";
+    solver_manifest_version: "star-sim.registry/2";
+    congruence_version: "star-sim.harmonic/2";
+    claim_identity_version: "star-sim.claims/2";
+    deterministic_request_hash: string;
+    canonical_observables_hash: string;
+    solver_manifest_hash: string;
+  };
   target: CanonicalStarTarget;
   taxonomy: {
     obs_class: ObsClass;
     phys_class: PhysClass;
+    requested_phys_class: PhysClass | null;
+    requested_phys_class_status: "complete" | "partial" | "blocked";
   };
   canonical_observables: CanonicalStarFields;
   completeness: StarSimCompleteness;

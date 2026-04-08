@@ -9,11 +9,13 @@ type SectionMeta = {
 
 const missingField = <T>(unit: string | null): CanonicalField<T> => ({
   value: null,
+  raw_value: null,
   unit,
   uncertainty: null,
   source: null,
   status: "missing",
   provenance_ref: null,
+  normalization: null,
 });
 
 const buildField = <T>(
@@ -22,17 +24,24 @@ const buildField = <T>(
   sectionMeta: SectionMeta | undefined,
   key: string,
   fallbackSource: string,
+  options?: {
+    rawValue?: unknown;
+    normalization?: string | null;
+    defaultStatus?: FieldStatus;
+  },
 ): CanonicalField<T> => {
   if (value === null || value === undefined) {
     return missingField<T>(unit);
   }
   return {
     value,
+    raw_value: options?.rawValue ?? value,
     unit,
     uncertainty: sectionMeta?.uncertainties?.[key] ?? null,
     source: sectionMeta?.source ?? fallbackSource,
-    status: sectionMeta?.statuses?.[key] ?? "observed",
+    status: sectionMeta?.statuses?.[key] ?? options?.defaultStatus ?? "observed",
     provenance_ref: sectionMeta?.provenance_ref ?? null,
+    normalization: options?.normalization ?? null,
   };
 };
 
@@ -119,6 +128,11 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
           photometry,
           "band_count",
           "request.photometry",
+          {
+            rawValue: photometry?.bands ?? null,
+            normalization: photometry?.bands ? "count_keys(request.photometry.bands)" : null,
+            defaultStatus: photometry?.bands ? "inferred" : "missing",
+          },
         ),
         time_series_ref: buildField(
           photometry?.time_series_ref,
@@ -159,6 +173,11 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
           spectroscopy,
           "abundance_count",
           "request.spectroscopy",
+          {
+            rawValue: spectroscopy?.abundances ?? null,
+            normalization: spectroscopy?.abundances ? "count_keys(request.spectroscopy.abundances)" : null,
+            defaultStatus: spectroscopy?.abundances ? "inferred" : "missing",
+          },
         ),
       },
       asteroseismology: {
@@ -182,6 +201,13 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
           asteroseismology,
           "mode_count",
           "request.asteroseismology",
+          {
+            rawValue: asteroseismology?.mode_frequencies_uHz ?? null,
+            normalization: asteroseismology?.mode_frequencies_uHz
+              ? "count_entries(request.asteroseismology.mode_frequencies_uHz)"
+              : null,
+            defaultStatus: asteroseismology?.mode_frequencies_uHz ? "inferred" : "missing",
+          },
         ),
       },
       activity: {
@@ -265,6 +291,11 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
           orbital,
           "companion_count",
           "request.orbital_context",
+          {
+            rawValue: orbital?.companions ?? null,
+            normalization: orbital?.companions ? "count_entries(request.orbital_context.companions)" : null,
+            defaultStatus: orbital?.companions ? "inferred" : "missing",
+          },
         ),
       },
       environment: {

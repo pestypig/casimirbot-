@@ -10,6 +10,9 @@ import {
   buildNhm2ShiftVsLapseDecompositionArtifact,
 } from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
 import {
+  isNhm2StrictSignalReadinessArtifact,
+} from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import {
   isNhm2FullLoopAuditContract,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
 import type { HullScientificRenderView } from "../shared/hull-render-contract";
@@ -116,6 +119,7 @@ import {
   buildNhm2ShiftLapseTransportResultArtifact,
   computeNhm2EnvelopePerturbationChecksum,
   publishNhm2EnvelopePerturbationResearchSurface,
+  publishNhm2ShiftLapseStrictSignalReadiness,
   publishNhm2ShiftLapseFullLoopAudit,
   publishNhm2ShiftVsLapseDecompositionResearchSurface,
   renderNhm2WarpWorldlineProofMarkdown,
@@ -988,6 +992,132 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| strict_signal_readiness |");
     expect(markdown).toContain("| source_closure |");
     expect(markdown).toContain("do not widen route ETA, transport, gravity, or viability claims");
+  });
+
+  it("publishes a selected-profile NHM2 strict-signal readiness artifact that stays fail-closed on missing emitted signal provenance", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const published = await publishNhm2ShiftLapseStrictSignalReadiness({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: path.join(
+        fixture.artifactRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      selectedFamilyAuditRootDir: path.join(
+        fixture.auditRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    expect(path.basename(published.strictSignalArtifact.latestJsonPath)).toBe(
+      "nhm2-strict-signal-readiness-latest.json",
+    );
+    expect(path.basename(published.strictSignalArtifact.latestMdPath)).toBe(
+      "warp-nhm2-strict-signal-readiness-latest.md",
+    );
+    expect(fs.existsSync(published.strictSignalArtifact.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.strictSignalArtifact.latestMdPath)).toBe(true);
+
+    const json = JSON.parse(
+      fs.readFileSync(published.strictSignalArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2StrictSignalReadinessArtifact(json)).toBe(true);
+    expect((json as any).status).toBe("fail");
+    expect((json as any).completeness).toBe("incomplete");
+    expect((json as any).family.familyId).toBe("nhm2_shift_lapse");
+    expect((json as any).family.lapseSummary.shiftLapseProfileId).toBe(
+      fixture.selectedProfileId,
+    );
+    expect((json as any).reasonCodes).toEqual(["strict_signal_missing"]);
+    expect((json as any).missingSignals).toEqual(["theta", "ts", "qi"]);
+    expect((json as any).proxySignals).toEqual([]);
+    expect((json as any).signals.theta.status).toBe("unavailable");
+    expect((json as any).signals.ts.status).toBe("unavailable");
+    expect((json as any).signals.qi.status).toBe("unavailable");
+    expect((json as any).promotionInputs.thetaMetricDerived).toBe(false);
+    expect((json as any).promotionInputs.tsMetricDerived).toBe(false);
+    expect((json as any).promotionInputs.qiMetricDerived).toBe(false);
+    expect((json as any).promotionInputs.qiApplicabilityStatus).toBeNull();
+    expect((json as any).readiness.promotionSignalReady).toBe(false);
+    expect((json as any).readiness.certifiedPromotionReady).toBe(false);
+
+    const markdown = fs.readFileSync(
+      published.strictSignalArtifact.latestMdPath,
+      "utf8",
+    );
+    expect(markdown).toContain("NHM2 Strict-Signal Readiness");
+    expect(markdown).toContain("publish-strict-signal-readiness");
+    expect(markdown).toContain(fixture.selectedProfileId);
+    expect(markdown).toContain("| theta | unavailable |");
+    expect(markdown).toContain("| ts | unavailable |");
+    expect(markdown).toContain("| qi | unavailable |");
+    expect(markdown).toContain("strict_signal_missing");
+    expect(markdown).toContain(
+      "does not widen route ETA, transport, gravity, or viability claims",
+    );
+  });
+
+  it("lets the full-loop audit consume emitted strict-signal evidence without upgrading missing signals", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    await publishNhm2ShiftLapseStrictSignalReadiness({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: path.join(
+        fixture.artifactRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      selectedFamilyAuditRootDir: path.join(
+        fixture.auditRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const published = await publishNhm2ShiftLapseFullLoopAudit({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: path.join(
+        fixture.artifactRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      selectedFamilyAuditRootDir: path.join(
+        fixture.auditRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const json = JSON.parse(
+      fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2FullLoopAuditContract(json)).toBe(true);
+    expect((json as any).sections.strict_signal_readiness.state).toBe("fail");
+    expect((json as any).sections.strict_signal_readiness.reasons).toContain(
+      "strict_signal_missing",
+    );
+    expect((json as any).sections.strict_signal_readiness.artifactRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactId: "nhm2_strict_signal_readiness",
+          path: expect.stringContaining(
+            "nhm2-strict-signal-readiness-latest.json",
+          ),
+        }),
+      ]),
+    );
+    expect((json as any).sections.strict_signal_readiness.missingSignals).toEqual([
+      "theta",
+      "ts",
+      "qi",
+    ]);
+    expect((json as any).highestPassingClaimTier).toBe("diagnostic");
+
+    const markdown = fs.readFileSync(published.auditArtifact.latestMdPath, "utf8");
+    expect(markdown).toContain(
+      "artifacts/research/full-solve/nhm2-strict-signal-readiness-latest.json",
+    );
+    expect(markdown).toContain("| strict_signal_readiness |");
   });
 
   it("blocks the full-loop audit when selected-profile refs are mismatched or contradictory", async () => {

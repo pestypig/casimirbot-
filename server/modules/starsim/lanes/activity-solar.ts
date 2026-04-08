@@ -46,7 +46,11 @@ export async function runActivitySolarLane(star: CanonicalStar): Promise<StarSim
       solver_id: "halobank.solar.activity/1",
       label: "Solar activity diagnostics",
       availability: "unavailable",
+      status: "unavailable",
+      status_reason: "sun_only_lane",
+      execution_kind: "replay",
       maturity: "obs_fit",
+      phys_class: "P4",
       assumptions: ["Current activity lane is Sun-only and depends on solar replay datasets."],
       domain_validity: {
         supported_targets: ["Sun"],
@@ -128,14 +132,19 @@ export async function runActivitySolarLane(star: CanonicalStar): Promise<StarSim
   const equationRefs = modules.flatMap((entry) => entry.tree_dag.equation_refs);
   const moduleClaimIds = modules.map((entry) => entry.tree_dag.claim_id);
   const moduleEvidenceRefs = modules.flatMap((entry) => entry.tree_dag.evidence_refs);
+  const status = passFraction === 1 ? "available" : "failed";
 
   return {
     lane_id: "activity_solar_observed",
     requested_lane: "activity",
     solver_id: "halobank.solar.activity/1",
     label: "Solar activity diagnostics",
-    availability: "available",
+    availability: status === "available" ? "available" : "unavailable",
+    status,
+    status_reason: status === "available" ? undefined : "diagnostic_gate_failed",
+    execution_kind: "replay",
     maturity: "obs_fit",
+    phys_class: "P4",
     assumptions: [
       "This lane replays observational solar diagnostics; it does not perform 3D MHD.",
       "Sunquake and p-mode outputs are diagnostic correlations, not causal proofs.",
@@ -171,7 +180,7 @@ export async function runActivitySolarLane(star: CanonicalStar): Promise<StarSim
       modules,
     },
     evidence_fit: evidenceFit,
-    domain_penalty: domainPenalty,
+    domain_penalty: status === "available" ? domainPenalty : 0,
     note: "This is a solar observational lane. It exposes the current replay diagnostics with their original TREE+DAG identities and guardrails.",
   };
 }

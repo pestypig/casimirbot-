@@ -1,12 +1,48 @@
-import { getBaryState, getBodyStateSource } from "../../halobank-solar/ephemeris-core";
+import { getBaryState, getBodyStateSource, resolveSupportedBody } from "../../halobank-solar/ephemeris-core";
 import { buildTreeDagClaim, collectCanonicalEvidenceRefs } from "../claims";
 import type { CanonicalStar, StarSimLaneResult } from "../contract";
 
 export function runBarycenterAnalyticLane(star: CanonicalStar): StarSimLaneResult {
   const explicitBodyId = star.fields.orbital_context.naif_body_id.value;
+  const supportedExplicitBody = typeof explicitBodyId === "number" ? resolveSupportedBody(explicitBodyId) : null;
   const bodyId =
-    typeof explicitBodyId === "number" ? explicitBodyId : star.target.is_solar_calibrator ? 10 : null;
+    supportedExplicitBody ? explicitBodyId : star.target.is_solar_calibrator ? 10 : null;
   const evidenceRefs = collectCanonicalEvidenceRefs(star);
+
+  if (typeof explicitBodyId === "number" && !supportedExplicitBody) {
+    return {
+      lane_id: "barycenter_analytic",
+      requested_lane: "barycenter",
+      solver_id: "halobank.solar.barycenter/1",
+      label: "Analytic barycenter state",
+      availability: "unavailable",
+      status: "unavailable",
+      status_reason: "unsupported_body",
+      execution_kind: "analytic",
+      maturity: "reduced_order",
+      phys_class: "P2",
+      assumptions: ["Current barycenter lane only supports the built-in solar-system body map."],
+      domain_validity: {
+        supported_context: "current solar-system body map only",
+      },
+      observables_used: ["orbital_context.naif_body_id"],
+      inferred_params: {
+        requested_body_id: explicitBodyId,
+      },
+      residuals_sigma: {},
+      falsifier_ids: ["STAR_SIM_BARYCENTER_BODY_UNSUPPORTED"],
+      tree_dag: buildTreeDagClaim({
+        claim_id: "claim:star-sim:barycenter_analytic",
+        evidence_refs: evidenceRefs,
+      }),
+      result: {
+        reason: "The requested body id is outside the currently supported barycenter map.",
+      },
+      evidence_fit: 0,
+      domain_penalty: 0,
+      note: "This adapter does not yet bridge arbitrary stellar barycenters, SPICE kernels, or forward N-body propagation.",
+    };
+  }
 
   if (bodyId === null) {
     return {
@@ -15,7 +51,11 @@ export function runBarycenterAnalyticLane(star: CanonicalStar): StarSimLaneResul
       solver_id: "halobank.solar.barycenter/1",
       label: "Analytic barycenter state",
       availability: "unavailable",
+      status: "not_applicable",
+      status_reason: "orbital_context_missing",
+      execution_kind: "analytic",
       maturity: "reduced_order",
+      phys_class: "P2",
       assumptions: ["Current barycenter lane requires a supported NAIF body id or the solar calibration target."],
       domain_validity: {
         supported_context: "current solar-system body map only",
@@ -50,7 +90,10 @@ export function runBarycenterAnalyticLane(star: CanonicalStar): StarSimLaneResul
     solver_id: "halobank.solar.barycenter/1",
     label: "Analytic barycenter state",
     availability: "available",
+    status: "available",
+    execution_kind: "analytic",
     maturity: "reduced_order",
+    phys_class: "P2",
     assumptions: [
       "Current barycenter state comes from astronomy-engine or synthetic diagnostic orbits, not SPICE exact kernels.",
     ],
@@ -76,6 +119,8 @@ export function runBarycenterAnalyticLane(star: CanonicalStar): StarSimLaneResul
       position_AU: state.pos,
       velocity_AU_per_day: state.vel,
       state_source: stateSource,
+      ephemeris_grade: "approximate",
+      not_for_precision_navigation: true,
     },
     evidence_fit: evidenceFit,
     domain_penalty: domainPenalty,

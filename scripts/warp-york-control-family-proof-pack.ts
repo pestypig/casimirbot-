@@ -84,6 +84,7 @@ import {
   type Nhm2FullLoopAuditState,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
 import {
+  buildNhm2StrictSignalReadinessArtifact,
   isNhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
@@ -594,6 +595,22 @@ const DEFAULT_SHIFT_VS_LAPSE_DECOMPOSITION_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-shift-vs-lapse-decomposition-latest.md",
 );
+const DEFAULT_STRICT_SIGNAL_READINESS_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-strict-signal-readiness-${DATE_STAMP}.json`,
+);
+const DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-strict-signal-readiness-latest.json",
+);
+const DEFAULT_STRICT_SIGNAL_READINESS_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-strict-signal-readiness-${DATE_STAMP}.md`,
+);
+const DEFAULT_STRICT_SIGNAL_READINESS_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-strict-signal-readiness-latest.md",
+);
 const DEFAULT_FULL_LOOP_AUDIT_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-full-loop-audit-${DATE_STAMP}.json`,
@@ -788,6 +805,8 @@ const SELECTED_SHIFT_LAPSE_BOUNDARY_SWEEP_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep";
 const SELECTED_SHIFT_LAPSE_ENVELOPE_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite";
+const SELECTED_SHIFT_LAPSE_STRICT_SIGNAL_READINESS_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-strict-signal-readiness";
 const SELECTED_SHIFT_LAPSE_FULL_LOOP_AUDIT_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit";
 const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
@@ -798,10 +817,6 @@ const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
   requireNhm2CongruentFullSolve: true,
   shiftLapseProfileId: DEFAULT_SELECTED_SHIFT_LAPSE_PROFILE_ID,
 };
-const DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON = path.join(
-  FULL_SOLVE_DIR,
-  "nhm2-strict-signal-readiness-latest.json",
-);
 const DEFAULT_SOURCE_CLOSURE_LATEST_JSON = path.join(
   FULL_SOLVE_DIR,
   "nhm2-source-closure-latest.json",
@@ -6640,11 +6655,13 @@ const resolveArtifactProfileId = (value: unknown): string | null => {
       : null;
   const profile = asRecord(record.profile);
   const family = asRecord(record.family);
+  const lapseSummary = asRecord(family.lapseSummary);
   const selectedFamily = asRecord(record.selectedFamily);
   return (
     asText(sourceSurface?.shiftLapseProfileId) ??
     asText(gate?.shiftLapseProfileId) ??
     asText(profile.shiftLapseProfileId) ??
+    asText(lapseSummary.shiftLapseProfileId) ??
     asText(family.shiftLapseProfileId) ??
     asText(selectedFamily.shiftLapseProfileId) ??
     asText(record.shiftLapseProfileId)
@@ -26856,6 +26873,339 @@ export const publishNhm2ShiftVsLapseDecompositionResearchSurface = (args: {
   });
 };
 
+const resolveStrictSignalPublishedProfileId = (args: {
+  transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
+  worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
+  missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+}): string => {
+  const selectedProfileId =
+    args.transportResultArtifact.selectedFamily.shiftLapseProfileId ??
+    resolveArtifactProfileId(args.worldlineArtifact) ??
+    resolveArtifactProfileId(args.missionTimeComparisonArtifact);
+  if (selectedProfileId == null) {
+    throw new Error("nhm2_strict_signal_selected_profile_missing");
+  }
+  const profileChecks = [
+    {
+      artifactId: "nhm2_warp_worldline_proof",
+      actualProfileId: resolveArtifactProfileId(args.worldlineArtifact),
+    },
+    {
+      artifactId: "nhm2_mission_time_comparison",
+      actualProfileId: resolveArtifactProfileId(args.missionTimeComparisonArtifact),
+    },
+  ];
+  for (const check of profileChecks) {
+    if (check.actualProfileId == null) {
+      throw new Error(
+        `nhm2_strict_signal_profile_missing:${check.artifactId}:${selectedProfileId}`,
+      );
+    }
+    if (check.actualProfileId !== selectedProfileId) {
+      throw new Error(
+        `nhm2_strict_signal_profile_mismatch:${check.artifactId}:${check.actualProfileId}:${selectedProfileId}`,
+      );
+    }
+  }
+  return selectedProfileId;
+};
+
+const resolveStrictSignalPublishedFamilyId = (args: {
+  transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
+  worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
+  missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+}): string => {
+  const familyId =
+    args.transportResultArtifact.selectedFamily.warpFieldType ??
+    resolveArtifactFamilyId(args.worldlineArtifact) ??
+    resolveArtifactFamilyId(args.missionTimeComparisonArtifact) ??
+    "nhm2_shift_lapse";
+  const familyChecks = [
+    {
+      artifactId: "nhm2_warp_worldline_proof",
+      actualFamilyId: resolveArtifactFamilyId(args.worldlineArtifact),
+    },
+    {
+      artifactId: "nhm2_mission_time_comparison",
+      actualFamilyId: resolveArtifactFamilyId(args.missionTimeComparisonArtifact),
+    },
+  ];
+  for (const check of familyChecks) {
+    if (check.actualFamilyId != null && check.actualFamilyId !== familyId) {
+      throw new Error(
+        `nhm2_strict_signal_family_mismatch:${check.artifactId}:${check.actualFamilyId}:${familyId}`,
+      );
+    }
+  }
+  return familyId;
+};
+
+const buildMissingStrictSignalReason = (
+  signalId: "theta" | "ts" | "qi",
+): string => {
+  switch (signalId) {
+    case "theta":
+      return "No emitted selected-profile artifact currently publishes theta metric-derivation provenance.";
+    case "ts":
+      return "No emitted selected-profile artifact currently publishes TS metric-derivation provenance.";
+    case "qi":
+      return "No emitted selected-profile artifact currently publishes QI metric-derivation provenance or applicability status.";
+  }
+};
+
+const buildNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile = (args: {
+  transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
+  worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
+  missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+}): Nhm2StrictSignalReadinessArtifact => {
+  const familyId = resolveStrictSignalPublishedFamilyId(args);
+  const selectedProfileId = resolveStrictSignalPublishedProfileId(args);
+  const shiftGate =
+    resolvePublishedShiftLapseGate(args.worldlineArtifact) ??
+    resolvePublishedShiftLapseGate(args.missionTimeComparisonArtifact);
+  const shiftLapseProfileStage =
+    args.transportResultArtifact.selectedFamily.shiftLapseProfileStage ??
+    asText(shiftGate?.shiftLapseProfileStage);
+  const shiftLapseProfileLabel = asText(shiftGate?.shiftLapseProfileLabel);
+  const shiftLapseProfileNote =
+    args.transportResultArtifact.selectedFamily.shiftLapseProfileNote ??
+    asText(shiftGate?.shiftLapseProfileNote);
+  const familyAuthorityStatus =
+    args.worldlineArtifact.sourceSurface.familyAuthorityStatus ??
+    args.missionTimeComparisonArtifact.sourceSurface.familyAuthorityStatus ??
+    null;
+  const transportCertificationStatus =
+    args.transportResultArtifact.transportCertificationStatus ??
+    args.worldlineArtifact.sourceSurface.transportCertificationStatus ??
+    args.missionTimeComparisonArtifact.sourceSurface.transportCertificationStatus ??
+    null;
+
+  return buildNhm2StrictSignalReadinessArtifact({
+    familyId,
+    familyAuthorityStatus,
+    transportCertificationStatus,
+    strictModeEnabled: true,
+    lapseSummary: {
+      alphaCenterline: args.transportResultArtifact.centerlineAlpha ?? null,
+      alphaMin: null,
+      alphaMax: null,
+      alphaProfileKind: null,
+      alphaGradientAxis: null,
+      shiftLapseProfileId: selectedProfileId,
+      shiftLapseProfileStage,
+      shiftLapseProfileLabel,
+      shiftLapseProfileNote,
+      signConvention: null,
+    },
+    theta: {
+      metricDerived: null,
+      provenance: "missing",
+      sourcePath: null,
+      reasonCode: "strict_signal_missing",
+      reason: buildMissingStrictSignalReason("theta"),
+    },
+    ts: {
+      metricDerived: null,
+      provenance: "missing",
+      sourcePath: null,
+      reasonCode: "strict_signal_missing",
+      reason: buildMissingStrictSignalReason("ts"),
+    },
+    qi: {
+      metricDerived: null,
+      provenance: "missing",
+      sourcePath: null,
+      rhoSource: null,
+      reasonCode: "strict_signal_missing",
+      reason: buildMissingStrictSignalReason("qi"),
+      applicabilityStatus: null,
+      applicabilityReasonCode: "strict_signal_missing",
+    },
+  });
+};
+
+const renderNhm2StrictSignalReadinessMarkdown = (
+  payload: Nhm2StrictSignalReadinessArtifact,
+): string => {
+  const reasonCodes =
+    payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
+  const missingSignals =
+    payload.missingSignals.length > 0 ? payload.missingSignals.join(", ") : "none";
+  const proxySignals =
+    payload.proxySignals.length > 0 ? payload.proxySignals.join(", ") : "none";
+  const signalRows = [
+    payload.signals.theta,
+    payload.signals.ts,
+    payload.signals.qi,
+  ]
+    .map((signal) =>
+      `| ${signal.signalId} | ${signal.status} | ${signal.metricDerived == null ? "null" : String(signal.metricDerived)} | ${signal.provenance} | ${signal.sourcePath ?? "null"} | ${signal.reasonCode ?? "null"} | ${signal.reason ?? "null"} | ${"rhoSource" in signal ? signal.rhoSource ?? "null" : "n/a"} | ${"applicabilityStatus" in signal ? signal.applicabilityStatus ?? "null" : "n/a"} | ${"applicabilityReasonCode" in signal ? signal.applicabilityReasonCode ?? "null" : "n/a"} |`,
+    )
+    .join("\n");
+
+  return `# NHM2 Strict-Signal Readiness (${DATE_STAMP})
+
+"This checklist records the currently selected nhm2_shift_lapse profile's published strict-signal evidence only. Missing signal publication remains explicit and does not widen route ETA, transport, gravity, or viability claims."
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| status | ${payload.status} |
+| completeness | ${payload.completeness} |
+| publicationCommand | ${SELECTED_SHIFT_LAPSE_STRICT_SIGNAL_READINESS_COMMAND} |
+| family.familyId | ${payload.family.familyId} |
+| family.familyAuthorityStatus | ${payload.family.familyAuthorityStatus ?? "null"} |
+| family.transportCertificationStatus | ${payload.family.transportCertificationStatus ?? "null"} |
+| family.lapseSummary.shiftLapseProfileId | ${payload.family.lapseSummary?.shiftLapseProfileId ?? "null"} |
+| family.lapseSummary.shiftLapseProfileStage | ${payload.family.lapseSummary?.shiftLapseProfileStage ?? "null"} |
+| family.lapseSummary.shiftLapseProfileLabel | ${payload.family.lapseSummary?.shiftLapseProfileLabel ?? "null"} |
+| family.lapseSummary.alphaCenterline | ${payload.family.lapseSummary?.alphaCenterline ?? "null"} |
+| strictModeEnabled | ${String(payload.strictModeEnabled)} |
+| reasonCodes | ${reasonCodes} |
+| missingSignals | ${missingSignals} |
+| proxySignals | ${proxySignals} |
+| promotionSignalReady | ${String(payload.readiness.promotionSignalReady)} |
+| certifiedPromotionReady | ${String(payload.readiness.certifiedPromotionReady)} |
+| thetaMetricDerived | ${String(payload.promotionInputs.thetaMetricDerived)} |
+| tsMetricDerived | ${String(payload.promotionInputs.tsMetricDerived)} |
+| qiMetricDerived | ${String(payload.promotionInputs.qiMetricDerived)} |
+| qiApplicabilityStatus | ${payload.promotionInputs.qiApplicabilityStatus ?? "null"} |
+
+## Signals
+| signal | status | metricDerived | provenance | sourcePath | reasonCode | reason | rhoSource | applicabilityStatus | applicabilityReasonCode |
+|---|---|---|---|---|---|---|---|---|---|
+${signalRows}
+`;
+};
+
+export const publishNhm2StrictSignalReadinessResearchSurface = (args: {
+  artifact: Nhm2StrictSignalReadinessArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2StrictSignalReadinessArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  const markdown = renderNhm2StrictSignalReadinessMarkdown(args.artifact);
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown,
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_STRICT_SIGNAL_READINESS_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_STRICT_SIGNAL_READINESS_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_STRICT_SIGNAL_READINESS_LATEST_MD),
+    ),
+  });
+};
+
+const publishNhm2ShiftLapseStrictSignalReadinessImpl = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  strictSignalArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2StrictSignalReadinessArtifact;
+  };
+}> => {
+  const selectedFamilyArtifactRootDir =
+    options?.selectedFamilyArtifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const selectedFamilyAuditRootDir =
+    options?.selectedFamilyAuditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+  const selectedTransportLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  );
+  const selectedTransport =
+    options?.reuseExistingSelectedArtifacts === true &&
+    fs.existsSync(selectedTransportLatestJsonPath)
+      ? readExistingSelectedShiftLapseTransportBundleForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseSelectedTransportBundle({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: selectedFamilyArtifactRootDir,
+          auditRootDir: selectedFamilyAuditRootDir,
+        });
+  const transportResultArtifact = selectedTransport.transportResult.artifact;
+  const worldlineLatestJsonPath =
+    transportResultArtifact.selectedBundleArtifacts.worldlineLatestJsonPath;
+  const missionTimeComparisonLatestJsonPath =
+    transportResultArtifact.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath;
+  const worldlineArtifact = readJsonArtifact<Nhm2WarpWorldlineProofArtifact>(
+    worldlineLatestJsonPath,
+    "nhm2_warp_worldline_proof/v1",
+  );
+  const missionTimeComparisonArtifact =
+    readJsonArtifact<Nhm2MissionTimeComparisonArtifact>(
+      missionTimeComparisonLatestJsonPath,
+      "nhm2_mission_time_comparison/v1",
+    );
+  const artifact = buildNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile({
+    transportResultArtifact,
+    worldlineArtifact,
+    missionTimeComparisonArtifact,
+  });
+  return {
+    selectedTransport,
+    strictSignalArtifact: publishNhm2StrictSignalReadinessResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    }),
+  };
+};
+
+export const publishNhm2ShiftLapseStrictSignalReadiness = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  strictSignalArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2StrictSignalReadinessArtifact;
+  };
+}> =>
+  withProofSurfacePublicationLock({
+    operation: "publish-selected-shift-lapse-strict-signal-readiness",
+    fn: async () => publishNhm2ShiftLapseStrictSignalReadinessImpl(options),
+  });
+
 const publishNhm2ShiftVsLapseDecompositionLatest = (args: {
   artifactRootDir: string;
   auditRootDir: string;
@@ -32007,6 +32357,10 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     artifactRootDir,
     path.basename(DEFAULT_ENVELOPE_PERTURBATION_SUITE_LATEST_JSON),
   );
+  const rootStrictSignalLatestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON),
+  );
   const selectedEnvelopeLatestJsonPath = path.join(
     selectedFamilyArtifactRootDir,
     "envelope",
@@ -32130,7 +32484,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     });
   const strictSignalInspection =
     inspectPublishedAuditArtifact<Nhm2StrictSignalReadinessArtifact>({
-      expectedPath: DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON,
+      expectedPath: rootStrictSignalLatestJsonPath,
       artifactId: "nhm2_strict_signal_readiness",
       validator: isNhm2StrictSignalReadinessArtifact,
       expectedProfileId: selectedProfileId,
@@ -45978,6 +46332,10 @@ if (isEntryPoint) {
     "--publish-selected-shift-lapse-envelope-suite",
     argv,
   );
+  const publishSelectedShiftLapseStrictSignalReadiness = hasArg(
+    "--publish-selected-shift-lapse-strict-signal-readiness",
+    argv,
+  );
   const publishSelectedShiftLapseFullLoopAudit = hasArg(
     "--publish-selected-shift-lapse-full-loop-audit",
     argv,
@@ -46338,6 +46696,12 @@ if (isEntryPoint) {
         reuseExistingSelectedArtifacts:
           parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
       })
+    : publishSelectedShiftLapseStrictSignalReadiness
+    ? publishNhm2ShiftLapseStrictSignalReadiness({
+        baseUrl: parsedOptions.baseUrl,
+        reuseExistingSelectedArtifacts:
+          parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
+      })
     : publishSelectedShiftLapseFullLoopAudit
     ? publishNhm2ShiftLapseFullLoopAudit({
         baseUrl: parsedOptions.baseUrl,
@@ -46399,6 +46763,7 @@ if (isEntryPoint) {
         publishSelectedShiftLapseProfileSweep ||
         publishSelectedShiftLapseBoundarySweep ||
         publishSelectedShiftLapseEnvelopeSuite ||
+        publishSelectedShiftLapseStrictSignalReadiness ||
         publishSelectedShiftLapseFullLoopAudit ||
         publishBoundedStackLatest ||
         publishProofSurfaceManifestLatest ||

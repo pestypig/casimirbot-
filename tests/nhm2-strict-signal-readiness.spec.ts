@@ -124,6 +124,22 @@ describe("nhm2 strict-signal readiness artifact", () => {
     expect(artifact.readiness.certifiedPromotionReady).toBe(false);
   });
 
+  it("preserves absent lapse-summary numerics as null instead of coercing them to zero", () => {
+    const artifact = buildNhm2StrictSignalReadinessArtifact({
+      familyId: "nhm2_shift_lapse",
+      lapseSummary: {
+        alphaCenterline: 0.995,
+        alphaMin: null,
+        alphaMax: undefined,
+        shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
+      },
+    });
+
+    expect(artifact.family.lapseSummary?.alphaCenterline).toBe(0.995);
+    expect(artifact.family.lapseSummary?.alphaMin).toBeNull();
+    expect(artifact.family.lapseSummary?.alphaMax).toBeNull();
+  });
+
   it("rejects malformed payloads", () => {
     expect(
       isNhm2StrictSignalReadinessArtifact({

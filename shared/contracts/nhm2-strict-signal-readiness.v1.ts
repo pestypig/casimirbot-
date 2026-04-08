@@ -150,6 +150,12 @@ const asText = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
 const toFinite = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
   const n = Number(value);
   return Number.isFinite(n) ? Number(n) : null;
 };

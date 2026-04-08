@@ -76,15 +76,20 @@ export function runStructureReducedLane(star: CanonicalStar): StarSimLaneResult 
     typeof cloudDensityInput === "number",
   ].filter(Boolean).length;
   const evidenceFit = Math.min(0.92, 0.4 + observedInputs * 0.1 + (star.target.is_solar_calibrator ? 0.08 : 0));
-  const domainPenalty = mass_Msun > 20 ? 0.8 : 1;
+  const inMassDomain = mass_Msun >= 0.08 && mass_Msun <= 20;
+  const domainPenalty = inMassDomain ? 1 : 0;
 
   return {
     lane_id: "structure_1d",
     requested_lane: "structure_1d",
     solver_id: "stellar.evolution.reduced/1",
     label: "Reduced-order 1D structure",
-    availability: "available",
+    availability: inMassDomain ? "available" : "unavailable",
+    status: inMassDomain ? "available" : "unavailable",
+    status_reason: inMassDomain ? undefined : "out_of_domain",
+    execution_kind: "analytic",
     maturity: "reduced_order",
+    phys_class: "P1",
     assumptions,
     domain_validity: {
       supported_mass_msun: [0.08, 20],
@@ -99,7 +104,7 @@ export function runStructureReducedLane(star: CanonicalStar): StarSimLaneResult 
       main_sequence_lifetime_Gyr: proofs.mainSequence.lifetime_Gyr,
     },
     residuals_sigma: {},
-    falsifier_ids: mass_Msun > 20 ? ["STAR_SIM_STRUCTURE_REDUCED_DOMAIN_EDGE"] : [],
+    falsifier_ids: inMassDomain ? [] : ["STAR_SIM_STRUCTURE_REDUCED_DOMAIN_EDGE"],
     tree_dag: buildTreeDagClaim({
       claim_id: "claim:star-sim:structure_reduced",
       parent_claim_ids: ["claim:star-sim:classification"],
@@ -123,6 +128,8 @@ export function runStructureReducedLane(star: CanonicalStar): StarSimLaneResult 
     },
     evidence_fit: evidenceFit,
     domain_penalty: domainPenalty,
-    note: "This wraps the existing analytic stellar closures. It is intentionally reduced-order and does not claim atmosphere- or granule-resolved fidelity.",
+    note: inMassDomain
+      ? "This wraps the existing analytic stellar closures. It is intentionally reduced-order and does not claim atmosphere- or granule-resolved fidelity."
+      : "The reduced-order structure lane is outside its declared mass domain for this target and is returned as unavailable.",
   };
 }

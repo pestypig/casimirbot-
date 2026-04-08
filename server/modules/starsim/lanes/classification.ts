@@ -72,7 +72,10 @@ export function runClassificationLane(star: CanonicalStar): StarSimLaneResult {
     solver_id: "star-sim.classification/1",
     label: "Stellar classification",
     availability: "available",
+    status: "available",
+    execution_kind: "fit",
     maturity: "obs_fit",
+    phys_class: "P0",
     assumptions,
     domain_validity: {
       supported_inputs: ["target.spectral_type", "spectroscopy.teff_K", "spectroscopy.logg_cgs"],
