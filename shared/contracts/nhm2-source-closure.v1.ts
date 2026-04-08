@@ -25,6 +25,7 @@ export const NHM2_SOURCE_CLOSURE_REASON_CODES = [
   "tile_tensor_missing",
   "metric_tensor_incomplete",
   "tile_tensor_incomplete",
+  "tolerance_missing",
   "tensor_residual_exceeded",
   "assumption_drift",
 ] as const;
@@ -373,6 +374,11 @@ export const buildNhm2SourceClosureArtifact = (
   const residualComponents = buildResidualComponents(metricTensor, tileTensor);
   const residualNorms = buildResidualNorms(residualComponents, toleranceRelLInf);
   const assumptionsDrifted = input.assumptionsDrifted === true;
+  const toleranceMissing =
+    completeness === "complete" && residualNorms.toleranceRelLInf == null;
+  if (toleranceMissing) {
+    reasonCodes.add("tolerance_missing");
+  }
   if (completeness === "complete" && residualNorms.pass === false) {
     reasonCodes.add("tensor_residual_exceeded");
   }
@@ -382,7 +388,13 @@ export const buildNhm2SourceClosureArtifact = (
 
   let status: Nhm2SourceClosureStatus = "unavailable";
   if (completeness === "complete") {
-    status = residualNorms.pass === false ? "fail" : "pass";
+    if (toleranceMissing) {
+      status = "unavailable";
+    } else if (residualNorms.pass === false) {
+      status = "fail";
+    } else {
+      status = "pass";
+    }
     if (assumptionsDrifted && status === "pass") {
       status = "review";
     }

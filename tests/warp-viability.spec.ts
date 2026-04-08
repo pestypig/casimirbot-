@@ -943,6 +943,131 @@ describe("warp viability congruence wiring", () => {
     );
   });
 
+  it("maps missing source-closure tolerance to a conservative NHM2 blocker", async () => {
+    const gate = makeShiftLapseTransportPromotionGateFixture({
+      shiftLapseProfileId: "stage1_centerline_alpha_0p9625_v1",
+      shiftLapseProfileStage: "stage1",
+      shiftLapseProfileLabel: "alpha=0.9625",
+      shiftLapseProfileNote: "selected family profile",
+      centerlineAlpha: 0.9625,
+      centerlineDtauDt: 0.9625,
+    });
+    const worldline = makeShiftLapseWarpWorldlineFixture(undefined, gate);
+    const missionTimeEstimator = makeWarpMissionTimeEstimatorFixture({ worldline });
+    const missionTimeComparison = makeWarpMissionTimeComparisonFixture({
+      missionTimeEstimator,
+    });
+
+    runtime.pipeline = makePipeline({
+      gr: {
+        constraints: {
+          rho_constraint: { mean: -100 * SI_TO_GEOM_STRESS, rms: 1e-4, maxAbs: 1e-4 },
+          H_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+          M_constraint: { rms: 1e-4, maxAbs: 1e-3 },
+        },
+        matter: { stressEnergy: { avgT00: -100 } },
+        gauge: {
+          lapseMin: 1,
+          betaMaxAbs: 0.1,
+          betaOverAlphaMax: 0.2,
+          betaOverAlphaP98: 0.18,
+          betaOutwardOverAlphaWallMax: 0.15,
+          betaOutwardOverAlphaWallP98: 0.12,
+          wallHorizonMargin: 0.4,
+        },
+      },
+      qiGuardrail: {
+        marginRatio: 0.2,
+        lhs_Jm3: -1,
+        bound_Jm3: -5,
+        rhoSource: "warp.metric.T00.nhm2.shift_lapse",
+        applicabilityStatus: "PASS",
+      },
+      shiftLapseTransportPromotionGate: gate,
+      warpMissionTimeEstimator: missionTimeEstimator,
+      warpMissionTimeComparison: missionTimeComparison,
+      warp: {
+        metricT00: -100,
+        metricT00Source: "metric",
+        metricT00Ref: "warp.metric.T00.nhm2.shift_lapse",
+        metricT00Observer: "eulerian_n",
+        metricT00Normalization: "si_stress",
+        metricT00UnitSystem: "SI",
+        metricT00ContractStatus: "ok",
+        metricAdapter: {
+          family: "nhm2_shift_lapse",
+          chart: { label: "comoving_cartesian", contractStatus: "ok" },
+          betaDiagnostics: { thetaMax: 0.5, method: "finite-diff" },
+        },
+      },
+      nhm2StrictSignalReadiness: buildNhm2StrictSignalReadinessArtifact({
+        strictModeEnabled: true,
+        familyId: "nhm2_shift_lapse",
+        familyAuthorityStatus: "candidate_authoritative_solve_family",
+        transportCertificationStatus: "bounded_transport_proof_bearing_gate_admitted",
+        lapseSummary: {
+          alphaCenterline: 0.9625,
+          alphaMin: 0.95,
+          alphaMax: 1,
+          alphaProfileKind: "selected_profile",
+          alphaGradientAxis: "centerline",
+          shiftLapseProfileId: gate.shiftLapseProfileId,
+          shiftLapseProfileStage: gate.shiftLapseProfileStage,
+          shiftLapseProfileLabel: gate.shiftLapseProfileLabel,
+          shiftLapseProfileNote: gate.shiftLapseProfileNote,
+          signConvention: "dtau_dt_equals_alpha_for_zero_coordinate_velocity",
+        },
+        theta: {
+          metricDerived: true,
+          provenance: "metric",
+          sourcePath: "warp.metricAdapter.betaDiagnostics.thetaMax",
+        },
+        ts: {
+          metricDerived: true,
+          provenance: "metric",
+          sourcePath: "warp.metricAdapter.ts",
+        },
+        qi: {
+          metricDerived: true,
+          provenance: "metric",
+          sourcePath: "qiGuardrail",
+          rhoSource: "warp.metric.T00.nhm2.shift_lapse",
+          applicabilityStatus: "PASS",
+        },
+      }),
+      nhm2SourceClosure: buildNhm2SourceClosureArtifact({
+        metricTensorRef: "warp.metricStressEnergy",
+        tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+        metricRequiredTensor: {
+          T00: -100,
+          T11: 30,
+          T22: 30,
+          T33: 30,
+        },
+        tileEffectiveTensor: {
+          T00: -100,
+          T11: 30,
+          T22: 30,
+          T33: 30,
+        },
+        scalarCl3RhoDeltaRel: 0,
+      }),
+      nhm2ObserverAudit: buildPassingObserverAudit(),
+    });
+
+    const result = await evaluateWarpViability({});
+    const layer = result.policyLayers?.nhm2_full_loop_audit;
+
+    expect(layer).toBeTruthy();
+    expect(layer?.artifact.sections.source_closure.state).toBe("unavailable");
+    expect(layer?.artifact.sections.source_closure.reasons).toContain(
+      "source_closure_missing",
+    );
+    expect((result.snapshot as any).nhm2_full_loop_blocking_reasons).toContain(
+      "source_closure_missing",
+    );
+  });
+
   it("does not emit an NHM2 full-loop policy layer for generic non-NHM2 runs", async () => {
     runtime.pipeline = makePipeline({
       warp: {

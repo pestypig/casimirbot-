@@ -1,0 +1,22 @@
+{
+  "solver_version": "gyre.mock/1",
+  "benchmark_case_id": "astero_gyre",
+  "evidence_fit": 0.89,
+  "mode_summary": {
+    "mode_count": 3,
+    "mode_frequencies_uHz": [3090.0, 3160.4, 3232.1],
+    "delta_nu_uHz": 135.1
+  },
+  "inferred_params": {
+    "large_frequency_separation_uHz": 135.1,
+    "nu_max_uHz": 3090.0
+  },
+  "residuals_sigma": {
+    "mode_frequency_uHz": 0.21
+  },
+  "domain_validity": {
+    "fixture_class": "solar_oscillation",
+    "supported_targets": ["Sun", "solar analog"],
+    "notes": ["mock runtime fixture derived from the GYRE solar-asteroseismic shape"]
+  }
+}

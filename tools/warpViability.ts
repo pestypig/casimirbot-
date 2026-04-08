@@ -888,6 +888,7 @@ const buildNhm2FullLoopPolicyLayer = (args: {
         case "tile_tensor_missing":
         case "metric_tensor_incomplete":
         case "tile_tensor_incomplete":
+        case "tolerance_missing":
           sourceClosureReasons.push("source_closure_missing");
           break;
         case "assumption_drift":

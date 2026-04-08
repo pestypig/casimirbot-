@@ -1,0 +1,22 @@
+{
+  "solver_version": "gyre.mock/1",
+  "benchmark_case_id": "gyre_in_mesa_ms",
+  "evidence_fit": 0.84,
+  "mode_summary": {
+    "mode_count": 3,
+    "mode_frequencies_uHz": [2852.4, 2928.7, 3002.9],
+    "delta_nu_uHz": 128.6
+  },
+  "inferred_params": {
+    "large_frequency_separation_uHz": 128.6,
+    "nu_max_uHz": 2852.4
+  },
+  "residuals_sigma": {
+    "mode_frequency_uHz": 0.34
+  },
+  "domain_validity": {
+    "fixture_class": "g_type_oscillation",
+    "supported_targets": ["late F", "G", "early K main-sequence analogs"],
+    "notes": ["mock runtime fixture for Sun-like field stars"]
+  }
+}

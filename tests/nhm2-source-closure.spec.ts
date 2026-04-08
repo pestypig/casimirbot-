@@ -38,6 +38,32 @@ describe("nhm2 source closure artifact", () => {
     expect(artifact.sampledSummaries.regions[0]?.regionId).toBe("global");
   });
 
+  it("blocks tensor-complete closure when no tolerance is declared", () => {
+    const artifact = buildNhm2SourceClosureArtifact({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      scalarCl3RhoDeltaRel: 0,
+    });
+
+    expect(artifact.status).toBe("unavailable");
+    expect(artifact.completeness).toBe("complete");
+    expect(artifact.reasonCodes).toContain("tolerance_missing");
+    expect(artifact.residualNorms.pass).toBeNull();
+    expect(artifact.residualNorms.toleranceRelLInf).toBeNull();
+  });
+
   it("fails when tensor closure diverges even if scalar T00 agrees", () => {
     const artifact = buildNhm2SourceClosureArtifact({
       metricTensorRef: "warp.metricStressEnergy",

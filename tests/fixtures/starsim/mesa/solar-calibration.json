@@ -1,0 +1,31 @@
+{
+  "solver_version": "mesa.mock/1",
+  "benchmark_case_id": "simplex_solar_calibration",
+  "evidence_fit": 0.91,
+  "structure_summary": {
+    "mass_Msun": 1.0,
+    "radius_Rsun": 1.0,
+    "age_Gyr": 4.57,
+    "metallicity_Z": 0.0142
+  },
+  "synthetic_observables": {
+    "teff_K": 5772,
+    "luminosity_Lsun": 1.0,
+    "logg_cgs": 4.438
+  },
+  "inferred_params": {
+    "core_hydrogen_fraction": 0.34,
+    "mixing_length_alpha": 1.92,
+    "main_sequence_age_Gyr": 4.57
+  },
+  "residuals_sigma": {
+    "teff_K": 0.38,
+    "radius_Rsun": 0.11,
+    "luminosity_Lsun": 0.14
+  },
+  "domain_validity": {
+    "fixture_class": "solar_calibration",
+    "supported_targets": ["Sun", "solar analog"],
+    "notes": ["mock runtime fixture derived from the MESA solar-calibration shape"]
+  }
+}

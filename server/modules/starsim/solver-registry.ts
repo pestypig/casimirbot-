@@ -12,21 +12,39 @@ import type {
 import { runActivitySolarLane } from "./lanes/activity-solar";
 import { runBarycenterAnalyticLane } from "./lanes/barycenter-analytic";
 import { runClassificationLane } from "./lanes/classification";
+import { runOscillationGyreLane } from "./lanes/oscillation-gyre";
+import { runStructureMesaLane, type StarSimLaneExecutionMode } from "./lanes/structure-mesa";
 import { runStructureReducedLane } from "./lanes/structure-reduced";
 import { hashStableJson } from "../../utils/information-boundary";
 
-type LaneRunner = (request: ReturnType<typeof canonicalizeStarSimRequest>) => Promise<StarSimLaneResult> | StarSimLaneResult;
+type LaneRunnerContext = {
+  executionMode: StarSimLaneExecutionMode;
+  resolvedLanes: Partial<Record<RequestedLane, StarSimLaneResult>>;
+};
+
+type LaneRunner = (
+  request: ReturnType<typeof canonicalizeStarSimRequest>,
+  context: LaneRunnerContext,
+) => Promise<StarSimLaneResult> | StarSimLaneResult;
 
 const registry: Record<RequestedLane, LaneRunner> = {
-  classification: runClassificationLane,
-  structure_1d: runStructureReducedLane,
-  activity: runActivitySolarLane,
-  barycenter: runBarycenterAnalyticLane,
+  classification: (request) => runClassificationLane(request),
+  structure_1d: (request) => runStructureReducedLane(request),
+  structure_mesa: (request, context) => runStructureMesaLane(request, { executionMode: context.executionMode }),
+  oscillation_gyre: (request, context) =>
+    runOscillationGyreLane(request, {
+      executionMode: context.executionMode,
+      resolvedLanes: context.resolvedLanes,
+    }),
+  activity: (request) => runActivitySolarLane(request),
+  barycenter: (request) => runBarycenterAnalyticLane(request),
 };
 
 const laneLabelByRequested: Record<RequestedLane, string> = {
   classification: "Stellar classification",
   structure_1d: "Reduced-order 1D structure",
+  structure_mesa: "MESA-backed 1D structure",
+  oscillation_gyre: "GYRE oscillation solver",
   activity: "Solar activity diagnostics",
   barycenter: "Analytic barycenter state",
 };
@@ -34,6 +52,8 @@ const laneLabelByRequested: Record<RequestedLane, string> = {
 const laneExecutionKindByRequested: Record<RequestedLane, ExecutionKind> = {
   classification: "fit",
   structure_1d: "analytic",
+  structure_mesa: "simulation",
+  oscillation_gyre: "simulation",
   activity: "replay",
   barycenter: "analytic",
 };
@@ -41,9 +61,20 @@ const laneExecutionKindByRequested: Record<RequestedLane, ExecutionKind> = {
 const lanePhysClassByRequested: Record<RequestedLane, PhysClass> = {
   classification: "P0",
   structure_1d: "P1",
+  structure_mesa: "P2",
+  oscillation_gyre: "P3",
   activity: "P4",
   barycenter: "P2",
 };
+
+const laneOrder: RequestedLane[] = [
+  "classification",
+  "structure_1d",
+  "structure_mesa",
+  "oscillation_gyre",
+  "activity",
+  "barycenter",
+];
 
 const availabilityFromStatus = (status: StarSimLaneResult["status"]): "available" | "unavailable" =>
   status === "available" ? "available" : "unavailable";
@@ -51,9 +82,10 @@ const availabilityFromStatus = (status: StarSimLaneResult["status"]): "available
 async function runLaneSafely(
   canonical: ReturnType<typeof canonicalizeStarSimRequest>,
   requestedLane: RequestedLane,
+  context: LaneRunnerContext,
 ): Promise<StarSimLaneResult> {
   try {
-    const result = await registry[requestedLane](canonical);
+    const result = await registry[requestedLane](canonical, context);
     return {
       ...result,
       availability: availabilityFromStatus(result.status),
@@ -93,12 +125,29 @@ async function runLaneSafely(
   }
 }
 
-export async function runStarSim(request: StarSimRequest): Promise<StarSimResponse> {
+export async function runStarSim(
+  request: StarSimRequest,
+  options?: {
+    executionMode?: StarSimLaneExecutionMode;
+  },
+): Promise<StarSimResponse> {
   const canonical = canonicalizeStarSimRequest(request);
   const completeness = assessCompleteness(canonical);
   const obsClass = deriveObsClass(canonical);
-
-  const lanes = await Promise.all(canonical.requested_lanes.map((lane) => runLaneSafely(canonical, lane)));
+  const executionMode = options?.executionMode ?? "sync";
+  const resolvedLanes: Partial<Record<RequestedLane, StarSimLaneResult>> = {};
+  const requestedLanes = [...canonical.requested_lanes].sort(
+    (left, right) => laneOrder.indexOf(left) - laneOrder.indexOf(right),
+  );
+  const lanes: StarSimLaneResult[] = [];
+  for (const lane of requestedLanes) {
+    const result = await runLaneSafely(canonical, lane, {
+      executionMode,
+      resolvedLanes,
+    });
+    resolvedLanes[lane] = result;
+    lanes.push(result);
+  }
   const scored = scoreLanes(lanes);
   const physDepth = derivePhysDepthSummary(scored.lanes);
   const unavailableRequested = scored.lanes
@@ -123,9 +172,9 @@ export async function runStarSim(request: StarSimRequest): Promise<StarSimRespon
     meta: {
       contract_version: "star-sim-v1",
       normalization_version: "star-sim.canonicalize/2",
-      solver_manifest_version: "star-sim.registry/2",
+      solver_manifest_version: "star-sim.registry/3",
       congruence_version: "star-sim.harmonic/2",
-      claim_identity_version: "star-sim.claims/2",
+      claim_identity_version: "star-sim.claims/3",
       deterministic_request_hash: hashStableJson(request),
       canonical_observables_hash: hashStableJson(canonical.fields),
       solver_manifest_hash: hashStableJson(solverManifest),

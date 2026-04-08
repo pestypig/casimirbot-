@@ -9,9 +9,22 @@ export const maturitySchema = z.enum([
   "research_sim",
   "ephemeris_exact",
 ]);
-export const requestedLaneSchema = z.enum(["classification", "structure_1d", "activity", "barycenter"]);
+export const requestedLaneSchema = z.enum([
+  "classification",
+  "structure_1d",
+  "structure_mesa",
+  "oscillation_gyre",
+  "activity",
+  "barycenter",
+]);
 export const laneStatusSchema = z.enum(["available", "unavailable", "not_applicable", "failed"]);
 export const executionKindSchema = z.enum(["simulation", "diagnostic", "replay", "analytic", "fit"]);
+export const starSimJobStatusSchema = z.enum(["queued", "running", "completed", "failed"]);
+export const starSimArtifactRefSchema = z.object({
+  kind: z.string().min(1),
+  path: z.string().min(1),
+  hash: z.string().min(1).optional(),
+});
 
 const sectionMetaShape = {
   source: z.string().optional(),
@@ -148,6 +161,8 @@ export type Maturity = z.infer<typeof maturitySchema>;
 export type RequestedLane = z.infer<typeof requestedLaneSchema>;
 export type LaneStatus = z.infer<typeof laneStatusSchema>;
 export type ExecutionKind = z.infer<typeof executionKindSchema>;
+export type StarSimJobStatus = z.infer<typeof starSimJobStatusSchema>;
+export type StarSimArtifactRef = z.infer<typeof starSimArtifactRefSchema>;
 export type ObsClass = "O0" | "O1" | "O2" | "O3" | "O4" | "O5";
 export type PhysClass = "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
 
@@ -261,6 +276,8 @@ export interface StarSimLaneResult {
   falsifier_ids: string[];
   tree_dag: TreeDagClaim;
   result: Record<string, unknown>;
+  artifact_refs?: StarSimArtifactRef[];
+  cache_key?: string;
   evidence_fit: number;
   domain_penalty: number;
   lane_score?: number;
@@ -300,9 +317,9 @@ export interface StarSimResponse {
   meta: {
     contract_version: "star-sim-v1";
     normalization_version: "star-sim.canonicalize/2";
-    solver_manifest_version: "star-sim.registry/2";
+    solver_manifest_version: "star-sim.registry/3";
     congruence_version: "star-sim.harmonic/2";
-    claim_identity_version: "star-sim.claims/2";
+    claim_identity_version: "star-sim.claims/3";
     deterministic_request_hash: string;
     canonical_observables_hash: string;
     solver_manifest_hash: string;
@@ -323,4 +340,18 @@ export interface StarSimResponse {
   };
   lanes: StarSimLaneResult[];
   congruence: StarSimCongruence;
+}
+
+export interface StarSimJobRecord {
+  job_id: string;
+  status: StarSimJobStatus;
+  created_at_iso: string;
+  started_at_iso: string | null;
+  completed_at_iso: string | null;
+  requested_lanes: RequestedLane[];
+  heavy_lanes: RequestedLane[];
+  request_hash: string;
+  queue_position: number;
+  result_path: string | null;
+  error: string | null;
 }

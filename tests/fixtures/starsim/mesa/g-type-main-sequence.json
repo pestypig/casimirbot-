@@ -1,0 +1,31 @@
+{
+  "solver_version": "mesa.mock/1",
+  "benchmark_case_id": "astero_gyre",
+  "evidence_fit": 0.87,
+  "structure_summary": {
+    "mass_Msun": 1.03,
+    "radius_Rsun": 1.01,
+    "age_Gyr": 3.8,
+    "metallicity_Z": 0.015
+  },
+  "synthetic_observables": {
+    "teff_K": 5820,
+    "luminosity_Lsun": 1.06,
+    "logg_cgs": 4.44
+  },
+  "inferred_params": {
+    "core_hydrogen_fraction": 0.41,
+    "mixing_length_alpha": 1.88,
+    "main_sequence_age_Gyr": 3.8
+  },
+  "residuals_sigma": {
+    "teff_K": 0.52,
+    "radius_Rsun": 0.18,
+    "luminosity_Lsun": 0.22
+  },
+  "domain_validity": {
+    "fixture_class": "g_type_main_sequence",
+    "supported_targets": ["late F", "G", "early K main-sequence analogs"],
+    "notes": ["mock runtime fixture for Sun-like field stars"]
+  }
+}
