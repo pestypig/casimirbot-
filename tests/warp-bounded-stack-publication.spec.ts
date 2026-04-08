@@ -121,6 +121,18 @@ const BOUNDARY_PROFILE_SPECS = [
   { profileId: "stage1_centerline_alpha_0p7650_v1", alpha: 0.765 },
   { profileId: "stage1_centerline_alpha_0p7625_v1", alpha: 0.7625 },
   { profileId: "stage1_centerline_alpha_0p7600_v1", alpha: 0.76 },
+  { profileId: "stage1_centerline_alpha_0p7575_v1", alpha: 0.7575 },
+  { profileId: "stage1_centerline_alpha_0p7550_v1", alpha: 0.755 },
+  { profileId: "stage1_centerline_alpha_0p7525_v1", alpha: 0.7525 },
+  { profileId: "stage1_centerline_alpha_0p7500_v1", alpha: 0.75 },
+  { profileId: "stage1_centerline_alpha_0p7475_v1", alpha: 0.7475 },
+  { profileId: "stage1_centerline_alpha_0p7450_v1", alpha: 0.745 },
+  { profileId: "stage1_centerline_alpha_0p7425_v1", alpha: 0.7425 },
+  { profileId: "stage1_centerline_alpha_0p7400_v1", alpha: 0.74 },
+  { profileId: "stage1_centerline_alpha_0p7375_v1", alpha: 0.7375 },
+  { profileId: "stage1_centerline_alpha_0p7350_v1", alpha: 0.735 },
+  { profileId: "stage1_centerline_alpha_0p7325_v1", alpha: 0.7325 },
+  { profileId: "stage1_centerline_alpha_0p7300_v1", alpha: 0.73 },
 ] as const;
 
 const withFailToken = <T extends { falsifierConditions: string[] }>(
@@ -1035,11 +1047,11 @@ describe("bounded-stack latest publication", () => {
       BOUNDARY_PROFILE_SPECS.map((entry) => entry.profileId),
     );
     expect(boundaryResultJson.testedStrongerBracketStopProfileId).toBe(
-      "stage1_centerline_alpha_0p7600_v1",
+      "stage1_centerline_alpha_0p7300_v1",
     );
-    expect(boundaryResultJson.testedStrongerBracketStopCenterlineAlpha).toBe(0.76);
+    expect(boundaryResultJson.testedStrongerBracketStopCenterlineAlpha).toBe(0.73);
     expect(boundaryResultJson.strongestProfileKeepingAllGatesPassing).toBe(
-      "stage1_centerline_alpha_0p7600_v1",
+      "stage1_centerline_alpha_0p7300_v1",
     );
     expect(boundaryResultJson.firstGateFailure).toBeNull();
     expect(boundaryResultJson.firstFailedGate).toBeNull();
@@ -1047,10 +1059,10 @@ describe("bounded-stack latest publication", () => {
       "no_failure_reached_within_tested_stronger_bracket",
     );
     expect(boundaryResultJson.marginFromReferenceProfile.toShiftLapseProfileId).toBe(
-      "stage1_centerline_alpha_0p7600_v1",
+      "stage1_centerline_alpha_0p7300_v1",
     );
     expect(boundaryResultJson.marginFromReferenceProfile.deltaCenterlineAlpha).toBeCloseTo(
-      0.235,
+      0.265,
       12,
     );
     expect(boundaryResultJson.scalingStatusWithinPassingRegion).toBe("monotonic");
@@ -1098,7 +1110,7 @@ describe("bounded-stack latest publication", () => {
     }
     expect(boundaryResultMd).toContain("no_failure_reached_within_tested_stronger_bracket");
     expect(boundaryResultMd).toContain("boundary-sweep");
-    expect(boundaryResultMd).toContain("stage1_centerline_alpha_0p7600_v1");
+    expect(boundaryResultMd).toContain("stage1_centerline_alpha_0p7300_v1");
     expect(boundaryResultMd).toContain("Trend Summary");
     expect(boundaryResultMd).toContain("Threshold Usage Summary");
     expect(boundaryResultMd).toContain("unresolved_within_tested_bracket");
