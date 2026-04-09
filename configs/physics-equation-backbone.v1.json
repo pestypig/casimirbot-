@@ -775,6 +775,321 @@
       "root_lane": "physics_stellar_structure_nucleosynthesis"
     },
     {
+      "id": "planck_radiance_lambda",
+      "name": "Planck spectral radiance",
+      "category": "stellar_radiation",
+      "expression": "B_lambda(T) = (2 * h * c^2 / lambda^5) * 1 / (exp((h * c) / (lambda * k_B * T)) - 1)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "B_lambda(T)",
+          "quantity": "spectral radiance at wavelength lambda and temperature T",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "h",
+          "quantity": "Planck constant",
+          "units": "J*s"
+        },
+        {
+          "symbol": "c",
+          "quantity": "speed of light",
+          "units": "m/s"
+        },
+        {
+          "symbol": "lambda",
+          "quantity": "wavelength",
+          "units": "m"
+        },
+        {
+          "symbol": "k_B",
+          "quantity": "Boltzmann constant",
+          "units": "J/K"
+        },
+        {
+          "symbol": "T",
+          "quantity": "temperature",
+          "units": "K"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stefan_boltzmann_flux",
+      "name": "Stefan-Boltzmann flux",
+      "category": "stellar_radiation",
+      "expression": "F = sigma * T^4",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "F",
+          "quantity": "bolometric radiant flux",
+          "units": "W/m^2"
+        },
+        {
+          "symbol": "sigma",
+          "quantity": "Stefan-Boltzmann constant",
+          "units": "W/(m^2*K^4)"
+        },
+        {
+          "symbol": "T",
+          "quantity": "effective temperature",
+          "units": "K"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "solar_teff_from_LR",
+      "name": "Effective temperature from luminosity and radius",
+      "category": "stellar_radiation",
+      "expression": "T_eff = (L / (4 * pi * R^2 * sigma))^(1/4)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "T_eff",
+          "quantity": "effective temperature inferred from luminosity and radius",
+          "units": "K"
+        },
+        {
+          "symbol": "L",
+          "quantity": "bolometric luminosity",
+          "units": "W"
+        },
+        {
+          "symbol": "R",
+          "quantity": "photospheric radius",
+          "units": "m"
+        },
+        {
+          "symbol": "sigma",
+          "quantity": "Stefan-Boltzmann constant",
+          "units": "W/(m^2*K^4)"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_source_augmented",
+      "name": "Augmented stellar source function",
+      "category": "stellar_radiation",
+      "expression": "I_lambda_model = T_lambda[(epsilon_lambda_base * B_lambda(T)) + J_lambda_mech + J_lambda_coh + J_lambda_other]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "I_lambda_model",
+          "quantity": "modeled emergent spectral radiance",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "T_lambda",
+          "quantity": "radiative transfer operator",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "epsilon_lambda_base",
+          "quantity": "baseline emissivity and opacity lane",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "B_lambda(T)",
+          "quantity": "Planck baseline source term",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "J_lambda_mech",
+          "quantity": "mechanoluminescent source contribution",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "J_lambda_coh",
+          "quantity": "coherence-driven source or redistribution term",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "J_lambda_other",
+          "quantity": "other explicit competing source terms",
+          "units": "W/(m^3*sr)"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "piezo_polarization_proxy",
+      "name": "Piezo polarization proxy",
+      "category": "stellar_radiation",
+      "expression": "P_piezo = d_eff * sigma_mech",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "P_piezo",
+          "quantity": "effective piezoelectric polarization proxy",
+          "units": "C/m^2"
+        },
+        {
+          "symbol": "d_eff",
+          "quantity": "effective piezoelectric coefficient",
+          "units": "C/N"
+        },
+        {
+          "symbol": "sigma_mech",
+          "quantity": "mechanical stress proxy",
+          "units": "Pa"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "mechanoluminescence_source",
+      "name": "Mechanoluminescent source term",
+      "category": "stellar_radiation",
+      "expression": "J_lambda_mech = A_ml * f(sigma, sigma_dot, n_trap, xi) * psi_lambda",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "J_lambda_mech",
+          "quantity": "mechanoluminescent source radiance",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "A_ml",
+          "quantity": "mechanoluminescent amplitude",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "sigma",
+          "quantity": "stress proxy",
+          "units": "Pa"
+        },
+        {
+          "symbol": "sigma_dot",
+          "quantity": "stress-rate proxy",
+          "units": "Pa/s"
+        },
+        {
+          "symbol": "n_trap",
+          "quantity": "trap-state or defect proxy",
+          "units": "1/m^3"
+        },
+        {
+          "symbol": "xi",
+          "quantity": "structural order parameter",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "psi_lambda",
+          "quantity": "normalized mechanoluminescent spectral kernel",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "lattice_emissivity_modifier",
+      "name": "Lattice emissivity modifier",
+      "category": "stellar_radiation",
+      "expression": "epsilon_lambda = epsilon_lambda_0(T, rho, X_i) * (1 + alpha_xi * K_xi(lambda))",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "epsilon_lambda",
+          "quantity": "structure-modified emissivity",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "epsilon_lambda_0(T, rho, X_i)",
+          "quantity": "baseline emissivity from temperature, density, and composition",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "alpha_xi",
+          "quantity": "lattice-response amplitude",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "K_xi(lambda)",
+          "quantity": "wavelength-localized lattice modifier kernel",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "coherence_angular_modifier",
+      "name": "Coherence angular modifier",
+      "category": "stellar_radiation",
+      "expression": "I_lambda(theta, phi) = epsilon_lambda * B_lambda(T) * (1 + C_lambda(theta, phi))",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "I_lambda(theta, phi)",
+          "quantity": "angle-resolved spectral radiance",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "epsilon_lambda",
+          "quantity": "effective emissivity",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "B_lambda(T)",
+          "quantity": "Planck spectral radiance baseline",
+          "units": "W/(m^3*sr)"
+        },
+        {
+          "symbol": "C_lambda(theta, phi)",
+          "quantity": "coherence-induced angular redistribution term",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_spectral_viability",
+      "name": "Stellar spectral viability contract",
+      "category": "stellar_radiation",
+      "expression": "V_star = score[continuum_rms, uv_residual, line_residual, bolometric_closure, anisotropy_penalty, parameter_penalty]",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "V_star",
+          "quantity": "aggregate stellar spectral viability score",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "continuum_rms",
+          "quantity": "continuum relative RMS residual against the null model family",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "uv_residual",
+          "quantity": "ultraviolet residual summary",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "line_residual",
+          "quantity": "line and feature residual summary",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "bolometric_closure",
+          "quantity": "bolometric closure residual against luminosity-radius constraints",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "anisotropy_penalty",
+          "quantity": "anisotropy and polarization mismatch penalty",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "parameter_penalty",
+          "quantity": "explicit complexity penalty for non-null source lanes",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
       "id": "nuclear_reaction_network_rate",
       "name": "Nuclear reaction network rate",
       "category": "stellar_structure",

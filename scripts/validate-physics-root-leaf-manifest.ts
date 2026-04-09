@@ -137,6 +137,10 @@ const REQUIRED_TREE_LANE_BY_ROOT: Record<string, { tree_lane: string; tree_path:
     tree_lane: "physics_information_dynamics",
     tree_path: "docs/knowledge/physics/physics-information-dynamics-tree.json",
   },
+  physics_stellar_structure_nucleosynthesis: {
+    tree_lane: "physics_stellar_structure_nucleosynthesis",
+    tree_path: "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+  },
 };
 
 

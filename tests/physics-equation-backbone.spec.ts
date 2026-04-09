@@ -157,6 +157,27 @@ describe("validatePhysicsEquationBackbone", () => {
     expect(equation?.symbols?.some((entry) => entry.symbol === "V_proxy" && entry.units === "m^3")).toBe(true);
   });
 
+  it("registers the stellar radiation null-model contract equations in repo backbone", () => {
+    const repoRoot = process.cwd();
+    const backbone = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
+    ) as {
+      equations: Array<{ id: string; category?: string; root_lane?: string; symbols?: Array<{ symbol?: string; units?: string }> }>;
+    };
+
+    const planck = backbone.equations.find((entry) => entry.id === "planck_radiance_lambda");
+    const spectralViability = backbone.equations.find((entry) => entry.id === "stellar_spectral_viability");
+
+    expect(planck).toBeDefined();
+    expect(planck?.category).toBe("stellar_radiation");
+    expect(planck?.root_lane).toBe("physics_stellar_structure_nucleosynthesis");
+    expect(planck?.symbols?.some((entry) => entry.symbol === "B_lambda(T)" && entry.units === "W/(m^3*sr)")).toBe(true);
+
+    expect(spectralViability).toBeDefined();
+    expect(spectralViability?.symbols?.some((entry) => entry.symbol === "continuum_rms" && entry.units === "dimensionless")).toBe(true);
+    expect(spectralViability?.symbols?.some((entry) => entry.symbol === "bolometric_closure" && entry.units === "dimensionless")).toBe(true);
+  });
+
   it("fails when manifest/equation claim tier is invalid", () => {
     const repoRoot = makeFixture((manifest) => {
       manifest.claim_tier = "exploratory";

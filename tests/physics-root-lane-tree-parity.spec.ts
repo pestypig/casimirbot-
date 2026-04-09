@@ -45,6 +45,7 @@ const REQUIRED_ROOT_TREE_MAP: Record<string, string> = {
   physics_prebiotic_chemistry: "docs/knowledge/physics/physics-prebiotic-chemistry-tree.json",
   physics_biology_life: "docs/knowledge/physics/physics-biology-life-tree.json",
   physics_runtime_safety_control: "docs/knowledge/physics/physics-runtime-safety-control-tree.json",
+  physics_stellar_structure_nucleosynthesis: "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
 };
 
 

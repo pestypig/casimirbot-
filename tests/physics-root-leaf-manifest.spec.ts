@@ -671,4 +671,44 @@ describe("validatePhysicsRootLeafManifest", () => {
     expect(policy.upstream_provenance_blocklist_for_certified).toEqual(["proxy", "inferred"]);
   });
 
+  it("declares the stellar radiation null-model lane in the repo manifest", () => {
+    const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      roots?: Array<{ id: string; tree_lane?: string; tree_path?: string }>;
+      leaves?: Array<{ id: string; prompt_family?: string }>;
+      paths?: Array<{ id: string; root_id?: string; leaf_id?: string; bundle_id?: string }>;
+      bridge_bundles?: Array<{ id: string; path_ids?: string[] }>;
+    };
+
+    expect(
+      manifest.roots?.find((entry) => entry.id === "physics_stellar_structure_nucleosynthesis"),
+    ).toEqual(
+      expect.objectContaining({
+        id: "physics_stellar_structure_nucleosynthesis",
+        tree_lane: "physics_stellar_structure_nucleosynthesis",
+        tree_path: "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+      }),
+    );
+    expect(
+      manifest.leaves?.find((entry) => entry.id === "leaf_stellar_spectral_viability"),
+    ).toEqual(
+      expect.objectContaining({
+        id: "leaf_stellar_spectral_viability",
+        prompt_family: "stellar radiation null model viability",
+      }),
+    );
+    expect(
+      manifest.paths?.find((entry) => entry.id === "path_stellar_structure_to_spectral_viability"),
+    ).toEqual(
+      expect.objectContaining({
+        root_id: "physics_stellar_structure_nucleosynthesis",
+        leaf_id: "leaf_stellar_spectral_viability",
+        bundle_id: "stellar.radiation.audit",
+      }),
+    );
+    expect(
+      manifest.bridge_bundles?.find((entry) => entry.id === "stellar.radiation.audit")?.path_ids,
+    ).toContain("path_stellar_structure_to_spectral_viability");
+  });
+
 });

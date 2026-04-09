@@ -124,6 +124,20 @@
       ],
       "tree_lane": "physics_solar_coherence_hypothesis",
       "tree_path": "docs/knowledge/solar-restoration.md"
+    },
+    {
+      "id": "physics_stellar_structure_nucleosynthesis",
+      "name": "Stellar structure, radiation, and nucleosynthesis lane",
+      "equation_refs": [
+        "stellar_hydrostatic_balance",
+        "stellar_thermal_balance",
+        "planck_radiance_lambda",
+        "stefan_boltzmann_flux",
+        "solar_teff_from_LR",
+        "stellar_spectral_viability"
+      ],
+      "tree_lane": "physics_stellar_structure_nucleosynthesis",
+      "tree_path": "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json"
     }
   ],
   "leaves": [
@@ -166,6 +180,11 @@
       "id": "leaf_solar_collapse_hypothesis",
       "prompt_family": "solar coherence to collapse hypothesis",
       "statement": "Solar coherence narratives stay hypothesis-scoped and subordinate to the measured Casimir to collapse benchmark family."
+    },
+    {
+      "id": "leaf_stellar_spectral_viability",
+      "prompt_family": "stellar radiation null model viability",
+      "statement": "Stellar radiation claims must preserve blackbody plus transfer as the null model and require explicit residual gains before structure-sensitive source terms are promoted."
     }
   ],
   "paths": [
@@ -543,6 +562,38 @@
       }
     },
     {
+      "id": "path_collapse_benchmark_entrypoint",
+      "bundle_id": "nhm2.curvature-collapse",
+      "root_id": "physics_collapse_benchmark",
+      "leaf_id": "leaf_collapse_benchmark",
+      "nodes": [
+        "physics_collapse_benchmark",
+        "leaf_collapse_benchmark"
+      ],
+      "dag_bridges": [
+        "bridge-collapse-benchmark-entrypoint-to-leaf"
+      ],
+      "falsifier": {
+        "observable": "benchmark replay determinism and null-model residual registry completeness",
+        "reject_rule": "predictionRegistryPresent != true OR nullModelComparisonWin != true OR benchmarkDeterminism != true",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
+        "test_refs": [
+          "tests/collapse-benchmark.phase2.routes.spec.ts",
+          "tests/collapse-benchmark.phase4.estimator.spec.ts",
+          "tests/curvature-collapse-contract.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_COLLAPSE_BENCHMARK_ENTRYPOINT_FAIL"
+      }
+    },
+    {
       "id": "path_solar_coherence_to_collapse_hypothesis",
       "bundle_id": "nhm2.curvature-collapse",
       "root_id": "physics_solar_coherence_hypothesis",
@@ -574,6 +625,39 @@
           "inferred"
         ],
         "strict_fail_reason": "ROOT_LEAF_SOLAR_COLLAPSE_HYPOTHESIS_QUARANTINED"
+      }
+    },
+    {
+      "id": "path_stellar_structure_to_spectral_viability",
+      "bundle_id": "stellar.radiation.audit",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "leaf_id": "leaf_stellar_spectral_viability",
+      "nodes": [
+        "physics_stellar_structure_nucleosynthesis",
+        "leaf_stellar_spectral_viability"
+      ],
+      "dag_bridges": [
+        "bridge-stellar-radiation-null-model-to-competing-source-terms",
+        "bridge-stellar-radiation-residuals-to-viability"
+      ],
+      "falsifier": {
+        "observable": "equation-grounded stellar spectral residual scorecard",
+        "reject_rule": "continuum_rms > 0.05 OR uv_residual > 0.15 OR line_residual > 0.10 OR bolometric_closure > 0.02 OR anisotropy_penalty > 0.05",
+        "uncertainty_model": "deterministic_threshold_contract_v1(pass_threshold=0.95,fail_threshold=0.90,window=rolling_20)",
+        "test_refs": [
+          "tests/stellar-viability.spec.ts",
+          "tests/solar-spectrum-ingest.spec.ts",
+          "scripts/validate-physics-equation-backbone.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_STELLAR_SPECTRAL_VIABILITY_FAIL"
       }
     }
   ],
@@ -617,7 +701,17 @@
         "path_stress_energy_to_gr_diagnostics",
         "path_gr_diagnostics_to_curvature_proxy",
         "path_curvature_proxy_to_collapse_benchmark",
+        "path_collapse_benchmark_entrypoint",
         "path_solar_coherence_to_collapse_hypothesis"
+      ]
+    },
+    {
+      "id": "stellar.radiation.audit",
+      "summary": "Diagnostic stellar-radiation lane that keeps blackbody plus transfer as the null model and scores explicit emissivity or source-term alternatives against residual contracts.",
+      "claim_scope": "physics_observables",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_stellar_structure_to_spectral_viability"
       ]
     }
   ]
