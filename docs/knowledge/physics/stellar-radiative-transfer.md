@@ -9,7 +9,7 @@ This note anchors the stellar null-model (`M0_planck_atmosphere`) hardening path
 Along a ray parameterized by path length `s` and frequency `nu`, the scalar transfer equation is:
 
 - `dI_nu/ds = -alpha_nu I_nu + j_nu`
-- equivalently, in optical-depth form: `dI_nu/dtau_nu = I_nu - S_nu`
+- equivalently, in optical-depth form: `dI_nu/dtau_nu = S_nu - I_nu`
 
 where:
 - `I_nu` is specific intensity,
