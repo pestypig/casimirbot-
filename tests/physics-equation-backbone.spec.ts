@@ -178,6 +178,29 @@ describe("validatePhysicsEquationBackbone", () => {
     expect(spectralViability?.symbols?.some((entry) => entry.symbol === "bolometric_closure" && entry.units === "dimensionless")).toBe(true);
   });
 
+  it("registers diagnostic stellar radiative transfer closures for M0 hardening", () => {
+    const repoRoot = process.cwd();
+    const backbone = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
+    ) as {
+      equations: Array<{ id: string; claim_tier?: string; symbols?: Array<{ symbol?: string; units?: string }> }>;
+    };
+
+    const requiredIds = [
+      "stellar_radiative_transfer_equation",
+      "stellar_lte_source_function",
+      "stellar_nlte_source_function",
+      "stellar_continuum_opacity_sum",
+      "stellar_population_ionization_balance_diagnostic",
+    ];
+
+    for (const id of requiredIds) {
+      const equation = backbone.equations.find((entry) => entry.id === id);
+      expect(equation).toBeDefined();
+      expect(equation?.claim_tier).toBe("diagnostic");
+    }
+  });
+
   it("fails when manifest/equation claim tier is invalid", () => {
     const repoRoot = makeFixture((manifest) => {
       manifest.claim_tier = "exploratory";

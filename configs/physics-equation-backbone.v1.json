@@ -1840,6 +1840,156 @@
         }
       ],
       "root_lane": "physics_microphysics_transport"
+    },
+    {
+      "id": "stellar_radiative_transfer_equation",
+      "name": "Stellar radiative transfer equation",
+      "category": "stellar_radiation",
+      "expression": "mu * dI_nu/dtau_nu = I_nu - S_nu",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "I_nu",
+          "quantity": "specific intensity at frequency nu",
+          "units": "W/(m^2*sr*Hz)"
+        },
+        {
+          "symbol": "tau_nu",
+          "quantity": "optical depth at frequency nu",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "S_nu",
+          "quantity": "source function at frequency nu",
+          "units": "W/(m^2*sr*Hz)"
+        },
+        {
+          "symbol": "mu",
+          "quantity": "direction cosine relative to outward normal",
+          "units": "dimensionless"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_lte_source_function",
+      "name": "LTE source function closure",
+      "category": "stellar_radiation",
+      "expression": "S_nu = B_nu(T)",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "S_nu",
+          "quantity": "local thermodynamic equilibrium source function",
+          "units": "W/(m^2*sr*Hz)"
+        },
+        {
+          "symbol": "B_nu(T)",
+          "quantity": "Planck function in frequency form",
+          "units": "W/(m^2*sr*Hz)"
+        },
+        {
+          "symbol": "T",
+          "quantity": "local kinetic temperature",
+          "units": "K"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_nlte_source_function",
+      "name": "NLTE source function closure",
+      "category": "stellar_radiation",
+      "expression": "S_nu = eta_nu / kappa_nu",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "S_nu",
+          "quantity": "non-LTE source function",
+          "units": "W/(m^2*sr*Hz)"
+        },
+        {
+          "symbol": "eta_nu",
+          "quantity": "total emissivity at frequency nu",
+          "units": "W/(m^3*sr*Hz)"
+        },
+        {
+          "symbol": "kappa_nu",
+          "quantity": "total extinction coefficient at frequency nu",
+          "units": "1/m"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_continuum_opacity_sum",
+      "name": "Continuum opacity sum",
+      "category": "stellar_radiation",
+      "expression": "kappa_nu_cont = kappa_nu_ff + kappa_nu_bf + kappa_nu_es + kappa_nu_Hminus",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "kappa_nu_cont",
+          "quantity": "total continuum extinction coefficient",
+          "units": "1/m"
+        },
+        {
+          "symbol": "kappa_nu_ff",
+          "quantity": "free-free extinction coefficient",
+          "units": "1/m"
+        },
+        {
+          "symbol": "kappa_nu_bf",
+          "quantity": "bound-free extinction coefficient",
+          "units": "1/m"
+        },
+        {
+          "symbol": "kappa_nu_es",
+          "quantity": "electron-scattering coefficient",
+          "units": "1/m"
+        },
+        {
+          "symbol": "kappa_nu_Hminus",
+          "quantity": "H- opacity contribution",
+          "units": "1/m"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
+    },
+    {
+      "id": "stellar_population_ionization_balance_diagnostic",
+      "name": "Population and ionization balance (diagnostic)",
+      "category": "stellar_radiation",
+      "expression": "n_i * R_ij = n_j * R_ji ; n_e * n_{k+1} / n_k = (2 * U_{k+1}/U_k) * (2 * pi * m_e * k_B * T / h^2)^(3/2) * exp(-chi_k/(k_B*T))",
+      "claim_tier": "diagnostic",
+      "symbols": [
+        {
+          "symbol": "n_i",
+          "quantity": "population density of level i",
+          "units": "1/m^3"
+        },
+        {
+          "symbol": "R_ij",
+          "quantity": "transition rate i to j",
+          "units": "1/s"
+        },
+        {
+          "symbol": "n_e",
+          "quantity": "electron number density",
+          "units": "1/m^3"
+        },
+        {
+          "symbol": "U_k",
+          "quantity": "partition function for ion stage k",
+          "units": "dimensionless"
+        },
+        {
+          "symbol": "chi_k",
+          "quantity": "ionization potential for stage k",
+          "units": "J"
+        }
+      ],
+      "root_lane": "physics_stellar_structure_nucleosynthesis"
     }
   ]
 }
