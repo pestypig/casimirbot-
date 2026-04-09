@@ -15,6 +15,7 @@ import {
   validateBenchmarkPackOutput,
 } from "../benchmarks";
 import { buildTreeDagClaim, collectCanonicalEvidenceRefs } from "../claims";
+import { buildLaneDiagnosticSummary } from "../diagnostics";
 import { evaluateStarSimSupportedDomain } from "../domain";
 import type { CanonicalStar, RequestedLane, StarSimBenchmarkValidation, StarSimLaneResult } from "../contract";
 import { runOscillationGyreInWorker } from "../worker/starsim-worker-client";
@@ -114,6 +115,7 @@ const buildUnavailableLane = (args: {
       fit_profile_id: args.fitProfileId,
       fit_constraints: args.supportedDomain.fit_constraints_applied,
       supported_domain: args.supportedDomain,
+      benchmark_target_id: args.star.source_context?.benchmark_target_id ?? null,
       benchmark_pack: args.benchmarkPackId
         ? {
             id: args.benchmarkPackId,
@@ -165,6 +167,8 @@ const buildFailedBenchmarkLane = (args: {
       runtime_kind: args.workerResult.runtime_kind,
       requires_structure_cache: true,
       supported_domain: args.workerResult.supported_domain,
+      benchmark_target_id: args.star.source_context?.benchmark_target_id ?? null,
+      diagnostic_summary: buildLaneDiagnosticSummary({ residuals: args.workerResult.residuals_sigma, observablesUsed: collectObservablesUsed(args.star), comparison: true }),
     },
     observables_used: collectObservablesUsed(args.star),
     inferred_params: args.workerResult.inferred_params,
@@ -186,6 +190,7 @@ const buildFailedBenchmarkLane = (args: {
       },
       benchmark_case_id: args.benchmarkCaseId,
       benchmark_validation: args.benchmarkValidation,
+      benchmark_target_id: args.star.source_context?.benchmark_target_id ?? null,
       benchmark_pack: args.benchmarkPackId
         ? {
             id: args.benchmarkPackId,
@@ -198,6 +203,8 @@ const buildFailedBenchmarkLane = (args: {
       comparison_summary: args.workerResult.comparison_summary,
       seismic_match_summary: args.workerResult.seismic_match_summary,
       supported_domain: args.workerResult.supported_domain,
+      benchmark_target_id: args.star.source_context?.benchmark_target_id ?? null,
+      diagnostic_summary: buildLaneDiagnosticSummary({ residuals: args.workerResult.residuals_sigma, observablesUsed: collectObservablesUsed(args.star), comparison: true }),
       mode_summary: args.workerResult.mode_summary,
       live_solver_metadata: args.workerResult.live_solver_metadata,
     },
@@ -532,6 +539,7 @@ export async function runOscillationGyreLane(
         benchmark_family_ids: benchmarkPackResolution.benchmark_pack.benchmark_family_ids,
       },
       benchmark_validation: effectiveValidation,
+      benchmark_target_id: star.source_context?.benchmark_target_id ?? null,
       cache_key: cacheKey,
       structure_cache_key: structureCacheKey,
       structure_claim_id: structureLane.tree_dag.claim_id,
@@ -543,6 +551,7 @@ export async function runOscillationGyreLane(
       supported_domain: workerResult.supported_domain ?? supportedDomain,
       mode_summary: workerResult.mode_summary,
       live_solver_metadata: workerResult.live_solver_metadata,
+      diagnostic_summary: buildLaneDiagnosticSummary({ residuals: workerResult.residuals_sigma, observablesUsed: collectObservablesUsed(star), comparison: true }),
     },
     cache_key: cacheKey,
     runtime_mode: workerResult.runtime_kind,
@@ -588,6 +597,7 @@ export async function runOscillationGyreLane(
       benchmark_case_id: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
       benchmark_pack_id: benchmarkPackResolution.benchmark_pack_id,
       benchmark_validation: effectiveValidation,
+      benchmark_target_id: star.source_context?.benchmark_target_id ?? null,
       structure_cache_key: structureCacheKey,
       fit_status: workerResult.fit_status,
       fit_profile_id: workerResult.fit_profile_id ?? fitProfileId,
@@ -598,6 +608,7 @@ export async function runOscillationGyreLane(
       inferred_params: workerResult.inferred_params,
       residuals_sigma: workerResult.residuals_sigma,
       live_solver_metadata: workerResult.live_solver_metadata,
+      diagnostic_summary: buildLaneDiagnosticSummary({ residuals: workerResult.residuals_sigma, observablesUsed: collectObservablesUsed(star), comparison: true }),
     },
     laneResult,
     runtimeArtifacts: finalizedArtifacts,

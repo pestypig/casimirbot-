@@ -68,6 +68,8 @@ describe("star-sim source resolution route", () => {
     expect(resolveResponse.body.supported_domain_preview?.passed).toBe(true);
     expect(resolveResponse.body.identifiers_resolved.gaia_dr3_source_id).toBe("123456789012345678");
     expect(resolveResponse.body.identifiers_resolved.sdss_apogee_id).toBe("2M00000000+0000000");
+    expect(resolveResponse.body.benchmark_target_id).toBe("demo_solar_a");
+    expect(resolveResponse.body.crossmatch_summary.accepted).toBeGreaterThan(0);
     expect(resolveResponse.body.canonical_request_draft.astrometry.parallax_mas).toBe(59.2);
     expect(resolveResponse.body.canonical_request_draft.spectroscopy.teff_K).toBe(5821);
     expect(resolveResponse.body.canonical_request_draft.spectroscopy.field_sources.teff_K).toBe("sdss_astra");
@@ -127,6 +129,7 @@ describe("star-sim source resolution route", () => {
     expect(res.body.identifiers_resolved.lamost_obsid).toBe("LAMOST-B-0002");
     expect(res.body.canonical_request_draft.spectroscopy.teff_K).toBe(5710);
     expect(res.body.canonical_request_draft.spectroscopy.field_sources.teff_K).toBe("lamost_dr10");
+    expect(res.body.crossmatch_summary.rejected).toBeGreaterThanOrEqual(0);
   });
 
   it("adds TASOC seismic summaries and marks oscillation readiness when requested", async () => {
@@ -174,6 +177,25 @@ describe("star-sim source resolution route", () => {
     expect(res.body.source_resolution.reasons).toContain("seismology_unresolved");
   });
 
+
+  it("records explicit crossmatch rejection reasons on identifier conflict", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          name: "Demo Solar A",
+        },
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+          sdss_apogee_id: "BAD-ID",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.quality_rejections.length).toBeGreaterThan(0);
+    expect(res.body.quality_rejections.some((entry: any) => entry.reason === "rejected_identifier_conflict")).toBe(true);
+  });
   it("fails unresolved targets honestly with explicit reasons", async () => {
     const app = await buildApp();
     const res = await request(app)

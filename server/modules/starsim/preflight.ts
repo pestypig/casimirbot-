@@ -45,6 +45,9 @@ export const evaluateStarSimPreflight = (args: {
   request: StarSimRequest;
   sourceReasons?: string[];
   policy?: StarSimPreconditionPolicy;
+  benchmarkTargetId?: string;
+  fallbackUsed?: boolean;
+  qualityRejections?: Array<{ reason: string }>;
 }): StarSimPreflight => {
   const policy = args.policy ?? args.request.precondition_policy ?? "strict_requested_lanes";
   const canonical = canonicalizeStarSimRequest(args.request);
@@ -135,5 +138,9 @@ export const evaluateStarSimPreflight = (args: {
     passed: blockedLanes.length === 0,
     enqueue_allowed: enqueueAllowed,
     by_lane: byLane,
+    benchmark_target_id: args.benchmarkTargetId,
+    benchmark_backed: Boolean(args.benchmarkTargetId),
+    source_resolution_quality_ok: (args.qualityRejections ?? []).length === 0,
+    fallback_used: args.fallbackUsed ?? false,
   };
 };

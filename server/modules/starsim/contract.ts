@@ -203,6 +203,7 @@ const starSimSourceContextSchema = z
     identifiers_resolved: starSimIdentifiersSchema,
     fetch_modes_by_catalog: z.record(starSimSourceFetchModeSchema).optional(),
     selected_field_origins: z.record(starSimSourceSelectionOriginSchema).optional(),
+    benchmark_target_id: z.string().min(1).optional(),
   })
   .optional();
 
@@ -268,6 +269,10 @@ export interface StarSimBenchmarkValidation {
   tolerance_profile: string;
   checked_metrics: StarSimBenchmarkMetricCheck[];
   notes: string[];
+  benchmark_target_id?: string;
+  crossmatch_summary?: StarSimCrossmatchSummary;
+  quality_rejections?: StarSimQualityRejection[];
+  diagnostic_summary?: StarSimDiagnosticSummary;
 }
 
 export interface StarSimSupportedDomain {
@@ -282,6 +287,10 @@ export interface StarSimSupportedDomain {
   fit_constraints_applied: Record<string, PhysicsFlagValue>;
   benchmark_pack_id: string | null;
   notes: string[];
+  benchmark_target_id?: string;
+  crossmatch_summary?: StarSimCrossmatchSummary;
+  quality_rejections?: StarSimQualityRejection[];
+  diagnostic_summary?: StarSimDiagnosticSummary;
 }
 
 export interface StarSimFitSummary {
@@ -346,6 +355,33 @@ export interface StarSimSourceContext {
   identifiers_resolved?: StarSimSourceIdentifiers;
   fetch_modes_by_catalog?: Partial<Record<StarSimSourceCatalog, StarSimSourceFetchMode>>;
   selected_field_origins?: Record<string, StarSimSourceSelectionOrigin>;
+  benchmark_target_id?: string;
+}
+
+
+export interface StarSimCrossmatchSummary {
+  accepted: number;
+  rejected: number;
+  fallback_used: boolean;
+}
+
+export interface StarSimQualityRejection {
+  catalog: string;
+  reason: string;
+  field_path?: string;
+  quality_flags?: string[];
+  fallback_consequence?: string;
+}
+
+export interface StarSimDiagnosticSummary {
+  fit_quality?: "good" | "borderline" | "poor";
+  comparison_quality?: "good" | "borderline" | "poor";
+  top_residual_fields?: string[];
+  observable_coverage?: {
+    used: number;
+    requested: number;
+    ratio: number;
+  };
 }
 
 export interface StarSimSourceCandidate {
@@ -386,6 +422,7 @@ export interface StarSimSourceSelectionManifest {
     identifiers: StarSimSourceIdentifiers;
   };
   fields: Record<string, StarSimSourceFieldSelection>;
+  quality_rejections?: StarSimQualityRejection[];
 }
 
 export interface StarSimSourceResolution {
@@ -406,6 +443,10 @@ export interface StarSimSourceResolution {
   resolved_sections: string[];
   reasons: string[];
   notes: string[];
+  benchmark_target_id?: string;
+  crossmatch_summary?: StarSimCrossmatchSummary;
+  quality_rejections?: StarSimQualityRejection[];
+  diagnostic_summary?: StarSimDiagnosticSummary;
 }
 
 export interface StarSimResolveResponse {
@@ -422,6 +463,10 @@ export interface StarSimResolveResponse {
   supported_domain_preview: StarSimSupportedDomain | null;
   oscillation_gyre_ready: boolean;
   oscillation_supported_domain_preview: StarSimSupportedDomain | null;
+  benchmark_target_id?: string;
+  crossmatch_summary?: StarSimCrossmatchSummary;
+  quality_rejections?: StarSimQualityRejection[];
+  diagnostic_summary?: StarSimDiagnosticSummary;
 }
 
 export interface StarSimPreflightLane {
@@ -442,6 +487,10 @@ export interface StarSimPreflight {
   passed: boolean;
   enqueue_allowed: boolean;
   by_lane: Partial<Record<RequestedLane, StarSimPreflightLane>>;
+  benchmark_target_id?: string;
+  benchmark_backed?: boolean;
+  source_resolution_quality_ok?: boolean;
+  fallback_used?: boolean;
 }
 
 export interface StarSimLanePlan {
@@ -469,6 +518,10 @@ export interface StarSimResolveBeforeRunResponse {
   preflight: StarSimPreflight;
   lane_plan: StarSimLanePlan;
   blocked_reasons: string[];
+  benchmark_target_id?: string;
+  crossmatch_summary?: StarSimCrossmatchSummary;
+  quality_rejections?: StarSimQualityRejection[];
+  diagnostic_summary?: StarSimDiagnosticSummary;
 }
 
 export interface CanonicalStarTarget {

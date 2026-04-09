@@ -98,6 +98,9 @@ export const prepareStarSimResolveBeforeRun = async (
     request: resolved.canonical_request_draft ?? request,
     sourceReasons: resolved.source_resolution.reasons,
     policy,
+    benchmarkTargetId: resolved.benchmark_target_id,
+    fallbackUsed: resolved.crossmatch_summary?.fallback_used,
+    qualityRejections: resolved.quality_rejections,
   });
   const lanePlan = buildLanePlan({
     policy,
@@ -124,6 +127,10 @@ export const prepareStarSimResolveBeforeRun = async (
     preflight,
     lane_plan: lanePlan,
     blocked_reasons: preflight.blocked_reasons,
+    benchmark_target_id: resolved.benchmark_target_id,
+    crossmatch_summary: resolved.crossmatch_summary,
+    quality_rejections: resolved.quality_rejections,
+    diagnostic_summary: resolved.diagnostic_summary,
   };
 
   if (!resolved.canonical_request_draft || !preflight.enqueue_allowed || !resolvedDraftHash) {
@@ -145,6 +152,7 @@ export const prepareStarSimResolveBeforeRun = async (
       identifiers_resolved: resolved.identifiers_resolved,
       fetch_modes_by_catalog: resolved.source_resolution.fetch_modes_by_catalog,
       selected_field_origins: buildSelectedFieldOrigins(resolved.source_resolution.selection_manifest.fields),
+      benchmark_target_id: resolved.benchmark_target_id,
     },
     runnableLanes: preflight.runnable_lanes,
     sourceArtifactRefs: resolved.source_resolution.artifact_refs,
