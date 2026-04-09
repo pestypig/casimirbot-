@@ -37,8 +37,10 @@ Resolver responses now include:
 - `quality_warnings`
 - `diagnostic_summary`
 
-`fallback_used` is true only when one or more selected fields are sourced from a lower-priority fallback catalog.
-`crossmatch_summary.fallback_fields` lists those field-level fallback decisions and whether the preferred source was absent or rejected.
+`fallback_used` is true only when one or more selected fields are sourced from a lower-priority eligible catalog for that field.
+This includes cases where the true preferred catalog for that field is absent, rejected, or available but not selected.
+`crossmatch_summary.fallback_fields` lists those field-level fallback decisions with `preferred_catalog` and `preferred_status`.
+User overrides (`selected_from: "user_override"`) are intentionally excluded from fallback accounting.
 Selection manifests preserve both rejection and warning records.
 
 ## Benchmark-backed vs domain-backed
