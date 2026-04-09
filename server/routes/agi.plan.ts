@@ -389,6 +389,7 @@ import {
   scoreHelixAskObjectiveRecoveryVariantResult,
   shouldBypassHelixAskObjectiveScopedRetrievalAgentGate,
 } from "../services/helix-ask/retrieval/objective-scoped-recovery";
+import { buildEvidenceKey, mergeEvidence } from "../services/helix-ask/retrieval/evidence-merging";
 import {
   buildGeneralAmbiguityAnswerFloor,
   hasHelixAskConcreteDefinitionTarget,
@@ -405,6 +406,10 @@ import {
   shouldPreferHelixAskPlannerLlmInFastMode,
   shouldUseHelixAskRiskTriggeredTwoPass,
 } from "../services/helix-ask/policy/execution-policy";
+import {
+  resolveExecutionHandledSummary,
+  resolveSafetyHandledSummary,
+} from "../services/helix-ask/policy/summary-handling";
 import {
   isHelixAskClarifyForcedShortCircuitRule,
   isHelixAskConceptForcedShortCircuitRule,
@@ -448,6 +453,7 @@ import {
   evaluateNeedleNatarioRelationProof,
 } from "../services/helix-ask/relation-proof";
 import { buildHelixAskStrictFailReasonLedger } from "../services/helix-ask/strict-fail-reason-ledger";
+import { collectStepCitations } from "../services/helix-ask/surface/step-citations";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
 import { runBeliefGraphLoop } from "../../modules/analysis/belief-graph-loop";
@@ -1656,39 +1662,6 @@ const summarizeExecutionSignals = (
   };
 };
 
-const SAFETY_REFUSAL_SUMMARY =
-  "Sorry, I cannot comply with that request. I can help if you share a non-sensitive excerpt or ask a high-level question.";
-const EXECUTION_FALLBACK_SUMMARY =
-  "Sorry, I am unable to complete that request because a tool step failed. You can retry or provide more details.";
-
-const resolveSafetyHandledSummary = (
-  summary: string,
-  safetyOk: boolean,
-): { summary: string; handled: boolean } => {
-  if (safetyOk) {
-    return { summary, handled: false };
-  }
-  const handling = detectSafetyHandling(summary);
-  if (handling.handled) {
-    return { summary, handled: true };
-  }
-  return { summary: SAFETY_REFUSAL_SUMMARY, handled: true };
-};
-
-const resolveExecutionHandledSummary = (
-  summary: string,
-  executionOk: boolean,
-): { summary: string; handled: boolean } => {
-  if (executionOk) {
-    return { summary, handled: false };
-  }
-  const handling = detectSafetyHandling(summary);
-  if (handling.handled) {
-    return { summary, handled: true };
-  }
-  return { summary: EXECUTION_FALLBACK_SUMMARY, handled: true };
-};
-
 type RepoGraphHitLike = {
   id?: string;
   kind?: string;
@@ -1698,28 +1671,6 @@ type RepoGraphHitLike = {
   snippet_id?: string;
   score?: number;
   symbol_name?: string;
-};
-
-const collectStepCitations = (steps: ExecutionResult[]): string[] => {
-  const citations = new Set<string>();
-  for (const step of steps) {
-    if (Array.isArray(step.citations)) {
-      step.citations.forEach((citation) => {
-        if (typeof citation === "string" && citation.trim().length > 0) {
-          citations.add(citation.trim());
-        }
-      });
-    }
-    const output = step.output as { citations?: unknown } | undefined;
-    if (Array.isArray(output?.citations)) {
-      output.citations.forEach((citation) => {
-        if (typeof citation === "string" && citation.trim().length > 0) {
-          citations.add(citation.trim());
-        }
-      });
-    }
-  }
-  return Array.from(citations);
 };
 
 const coerceRepoGraphHits = (value: unknown): RepoGraphHitLike[] => {
@@ -1928,24 +1879,6 @@ const hasCitationClaim = (value: string): boolean => {
     CITATION_COMPLETION_CLAIM_PATTERN.test(normalized) ||
     CITATION_COMPLETION_FILE_PATTERN.test(normalized)
   );
-};
-
-const buildEvidenceKey = (item: AgiEvidence): string =>
-  item.hash ?? `${item.kind ?? ""}:${item.id ?? ""}:${item.path ?? ""}`;
-
-const mergeEvidence = (
-  primary: AgiEvidence[],
-  extra: AgiEvidence[],
-): AgiEvidence[] => {
-  const output: AgiEvidence[] = [];
-  const seen = new Set<string>();
-  for (const item of [...primary, ...extra]) {
-    const key = buildEvidenceKey(item);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    output.push(item);
-  }
-  return output;
 };
 
 const collectEvidenceTokens = (item: AgiEvidence): string[] => {
@@ -68451,10 +68384,11 @@ planRouter.post("/execute", async (req, res) => {
   );
   const rawSummary =
     record.taskTrace.result_summary ?? summarizeExecutionResults(steps);
-  const executionSummary = resolveExecutionHandledSummary(rawSummary, ok);
+  const executionSummary = resolveExecutionHandledSummary(rawSummary, ok, detectSafetyHandling);
   const safetySummary = resolveSafetyHandledSummary(
     executionSummary.summary,
     executionSignals.safetyOk,
+    detectSafetyHandling,
   );
   const summary = safetySummary.summary;
   record.taskTrace.result_summary = summary;
