@@ -1845,7 +1845,7 @@
       "id": "stellar_radiative_transfer_equation",
       "name": "Stellar radiative transfer equation",
       "category": "stellar_radiation",
-      "expression": "mu * dI_nu/dtau_nu = S_nu - I_nu",
+      "expression": "dI_nu/dtau_nu = S_nu - I_nu",
       "claim_tier": "diagnostic",
       "symbols": [
         {
@@ -1862,11 +1862,6 @@
           "symbol": "S_nu",
           "quantity": "source function at frequency nu",
           "units": "W/(m^2*sr*Hz)"
-        },
-        {
-          "symbol": "mu",
-          "quantity": "direction cosine relative to outward normal",
-          "units": "dimensionless"
         }
       ],
       "root_lane": "physics_stellar_structure_nucleosynthesis"

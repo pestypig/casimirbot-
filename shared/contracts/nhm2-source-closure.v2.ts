@@ -50,6 +50,22 @@ export const NHM2_SOURCE_CLOSURE_REGION_ACCOUNTING_EVIDENCE_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_SOURCE_CLOSURE_REGION_T00_DERIVATION_MODE_VALUES = [
+  "runtime_integrated_metric_region_mean",
+  "gr_matter_brick_region_mean",
+  "tensor_snapshot_inferred",
+  "unknown",
+] as const;
+
+export const NHM2_SOURCE_CLOSURE_REGION_T00_TRACE_STAGE_VALUES = [
+  "region_mean_from_shift_field",
+  "region_mean_from_gr_matter_brick",
+  "tensor_snapshot_fallback",
+  "unknown",
+] as const;
+
+const NHM2_SOURCE_CLOSURE_PRESSURE_COMPONENTS = ["T11", "T22", "T33"] as const;
+
 export type Nhm2SourceClosureV2ReasonCode =
   (typeof NHM2_SOURCE_CLOSURE_V2_REASON_CODES)[number];
 export type Nhm2SourceClosureRegionBasisStatus =
@@ -58,6 +74,10 @@ export type Nhm2SourceClosureRegionAggregationMode =
   (typeof NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES)[number];
 export type Nhm2SourceClosureV2RegionAccountingEvidenceStatus =
   (typeof NHM2_SOURCE_CLOSURE_REGION_ACCOUNTING_EVIDENCE_VALUES)[number];
+export type Nhm2SourceClosureV2RegionT00DerivationMode =
+  (typeof NHM2_SOURCE_CLOSURE_REGION_T00_DERIVATION_MODE_VALUES)[number];
+export type Nhm2SourceClosureV2RegionT00TraceStage =
+  (typeof NHM2_SOURCE_CLOSURE_REGION_T00_TRACE_STAGE_VALUES)[number];
 export type Nhm2SourceClosureV2RegionT00MechanismCategory =
   | "t00_mismatch_present"
   | "pressure_proxy_dominant"
@@ -65,6 +85,17 @@ export type Nhm2SourceClosureV2RegionT00MechanismCategory =
   | "metric_required_evidence_unknown"
   | "tile_effective_evidence_unknown"
   | "accounting_suspect";
+export type Nhm2SourceClosureV2RegionT00MechanismNextStep =
+  | "direct_t00_source_model_mapping"
+  | "pressure_proxy_mapping"
+  | "mixed_followup"
+  | "insufficient_evidence";
+export type Nhm2SourceClosureV2RegionT00TraceDivergenceStage =
+  | "mask_mismatch"
+  | "aggregation_mismatch"
+  | "source_path_mismatch"
+  | "value_mismatch_after_same_trace"
+  | "unknown";
 
 export type Nhm2SourceClosureV2RegionAccounting = {
   sampleCount: number | null;
@@ -77,6 +108,18 @@ export type Nhm2SourceClosureV2RegionAccounting = {
   evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
 };
 
+export type Nhm2SourceClosureV2RegionT00Trace = {
+  regionMaskRef: string | null;
+  sampleCount: number | null;
+  normalizationBasis: string | null;
+  aggregationMode: Nhm2SourceClosureRegionAggregationMode;
+  valueRef: string | null;
+  tensorRef: string | null;
+  maskNote: string | null;
+  supportInclusionNote: string | null;
+  traceStage: Nhm2SourceClosureV2RegionT00TraceStage;
+};
+
 export type Nhm2SourceClosureV2RegionT00Diagnostics = {
   sampleCount: number | null;
   includedCount: number | null;
@@ -84,6 +127,9 @@ export type Nhm2SourceClosureV2RegionT00Diagnostics = {
   nonFiniteCount: number | null;
   meanT00: number | null;
   sumT00: number | null;
+  sourceRef?: string | null;
+  derivationMode?: Nhm2SourceClosureV2RegionT00DerivationMode;
+  trace?: Nhm2SourceClosureV2RegionT00Trace | null;
   normalizationBasis: string | null;
   aggregationMode: Nhm2SourceClosureRegionAggregationMode;
   evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
@@ -148,6 +194,8 @@ export type Nhm2SourceClosureV2RegionMismatchDiagnostics = {
   dominantSide: "metric" | "tile" | "tie" | null;
   t00MechanismCategory: Nhm2SourceClosureV2RegionT00MechanismCategory;
   t00MechanismEvidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
+  t00MechanismNextStep: Nhm2SourceClosureV2RegionT00MechanismNextStep;
+  t00TraceDivergenceStage: Nhm2SourceClosureV2RegionT00TraceDivergenceStage;
   components: Record<Nhm2SourceClosureComponent, Nhm2SourceClosureV2RegionScaleComponent>;
 };
 
@@ -561,6 +609,9 @@ const normalizeRegionT00Diagnostics = (
     nonFiniteCount: toFiniteOrNull(value.nonFiniteCount),
     meanT00: toFiniteOrNull(value.meanT00),
     sumT00: toFiniteOrNull(value.sumT00),
+    sourceRef: toText(value.sourceRef),
+    derivationMode: normalizeT00DerivationMode(value.derivationMode),
+    trace: normalizeRegionT00Trace(value.trace),
     normalizationBasis: toText(value.normalizationBasis),
     aggregationMode: normalizeRegionAggregationMode(value.aggregationMode),
     evidenceStatus: normalizeAccountingEvidenceStatus(value.evidenceStatus),
@@ -575,6 +626,43 @@ const normalizeRegionT00Diagnostics = (
     }
   }
   return normalized;
+};
+
+const normalizeT00DerivationMode = (
+  value: unknown,
+): Nhm2SourceClosureV2RegionT00DerivationMode =>
+  value === "runtime_integrated_metric_region_mean" ||
+  value === "gr_matter_brick_region_mean" ||
+  value === "tensor_snapshot_inferred" ||
+  value === "unknown"
+    ? value
+    : "unknown";
+
+const normalizeT00TraceStage = (
+  value: unknown,
+): Nhm2SourceClosureV2RegionT00TraceStage =>
+  value === "region_mean_from_shift_field" ||
+  value === "region_mean_from_gr_matter_brick" ||
+  value === "tensor_snapshot_fallback" ||
+  value === "unknown"
+    ? value
+    : "unknown";
+
+const normalizeRegionT00Trace = (
+  value: Nhm2SourceClosureV2RegionT00Trace | null | undefined,
+): Nhm2SourceClosureV2RegionT00Trace | null => {
+  if (!value) return null;
+  return {
+    regionMaskRef: toText(value.regionMaskRef),
+    sampleCount: toFiniteOrNull(value.sampleCount),
+    normalizationBasis: toText(value.normalizationBasis),
+    aggregationMode: normalizeRegionAggregationMode(value.aggregationMode),
+    valueRef: toText(value.valueRef),
+    tensorRef: toText(value.tensorRef),
+    maskNote: toText(value.maskNote),
+    supportInclusionNote: toText(value.supportInclusionNote),
+    traceStage: normalizeT00TraceStage(value.traceStage),
+  };
 };
 
 const normalizeProxyMode = (
@@ -829,8 +917,98 @@ const buildMismatchDiagnostics = (
     dominantSide,
     t00MechanismCategory: "unknown",
     t00MechanismEvidenceStatus: "unknown",
+    t00MechanismNextStep: "insufficient_evidence",
+    t00TraceDivergenceStage: "unknown",
     components,
   };
+};
+
+export const computeNhm2PressureSignificanceFloor = (
+  residualComponents: Record<
+    Nhm2SourceClosureComponent,
+    Nhm2SourceClosureResidualComponent
+  >,
+  eps = 1e-12,
+): number => {
+  const pressureMagnitudeScale = NHM2_SOURCE_CLOSURE_PRESSURE_COMPONENTS.reduce(
+    (best, component) => {
+      const metricAbs = Math.abs(residualComponents[component]?.metricRequired ?? 0);
+      const tileAbs = Math.abs(residualComponents[component]?.tileEffective ?? 0);
+      return Math.max(best, metricAbs, tileAbs);
+    },
+    0,
+  );
+  return Math.max(eps, pressureMagnitudeScale * Number.EPSILON * 16);
+};
+
+const resolveT00MechanismNextStep = (args: {
+  category: Nhm2SourceClosureV2RegionT00MechanismCategory;
+  evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
+}): Nhm2SourceClosureV2RegionT00MechanismNextStep => {
+  const { category, evidenceStatus } = args;
+  if (evidenceStatus === "unknown") {
+    return "insufficient_evidence";
+  }
+  if (category === "t00_mismatch_present") {
+    return "direct_t00_source_model_mapping";
+  }
+  if (category === "pressure_proxy_dominant") {
+    return "pressure_proxy_mapping";
+  }
+  return "insufficient_evidence";
+};
+
+const resolveT00TraceDivergenceStage = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): Nhm2SourceClosureV2RegionT00TraceDivergenceStage => {
+  const metricT00Diagnostics = args.metricT00Diagnostics;
+  const tileT00Diagnostics = args.tileT00Diagnostics;
+  const metricTrace = metricT00Diagnostics?.trace ?? null;
+  const tileTrace = tileT00Diagnostics?.trace ?? null;
+  if (!metricTrace || !tileTrace) {
+    return "unknown";
+  }
+
+  const metricMaskRef = metricTrace.regionMaskRef;
+  const tileMaskRef = tileTrace.regionMaskRef;
+  if (metricMaskRef != null && tileMaskRef != null && metricMaskRef !== tileMaskRef) {
+    return "mask_mismatch";
+  }
+
+  const aggregationMismatch =
+    metricTrace.aggregationMode !== "unknown" &&
+    tileTrace.aggregationMode !== "unknown" &&
+    metricTrace.aggregationMode !== tileTrace.aggregationMode;
+  const normalizationMismatch =
+    metricTrace.normalizationBasis != null &&
+    tileTrace.normalizationBasis != null &&
+    metricTrace.normalizationBasis !== tileTrace.normalizationBasis;
+  if (aggregationMismatch || normalizationMismatch) {
+    return "aggregation_mismatch";
+  }
+
+  const traceStageMismatch =
+    metricTrace.traceStage !== "unknown" &&
+    tileTrace.traceStage !== "unknown" &&
+    metricTrace.traceStage !== tileTrace.traceStage;
+  const derivationModeMismatch =
+    metricT00Diagnostics?.derivationMode != null &&
+    tileT00Diagnostics?.derivationMode != null &&
+    metricT00Diagnostics.derivationMode !== "unknown" &&
+    tileT00Diagnostics.derivationMode !== "unknown" &&
+    metricT00Diagnostics.derivationMode !== tileT00Diagnostics.derivationMode;
+  if (traceStageMismatch || derivationModeMismatch) {
+    return "source_path_mismatch";
+  }
+
+  const metricMean = metricT00Diagnostics?.meanT00 ?? null;
+  const tileMean = tileT00Diagnostics?.meanT00 ?? null;
+  if (metricMean != null && tileMean != null && Math.abs(tileMean - metricMean) > 1e-12) {
+    return "value_mismatch_after_same_trace";
+  }
+
+  return "unknown";
 };
 
 const summarizeT00Mechanism = (args: {
@@ -880,25 +1058,23 @@ const summarizeT00Mechanism = (args: {
     return { category: "t00_mismatch_present", evidenceStatus };
   }
 
-  const pressureAbsDeltaMax = (["T11", "T22", "T33"] as const).reduce((best, component) => {
-    const delta = residualComponents[component]?.absResidual;
-    return delta != null ? Math.max(best, Math.abs(delta)) : best;
-  }, 0);
-  const pressureResidualMax = (["T11", "T22", "T33"] as const).reduce((best, component) => {
-    const relResidual = residualComponents[component]?.relResidual;
-    return relResidual != null ? Math.max(best, Math.abs(relResidual)) : best;
-  }, 0);
-  const pressureMagnitudeScale = (["T11", "T22", "T33"] as const).reduce(
+  const pressureAbsDeltaMax = NHM2_SOURCE_CLOSURE_PRESSURE_COMPONENTS.reduce(
     (best, component) => {
-      const metricAbs = Math.abs(args.residualComponents[component]?.metric ?? 0);
-      const tileAbs = Math.abs(args.residualComponents[component]?.tile ?? 0);
-      return Math.max(best, metricAbs, tileAbs);
+      const delta = residualComponents[component]?.absResidual;
+      return delta != null ? Math.max(best, Math.abs(delta)) : best;
     },
     0,
   );
-  const pressureSignificanceFloor = Math.max(
+  const pressureResidualMax = NHM2_SOURCE_CLOSURE_PRESSURE_COMPONENTS.reduce(
+    (best, component) => {
+      const relResidual = residualComponents[component]?.relResidual;
+      return relResidual != null ? Math.max(best, Math.abs(relResidual)) : best;
+    },
+    0,
+  );
+  const pressureSignificanceFloor = computeNhm2PressureSignificanceFloor(
+    residualComponents,
     eps,
-    pressureMagnitudeScale * Number.EPSILON * 16,
   );
   const pressureMismatchIsSignificant = pressureAbsDeltaMax > pressureSignificanceFloor;
 
@@ -962,6 +1138,11 @@ const buildRegionComparison = (args: {
   if (mismatchDiagnostics != null) {
     mismatchDiagnostics.t00MechanismCategory = t00Mechanism.category;
     mismatchDiagnostics.t00MechanismEvidenceStatus = t00Mechanism.evidenceStatus;
+    mismatchDiagnostics.t00MechanismNextStep = resolveT00MechanismNextStep(t00Mechanism);
+    mismatchDiagnostics.t00TraceDivergenceStage = resolveT00TraceDivergenceStage({
+      metricT00Diagnostics,
+      tileT00Diagnostics,
+    });
   }
   const sampleCount = toFiniteOrNull(args.input.sampleCount);
   const resolvedSampleCount =

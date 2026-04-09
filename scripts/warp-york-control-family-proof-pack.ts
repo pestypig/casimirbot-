@@ -27761,6 +27761,36 @@ const renderNhm2SourceClosureMarkdown = (
   const summarizeT00Mechanism = (region: Nhm2SourceClosureV2RegionComparison) => {
     return region.mismatchDiagnostics?.t00MechanismCategory ?? "unknown";
   };
+  const summarizeT00MechanismNextStep = (region: Nhm2SourceClosureV2RegionComparison) => {
+    return region.mismatchDiagnostics?.t00MechanismNextStep ?? "insufficient_evidence";
+  };
+  const summarizeT00TraceDivergenceStage = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceDivergenceStage ?? "unknown";
+  };
+  const summarizeDirectT00LocalizationNote = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    const metricSourceRef = region.metricT00Diagnostics?.sourceRef ?? null;
+    const tileSourceRef = region.tileT00Diagnostics?.sourceRef ?? null;
+    const metricMode = region.metricT00Diagnostics?.derivationMode ?? "unknown";
+    const tileMode = region.tileT00Diagnostics?.derivationMode ?? "unknown";
+    const metricTraceStage = region.metricT00Diagnostics?.trace?.traceStage ?? "unknown";
+    const tileTraceStage = region.tileT00Diagnostics?.trace?.traceStage ?? "unknown";
+    if (
+      summarizeT00MechanismNextStep(region) !== "direct_t00_source_model_mapping" ||
+      metricSourceRef == null ||
+      tileSourceRef == null ||
+      metricMode === "unknown" ||
+      tileMode === "unknown" ||
+      metricTraceStage === "unknown" ||
+      tileTraceStage === "unknown"
+    ) {
+      return null;
+    }
+    return `direct T00 compares ${metricMode} (${metricTraceStage}) at ${metricSourceRef} against ${tileMode} (${tileTraceStage}) at ${tileSourceRef}`;
+  };
   const renderAccountingRows = (
     accounting: ReturnType<typeof summarizeAccounting>,
   ) => {
@@ -27830,6 +27860,9 @@ const renderNhm2SourceClosureMarkdown = (
           const accounting = summarizeAccounting(region);
           const mismatch = summarizeMismatch(region);
           const t00Mechanism = summarizeT00Mechanism(region);
+          const t00MechanismNextStep = summarizeT00MechanismNextStep(region);
+          const t00TraceDivergenceStage = summarizeT00TraceDivergenceStage(region);
+          const directT00LocalizationNote = summarizeDirectT00LocalizationNote(region);
           const tileProxy = region.tileProxyDiagnostics ?? null;
           const detailRows = renderComponentRows(region.residualComponents);
           const mismatchRows = renderMismatchRows(mismatch);
@@ -27868,6 +27901,9 @@ const renderNhm2SourceClosureMarkdown = (
 | accountingMismatches | ${accounting.mismatchNote} |
 | t00MismatchMechanism | ${t00Mechanism} |
 | t00MismatchMechanismEvidenceStatus | ${region.mismatchDiagnostics?.t00MechanismEvidenceStatus ?? "unknown"} |
+| t00MismatchMechanismNextStep | ${t00MechanismNextStep} |
+| t00TraceDivergenceStage | ${t00TraceDivergenceStage} |
+| directT00LocalizationNote | ${directT00LocalizationNote ?? "null"} |
 | note | ${region.note ?? "null"} |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -27894,6 +27930,17 @@ ${renderAccountingRows(accounting)}
 | nonFiniteCount | ${region.metricT00Diagnostics?.nonFiniteCount ?? "null"} | ${region.tileT00Diagnostics?.nonFiniteCount ?? "null"} |
 | meanT00 | ${region.metricT00Diagnostics?.meanT00 ?? "null"} | ${region.tileT00Diagnostics?.meanT00 ?? "null"} |
 | sumT00 | ${region.metricT00Diagnostics?.sumT00 ?? "null"} | ${region.tileT00Diagnostics?.sumT00 ?? "null"} |
+| sourceRef | ${region.metricT00Diagnostics?.sourceRef ?? "null"} | ${region.tileT00Diagnostics?.sourceRef ?? "null"} |
+| derivationMode | ${region.metricT00Diagnostics?.derivationMode ?? "null"} | ${region.tileT00Diagnostics?.derivationMode ?? "null"} |
+| traceStage | ${region.metricT00Diagnostics?.trace?.traceStage ?? "null"} | ${region.tileT00Diagnostics?.trace?.traceStage ?? "null"} |
+| trace.regionMaskRef | ${region.metricT00Diagnostics?.trace?.regionMaskRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.regionMaskRef ?? "null"} |
+| trace.sampleCount | ${region.metricT00Diagnostics?.trace?.sampleCount ?? "null"} | ${region.tileT00Diagnostics?.trace?.sampleCount ?? "null"} |
+| trace.valueRef | ${region.metricT00Diagnostics?.trace?.valueRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.valueRef ?? "null"} |
+| trace.tensorRef | ${region.metricT00Diagnostics?.trace?.tensorRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.tensorRef ?? "null"} |
+| trace.maskNote | ${region.metricT00Diagnostics?.trace?.maskNote ?? "null"} | ${region.tileT00Diagnostics?.trace?.maskNote ?? "null"} |
+| trace.supportInclusionNote | ${region.metricT00Diagnostics?.trace?.supportInclusionNote ?? "null"} | ${region.tileT00Diagnostics?.trace?.supportInclusionNote ?? "null"} |
+| trace.normalizationBasis | ${region.metricT00Diagnostics?.trace?.normalizationBasis ?? "null"} | ${region.tileT00Diagnostics?.trace?.normalizationBasis ?? "null"} |
+| trace.aggregationMode | ${region.metricT00Diagnostics?.trace?.aggregationMode ?? "null"} | ${region.tileT00Diagnostics?.trace?.aggregationMode ?? "null"} |
 | aggregationMode | ${region.metricT00Diagnostics?.aggregationMode ?? "null"} | ${region.tileT00Diagnostics?.aggregationMode ?? "null"} |
 | normalizationBasis | ${region.metricT00Diagnostics?.normalizationBasis ?? "null"} | ${region.tileT00Diagnostics?.normalizationBasis ?? "null"} |
 | evidenceStatus | ${region.metricT00Diagnostics?.evidenceStatus ?? "null"} | ${region.tileT00Diagnostics?.evidenceStatus ?? "null"} |`;

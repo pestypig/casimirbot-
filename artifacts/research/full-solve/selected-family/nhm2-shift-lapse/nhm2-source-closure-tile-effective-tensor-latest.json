@@ -10,10 +10,10 @@
   "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
   "producer": "scripts/warp-york-control-family-proof-pack.ts",
   "diagonalTensor": {
-    "T00": -58267450.94958379,
-    "T11": 58267450.94958379,
-    "T22": 58267450.94958379,
-    "T33": 58267450.94958379
+    "T00": -58267450.96267209,
+    "T11": 58267450.96267209,
+    "T22": 58267450.96267209,
+    "T33": 58267450.96267209
   },
   "note": "Selected-profile global tile-effective diagonal tensor from the GR matter brick global tensor summary used by NHM2 source-closure publication."
 }

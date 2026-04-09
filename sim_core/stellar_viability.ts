@@ -11,12 +11,20 @@ export type StellarRadiationModelId =
   | "M2_mechanoluminescent_pressure"
   | "M3_coherence_angular";
 
+export type StellarCoverageMode = "full_spectrum" | "band_limited";
+
 export interface StellarSpectrumObservation {
   wavelength_m: ArrayLike<number>;
   intensity: ArrayLike<number>;
+  benchmark_id?: string;
+  coverage_mode?: StellarCoverageMode;
+  reference_flux_W_m2?: number;
+  coverage_fraction?: number;
   continuum_mask?: ArrayLike<number | boolean>;
   uv_mask?: ArrayLike<number | boolean>;
   line_mask?: ArrayLike<number | boolean>;
+  mu_grid?: ArrayLike<number>;
+  intensity_by_mu?: ArrayLike<number>;
   anisotropy?: ArrayLike<number>;
   polarization?: ArrayLike<number>;
 }
@@ -34,6 +42,8 @@ export interface StellarAtmosphereState {
   transfer_operator?: ArrayLike<number> | number;
   pressure_profile_Pa?: ArrayLike<number>;
   continuum_opacity?: ArrayLike<number> | number;
+  line_opacity?: ArrayLike<number> | number;
+  line_source_contrast?: ArrayLike<number> | number;
   source_function_mode?: "lte" | "nlte_proxy";
   nlte_departure?: ArrayLike<number> | number;
 }
@@ -72,20 +82,31 @@ export interface StellarRadiationInput {
 }
 
 export interface StellarModelMetrics {
-  continuum_rms: number;
-  uv_residual: number;
+  continuum_rms: number | null;
+  uv_residual: number | null;
   line_residual: number | null;
-  bolometric_closure: number;
-  anisotropy_penalty: number;
-  polarization_penalty: number;
+  bolometric_closure: number | null;
+  band_flux_closure: number | null;
+  anisotropy_penalty: number | null;
+  polarization_penalty: number | null;
   parameter_penalty: number;
   total: number;
+  status: {
+    continuum_rms: "computed" | "gated";
+    uv_residual: "computed" | "gated";
+    line_residual: "computed" | "gated";
+    bolometric_closure: "computed" | "gated";
+    band_flux_closure: "computed" | "gated";
+    anisotropy_penalty: "computed" | "unavailable";
+    polarization_penalty: "computed" | "unavailable";
+  };
 }
 
 export interface StellarModelResult {
   id: StellarRadiationModelId;
   teff_K: number;
   predicted_intensity: Float64Array;
+  predicted_mu_profile: Float64Array | null;
   bolometric_flux_W_m2: number;
   observed_bolometric_flux_W_m2: number;
   predicted_anisotropy: number;
@@ -103,11 +124,26 @@ export interface StellarViabilityReport {
   fallback_winner: StellarRadiationModelId;
   models: StellarModelResult[];
   null_model: StellarRadiationModelId;
+  observables_active: {
+    continuum: boolean;
+    uv: boolean;
+    line: boolean;
+    angular: boolean;
+    polarization: boolean;
+  };
+  benchmark: {
+    id: string | null;
+    coverage_mode: StellarCoverageMode;
+    wavelength_min_m: number;
+    wavelength_max_m: number;
+    coverage_fraction: number | null;
+  };
   contract: {
     continuum_rms_max: number;
     uv_residual_max: number;
     line_residual_max: number;
     bolometric_closure_max: number;
+    band_flux_closure_max: number;
     anisotropy_penalty_max: number;
     polarization_penalty_max: number;
   };
@@ -127,6 +163,7 @@ const DEFAULT_CONTRACT = {
   uv_residual_max: 0.15,
   line_residual_max: 0.1,
   bolometric_closure_max: 0.02,
+  band_flux_closure_max: 0.02,
   anisotropy_penalty_max: 0.05,
   polarization_penalty_max: 0.05,
 };
@@ -166,15 +203,20 @@ function scalarOrSeries(value: ArrayLike<number> | number | undefined, length: n
   return Float64Array.from(Array.from({ length }, () => fallback));
 }
 
-function toMask(values: ArrayLike<number | boolean> | undefined, length: number, fallback: (index: number) => boolean): boolean[] {
+function toOptionalMask(values: ArrayLike<number | boolean> | undefined, length: number): boolean[] | null {
   if (!values) {
-    return Array.from({ length }, (_, index) => fallback(index));
+    return null;
   }
   return Array.from({ length }, (_, index) => Boolean(values[index]));
 }
 
 function averageSeries(values: ArrayLike<number> | undefined): number {
   return values && values.length > 0 ? clamp01(mean(values)) : 0;
+}
+
+function averageScalarOrSeries(value: ArrayLike<number> | number | undefined): number {
+  if (typeof value === "number") return value;
+  return value && value.length > 0 ? mean(value) : 0;
 }
 
 function normalizeKernel(kernel: Float64Array): Float64Array {
@@ -212,6 +254,14 @@ function oscillatoryKernel(wavelength_m: Float64Array): Float64Array {
   );
 }
 
+function stellarLineKernel(wavelength_m: Float64Array): Float64Array {
+  const hBeta = gaussianKernel(wavelength_m, 486.1e-9, 4e-9);
+  const hAlpha = gaussianKernel(wavelength_m, 656.3e-9, 6e-9);
+  return normalizeKernel(
+    Float64Array.from(wavelength_m, (_, index) => 0.75 * hBeta[index] + 1.0 * hAlpha[index]),
+  );
+}
+
 function integrateTrapezoid(x: Float64Array, y: Float64Array): number {
   if (x.length < 2 || y.length !== x.length) return 0;
   let area = 0;
@@ -220,6 +270,17 @@ function integrateTrapezoid(x: Float64Array, y: Float64Array): number {
     area += 0.5 * (y[index] + y[index + 1]) * dx;
   }
   return area;
+}
+
+function maxFinite(values: ArrayLike<number>): number {
+  let best = 0;
+  for (let index = 0; index < values.length; index += 1) {
+    const value = Number(values[index]) || 0;
+    if (Number.isFinite(value)) {
+      best = Math.max(best, value);
+    }
+  }
+  return best;
 }
 
 function relativeRms(observed: Float64Array, predicted: Float64Array, mask: boolean[]): number {
@@ -233,6 +294,71 @@ function relativeRms(observed: Float64Array, predicted: Float64Array, mask: bool
     count += 1;
   }
   return count > 0 ? Math.sqrt(sumSq / count) : 0;
+}
+
+function normalizeByPeak(values: Float64Array): Float64Array {
+  const peak = Math.max(maxFinite(values), TINY);
+  return Float64Array.from(values, (value) => Math.max(0, value / peak));
+}
+
+function computeMaskedResidual(
+  observed: Float64Array,
+  predicted: Float64Array,
+  mask: boolean[] | null,
+): { value: number | null; status: "computed" | "gated" } {
+  if (!mask || !mask.some(Boolean)) {
+    return { value: null, status: "gated" };
+  }
+  return {
+    value: relativeRms(observed, predicted, mask),
+    status: "computed",
+  };
+}
+
+function computeFluxClosure(referenceFlux: number | null | undefined, predictedFlux: number): { value: number | null; status: "computed" | "gated" } {
+  if (!(referenceFlux != null && Number.isFinite(referenceFlux) && referenceFlux > 0)) {
+    return { value: null, status: "gated" };
+  }
+  return {
+    value: Math.abs(predictedFlux - referenceFlux) / Math.max(referenceFlux, TINY),
+    status: "computed",
+  };
+}
+
+function buildAngularProfile(
+  muGrid: Float64Array,
+  atmosphere: StellarAtmosphereState | undefined,
+  anisotropy: number,
+): Float64Array {
+  if (muGrid.length === 0) return new Float64Array();
+  const meanOpacity = Math.max(0, averageScalarOrSeries(atmosphere?.continuum_opacity));
+  const meanLineOpacity = Math.max(0, averageScalarOrSeries(atmosphere?.line_opacity));
+  const meanDeparture = averageScalarOrSeries(atmosphere?.nlte_departure);
+  const meanLineContrast = averageScalarOrSeries(atmosphere?.line_source_contrast);
+  const linearCoeff = Math.min(
+    0.9,
+    Math.max(
+      0.25,
+      0.55 +
+        0.08 * Math.tanh(meanOpacity) +
+        0.06 * Math.tanh(meanLineOpacity) -
+        0.1 * meanDeparture +
+        0.05 * meanLineContrast,
+    ),
+  );
+  const quadraticCoeff = Math.min(
+    0.2,
+    Math.max(0, 0.04 * Math.tanh(meanOpacity + meanLineOpacity) - 0.03 * meanDeparture + 0.02 * Math.abs(meanLineContrast)),
+  );
+  const meanMu = mean(muGrid);
+  const profile = Float64Array.from(muGrid, (muValue) => {
+    const mu = clamp01(muValue);
+    const edge = 1 - mu;
+    const base = Math.max(TINY, 1 - linearCoeff * edge - quadraticCoeff * edge * edge);
+    const angularModifier = 1 + 0.35 * anisotropy * (mu - meanMu);
+    return Math.max(TINY, base * angularModifier);
+  });
+  return normalizeByPeak(profile);
 }
 
 function computeProxyScale(value: number, reference: number): number {
@@ -293,15 +419,32 @@ function buildBaseSpectrum(
   const emissivity = scalarOrSeries(kernels?.emissivity_base ?? atmosphere?.emissivity_base, wavelength_m.length, 1);
   const transfer = scalarOrSeries(kernels?.transfer_operator ?? atmosphere?.transfer_operator, wavelength_m.length, 1);
   const continuumOpacity = scalarOrSeries(atmosphere?.continuum_opacity, wavelength_m.length, 0);
+  const lineOpacity = scalarOrSeries(atmosphere?.line_opacity, wavelength_m.length, 0);
+  const lineSourceContrast = scalarOrSeries(atmosphere?.line_source_contrast, wavelength_m.length, 0);
   const nlteDeparture = scalarOrSeries(atmosphere?.nlte_departure, wavelength_m.length, 0);
+  const lineKernel = stellarLineKernel(wavelength_m);
   const sourceMode = atmosphere?.source_function_mode ?? "lte";
   return Float64Array.from(wavelength_m, (lambda, index) => {
     const planckBase = planckRadianceLambda(lambda, teff_K);
     const boundedDeparture = Math.max(-0.5, Math.min(0.5, nlteDeparture[index]));
-    const sourceFunction = sourceMode === "nlte_proxy" ? planckBase * (1 + boundedDeparture) : planckBase;
+    const uvWeight = lambda <= 400e-9 ? 1 : Math.exp(-(lambda - 400e-9) / 800e-9);
+    const sourceFunction =
+      sourceMode === "nlte_proxy" ? planckBase * Math.max(0, 1 + boundedDeparture * (0.45 + 0.55 * uvWeight)) : planckBase;
     const opacity = Math.max(0, continuumOpacity[index]);
+    const lineWeight = lineKernel[index];
+    const boundedLineOpacity = Math.max(0, lineOpacity[index]) * lineWeight;
+    const boundedLineContrast = Math.max(-0.5, Math.min(0.5, lineSourceContrast[index])) * lineWeight;
     const attenuation = 1 / (1 + opacity);
-    return sourceFunction * attenuation * Math.max(0, emissivity[index]) * Math.max(0, transfer[index]);
+    const lineAttenuation = 1 / (1 + boundedLineOpacity);
+    const lineSourceMultiplier = Math.max(0, 1 + boundedLineContrast);
+    return (
+      sourceFunction *
+      attenuation *
+      lineAttenuation *
+      lineSourceMultiplier *
+      Math.max(0, emissivity[index]) *
+      Math.max(0, transfer[index])
+    );
   });
 }
 
@@ -382,57 +525,133 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
   const observation = input.observation ?? {
     wavelength_m,
     intensity: base,
+    coverage_mode: "full_spectrum" as const,
   };
 
   const observedIntensity = toFloat64(observation.intensity);
-  const continuumMask = toMask(observation.continuum_mask, wavelength_m.length, (index) => wavelength_m[index] >= 400e-9 && wavelength_m[index] <= 2.5e-6);
-  const uvMask = toMask(observation.uv_mask, wavelength_m.length, (index) => wavelength_m[index] < 400e-9);
-  const lineMask = observation.line_mask ? toMask(observation.line_mask, wavelength_m.length, () => false) : null;
-  const observedAnisotropy = averageSeries(observation.anisotropy);
-  const observedPolarization = averageSeries(observation.polarization);
+  const coverageMode: StellarCoverageMode = observation.coverage_mode ?? "full_spectrum";
+  const continuumMask = toOptionalMask(observation.continuum_mask, wavelength_m.length);
+  const uvMask = toOptionalMask(observation.uv_mask, wavelength_m.length);
+  const lineMask = toOptionalMask(observation.line_mask, wavelength_m.length);
+  const muGrid =
+    observation.mu_grid && observation.intensity_by_mu && observation.mu_grid.length === observation.intensity_by_mu.length
+      ? toFloat64(observation.mu_grid)
+      : null;
+  const observedMuProfile =
+    muGrid && observation.intensity_by_mu ? normalizeByPeak(toFloat64(observation.intensity_by_mu)) : null;
+  const observedAnisotropy = observation.anisotropy ? averageSeries(observation.anisotropy) : null;
+  const observedPolarization = observation.polarization ? averageSeries(observation.polarization) : null;
   const expectedBolometricFlux = STEFAN_BOLTZMANN * Math.pow(teff_K, 4);
   const observedBolometricFlux = PI * integrateTrapezoid(wavelength_m, observedIntensity);
+  const bolometricReferenceFlux =
+    coverageMode === "full_spectrum" ? (observation.reference_flux_W_m2 ?? expectedBolometricFlux) : null;
+  const bandReferenceFlux =
+    coverageMode === "band_limited" ? (observation.reference_flux_W_m2 ?? observedBolometricFlux) : null;
   const weights: StellarViabilityWeights = { ...DEFAULT_WEIGHTS, ...(input.weights ?? {}) };
+  const observablesActive = {
+    continuum: Boolean(continuumMask?.some(Boolean)),
+    uv: Boolean(uvMask?.some(Boolean)),
+    line: Boolean(lineMask?.some(Boolean)),
+    angular: Boolean((muGrid && observedMuProfile) || (observation.anisotropy && observation.anisotropy.length > 0)),
+    polarization: Boolean(observation.polarization && observation.polarization.length > 0),
+  };
+  const benchmarkCoverageFraction =
+    observation.coverage_fraction == null
+      ? coverageMode === "full_spectrum"
+        ? 1
+        : null
+      : clamp01(observation.coverage_fraction);
+  const benchmarkSummary = {
+    id: observation.benchmark_id ?? null,
+    coverage_mode: coverageMode,
+    wavelength_min_m: wavelength_m[0] ?? 0,
+    wavelength_max_m: wavelength_m[wavelength_m.length - 1] ?? 0,
+    coverage_fraction: benchmarkCoverageFraction,
+  };
 
-  const hasLineMask = lineMask ? lineMask.some(Boolean) : false;
   const models = buildModelPredictions(input, wavelength_m, base).map((entry) => {
     const predictedFlux = PI * integrateTrapezoid(wavelength_m, entry.predicted);
+    const continuumResidual = computeMaskedResidual(observedIntensity, entry.predicted, continuumMask);
+    const uvResidual = computeMaskedResidual(observedIntensity, entry.predicted, uvMask);
+    const lineResidual = computeMaskedResidual(observedIntensity, entry.predicted, lineMask);
+    const bolometricClosure = computeFluxClosure(bolometricReferenceFlux, predictedFlux);
+    const bandFluxClosure = computeFluxClosure(bandReferenceFlux, predictedFlux);
+    const activeClosure = coverageMode === "band_limited" ? bandFluxClosure : bolometricClosure;
+    const predictedMuProfile = muGrid ? buildAngularProfile(muGrid, input.atmosphere, entry.anisotropy) : null;
+    const anisotropyMetric =
+      muGrid && observedMuProfile && predictedMuProfile
+        ? {
+            value: relativeRms(observedMuProfile, predictedMuProfile, Array.from({ length: muGrid.length }, () => true)),
+            status: "computed" as const,
+          }
+        : observedAnisotropy != null
+          ? {
+              value: Math.abs(entry.anisotropy - observedAnisotropy),
+              status: "computed" as const,
+            }
+          : {
+              value: null,
+              status: "unavailable" as const,
+            };
+    const polarizationMetric =
+      observedPolarization != null
+        ? {
+            value: Math.abs(entry.polarization - observedPolarization),
+            status: "computed" as const,
+          }
+        : {
+            value: null,
+            status: "unavailable" as const,
+          };
     const metrics: StellarModelMetrics = {
-      continuum_rms: relativeRms(observedIntensity, entry.predicted, continuumMask),
-      uv_residual: relativeRms(observedIntensity, entry.predicted, uvMask),
-      line_residual: hasLineMask && lineMask ? relativeRms(observedIntensity, entry.predicted, lineMask) : null,
-      bolometric_closure: Math.abs(predictedFlux - expectedBolometricFlux) / Math.max(expectedBolometricFlux, TINY),
-      anisotropy_penalty: Math.abs(entry.anisotropy - observedAnisotropy),
-      polarization_penalty: Math.abs(entry.polarization - observedPolarization),
+      continuum_rms: continuumResidual.value,
+      uv_residual: uvResidual.value,
+      line_residual: lineResidual.value,
+      bolometric_closure: bolometricClosure.value,
+      band_flux_closure: bandFluxClosure.value,
+      anisotropy_penalty: anisotropyMetric.value,
+      polarization_penalty: polarizationMetric.value,
       parameter_penalty: MODEL_PENALTY[entry.id],
       total: 0,
+      status: {
+        continuum_rms: continuumResidual.status,
+        uv_residual: uvResidual.status,
+        line_residual: lineResidual.status,
+        bolometric_closure: bolometricClosure.status,
+        band_flux_closure: bandFluxClosure.status,
+        anisotropy_penalty: anisotropyMetric.status,
+        polarization_penalty: polarizationMetric.status,
+      },
     };
 
     metrics.total =
-      weights.continuum * metrics.continuum_rms +
-      weights.uv * metrics.uv_residual +
+      (metrics.continuum_rms == null ? 0 : weights.continuum * metrics.continuum_rms) +
+      (metrics.uv_residual == null ? 0 : weights.uv * metrics.uv_residual) +
       (metrics.line_residual == null ? 0 : weights.line * metrics.line_residual) +
-      weights.bolometric * metrics.bolometric_closure +
-      weights.anisotropy * metrics.anisotropy_penalty +
-      weights.polarization * metrics.polarization_penalty +
+      (activeClosure.value == null ? 0 : weights.bolometric * activeClosure.value) +
+      (metrics.anisotropy_penalty == null ? 0 : weights.anisotropy * metrics.anisotropy_penalty) +
+      (metrics.polarization_penalty == null ? 0 : weights.polarization * metrics.polarization_penalty) +
       metrics.parameter_penalty;
 
     return {
       id: entry.id,
       teff_K,
       predicted_intensity: entry.predicted,
+      predicted_mu_profile: predictedMuProfile,
       bolometric_flux_W_m2: predictedFlux,
       observed_bolometric_flux_W_m2: observedBolometricFlux,
       predicted_anisotropy: entry.anisotropy,
       predicted_polarization: entry.polarization,
       metrics,
       passes_contract:
-        metrics.continuum_rms <= DEFAULT_CONTRACT.continuum_rms_max &&
-        metrics.uv_residual <= DEFAULT_CONTRACT.uv_residual_max &&
+        (metrics.continuum_rms == null || metrics.continuum_rms <= DEFAULT_CONTRACT.continuum_rms_max) &&
+        (metrics.uv_residual == null || metrics.uv_residual <= DEFAULT_CONTRACT.uv_residual_max) &&
         (metrics.line_residual == null || metrics.line_residual <= DEFAULT_CONTRACT.line_residual_max) &&
-        metrics.bolometric_closure <= DEFAULT_CONTRACT.bolometric_closure_max &&
-        metrics.anisotropy_penalty <= DEFAULT_CONTRACT.anisotropy_penalty_max &&
-        metrics.polarization_penalty <= DEFAULT_CONTRACT.polarization_penalty_max,
+        (coverageMode === "band_limited"
+          ? activeClosure.value == null || activeClosure.value <= DEFAULT_CONTRACT.band_flux_closure_max
+          : activeClosure.value == null || activeClosure.value <= DEFAULT_CONTRACT.bolometric_closure_max) &&
+        (metrics.anisotropy_penalty == null || metrics.anisotropy_penalty <= DEFAULT_CONTRACT.anisotropy_penalty_max) &&
+        (metrics.polarization_penalty == null || metrics.polarization_penalty <= DEFAULT_CONTRACT.polarization_penalty_max),
     } satisfies StellarModelResult;
   });
 
@@ -452,6 +671,8 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
     fallback_winner: fallbackWinner,
     models: byScore,
     null_model: "M0_planck_atmosphere",
+    observables_active: observablesActive,
+    benchmark: benchmarkSummary,
     contract: DEFAULT_CONTRACT,
   };
 }

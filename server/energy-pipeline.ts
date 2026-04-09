@@ -100,6 +100,7 @@ import {
   type Nhm2SourceClosureV2RegionAccounting,
   type Nhm2SourceClosureV2RegionComparisonInput,
   type Nhm2SourceClosureV2RegionT00Diagnostics,
+  type Nhm2SourceClosureV2RegionT00Trace,
   type Nhm2SourceClosureV2RegionProxyComponentAttribution,
   type Nhm2SourceClosureV2RegionProxyDiagnostics,
 } from "../shared/contracts/nhm2-source-closure.v2.ts";
@@ -4191,6 +4192,7 @@ const collectNhm2SourceClosureRegionComparisons = (
       normalizationBasis?: unknown;
       weightSum?: unknown;
       accountingEvidenceStatus?: unknown;
+      t00Diagnostics?: Record<string, unknown> | null;
       tensor?: unknown;
       note?: unknown;
     }
@@ -4203,6 +4205,9 @@ const collectNhm2SourceClosureRegionComparisons = (
         normalizationBasis: (region as { normalizationBasis?: unknown }).normalizationBasis,
         weightSum: (region as { weightSum?: unknown }).weightSum,
         accountingEvidenceStatus: (region as { accountingEvidenceStatus?: unknown }).accountingEvidenceStatus,
+        t00Diagnostics:
+          (region as { t00Diagnostics?: Record<string, unknown> | null }).t00Diagnostics ??
+          null,
         tensor: region.tensor,
         note: region.note,
       });
@@ -4288,6 +4293,9 @@ const collectNhm2SourceClosureRegionComparisons = (
     nonFiniteCount?: number | null;
     meanT00: number | null;
     sumT00: number | null;
+    sourceRef?: string | null;
+    derivationMode?: Nhm2SourceClosureV2RegionT00Diagnostics["derivationMode"];
+    trace?: Nhm2SourceClosureV2RegionT00Trace | null;
     normalizationBasis: string | null;
     aggregationMode: Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"];
     evidenceStatus: Nhm2SourceClosureV2RegionT00Diagnostics["evidenceStatus"];
@@ -4298,6 +4306,9 @@ const collectNhm2SourceClosureRegionComparisons = (
     nonFiniteCount: args.nonFiniteCount ?? null,
     meanT00: args.meanT00,
     sumT00: args.sumT00,
+    sourceRef: args.sourceRef ?? null,
+    derivationMode: args.derivationMode ?? "unknown",
+    trace: args.trace ?? null,
     normalizationBasis: args.normalizationBasis,
     aggregationMode: args.aggregationMode,
     evidenceStatus: args.evidenceStatus,
@@ -4319,6 +4330,8 @@ const collectNhm2SourceClosureRegionComparisons = (
     const maskVoxelCount =
       toFiniteNumberOrNull(regionMaskCounts.get(regionId) ?? null);
     const sampleCount = metricSampleCount ?? tileSampleCount ?? null;
+    const metricRegionTensorRef = `${metricTensorRef}.region.${regionId}`;
+    const tileRegionTensorRef = `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`;
     const noteParts: string[] = [];
     const tileNote = asText(tileRegionEntry?.note);
     if (tileNote != null) {
@@ -4363,9 +4376,7 @@ const collectNhm2SourceClosureRegionComparisons = (
       supportInclusionNote:
         "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
     });
-    const tileRegionDiagnostics =
-      (tileRegionEntry as { t00Diagnostics?: Record<string, unknown> | null } | undefined)
-        ?.t00Diagnostics ?? null;
+    const tileRegionDiagnostics = tileRegionEntry?.t00Diagnostics ?? null;
     const tileSampleCountResolved = toFiniteNumberOrNull(
       tileRegionDiagnostics?.sampleCount ?? tileSampleCount,
     );
@@ -4405,10 +4416,63 @@ const collectNhm2SourceClosureRegionComparisons = (
             tileRegionDiagnostics?.evidenceStatus === "measured"
           ? "inferred"
           : "unknown";
+    const metricT00SourceRef =
+      metricRegionTensor.T00 != null ? `${metricRegionTensorRef}.T00` : null;
+    const tileT00SourceRef =
+      tileRegionDiagnostics?.meanT00 != null
+        ? `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.t00Diagnostics.meanT00`
+        : tileRegionTensor.T00 != null
+          ? `${tileRegionTensorRef}.T00`
+          : null;
+    const regionMaskRef = `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.brick_mask`;
+    const metricT00Trace: Nhm2SourceClosureV2RegionT00Trace | null =
+      metricRegionTensor.T00 != null
+        ? {
+            regionMaskRef,
+            sampleCount: metricSampleCount,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            valueRef: metricT00SourceRef,
+            tensorRef: metricRegionTensorRef,
+            maskNote: regionMaskNote,
+            supportInclusionNote: metricAccounting.supportInclusionNote,
+            traceStage: "region_mean_from_shift_field",
+          }
+        : null;
+    const tileT00Trace: Nhm2SourceClosureV2RegionT00Trace | null =
+      tileMeanT00Resolved != null
+        ? {
+            regionMaskRef,
+            sampleCount: tileSampleCountResolved,
+            normalizationBasis:
+              asText(tileRegionDiagnostics?.normalizationBasis) ??
+              asText(tileRegionEntry?.normalizationBasis),
+            aggregationMode:
+              (tileRegionDiagnostics?.aggregationMode as Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"] | undefined) ??
+              ((tileRegionEntry?.aggregationMode as Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"] | undefined) ??
+                "unknown"),
+            valueRef: tileT00SourceRef,
+            tensorRef: tileRegionTensorRef,
+            maskNote: regionMaskNote,
+            supportInclusionNote: tileAccounting.supportInclusionNote,
+            traceStage:
+              tileRegionDiagnostics?.meanT00 != null
+                ? "region_mean_from_gr_matter_brick"
+                : tileRegionTensor.T00 != null
+                  ? "tensor_snapshot_fallback"
+                  : "unknown",
+          }
+        : null;
     const metricT00Diagnostics = buildT00Diagnostics({
       sampleCount: metricSampleCount,
       meanT00: metricRegionTensor.T00 ?? null,
       sumT00: null,
+      sourceRef: metricT00SourceRef,
+      derivationMode:
+        metricRegionTensor.T00 != null
+          ? "runtime_integrated_metric_region_mean"
+          : "unknown",
+      trace: metricT00Trace,
       normalizationBasis: "sample_count",
       aggregationMode: "mean",
       evidenceStatus:
@@ -4421,6 +4485,14 @@ const collectNhm2SourceClosureRegionComparisons = (
       nonFiniteCount: tileNonFiniteCountResolved,
       meanT00: tileMeanT00Resolved,
       sumT00: tileSumT00Resolved,
+      sourceRef: tileT00SourceRef,
+      derivationMode:
+        tileRegionDiagnostics?.meanT00 != null
+          ? "gr_matter_brick_region_mean"
+          : tileRegionTensor.T00 != null
+            ? "tensor_snapshot_inferred"
+            : "unknown",
+      trace: tileT00Trace,
       normalizationBasis:
         asText(tileRegionDiagnostics?.normalizationBasis) ??
         asText(tileRegionEntry?.normalizationBasis),
@@ -4436,8 +4508,8 @@ const collectNhm2SourceClosureRegionComparisons = (
       regionId,
       comparisonBasisStatus:
         metricTensorAvailable && tileTensorAvailable ? "same_basis" : "unavailable",
-      metricTensorRef: `${metricTensorRef}.region.${regionId}`,
-      tileTensorRef: `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`,
+      metricTensorRef: metricRegionTensorRef,
+      tileTensorRef: tileRegionTensorRef,
       metricRequiredTensor: metricRegionTensor,
       tileEffectiveTensor: tileRegionTensor,
       sampleCount,

@@ -89,6 +89,57 @@ const coerceObjectRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const coerceTrimmedString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const resolveGroundedAnswerCompletionFloor = (
+  payload: Record<string, unknown>,
+): { text: string; source: "envelope_answer" | "envelope_sections" | "memory_citation" } | null => {
+  const envelope = coerceObjectRecord(payload.envelope);
+  const envelopeAnswer = coerceTrimmedString(envelope?.answer);
+  if (envelopeAnswer) {
+    return { text: envelopeAnswer, source: "envelope_answer" };
+  }
+
+  if (Array.isArray(envelope?.sections)) {
+    const sectionBlocks: string[] = [];
+    for (const entry of envelope.sections) {
+      const section = coerceObjectRecord(entry);
+      if (!section) continue;
+      const body = coerceTrimmedString(section.body);
+      if (!body) continue;
+      const title = coerceTrimmedString(section.title);
+      sectionBlocks.push(title ? `${title}\n${body}` : body);
+      if (sectionBlocks.length >= 3) break;
+    }
+    if (sectionBlocks.length > 0) {
+      return {
+        text: sectionBlocks.join("\n\n").slice(0, 1600).trim(),
+        source: "envelope_sections",
+      };
+    }
+  }
+
+  const memoryCitation = coerceObjectRecord(payload.memory_citation);
+  if (Array.isArray(memoryCitation?.entries)) {
+    const citedPaths = Array.from(
+      new Set(
+        memoryCitation.entries
+          .map((entry) => coerceTrimmedString(coerceObjectRecord(entry)?.path))
+          .filter(Boolean),
+      ),
+    ).slice(0, 3);
+    if (citedPaths.length > 0) {
+      return {
+        text: `Sources: ${citedPaths.join(", ")}`,
+        source: "memory_citation",
+      };
+    }
+  }
+
+  return null;
+};
+
 export const applyHelixAskSuccessSurface = (
   args: HelixAskSuccessSurfaceArgs,
 ): Record<string, unknown> => {
@@ -108,6 +159,28 @@ export const applyHelixAskSuccessSurface = (
   }
   if (typeof typedPayload.report_mode !== "boolean") {
     typedPayload.report_mode = false;
+  }
+
+  const existingVisibleText = coerceTrimmedString(
+    typedPayload.text ?? typedPayload.answer ?? typedPayload.message,
+  );
+  if (!existingVisibleText && typedPayload.report_mode !== true && typedPayload.dry_run !== true) {
+    const completionFloor = resolveGroundedAnswerCompletionFloor(typedPayload);
+    if (completionFloor) {
+      typedPayload.text = completionFloor.text;
+      if (!coerceTrimmedString(typedPayload.answer)) {
+        typedPayload.answer = completionFloor.text;
+      }
+      const typedEnvelope = coerceObjectRecord(typedPayload.envelope);
+      if (typedEnvelope && !coerceTrimmedString(typedEnvelope.answer)) {
+        typedEnvelope.answer = completionFloor.text;
+      }
+      const typedDebug = coerceObjectRecord(typedPayload.debug);
+      if (typedDebug) {
+        typedDebug.answer_completion_floor_applied = true;
+        typedDebug.answer_completion_floor_source = completionFloor.source;
+      }
+    }
   }
 
   if (args.includeMultilangMetadata) {

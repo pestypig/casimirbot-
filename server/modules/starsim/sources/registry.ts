@@ -3,6 +3,7 @@ import type {
   StarSimRequest,
   StarSimResolveResponse,
   StarSimSourceCatalog,
+  StarSimSourceIdentifiers,
 } from "../contract";
 import { canonicalizeStarSimRequest } from "../canonicalize";
 import { resolveBenchmarkTarget } from "../benchmark-targets";
@@ -40,6 +41,38 @@ import {
 } from "./types";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+const normalizeIdentifier = (value: string | null | undefined): string =>
+  (value ?? "").trim().toLowerCase();
+const sourceIdentifierKeys: Array<keyof StarSimSourceIdentifiers> = [
+  "gaia_dr3_source_id",
+  "sdss_apogee_id",
+  "lamost_obsid",
+  "tess_tic_id",
+  "tasoc_target_id",
+  "mast_obs_id",
+];
+
+const getRecordTrustedIdentityBasis = (args: {
+  record: StarSimSourceRecord;
+  explicitIdentifiers: StarSimSourceIdentifiers;
+  trustedIdentifiers: StarSimSourceIdentifiers;
+}): string[] => {
+  const bases = new Set<string>();
+  for (const key of sourceIdentifierKeys) {
+    const recordValue = args.record.identifiers[key];
+    if (!recordValue) continue;
+    const explicitValue = args.explicitIdentifiers[key];
+    if (explicitValue && normalizeIdentifier(recordValue) === normalizeIdentifier(explicitValue)) {
+      bases.add("explicit_request_identifier");
+      continue;
+    }
+    const trustedValue = args.trustedIdentifiers[key];
+    if (trustedValue && normalizeIdentifier(recordValue) === normalizeIdentifier(trustedValue)) {
+      bases.add("trusted_identifier");
+    }
+  }
+  return [...bases];
+};
 
 const buildCacheIdentity = (): StarSimSourceCacheIdentity => ({
   registry_version: STAR_SIM_SOURCE_REGISTRY_VERSION,
@@ -88,7 +121,8 @@ const applyCrossmatchPolicy = (args: {
   qualityWarnings: import("../contract").StarSimQualityWarning[];
 } => {
   const gaia = args.records.find((record) => record.catalog === "gaia_dr3") ?? null;
-  const accepted = gaia ? [gaia] : [...args.records];
+  const acceptedRecords = gaia ? [gaia] : [...args.records];
+  const identityTrustedRecords = gaia ? [gaia] : [];
   const outcomes: CrossmatchOutcome[] = [];
   const crossmatchIdentityBasis: Partial<Record<StarSimSourceCatalog, string[]>> = {};
   const qualityRejections: import("../contract").StarSimQualityRejection[] = [];
@@ -96,8 +130,38 @@ const applyCrossmatchPolicy = (args: {
   const explicitIdentifiers = args.request.identifiers ?? {};
   let trustedIdentifiers = mergeTrustedIdentifiers({
     explicitIdentifiers,
-    acceptedRecords: accepted,
+    acceptedRecords: identityTrustedRecords,
   });
+
+  if (!gaia) {
+    for (const catalog of secondaryCatalogs) {
+      const record = args.records.find((candidate) => candidate.catalog === catalog) ?? null;
+      if (!record) continue;
+      const identityBasis = getRecordTrustedIdentityBasis({
+        record,
+        explicitIdentifiers,
+        trustedIdentifiers,
+      });
+      if (identityBasis.length === 0) continue;
+      crossmatchIdentityBasis[catalog] = identityBasis;
+      if (!identityTrustedRecords.some((entry) => entry.catalog === catalog)) {
+        identityTrustedRecords.push(record);
+        trustedIdentifiers = mergeTrustedIdentifiers({
+          explicitIdentifiers,
+          acceptedRecords: identityTrustedRecords,
+        });
+      }
+    }
+
+    return {
+      acceptedRecords,
+      trustedIdentifiers,
+      outcomes,
+      crossmatchIdentityBasis,
+      qualityRejections,
+      qualityWarnings,
+    };
+  }
 
   for (const catalog of secondaryCatalogs) {
     const record = args.records.find((candidate) => candidate.catalog === catalog) ?? null;
@@ -122,11 +186,14 @@ const applyCrossmatchPolicy = (args: {
       });
       continue;
     }
-    if (record && !accepted.some((entry) => entry.catalog === catalog)) {
-      accepted.push(record);
+    if (record && !acceptedRecords.some((entry) => entry.catalog === catalog)) {
+      acceptedRecords.push(record);
+    }
+    if (record && !identityTrustedRecords.some((entry) => entry.catalog === catalog)) {
+      identityTrustedRecords.push(record);
       trustedIdentifiers = mergeTrustedIdentifiers({
         explicitIdentifiers,
-        acceptedRecords: accepted,
+        acceptedRecords: identityTrustedRecords,
       });
     }
     if (outcome.status === "accepted_with_warning") {
@@ -140,7 +207,7 @@ const applyCrossmatchPolicy = (args: {
   }
 
   return {
-    acceptedRecords: accepted,
+    acceptedRecords,
     trustedIdentifiers,
     outcomes,
     crossmatchIdentityBasis,

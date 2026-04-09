@@ -208,7 +208,15 @@ describe("validatePhysicsEquationBackbone", () => {
     const radiativeTransferEquation = backbone.equations.find(
       (entry) => entry.id === "stellar_radiative_transfer_equation",
     );
-    expect(radiativeTransferEquation?.expression).toBe("mu * dI_nu/dtau_nu = S_nu - I_nu");
+    expect(radiativeTransferEquation?.expression).toBe("dI_nu/dtau_nu = S_nu - I_nu");
+    expect(radiativeTransferEquation?.symbols?.some((entry) => entry.symbol === "mu")).toBe(false);
+
+    const radiativeTransferNote = fs.readFileSync(
+      path.join(repoRoot, "docs", "knowledge", "physics", "stellar-radiative-transfer.md"),
+      "utf8",
+    );
+    expect(radiativeTransferNote).toContain("dI_nu/dtau_nu = S_nu - I_nu");
+    expect(radiativeTransferNote).toContain("dtau_nu = alpha_nu ds");
   });
 
   it("fails when manifest/equation claim tier is invalid", () => {

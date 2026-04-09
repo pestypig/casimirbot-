@@ -211,6 +211,50 @@ describe("star-sim source resolution route", () => {
     expect(res.body.benchmark_target_id).not.toBe("demo_solar_a");
   });
 
+  it("does not promote name-only non-Gaia secondary records into trusted benchmark identity", async () => {
+    process.env.STAR_SIM_GAIA_DR3_MODE = "disabled";
+    process.env.STAR_SIM_SDSS_ASTRA_MODE = "disabled";
+    process.env.STAR_SIM_TASOC_MODE = "disabled";
+    process.env.STAR_SIM_TESS_MAST_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          object_id: "lamost-demo-solar-b",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.identifiers_observed.lamost_obsid).toBe("LAMOST-B-0002");
+    expect(res.body.identifiers_trusted.lamost_obsid).toBeUndefined();
+    expect(res.body.benchmark_target_id).toBeUndefined();
+    expect(res.body.benchmark_target_match_mode).toBe("no_match");
+    expect(res.body.canonical_request_draft.spectroscopy.teff_K).toBe(5710);
+  });
+
+  it("allows an explicit non-Gaia secondary identifier to become trusted without promoting unrelated fetched identity", async () => {
+    process.env.STAR_SIM_GAIA_DR3_MODE = "disabled";
+    process.env.STAR_SIM_SDSS_ASTRA_MODE = "disabled";
+    process.env.STAR_SIM_TASOC_MODE = "disabled";
+    process.env.STAR_SIM_TESS_MAST_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        identifiers: {
+          lamost_obsid: "LAMOST-B-0002",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.identifiers_observed.lamost_obsid).toBe("LAMOST-B-0002");
+    expect(res.body.identifiers_trusted.lamost_obsid).toBe("LAMOST-B-0002");
+    expect(res.body.benchmark_target_id).toBe("demo_solar_b");
+    expect(res.body.benchmark_target_match_mode).toBe("matched_by_identifier");
+    expect(res.body.crossmatch_identity_basis.lamost_dr10).toContain("explicit_request_identifier");
+  });
+
   it("marks fallback as used when Astra is absent and LAMOST provides selected spectroscopy", async () => {
     process.env.STAR_SIM_SDSS_ASTRA_MODE = "disabled";
     const app = await buildApp();

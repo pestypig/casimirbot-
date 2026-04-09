@@ -7,6 +7,7 @@ import {
 } from "../shared/contracts/nhm2-source-closure.v1";
 import {
   buildNhm2SourceClosureArtifactV2,
+  computeNhm2PressureSignificanceFloor,
   isNhm2SourceClosureV2Artifact,
   NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION,
 } from "../shared/contracts/nhm2-source-closure.v2";
@@ -345,7 +346,7 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.regionComparisons.regions[0]?.status).toBe("review");
   });
 
-  it("classifies t00 mismatch from truthful inferred evidence and blocks near-zero pressure dominance", () => {
+  it("classifies t00 mismatch from truthful inferred evidence and blocks near-zero pressure dominance when scale-aware pressure floor exceeds fallback", () => {
     const makeInferredT00Diagnostics = (sampleCount: number, meanT00: number) => ({
       sampleCount,
       includedCount: sampleCount,
@@ -382,8 +383,13 @@ describe("nhm2 source closure artifact v2", () => {
           comparisonBasisStatus: "same_basis",
           metricTensorRef: "artifact://metric-hull",
           tileTensorRef: "artifact://tile-hull",
-          metricRequiredTensor: { T00: -100, T11: 1e-15, T22: -1e-15, T33: 1e-15 },
-          tileEffectiveTensor: { T00: -100, T11: 2e-15, T22: -2e-15, T33: 2e-15 },
+          metricRequiredTensor: { T00: -100, T11: 1_000_000, T22: -1e-11, T33: 1e-11 },
+          tileEffectiveTensor: {
+            T00: -100,
+            T11: 1_000_000 + 1e-9,
+            T22: -1.3e-11,
+            T33: 1.3e-11,
+          },
           sampleCount: 8,
           metricAccounting: makeAccounting(8, "metric"),
           tileAccounting: makeAccounting(8, "tile"),
@@ -398,8 +404,94 @@ describe("nhm2 source closure artifact v2", () => {
     const hull = artifact.regionComparisons.regions.find((region) => region.regionId === "hull");
     expect(wall?.mismatchDiagnostics?.t00MechanismCategory).toBe("t00_mismatch_present");
     expect(wall?.mismatchDiagnostics?.t00MechanismEvidenceStatus).toBe("inferred");
+    expect(wall?.mismatchDiagnostics?.t00MechanismNextStep).toBe(
+      "direct_t00_source_model_mapping",
+    );
     expect(hull?.mismatchDiagnostics?.t00MechanismCategory).toBe("unknown");
     expect(hull?.mismatchDiagnostics?.t00MechanismEvidenceStatus).toBe("inferred");
+    expect(hull?.mismatchDiagnostics?.t00MechanismNextStep).toBe("insufficient_evidence");
+    const hullPressureFloor = computeNhm2PressureSignificanceFloor(hull!.residualComponents);
+    expect(hull!.residualComponents.T11.absResidual).toBeGreaterThan(1e-12);
+    expect(Math.abs(hull!.residualComponents.T22.relResidual ?? 0)).toBeGreaterThan(0.1);
+    expect(hullPressureFloor).toBeGreaterThan(1e-12);
+    expect(hullPressureFloor).toBeGreaterThan(
+      hull!.residualComponents.T11.absResidual ?? 0,
+    );
+  });
+
+  it("maps pressure proxy dominance to pressure-proxy follow-up guidance", () => {
+    const makeInferredT00Diagnostics = (sampleCount: number, meanT00: number) => ({
+      sampleCount,
+      includedCount: sampleCount,
+      skippedCount: null,
+      nonFiniteCount: null,
+      meanT00,
+      sumT00: sampleCount * meanT00,
+      normalizationBasis: "sample_count",
+      aggregationMode: "mean" as const,
+      evidenceStatus: "inferred" as const,
+    });
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      tileEffectiveTensor: { T00: -100, T11: 130, T22: 130, T33: 130 },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -100, T11: 130, T22: 130, T33: 130 },
+          sampleCount: 8,
+          metricAccounting: makeAccounting(8, "metric"),
+          tileAccounting: makeAccounting(8, "tile"),
+          metricT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+          tileT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    const wall = artifact.regionComparisons.regions[0];
+    expect(wall?.mismatchDiagnostics?.t00MechanismCategory).toBe("pressure_proxy_dominant");
+    expect(wall?.mismatchDiagnostics?.t00MechanismEvidenceStatus).toBe("inferred");
+    expect(wall?.mismatchDiagnostics?.t00MechanismNextStep).toBe("pressure_proxy_mapping");
+  });
+
+  it("computes a scale-aware pressure significance floor from emitted component magnitudes", () => {
+    const floor = computeNhm2PressureSignificanceFloor({
+      T00: {
+        metricRequired: -100,
+        tileEffective: -100,
+        absResidual: 0,
+        relResidual: 0,
+      },
+      T11: {
+        metricRequired: 1_000_000,
+        tileEffective: 1_000_000 + 1e-9,
+        absResidual: 1e-9,
+        relResidual: 1e-15,
+      },
+      T22: {
+        metricRequired: 500_000,
+        tileEffective: 500_000,
+        absResidual: 0,
+        relResidual: 0,
+      },
+      T33: {
+        metricRequired: 250_000,
+        tileEffective: 250_000,
+        absResidual: 0,
+        relResidual: 0,
+      },
+    });
+
+    expect(floor).toBeGreaterThan(1e-12);
+    expect(floor).toBeCloseTo(1_000_000 * Number.EPSILON * 16, 20);
   });
 
   it("marks missing required regional tensors as unavailable instead of synthetic success", () => {
@@ -497,6 +589,8 @@ describe("nhm2 source closure artifact v2", () => {
             nonFiniteCount: null,
             meanT00: null,
             sumT00: null,
+            sourceRef: null,
+            derivationMode: "unknown",
             aggregationMode: "unknown",
             normalizationBasis: null,
             evidenceStatus: "unknown",
@@ -508,6 +602,8 @@ describe("nhm2 source closure artifact v2", () => {
             nonFiniteCount: null,
             meanT00: null,
             sumT00: null,
+            sourceRef: null,
+            derivationMode: "unknown",
             aggregationMode: "unknown",
             normalizationBasis: null,
             evidenceStatus: "unknown",
@@ -530,6 +626,86 @@ describe("nhm2 source closure artifact v2", () => {
     expect(region.tileProxyDiagnostics?.pressureFactor).toBeNull();
     expect(region.metricT00Diagnostics?.meanT00).toBeNull();
     expect(region.tileT00Diagnostics?.sumT00).toBeNull();
+    expect(region.metricT00Diagnostics?.sourceRef).toBeNull();
+    expect(region.tileT00Diagnostics?.derivationMode).toBe("unknown");
+  });
+
+  it("preserves direct T00 provenance and keeps direct mapping guidance explicit", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -140, T11: 140, T22: 140, T33: 140 },
+          sampleCount: 16,
+          metricAccounting: makeAccounting(16, "metric"),
+          tileAccounting: makeAccounting(16, "tile"),
+          metricT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: 16,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: -100,
+            sumT00: -1600,
+            sourceRef: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
+            derivationMode: "runtime_integrated_metric_region_mean",
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "inferred",
+          },
+          tileT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: 16,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: -140,
+            sumT00: -2240,
+            sourceRef:
+              "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+            derivationMode: "gr_matter_brick_region_mean",
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "inferred",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    const region = artifact.regionComparisons.regions[0];
+    expect(region.metricT00Diagnostics?.sourceRef).toBe(
+      "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
+    );
+    expect(region.metricT00Diagnostics?.derivationMode).toBe(
+      "runtime_integrated_metric_region_mean",
+    );
+    expect(region.tileT00Diagnostics?.sourceRef).toBe(
+      "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+    );
+    expect(region.tileT00Diagnostics?.derivationMode).toBe("gr_matter_brick_region_mean");
+    expect(region.mismatchDiagnostics?.t00MechanismCategory).toBe("t00_mismatch_present");
+    expect(region.mismatchDiagnostics?.t00MechanismNextStep).toBe(
+      "direct_t00_source_model_mapping",
+    );
   });
 
   it("preserves null includedCount when reducer-native evidence is absent", () => {

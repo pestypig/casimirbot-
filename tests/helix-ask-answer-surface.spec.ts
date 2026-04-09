@@ -108,6 +108,79 @@ describe("helix ask answer surface", () => {
     expect((result.debug as Record<string, unknown>).report_mode).toBe(false);
   });
 
+  it("restores grounded visible text from envelope sections when final text is empty", () => {
+    const args = buildBaseArgs();
+    args.payload = {
+      text: "",
+      answer: "",
+      envelope: {
+        answer: "",
+        sections: [
+          {
+            title: "Key files",
+            body: "- docs/helix-ask-reasoning-ladder-research-report.md",
+          },
+        ],
+      },
+      debug: {},
+    } as Record<string, unknown>;
+
+    const result = applyHelixAskSuccessSurface(args);
+
+    expect(result.text).toBe("Key files\n- docs/helix-ask-reasoning-ladder-research-report.md");
+    expect(result.answer).toBe("Key files\n- docs/helix-ask-reasoning-ladder-research-report.md");
+    expect(((result.envelope as Record<string, unknown>).answer)).toBe(
+      "Key files\n- docs/helix-ask-reasoning-ladder-research-report.md",
+    );
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_applied).toBe(true);
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_source).toBe(
+      "envelope_sections",
+    );
+  });
+
+  it("falls back to cited paths when no answer text survives but memory citations exist", () => {
+    const args = buildBaseArgs();
+    args.payload = {
+      text: "",
+      answer: "",
+      envelope: {
+        answer: "",
+        sections: [],
+      },
+      debug: {},
+    } as Record<string, unknown>;
+
+    const result = applyHelixAskSuccessSurface(args);
+
+    expect(result.text).toBe("Sources: server/routes/agi.plan.ts");
+    expect(result.answer).toBe("Sources: server/routes/agi.plan.ts");
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_source).toBe(
+      "memory_citation",
+    );
+  });
+
+  it("does not invent answer text when no grounded substrate exists", () => {
+    const args = buildBaseArgs();
+    args.payload = {
+      text: "",
+      answer: "",
+      envelope: {
+        answer: "",
+        sections: [],
+      },
+      debug: {},
+    } as Record<string, unknown>;
+    args.buildMemoryCitation = vi.fn(() => null);
+    args.extractResponseEvidenceRefs = vi.fn(() => []);
+    args.extractMemoryCitationRolloutIds = vi.fn(() => []);
+
+    const result = applyHelixAskSuccessSurface(args);
+
+    expect(result.text).toBe("");
+    expect(result.answer).toBe("");
+    expect((result.debug as Record<string, unknown>).answer_completion_floor_applied).toBeUndefined();
+  });
+
   it("records multilang observation signals when rollout stage is active", () => {
     const args = buildBaseArgs();
     args.multilangRollout = {

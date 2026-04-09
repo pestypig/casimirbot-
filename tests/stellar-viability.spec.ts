@@ -17,6 +17,47 @@ function makeWavelengthGrid(): Float64Array {
   );
 }
 
+function makeContinuumMask(wavelengths: ArrayLike<number>): Float64Array {
+  return Float64Array.from(wavelengths, (lambda) =>
+    lambda >= 400e-9 &&
+    lambda <= 2.5e-6 &&
+    !((lambda >= 482e-9 && lambda <= 490e-9) || (lambda >= 650e-9 && lambda <= 660e-9))
+      ? 1
+      : 0,
+  );
+}
+
+function makeUvMask(wavelengths: ArrayLike<number>): Float64Array {
+  return Float64Array.from(wavelengths, (lambda) => (lambda < 400e-9 ? 1 : 0));
+}
+
+function makeLineMask(wavelengths: ArrayLike<number>): Float64Array {
+  return Float64Array.from(wavelengths, (lambda) =>
+    (lambda >= 482e-9 && lambda <= 490e-9) || (lambda >= 650e-9 && lambda <= 660e-9) ? 1 : 0,
+  );
+}
+
+function makeMuGrid(): Float64Array {
+  return Float64Array.from([0.2, 0.35, 0.5, 0.7, 0.85, 1]);
+}
+
+function makeVisibleBandGrid(): Float64Array {
+  return Float64Array.from({ length: 64 }, (_, index) => 420e-9 + index * 5e-9);
+}
+
+function nearestIndex(wavelengths: ArrayLike<number>, target: number): number {
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < wavelengths.length; index += 1) {
+    const distance = Math.abs(Number(wavelengths[index]) - target);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+
 describe("stellar viability contract", () => {
   it("recovers the solar blackbody-equivalent effective temperature from luminosity and radius", () => {
     const teff = computeEffectiveTemperature(SOLAR_LUMINOSITY_W, SOLAR_RADIUS_M);
@@ -37,6 +78,8 @@ describe("stellar viability contract", () => {
       observation: {
         wavelength_m: seed.wavelength_m,
         intensity: nullModel?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
       },
       structure: {
         xi: 0.4,
@@ -51,6 +94,18 @@ describe("stellar viability contract", () => {
     expect(
       report.models.find((entry) => entry.id === "M0_planck_atmosphere")?.metrics.continuum_rms,
     ).toBeLessThan(1e-12);
+    expect(report.models.find((entry) => entry.id === "M0_planck_atmosphere")?.metrics.status.uv_residual).toBe("computed");
+    expect(report.models.find((entry) => entry.id === "M0_planck_atmosphere")?.metrics.status.bolometric_closure).toBe("computed");
+    expect(report.observables_active).toEqual({
+      continuum: true,
+      uv: true,
+      line: false,
+      angular: false,
+      polarization: false,
+    });
+    expect(report.benchmark.coverage_mode).toBe("full_spectrum");
+    expect(report.benchmark.id).toBeNull();
+    expect(report.benchmark.coverage_fraction).toBe(1);
   });
 
   it("keeps default M0 behavior unchanged when no atmosphere hardening inputs are supplied", () => {
@@ -107,6 +162,37 @@ describe("stellar viability contract", () => {
     expect(highRatio).toBeLessThan(lowRatio);
   });
 
+  it("applies line opacity and source contrast only within the null-model line regions", () => {
+    const baseline = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const hardened = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        line_opacity: 1.5,
+        line_source_contrast: -0.2,
+      },
+    });
+
+    const baselineM0 = baseline.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const hardenedM0 = hardened.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(baselineM0).toBeDefined();
+    expect(hardenedM0).toBeDefined();
+
+    const continuumIndex = nearestIndex(baseline.wavelength_m, 550e-9);
+    const lineIndex = nearestIndex(baseline.wavelength_m, 656.3e-9);
+    const continuumRatio =
+      (hardenedM0?.predicted_intensity[continuumIndex] ?? 0) /
+      Math.max(baselineM0?.predicted_intensity[continuumIndex] ?? 0, 1e-30);
+    const lineRatio =
+      (hardenedM0?.predicted_intensity[lineIndex] ?? 0) / Math.max(baselineM0?.predicted_intensity[lineIndex] ?? 0, 1e-30);
+
+    expect(Math.abs(continuumRatio - 1)).toBeLessThan(1e-4);
+    expect(lineRatio).toBeLessThan(0.5);
+  });
+
   it("changes M0 deterministically when nlte_proxy source mode is enabled", () => {
     const baseline = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
@@ -125,8 +211,174 @@ describe("stellar viability contract", () => {
     const nlteM0 = nlteProxy.models.find((entry) => entry.id === "M0_planck_atmosphere");
     expect(baselineM0).toBeDefined();
     expect(nlteM0).toBeDefined();
-    expect(nlteM0?.predicted_intensity[0]).toBeCloseTo((baselineM0?.predicted_intensity[0] ?? 0) * 1.2, 12);
-    expect(nlteM0?.predicted_intensity[128]).toBeCloseTo((baselineM0?.predicted_intensity[128] ?? 0) * 1.2, 12);
+    const uvRatio = (nlteM0?.predicted_intensity[0] ?? 0) / Math.max(baselineM0?.predicted_intensity[0] ?? 0, 1e-30);
+    const visibleRatio =
+      (nlteM0?.predicted_intensity[128] ?? 0) / Math.max(baselineM0?.predicted_intensity[128] ?? 0, 1e-30);
+    expect(uvRatio).toBeGreaterThan(visibleRatio);
+    expect(uvRatio).toBeGreaterThan(1.18);
+    expect(visibleRatio).toBeGreaterThan(1.08);
+  });
+
+  it("reduces line-region residuals when null-model line controls match the observation", () => {
+    const hardenedSeed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        line_opacity: 1.2,
+        line_source_contrast: -0.15,
+      },
+    });
+    const hardenedM0 = hardenedSeed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(hardenedM0).toBeDefined();
+
+    const baselineFit = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: hardenedSeed.wavelength_m,
+        intensity: hardenedM0?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(hardenedSeed.wavelength_m),
+        uv_mask: makeUvMask(hardenedSeed.wavelength_m),
+        line_mask: makeLineMask(hardenedSeed.wavelength_m),
+      },
+    });
+    const hardenedFit = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: hardenedSeed.wavelength_m,
+        intensity: hardenedM0?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(hardenedSeed.wavelength_m),
+        uv_mask: makeUvMask(hardenedSeed.wavelength_m),
+        line_mask: makeLineMask(hardenedSeed.wavelength_m),
+      },
+      atmosphere: {
+        line_opacity: 1.2,
+        line_source_contrast: -0.15,
+      },
+    });
+
+    const baselineM0 = baselineFit.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const matchedM0 = hardenedFit.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(baselineM0?.metrics.line_residual).toBeGreaterThan(0);
+    expect(matchedM0?.metrics.line_residual).toBeLessThan(1e-12);
+    expect((baselineM0?.metrics.line_residual ?? 0)).toBeGreaterThan(matchedM0?.metrics.line_residual ?? 0);
+  });
+
+  it("treats band-limited benchmarks differently from full-spectrum closure checks", () => {
+    const wavelengths = makeVisibleBandGrid();
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: wavelengths,
+        intensity: Float64Array.from({ length: wavelengths.length }, () => 1),
+        coverage_mode: "band_limited",
+      },
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const bandLimited = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        benchmark_id: "solar-visible",
+        coverage_mode: "band_limited",
+        coverage_fraction: 0.38,
+        wavelength_m: wavelengths,
+        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(wavelengths),
+        line_mask: makeLineMask(wavelengths),
+      },
+    });
+    const fullSpectrum = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        benchmark_id: "solar-visible",
+        coverage_mode: "full_spectrum",
+        coverage_fraction: 0.38,
+        wavelength_m: wavelengths,
+        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(wavelengths),
+        line_mask: makeLineMask(wavelengths),
+      },
+    });
+
+    const bandM0 = bandLimited.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const fullM0 = fullSpectrum.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(bandM0?.metrics.band_flux_closure).toBeLessThan(1e-12);
+    expect(bandM0?.metrics.status.band_flux_closure).toBe("computed");
+    expect(bandM0?.metrics.bolometric_closure).toBeNull();
+    expect(bandM0?.metrics.status.bolometric_closure).toBe("gated");
+    expect(fullM0?.metrics.bolometric_closure).toBeGreaterThan(0.5);
+    expect(fullM0?.metrics.status.bolometric_closure).toBe("computed");
+    expect(bandLimited.winner).toBe("M0_planck_atmosphere");
+    expect(bandLimited.promotable_winner).toBe("M0_planck_atmosphere");
+    expect(fullSpectrum.promotable_winner).toBeNull();
+    expect(bandLimited.observables_active).toEqual({
+      continuum: true,
+      uv: false,
+      line: true,
+      angular: false,
+      polarization: false,
+    });
+    expect(bandLimited.benchmark).toEqual({
+      id: "solar-visible",
+      coverage_mode: "band_limited",
+      wavelength_min_m: wavelengths[0],
+      wavelength_max_m: wavelengths[wavelengths.length - 1],
+      coverage_fraction: 0.38,
+    });
+  });
+
+  it("applies reference_flux_W_m2 to the active closure path deterministically", () => {
+    const wavelengths = makeVisibleBandGrid();
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: wavelengths,
+        intensity: Float64Array.from({ length: wavelengths.length }, () => 1),
+        coverage_mode: "band_limited",
+      },
+    });
+    const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0Seed).toBeDefined();
+
+    const matched = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        benchmark_id: "solar-visible",
+        coverage_mode: "band_limited",
+        wavelength_m: wavelengths,
+        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(wavelengths),
+        line_mask: makeLineMask(wavelengths),
+      },
+    });
+    const matchedReferenceFlux = matched.models[0]?.observed_bolometric_flux_W_m2 ?? 0;
+    const shifted = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        benchmark_id: "solar-visible",
+        coverage_mode: "band_limited",
+        reference_flux_W_m2: matchedReferenceFlux * 0.5,
+        wavelength_m: wavelengths,
+        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(wavelengths),
+        line_mask: makeLineMask(wavelengths),
+      },
+    });
+
+    const matchedM0 = matched.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const shiftedM0 = shifted.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(matchedM0?.metrics.band_flux_closure).toBeLessThan(1e-12);
+    expect(shiftedM0?.metrics.band_flux_closure).toBeCloseTo(1, 12);
+    expect(shiftedM0?.metrics.bolometric_closure).toBeNull();
   });
 
   it("promotes the lattice lane only when it improves the observed structured spectrum", () => {
@@ -147,6 +399,9 @@ describe("stellar viability contract", () => {
       observation: {
         wavelength_m: seed.wavelength_m,
         intensity: lattice?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
+        line_mask: makeLineMask(seed.wavelength_m),
       },
       structure: {
         xi: 0.8,
@@ -175,6 +430,8 @@ describe("stellar viability contract", () => {
       observation: {
         wavelength_m: seed.wavelength_m,
         intensity: m0?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
         polarization: Float64Array.from({ length: seed.wavelength_m.length }, () => 0.05),
       },
       structure: { xi: 1, alpha_xi: 0, d_eff: 1e-12, A_ml: 0, material_gate: true },
@@ -214,6 +471,8 @@ describe("stellar viability contract", () => {
       observation: {
         wavelength_m: seed.wavelength_m,
         intensity: m0?.predicted_intensity ?? new Float64Array(),
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
         polarization: Float64Array.from({ length: seed.wavelength_m.length }, () => 0.05),
       },
       structure: { xi: 1, alpha_xi: 0, d_eff: 1e-12, A_ml: 0, material_gate: true },
@@ -246,12 +505,22 @@ describe("stellar viability contract", () => {
       observation: {
         wavelength_m: wavelengths,
         intensity: Float64Array.from({ length: wavelengths.length }, () => 0),
+        continuum_mask: makeContinuumMask(wavelengths),
+        uv_mask: makeUvMask(wavelengths),
+        line_mask: makeLineMask(wavelengths),
       },
     });
     expect(report.models.every((entry) => entry.passes_contract === false)).toBe(true);
     expect(report.promotable_winner).toBeNull();
     expect(report.fallback_winner).toBe("M0_planck_atmosphere");
     expect(report.winner).toBe(report.fallback_winner);
+    expect(report.observables_active).toEqual({
+      continuum: true,
+      uv: true,
+      line: true,
+      angular: false,
+      polarization: false,
+    });
   });
 
   it("keeps M1 and M3 bolometric flux matched to M0 by default", () => {
@@ -319,20 +588,140 @@ describe("stellar viability contract", () => {
     expect(m2?.bolometric_flux_W_m2).not.toBeCloseTo(m2WithoutSource?.bolometric_flux_W_m2 ?? 0, 12);
   });
 
-  it("separates continuum and line residual metrics when no line mask is supplied", () => {
-    const wavelengths = makeWavelengthGrid();
-    const report = evaluateStellarSpectralViability({
+  it("keeps continuum, UV, and line residuals separate and gates missing spectral windows", () => {
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const distorted = Float64Array.from(seed.wavelength_m, (_, index) => {
+      const lambda = seed.wavelength_m[index];
+      const base = seed.models.find((entry) => entry.id === "M0_planck_atmosphere")?.predicted_intensity[index] ?? 0;
+      if (lambda < 400e-9) return base * 1.25;
+      if ((lambda >= 482e-9 && lambda <= 490e-9) || (lambda >= 650e-9 && lambda <= 660e-9)) return base * 0.7;
+      if (lambda >= 400e-9 && lambda <= 2.5e-6) return base * 1.05;
+      return base;
+    });
+
+    const gated = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
       observation: {
-        wavelength_m: wavelengths,
-        intensity: Float64Array.from(wavelengths, (_, index) => (index % 2 === 0 ? 1.1 : 0.9)),
-        continuum_mask: Float64Array.from(wavelengths, (_, index) => (index % 2 === 0 ? 1 : 0)),
+        wavelength_m: seed.wavelength_m,
+        intensity: distorted,
       },
     });
-    const m0 = report.models.find((entry) => entry.id === "M0_planck_atmosphere");
-    expect(m0?.metrics.continuum_rms).toBeGreaterThan(0);
-    expect(m0?.metrics.line_residual).toBeNull();
+    const gatedM0 = gated.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(gatedM0?.metrics.continuum_rms).toBeNull();
+    expect(gatedM0?.metrics.uv_residual).toBeNull();
+    expect(gatedM0?.metrics.line_residual).toBeNull();
+    expect(gatedM0?.metrics.status.continuum_rms).toBe("gated");
+    expect(gatedM0?.metrics.status.uv_residual).toBe("gated");
+    expect(gatedM0?.metrics.status.line_residual).toBe("gated");
+
+    const partitioned = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: seed.wavelength_m,
+        intensity: distorted,
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
+        line_mask: makeLineMask(seed.wavelength_m),
+      },
+    });
+    const partitionedM0 = partitioned.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(partitionedM0?.metrics.continuum_rms).toBeGreaterThan(0);
+    expect(partitionedM0?.metrics.uv_residual).toBeGreaterThan(0);
+    expect(partitionedM0?.metrics.line_residual).toBeGreaterThan(0);
+    expect(partitionedM0?.metrics.status.continuum_rms).toBe("computed");
+    expect(partitionedM0?.metrics.status.uv_residual).toBe("computed");
+    expect(partitionedM0?.metrics.status.line_residual).toBe("computed");
+    expect(partitionedM0?.metrics.uv_residual).toBeGreaterThan(partitionedM0?.metrics.continuum_rms ?? 0);
+  });
+
+  it("only evaluates angular residuals when mu-profile observations are provided", () => {
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const baseIntensity = seed.models.find((entry) => entry.id === "M0_planck_atmosphere")?.predicted_intensity ?? new Float64Array();
+
+    const withoutMu = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: seed.wavelength_m,
+        intensity: baseIntensity,
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
+      },
+    });
+    const withoutMuM0 = withoutMu.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(withoutMuM0?.metrics.anisotropy_penalty).toBeNull();
+    expect(withoutMuM0?.metrics.status.anisotropy_penalty).toBe("unavailable");
+    expect(withoutMu.observables_active.angular).toBe(false);
+
+    const muGrid = makeMuGrid();
+    const withMu = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: seed.wavelength_m,
+        intensity: baseIntensity,
+        continuum_mask: makeContinuumMask(seed.wavelength_m),
+        uv_mask: makeUvMask(seed.wavelength_m),
+        mu_grid: muGrid,
+        intensity_by_mu: Float64Array.from(muGrid, (mu) => 1 - 0.55 * (1 - mu)),
+      },
+    });
+    const withMuM0 = withMu.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(withMuM0?.metrics.anisotropy_penalty).toBeLessThan(1e-12);
+    expect(withMuM0?.metrics.status.anisotropy_penalty).toBe("computed");
+    expect(withMuM0?.predicted_mu_profile?.length).toBe(muGrid.length);
+    expect(withMu.observables_active.angular).toBe(true);
+  });
+
+  it("changes angular null-model profiles deterministically with atmosphere inputs", () => {
+    const muGrid = makeMuGrid();
+    const baseline = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: makeWavelengthGrid(),
+        intensity: Float64Array.from(makeWavelengthGrid(), () => 1),
+        continuum_mask: makeContinuumMask(makeWavelengthGrid()),
+        uv_mask: makeUvMask(makeWavelengthGrid()),
+        mu_grid: muGrid,
+        intensity_by_mu: Float64Array.from(muGrid, (mu) => 1 - 0.55 * (1 - mu)),
+      },
+    });
+    const atmosphereShifted = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        continuum_opacity: 1.8,
+        line_opacity: 1.1,
+        line_source_contrast: -0.2,
+        nlte_departure: 0.15,
+      },
+      observation: {
+        wavelength_m: baseline.wavelength_m,
+        intensity: Float64Array.from(baseline.wavelength_m, () => 1),
+        continuum_mask: makeContinuumMask(baseline.wavelength_m),
+        uv_mask: makeUvMask(baseline.wavelength_m),
+        mu_grid: muGrid,
+        intensity_by_mu: Float64Array.from(muGrid, (mu) => 1 - 0.55 * (1 - mu)),
+      },
+    });
+
+    const baselineM0 = baseline.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const shiftedM0 = atmosphereShifted.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(baselineM0?.predicted_mu_profile).toBeDefined();
+    expect(shiftedM0?.predicted_mu_profile).toBeDefined();
+    const edgeIndex = 0;
+    const centerIndex = muGrid.length - 1;
+    expect(shiftedM0?.predicted_mu_profile?.[edgeIndex]).not.toBeCloseTo(baselineM0?.predicted_mu_profile?.[edgeIndex] ?? 0, 6);
+    expect(shiftedM0?.predicted_mu_profile?.[centerIndex]).toBeCloseTo(1, 12);
   });
 
   it("requires explicit M2 material gate and prevents M2 wins when the gate is off", () => {

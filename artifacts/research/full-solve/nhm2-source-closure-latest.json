@@ -24,45 +24,45 @@
       "T33": 58267450.98955891
     },
     "tileEffective": {
-      "T00": -58267450.94958379,
-      "T11": 58267450.94958379,
-      "T22": 58267450.94958379,
-      "T33": 58267450.94958379
+      "T00": -58267450.96267209,
+      "T11": 58267450.96267209,
+      "T22": 58267450.96267209,
+      "T33": 58267450.96267209
     }
   },
   "residualComponents": {
     "T00": {
       "metricRequired": -58267450.98955891,
-      "tileEffective": -58267450.94958379,
-      "absResidual": 0.0399751216173172,
-      "relResidual": 6.86062646270221e-10
+      "tileEffective": -58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     },
     "T11": {
       "metricRequired": 58267450.98955891,
-      "tileEffective": 58267450.94958379,
-      "absResidual": 0.0399751216173172,
-      "relResidual": 6.86062646270221e-10
+      "tileEffective": 58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     },
     "T22": {
       "metricRequired": 58267450.98955891,
-      "tileEffective": 58267450.94958379,
-      "absResidual": 0.0399751216173172,
-      "relResidual": 6.86062646270221e-10
+      "tileEffective": 58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     },
     "T33": {
       "metricRequired": 58267450.98955891,
-      "tileEffective": 58267450.94958379,
-      "absResidual": 0.0399751216173172,
-      "relResidual": 6.86062646270221e-10
+      "tileEffective": 58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     }
   },
   "residualNorms": {
-    "absL1": 0.1599004864692688,
-    "absL2": 0.0799502432346344,
-    "absLInf": 0.0399751216173172,
-    "relL1": 2.744250585080884e-9,
-    "relL2": 1.372125292540442e-9,
-    "relLInf": 6.86062646270221e-10,
+    "absL1": 0.10754728317260742,
+    "absL2": 0.05377364158630371,
+    "absLInf": 0.026886820793151855,
+    "relL1": 1.845752325631665e-9,
+    "relL2": 9.228761628158325e-10,
+    "relLInf": 4.6143808140791624e-10,
     "toleranceRelLInf": 0.1,
     "pass": true
   },
@@ -121,17 +121,21 @@
           "nonFiniteCount": null,
           "meanT00": -733553902.6786809,
           "sumT00": null,
+          "sourceRef": "warp.metric.T00.nhm2.shift_lapse.region.hull.T00",
+          "derivationMode": "runtime_integrated_metric_region_mean",
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
         },
         "tileT00Diagnostics": {
           "sampleCount": 1096760,
-          "includedCount": null,
+          "includedCount": 1096760,
           "skippedCount": null,
           "nonFiniteCount": null,
           "meanT00": -16732756.921958108,
           "sumT00": -18351818481726.773,
+          "sourceRef": "gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00",
+          "derivationMode": "gr_matter_brick_region_mean",
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -199,6 +203,7 @@
           "dominantSide": "metric",
           "t00MechanismCategory": "t00_mismatch_present",
           "t00MechanismEvidenceStatus": "inferred",
+          "t00MechanismNextStep": "direct_t00_source_model_mapping",
           "components": {
             "T00": {
               "metricValue": -733553902.6786809,
@@ -338,17 +343,21 @@
           "nonFiniteCount": null,
           "meanT00": -1699539201.2526472,
           "sumT00": null,
+          "sourceRef": "warp.metric.T00.nhm2.shift_lapse.region.wall.T00",
+          "derivationMode": "runtime_integrated_metric_region_mean",
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
         },
         "tileT00Diagnostics": {
           "sampleCount": 3352,
-          "includedCount": null,
+          "includedCount": 3352,
           "skippedCount": null,
           "nonFiniteCount": null,
           "meanT00": -27108804644.765415,
           "sumT00": -90868713169253.67,
+          "sourceRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+          "derivationMode": "gr_matter_brick_region_mean",
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -416,6 +425,7 @@
           "dominantSide": "tile",
           "t00MechanismCategory": "t00_mismatch_present",
           "t00MechanismEvidenceStatus": "inferred",
+          "t00MechanismNextStep": "direct_t00_source_model_mapping",
           "components": {
             "T00": {
               "metricValue": -1699539201.2526472,
@@ -555,17 +565,21 @@
           "nonFiniteCount": null,
           "meanT00": -1699157799.1011546,
           "sumT00": null,
+          "sourceRef": "warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00",
+          "derivationMode": "runtime_integrated_metric_region_mean",
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
         },
         "tileT00Diagnostics": {
           "sampleCount": 2504,
-          "includedCount": null,
+          "includedCount": 2504,
           "skippedCount": null,
           "nonFiniteCount": null,
           "meanT00": -5133810475.7006645,
-          "sumT00": -12855061431154.465,
+          "sumT00": -12855061431154.463,
+          "sourceRef": "gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00",
+          "derivationMode": "gr_matter_brick_region_mean",
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -633,6 +647,7 @@
           "dominantSide": "tile",
           "t00MechanismCategory": "t00_mismatch_present",
           "t00MechanismEvidenceStatus": "inferred",
+          "t00MechanismNextStep": "direct_t00_source_model_mapping",
           "components": {
             "T00": {
               "metricValue": -1699157799.1011546,
@@ -728,10 +743,10 @@
     ]
   },
   "scalarProjections": {
-    "cl3RhoDeltaRel": 4.814474944003001e-25,
-    "metricVsTileT00Rel": 6.86062646270221e-10,
-    "traceRel": 6.86062646270221e-10,
-    "isotropicPressureRel": 6.86062646270221e-10
+    "cl3RhoDeltaRel": 0,
+    "metricVsTileT00Rel": 4.6143808140791624e-10,
+    "traceRel": 4.6143808140791624e-10,
+    "isotropicPressureRel": 4.6143808140791624e-10
   },
   "distinction": {
     "scalarCongruenceSecondary": true,

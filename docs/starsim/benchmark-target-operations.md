@@ -32,6 +32,7 @@ Crossmatch now evaluates two identifier sets:
 - `identifiers_trusted`: request identifiers plus identifiers from records that survived crossmatch policy.
 
 Only trusted identifiers can back strong-link acceptance and benchmark-target identifier matching.
+When Gaia is absent, fetched secondary records can still populate observables, but they do not enter `identifiers_trusted` unless they are directly anchored by explicit request identifiers or an already-trusted identifier chain.
 Identifier-backed name mismatches can still produce `accepted_with_warning`, but only when the backing identifier evidence is trusted (`explicit_request_identifier`, `trusted_identifier`, or `trusted_gaia_link`).
 Identifier conflicts stay strict and continue to be rejected.
 If Gaia is the trusted anchor and a candidate that should carry that link does not, the result remains `rejected_missing_link` even when other fields look plausible.

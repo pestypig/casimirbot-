@@ -16,7 +16,7 @@ import type {
 
 export { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION };
 export const STAR_SIM_SOURCE_CACHE_SCHEMA_VERSION = "star-sim-source-cache/1" as const;
-export const STAR_SIM_SOURCE_REGISTRY_VERSION = "star-sim-sources/7" as const;
+export const STAR_SIM_SOURCE_REGISTRY_VERSION = "star-sim-sources/8" as const;
 
 type AstrometryRequest = NonNullable<StarSimRequest["astrometry"]>;
 type PhotometryRequest = NonNullable<StarSimRequest["photometry"]>;

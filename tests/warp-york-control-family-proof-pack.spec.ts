@@ -1433,6 +1433,16 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.tileT00Diagnostics.meanT00).not.toBeNull();
       expect(region.metricT00Diagnostics.sumT00).toBeNull();
       expect(region.tileT00Diagnostics.sumT00).not.toBeNull();
+      expect(region.metricT00Diagnostics.sourceRef).toContain(
+        `.region.${region.regionId}.T00`,
+      );
+      expect(region.metricT00Diagnostics.derivationMode).toBe(
+        "runtime_integrated_metric_region_mean",
+      );
+      expect(region.tileT00Diagnostics.sourceRef).toBe(
+        `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.t00Diagnostics.meanT00`,
+      );
+      expect(region.tileT00Diagnostics.derivationMode).toBe("gr_matter_brick_region_mean");
       expect(region.tileProxyDiagnostics).toBeTruthy();
       expect(region.tileProxyDiagnostics.pressureModel).toBeTruthy();
       expect(region.tileProxyDiagnostics.proxyMode).toBeTruthy();
@@ -1482,7 +1492,10 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| scaleRatio |");
     expect(markdown).toContain("| signStatus |");
     expect(markdown).toContain("| t00MismatchMechanism |");
+    expect(markdown).toContain("| directT00LocalizationNote |");
     expect(markdown).toContain("| t00 diagnostic field | metric | tile |");
+    expect(markdown).toContain("| sourceRef |");
+    expect(markdown).toContain("| derivationMode |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
@@ -1495,6 +1508,8 @@ describe("nhm2 publication completion surfaces", () => {
       "| component | constructionMode | sourceComponent | proxyFactor | proxyReconstructedValue | proxyReconstructionAbsError | proxyReconstructionRelError | evidenceStatus |",
     );
     expect(markdown).toContain("accountingStatus");
+    expect(markdown).toContain("runtime_integrated_metric_region_mean");
+    expect(markdown).toContain("gr_matter_brick_region_mean");
     expect(markdown).toContain("| accounting field | metric | tile |");
     expect(markdown).toContain("evidenceStatus");
     expect(markdown).not.toContain("accounting_measured_match");
@@ -1771,11 +1786,15 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain(
       "| t00MismatchMechanismEvidenceStatus | measured |",
     );
+    expect(markdown).toContain(
+      "| t00MismatchMechanismNextStep | direct_t00_source_model_mapping |",
+    );
     expect(markdown).toContain("| t00MismatchMechanism | unknown |");
     expect(markdown).toContain("| t00MismatchMechanism | tile_effective_evidence_unknown |");
     expect(markdown).toContain(
       "| t00MismatchMechanismEvidenceStatus | unknown |",
     );
+    expect(markdown).toContain("| t00MismatchMechanismNextStep | insufficient_evidence |");
     expect(markdown).not.toContain("| t00MismatchMechanism | pressure_proxy_dominant |");
   });
 
