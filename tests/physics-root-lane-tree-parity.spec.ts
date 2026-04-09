@@ -159,7 +159,7 @@ describe("physics root-lane tree parity", () => {
     }
   });
 
-  it("requires stellar M0 hardening nodes to point to existing evidence docs", () => {
+  it("requires stellar opacity and M0 hardening nodes to keep evidence provenance bindings", () => {
     const repoRoot = process.cwd();
     const treePath = path.join(
       repoRoot,
@@ -172,21 +172,32 @@ describe("physics root-lane tree parity", () => {
       nodes: Array<{ id: string; evidence?: Array<{ type?: string; path?: string }> }>;
     };
 
-    const requiredNodeIds = [
+    const hardenedNodeIds = [
       "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
       "physics-stellar-structure-nucleosynthesis-lte-source-function-definition",
       "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
       "physics-stellar-structure-nucleosynthesis-continuum-opacity-sum-definition",
       "physics-stellar-structure-nucleosynthesis-population-ionization-balance-diagnostic",
     ];
+    const hardenedEvidencePath = "docs/knowledge/physics/stellar-radiative-transfer.md";
 
-    for (const nodeId of requiredNodeIds) {
+    const stellarOpacityDefinition = tree.nodes.find(
+      (entry) => entry.id === "physics-stellar-structure-nucleosynthesis-stellar-opacity-definition",
+    );
+    expect(stellarOpacityDefinition).toBeTruthy();
+    const stellarOpacityDocPaths = (stellarOpacityDefinition?.evidence ?? [])
+      .filter((entry) => entry.type === "doc" && typeof entry.path === "string")
+      .map((entry) => String(entry.path));
+    expect(stellarOpacityDocPaths).toContain("docs/knowledge/physics/stellar-opacity.md");
+
+    for (const nodeId of hardenedNodeIds) {
       const node = tree.nodes.find((entry) => entry.id === nodeId);
       expect(node).toBeTruthy();
       const docPaths = (node?.evidence ?? [])
         .filter((entry) => entry.type === "doc" && typeof entry.path === "string")
         .map((entry) => String(entry.path));
       expect(docPaths.length).toBeGreaterThan(0);
+      expect(docPaths).toContain(hardenedEvidencePath);
 
       for (const docPath of docPaths) {
         expect(fs.existsSync(path.join(repoRoot, docPath))).toBe(true);

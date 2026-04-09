@@ -270,7 +270,7 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
+          "path": "docs/knowledge/physics/stellar-opacity.md"
         }
       ]
     },
