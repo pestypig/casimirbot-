@@ -188,7 +188,9 @@ describe("physics root-lane tree parity", () => {
     const stellarOpacityDocPaths = (stellarOpacityDefinition?.evidence ?? [])
       .filter((entry) => entry.type === "doc" && typeof entry.path === "string")
       .map((entry) => String(entry.path));
-    expect(stellarOpacityDocPaths).toContain("docs/knowledge/physics/stellar-opacity.md");
+    const stellarOpacityDocPath = "docs/knowledge/physics/stellar-opacity.md";
+    expect(stellarOpacityDocPaths).toContain(stellarOpacityDocPath);
+    expect(fs.existsSync(path.join(repoRoot, stellarOpacityDocPath))).toBe(true);
 
     for (const nodeId of hardenedNodeIds) {
       const node = tree.nodes.find((entry) => entry.id === nodeId);
