@@ -37,6 +37,7 @@ If a slice fails its local gate, remove that wiring before starting the next sli
 ## Follow-on Cleanup Slices
 - `S9 execution-policy` is now stable in [server/services/helix-ask/policy/execution-policy.ts](/c:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/server/services/helix-ask/policy/execution-policy.ts) for fast-mode planner preference, two-pass triggers, and retrieval-retry override policy.
 - `S10 forced-answer-policy` is now stable in [server/services/helix-ask/policy/forced-answer.ts](/c:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/server/services/helix-ask/policy/forced-answer.ts) for simple composition rendering and forced-answer preservation/finalization rules.
+- `S11 repo-runtime-fallback-policy` is now stable in [server/services/helix-ask/policy/repo-runtime-fallback.ts](/c:/Users/dan/Desktop/RESEARCH%201,0/research/Alcubierre%20drive/casimirbot.com/versions/CasimirBot%20(9-3-25)/CasimirBot%20(9-3-25)/CasimirBot/server/services/helix-ask/policy/repo-runtime-fallback.ts) for deterministic repo-runtime fallback candidate selection, direct-use gating, and fallback-shape acceptance checks.
 
 ## Validation Tiers
 ### Micro-slice
@@ -111,6 +112,7 @@ This phase is not done while the route still primarily owns:
 | S8 | policy | `server/services/helix-ask/policy/*` | stable | `helix-ask-pre-intent-policy` + `helix-ask-runtime-errors` targeted policy assertions + stable thread gate | restart `5050` + smoke + Casimir | working-tree checkpoint | pre-intent clarify bypass rules and general ambiguity answer floor now live in `policy/pre-intent-clarify.ts`; deeper intent routing and open-world execution policy still remain inline |
 | S9 | execution-policy | `server/services/helix-ask/policy/execution-policy.ts` | stable | `helix-ask-execution-policy` + `helix-ask-runtime-errors` targeted fast-mode policy assertions + stable thread gate | restart `5050` + smoke + Casimir | working-tree checkpoint | fast-mode planner preference, risk-triggered two-pass, and retrieval-retry override logic are now off the route; broader execution heuristics still remain inline |
 | S10 | forced-answer-policy | `server/services/helix-ask/policy/forced-answer.ts` | stable | `helix-ask-forced-answer-policy` + `helix-ask-runtime-errors` targeted forced-answer assertions + stable thread gate | restart `5050` + smoke + Casimir | working-tree checkpoint | simple composition rendering plus forced-answer short-circuit, preservation, and fast-path finalization rules are now off the route |
+| S11 | repo-runtime-fallback-policy | `server/services/helix-ask/policy/repo-runtime-fallback.ts` | stable | `helix-ask-runtime-errors` deterministic fallback assertions (`deterministic repo runtime fallback`) + `helix-conversation-turn.routes`; full stable thread gate currently blocked by baseline red in `helix-thread-ledger` parity replay spec | restart `5050` + smoke + Casimir | working-tree checkpoint | deterministic repo-runtime fallback candidate selection, direct-use gating, and accepted fallback-shape checks are now imported from a dedicated policy module |
 
 ## Operating Commands
 Generate a fresh route inventory:
@@ -137,5 +139,6 @@ npx vitest run tests/helix-thread-ledger.spec.ts tests/helix-thread-item-protoco
 - Pre-intent clarify bypass rules, concrete definition targeting, repo-technical cue detection, and the general ambiguity answer floor are now off the route and live in `policy/pre-intent-clarify.ts`.
 - Fast-mode planner preference, risk-triggered two-pass, and retrieval-retry override decisions are now off the route and live in `policy/execution-policy.ts`.
 - Simple composition rendering and forced-answer short-circuit / preservation / fast-path finalization rules are now off the route and live in `policy/forced-answer.ts`.
+- Deterministic repo-runtime fallback candidate selection, direct-use gating, and accepted fallback-shape checks are now off the route and live in `policy/repo-runtime-fallback.ts`.
 - The remaining large `/ask` ownership in the route is the deep engine body entered through `executeHelixAsk`, plus deeper objective/retrieval/policy execution logic outside the transport shell.
 - Casimir is still required before final completion claims once the latest bundle is restarted on `5050`.
