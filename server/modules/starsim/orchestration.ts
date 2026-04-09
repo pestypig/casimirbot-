@@ -99,6 +99,9 @@ export const prepareStarSimResolveBeforeRun = async (
     sourceReasons: resolved.source_resolution.reasons,
     policy,
     benchmarkTargetId: resolved.benchmark_target_id,
+    benchmarkTargetMatchMode: resolved.benchmark_target_match_mode,
+    benchmarkTargetConflictReason: resolved.benchmark_target_conflict_reason,
+    benchmarkTargetQualityOk: resolved.benchmark_target_quality_ok,
     fallbackUsed: resolved.crossmatch_summary?.fallback_used,
     qualityRejections: resolved.quality_rejections,
   });
@@ -128,8 +131,12 @@ export const prepareStarSimResolveBeforeRun = async (
     lane_plan: lanePlan,
     blocked_reasons: preflight.blocked_reasons,
     benchmark_target_id: resolved.benchmark_target_id,
+    benchmark_target_match_mode: resolved.benchmark_target_match_mode,
+    benchmark_target_conflict_reason: resolved.benchmark_target_conflict_reason,
+    benchmark_target_quality_ok: resolved.benchmark_target_quality_ok,
     crossmatch_summary: resolved.crossmatch_summary,
     quality_rejections: resolved.quality_rejections,
+    quality_warnings: resolved.quality_warnings,
     diagnostic_summary: resolved.diagnostic_summary,
   };
 
@@ -153,6 +160,9 @@ export const prepareStarSimResolveBeforeRun = async (
       fetch_modes_by_catalog: resolved.source_resolution.fetch_modes_by_catalog,
       selected_field_origins: buildSelectedFieldOrigins(resolved.source_resolution.selection_manifest.fields),
       benchmark_target_id: resolved.benchmark_target_id,
+      benchmark_target_match_mode: resolved.benchmark_target_match_mode,
+      benchmark_target_conflict_reason: resolved.benchmark_target_conflict_reason,
+      benchmark_target_quality_ok: resolved.benchmark_target_quality_ok,
     },
     runnableLanes: preflight.runnable_lanes,
     sourceArtifactRefs: resolved.source_resolution.artifact_refs,

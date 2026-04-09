@@ -21,7 +21,21 @@ const normalize = (value: string | null | undefined): string =>
     .replace(/\s+/g, " ")
     .replace(/[^a-z0-9:._+\- ]+/g, "");
 
-export const STAR_SIM_BENCHMARK_TARGETS_VERSION = "starsim-benchmark-targets/1";
+export type StarSimBenchmarkTargetMatchMode =
+  | "matched_by_identifier"
+  | "matched_by_name"
+  | "conflicted_name_vs_identifier"
+  | "no_match";
+
+export interface StarSimBenchmarkTargetMatchResult {
+  benchmark_target: StarSimBenchmarkTarget | null;
+  benchmark_target_match_mode: StarSimBenchmarkTargetMatchMode;
+  benchmark_target_conflict_reason?: string;
+  benchmark_target_quality_ok: boolean;
+}
+
+export const STAR_SIM_BENCHMARK_TARGETS_VERSION = "starsim-benchmark-targets/2";
+const ALLOW_IDENTIFIER_MATCH_ON_NAME_CONFLICT = false;
 
 const BENCHMARK_TARGETS: StarSimBenchmarkTarget[] = [
   {
@@ -65,23 +79,66 @@ const findMatchedId = (target: StarSimBenchmarkTarget, identifiers: StarSimSourc
     return typeof expected === "string" && normalize(actual) === normalize(expected);
   });
 
+const matchesName = (target: StarSimBenchmarkTarget, values: string[]): boolean => {
+  const aliasSet = new Set(
+    [target.canonical_name, ...(target.allowed_object_ids ?? []), ...target.aliases].map((value) => normalize(value)),
+  );
+  return values.some((value) => aliasSet.has(value));
+};
+
 export const resolveBenchmarkTarget = (args: {
   request: StarSimRequest;
   identifiersResolved: StarSimSourceIdentifiers;
-}): StarSimBenchmarkTarget | null => {
+}): StarSimBenchmarkTargetMatchResult => {
   const objectIds = [args.request.target?.object_id, args.request.target?.name]
     .map((value) => normalize(value))
     .filter(Boolean);
-  for (const target of BENCHMARK_TARGETS) {
-    const aliasSet = new Set([target.canonical_name, ...(target.allowed_object_ids ?? []), ...target.aliases].map((value) => normalize(value)));
-    if (objectIds.some((id) => aliasSet.has(id))) {
-      return target;
+  const identifierMatches = BENCHMARK_TARGETS.filter((target) => findMatchedId(target, args.identifiersResolved));
+  const nameMatches = BENCHMARK_TARGETS.filter((target) => matchesName(target, objectIds));
+
+  if (identifierMatches.length > 0 && nameMatches.length > 0) {
+    const shared = identifierMatches.find((target) => nameMatches.some((match) => match.id === target.id));
+    if (shared) {
+      return {
+        benchmark_target: shared,
+        benchmark_target_match_mode: "matched_by_identifier",
+        benchmark_target_quality_ok: true,
+      };
     }
-    if (findMatchedId(target, args.identifiersResolved)) {
-      return target;
+    if (ALLOW_IDENTIFIER_MATCH_ON_NAME_CONFLICT && identifierMatches.length === 1) {
+      return {
+        benchmark_target: identifierMatches[0],
+        benchmark_target_match_mode: "conflicted_name_vs_identifier",
+        benchmark_target_conflict_reason: "name_identifier_disagreement_identifier_selected_by_policy",
+        benchmark_target_quality_ok: false,
+      };
     }
+    return {
+      benchmark_target: null,
+      benchmark_target_match_mode: "conflicted_name_vs_identifier",
+      benchmark_target_conflict_reason: "name_identifier_disagreement_conflict_unresolved",
+      benchmark_target_quality_ok: false,
+    };
   }
-  return null;
+  if (identifierMatches.length > 0) {
+    return {
+      benchmark_target: identifierMatches[0],
+      benchmark_target_match_mode: "matched_by_identifier",
+      benchmark_target_quality_ok: true,
+    };
+  }
+  if (nameMatches.length > 0) {
+    return {
+      benchmark_target: nameMatches[0],
+      benchmark_target_match_mode: "matched_by_name",
+      benchmark_target_quality_ok: true,
+    };
+  }
+  return {
+    benchmark_target: null,
+    benchmark_target_match_mode: "no_match",
+    benchmark_target_quality_ok: false,
+  };
 };
 
 export const listBenchmarkTargets = (): StarSimBenchmarkTarget[] => BENCHMARK_TARGETS.map((entry) => ({ ...entry }));
