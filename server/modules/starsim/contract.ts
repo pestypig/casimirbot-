@@ -22,6 +22,12 @@ export const executionKindSchema = z.enum(["simulation", "diagnostic", "replay",
 export const starSimExternalRuntimeKindSchema = z.enum(["mock", "docker", "wsl", "disabled"]);
 export const starSimArtifactIntegritySchema = z.enum(["verified", "missing", "corrupt", "stale", "unknown"]);
 export const starSimJobStatusSchema = z.enum(["queued", "running", "completed", "failed", "abandoned"]);
+export const starSimSupportedDomainReasonSchema = z.enum([
+  "out_of_supported_domain",
+  "insufficient_observables",
+  "seismology_required",
+  "unsupported_evolutionary_state",
+]);
 export const starSimArtifactRefSchema = z.object({
   kind: z.string().min(1),
   path: z.string().min(1),
@@ -158,6 +164,8 @@ export const starSimRequestSchema = z
     requested_lanes: z.array(requestedLaneSchema).optional(),
     strict_lanes: z.boolean().optional(),
     benchmark_case_id: z.string().min(1).optional(),
+    fit_profile_id: z.string().min(1).optional(),
+    fit_constraints: physicsFlagsSchema,
     physics_flags: physicsFlagsSchema,
   })
   .strict();
@@ -171,6 +179,7 @@ export type ExecutionKind = z.infer<typeof executionKindSchema>;
 export type StarSimExternalRuntimeKind = z.infer<typeof starSimExternalRuntimeKindSchema>;
 export type StarSimArtifactIntegrityStatus = z.infer<typeof starSimArtifactIntegritySchema>;
 export type StarSimJobStatus = z.infer<typeof starSimJobStatusSchema>;
+export type StarSimSupportedDomainReason = z.infer<typeof starSimSupportedDomainReasonSchema>;
 export type StarSimArtifactRef = z.infer<typeof starSimArtifactRefSchema>;
 export type PhysicsFlagValue = string | number | boolean | null;
 export type ObsClass = "O0" | "O1" | "O2" | "O3" | "O4" | "O5";
@@ -190,6 +199,43 @@ export interface StarSimBenchmarkValidation {
   tolerance_profile: string;
   checked_metrics: StarSimBenchmarkMetricCheck[];
   notes: string[];
+}
+
+export interface StarSimSupportedDomain {
+  id: string;
+  version: string;
+  lane_id: "structure_mesa" | "oscillation_gyre";
+  passed: boolean;
+  reasons: StarSimSupportedDomainReason[];
+  required_observables: string[];
+  optional_observables: string[];
+  fit_profile_id: string | null;
+  fit_constraints_applied: Record<string, PhysicsFlagValue>;
+  benchmark_pack_id: string | null;
+  notes: string[];
+}
+
+export interface StarSimFitSummary {
+  profile_id: string;
+  free_parameters: string[];
+  fixed_priors: Record<string, unknown>;
+  applied_constraints: Record<string, PhysicsFlagValue>;
+  metrics: Record<string, number>;
+  note?: string;
+}
+
+export interface StarSimComparisonSummary {
+  profile_id: string;
+  checked_observables: string[];
+  coverage: number;
+  metrics: Record<string, number>;
+  note?: string;
+}
+
+export interface StarSimSeismicMatchSummary {
+  used_observables: string[];
+  matched_mode_count: number;
+  available_mode_count: number;
 }
 
 export interface CanonicalField<T = unknown> {
@@ -275,6 +321,8 @@ export interface CanonicalStar {
   requested_lanes: RequestedLane[];
   strict_lanes: boolean;
   benchmark_case_id: string | null;
+  fit_profile_id: string | null;
+  fit_constraints: Record<string, PhysicsFlagValue>;
   physics_flags: Record<string, PhysicsFlagValue>;
 }
 
@@ -350,8 +398,8 @@ export interface StarSimResponse {
   schema_version: "star-sim-v1";
   meta: {
     contract_version: "star-sim-v1";
-    normalization_version: "star-sim.canonicalize/3";
-    solver_manifest_version: "star-sim.registry/5";
+    normalization_version: "star-sim.canonicalize/4";
+    solver_manifest_version: "star-sim.registry/6";
     congruence_version: "star-sim.harmonic/2";
     claim_identity_version: "star-sim.claims/3";
     deterministic_request_hash: string;

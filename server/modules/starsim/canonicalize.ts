@@ -320,6 +320,10 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
     requested_lanes: request.requested_lanes ?? defaultRequestedLanes(request, solar),
     strict_lanes: request.strict_lanes === true,
     benchmark_case_id: request.benchmark_case_id?.trim() || null,
+    fit_profile_id: request.fit_profile_id?.trim() || null,
+    fit_constraints: Object.fromEntries(
+      Object.entries(request.fit_constraints ?? {}).sort(([left], [right]) => left.localeCompare(right)),
+    ),
     physics_flags: Object.fromEntries(
       Object.entries(request.physics_flags ?? {}).sort(([left], [right]) => left.localeCompare(right)),
     ),

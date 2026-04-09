@@ -5,15 +5,15 @@
   "familyId": "nhm2_shift_lapse",
   "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
   "shiftLapseProfileStage": "controlled_tuning_stage_1",
-  "regionId": null,
-  "tensorSemanticRef": "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy",
+  "regionId": "wall",
+  "tensorSemanticRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.nhm2_shift_lapse.diagonal_proxy",
   "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
   "producer": "scripts/warp-york-control-family-proof-pack.ts",
   "diagonalTensor": {
-    "T00": -58267450.96267209,
-    "T11": 58267450.96267209,
-    "T22": 58267450.96267209,
-    "T33": 58267450.96267209
+    "T00": -88605568.92269962,
+    "T11": 88605568.92269962,
+    "T22": 88605568.92269962,
+    "T33": 88605568.92269962
   },
-  "note": "Selected-profile global tile-effective diagonal tensor from the GR matter brick global tensor summary used by NHM2 source-closure publication."
+  "note": "Selected-profile integral tile-effective diagonal tensor over the shared wall stress-energy brick mask. wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy"
 }

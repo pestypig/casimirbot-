@@ -113,6 +113,8 @@ const buildJobFingerprint = (request: StarSimRequest): string => {
     target: canonical.target,
     fields: canonical.fields,
     benchmark_case_id: canonical.benchmark_case_id,
+    fit_profile_id: canonical.fit_profile_id,
+    fit_constraints: canonical.fit_constraints,
     physics_flags: canonical.physics_flags,
     evidence_refs: canonical.evidence_refs,
     requested_lanes: canonical.requested_lanes,

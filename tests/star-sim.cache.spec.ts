@@ -183,6 +183,52 @@ describe("star-sim cache-backed heavy lanes", () => {
     expect(dockerLane.runtime_mode).toBe("docker");
   });
 
+  it("changes the cache key when fit profile or fit constraints change", async () => {
+    const app = await buildApp();
+    const basePayload = {
+      target: {
+        object_id: "alpha-centauri-a",
+        name: "Alpha Centauri A",
+        epoch_iso: "2026-01-01T00:00:00.000Z",
+        spectral_type: "G2",
+        luminosity_class: "V",
+      },
+      spectroscopy: {
+        teff_K: 5790,
+        logg_cgs: 4.31,
+        metallicity_feh: 0.22,
+      },
+      structure: {
+        radius_Rsun: 1.22,
+      },
+      requested_lanes: ["structure_mesa"],
+    };
+
+    const variantA = {
+      ...basePayload,
+      fit_profile_id: "solar_like_observable_fit_v1",
+      fit_constraints: {
+        mixing_length_alpha_max: 2.05,
+      },
+    };
+    const variantB = {
+      ...basePayload,
+      fit_profile_id: "solar_like_observable_fit_v2",
+      fit_constraints: {
+        mixing_length_alpha_max: 1.95,
+      },
+    };
+
+    const submit = await request(app).post("/api/star-sim/v1/jobs").send(variantA).expect(202);
+    await waitForJob(app, submit.body.job_id, "completed");
+    const [resA, resB] = await Promise.all([
+      request(app).post("/api/star-sim/v1/run").send(variantA).expect(200),
+      request(app).post("/api/star-sim/v1/run").send(variantB).expect(200),
+    ]);
+
+    expect(resA.body.lanes[0].cache_key).not.toBe(resB.body.lanes[0].cache_key);
+  });
+
   it("treats a corrupt cached artifact as a cache miss instead of valid output", async () => {
     const app = await buildApp();
     const payload = {

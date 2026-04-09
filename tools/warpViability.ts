@@ -33,10 +33,13 @@ import {
   type Nhm2ObserverAuditCondition,
 } from "../shared/contracts/nhm2-observer-audit.v1";
 import {
-  NHM2_SOURCE_CLOSURE_ARTIFACT_ID,
-  NHM2_SOURCE_CLOSURE_SCHEMA_VERSION,
+  isNhm2SourceClosureArtifact,
   type Nhm2SourceClosureArtifact,
 } from "../shared/contracts/nhm2-source-closure.v1";
+import {
+  isNhm2SourceClosureV2Artifact,
+  type Nhm2SourceClosureV2Artifact,
+} from "../shared/contracts/nhm2-source-closure.v2";
 import {
   isNhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessArtifact,
@@ -590,15 +593,17 @@ const normalizeAuditState = (value: unknown): Nhm2FullLoopAuditState | null =>
 
 const isNhm2SourceClosureArtifactLike = (
   value: unknown,
-): value is Nhm2SourceClosureArtifact => {
-  const record = asRecord(value);
-  return (
-    record?.artifactId === NHM2_SOURCE_CLOSURE_ARTIFACT_ID &&
-    record?.schemaVersion === NHM2_SOURCE_CLOSURE_SCHEMA_VERSION &&
-    normalizeAuditState(record?.status) != null &&
-    (record?.completeness === "complete" || record?.completeness === "incomplete")
-  );
-};
+): value is Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact =>
+  isNhm2SourceClosureArtifact(value) || isNhm2SourceClosureV2Artifact(value);
+
+const getSourceClosureRegions = (
+  artifact: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact | null,
+) =>
+  artifact == null
+    ? []
+    : artifact.schemaVersion === "nhm2_source_closure/v2"
+      ? artifact.regionComparisons.regions
+      : artifact.sampledSummaries.regions;
 
 const makeAuditRef = (
   artifactId: string,
@@ -889,9 +894,14 @@ const buildNhm2FullLoopPolicyLayer = (args: {
         case "metric_tensor_incomplete":
         case "tile_tensor_incomplete":
         case "tolerance_missing":
+        case "region_metric_tensor_missing":
+        case "region_tile_tensor_missing":
+        case "region_metric_tensor_incomplete":
+        case "region_tile_tensor_incomplete":
           sourceClosureReasons.push("source_closure_missing");
           break;
         case "assumption_drift":
+        case "region_basis_diagnostic_only":
           sourceClosureReasons.push("policy_review_required");
           break;
       }
@@ -904,11 +914,18 @@ const buildNhm2FullLoopPolicyLayer = (args: {
     sourceClosure != null
       ? (normalizeAuditState(sourceClosure.status) ?? "review")
       : "unavailable";
-  const sourceClosureRegions = sourceClosure?.sampledSummaries?.regions ?? [];
-  const findRegionResidual = (regionId: string): number | null =>
-    finiteOrUndefined(
-      sourceClosureRegions.find((entry) => entry.regionId === regionId)?.residualNorms?.relLInf,
-    ) ?? null;
+  const sourceClosureRegions = getSourceClosureRegions(sourceClosure);
+  const findRegionResidual = (...regionIds: string[]): number | null => {
+    for (const regionId of regionIds) {
+      const value =
+        finiteOrUndefined(
+          sourceClosureRegions.find((entry) => entry.regionId === regionId)?.residualNorms
+            ?.relLInf,
+        ) ?? null;
+      if (value != null) return value;
+    }
+    return null;
+  };
 
   const observerReasons: Nhm2FullLoopAuditReasonCode[] = [];
   if (observerAudit) {
@@ -1138,7 +1155,7 @@ const buildNhm2FullLoopPolicyLayer = (args: {
       residualByRegion: {
         hull: findRegionResidual("hull"),
         wall: findRegionResidual("wall"),
-        exteriorShell: findRegionResidual("exteriorShell"),
+        exteriorShell: findRegionResidual("exterior_shell", "exteriorShell"),
       },
       toleranceRef:
         sourceClosure?.residualNorms.toleranceRelLInf != null

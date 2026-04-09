@@ -1,11 +1,10 @@
 {
   "artifactId": "nhm2_source_closure",
-  "schemaVersion": "nhm2_source_closure/v1",
+  "schemaVersion": "nhm2_source_closure/v2",
   "status": "fail",
   "completeness": "complete",
   "reasonCodes": [
-    "tensor_residual_exceeded",
-    "assumption_drift"
+    "tensor_residual_exceeded"
   ],
   "comparedComponents": [
     "T00",
@@ -25,204 +24,242 @@
       "T33": 58267450.98955891
     },
     "tileEffective": {
-      "T00": -0.11480523685564506,
-      "T11": 0.11480523685564506,
-      "T22": 0.05740261842782253,
-      "T33": 0.11480523685564506
+      "T00": -58267450.96267209,
+      "T11": 58267450.96267209,
+      "T22": 58267450.96267209,
+      "T33": 58267450.96267209
     }
   },
   "residualComponents": {
     "T00": {
       "metricRequired": -58267450.98955891,
-      "tileEffective": -0.11480523685564506,
-      "absResidual": 58267450.87475368,
-      "relResidual": 0.999999998029685
+      "tileEffective": -58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     },
     "T11": {
       "metricRequired": 58267450.98955891,
-      "tileEffective": 0.11480523685564506,
-      "absResidual": 58267450.87475368,
-      "relResidual": 0.999999998029685
+      "tileEffective": 58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     },
     "T22": {
       "metricRequired": 58267450.98955891,
-      "tileEffective": 0.05740261842782253,
-      "absResidual": 58267450.932156295,
-      "relResidual": 0.9999999990148425
+      "tileEffective": 58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     },
     "T33": {
       "metricRequired": 58267450.98955891,
-      "tileEffective": 0.11480523685564506,
-      "absResidual": 58267450.87475368,
-      "relResidual": 0.999999998029685
+      "tileEffective": 58267450.96267209,
+      "absResidual": 0.026886820793151855,
+      "relResidual": 4.6143808140791624e-10
     }
   },
   "residualNorms": {
-    "absL1": 233069803.55641732,
-    "absL2": 116534901.77820866,
-    "absLInf": 58267450.932156295,
-    "relL1": 3.999999993103897,
-    "relL2": 1.9999999965519486,
-    "relLInf": 0.9999999990148425,
+    "absL1": 0.10754728317260742,
+    "absL2": 0.05377364158630371,
+    "absLInf": 0.026886820793151855,
+    "relL1": 1.845752325631665e-9,
+    "relL2": 9.228761628158325e-10,
+    "relLInf": 4.6143808140791624e-10,
     "toleranceRelLInf": 0.1,
-    "pass": false
+    "pass": true
   },
-  "sampledSummaries": {
+  "regionComparisons": {
     "status": "available",
+    "requiredRegionIds": [
+      "hull",
+      "wall",
+      "exterior_shell"
+    ],
     "regions": [
       {
         "regionId": "hull",
-        "sampleCount": 1096760,
-        "tileTensor": {
-          "T00": -16732756.921958108,
-          "T11": 16732756.921958108,
-          "T22": 16732756.921958108,
-          "T33": 16732756.921958108
+        "comparisonBasisStatus": "same_basis",
+        "status": "fail",
+        "completeness": "complete",
+        "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-hull-latest.json",
+        "tileTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-hull-latest.json",
+        "metricRequiredTensor": {
+          "T00": -733553902.6786809,
+          "T11": 733553902.6786809,
+          "T22": 733553902.6786809,
+          "T33": 733553902.6786809
         },
+        "tileEffectiveTensor": {
+          "T00": -54691.28816794322,
+          "T11": 54691.28816794322,
+          "T22": 54691.28816794322,
+          "T33": 54691.28816794322
+        },
+        "sampleCount": 1096760,
         "residualComponents": {
           "T00": {
-            "metricRequired": -58267450.98955891,
-            "tileEffective": -16732756.921958108,
-            "absResidual": 41534694.0676008,
-            "relResidual": 0.7128284035463214
+            "metricRequired": -733553902.6786809,
+            "tileEffective": -54691.28816794322,
+            "absResidual": 733499211.390513,
+            "relResidual": 0.9999254433955457
           },
           "T11": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 16732756.921958108,
-            "absResidual": 41534694.0676008,
-            "relResidual": 0.7128284035463214
+            "metricRequired": 733553902.6786809,
+            "tileEffective": 54691.28816794322,
+            "absResidual": 733499211.390513,
+            "relResidual": 0.9999254433955457
           },
           "T22": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 16732756.921958108,
-            "absResidual": 41534694.0676008,
-            "relResidual": 0.7128284035463214
+            "metricRequired": 733553902.6786809,
+            "tileEffective": 54691.28816794322,
+            "absResidual": 733499211.390513,
+            "relResidual": 0.9999254433955457
           },
           "T33": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 16732756.921958108,
-            "absResidual": 41534694.0676008,
-            "relResidual": 0.7128284035463214
+            "metricRequired": 733553902.6786809,
+            "tileEffective": 54691.28816794322,
+            "absResidual": 733499211.390513,
+            "relResidual": 0.9999254433955457
           }
         },
         "residualNorms": {
-          "absL1": 166138776.2704032,
-          "absL2": 83069388.1352016,
-          "absLInf": 41534694.0676008,
-          "relL1": 2.8513136141852855,
-          "relL2": 1.4256568070926428,
-          "relLInf": 0.7128284035463214,
+          "absL1": 2933996845.562052,
+          "absL2": 1466998422.781026,
+          "absLInf": 733499211.390513,
+          "relL1": 3.9997017735821827,
+          "relL2": 1.9998508867910914,
+          "relLInf": 0.9999254433955457,
           "toleranceRelLInf": 0.1,
           "pass": false
         },
-        "note": "inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published."
+        "note": "inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares selected-profile integral metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
       },
       {
         "regionId": "wall",
-        "sampleCount": 3352,
-        "tileTensor": {
-          "T00": -27108804644.765415,
-          "T11": 27108804644.765415,
-          "T22": 27108804644.765415,
-          "T33": 27108804644.765415
+        "comparisonBasisStatus": "same_basis",
+        "status": "fail",
+        "completeness": "complete",
+        "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-wall-latest.json",
+        "tileTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-wall-latest.json",
+        "metricRequiredTensor": {
+          "T00": -1699539201.2526472,
+          "T11": 1699539201.2526472,
+          "T22": 1699539201.2526472,
+          "T33": 1699539201.2526472
         },
+        "tileEffectiveTensor": {
+          "T00": -88605568.92269962,
+          "T11": 88605568.92269962,
+          "T22": 88605568.92269962,
+          "T33": 88605568.92269962
+        },
+        "sampleCount": 3352,
         "residualComponents": {
           "T00": {
-            "metricRequired": -58267450.98955891,
-            "tileEffective": -27108804644.765415,
-            "absResidual": 27050537193.775856,
-            "relResidual": 464.24782162897617
+            "metricRequired": -1699539201.2526472,
+            "tileEffective": -88605568.92269962,
+            "absResidual": 1610933632.3299475,
+            "relResidual": 0.9478649454761662
           },
           "T11": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 27108804644.765415,
-            "absResidual": 27050537193.775856,
-            "relResidual": 464.24782162897617
+            "metricRequired": 1699539201.2526472,
+            "tileEffective": 88605568.92269962,
+            "absResidual": 1610933632.3299475,
+            "relResidual": 0.9478649454761662
           },
           "T22": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 27108804644.765415,
-            "absResidual": 27050537193.775856,
-            "relResidual": 464.24782162897617
+            "metricRequired": 1699539201.2526472,
+            "tileEffective": 88605568.92269962,
+            "absResidual": 1610933632.3299475,
+            "relResidual": 0.9478649454761662
           },
           "T33": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 27108804644.765415,
-            "absResidual": 27050537193.775856,
-            "relResidual": 464.24782162897617
+            "metricRequired": 1699539201.2526472,
+            "tileEffective": 88605568.92269962,
+            "absResidual": 1610933632.3299475,
+            "relResidual": 0.9478649454761662
           }
         },
         "residualNorms": {
-          "absL1": 108202148775.10342,
-          "absL2": 54101074387.55171,
-          "absLInf": 27050537193.775856,
-          "relL1": 1856.9912865159047,
-          "relL2": 928.4956432579523,
-          "relLInf": 464.24782162897617,
+          "absL1": 6443734529.31979,
+          "absL2": 3221867264.659895,
+          "absLInf": 1610933632.3299475,
+          "relL1": 3.7914597819046647,
+          "relL2": 1.8957298909523324,
+          "relLInf": 0.9478649454761662,
           "toleranceRelLInf": 0.1,
           "pass": false
         },
-        "note": "wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published."
+        "note": "wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares selected-profile integral metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
       },
       {
         "regionId": "exterior_shell",
-        "sampleCount": 2504,
-        "tileTensor": {
-          "T00": -5133810475.7006645,
-          "T11": 5133810475.7006645,
-          "T22": 5133810475.7006645,
-          "T33": 5133810475.7006645
+        "comparisonBasisStatus": "same_basis",
+        "status": "fail",
+        "completeness": "complete",
+        "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-exterior-shell-latest.json",
+        "tileTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-exterior-shell-latest.json",
+        "metricRequiredTensor": {
+          "T00": -1699157799.1011546,
+          "T11": 1699157799.1011546,
+          "T22": 1699157799.1011546,
+          "T33": 1699157799.1011546
         },
+        "tileEffectiveTensor": {
+          "T00": -16779943.04439419,
+          "T11": 16779943.04439419,
+          "T22": 16779943.04439419,
+          "T33": 16779943.04439419
+        },
+        "sampleCount": 2504,
         "residualComponents": {
           "T00": {
-            "metricRequired": -58267450.98955891,
-            "tileEffective": -5133810475.7006645,
-            "absResidual": 5075543024.711105,
-            "relResidual": 87.1076894305983
+            "metricRequired": -1699157799.1011546,
+            "tileEffective": -16779943.04439419,
+            "absResidual": 1682377856.0567603,
+            "relResidual": 0.9901245528500822
           },
           "T11": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 5133810475.7006645,
-            "absResidual": 5075543024.711105,
-            "relResidual": 87.1076894305983
+            "metricRequired": 1699157799.1011546,
+            "tileEffective": 16779943.04439419,
+            "absResidual": 1682377856.0567603,
+            "relResidual": 0.9901245528500822
           },
           "T22": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 5133810475.7006645,
-            "absResidual": 5075543024.711105,
-            "relResidual": 87.1076894305983
+            "metricRequired": 1699157799.1011546,
+            "tileEffective": 16779943.04439419,
+            "absResidual": 1682377856.0567603,
+            "relResidual": 0.9901245528500822
           },
           "T33": {
-            "metricRequired": 58267450.98955891,
-            "tileEffective": 5133810475.7006645,
-            "absResidual": 5075543024.711105,
-            "relResidual": 87.1076894305983
+            "metricRequired": 1699157799.1011546,
+            "tileEffective": 16779943.04439419,
+            "absResidual": 1682377856.0567603,
+            "relResidual": 0.9901245528500822
           }
         },
         "residualNorms": {
-          "absL1": 20302172098.84442,
-          "absL2": 10151086049.42221,
-          "absLInf": 5075543024.711105,
-          "relL1": 348.4307577223932,
-          "relL2": 174.2153788611966,
-          "relLInf": 87.1076894305983,
+          "absL1": 6729511424.227041,
+          "absL2": 3364755712.1135206,
+          "absLInf": 1682377856.0567603,
+          "relL1": 3.9604982114003286,
+          "relL2": 1.9802491057001643,
+          "relLInf": 0.9901245528500822,
           "toleranceRelLInf": 0.1,
           "pass": false
         },
-        "note": "exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published."
+        "note": "exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares selected-profile integral metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
       }
     ]
   },
   "scalarProjections": {
     "cl3RhoDeltaRel": 0,
-    "metricVsTileT00Rel": 0.999999998029685,
-    "traceRel": 0.9999999985222636,
-    "isotropicPressureRel": 0.9999999983580709
+    "metricVsTileT00Rel": 4.6143808140791624e-10,
+    "traceRel": 4.6143808140791624e-10,
+    "isotropicPressureRel": 4.6143808140791624e-10
   },
   "distinction": {
     "scalarCongruenceSecondary": true,
     "scalarSurfaceId": "CL3_RhoDelta",
     "tensorSurfaceId": "nhm2_source_closure"
   },
-  "assumptionsDrifted": true
+  "assumptionsDrifted": false
 }

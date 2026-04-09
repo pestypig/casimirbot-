@@ -16,6 +16,9 @@ port.on("message", async (message: StarSimWorkerRequest) => {
       const payload = await executeStructureMesaRuntime({
         star: message.star,
         cache_key: message.cache_key,
+        fit_profile_id: message.fit_profile_id,
+        fit_constraints: message.fit_constraints,
+        supported_domain: message.supported_domain,
       });
       const response: StarSimWorkerResponse = {
         id: message.id,
@@ -32,6 +35,9 @@ port.on("message", async (message: StarSimWorkerRequest) => {
       structure_cache_key: message.structure_cache_key,
       structure_claim_id: message.structure_claim_id,
       structure_summary: message.structure_summary,
+      fit_profile_id: message.fit_profile_id,
+      fit_constraints: message.fit_constraints,
+      supported_domain: message.supported_domain,
     });
     const response: StarSimWorkerResponse = {
       id: message.id,

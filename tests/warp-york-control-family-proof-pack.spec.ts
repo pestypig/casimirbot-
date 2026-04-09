@@ -13,6 +13,9 @@ import {
   buildNhm2SourceClosureArtifact,
 } from "../shared/contracts/nhm2-source-closure.v1";
 import {
+  isNhm2SourceClosureV2Artifact,
+} from "../shared/contracts/nhm2-source-closure.v2";
+import {
   buildNhm2SourceClosureDiagonalTensorSnapshotArtifact,
   isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
 } from "../shared/contracts/nhm2-source-closure-diagonal-tensor.v1";
@@ -1034,12 +1037,42 @@ describe("nhm2 publication completion surfaces", () => {
     const json = JSON.parse(
       fs.readFileSync(published.strictSignalArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
+    const selectedTransport = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          fixture.artifactRootDir,
+          "selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+        ),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
+    const selectedWorldline = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          fixture.artifactRootDir,
+          "selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+        ),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
     expect(isNhm2StrictSignalReadinessArtifact(json)).toBe(true);
     expect((json as any).status).toBe("pass");
     expect((json as any).completeness).toBe("complete");
     expect((json as any).family.familyId).toBe("nhm2_shift_lapse");
+    expect((json as any).family.familyAuthorityStatus).toBe(
+      (selectedWorldline as any).sourceSurface.familyAuthorityStatus,
+    );
+    expect((json as any).family.transportCertificationStatus).toBe(
+      (selectedTransport as any).transportCertificationStatus,
+    );
     expect((json as any).family.lapseSummary.shiftLapseProfileId).toBe(
       fixture.selectedProfileId,
+    );
+    expect((json as any).family.lapseSummary.shiftLapseProfileStage).toBe(
+      (selectedTransport as any).selectedFamily.shiftLapseProfileStage,
+    );
+    expect((json as any).family.lapseSummary.alphaCenterline).toBeCloseTo(
+      (selectedTransport as any).centerlineAlpha,
     );
     expect((json as any).reasonCodes).toEqual([]);
     expect((json as any).missingSignals).toEqual([]);
@@ -1085,6 +1118,36 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
     );
+  });
+
+  it("fails closed when selected-profile publication metadata disagrees on the strict-signal profile", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedWorldlinePath = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse/nhm2-warp-worldline-proof-latest.json",
+    );
+    const selectedWorldline = JSON.parse(
+      fs.readFileSync(selectedWorldlinePath, "utf8"),
+    ) as Record<string, any>;
+    selectedWorldline.sourceSurface.shiftLapseProfileId =
+      "stage1_centerline_alpha_0p9975_v1";
+    fs.writeFileSync(selectedWorldlinePath, `${JSON.stringify(selectedWorldline, null, 2)}\n`);
+
+    await expect(
+      publishNhm2ShiftLapseStrictSignalReadiness({
+        artifactRootDir: fixture.artifactRootDir,
+        auditRootDir: fixture.auditRootDir,
+        selectedFamilyArtifactRootDir: path.join(
+          fixture.artifactRootDir,
+          "selected-family/nhm2-shift-lapse",
+        ),
+        selectedFamilyAuditRootDir: path.join(
+          fixture.auditRootDir,
+          "selected-family/nhm2-shift-lapse",
+        ),
+        reuseExistingSelectedArtifacts: true,
+      }),
+    ).rejects.toThrow(/nhm2_strict_signal_profile_mismatch/);
   });
 
   it("lets the full-loop audit consume emitted strict-signal evidence instead of the placeholder all-missing artifact", async () => {
@@ -1205,28 +1268,105 @@ describe("nhm2 publication completion surfaces", () => {
       fixture.selectedProfileId,
     );
     expect((tileTensorJson as any).familyId).toBe("nhm2_shift_lapse");
+    expect((tileTensorJson as any).tensorSemanticRef).toBe(
+      "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy",
+    );
+    expect((tileTensorJson as any).note).toContain(
+      "GR matter brick global tensor summary",
+    );
+
+    expect(Object.keys(published.regionMetricTensorSnapshots)).toEqual([
+      "hull",
+      "wall",
+      "exterior_shell",
+    ]);
+    expect(Object.keys(published.regionTileTensorSnapshots)).toEqual([
+      "hull",
+      "wall",
+      "exterior_shell",
+    ]);
+    for (const regionId of ["hull", "wall", "exterior_shell"] as const) {
+      const metricRegionSnapshot = published.regionMetricTensorSnapshots[regionId];
+      const tileRegionSnapshot = published.regionTileTensorSnapshots[regionId];
+      expect(fs.existsSync(metricRegionSnapshot.latestJsonPath)).toBe(true);
+      expect(fs.existsSync(tileRegionSnapshot.latestJsonPath)).toBe(true);
+
+      const metricRegionJson = JSON.parse(
+        fs.readFileSync(metricRegionSnapshot.latestJsonPath, "utf8"),
+      ) as Record<string, unknown>;
+      const tileRegionJson = JSON.parse(
+        fs.readFileSync(tileRegionSnapshot.latestJsonPath, "utf8"),
+      ) as Record<string, unknown>;
+      expect(isNhm2SourceClosureDiagonalTensorSnapshotArtifact(metricRegionJson)).toBe(
+        true,
+      );
+      expect(isNhm2SourceClosureDiagonalTensorSnapshotArtifact(tileRegionJson)).toBe(
+        true,
+      );
+      expect((metricRegionJson as any).regionId).toBe(regionId);
+      expect((tileRegionJson as any).regionId).toBe(regionId);
+      expect((metricRegionJson as any).shiftLapseProfileId).toBe(fixture.selectedProfileId);
+      expect((tileRegionJson as any).familyId).toBe("nhm2_shift_lapse");
+    }
 
     const json = JSON.parse(
       fs.readFileSync(published.sourceClosureArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect((json as any).artifactId).toBe("nhm2_source_closure");
-    expect((json as any).schemaVersion).toBe("nhm2_source_closure/v1");
+    expect(isNhm2SourceClosureV2Artifact(json)).toBe(true);
+    expect((json as any).schemaVersion).toBe("nhm2_source_closure/v2");
     expect((json as any).status).toBe("fail");
     expect((json as any).completeness).toBe("complete");
     expect((json as any).reasonCodes).toContain("tensor_residual_exceeded");
+    expect((json as any).reasonCodes).not.toContain("assumption_drift");
     expect((json as any).tensorRefs.metricRequired).toContain(
       "nhm2-source-closure-metric-required-tensor-latest.json",
     );
     expect((json as any).tensorRefs.tileEffective).toContain(
       "nhm2-source-closure-tile-effective-tensor-latest.json",
     );
+    expect(
+      Math.abs(
+        (json as any).tensors.metricRequired.T00 -
+          (json as any).tensors.tileEffective.T00,
+      ),
+    ).toBeLessThan(0.1);
+    expect(
+      Math.abs(
+        (json as any).tensors.metricRequired.T11 -
+          (json as any).tensors.tileEffective.T11,
+      ),
+    ).toBeLessThan(0.1);
+    expect(
+      Math.abs(
+        (json as any).tensors.metricRequired.T22 -
+          (json as any).tensors.tileEffective.T22,
+      ),
+    ).toBeLessThan(0.1);
+    expect(
+      Math.abs(
+        (json as any).tensors.metricRequired.T33 -
+          (json as any).tensors.tileEffective.T33,
+      ),
+    ).toBeLessThan(0.1);
+    expect((json as any).residualNorms.relLInf).toBeLessThan(0.1);
     expect((json as any).residualNorms.toleranceRelLInf).not.toBeNull();
-    expect((json as any).sampledSummaries.regions.map((entry: any) => entry.regionId)).toEqual([
+    expect((json as any).regionComparisons.status).toBe("available");
+    expect((json as any).regionComparisons.requiredRegionIds).toEqual([
       "hull",
       "wall",
       "exterior_shell",
     ]);
-    expect((json as any).assumptionsDrifted).toBe(true);
+    expect((json as any).assumptionsDrifted).toBe(false);
+    for (const region of (json as any).regionComparisons.regions) {
+      expect(region.comparisonBasisStatus).toBe("same_basis");
+      expect(region.status).toBe("fail");
+      expect(region.completeness).toBe("complete");
+      expect(region.metricTensorRef).toContain(`${region.regionId}`.replace("_", "-"));
+      expect(region.tileTensorRef).toContain(`${region.regionId}`.replace("_", "-"));
+      expect(region.residualNorms.relLInf).toBeGreaterThan(0.1);
+      expect(region.note).toContain("Same-basis regional closure compares");
+    }
 
     const markdown = fs.readFileSync(
       published.sourceClosureArtifact.latestMdPath,
@@ -1234,6 +1374,7 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect(markdown).toContain("NHM2 Source Closure");
     expect(markdown).toContain("publish-source-closure");
+    expect(markdown).toContain("| basis |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
@@ -1277,11 +1418,11 @@ describe("nhm2 publication completion surfaces", () => {
     expect((json as any).sections.source_closure.reasons).toContain(
       "source_closure_residual_exceeded",
     );
-    expect((json as any).sections.source_closure.reasons).toContain(
-      "policy_review_required",
-    );
     expect((json as any).sections.source_closure.reasons).not.toContain(
       "source_closure_missing",
+    );
+    expect((json as any).sections.source_closure.reasons).not.toContain(
+      "policy_review_required",
     );
     expect((json as any).sections.source_closure.metricTensorRef).toContain(
       "nhm2-source-closure-metric-required-tensor-latest.json",
@@ -1291,9 +1432,13 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect((json as any).sections.source_closure.residualRms).not.toBeNull();
     expect((json as any).sections.source_closure.residualMax).not.toBeNull();
-    expect((json as any).sections.source_closure.residualByRegion.hull).not.toBeNull();
-    expect((json as any).sections.source_closure.residualByRegion.wall).not.toBeNull();
-    expect((json as any).sections.source_closure.residualByRegion.exteriorShell).not.toBeNull();
+    expect((json as any).sections.source_closure.residualMax).toBeLessThan(0.1);
+    expect((json as any).sections.source_closure.residualByRegion.hull).toBeGreaterThan(0.1);
+    expect((json as any).sections.source_closure.residualByRegion.wall).toBeGreaterThan(0.1);
+    expect((json as any).sections.source_closure.residualByRegion.exteriorShell).toBeGreaterThan(
+      0.1,
+    );
+    expect((json as any).sections.source_closure.assumptionsDrifted).toBe(false);
     expect((json as any).sections.source_closure.artifactRefs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1312,6 +1457,18 @@ describe("nhm2 publication completion surfaces", () => {
             "nhm2-source-closure-tile-effective-tensor-latest.json",
           ),
         }),
+        expect.objectContaining({
+          artifactId: "nhm2_source_closure_metric_required_tensor_hull",
+          path: expect.stringContaining(
+            "nhm2-source-closure-metric-required-tensor-hull-latest.json",
+          ),
+        }),
+        expect.objectContaining({
+          artifactId: "nhm2_source_closure_tile_effective_tensor_hull",
+          path: expect.stringContaining(
+            "nhm2-source-closure-tile-effective-tensor-hull-latest.json",
+          ),
+        }),
       ]),
     );
 
@@ -1324,6 +1481,12 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect(markdown).toContain(
       "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    expect(markdown).toContain(
+      "nhm2-source-closure-metric-required-tensor-hull-latest.json",
+    );
+    expect(markdown).toContain(
+      "nhm2-source-closure-tile-effective-tensor-hull-latest.json",
     );
   });
 

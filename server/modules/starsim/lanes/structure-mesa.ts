@@ -1,15 +1,25 @@
 import {
   buildStructureMesaCacheKey,
   readStructureMesaCache,
+  type StarSimCacheControls,
   writeStructureMesaCache,
 } from "../artifacts";
 import {
+  createBenchmarkPackArtifact,
   getBenchmarkRegistryVersion,
   resolveBenchmarkForLane,
+  resolveBenchmarkPackForLane,
   validateBenchmarkOutput,
+  validateBenchmarkPackOutput,
 } from "../benchmarks";
 import { buildTreeDagClaim, collectCanonicalEvidenceRefs } from "../claims";
-import type { CanonicalStar, PhysClass, StarSimLaneResult } from "../contract";
+import { evaluateStarSimSupportedDomain } from "../domain";
+import type {
+  CanonicalStar,
+  PhysClass,
+  StarSimBenchmarkValidation,
+  StarSimLaneResult,
+} from "../contract";
 import { runStructureMesaInWorker } from "../worker/starsim-worker-client";
 import {
   canMockStructureMesa,
@@ -18,7 +28,7 @@ import {
 } from "../worker/starsim-runtime";
 
 export type StarSimLaneExecutionMode = "sync" | "job";
-export const STRUCTURE_MESA_SOLVER_MANIFEST = `structure_mesa/3:${getBenchmarkRegistryVersion()}`;
+export const STRUCTURE_MESA_SOLVER_MANIFEST = `structure_mesa/4:${getBenchmarkRegistryVersion()}`;
 
 const collectObservablesUsed = (star: CanonicalStar): string[] => {
   const used: string[] = [];
@@ -34,17 +44,35 @@ const collectObservablesUsed = (star: CanonicalStar): string[] => {
   return used;
 };
 
+const fitStatusFromReason = (
+  statusReason: string,
+): "fit_completed" | "comparison_completed" | "insufficient_data" | "out_of_domain" => {
+  if (statusReason === "insufficient_observables" || statusReason === "seismology_required") {
+    return "insufficient_data";
+  }
+  if (statusReason === "out_of_supported_domain" || statusReason === "unsupported_evolutionary_state") {
+    return "out_of_domain";
+  }
+  return "insufficient_data";
+};
+
 const buildUnavailableLane = (args: {
   star: CanonicalStar;
   cacheKey: string;
   runtimeMode: StarSimLaneResult["runtime_mode"];
   runtimeFingerprint: string;
+  supportedDomain: ReturnType<typeof evaluateStarSimSupportedDomain>;
+  benchmarkPackId: string | null;
+  fitProfileId: string | null;
   statusReason:
     | "async_job_required"
     | "solver_unconfigured"
     | "runtime_not_ready"
     | "out_of_domain"
-    | "benchmark_required";
+    | "benchmark_required"
+    | "out_of_supported_domain"
+    | "insufficient_observables"
+    | "unsupported_evolutionary_state";
   note: string;
   cacheStatus?: StarSimLaneResult["cache_status"];
   cacheStatusReason?: string;
@@ -54,7 +82,7 @@ const buildUnavailableLane = (args: {
   return {
     lane_id: "structure_mesa",
     requested_lane: "structure_mesa",
-    solver_id: "starsim.mesa.structure/1",
+    solver_id: "starsim.mesa.structure/2",
     label: "MESA-backed 1D structure",
     availability: "unavailable",
     status: "unavailable",
@@ -63,11 +91,12 @@ const buildUnavailableLane = (args: {
     maturity: "obs_fit",
     phys_class: "P2",
     assumptions: [
-      "This lane requires an asynchronous worker run or a previously cached artifact before it can return a structure model.",
+      "This lane is limited to a constrained solar-like main-sequence live-fit domain and requires an asynchronous worker run or a cached artifact.",
     ],
     domain_validity: {
       runtime_backbone: "mesa_worker",
       cached_execution_only_on_sync_route: true,
+      supported_domain: args.supportedDomain,
     },
     observables_used: collectObservablesUsed(args.star),
     inferred_params: {},
@@ -82,6 +111,17 @@ const buildUnavailableLane = (args: {
     result: {
       cache_key: args.cacheKey,
       reason: args.note,
+      fit_status: fitStatusFromReason(args.statusReason),
+      fit_profile_id: args.fitProfileId,
+      fit_constraints: args.supportedDomain.fit_constraints_applied,
+      supported_domain: args.supportedDomain,
+      benchmark_pack: args.benchmarkPackId
+        ? {
+            id: args.benchmarkPackId,
+            benchmark_registry_version: getBenchmarkRegistryVersion(),
+            support_mode: "fit_backed_supported_domain",
+          }
+        : null,
     },
     cache_key: args.cacheKey,
     runtime_mode: args.runtimeMode,
@@ -101,7 +141,8 @@ const buildFailedBenchmarkLane = (args: {
   runtimeMode: StarSimLaneResult["runtime_mode"];
   runtimeFingerprint: string;
   benchmarkCaseId: string | null;
-  benchmarkValidation: NonNullable<StarSimLaneResult["benchmark_validation"]>;
+  benchmarkPackId: string | null;
+  benchmarkValidation: StarSimBenchmarkValidation;
   workerResult: Awaited<ReturnType<typeof runStructureMesaInWorker>>;
 }): StarSimLaneResult => {
   const evidenceRefs = collectCanonicalEvidenceRefs(args.star);
@@ -117,11 +158,12 @@ const buildFailedBenchmarkLane = (args: {
     maturity: "obs_fit",
     phys_class: args.workerResult.used_seismic_constraints ? "P3" : "P2",
     assumptions: [
-      "A live benchmark execution completed, but the output fell outside the declared benchmark tolerance envelope.",
+      "A live fit execution completed, but the output fell outside the declared benchmark or benchmark-pack tolerance envelope.",
     ],
     domain_validity: {
       ...args.workerResult.domain_validity,
       runtime_kind: args.workerResult.runtime_kind,
+      supported_domain: args.workerResult.supported_domain,
     },
     observables_used: collectObservablesUsed(args.star),
     inferred_params: args.workerResult.inferred_params,
@@ -143,7 +185,17 @@ const buildFailedBenchmarkLane = (args: {
       },
       benchmark_case_id: args.benchmarkCaseId,
       benchmark_validation: args.benchmarkValidation,
+      benchmark_pack: args.benchmarkPackId
+        ? {
+            id: args.benchmarkPackId,
+            benchmark_registry_version: getBenchmarkRegistryVersion(),
+          }
+        : null,
       cache_key: args.cacheKey,
+      fit_status: args.workerResult.fit_status,
+      fit_profile_id: args.workerResult.fit_profile_id,
+      fit_summary: args.workerResult.fit_summary,
+      supported_domain: args.workerResult.supported_domain,
       structure_summary: args.workerResult.structure_summary,
       synthetic_observables: args.workerResult.synthetic_observables,
       live_solver_metadata: args.workerResult.live_solver_metadata,
@@ -156,7 +208,7 @@ const buildFailedBenchmarkLane = (args: {
     benchmark_validation: args.benchmarkValidation,
     evidence_fit: 0,
     domain_penalty: 0,
-    note: "Live benchmark output failed post-run validation and was not cached as a successful artifact.",
+    note: "Live fit output failed post-run validation and was not cached as a successful artifact.",
   };
 };
 
@@ -165,14 +217,26 @@ export async function runStructureMesaLane(
   options: { executionMode: StarSimLaneExecutionMode },
 ): Promise<StarSimLaneResult> {
   const runtime = resolveStarSimSolverRuntime("mesa");
+  const supportedDomain = evaluateStarSimSupportedDomain(star, "structure_mesa");
+  const benchmarkPackResolution = resolveBenchmarkPackForLane("structure_mesa", supportedDomain);
   const benchmarkResolution =
-    runtime.runtime_kind === "mock" ? null : resolveBenchmarkForLane(star, "structure_mesa");
+    runtime.runtime_kind === "mock" || !star.benchmark_case_id
+      ? null
+      : resolveBenchmarkForLane(star, "structure_mesa");
+  const fitProfileId = supportedDomain.fit_profile_id;
+  const cacheControls: StarSimCacheControls = {
+    benchmark_pack_id: supportedDomain.benchmark_pack_id,
+    fit_profile_id: fitProfileId,
+    fit_constraints: supportedDomain.fit_constraints_applied,
+    supported_domain_id: supportedDomain.id,
+    supported_domain_version: supportedDomain.version,
+  };
   const cacheIdentity = {
     runtime_mode: runtime.runtime_kind,
     runtime_fingerprint: runtime.runtime_fingerprint,
     solver_manifest: STRUCTURE_MESA_SOLVER_MANIFEST,
   } as const;
-  const cacheKey = buildStructureMesaCacheKey(star, cacheIdentity);
+  const cacheKey = buildStructureMesaCacheKey(star, cacheIdentity, cacheControls);
   const cacheRead = await readStructureMesaCache(cacheKey, cacheIdentity);
   if (cacheRead.status === "hit") {
     return cacheRead.laneResult;
@@ -184,6 +248,9 @@ export async function runStructureMesaLane(
       cacheKey,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: supportedDomain.benchmark_pack_id,
+      fitProfileId,
       statusReason: "solver_unconfigured",
       note: "No MESA runtime is configured. Set STAR_SIM_MESA_RUNTIME=mock|docker|wsl or populate the cache first.",
       cacheStatus: cacheRead.miss_reason,
@@ -198,8 +265,28 @@ export async function runStructureMesaLane(
       cacheKey,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: supportedDomain.benchmark_pack_id,
+      fitProfileId,
       statusReason: benchmarkResolution.reason,
       note: benchmarkResolution.note,
+      cacheStatus: cacheRead.miss_reason,
+      cacheStatusReason: cacheRead.detail,
+      artifactIntegrityStatus: cacheRead.artifact_integrity_status,
+    });
+  }
+
+  if (benchmarkPackResolution.status === "unavailable") {
+    return buildUnavailableLane({
+      star,
+      cacheKey,
+      runtimeMode: runtime.runtime_kind,
+      runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: supportedDomain.benchmark_pack_id,
+      fitProfileId,
+      statusReason: benchmarkPackResolution.reason,
+      note: benchmarkPackResolution.note,
       cacheStatus: cacheRead.miss_reason,
       cacheStatusReason: cacheRead.detail,
       artifactIntegrityStatus: cacheRead.artifact_integrity_status,
@@ -212,7 +299,10 @@ export async function runStructureMesaLane(
       cacheKey,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
-      statusReason: "out_of_domain",
+      supportedDomain,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+      fitProfileId,
+      statusReason: "out_of_supported_domain",
       note: "The mock MESA runtime currently ships only solar and G-type main-sequence fixtures.",
       cacheStatus: cacheRead.miss_reason,
       cacheStatusReason: cacheRead.detail,
@@ -228,6 +318,9 @@ export async function runStructureMesaLane(
         cacheKey,
         runtimeMode: runtime.runtime_kind,
         runtimeFingerprint: runtime.runtime_fingerprint,
+        supportedDomain,
+        benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+        fitProfileId,
         statusReason: probe.status_reason ?? "runtime_not_ready",
         note: probe.detail ?? `The ${runtime.runtime_kind} MESA runtime failed readiness checks.`,
         cacheStatus: cacheRead.miss_reason,
@@ -243,6 +336,9 @@ export async function runStructureMesaLane(
       cacheKey,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+      fitProfileId,
       statusReason: "async_job_required",
       note: "No valid cached MESA artifact was found. Submit this request to /api/star-sim/v1/jobs to execute the worker.",
       cacheStatus: cacheRead.miss_reason,
@@ -252,8 +348,33 @@ export async function runStructureMesaLane(
   }
 
   const evidenceRefs = collectCanonicalEvidenceRefs(star);
-  const workerResult = await runStructureMesaInWorker(star, cacheKey);
-  const benchmarkValidation =
+  const workerResult = await runStructureMesaInWorker({
+    star,
+    cacheKey,
+    fitProfileId,
+    fitConstraints: supportedDomain.fit_constraints_applied,
+    supportedDomain,
+  });
+  const artifactPayloads = [
+    ...workerResult.artifact_payloads,
+    createBenchmarkPackArtifact({
+      benchmarkPack: benchmarkPackResolution.benchmark_pack,
+      supportedDomain,
+      validation: undefined,
+      benchmarkCaseId: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+    }),
+  ];
+  const packValidation = validateBenchmarkPackOutput({
+    benchmarkPack: benchmarkPackResolution.benchmark_pack,
+    star,
+    payload: {
+      structure_summary: workerResult.structure_summary,
+      synthetic_observables: workerResult.synthetic_observables,
+      fit_summary: workerResult.fit_summary,
+    },
+    artifactKinds: artifactPayloads.map((artifact) => artifact.kind),
+  });
+  const caseValidation =
     workerResult.live_solver && benchmarkResolution?.status === "ok"
       ? validateBenchmarkOutput({
           benchmark: benchmarkResolution.benchmark,
@@ -262,27 +383,37 @@ export async function runStructureMesaLane(
             structure_summary: workerResult.structure_summary,
             synthetic_observables: workerResult.synthetic_observables,
           },
-          artifactKinds: workerResult.artifact_payloads.map((artifact) => artifact.kind),
+          artifactKinds: artifactPayloads.map((artifact) => artifact.kind),
         })
       : undefined;
-  if (workerResult.live_solver && (!benchmarkValidation?.passed || workerResult.benchmark_case_id !== benchmarkResolution?.benchmark_case_id)) {
+  const effectiveValidation = caseValidation ?? packValidation;
+  const liveValidationPassed =
+    workerResult.live_solver
+    && supportedDomain.passed
+    && packValidation.passed
+    && (caseValidation ? caseValidation.passed : true)
+    && (!benchmarkResolution || workerResult.benchmark_case_id === benchmarkResolution.benchmark_case_id);
+  if (workerResult.live_solver && !liveValidationPassed) {
     return buildFailedBenchmarkLane({
       star,
       cacheKey,
       runtimeMode: workerResult.runtime_kind,
       runtimeFingerprint: workerResult.runtime_fingerprint,
       benchmarkCaseId: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
       benchmarkValidation:
-        benchmarkValidation
+        caseValidation
         ?? {
-          passed: false,
-          tolerance_profile: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark.tolerance_profile : "unknown",
-          checked_metrics: [],
-          notes: ["Benchmark case mismatch between request resolution and live runtime output."],
+          ...packValidation,
+          notes: [
+            ...packValidation.notes,
+            ...(benchmarkResolution && !caseValidation ? ["Benchmark case mismatch between request resolution and live runtime output."] : []),
+          ],
         },
       workerResult,
     });
   }
+
   const physClass: PhysClass = workerResult.used_seismic_constraints ? "P3" : "P2";
   const maturity = workerResult.live_solver ? "research_sim" : "obs_fit";
   const claimId = `claim:star-sim:structure_mesa:${cacheKey.replace(/^sha256:/, "").slice(0, 16)}`;
@@ -298,7 +429,7 @@ export async function runStructureMesaLane(
     phys_class: physClass,
     assumptions: [
       workerResult.live_solver
-        ? "This result comes from a live benchmark-scoped MESA execution path. It is validated only against the registered benchmark tolerance profile, not against arbitrary-star science claims."
+        ? "This result comes from a live constrained MESA fit within the declared solar-like supported domain and is benchmark-pack validated before it earns research_sim."
         : workerResult.runtime_kind === "mock"
         ? "This result comes from the fixture-backed mock MESA runtime and is suitable for orchestration and contract testing, not public scientific claims."
         : "This lane uses an external MESA execution backend and caches its artifacts for deterministic reuse.",
@@ -306,6 +437,7 @@ export async function runStructureMesaLane(
     domain_validity: {
       ...workerResult.domain_validity,
       runtime_kind: workerResult.runtime_kind,
+      supported_domain: workerResult.supported_domain ?? supportedDomain,
     },
     observables_used: collectObservablesUsed(star),
     inferred_params: workerResult.inferred_params,
@@ -326,8 +458,20 @@ export async function runStructureMesaLane(
         fixture_id: workerResult.fixture_id,
       },
       benchmark_case_id: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
-      benchmark_validation: benchmarkValidation,
+      benchmark_pack: {
+        id: benchmarkPackResolution.benchmark_pack_id,
+        benchmark_registry_version: getBenchmarkRegistryVersion(),
+        tolerance_profile: benchmarkPackResolution.benchmark_pack.tolerance_profile,
+        support_mode: benchmarkPackResolution.benchmark_pack.support_mode,
+        benchmark_family_ids: benchmarkPackResolution.benchmark_pack.benchmark_family_ids,
+      },
+      benchmark_validation: effectiveValidation,
       cache_key: cacheKey,
+      fit_status: workerResult.fit_status,
+      fit_profile_id: workerResult.fit_profile_id ?? fitProfileId,
+      fit_constraints: supportedDomain.fit_constraints_applied,
+      fit_summary: workerResult.fit_summary,
+      supported_domain: workerResult.supported_domain ?? supportedDomain,
       structure_summary: workerResult.structure_summary,
       synthetic_observables: workerResult.synthetic_observables,
       used_seismic_constraints: workerResult.used_seismic_constraints,
@@ -338,17 +482,28 @@ export async function runStructureMesaLane(
     runtime_fingerprint: workerResult.runtime_fingerprint,
     artifact_integrity_status: "verified",
     cache_status: "hit",
-    benchmark_validation: benchmarkValidation,
+    benchmark_validation: effectiveValidation,
     evidence_fit: workerResult.evidence_fit,
     domain_penalty: 1,
     note:
       workerResult.live_solver
-        ? "Live benchmark-scoped MESA output cached after validation against the registered tolerance profile."
+        ? "Live constrained MESA fit cached after supported-domain and benchmark-pack validation."
         : workerResult.runtime_kind === "mock"
         ? "Fixture-backed MESA mock output cached for deterministic star-sim orchestration."
         : "External MESA output cached for deterministic star-sim orchestration.",
   };
 
+  const finalizedArtifacts = artifactPayloads.map((artifact) =>
+    artifact.kind === "benchmark_pack"
+      ? createBenchmarkPackArtifact({
+          benchmarkPack: benchmarkPackResolution.benchmark_pack,
+          supportedDomain,
+          validation: effectiveValidation,
+          benchmarkCaseId:
+            benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+        })
+      : artifact,
+  );
   const artifactRefs = await writeStructureMesaCache({
     star,
     cacheKey,
@@ -356,9 +511,19 @@ export async function runStructureMesaLane(
     runtimeFingerprint: workerResult.runtime_fingerprint,
     solverManifest: STRUCTURE_MESA_SOLVER_MANIFEST,
     benchmarkCaseId: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+    benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+    fitProfileId: workerResult.fit_profile_id ?? fitProfileId,
+    fitConstraints: supportedDomain.fit_constraints_applied,
+    supportedDomainId: supportedDomain.id,
+    supportedDomainVersion: supportedDomain.version,
     summary: {
       benchmark_case_id: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
-      benchmark_validation: benchmarkValidation,
+      benchmark_pack_id: benchmarkPackResolution.benchmark_pack_id,
+      benchmark_validation: effectiveValidation,
+      fit_status: workerResult.fit_status,
+      fit_profile_id: workerResult.fit_profile_id ?? fitProfileId,
+      fit_summary: workerResult.fit_summary,
+      supported_domain: workerResult.supported_domain ?? supportedDomain,
       structure_summary: workerResult.structure_summary,
       synthetic_observables: workerResult.synthetic_observables,
       inferred_params: workerResult.inferred_params,
@@ -367,7 +532,7 @@ export async function runStructureMesaLane(
     },
     laneResult,
     modelPlaceholder: workerResult.model_placeholder,
-    runtimeArtifacts: workerResult.artifact_payloads,
+    runtimeArtifacts: finalizedArtifacts,
   });
 
   return {

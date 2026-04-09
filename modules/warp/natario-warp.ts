@@ -163,6 +163,294 @@ const calculateAlcubierreStressEnergy = (
   };
 };
 
+export const calculateMetricStressEnergyTensorAtPointFromShiftField = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  point: Vec3,
+  opts?: { derivativeStep_m?: number; scale_m?: number },
+) => {
+  const inferredScale =
+    opts?.scale_m ?? (Math.hypot(point[0], point[1], point[2]) || 1);
+  const scale = Math.max(1e-9, inferredScale);
+  const step = Math.max(1e-9, opts?.derivativeStep_m ?? scale * 0.02);
+  const denom = 2 * step;
+  const [x, y, z] = point;
+
+  try {
+    const betaXp = evaluateShiftVector(x + step, y, z);
+    const betaXm = evaluateShiftVector(x - step, y, z);
+    const betaYp = evaluateShiftVector(x, y + step, z);
+    const betaYm = evaluateShiftVector(x, y - step, z);
+    const betaZp = evaluateShiftVector(x, y, z + step);
+    const betaZm = evaluateShiftVector(x, y, z - step);
+
+    const dBx_dx = (betaXp[0] - betaXm[0]) / denom;
+    const dBy_dx = (betaXp[1] - betaXm[1]) / denom;
+    const dBz_dx = (betaXp[2] - betaXm[2]) / denom;
+
+    const dBx_dy = (betaYp[0] - betaYm[0]) / denom;
+    const dBy_dy = (betaYp[1] - betaYm[1]) / denom;
+    const dBz_dy = (betaYp[2] - betaYm[2]) / denom;
+
+    const dBx_dz = (betaZp[0] - betaZm[0]) / denom;
+    const dBy_dz = (betaZp[1] - betaZm[1]) / denom;
+    const dBz_dz = (betaZp[2] - betaZm[2]) / denom;
+
+    if (
+      !Number.isFinite(dBx_dx) ||
+      !Number.isFinite(dBy_dx) ||
+      !Number.isFinite(dBz_dx) ||
+      !Number.isFinite(dBx_dy) ||
+      !Number.isFinite(dBy_dy) ||
+      !Number.isFinite(dBz_dy) ||
+      !Number.isFinite(dBx_dz) ||
+      !Number.isFinite(dBy_dz) ||
+      !Number.isFinite(dBz_dz)
+    ) {
+      return null;
+    }
+
+    const Kxx = dBx_dx;
+    const Kyy = dBy_dy;
+    const Kzz = dBz_dz;
+    const Kxy = 0.5 * (dBy_dx + dBx_dy);
+    const Kxz = 0.5 * (dBz_dx + dBx_dz);
+    const Kyz = 0.5 * (dBz_dy + dBy_dz);
+    const trace = Kxx + Kyy + Kzz;
+    const kSquared =
+      Kxx * Kxx +
+      Kyy * Kyy +
+      Kzz * Kzz +
+      2 * (Kxy * Kxy + Kxz * Kxz + Kyz * Kyz);
+    const rhoGeom = (trace * trace - kSquared) * INV16PI;
+    if (!Number.isFinite(rhoGeom)) return null;
+    const rhoEuler = rhoGeom * GEOM_TO_SI_STRESS;
+    return {
+      stress: {
+        T00: rhoEuler,
+        T11: -rhoEuler,
+        T22: -rhoEuler,
+        T33: -rhoEuler,
+        isNullEnergyConditionSatisfied: false,
+      },
+      diagnostics: {
+        rhoGeom,
+        rhoSi: rhoEuler,
+        kTrace: trace,
+        kSquared,
+        step_m: step,
+        scale_m: scale,
+      },
+    };
+  } catch {
+    return null;
+  }
+};
+
+export type MetricStressEnergyGridRegionClassifierSample = {
+  position: Vec3;
+  voxelIndex: [number, number, number];
+};
+
+export type MetricStressEnergyTensorMean = {
+  sampleCount: number;
+  diagonalTensor: {
+    T00: number;
+    T11: number;
+    T22: number;
+    T33: number;
+    isNullEnergyConditionSatisfied: boolean;
+  } | null;
+};
+
+export type MetricStressEnergyTensorRegionMean = MetricStressEnergyTensorMean & {
+  regionId: string;
+};
+
+export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
+  evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
+  args: {
+    dims: [number, number, number];
+    bounds: { min: Vec3; max: Vec3 };
+    classifyRegion?: (
+      sample: MetricStressEnergyGridRegionClassifierSample,
+    ) => string | null;
+  },
+): {
+  global: MetricStressEnergyTensorMean;
+  regions: MetricStressEnergyTensorRegionMean[];
+  grid: {
+    dims: [number, number, number];
+    bounds: { min: Vec3; max: Vec3 };
+    spacing: Vec3;
+  };
+} => {
+  const [nxRaw, nyRaw, nzRaw] = args.dims;
+  const nx = Math.max(1, Math.floor(nxRaw));
+  const ny = Math.max(1, Math.floor(nyRaw));
+  const nz = Math.max(1, Math.floor(nzRaw));
+  const bounds = {
+    min: args.bounds.min,
+    max: args.bounds.max,
+  };
+  const dx = (bounds.max[0] - bounds.min[0]) / nx;
+  const dy = (bounds.max[1] - bounds.min[1]) / ny;
+  const dz = (bounds.max[2] - bounds.min[2]) / nz;
+  const spacing: Vec3 = [dx, dy, dz];
+  const total = nx * ny * nz;
+  const betaX = new Float64Array(total);
+  const betaY = new Float64Array(total);
+  const betaZ = new Float64Array(total);
+  const idxBase = (i: number, j: number, k: number) => i + nx * (j + ny * k);
+
+  for (let k = 0; k < nz; k += 1) {
+    const z = bounds.min[2] + (k + 0.5) * dz;
+    for (let j = 0; j < ny; j += 1) {
+      const y = bounds.min[1] + (j + 0.5) * dy;
+      for (let i = 0; i < nx; i += 1) {
+        const x = bounds.min[0] + (i + 0.5) * dx;
+        const id = idxBase(i, j, k);
+        try {
+          const beta = evaluateShiftVector(x, y, z);
+          betaX[id] = Number.isFinite(beta[0]) ? beta[0] : 0;
+          betaY[id] = Number.isFinite(beta[1]) ? beta[1] : 0;
+          betaZ[id] = Number.isFinite(beta[2]) ? beta[2] : 0;
+        } catch {
+          betaX[id] = 0;
+          betaY[id] = 0;
+          betaZ[id] = 0;
+        }
+      }
+    }
+  }
+
+  const sumGlobal = { count: 0, T00: 0, T11: 0, T22: 0, T33: 0 };
+  const regionSums = new Map<
+    string,
+    { count: number; T00: number; T11: number; T22: number; T33: number }
+  >();
+
+  const accumulate = (
+    bucket: { count: number; T00: number; T11: number; T22: number; T33: number },
+    rhoEuler: number,
+  ) => {
+    bucket.count += 1;
+    bucket.T00 += rhoEuler;
+    bucket.T11 += -rhoEuler;
+    bucket.T22 += -rhoEuler;
+    bucket.T33 += -rhoEuler;
+  };
+
+  for (let k = 0; k < nz; k += 1) {
+    const z = bounds.min[2] + (k + 0.5) * dz;
+    for (let j = 0; j < ny; j += 1) {
+      const y = bounds.min[1] + (j + 0.5) * dy;
+      for (let i = 0; i < nx; i += 1) {
+        const x = bounds.min[0] + (i + 0.5) * dx;
+        const id = idxBase(i, j, k);
+        const ixp = i < nx - 1 ? idxBase(i + 1, j, k) : id;
+        const ixm = i > 0 ? idxBase(i - 1, j, k) : id;
+        const iDen = i > 0 && i < nx - 1 ? 2 * dx : Math.max(dx, 1e-9);
+        const jyp = j < ny - 1 ? idxBase(i, j + 1, k) : id;
+        const jym = j > 0 ? idxBase(i, j - 1, k) : id;
+        const jDen = j > 0 && j < ny - 1 ? 2 * dy : Math.max(dy, 1e-9);
+        const kzp = k < nz - 1 ? idxBase(i, j, k + 1) : id;
+        const kzm = k > 0 ? idxBase(i, j, k - 1) : id;
+        const kDen = k > 0 && k < nz - 1 ? 2 * dz : Math.max(dz, 1e-9);
+
+        const dBx_dx = (betaX[ixp] - betaX[ixm]) / iDen;
+        const dBy_dx = (betaY[ixp] - betaY[ixm]) / iDen;
+        const dBz_dx = (betaZ[ixp] - betaZ[ixm]) / iDen;
+
+        const dBx_dy = (betaX[jyp] - betaX[jym]) / jDen;
+        const dBy_dy = (betaY[jyp] - betaY[jym]) / jDen;
+        const dBz_dy = (betaZ[jyp] - betaZ[jym]) / jDen;
+
+        const dBx_dz = (betaX[kzp] - betaX[kzm]) / kDen;
+        const dBy_dz = (betaY[kzp] - betaY[kzm]) / kDen;
+        const dBz_dz = (betaZ[kzp] - betaZ[kzm]) / kDen;
+
+        if (
+          !Number.isFinite(dBx_dx) ||
+          !Number.isFinite(dBy_dx) ||
+          !Number.isFinite(dBz_dx) ||
+          !Number.isFinite(dBx_dy) ||
+          !Number.isFinite(dBy_dy) ||
+          !Number.isFinite(dBz_dy) ||
+          !Number.isFinite(dBx_dz) ||
+          !Number.isFinite(dBy_dz) ||
+          !Number.isFinite(dBz_dz)
+        ) {
+          continue;
+        }
+
+        const Kxx = dBx_dx;
+        const Kyy = dBy_dy;
+        const Kzz = dBz_dz;
+        const Kxy = 0.5 * (dBy_dx + dBx_dy);
+        const Kxz = 0.5 * (dBz_dx + dBx_dz);
+        const Kyz = 0.5 * (dBz_dy + dBy_dz);
+        const trace = Kxx + Kyy + Kzz;
+        const kSquared =
+          Kxx * Kxx +
+          Kyy * Kyy +
+          Kzz * Kzz +
+          2 * (Kxy * Kxy + Kxz * Kxz + Kyz * Kyz);
+        const rhoGeom = (trace * trace - kSquared) * INV16PI;
+        if (!Number.isFinite(rhoGeom)) {
+          continue;
+        }
+        const rhoEuler = rhoGeom * GEOM_TO_SI_STRESS;
+        accumulate(sumGlobal, rhoEuler);
+
+        const regionId = args.classifyRegion?.({
+          position: [x, y, z],
+          voxelIndex: [i, j, k],
+        });
+        if (regionId) {
+          const bucket =
+            regionSums.get(regionId) ??
+            { count: 0, T00: 0, T11: 0, T22: 0, T33: 0 };
+          accumulate(bucket, rhoEuler);
+          regionSums.set(regionId, bucket);
+        }
+      }
+    }
+  }
+
+  const toMean = (bucket: {
+    count: number;
+    T00: number;
+    T11: number;
+    T22: number;
+    T33: number;
+  }): MetricStressEnergyTensorMean => ({
+    sampleCount: bucket.count,
+    diagonalTensor:
+      bucket.count > 0
+        ? {
+            T00: bucket.T00 / bucket.count,
+            T11: bucket.T11 / bucket.count,
+            T22: bucket.T22 / bucket.count,
+            T33: bucket.T33 / bucket.count,
+            isNullEnergyConditionSatisfied: false,
+          }
+        : null,
+  });
+
+  return {
+    global: toMean(sumGlobal),
+    regions: Array.from(regionSums.entries()).map(([regionId, bucket]) => ({
+      regionId,
+      ...toMean(bucket),
+    })),
+    grid: {
+      dims: [nx, ny, nz],
+      bounds,
+      spacing,
+    },
+  };
+};
+
 const calculateMetricStressEnergyFromShiftField = (
   evaluateShiftVector: (x: number, y: number, z: number) => Vec3,
   opts: { sampleScale_m: number; derivativeStep_m?: number; samplePoints?: Vec3[] },
@@ -189,54 +477,21 @@ const calculateMetricStressEnergyFromShiftField = (
   let sumTrace = 0;
   let sumKsq = 0;
   let count = 0;
-  const denom = 2 * step;
 
-  for (const [x, y, z] of points) {
-    try {
-      const betaXp = evaluateShiftVector(x + step, y, z);
-      const betaXm = evaluateShiftVector(x - step, y, z);
-      const betaYp = evaluateShiftVector(x, y + step, z);
-      const betaYm = evaluateShiftVector(x, y - step, z);
-      const betaZp = evaluateShiftVector(x, y, z + step);
-      const betaZm = evaluateShiftVector(x, y, z - step);
-
-      const dBx_dx = (betaXp[0] - betaXm[0]) / denom;
-      const dBy_dx = (betaXp[1] - betaXm[1]) / denom;
-      const dBz_dx = (betaXp[2] - betaXm[2]) / denom;
-
-      const dBx_dy = (betaYp[0] - betaYm[0]) / denom;
-      const dBy_dy = (betaYp[1] - betaYm[1]) / denom;
-      const dBz_dy = (betaYp[2] - betaYm[2]) / denom;
-
-      const dBx_dz = (betaZp[0] - betaZm[0]) / denom;
-      const dBy_dz = (betaZp[1] - betaZm[1]) / denom;
-      const dBz_dz = (betaZp[2] - betaZm[2]) / denom;
-
-      if (
-        !Number.isFinite(dBx_dx) || !Number.isFinite(dBy_dx) || !Number.isFinite(dBz_dx) ||
-        !Number.isFinite(dBx_dy) || !Number.isFinite(dBy_dy) || !Number.isFinite(dBz_dy) ||
-        !Number.isFinite(dBx_dz) || !Number.isFinite(dBy_dz) || !Number.isFinite(dBz_dz)
-      ) {
-        continue;
-      }
-
-      const Kxx = dBx_dx;
-      const Kyy = dBy_dy;
-      const Kzz = dBz_dz;
-      const Kxy = 0.5 * (dBy_dx + dBx_dy);
-      const Kxz = 0.5 * (dBz_dx + dBx_dz);
-      const Kyz = 0.5 * (dBz_dy + dBy_dz);
-      const trace = Kxx + Kyy + Kzz;
-      const kSquared = Kxx * Kxx + Kyy * Kyy + Kzz * Kzz + 2 * (Kxy * Kxy + Kxz * Kxz + Kyz * Kyz);
-      const rhoGeom = (trace * trace - kSquared) * INV16PI;
-      if (!Number.isFinite(rhoGeom)) continue;
-      sumRho += rhoGeom;
-      sumTrace += trace;
-      sumKsq += kSquared;
-      count += 1;
-    } catch {
-      continue;
-    }
+  for (const point of points) {
+    const sample = calculateMetricStressEnergyTensorAtPointFromShiftField(
+      evaluateShiftVector,
+      point,
+      {
+        derivativeStep_m: step,
+        scale_m: scale,
+      },
+    );
+    if (!sample) continue;
+    sumRho += sample.diagnostics.rhoGeom;
+    sumTrace += sample.diagnostics.kTrace;
+    sumKsq += sample.diagnostics.kSquared;
+    count += 1;
   }
 
   if (count === 0) return null;

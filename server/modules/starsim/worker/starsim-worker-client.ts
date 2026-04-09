@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Worker } from "node:worker_threads";
-import type { CanonicalStar } from "../contract";
+import type { CanonicalStar, StarSimSupportedDomain } from "../contract";
 import type {
   OscillationGyreWorkerResult,
   StarSimWorkerRequest,
@@ -107,12 +107,21 @@ const submitTask = <T extends StructureMesaWorkerResult | OscillationGyreWorkerR
   });
 };
 
-export const runStructureMesaInWorker = (star: CanonicalStar, cacheKey: string) =>
+export const runStructureMesaInWorker = (args: {
+  star: CanonicalStar;
+  cacheKey: string;
+  fitProfileId: string | null;
+  fitConstraints: Record<string, string | number | boolean | null>;
+  supportedDomain: StarSimSupportedDomain;
+}) =>
   submitTask<StructureMesaWorkerResult>({
     id: randomUUID(),
     kind: "structure_mesa",
-    star,
-    cache_key: cacheKey,
+    star: args.star,
+    cache_key: args.cacheKey,
+    fit_profile_id: args.fitProfileId,
+    fit_constraints: args.fitConstraints,
+    supported_domain: args.supportedDomain,
   });
 
 export const runOscillationGyreInWorker = (args: {
@@ -121,6 +130,9 @@ export const runOscillationGyreInWorker = (args: {
   structureCacheKey: string;
   structureClaimId: string;
   structureSummary: Record<string, unknown>;
+  fitProfileId: string | null;
+  fitConstraints: Record<string, string | number | boolean | null>;
+  supportedDomain: StarSimSupportedDomain;
 }) =>
   submitTask<OscillationGyreWorkerResult>({
     id: randomUUID(),
@@ -130,6 +142,9 @@ export const runOscillationGyreInWorker = (args: {
     structure_cache_key: args.structureCacheKey,
     structure_claim_id: args.structureClaimId,
     structure_summary: args.structureSummary,
+    fit_profile_id: args.fitProfileId,
+    fit_constraints: args.fitConstraints,
+    supported_domain: args.supportedDomain,
   });
 
 export const __resetStarSimWorkerForTest = async (): Promise<void> => {

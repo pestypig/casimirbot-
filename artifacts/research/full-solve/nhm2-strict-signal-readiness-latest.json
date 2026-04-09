@@ -8,7 +8,7 @@
   "family": {
     "familyId": "nhm2_shift_lapse",
     "familyAuthorityStatus": "candidate_authoritative_solve_family",
-    "transportCertificationStatus": "bounded_transport_fail_closed_reference_only",
+    "transportCertificationStatus": "bounded_transport_proof_bearing_gate_admitted",
     "lapseSummary": {
       "alphaCenterline": 0.995,
       "alphaMin": 0.9949999999999847,

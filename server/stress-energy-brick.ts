@@ -69,6 +69,16 @@ export interface StressEnergyTensorRegionSummary {
   note?: string;
 }
 
+export type StressEnergyBrickRegionId =
+  Exclude<StressEnergyTensorRegionSummary["regionId"], "global">;
+
+export interface StressEnergyBrickRegionVoxelSample {
+  position: Vec3;
+  classifiedRegionId: StressEnergyBrickRegionId | null;
+  cellVolume: number;
+  voxelIndex: [number, number, number];
+}
+
 export interface StressEnergyTensorSampledSummaries {
   pressureModel: "isotropic_pressure_proxy";
   regions: StressEnergyTensorRegionSummary[];
@@ -674,6 +684,71 @@ const encodeFloat32 = (payload: Float32Array) =>
   Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).toString("base64");
 
 const axisIndex = (x: number, y: number, z: number, nx: number, ny: number) => z * nx * ny + y * nx + x;
+
+const classifyStressEnergyBrickRegion = (args: {
+  position: Vec3;
+  axes: Vec3;
+  radialMap: HullRadialMap | null;
+  wallSigma: number;
+}): StressEnergyBrickRegionId | null => {
+  const [px, py, pz] = args.position;
+  const pLen = Math.hypot(px, py, pz);
+  const dir =
+    pLen > 1e-9
+      ? ([px / pLen, py / pLen, pz / pLen] as Vec3)
+      : ([0, 0, 0] as Vec3);
+  const radius = resolveHullRadius(dir, args.axes, args.radialMap);
+  const centerDist = pLen - radius;
+  const exteriorShellLimit = args.wallSigma * 3;
+  if (centerDist < -args.wallSigma) return "hull";
+  if (Math.abs(centerDist) <= args.wallSigma) return "wall";
+  if (centerDist > args.wallSigma && centerDist <= exteriorShellLimit) {
+    return "exterior_shell";
+  }
+  return null;
+};
+
+export const forEachStressEnergyBrickRegionVoxel = (
+  input: Pick<
+    StressEnergyBrickParams,
+    "dims" | "bounds" | "hullAxes" | "hullWall" | "radialMap"
+  >,
+  visit: (sample: StressEnergyBrickRegionVoxelSample) => void,
+): void => {
+  const defaults = defaultHullBounds();
+  const dims = input.dims ?? [128, 128, 128];
+  const bounds = input.bounds ?? { min: defaults.min, max: defaults.max };
+  const axes = input.hullAxes ?? defaults.axes;
+  const radialMap = input.radialMap ?? null;
+  const wallSigma = Math.max(input.hullWall ?? defaults.wall, 0.1);
+  const [nx, ny, nz] = dims;
+  const dx = (bounds.max[0] - bounds.min[0]) / nx;
+  const dy = (bounds.max[1] - bounds.min[1]) / ny;
+  const dz = (bounds.max[2] - bounds.min[2]) / nz;
+  const cellVolume = dx * dy * dz;
+
+  for (let z = 0; z < nz; z += 1) {
+    const pz = bounds.min[2] + (z + 0.5) * dz;
+    for (let y = 0; y < ny; y += 1) {
+      const py = bounds.min[1] + (y + 0.5) * dy;
+      for (let x = 0; x < nx; x += 1) {
+        const px = bounds.min[0] + (x + 0.5) * dx;
+        const position: Vec3 = [px, py, pz];
+        visit({
+          position,
+          classifiedRegionId: classifyStressEnergyBrickRegion({
+            position,
+            axes,
+            radialMap,
+            wallSigma,
+          }),
+          cellVolume,
+          voxelIndex: [x, y, z],
+        });
+      }
+    }
+  }
+};
 
 const gradientX = (field: Float32Array, x: number, y: number, z: number, nx: number, ny: number, dx: number) => {
   if (nx <= 1 || dx === 0) return 0;

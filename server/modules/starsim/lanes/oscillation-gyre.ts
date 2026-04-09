@@ -1,17 +1,22 @@
 import {
   buildOscillationGyreCacheKey,
   buildStructureMesaCacheKey,
-  readStructureMesaCache,
   readOscillationGyreCache,
+  readStructureMesaCache,
+  type StarSimCacheControls,
   writeOscillationGyreCache,
 } from "../artifacts";
 import {
+  createBenchmarkPackArtifact,
   getBenchmarkRegistryVersion,
   resolveBenchmarkForLane,
+  resolveBenchmarkPackForLane,
   validateBenchmarkOutput,
+  validateBenchmarkPackOutput,
 } from "../benchmarks";
 import { buildTreeDagClaim, collectCanonicalEvidenceRefs } from "../claims";
-import type { CanonicalStar, RequestedLane, StarSimLaneResult } from "../contract";
+import { evaluateStarSimSupportedDomain } from "../domain";
+import type { CanonicalStar, RequestedLane, StarSimBenchmarkValidation, StarSimLaneResult } from "../contract";
 import { runOscillationGyreInWorker } from "../worker/starsim-worker-client";
 import {
   canMockOscillationGyre,
@@ -23,7 +28,29 @@ import {
   type StarSimLaneExecutionMode,
 } from "./structure-mesa";
 
-export const OSCILLATION_GYRE_SOLVER_MANIFEST = `oscillation_gyre/3:${getBenchmarkRegistryVersion()}`;
+export const OSCILLATION_GYRE_SOLVER_MANIFEST = `oscillation_gyre/4:${getBenchmarkRegistryVersion()}`;
+
+const collectObservablesUsed = (star: CanonicalStar): string[] => {
+  const used: string[] = [];
+  if (typeof star.fields.asteroseismology.numax_uHz.value === "number") used.push("asteroseismology.numax_uHz");
+  if (typeof star.fields.asteroseismology.deltanu_uHz.value === "number") used.push("asteroseismology.deltanu_uHz");
+  if (typeof star.fields.asteroseismology.mode_count.value === "number") used.push("asteroseismology.mode_count");
+  if (typeof star.fields.spectroscopy.teff_K.value === "number") used.push("spectroscopy.teff_K");
+  if (typeof star.fields.spectroscopy.logg_cgs.value === "number") used.push("spectroscopy.logg_cgs");
+  return used;
+};
+
+const fitStatusFromReason = (
+  statusReason: string,
+): "fit_completed" | "comparison_completed" | "insufficient_data" | "out_of_domain" => {
+  if (statusReason === "seismology_required" || statusReason === "insufficient_observables" || statusReason === "missing_structure_model") {
+    return "insufficient_data";
+  }
+  if (statusReason === "out_of_supported_domain" || statusReason === "unsupported_evolutionary_state") {
+    return "out_of_domain";
+  }
+  return "insufficient_data";
+};
 
 const buildUnavailableLane = (args: {
   star: CanonicalStar;
@@ -31,13 +58,20 @@ const buildUnavailableLane = (args: {
   structureClaimId: string | null;
   runtimeMode: StarSimLaneResult["runtime_mode"];
   runtimeFingerprint: string;
+  supportedDomain: ReturnType<typeof evaluateStarSimSupportedDomain>;
+  benchmarkPackId: string | null;
+  fitProfileId: string | null;
   statusReason:
     | "missing_structure_model"
     | "async_job_required"
     | "solver_unconfigured"
     | "runtime_not_ready"
     | "out_of_domain"
-    | "benchmark_required";
+    | "benchmark_required"
+    | "out_of_supported_domain"
+    | "insufficient_observables"
+    | "seismology_required"
+    | "unsupported_evolutionary_state";
   note: string;
   cacheStatus?: StarSimLaneResult["cache_status"];
   cacheStatusReason?: string;
@@ -47,7 +81,7 @@ const buildUnavailableLane = (args: {
   return {
     lane_id: "oscillation_gyre",
     requested_lane: "oscillation_gyre",
-    solver_id: "starsim.gyre.oscillation/1",
+    solver_id: "starsim.gyre.oscillation/2",
     label: "GYRE oscillation solver",
     availability: "unavailable",
     status: "unavailable",
@@ -56,13 +90,14 @@ const buildUnavailableLane = (args: {
     maturity: "obs_fit",
     phys_class: "P3",
     assumptions: [
-      "This lane requires a cached or freshly executed structure_mesa model before oscillation outputs can be produced.",
+      "This lane requires a supported solar-like seismology domain and a valid structure_mesa artifact before oscillation outputs can be produced.",
     ],
     domain_validity: {
       runtime_backbone: "gyre_worker",
       cached_execution_only_on_sync_route: true,
+      supported_domain: args.supportedDomain,
     },
-    observables_used: [],
+    observables_used: collectObservablesUsed(args.star),
     inferred_params: {},
     residuals_sigma: {},
     falsifier_ids: [`STAR_SIM_OSCILLATION_GYRE_${args.statusReason.toUpperCase()}`],
@@ -75,6 +110,17 @@ const buildUnavailableLane = (args: {
     result: {
       cache_key: args.cacheKey,
       reason: args.note,
+      fit_status: fitStatusFromReason(args.statusReason),
+      fit_profile_id: args.fitProfileId,
+      fit_constraints: args.supportedDomain.fit_constraints_applied,
+      supported_domain: args.supportedDomain,
+      benchmark_pack: args.benchmarkPackId
+        ? {
+            id: args.benchmarkPackId,
+            benchmark_registry_version: getBenchmarkRegistryVersion(),
+            support_mode: "fit_backed_supported_domain",
+          }
+        : null,
     },
     cache_key: args.cacheKey,
     runtime_mode: args.runtimeMode,
@@ -95,7 +141,8 @@ const buildFailedBenchmarkLane = (args: {
   runtimeMode: StarSimLaneResult["runtime_mode"];
   runtimeFingerprint: string;
   benchmarkCaseId: string | null;
-  benchmarkValidation: NonNullable<StarSimLaneResult["benchmark_validation"]>;
+  benchmarkPackId: string | null;
+  benchmarkValidation: StarSimBenchmarkValidation;
   workerResult: Awaited<ReturnType<typeof runOscillationGyreInWorker>>;
 }): StarSimLaneResult => {
   const evidenceRefs = collectCanonicalEvidenceRefs(args.star);
@@ -111,18 +158,15 @@ const buildFailedBenchmarkLane = (args: {
     maturity: "obs_fit",
     phys_class: "P3",
     assumptions: [
-      "A live benchmark execution completed, but the oscillation output fell outside the declared benchmark tolerance envelope.",
+      "A live seismic comparison completed, but the output fell outside the declared benchmark or benchmark-pack tolerance envelope.",
     ],
     domain_validity: {
       ...args.workerResult.domain_validity,
       runtime_kind: args.workerResult.runtime_kind,
       requires_structure_cache: true,
+      supported_domain: args.workerResult.supported_domain,
     },
-    observables_used: [
-      "asteroseismology.numax_uHz",
-      "asteroseismology.deltanu_uHz",
-      "asteroseismology.mode_count",
-    ],
+    observables_used: collectObservablesUsed(args.star),
     inferred_params: args.workerResult.inferred_params,
     residuals_sigma: args.workerResult.residuals_sigma,
     falsifier_ids: ["STAR_SIM_OSCILLATION_GYRE_BENCHMARK_VALIDATION_FAILED"],
@@ -142,7 +186,18 @@ const buildFailedBenchmarkLane = (args: {
       },
       benchmark_case_id: args.benchmarkCaseId,
       benchmark_validation: args.benchmarkValidation,
+      benchmark_pack: args.benchmarkPackId
+        ? {
+            id: args.benchmarkPackId,
+            benchmark_registry_version: getBenchmarkRegistryVersion(),
+          }
+        : null,
       cache_key: args.cacheKey,
+      fit_status: args.workerResult.fit_status,
+      fit_profile_id: args.workerResult.fit_profile_id,
+      comparison_summary: args.workerResult.comparison_summary,
+      seismic_match_summary: args.workerResult.seismic_match_summary,
+      supported_domain: args.workerResult.supported_domain,
       mode_summary: args.workerResult.mode_summary,
       live_solver_metadata: args.workerResult.live_solver_metadata,
     },
@@ -154,7 +209,7 @@ const buildFailedBenchmarkLane = (args: {
     benchmark_validation: args.benchmarkValidation,
     evidence_fit: 0,
     domain_penalty: 0,
-    note: "Live benchmark oscillation output failed post-run validation and was not cached as a successful artifact.",
+    note: "Live oscillation comparison failed post-run validation and was not cached as a successful artifact.",
   };
 };
 
@@ -167,12 +222,20 @@ const resolveStructureLaneResult = async (
     return current;
   }
   const structureRuntime = resolveStarSimSolverRuntime("mesa");
+  const structureSupportedDomain = evaluateStarSimSupportedDomain(star, "structure_mesa");
+  const structureControls: StarSimCacheControls = {
+    benchmark_pack_id: structureSupportedDomain.benchmark_pack_id,
+    fit_profile_id: structureSupportedDomain.fit_profile_id,
+    fit_constraints: structureSupportedDomain.fit_constraints_applied,
+    supported_domain_id: structureSupportedDomain.id,
+    supported_domain_version: structureSupportedDomain.version,
+  };
   const structureCacheIdentity = {
     runtime_mode: structureRuntime.runtime_kind,
     runtime_fingerprint: structureRuntime.runtime_fingerprint,
     solver_manifest: STRUCTURE_MESA_SOLVER_MANIFEST,
   } as const;
-  const structureCacheKey = buildStructureMesaCacheKey(star, structureCacheIdentity);
+  const structureCacheKey = buildStructureMesaCacheKey(star, structureCacheIdentity, structureControls);
   const cached = await readStructureMesaCache(structureCacheKey, structureCacheIdentity);
   if (cached.status === "hit" && cached.laneResult.status === "available") {
     return cached.laneResult;
@@ -188,19 +251,67 @@ export async function runOscillationGyreLane(
   },
 ): Promise<StarSimLaneResult> {
   const runtime = resolveStarSimSolverRuntime("gyre");
+  const supportedDomain = evaluateStarSimSupportedDomain(star, "oscillation_gyre");
+  const benchmarkPackResolution = resolveBenchmarkPackForLane("oscillation_gyre", supportedDomain);
   const benchmarkResolution =
-    runtime.runtime_kind === "mock" ? null : resolveBenchmarkForLane(star, "oscillation_gyre");
+    runtime.runtime_kind === "mock" || !star.benchmark_case_id
+      ? null
+      : resolveBenchmarkForLane(star, "oscillation_gyre");
+  const fitProfileId = supportedDomain.fit_profile_id;
+  const structureLane = await resolveStructureLaneResult(star, options.resolvedLanes);
+  const structureCacheKey = structureLane?.cache_key ?? "missing_structure_cache";
+  const cacheControls: StarSimCacheControls = {
+    benchmark_pack_id: supportedDomain.benchmark_pack_id,
+    fit_profile_id: fitProfileId,
+    fit_constraints: supportedDomain.fit_constraints_applied,
+    supported_domain_id: supportedDomain.id,
+    supported_domain_version: supportedDomain.version,
+  };
   const cacheIdentity = {
     runtime_mode: runtime.runtime_kind,
     runtime_fingerprint: runtime.runtime_fingerprint,
     solver_manifest: OSCILLATION_GYRE_SOLVER_MANIFEST,
   } as const;
-  const structureLane = await resolveStructureLaneResult(star, options.resolvedLanes);
-  const structureCacheKey = structureLane?.cache_key ?? "missing_structure_cache";
-  const cacheKey = buildOscillationGyreCacheKey(star, structureCacheKey, cacheIdentity);
+  const cacheKey = buildOscillationGyreCacheKey(star, structureCacheKey, cacheIdentity, cacheControls);
   const cached = await readOscillationGyreCache(cacheKey, cacheIdentity);
   if (cached.status === "hit") {
     return cached.laneResult;
+  }
+
+  if (benchmarkResolution?.status === "unavailable") {
+    return buildUnavailableLane({
+      star,
+      cacheKey,
+      structureClaimId: structureLane?.tree_dag.claim_id ?? null,
+      runtimeMode: runtime.runtime_kind,
+      runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: supportedDomain.benchmark_pack_id,
+      fitProfileId,
+      statusReason: benchmarkResolution.reason,
+      note: benchmarkResolution.note,
+      cacheStatus: cached.miss_reason,
+      cacheStatusReason: cached.detail,
+      artifactIntegrityStatus: cached.artifact_integrity_status,
+    });
+  }
+
+  if (benchmarkPackResolution.status === "unavailable") {
+    return buildUnavailableLane({
+      star,
+      cacheKey,
+      structureClaimId: structureLane?.tree_dag.claim_id ?? null,
+      runtimeMode: runtime.runtime_kind,
+      runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: supportedDomain.benchmark_pack_id,
+      fitProfileId,
+      statusReason: benchmarkPackResolution.reason,
+      note: benchmarkPackResolution.note,
+      cacheStatus: cached.miss_reason,
+      cacheStatusReason: cached.detail,
+      artifactIntegrityStatus: cached.artifact_integrity_status,
+    });
   }
 
   if (!structureLane) {
@@ -210,6 +321,9 @@ export async function runOscillationGyreLane(
       structureClaimId: null,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+      fitProfileId,
       statusReason: "missing_structure_model",
       note: "No cached or current-run structure_mesa artifact is available for GYRE to consume.",
       cacheStatus: cached.miss_reason,
@@ -225,23 +339,11 @@ export async function runOscillationGyreLane(
       structureClaimId: structureLane.tree_dag.claim_id,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+      fitProfileId,
       statusReason: "solver_unconfigured",
       note: "No GYRE runtime is configured. Set STAR_SIM_GYRE_RUNTIME=mock|docker|wsl or populate the cache first.",
-      cacheStatus: cached.miss_reason,
-      cacheStatusReason: cached.detail,
-      artifactIntegrityStatus: cached.artifact_integrity_status,
-    });
-  }
-
-  if (benchmarkResolution?.status === "unavailable") {
-    return buildUnavailableLane({
-      star,
-      cacheKey,
-      structureClaimId: structureLane.tree_dag.claim_id,
-      runtimeMode: runtime.runtime_kind,
-      runtimeFingerprint: runtime.runtime_fingerprint,
-      statusReason: benchmarkResolution.reason,
-      note: benchmarkResolution.note,
       cacheStatus: cached.miss_reason,
       cacheStatusReason: cached.detail,
       artifactIntegrityStatus: cached.artifact_integrity_status,
@@ -255,7 +357,10 @@ export async function runOscillationGyreLane(
       structureClaimId: structureLane.tree_dag.claim_id,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
-      statusReason: "out_of_domain",
+      supportedDomain,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+      fitProfileId,
+      statusReason: "out_of_supported_domain",
       note: "The mock GYRE runtime currently ships only solar and G-type main-sequence fixtures.",
       cacheStatus: cached.miss_reason,
       cacheStatusReason: cached.detail,
@@ -272,6 +377,9 @@ export async function runOscillationGyreLane(
         structureClaimId: structureLane.tree_dag.claim_id,
         runtimeMode: runtime.runtime_kind,
         runtimeFingerprint: runtime.runtime_fingerprint,
+        supportedDomain,
+        benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+        fitProfileId,
         statusReason: probe.status_reason ?? "runtime_not_ready",
         note: probe.detail ?? `The ${runtime.runtime_kind} GYRE runtime failed readiness checks.`,
         cacheStatus: cached.miss_reason,
@@ -288,6 +396,9 @@ export async function runOscillationGyreLane(
       structureClaimId: structureLane.tree_dag.claim_id,
       runtimeMode: runtime.runtime_kind,
       runtimeFingerprint: runtime.runtime_fingerprint,
+      supportedDomain,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+      fitProfileId,
       statusReason: "async_job_required",
       note: "No valid cached GYRE artifact was found. Submit this request to /api/star-sim/v1/jobs to execute the worker.",
       cacheStatus: cached.miss_reason,
@@ -307,8 +418,29 @@ export async function runOscillationGyreLane(
     structureCacheKey,
     structureClaimId: structureLane.tree_dag.claim_id,
     structureSummary,
+    fitProfileId,
+    fitConstraints: supportedDomain.fit_constraints_applied,
+    supportedDomain,
   });
-  const benchmarkValidation =
+  const artifactPayloads = [
+    ...workerResult.artifact_payloads,
+    createBenchmarkPackArtifact({
+      benchmarkPack: benchmarkPackResolution.benchmark_pack,
+      supportedDomain,
+      validation: undefined,
+      benchmarkCaseId: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+    }),
+  ];
+  const packValidation = validateBenchmarkPackOutput({
+    benchmarkPack: benchmarkPackResolution.benchmark_pack,
+    star,
+    payload: {
+      mode_summary: workerResult.mode_summary,
+      comparison_summary: workerResult.comparison_summary,
+    },
+    artifactKinds: artifactPayloads.map((artifact) => artifact.kind),
+  });
+  const caseValidation =
     workerResult.live_solver && benchmarkResolution?.status === "ok"
       ? validateBenchmarkOutput({
           benchmark: benchmarkResolution.benchmark,
@@ -316,10 +448,17 @@ export async function runOscillationGyreLane(
           payload: {
             mode_summary: workerResult.mode_summary,
           },
-          artifactKinds: workerResult.artifact_payloads.map((artifact) => artifact.kind),
+          artifactKinds: artifactPayloads.map((artifact) => artifact.kind),
         })
       : undefined;
-  if (workerResult.live_solver && (!benchmarkValidation?.passed || workerResult.benchmark_case_id !== benchmarkResolution?.benchmark_case_id)) {
+  const effectiveValidation = caseValidation ?? packValidation;
+  const liveValidationPassed =
+    workerResult.live_solver
+    && supportedDomain.passed
+    && packValidation.passed
+    && (caseValidation ? caseValidation.passed : true)
+    && (!benchmarkResolution || workerResult.benchmark_case_id === benchmarkResolution.benchmark_case_id);
+  if (workerResult.live_solver && !liveValidationPassed) {
     return buildFailedBenchmarkLane({
       star,
       cacheKey,
@@ -327,17 +466,20 @@ export async function runOscillationGyreLane(
       runtimeMode: workerResult.runtime_kind,
       runtimeFingerprint: workerResult.runtime_fingerprint,
       benchmarkCaseId: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+      benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
       benchmarkValidation:
-        benchmarkValidation
+        caseValidation
         ?? {
-          passed: false,
-          tolerance_profile: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark.tolerance_profile : "unknown",
-          checked_metrics: [],
-          notes: ["Benchmark case mismatch between request resolution and live runtime output."],
+          ...packValidation,
+          notes: [
+            ...packValidation.notes,
+            ...(benchmarkResolution && !caseValidation ? ["Benchmark case mismatch between request resolution and live runtime output."] : []),
+          ],
         },
       workerResult,
     });
   }
+
   const maturity = workerResult.live_solver ? "research_sim" : "obs_fit";
   const claimId = `claim:star-sim:oscillation_gyre:${cacheKey.replace(/^sha256:/, "").slice(0, 16)}`;
   const laneResult: StarSimLaneResult = {
@@ -352,7 +494,7 @@ export async function runOscillationGyreLane(
     phys_class: "P3",
     assumptions: [
       workerResult.live_solver
-        ? "This result comes from a live benchmark-scoped GYRE execution path. It is validated only against the registered benchmark tolerance profile, not against arbitrary-star seismology claims."
+        ? "This result comes from a live seismic comparison within the declared solar-like supported domain and is benchmark-pack validated before it earns research_sim."
         : workerResult.runtime_kind === "mock"
         ? "This result comes from the fixture-backed mock GYRE runtime and is suitable for orchestration and contract testing, not public seismology claims."
         : "This lane uses an external GYRE execution backend and caches its artifacts for deterministic reuse.",
@@ -361,12 +503,9 @@ export async function runOscillationGyreLane(
       ...workerResult.domain_validity,
       runtime_kind: workerResult.runtime_kind,
       requires_structure_cache: true,
+      supported_domain: workerResult.supported_domain ?? supportedDomain,
     },
-    observables_used: [
-      "asteroseismology.numax_uHz",
-      "asteroseismology.deltanu_uHz",
-      "asteroseismology.mode_count",
-    ],
+    observables_used: collectObservablesUsed(star),
     inferred_params: workerResult.inferred_params,
     residuals_sigma: workerResult.residuals_sigma,
     falsifier_ids: [],
@@ -385,10 +524,23 @@ export async function runOscillationGyreLane(
         fixture_id: workerResult.fixture_id,
       },
       benchmark_case_id: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
-      benchmark_validation: benchmarkValidation,
+      benchmark_pack: {
+        id: benchmarkPackResolution.benchmark_pack_id,
+        benchmark_registry_version: getBenchmarkRegistryVersion(),
+        tolerance_profile: benchmarkPackResolution.benchmark_pack.tolerance_profile,
+        support_mode: benchmarkPackResolution.benchmark_pack.support_mode,
+        benchmark_family_ids: benchmarkPackResolution.benchmark_pack.benchmark_family_ids,
+      },
+      benchmark_validation: effectiveValidation,
       cache_key: cacheKey,
       structure_cache_key: structureCacheKey,
       structure_claim_id: structureLane.tree_dag.claim_id,
+      fit_status: workerResult.fit_status,
+      fit_profile_id: workerResult.fit_profile_id ?? fitProfileId,
+      fit_constraints: supportedDomain.fit_constraints_applied,
+      comparison_summary: workerResult.comparison_summary,
+      seismic_match_summary: workerResult.seismic_match_summary,
+      supported_domain: workerResult.supported_domain ?? supportedDomain,
       mode_summary: workerResult.mode_summary,
       live_solver_metadata: workerResult.live_solver_metadata,
     },
@@ -397,17 +549,28 @@ export async function runOscillationGyreLane(
     runtime_fingerprint: workerResult.runtime_fingerprint,
     artifact_integrity_status: "verified",
     cache_status: "hit",
-    benchmark_validation: benchmarkValidation,
+    benchmark_validation: effectiveValidation,
     evidence_fit: workerResult.evidence_fit,
     domain_penalty: 1,
     note:
       workerResult.live_solver
-        ? "Live benchmark-scoped GYRE output cached after validation against the registered tolerance profile."
+        ? "Live GYRE comparison cached after supported-domain and benchmark-pack validation."
         : workerResult.runtime_kind === "mock"
         ? "Fixture-backed GYRE mock output cached for deterministic star-sim orchestration."
         : "External GYRE output cached for deterministic star-sim orchestration.",
   };
 
+  const finalizedArtifacts = artifactPayloads.map((artifact) =>
+    artifact.kind === "benchmark_pack"
+      ? createBenchmarkPackArtifact({
+          benchmarkPack: benchmarkPackResolution.benchmark_pack,
+          supportedDomain,
+          validation: effectiveValidation,
+          benchmarkCaseId:
+            benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+        })
+      : artifact,
+  );
   const artifactRefs = await writeOscillationGyreCache({
     star,
     cacheKey,
@@ -416,17 +579,28 @@ export async function runOscillationGyreLane(
     runtimeFingerprint: workerResult.runtime_fingerprint,
     solverManifest: OSCILLATION_GYRE_SOLVER_MANIFEST,
     benchmarkCaseId: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
+    benchmarkPackId: benchmarkPackResolution.benchmark_pack_id,
+    fitProfileId: workerResult.fit_profile_id ?? fitProfileId,
+    fitConstraints: supportedDomain.fit_constraints_applied,
+    supportedDomainId: supportedDomain.id,
+    supportedDomainVersion: supportedDomain.version,
     summary: {
       benchmark_case_id: benchmarkResolution?.status === "ok" ? benchmarkResolution.benchmark_case_id : workerResult.benchmark_case_id,
-      benchmark_validation: benchmarkValidation,
+      benchmark_pack_id: benchmarkPackResolution.benchmark_pack_id,
+      benchmark_validation: effectiveValidation,
       structure_cache_key: structureCacheKey,
+      fit_status: workerResult.fit_status,
+      fit_profile_id: workerResult.fit_profile_id ?? fitProfileId,
+      comparison_summary: workerResult.comparison_summary,
+      seismic_match_summary: workerResult.seismic_match_summary,
+      supported_domain: workerResult.supported_domain ?? supportedDomain,
       mode_summary: workerResult.mode_summary,
       inferred_params: workerResult.inferred_params,
       residuals_sigma: workerResult.residuals_sigma,
       live_solver_metadata: workerResult.live_solver_metadata,
     },
     laneResult,
-    runtimeArtifacts: workerResult.artifact_payloads,
+    runtimeArtifacts: finalizedArtifacts,
   });
 
   return {

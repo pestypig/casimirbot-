@@ -14,7 +14,7 @@ import type {
 } from "./contract";
 import type { StarSimRuntimeArtifactPayload } from "./worker/starsim-worker-types";
 
-export const STAR_SIM_ARTIFACT_SCHEMA_VERSION = "star-sim-cache/2";
+export const STAR_SIM_ARTIFACT_SCHEMA_VERSION = "star-sim-cache/3";
 export const STAR_SIM_JOB_SCHEMA_VERSION = "star-sim-job/2";
 
 type CacheLaneId = "structure_mesa" | "oscillation_gyre";
@@ -35,6 +35,11 @@ type BaseCacheManifest = {
   runtime_fingerprint: string;
   solver_manifest: string;
   benchmark_case_id: string | null;
+  benchmark_pack_id: string | null;
+  fit_profile_id: string | null;
+  fit_constraints: Record<string, unknown>;
+  supported_domain_id: string | null;
+  supported_domain_version: string | null;
   request_hash: string;
   canonical_observables_hash: string;
   created_at: string;
@@ -62,6 +67,14 @@ export type StarSimCacheIdentity = {
   runtime_mode: StarSimExternalRuntimeKind;
   runtime_fingerprint: string;
   solver_manifest: string;
+};
+
+export type StarSimCacheControls = {
+  benchmark_pack_id: string | null;
+  fit_profile_id: string | null;
+  fit_constraints: Record<string, unknown>;
+  supported_domain_id: string | null;
+  supported_domain_version: string | null;
 };
 
 export type StarSimCacheReadResult =
@@ -453,13 +466,22 @@ const writeCacheBundle = async (args: {
 export const resolveStarSimArtifactRoot = (): string =>
   path.resolve(process.env.STAR_SIM_ARTIFACT_ROOT?.trim() || path.join("artifacts", "research", "starsim"));
 
-export const buildStructureMesaCacheKey = (star: CanonicalStar, identity: StarSimCacheIdentity): string =>
+export const buildStructureMesaCacheKey = (
+  star: CanonicalStar,
+  identity: StarSimCacheIdentity,
+  controls?: Partial<StarSimCacheControls>,
+): string =>
   hashStableJson({
     artifact_schema_version: STAR_SIM_ARTIFACT_SCHEMA_VERSION,
     lane: "structure_mesa",
     target: star.target,
     fields: star.fields,
     benchmark_case_id: star.benchmark_case_id,
+    benchmark_pack_id: controls?.benchmark_pack_id ?? null,
+    fit_profile_id: controls?.fit_profile_id ?? star.fit_profile_id,
+    fit_constraints: controls?.fit_constraints ?? star.fit_constraints,
+    supported_domain_id: controls?.supported_domain_id ?? null,
+    supported_domain_version: controls?.supported_domain_version ?? null,
     physics_flags: star.physics_flags,
     evidence_refs: star.evidence_refs,
     requested_lanes: star.requested_lanes,
@@ -473,6 +495,7 @@ export const buildOscillationGyreCacheKey = (
   star: CanonicalStar,
   structureCacheKey: string,
   identity: StarSimCacheIdentity,
+  controls?: Partial<StarSimCacheControls>,
 ): string =>
   hashStableJson({
     artifact_schema_version: STAR_SIM_ARTIFACT_SCHEMA_VERSION,
@@ -480,6 +503,11 @@ export const buildOscillationGyreCacheKey = (
     target: star.target,
     asteroseismology: star.fields.asteroseismology,
     benchmark_case_id: star.benchmark_case_id,
+    benchmark_pack_id: controls?.benchmark_pack_id ?? null,
+    fit_profile_id: controls?.fit_profile_id ?? star.fit_profile_id,
+    fit_constraints: controls?.fit_constraints ?? star.fit_constraints,
+    supported_domain_id: controls?.supported_domain_id ?? null,
+    supported_domain_version: controls?.supported_domain_version ?? null,
     physics_flags: star.physics_flags,
     structure_cache_key: structureCacheKey,
     runtime_mode: identity.runtime_mode,
@@ -549,6 +577,11 @@ export const writeStructureMesaCache = async (args: {
   runtimeFingerprint: string;
   solverManifest: string;
   benchmarkCaseId: string | null;
+  benchmarkPackId: string | null;
+  fitProfileId: string | null;
+  fitConstraints: Record<string, unknown>;
+  supportedDomainId: string | null;
+  supportedDomainVersion: string | null;
   summary: Record<string, unknown>;
   laneResult: StarSimLaneResult;
   modelPlaceholder: Record<string, unknown> | null;
@@ -567,11 +600,21 @@ export const writeStructureMesaCache = async (args: {
       runtime_fingerprint: args.runtimeFingerprint,
       solver_manifest: args.solverManifest,
       benchmark_case_id: args.benchmarkCaseId,
+      benchmark_pack_id: args.benchmarkPackId,
+      fit_profile_id: args.fitProfileId,
+      fit_constraints: args.fitConstraints,
+      supported_domain_id: args.supportedDomainId,
+      supported_domain_version: args.supportedDomainVersion,
       request_hash: hashStableJson({
         target: args.star.target,
         requested_lanes: args.star.requested_lanes,
         evidence_refs: args.star.evidence_refs,
         benchmark_case_id: args.star.benchmark_case_id,
+        fit_profile_id: args.fitProfileId,
+        fit_constraints: args.fitConstraints,
+        benchmark_pack_id: args.benchmarkPackId,
+        supported_domain_id: args.supportedDomainId,
+        supported_domain_version: args.supportedDomainVersion,
         physics_flags: args.star.physics_flags,
       }),
       canonical_observables_hash: hashStableJson(args.star.fields),
@@ -588,6 +631,11 @@ export const writeStructureMesaCache = async (args: {
       requested_lanes: args.star.requested_lanes,
       strict_lanes: args.star.strict_lanes,
       benchmark_case_id: args.star.benchmark_case_id,
+      fit_profile_id: args.fitProfileId,
+      fit_constraints: args.fitConstraints,
+      benchmark_pack_id: args.benchmarkPackId,
+      supported_domain_id: args.supportedDomainId,
+      supported_domain_version: args.supportedDomainVersion,
       physics_flags: args.star.physics_flags,
     },
     summary: args.summary,
@@ -605,6 +653,11 @@ export const writeOscillationGyreCache = async (args: {
   runtimeFingerprint: string;
   solverManifest: string;
   benchmarkCaseId: string | null;
+  benchmarkPackId: string | null;
+  fitProfileId: string | null;
+  fitConstraints: Record<string, unknown>;
+  supportedDomainId: string | null;
+  supportedDomainVersion: string | null;
   summary: Record<string, unknown>;
   laneResult: StarSimLaneResult;
   runtimeArtifacts?: StarSimRuntimeArtifactPayload[];
@@ -623,11 +676,21 @@ export const writeOscillationGyreCache = async (args: {
       runtime_fingerprint: args.runtimeFingerprint,
       solver_manifest: args.solverManifest,
       benchmark_case_id: args.benchmarkCaseId,
+      benchmark_pack_id: args.benchmarkPackId,
+      fit_profile_id: args.fitProfileId,
+      fit_constraints: args.fitConstraints,
+      supported_domain_id: args.supportedDomainId,
+      supported_domain_version: args.supportedDomainVersion,
       request_hash: hashStableJson({
         target: args.star.target,
         requested_lanes: args.star.requested_lanes,
         evidence_refs: args.star.evidence_refs,
         benchmark_case_id: args.star.benchmark_case_id,
+        fit_profile_id: args.fitProfileId,
+        fit_constraints: args.fitConstraints,
+        benchmark_pack_id: args.benchmarkPackId,
+        supported_domain_id: args.supportedDomainId,
+        supported_domain_version: args.supportedDomainVersion,
         physics_flags: args.star.physics_flags,
       }),
       canonical_observables_hash: hashStableJson(args.star.fields),
@@ -643,6 +706,11 @@ export const writeOscillationGyreCache = async (args: {
       structure: args.star.fields.structure,
       evidence_refs: args.star.evidence_refs,
       benchmark_case_id: args.star.benchmark_case_id,
+      fit_profile_id: args.fitProfileId,
+      fit_constraints: args.fitConstraints,
+      benchmark_pack_id: args.benchmarkPackId,
+      supported_domain_id: args.supportedDomainId,
+      supported_domain_version: args.supportedDomainVersion,
       physics_flags: args.star.physics_flags,
     },
     summary: args.summary,

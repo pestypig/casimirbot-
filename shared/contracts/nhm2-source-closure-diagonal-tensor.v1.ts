@@ -18,6 +18,7 @@ export type Nhm2SourceClosureDiagonalTensorSnapshotArtifact = {
   familyId: string;
   shiftLapseProfileId: string | null;
   shiftLapseProfileStage: string | null;
+  regionId: string | null;
   tensorSemanticRef: string | null;
   sourceArtifactPath: string | null;
   producer: string;
@@ -35,6 +36,7 @@ export type BuildNhm2SourceClosureDiagonalTensorSnapshotArtifactInput = {
   familyId?: string | null;
   shiftLapseProfileId?: string | null;
   shiftLapseProfileStage?: string | null;
+  regionId?: string | null;
   tensorSemanticRef?: string | null;
   sourceArtifactPath?: string | null;
   producer?: string | null;
@@ -70,6 +72,7 @@ export const buildNhm2SourceClosureDiagonalTensorSnapshotArtifact = (
   familyId: asText(input.familyId) ?? "nhm2_shift_lapse",
   shiftLapseProfileId: asText(input.shiftLapseProfileId),
   shiftLapseProfileStage: asText(input.shiftLapseProfileStage),
+  regionId: asText(input.regionId),
   tensorSemanticRef: asText(input.tensorSemanticRef),
   sourceArtifactPath: toRepoPath(input.sourceArtifactPath),
   producer: asText(input.producer) ?? "scripts/warp-york-control-family-proof-pack.ts",

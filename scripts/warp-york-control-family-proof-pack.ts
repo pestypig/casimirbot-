@@ -89,11 +89,16 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
 import {
-  buildNhm2SourceClosureArtifact,
+  isNhm2SourceClosureArtifact,
   type Nhm2SourceClosureArtifact,
-  type Nhm2SourceClosureSampledSummaryInput,
   type Nhm2SourceClosureTensor,
 } from "../shared/contracts/nhm2-source-closure.v1";
+import {
+  buildNhm2SourceClosureArtifactV2,
+  isNhm2SourceClosureV2Artifact,
+  type Nhm2SourceClosureV2Artifact,
+  type Nhm2SourceClosureV2RegionComparisonInput,
+} from "../shared/contracts/nhm2-source-closure.v2";
 import {
   buildNhm2SourceClosureDiagonalTensorSnapshotArtifact,
   isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
@@ -6790,19 +6795,41 @@ const isNhm2SourceClosureArtifactLike = (
   status: string;
   tensorRefs: { metricRequired: string | null; tileEffective: string | null };
   residualNorms: { relL2: number | null; relLInf: number | null };
-  sampledSummaries: { regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }> };
+  assumptionsDrifted?: boolean | null;
+  sampledSummaries?: {
+    regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
+  };
+  regionComparisons?: {
+    regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
+  };
   reasonCodes: string[];
-} => {
-  const record = asRecord(value);
-  return (
-    record.artifactId === "nhm2_source_closure" &&
-    record.schemaVersion === "nhm2_source_closure/v1" &&
-    asText(record.status) != null &&
-    record.tensorRefs != null &&
-    record.residualNorms != null &&
-    Array.isArray(record.reasonCodes)
-  );
+} => isNhm2SourceClosureArtifact(value) || isNhm2SourceClosureV2Artifact(value);
+
+type SourceClosureInspectionArtifact = {
+  status: string;
+  reasonCodes: string[];
+  tensorRefs: { metricRequired: string | null; tileEffective: string | null };
+  residualNorms: { relL2: number | null; relLInf: number | null };
+  assumptionsDrifted?: boolean | null;
+  sampledSummaries?: {
+    regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
+  };
+  regionComparisons?: {
+    regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
+  };
 };
+
+const getPublishedSourceClosureRegions = (
+  value: SourceClosureInspectionArtifact | null | undefined,
+): Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }> => {
+  if (value?.regionComparisons?.regions) {
+    return value.regionComparisons.regions;
+  }
+  return value?.sampledSummaries?.regions ?? [];
+};
+
+const isRegionSourceClosureReviewCode = (reasonCode: string): boolean =>
+  ["region_basis_diagnostic_only", "assumption_drift"].includes(reasonCode);
 
 const inspectPublishedAuditArtifact = <T>(args: {
   expectedPath: string;
@@ -26997,6 +27024,182 @@ const resolveStrictSignalPublishedFamilyId = (args: {
   return familyId;
 };
 
+const resolveConsistentStrictSignalPublishedMetadataValue = <
+  T extends string | number,
+>(args: {
+  field: string;
+  candidates: Array<{ source: string; value: T | null }>;
+}): T | null => {
+  const present = args.candidates.filter(
+    (entry): entry is { source: string; value: T } => entry.value != null,
+  );
+  if (present.length === 0) {
+    return null;
+  }
+  const baseline = present[0].value;
+  const mismatch = present.find((entry) => entry.value !== baseline);
+  if (mismatch != null) {
+    throw new Error(
+      `nhm2_strict_signal_publication_mismatch:${args.field}:${present.map((entry) => `${entry.source}=${String(entry.value)}`).join("|")}`,
+    );
+  }
+  return baseline;
+};
+
+const normalizeStrictSignalPublishedFamilyMetadata = (args: {
+  transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
+  worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
+  missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+  strictSignalArtifact: Nhm2StrictSignalReadinessArtifact;
+  familyId: string;
+  selectedProfileId: string;
+}): Nhm2StrictSignalReadinessArtifact["family"] => {
+  const existingFamily = args.strictSignalArtifact.family;
+  const existingLapseSummary = existingFamily.lapseSummary;
+  const transportArtifactRecord = asRecord(args.transportResultArtifact);
+  const transportSelectedFamily = asRecord(args.transportResultArtifact.selectedFamily);
+  const worldlineSourceSurface = args.worldlineArtifact.sourceSurface;
+  const missionSourceSurface = args.missionTimeComparisonArtifact.sourceSurface;
+  const worldlineGate = asRecord(worldlineSourceSurface.shiftLapseTransportPromotionGate);
+  const missionGate = asRecord(missionSourceSurface.shiftLapseTransportPromotionGate);
+
+  const familyAuthorityStatus =
+    resolveConsistentStrictSignalPublishedMetadataValue({
+      field: "family.familyAuthorityStatus",
+      candidates: [
+        {
+          source: "selected_transport.familyAuthorityStatus",
+          value: asText(transportArtifactRecord.familyAuthorityStatus),
+        },
+        {
+          source: "selected_worldline.sourceSurface.familyAuthorityStatus",
+          value: asText(worldlineSourceSurface.familyAuthorityStatus),
+        },
+        {
+          source: "selected_mission_time_comparison.sourceSurface.familyAuthorityStatus",
+          value: asText(missionSourceSurface.familyAuthorityStatus),
+        },
+        {
+          source: "selected_worldline.shiftLapseTransportPromotionGate.familyAuthorityStatus",
+          value: asText(worldlineGate.familyAuthorityStatus),
+        },
+        {
+          source: "selected_mission_time_comparison.shiftLapseTransportPromotionGate.familyAuthorityStatus",
+          value: asText(missionGate.familyAuthorityStatus),
+        },
+      ],
+    }) ?? existingFamily.familyAuthorityStatus;
+
+  const transportCertificationStatus =
+    resolveConsistentStrictSignalPublishedMetadataValue({
+      field: "family.transportCertificationStatus",
+      candidates: [
+        {
+          source: "selected_transport.transportCertificationStatus",
+          value: asText(args.transportResultArtifact.transportCertificationStatus),
+        },
+        {
+          source: "selected_worldline.sourceSurface.transportCertificationStatus",
+          value: asText(worldlineSourceSurface.transportCertificationStatus),
+        },
+        {
+          source: "selected_mission_time_comparison.sourceSurface.transportCertificationStatus",
+          value: asText(missionSourceSurface.transportCertificationStatus),
+        },
+        {
+          source: "selected_worldline.shiftLapseTransportPromotionGate.transportCertificationStatus",
+          value: asText(worldlineGate.transportCertificationStatus),
+        },
+        {
+          source: "selected_mission_time_comparison.shiftLapseTransportPromotionGate.transportCertificationStatus",
+          value: asText(missionGate.transportCertificationStatus),
+        },
+      ],
+    }) ?? existingFamily.transportCertificationStatus;
+
+  return {
+    familyId: args.familyId,
+    familyAuthorityStatus,
+    transportCertificationStatus,
+    lapseSummary: {
+      alphaCenterline:
+        resolveConsistentStrictSignalPublishedMetadataValue({
+          field: "family.lapseSummary.alphaCenterline",
+          candidates: [
+            {
+              source: "selected_transport.centerlineAlpha",
+              value: toFiniteNumber(args.transportResultArtifact.centerlineAlpha),
+            },
+            {
+              source: "selected_worldline.shiftLapseTransportPromotionGate.centerlineAlpha",
+              value: toFiniteNumber(worldlineGate.centerlineAlpha),
+            },
+            {
+              source: "selected_mission_time_comparison.shiftLapseTransportPromotionGate.centerlineAlpha",
+              value: toFiniteNumber(missionGate.centerlineAlpha),
+            },
+          ],
+        }) ?? existingLapseSummary?.alphaCenterline ?? null,
+      alphaMin: existingLapseSummary?.alphaMin ?? null,
+      alphaMax: existingLapseSummary?.alphaMax ?? null,
+      alphaProfileKind: existingLapseSummary?.alphaProfileKind ?? null,
+      alphaGradientAxis: existingLapseSummary?.alphaGradientAxis ?? null,
+      shiftLapseProfileId: args.selectedProfileId,
+      shiftLapseProfileStage:
+        resolveConsistentStrictSignalPublishedMetadataValue({
+          field: "family.lapseSummary.shiftLapseProfileStage",
+          candidates: [
+            {
+              source: "selected_transport.selectedFamily.shiftLapseProfileStage",
+              value: asText(transportSelectedFamily.shiftLapseProfileStage),
+            },
+            {
+              source: "selected_worldline.shiftLapseTransportPromotionGate.shiftLapseProfileStage",
+              value: asText(worldlineGate.shiftLapseProfileStage),
+            },
+            {
+              source: "selected_mission_time_comparison.shiftLapseTransportPromotionGate.shiftLapseProfileStage",
+              value: asText(missionGate.shiftLapseProfileStage),
+            },
+          ],
+        }) ?? existingLapseSummary?.shiftLapseProfileStage ?? null,
+      shiftLapseProfileLabel:
+        resolveConsistentStrictSignalPublishedMetadataValue({
+          field: "family.lapseSummary.shiftLapseProfileLabel",
+          candidates: [
+            {
+              source: "selected_worldline.shiftLapseTransportPromotionGate.shiftLapseProfileLabel",
+              value: asText(worldlineGate.shiftLapseProfileLabel),
+            },
+            {
+              source: "selected_mission_time_comparison.shiftLapseTransportPromotionGate.shiftLapseProfileLabel",
+              value: asText(missionGate.shiftLapseProfileLabel),
+            },
+          ],
+        }) ?? existingLapseSummary?.shiftLapseProfileLabel ?? null,
+      shiftLapseProfileNote:
+        resolveConsistentStrictSignalPublishedMetadataValue({
+          field: "family.lapseSummary.shiftLapseProfileNote",
+          candidates: [
+            {
+              source: "selected_transport.selectedFamily.shiftLapseProfileNote",
+              value: asText(transportSelectedFamily.shiftLapseProfileNote),
+            },
+            {
+              source: "selected_worldline.shiftLapseTransportPromotionGate.shiftLapseProfileNote",
+              value: asText(worldlineGate.shiftLapseProfileNote),
+            },
+            {
+              source: "selected_mission_time_comparison.shiftLapseTransportPromotionGate.shiftLapseProfileNote",
+              value: asText(missionGate.shiftLapseProfileNote),
+            },
+          ],
+        }) ?? existingLapseSummary?.shiftLapseProfileNote ?? null,
+      signConvention: existingLapseSummary?.signConvention ?? null,
+    },
+  };
+};
+
 const resolveNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile = (args: {
   transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
   worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
@@ -27027,7 +27230,14 @@ const resolveNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile = (ar
     );
   }
 
-  return args.strictSignalArtifact;
+  return {
+    ...args.strictSignalArtifact,
+    family: normalizeStrictSignalPublishedFamilyMetadata({
+      ...args,
+      familyId,
+      selectedProfileId,
+    }),
+  };
 };
 
 const renderNhm2StrictSignalReadinessMarkdown = (
@@ -27248,8 +27458,26 @@ const REQUIRED_SOURCE_CLOSURE_REGION_IDS = [
   "exterior_shell",
 ] as const;
 
+const NHM2_SOURCE_CLOSURE_TILE_TENSOR_SEMANTIC_REF =
+  "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
+
 type RequiredSourceClosureRegionId =
   (typeof REQUIRED_SOURCE_CLOSURE_REGION_IDS)[number];
+
+type PublishedNhm2SourceClosureArtifact =
+  | Nhm2SourceClosureArtifact
+  | Nhm2SourceClosureV2Artifact;
+
+type SourceClosureTensorSnapshotPathSet = {
+  metricRequiredOutJsonPath: string;
+  metricRequiredLatestJsonPath: string;
+  tileEffectiveOutJsonPath: string;
+  tileEffectiveLatestJsonPath: string;
+};
+
+const toSourceClosureRegionPathSlug = (
+  regionId: RequiredSourceClosureRegionId,
+): string => regionId.replace(/_/g, "-");
 
 const normalizeSourceClosureTensor = (
   value: unknown,
@@ -27282,6 +27510,30 @@ const buildSelectedShiftLapseSourceClosureTensorSnapshotPaths = (
     artifactRootDir,
     path.basename(SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_TILE_TENSOR_LATEST_JSON),
   ),
+  regions: Object.fromEntries(
+    REQUIRED_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
+      const slug = toSourceClosureRegionPathSlug(regionId);
+      const paths: SourceClosureTensorSnapshotPathSet = {
+        metricRequiredOutJsonPath: path.join(
+          artifactRootDir,
+          `nhm2-source-closure-metric-required-tensor-${slug}-${DATE_STAMP}.json`,
+        ),
+        metricRequiredLatestJsonPath: path.join(
+          artifactRootDir,
+          `nhm2-source-closure-metric-required-tensor-${slug}-latest.json`,
+        ),
+        tileEffectiveOutJsonPath: path.join(
+          artifactRootDir,
+          `nhm2-source-closure-tile-effective-tensor-${slug}-${DATE_STAMP}.json`,
+        ),
+        tileEffectiveLatestJsonPath: path.join(
+          artifactRootDir,
+          `nhm2-source-closure-tile-effective-tensor-${slug}-latest.json`,
+        ),
+      };
+      return [regionId, paths] as const;
+    }),
+  ) as Record<RequiredSourceClosureRegionId, SourceClosureTensorSnapshotPathSet>,
 });
 
 const buildNhm2SourceClosureDiagonalTensorSnapshotMarkdown = (
@@ -27337,7 +27589,7 @@ const writeNhm2SourceClosureDiagonalTensorSnapshot = (args: {
 };
 
 const renderNhm2SourceClosureMarkdown = (
-  payload: Nhm2SourceClosureArtifact,
+  payload: PublishedNhm2SourceClosureArtifact,
 ): string => {
   const reasonCodes =
     payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
@@ -27347,12 +27599,24 @@ const renderNhm2SourceClosureMarkdown = (
       return `| ${component} | ${residual.metricRequired ?? "null"} | ${residual.tileEffective ?? "null"} | ${residual.absResidual ?? "null"} | ${residual.relResidual ?? "null"} |`;
     })
     .join("\n");
-  const regionRows = payload.sampledSummaries.regions
-    .map((region) => {
-      const tensor = region.tileTensor;
-      return `| ${region.regionId} | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | ${tensor.T00 ?? "null"} | ${tensor.T11 ?? "null"} | ${tensor.T22 ?? "null"} | ${tensor.T33 ?? "null"} | ${region.note ?? "null"} |`;
-    })
-    .join("\n");
+  const isV2 = payload.schemaVersion === "nhm2_source_closure/v2";
+  const scalarCl3RhoDeltaRel = isV2
+    ? payload.scalarProjections.cl3RhoDeltaRel
+    : payload.scalarProjections.cl3RhoDeltaRel;
+  const regionSummaryRows = isV2
+    ? payload.regionComparisons.regions
+        .map((region) => {
+          const metricTensor = region.metricRequiredTensor;
+          const tileTensor = region.tileEffectiveTensor;
+          return `| ${region.regionId} | ${region.comparisonBasisStatus} | ${region.status} | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | ${metricTensor.T00 ?? "null"} | ${tileTensor.T00 ?? "null"} | ${region.metricTensorRef ?? "null"} | ${region.tileTensorRef ?? "null"} | ${region.note ?? "null"} |`;
+        })
+        .join("\n")
+    : payload.sampledSummaries.regions
+        .map((region) => {
+          const tensor = region.tileTensor;
+          return `| ${region.regionId} | diagnostic_only | review | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | null | ${tensor.T00 ?? "null"} | null | null | ${region.note ?? "null"} |`;
+        })
+        .join("\n");
   return `# NHM2 Source Closure (${DATE_STAMP})
 
 "This checklist records tensor-first NHM2 source-closure evidence for the currently selected nhm2_shift_lapse profile only. It does not widen route ETA, transport, gravity, or viability claims."
@@ -27371,10 +27635,10 @@ const renderNhm2SourceClosureMarkdown = (
 | residualNorms.relL2 | ${payload.residualNorms.relL2 ?? "null"} |
 | residualNorms.relLInf | ${payload.residualNorms.relLInf ?? "null"} |
 | residualNorms.toleranceRelLInf | ${payload.residualNorms.toleranceRelLInf ?? "null"} |
-| sampledSummaries.status | ${payload.sampledSummaries.status} |
-| sampledSummaries.regionIds | ${payload.sampledSummaries.regions.map((entry) => entry.regionId).join(", ")} |
+| regional.status | ${isV2 ? payload.regionComparisons.status : payload.sampledSummaries.status} |
+| regional.regionIds | ${isV2 ? payload.regionComparisons.regions.map((entry) => entry.regionId).join(", ") : payload.sampledSummaries.regions.map((entry) => entry.regionId).join(", ")} |
 | assumptionsDrifted | ${payload.assumptionsDrifted == null ? "null" : String(payload.assumptionsDrifted)} |
-| scalarCl3RhoDeltaRel | ${payload.scalarProjections.cl3RhoDeltaRel ?? "null"} |
+| scalarCl3RhoDeltaRel | ${scalarCl3RhoDeltaRel ?? "null"} |
 | scalarCongruenceSecondary | ${String(payload.distinction.scalarCongruenceSecondary)} |
 | scalarSurfaceId | ${payload.distinction.scalarSurfaceId} |
 
@@ -27383,15 +27647,15 @@ const renderNhm2SourceClosureMarkdown = (
 |---|---|---|---|---|
 ${componentRows}
 
-## Regional Sampled Summaries
-| regionId | sampleCount | relLInf | tileT00 | tileT11 | tileT22 | tileT33 | note |
-|---|---|---|---|---|---|---|---|
-${regionRows}
+## Regional Comparisons
+| regionId | basis | status | sampleCount | relLInf | metricT00 | tileT00 | metricTensorRef | tileTensorRef | note |
+|---|---|---|---|---|---|---|---|---|---|
+${regionSummaryRows}
 `;
 };
 
 export const publishNhm2SourceClosureResearchSurface = (args: {
-  artifact: Nhm2SourceClosureArtifact;
+  artifact: PublishedNhm2SourceClosureArtifact;
   artifactRootDir?: string;
   auditRootDir?: string;
 }): {
@@ -27399,7 +27663,7 @@ export const publishNhm2SourceClosureResearchSurface = (args: {
   latestJsonPath: string;
   outMdPath: string;
   latestMdPath: string;
-  artifact: Nhm2SourceClosureArtifact;
+  artifact: PublishedNhm2SourceClosureArtifact;
 } => {
   const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
   const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
@@ -27425,63 +27689,33 @@ export const publishNhm2SourceClosureResearchSurface = (args: {
   });
 };
 
-const buildSelectedShiftLapseSourceClosureSampledSummaries = (args: {
-  regions: Array<{
-    regionId: string;
-    sampleCount?: unknown;
-    tensor?: unknown;
-    note?: unknown;
-  }> | null | undefined;
-  globalTileTensor: Nhm2SourceClosureTensor;
-}): {
-  sampledSummaries: Nhm2SourceClosureSampledSummaryInput[];
-  assumptionsDrifted: boolean;
+const resolveSelectedShiftLapseSourceClosureBrickBasis = (
+  refreshedState: Record<string, unknown>,
+): {
+  dims: [number, number, number];
+  bounds: { min: [number, number, number]; max: [number, number, number] };
+  hullAxes: [number, number, number];
+  hullWall: number;
+  radialMap: null;
 } => {
-  const regionMap = new Map<string, { sampleCount?: unknown; tensor?: unknown; note?: unknown }>();
-  for (const region of args.regions ?? []) {
-    if (typeof region.regionId === "string") {
-      regionMap.set(region.regionId, region);
-    }
-  }
-
-  const driftEpsilon = 1e-12;
-  let assumptionsDrifted = false;
-  const sampledSummaries = REQUIRED_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
-    const entry = regionMap.get(regionId);
-    const tileTensor = normalizeSourceClosureTensor(entry?.tensor);
-    const noteParts: string[] = [];
-    const existingNote = asText(entry?.note);
-    if (existingNote) {
-      noteParts.push(existingNote);
-    } else if (entry == null) {
-      noteParts.push("selected-profile regional tile-effective tensor summary not presently published for this region");
-    }
-    noteParts.push(
-      "Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published.",
-    );
-    if (
-      ["T00", "T11", "T22", "T33"].some((component) => {
-        const key = component as keyof Nhm2SourceClosureTensor;
-        const regionValue = tileTensor[key];
-        const globalValue = args.globalTileTensor[key];
-        return (
-          regionValue != null &&
-          globalValue != null &&
-          Math.abs(regionValue - globalValue) > driftEpsilon
-        );
-      })
-    ) {
-      assumptionsDrifted = true;
-    }
-    return {
-      regionId,
-      sampleCount: toFiniteNumber(entry?.sampleCount),
-      tileTensor,
-      note: noteParts.join(" "),
-    };
-  });
-
-  return { sampledSummaries, assumptionsDrifted };
+  const hull = asRecord(refreshedState.hull);
+  const Lx = Math.max(1e-6, toFiniteNumber(hull?.Lx_m) ?? 1007);
+  const Ly = Math.max(1e-6, toFiniteNumber(hull?.Ly_m) ?? 264);
+  const Lz = Math.max(1e-6, toFiniteNumber(hull?.Lz_m) ?? 173);
+  const wallThickness = Math.max(
+    0.1,
+    toFiniteNumber(hull?.wallThickness_m) ?? 0.45,
+  );
+  return {
+    dims: [128, 128, 128],
+    bounds: {
+      min: [-Lx / 2, -Ly / 2, -Lz / 2],
+      max: [Lx / 2, Ly / 2, Lz / 2],
+    },
+    hullAxes: [Lx / 2, Ly / 2, Lz / 2],
+    hullWall: wallThickness,
+    radialMap: null,
+  };
 };
 
 const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
@@ -27503,12 +27737,28 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
     latestJsonPath: string;
     artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
   };
+  regionMetricTensorSnapshots: Record<
+    RequiredSourceClosureRegionId,
+    {
+      outJsonPath: string;
+      latestJsonPath: string;
+      artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+    }
+  >;
+  regionTileTensorSnapshots: Record<
+    RequiredSourceClosureRegionId,
+    {
+      outJsonPath: string;
+      latestJsonPath: string;
+      artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+    }
+  >;
   sourceClosureArtifact: {
     outJsonPath: string;
     latestJsonPath: string;
     outMdPath: string;
     latestMdPath: string;
-    artifact: Nhm2SourceClosureArtifact;
+    artifact: PublishedNhm2SourceClosureArtifact;
   };
 }> => {
   const selectedFamilyArtifactRootDir =
@@ -27578,8 +27828,9 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
         transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
     },
   } as Record<string, unknown>;
-  const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
-  pipelineModule.setGlobalPipelineState?.(refreshedState as any);
+  const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any, {
+    preserveLiveWarpFunctions: true,
+  });
   const nhm2SourceClosure = asRecord(refreshedState.nhm2SourceClosure);
   const sourceClosureTensors = asRecord(nhm2SourceClosure?.tensors);
   const metricTensor = normalizeSourceClosureTensor(
@@ -27605,20 +27856,122 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
     transportResultArtifact.selectedFamily.shiftLapseProfileStage ??
     asText(shiftGate?.shiftLapseProfileStage);
 
+  const brickBasis =
+    resolveSelectedShiftLapseSourceClosureBrickBasis(refreshedState as Record<string, unknown>);
   const stressEnergyBrickModule = await import("../server/stress-energy-brick.ts");
   const stressBrick = stressEnergyBrickModule.buildStressEnergyBrick({
     metricT00Ref: transportResultArtifact.selectedFamily.metricT00Ref ?? undefined,
     metricT00Source:
       transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
     warpFieldType: "nhm2_shift_lapse",
+    dims: brickBasis.dims,
+    bounds: brickBasis.bounds,
+    hullAxes: brickBasis.hullAxes,
+    hullWall: brickBasis.hullWall,
+    radialMap: brickBasis.radialMap,
   });
-  const stressRegions =
-    stressBrick.stats.tensorSampledSummaries?.regions?.map((region) => ({
-      regionId: region.regionId,
-      sampleCount: region.sampleCount,
-      tensor: region.tensor,
-      note: region.note,
-    })) ?? null;
+  const stressRegionMap = new Map<
+    RequiredSourceClosureRegionId,
+    {
+      sampleCount?: unknown;
+      tensor?: unknown;
+      note?: unknown;
+    }
+  >();
+  for (const region of stressBrick.stats.tensorSampledSummaries?.regions ?? []) {
+    if (
+      typeof region.regionId === "string" &&
+      REQUIRED_SOURCE_CLOSURE_REGION_IDS.includes(
+        region.regionId as RequiredSourceClosureRegionId,
+      )
+    ) {
+      stressRegionMap.set(region.regionId as RequiredSourceClosureRegionId, {
+        sampleCount: region.sampleCount,
+        tensor: region.tensor,
+        note: region.note,
+      });
+    }
+  }
+
+  const shiftVectorField = asRecord(asRecord(refreshedState.warp)?.shiftVectorField);
+  const evaluateShiftVector =
+    typeof shiftVectorField?.evaluateShiftVector === "function"
+      ? (shiftVectorField.evaluateShiftVector as (
+          x: number,
+          y: number,
+          z: number,
+        ) => [number, number, number])
+      : null;
+
+  const regionVoxelIds = new Array<RequiredSourceClosureRegionId | null>(
+    brickBasis.dims[0] * brickBasis.dims[1] * brickBasis.dims[2],
+  ).fill(null);
+  const voxelIndex = (x: number, y: number, z: number) =>
+    x + brickBasis.dims[0] * (y + brickBasis.dims[1] * z);
+  stressEnergyBrickModule.forEachStressEnergyBrickRegionVoxel(
+    {
+      dims: brickBasis.dims,
+      bounds: brickBasis.bounds,
+      hullAxes: brickBasis.hullAxes,
+      hullWall: brickBasis.hullWall,
+      radialMap: brickBasis.radialMap,
+    },
+    (sample: {
+      voxelIndex: [number, number, number];
+      classifiedRegionId: string | null;
+    }) => {
+      const [x, y, z] = sample.voxelIndex;
+      const regionId =
+        typeof sample.classifiedRegionId === "string" &&
+        REQUIRED_SOURCE_CLOSURE_REGION_IDS.includes(
+          sample.classifiedRegionId as RequiredSourceClosureRegionId,
+        )
+          ? (sample.classifiedRegionId as RequiredSourceClosureRegionId)
+          : null;
+      regionVoxelIds[voxelIndex(x, y, z)] = regionId;
+    },
+  );
+
+  const natarioWarpModule = await import("../modules/warp/natario-warp.ts");
+  const metricRegionMeans =
+    evaluateShiftVector != null
+      ? natarioWarpModule.calculateMetricStressEnergyTensorRegionMeansFromShiftField(
+          evaluateShiftVector,
+          {
+            dims: brickBasis.dims,
+            bounds: brickBasis.bounds,
+            classifyRegion: ({ voxelIndex: [x, y, z] }) =>
+              regionVoxelIds[voxelIndex(x, y, z)],
+          },
+        )
+      : null;
+  const metricRegionMap = new Map<
+    RequiredSourceClosureRegionId,
+    {
+      sampleCount: number;
+      diagonalTensor:
+        | {
+            T00: number;
+            T11: number;
+            T22: number;
+            T33: number;
+            isNullEnergyConditionSatisfied: boolean;
+          }
+        | null;
+    }
+  >();
+  for (const region of metricRegionMeans?.regions ?? []) {
+    if (
+      REQUIRED_SOURCE_CLOSURE_REGION_IDS.includes(
+        region.regionId as RequiredSourceClosureRegionId,
+      )
+    ) {
+      metricRegionMap.set(region.regionId as RequiredSourceClosureRegionId, {
+        sampleCount: region.sampleCount,
+        diagonalTensor: region.diagonalTensor,
+      });
+    }
+  }
 
   const tensorSnapshotPaths =
     buildSelectedShiftLapseSourceClosureTensorSnapshotPaths(
@@ -27642,11 +27995,11 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
       familyId,
       shiftLapseProfileId: selectedProfileId,
       shiftLapseProfileStage: selectedProfileStage,
-      tensorSemanticRef: "warp.tileEffectiveStressEnergy.nhm2_shift_lapse.diagonal",
+      tensorSemanticRef: NHM2_SOURCE_CLOSURE_TILE_TENSOR_SEMANTIC_REF,
       sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
       diagonalTensor: globalTileTensor,
       note:
-        "Selected-profile global tile-effective diagonal tensor used by NHM2 source-closure publication.",
+        "Selected-profile global tile-effective diagonal tensor from the GR matter brick global tensor summary used by NHM2 source-closure publication.",
     });
 
   const metricTensorSnapshot = writeNhm2SourceClosureDiagonalTensorSnapshot({
@@ -27660,27 +28013,159 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
     latestJsonPath: tensorSnapshotPaths.tileEffectiveLatestJsonPath,
   });
 
-  const sampledSummariesResult =
-    buildSelectedShiftLapseSourceClosureSampledSummaries({
-      regions: stressRegions,
-      globalTileTensor,
-    });
+  const regionMetricTensorSnapshots = {} as Record<
+    RequiredSourceClosureRegionId,
+    {
+      outJsonPath: string;
+      latestJsonPath: string;
+      artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+    }
+  >;
+  const regionTileTensorSnapshots = {} as Record<
+    RequiredSourceClosureRegionId,
+    {
+      outJsonPath: string;
+      latestJsonPath: string;
+      artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+    }
+  >;
+  const regionComparisons: Nhm2SourceClosureV2RegionComparisonInput[] = [];
 
-  const artifact = buildNhm2SourceClosureArtifact({
+  for (const regionId of REQUIRED_SOURCE_CLOSURE_REGION_IDS) {
+    const regionPaths = tensorSnapshotPaths.regions[regionId];
+    const metricRegionEntry = metricRegionMap.get(regionId);
+    const tileRegionEntry = stressRegionMap.get(regionId);
+    const metricRegionTensor = normalizeSourceClosureTensor(
+      metricRegionEntry?.diagonalTensor ?? null,
+    );
+    const tileRegionTensor = normalizeSourceClosureTensor(tileRegionEntry?.tensor ?? null);
+    const metricRegionNoteParts: string[] = [
+      `Selected-profile integral metric-required diagonal tensor over the shared ${regionId} stress-energy brick mask.`,
+    ];
+    if (metricRegionEntry?.sampleCount != null) {
+      metricRegionNoteParts.push(`sample_count=${metricRegionEntry.sampleCount}`);
+    }
+    if (evaluateShiftVector == null) {
+      metricRegionNoteParts.push(
+        "Publisher could not recover a live shiftVectorField.evaluateShiftVector from the refreshed pipeline state for this publication pass.",
+      );
+    }
+    const tileRegionNoteParts: string[] = [
+      `Selected-profile integral tile-effective diagonal tensor over the shared ${regionId} stress-energy brick mask.`,
+    ];
+    const tileExistingNote = asText(tileRegionEntry?.note);
+    if (tileExistingNote) {
+      tileRegionNoteParts.push(tileExistingNote);
+    }
+    const metricRegionSnapshotArtifact =
+      buildNhm2SourceClosureDiagonalTensorSnapshotArtifact({
+        tensorRole: "metric_required",
+        familyId,
+        shiftLapseProfileId: selectedProfileId,
+        shiftLapseProfileStage: selectedProfileStage,
+        regionId,
+        tensorSemanticRef: `${
+          transportResultArtifact.selectedFamily.metricT00Ref ??
+          "warp.metric.T00.nhm2.shift_lapse"
+        }.region.${regionId}`,
+        sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
+        diagonalTensor: metricRegionTensor,
+        note: metricRegionNoteParts.join(" "),
+      });
+    const tileRegionSnapshotArtifact =
+      buildNhm2SourceClosureDiagonalTensorSnapshotArtifact({
+        tensorRole: "tile_effective",
+        familyId,
+        shiftLapseProfileId: selectedProfileId,
+        shiftLapseProfileStage: selectedProfileStage,
+        regionId,
+        tensorSemanticRef: `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`,
+        sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
+        diagonalTensor: tileRegionTensor,
+        note: tileRegionNoteParts.join(" "),
+      });
+    const metricRegionSnapshot = writeNhm2SourceClosureDiagonalTensorSnapshot({
+      artifact: metricRegionSnapshotArtifact,
+      outJsonPath: regionPaths.metricRequiredOutJsonPath,
+      latestJsonPath: regionPaths.metricRequiredLatestJsonPath,
+    });
+    const tileRegionSnapshot = writeNhm2SourceClosureDiagonalTensorSnapshot({
+      artifact: tileRegionSnapshotArtifact,
+      outJsonPath: regionPaths.tileEffectiveOutJsonPath,
+      latestJsonPath: regionPaths.tileEffectiveLatestJsonPath,
+    });
+    regionMetricTensorSnapshots[regionId] = metricRegionSnapshot;
+    regionTileTensorSnapshots[regionId] = tileRegionSnapshot;
+
+    const metricTensorAvailable = ["T00", "T11", "T22", "T33"].every((component) => {
+      const key = component as keyof Nhm2SourceClosureTensor;
+      return metricRegionTensor[key] != null;
+    });
+    const tileTensorAvailable = ["T00", "T11", "T22", "T33"].every((component) => {
+      const key = component as keyof Nhm2SourceClosureTensor;
+      return tileRegionTensor[key] != null;
+    });
+    const sampleCount =
+      toFiniteNumber(metricRegionEntry?.sampleCount) ??
+      toFiniteNumber(tileRegionEntry?.sampleCount) ??
+      null;
+    const noteParts: string[] = [];
+    if (tileExistingNote) {
+      noteParts.push(tileExistingNote);
+    }
+    if (metricTensorAvailable && tileTensorAvailable) {
+      noteParts.push(
+        "Same-basis regional closure compares selected-profile integral metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask.",
+      );
+      if (
+        toFiniteNumber(metricRegionEntry?.sampleCount) != null &&
+        toFiniteNumber(tileRegionEntry?.sampleCount) != null &&
+        toFiniteNumber(metricRegionEntry?.sampleCount) !==
+          toFiniteNumber(tileRegionEntry?.sampleCount)
+      ) {
+        noteParts.push(
+          `Metric sample count ${toFiniteNumber(metricRegionEntry?.sampleCount)} differs from tile sample count ${toFiniteNumber(tileRegionEntry?.sampleCount)}.`,
+        );
+      }
+    } else if (tileTensorAvailable) {
+      noteParts.push(
+        "Regional source closure is unavailable because the selected-profile metric-required tensor could not be integrated over this region on the shared brick basis during publication.",
+      );
+    } else {
+      noteParts.push(
+        "Regional source closure is unavailable because same-basis regional metric and tile tensors were not both available during publication.",
+      );
+    }
+    regionComparisons.push({
+      regionId,
+      comparisonBasisStatus:
+        metricTensorAvailable && tileTensorAvailable ? "same_basis" : "unavailable",
+      metricTensorRef: normalizePath(metricRegionSnapshot.latestJsonPath),
+      tileTensorRef: normalizePath(tileRegionSnapshot.latestJsonPath),
+      metricRequiredTensor: metricRegionTensor,
+      tileEffectiveTensor: tileRegionTensor,
+      sampleCount,
+      note: noteParts.join(" "),
+    });
+  }
+
+  const artifact = buildNhm2SourceClosureArtifactV2({
     metricTensorRef: normalizePath(metricTensorSnapshot.latestJsonPath),
     tileEffectiveTensorRef: normalizePath(tileTensorSnapshot.latestJsonPath),
     metricRequiredTensor: metricTensor,
     tileEffectiveTensor: globalTileTensor,
-    sampledSummaries: sampledSummariesResult.sampledSummaries,
+    requiredRegionIds: [...REQUIRED_SOURCE_CLOSURE_REGION_IDS],
+    regionComparisons,
     toleranceRelLInf,
     scalarCl3RhoDeltaRel,
-    assumptionsDrifted: sampledSummariesResult.assumptionsDrifted,
   });
 
   return {
     selectedTransport,
     metricTensorSnapshot,
     tileTensorSnapshot,
+    regionMetricTensorSnapshots,
+    regionTileTensorSnapshots,
     sourceClosureArtifact: publishNhm2SourceClosureResearchSurface({
       artifact,
       artifactRootDir,
@@ -27708,12 +28193,28 @@ export const publishNhm2ShiftLapseSourceClosure = async (options?: {
     latestJsonPath: string;
     artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
   };
+  regionMetricTensorSnapshots: Record<
+    RequiredSourceClosureRegionId,
+    {
+      outJsonPath: string;
+      latestJsonPath: string;
+      artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+    }
+  >;
+  regionTileTensorSnapshots: Record<
+    RequiredSourceClosureRegionId,
+    {
+      outJsonPath: string;
+      latestJsonPath: string;
+      artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+    }
+  >;
   sourceClosureArtifact: {
     outJsonPath: string;
     latestJsonPath: string;
     outMdPath: string;
     latestMdPath: string;
-    artifact: Nhm2SourceClosureArtifact;
+    artifact: PublishedNhm2SourceClosureArtifact;
   };
 }> =>
   withProofSurfacePublicationLock({
@@ -33405,15 +33906,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     buildSelectedShiftLapseSourceClosureTensorSnapshotPaths(
       selectedFamilyArtifactRootDir,
     );
-  const sourceClosureInspection = inspectPublishedAuditArtifact<{
-    status: string;
-    reasonCodes: string[];
-    tensorRefs: { metricRequired: string | null; tileEffective: string | null };
-    residualNorms: { relL2: number | null; relLInf: number | null };
-    sampledSummaries: {
-      regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
-    };
-  }>({
+  const sourceClosureInspection = inspectPublishedAuditArtifact<SourceClosureInspectionArtifact>({
     expectedPath: rootSourceClosureLatestJsonPath,
     artifactId: "nhm2_source_closure",
     validator: isNhm2SourceClosureArtifactLike,
@@ -33434,6 +33927,38 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       expectedProfileId: selectedProfileId,
       expectedFamilyId: selectedFamilyId,
     });
+  const sourceClosureRegionMetricTensorInspections = Object.fromEntries(
+    REQUIRED_SOURCE_CLOSURE_REGION_IDS.map((regionId) => [
+      regionId,
+      inspectPublishedAuditArtifact<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>({
+        expectedPath:
+          sourceClosureTensorSnapshotPaths.regions[regionId].metricRequiredLatestJsonPath,
+        artifactId: `nhm2_source_closure_metric_required_tensor_${regionId}`,
+        validator: isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+        expectedProfileId: selectedProfileId,
+        expectedFamilyId: selectedFamilyId,
+      }),
+    ]),
+  ) as Record<
+    RequiredSourceClosureRegionId,
+    Nhm2FullLoopArtifactInspection<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>
+  >;
+  const sourceClosureRegionTileTensorInspections = Object.fromEntries(
+    REQUIRED_SOURCE_CLOSURE_REGION_IDS.map((regionId) => [
+      regionId,
+      inspectPublishedAuditArtifact<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>({
+        expectedPath:
+          sourceClosureTensorSnapshotPaths.regions[regionId].tileEffectiveLatestJsonPath,
+        artifactId: `nhm2_source_closure_tile_effective_tensor_${regionId}`,
+        validator: isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+        expectedProfileId: selectedProfileId,
+        expectedFamilyId: selectedFamilyId,
+      }),
+    ]),
+  ) as Record<
+    RequiredSourceClosureRegionId,
+    Nhm2FullLoopArtifactInspection<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>
+  >;
   const observerAuditInspection =
     inspectPublishedAuditArtifact<Nhm2ObserverAuditArtifact>({
       expectedPath: rootObserverAuditLatestJsonPath,
@@ -33699,18 +34224,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       : null;
   const sourceClosureArtifact =
     sourceClosureInspection.parseStatus === "pass"
-      ? (sourceClosureInspection.parsed as {
-          status: string;
-          reasonCodes: string[];
-          tensorRefs: { metricRequired: string | null; tileEffective: string | null };
-          residualNorms: { relL2: number | null; relLInf: number | null };
-          sampledSummaries: {
-            regions: Array<{
-              regionId: string;
-              residualNorms?: { relLInf?: number | null };
-            }>;
-          };
-        })
+      ? (sourceClosureInspection.parsed as SourceClosureInspectionArtifact)
       : null;
   appendArtifactPathCheck({
     inspection: sourceClosureInspection,
@@ -33726,6 +34240,62 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     expectedPath: sourceClosureTensorSnapshotPaths.tileEffectiveLatestJsonPath,
     mismatchCode: "source_closure_tile_tensor_ref_mismatch",
   });
+  for (const regionId of REQUIRED_SOURCE_CLOSURE_REGION_IDS) {
+    const metricInspection = sourceClosureRegionMetricTensorInspections[regionId];
+    const tileInspection = sourceClosureRegionTileTensorInspections[regionId];
+    if (
+      metricInspection.parseStatus === "pass" &&
+      metricInspection.parsed?.regionId !== regionId
+    ) {
+      appendInspectionMismatch(
+        metricInspection,
+        `source_closure_metric_tensor_region_mismatch:${metricInspection.parsed?.regionId ?? "null"}:${regionId}`,
+      );
+    }
+    if (
+      tileInspection.parseStatus === "pass" &&
+      tileInspection.parsed?.regionId !== regionId
+    ) {
+      appendInspectionMismatch(
+        tileInspection,
+        `source_closure_tile_tensor_region_mismatch:${tileInspection.parsed?.regionId ?? "null"}:${regionId}`,
+      );
+    }
+    if (sourceClosureArtifact?.regionComparisons?.regions) {
+      const publishedRegion = sourceClosureArtifact.regionComparisons.regions.find(
+        (entry) => entry.regionId === regionId,
+      );
+      if (!publishedRegion) {
+        appendInspectionMismatch(
+          sourceClosureInspection,
+          `source_closure_region_missing:${regionId}`,
+        );
+        continue;
+      }
+      if (
+        normalizePath(publishedRegion.metricTensorRef ?? "") !==
+        normalizePath(
+          sourceClosureTensorSnapshotPaths.regions[regionId].metricRequiredLatestJsonPath,
+        )
+      ) {
+        appendInspectionMismatch(
+          sourceClosureInspection,
+          `source_closure_region_metric_tensor_ref_mismatch:${regionId}`,
+        );
+      }
+      if (
+        normalizePath(publishedRegion.tileTensorRef ?? "") !==
+        normalizePath(
+          sourceClosureTensorSnapshotPaths.regions[regionId].tileEffectiveLatestJsonPath,
+        )
+      ) {
+        appendInspectionMismatch(
+          sourceClosureInspection,
+          `source_closure_region_tile_tensor_ref_mismatch:${regionId}`,
+        );
+      }
+    }
+  }
   appendArtifactPathCheck({
     inspection: observerAuditInspection,
     value: observerAuditInspection.parsed,
@@ -33791,6 +34361,12 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     sourceClosureInspection,
     sourceClosureMetricTensorInspection,
     sourceClosureTileTensorInspection,
+    ...(sourceClosureArtifact?.schemaVersion === "nhm2_source_closure/v2"
+      ? [
+          ...Object.values(sourceClosureRegionMetricTensorInspections),
+          ...Object.values(sourceClosureRegionTileTensorInspections),
+        ]
+      : []),
   ];
   const observerAuditInspections = [observerAuditInspection];
   const grStabilityInspections = [
@@ -33926,6 +34502,14 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
           "metric_tensor_incomplete",
           "tile_tensor_incomplete",
           "tolerance_missing",
+          ...(sourceClosureArtifact.schemaVersion === "nhm2_source_closure/v2"
+            ? [
+                "region_metric_tensor_missing",
+                "region_tile_tensor_missing",
+                "region_metric_tensor_incomplete",
+                "region_tile_tensor_incomplete",
+              ]
+            : []),
         ].includes(entry),
       )
     ) {
@@ -33934,7 +34518,14 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     if (sourceClosureArtifact.reasonCodes.includes("tensor_residual_exceeded")) {
       sourceClosureReasons.push("source_closure_residual_exceeded");
     }
-    if (sourceClosureArtifact.reasonCodes.includes("assumption_drift")) {
+    if (
+      sourceClosureArtifact.reasonCodes.some(
+        (entry) =>
+          isRegionSourceClosureReviewCode(entry) ||
+          (sourceClosureArtifact.schemaVersion === "nhm2_source_closure/v2" &&
+            entry === "region_basis_diagnostic_only"),
+      )
+    ) {
       sourceClosureReasons.push("policy_review_required");
     }
     if (hasInspectionMismatch(sourceClosureInspections)) {
@@ -34140,7 +34731,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       null,
   });
 
-  const sourceClosureRegions = sourceClosureArtifact?.sampledSummaries.regions ?? [];
+  const sourceClosureRegions = getPublishedSourceClosureRegions(sourceClosureArtifact);
   const envelopeHashConsistencyStatus =
     rootEnvelopeChecksum != null && selectedEnvelopeChecksum != null
       ? rootEnvelopeChecksum === selectedEnvelopeChecksum
@@ -34242,8 +34833,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
             ?.residualNorms?.relLInf ?? null,
       },
       toleranceRef: "tensor_residual_relLInf",
-      assumptionsDrifted:
-        sourceClosureArtifact?.reasonCodes.includes("assumption_drift") ?? null,
+      assumptionsDrifted: sourceClosureArtifact?.assumptionsDrifted ?? null,
     },
     observer_audit: {
       sectionId: "observer_audit",

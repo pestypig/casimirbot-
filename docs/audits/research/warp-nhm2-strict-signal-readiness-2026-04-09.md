@@ -12,7 +12,7 @@
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-strict-signal-readiness |
 | family.familyId | nhm2_shift_lapse |
 | family.familyAuthorityStatus | candidate_authoritative_solve_family |
-| family.transportCertificationStatus | bounded_transport_fail_closed_reference_only |
+| family.transportCertificationStatus | bounded_transport_proof_bearing_gate_admitted |
 | family.lapseSummary.shiftLapseProfileId | stage1_centerline_alpha_0p995_v1 |
 | family.lapseSummary.shiftLapseProfileStage | controlled_tuning_stage_1 |
 | family.lapseSummary.shiftLapseProfileLabel | Stage 1 centerline alpha 0.995 |

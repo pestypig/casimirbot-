@@ -5,6 +5,7 @@
   "familyId": "nhm2_shift_lapse",
   "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
   "shiftLapseProfileStage": "controlled_tuning_stage_1",
+  "regionId": null,
   "tensorSemanticRef": "warp.metric.T00.nhm2.shift_lapse",
   "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
   "producer": "scripts/warp-york-control-family-proof-pack.ts",

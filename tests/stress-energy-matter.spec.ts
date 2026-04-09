@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GridSpec } from "../modules/gr/bssn-state";
+import { calculateMetricStressEnergyTensorRegionMeansFromShiftField } from "../modules/warp/natario-warp";
 import type { StressEnergyBrick } from "../server/stress-energy-brick";
 import { buildStressEnergyFieldSetFromBrick } from "../server/gr/evolution/stress-energy";
 
@@ -141,5 +142,53 @@ describe("stress-energy matter modeling", () => {
       conservationDamping: 1,
     });
     expect(damped.Sx[0]).toBeCloseTo(1);
+  });
+
+  it("computes honest region means for metric-side stress on a shared voxel basis", () => {
+    const result = calculateMetricStressEnergyTensorRegionMeansFromShiftField(
+      (x, y, z) => [2 * x, 3 * y, 5 * z],
+      {
+        dims: [6, 4, 2],
+        bounds: {
+          min: [-3, -2, -1],
+          max: [3, 2, 1],
+        },
+        classifyRegion: ({ position: [x] }) => (x < 0 ? "hull" : "wall"),
+      },
+    );
+
+    expect(result.global.sampleCount).toBe(48);
+    expect(result.regions.map((entry) => entry.regionId).sort()).toEqual([
+      "hull",
+      "wall",
+    ]);
+
+    const hull = result.regions.find((entry) => entry.regionId === "hull");
+    const wall = result.regions.find((entry) => entry.regionId === "wall");
+    expect(hull?.sampleCount).toBe(24);
+    expect(wall?.sampleCount).toBe(24);
+    expect(result.global.diagonalTensor).not.toBeNull();
+    expect(hull?.diagonalTensor).not.toBeNull();
+    expect(wall?.diagonalTensor).not.toBeNull();
+
+    const relDiff = (a: number, b: number) =>
+      Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1);
+
+    expect(
+      relDiff(result.global.diagonalTensor?.T00 ?? 0, hull?.diagonalTensor?.T00 ?? 0),
+    ).toBeLessThan(1e-12);
+    expect(
+      relDiff(result.global.diagonalTensor?.T00 ?? 0, wall?.diagonalTensor?.T00 ?? 0),
+    ).toBeLessThan(1e-12);
+    expect(
+      relDiff(result.global.diagonalTensor?.T11 ?? 0, hull?.diagonalTensor?.T11 ?? 0),
+    ).toBeLessThan(1e-12);
+    expect(
+      relDiff(result.global.diagonalTensor?.T11 ?? 0, wall?.diagonalTensor?.T11 ?? 0),
+    ).toBeLessThan(1e-12);
+    expect(result.global.diagonalTensor?.T11).toBeCloseTo(
+      -(result.global.diagonalTensor?.T00 ?? 0),
+    );
+    expect(result.grid.spacing).toEqual([1, 1, 1]);
   });
 });

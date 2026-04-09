@@ -1,19 +1,19 @@
 {
   "artifactId": "nhm2_source_closure_diagonal_tensor",
   "schemaVersion": "nhm2_source_closure_diagonal_tensor/v1",
-  "tensorRole": "tile_effective",
+  "tensorRole": "metric_required",
   "familyId": "nhm2_shift_lapse",
   "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
   "shiftLapseProfileStage": "controlled_tuning_stage_1",
-  "regionId": null,
-  "tensorSemanticRef": "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy",
+  "regionId": "hull",
+  "tensorSemanticRef": "warp.metric.T00.nhm2.shift_lapse.region.hull",
   "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
   "producer": "scripts/warp-york-control-family-proof-pack.ts",
   "diagonalTensor": {
-    "T00": -58267450.96267209,
-    "T11": 58267450.96267209,
-    "T22": 58267450.96267209,
-    "T33": 58267450.96267209
+    "T00": -733553902.6786809,
+    "T11": 733553902.6786809,
+    "T22": 733553902.6786809,
+    "T33": 733553902.6786809
   },
-  "note": "Selected-profile global tile-effective diagonal tensor from the GR matter brick global tensor summary used by NHM2 source-closure publication."
+  "note": "Selected-profile integral metric-required diagonal tensor over the shared hull stress-energy brick mask. sample_count=1096760"
 }

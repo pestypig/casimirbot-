@@ -448,3 +448,31 @@ export const buildNhm2SourceClosureArtifact = (
       input.assumptionsDrifted == null ? null : input.assumptionsDrifted === true,
   };
 };
+
+export const isNhm2SourceClosureArtifact = (
+  value: unknown,
+): value is Nhm2SourceClosureArtifact => {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  const sampledSummaries =
+    record.sampledSummaries && typeof record.sampledSummaries === "object"
+      ? (record.sampledSummaries as Record<string, unknown>)
+      : null;
+  const regions = Array.isArray(sampledSummaries?.regions)
+    ? (sampledSummaries?.regions as Array<Record<string, unknown>>)
+    : null;
+  return (
+    record.artifactId === NHM2_SOURCE_CLOSURE_ARTIFACT_ID &&
+    record.schemaVersion === NHM2_SOURCE_CLOSURE_SCHEMA_VERSION &&
+    NHM2_SOURCE_CLOSURE_STATUS_VALUES.includes(record.status as Nhm2SourceClosureStatus) &&
+    NHM2_SOURCE_CLOSURE_COMPLETENESS_VALUES.includes(
+      record.completeness as Nhm2SourceClosureCompleteness,
+    ) &&
+    record.tensorRefs != null &&
+    record.residualNorms != null &&
+    Array.isArray(record.reasonCodes) &&
+    sampledSummaries != null &&
+    regions != null &&
+    regions.every((entry) => typeof entry.regionId === "string")
+  );
+};

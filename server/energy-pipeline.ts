@@ -101,7 +101,10 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessProvenance,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1.ts";
-import type { StressEnergyStats } from "./stress-energy-brick";
+import {
+  buildStressEnergyBrick,
+  type StressEnergyStats,
+} from "./stress-energy-brick";
 import {
   DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID,
   deriveWarpMetricFamilySemantics,
@@ -262,6 +265,7 @@ export interface PipelineRunOptions {
   sweepMode?: "auto" | "skip" | "force" | "async";
   scheduleSweep?: (request: ScheduleSweepRequest) => void;
   sweepReason?: string;
+  preserveLiveWarpFunctions?: boolean;
 }
 
 const parseEnvNumber = (value: string | undefined, fallback: number): number => {
@@ -3998,6 +4002,56 @@ const resolveNhm2SourceClosureTolerance = (): number => {
     : DEFAULT_NHM2_SOURCE_CLOSURE_REL_LINF_MAX;
 };
 
+const NHM2_SOURCE_CLOSURE_TILE_GLOBAL_SUMMARY_REF =
+  "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
+
+const resolveNhm2SourceClosureTileEffectiveTensor = (
+  state: EnergyPipelineState,
+): {
+  tileEffectiveTensor: Nhm2SourceClosureTensor | null;
+  tileEffectiveTensorRef: string;
+} => {
+  const globalRegion = state.gr?.matter?.stressEnergy?.tensorSampledSummaries?.regions?.find(
+    (region) => region.regionId === "global",
+  );
+  const globalRegionTensor = extractNhm2SourceClosureTensor(globalRegion?.tensor);
+  if (globalRegionTensor != null) {
+    return {
+      tileEffectiveTensor: globalRegionTensor,
+      tileEffectiveTensorRef: NHM2_SOURCE_CLOSURE_TILE_GLOBAL_SUMMARY_REF,
+    };
+  }
+
+  const fallbackBrick = buildStressEnergyBrick({
+    metricT00: toFiniteNumber((state as any)?.warp?.metricT00) ?? undefined,
+    metricT00Ref: asText((state as any)?.warp?.metricT00Ref) ?? undefined,
+    metricT00Source:
+      asText((state as any)?.warp?.metricT00Source) ??
+      asText((state as any)?.warp?.stressEnergySource) ??
+      undefined,
+    warpFieldType: "nhm2_shift_lapse",
+  });
+  const brickGlobalTensor = extractNhm2SourceClosureTensor(
+    fallbackBrick.stats.tensorSampledSummaries?.regions?.find(
+      (region) => region.regionId === "global",
+    )?.tensor,
+  );
+  if (brickGlobalTensor != null) {
+    return {
+      tileEffectiveTensor: brickGlobalTensor,
+      tileEffectiveTensorRef: NHM2_SOURCE_CLOSURE_TILE_GLOBAL_SUMMARY_REF,
+    };
+  }
+
+  const fallbackTensor =
+    extractNhm2SourceClosureTensor((state as any).warp?.tileEffectiveStressEnergy) ??
+    extractNhm2SourceClosureTensor((state as any)?.tileEffectiveStressEnergy);
+  return {
+    tileEffectiveTensor: fallbackTensor,
+    tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+  };
+};
+
 const magnitudeVec3 = (value: [number, number, number]): number =>
   Math.hypot(value[0], value[1], value[2]);
 
@@ -4528,15 +4582,12 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
         ? warpState?.stressEnergyTensor
         : null,
     );
-  const tileEffectiveTensor =
-    extractNhm2SourceClosureTensor(warpState?.tileEffectiveStressEnergy) ??
-    extractNhm2SourceClosureTensor((state as any)?.tileEffectiveStressEnergy);
+  const { tileEffectiveTensor, tileEffectiveTensorRef } =
+    resolveNhm2SourceClosureTileEffectiveTensor(state);
   const metricTensorRef =
     metricRequiredTensor != null
       ? metricT00Ref ?? "warp.metricStressEnergy"
       : "warp.metricStressEnergy";
-  const tileEffectiveTensorRef =
-    tileEffectiveTensor != null ? "warp.tileEffectiveStressEnergy" : "warp.tileEffectiveStressEnergy";
   const sampledSummaries = collectNhm2SourceClosureSampledSummaries(
     state,
     tileEffectiveTensor,
@@ -8179,6 +8230,9 @@ export async function calculateEnergyPipeline(
 
     const sanitizeWarpResult = (warpResult: unknown) => {
       if (!warpResult || typeof warpResult !== "object") return warpResult;
+      if (opts.preserveLiveWarpFunctions === true) {
+        return warpResult;
+      }
       const result = warpResult as Record<string, unknown>;
       const shiftVectorField = result.shiftVectorField;
       if (shiftVectorField && typeof shiftVectorField === "object") {

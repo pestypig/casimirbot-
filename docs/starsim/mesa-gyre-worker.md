@@ -26,6 +26,7 @@ Control the runtime per solver with environment variables:
 - `STAR_SIM_JOB_MAX_ATTEMPTS=<n>`
 - `STAR_SIM_CACHE_TTL_MS=<ms>`
 - `STAR_SIM_ARTIFACT_ROOT=<path>`
+- `STAR_SIM_BENCHMARK_REGISTRY_VERSION=<version>`
 
 Current implementation notes:
 
@@ -35,25 +36,59 @@ Current implementation notes:
 
 On Windows, prefer `docker` or `wsl` for future real MESA/GYRE execution. Do not assume a direct native Windows install path.
 
-## Benchmark Scope
+## Supported Domain
 
-The live runtime path is benchmark-scoped, not general any-star solving.
+The live runtime path is no longer benchmark-case-only, but it is still narrow. Current live fitting support is limited to a declared solar-like main-sequence domain:
+
+- solar-like / near-solar temperatures
+- main-sequence gravity assumptions
+- bounded metallicity, rotation, and mass envelope
+- no compact objects
+- no giants or subgiants
 
 Supported benchmark ids currently include:
 
 - `simplex_solar_calibration`
 - `astero_gyre_solar_like`
 
-Requests may provide `benchmark_case_id` explicitly. If they do not, `star-sim-v1` only runs live execution when a deterministic benchmark mapping exists. Unsupported live requests return `benchmark_required` or `out_of_domain` instead of guessing.
+Requests may provide `benchmark_case_id` explicitly. If they do not, `star-sim-v1` can still run live fitting inside the declared supported domain using constrained profiles such as:
+
+- `solar_like_observable_fit_v1`
+- `solar_like_seismic_compare_v1`
+
+Unsupported or underconstrained live requests return explicit reasons such as:
+
+- `out_of_supported_domain`
+- `insufficient_observables`
+- `seismology_required`
+- `unsupported_evolutionary_state`
 
 Live runtime results only earn `research_sim` when all of the following are true:
 
-- the request resolved to a supported benchmark
+- the request stayed inside the declared supported domain
 - the runtime actually executed a live solver command
 - required artifacts were produced
-- benchmark validation passed
+- benchmark-pack validation passed
+- benchmark-case validation passed when an explicit benchmark case is in play
 
 Mock output stays below `research_sim` even when it reuses the same lane names.
+
+## Benchmark Packs
+
+Live fitting is tied to named benchmark packs, not just individual benchmark cases. Current pack ids include:
+
+- `solar_like_structure_fit_pack_v1`
+- `solar_like_seismic_compare_pack_v1`
+
+Each successful live lane records:
+
+- benchmark pack id
+- benchmark registry version
+- tolerance profile
+- support mode
+- benchmark family ids
+
+The benchmark pack is also persisted as a first-class artifact in the heavy-lane cache.
 
 ## Live Runtime JSON Protocol
 
@@ -65,11 +100,15 @@ Input payload fields include:
 - `lane_id`
 - `cache_key`
 - `benchmark_case_id`
+- `benchmark_pack_id`
+- `fit_profile_id`
+- `fit_constraints`
 - `physics_flags`
 - `target`
 - `canonical_observables`
 - `requested_lanes`
 - `evidence_refs`
+- `supported_domain`
 
 `oscillation_gyre` inputs also include:
 
@@ -80,11 +119,17 @@ Input payload fields include:
 Output payload fields for a successful live benchmark run include:
 
 - `schema_version: "star-sim-runtime-result/1"`
-- `execution_mode: "live_benchmark"`
+- `execution_mode: "live_fit"` for `structure_mesa`
+- `execution_mode: "live_comparison"` for `oscillation_gyre`
 - `live_solver: true`
 - `solver_version`
 - `benchmark_case_id`
+- `benchmark_pack_id`
+- `fit_profile_id`
+- `fit_status`
+- `supported_domain`
 - lane-specific summaries such as `structure_summary`, `synthetic_observables`, or `mode_summary`
+- `fit_summary` or `comparison_summary`
 - `artifact_payloads`
 - `live_solver_metadata`
 
@@ -176,8 +221,9 @@ Live benchmark runs may also persist runtime-produced files such as:
 - `solver_metadata`
 - `model_artifact`
 - `mode_table`
+- `benchmark_pack`
 
-Those runtime artifact kinds are part of benchmark validation.
+Those artifact kinds are part of benchmark-pack validation.
 
 ## Cache Invalidation
 
@@ -188,7 +234,7 @@ Those runtime artifact kinds are part of benchmark validation.
 ## Maturity Semantics
 
 - Mock runtime results are cached as fixture-backed orchestration outputs and use lower maturity than real external solver runs.
-- Live external benchmark backends should only claim `research_sim` once benchmark validation passes.
+- Live external fit/comparison backends should only claim `research_sim` once supported-domain and benchmark-pack validation pass.
 - A live run that finishes but misses its tolerance envelope fails with `benchmark_validation_failed` and is not cached as a successful artifact.
 - `oscillation_gyre` must reference a `structure_mesa` parent claim. It must not fabricate a stand-alone seismic result without a structure artifact.
 
@@ -207,7 +253,7 @@ The lane result exposes `benchmark_validation` with:
 - `checked_metrics`
 - `notes`
 
-This validates benchmark agreement for the narrow supported benchmark case. It is not a blanket claim that arbitrary-star science is solved.
+This validates either benchmark-case agreement or benchmark-pack agreement for the narrow supported solar-like domain. It is not a blanket claim that arbitrary-star science is solved.
 
 ## Job Dedupe And Recovery
 
