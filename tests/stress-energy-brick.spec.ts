@@ -70,6 +70,9 @@ describe("stress-energy brick builder", () => {
     const global = summaries?.regions.find((region) => region.regionId === "global");
     expect(global?.tensor.T00).toBeCloseTo(brick.stats.avgT00, 5);
     expect(global?.tensor.T11).toBeCloseTo(-brick.stats.avgT00, 5);
+    expect(global?.t00Diagnostics?.skippedCount).toBeNull();
+    expect(global?.t00Diagnostics?.nonFiniteCount).toBeNull();
+    expect(global?.t00Diagnostics?.evidenceStatus).toBe("inferred");
   });
 
   it("computes observer-robust energy-condition margins", () => {

@@ -13,23 +13,23 @@
 | reasonCodes | tensor_residual_exceeded |
 | tensorRefs.metricRequired | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json |
 | tensorRefs.tileEffective | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json |
-| residualNorms.relL2 | 9.228761628158325e-10 |
-| residualNorms.relLInf | 4.6143808140791624e-10 |
+| residualNorms.relL2 | 1.372125292540442e-9 |
+| residualNorms.relLInf | 6.86062646270221e-10 |
 | residualNorms.toleranceRelLInf | 0.1 |
 | regional.status | available |
 | regional.regionIds | hull, wall, exterior_shell |
 | assumptionsDrifted | false |
-| scalarCl3RhoDeltaRel | 0 |
+| scalarCl3RhoDeltaRel | 4.814474944003001e-25 |
 | scalarCongruenceSecondary | true |
 | scalarSurfaceId | CL3_RhoDelta |
 
 ## Global Tensor Comparison
 | component | metricRequired | tileEffective | absResidual | relResidual |
 |---|---|---|---|---|
-| T00 | -58267450.98955891 | -58267450.96267209 | 0.026886820793151855 | 4.6143808140791624e-10 |
-| T11 | 58267450.98955891 | 58267450.96267209 | 0.026886820793151855 | 4.6143808140791624e-10 |
-| T22 | 58267450.98955891 | 58267450.96267209 | 0.026886820793151855 | 4.6143808140791624e-10 |
-| T33 | 58267450.98955891 | 58267450.96267209 | 0.026886820793151855 | 4.6143808140791624e-10 |
+| T00 | -58267450.98955891 | -58267450.94958379 | 0.0399751216173172 | 6.86062646270221e-10 |
+| T11 | 58267450.98955891 | 58267450.94958379 | 0.0399751216173172 | 6.86062646270221e-10 |
+| T22 | 58267450.98955891 | 58267450.94958379 | 0.0399751216173172 | 6.86062646270221e-10 |
+| T33 | 58267450.98955891 | 58267450.94958379 | 0.0399751216173172 | 6.86062646270221e-10 |
 
 ## Regional Comparisons (Summary)
 | regionId | basis | status | sampleCount | relLInf | dominantComponent | dominantRel | scaleSide | scaleRatio | signStatus | accounting | note |
@@ -71,6 +71,7 @@
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-hull-latest.json |
 | accountingStatus | accounting_unknown |
 | accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
+| t00MismatchMechanism | unknown |
 | note | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -105,6 +106,18 @@
 | regionMaskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
 | supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
 
+| t00 diagnostic field | metric | tile |
+|---|---|---|
+| sampleCount | 1096760 | 1096760 |
+| includedCount | null | null |
+| skippedCount | null | null |
+| nonFiniteCount | null | null |
+| meanT00 | -733553902.6786809 | -16732756.921958108 |
+| sumT00 | null | -18351818481726.773 |
+| aggregationMode | mean | mean |
+| normalizationBasis | sample_count | sample_count |
+| evidenceStatus | inferred | inferred |
+
 ### Region: wall
 | field | value |
 |---|---|
@@ -137,6 +150,7 @@
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-wall-latest.json |
 | accountingStatus | accounting_unknown |
 | accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
+| t00MismatchMechanism | unknown |
 | note | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -171,6 +185,18 @@
 | regionMaskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
 | supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
 
+| t00 diagnostic field | metric | tile |
+|---|---|---|
+| sampleCount | 3352 | 3352 |
+| includedCount | null | null |
+| skippedCount | null | null |
+| nonFiniteCount | null | null |
+| meanT00 | -1699539201.2526472 | -27108804644.765415 |
+| sumT00 | null | -90868713169253.67 |
+| aggregationMode | mean | mean |
+| normalizationBasis | sample_count | sample_count |
+| evidenceStatus | inferred | inferred |
+
 ### Region: exterior_shell
 | field | value |
 |---|---|
@@ -203,6 +229,7 @@
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-exterior-shell-latest.json |
 | accountingStatus | accounting_unknown |
 | accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
+| t00MismatchMechanism | unknown |
 | note | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -236,4 +263,16 @@
 | evidenceStatus | unknown | measured |
 | regionMaskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
 | supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
+
+| t00 diagnostic field | metric | tile |
+|---|---|---|
+| sampleCount | 2504 | 2504 |
+| includedCount | null | null |
+| skippedCount | null | null |
+| nonFiniteCount | null | null |
+| meanT00 | -1699157799.1011546 | -5133810475.7006645 |
+| sumT00 | null | -12855061431154.465 |
+| aggregationMode | mean | mean |
+| normalizationBasis | sample_count | sample_count |
+| evidenceStatus | inferred | inferred |
 
