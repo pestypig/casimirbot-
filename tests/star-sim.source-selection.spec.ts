@@ -4,6 +4,7 @@ import path from "node:path";
 import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { __buildFallbackSummaryForTest } from "../server/modules/starsim/sources/registry";
 
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
 
@@ -112,6 +113,7 @@ describe("star-sim source selection policy", () => {
       "sdss_astra",
       "lamost_dr10",
     ]);
+    expect(res.body.crossmatch_summary.fallback_used).toBe(false);
   });
 
   it("selects TASOC over TESS/MAST deterministically for seismic summaries by default preference", async () => {
@@ -160,5 +162,82 @@ describe("star-sim source selection policy", () => {
     expect(res.body.canonical_request_draft.asteroseismology.numax_uHz).toBe(3085.2);
     expect(res.body.source_resolution.selection_manifest.fields["asteroseismology.numax_uHz"].selected_from).toBe("tasoc");
     expect(res.body.source_resolution.selection_manifest.fields["asteroseismology.numax_uHz"].reason).toBe("strict_catalog_resolution");
+  });
+
+  it("reports fallback_used only when fallback fields are actually selected", async () => {
+    const app = await buildApp();
+    const preferredWins = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: { name: "Demo Solar A" },
+        identifiers: { gaia_dr3_source_id: "123456789012345678" },
+      })
+      .expect(200);
+    expect(preferredWins.body.crossmatch_summary.fallback_used).toBe(false);
+
+    const fallbackSummary = __buildFallbackSummaryForTest({
+      selectionManifest: {
+        schema_version: "star-sim-source-selection/2",
+        target_query: { object_id: null, name: null, identifiers: {} },
+        fields: {
+          "spectroscopy.teff_K": {
+            field_path: "spectroscopy.teff_K",
+            selected_from: "lamost_dr10",
+            reason: "fallback_catalog",
+            chosen: {
+              field_path: "spectroscopy.teff_K",
+              selected_from: "lamost_dr10",
+              value: 5790,
+              unit: "K",
+              uncertainty: null,
+              status: "observed",
+              source_record_id: "lamost_dr10:mock",
+              identifiers: {},
+              quality_flags: [],
+              provenance_ref: "mock",
+              raw_payload_ref: "mock",
+            },
+            candidates: [
+              {
+                field_path: "spectroscopy.teff_K",
+                selected_from: "sdss_astra",
+                value: 5821,
+                unit: "K",
+                uncertainty: null,
+                status: "observed",
+                source_record_id: "sdss_astra:mock",
+                identifiers: {},
+                quality_flags: [],
+                provenance_ref: "mock",
+                raw_payload_ref: "mock",
+              },
+              {
+                field_path: "spectroscopy.teff_K",
+                selected_from: "lamost_dr10",
+                value: 5790,
+                unit: "K",
+                uncertainty: null,
+                status: "observed",
+                source_record_id: "lamost_dr10:mock",
+                identifiers: {},
+                quality_flags: [],
+                provenance_ref: "mock",
+                raw_payload_ref: "mock",
+              },
+            ],
+          },
+        },
+      } as any,
+      preferredCatalogs: ["gaia_dr3", "sdss_astra", "lamost_dr10", "tasoc", "tess_mast"],
+      qualityRejections: [
+        {
+          catalog: "sdss_astra",
+          reason: "rejected_identifier_conflict",
+          field_path: "spectroscopy",
+        },
+      ],
+    });
+    expect(fallbackSummary.fallback_used).toBe(true);
+    expect(fallbackSummary.fallback_fields.length).toBeGreaterThan(0);
   });
 });

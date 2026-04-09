@@ -1,6 +1,7 @@
 import { canonicalizeStarSimRequest } from "./canonicalize";
 import { evaluateStarSimSupportedDomain } from "./domain";
 import type {
+  StarSimBenchmarkTargetMatchMode,
   RequestedLane,
   StarSimPreconditionPolicy,
   StarSimPreflight,
@@ -46,6 +47,9 @@ export const evaluateStarSimPreflight = (args: {
   sourceReasons?: string[];
   policy?: StarSimPreconditionPolicy;
   benchmarkTargetId?: string;
+  benchmarkTargetMatchMode?: StarSimBenchmarkTargetMatchMode;
+  benchmarkTargetConflictReason?: string;
+  benchmarkTargetQualityOk?: boolean;
   fallbackUsed?: boolean;
   qualityRejections?: Array<{ reason: string }>;
 }): StarSimPreflight => {
@@ -140,6 +144,9 @@ export const evaluateStarSimPreflight = (args: {
     by_lane: byLane,
     benchmark_target_id: args.benchmarkTargetId,
     benchmark_backed: Boolean(args.benchmarkTargetId),
+    benchmark_target_match_mode: args.benchmarkTargetMatchMode,
+    benchmark_target_conflict_reason: args.benchmarkTargetConflictReason,
+    benchmark_target_quality_ok: args.benchmarkTargetQualityOk,
     source_resolution_quality_ok: (args.qualityRejections ?? []).length === 0,
     fallback_used: args.fallbackUsed ?? false,
   };

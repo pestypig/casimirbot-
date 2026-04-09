@@ -308,6 +308,7 @@ export const buildSourceSelectionManifest = (args: {
   policy: Required<StarSimSourcePolicy>;
   identifiersResolved: StarSimSourceIdentifiers;
   qualityRejections?: import("../contract").StarSimQualityRejection[];
+  qualityWarnings?: import("../contract").StarSimQualityWarning[];
 }): StarSimSourceSelectionManifest => {
   const fields: Record<string, StarSimSourceFieldSelection> = {};
   const activeCatalogs = args.allowFallbacks
@@ -349,6 +350,7 @@ export const buildSourceSelectionManifest = (args: {
     },
     fields,
     quality_rejections: args.qualityRejections,
+    quality_warnings: args.qualityWarnings,
   };
 };
 
