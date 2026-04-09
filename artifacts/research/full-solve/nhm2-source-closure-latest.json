@@ -197,6 +197,8 @@
           "dominantComponent": "T00",
           "dominantAbsRatio": 43.83939276115646,
           "dominantSide": "metric",
+          "t00MechanismCategory": "t00_mismatch_present",
+          "t00MechanismEvidenceStatus": "inferred",
           "components": {
             "T00": {
               "metricValue": -733553902.6786809,
@@ -412,6 +414,8 @@
           "dominantComponent": "T00",
           "dominantAbsRatio": 15.950679233985802,
           "dominantSide": "tile",
+          "t00MechanismCategory": "t00_mismatch_present",
+          "t00MechanismEvidenceStatus": "inferred",
           "components": {
             "T00": {
               "metricValue": -1699539201.2526472,
@@ -627,6 +631,8 @@
           "dominantComponent": "T00",
           "dominantAbsRatio": 3.0213853465619396,
           "dominantSide": "tile",
+          "t00MechanismCategory": "t00_mismatch_present",
+          "t00MechanismEvidenceStatus": "inferred",
           "components": {
             "T00": {
               "metricValue": -1699157799.1011546,

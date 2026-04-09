@@ -58,6 +58,13 @@ export type Nhm2SourceClosureRegionAggregationMode =
   (typeof NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES)[number];
 export type Nhm2SourceClosureV2RegionAccountingEvidenceStatus =
   (typeof NHM2_SOURCE_CLOSURE_REGION_ACCOUNTING_EVIDENCE_VALUES)[number];
+export type Nhm2SourceClosureV2RegionT00MechanismCategory =
+  | "t00_mismatch_present"
+  | "pressure_proxy_dominant"
+  | "unknown"
+  | "metric_required_evidence_unknown"
+  | "tile_effective_evidence_unknown"
+  | "accounting_suspect";
 
 export type Nhm2SourceClosureV2RegionAccounting = {
   sampleCount: number | null;
@@ -139,6 +146,8 @@ export type Nhm2SourceClosureV2RegionMismatchDiagnostics = {
   dominantComponent: Nhm2SourceClosureComponent | null;
   dominantAbsRatio: number | null;
   dominantSide: "metric" | "tile" | "tie" | null;
+  t00MechanismCategory: Nhm2SourceClosureV2RegionT00MechanismCategory;
+  t00MechanismEvidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
   components: Record<Nhm2SourceClosureComponent, Nhm2SourceClosureV2RegionScaleComponent>;
 };
 
@@ -818,8 +827,90 @@ const buildMismatchDiagnostics = (
     dominantComponent,
     dominantAbsRatio,
     dominantSide,
+    t00MechanismCategory: "unknown",
+    t00MechanismEvidenceStatus: "unknown",
     components,
   };
+};
+
+const summarizeT00Mechanism = (args: {
+  residualComponents: Record<Nhm2SourceClosureComponent, Nhm2SourceClosureResidualComponent>;
+  residualTolerance: number;
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): {
+  category: Nhm2SourceClosureV2RegionT00MechanismCategory;
+  evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
+} => {
+  const { residualComponents, residualTolerance, metricT00Diagnostics, tileT00Diagnostics } = args;
+  const eps = 1e-12;
+  const metricEvidence = metricT00Diagnostics?.evidenceStatus ?? "unknown";
+  const tileEvidence = tileT00Diagnostics?.evidenceStatus ?? "unknown";
+  const metricMean = metricT00Diagnostics?.meanT00 ?? null;
+  const tileMean = tileT00Diagnostics?.meanT00 ?? null;
+  const evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus =
+    metricEvidence === "unknown" || tileEvidence === "unknown"
+      ? "unknown"
+      : metricEvidence === "measured" && tileEvidence === "measured"
+        ? "measured"
+        : "inferred";
+
+  if (metricMean == null && tileMean != null) {
+    return { category: "metric_required_evidence_unknown", evidenceStatus: "unknown" };
+  }
+  if (tileMean == null && metricMean != null) {
+    return { category: "tile_effective_evidence_unknown", evidenceStatus: "unknown" };
+  }
+  if (metricEvidence === "unknown" && tileEvidence !== "unknown") {
+    return { category: "metric_required_evidence_unknown", evidenceStatus: "unknown" };
+  }
+  if (tileEvidence === "unknown" && metricEvidence !== "unknown") {
+    return { category: "tile_effective_evidence_unknown", evidenceStatus: "unknown" };
+  }
+  if (metricEvidence === "unknown" && tileEvidence === "unknown") {
+    return { category: "accounting_suspect", evidenceStatus: "unknown" };
+  }
+  if (metricMean == null || tileMean == null) {
+    return { category: "accounting_suspect", evidenceStatus };
+  }
+
+  const absDelta = Math.abs(tileMean - metricMean);
+  const relDelta = absDelta / Math.max(Math.abs(metricMean), Math.abs(tileMean), eps);
+  if (absDelta > eps && relDelta > residualTolerance) {
+    return { category: "t00_mismatch_present", evidenceStatus };
+  }
+
+  const pressureAbsDeltaMax = (["T11", "T22", "T33"] as const).reduce((best, component) => {
+    const delta = residualComponents[component]?.absResidual;
+    return delta != null ? Math.max(best, Math.abs(delta)) : best;
+  }, 0);
+  const pressureResidualMax = (["T11", "T22", "T33"] as const).reduce((best, component) => {
+    const relResidual = residualComponents[component]?.relResidual;
+    return relResidual != null ? Math.max(best, Math.abs(relResidual)) : best;
+  }, 0);
+  const pressureMagnitudeScale = (["T11", "T22", "T33"] as const).reduce(
+    (best, component) => {
+      const metricAbs = Math.abs(args.residualComponents[component]?.metric ?? 0);
+      const tileAbs = Math.abs(args.residualComponents[component]?.tile ?? 0);
+      return Math.max(best, metricAbs, tileAbs);
+    },
+    0,
+  );
+  const pressureSignificanceFloor = Math.max(
+    eps,
+    pressureMagnitudeScale * Number.EPSILON * 16,
+  );
+  const pressureMismatchIsSignificant = pressureAbsDeltaMax > pressureSignificanceFloor;
+
+  if (
+    relDelta <= residualTolerance &&
+    pressureResidualMax > residualTolerance &&
+    pressureMismatchIsSignificant
+  ) {
+    return { category: "pressure_proxy_dominant", evidenceStatus };
+  }
+
+  return { category: "unknown", evidenceStatus };
 };
 
 const buildRegionComparison = (args: {
@@ -862,6 +953,16 @@ const buildRegionComparison = (args: {
   const tileT00Diagnostics = normalizeRegionT00Diagnostics(args.input.tileT00Diagnostics);
   const tileProxyDiagnostics = normalizeProxyDiagnostics(args.input.tileProxyDiagnostics);
   const mismatchDiagnostics = buildMismatchDiagnostics(metricTensor, tileTensor);
+  const t00Mechanism = summarizeT00Mechanism({
+    residualComponents,
+    residualTolerance: Math.max(residualNorms.toleranceRelLInf ?? 0.1, 1e-12),
+    metricT00Diagnostics,
+    tileT00Diagnostics,
+  });
+  if (mismatchDiagnostics != null) {
+    mismatchDiagnostics.t00MechanismCategory = t00Mechanism.category;
+    mismatchDiagnostics.t00MechanismEvidenceStatus = t00Mechanism.evidenceStatus;
+  }
   const sampleCount = toFiniteOrNull(args.input.sampleCount);
   const resolvedSampleCount =
     metricAccounting?.sampleCount ?? tileAccounting?.sampleCount ?? sampleCount;

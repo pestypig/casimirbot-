@@ -71,7 +71,8 @@
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-hull-latest.json |
 | accountingStatus | accounting_unknown |
 | accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
-| t00MismatchMechanism | unknown |
+| t00MismatchMechanism | t00_mismatch_present |
+| t00MismatchMechanismEvidenceStatus | inferred |
 | note | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -150,7 +151,8 @@
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-wall-latest.json |
 | accountingStatus | accounting_unknown |
 | accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
-| t00MismatchMechanism | unknown |
+| t00MismatchMechanism | t00_mismatch_present |
+| t00MismatchMechanismEvidenceStatus | inferred |
 | note | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -229,7 +231,8 @@
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-exterior-shell-latest.json |
 | accountingStatus | accounting_unknown |
 | accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
-| t00MismatchMechanism | unknown |
+| t00MismatchMechanism | t00_mismatch_present |
+| t00MismatchMechanismEvidenceStatus | inferred |
 | note | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
