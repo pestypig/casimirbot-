@@ -1,0 +1,43 @@
+{
+  "record_id": "tasoc-demo-solar-a",
+  "identifiers": {
+    "gaia_dr3_source_id": "123456789012345678",
+    "tess_tic_id": "100000001",
+    "tasoc_target_id": "TASOC-A-0001"
+  },
+  "aliases": [
+    "demo solar a",
+    "demo-a"
+  ],
+  "quality_flags": [
+    "tasoc_summary_primary",
+    "seismic_qc_pass"
+  ],
+  "quality_score": 92,
+  "target": {
+    "name": "Demo Solar A",
+    "spectral_type": "G2",
+    "luminosity_class": "V"
+  },
+  "photometry": {
+    "time_series_ref": "tasoc://demo-solar-a/lightcurve"
+  },
+  "asteroseismology": {
+    "numax_uHz": 3085.2,
+    "deltanu_uHz": 134.7,
+    "mode_frequencies_uHz": [
+      2865.4,
+      2998.1,
+      3130.3
+    ],
+    "uncertainties": {
+      "numax_uHz": 12.5,
+      "deltanu_uHz": 0.4
+    }
+  },
+  "raw_payload": {
+    "catalog": "tasoc",
+    "pipeline": "tasoc-summary-v1",
+    "sector_count": 8
+  }
+}

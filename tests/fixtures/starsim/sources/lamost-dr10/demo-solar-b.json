@@ -1,0 +1,37 @@
+{
+  "record_id": "lamost-demo-solar-b",
+  "identifiers": {
+    "gaia_dr3_source_id": "987654321098765432",
+    "lamost_obsid": "LAMOST-B-0002"
+  },
+  "aliases": [
+    "demo solar b",
+    "demo-b"
+  ],
+  "quality_flags": [
+    "lamost_primary"
+  ],
+  "quality_score": 62,
+  "target": {
+    "name": "Demo Solar B",
+    "spectral_type": "G5",
+    "luminosity_class": "V"
+  },
+  "spectroscopy": {
+    "teff_K": 5710,
+    "logg_cgs": 4.48,
+    "metallicity_feh": -0.12,
+    "vsini_kms": 3.4,
+    "spectrum_ref": "lamost-dr10://lamost-demo-solar-b",
+    "uncertainties": {
+      "teff_K": 36,
+      "logg_cgs": 0.05,
+      "metallicity_feh": 0.04,
+      "vsini_kms": 0.6
+    }
+  },
+  "raw_payload": {
+    "catalog": "lamost_dr10",
+    "obsid": "LAMOST-B-0002"
+  }
+}

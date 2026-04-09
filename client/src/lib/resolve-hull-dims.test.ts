@@ -98,4 +98,19 @@ describe("resolveHullDimsEffective", () => {
     expect(result?.Ly_m).toBeCloseTo(pipelineHull.Ly_m);
     expect(result?.Lz_m).toBeCloseTo(pipelineHull.Lz_m);
   });
+
+  it("falls back to explicit authority dims when preview and pipeline dims are absent", () => {
+    const result = resolveHullDimsEffective({
+      previewPayload: null,
+      pipelineSnapshot: null,
+      authorityFallbackDims: { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+      nowMs: 42,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe("authority");
+    expect(result?.basis).toEqual(HULL_BASIS_IDENTITY);
+    expect(result?.Lx_m).toBeCloseTo(1007);
+    expect(result?.Ly_m).toBeCloseTo(264);
+    expect(result?.Lz_m).toBeCloseTo(173);
+  });
 });

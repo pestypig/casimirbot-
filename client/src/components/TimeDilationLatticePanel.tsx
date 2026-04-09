@@ -11,6 +11,7 @@ import { useGrBrick } from "@/hooks/useGrBrick";
 import { useGrRegionStats } from "@/hooks/useGrRegionStats";
 import { useCasimirTileSummary } from "@/hooks/useCasimirTileSummary";
 import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
+import { useNhm2SolveState } from "@/hooks/useNhm2SolveState";
 import { useProofPack } from "@/hooks/useProofPack";
 import { useLapseBrick } from "@/hooks/useLapseBrick";
 import { useSectorControlLive } from "@/hooks/use-sector-control-live";
@@ -313,7 +314,7 @@ const DEFAULT_KAPPA_TUNING: KappaTuning = {
   smooth: 0.08,
 };
 
-const DEFAULT_HULL_AXES: [number, number, number] = [503.5, 132, 86.5];
+const LEGACY_HULL_AXES: [number, number, number] = [503.5, 132, 86.5];
 const DEFAULT_HULL_EPS = 1e-3;
 const DEFAULT_BUBBLE_SIGMA = 6;
 const BRICK_BLEND_TAU = 0.3;
@@ -1733,7 +1734,15 @@ function applyKappaBlend(settings: LatticeSettings, blend: number, tuning: Kappa
   settings.softening = lerp(tuning.softenMin, tuning.softenMax, lengthBlend);
 }
 
-function resolveHullAxes(pipeline?: EnergyPipelineState | null): [number, number, number] {
+type HullAxesResolution = {
+  axes: [number, number, number];
+  source: "pipeline" | "authority" | "legacy";
+};
+
+function resolveHullAxes(
+  pipeline?: EnergyPipelineState | null,
+  authorityAxes: [number, number, number] = LEGACY_HULL_AXES,
+): HullAxesResolution {
   const hull = (pipeline as any)?.hull ?? {};
   const a = firstFinite(hull?.a, (pipeline as any)?.a);
   const b = firstFinite(hull?.b, (pipeline as any)?.b);
@@ -1746,7 +1755,7 @@ function resolveHullAxes(pipeline?: EnergyPipelineState | null): [number, number
     (b as number) > 0 &&
     (c as number) > 0
   ) {
-    return [a as number, b as number, c as number];
+    return { axes: [a as number, b as number, c as number], source: "pipeline" };
   }
   const Lx = firstFinite(hull?.Lx_m, (pipeline as any)?.Lx_m);
   const Ly = firstFinite(hull?.Ly_m, (pipeline as any)?.Ly_m);
@@ -1759,14 +1768,24 @@ function resolveHullAxes(pipeline?: EnergyPipelineState | null): [number, number
     (Ly as number) > 0 &&
     (Lz as number) > 0
   ) {
-    return [(Lx as number) / 2, (Ly as number) / 2, (Lz as number) / 2];
+    return {
+      axes: [(Lx as number) / 2, (Ly as number) / 2, (Lz as number) / 2],
+      source: "pipeline",
+    };
   }
-  return DEFAULT_HULL_AXES;
+  const authorityReady = authorityAxes.every((axis) => Number.isFinite(axis) && axis > 0);
+  if (authorityReady) {
+    return { axes: authorityAxes, source: "authority" };
+  }
+  return { axes: LEGACY_HULL_AXES, source: "legacy" };
 }
 
-function isDefaultHullAxes(axes: [number, number, number]): boolean {
+function isDefaultHullAxes(
+  axes: [number, number, number],
+  baselineAxes: [number, number, number] = LEGACY_HULL_AXES,
+): boolean {
   return axes.every((axis, idx) => {
-    const base = DEFAULT_HULL_AXES[idx];
+    const base = baselineAxes[idx];
     const tol = Math.max(1e-6, Math.abs(base) * DEFAULT_HULL_EPS);
     return Math.abs(axis - base) <= tol;
   });
@@ -1787,8 +1806,11 @@ function resolveUserHullChoice(pipeline?: EnergyPipelineState | null): boolean {
   );
 }
 
-function resolveHullBounds(pipeline?: EnergyPipelineState | null): HullBounds {
-  const axes = resolveHullAxes(pipeline);
+function resolveHullBounds(
+  pipeline?: EnergyPipelineState | null,
+  authorityAxes: [number, number, number] = LEGACY_HULL_AXES,
+): HullBounds {
+  const { axes } = resolveHullAxes(pipeline, authorityAxes);
   return {
     axes,
     min: [-axes[0], -axes[1], -axes[2]],
@@ -2615,6 +2637,7 @@ function TimeDilationLatticePanelInner({
   kappaTuning,
   showDebug = false,
 }: TimeDilationLatticePanelProps) {
+  const { state: nhm2SolveState } = useNhm2SolveState();
   const { data: pipelineSnapshot } = useEnergyPipeline({
     staleTime: 5000,
     refetchOnWindowFocus: false,
@@ -2622,6 +2645,22 @@ function TimeDilationLatticePanelInner({
   const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
   const { data: proofPack } = useProofPack({ refetchInterval: 1500, staleTime: 5000 });
   const pipelineState = pipeline ?? pipelineSnapshot ?? null;
+  const authorityHullAxes = useMemo<[number, number, number]>(
+    () => [
+      nhm2SolveState.geometry.authority.Lx_m / 2,
+      nhm2SolveState.geometry.authority.Ly_m / 2,
+      nhm2SolveState.geometry.authority.Lz_m / 2,
+    ],
+    [
+      nhm2SolveState.geometry.authority.Lx_m,
+      nhm2SolveState.geometry.authority.Ly_m,
+      nhm2SolveState.geometry.authority.Lz_m,
+    ],
+  );
+  const hullAxesResolution = useMemo(
+    () => resolveHullAxes(pipelineState, authorityHullAxes),
+    [pipelineState, authorityHullAxes],
+  );
   const strictCongruence = resolveStrictCongruence(pipelineState);
   const proofNum = (key: string) => readProofNumber(proofPack, key);
   const proofStr = (key: string) => readProofString(proofPack, key);
@@ -2743,7 +2782,10 @@ function TimeDilationLatticePanelInner({
       : tsMetricDerived === false
         ? "TS proxy/hardware"
         : "TS metric n/a";
-  const hullBounds = useMemo(() => resolveHullBounds(pipelineState), [pipelineState]);
+  const hullBounds = useMemo(
+    () => resolveHullBounds(pipelineState, authorityHullAxes),
+    [pipelineState, authorityHullAxes],
+  );
   const hullDims = useMemo(
     () => ({
       Lx_m: hullBounds.axes[0] * 2,
@@ -3294,14 +3336,14 @@ function TimeDilationLatticePanelInner({
   }, [pipelineState, updatePipeline]);
 
   const grDims = useMemo(() => {
-    const bounds = resolveHullBounds(pipelineState);
+    const bounds = resolveHullBounds(pipelineState, authorityHullAxes);
     const dx = Math.max(1e-3, grTargetDx);
     return [
       Math.max(1, Math.ceil((bounds.axes[0] * 2) / dx)),
       Math.max(1, Math.ceil((bounds.axes[1] * 2) / dx)),
       Math.max(1, Math.ceil((bounds.axes[2] * 2) / dx)),
     ] as [number, number, number];
-  }, [pipelineState, grTargetDx]);
+  }, [pipelineState, authorityHullAxes, grTargetDx]);
   const includeKijResolved = grIncludeKij || grIncludeExtra;
   const includeMatterResolved = grIncludeMatter || grIncludeExtra;
   const certifiedModeEnabled = latticeMetricOnly ? certifiedMode : true;
@@ -3352,14 +3394,14 @@ function TimeDilationLatticePanelInner({
     grQuery.refetch();
   }, [strictCongruence, grRequested, grQuery.data, grQuery.isFetching, grQuery.refetch]);
   const regionDims = useMemo(() => {
-    const bounds = resolveHullBounds(pipelineState);
+    const bounds = resolveHullBounds(pipelineState, authorityHullAxes);
     const dx = Math.max(1e-3, regionTargetDx);
     return [
       Math.max(1, Math.ceil((bounds.axes[0] * 2) / dx)),
       Math.max(1, Math.ceil((bounds.axes[1] * 2) / dx)),
       Math.max(1, Math.ceil((bounds.axes[2] * 2) / dx)),
     ] as [number, number, number];
-  }, [pipelineState, regionTargetDx]);
+  }, [pipelineState, authorityHullAxes, regionTargetDx]);
   const regionRequested = regionEnabled || regionAutoRefresh;
     const regionQuery = useGrRegionStats({
       dims: regionDims,
@@ -4171,7 +4213,9 @@ function TimeDilationLatticePanelInner({
   }, [liveNowTs, sectorControlLiveEvent]);
 
   const hasHull = useMemo(() => {
-    const nonDefault = !isDefaultHullAxes(hullBounds.axes);
+    const nonDefault =
+      hullAxesResolution.source === "pipeline" ||
+      !isDefaultHullAxes(hullBounds.axes, authorityHullAxes);
     const userChosen = resolveUserHullChoice(pipelineState);
     const hasGeometry = Boolean(
       pipelineState?.hull ||
@@ -4182,7 +4226,7 @@ function TimeDilationLatticePanelInner({
         pipelineState?.hullBrick,
     );
     return hasGeometry && (nonDefault || userChosen);
-  }, [pipelineState, hullBounds]);
+  }, [authorityHullAxes, hullAxesResolution.source, pipelineState, hullBounds]);
   const effectiveHasHull = certifiedModeEnabled
     ? hasHull || Boolean((pipelineState as any)?.hull)
     : false;

@@ -1049,6 +1049,7 @@ describe("warp viability congruence wiring", () => {
           normalizationBasis: "sample_count",
           regionMaskNote: "mask",
           supportInclusionNote: "note",
+          evidenceStatus: "measured" as const,
         });
         return buildNhm2SourceClosureArtifactV2({
           metricTensorRef: "warp.metricStressEnergy",

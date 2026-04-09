@@ -88,6 +88,7 @@ describe("star-sim job lifecycle", () => {
     const job: contractModule.StarSimJobRecord = {
       job_id: "job-restart-demo",
       status: "running",
+      stage: "running_structure_mesa",
       status_reason: null,
       created_at_iso: "2026-01-01T00:00:00.000Z",
       started_at_iso: "2026-01-01T00:00:05.000Z",
@@ -103,6 +104,12 @@ describe("star-sim job lifecycle", () => {
       error: null,
       deduped: false,
       deduped_from_job_id: null,
+      precondition_policy: null,
+      resolved_draft_hash: null,
+      resolved_draft_ref: null,
+      source_resolution_ref: null,
+      source_cache_key: null,
+      lane_plan: null,
     };
 
     await artifactsModule.persistStarSimJobArtifacts({

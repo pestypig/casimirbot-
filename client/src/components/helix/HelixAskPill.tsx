@@ -40,6 +40,12 @@ import { LUMA_MOOD_ORDER, resolveMoodAsset, type LumaMood } from "@/lib/luma-moo
 import { broadcastLumaMood } from "@/lib/luma-mood-theme";
 import { reportClientError } from "@/lib/observability/client-error";
 import {
+  HELIX_ASK_PROMPT_EVENT,
+  clearPendingHelixAskPrompt,
+  consumePendingHelixAskPrompt,
+  type PendingHelixAskPrompt,
+} from "@/lib/helix/ask-prompt-launch";
+import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
   writeMissionContextControls,
@@ -7582,6 +7588,7 @@ export function HelixAskPill({
   const explorationRuntimeByTopicRef = useRef<Record<string, ExplorationRuntimeState>>({});
   const reasoningTimelineEntryByAttemptIdRef = useRef<Record<string, string>>({});
   const reasoningStreamEntryByAttemptIdRef = useRef<Record<string, string>>({});
+  const pendingExternalAskPromptRef = useRef<PendingHelixAskPrompt | null>(null);
 
   useEffect(() => {
     reasoningAttemptsRef.current = reasoningAttempts;
@@ -17446,6 +17453,54 @@ export function HelixAskPill({
       userSettings.showHelixAskDebug,
     ],
   );
+
+  const executePendingExternalAskPrompt = useCallback(
+    (pending: PendingHelixAskPrompt | null) => {
+      const question = pending?.question?.trim() ?? "";
+      if (!question) return;
+      clearPendingHelixAskPrompt();
+      if (askBusy) {
+        pendingExternalAskPromptRef.current = pending;
+        return;
+      }
+      pendingExternalAskPromptRef.current = null;
+      if (pending?.autoSubmit === false) {
+        if (askInputRef.current) {
+          askInputRef.current.value = question;
+          resizeTextarea();
+          askInputRef.current.focus();
+        }
+        return;
+      }
+      void runAsk(question);
+    },
+    [askBusy, resizeTextarea, runAsk],
+  );
+
+  useEffect(() => {
+    if (askBusy) return;
+    if (!pendingExternalAskPromptRef.current) return;
+    const nextPrompt = pendingExternalAskPromptRef.current;
+    pendingExternalAskPromptRef.current = null;
+    executePendingExternalAskPrompt(nextPrompt);
+  }, [askBusy, executePendingExternalAskPrompt]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pending = consumePendingHelixAskPrompt();
+    if (pending) {
+      executePendingExternalAskPrompt(pending);
+    }
+    const handlePromptEvent = (event: Event) => {
+      const detail = (event as CustomEvent<PendingHelixAskPrompt>)?.detail;
+      if (!detail?.question?.trim()) return;
+      executePendingExternalAskPrompt(detail);
+    };
+    window.addEventListener(HELIX_ASK_PROMPT_EVENT, handlePromptEvent as EventListener);
+    return () => {
+      window.removeEventListener(HELIX_ASK_PROMPT_EVENT, handlePromptEvent as EventListener);
+    };
+  }, [executePendingExternalAskPrompt]);
 
   useEffect(() => {
     if (askBusy || askQueue.length === 0) return;

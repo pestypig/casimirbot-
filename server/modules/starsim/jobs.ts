@@ -10,7 +10,15 @@ import {
   resolveStarSimJobPaths,
 } from "./artifacts";
 import { canonicalizeStarSimRequest } from "./canonicalize";
-import type { RequestedLane, StarSimJobRecord, StarSimRequest, StarSimResponse } from "./contract";
+import type {
+  RequestedLane,
+  StarSimJobRecord,
+  StarSimJobStage,
+  StarSimLanePlan,
+  StarSimPreconditionPolicy,
+  StarSimRequest,
+  StarSimResponse,
+} from "./contract";
 import { runStarSim } from "./solver-registry";
 import { resolveStarSimSolverRuntime } from "./worker/starsim-runtime";
 
@@ -59,9 +67,30 @@ const queuePositionFor = (jobId: string): number => {
   return queue.indexOf(jobId) + 1;
 };
 
+const queuedStageFor = (requestedLanes: RequestedLane[]): StarSimJobStage | null => {
+  if (requestedLanes.includes("structure_mesa")) {
+    return "queued_structure_mesa";
+  }
+  if (requestedLanes.includes("oscillation_gyre")) {
+    return "queued_oscillation_gyre";
+  }
+  return null;
+};
+
+const runningStageFor = (lane: RequestedLane): StarSimJobStage | null => {
+  if (lane === "structure_mesa") {
+    return "running_structure_mesa";
+  }
+  if (lane === "oscillation_gyre") {
+    return "running_oscillation_gyre";
+  }
+  return null;
+};
+
 const publicJobRecord = (job: InternalJobRecord): StarSimJobRecord => ({
   job_id: job.job_id,
   status: job.status,
+  stage: job.stage,
   status_reason: job.status_reason,
   created_at_iso: job.created_at_iso,
   started_at_iso: job.started_at_iso,
@@ -77,6 +106,12 @@ const publicJobRecord = (job: InternalJobRecord): StarSimJobRecord => ({
   error: job.error,
   deduped: job.deduped,
   deduped_from_job_id: job.deduped_from_job_id,
+  precondition_policy: job.precondition_policy,
+  resolved_draft_hash: job.resolved_draft_hash,
+  resolved_draft_ref: job.resolved_draft_ref,
+  source_resolution_ref: job.source_resolution_ref,
+  source_cache_key: job.source_cache_key,
+  lane_plan: job.lane_plan,
 });
 
 const readPersistedRequest = async (requestPath: string): Promise<StarSimRequest> => {
@@ -119,6 +154,8 @@ const buildJobFingerprint = (request: StarSimRequest): string => {
     evidence_refs: canonical.evidence_refs,
     requested_lanes: canonical.requested_lanes,
     strict_lanes: canonical.strict_lanes,
+    precondition_policy: request.precondition_policy ?? canonical.precondition_policy,
+    source_context: request.source_context ?? null,
     runtimes,
   });
 };
@@ -199,6 +236,12 @@ const executeJob = async (jobId: string): Promise<void> => {
   if (!job) return;
 
   job.status = "running";
+  job.stage =
+    job.heavy_lanes.includes("structure_mesa")
+      ? "running_structure_mesa"
+      : job.heavy_lanes.includes("oscillation_gyre")
+        ? "running_oscillation_gyre"
+        : job.stage;
   job.status_reason = null;
   job.started_at_iso = new Date().toISOString();
   job.completed_at_iso = null;
@@ -207,7 +250,17 @@ const executeJob = async (jobId: string): Promise<void> => {
   await persistJob(job);
 
   try {
-    const result = await runStarSim(job.request, { executionMode: "job" });
+    const result = await runStarSim(job.request, {
+      executionMode: "job",
+      onLaneStart: async (lane) => {
+        const nextStage = runningStageFor(lane);
+        if (!nextStage || job.stage === nextStage) {
+          return;
+        }
+        job.stage = nextStage;
+        await persistJob(job);
+      },
+    });
     const failedLane = result.lanes.find((lane) => lane.status === "failed");
     if (failedLane) {
       const laneError =
@@ -215,6 +268,7 @@ const executeJob = async (jobId: string): Promise<void> => {
           ? failedLane.result.error
           : `${failedLane.requested_lane} returned failed status`;
       job.status = "failed";
+      job.stage = "failed";
       job.status_reason = laneError.includes("star_sim_worker") ? "worker_crash" : "lane_execution_error";
       job.completed_at_iso = new Date().toISOString();
       job.error = laneError;
@@ -225,6 +279,7 @@ const executeJob = async (jobId: string): Promise<void> => {
     }
 
     job.status = "completed";
+    job.stage = "completed";
     job.status_reason = null;
     job.completed_at_iso = new Date().toISOString();
     job.result = result;
@@ -234,6 +289,7 @@ const executeJob = async (jobId: string): Promise<void> => {
     const message = error instanceof Error ? error.message : String(error);
     if (shouldRetryJob(message) && job.attempt_count < job.max_attempts) {
       job.status = "queued";
+      job.stage = queuedStageFor(job.heavy_lanes);
       job.status_reason = "retrying_after_worker_failure";
       job.error = message;
       job.completed_at_iso = null;
@@ -247,6 +303,7 @@ const executeJob = async (jobId: string): Promise<void> => {
     }
 
     job.status = "failed";
+    job.stage = "failed";
     job.status_reason = shouldRetryJob(message) ? "worker_crash" : "job_execution_error";
     job.completed_at_iso = new Date().toISOString();
     job.error = message;
@@ -275,6 +332,21 @@ const drainQueue = async (): Promise<void> => {
 };
 
 export const submitStarSimJob = async (request: StarSimRequest): Promise<StarSimJobRecord> => {
+  return submitStarSimJobWithMeta(request);
+};
+
+export const submitStarSimJobWithMeta = async (
+  request: StarSimRequest,
+  meta?: {
+    requested_lanes_original?: RequestedLane[];
+    precondition_policy?: StarSimPreconditionPolicy;
+    resolved_draft_hash?: string | null;
+    resolved_draft_ref?: string | null;
+    source_resolution_ref?: string | null;
+    source_cache_key?: string | null;
+    lane_plan?: StarSimLanePlan | null;
+  },
+): Promise<StarSimJobRecord> => {
   await ensureJobsLoaded();
   return withMutationLock(async () => {
     const jobFingerprint = buildJobFingerprint(request);
@@ -291,14 +363,16 @@ export const submitStarSimJob = async (request: StarSimRequest): Promise<StarSim
     }
 
     const requestedLanes = canonicalizeStarSimRequest(request).requested_lanes;
+    const requestedLanesOriginal = meta?.requested_lanes_original ?? requestedLanes;
     const record: InternalJobRecord = {
       job_id: randomUUID(),
       status: "queued",
+      stage: queuedStageFor(requestedLanes),
       status_reason: null,
       created_at_iso: new Date().toISOString(),
       started_at_iso: null,
       completed_at_iso: null,
-      requested_lanes: requestedLanes,
+      requested_lanes: requestedLanesOriginal,
       heavy_lanes: requestedLanes.filter((lane) => heavyLaneSet.has(lane)),
       request_hash: hashStableJson(request),
       job_fingerprint: jobFingerprint,
@@ -309,6 +383,12 @@ export const submitStarSimJob = async (request: StarSimRequest): Promise<StarSim
       error: null,
       deduped: false,
       deduped_from_job_id: null,
+      precondition_policy: meta?.precondition_policy ?? request.precondition_policy ?? null,
+      resolved_draft_hash: meta?.resolved_draft_hash ?? request.source_context?.resolved_draft_hash ?? null,
+      resolved_draft_ref: meta?.resolved_draft_ref ?? request.source_context?.resolved_draft_ref ?? null,
+      source_resolution_ref: meta?.source_resolution_ref ?? request.source_context?.source_resolution_ref ?? null,
+      source_cache_key: meta?.source_cache_key ?? request.source_context?.source_cache_key ?? null,
+      lane_plan: meta?.lane_plan ?? null,
       request,
       result: null,
     };

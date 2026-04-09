@@ -2,9 +2,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { ObservableUniverseAccordionPanel } from "../ObservableUniverseAccordionPanel";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import ObservableUniverseAccordionConnectedPanel, {
+  ObservableUniverseAccordionPanel,
+} from "../ObservableUniverseAccordionPanel";
 import { buildObservableUniverseAccordionEtaProjection } from "@shared/observable-universe-accordion-projections";
 import { OBSERVABLE_UNIVERSE_NHM2_ETA_POLICY } from "@shared/observable-universe-accordion-projections-constants";
 import { buildObservableUniverseAccordionEtaSurface } from "@shared/observable-universe-accordion-surfaces";
@@ -38,8 +41,24 @@ const buildSurface = () => {
   });
 };
 
+const renderWithQueryClient = (ui: React.ReactElement) => {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+};
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("ObservableUniverseAccordionPanel", () => {
-  it("shows the default, supported, and evidence provenance fields", () => {
+  it("shows the default, supported, and evidence provenance fields with a rendered map", () => {
     render(<ObservableUniverseAccordionPanel surface={buildSurface()} />);
 
     expect(
@@ -54,6 +73,9 @@ describe("ObservableUniverseAccordionPanel", () => {
     expect(screen.getByText("0.03")).toBeDefined();
     expect(screen.getByText("manually_reviewed_static_band")).toBeDefined();
     expect(screen.getByText("Mode: proper_time")).toBeDefined();
+    expect(screen.getByTestId("observable-universe-accordion-map")).toBeDefined();
+    expect(screen.getByText("Sol")).toBeDefined();
+    expect(screen.getByText("canonical")).toBeDefined();
   });
 
   it("shows fail-closed deferred state when contract data is missing", () => {
@@ -68,5 +90,28 @@ describe("ObservableUniverseAccordionPanel", () => {
     expect(
       screen.getByText(/stays fail-closed instead of substituting SR output/i),
     ).toBeDefined();
+  });
+
+  it("loads the accordion surface from the real route path in the connected panel", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        projection: buildSurface(),
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithQueryClient(<ObservableUniverseAccordionConnectedPanel />);
+
+    expect(
+      await screen.findByText("stage1_centerline_alpha_0p8200_v1"),
+    ).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/helix/relativistic-map/project",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
   });
 });

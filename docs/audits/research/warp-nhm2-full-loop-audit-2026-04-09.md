@@ -8,7 +8,7 @@
 | contractVersion | nhm2_full_loop_audit/v1 |
 | auditId | nhm2_full_loop |
 | laneId | nhm2_shift_lapse |
-| generatedAt | 2026-04-09T13:24:32.735Z |
+| generatedAt | 2026-04-09T18:40:08.385Z |
 | selectedProfileId | stage1_centerline_alpha_0p995_v1 |
 | publicationCommand | npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit |
 | currentClaimTier | diagnostic |

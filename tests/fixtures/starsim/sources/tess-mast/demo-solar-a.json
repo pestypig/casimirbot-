@@ -1,0 +1,31 @@
+{
+  "record_id": "tess-demo-solar-a",
+  "identifiers": {
+    "gaia_dr3_source_id": "123456789012345678",
+    "tess_tic_id": "100000001",
+    "mast_obs_id": "MAST-A-0001"
+  },
+  "aliases": [
+    "demo solar a",
+    "demo-a"
+  ],
+  "quality_flags": [
+    "tess_summary_available"
+  ],
+  "quality_score": 71,
+  "photometry": {
+    "time_series_ref": "mast://demo-solar-a/lightcurve"
+  },
+  "asteroseismology": {
+    "numax_uHz": 3079.5,
+    "deltanu_uHz": 134.1,
+    "uncertainties": {
+      "numax_uHz": 22.0,
+      "deltanu_uHz": 0.8
+    }
+  },
+  "raw_payload": {
+    "catalog": "tess_mast",
+    "product_collection": "tess_dvt"
+  }
+}

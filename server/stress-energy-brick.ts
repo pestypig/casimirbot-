@@ -66,6 +66,10 @@ export interface StressEnergyTensorRegionSummary {
   regionId: "global" | "hull" | "wall" | "exterior_shell";
   sampleCount: number;
   tensor: StressEnergyTensorSummary;
+  aggregationMode?: "mean";
+  normalizationBasis?: "sample_count";
+  weightSum?: number | null;
+  accountingEvidenceStatus?: "measured";
   note?: string;
 }
 
@@ -267,6 +271,10 @@ const buildTensorRegionSummary = (
       accumulator.sumT00 / accumulator.count,
       pressureFactor,
     ),
+    aggregationMode: "mean",
+    normalizationBasis: "sample_count",
+    weightSum: accumulator.count,
+    accountingEvidenceStatus: "measured",
     ...(note ? { note } : {}),
   };
 };

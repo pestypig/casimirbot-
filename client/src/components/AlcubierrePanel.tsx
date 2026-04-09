@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { useHullPreviewPayload } from "@/hooks/use-hull-preview-payload";
+import { useNhm2SolveState } from "@/hooks/useNhm2SolveState";
 import { useHullLatticeVolume } from "@/hooks/useHullLatticeVolume";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
@@ -3233,6 +3234,7 @@ const res = 256;
     staleTime: 5000,
     refetchOnWindowFocus: false,
   });
+  const { state: nhm2SolveState } = useNhm2SolveState();
   const warpFieldType = live?.warpFieldType ?? live?.dynamicConfig?.warpFieldType ?? "natario";
   const hullPreview = useHullPreviewPayload();
   const [rawPreviewMesh, setRawPreviewMesh] = useState<{
@@ -3254,8 +3256,13 @@ const res = 256;
     return undefined;
   }, [live]);
   const hullDimsResolved = useMemo(
-    () => resolveHullDimsEffective({ previewPayload: hullPreview, pipelineSnapshot: live as any }),
-    [hullPreview, live],
+    () =>
+      resolveHullDimsEffective({
+        previewPayload: hullPreview,
+        pipelineSnapshot: live as any,
+        authorityFallbackDims: nhm2SolveState.geometry.authority,
+      }),
+    [hullPreview, live, nhm2SolveState.geometry.authority],
   );
   const previewTargetDims = useMemo(
     () =>

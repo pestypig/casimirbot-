@@ -61,6 +61,7 @@ export interface PanelDefinition {
   keywords?: string[];
   mobileReady?: boolean;
   heavy?: boolean;
+  startHidden?: boolean;
   telemetryKind?: string;
   collectTelemetry?: PanelTelemetryCollector;
 }

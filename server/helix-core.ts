@@ -41,6 +41,17 @@ import { C } from './utils/physics-const-safe.ts';
 import { computeClocking } from "../shared/clocking.js";
 import { PROMOTED_WARP_PROFILE } from "../shared/warp-promoted-profile.js";
 import {
+  buildNhm2Blocks,
+  nhm2BlockBatchResponseSchema,
+  nhm2BlockResolveRequestSchema,
+  nhm2BlockResponseSchema,
+  type Nhm2BlockId,
+} from "../shared/nhm2-blocks.js";
+import {
+  buildNhm2SolveState,
+  resolveNhm2ProofPackStageGate,
+} from "../shared/nhm2-solve-state.js";
+import {
   buildCurvatureBrick,
   buildHullRadialMapFromPositions,
   resolveHullRadius,
@@ -139,9 +150,11 @@ import type {
   AxisLabel,
   WarpGeometryFallback,
   GrConstraintContract,
+  GrEvaluation,
   GrAssistantReportPayload,
   GrGrounding,
   GrRegionStats,
+  ProofPack,
 } from "../shared/schema.js";
 import type { WarpConfig } from "../types/warpViability";
 import { grAssistantHandler } from "./skills/physics.gr.assistant.js";
@@ -1786,6 +1799,116 @@ function setCors(res: Response) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+type CapturedJsonResult<T> = {
+  statusCode: number;
+  body: T | null;
+};
+
+function createCapturedJsonResponse<T>() {
+  let statusCode = 200;
+  let body: T | null = null;
+  const response = {
+    setHeader: () => response,
+    status: (code: number) => {
+      statusCode = code;
+      return response;
+    },
+    json: (payload: T) => {
+      body = payload;
+      return response;
+    },
+    end: () => response,
+  } as unknown as Response;
+  return {
+    response,
+    read(): CapturedJsonResult<T> {
+      return { statusCode, body };
+    },
+  };
+}
+
+async function captureJsonFromHandler<T>(
+  handler: (req: Request, res: Response) => Promise<void> | void,
+  reqInit: Partial<Request>,
+): Promise<T> {
+  const capture = createCapturedJsonResponse<T>();
+  await handler(reqInit as Request, capture.response);
+  const result = capture.read();
+  if (result.statusCode >= 400) {
+    throw new Error(`Captured helix handler failed with status ${result.statusCode}`);
+  }
+  if (result.body == null) {
+    throw new Error("Captured helix handler returned no JSON body");
+  }
+  return result.body;
+}
+
+const buildNhm2MathStageRoot = () => ({
+  id: "nhm2-math-root",
+  children: mathStageRegistry.map((entry) => ({
+    id: entry.module,
+    stage: entry.stage,
+  })),
+});
+
+export async function resolveLiveNhm2Blocks(
+  requestedBlockIds?: ReadonlyArray<Nhm2BlockId>,
+) {
+  const requestShape = {
+    method: "GET",
+    query: {},
+    body: {},
+    params: {},
+  } satisfies Partial<Request>;
+  const pipeline = await captureJsonFromHandler<Record<string, unknown>>(
+    getPipelineState,
+    requestShape,
+  );
+  const proofPack = await captureJsonFromHandler<ProofPack>(
+    getPipelineProofs,
+    requestShape,
+  );
+  const grEvaluation = await captureJsonFromHandler<GrEvaluation>(
+    getGrEvaluation,
+    requestShape,
+  );
+  const grConstraintContract = await captureJsonFromHandler<GrConstraintContract>(
+    getGrConstraintContract,
+    requestShape,
+  );
+  const stageGate = resolveNhm2ProofPackStageGate(buildNhm2MathStageRoot());
+  const state = buildNhm2SolveState({
+    pipeline,
+    proofPack,
+    grConstraintContract,
+    grEvaluation,
+    stageGate,
+  });
+
+  return buildNhm2Blocks({
+    state,
+    blockIds: requestedBlockIds,
+    generatedAt: Date.now(),
+  });
+}
+
+const readBlockIdsFromQuery = (
+  value: unknown,
+): Nhm2BlockId[] | undefined => {
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0) as Nhm2BlockId[];
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry).trim())
+      .filter((entry) => entry.length > 0) as Nhm2BlockId[];
+  }
+  return undefined;
+};
+
 // Tile status endpoint
 export function getTileStatus(req: Request, res: Response) {
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
@@ -2286,6 +2409,72 @@ export async function getPipelineProofs(req: Request, res: Response) {
   }
 
   res.json(proofPack);
+}
+
+export async function getNhm2Block(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const blockId = typeof req.params?.blockId === "string" ? req.params.blockId : "";
+    const parsed = nhm2BlockResolveRequestSchema.safeParse({ blockIds: [blockId] });
+    if (!parsed.success || !parsed.data.blockIds?.length) {
+      res.status(400).json({
+        error: "invalid-nhm2-block-id",
+        details: parsed.success ? undefined : parsed.error.flatten(),
+      });
+      return;
+    }
+    const [block] = await resolveLiveNhm2Blocks(parsed.data.blockIds);
+    if (!block) {
+      res.status(404).json({ error: "nhm2-block-not-found" });
+      return;
+    }
+    res.json(
+      nhm2BlockResponseSchema.parse({
+        kind: "nhm2-block",
+        block,
+      }),
+    );
+  } catch (err) {
+    console.error("[helix-core] getNhm2Block failed:", err);
+    const message = err instanceof Error ? err.message : "Failed to resolve NHM2 block";
+    res.status(500).json({ error: "nhm2-block-failed", message });
+  }
+}
+
+export async function resolveNhm2Blocks(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const queryBlockIds = readBlockIdsFromQuery((req.query as Record<string, unknown>)?.blockIds);
+    const body =
+      req.method === "POST" && typeof req.body === "object" && req.body
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const parsed = nhm2BlockResolveRequestSchema.safeParse({
+      blockIds: body.blockIds ?? queryBlockIds,
+    });
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "invalid-nhm2-block-request",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+    const blocks = await resolveLiveNhm2Blocks(parsed.data.blockIds);
+    res.json(
+      nhm2BlockBatchResponseSchema.parse({
+        kind: "nhm2-block-batch",
+        blocks,
+      }),
+    );
+  } catch (err) {
+    console.error("[helix-core] resolveNhm2Blocks failed:", err);
+    const message = err instanceof Error ? err.message : "Failed to resolve NHM2 blocks";
+    res.status(500).json({ error: "nhm2-block-batch-failed", message });
+  }
 }
 
 // Update pipeline parameters

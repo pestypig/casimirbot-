@@ -32,11 +32,11 @@
 | T33 | 58267450.98955891 | 58267450.96267209 | 0.026886820793151855 | 4.6143808140791624e-10 |
 
 ## Regional Comparisons (Summary)
-| regionId | basis | status | sampleCount | relLInf | dominantComponent | dominantRel | accounting | note |
-|---|---|---|---|---|---|---|---|---|
-| hull | same_basis | fail | 1096760 | 0.9771894650674532 | T00 | 0.9771894650674532 | accounting_clean | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
-| wall | same_basis | fail | 3352 | 14.950679233985802 | T00 | 14.950679233985802 | accounting_clean | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
-| exterior_shell | same_basis | fail | 2504 | 2.0213853465619396 | T00 | 2.0213853465619396 | accounting_clean | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| regionId | basis | status | sampleCount | relLInf | dominantComponent | dominantRel | scaleSide | scaleRatio | signStatus | accounting | note |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| hull | same_basis | fail | 1096760 | 0.9771894650674532 | T00 | 0.9771894650674532 | metric | 0.02281053493254683 | match | accounting_unknown | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| wall | same_basis | fail | 3352 | 14.950679233985802 | T00 | 14.950679233985802 | tile | 15.950679233985802 | match | accounting_unknown | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
+| exterior_shell | same_basis | fail | 2504 | 2.0213853465619396 | T00 | 2.0213853465619396 | tile | 3.0213853465619396 | match | accounting_unknown | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 ## Regional Component Details
 ### Region: hull
@@ -50,10 +50,27 @@
 | dominantResidualComponent | T00 |
 | dominantResidualRel | 0.9771894650674532 |
 | dominantResidualAbs | 716821145.7567228 |
+| diagonalMeanMetric | 366776951.33934045 |
+| diagonalMeanTile | 8366378.460979054 |
+| diagonalMeanSignedRatio | 0.02281053493254683 |
+| diagonalMeanMetricAbs | 733553902.6786809 |
+| diagonalMeanTileAbs | 16732756.921958108 |
+| diagonalMeanRatio | 0.02281053493254683 |
+| diagonalMeanSide | metric |
+| diagonalSignStatus | match |
+| signFlipComponents | none |
+| dominantScaleComponent | T00 |
+| dominantScaleRatio | 43.83939276115646 |
+| dominantScaleSide | metric |
+| tileProxy.pressureModel | isotropic_pressure_proxy |
+| tileProxy.pressureFactor | -1 |
+| tileProxy.pressureSource | proxy |
+| tileProxy.proxyMode | proxy |
+| tileProxy.brickProxyMode | metric |
 | metricTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-hull-latest.json |
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-hull-latest.json |
-| accountingStatus | accounting_clean |
-| accountingMismatches | none |
+| accountingStatus | accounting_unknown |
+| accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
 | note | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -63,13 +80,28 @@
 | T22 | 733553902.6786809 | 16732756.921958108 | 716821145.7567228 | 0.9771894650674532 |
 | T33 | 733553902.6786809 | 16732756.921958108 | 716821145.7567228 | 0.9771894650674532 |
 
+| component | metricAbs | tileAbs | ratioTileToMetric | signedRatioTileToMetric | signMatch | signedDelta | absDelta |
+|---|---|---|---|---|---|---|---|
+| T00 | 733553902.6786809 | 16732756.921958108 | 0.02281053493254683 | 0.02281053493254683 | true | 716821145.7567228 | 716821145.7567228 |
+| T11 | 733553902.6786809 | 16732756.921958108 | 0.02281053493254683 | 0.02281053493254683 | true | -716821145.7567228 | 716821145.7567228 |
+| T22 | 733553902.6786809 | 16732756.921958108 | 0.02281053493254683 | 0.02281053493254683 | true | -716821145.7567228 | 716821145.7567228 |
+| T33 | 733553902.6786809 | 16732756.921958108 | 0.02281053493254683 | 0.02281053493254683 | true | -716821145.7567228 | 716821145.7567228 |
+
+| component | constructionMode | sourceComponent | proxyFactor | proxyReconstructedValue | proxyReconstructionAbsError | proxyReconstructionRelError | evidenceStatus |
+|---|---|---|---|---|---|---|---|
+| T00 | direct_region_mean_t00 | null | null | null | null | null | measured |
+| T11 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 16732756.921958108 | 0 | 0 | inferred |
+| T22 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 16732756.921958108 | 0 | 0 | inferred |
+| T33 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 16732756.921958108 | 0 | 0 | inferred |
+
 | accounting field | metric | tile |
 |---|---|---|
 | sampleCount | 1096760 | 1096760 |
 | maskVoxelCount | 1096760 | 1096760 |
-| weightSum | 1096760 | 1096760 |
-| aggregationMode | mean | mean |
-| normalizationBasis | sample_count | sample_count |
+| weightSum | null | 1096760 |
+| aggregationMode | unknown | mean |
+| normalizationBasis | null | sample_count |
+| evidenceStatus | unknown | measured |
 | regionMaskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
 | supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
 
@@ -84,10 +116,27 @@
 | dominantResidualComponent | T00 |
 | dominantResidualRel | 14.950679233985802 |
 | dominantResidualAbs | 25409265443.512768 |
+| diagonalMeanMetric | 849769600.6263236 |
+| diagonalMeanTile | 13554402322.382708 |
+| diagonalMeanSignedRatio | 15.950679233985802 |
+| diagonalMeanMetricAbs | 1699539201.2526472 |
+| diagonalMeanTileAbs | 27108804644.765415 |
+| diagonalMeanRatio | 15.950679233985802 |
+| diagonalMeanSide | tile |
+| diagonalSignStatus | match |
+| signFlipComponents | none |
+| dominantScaleComponent | T00 |
+| dominantScaleRatio | 15.950679233985802 |
+| dominantScaleSide | tile |
+| tileProxy.pressureModel | isotropic_pressure_proxy |
+| tileProxy.pressureFactor | -1 |
+| tileProxy.pressureSource | proxy |
+| tileProxy.proxyMode | proxy |
+| tileProxy.brickProxyMode | metric |
 | metricTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-wall-latest.json |
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-wall-latest.json |
-| accountingStatus | accounting_clean |
-| accountingMismatches | none |
+| accountingStatus | accounting_unknown |
+| accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
 | note | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -97,13 +146,28 @@
 | T22 | 1699539201.2526472 | 27108804644.765415 | 25409265443.512768 | 14.950679233985802 |
 | T33 | 1699539201.2526472 | 27108804644.765415 | 25409265443.512768 | 14.950679233985802 |
 
+| component | metricAbs | tileAbs | ratioTileToMetric | signedRatioTileToMetric | signMatch | signedDelta | absDelta |
+|---|---|---|---|---|---|---|---|
+| T00 | 1699539201.2526472 | 27108804644.765415 | 15.950679233985802 | 15.950679233985802 | true | -25409265443.512768 | 25409265443.512768 |
+| T11 | 1699539201.2526472 | 27108804644.765415 | 15.950679233985802 | 15.950679233985802 | true | 25409265443.512768 | 25409265443.512768 |
+| T22 | 1699539201.2526472 | 27108804644.765415 | 15.950679233985802 | 15.950679233985802 | true | 25409265443.512768 | 25409265443.512768 |
+| T33 | 1699539201.2526472 | 27108804644.765415 | 15.950679233985802 | 15.950679233985802 | true | 25409265443.512768 | 25409265443.512768 |
+
+| component | constructionMode | sourceComponent | proxyFactor | proxyReconstructedValue | proxyReconstructionAbsError | proxyReconstructionRelError | evidenceStatus |
+|---|---|---|---|---|---|---|---|
+| T00 | direct_region_mean_t00 | null | null | null | null | null | measured |
+| T11 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 27108804644.765415 | 0 | 0 | inferred |
+| T22 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 27108804644.765415 | 0 | 0 | inferred |
+| T33 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 27108804644.765415 | 0 | 0 | inferred |
+
 | accounting field | metric | tile |
 |---|---|---|
 | sampleCount | 3352 | 3352 |
 | maskVoxelCount | 3352 | 3352 |
-| weightSum | 3352 | 3352 |
-| aggregationMode | mean | mean |
-| normalizationBasis | sample_count | sample_count |
+| weightSum | null | 3352 |
+| aggregationMode | unknown | mean |
+| normalizationBasis | null | sample_count |
+| evidenceStatus | unknown | measured |
 | regionMaskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
 | supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
 
@@ -118,10 +182,27 @@
 | dominantResidualComponent | T00 |
 | dominantResidualRel | 2.0213853465619396 |
 | dominantResidualAbs | 3434652676.59951 |
+| diagonalMeanMetric | 849578899.5505773 |
+| diagonalMeanTile | 2566905237.8503323 |
+| diagonalMeanSignedRatio | 3.0213853465619396 |
+| diagonalMeanMetricAbs | 1699157799.1011546 |
+| diagonalMeanTileAbs | 5133810475.7006645 |
+| diagonalMeanRatio | 3.0213853465619396 |
+| diagonalMeanSide | tile |
+| diagonalSignStatus | match |
+| signFlipComponents | none |
+| dominantScaleComponent | T00 |
+| dominantScaleRatio | 3.0213853465619396 |
+| dominantScaleSide | tile |
+| tileProxy.pressureModel | isotropic_pressure_proxy |
+| tileProxy.pressureFactor | -1 |
+| tileProxy.pressureSource | proxy |
+| tileProxy.proxyMode | proxy |
+| tileProxy.brickProxyMode | metric |
 | metricTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-exterior-shell-latest.json |
 | tileTensorRef | artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-exterior-shell-latest.json |
-| accountingStatus | accounting_clean |
-| accountingMismatches | none |
+| accountingStatus | accounting_unknown |
+| accountingMismatches | unknown:weightSum, aggregationMode, normalizationBasis |
 | note | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -131,13 +212,28 @@
 | T22 | 1699157799.1011546 | 5133810475.7006645 | 3434652676.59951 | 2.0213853465619396 |
 | T33 | 1699157799.1011546 | 5133810475.7006645 | 3434652676.59951 | 2.0213853465619396 |
 
+| component | metricAbs | tileAbs | ratioTileToMetric | signedRatioTileToMetric | signMatch | signedDelta | absDelta |
+|---|---|---|---|---|---|---|---|
+| T00 | 1699157799.1011546 | 5133810475.7006645 | 3.0213853465619396 | 3.0213853465619396 | true | -3434652676.59951 | 3434652676.59951 |
+| T11 | 1699157799.1011546 | 5133810475.7006645 | 3.0213853465619396 | 3.0213853465619396 | true | 3434652676.59951 | 3434652676.59951 |
+| T22 | 1699157799.1011546 | 5133810475.7006645 | 3.0213853465619396 | 3.0213853465619396 | true | 3434652676.59951 | 3434652676.59951 |
+| T33 | 1699157799.1011546 | 5133810475.7006645 | 3.0213853465619396 | 3.0213853465619396 | true | 3434652676.59951 | 3434652676.59951 |
+
+| component | constructionMode | sourceComponent | proxyFactor | proxyReconstructedValue | proxyReconstructionAbsError | proxyReconstructionRelError | evidenceStatus |
+|---|---|---|---|---|---|---|---|
+| T00 | direct_region_mean_t00 | null | null | null | null | null | measured |
+| T11 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 5133810475.7006645 | 0 | 0 | inferred |
+| T22 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 5133810475.7006645 | 0 | 0 | inferred |
+| T33 | proxy_scaled_from_region_mean_t00 | T00 | -1 | 5133810475.7006645 | 0 | 0 | inferred |
+
 | accounting field | metric | tile |
 |---|---|---|
 | sampleCount | 2504 | 2504 |
 | maskVoxelCount | 2504 | 2504 |
-| weightSum | 2504 | 2504 |
-| aggregationMode | mean | mean |
-| normalizationBasis | sample_count | sample_count |
+| weightSum | null | 2504 |
+| aggregationMode | unknown | mean |
+| normalizationBasis | null | sample_count |
+| evidenceStatus | unknown | measured |
 | regionMaskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
 | supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
 

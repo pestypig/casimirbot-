@@ -1,4 +1,4 @@
-import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+ï»¿import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import type { QiStats } from "@shared/schema";
@@ -28,6 +28,7 @@ import { useProofPack } from "@/hooks/useProofPack";
 import { useMathStageGate } from "@/hooks/useMathStageGate";
 import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { useMetrics } from "@/hooks/use-metrics";
+import { useNhm2SolveState } from "@/hooks/useNhm2SolveState";
 import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
 import { buildCongruenceBadge, resolveCongruenceMeta } from "@/lib/congruence-meta";
 import { useCycleLedger, LEDGER_GUARD_THRESHOLD } from "@/hooks/useCycleLedger";
@@ -276,7 +277,7 @@ const formatMsFromUs = (microseconds: number) => {
 
   if (!Number.isFinite(microseconds)) return "n/a";
   if (microseconds >= 1000) return `${(microseconds / 1000).toFixed(3)} ms`;
-  if (microseconds >= 1) return `${microseconds.toFixed(3)} µs`;
+  if (microseconds >= 1) return `${microseconds.toFixed(3)} Âµs`;
   return `${(microseconds * 1000).toFixed(2)} ns`;
 
 };
@@ -1220,6 +1221,7 @@ function computeCurvatureProxy(pipeline: any, dEff: number) {
 
 
 export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = {}) {
+  const { state: nhm2SolveState } = useNhm2SolveState();
   const { data: pipeline, sweepResults } = useEnergyPipeline({ refetchInterval: 1500 });
   const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
   const pipe = pipeline as any;
@@ -1254,6 +1256,18 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
       return strictProof ? entry?.proxy === true : Boolean(entry?.proxy);
     });
   };
+  const authorityAxes = useMemo<AxesABC>(
+    () => ({
+      a: nhm2SolveState.geometry.authority.Lx_m / 2,
+      b: nhm2SolveState.geometry.authority.Ly_m / 2,
+      c: nhm2SolveState.geometry.authority.Lz_m / 2,
+    }),
+    [
+      nhm2SolveState.geometry.authority.Lx_m,
+      nhm2SolveState.geometry.authority.Ly_m,
+      nhm2SolveState.geometry.authority.Lz_m,
+    ],
+  );
   const renderProxy = (active?: boolean) => renderProxyBadge(active, strictProof);
 
   const [readMode, setReadMode] = useState(false);
@@ -1327,15 +1341,18 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
     };
     const half = (value?: number) =>
       typeof value === "number" && Number.isFinite(value) && value > 0 ? value / 2 : undefined;
-    const a = axisFrom(hull.a, half(hull.Lx_m)) ?? DEFAULT_HULL_AXIS;
-    const b = axisFrom(hull.b, half(hull.Ly_m)) ?? a;
-    const c = axisFrom(hull.c, half(hull.Lz_m)) ?? a;
+    const a = axisFrom(hull.a, half(hull.Lx_m)) ?? authorityAxes.a ?? DEFAULT_HULL_AXIS;
+    const b = axisFrom(hull.b, half(hull.Ly_m)) ?? authorityAxes.b ?? a;
+    const c = axisFrom(hull.c, half(hull.Lz_m)) ?? authorityAxes.c ?? a;
     return {
-      a: Math.abs(a) || DEFAULT_HULL_AXIS,
-      b: Math.abs(b) || Math.abs(a) || DEFAULT_HULL_AXIS,
-      c: Math.abs(c) || Math.abs(a) || DEFAULT_HULL_AXIS,
+      a: Math.abs(a) || Math.abs(authorityAxes.a) || DEFAULT_HULL_AXIS,
+      b: Math.abs(b) || Math.abs(authorityAxes.b) || Math.abs(a) || DEFAULT_HULL_AXIS,
+      c: Math.abs(c) || Math.abs(authorityAxes.c) || Math.abs(a) || DEFAULT_HULL_AXIS,
     };
   }, [
+    authorityAxes.a,
+    authorityAxes.b,
+    authorityAxes.c,
     pipe?.hull?.a,
     pipe?.hull?.b,
     pipe?.hull?.c,
@@ -1393,10 +1410,10 @@ export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = 
   const natarioBadgeTone = natarioOk
     ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
     : "border-amber-500/40 bg-amber-500/10 text-amber-200";
-  const natarioBadgeLabel = natarioOk ? "Natario K˜0" : "Natario violated";
+  const natarioBadgeLabel = natarioOk ? "Natario KËœ0" : "Natario violated";
   const helmholtzDisabled = yorkBaseSamples.length === 0;
   const yorkSampleCount = yorkBaseSamples.length;
-  const yorkDocString = "Natario = divergence-free shift ((?·ß = 0) ? York time (K=0)).";
+  const yorkDocString = "Natario = divergence-free shift ((?Â·ÃŸ = 0) ? York time (K=0)).";
   const divMaxDisplay = Number.isFinite(divMaxVal) ? toSci(divMaxVal, 2) : "n/a";
   const kRmsDisplay = Number.isFinite(kRmsValue) ? toSci(kRmsValue, 2) : "n/a";
   useEffect(() => {
@@ -4054,7 +4071,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 onChange={(event) => setHelmholtzEnabled(event.target.checked)}
                 disabled={helmholtzDisabled}
               />
-              Project ß to div-free (Helmholtz)
+              Project ÃŸ to div-free (Helmholtz)
             </label>
             <label className="inline-flex items-center gap-1">
               <input
@@ -4069,7 +4086,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
           <div className="font-mono text-[11px] text-slate-400">{yorkDocString}</div>
           <div className="grid grid-cols-1 gap-3 font-mono sm:grid-cols-2">
             <div>
-              <div className="text-slate-500">max|?·ß|</div>
+              <div className="text-slate-500">max|?Â·ÃŸ|</div>
               <div className="text-cyan-200">{divMaxDisplay}</div>
             </div>
             <div>
@@ -4078,8 +4095,8 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-            <span>ß samples: {betaSourceLabel}</span>
-            <span>{yorkSampleCount ? `${YORK_THETA_STEPS}×${YORK_PHI_STEPS}` : "n/a"}</span>
+            <span>ÃŸ samples: {betaSourceLabel}</span>
+            <span>{yorkSampleCount ? `${YORK_THETA_STEPS}Ã—${YORK_PHI_STEPS}` : "n/a"}</span>
           </div>
         </div>
 
@@ -4325,7 +4342,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 >
                   <span>eta_d={probe.scale.toFixed(2)}</span>
                   <span>
-                    {probe.pred !== null ? `R˜${toPercent(probe.pred, 3)}` : "R pending"}{" "}
+                    {probe.pred !== null ? `RËœ${toPercent(probe.pred, 3)}` : "R pending"}{" "}
                     {probe.measured !== null ? `(seen ${toPercent(probe.measured, 3)})` : ""}
                   </span>
                 </div>
@@ -4352,7 +4369,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 {Number.isFinite(dwellMsLive) ? `dwell=${formatSecondsFriendly((dwellMsLive as number) / 1000)}` : "dwell=n/a"}
               </li>
               <li className="text-slate-300">
-                Ledger source: {ledgerSourceLabel} · {ledgerReadValue}
+                Ledger source: {ledgerSourceLabel} Â· {ledgerReadValue}
               </li>
             </ul>
             <div className="text-[10px] text-slate-400">
@@ -6779,20 +6796,20 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                 <li>
                   {readMode
                     ? Number.isFinite(natarioTheta)
-                      ? `Server-calculated ${natarioThetaLabel} ˜ ${natarioTheta.toExponential(3)} (${natarioThetaTag}); this tracks Natario volume targets.`
+                      ? `Server-calculated ${natarioThetaLabel} Ëœ ${natarioTheta.toExponential(3)} (${natarioThetaTag}); this tracks Natario volume targets.`
                       : `${natarioThetaLabel} estimate unavailable.`
-                    : `${natarioThetaLabel} (server) = ${Number.isFinite(natarioTheta) ? natarioTheta.toExponential(3) : "—"} (${natarioThetaTag})`}
+                    : `${natarioThetaLabel} (server) = ${Number.isFinite(natarioTheta) ? natarioTheta.toExponential(3) : "â€”"} (${natarioThetaTag})`}
                 </li>
 
                 <li>
                   {`K_trace_mean = ${
-                    Number.isFinite(kTraceMeanPack) ? kTraceMeanPack.toExponential(3) : "—"
+                    Number.isFinite(kTraceMeanPack) ? kTraceMeanPack.toExponential(3) : "â€”"
                   } (${kTraceTag})`}
                 </li>
 
                 <li>
                   {`K_sq_mean = ${
-                    Number.isFinite(kSqMeanPack) ? kSqMeanPack.toExponential(3) : "—"
+                    Number.isFinite(kSqMeanPack) ? kSqMeanPack.toExponential(3) : "â€”"
                   } (${kSqTag})`}
                 </li>
 
@@ -7061,7 +7078,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-                  ? `LRL delta ${lrlDriftValueDisplay}; |A| ˜ ${lrlMagnitudeDisplay}, ?|A| = ${lrlDeltaDisplay}.`
+                  ? `LRL delta ${lrlDriftValueDisplay}; |A| Ëœ ${lrlMagnitudeDisplay}, ?|A| = ${lrlDeltaDisplay}.`
 
 
 
@@ -7073,7 +7090,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              readDescription="Laplace–Runge–Lenz vector should stay conserved (docs/alcubierre-alignment). Drift implies Maupertuis violations or non-Keplerian potentials."
+              readDescription="Laplaceâ€“Rungeâ€“Lenz vector should stay conserved (docs/alcubierre-alignment). Drift implies Maupertuis violations or non-Keplerian potentials."
 
 
 
@@ -7543,7 +7560,7 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
 
 
 
-              readValue={`tau_LC ${formatSecondsFriendly(tauLcSecondsDisplay)} | tau_pulse ${formatSecondsFriendly(tauPulseSecondsDisplay)} | dwell ${formatSecondsFriendly(tauDwellSecondsDisplay)}${modelMode ? ` · mode ${modelMode}` : ""}`}
+              readValue={`tau_LC ${formatSecondsFriendly(tauLcSecondsDisplay)} | tau_pulse ${formatSecondsFriendly(tauPulseSecondsDisplay)} | dwell ${formatSecondsFriendly(tauDwellSecondsDisplay)}${modelMode ? ` Â· mode ${modelMode}` : ""}`}
 
 
 
@@ -7949,25 +7966,25 @@ function LRLProofStrip({ telemetry, className }: LRLProofStripProps) {
 
   const proofs = [
     {
-      label: "Proof I · Maupertuis",
+      label: "Proof I Â· Maupertuis",
       ok: actionOk,
-      primary: actionOk ? `${formatSci(action)} kg·m²/s³` : "action undefined",
-      detail: "Instantaneous p·v lock streamed with every stress-energy tick.",
+      primary: actionOk ? `${formatSci(action)} kgÂ·mÂ²/sÂ³` : "action undefined",
+      detail: "Instantaneous pÂ·v lock streamed with every stress-energy tick.",
     },
     {
-      label: "Proof II · vz bridge",
+      label: "Proof II Â· vz bridge",
       ok: bridgeOk && Number.isFinite(oscillatorMag),
-      primary: bridgeOk ? `|w| ˜ ${formatSci(oscillatorMag)} m¹?²` : "bridge unlock",
+      primary: bridgeOk ? `|w| Ëœ ${formatSci(oscillatorMag)} mÂ¹?Â²` : "bridge unlock",
       detail: bridgeOk
-        ? `Residual |w² - z| = ${formatSci(planarResidual)} m · |E_c| ˜ ${formatSci(energyMag)}`
+        ? `Residual |wÂ² - z| = ${formatSci(planarResidual)} m Â· |E_c| Ëœ ${formatSci(energyMag)}`
         : "Conformal lift unavailable.",
     },
     {
-      label: "Proof III · Geometry",
+      label: "Proof III Â· Geometry",
       ok: geometryOk && Number.isFinite(magnitude),
-      primary: geometryOk ? `e ˜ ${formatSci(eccentricity, 3)}` : "ecc undefined",
+      primary: geometryOk ? `e Ëœ ${formatSci(eccentricity, 3)}` : "ecc undefined",
       detail: geometryOk
-        ? `|A| ˜ ${formatSci(magnitude)} · residual ${formatSci(geometryResidual)}`
+        ? `|A| Ëœ ${formatSci(magnitude)} Â· residual ${formatSci(geometryResidual)}`
         : "LRL magnitude missing.",
     },
   ];
@@ -7994,4 +8011,5 @@ function LRLProofStrip({ telemetry, className }: LRLProofStripProps) {
     </div>
   );
 }
+
 

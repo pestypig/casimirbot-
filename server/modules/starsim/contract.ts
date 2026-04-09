@@ -22,6 +22,28 @@ export const executionKindSchema = z.enum(["simulation", "diagnostic", "replay",
 export const starSimExternalRuntimeKindSchema = z.enum(["mock", "docker", "wsl", "disabled"]);
 export const starSimArtifactIntegritySchema = z.enum(["verified", "missing", "corrupt", "stale", "unknown"]);
 export const starSimJobStatusSchema = z.enum(["queued", "running", "completed", "failed", "abandoned"]);
+export const starSimJobStageSchema = z.enum([
+  "resolving_sources",
+  "resolved_sources",
+  "preflight_blocked",
+  "queued_structure_mesa",
+  "running_structure_mesa",
+  "queued_oscillation_gyre",
+  "running_oscillation_gyre",
+  "completed",
+  "failed",
+]);
+export const starSimSourceCatalogSchema = z.enum(["gaia_dr3", "sdss_astra", "lamost_dr10", "tess_mast", "tasoc"]);
+export const starSimSourceSelectionOriginSchema = z.enum([
+  "user_override",
+  "gaia_dr3",
+  "sdss_astra",
+  "lamost_dr10",
+  "tess_mast",
+  "tasoc",
+]);
+export const starSimSourceFetchModeSchema = z.enum(["fixture", "cache", "live", "cache_only", "disabled"]);
+export const starSimPreconditionPolicySchema = z.enum(["strict_requested_lanes", "run_available_prefix"]);
 export const starSimSupportedDomainReasonSchema = z.enum([
   "out_of_supported_domain",
   "insufficient_observables",
@@ -40,6 +62,8 @@ const sectionMetaShape = {
   provenance_ref: z.string().optional(),
   uncertainties: z.record(z.number()).optional(),
   statuses: z.record(fieldStatusSchema).optional(),
+  field_sources: z.record(z.string()).optional(),
+  field_provenance_refs: z.record(z.string()).optional(),
 } as const;
 
 const targetSchema = z
@@ -147,10 +171,47 @@ const environmentSchema = z
   .optional();
 
 const physicsFlagsSchema = z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional();
+const starSimIdentifiersSchema = z
+  .object({
+    gaia_dr3_source_id: z.string().min(1).optional(),
+    sdss_apogee_id: z.string().min(1).optional(),
+    lamost_obsid: z.string().min(1).optional(),
+    tess_tic_id: z.string().min(1).optional(),
+    tasoc_target_id: z.string().min(1).optional(),
+    mast_obs_id: z.string().min(1).optional(),
+  })
+  .optional();
+const starSimSourceHintsSchema = z
+  .object({
+    preferred_catalogs: z.array(starSimSourceCatalogSchema).optional(),
+    allow_fallbacks: z.boolean().optional(),
+  })
+  .optional();
+const starSimSourcePolicySchema = z
+  .object({
+    user_overrides_win: z.boolean().optional(),
+    strict_catalog_resolution: z.boolean().optional(),
+  })
+  .optional();
+const starSimSourceContextSchema = z
+  .object({
+    source_cache_key: z.string().min(1).optional(),
+    source_resolution_ref: z.string().min(1).optional(),
+    source_selection_manifest_ref: z.string().min(1).optional(),
+    resolved_draft_ref: z.string().min(1).optional(),
+    resolved_draft_hash: z.string().min(1).optional(),
+    identifiers_resolved: starSimIdentifiersSchema,
+    fetch_modes_by_catalog: z.record(starSimSourceFetchModeSchema).optional(),
+    selected_field_origins: z.record(starSimSourceSelectionOriginSchema).optional(),
+  })
+  .optional();
 
 export const starSimRequestSchema = z
   .object({
     target: targetSchema,
+    identifiers: starSimIdentifiersSchema,
+    source_hints: starSimSourceHintsSchema,
+    source_policy: starSimSourcePolicySchema,
     astrometry: astrometrySchema,
     photometry: photometrySchema,
     spectroscopy: spectroscopySchema,
@@ -163,10 +224,13 @@ export const starSimRequestSchema = z
     evidence_refs: z.array(z.string()).optional(),
     requested_lanes: z.array(requestedLaneSchema).optional(),
     strict_lanes: z.boolean().optional(),
+    resolve_before_run: z.boolean().optional(),
+    precondition_policy: starSimPreconditionPolicySchema.optional(),
     benchmark_case_id: z.string().min(1).optional(),
     fit_profile_id: z.string().min(1).optional(),
     fit_constraints: physicsFlagsSchema,
     physics_flags: physicsFlagsSchema,
+    source_context: starSimSourceContextSchema,
   })
   .strict();
 
@@ -179,6 +243,11 @@ export type ExecutionKind = z.infer<typeof executionKindSchema>;
 export type StarSimExternalRuntimeKind = z.infer<typeof starSimExternalRuntimeKindSchema>;
 export type StarSimArtifactIntegrityStatus = z.infer<typeof starSimArtifactIntegritySchema>;
 export type StarSimJobStatus = z.infer<typeof starSimJobStatusSchema>;
+export type StarSimJobStage = z.infer<typeof starSimJobStageSchema>;
+export type StarSimSourceCatalog = z.infer<typeof starSimSourceCatalogSchema>;
+export type StarSimSourceSelectionOrigin = z.infer<typeof starSimSourceSelectionOriginSchema>;
+export type StarSimSourceFetchMode = z.infer<typeof starSimSourceFetchModeSchema>;
+export type StarSimPreconditionPolicy = z.infer<typeof starSimPreconditionPolicySchema>;
 export type StarSimSupportedDomainReason = z.infer<typeof starSimSupportedDomainReasonSchema>;
 export type StarSimArtifactRef = z.infer<typeof starSimArtifactRefSchema>;
 export type PhysicsFlagValue = string | number | boolean | null;
@@ -247,6 +316,159 @@ export interface CanonicalField<T = unknown> {
   status: FieldStatus;
   provenance_ref: string | null;
   normalization: string | null;
+}
+
+export interface StarSimSourceIdentifiers {
+  gaia_dr3_source_id?: string;
+  sdss_apogee_id?: string;
+  lamost_obsid?: string;
+  tess_tic_id?: string;
+  tasoc_target_id?: string;
+  mast_obs_id?: string;
+}
+
+export interface StarSimSourceHints {
+  preferred_catalogs?: StarSimSourceCatalog[];
+  allow_fallbacks?: boolean;
+}
+
+export interface StarSimSourcePolicy {
+  user_overrides_win?: boolean;
+  strict_catalog_resolution?: boolean;
+}
+
+export interface StarSimSourceContext {
+  source_cache_key?: string;
+  source_resolution_ref?: string;
+  source_selection_manifest_ref?: string;
+  resolved_draft_ref?: string;
+  resolved_draft_hash?: string;
+  identifiers_resolved?: StarSimSourceIdentifiers;
+  fetch_modes_by_catalog?: Partial<Record<StarSimSourceCatalog, StarSimSourceFetchMode>>;
+  selected_field_origins?: Record<string, StarSimSourceSelectionOrigin>;
+}
+
+export interface StarSimSourceCandidate {
+  field_path: string;
+  selected_from: StarSimSourceSelectionOrigin;
+  value: unknown;
+  unit: string | null;
+  uncertainty: number | null;
+  status: FieldStatus;
+  source_record_id: string | null;
+  identifiers: StarSimSourceIdentifiers;
+  quality_flags: string[];
+  provenance_ref: string | null;
+  raw_payload_ref: string | null;
+  fetch_mode?: StarSimSourceFetchMode;
+  fetched_at_iso?: string | null;
+  query_metadata?: Record<string, unknown> | null;
+}
+
+export interface StarSimSourceFieldSelection {
+  field_path: string;
+  selected_from: StarSimSourceSelectionOrigin;
+  reason:
+    | "user_override"
+    | "strict_catalog_resolution"
+    | "preferred_catalog_order"
+    | "fallback_catalog"
+    | "only_available_candidate";
+  chosen: StarSimSourceCandidate;
+  candidates: StarSimSourceCandidate[];
+}
+
+export interface StarSimSourceSelectionManifest {
+  schema_version: "star-sim-source-selection/1";
+  target_query: {
+    object_id: string | null;
+    name: string | null;
+    identifiers: StarSimSourceIdentifiers;
+  };
+  fields: Record<string, StarSimSourceFieldSelection>;
+}
+
+export interface StarSimSourceResolution {
+  status: "resolved" | "partial" | "unresolved";
+  cache_key: string;
+  cache_status: "hit" | "missing" | "stale" | "corrupt" | "incompatible";
+  fetch_mode: StarSimSourceFetchMode;
+  fetch_modes_by_catalog?: Record<StarSimSourceCatalog, StarSimSourceFetchMode>;
+  artifact_integrity_status: StarSimArtifactIntegrityStatus;
+  identifiers_resolved: StarSimSourceIdentifiers;
+  artifact_refs: StarSimArtifactRef[];
+  selection_manifest: StarSimSourceSelectionManifest;
+  candidate_counts: {
+    total: number;
+    by_catalog: Record<StarSimSourceSelectionOrigin, number>;
+    by_field: Record<string, number>;
+  };
+  resolved_sections: string[];
+  reasons: string[];
+  notes: string[];
+}
+
+export interface StarSimResolveResponse {
+  schema_version: "star-sim-source-resolve-v1";
+  target: {
+    requested_object_id: string | null;
+    requested_name: string | null;
+    resolved_name: string | null;
+  };
+  identifiers_resolved: StarSimSourceIdentifiers;
+  canonical_request_draft: StarSimRequest | null;
+  source_resolution: StarSimSourceResolution;
+  structure_mesa_ready: boolean;
+  supported_domain_preview: StarSimSupportedDomain | null;
+  oscillation_gyre_ready: boolean;
+  oscillation_supported_domain_preview: StarSimSupportedDomain | null;
+}
+
+export interface StarSimPreflightLane {
+  requested_lane: RequestedLane;
+  ready: boolean;
+  will_run: boolean;
+  blocked_reasons: string[];
+  supported_domain: StarSimSupportedDomain | null;
+  depends_on: RequestedLane[];
+}
+
+export interface StarSimPreflight {
+  policy: StarSimPreconditionPolicy;
+  requested_lanes: RequestedLane[];
+  runnable_lanes: RequestedLane[];
+  blocked_lanes: RequestedLane[];
+  blocked_reasons: string[];
+  passed: boolean;
+  enqueue_allowed: boolean;
+  by_lane: Partial<Record<RequestedLane, StarSimPreflightLane>>;
+}
+
+export interface StarSimLanePlan {
+  policy: StarSimPreconditionPolicy;
+  requested_lanes: RequestedLane[];
+  runnable_lanes: RequestedLane[];
+  blocked_lanes: RequestedLane[];
+  blocked_reasons_by_lane: Partial<Record<RequestedLane, string[]>>;
+}
+
+export interface StarSimResolveBeforeRunResponse {
+  schema_version: "star-sim-resolve-run-v1";
+  resolution_stage: "preflight_blocked" | "job_enqueued";
+  job_enqueued: boolean;
+  job_id: string | null;
+  result_url: string | null;
+  policy_used: StarSimPreconditionPolicy;
+  target: StarSimResolveResponse["target"];
+  identifiers_resolved: StarSimSourceIdentifiers;
+  source_resolution_ref: string | null;
+  resolved_draft_ref: string | null;
+  resolved_draft_hash: string | null;
+  source_cache_key: string | null;
+  source_artifact_refs: StarSimArtifactRef[];
+  preflight: StarSimPreflight;
+  lane_plan: StarSimLanePlan;
+  blocked_reasons: string[];
 }
 
 export interface CanonicalStarTarget {
@@ -320,10 +542,12 @@ export interface CanonicalStar {
   evidence_refs: string[];
   requested_lanes: RequestedLane[];
   strict_lanes: boolean;
+  precondition_policy: StarSimPreconditionPolicy;
   benchmark_case_id: string | null;
   fit_profile_id: string | null;
   fit_constraints: Record<string, PhysicsFlagValue>;
   physics_flags: Record<string, PhysicsFlagValue>;
+  source_context: StarSimSourceContext | null;
 }
 
 export interface TreeDagClaim {
@@ -398,8 +622,8 @@ export interface StarSimResponse {
   schema_version: "star-sim-v1";
   meta: {
     contract_version: "star-sim-v1";
-    normalization_version: "star-sim.canonicalize/4";
-    solver_manifest_version: "star-sim.registry/6";
+    normalization_version: "star-sim.canonicalize/5";
+    solver_manifest_version: "star-sim.registry/7";
     congruence_version: "star-sim.harmonic/2";
     claim_identity_version: "star-sim.claims/3";
     deterministic_request_hash: string;
@@ -427,6 +651,7 @@ export interface StarSimResponse {
 export interface StarSimJobRecord {
   job_id: string;
   status: StarSimJobStatus;
+  stage: StarSimJobStage | null;
   status_reason: string | null;
   created_at_iso: string;
   started_at_iso: string | null;
@@ -442,4 +667,10 @@ export interface StarSimJobRecord {
   error: string | null;
   deduped: boolean;
   deduped_from_job_id: string | null;
+  precondition_policy: StarSimPreconditionPolicy | null;
+  resolved_draft_hash: string | null;
+  resolved_draft_ref: string | null;
+  source_resolution_ref: string | null;
+  source_cache_key: string | null;
+  lane_plan: StarSimLanePlan | null;
 }

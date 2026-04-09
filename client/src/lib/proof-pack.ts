@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/queryClient";
 import type { ProofPack, ProofValue } from "@shared/schema";
 import type { EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { NHM2_PROOF_PACK_STAGE_REQUIREMENTS } from "@shared/nhm2-solve-state";
 
 type GrInvariantStats = {
   min: number;
@@ -21,12 +22,7 @@ type GrInvariantStatsSet = {
   ricci4?: GrInvariantStats;
 };
 
-export const PROOF_PACK_STAGE_REQUIREMENTS = [
-  { module: "shared/curvature-proxy.ts", minStage: "reduced-order" },
-  { module: "client/src/physics/curvature.ts", minStage: "reduced-order" },
-  { module: "client/src/lib/warp-proof-math.ts", minStage: "reduced-order" },
-  { module: "server/helix-proof-pack.ts", minStage: "reduced-order" },
-] as const;
+export const PROOF_PACK_STAGE_REQUIREMENTS = NHM2_PROOF_PACK_STAGE_REQUIREMENTS;
 
 export async function fetchProofPack(signal?: AbortSignal): Promise<ProofPack> {
   const res = await apiRequest("GET", "/api/helix/pipeline/proofs", undefined, signal);

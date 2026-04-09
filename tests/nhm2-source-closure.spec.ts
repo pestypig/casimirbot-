@@ -156,6 +156,7 @@ describe("nhm2 source closure artifact v2", () => {
     normalizationBasis: "sample_count",
     regionMaskNote: "mask",
     supportInclusionNote: note,
+    evidenceStatus: "measured" as const,
   });
 
   it("passes when global and required regional comparisons are same-basis and within tolerance", () => {
@@ -220,6 +221,14 @@ describe("nhm2 source closure artifact v2", () => {
       );
       expect(region.metricAccounting?.aggregationMode).toBe("mean");
       expect(region.tileAccounting?.aggregationMode).toBe("mean");
+      expect(region.metricAccounting?.evidenceStatus).toBe("measured");
+      expect(region.tileAccounting?.evidenceStatus).toBe("measured");
+      expect(region.tileProxyDiagnostics).toBeNull();
+      expect(region.mismatchDiagnostics).toBeTruthy();
+      expect(region.mismatchDiagnostics?.components.T00.ratioTileToMetric).not.toBeNull();
+      expect(region.mismatchDiagnostics?.components.T00.signedRatioTileToMetric).not.toBeNull();
+      expect(region.mismatchDiagnostics?.components.T00.signMatch).toBe(true);
+      expect(region.mismatchDiagnostics?.diagonalSignStatus).toBe("match");
     }
   });
 
@@ -355,5 +364,271 @@ describe("nhm2 source closure artifact v2", () => {
       expect.arrayContaining(["region_metric_tensor_missing"]),
     );
     expect(artifact.regionComparisons.regions[0]?.status).toBe("unavailable");
+  });
+
+  it("preserves null proxy diagnostics instead of coercing to zeros", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["hull"],
+      regionComparisons: [
+        {
+          regionId: "hull",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-hull",
+          tileTensorRef: "artifact://tile-hull",
+          metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          sampleCount: null,
+          metricAccounting: {
+            sampleCount: null,
+            maskVoxelCount: null,
+            weightSum: null,
+            aggregationMode: "unknown",
+            normalizationBasis: null,
+            regionMaskNote: null,
+            supportInclusionNote: null,
+            evidenceStatus: "unknown",
+          },
+          tileAccounting: {
+            sampleCount: null,
+            maskVoxelCount: null,
+            weightSum: null,
+            aggregationMode: "unknown",
+            normalizationBasis: null,
+            regionMaskNote: null,
+            supportInclusionNote: null,
+            evidenceStatus: "unknown",
+          },
+          tileProxyDiagnostics: {
+            pressureModel: null,
+            pressureFactor: null,
+            pressureSource: null,
+            proxyMode: "unknown",
+            brickProxyMode: "unknown",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    const region = artifact.regionComparisons.regions[0];
+    expect(region.sampleCount).toBeNull();
+    expect(region.tileProxyDiagnostics?.pressureFactor).toBeNull();
+  });
+
+  it("preserves proxy component attribution fields without coercion", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["hull"],
+      regionComparisons: [
+        {
+          regionId: "hull",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-hull",
+          tileTensorRef: "artifact://tile-hull",
+          metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          sampleCount: 12,
+          metricAccounting: makeAccounting(12, "metric"),
+          tileAccounting: makeAccounting(12, "tile"),
+          tileProxyDiagnostics: {
+            pressureModel: "isotropic_pressure_proxy",
+            pressureFactor: null,
+            pressureSource: "proxy",
+            proxyMode: "proxy",
+            brickProxyMode: "metric",
+            componentAttribution: {
+              T00: {
+                constructionMode: "direct_region_mean_t00",
+                sourceComponent: null,
+                proxyFactor: null,
+                proxyReconstructedValue: null,
+                proxyReconstructionAbsError: null,
+                proxyReconstructionRelError: null,
+                evidenceStatus: "measured",
+              },
+              T11: {
+                constructionMode: "proxy_scaled_from_region_mean_t00",
+                sourceComponent: "T00",
+                proxyFactor: null,
+                proxyReconstructedValue: null,
+                proxyReconstructionAbsError: null,
+                proxyReconstructionRelError: null,
+                evidenceStatus: "inferred",
+              },
+              T22: {
+                constructionMode: "proxy_scaled_from_region_mean_t00",
+                sourceComponent: "T00",
+                proxyFactor: null,
+                proxyReconstructedValue: null,
+                proxyReconstructionAbsError: null,
+                proxyReconstructionRelError: null,
+                evidenceStatus: "inferred",
+              },
+              T33: {
+                constructionMode: "proxy_scaled_from_region_mean_t00",
+                sourceComponent: "T00",
+                proxyFactor: null,
+                proxyReconstructedValue: null,
+                proxyReconstructionAbsError: null,
+                proxyReconstructionRelError: null,
+                evidenceStatus: "inferred",
+              },
+            },
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    const attribution =
+      artifact.regionComparisons.regions[0]?.tileProxyDiagnostics?.componentAttribution;
+    expect(attribution).toBeTruthy();
+    expect(attribution?.T00.constructionMode).toBe("direct_region_mean_t00");
+    expect(attribution?.T11.sourceComponent).toBe("T00");
+    expect(attribution?.T11.proxyFactor).toBeNull();
+    expect(attribution?.T11.proxyReconstructedValue).toBeNull();
+  });
+
+  it("downgrades measured accounting when required evidence is missing", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["hull"],
+      regionComparisons: [
+        {
+          regionId: "hull",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-hull",
+          tileTensorRef: "artifact://tile-hull",
+          metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          sampleCount: 10,
+          metricAccounting: {
+            sampleCount: 10,
+            maskVoxelCount: 10,
+            weightSum: null,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "mask",
+            supportInclusionNote: "metric",
+            evidenceStatus: "measured",
+          },
+          tileAccounting: {
+            sampleCount: 10,
+            maskVoxelCount: 10,
+            weightSum: null,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "mask",
+            supportInclusionNote: "tile",
+            evidenceStatus: "measured",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    const region = artifact.regionComparisons.regions[0];
+    expect(region.metricAccounting?.evidenceStatus).toBe("unknown");
+    expect(region.tileAccounting?.evidenceStatus).toBe("unknown");
+  });
+
+  it("downgrades measured accounting when normalization semantics are inconsistent", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["hull"],
+      regionComparisons: [
+        {
+          regionId: "hull",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-hull",
+          tileTensorRef: "artifact://tile-hull",
+          metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          sampleCount: 10,
+          metricAccounting: {
+            sampleCount: 10,
+            maskVoxelCount: 10,
+            weightSum: 12,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "mask",
+            supportInclusionNote: "metric",
+            evidenceStatus: "measured",
+          },
+          tileAccounting: {
+            sampleCount: 10,
+            maskVoxelCount: 10,
+            weightSum: 8,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "mask",
+            supportInclusionNote: "tile",
+            evidenceStatus: "measured",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    const region = artifact.regionComparisons.regions[0];
+    expect(region.metricAccounting?.evidenceStatus).toBe("unknown");
+    expect(region.tileAccounting?.evidenceStatus).toBe("unknown");
   });
 });

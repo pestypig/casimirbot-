@@ -203,6 +203,10 @@ import {
   type HelixAskNoveltyContext,
 } from "../services/helix-ask/novelty-phrasing";
 import {
+  buildNhm2BlockGroundingContext,
+  selectNhm2BlockIdsForQuestion,
+} from "../services/helix-ask/nhm2-block-grounding";
+import {
   readDocSectionIndex,
   selectDocSectionMatch,
   type DocSection,
@@ -218,6 +222,7 @@ import {
   filterSignalTokens,
   tokenizeAskQuery,
 } from "../services/helix-ask/query";
+import { resolveLiveNhm2Blocks } from "../helix-core";
 import { resolveHelixAskArbiter } from "../services/helix-ask/arbiter";
 import {
   evaluateHelixAskAlignmentGate,
@@ -398,6 +403,16 @@ import {
   shouldPreferHelixAskPlannerLlmInFastMode,
   shouldUseHelixAskRiskTriggeredTwoPass,
 } from "../services/helix-ask/policy/execution-policy";
+import {
+  isHelixAskClarifyForcedShortCircuitRule,
+  isHelixAskConceptForcedShortCircuitRule,
+  isHelixAskHardForcedShortCircuitRule,
+  isHelixAskResearchContractFailClosedForcedShortCircuitRule,
+  renderHelixAskSimpleCompositionalAnswer,
+  shouldFastPathFinalizeHelixAskForcedAnswer,
+  shouldPreserveHelixAskForcedAnswerAcrossComposer,
+  shouldPreserveHelixAskForcedAnswerAcrossFinalizer,
+} from "../services/helix-ask/policy/forced-answer";
 import {
   buildEventStableFields,
   computeRelationSecondPassDelta,
@@ -14252,6 +14267,7 @@ function buildGroundedAskPrompt(
     "Use only the evidence in the context below. Cite file paths when referencing code.",
     "If the context is insufficient, say what is missing and ask a concise follow-up.",
     "When the context includes solver or calculation functions, summarize the inputs, outputs, and flow before UI details.",
+    "When the context includes NHM2 live claim blocks, preserve their status, authority tier, integrity, and proxy semantics exactly.",
   ];
   const normalizedResponseLanguage = normalizeLanguageTag(responseLanguage ?? null) ?? "en";
   if (!isEnglishLikeLanguage(normalizedResponseLanguage)) {
@@ -21339,110 +21355,6 @@ const shouldUseScientificPreIntentClarify = (args: {
   if (args.isRepoQuestion) return true;
   return false;
 };
-
-const renderHelixAskSimpleCompositionalAnswer = (question: string): string | null => {
-  const trimmed = question.trim();
-  if (!trimmed) return null;
-  const matched = trimmed.match(
-    /^(?:please\s+)?(?:say|write|reply|respond|give|tell|draft|compose)\s+(.*)$/i,
-  );
-  if (!matched) return null;
-  let body = matched[1]?.trim() ?? "";
-  body = body.replace(/\s+in\s+(?:one|1)\s+sentence(?:s)?[.?!]*$/i, "").trim();
-  body = body.replace(/\s+using\s+(?:one|1)\s+sentence(?:s)?[.?!]*$/i, "").trim();
-  body = body.replace(/^(?:with\s+)/i, "").trim();
-  body = body.replace(/^["'`]+|["'`]+$/g, "").trim();
-  if (!body) return null;
-  if (/^[a-z]/.test(body)) {
-    body = body.charAt(0).toUpperCase() + body.slice(1);
-  }
-  if (!/[.!?]$/.test(body)) {
-    body = `${body}.`;
-  }
-  return body;
-};
-
-const isHelixAskHardForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
-  rule === "forcedAnswer:pre_intent_clarify" ||
-  rule === "forcedAnswer:simple_composition" ||
-  rule === "forcedAnswer:math_solver" ||
-  rule === "forcedAnswer:math_solver_warp_guard" ||
-  rule === "forcedAnswer:constraint_report" ||
-  rule === "forcedAnswer:helix_pipeline" ||
-  rule === "forcedAnswer:stage05_summary_hard_fail" ||
-  rule === "forcedAnswer:research_contract_fail_closed" ||
-  rule === "forcedAnswer:concept" ||
-  rule === "forcedAnswer:concept_short_definition";
-
-const isHelixAskConceptForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
-  rule === "forcedAnswer:concept" || rule === "forcedAnswer:concept_short_definition";
-
-const isHelixAskClarifyForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
-  rule === "forcedAnswer:pre_intent_clarify";
-
-const isHelixAskResearchContractFailClosedForcedShortCircuitRule = (
-  rule: string | null | undefined,
-): boolean => rule === "forcedAnswer:research_contract_fail_closed";
-
-const isHelixAskSimpleForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
-  rule === "forcedAnswer:simple_composition";
-
-const isHelixAskPipelineForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
-  rule === "forcedAnswer:helix_pipeline";
-
-const shouldFastPathFinalizeHelixAskForcedAnswer = (args: {
-  shouldShortCircuitAnswer: boolean;
-  fallbackAnswer: string;
-  forcedAnswerIsHard: boolean;
-  forcedRule?: string | null;
-  conceptFastPath: boolean;
-  isIdeologyReferenceIntent: boolean;
-  verbosity: HelixAskVerbosity;
-}): boolean => {
-  if (!args.shouldShortCircuitAnswer) return false;
-  if (!args.forcedAnswerIsHard) return false;
-  const forcedRule = args.forcedRule ?? null;
-  if (isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule)) {
-    return true;
-  }
-  const normalizedFallback = String(args.fallbackAnswer ?? "").trim();
-  if (!normalizedFallback) return false;
-  if (hasSourcesLine(normalizedFallback)) {
-    return true;
-  }
-  if (HELIX_ASK_STRUCTURED_DETERMINISTIC_SECTION_RE.test(normalizedFallback)) {
-    return true;
-  }
-  if (
-    args.isIdeologyReferenceIntent &&
-    args.conceptFastPath &&
-    String(args.verbosity ?? "").trim().length > 0
-  ) {
-    return true;
-  }
-  return false;
-};
-
-const shouldPreserveHelixAskForcedAnswerAcrossComposer = (args: {
-  forcedAnswerPinned: boolean;
-  forcedRule?: string | null;
-}): boolean =>
-  args.forcedAnswerPinned &&
-  (isHelixAskConceptForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskPipelineForcedShortCircuitRule(args.forcedRule ?? null));
-
-const shouldPreserveHelixAskForcedAnswerAcrossFinalizer = (args: {
-  forcedAnswerPinned: boolean;
-  forcedRule?: string | null;
-}): boolean =>
-  args.forcedAnswerPinned &&
-  (isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskPipelineForcedShortCircuitRule(args.forcedRule ?? null));
 
 const resolveStage05SummaryPolicy = (args?: {
   singleLlm?: boolean;
@@ -44983,6 +44895,47 @@ const executeHelixAsk = async ({
       failReason: undefined as "bridge_count_low" | "evidence_count_low" | undefined,
     };
     let relationSecondPassAttempted = false;
+    const nhm2GroundingBlockIds = selectNhm2BlockIdsForQuestion(baseQuestion);
+    let nhm2GroundingContext = "";
+    let nhm2GroundingRefs: string[] = [];
+    let nhm2GroundingError: string | null = null;
+    if (nhm2GroundingBlockIds.length > 0) {
+      requiresRepoEvidence = true;
+      hasRepoHints = true;
+      repoExpectationScore = Math.max(repoExpectationScore, 3);
+      repoExpectationLevel = "high";
+      repoExpectationSignals.push("nhm2_live_blocks");
+      try {
+        const nhm2GroundingBlocks = await resolveLiveNhm2Blocks(nhm2GroundingBlockIds);
+        const nhm2Grounding = buildNhm2BlockGroundingContext(nhm2GroundingBlocks);
+        nhm2GroundingContext = nhm2Grounding.context;
+        nhm2GroundingRefs = nhm2Grounding.sourceRefs;
+        if (nhm2GroundingContext) {
+          contextText = appendContextBlock(contextText, nhm2GroundingContext);
+        }
+        if (nhm2GroundingRefs.length > 0) {
+          contextFiles = Array.from(new Set([...contextFiles, ...nhm2GroundingRefs]));
+        }
+        answerPath.push(`grounding:nhm2_blocks(${nhm2GroundingBlockIds.join(",")})`);
+      } catch (error) {
+        nhm2GroundingError = error instanceof Error ? error.message : String(error);
+        contextText = appendContextBlock(
+          contextText,
+          `NHM2 live claim blocks were unavailable for this turn. Treat current NHM2 state as unresolved instead of inferred. Error: ${clipAskText(nhm2GroundingError, 240)}`,
+        );
+        answerPath.push("grounding:nhm2_blocks_error");
+      }
+      if (debugPayload) {
+        const debugRecord = debugPayload as Record<string, unknown>;
+        debugRecord.nhm2_block_grounding_ids = nhm2GroundingBlockIds.slice();
+        debugRecord.nhm2_block_grounding_refs = nhm2GroundingRefs.slice();
+        debugRecord.nhm2_block_grounding_attached = Boolean(nhm2GroundingContext);
+        debugRecord.nhm2_block_grounding_error = nhm2GroundingError;
+        debugRecord.repo_expectation_score = repoExpectationScore;
+        debugRecord.repo_expectation_level = repoExpectationLevel;
+        debugRecord.repo_expectation_signals = Array.from(new Set(repoExpectationSignals));
+      }
+    }
     const hardBypassPreIntentClarifyForGeneralDefinitionRaw =
       Boolean(preIntentClarify) &&
       shouldBypassHelixAskPreIntentClarifyForGeneralDefinitionTarget({

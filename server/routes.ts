@@ -1161,6 +1161,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
     getSystemMetrics,
     getPipelineState,
     getPipelineProofs,
+    getNhm2Block,
+    resolveNhm2Blocks,
     getDisplacementField,
     getDisplacementFieldGeometry,
     probeFieldOnHull,
@@ -1215,6 +1217,8 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.get("/api/helix/metrics", getSystemMetrics);
   app.get("/api/helix/pipeline", getPipelineState);
   app.get("/api/helix/pipeline/proofs", getPipelineProofs);
+  app.get("/api/helix/blocks/:blockId", getNhm2Block);
+  app.post("/api/helix/blocks/resolve", resolveNhm2Blocks);
   // Backwards-compatible alias: some clients (HelixCasimirAmplifier) request /api/helix/state
   app.get("/api/helix/state", getPipelineState);
   app.get("/api/helix/field", getDisplacementField);

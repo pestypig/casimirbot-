@@ -44,12 +44,20 @@ export const NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_SOURCE_CLOSURE_REGION_ACCOUNTING_EVIDENCE_VALUES = [
+  "measured",
+  "inferred",
+  "unknown",
+] as const;
+
 export type Nhm2SourceClosureV2ReasonCode =
   (typeof NHM2_SOURCE_CLOSURE_V2_REASON_CODES)[number];
 export type Nhm2SourceClosureRegionBasisStatus =
   (typeof NHM2_SOURCE_CLOSURE_REGION_BASIS_STATUS_VALUES)[number];
 export type Nhm2SourceClosureRegionAggregationMode =
   (typeof NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES)[number];
+export type Nhm2SourceClosureV2RegionAccountingEvidenceStatus =
+  (typeof NHM2_SOURCE_CLOSURE_REGION_ACCOUNTING_EVIDENCE_VALUES)[number];
 
 export type Nhm2SourceClosureV2RegionAccounting = {
   sampleCount: number | null;
@@ -59,6 +67,67 @@ export type Nhm2SourceClosureV2RegionAccounting = {
   normalizationBasis: string | null;
   regionMaskNote: string | null;
   supportInclusionNote: string | null;
+  evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
+};
+
+export type Nhm2SourceClosureV2RegionProxyMode = "proxy" | "metric" | "unknown";
+export type Nhm2SourceClosureV2RegionProxyConstructionMode =
+  | "direct_region_mean_t00"
+  | "proxy_scaled_from_region_mean_t00"
+  | "unknown";
+
+export type Nhm2SourceClosureV2RegionProxyComponentAttribution = {
+  constructionMode: Nhm2SourceClosureV2RegionProxyConstructionMode;
+  sourceComponent: Nhm2SourceClosureComponent | null;
+  proxyFactor: number | null;
+  proxyReconstructedValue: number | null;
+  proxyReconstructionAbsError: number | null;
+  proxyReconstructionRelError: number | null;
+  evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
+};
+
+export type Nhm2SourceClosureV2RegionProxyDiagnostics = {
+  pressureModel: string | null;
+  pressureFactor: number | null;
+  pressureSource: string | null;
+  proxyMode: Nhm2SourceClosureV2RegionProxyMode;
+  brickProxyMode: Nhm2SourceClosureV2RegionProxyMode;
+  componentAttribution?: Record<
+    Nhm2SourceClosureComponent,
+    Nhm2SourceClosureV2RegionProxyComponentAttribution
+  > | null;
+};
+
+export type Nhm2SourceClosureV2RegionScaleComponent = {
+  metricValue: number | null;
+  tileValue: number | null;
+  metricAbs: number | null;
+  tileAbs: number | null;
+  signedDelta: number | null;
+  absDelta: number | null;
+  ratioTileToMetric: number | null;
+  ratioMetricToTile: number | null;
+  signedRatioTileToMetric: number | null;
+  signMatch: boolean | null;
+};
+
+export type Nhm2SourceClosureV2RegionMismatchDiagnostics = {
+  diagonalMeanMetric: number | null;
+  diagonalMeanTile: number | null;
+  diagonalMeanSignedRatio: number | null;
+  diagonalMeanMetricAbs: number | null;
+  diagonalMeanTileAbs: number | null;
+  diagonalMeanRatio: number | null;
+  diagonalMeanSide: "metric" | "tile" | "tie" | null;
+  diagonalSignStatus: "match" | "flip" | "mixed" | "unknown" | null;
+  signMatchCount: number | null;
+  signFlipCount: number | null;
+  signUnknownCount: number | null;
+  signFlipComponents: Nhm2SourceClosureComponent[];
+  dominantComponent: Nhm2SourceClosureComponent | null;
+  dominantAbsRatio: number | null;
+  dominantSide: "metric" | "tile" | "tie" | null;
+  components: Record<Nhm2SourceClosureComponent, Nhm2SourceClosureV2RegionScaleComponent>;
 };
 
 export type Nhm2SourceClosureV2RegionComparisonInput = {
@@ -71,6 +140,7 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
   sampleCount?: number | null;
   metricAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
   tileAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
+  tileProxyDiagnostics?: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
   note?: string | null;
 };
 
@@ -86,6 +156,8 @@ export type Nhm2SourceClosureV2RegionComparison = {
   sampleCount: number | null;
   metricAccounting: Nhm2SourceClosureV2RegionAccounting | null;
   tileAccounting: Nhm2SourceClosureV2RegionAccounting | null;
+  tileProxyDiagnostics: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
+  mismatchDiagnostics: Nhm2SourceClosureV2RegionMismatchDiagnostics | null;
   residualComponents: Record<
     Nhm2SourceClosureComponent,
     Nhm2SourceClosureResidualComponent
@@ -153,6 +225,12 @@ const toFinite = (value: unknown): number | null => {
   return Number.isFinite(n) ? Number(n) : null;
 };
 
+const toFiniteOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Number(n) : null;
+};
+
 const toRepoPath = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0
     ? value.trim().replace(/\\/g, "/")
@@ -171,6 +249,34 @@ const missingComponents = (
 
 const relDelta = (value: number, baseline: number, eps = 1e-12): number =>
   Math.abs(value - baseline) / Math.max(Math.abs(baseline), eps);
+
+const relRatio = (value: number, baseline: number, eps = 1e-12): number =>
+  Math.abs(value) / Math.max(Math.abs(baseline), eps);
+
+const hasConsistentMeanSampleCount = (
+  sampleCount: number | null,
+  weightSum: number | null,
+  tolerance = 1e-9,
+): boolean => {
+  if (sampleCount == null || weightSum == null) return false;
+  if (sampleCount === 0 && weightSum === 0) return true;
+  return relDelta(weightSum, sampleCount, 1e-12) <= tolerance;
+};
+
+const isAccountingConsistencyVerified = (
+  accounting: Nhm2SourceClosureV2RegionAccounting,
+): boolean => {
+  if (
+    accounting.aggregationMode === "mean" &&
+    accounting.normalizationBasis === "sample_count"
+  ) {
+    return hasConsistentMeanSampleCount(
+      accounting.sampleCount,
+      accounting.weightSum,
+    );
+  }
+  return false;
+};
 
 const buildResidualComponents = (
   metricTensor: Nhm2SourceClosureTensor,
@@ -383,18 +489,293 @@ const normalizeRegionAggregationMode = (
     ? (value as Nhm2SourceClosureRegionAggregationMode)
     : "unknown";
 
+const normalizeAccountingEvidenceStatus = (
+  value: unknown,
+): Nhm2SourceClosureV2RegionAccountingEvidenceStatus =>
+  NHM2_SOURCE_CLOSURE_REGION_ACCOUNTING_EVIDENCE_VALUES.includes(
+    value as Nhm2SourceClosureV2RegionAccountingEvidenceStatus,
+  )
+    ? (value as Nhm2SourceClosureV2RegionAccountingEvidenceStatus)
+    : "unknown";
+
 const normalizeRegionAccounting = (
   value: Nhm2SourceClosureV2RegionAccounting | null | undefined,
 ): Nhm2SourceClosureV2RegionAccounting | null => {
   if (!value) return null;
-  return {
-    sampleCount: toFinite(value.sampleCount),
-    maskVoxelCount: toFinite(value.maskVoxelCount),
-    weightSum: toFinite(value.weightSum),
+  const normalized: Nhm2SourceClosureV2RegionAccounting = {
+    sampleCount: toFiniteOrNull(value.sampleCount),
+    maskVoxelCount: toFiniteOrNull(value.maskVoxelCount),
+    weightSum: toFiniteOrNull(value.weightSum),
     aggregationMode: normalizeRegionAggregationMode(value.aggregationMode),
     normalizationBasis: toText(value.normalizationBasis),
     regionMaskNote: toText(value.regionMaskNote),
     supportInclusionNote: toText(value.supportInclusionNote),
+    evidenceStatus: normalizeAccountingEvidenceStatus(value.evidenceStatus),
+  };
+  if (normalized.evidenceStatus === "measured") {
+    const hasMeasuredEvidence =
+      normalized.sampleCount != null &&
+      normalized.weightSum != null &&
+      normalized.aggregationMode !== "unknown" &&
+      normalized.normalizationBasis != null;
+    if (!hasMeasuredEvidence || !isAccountingConsistencyVerified(normalized)) {
+      normalized.evidenceStatus = "unknown";
+    }
+  }
+  return normalized;
+};
+
+const normalizeProxyMode = (
+  value: unknown,
+): Nhm2SourceClosureV2RegionProxyMode =>
+  value === "proxy" || value === "metric" || value === "unknown"
+    ? value
+    : "unknown";
+
+const normalizeProxyConstructionMode = (
+  value: unknown,
+): Nhm2SourceClosureV2RegionProxyConstructionMode =>
+  value === "direct_region_mean_t00" ||
+  value === "proxy_scaled_from_region_mean_t00" ||
+  value === "unknown"
+    ? value
+    : "unknown";
+
+const normalizeProxySourceComponent = (
+  value: unknown,
+): Nhm2SourceClosureComponent | null =>
+  NHM2_SOURCE_CLOSURE_COMPONENTS.includes(
+    value as Nhm2SourceClosureComponent,
+  )
+    ? (value as Nhm2SourceClosureComponent)
+    : null;
+
+const buildUnknownProxyComponentAttribution =
+  (): Nhm2SourceClosureV2RegionProxyComponentAttribution => ({
+    constructionMode: "unknown",
+    sourceComponent: null,
+    proxyFactor: null,
+    proxyReconstructedValue: null,
+    proxyReconstructionAbsError: null,
+    proxyReconstructionRelError: null,
+    evidenceStatus: "unknown",
+  });
+
+const normalizeProxyComponentAttribution = (
+  value: unknown,
+): Nhm2SourceClosureV2RegionProxyComponentAttribution => {
+  if (!value || typeof value !== "object") {
+    return buildUnknownProxyComponentAttribution();
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    constructionMode: normalizeProxyConstructionMode(record.constructionMode),
+    sourceComponent: normalizeProxySourceComponent(record.sourceComponent),
+    proxyFactor: toFiniteOrNull(record.proxyFactor),
+    proxyReconstructedValue: toFiniteOrNull(record.proxyReconstructedValue),
+    proxyReconstructionAbsError: toFiniteOrNull(record.proxyReconstructionAbsError),
+    proxyReconstructionRelError: toFiniteOrNull(record.proxyReconstructionRelError),
+    evidenceStatus: normalizeAccountingEvidenceStatus(record.evidenceStatus),
+  };
+};
+
+const normalizeProxyComponentAttributionMap = (
+  value: unknown,
+): Record<
+  Nhm2SourceClosureComponent,
+  Nhm2SourceClosureV2RegionProxyComponentAttribution
+> | null => {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const normalized = {} as Record<
+    Nhm2SourceClosureComponent,
+    Nhm2SourceClosureV2RegionProxyComponentAttribution
+  >;
+  for (const component of NHM2_SOURCE_CLOSURE_COMPONENTS) {
+    normalized[component] = normalizeProxyComponentAttribution(record[component]);
+  }
+  return normalized;
+};
+
+const normalizeProxyDiagnostics = (
+  value: Nhm2SourceClosureV2RegionProxyDiagnostics | null | undefined,
+): Nhm2SourceClosureV2RegionProxyDiagnostics | null => {
+  if (!value) return null;
+  return {
+    pressureModel: toText(value.pressureModel),
+    pressureFactor: toFiniteOrNull(value.pressureFactor),
+    pressureSource: toText(value.pressureSource),
+    proxyMode: normalizeProxyMode(value.proxyMode),
+    brickProxyMode: normalizeProxyMode(value.brickProxyMode),
+    componentAttribution: normalizeProxyComponentAttributionMap(
+      value.componentAttribution,
+    ),
+  };
+};
+
+const buildMismatchDiagnostics = (
+  metricTensor: Nhm2SourceClosureTensor,
+  tileTensor: Nhm2SourceClosureTensor,
+): Nhm2SourceClosureV2RegionMismatchDiagnostics | null => {
+  if (!tensorHasAnyComponent(metricTensor) && !tensorHasAnyComponent(tileTensor)) {
+    return null;
+  }
+  const eps = 1e-12;
+  const components = {} as Record<
+    Nhm2SourceClosureComponent,
+    Nhm2SourceClosureV2RegionScaleComponent
+  >;
+  const metricSignedValues: number[] = [];
+  const tileSignedValues: number[] = [];
+  const metricAbsValues: number[] = [];
+  const tileAbsValues: number[] = [];
+  const signFlipComponents: Nhm2SourceClosureComponent[] = [];
+  let signMatchCount = 0;
+  let signFlipCount = 0;
+  let signUnknownCount = 0;
+  let dominantComponent: Nhm2SourceClosureComponent | null = null;
+  let dominantAbsRatio: number | null = null;
+  let dominantSide: "metric" | "tile" | "tie" | null = null;
+
+  for (const component of NHM2_SOURCE_CLOSURE_COMPONENTS) {
+    const metricValue = metricTensor[component];
+    const tileValue = tileTensor[component];
+    const metricAbs = metricValue != null ? Math.abs(metricValue) : null;
+    const tileAbs = tileValue != null ? Math.abs(tileValue) : null;
+    const signedDelta =
+      metricValue != null && tileValue != null ? tileValue - metricValue : null;
+    const absDelta = signedDelta != null ? Math.abs(signedDelta) : null;
+    const ratioTileToMetric =
+      metricAbs != null && tileAbs != null
+        ? relRatio(tileAbs, metricAbs, eps)
+        : null;
+    const ratioMetricToTile =
+      metricAbs != null && tileAbs != null
+        ? relRatio(metricAbs, tileAbs, eps)
+        : null;
+    const signedRatioTileToMetric =
+      metricValue != null &&
+      tileValue != null &&
+      Math.abs(metricValue) > eps
+        ? tileValue / metricValue
+        : null;
+    let signMatch: boolean | null = null;
+    if (
+      metricValue != null &&
+      tileValue != null &&
+      Math.abs(metricValue) > eps &&
+      Math.abs(tileValue) > eps
+    ) {
+      signMatch = Math.sign(metricValue) === Math.sign(tileValue);
+      if (signMatch) {
+        signMatchCount += 1;
+      } else {
+        signFlipCount += 1;
+        signFlipComponents.push(component);
+      }
+    } else {
+      signUnknownCount += 1;
+    }
+
+    components[component] = {
+      metricValue,
+      tileValue,
+      metricAbs,
+      tileAbs,
+      signedDelta,
+      absDelta,
+      ratioTileToMetric,
+      ratioMetricToTile,
+      signedRatioTileToMetric,
+      signMatch,
+    };
+
+    if (metricValue != null) metricSignedValues.push(metricValue);
+    if (tileValue != null) tileSignedValues.push(tileValue);
+    if (metricAbs != null) metricAbsValues.push(metricAbs);
+    if (tileAbs != null) tileAbsValues.push(tileAbs);
+
+    if (ratioTileToMetric != null) {
+      const absRatio =
+        ratioTileToMetric >= 1 ? ratioTileToMetric : 1 / ratioTileToMetric;
+      if (dominantAbsRatio == null || absRatio > dominantAbsRatio) {
+        dominantComponent = component;
+        dominantAbsRatio = absRatio;
+        dominantSide =
+          Math.abs(ratioTileToMetric - 1) <= eps
+            ? "tie"
+            : ratioTileToMetric > 1
+              ? "tile"
+              : "metric";
+      }
+    }
+  }
+
+  const diagonalMeanMetric =
+    metricSignedValues.length > 0
+      ? metricSignedValues.reduce((sum, value) => sum + value, 0) /
+        metricSignedValues.length
+      : null;
+  const diagonalMeanTile =
+    tileSignedValues.length > 0
+      ? tileSignedValues.reduce((sum, value) => sum + value, 0) /
+        tileSignedValues.length
+      : null;
+  const diagonalMeanSignedRatio =
+    diagonalMeanMetric != null &&
+    diagonalMeanTile != null &&
+    Math.abs(diagonalMeanMetric) > eps
+      ? diagonalMeanTile / diagonalMeanMetric
+      : null;
+  const diagonalMeanMetricAbs =
+    metricAbsValues.length > 0
+      ? metricAbsValues.reduce((sum, value) => sum + value, 0) /
+        metricAbsValues.length
+      : null;
+  const diagonalMeanTileAbs =
+    tileAbsValues.length > 0
+      ? tileAbsValues.reduce((sum, value) => sum + value, 0) / tileAbsValues.length
+      : null;
+  const diagonalMeanRatio =
+    diagonalMeanMetricAbs != null && diagonalMeanTileAbs != null
+      ? relRatio(diagonalMeanTileAbs, diagonalMeanMetricAbs, eps)
+      : null;
+  const diagonalMeanSide =
+    diagonalMeanRatio == null
+      ? null
+      : Math.abs(diagonalMeanRatio - 1) <= eps
+        ? "tie"
+        : diagonalMeanRatio > 1
+          ? "tile"
+          : "metric";
+  const diagonalSignStatus =
+    signMatchCount === 0 && signFlipCount === 0
+      ? "unknown"
+      : signFlipCount === 0
+        ? "match"
+        : signMatchCount === 0
+          ? "flip"
+          : "mixed";
+  const totalSignObservations =
+    signMatchCount + signFlipCount + signUnknownCount;
+
+  return {
+    diagonalMeanMetric,
+    diagonalMeanTile,
+    diagonalMeanSignedRatio,
+    diagonalMeanMetricAbs,
+    diagonalMeanTileAbs,
+    diagonalMeanRatio,
+    diagonalMeanSide,
+    diagonalSignStatus,
+    signMatchCount: totalSignObservations > 0 ? signMatchCount : null,
+    signFlipCount: totalSignObservations > 0 ? signFlipCount : null,
+    signUnknownCount: totalSignObservations > 0 ? signUnknownCount : null,
+    signFlipComponents,
+    dominantComponent,
+    dominantAbsRatio,
+    dominantSide,
+    components,
   };
 };
 
@@ -432,7 +813,9 @@ const buildRegionComparison = (args: {
   const dominantResidual = resolveDominantResidualComponent(residualComponents);
   const metricAccounting = normalizeRegionAccounting(args.input.metricAccounting);
   const tileAccounting = normalizeRegionAccounting(args.input.tileAccounting);
-  const sampleCount = toFinite(args.input.sampleCount);
+  const tileProxyDiagnostics = normalizeProxyDiagnostics(args.input.tileProxyDiagnostics);
+  const mismatchDiagnostics = buildMismatchDiagnostics(metricTensor, tileTensor);
+  const sampleCount = toFiniteOrNull(args.input.sampleCount);
   const resolvedSampleCount =
     metricAccounting?.sampleCount ?? tileAccounting?.sampleCount ?? sampleCount;
 
@@ -474,6 +857,8 @@ const buildRegionComparison = (args: {
       sampleCount: resolvedSampleCount,
       metricAccounting,
       tileAccounting,
+      tileProxyDiagnostics,
+      mismatchDiagnostics,
       residualComponents,
       residualNorms,
       dominantResidualComponent: dominantResidual.component,
@@ -494,7 +879,7 @@ export const buildNhm2SourceClosureArtifactV2 = (
 ): Nhm2SourceClosureV2Artifact => {
   const metricTensor = normalizeNhm2SourceClosureTensor(input.metricRequiredTensor);
   const tileTensor = normalizeNhm2SourceClosureTensor(input.tileEffectiveTensor);
-  const toleranceRelLInf = toFinite(input.toleranceRelLInf);
+  const toleranceRelLInf = toFiniteOrNull(input.toleranceRelLInf);
   const metricMissing = !tensorHasAnyComponent(metricTensor);
   const tileMissing = !tensorHasAnyComponent(tileTensor);
   const metricMissingComponents = missingComponents(metricTensor);
@@ -596,7 +981,7 @@ export const buildNhm2SourceClosureArtifactV2 = (
     metricTensor,
     tileTensor,
     residualComponents,
-    scalarCl3RhoDeltaRel: toFinite(input.scalarCl3RhoDeltaRel),
+    scalarCl3RhoDeltaRel: toFiniteOrNull(input.scalarCl3RhoDeltaRel),
   });
 
   return {

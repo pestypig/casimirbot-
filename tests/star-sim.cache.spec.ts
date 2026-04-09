@@ -42,6 +42,7 @@ beforeEach(() => {
   process.env.STAR_SIM_ARTIFACT_ROOT = artifactRoot;
   process.env.STAR_SIM_MESA_RUNTIME = "mock";
   process.env.STAR_SIM_GYRE_RUNTIME = "mock";
+  process.env.STAR_SIM_SOURCE_FETCH_MODE = "fixture";
 });
 
 afterEach(async () => {
@@ -54,9 +55,115 @@ afterEach(async () => {
   delete process.env.STAR_SIM_ARTIFACT_ROOT;
   delete process.env.STAR_SIM_MESA_RUNTIME;
   delete process.env.STAR_SIM_GYRE_RUNTIME;
+  delete process.env.STAR_SIM_SOURCE_FETCH_MODE;
+  delete process.env.STAR_SIM_GAIA_DR3_MODE;
+  delete process.env.STAR_SIM_SDSS_ASTRA_MODE;
+  delete process.env.STAR_SIM_LAMOST_DR10_MODE;
+  delete process.env.STAR_SIM_GAIA_DR3_ENDPOINT;
+  delete process.env.STAR_SIM_SDSS_ASTRA_ENDPOINT;
+  delete process.env.STAR_SIM_LAMOST_DR10_ENDPOINT;
+  delete process.env.STAR_SIM_TESS_MAST_MODE;
+  delete process.env.STAR_SIM_TASOC_MODE;
+  delete process.env.STAR_SIM_TESS_MAST_ENDPOINT;
+  delete process.env.STAR_SIM_TASOC_ENDPOINT;
+  delete process.env.STAR_SIM_SOURCE_TIMEOUT_MS;
+  delete process.env.STAR_SIM_SOURCE_USER_AGENT;
   delete process.env.STAR_SIM_CACHE_TTL_MS;
   fs.rmSync(artifactRoot, { recursive: true, force: true });
   vi.resetModules();
+});
+
+describe("star-sim source-resolution cache", () => {
+  it("serves a cached source-resolution result on repeated identical requests", async () => {
+    const app = await buildApp();
+    const payload = {
+      target: {
+        name: "Demo Solar A",
+      },
+      identifiers: {
+        gaia_dr3_source_id: "123456789012345678",
+      },
+    };
+
+    const first = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+    const second = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+
+    expect(first.body.source_resolution.cache_key).toBe(second.body.source_resolution.cache_key);
+    expect(first.body.identifiers_resolved).toEqual(second.body.identifiers_resolved);
+    expect(second.body.source_resolution.cache_status).toBe("hit");
+    expect(second.body.source_resolution.fetch_mode).toBe("cache");
+    expect(Array.isArray(second.body.source_resolution.artifact_refs)).toBe(true);
+  });
+
+  it("changes the source-resolution cache key when source policy changes", async () => {
+    const app = await buildApp();
+    const payloadA = {
+      target: {
+        name: "Demo Solar A",
+      },
+      identifiers: {
+        gaia_dr3_source_id: "123456789012345678",
+      },
+      spectroscopy: {
+        teff_K: 5900,
+      },
+    };
+    const payloadB = {
+      ...payloadA,
+      source_policy: {
+        strict_catalog_resolution: true,
+      },
+    };
+
+    const [resA, resB] = await Promise.all([
+      request(app).post("/api/star-sim/v1/resolve").send(payloadA).expect(200),
+      request(app).post("/api/star-sim/v1/resolve").send(payloadB).expect(200),
+    ]);
+
+    expect(resA.body.source_resolution.cache_key).not.toBe(resB.body.source_resolution.cache_key);
+  });
+
+  it("separates live and fixture source cache namespaces", async () => {
+    const fixtureApp = await buildApp();
+    const payload = {
+      target: {
+        name: "Demo Solar A",
+      },
+      identifiers: {
+        gaia_dr3_source_id: "123456789012345678",
+      },
+    };
+    const fixtureRes = await request(fixtureApp).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "live";
+    process.env.STAR_SIM_GAIA_DR3_ENDPOINT = "http://127.0.0.1:9/gaia";
+    process.env.STAR_SIM_SDSS_ASTRA_ENDPOINT = "http://127.0.0.1:9/astra";
+    process.env.STAR_SIM_LAMOST_DR10_ENDPOINT = "http://127.0.0.1:9/lamost";
+    const liveApp = await buildApp();
+    const liveRes = await request(liveApp).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+
+    expect(fixtureRes.body.source_resolution.cache_key).not.toBe(liveRes.body.source_resolution.cache_key);
+    expect(liveRes.body.source_resolution.fetch_mode).toBe("live");
+  });
+
+  it("returns an explicit cache-only miss when no compatible source artifact exists", async () => {
+    process.env.STAR_SIM_SOURCE_FETCH_MODE = "cache_only";
+    const app = await buildApp();
+    const payload = {
+      target: {
+        name: "Demo Solar A",
+      },
+      identifiers: {
+        gaia_dr3_source_id: "123456789012345678",
+      },
+    };
+
+    const res = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+
+    expect(res.body.source_resolution.status).toBe("unresolved");
+    expect(res.body.source_resolution.fetch_mode).toBe("cache_only");
+    expect(res.body.source_resolution.reasons).toContain("cache_only_miss");
+  });
 });
 
 describe("star-sim cache-backed heavy lanes", () => {

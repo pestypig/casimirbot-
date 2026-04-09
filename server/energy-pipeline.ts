@@ -99,6 +99,8 @@ import {
   type Nhm2SourceClosureV2Artifact,
   type Nhm2SourceClosureV2RegionAccounting,
   type Nhm2SourceClosureV2RegionComparisonInput,
+  type Nhm2SourceClosureV2RegionProxyComponentAttribution,
+  type Nhm2SourceClosureV2RegionProxyDiagnostics,
 } from "../shared/contracts/nhm2-source-closure.v2.ts";
 import {
   buildNhm2StrictSignalReadinessArtifact,
@@ -511,6 +513,12 @@ const resolveMetricPathLengthFromAdapter = (
 const toFiniteNumber = (value: unknown): number | undefined => {
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
+};
+
+const toFiniteNumberOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 };
 
 const asText = (value: unknown): string | null =>
@@ -4063,9 +4071,6 @@ const collectNhm2SourceClosureRegionComparisons = (
   const regionMaskNote = `brick_mask=ellipsoid_axes_m(${brickBasis.hullAxes
     .map((value) => value.toFixed(6))
     .join(",")}); wall_sigma_m=${brickBasis.hullWall.toFixed(6)}; exterior_shell_limit_m=${(brickBasis.hullWall * 3).toFixed(6)}; dims=${brickBasis.dims.join("x")}; cell_volume_m3=${cellVolume.toExponential(6)}`;
-  const normalizationBasis = "sample_count";
-  const aggregationMode: Nhm2SourceClosureV2RegionAccounting["aggregationMode"] =
-    "mean";
   const regionVoxelIds = new Array<RequiredNhm2SourceClosureRegionId | null>(
     brickBasis.dims[0] * brickBasis.dims[1] * brickBasis.dims[2],
   ).fill(null);
@@ -4088,10 +4093,103 @@ const collectNhm2SourceClosureRegionComparisons = (
     radialMap: brickBasis.radialMap,
   });
   const stressRegions = stressBrick.stats.tensorSampledSummaries?.regions ?? [];
+  const pressureModel =
+    asText(stressBrick.stats.tensorSampledSummaries?.pressureModel) ?? null;
+  const pressureSource = asText(stressBrick.stats.mapping?.pressureSource) ?? null;
+  const derivePressureProxyMode = (): Nhm2SourceClosureV2RegionProxyDiagnostics["proxyMode"] => {
+    const modelSuggestsProxy =
+      pressureModel != null && pressureModel.toLowerCase().includes("proxy");
+    if (pressureSource === "proxy" || modelSuggestsProxy) return "proxy";
+    if (pressureSource === "pipeline" || pressureSource === "override") return "metric";
+    return "unknown";
+  };
+  const tileProxyDiagnosticsBase: Nhm2SourceClosureV2RegionProxyDiagnostics = {
+    pressureModel,
+    pressureFactor: toFiniteNumberOrNull(stressBrick.stats.mapping?.pressureFactor),
+    pressureSource,
+    proxyMode: derivePressureProxyMode(),
+    brickProxyMode:
+      stressBrick.stats.mapping?.proxy === true
+        ? "proxy"
+        : stressBrick.stats.mapping?.proxy === false
+          ? "metric"
+          : "unknown",
+  };
+  const buildTileProxyComponentAttribution = (
+    tileTensor: Nhm2SourceClosureTensor,
+  ): Record<Nhm2SourceClosureComponent, Nhm2SourceClosureV2RegionProxyComponentAttribution> | null => {
+    const hasAnyComponent = NHM2_SOURCE_CLOSURE_COMPONENTS.some(
+      (component) => tileTensor[component] != null,
+    );
+    if (!hasAnyComponent) return null;
+    const proxyEligible =
+      tileProxyDiagnosticsBase.proxyMode === "proxy" ||
+      tileProxyDiagnosticsBase.brickProxyMode === "proxy" ||
+      tileProxyDiagnosticsBase.pressureSource === "proxy";
+    const pressureFactor = toFiniteNumberOrNull(tileProxyDiagnosticsBase.pressureFactor);
+    const meanT00 = toFiniteNumberOrNull(tileTensor.T00);
+    const eps = 1e-12;
+    const attribution = {} as Record<
+      Nhm2SourceClosureComponent,
+      Nhm2SourceClosureV2RegionProxyComponentAttribution
+    >;
+    for (const component of NHM2_SOURCE_CLOSURE_COMPONENTS) {
+      const tileValue = toFiniteNumberOrNull(tileTensor[component]);
+      if (component === "T00") {
+        attribution[component] = {
+          constructionMode: tileValue != null ? "direct_region_mean_t00" : "unknown",
+          sourceComponent: null,
+          proxyFactor: null,
+          proxyReconstructedValue: null,
+          proxyReconstructionAbsError: null,
+          proxyReconstructionRelError: null,
+          evidenceStatus: tileValue != null ? "measured" : "unknown",
+        };
+        continue;
+      }
+
+      const hasProxyEvidence = proxyEligible && meanT00 != null && tileValue != null;
+      const reconstructed =
+        hasProxyEvidence && pressureFactor != null
+          ? meanT00 * pressureFactor
+          : null;
+      const absError =
+        reconstructed != null && tileValue != null
+          ? Math.abs(tileValue - reconstructed)
+          : null;
+      const relError =
+        absError != null && reconstructed != null && tileValue != null
+          ? absError / Math.max(Math.abs(tileValue), Math.abs(reconstructed), eps)
+          : null;
+
+      attribution[component] = {
+        constructionMode: hasProxyEvidence
+          ? "proxy_scaled_from_region_mean_t00"
+          : "unknown",
+        sourceComponent: hasProxyEvidence ? "T00" : null,
+        proxyFactor: hasProxyEvidence ? pressureFactor : null,
+        proxyReconstructedValue: reconstructed,
+        proxyReconstructionAbsError: absError,
+        proxyReconstructionRelError: relError,
+        evidenceStatus: hasProxyEvidence ? "inferred" : "unknown",
+      };
+    }
+    return attribution;
+  };
+  const buildTileProxyDiagnostics = (
+    tileTensor: Nhm2SourceClosureTensor,
+  ): Nhm2SourceClosureV2RegionProxyDiagnostics => ({
+    ...tileProxyDiagnosticsBase,
+    componentAttribution: buildTileProxyComponentAttribution(tileTensor),
+  });
   const stressRegionMap = new Map<
     RequiredNhm2SourceClosureRegionId,
     {
       sampleCount?: unknown;
+      aggregationMode?: unknown;
+      normalizationBasis?: unknown;
+      weightSum?: unknown;
+      accountingEvidenceStatus?: unknown;
       tensor?: unknown;
       note?: unknown;
     }
@@ -4100,6 +4198,10 @@ const collectNhm2SourceClosureRegionComparisons = (
     if (isRequiredNhm2SourceClosureRegionId(region?.regionId)) {
       stressRegionMap.set(region.regionId, {
         sampleCount: region.sampleCount,
+        aggregationMode: (region as { aggregationMode?: unknown }).aggregationMode,
+        normalizationBasis: (region as { normalizationBasis?: unknown }).normalizationBasis,
+        weightSum: (region as { weightSum?: unknown }).weightSum,
+        accountingEvidenceStatus: (region as { accountingEvidenceStatus?: unknown }).accountingEvidenceStatus,
         tensor: region.tensor,
         note: region.note,
       });
@@ -4163,15 +4265,20 @@ const collectNhm2SourceClosureRegionComparisons = (
   const buildAccounting = (args: {
     sampleCount: number | null;
     maskVoxelCount: number | null;
+    weightSum: number | null;
+    aggregationMode: Nhm2SourceClosureV2RegionAccounting["aggregationMode"];
+    normalizationBasis: string | null;
+    evidenceStatus: Nhm2SourceClosureV2RegionAccounting["evidenceStatus"];
     supportInclusionNote: string;
   }): Nhm2SourceClosureV2RegionAccounting => ({
     sampleCount: args.sampleCount,
     maskVoxelCount: args.maskVoxelCount,
-    weightSum: args.sampleCount,
-    aggregationMode,
-    normalizationBasis,
+    weightSum: args.weightSum,
+    aggregationMode: args.aggregationMode,
+    normalizationBasis: args.normalizationBasis,
     regionMaskNote,
     supportInclusionNote: args.supportInclusionNote,
+    evidenceStatus: args.evidenceStatus,
   });
 
   return REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
@@ -4185,10 +4292,10 @@ const collectNhm2SourceClosureRegionComparisons = (
       normalizeNhm2SourceClosureTensor(tileRegionEntry?.tensor ?? null);
     const metricTensorAvailable = isCompleteNhm2SourceClosureTensor(metricRegionTensor);
     const tileTensorAvailable = isCompleteNhm2SourceClosureTensor(tileRegionTensor);
-    const metricSampleCount = toFiniteNumber(metricRegionEntry?.sampleCount) ?? null;
-    const tileSampleCount = toFiniteNumber(tileRegionEntry?.sampleCount) ?? null;
+    const metricSampleCount = toFiniteNumberOrNull(metricRegionEntry?.sampleCount);
+    const tileSampleCount = toFiniteNumberOrNull(tileRegionEntry?.sampleCount);
     const maskVoxelCount =
-      toFiniteNumber(regionMaskCounts.get(regionId) ?? null) ?? null;
+      toFiniteNumberOrNull(regionMaskCounts.get(regionId) ?? null);
     const sampleCount = metricSampleCount ?? tileSampleCount ?? null;
     const noteParts: string[] = [];
     const tileNote = asText(tileRegionEntry?.note);
@@ -4212,15 +4319,30 @@ const collectNhm2SourceClosureRegionComparisons = (
     const metricAccounting = buildAccounting({
       sampleCount: metricSampleCount,
       maskVoxelCount,
+      weightSum: null,
+      aggregationMode: "unknown",
+      normalizationBasis: null,
+      evidenceStatus: "unknown",
       supportInclusionNote:
         "metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped.",
     });
     const tileAccounting = buildAccounting({
       sampleCount: tileSampleCount,
       maskVoxelCount,
+      weightSum: toFiniteNumberOrNull(tileRegionEntry?.weightSum),
+      aggregationMode: (tileRegionEntry?.aggregationMode as Nhm2SourceClosureV2RegionAccounting["aggregationMode"] | undefined) ?? "unknown",
+      normalizationBasis: asText(tileRegionEntry?.normalizationBasis),
+      evidenceStatus:
+        tileRegionEntry?.accountingEvidenceStatus === "measured"
+          ? "measured"
+          : tileRegionEntry?.accountingEvidenceStatus === "inferred"
+            ? "inferred"
+            : "unknown",
       supportInclusionNote:
         "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
     });
+
+    const tileProxyDiagnostics = buildTileProxyDiagnostics(tileRegionTensor);
 
     return {
       regionId,
@@ -4233,6 +4355,7 @@ const collectNhm2SourceClosureRegionComparisons = (
       sampleCount,
       metricAccounting,
       tileAccounting,
+      tileProxyDiagnostics,
       note: noteParts.join(" "),
     };
   });

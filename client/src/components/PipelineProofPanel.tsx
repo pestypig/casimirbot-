@@ -1,4 +1,4 @@
-import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
+﻿import { PROMOTED_WARP_PROFILE } from "@shared/warp-promoted-profile";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { FrontProofsLedger } from "./FrontProofsLedger";
 import { NeedleCavityBubblePanel } from "./NeedleCavityBubblePanel";
@@ -6,6 +6,7 @@ import TimeDilationLatticePanel from "./TimeDilationLatticePanel";
 import { MODE_CONFIGS, useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { useProofPack } from "@/hooks/useProofPack";
 import { useMathStageGate } from "@/hooks/useMathStageGate";
+import { useNhm2SolveState } from "@/hooks/useNhm2SolveState";
 import {
   PROOF_PACK_STAGE_REQUIREMENTS,
   mergeProofPackIntoPipeline,
@@ -175,7 +176,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
                     <span className="text-[11px] text-slate-400">({dims!.source})</span>
                   </div>
                   <div className="font-mono text-emerald-100">
-                    Lx={fmt(dims!.Lx)} m · Ly={fmt(dims!.Ly)} m · Lz={fmt(dims!.Lz)} m
+                    Lx={fmt(dims!.Lx)} m Â· Ly={fmt(dims!.Ly)} m Â· Lz={fmt(dims!.Lz)} m
                   </div>
                   <div className="text-emerald-100">
                     R_geom = {fmt(R)} m{" "}
@@ -193,7 +194,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
       {
         equation: (
           <>
-            <code>A_hull = &int; sqrt(det h) d^2xi, N_tiles ≈ floor(A_hull / A_tile) · (packing · radialLayers)</code>
+            <code>A_hull = &int; sqrt(det h) d^2xi, N_tiles â‰ˆ floor(A_hull / A_tile) Â· (packing Â· radialLayers)</code>
           </>
         ),
         fields: ({ p, fmt, num, pos }) => {
@@ -211,10 +212,10 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
                 <div className="space-y-1">
                   <div className="font-semibold text-emerald-100">Area & tiling</div>
                   <div className="font-mono text-emerald-100">
-                    A_hull = {fmt(A_hull)} m² · A_tile = {fmt(A_tile, 4)} m² · N_tiles = {fmt(N_tiles)}
+                    A_hull = {fmt(A_hull)} mÂ² Â· A_tile = {fmt(A_tile, 4)} mÂ² Â· N_tiles = {fmt(N_tiles)}
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    packing = {PACKING} · radial layers = {RADIAL_LAYERS}; pulled from <code>hullArea_m2</code>,{" "}
+                    packing = {PACKING} Â· radial layers = {RADIAL_LAYERS}; pulled from <code>hullArea_m2</code>,{" "}
                     <code>tileArea_cm2</code>, <code>N_tiles</code>
                   </div>
                 </div>
@@ -258,7 +259,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
         <code>client/src/lib/warp-proof-math.ts</code>.
       </>,
       <>
-        With <code>TS_ratio</code> ≈ 120 ≫ 1, GR sees ⟨T_{"{mu nu}"}⟩ over <code>tau_LC</code> (Isaacson HF regime); spikes are averaged.
+        With <code>TS_ratio</code> â‰ˆ 120 â‰« 1, GR sees âŸ¨T_{"{mu nu}"}âŸ© over <code>tau_LC</code> (Isaacson HF regime); spikes are averaged.
       </>,
     ],
     solved: [
@@ -288,10 +289,10 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
               ) : (
                 <>
                   <div className="font-mono text-emerald-100">
-                    T00={fmt(T00)} J/m³ · T11={fmt(T11)} J/m³ · T22={fmt(T22)} J/m³ · T33={fmt(T33)} J/m³
+                    T00={fmt(T00)} J/mÂ³ Â· T11={fmt(T11)} J/mÂ³ Â· T22={fmt(T22)} J/mÂ³ Â· T33={fmt(T33)} J/mÂ³
                   </div>
                   <div className="text-[11px] text-slate-400">
-                    from <code>useEnergyPipeline</code>; units are SI J/m³ (c ≠ 1), so G_{"{mu nu}"} = 8πG T_{"{mu nu}"}/c⁴
+                    from <code>useEnergyPipeline</code>; units are SI J/mÂ³ (c â‰  1), so G_{"{mu nu}"} = 8Ï€G T_{"{mu nu}"}/câ´
                     {allZero ? " (value is zero; likely safed placeholder)" : ""}
                   </div>
                 </>
@@ -321,9 +322,9 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
             <div className="space-y-1">
               <div className="font-semibold text-emerald-100">Curvature proxy inputs</div>
               <div className="font-mono text-emerald-100">
-                P_avg={fmt(P_avg_W)} W · A_hull={fmt(A_hull)} m² · d_eff={fmt(d_eff)} · G_geom={fmt(G_geom)}
+                P_avg={fmt(P_avg_W)} W Â· A_hull={fmt(A_hull)} mÂ² Â· d_eff={fmt(d_eff)} Â· G_geom={fmt(G_geom)}
               </div>
-              <div className="text-[11px] text-slate-400">G_geom = gammaGeo³ (geometry gain)</div>
+              <div className="text-[11px] text-slate-400">G_geom = gammaGeoÂ³ (geometry gain)</div>
               <div className="text-[11px] text-slate-400">
                 pulled from <code>P_avg</code>, <code>hullArea_m2</code>, <code>dutyEffective_FR</code>,{" "}
                 <code>gammaGeo^3</code>
@@ -383,7 +384,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
             <div className="space-y-1">
               <div className="font-semibold text-emerald-100">York-time inputs (snapshot)</div>
               <div className="font-mono text-emerald-100">
-                beta={fmt(beta)} · sigma={fmt(sigma)} · thetaScaleExpected={fmt(thetaExpected)}
+                beta={fmt(beta)} Â· sigma={fmt(sigma)} Â· thetaScaleExpected={fmt(thetaExpected)}
               </div>
               {bubbleDisabled ? (
                 <div className="text-[11px] text-amber-300">Bubble disabled in snapshot (beta=0, sigma=0)</div>
@@ -435,7 +436,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
           return (
             <div className="space-y-1">
               <div className="font-semibold text-emerald-100">Warp profile (snapshot)</div>
-              <div className="font-mono text-emerald-100">sigma={fmt(sigma)} · R_metric={fmt(R)}</div>
+              <div className="font-mono text-emerald-100">sigma={fmt(sigma)} Â· R_metric={fmt(R)}</div>
               {bubbleDisabled ? (
                 <div className="text-[11px] text-amber-300">Bubble profile not configured in snapshot (sigma=R=0)</div>
               ) : null}
@@ -483,7 +484,7 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
             <div className="space-y-1">
               <div className="font-semibold text-emerald-100">Drive ladder inputs (snapshot)</div>
               <div className="font-mono text-emerald-100">
-                gammaGeo={fmt(gammaGeo)} · q={fmt(q)} · gammaVdB={fmt(gammaVdB)} · d_eff={fmt(d_eff)}
+                gammaGeo={fmt(gammaGeo)} Â· q={fmt(q)} Â· gammaVdB={fmt(gammaVdB)} Â· d_eff={fmt(d_eff)}
               </div>
               <div className="text-emerald-100">
                 thetaScaleExpected = {fmt(thetaExpected)}{" "}
@@ -547,11 +548,11 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
               ) : (
                 <>
                   <div className="font-mono text-emerald-100">
-                    gap={fmt(gap_nm)} nm · A_tile={fmt(A_tile, 4)} m² · U_static={fmt(U_static)} J
+                    gap={fmt(gap_nm)} nm Â· A_tile={fmt(A_tile, 4)} mÂ² Â· U_static={fmt(U_static)} J
                   </div>
                   <div className="text-[11px] text-slate-400">
                     from <code>gap_nm</code>, <code>tileArea_cm2</code>, <code>U_static</code> in the pipeline payload
-                    {chi != null ? ` · chi_coupling=${fmt(chi)}` : ""}
+                    {chi != null ? ` Â· chi_coupling=${fmt(chi)}` : ""}
                   </div>
                 </>
               )}
@@ -621,17 +622,17 @@ const GR_APPENDIX_SECTIONS: GrAppendixSection[] = [
                 P/Planck power (c^5/G)={fmtMaybe(planckRatio, 3)}
               </div>
               <div className="font-mono text-emerald-100">
-                P_target={fmtMw(P_target_W)} · P_cap={fmtMw(P_cap_W)} · mechGuard_status={mechGuard?.status ?? "n/a"}
+                P_target={fmtMw(P_target_W)} Â· P_cap={fmtMw(P_cap_W)} Â· mechGuard_status={mechGuard?.status ?? "n/a"}
               </div>
               <div className="font-mono text-emerald-100">
-                pApplied={fmtMw(pApplied_W)} · pShortfall={fmtMw(pShortfall_W)}
+                pApplied={fmtMw(pApplied_W)} Â· pShortfall={fmtMw(pShortfall_W)}
               </div>
               <div className="font-mono text-emerald-100">
-                d_eff={fmtMaybe(dEff)} · dutyCycle={fmtMaybe(dutyCycle ?? modeConfig?.dutyCycle)} · localBurstFrac=
+                d_eff={fmtMaybe(dEff)} Â· dutyCycle={fmtMaybe(dutyCycle ?? modeConfig?.dutyCycle)} Â· localBurstFrac=
                 {fmtMaybe(localBurstFrac)}
               </div>
               <div className="font-mono text-emerald-100">
-                M_exotic={fmtMaybe(M_exotic)} kg · zeta={fmtMaybe(zeta, 4)} · TS_ratio={fmtMaybe(TS_ratio)}
+                M_exotic={fmtMaybe(M_exotic)} kg Â· zeta={fmtMaybe(zeta, 4)} Â· TS_ratio={fmtMaybe(TS_ratio)}
               </div>
               <div className="font-mono text-emerald-100">gammaVdB_limit={fmtMaybe(gammaLimit)}</div>
               <div className="text-[11px] text-slate-400">all fields from <code>useEnergyPipeline</code></div>
@@ -824,6 +825,7 @@ const PIPELINE_STATUS_URL = "/api/agi/pipeline/status";
 const PLAN_DEBUG_URL = "/api/agi/pipeline/last-plan-debug";
 
 export default function PipelineProofPanel() {
+  const { state: nhm2SolveState } = useNhm2SolveState();
   const [status, setStatus] = useState<PipelineStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [planDebug, setPlanDebug] = useState<PlanDebugPayload | null>(null);
@@ -1035,7 +1037,7 @@ export default function PipelineProofPanel() {
                 </pre>
               </div>
             ) : (
-              <Placeholder text="Loading pipeline status…" />
+              <Placeholder text="Loading pipeline statusâ€¦" />
             )}
           </InfoCard>
 
@@ -1095,7 +1097,7 @@ export default function PipelineProofPanel() {
           title="Last Plan & Resonance"
           subtitle={
             planDebug?.traceId
-              ? `Trace ${planDebug.traceId}${planDebug.resonancePatchId ? ` · patch ${planDebug.resonancePatchId}` : ""}`
+              ? `Trace ${planDebug.traceId}${planDebug.resonancePatchId ? ` Â· patch ${planDebug.resonancePatchId}` : ""}`
               : undefined
           }
         >
@@ -1121,8 +1123,8 @@ export default function PipelineProofPanel() {
                     <div>
                       <p className="text-slate-100">{patch.path}</p>
                       <p className="text-[11px] text-slate-400">
-                        {patch.id} {patch.kind ? `· ${patch.kind}` : ""}{" "}
-                        {typeof patch.score === "number" ? `· score ${patch.score.toFixed(3)}` : ""}
+                        {patch.id} {patch.kind ? `Â· ${patch.kind}` : ""}{" "}
+                        {typeof patch.score === "number" ? `Â· score ${patch.score.toFixed(3)}` : ""}
                       </p>
                     </div>
                   </li>
@@ -1134,7 +1136,7 @@ export default function PipelineProofPanel() {
               </div>
             </div>
           ) : (
-            <Placeholder text="Waiting for the next plan run…" />
+            <Placeholder text="Waiting for the next plan runâ€¦" />
           )}
         </InfoCard>
 
@@ -1213,7 +1215,7 @@ function GroundingRow({ source }: { source: GroundingSource }) {
       <div>
         <p className="text-sm text-slate-100">{label}</p>
         <p className="text-[11px] uppercase tracking-wide text-slate-500">
-          {kind ?? "unknown"} {id && !label.includes(id) ? `· ${id}` : ""}
+          {kind ?? "unknown"} {id && !label.includes(id) ? `Â· ${id}` : ""}
         </p>
       </div>
       {actionable && (
@@ -1273,10 +1275,10 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
 
     const directLx = pos(hull?.Lx_m) ?? pos((p as any)?.Lx_m);
     const directLy = pos(hull?.Ly_m) ?? pos((p as any)?.Ly_m);
-      const directLz = pos(hull?.Lz_m) ?? pos((p as any)?.Lz_m);
-      if (directLx != null && directLy != null && directLz != null) {
-        return { Lx: directLx, Ly: directLy, Lz: directLz, source: "hull.Lx_m/Ly_m/Lz_m" };
-      }
+    const directLz = pos(hull?.Lz_m) ?? pos((p as any)?.Lz_m);
+    if (directLx != null && directLy != null && directLz != null) {
+      return { Lx: directLx, Ly: directLy, Lz: directLz, source: "hull.Lx_m/Ly_m/Lz_m" };
+    }
 
     const a = pos(hull?.a ?? (p as any)?.a);
     const b = pos(hull?.b ?? (p as any)?.b);
@@ -1285,8 +1287,12 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
       return { Lx: 2 * a, Ly: 2 * b, Lz: 2 * c, source: "hull.a/b/c (semi-axes)" };
     }
 
-    // Known Needle hull defaults when snapshot omits dims (1007 x 264 x 173 m)
-    return { Lx: 1007, Ly: 264, Lz: 173, source: "default Needle hull (1007×264×173 m)" };
+    return {
+      Lx: nhm2SolveState.geometry.authority.Lx_m,
+      Ly: nhm2SolveState.geometry.authority.Ly_m,
+      Lz: nhm2SolveState.geometry.authority.Lz_m,
+      source: "NHM2 authority hull contract",
+    };
   };
 
   const solvedCtx: GrSolvedCtx = { p: pipeline, fmt, num, pos, resolveHullDims };
@@ -1418,7 +1424,7 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
         (standby / placeholder), not a physical solve. Check overallStatus/modelMode before quoting numbers.
       </p>
       <p className="text-[11px] text-cyan-200">
-        This ladder uses a high-frequency GR proxy: GR sees ⟨T_{"{mu nu}"}⟩ over τ_LC with TS ≫ 1, so kappa_drive and theta_drive
+        This ladder uses a high-frequency GR proxy: GR sees âŸ¨T_{"{mu nu}"}âŸ© over Ï„_LC with TS â‰« 1, so kappa_drive and theta_drive
         are effective curvature proxies, not a full Einstein solve.
       </p>
         <p className="text-[11px] text-cyan-200">
@@ -1571,4 +1577,5 @@ function AppendixGR({ pipeline }: { pipeline?: EnergyPipelineState | null }) {
     </div>
   );
 }
+
 

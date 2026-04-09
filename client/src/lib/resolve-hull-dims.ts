@@ -5,7 +5,7 @@ import type { HullPreviewOBB, HullPreviewPayload } from "@shared/schema";
 
 const PREVIEW_STALE_MS = 24 * 60 * 60 * 1000; // 24h, matches helix-core backend guard
 
-export type HullDimsEffectiveSource = "preview" | "pipeline";
+export type HullDimsEffectiveSource = "preview" | "pipeline" | "authority";
 
 export type HullDimsEffective = {
   Lx_m: number;
@@ -48,11 +48,13 @@ const coerceHullDims = (raw: any | undefined | null) => {
 export function resolveHullDimsEffective({
   previewPayload,
   pipelineSnapshot,
+  authorityFallbackDims,
   staleAfterMs = PREVIEW_STALE_MS,
   nowMs,
 }: {
   previewPayload?: HullPreviewPayload | null;
   pipelineSnapshot?: EnergyPipelineSnapshot | null | undefined;
+  authorityFallbackDims?: { Lx_m: number; Ly_m: number; Lz_m: number } | null;
   staleAfterMs?: number;
   nowMs?: number;
 }): HullDimsEffective | null {
@@ -89,6 +91,15 @@ export function resolveHullDimsEffective({
   const fromPipeline = coerceHullDims(pipelineSnapshot?.hull);
   if (fromPipeline) {
     return { ...applyHullBasisToDims(fromPipeline, HULL_BASIS_IDENTITY), basis: HULL_BASIS_IDENTITY, source: "pipeline" };
+  }
+
+  const fromAuthority = coerceHullDims(authorityFallbackDims);
+  if (fromAuthority) {
+    return {
+      ...applyHullBasisToDims(fromAuthority, HULL_BASIS_IDENTITY),
+      basis: HULL_BASIS_IDENTITY,
+      source: "authority",
+    };
   }
 
   return null;

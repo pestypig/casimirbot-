@@ -55,7 +55,9 @@ function HelixStartLauncher() {
 
   const helixPanels = React.useMemo(
     () =>
-      [...HELIX_PANELS].sort((a, b) =>
+      [...HELIX_PANELS]
+        .filter((panel) => !panel.startHidden)
+        .sort((a, b) =>
         a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
       ),
     []

@@ -1,0 +1,47 @@
+{
+  "record_id": "gaia-demo-solar-b",
+  "identifiers": {
+    "gaia_dr3_source_id": "987654321098765432"
+  },
+  "aliases": [
+    "demo solar b",
+    "demo-b"
+  ],
+  "quality_flags": [
+    "astrometry_clean",
+    "photometry_complete"
+  ],
+  "quality_score": 92,
+  "target": {
+    "object_id": "987654321098765432",
+    "name": "Demo Solar B",
+    "spectral_type": "G5",
+    "luminosity_class": "V",
+    "epoch_iso": "2016-01-01T00:00:00.000Z"
+  },
+  "astrometry": {
+    "parallax_mas": 42.6,
+    "proper_motion_ra_masyr": 122.1,
+    "proper_motion_dec_masyr": -54.8,
+    "radial_velocity_kms": 18.4,
+    "uncertainties": {
+      "parallax_mas": 0.04,
+      "proper_motion_ra_masyr": 0.06,
+      "proper_motion_dec_masyr": 0.05,
+      "radial_velocity_kms": 0.2
+    }
+  },
+  "photometry": {
+    "bands": {
+      "G": 6.31,
+      "BP": 6.71,
+      "RP": 5.82
+    }
+  },
+  "raw_payload": {
+    "catalog": "gaia_dr3",
+    "source_id": "987654321098765432",
+    "ruwe": 1.03,
+    "phot_g_mean_mag": 6.31
+  }
+}

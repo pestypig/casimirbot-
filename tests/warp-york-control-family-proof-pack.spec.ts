@@ -1415,12 +1415,46 @@ describe("nhm2 publication completion surfaces", () => {
       );
       expect(region.metricAccounting).toBeTruthy();
       expect(region.tileAccounting).toBeTruthy();
-      expect(region.metricAccounting.aggregationMode).toBe("mean");
+      expect(region.metricAccounting.aggregationMode).toBe("unknown");
       expect(region.tileAccounting.aggregationMode).toBe("mean");
-      expect(region.metricAccounting.normalizationBasis).toBe("sample_count");
+      expect(region.metricAccounting.normalizationBasis).toBeNull();
       expect(region.tileAccounting.normalizationBasis).toBe("sample_count");
+      expect(region.metricAccounting.evidenceStatus).toBe("unknown");
+      expect(region.tileAccounting.evidenceStatus).toBe("measured");
       expect(region.metricAccounting.regionMaskNote).toContain("brick_mask");
       expect(region.tileAccounting.regionMaskNote).toContain("brick_mask");
+      expect(region.tileProxyDiagnostics).toBeTruthy();
+      expect(region.tileProxyDiagnostics.pressureModel).toBeTruthy();
+      expect(region.tileProxyDiagnostics.proxyMode).toBeTruthy();
+      expect(region.tileProxyDiagnostics.brickProxyMode).toBeTruthy();
+      expect(region.tileProxyDiagnostics.componentAttribution).toBeTruthy();
+      expect(
+        region.tileProxyDiagnostics.componentAttribution?.T00.constructionMode,
+      ).toBe("direct_region_mean_t00");
+      expect(region.tileProxyDiagnostics.componentAttribution?.T00.sourceComponent).toBeNull();
+      expect(
+        region.tileProxyDiagnostics.componentAttribution?.T11.constructionMode,
+      ).toBe("proxy_scaled_from_region_mean_t00");
+      expect(region.tileProxyDiagnostics.componentAttribution?.T11.sourceComponent).toBe("T00");
+      expect(region.tileProxyDiagnostics.componentAttribution?.T11.proxyFactor).not.toBeNull();
+      expect(
+        region.tileProxyDiagnostics.componentAttribution?.T11.proxyReconstructedValue,
+      ).not.toBeNull();
+      expect(
+        region.tileProxyDiagnostics.componentAttribution?.T11.proxyReconstructionAbsError,
+      ).not.toBeNull();
+      expect(
+        region.tileProxyDiagnostics.componentAttribution?.T11.proxyReconstructionAbsError ??
+          0,
+      ).toBeCloseTo(0, 10);
+      expect(region.tileProxyDiagnostics.componentAttribution?.T11.evidenceStatus).toBe(
+        "inferred",
+      );
+      expect(region.mismatchDiagnostics).toBeTruthy();
+      expect(region.mismatchDiagnostics.components?.T00).toBeTruthy();
+      expect(region.mismatchDiagnostics.diagonalMeanRatio).not.toBeNull();
+      expect(region.mismatchDiagnostics.diagonalSignStatus).toBeTruthy();
+      expect(region.mismatchDiagnostics.components?.T00.signedRatioTileToMetric).not.toBeNull();
       expect(region.residualNorms.relLInf).toBeGreaterThan(0.1);
       expect(region.note).toContain("Same-basis regional closure compares");
     }
@@ -1434,14 +1468,27 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("Regional Comparisons (Summary)");
     expect(markdown).toContain("| basis |");
     expect(markdown).toContain("| accounting |");
+    expect(markdown).toContain("| scaleSide |");
+    expect(markdown).toContain("| scaleRatio |");
+    expect(markdown).toContain("| signStatus |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
     expect(markdown).toContain("Regional Component Details");
     expect(markdown).toContain("dominantResidualComponent");
+    expect(markdown).toContain("dominantScaleComponent");
+    expect(markdown).toContain("tileProxy.pressureModel");
+    expect(markdown).toContain("tileProxy.brickProxyMode");
+    expect(markdown).toContain(
+      "| component | constructionMode | sourceComponent | proxyFactor | proxyReconstructedValue | proxyReconstructionAbsError | proxyReconstructionRelError | evidenceStatus |",
+    );
     expect(markdown).toContain("accountingStatus");
     expect(markdown).toContain("| accounting field | metric | tile |");
+    expect(markdown).toContain("evidenceStatus");
+    expect(markdown).not.toContain("accounting_measured_match");
+    expect(markdown).not.toContain("accounting_clean");
     expect(markdown).toContain("| component | metricRequired | tileEffective | absResidual | relResidual |");
+    expect(markdown).toContain("| component | metricAbs | tileAbs | ratioTileToMetric | signedRatioTileToMetric | signMatch | signedDelta | absDelta |");
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
     );

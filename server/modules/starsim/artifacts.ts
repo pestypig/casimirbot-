@@ -14,8 +14,8 @@ import type {
 } from "./contract";
 import type { StarSimRuntimeArtifactPayload } from "./worker/starsim-worker-types";
 
-export const STAR_SIM_ARTIFACT_SCHEMA_VERSION = "star-sim-cache/3";
-export const STAR_SIM_JOB_SCHEMA_VERSION = "star-sim-job/2";
+export const STAR_SIM_ARTIFACT_SCHEMA_VERSION = "star-sim-cache/4";
+export const STAR_SIM_JOB_SCHEMA_VERSION = "star-sim-job/3";
 
 type CacheLaneId = "structure_mesa" | "oscillation_gyre";
 type CacheMissReason = "missing" | "stale" | "corrupt" | "incompatible";
@@ -486,6 +486,8 @@ export const buildStructureMesaCacheKey = (
     evidence_refs: star.evidence_refs,
     requested_lanes: star.requested_lanes,
     strict_lanes: star.strict_lanes,
+    precondition_policy: star.precondition_policy,
+    source_context: star.source_context,
     runtime_mode: identity.runtime_mode,
     runtime_fingerprint: identity.runtime_fingerprint,
     solver_manifest: identity.solver_manifest,
@@ -509,6 +511,7 @@ export const buildOscillationGyreCacheKey = (
     supported_domain_id: controls?.supported_domain_id ?? null,
     supported_domain_version: controls?.supported_domain_version ?? null,
     physics_flags: star.physics_flags,
+    source_context: star.source_context,
     structure_cache_key: structureCacheKey,
     runtime_mode: identity.runtime_mode,
     runtime_fingerprint: identity.runtime_fingerprint,
@@ -630,6 +633,7 @@ export const writeStructureMesaCache = async (args: {
       evidence_refs: args.star.evidence_refs,
       requested_lanes: args.star.requested_lanes,
       strict_lanes: args.star.strict_lanes,
+      precondition_policy: args.star.precondition_policy,
       benchmark_case_id: args.star.benchmark_case_id,
       fit_profile_id: args.fitProfileId,
       fit_constraints: args.fitConstraints,
@@ -637,6 +641,7 @@ export const writeStructureMesaCache = async (args: {
       supported_domain_id: args.supportedDomainId,
       supported_domain_version: args.supportedDomainVersion,
       physics_flags: args.star.physics_flags,
+      source_context: args.star.source_context,
     },
     summary: args.summary,
     laneResult: args.laneResult,
@@ -705,6 +710,7 @@ export const writeOscillationGyreCache = async (args: {
       asteroseismology: args.star.fields.asteroseismology,
       structure: args.star.fields.structure,
       evidence_refs: args.star.evidence_refs,
+      source_context: args.star.source_context,
       benchmark_case_id: args.star.benchmark_case_id,
       fit_profile_id: args.fitProfileId,
       fit_constraints: args.fitConstraints,

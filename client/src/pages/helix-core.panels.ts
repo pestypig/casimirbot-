@@ -59,6 +59,7 @@ export type HelixPanelRef = {
    */
   mobileReady?: boolean;
   heavy?: boolean;
+  startHidden?: boolean;
 };
 
 const API = {
@@ -70,8 +71,13 @@ const API = {
   helixSnapshot: "GET /api/helix/snapshot",
   helixMetrics: "GET /api/helix/metrics",
   helixDisplacement: "GET /api/helix/displacement",
+  helixProofs: "GET /api/helix/pipeline/proofs",
   helixSpectrumRead: "GET /api/helix/spectrum",
   helixSpectrumWrite: "POST /api/helix/spectrum",
+  grConstraintContract: "GET /api/helix/gr-constraint-contract",
+  grEvaluation: "GET /api/helix/gr-evaluation",
+  nhm2BlockGet: "GET /api/helix/blocks/:blockId",
+  nhm2BlockResolve: "POST /api/helix/blocks/resolve",
   grAgentLoop: "GET /api/helix/gr-agent-loop",
   grAgentLoopKpis: "GET /api/helix/gr-agent-loop/kpis",
   mathGraph: "GET /api/helix/math/graph",
@@ -134,6 +140,22 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "constraint ladder"
   ],
   "warp-ledger": ["km-scale ledger", "warp ledger", "bubble log", "warp km", "ledger bands"],
+  "nhm2-solve-state": [
+    "nhm2 solve",
+    "solve state",
+    "needle hull mark 2",
+    "warp bubble",
+    "proof surface",
+    "gr certificate",
+  ],
+  "nhm2-calibration-proof": [
+    "nhm2 calibration",
+    "proof surface",
+    "drive guards",
+    "pipeline proof",
+    "warp proof",
+    "deterministic evidence",
+  ],
   "spectrum-tuner": ["spectrum tuner", "FFT", "frequency dial", "harmonics sweep", "waveform tuner"],
   "experiment-ladder": ["experiment ladder", "casimir", "phoenix", "ford-roman", "natario", "sector gating"],
   "vacuum-gap-heatmap": ["vacuum gap", "Casimir gap", "nm gap map", "heatmap", "gap stress"],
@@ -207,6 +229,7 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   "essence-proposals": ["essence proposals", "proposal queue", "jobs board", "proposal actions", "proposal mgr"],
   "dresscode": ["dresscode", "pattern", "draft", "garment", "svg", "grid", "clip mask"],
   "stellar-lsr": ["stars", "lsr", "local standard of rest", "catalog", "nav", "stellar"],
+  "observable-universe-accordion": ["accordion map", "observable universe", "nhm2 trip estimate", "sol centered", "target-coupled eta"],
   "model-silhouette": ["glb", "bbox", "ellipsoid", "scale", "axes", "grid"],
   "hull-metrics-vis": ["hull metrics", "natario", "alcubierre", "glb preview", "wireframe"],
   "collapse-benchmark-hud": ["collapse benchmark", "tau", "L_present", "kappa", "lattice hash", "relativity"],
@@ -274,7 +297,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/NeedleIpeakWorksheetPanel")),
     defaultSize: { w: 1120, h: 760 },
     defaultPosition: { x: 200, y: 140 },
-    keywords: ["pulsed power", "i_peak", "worksheet", "needle hull", "blumlein", "pfn"]
+    keywords: ["pulsed power", "i_peak", "worksheet", "needle hull", "blumlein", "pfn"],
+    startHidden: true,
   },
   {
     id: "needle-world-roadmap",
@@ -282,7 +306,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     icon: Globe2,
     loader: lazyPanel(() => import("@/components/NeedleWorldRoadmap")),
     defaultSize: { w: 1100, h: 720 },
-    defaultPosition: { x: 220, y: 180 }
+    defaultPosition: { x: 220, y: 180 },
+    startHidden: true,
   },
   {
     id: "electron-orbital",
@@ -398,7 +423,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/PulsedPowerDocPanel")),
     defaultSize: { w: 1000, h: 680 },
     defaultPosition: { x: 140, y: 20 },
-    keywords: ["warp", "pulsed power", "coil", "pipeline", "hardware"]
+    keywords: ["warp", "pulsed power", "coil", "pipeline", "hardware"],
+    startHidden: true,
   },
   {
     id: "bus-voltage",
@@ -418,7 +444,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     pinned: true,
     defaultSize: { w: 1080, h: 720 },
     defaultPosition: { x: 140, y: 32 },
-    endpoints: ["GET /km-scale-warp-ledger"]
+    endpoints: ["GET /km-scale-warp-ledger"],
+    startHidden: true,
   },
   {
     id: "experiment-ladder",
@@ -427,7 +454,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/WarpExperimentLadderPanel")),
     defaultSize: { w: 1120, h: 780 },
     defaultPosition: { x: 200, y: 140 },
-    endpoints: [API.pipelineGet, API.helixMetrics]
+    endpoints: [API.pipelineGet, API.helixMetrics],
+    startHidden: true,
   },
   {
     id: "spectrum-tuner",
@@ -568,6 +596,43 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/deepmix/DeepMixGlobePanel")),
     defaultSize: { w: 760, h: 620 },
     defaultPosition: { x: 320, y: 380 }
+  },
+  {
+    id: "nhm2-solve-state",
+    title: "NHM2 Solve State",
+    icon: ShieldCheck,
+    loader: lazyPanel(() => import("@/components/Nhm2SolveStatePanel")),
+    pinned: true,
+    defaultOpen: true,
+    defaultSize: { w: 1180, h: 780 },
+    defaultPosition: { x: 140, y: 60 },
+    endpoints: [
+      API.pipelineGet,
+      API.helixProofs,
+      API.grConstraintContract,
+      API.grEvaluation,
+      API.nhm2BlockGet,
+      API.nhm2BlockResolve,
+      API.stressEnergyBrick,
+      API.warpCalculator,
+    ],
+    keywords: PANEL_KEYWORDS["nhm2-solve-state"],
+  },
+  {
+    id: "nhm2-calibration-proof",
+    title: "NHM2 Calibration + Proof",
+    icon: Shield,
+    loader: lazyPanel(() => import("@/components/Nhm2CalibrationProofPanel")),
+    defaultSize: { w: 1220, h: 820 },
+    defaultPosition: { x: 180, y: 80 },
+    endpoints: [
+      API.pipelineGet,
+      API.helixProofs,
+      API.grConstraintContract,
+      API.grEvaluation,
+      API.nhm2BlockResolve,
+    ],
+    keywords: PANEL_KEYWORDS["nhm2-calibration-proof"],
   },
   {
     id: "alcubierre-viewer",
@@ -958,6 +1023,17 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultSize: { w: 1120, h: 780 },
     defaultPosition: { x: 180, y: 120 },
     endpoints: ["GET /api/stellar/local-rest", "GET /api/stellar/local-rest/stream"]
+  },
+  {
+    id: "observable-universe-accordion",
+    title: "Observable Universe Accordion",
+    icon: Map,
+    loader: lazyPanel(() => import("@/components/ObservableUniverseAccordionPanel")),
+    defaultSize: { w: 1200, h: 820 },
+    defaultPosition: { x: 220, y: 120 },
+    mobileReady: true,
+    endpoints: ["POST /api/helix/relativistic-map/project"],
+    keywords: PANEL_KEYWORDS["observable-universe-accordion"]
   },
   {
     id: "essence-proposals",

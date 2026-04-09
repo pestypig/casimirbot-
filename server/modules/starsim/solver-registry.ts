@@ -129,6 +129,7 @@ export async function runStarSim(
   request: StarSimRequest,
   options?: {
     executionMode?: StarSimLaneExecutionMode;
+    onLaneStart?: (lane: RequestedLane) => Promise<void> | void;
   },
 ): Promise<StarSimResponse> {
   const canonical = canonicalizeStarSimRequest(request);
@@ -141,6 +142,7 @@ export async function runStarSim(
   );
   const lanes: StarSimLaneResult[] = [];
   for (const lane of requestedLanes) {
+    await options?.onLaneStart?.(lane);
     const result = await runLaneSafely(canonical, lane, {
       executionMode,
       resolvedLanes,
@@ -154,14 +156,16 @@ export async function runStarSim(
     .filter((lane) => lane.status === "unavailable" || lane.status === "failed")
     .map((lane) => lane.requested_lane);
   const solverManifest = {
-    requested_lanes: canonical.requested_lanes,
-    strict_lanes: canonical.strict_lanes,
-    benchmark_case_id: canonical.benchmark_case_id,
-    fit_profile_id: canonical.fit_profile_id,
-    fit_constraints: canonical.fit_constraints,
-    physics_flags: canonical.physics_flags,
-    lanes: scored.lanes.map((lane) => ({
-      lane_id: lane.lane_id,
+      requested_lanes: canonical.requested_lanes,
+      strict_lanes: canonical.strict_lanes,
+      precondition_policy: canonical.precondition_policy,
+      benchmark_case_id: canonical.benchmark_case_id,
+      fit_profile_id: canonical.fit_profile_id,
+      fit_constraints: canonical.fit_constraints,
+      physics_flags: canonical.physics_flags,
+      source_context: canonical.source_context,
+      lanes: scored.lanes.map((lane) => ({
+        lane_id: lane.lane_id,
       requested_lane: lane.requested_lane,
       solver_id: lane.solver_id,
       status: lane.status,
@@ -175,8 +179,8 @@ export async function runStarSim(
     schema_version: "star-sim-v1",
     meta: {
       contract_version: "star-sim-v1",
-      normalization_version: "star-sim.canonicalize/4",
-      solver_manifest_version: "star-sim.registry/6",
+      normalization_version: "star-sim.canonicalize/5",
+      solver_manifest_version: "star-sim.registry/7",
       congruence_version: "star-sim.harmonic/2",
       claim_identity_version: "star-sim.claims/3",
       deterministic_request_hash: hashStableJson(request),

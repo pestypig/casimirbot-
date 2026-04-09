@@ -1,0 +1,47 @@
+{
+  "record_id": "gaia-demo-solar-c",
+  "identifiers": {
+    "gaia_dr3_source_id": "112233445566778899",
+    "tess_tic_id": "100000003"
+  },
+  "aliases": [
+    "demo solar c",
+    "demo-c"
+  ],
+  "quality_flags": [
+    "astrometry_clean",
+    "photometry_complete"
+  ],
+  "quality_score": 96,
+  "target": {
+    "object_id": "112233445566778899",
+    "name": "Demo Solar C",
+    "spectral_type": "G1",
+    "luminosity_class": "V",
+    "epoch_iso": "2016-01-01T00:00:00.000Z"
+  },
+  "astrometry": {
+    "parallax_mas": 57.9,
+    "proper_motion_ra_masyr": -34.2,
+    "proper_motion_dec_masyr": 65.7,
+    "radial_velocity_kms": -8.4,
+    "uncertainties": {
+      "parallax_mas": 0.03,
+      "proper_motion_ra_masyr": 0.04,
+      "proper_motion_dec_masyr": 0.04,
+      "radial_velocity_kms": 0.2
+    }
+  },
+  "photometry": {
+    "bands": {
+      "G": 5.44,
+      "BP": 5.78,
+      "RP": 5.09
+    }
+  },
+  "raw_payload": {
+    "catalog": "gaia_dr3",
+    "source_id": "112233445566778899",
+    "ruwe": 1.03
+  }
+}

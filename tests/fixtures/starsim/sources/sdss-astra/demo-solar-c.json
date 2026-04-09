@@ -1,0 +1,44 @@
+{
+  "record_id": "astra-demo-solar-c",
+  "identifiers": {
+    "gaia_dr3_source_id": "112233445566778899",
+    "sdss_apogee_id": "2M00000000+0000003",
+    "tess_tic_id": "100000003"
+  },
+  "aliases": [
+    "demo solar c",
+    "demo-c"
+  ],
+  "quality_flags": [
+    "astra_primary_pipeline",
+    "snr_high"
+  ],
+  "quality_score": 89,
+  "target": {
+    "name": "Demo Solar C",
+    "spectral_type": "G1",
+    "luminosity_class": "V"
+  },
+  "spectroscopy": {
+    "teff_K": 5894,
+    "logg_cgs": 4.40,
+    "metallicity_feh": 0.01,
+    "vsini_kms": 2.3,
+    "spectrum_ref": "sdss-astra://astra-demo-solar-c",
+    "abundances": {
+      "Fe": 0.01,
+      "Mg": 0.02
+    },
+    "uncertainties": {
+      "teff_K": 21,
+      "logg_cgs": 0.03,
+      "metallicity_feh": 0.02,
+      "vsini_kms": 0.4
+    }
+  },
+  "raw_payload": {
+    "catalog": "sdss_astra",
+    "gaia_dr3_source_id": "112233445566778899",
+    "pipeline": "astra_mwm"
+  }
+}

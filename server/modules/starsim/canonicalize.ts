@@ -6,6 +6,8 @@ type SectionMeta = {
   provenance_ref?: string;
   uncertainties?: Record<string, number>;
   statuses?: Record<string, FieldStatus>;
+  field_sources?: Record<string, string>;
+  field_provenance_refs?: Record<string, string>;
 };
 
 const missingField = <T>(unit: string | null): CanonicalField<T> => ({
@@ -39,9 +41,9 @@ const buildField = <T>(
     raw_value: options?.rawValue ?? value,
     unit,
     uncertainty: sectionMeta?.uncertainties?.[key] ?? null,
-    source: sectionMeta?.source ?? fallbackSource,
+    source: sectionMeta?.field_sources?.[key] ?? sectionMeta?.source ?? fallbackSource,
     status: sectionMeta?.statuses?.[key] ?? options?.defaultStatus ?? "observed",
-    provenance_ref: sectionMeta?.provenance_ref ?? null,
+    provenance_ref: sectionMeta?.field_provenance_refs?.[key] ?? sectionMeta?.provenance_ref ?? null,
     normalization: options?.normalization ?? null,
   };
 };
@@ -319,6 +321,7 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
     evidence_refs: Array.from(new Set(request.evidence_refs ?? [])),
     requested_lanes: request.requested_lanes ?? defaultRequestedLanes(request, solar),
     strict_lanes: request.strict_lanes === true,
+    precondition_policy: request.precondition_policy ?? "strict_requested_lanes",
     benchmark_case_id: request.benchmark_case_id?.trim() || null,
     fit_profile_id: request.fit_profile_id?.trim() || null,
     fit_constraints: Object.fromEntries(
@@ -327,6 +330,30 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
     physics_flags: Object.fromEntries(
       Object.entries(request.physics_flags ?? {}).sort(([left], [right]) => left.localeCompare(right)),
     ),
+    source_context: request.source_context
+      ? {
+          source_cache_key: request.source_context.source_cache_key?.trim() || undefined,
+          source_resolution_ref: request.source_context.source_resolution_ref?.trim() || undefined,
+          source_selection_manifest_ref: request.source_context.source_selection_manifest_ref?.trim() || undefined,
+          resolved_draft_ref: request.source_context.resolved_draft_ref?.trim() || undefined,
+          resolved_draft_hash: request.source_context.resolved_draft_hash?.trim() || undefined,
+          identifiers_resolved: request.source_context.identifiers_resolved,
+          fetch_modes_by_catalog: request.source_context.fetch_modes_by_catalog
+            ? Object.fromEntries(
+                Object.entries(request.source_context.fetch_modes_by_catalog).sort(([left], [right]) =>
+                  left.localeCompare(right),
+                ),
+              )
+            : undefined,
+          selected_field_origins: request.source_context.selected_field_origins
+            ? Object.fromEntries(
+                Object.entries(request.source_context.selected_field_origins).sort(([left], [right]) =>
+                  left.localeCompare(right),
+                ),
+              )
+            : undefined,
+        }
+      : null,
   };
   canonical.benchmark_case_id = canonical.benchmark_case_id ?? inferBenchmarkCaseIdForCanonicalStar(canonical);
   return canonical;

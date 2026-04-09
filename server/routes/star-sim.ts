@@ -1,9 +1,35 @@
 import { Router } from "express";
 import { starSimRequestSchema } from "../modules/starsim/contract";
-import { getStarSimJob, getStarSimJobResult, submitStarSimJob } from "../modules/starsim/jobs";
+import { getStarSimJob, getStarSimJobResult, submitStarSimJob, submitStarSimJobWithMeta } from "../modules/starsim/jobs";
+import {
+  buildResolveBeforeRunEnqueuedResponse,
+  prepareStarSimResolveBeforeRun,
+} from "../modules/starsim/orchestration";
 import { runStarSim } from "../modules/starsim/solver-registry";
+import { resolveStarSimSources } from "../modules/starsim/sources/registry";
 
 export const starSimRouter = Router();
+
+starSimRouter.post("/v1/resolve", async (req, res) => {
+  const parsed = starSimRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: "star_sim_invalid_request",
+      details: parsed.error.flatten(),
+    });
+  }
+
+  try {
+    const result = await resolveStarSimSources(parsed.data);
+    return res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({
+      error: "star_sim_source_resolution_failed",
+      message,
+    });
+  }
+});
 
 starSimRouter.post("/v1/run", async (req, res) => {
   const parsed = starSimRequestSchema.safeParse(req.body);
@@ -33,6 +59,35 @@ starSimRouter.post("/v1/jobs", async (req, res) => {
       error: "star_sim_invalid_request",
       details: parsed.error.flatten(),
     });
+  }
+
+  if (parsed.data.resolve_before_run) {
+    try {
+      const orchestration = await prepareStarSimResolveBeforeRun(parsed.data);
+      if (orchestration.status === "blocked") {
+        return res.status(200).json(orchestration.response);
+      }
+
+      const job = await submitStarSimJobWithMeta(orchestration.frozen_request, {
+        requested_lanes_original: orchestration.response.preflight.requested_lanes,
+        precondition_policy: orchestration.job_meta.precondition_policy,
+        resolved_draft_hash: orchestration.job_meta.resolved_draft_hash,
+        resolved_draft_ref: orchestration.job_meta.resolved_draft_ref,
+        source_resolution_ref: orchestration.job_meta.source_resolution_ref,
+        source_cache_key: orchestration.job_meta.source_cache_key,
+        lane_plan: orchestration.job_meta.lane_plan,
+      });
+      return res.status(202).json(buildResolveBeforeRunEnqueuedResponse({
+        base: orchestration.response,
+        job,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return res.status(500).json({
+        error: "star_sim_resolve_before_run_failed",
+        message,
+      });
+    }
   }
 
   const job = await submitStarSimJob(parsed.data);
