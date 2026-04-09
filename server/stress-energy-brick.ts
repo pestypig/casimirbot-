@@ -73,13 +73,13 @@ export interface StressEnergyTensorRegionSummary {
   t00Diagnostics?: {
     sampleCount: number;
     includedCount: number;
-    skippedCount: number;
-    nonFiniteCount: number;
+    skippedCount: number | null;
+    nonFiniteCount: number | null;
     meanT00: number;
     sumT00: number;
     normalizationBasis: "sample_count";
     aggregationMode: "mean";
-    evidenceStatus: "measured";
+    evidenceStatus: "measured" | "inferred" | "unknown";
   };
   note?: string;
 }
@@ -295,13 +295,13 @@ const buildTensorRegionSummary = (
     t00Diagnostics: {
       sampleCount: accumulator.count,
       includedCount: accumulator.includedCount,
-      skippedCount: accumulator.skippedCount,
-      nonFiniteCount: accumulator.nonFiniteCount,
+      skippedCount: null,
+      nonFiniteCount: null,
       meanT00: accumulator.sumT00 / accumulator.count,
       sumT00: accumulator.sumT00,
       normalizationBasis: "sample_count",
       aggregationMode: "mean",
-      evidenceStatus: "measured",
+      evidenceStatus: "inferred",
     },
     ...(note ? { note } : {}),
   };
