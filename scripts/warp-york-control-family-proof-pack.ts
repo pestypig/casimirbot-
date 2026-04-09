@@ -27763,11 +27763,28 @@ const renderNhm2SourceClosureMarkdown = (
     const tile = region.tileT00Diagnostics ?? null;
     const metricMean = metric?.meanT00 ?? null;
     const tileMean = tile?.meanT00 ?? null;
+    const mismatch = region.mismatchDiagnostics ?? null;
+    const residualTolerance = Math.max(region.residualNorms.toleranceRelLInf ?? 0.1, 1e-12);
+    const eps = 1e-12;
     if (metricMean == null && tileMean != null) {
       return "metric_required_t00_unavailable";
     }
     if (tileMean == null && metricMean != null) {
       return "tile_effective_t00_unavailable";
+    }
+    if (metricMean != null && tileMean != null) {
+      const absDelta = Math.abs(tileMean - metricMean);
+      const relDelta = absDelta / Math.max(Math.abs(metricMean), Math.abs(tileMean), eps);
+      if (absDelta > eps && relDelta > residualTolerance) {
+        return "t00_mismatch_present";
+      }
+      if (
+        mismatch?.dominantComponent != null &&
+        mismatch.dominantComponent !== "T00" &&
+        (mismatch.dominantAbsRatio ?? 0) > residualTolerance
+      ) {
+        return "pressure_proxy_dominant";
+      }
     }
     const metricSkipped = (metric?.skippedCount ?? 0) + (metric?.nonFiniteCount ?? 0);
     const tileSkipped = (tile?.skippedCount ?? 0) + (tile?.nonFiniteCount ?? 0);
@@ -27789,6 +27806,9 @@ const renderNhm2SourceClosureMarkdown = (
     }
     if (tile?.evidenceStatus === "unknown" && metric?.evidenceStatus !== "unknown") {
       return "tile_effective_evidence_unknown";
+    }
+    if (metric?.evidenceStatus === "unknown" && tile?.evidenceStatus === "unknown") {
+      return "accounting_suspect";
     }
     return "unknown";
   };
@@ -49066,6 +49086,5 @@ if (isEntryPoint) {
       process.exitCode = 1;
     });
 }
-
 
 

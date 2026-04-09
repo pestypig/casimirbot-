@@ -4293,7 +4293,7 @@ const collectNhm2SourceClosureRegionComparisons = (
     evidenceStatus: Nhm2SourceClosureV2RegionT00Diagnostics["evidenceStatus"];
   }): Nhm2SourceClosureV2RegionT00Diagnostics => ({
     sampleCount: args.sampleCount,
-    includedCount: args.includedCount ?? args.sampleCount,
+    includedCount: args.includedCount ?? null,
     skippedCount: args.skippedCount ?? null,
     nonFiniteCount: args.nonFiniteCount ?? null,
     meanT00: args.meanT00,
@@ -4372,11 +4372,39 @@ const collectNhm2SourceClosureRegionComparisons = (
     const tileMeanT00Resolved = toFiniteNumberOrNull(
       tileRegionDiagnostics?.meanT00 ?? tileRegionTensor.T00,
     );
-    const tileSumT00Resolved =
-      toFiniteNumberOrNull(tileRegionDiagnostics?.sumT00) ??
-      (tileSampleCountResolved != null && tileMeanT00Resolved != null
+    const tileIncludedCountResolved = toFiniteNumberOrNull(
+      tileRegionDiagnostics?.includedCount,
+    );
+    const tileSkippedCountResolved = toFiniteNumberOrNull(
+      tileRegionDiagnostics?.skippedCount,
+    );
+    const tileNonFiniteCountResolved = toFiniteNumberOrNull(
+      tileRegionDiagnostics?.nonFiniteCount,
+    );
+    const tileSumT00Measured = toFiniteNumberOrNull(tileRegionDiagnostics?.sumT00);
+    const tileSumT00Synthesized =
+      tileSumT00Measured == null &&
+      tileSampleCountResolved != null &&
+      tileMeanT00Resolved != null
         ? tileSampleCountResolved * tileMeanT00Resolved
-        : null);
+        : null;
+    const tileSumT00Resolved = tileSumT00Measured ?? tileSumT00Synthesized;
+    const tileHasReducerNativeMeasuredEvidence =
+      tileSampleCountResolved != null &&
+      tileIncludedCountResolved != null &&
+      tileSkippedCountResolved != null &&
+      tileNonFiniteCountResolved != null &&
+      tileMeanT00Resolved != null &&
+      tileSumT00Measured != null;
+    const tileEvidenceStatusResolved: Nhm2SourceClosureV2RegionT00Diagnostics["evidenceStatus"] =
+      tileHasReducerNativeMeasuredEvidence &&
+      tileRegionDiagnostics?.evidenceStatus === "measured"
+        ? "measured"
+        : tileRegionDiagnostics?.evidenceStatus === "inferred" ||
+            tileSumT00Synthesized != null ||
+            tileRegionDiagnostics?.evidenceStatus === "measured"
+          ? "inferred"
+          : "unknown";
     const metricT00Diagnostics = buildT00Diagnostics({
       sampleCount: metricSampleCount,
       meanT00: metricRegionTensor.T00 ?? null,
@@ -4388,11 +4416,9 @@ const collectNhm2SourceClosureRegionComparisons = (
     });
     const tileT00Diagnostics = buildT00Diagnostics({
       sampleCount: tileSampleCountResolved,
-      includedCount: toFiniteNumberOrNull(
-        tileRegionDiagnostics?.includedCount ?? tileRegionDiagnostics?.sampleCount ?? tileSampleCount,
-      ),
-      skippedCount: toFiniteNumberOrNull(tileRegionDiagnostics?.skippedCount),
-      nonFiniteCount: toFiniteNumberOrNull(tileRegionDiagnostics?.nonFiniteCount),
+      includedCount: tileIncludedCountResolved,
+      skippedCount: tileSkippedCountResolved,
+      nonFiniteCount: tileNonFiniteCountResolved,
       meanT00: tileMeanT00Resolved,
       sumT00: tileSumT00Resolved,
       normalizationBasis:
@@ -4401,14 +4427,7 @@ const collectNhm2SourceClosureRegionComparisons = (
       aggregationMode:
         (tileRegionDiagnostics?.aggregationMode as Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"] | undefined) ??
         ((tileRegionEntry?.aggregationMode as Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"] | undefined) ?? "unknown"),
-      evidenceStatus:
-        tileRegionDiagnostics?.evidenceStatus === "measured"
-          ? "measured"
-          : tileRegionDiagnostics?.evidenceStatus === "inferred"
-            ? "inferred"
-            : tileRegionEntry?.accountingEvidenceStatus === "measured"
-              ? "measured"
-              : "unknown",
+      evidenceStatus: tileEvidenceStatusResolved,
     });
 
     const tileProxyDiagnostics = buildTileProxyDiagnostics(tileRegionTensor);

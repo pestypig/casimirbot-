@@ -17,6 +17,7 @@ import {
   buildNhm2SourceClosureArtifact,
 } from "../shared/contracts/nhm2-source-closure.v1";
 import {
+  buildNhm2SourceClosureArtifactV2,
   isNhm2SourceClosureV2Artifact,
 } from "../shared/contracts/nhm2-source-closure.v2";
 import {
@@ -138,6 +139,7 @@ import {
   publishNhm2EnvelopePerturbationResearchSurface,
   publishNhm2ShiftLapseObserverAudit,
   publishNhm2ShiftLapseSourceClosure,
+  publishNhm2SourceClosureResearchSurface,
   publishNhm2ShiftLapseStrictSignalReadiness,
   publishNhm2ShiftLapseFullLoopAudit,
   publishNhm2ShiftVsLapseDecompositionResearchSurface,
@@ -1588,6 +1590,135 @@ describe("nhm2 publication completion surfaces", () => {
       );
       expect(publishedRegion?.tileT00Diagnostics).toEqual(runtimeRegion.tileT00Diagnostics);
     }
+  });
+
+  it("classifies T00 mismatch and pressure-proxy dominant mechanisms from regional deltas", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nhm2-source-closure-mechanism-"));
+    const artifactRootDir = path.join(tempDir, "artifacts/research/full-solve");
+    const auditRootDir = path.join(tempDir, "docs/audits/research");
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "artifact://metric-global",
+      tileEffectiveTensorRef: "artifact://tile-global",
+      metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      tileEffectiveTensor: { T00: -105, T11: 105, T22: 105, T33: 105 },
+      requiredRegionIds: ["wall", "hull"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -140, T11: 140, T22: 140, T33: 140 },
+          sampleCount: 16,
+          metricAccounting: {
+            sampleCount: 16,
+            maskVoxelCount: 16,
+            weightSum: null,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "brick_mask",
+            supportInclusionNote: "metric",
+            evidenceStatus: "inferred",
+          },
+          tileAccounting: {
+            sampleCount: 16,
+            maskVoxelCount: 16,
+            weightSum: 16,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "brick_mask",
+            supportInclusionNote: "tile",
+            evidenceStatus: "inferred",
+          },
+          metricT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: null,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: -100,
+            sumT00: null,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "inferred",
+          },
+          tileT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: 16,
+            skippedCount: 0,
+            nonFiniteCount: 0,
+            meanT00: -140,
+            sumT00: -2240,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "measured",
+          },
+        },
+        {
+          regionId: "hull",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-hull",
+          tileTensorRef: "artifact://tile-hull",
+          metricRequiredTensor: { T00: -100, T11: 10, T22: 10, T33: 10 },
+          tileEffectiveTensor: { T00: -100.000001, T11: 100, T22: 100, T33: 100 },
+          sampleCount: 16,
+          metricAccounting: {
+            sampleCount: 16,
+            maskVoxelCount: 16,
+            weightSum: null,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "brick_mask",
+            supportInclusionNote: "metric",
+            evidenceStatus: "inferred",
+          },
+          tileAccounting: {
+            sampleCount: 16,
+            maskVoxelCount: 16,
+            weightSum: 16,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+            regionMaskNote: "brick_mask",
+            supportInclusionNote: "tile",
+            evidenceStatus: "inferred",
+          },
+          metricT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: null,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: -100,
+            sumT00: null,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "inferred",
+          },
+          tileT00Diagnostics: {
+            sampleCount: 16,
+            includedCount: 16,
+            skippedCount: 0,
+            nonFiniteCount: 0,
+            meanT00: -100.000001,
+            sumT00: -1600.000016,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "measured",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+    const published = publishNhm2SourceClosureResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    });
+    const markdown = fs.readFileSync(published.latestMdPath, "utf8");
+
+    expect(markdown).toContain("| t00MismatchMechanism | t00_mismatch_present |");
+    expect(markdown).toContain("| t00MismatchMechanism | pressure_proxy_dominant |");
+    expect(markdown).not.toContain("| t00MismatchMechanism | unknown |");
   });
 
   it("lets the full-loop audit consume emitted source-closure evidence instead of missing-publication placeholders", async () => {
