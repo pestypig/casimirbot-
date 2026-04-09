@@ -71,8 +71,11 @@ describe("star-sim source resolution route", () => {
     expect(resolveResponse.body.supported_domain_preview?.passed).toBe(true);
     expect(resolveResponse.body.identifiers_resolved.gaia_dr3_source_id).toBe("123456789012345678");
     expect(resolveResponse.body.identifiers_resolved.sdss_apogee_id).toBe("2M00000000+0000000");
+    expect(resolveResponse.body.identifiers_observed.sdss_apogee_id).toBe("2M00000000+0000000");
+    expect(resolveResponse.body.identifiers_trusted.sdss_apogee_id).toBe("2M00000000+0000000");
     expect(resolveResponse.body.benchmark_target_id).toBe("demo_solar_a");
     expect(resolveResponse.body.benchmark_target_match_mode).toBe("matched_by_identifier");
+    expect(resolveResponse.body.benchmark_target_identity_basis).toBe("trusted_identifier");
     expect(resolveResponse.body.crossmatch_summary.accepted).toBeGreaterThan(0);
     expect(resolveResponse.body.crossmatch_summary.rejected).toBe(0);
     expect(
@@ -184,6 +187,28 @@ describe("star-sim source resolution route", () => {
 
     expect(res.body.quality_rejections.length).toBeGreaterThan(0);
     expect(res.body.quality_rejections.some((entry: any) => entry.reason === "rejected_identifier_conflict")).toBe(true);
+  });
+
+  it("does not let rejected-source identifiers drive benchmark-target assignment", async () => {
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          name: "Demo Solar B",
+        },
+        identifiers: {
+          gaia_dr3_source_id: "987654321098765432",
+          sdss_apogee_id: "2M00000000+0000000",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.quality_rejections.some((entry: any) => entry.catalog === "sdss_astra")).toBe(true);
+    expect(res.body.identifiers_observed.sdss_apogee_id).toBe("2M00000000+0000000");
+    expect(res.body.identifiers_trusted.sdss_apogee_id).toBe("2M00000000+0000000");
+    expect(res.body.benchmark_target_id).toBe("demo_solar_b");
+    expect(res.body.benchmark_target_id).not.toBe("demo_solar_a");
   });
 
   it("marks fallback as used when Astra is absent and LAMOST provides selected spectroscopy", async () => {

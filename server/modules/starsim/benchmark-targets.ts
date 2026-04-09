@@ -1,4 +1,9 @@
-import type { StarSimRequest, StarSimSourceCatalog, StarSimSourceIdentifiers } from "./contract";
+import type {
+  StarSimBenchmarkTargetIdentityBasis,
+  StarSimRequest,
+  StarSimSourceCatalog,
+  StarSimSourceIdentifiers,
+} from "./contract";
 
 export interface StarSimBenchmarkTarget {
   id: string;
@@ -31,6 +36,7 @@ export interface StarSimBenchmarkTargetMatchResult {
   benchmark_target: StarSimBenchmarkTarget | null;
   benchmark_target_match_mode: StarSimBenchmarkTargetMatchMode;
   benchmark_target_conflict_reason?: string;
+  benchmark_target_identity_basis: StarSimBenchmarkTargetIdentityBasis;
   benchmark_target_quality_ok: boolean;
 }
 
@@ -102,6 +108,7 @@ export const resolveBenchmarkTarget = (args: {
       return {
         benchmark_target: shared,
         benchmark_target_match_mode: "matched_by_identifier",
+        benchmark_target_identity_basis: "trusted_identifier",
         benchmark_target_quality_ok: true,
       };
     }
@@ -110,6 +117,7 @@ export const resolveBenchmarkTarget = (args: {
         benchmark_target: identifierMatches[0],
         benchmark_target_match_mode: "conflicted_name_vs_identifier",
         benchmark_target_conflict_reason: "name_identifier_disagreement_identifier_selected_by_policy",
+        benchmark_target_identity_basis: "conflicted_trusted_identifier_vs_name",
         benchmark_target_quality_ok: false,
       };
     }
@@ -117,6 +125,7 @@ export const resolveBenchmarkTarget = (args: {
       benchmark_target: null,
       benchmark_target_match_mode: "conflicted_name_vs_identifier",
       benchmark_target_conflict_reason: "name_identifier_disagreement_conflict_unresolved",
+      benchmark_target_identity_basis: "conflicted_trusted_identifier_vs_name",
       benchmark_target_quality_ok: false,
     };
   }
@@ -124,6 +133,7 @@ export const resolveBenchmarkTarget = (args: {
     return {
       benchmark_target: identifierMatches[0],
       benchmark_target_match_mode: "matched_by_identifier",
+      benchmark_target_identity_basis: "trusted_identifier",
       benchmark_target_quality_ok: true,
     };
   }
@@ -131,12 +141,14 @@ export const resolveBenchmarkTarget = (args: {
     return {
       benchmark_target: nameMatches[0],
       benchmark_target_match_mode: "matched_by_name",
+      benchmark_target_identity_basis: "name_label",
       benchmark_target_quality_ok: true,
     };
   }
   return {
     benchmark_target: null,
     benchmark_target_match_mode: "no_match",
+    benchmark_target_identity_basis: "none",
     benchmark_target_quality_ok: false,
   };
 };

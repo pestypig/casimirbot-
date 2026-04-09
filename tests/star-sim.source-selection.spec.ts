@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __buildFallbackSummaryForTest } from "../server/modules/starsim/sources/registry";
 import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/contract";
 import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION as RUNTIME_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/sources/types";
+import { evaluateCrossmatch } from "../server/modules/starsim/sources/crossmatch";
+import type { StarSimSourceRecord } from "../server/modules/starsim/sources/types";
 
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
 
@@ -401,5 +403,110 @@ describe("star-sim source selection policy", () => {
 
     expect(fallbackSummary.fallback_used).toBe(false);
     expect(fallbackSummary.fallback_fields).toEqual([]);
+  });
+});
+
+describe("star-sim crossmatch trust semantics", () => {
+  const primary: StarSimSourceRecord = {
+    catalog: "gaia_dr3",
+    adapter_version: "test",
+    fetch_mode: "fixture",
+    record_id: "gaia:test",
+    identifiers: {
+      gaia_dr3_source_id: "123",
+    },
+    aliases: ["primary"],
+    quality_flags: [],
+    raw_payload: {},
+    target: {
+      name: "Primary Name",
+    },
+  };
+
+  it("does not allow candidate self-supplied identifiers to create strong-link acceptance", () => {
+    const candidate: StarSimSourceRecord = {
+      catalog: "sdss_astra",
+      adapter_version: "test",
+      fetch_mode: "fixture",
+      record_id: "sdss:test",
+      identifiers: {
+        sdss_apogee_id: "SELF-ONLY",
+      },
+      aliases: ["candidate"],
+      quality_flags: [],
+      raw_payload: {},
+      target: {
+        name: "Different Name",
+      },
+    };
+    const outcome = evaluateCrossmatch({
+      primary,
+      candidate,
+      explicitIdentifiers: {},
+      trustedIdentifiers: {
+        gaia_dr3_source_id: "123",
+      },
+    });
+    expect(outcome?.status).toBe("rejected_missing_link");
+  });
+
+  it("accepts name mismatch with warning only when identifier evidence is trusted", () => {
+    const candidate: StarSimSourceRecord = {
+      catalog: "sdss_astra",
+      adapter_version: "test",
+      fetch_mode: "fixture",
+      record_id: "sdss:test",
+      identifiers: {
+        sdss_apogee_id: "2M00000000+0000000",
+        gaia_dr3_source_id: "123",
+      },
+      aliases: ["candidate"],
+      quality_flags: [],
+      raw_payload: {},
+      target: {
+        name: "Different Name",
+      },
+    };
+    const outcome = evaluateCrossmatch({
+      primary,
+      candidate,
+      explicitIdentifiers: {
+        sdss_apogee_id: "2M00000000+0000000",
+      },
+      trustedIdentifiers: {
+        gaia_dr3_source_id: "123",
+      },
+    });
+    expect(outcome?.status).toBe("accepted_with_warning");
+    expect(outcome?.identity_basis).toContain("explicit_request_identifier");
+  });
+
+  it("still rejects candidates missing a required trusted Gaia link", () => {
+    const candidate: StarSimSourceRecord = {
+      catalog: "tasoc",
+      adapter_version: "test",
+      fetch_mode: "fixture",
+      record_id: "tasoc:test",
+      identifiers: {
+        tasoc_target_id: "TASOC-1",
+      },
+      aliases: ["candidate"],
+      quality_flags: [],
+      raw_payload: {},
+      target: {
+        name: "Different Name",
+      },
+    };
+    const outcome = evaluateCrossmatch({
+      primary,
+      candidate,
+      explicitIdentifiers: {
+        tasoc_target_id: "TASOC-1",
+      },
+      trustedIdentifiers: {
+        gaia_dr3_source_id: "123",
+      },
+    });
+    expect(outcome?.status).toBe("rejected_missing_link");
   });
 });

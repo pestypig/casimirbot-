@@ -14,6 +14,7 @@ export interface CrossmatchOutcome {
   to_catalog: StarSimSourceCatalog;
   status: CrossmatchOutcomeCode;
   reason: string;
+  identity_basis?: string[];
   quality_flags: string[];
   warnings?: string[];
 }
@@ -38,11 +39,13 @@ const identifiersConflict = (record: StarSimSourceRecord, expected: StarSimSourc
     return Boolean(recordValue) && normalize(recordValue) !== normalize(value);
   });
 
-const hasStrongIdentifierLink = (
+const getStrongIdentifierLinkBasis = (
   primary: StarSimSourceRecord,
   candidate: StarSimSourceRecord,
-  expected: StarSimSourceIdentifiers,
-): boolean => {
+  explicit: StarSimSourceIdentifiers,
+  trusted: StarSimSourceIdentifiers,
+): string[] => {
+  const bases = new Set<string>();
   const keys: Array<keyof StarSimSourceIdentifiers> = [
     "gaia_dr3_source_id",
     "sdss_apogee_id",
@@ -51,22 +54,34 @@ const hasStrongIdentifierLink = (
     "tasoc_target_id",
     "mast_obs_id",
   ];
-  return keys.some((key) => {
+  for (const key of keys) {
     const candidateValue = candidate.identifiers[key];
-    if (!candidateValue) return false;
-    const expectedValue = expected[key];
-    if (expectedValue && normalize(candidateValue) === normalize(expectedValue)) {
-      return true;
+    if (!candidateValue) continue;
+    const explicitValue = explicit[key];
+    if (explicitValue && normalize(candidateValue) === normalize(explicitValue)) {
+      bases.add("explicit_request_identifier");
     }
-    const primaryValue = primary.identifiers[key];
-    return Boolean(primaryValue && normalize(candidateValue) === normalize(primaryValue));
-  });
+    const trustedValue = trusted[key];
+    if (trustedValue && normalize(candidateValue) === normalize(trustedValue)) {
+      bases.add("trusted_identifier");
+    }
+  }
+
+  if (
+    candidate.identifiers.gaia_dr3_source_id
+    && primary.identifiers.gaia_dr3_source_id
+    && normalize(candidate.identifiers.gaia_dr3_source_id) === normalize(primary.identifiers.gaia_dr3_source_id)
+  ) {
+    bases.add("trusted_gaia_link");
+  }
+  return [...bases];
 };
 
 export const evaluateCrossmatch = (args: {
   primary: StarSimSourceRecord | null;
   candidate: StarSimSourceRecord | null;
-  expectedIdentifiers: StarSimSourceIdentifiers;
+  explicitIdentifiers: StarSimSourceIdentifiers;
+  trustedIdentifiers: StarSimSourceIdentifiers;
 }): CrossmatchOutcome | null => {
   if (!args.primary || !args.candidate) {
     return null;
@@ -82,35 +97,12 @@ export const evaluateCrossmatch = (args: {
     };
   }
 
-  if (identifiersConflict(args.candidate, args.expectedIdentifiers)) {
+  if (identifiersConflict(args.candidate, args.trustedIdentifiers)) {
     return {
       from_catalog: args.primary.catalog,
       to_catalog: args.candidate.catalog,
       status: "rejected_identifier_conflict",
       reason: "identifier_conflict",
-      quality_flags: [...args.candidate.quality_flags],
-    };
-  }
-
-  const primaryName = normalize(args.primary.target?.name);
-  const candidateName = normalize(args.candidate.target?.name);
-  const strongIdentifierLink = hasStrongIdentifierLink(args.primary, args.candidate, args.expectedIdentifiers);
-  if (primaryName && candidateName && primaryName !== candidateName) {
-    if (strongIdentifierLink) {
-      return {
-        from_catalog: args.primary.catalog,
-        to_catalog: args.candidate.catalog,
-        status: "accepted_with_warning",
-        reason: "name_mismatch_identifier_linked",
-        quality_flags: [...args.candidate.quality_flags],
-        warnings: ["name_mismatch_identifier_linked"],
-      };
-    }
-    return {
-      from_catalog: args.primary.catalog,
-      to_catalog: args.candidate.catalog,
-      status: "rejected_name_mismatch",
-      reason: "name_mismatch",
       quality_flags: [...args.candidate.quality_flags],
     };
   }
@@ -125,11 +117,42 @@ export const evaluateCrossmatch = (args: {
     };
   }
 
+  const primaryName = normalize(args.primary.target?.name);
+  const candidateName = normalize(args.candidate.target?.name);
+  const identityBasis = getStrongIdentifierLinkBasis(
+    args.primary,
+    args.candidate,
+    args.explicitIdentifiers,
+    args.trustedIdentifiers,
+  );
+  const strongIdentifierLink = identityBasis.length > 0;
+  if (primaryName && candidateName && primaryName !== candidateName) {
+    if (strongIdentifierLink) {
+      return {
+        from_catalog: args.primary.catalog,
+        to_catalog: args.candidate.catalog,
+        status: "accepted_with_warning",
+        reason: "name_mismatch_identifier_linked",
+        identity_basis: identityBasis,
+        quality_flags: [...args.candidate.quality_flags],
+        warnings: ["name_mismatch_identifier_linked"],
+      };
+    }
+    return {
+      from_catalog: args.primary.catalog,
+      to_catalog: args.candidate.catalog,
+      status: "rejected_name_mismatch",
+      reason: "name_mismatch",
+      quality_flags: [...args.candidate.quality_flags],
+    };
+  }
+
   return {
     from_catalog: args.primary.catalog,
     to_catalog: args.candidate.catalog,
     status: "accepted",
     reason: "crossmatch_ok",
+    identity_basis: identityBasis,
     quality_flags: [...args.candidate.quality_flags],
   };
 };

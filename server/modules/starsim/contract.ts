@@ -353,6 +353,7 @@ export interface StarSimSourceContext {
   resolved_draft_ref?: string;
   resolved_draft_hash?: string;
   identifiers_resolved?: StarSimSourceIdentifiers;
+  identifiers_trusted?: StarSimSourceIdentifiers;
   fetch_modes_by_catalog?: Partial<Record<StarSimSourceCatalog, StarSimSourceFetchMode>>;
   selected_field_origins?: Record<string, StarSimSourceSelectionOrigin>;
   benchmark_target_id?: string;
@@ -366,6 +367,12 @@ export type StarSimBenchmarkTargetMatchMode =
   | "matched_by_name"
   | "conflicted_name_vs_identifier"
   | "no_match";
+
+export type StarSimBenchmarkTargetIdentityBasis =
+  | "trusted_identifier"
+  | "name_label"
+  | "conflicted_trusted_identifier_vs_name"
+  | "none";
 
 export interface StarSimCrossmatchSummary {
   accepted: number;
@@ -458,6 +465,8 @@ export interface StarSimSourceResolution {
   fetch_modes_by_catalog?: Record<StarSimSourceCatalog, StarSimSourceFetchMode>;
   artifact_integrity_status: StarSimArtifactIntegrityStatus;
   identifiers_resolved: StarSimSourceIdentifiers;
+  identifiers_observed?: StarSimSourceIdentifiers;
+  identifiers_trusted?: StarSimSourceIdentifiers;
   artifact_refs: StarSimArtifactRef[];
   selection_manifest: StarSimSourceSelectionManifest;
   candidate_counts: {
@@ -471,8 +480,10 @@ export interface StarSimSourceResolution {
   benchmark_target_id?: string;
   benchmark_target_match_mode?: StarSimBenchmarkTargetMatchMode;
   benchmark_target_conflict_reason?: string;
+  benchmark_target_identity_basis?: StarSimBenchmarkTargetIdentityBasis;
   benchmark_target_quality_ok?: boolean;
   crossmatch_summary?: StarSimCrossmatchSummary;
+  crossmatch_identity_basis?: Partial<Record<StarSimSourceCatalog, string[]>>;
   quality_rejections?: StarSimQualityRejection[];
   quality_warnings?: StarSimQualityWarning[];
   diagnostic_summary?: StarSimDiagnosticSummary;
@@ -486,6 +497,8 @@ export interface StarSimResolveResponse {
     resolved_name: string | null;
   };
   identifiers_resolved: StarSimSourceIdentifiers;
+  identifiers_observed?: StarSimSourceIdentifiers;
+  identifiers_trusted?: StarSimSourceIdentifiers;
   canonical_request_draft: StarSimRequest | null;
   source_resolution: StarSimSourceResolution;
   structure_mesa_ready: boolean;
@@ -495,8 +508,10 @@ export interface StarSimResolveResponse {
   benchmark_target_id?: string;
   benchmark_target_match_mode?: StarSimBenchmarkTargetMatchMode;
   benchmark_target_conflict_reason?: string;
+  benchmark_target_identity_basis?: StarSimBenchmarkTargetIdentityBasis;
   benchmark_target_quality_ok?: boolean;
   crossmatch_summary?: StarSimCrossmatchSummary;
+  crossmatch_identity_basis?: Partial<Record<StarSimSourceCatalog, string[]>>;
   quality_rejections?: StarSimQualityRejection[];
   quality_warnings?: StarSimQualityWarning[];
   diagnostic_summary?: StarSimDiagnosticSummary;
@@ -546,6 +561,8 @@ export interface StarSimResolveBeforeRunResponse {
   policy_used: StarSimPreconditionPolicy;
   target: StarSimResolveResponse["target"];
   identifiers_resolved: StarSimSourceIdentifiers;
+  identifiers_observed?: StarSimSourceIdentifiers;
+  identifiers_trusted?: StarSimSourceIdentifiers;
   source_resolution_ref: string | null;
   resolved_draft_ref: string | null;
   resolved_draft_hash: string | null;
@@ -557,8 +574,10 @@ export interface StarSimResolveBeforeRunResponse {
   benchmark_target_id?: string;
   benchmark_target_match_mode?: StarSimBenchmarkTargetMatchMode;
   benchmark_target_conflict_reason?: string;
+  benchmark_target_identity_basis?: StarSimBenchmarkTargetIdentityBasis;
   benchmark_target_quality_ok?: boolean;
   crossmatch_summary?: StarSimCrossmatchSummary;
+  crossmatch_identity_basis?: Partial<Record<StarSimSourceCatalog, string[]>>;
   quality_rejections?: StarSimQualityRejection[];
   quality_warnings?: StarSimQualityWarning[];
   diagnostic_summary?: StarSimDiagnosticSummary;
