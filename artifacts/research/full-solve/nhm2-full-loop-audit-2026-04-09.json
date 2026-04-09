@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-09T04:07:49.863Z",
+  "generatedAt": "2026-04-09T13:24:32.735Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -242,9 +242,9 @@
       "residualRms": 9.228761628158325e-10,
       "residualMax": 4.6143808140791624e-10,
       "residualByRegion": {
-        "hull": 0.9999254433955457,
-        "wall": 0.9478649454761662,
-        "exteriorShell": 0.9901245528500822
+        "hull": 0.9771894650674532,
+        "wall": 14.950679233985802,
+        "exteriorShell": 2.0213853465619396
       },
       "toleranceRef": "tensor_residual_relLInf",
       "assumptionsDrifted": false,

@@ -7,6 +7,10 @@ import {
   buildNhm2EnvelopePerturbationArtifact,
 } from "../shared/contracts/nhm2-envelope-perturbation-suite.v1";
 import {
+  calculateEnergyPipeline,
+  initializePipelineState,
+} from "../server/energy-pipeline";
+import {
   buildNhm2ShiftVsLapseDecompositionArtifact,
 } from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
 import {
@@ -387,6 +391,41 @@ const writeJsonFixture = (filePath: string, value: unknown) => {
 const writeMarkdownFixture = (filePath: string, markdown: string) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${markdown}\n`);
+};
+
+const buildSelectedShiftLapseRuntimeState = async (args: {
+  selectedArtifactDir: string;
+  selectedProfileId: string;
+}) => {
+  const transportResultArtifact = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        args.selectedArtifactDir,
+        "nhm2-shift-lapse-transport-result-latest.json",
+      ),
+      "utf8",
+    ),
+  ) as Record<string, any>;
+  const baseState = initializePipelineState();
+  const nextState = {
+    ...baseState,
+    warpFieldType: "nhm2_shift_lapse",
+    dynamicConfig: {
+      ...((baseState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: args.selectedProfileId,
+    },
+    warp: {
+      ...(((baseState as any).warp as Record<string, unknown> | undefined) ?? {}),
+      metricT00Ref: transportResultArtifact.selectedFamily?.metricT00Ref ?? undefined,
+      metricT00Source:
+        transportResultArtifact.selectedFamily?.metricT00Source ?? undefined,
+    },
+  } as Record<string, unknown>;
+
+  return calculateEnergyPipeline(nextState as any, {
+    preserveLiveWarpFunctions: true,
+  });
 };
 
 const makeNhm2FullLoopAuditPublisherFixture = (args?: {
@@ -1364,6 +1403,24 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.completeness).toBe("complete");
       expect(region.metricTensorRef).toContain(`${region.regionId}`.replace("_", "-"));
       expect(region.tileTensorRef).toContain(`${region.regionId}`.replace("_", "-"));
+      expect(region.metricRequiredTensor).toBeTruthy();
+      expect(region.tileEffectiveTensor).toBeTruthy();
+      expect(region.residualComponents?.T00).toBeTruthy();
+      expect(region.residualComponents?.T11).toBeTruthy();
+      expect(region.residualComponents?.T22).toBeTruthy();
+      expect(region.residualComponents?.T33).toBeTruthy();
+      expect(region.dominantResidualComponent).toBeTruthy();
+      expect(region.dominantResidualRel).toBe(
+        region.residualComponents[region.dominantResidualComponent].relResidual,
+      );
+      expect(region.metricAccounting).toBeTruthy();
+      expect(region.tileAccounting).toBeTruthy();
+      expect(region.metricAccounting.aggregationMode).toBe("mean");
+      expect(region.tileAccounting.aggregationMode).toBe("mean");
+      expect(region.metricAccounting.normalizationBasis).toBe("sample_count");
+      expect(region.tileAccounting.normalizationBasis).toBe("sample_count");
+      expect(region.metricAccounting.regionMaskNote).toContain("brick_mask");
+      expect(region.tileAccounting.regionMaskNote).toContain("brick_mask");
       expect(region.residualNorms.relLInf).toBeGreaterThan(0.1);
       expect(region.note).toContain("Same-basis regional closure compares");
     }
@@ -1374,13 +1431,102 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect(markdown).toContain("NHM2 Source Closure");
     expect(markdown).toContain("publish-source-closure");
+    expect(markdown).toContain("Regional Comparisons (Summary)");
     expect(markdown).toContain("| basis |");
+    expect(markdown).toContain("| accounting |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
+    expect(markdown).toContain("Regional Component Details");
+    expect(markdown).toContain("dominantResidualComponent");
+    expect(markdown).toContain("accountingStatus");
+    expect(markdown).toContain("| accounting field | metric | tile |");
+    expect(markdown).toContain("| component | metricRequired | tileEffective | absResidual | relResidual |");
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
     );
+  });
+
+  it("keeps runtime and published NHM2 source-closure authority aligned on v2 fields", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedArtifactDir = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const selectedAuditDir = path.join(
+      fixture.auditRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+
+    const published = await publishNhm2ShiftLapseSourceClosure({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const refreshed = await buildSelectedShiftLapseRuntimeState({
+      selectedArtifactDir,
+      selectedProfileId: fixture.selectedProfileId,
+    });
+    const runtimeArtifact = (refreshed as any).nhm2SourceClosure;
+    expect(isNhm2SourceClosureV2Artifact(runtimeArtifact)).toBe(true);
+
+    const publishedJson = JSON.parse(
+      fs.readFileSync(published.sourceClosureArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, any>;
+    expect(isNhm2SourceClosureV2Artifact(publishedJson)).toBe(true);
+
+    expect(publishedJson.schemaVersion).toBe(runtimeArtifact.schemaVersion);
+    expect(publishedJson.status).toBe(runtimeArtifact.status);
+    expect(publishedJson.completeness).toBe(runtimeArtifact.completeness);
+    expect(publishedJson.reasonCodes).toEqual(runtimeArtifact.reasonCodes);
+    expect(publishedJson.residualNorms.relL2).toBe(runtimeArtifact.residualNorms.relL2);
+    expect(publishedJson.residualNorms.relLInf).toBe(runtimeArtifact.residualNorms.relLInf);
+    expect(publishedJson.assumptionsDrifted).toBe(runtimeArtifact.assumptionsDrifted);
+    expect(publishedJson.regionComparisons.requiredRegionIds).toEqual(
+      runtimeArtifact.regionComparisons.requiredRegionIds,
+    );
+
+    for (const runtimeRegion of runtimeArtifact.regionComparisons.regions) {
+      const publishedRegion = publishedJson.regionComparisons.regions.find(
+        (entry: Record<string, unknown>) => entry.regionId === runtimeRegion.regionId,
+      ) as Record<string, any> | undefined;
+      expect(publishedRegion).toBeTruthy();
+      expect(publishedRegion?.comparisonBasisStatus).toBe(
+        runtimeRegion.comparisonBasisStatus,
+      );
+      expect(publishedRegion?.status).toBe(runtimeRegion.status);
+      expect(publishedRegion?.residualNorms?.relLInf).toBe(
+        runtimeRegion.residualNorms.relLInf,
+      );
+      for (const component of ["T00", "T11", "T22", "T33"] as const) {
+        expect(publishedRegion?.residualComponents?.[component]?.metricRequired).toBe(
+          runtimeRegion.residualComponents[component].metricRequired,
+        );
+        expect(publishedRegion?.residualComponents?.[component]?.tileEffective).toBe(
+          runtimeRegion.residualComponents[component].tileEffective,
+        );
+        expect(publishedRegion?.residualComponents?.[component]?.absResidual).toBe(
+          runtimeRegion.residualComponents[component].absResidual,
+        );
+        expect(publishedRegion?.residualComponents?.[component]?.relResidual).toBe(
+          runtimeRegion.residualComponents[component].relResidual,
+        );
+      }
+      expect(publishedRegion?.dominantResidualComponent).toBe(
+        runtimeRegion.dominantResidualComponent,
+      );
+      expect(publishedRegion?.dominantResidualAbs).toBe(
+        runtimeRegion.dominantResidualAbs,
+      );
+      expect(publishedRegion?.dominantResidualRel).toBe(
+        runtimeRegion.dominantResidualRel,
+      );
+      expect(publishedRegion?.metricAccounting).toEqual(runtimeRegion.metricAccounting);
+      expect(publishedRegion?.tileAccounting).toEqual(runtimeRegion.tileAccounting);
+    }
   });
 
   it("lets the full-loop audit consume emitted source-closure evidence instead of missing-publication placeholders", async () => {

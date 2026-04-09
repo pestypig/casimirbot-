@@ -884,6 +884,9 @@ const buildNhm2FullLoopPolicyLayer = (args: {
 
   const sourceClosureReasons: Nhm2FullLoopAuditReasonCode[] = [];
   if (sourceClosure) {
+    if (sourceClosure.schemaVersion === "nhm2_source_closure/v1") {
+      sourceClosureReasons.push("source_closure_version_lag");
+    }
     for (const reasonCode of sourceClosure.reasonCodes) {
       switch (reasonCode) {
         case "tensor_residual_exceeded":
@@ -911,9 +914,15 @@ const buildNhm2FullLoopPolicyLayer = (args: {
   }
   const uniqueSourceClosureReasons = uniqueList(sourceClosureReasons);
   const sourceClosureState: Nhm2FullLoopAuditState =
-    sourceClosure != null
-      ? (normalizeAuditState(sourceClosure.status) ?? "review")
-      : "unavailable";
+    sourceClosure == null
+      ? "unavailable"
+      : sourceClosure.schemaVersion === "nhm2_source_closure/v1"
+        ? uniqueSourceClosureReasons.includes("source_closure_missing")
+          ? "unavailable"
+          : normalizeAuditState(sourceClosure.status) === "fail"
+            ? "fail"
+            : "review"
+        : (normalizeAuditState(sourceClosure.status) ?? "review");
   const sourceClosureRegions = getSourceClosureRegions(sourceClosure);
   const findRegionResidual = (...regionIds: string[]): number | null => {
     for (const regionId of regionIds) {

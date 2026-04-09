@@ -89,13 +89,17 @@ import {
 } from "../shared/contracts/nhm2-observer-audit.v1.ts";
 import {
   NHM2_SOURCE_CLOSURE_COMPONENTS,
-  buildNhm2SourceClosureArtifact,
   normalizeNhm2SourceClosureTensor,
   type Nhm2SourceClosureArtifact,
   type Nhm2SourceClosureComponent,
-  type Nhm2SourceClosureSampledSummaryInput,
   type Nhm2SourceClosureTensor,
 } from "../shared/contracts/nhm2-source-closure.v1.ts";
+import {
+  buildNhm2SourceClosureArtifactV2,
+  type Nhm2SourceClosureV2Artifact,
+  type Nhm2SourceClosureV2RegionAccounting,
+  type Nhm2SourceClosureV2RegionComparisonInput,
+} from "../shared/contracts/nhm2-source-closure.v2.ts";
 import {
   buildNhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessArtifact,
@@ -103,6 +107,7 @@ import {
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1.ts";
 import {
   buildStressEnergyBrick,
+  forEachStressEnergyBrickRegionVoxel,
   type StressEnergyStats,
 } from "./stress-energy-brick";
 import {
@@ -113,6 +118,7 @@ import {
   type WarpMetricFamilyAuthorityStatus,
   type WarpMetricTransportCertificationStatus,
 } from "../modules/warp/warp-metric-adapter.ts";
+import { calculateMetricStressEnergyTensorRegionMeansFromShiftField } from "../modules/warp/natario-warp.ts";
 import type { CongruenceMeta } from "../types/pipeline";
 import type { SectorControlLiveEvent } from "../shared/schema.ts";
 
@@ -122,6 +128,11 @@ const DEFAULT_WALL_THICKNESS_M = C / (DEFAULT_MODULATION_FREQ_GHZ * 1e9);
 const STROBE_DUTY_WINDOW_MS_DEFAULT = 12_000;
 const STROBE_DUTY_STALE_MS = 20_000;
 const DEFAULT_NHM2_SOURCE_CLOSURE_REL_LINF_MAX = 0.1;
+const REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS = [
+  "hull",
+  "wall",
+  "exterior_shell",
+] as const;
 
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
@@ -1753,7 +1764,7 @@ export interface EnergyPipelineState {
   stressMeta?: CongruenceMeta;
   metricConstraint?: MetricConstraintAudit;
   nhm2ObserverAudit?: Nhm2ObserverAuditArtifact;
-  nhm2SourceClosure?: Nhm2SourceClosureArtifact;
+  nhm2SourceClosure?: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact;
   nhm2StrictSignalReadiness?: Nhm2StrictSignalReadinessArtifact;
 }
 
@@ -4005,6 +4016,228 @@ const resolveNhm2SourceClosureTolerance = (): number => {
 const NHM2_SOURCE_CLOSURE_TILE_GLOBAL_SUMMARY_REF =
   "gr.matter.stressEnergy.tensorSampledSummaries.global.nhm2_shift_lapse.diagonal_proxy";
 
+type RequiredNhm2SourceClosureRegionId =
+  (typeof REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS)[number];
+
+const isRequiredNhm2SourceClosureRegionId = (
+  value: unknown,
+): value is RequiredNhm2SourceClosureRegionId =>
+  typeof value === "string" &&
+  REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS.includes(
+    value as RequiredNhm2SourceClosureRegionId,
+  );
+
+const isCompleteNhm2SourceClosureTensor = (
+  tensor: Nhm2SourceClosureTensor,
+): boolean =>
+  NHM2_SOURCE_CLOSURE_COMPONENTS.every((component) => tensor[component] != null);
+
+const resolveNhm2SourceClosureBrickBasis = (state: EnergyPipelineState) => {
+  const hull = (state.hull ?? {}) as Record<string, unknown>;
+  const Lx = Math.max(1e-6, toFiniteNumber(hull.Lx_m) ?? 1007);
+  const Ly = Math.max(1e-6, toFiniteNumber(hull.Ly_m) ?? 264);
+  const Lz = Math.max(1e-6, toFiniteNumber(hull.Lz_m) ?? 173);
+  const wallThickness = Math.max(0.1, toFiniteNumber(hull.wallThickness_m) ?? 0.45);
+  return {
+    dims: [128, 128, 128] as [number, number, number],
+    bounds: {
+      min: [-Lx / 2, -Ly / 2, -Lz / 2] as [number, number, number],
+      max: [Lx / 2, Ly / 2, Lz / 2] as [number, number, number],
+    },
+    hullAxes: [Lx / 2, Ly / 2, Lz / 2] as [number, number, number],
+    hullWall: wallThickness,
+    radialMap: null,
+  };
+};
+
+const collectNhm2SourceClosureRegionComparisons = (
+  state: EnergyPipelineState,
+  metricTensorRef: string,
+): Nhm2SourceClosureV2RegionComparisonInput[] => {
+  const brickBasis = resolveNhm2SourceClosureBrickBasis(state);
+  const [nx, ny, nz] = brickBasis.dims;
+  const dx = (brickBasis.bounds.max[0] - brickBasis.bounds.min[0]) / nx;
+  const dy = (brickBasis.bounds.max[1] - brickBasis.bounds.min[1]) / ny;
+  const dz = (brickBasis.bounds.max[2] - brickBasis.bounds.min[2]) / nz;
+  const cellVolume = dx * dy * dz;
+  const regionMaskNote = `brick_mask=ellipsoid_axes_m(${brickBasis.hullAxes
+    .map((value) => value.toFixed(6))
+    .join(",")}); wall_sigma_m=${brickBasis.hullWall.toFixed(6)}; exterior_shell_limit_m=${(brickBasis.hullWall * 3).toFixed(6)}; dims=${brickBasis.dims.join("x")}; cell_volume_m3=${cellVolume.toExponential(6)}`;
+  const normalizationBasis = "sample_count";
+  const aggregationMode: Nhm2SourceClosureV2RegionAccounting["aggregationMode"] =
+    "mean";
+  const regionVoxelIds = new Array<RequiredNhm2SourceClosureRegionId | null>(
+    brickBasis.dims[0] * brickBasis.dims[1] * brickBasis.dims[2],
+  ).fill(null);
+  const regionMaskCounts = new Map<RequiredNhm2SourceClosureRegionId, number>();
+  const voxelIndex = (x: number, y: number, z: number) =>
+    x + brickBasis.dims[0] * (y + brickBasis.dims[1] * z);
+  const warpState = ((state as any).warp ?? null) as Record<string, unknown> | null;
+  const stressBrick = buildStressEnergyBrick({
+    metricT00: toFiniteNumber((warpState as Record<string, unknown> | null)?.metricT00) ?? undefined,
+    metricT00Ref: asText(warpState?.metricT00Ref) ?? undefined,
+    metricT00Source:
+      asText(warpState?.metricT00Source) ??
+      asText(warpState?.stressEnergySource) ??
+      undefined,
+    warpFieldType: "nhm2_shift_lapse",
+    dims: brickBasis.dims,
+    bounds: brickBasis.bounds,
+    hullAxes: brickBasis.hullAxes,
+    hullWall: brickBasis.hullWall,
+    radialMap: brickBasis.radialMap,
+  });
+  const stressRegions = stressBrick.stats.tensorSampledSummaries?.regions ?? [];
+  const stressRegionMap = new Map<
+    RequiredNhm2SourceClosureRegionId,
+    {
+      sampleCount?: unknown;
+      tensor?: unknown;
+      note?: unknown;
+    }
+  >();
+  for (const region of stressRegions) {
+    if (isRequiredNhm2SourceClosureRegionId(region?.regionId)) {
+      stressRegionMap.set(region.regionId, {
+        sampleCount: region.sampleCount,
+        tensor: region.tensor,
+        note: region.note,
+      });
+    }
+  }
+
+  forEachStressEnergyBrickRegionVoxel(brickBasis, (sample) => {
+    const [x, y, z] = sample.voxelIndex;
+    const regionId = isRequiredNhm2SourceClosureRegionId(sample.classifiedRegionId)
+      ? sample.classifiedRegionId
+      : null;
+    regionVoxelIds[voxelIndex(x, y, z)] = regionId;
+    if (regionId) {
+      regionMaskCounts.set(regionId, (regionMaskCounts.get(regionId) ?? 0) + 1);
+    }
+  });
+
+  const shiftVectorField = warpState?.shiftVectorField;
+  const evaluateShiftVector =
+    shiftVectorField != null &&
+    typeof (shiftVectorField as Record<string, unknown>).evaluateShiftVector === "function"
+      ? ((shiftVectorField as Record<string, unknown>).evaluateShiftVector as (
+          x: number,
+          y: number,
+          z: number,
+        ) => [number, number, number])
+      : null;
+
+  const metricRegionMap = new Map<
+    RequiredNhm2SourceClosureRegionId,
+    {
+      sampleCount: number;
+      diagonalTensor: {
+        T00: number;
+        T11: number;
+        T22: number;
+        T33: number;
+        isNullEnergyConditionSatisfied: boolean;
+      } | null;
+    }
+  >();
+
+  if (evaluateShiftVector != null) {
+    const metricRegionMeans =
+      calculateMetricStressEnergyTensorRegionMeansFromShiftField(evaluateShiftVector, {
+        dims: brickBasis.dims,
+        bounds: brickBasis.bounds,
+        classifyRegion: ({ voxelIndex: [x, y, z] }) => regionVoxelIds[voxelIndex(x, y, z)],
+      });
+
+    for (const region of metricRegionMeans.regions) {
+      if (isRequiredNhm2SourceClosureRegionId(region.regionId)) {
+        metricRegionMap.set(region.regionId, {
+          sampleCount: region.sampleCount,
+          diagonalTensor: region.diagonalTensor,
+        });
+      }
+    }
+  }
+
+  const buildAccounting = (args: {
+    sampleCount: number | null;
+    maskVoxelCount: number | null;
+    supportInclusionNote: string;
+  }): Nhm2SourceClosureV2RegionAccounting => ({
+    sampleCount: args.sampleCount,
+    maskVoxelCount: args.maskVoxelCount,
+    weightSum: args.sampleCount,
+    aggregationMode,
+    normalizationBasis,
+    regionMaskNote,
+    supportInclusionNote: args.supportInclusionNote,
+  });
+
+  return REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
+    const metricRegionEntry = metricRegionMap.get(regionId);
+    const tileRegionEntry = stressRegionMap.get(regionId);
+    const metricRegionTensor = normalizeNhm2SourceClosureTensor(
+      metricRegionEntry?.diagonalTensor ?? null,
+    );
+    const tileRegionTensor =
+      extractNhm2SourceClosureTensor(tileRegionEntry?.tensor ?? null) ??
+      normalizeNhm2SourceClosureTensor(tileRegionEntry?.tensor ?? null);
+    const metricTensorAvailable = isCompleteNhm2SourceClosureTensor(metricRegionTensor);
+    const tileTensorAvailable = isCompleteNhm2SourceClosureTensor(tileRegionTensor);
+    const metricSampleCount = toFiniteNumber(metricRegionEntry?.sampleCount) ?? null;
+    const tileSampleCount = toFiniteNumber(tileRegionEntry?.sampleCount) ?? null;
+    const maskVoxelCount =
+      toFiniteNumber(regionMaskCounts.get(regionId) ?? null) ?? null;
+    const sampleCount = metricSampleCount ?? tileSampleCount ?? null;
+    const noteParts: string[] = [];
+    const tileNote = asText(tileRegionEntry?.note);
+    if (tileNote != null) {
+      noteParts.push(tileNote);
+    }
+    if (metricTensorAvailable && tileTensorAvailable) {
+      noteParts.push(
+        "Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask.",
+      );
+    } else if (tileTensorAvailable) {
+      noteParts.push(
+        "Regional source closure is unavailable because the runtime metric-required tensor could not be integrated over this region on the shared brick basis.",
+      );
+    } else {
+      noteParts.push(
+        "Regional source closure is unavailable because same-basis regional metric and tile tensors were not both available at runtime.",
+      );
+    }
+
+    const metricAccounting = buildAccounting({
+      sampleCount: metricSampleCount,
+      maskVoxelCount,
+      supportInclusionNote:
+        "metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped.",
+    });
+    const tileAccounting = buildAccounting({
+      sampleCount: tileSampleCount,
+      maskVoxelCount,
+      supportInclusionNote:
+        "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
+    });
+
+    return {
+      regionId,
+      comparisonBasisStatus:
+        metricTensorAvailable && tileTensorAvailable ? "same_basis" : "unavailable",
+      metricTensorRef: `${metricTensorRef}.region.${regionId}`,
+      tileTensorRef: `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`,
+      metricRequiredTensor: metricRegionTensor,
+      tileEffectiveTensor: tileRegionTensor,
+      sampleCount,
+      metricAccounting,
+      tileAccounting,
+      note: noteParts.join(" "),
+    };
+  });
+};
+
 const resolveNhm2SourceClosureTileEffectiveTensor = (
   state: EnergyPipelineState,
 ): {
@@ -4430,32 +4663,6 @@ const buildTileObserverAuditTensorInput = (
   };
 };
 
-const collectNhm2SourceClosureSampledSummaries = (
-  state: EnergyPipelineState,
-  globalTileTensor: Nhm2SourceClosureTensor | null,
-): Nhm2SourceClosureSampledSummaryInput[] => {
-  const regions = state.gr?.matter?.stressEnergy?.tensorSampledSummaries?.regions;
-  if (Array.isArray(regions) && regions.length > 0) {
-    return regions.map((region) => ({
-      regionId: region.regionId,
-      sampleCount: region.sampleCount,
-      tileTensor: region.tensor,
-      note: region.note ?? null,
-    }));
-  }
-  if (globalTileTensor) {
-    return [
-      {
-        regionId: "global",
-        sampleCount: null,
-        tileTensor: globalTileTensor,
-        note: "global tensor summary fallback",
-      },
-    ];
-  }
-  return [];
-};
-
 const resolveNhm2ArtifactContext = (state: EnergyPipelineState) => {
   const warpState = (state as any).warp as Record<string, any> | undefined;
   const adapter = (warpState?.metricAdapter ?? null) as WarpMetricAdapterSnapshot | null;
@@ -4588,21 +4795,21 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
     metricRequiredTensor != null
       ? metricT00Ref ?? "warp.metricStressEnergy"
       : "warp.metricStressEnergy";
-  const sampledSummaries = collectNhm2SourceClosureSampledSummaries(
+  const regionComparisons = collectNhm2SourceClosureRegionComparisons(
     state,
-    tileEffectiveTensor,
+    metricTensorRef,
   );
 
-  state.nhm2SourceClosure = buildNhm2SourceClosureArtifact({
+  state.nhm2SourceClosure = buildNhm2SourceClosureArtifactV2({
     metricTensorRef,
     tileEffectiveTensorRef,
     metricRequiredTensor,
     tileEffectiveTensor,
-    sampledSummaries,
+    requiredRegionIds: [...REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS],
+    regionComparisons,
     toleranceRelLInf: resolveNhm2SourceClosureTolerance(),
     scalarCl3RhoDeltaRel:
       Number.isFinite(state.rho_delta_metric_mean) ? Number(state.rho_delta_metric_mean) : null,
-    assumptionsDrifted: null,
   });
 };
 

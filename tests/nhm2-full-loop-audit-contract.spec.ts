@@ -294,6 +294,28 @@ describe("nhm2 full-loop audit contract", () => {
     expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
   });
 
+  it("accepts source-closure version lag as an explicit fail-closed blocker", () => {
+    const sections = makeSections();
+    sections.source_closure = {
+      ...sections.source_closure,
+      state: "review",
+      reasons: ["source_closure_version_lag"],
+      artifactRefs: [makeArtifactRef("source_closure", "runtime://pipeline/nhm2SourceClosure")],
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-04-09T12:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.source_closure.reasons).toContain(
+      "source_closure_version_lag",
+    );
+    expect(contract?.blockingReasons).toContain("source_closure_version_lag");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
   it("rejects forged contracts with invalid tier maps or unknown reason codes", () => {
     const contract = buildNhm2FullLoopAuditContract({
       generatedAt: "2026-04-07T12:10:00.000Z",

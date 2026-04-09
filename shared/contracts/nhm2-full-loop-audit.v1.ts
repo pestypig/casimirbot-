@@ -37,6 +37,7 @@ export const NHM2_FULL_LOOP_AUDIT_REASON_CODES = [
   "lapse_profile_missing",
   "metric_contract_missing",
   "source_closure_missing",
+  "source_closure_version_lag",
   "source_closure_residual_exceeded",
   "observer_audit_incomplete",
   "observer_blocking_violation",

@@ -928,7 +928,10 @@ describe("warp viability congruence wiring", () => {
     expect(layer?.policyId).toBe("nhm2_full_loop_audit");
     expect(layer?.artifact.sections.mission_time_outputs.state).toBe("pass");
     expect(layer?.artifact.sections.strict_signal_readiness.state).toBe("pass");
-    expect(layer?.artifact.sections.source_closure.state).toBe("pass");
+    expect(layer?.artifact.sections.source_closure.state).toBe("review");
+    expect(layer?.artifact.sections.source_closure.reasons).toContain(
+      "source_closure_version_lag",
+    );
     expect(layer?.artifact.sections.observer_audit.state).toBe("pass");
     expect(layer?.artifact.sections.shift_vs_lapse_decomposition.reasons).toContain(
       "shift_lapse_decomposition_missing",
@@ -1036,54 +1039,72 @@ describe("warp viability congruence wiring", () => {
           applicabilityStatus: "PASS",
         },
       }),
-      nhm2SourceClosure: buildNhm2SourceClosureArtifactV2({
-        metricTensorRef: "warp.metricStressEnergy",
-        tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
-        metricRequiredTensor: {
-          T00: -100,
-          T11: 30,
-          T22: 30,
-          T33: 30,
-        },
-        tileEffectiveTensor: {
-          T00: -100,
-          T11: 30,
-          T22: 30,
-          T33: 30,
-        },
-        requiredRegionIds: ["hull", "wall", "exterior_shell"],
-        regionComparisons: [
-          {
-            regionId: "hull",
-            comparisonBasisStatus: "same_basis",
-            metricTensorRef: "artifact://metric-hull",
-            tileTensorRef: "artifact://tile-hull",
-            metricRequiredTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
-            tileEffectiveTensor: { T00: -5, T11: 1, T22: 1, T33: 1 },
-            sampleCount: 12,
+      // basis-accounting diagnostics for source-closure regions
+      nhm2SourceClosure: (() => {
+        const makeAccounting = (count: number) => ({
+          sampleCount: count,
+          maskVoxelCount: count,
+          weightSum: count,
+          aggregationMode: "mean" as const,
+          normalizationBasis: "sample_count",
+          regionMaskNote: "mask",
+          supportInclusionNote: "note",
+        });
+        return buildNhm2SourceClosureArtifactV2({
+          metricTensorRef: "warp.metricStressEnergy",
+          tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+          metricRequiredTensor: {
+            T00: -100,
+            T11: 30,
+            T22: 30,
+            T33: 30,
           },
-          {
-            regionId: "wall",
-            comparisonBasisStatus: "same_basis",
-            metricTensorRef: "artifact://metric-wall",
-            tileTensorRef: "artifact://tile-wall",
-            metricRequiredTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
-            tileEffectiveTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
-            sampleCount: 6,
+          tileEffectiveTensor: {
+            T00: -100,
+            T11: 30,
+            T22: 30,
+            T33: 30,
           },
-          {
-            regionId: "exterior_shell",
-            comparisonBasisStatus: "same_basis",
-            metricTensorRef: "artifact://metric-exterior",
-            tileTensorRef: "artifact://tile-exterior",
-            metricRequiredTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
-            tileEffectiveTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
-            sampleCount: 6,
-          },
-        ],
-        toleranceRelLInf: 0.1,
-        scalarCl3RhoDeltaRel: 0,
-      }),
+          requiredRegionIds: ["hull", "wall", "exterior_shell"],
+          regionComparisons: [
+            {
+              regionId: "hull",
+              comparisonBasisStatus: "same_basis",
+              metricTensorRef: "artifact://metric-hull",
+              tileTensorRef: "artifact://tile-hull",
+              metricRequiredTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
+              tileEffectiveTensor: { T00: -5, T11: 1, T22: 1, T33: 1 },
+              sampleCount: 12,
+              metricAccounting: makeAccounting(12),
+              tileAccounting: makeAccounting(12),
+            },
+            {
+              regionId: "wall",
+              comparisonBasisStatus: "same_basis",
+              metricTensorRef: "artifact://metric-wall",
+              tileTensorRef: "artifact://tile-wall",
+              metricRequiredTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
+              tileEffectiveTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
+              sampleCount: 6,
+              metricAccounting: makeAccounting(6),
+              tileAccounting: makeAccounting(6),
+            },
+            {
+              regionId: "exterior_shell",
+              comparisonBasisStatus: "same_basis",
+              metricTensorRef: "artifact://metric-exterior",
+              tileTensorRef: "artifact://tile-exterior",
+              metricRequiredTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
+              tileEffectiveTensor: { T00: -100, T11: 30, T22: 30, T33: 30 },
+              sampleCount: 6,
+              metricAccounting: makeAccounting(6),
+              tileAccounting: makeAccounting(6),
+            },
+          ],
+          toleranceRelLInf: 0.1,
+          scalarCl3RhoDeltaRel: 0,
+        });
+      })(),
       nhm2ObserverAudit: buildPassingObserverAudit(),
     });
 
@@ -1221,6 +1242,9 @@ describe("warp viability congruence wiring", () => {
     expect(layer?.artifact.sections.source_closure.state).toBe("unavailable");
     expect(layer?.artifact.sections.source_closure.reasons).toContain(
       "source_closure_missing",
+    );
+    expect(layer?.artifact.sections.source_closure.reasons).toContain(
+      "source_closure_version_lag",
     );
     expect((result.snapshot as any).nhm2_full_loop_blocking_reasons).toContain(
       "source_closure_missing",

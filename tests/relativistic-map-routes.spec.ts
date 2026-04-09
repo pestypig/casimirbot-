@@ -54,7 +54,7 @@ describe("relativistic map route", () => {
     expect(res.body.projection?.certifying).toBe(false);
   });
 
-  it("fails closed for warp route-time requests instead of falling back to flat-SR", async () => {
+  it("fails closed for warp route-time requests outside the explicit NHM2 accordion contract", async () => {
     const app = makeApp();
     const res = await request(app)
       .post("/api/helix/relativistic-map/project")
@@ -67,7 +67,7 @@ describe("relativistic map route", () => {
 
     expect(res.body.ok).toBe(false);
     expect(res.body.projection?.status).toBe("unavailable");
-    expect(res.body.projection?.fail_id).toBe("RELATIVISTIC_MAP_WARP_WORLDLINE_REQUIRED");
+    expect(res.body.projection?.fail_id).toBe("NHM2_TARGET_NOT_IN_EXPLICIT_CONTRACT");
   });
 
   it("returns a 400 for flat-SR requests that omit the declared control law", async () => {
@@ -105,7 +105,7 @@ describe("relativistic map route", () => {
     expect(res.body.projection?.provenance_class).toBe("solve_backed");
   });
 
-  it("keeps route-time map projections fail-closed even when the authoritative bounded route-time contract exists", async () => {
+  it("keeps the accordion route target-coupled even when the bounded route-time contract exists", async () => {
     const app = makeApp();
     const nextState = initializePipelineState();
     nextState.warpWorldline = makeWarpWorldlineFixture();
@@ -132,22 +132,8 @@ describe("relativistic map route", () => {
 
     expect(res.body.ok).toBe(false);
     expect(res.body.projection?.status).toBe("unavailable");
-    expect(res.body.projection?.fail_id).toBe("RELATIVISTIC_MAP_WARP_ROUTE_TIME_DEFERRED");
-    expect(res.body.projection?.metadata).toEqual(
-      expect.objectContaining({
-        routeTimeContractVersion: "warp_route_time_worldline/v1",
-        routeModelId: "nhm2_bounded_local_probe_lambda",
-        routeTimeStatus: "bounded_local_segment_certified",
-        missionTimeEstimatorSummary: expect.objectContaining({
-          contractVersion: "warp_mission_time_estimator/v1",
-          targetId: "alpha-cen-a",
-        }),
-        missionTimeComparisonSummary: expect.objectContaining({
-          contractVersion: "warp_mission_time_comparison/v1",
-          targetId: "alpha-cen-a",
-          comparisonModelId: "nhm2_classical_no_time_dilation_reference",
-        }),
-      }),
-    );
+    expect(res.body.projection?.fail_id).toBe("NHM2_TARGET_NOT_IN_EXPLICIT_CONTRACT");
+    expect(res.body.projection?.canonicalFrame?.id).toBe("ICRS");
+    expect(res.body.projection?.renderFrame?.id).toBe("sol_centered_accordion_render");
   });
 });

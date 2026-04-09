@@ -148,6 +148,16 @@ describe("nhm2 source closure artifact", () => {
 });
 
 describe("nhm2 source closure artifact v2", () => {
+  const makeAccounting = (sampleCount: number, note: string) => ({
+    sampleCount,
+    maskVoxelCount: sampleCount,
+    weightSum: sampleCount,
+    aggregationMode: "mean" as const,
+    normalizationBasis: "sample_count",
+    regionMaskNote: "mask",
+    supportInclusionNote: note,
+  });
+
   it("passes when global and required regional comparisons are same-basis and within tolerance", () => {
     const artifact = buildNhm2SourceClosureArtifactV2({
       metricTensorRef: "warp.metricStressEnergy",
@@ -174,6 +184,8 @@ describe("nhm2 source closure artifact v2", () => {
           metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
           tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
           sampleCount: 16,
+          metricAccounting: makeAccounting(16, "metric"),
+          tileAccounting: makeAccounting(16, "tile"),
         },
         {
           regionId: "wall",
@@ -183,6 +195,8 @@ describe("nhm2 source closure artifact v2", () => {
           metricRequiredTensor: { T00: -40, T11: 40, T22: 40, T33: 40 },
           tileEffectiveTensor: { T00: -40.5, T11: 40.5, T22: 40.5, T33: 40.5 },
           sampleCount: 8,
+          metricAccounting: makeAccounting(8, "metric"),
+          tileAccounting: makeAccounting(8, "tile"),
         },
       ],
       toleranceRelLInf: 0.1,
@@ -199,6 +213,14 @@ describe("nhm2 source closure artifact v2", () => {
       "pass",
       "pass",
     ]);
+    for (const region of artifact.regionComparisons.regions) {
+      expect(region.dominantResidualComponent).toBe("T00");
+      expect(region.dominantResidualRel).toBe(
+        region.residualComponents.T00.relResidual,
+      );
+      expect(region.metricAccounting?.aggregationMode).toBe("mean");
+      expect(region.tileAccounting?.aggregationMode).toBe("mean");
+    }
   });
 
   it("fails when a same-basis required region exceeds tolerance", () => {
@@ -227,6 +249,8 @@ describe("nhm2 source closure artifact v2", () => {
           metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
           tileEffectiveTensor: { T00: -10, T11: 10, T22: 10, T33: 10 },
           sampleCount: 8,
+          metricAccounting: makeAccounting(8, "metric"),
+          tileAccounting: makeAccounting(8, "tile"),
         },
       ],
       toleranceRelLInf: 0.1,
@@ -240,6 +264,10 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.regionComparisons.regions[0]?.status).toBe("fail");
     expect((artifact.regionComparisons.regions[0]?.residualNorms.relLInf ?? 0) > 0.1).toBe(
       true,
+    );
+    expect(artifact.regionComparisons.regions[0]?.dominantResidualComponent).toBe("T00");
+    expect(artifact.regionComparisons.regions[0]?.dominantResidualRel).toBe(
+      artifact.regionComparisons.regions[0]?.residualComponents.T00.relResidual,
     );
   });
 
@@ -269,6 +297,8 @@ describe("nhm2 source closure artifact v2", () => {
           metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
           tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
           sampleCount: 16,
+          metricAccounting: makeAccounting(16, "metric"),
+          tileAccounting: makeAccounting(16, "tile"),
           note: "global metric substitution remains diagnostic only",
         },
       ],
@@ -311,6 +341,8 @@ describe("nhm2 source closure artifact v2", () => {
           metricRequiredTensor: null,
           tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
           sampleCount: 16,
+          metricAccounting: makeAccounting(16, "metric"),
+          tileAccounting: makeAccounting(16, "tile"),
         },
       ],
       toleranceRelLInf: 0.1,

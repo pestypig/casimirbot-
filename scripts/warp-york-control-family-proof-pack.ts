@@ -89,14 +89,18 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
 import {
+  NHM2_SOURCE_CLOSURE_COMPONENTS,
   isNhm2SourceClosureArtifact,
   type Nhm2SourceClosureArtifact,
+  type Nhm2SourceClosureComponent,
+  type Nhm2SourceClosureResidualComponent,
   type Nhm2SourceClosureTensor,
 } from "../shared/contracts/nhm2-source-closure.v1";
 import {
   buildNhm2SourceClosureArtifactV2,
   isNhm2SourceClosureV2Artifact,
   type Nhm2SourceClosureV2Artifact,
+  type Nhm2SourceClosureV2RegionComparison,
   type Nhm2SourceClosureV2RegionComparisonInput,
 } from "../shared/contracts/nhm2-source-closure.v2";
 import {
@@ -27593,30 +27597,186 @@ const renderNhm2SourceClosureMarkdown = (
 ): string => {
   const reasonCodes =
     payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
-  const componentRows = payload.comparedComponents
-    .map((component) => {
-      const residual = payload.residualComponents[component];
-      return `| ${component} | ${residual.metricRequired ?? "null"} | ${residual.tileEffective ?? "null"} | ${residual.absResidual ?? "null"} | ${residual.relResidual ?? "null"} |`;
-    })
-    .join("\n");
+  const renderComponentRows = (
+    residualComponents: Record<
+      Nhm2SourceClosureComponent,
+      Nhm2SourceClosureResidualComponent
+    >,
+  ) =>
+    payload.comparedComponents
+      .map((component) => {
+        const residual = residualComponents[component];
+        return `| ${component} | ${residual.metricRequired ?? "null"} | ${residual.tileEffective ?? "null"} | ${residual.absResidual ?? "null"} | ${residual.relResidual ?? "null"} |`;
+      })
+      .join("\n");
+  const componentRows = renderComponentRows(payload.residualComponents);
   const isV2 = payload.schemaVersion === "nhm2_source_closure/v2";
   const scalarCl3RhoDeltaRel = isV2
     ? payload.scalarProjections.cl3RhoDeltaRel
     : payload.scalarProjections.cl3RhoDeltaRel;
+  const resolveDominantResidual = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ): {
+    component: Nhm2SourceClosureComponent | null;
+    absResidual: number | null;
+    relResidual: number | null;
+  } => {
+    const component = region.dominantResidualComponent ?? null;
+    if (component != null) {
+      return {
+        component,
+        absResidual: region.dominantResidualAbs ?? region.residualComponents[component].absResidual,
+        relResidual: region.dominantResidualRel ?? region.residualComponents[component].relResidual,
+      };
+    }
+    let bestComponent: Nhm2SourceClosureComponent | null = null;
+    let bestAbs: number | null = null;
+    let bestRel: number | null = null;
+    for (const candidate of payload.comparedComponents) {
+      const residual = region.residualComponents[candidate];
+      const candidateAbs =
+        typeof residual.absResidual === "number" ? residual.absResidual : null;
+      const candidateRel =
+        typeof residual.relResidual === "number" ? residual.relResidual : null;
+      if (candidateAbs == null && candidateRel == null) continue;
+      if (bestComponent == null) {
+        bestComponent = candidate;
+        bestAbs = candidateAbs;
+        bestRel = candidateRel;
+        continue;
+      }
+      if (candidateRel != null) {
+        if (bestRel == null || candidateRel > bestRel) {
+          bestComponent = candidate;
+          bestAbs = candidateAbs;
+          bestRel = candidateRel;
+        }
+        continue;
+      }
+      if (bestRel == null && candidateAbs != null) {
+        if (bestAbs == null || candidateAbs > bestAbs) {
+          bestComponent = candidate;
+          bestAbs = candidateAbs;
+          bestRel = candidateRel;
+        }
+      }
+    }
+    return {
+      component: bestComponent,
+      absResidual: bestAbs,
+      relResidual: bestRel,
+    };
+  };
+  const summarizeAccounting = (region: Nhm2SourceClosureV2RegionComparison) => {
+    const metric = region.metricAccounting ?? null;
+    const tile = region.tileAccounting ?? null;
+    const mismatches: string[] = [];
+    const approxEqual = (lhs: number | null, rhs: number | null, eps = 1e-12) =>
+      lhs == null && rhs == null
+        ? true
+        : lhs != null && rhs != null
+          ? Math.abs(lhs - rhs) <= eps
+          : false;
+
+    if (!metric || !tile) {
+      mismatches.push("accounting_missing");
+    } else {
+      if (!approxEqual(metric.sampleCount, tile.sampleCount)) {
+        mismatches.push("sampleCount");
+      }
+      if (!approxEqual(metric.maskVoxelCount, tile.maskVoxelCount)) {
+        mismatches.push("maskVoxelCount");
+      }
+      if (!approxEqual(metric.weightSum, tile.weightSum)) {
+        mismatches.push("weightSum");
+      }
+      if (metric.aggregationMode !== tile.aggregationMode) {
+        mismatches.push("aggregationMode");
+      }
+      if (metric.normalizationBasis !== tile.normalizationBasis) {
+        mismatches.push("normalizationBasis");
+      }
+      if (metric.regionMaskNote !== tile.regionMaskNote) {
+        mismatches.push("regionMaskNote");
+      }
+    }
+
+    return {
+      status: mismatches.length === 0 ? "accounting_clean" : "accounting_suspect",
+      mismatchNote: mismatches.length > 0 ? mismatches.join(", ") : "none",
+      metric,
+      tile,
+    };
+  };
+  const renderAccountingRows = (
+    accounting: ReturnType<typeof summarizeAccounting>,
+  ) => {
+    const metric = accounting.metric;
+    const tile = accounting.tile;
+    const rows: Array<[string, unknown, unknown]> = [
+      ["sampleCount", metric?.sampleCount ?? null, tile?.sampleCount ?? null],
+      ["maskVoxelCount", metric?.maskVoxelCount ?? null, tile?.maskVoxelCount ?? null],
+      ["weightSum", metric?.weightSum ?? null, tile?.weightSum ?? null],
+      ["aggregationMode", metric?.aggregationMode ?? null, tile?.aggregationMode ?? null],
+      ["normalizationBasis", metric?.normalizationBasis ?? null, tile?.normalizationBasis ?? null],
+      ["regionMaskNote", metric?.regionMaskNote ?? null, tile?.regionMaskNote ?? null],
+      ["supportInclusionNote", metric?.supportInclusionNote ?? null, tile?.supportInclusionNote ?? null],
+    ];
+    return rows
+      .map(
+        ([field, metricValue, tileValue]) =>
+          `| ${field} | ${metricValue ?? "null"} | ${tileValue ?? "null"} |`,
+      )
+      .join("\n");
+  };
   const regionSummaryRows = isV2
     ? payload.regionComparisons.regions
         .map((region) => {
-          const metricTensor = region.metricRequiredTensor;
-          const tileTensor = region.tileEffectiveTensor;
-          return `| ${region.regionId} | ${region.comparisonBasisStatus} | ${region.status} | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | ${metricTensor.T00 ?? "null"} | ${tileTensor.T00 ?? "null"} | ${region.metricTensorRef ?? "null"} | ${region.tileTensorRef ?? "null"} | ${region.note ?? "null"} |`;
+          const dominant = resolveDominantResidual(region);
+          const accounting = summarizeAccounting(region);
+          return `| ${region.regionId} | ${region.comparisonBasisStatus} | ${region.status} | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | ${dominant.component ?? "null"} | ${dominant.relResidual ?? "null"} | ${accounting.status} | ${region.note ?? "null"} |`;
         })
         .join("\n")
     : payload.sampledSummaries.regions
         .map((region) => {
-          const tensor = region.tileTensor;
-          return `| ${region.regionId} | diagnostic_only | review | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | null | ${tensor.T00 ?? "null"} | null | null | ${region.note ?? "null"} |`;
+          return `| ${region.regionId} | diagnostic_only | review | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | null | null | accounting_unavailable | ${region.note ?? "null"} |`;
         })
         .join("\n");
+  const regionDetailBlocks = isV2
+    ? payload.regionComparisons.regions
+        .map((region) => {
+          const metricTensor = region.metricRequiredTensor;
+          const tileTensor = region.tileEffectiveTensor;
+          const dominant = resolveDominantResidual(region);
+          const accounting = summarizeAccounting(region);
+          const detailRows = renderComponentRows(region.residualComponents);
+          return `### Region: ${region.regionId}
+| field | value |
+|---|---|
+| comparisonBasisStatus | ${region.comparisonBasisStatus} |
+| status | ${region.status} |
+| residualNorms.relLInf | ${region.residualNorms.relLInf ?? "null"} |
+| metricDiagonal | T00=${metricTensor.T00 ?? "null"}, T11=${metricTensor.T11 ?? "null"}, T22=${metricTensor.T22 ?? "null"}, T33=${metricTensor.T33 ?? "null"} |
+| tileDiagonal | T00=${tileTensor.T00 ?? "null"}, T11=${tileTensor.T11 ?? "null"}, T22=${tileTensor.T22 ?? "null"}, T33=${tileTensor.T33 ?? "null"} |
+| dominantResidualComponent | ${dominant.component ?? "null"} |
+| dominantResidualRel | ${dominant.relResidual ?? "null"} |
+| dominantResidualAbs | ${dominant.absResidual ?? "null"} |
+| metricTensorRef | ${region.metricTensorRef ?? "null"} |
+| tileTensorRef | ${region.tileTensorRef ?? "null"} |
+| accountingStatus | ${accounting.status} |
+| accountingMismatches | ${accounting.mismatchNote} |
+| note | ${region.note ?? "null"} |
+
+| component | metricRequired | tileEffective | absResidual | relResidual |
+|---|---|---|---|---|
+${detailRows}
+
+| accounting field | metric | tile |
+|---|---|---|
+${renderAccountingRows(accounting)}`;
+        })
+        .join("\n\n")
+    : "";
   return `# NHM2 Source Closure (${DATE_STAMP})
 
 "This checklist records tensor-first NHM2 source-closure evidence for the currently selected nhm2_shift_lapse profile only. It does not widen route ETA, transport, gravity, or viability claims."
@@ -27647,10 +27807,13 @@ const renderNhm2SourceClosureMarkdown = (
 |---|---|---|---|---|
 ${componentRows}
 
-## Regional Comparisons
-| regionId | basis | status | sampleCount | relLInf | metricT00 | tileT00 | metricTensorRef | tileTensorRef | note |
-|---|---|---|---|---|---|---|---|---|---|
+## Regional Comparisons (Summary)
+| regionId | basis | status | sampleCount | relLInf | dominantComponent | dominantRel | accounting | note |
+|---|---|---|---|---|---|---|---|---|
 ${regionSummaryRows}
+
+${isV2 ? `## Regional Component Details
+${regionDetailBlocks}` : ""}
 `;
 };
 
@@ -27689,33 +27852,180 @@ export const publishNhm2SourceClosureResearchSurface = (args: {
   });
 };
 
-const resolveSelectedShiftLapseSourceClosureBrickBasis = (
-  refreshedState: Record<string, unknown>,
-): {
-  dims: [number, number, number];
-  bounds: { min: [number, number, number]; max: [number, number, number] };
-  hullAxes: [number, number, number];
-  hullWall: number;
-  radialMap: null;
-} => {
-  const hull = asRecord(refreshedState.hull);
-  const Lx = Math.max(1e-6, toFiniteNumber(hull?.Lx_m) ?? 1007);
-  const Ly = Math.max(1e-6, toFiniteNumber(hull?.Ly_m) ?? 264);
-  const Lz = Math.max(1e-6, toFiniteNumber(hull?.Lz_m) ?? 173);
-  const wallThickness = Math.max(
-    0.1,
-    toFiniteNumber(hull?.wallThickness_m) ?? 0.45,
-  );
-  return {
-    dims: [128, 128, 128],
-    bounds: {
-      min: [-Lx / 2, -Ly / 2, -Lz / 2],
-      max: [Lx / 2, Ly / 2, Lz / 2],
-    },
-    hullAxes: [Lx / 2, Ly / 2, Lz / 2],
-    hullWall: wallThickness,
-    radialMap: null,
+const assertNhm2SourceClosureAuthorityParity = (args: {
+  runtimeArtifact: Nhm2SourceClosureV2Artifact;
+  publishedArtifact: Nhm2SourceClosureV2Artifact;
+}) => {
+  const { runtimeArtifact, publishedArtifact } = args;
+  const approxEqual = (lhs: number | null, rhs: number | null, eps = 1e-12) =>
+    lhs == null && rhs == null
+      ? true
+      : lhs != null && rhs != null
+        ? Math.abs(lhs - rhs) <= eps
+        : false;
+  const mismatch = (field: string) => {
+    throw new Error(`nhm2_source_closure_authority_parity_mismatch:${field}`);
   };
+  const assertAccountingParity = (
+    fieldPrefix: string,
+    published: {
+      sampleCount: number | null;
+      maskVoxelCount: number | null;
+      weightSum: number | null;
+      aggregationMode: string;
+      normalizationBasis: string | null;
+      regionMaskNote: string | null;
+      supportInclusionNote: string | null;
+    } | null,
+    runtime: {
+      sampleCount: number | null;
+      maskVoxelCount: number | null;
+      weightSum: number | null;
+      aggregationMode: string;
+      normalizationBasis: string | null;
+      regionMaskNote: string | null;
+      supportInclusionNote: string | null;
+    } | null,
+  ) => {
+    if ((published == null) !== (runtime == null)) {
+      mismatch(`${fieldPrefix}:presence`);
+    }
+    if (!published || !runtime) return;
+    if (!approxEqual(published.sampleCount, runtime.sampleCount)) {
+      mismatch(`${fieldPrefix}:sampleCount`);
+    }
+    if (!approxEqual(published.maskVoxelCount, runtime.maskVoxelCount)) {
+      mismatch(`${fieldPrefix}:maskVoxelCount`);
+    }
+    if (!approxEqual(published.weightSum, runtime.weightSum)) {
+      mismatch(`${fieldPrefix}:weightSum`);
+    }
+    if (published.aggregationMode !== runtime.aggregationMode) {
+      mismatch(`${fieldPrefix}:aggregationMode`);
+    }
+    if (published.normalizationBasis !== runtime.normalizationBasis) {
+      mismatch(`${fieldPrefix}:normalizationBasis`);
+    }
+    if (published.regionMaskNote !== runtime.regionMaskNote) {
+      mismatch(`${fieldPrefix}:regionMaskNote`);
+    }
+    if (published.supportInclusionNote !== runtime.supportInclusionNote) {
+      mismatch(`${fieldPrefix}:supportInclusionNote`);
+    }
+  };
+
+  if (publishedArtifact.schemaVersion !== runtimeArtifact.schemaVersion) {
+    mismatch("schemaVersion");
+  }
+  if (publishedArtifact.status !== runtimeArtifact.status) {
+    mismatch("status");
+  }
+  if (publishedArtifact.completeness !== runtimeArtifact.completeness) {
+    mismatch("completeness");
+  }
+  if (
+    JSON.stringify(publishedArtifact.reasonCodes) !==
+    JSON.stringify(runtimeArtifact.reasonCodes)
+  ) {
+    mismatch("reasonCodes");
+  }
+  if (
+    !approxEqual(
+      publishedArtifact.residualNorms.relL2,
+      runtimeArtifact.residualNorms.relL2,
+    )
+  ) {
+    mismatch("residualNorms.relL2");
+  }
+  if (
+    !approxEqual(
+      publishedArtifact.residualNorms.relLInf,
+      runtimeArtifact.residualNorms.relLInf,
+    )
+  ) {
+    mismatch("residualNorms.relLInf");
+  }
+  if (publishedArtifact.assumptionsDrifted !== runtimeArtifact.assumptionsDrifted) {
+    mismatch("assumptionsDrifted");
+  }
+  if (
+    JSON.stringify(publishedArtifact.regionComparisons.requiredRegionIds) !==
+    JSON.stringify(runtimeArtifact.regionComparisons.requiredRegionIds)
+  ) {
+    mismatch("regionComparisons.requiredRegionIds");
+  }
+
+  const runtimeRegionMap = new Map(
+    runtimeArtifact.regionComparisons.regions.map((region) => [region.regionId, region] as const),
+  );
+  for (const publishedRegion of publishedArtifact.regionComparisons.regions) {
+    const runtimeRegion = runtimeRegionMap.get(publishedRegion.regionId);
+    if (runtimeRegion == null) {
+      mismatch(`region:${publishedRegion.regionId}:missing`);
+    }
+    if (publishedRegion.comparisonBasisStatus !== runtimeRegion.comparisonBasisStatus) {
+      mismatch(`region:${publishedRegion.regionId}:comparisonBasisStatus`);
+    }
+    if (publishedRegion.status !== runtimeRegion.status) {
+      mismatch(`region:${publishedRegion.regionId}:status`);
+    }
+    if (
+      !approxEqual(
+        publishedRegion.residualNorms.relLInf,
+        runtimeRegion.residualNorms.relLInf,
+      )
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:relLInf`);
+    }
+    assertAccountingParity(
+      `region:${publishedRegion.regionId}:metricAccounting`,
+      publishedRegion.metricAccounting ?? null,
+      runtimeRegion.metricAccounting ?? null,
+    );
+    assertAccountingParity(
+      `region:${publishedRegion.regionId}:tileAccounting`,
+      publishedRegion.tileAccounting ?? null,
+      runtimeRegion.tileAccounting ?? null,
+    );
+    for (const component of NHM2_SOURCE_CLOSURE_COMPONENTS) {
+      const publishedResidual = publishedRegion.residualComponents?.[component];
+      const runtimeResidual = runtimeRegion.residualComponents?.[component];
+      if (!publishedResidual || !runtimeResidual) {
+        mismatch(`region:${publishedRegion.regionId}:residualComponents:${component}`);
+      }
+      if (!approxEqual(publishedResidual.metricRequired, runtimeResidual.metricRequired)) {
+        mismatch(`region:${publishedRegion.regionId}:residualComponents:${component}:metricRequired`);
+      }
+      if (!approxEqual(publishedResidual.tileEffective, runtimeResidual.tileEffective)) {
+        mismatch(`region:${publishedRegion.regionId}:residualComponents:${component}:tileEffective`);
+      }
+      if (!approxEqual(publishedResidual.absResidual, runtimeResidual.absResidual)) {
+        mismatch(`region:${publishedRegion.regionId}:residualComponents:${component}:absResidual`);
+      }
+      if (!approxEqual(publishedResidual.relResidual, runtimeResidual.relResidual)) {
+        mismatch(`region:${publishedRegion.regionId}:residualComponents:${component}:relResidual`);
+      }
+    }
+    if (publishedRegion.dominantResidualComponent !== runtimeRegion.dominantResidualComponent) {
+      mismatch(`region:${publishedRegion.regionId}:dominantResidualComponent`);
+    }
+    if (
+      !approxEqual(
+        publishedRegion.dominantResidualAbs,
+        runtimeRegion.dominantResidualAbs,
+      )
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:dominantResidualAbs`);
+    }
+    if (
+      !approxEqual(
+        publishedRegion.dominantResidualRel,
+        runtimeRegion.dominantResidualRel,
+      )
+    ) {
+      mismatch(`region:${publishedRegion.regionId}:dominantResidualRel`);
+    }
+  }
 };
 
 const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
@@ -27831,23 +28141,25 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
   const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any, {
     preserveLiveWarpFunctions: true,
   });
-  const nhm2SourceClosure = asRecord(refreshedState.nhm2SourceClosure);
-  const sourceClosureTensors = asRecord(nhm2SourceClosure?.tensors);
+  const runtimeSourceClosure = isNhm2SourceClosureV2Artifact(
+    refreshedState.nhm2SourceClosure,
+  )
+    ? refreshedState.nhm2SourceClosure
+    : null;
+  if (runtimeSourceClosure == null) {
+    throw new Error("selected_shift_lapse_runtime_source_closure_v2_missing");
+  }
   const metricTensor = normalizeSourceClosureTensor(
-    sourceClosureTensors?.metricRequired ??
-      asRecord(refreshedState.warp)?.metricStressEnergy ??
-      null,
+    runtimeSourceClosure.tensors.metricRequired,
   );
   const globalTileTensor = normalizeSourceClosureTensor(
-    sourceClosureTensors?.tileEffective ??
-      asRecord(refreshedState.warp)?.tileEffectiveStressEnergy ??
-      null,
+    runtimeSourceClosure.tensors.tileEffective,
   );
   const toleranceRelLInf = toFiniteNumber(
-    asRecord(nhm2SourceClosure?.residualNorms)?.toleranceRelLInf,
+    runtimeSourceClosure.residualNorms.toleranceRelLInf,
   );
   const scalarCl3RhoDeltaRel = toFiniteNumber(
-    asRecord(nhm2SourceClosure?.scalarProjections)?.cl3RhoDeltaRel,
+    runtimeSourceClosure.scalarProjections.cl3RhoDeltaRel,
   );
   const shiftGate =
     resolvePublishedShiftLapseGate(worldlineArtifact) ??
@@ -27855,123 +28167,15 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
   const selectedProfileStage =
     transportResultArtifact.selectedFamily.shiftLapseProfileStage ??
     asText(shiftGate?.shiftLapseProfileStage);
-
-  const brickBasis =
-    resolveSelectedShiftLapseSourceClosureBrickBasis(refreshedState as Record<string, unknown>);
-  const stressEnergyBrickModule = await import("../server/stress-energy-brick.ts");
-  const stressBrick = stressEnergyBrickModule.buildStressEnergyBrick({
-    metricT00Ref: transportResultArtifact.selectedFamily.metricT00Ref ?? undefined,
-    metricT00Source:
-      transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
-    warpFieldType: "nhm2_shift_lapse",
-    dims: brickBasis.dims,
-    bounds: brickBasis.bounds,
-    hullAxes: brickBasis.hullAxes,
-    hullWall: brickBasis.hullWall,
-    radialMap: brickBasis.radialMap,
-  });
-  const stressRegionMap = new Map<
-    RequiredSourceClosureRegionId,
-    {
-      sampleCount?: unknown;
-      tensor?: unknown;
-      note?: unknown;
-    }
-  >();
-  for (const region of stressBrick.stats.tensorSampledSummaries?.regions ?? []) {
-    if (
-      typeof region.regionId === "string" &&
-      REQUIRED_SOURCE_CLOSURE_REGION_IDS.includes(
-        region.regionId as RequiredSourceClosureRegionId,
-      )
-    ) {
-      stressRegionMap.set(region.regionId as RequiredSourceClosureRegionId, {
-        sampleCount: region.sampleCount,
-        tensor: region.tensor,
-        note: region.note,
-      });
-    }
-  }
-
-  const shiftVectorField = asRecord(asRecord(refreshedState.warp)?.shiftVectorField);
-  const evaluateShiftVector =
-    typeof shiftVectorField?.evaluateShiftVector === "function"
-      ? (shiftVectorField.evaluateShiftVector as (
-          x: number,
-          y: number,
-          z: number,
-        ) => [number, number, number])
-      : null;
-
-  const regionVoxelIds = new Array<RequiredSourceClosureRegionId | null>(
-    brickBasis.dims[0] * brickBasis.dims[1] * brickBasis.dims[2],
-  ).fill(null);
-  const voxelIndex = (x: number, y: number, z: number) =>
-    x + brickBasis.dims[0] * (y + brickBasis.dims[1] * z);
-  stressEnergyBrickModule.forEachStressEnergyBrickRegionVoxel(
-    {
-      dims: brickBasis.dims,
-      bounds: brickBasis.bounds,
-      hullAxes: brickBasis.hullAxes,
-      hullWall: brickBasis.hullWall,
-      radialMap: brickBasis.radialMap,
-    },
-    (sample: {
-      voxelIndex: [number, number, number];
-      classifiedRegionId: string | null;
-    }) => {
-      const [x, y, z] = sample.voxelIndex;
-      const regionId =
-        typeof sample.classifiedRegionId === "string" &&
+  const runtimeRegionMap = new Map(
+    runtimeSourceClosure.regionComparisons.regions
+      .filter((region) =>
         REQUIRED_SOURCE_CLOSURE_REGION_IDS.includes(
-          sample.classifiedRegionId as RequiredSourceClosureRegionId,
-        )
-          ? (sample.classifiedRegionId as RequiredSourceClosureRegionId)
-          : null;
-      regionVoxelIds[voxelIndex(x, y, z)] = regionId;
-    },
-  );
-
-  const natarioWarpModule = await import("../modules/warp/natario-warp.ts");
-  const metricRegionMeans =
-    evaluateShiftVector != null
-      ? natarioWarpModule.calculateMetricStressEnergyTensorRegionMeansFromShiftField(
-          evaluateShiftVector,
-          {
-            dims: brickBasis.dims,
-            bounds: brickBasis.bounds,
-            classifyRegion: ({ voxelIndex: [x, y, z] }) =>
-              regionVoxelIds[voxelIndex(x, y, z)],
-          },
-        )
-      : null;
-  const metricRegionMap = new Map<
-    RequiredSourceClosureRegionId,
-    {
-      sampleCount: number;
-      diagonalTensor:
-        | {
-            T00: number;
-            T11: number;
-            T22: number;
-            T33: number;
-            isNullEnergyConditionSatisfied: boolean;
-          }
-        | null;
-    }
-  >();
-  for (const region of metricRegionMeans?.regions ?? []) {
-    if (
-      REQUIRED_SOURCE_CLOSURE_REGION_IDS.includes(
-        region.regionId as RequiredSourceClosureRegionId,
+          region.regionId as RequiredSourceClosureRegionId,
+        ),
       )
-    ) {
-      metricRegionMap.set(region.regionId as RequiredSourceClosureRegionId, {
-        sampleCount: region.sampleCount,
-        diagonalTensor: region.diagonalTensor,
-      });
-    }
-  }
+      .map((region) => [region.regionId as RequiredSourceClosureRegionId, region] as const),
+  );
 
   const tensorSnapshotPaths =
     buildSelectedShiftLapseSourceClosureTensorSnapshotPaths(
@@ -28033,27 +28237,23 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
 
   for (const regionId of REQUIRED_SOURCE_CLOSURE_REGION_IDS) {
     const regionPaths = tensorSnapshotPaths.regions[regionId];
-    const metricRegionEntry = metricRegionMap.get(regionId);
-    const tileRegionEntry = stressRegionMap.get(regionId);
+    const runtimeRegion = runtimeRegionMap.get(regionId);
     const metricRegionTensor = normalizeSourceClosureTensor(
-      metricRegionEntry?.diagonalTensor ?? null,
+      runtimeRegion?.metricRequiredTensor ?? null,
     );
-    const tileRegionTensor = normalizeSourceClosureTensor(tileRegionEntry?.tensor ?? null);
+    const tileRegionTensor = normalizeSourceClosureTensor(
+      runtimeRegion?.tileEffectiveTensor ?? null,
+    );
     const metricRegionNoteParts: string[] = [
-      `Selected-profile integral metric-required diagonal tensor over the shared ${regionId} stress-energy brick mask.`,
+      `Selected-profile runtime-emitted metric-required diagonal tensor over the shared ${regionId} stress-energy brick mask.`,
     ];
-    if (metricRegionEntry?.sampleCount != null) {
-      metricRegionNoteParts.push(`sample_count=${metricRegionEntry.sampleCount}`);
-    }
-    if (evaluateShiftVector == null) {
-      metricRegionNoteParts.push(
-        "Publisher could not recover a live shiftVectorField.evaluateShiftVector from the refreshed pipeline state for this publication pass.",
-      );
+    if (runtimeRegion?.sampleCount != null) {
+      metricRegionNoteParts.push(`sample_count=${runtimeRegion.sampleCount}`);
     }
     const tileRegionNoteParts: string[] = [
-      `Selected-profile integral tile-effective diagonal tensor over the shared ${regionId} stress-energy brick mask.`,
+      `Selected-profile runtime-emitted tile-effective diagonal tensor over the shared ${regionId} stress-energy brick mask.`,
     ];
-    const tileExistingNote = asText(tileRegionEntry?.note);
+    const tileExistingNote = asText(runtimeRegion?.note);
     if (tileExistingNote) {
       tileRegionNoteParts.push(tileExistingNote);
     }
@@ -28064,10 +28264,12 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
         shiftLapseProfileId: selectedProfileId,
         shiftLapseProfileStage: selectedProfileStage,
         regionId,
-        tensorSemanticRef: `${
-          transportResultArtifact.selectedFamily.metricT00Ref ??
-          "warp.metric.T00.nhm2.shift_lapse"
-        }.region.${regionId}`,
+        tensorSemanticRef:
+          runtimeRegion?.metricTensorRef ??
+          `${
+            transportResultArtifact.selectedFamily.metricT00Ref ??
+            "warp.metric.T00.nhm2.shift_lapse"
+          }.region.${regionId}`,
         sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
         diagonalTensor: metricRegionTensor,
         note: metricRegionNoteParts.join(" "),
@@ -28079,7 +28281,9 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
         shiftLapseProfileId: selectedProfileId,
         shiftLapseProfileStage: selectedProfileStage,
         regionId,
-        tensorSemanticRef: `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`,
+        tensorSemanticRef:
+          runtimeRegion?.tileTensorRef ??
+          `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`,
         sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
         diagonalTensor: tileRegionTensor,
         note: tileRegionNoteParts.join(" "),
@@ -28097,54 +28301,23 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
     regionMetricTensorSnapshots[regionId] = metricRegionSnapshot;
     regionTileTensorSnapshots[regionId] = tileRegionSnapshot;
 
-    const metricTensorAvailable = ["T00", "T11", "T22", "T33"].every((component) => {
-      const key = component as keyof Nhm2SourceClosureTensor;
-      return metricRegionTensor[key] != null;
-    });
-    const tileTensorAvailable = ["T00", "T11", "T22", "T33"].every((component) => {
-      const key = component as keyof Nhm2SourceClosureTensor;
-      return tileRegionTensor[key] != null;
-    });
-    const sampleCount =
-      toFiniteNumber(metricRegionEntry?.sampleCount) ??
-      toFiniteNumber(tileRegionEntry?.sampleCount) ??
-      null;
+    const sampleCount = toFiniteNumber(runtimeRegion?.sampleCount) ?? null;
+    const metricAccounting = runtimeRegion?.metricAccounting ?? null;
+    const tileAccounting = runtimeRegion?.tileAccounting ?? null;
     const noteParts: string[] = [];
     if (tileExistingNote) {
       noteParts.push(tileExistingNote);
     }
-    if (metricTensorAvailable && tileTensorAvailable) {
-      noteParts.push(
-        "Same-basis regional closure compares selected-profile integral metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask.",
-      );
-      if (
-        toFiniteNumber(metricRegionEntry?.sampleCount) != null &&
-        toFiniteNumber(tileRegionEntry?.sampleCount) != null &&
-        toFiniteNumber(metricRegionEntry?.sampleCount) !==
-          toFiniteNumber(tileRegionEntry?.sampleCount)
-      ) {
-        noteParts.push(
-          `Metric sample count ${toFiniteNumber(metricRegionEntry?.sampleCount)} differs from tile sample count ${toFiniteNumber(tileRegionEntry?.sampleCount)}.`,
-        );
-      }
-    } else if (tileTensorAvailable) {
-      noteParts.push(
-        "Regional source closure is unavailable because the selected-profile metric-required tensor could not be integrated over this region on the shared brick basis during publication.",
-      );
-    } else {
-      noteParts.push(
-        "Regional source closure is unavailable because same-basis regional metric and tile tensors were not both available during publication.",
-      );
-    }
     regionComparisons.push({
       regionId,
-      comparisonBasisStatus:
-        metricTensorAvailable && tileTensorAvailable ? "same_basis" : "unavailable",
+      comparisonBasisStatus: runtimeRegion?.comparisonBasisStatus ?? "unavailable",
       metricTensorRef: normalizePath(metricRegionSnapshot.latestJsonPath),
       tileTensorRef: normalizePath(tileRegionSnapshot.latestJsonPath),
       metricRequiredTensor: metricRegionTensor,
       tileEffectiveTensor: tileRegionTensor,
       sampleCount,
+      metricAccounting,
+      tileAccounting,
       note: noteParts.join(" "),
     });
   }
@@ -28154,10 +28327,14 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
     tileEffectiveTensorRef: normalizePath(tileTensorSnapshot.latestJsonPath),
     metricRequiredTensor: metricTensor,
     tileEffectiveTensor: globalTileTensor,
-    requiredRegionIds: [...REQUIRED_SOURCE_CLOSURE_REGION_IDS],
+    requiredRegionIds: [...runtimeSourceClosure.regionComparisons.requiredRegionIds],
     regionComparisons,
     toleranceRelLInf,
     scalarCl3RhoDeltaRel,
+  });
+  assertNhm2SourceClosureAuthorityParity({
+    runtimeArtifact: runtimeSourceClosure,
+    publishedArtifact: artifact,
   });
 
   return {

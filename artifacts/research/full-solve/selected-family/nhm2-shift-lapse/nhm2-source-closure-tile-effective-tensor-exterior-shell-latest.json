@@ -10,10 +10,10 @@
   "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
   "producer": "scripts/warp-york-control-family-proof-pack.ts",
   "diagonalTensor": {
-    "T00": -16779943.04439419,
-    "T11": 16779943.04439419,
-    "T22": 16779943.04439419,
-    "T33": 16779943.04439419
+    "T00": -5133810475.7006645,
+    "T11": 5133810475.7006645,
+    "T22": 5133810475.7006645,
+    "T33": 5133810475.7006645
   },
-  "note": "Selected-profile integral tile-effective diagonal tensor over the shared exterior_shell stress-energy brick mask. exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy"
+  "note": "Selected-profile runtime-emitted tile-effective diagonal tensor over the shared exterior_shell stress-energy brick mask. exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask."
 }

@@ -36,10 +36,30 @@ export const NHM2_SOURCE_CLOSURE_REGION_BASIS_STATUS_VALUES = [
   "unavailable",
 ] as const;
 
+export const NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES = [
+  "mean",
+  "weighted_mean",
+  "integral",
+  "sum",
+  "unknown",
+] as const;
+
 export type Nhm2SourceClosureV2ReasonCode =
   (typeof NHM2_SOURCE_CLOSURE_V2_REASON_CODES)[number];
 export type Nhm2SourceClosureRegionBasisStatus =
   (typeof NHM2_SOURCE_CLOSURE_REGION_BASIS_STATUS_VALUES)[number];
+export type Nhm2SourceClosureRegionAggregationMode =
+  (typeof NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES)[number];
+
+export type Nhm2SourceClosureV2RegionAccounting = {
+  sampleCount: number | null;
+  maskVoxelCount: number | null;
+  weightSum: number | null;
+  aggregationMode: Nhm2SourceClosureRegionAggregationMode;
+  normalizationBasis: string | null;
+  regionMaskNote: string | null;
+  supportInclusionNote: string | null;
+};
 
 export type Nhm2SourceClosureV2RegionComparisonInput = {
   regionId: string;
@@ -49,6 +69,8 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
   metricRequiredTensor?: Nhm2SourceClosureTensorInput | null;
   tileEffectiveTensor?: Nhm2SourceClosureTensorInput | null;
   sampleCount?: number | null;
+  metricAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
+  tileAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
   note?: string | null;
 };
 
@@ -62,11 +84,16 @@ export type Nhm2SourceClosureV2RegionComparison = {
   metricRequiredTensor: Nhm2SourceClosureTensor;
   tileEffectiveTensor: Nhm2SourceClosureTensor;
   sampleCount: number | null;
+  metricAccounting: Nhm2SourceClosureV2RegionAccounting | null;
+  tileAccounting: Nhm2SourceClosureV2RegionAccounting | null;
   residualComponents: Record<
     Nhm2SourceClosureComponent,
     Nhm2SourceClosureResidualComponent
   >;
   residualNorms: Nhm2SourceClosureResidualNorms;
+  dominantResidualComponent: Nhm2SourceClosureComponent | null;
+  dominantResidualAbs: number | null;
+  dominantResidualRel: number | null;
   note: string | null;
 };
 
@@ -131,6 +158,9 @@ const toRepoPath = (value: unknown): string | null =>
     ? value.trim().replace(/\\/g, "/")
     : null;
 
+const toText = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
 const tensorHasAnyComponent = (tensor: Nhm2SourceClosureTensor): boolean =>
   NHM2_SOURCE_CLOSURE_COMPONENTS.some((component) => tensor[component] != null);
 
@@ -172,6 +202,55 @@ const buildResidualComponents = (
     Nhm2SourceClosureComponent,
     Nhm2SourceClosureResidualComponent
   >;
+};
+
+const resolveDominantResidualComponent = (
+  residualComponents: Record<
+    Nhm2SourceClosureComponent,
+    Nhm2SourceClosureResidualComponent
+  >,
+): {
+  component: Nhm2SourceClosureComponent | null;
+  absResidual: number | null;
+  relResidual: number | null;
+} => {
+  let component: Nhm2SourceClosureComponent | null = null;
+  let absResidual: number | null = null;
+  let relResidual: number | null = null;
+
+  for (const candidate of NHM2_SOURCE_CLOSURE_COMPONENTS) {
+    const entry = residualComponents[candidate];
+    const candidateAbs = toFinite(entry.absResidual);
+    const candidateRel = toFinite(entry.relResidual);
+    if (candidateAbs == null && candidateRel == null) continue;
+    if (component == null) {
+      component = candidate;
+      absResidual = candidateAbs;
+      relResidual = candidateRel;
+      continue;
+    }
+    if (candidateRel != null) {
+      if (relResidual == null || candidateRel > relResidual) {
+        component = candidate;
+        absResidual = candidateAbs;
+        relResidual = candidateRel;
+      }
+      continue;
+    }
+    if (relResidual == null && candidateAbs != null) {
+      if (absResidual == null || candidateAbs > absResidual) {
+        component = candidate;
+        absResidual = candidateAbs;
+        relResidual = candidateRel;
+      }
+    }
+  }
+
+  return {
+    component,
+    absResidual,
+    relResidual,
+  };
 };
 
 const buildResidualNorms = (
@@ -295,6 +374,30 @@ const normalizeRegionBasisStatus = (
     ? value
     : "unavailable";
 
+const normalizeRegionAggregationMode = (
+  value: unknown,
+): Nhm2SourceClosureRegionAggregationMode =>
+  NHM2_SOURCE_CLOSURE_REGION_AGGREGATION_MODE_VALUES.includes(
+    value as Nhm2SourceClosureRegionAggregationMode,
+  )
+    ? (value as Nhm2SourceClosureRegionAggregationMode)
+    : "unknown";
+
+const normalizeRegionAccounting = (
+  value: Nhm2SourceClosureV2RegionAccounting | null | undefined,
+): Nhm2SourceClosureV2RegionAccounting | null => {
+  if (!value) return null;
+  return {
+    sampleCount: toFinite(value.sampleCount),
+    maskVoxelCount: toFinite(value.maskVoxelCount),
+    weightSum: toFinite(value.weightSum),
+    aggregationMode: normalizeRegionAggregationMode(value.aggregationMode),
+    normalizationBasis: toText(value.normalizationBasis),
+    regionMaskNote: toText(value.regionMaskNote),
+    supportInclusionNote: toText(value.supportInclusionNote),
+  };
+};
+
 const buildRegionComparison = (args: {
   input: Nhm2SourceClosureV2RegionComparisonInput;
   toleranceRelLInf: number | null;
@@ -326,6 +429,12 @@ const buildRegionComparison = (args: {
   const comparisonBasisStatus = normalizeRegionBasisStatus(
     args.input.comparisonBasisStatus,
   );
+  const dominantResidual = resolveDominantResidualComponent(residualComponents);
+  const metricAccounting = normalizeRegionAccounting(args.input.metricAccounting);
+  const tileAccounting = normalizeRegionAccounting(args.input.tileAccounting);
+  const sampleCount = toFinite(args.input.sampleCount);
+  const resolvedSampleCount =
+    metricAccounting?.sampleCount ?? tileAccounting?.sampleCount ?? sampleCount;
 
   const reasonCodes = new Set<Nhm2SourceClosureV2ReasonCode>();
   if (metricMissing) reasonCodes.add("region_metric_tensor_missing");
@@ -362,9 +471,14 @@ const buildRegionComparison = (args: {
       tileTensorRef: toRepoPath(args.input.tileTensorRef),
       metricRequiredTensor: metricTensor,
       tileEffectiveTensor: tileTensor,
-      sampleCount: toFinite(args.input.sampleCount),
+      sampleCount: resolvedSampleCount,
+      metricAccounting,
+      tileAccounting,
       residualComponents,
       residualNorms,
+      dominantResidualComponent: dominantResidual.component,
+      dominantResidualAbs: dominantResidual.absResidual,
+      dominantResidualRel: dominantResidual.relResidual,
       note:
         typeof args.input.note === "string" && args.input.note.trim().length > 0
           ? args.input.note.trim()
