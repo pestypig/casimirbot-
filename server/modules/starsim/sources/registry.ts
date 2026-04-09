@@ -27,6 +27,7 @@ import { evaluateCrossmatch, type CrossmatchOutcome } from "./crossmatch";
 import {
   buildResolvedRequestDraft,
   buildSourceSelectionManifest,
+  getPreferredCatalogForField,
   mergeResolvedIdentifiers,
   summarizeSourceCandidates,
 } from "./selection";
@@ -137,13 +138,7 @@ const buildFallbackSummary = (args: {
     const rejectedForField = args.qualityRejections.filter(
       (entry) => entry.field_path === fieldSection || entry.field_path === selection.field_path,
     );
-    const preferredFromCandidates = args.preferredCatalogs.find((catalog) =>
-      selection.candidates.some((candidate) => candidate.selected_from === catalog),
-    );
-    const preferredFromRejected = args.preferredCatalogs.find((catalog) =>
-      rejectedForField.some((entry) => entry.catalog === catalog),
-    );
-    const preferred = preferredFromCandidates ?? preferredFromRejected ?? args.preferredCatalogs[0] ?? null;
+    const preferred = getPreferredCatalogForField(selection.field_path, args.preferredCatalogs);
     if (!preferred || chosen.selected_from === preferred) continue;
     const rejectedPreferred = rejectedForField.some((entry) => entry.catalog === preferred);
     const preferredAvailable = selection.candidates.some((candidate) => candidate.selected_from === preferred);

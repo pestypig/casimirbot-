@@ -72,7 +72,11 @@ describe("star-sim source resolution route", () => {
     expect(resolveResponse.body.benchmark_target_match_mode).toBe("matched_by_identifier");
     expect(resolveResponse.body.crossmatch_summary.accepted).toBeGreaterThan(0);
     expect(resolveResponse.body.crossmatch_summary.rejected).toBe(0);
-    expect(resolveResponse.body.crossmatch_summary.fallback_used).toBe(false);
+    expect(
+      (resolveResponse.body.crossmatch_summary.fallback_fields as Array<{ field_path: string }>).some(
+        (entry) => entry.field_path === "spectroscopy.teff_K",
+      ),
+    ).toBe(false);
     expect(resolveResponse.body.canonical_request_draft.astrometry.parallax_mas).toBe(59.2);
     expect(resolveResponse.body.canonical_request_draft.spectroscopy.teff_K).toBe(5821);
     expect(resolveResponse.body.canonical_request_draft.spectroscopy.field_sources.teff_K).toBe("sdss_astra");
@@ -177,6 +181,65 @@ describe("star-sim source resolution route", () => {
 
     expect(res.body.quality_rejections.length).toBeGreaterThan(0);
     expect(res.body.quality_rejections.some((entry: any) => entry.reason === "rejected_identifier_conflict")).toBe(true);
+  });
+
+  it("marks fallback as used when Astra is absent and LAMOST provides selected spectroscopy", async () => {
+    process.env.STAR_SIM_SDSS_ASTRA_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          name: "Demo Solar A",
+        },
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+        },
+      })
+      .expect(200);
+
+    expect(res.body.source_resolution.selection_manifest.fields["spectroscopy.teff_K"].selected_from).toBe("lamost_dr10");
+    expect(res.body.crossmatch_summary.fallback_used).toBe(true);
+    expect(res.body.crossmatch_summary.fallback_fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field_path: "spectroscopy.teff_K",
+          selected_from: "lamost_dr10",
+          preferred_catalog: "sdss_astra",
+          preferred_status: "absent",
+        }),
+      ]),
+    );
+  });
+
+  it("marks fallback as used when TASOC is absent and TESS provides selected seismic summaries", async () => {
+    process.env.STAR_SIM_TASOC_MODE = "disabled";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/resolve")
+      .send({
+        target: {
+          name: "Demo Solar A",
+        },
+        identifiers: {
+          gaia_dr3_source_id: "123456789012345678",
+        },
+        requested_lanes: ["oscillation_gyre"],
+      })
+      .expect(200);
+
+    expect(res.body.source_resolution.selection_manifest.fields["asteroseismology.numax_uHz"].selected_from).toBe("tess_mast");
+    expect(res.body.crossmatch_summary.fallback_used).toBe(true);
+    expect(res.body.crossmatch_summary.fallback_fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field_path: "asteroseismology.numax_uHz",
+          selected_from: "tess_mast",
+          preferred_catalog: "tasoc",
+          preferred_status: "absent",
+        }),
+      ]),
+    );
   });
 
   it("fails unresolved targets honestly with explicit reasons", async () => {

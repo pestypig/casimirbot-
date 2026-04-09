@@ -4,6 +4,7 @@ import os from "node:os";
 import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { STAR_SIM_SOURCE_REGISTRY_VERSION } from "../server/modules/starsim/sources/types";
 
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
 type StarSimJobsModule = typeof import("../server/modules/starsim/jobs");
@@ -163,6 +164,28 @@ describe("star-sim source-resolution cache", () => {
     expect(res.body.source_resolution.status).toBe("unresolved");
     expect(res.body.source_resolution.fetch_mode).toBe("cache_only");
     expect(res.body.source_resolution.reasons).toContain("cache_only_miss");
+  });
+
+  it("writes source cache artifacts with the current registry version", async () => {
+    const app = await buildApp();
+    const payload = {
+      target: {
+        name: "Demo Solar A",
+      },
+      identifiers: {
+        gaia_dr3_source_id: "123456789012345678",
+      },
+    };
+
+    const res = await request(app).post("/api/star-sim/v1/resolve").send(payload).expect(200);
+    const manifestRef = (res.body.source_resolution.artifact_refs as Array<{ kind: string; path: string }>).find(
+      (ref) => ref.kind === "manifest",
+    );
+    expect(manifestRef).toBeTruthy();
+
+    const manifestPath = path.resolve(manifestRef!.path);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    expect(manifest.registry_version).toBe(STAR_SIM_SOURCE_REGISTRY_VERSION);
   });
 });
 

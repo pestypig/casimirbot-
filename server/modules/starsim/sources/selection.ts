@@ -38,6 +38,32 @@ const FIELD_DEFINITIONS: SourceFieldDefinition[] = [
 
 const DEFAULT_TARGET_SOURCE_ORDER: StarSimSourceCatalog[] = ["gaia_dr3", "sdss_astra", "lamost_dr10", "tasoc", "tess_mast"];
 
+const getFieldDefinition = (fieldPath: string): SourceFieldDefinition | null =>
+  FIELD_DEFINITIONS.find((definition) => definition.path === fieldPath) ?? null;
+
+export const getEligibleCatalogsForField = (
+  fieldPath: string,
+): StarSimSourceCatalog[] => {
+  const fieldDefinition = getFieldDefinition(fieldPath);
+  if (!fieldDefinition) {
+    return [];
+  }
+  return fieldDefinition.allowed_catalogs.filter(
+    (catalog): catalog is StarSimSourceCatalog => catalog !== "user_override",
+  );
+};
+
+export const getPreferredCatalogForField = (
+  fieldPath: string,
+  preferredCatalogs: StarSimSourceCatalog[],
+): StarSimSourceCatalog | null => {
+  const eligibleCatalogs = getEligibleCatalogsForField(fieldPath);
+  if (eligibleCatalogs.length === 0) {
+    return null;
+  }
+  return preferredCatalogs.find((catalog) => eligibleCatalogs.includes(catalog)) ?? null;
+};
+
 const catalogPriority = (
   catalog: StarSimSourceSelectionOrigin,
   preferredCatalogs: StarSimSourceCatalog[],
