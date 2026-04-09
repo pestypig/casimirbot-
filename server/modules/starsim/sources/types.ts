@@ -1,3 +1,6 @@
+import {
+  STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
+} from "../contract";
 import type {
   FieldStatus,
   StarSimArtifactIntegrityStatus,
@@ -11,7 +14,7 @@ import type {
   StarSimSourceSelectionManifest,
 } from "../contract";
 
-export const STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION = "star-sim-source-selection/3" as const;
+export { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION };
 export const STAR_SIM_SOURCE_CACHE_SCHEMA_VERSION = "star-sim-source-cache/1" as const;
 export const STAR_SIM_SOURCE_REGISTRY_VERSION = "star-sim-sources/6" as const;
 

@@ -436,8 +436,10 @@ export interface StarSimSourceFieldSelection {
   candidates: StarSimSourceCandidate[];
 }
 
+export const STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION = "star-sim-source-selection/3" as const;
+
 export interface StarSimSourceSelectionManifest {
-  schema_version: "star-sim-source-selection/2";
+  schema_version: typeof STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION;
   target_query: {
     object_id: string | null;
     name: string | null;

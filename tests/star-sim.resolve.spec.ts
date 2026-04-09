@@ -5,6 +5,8 @@ import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/contract";
+
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
 
 let artifactRoot = "";
@@ -64,6 +66,7 @@ describe("star-sim source resolution route", () => {
     expect(resolveResponse.body.schema_version).toBe("star-sim-source-resolve-v1");
     expect(resolveResponse.body.source_resolution.status).toBe("resolved");
     expect(resolveResponse.body.source_resolution.fetch_mode).toBe("fixture");
+    expect(resolveResponse.body.source_resolution.selection_manifest.schema_version).toBe(STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION);
     expect(resolveResponse.body.structure_mesa_ready).toBe(true);
     expect(resolveResponse.body.supported_domain_preview?.passed).toBe(true);
     expect(resolveResponse.body.identifiers_resolved.gaia_dr3_source_id).toBe("123456789012345678");
