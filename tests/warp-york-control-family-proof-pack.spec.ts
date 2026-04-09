@@ -1768,8 +1768,14 @@ describe("nhm2 publication completion surfaces", () => {
     const markdown = fs.readFileSync(published.latestMdPath, "utf8");
 
     expect(markdown).toContain("| t00MismatchMechanism | t00_mismatch_present |");
+    expect(markdown).toContain(
+      "| t00MismatchMechanismEvidenceStatus | measured |",
+    );
     expect(markdown).toContain("| t00MismatchMechanism | unknown |");
     expect(markdown).toContain("| t00MismatchMechanism | tile_effective_evidence_unknown |");
+    expect(markdown).toContain(
+      "| t00MismatchMechanismEvidenceStatus | unknown |",
+    );
     expect(markdown).not.toContain("| t00MismatchMechanism | pressure_proxy_dominant |");
   });
 

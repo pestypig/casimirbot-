@@ -27759,68 +27759,7 @@ const renderNhm2SourceClosureMarkdown = (
     };
   };
   const summarizeT00Mechanism = (region: Nhm2SourceClosureV2RegionComparison) => {
-    const metric = region.metricT00Diagnostics ?? null;
-    const tile = region.tileT00Diagnostics ?? null;
-    const metricMean = metric?.meanT00 ?? null;
-    const tileMean = tile?.meanT00 ?? null;
-    const residualTolerance = Math.max(region.residualNorms.toleranceRelLInf ?? 0.1, 1e-12);
-    const eps = 1e-12;
-    const metricEvidence = metric?.evidenceStatus ?? "unknown";
-    const tileEvidence = tile?.evidenceStatus ?? "unknown";
-    const metricHasMeasuredMaskingCounts =
-      metric?.skippedCount != null && metric?.nonFiniteCount != null;
-    const tileHasMeasuredMaskingCounts = tile?.skippedCount != null && tile?.nonFiniteCount != null;
-    const pressureResidualMax = ["T11", "T22", "T33"].reduce((best, component) => {
-      const relResidual = region.residualComponents[component as "T11" | "T22" | "T33"]?.relResidual;
-      return relResidual != null ? Math.max(best, Math.abs(relResidual)) : best;
-    }, 0);
-
-    if (metricMean == null && tileMean != null) {
-      return "metric_required_t00_unavailable";
-    }
-    if (tileMean == null && metricMean != null) {
-      return "tile_effective_t00_unavailable";
-    }
-    if (metricEvidence === "unknown" && tileEvidence !== "unknown") {
-      return "metric_required_evidence_unknown";
-    }
-    if (tileEvidence === "unknown" && metricEvidence !== "unknown") {
-      return "tile_effective_evidence_unknown";
-    }
-    if (metricEvidence === "unknown" && tileEvidence === "unknown") {
-      return "accounting_suspect";
-    }
-    if (metricEvidence !== "measured" || tileEvidence !== "measured") {
-      return "unknown";
-    }
-    if (metricMean != null && tileMean != null) {
-      const absDelta = Math.abs(tileMean - metricMean);
-      const relDelta = absDelta / Math.max(Math.abs(metricMean), Math.abs(tileMean), eps);
-      if (absDelta > eps && relDelta > residualTolerance) {
-        return "t00_mismatch_present";
-      }
-      if (pressureResidualMax > residualTolerance) {
-        return "pressure_proxy_dominant";
-      }
-    }
-    if (metricHasMeasuredMaskingCounts && tileHasMeasuredMaskingCounts) {
-      const metricSkipped = (metric?.skippedCount ?? 0) + (metric?.nonFiniteCount ?? 0);
-      const tileSkipped = (tile?.skippedCount ?? 0) + (tile?.nonFiniteCount ?? 0);
-      if (metricSkipped > tileSkipped) {
-        return "metric_required_integration_masking";
-      }
-      if (tileSkipped > metricSkipped) {
-        return "tile_effective_aggregation_masking";
-      }
-    }
-    if (
-      metric?.sampleCount != null &&
-      tile?.sampleCount != null &&
-      metric.sampleCount !== tile.sampleCount
-    ) {
-      return "mask_inclusion_count_mismatch";
-    }
-    return "unknown";
+    return region.mismatchDiagnostics?.t00MechanismCategory ?? "unknown";
   };
   const renderAccountingRows = (
     accounting: ReturnType<typeof summarizeAccounting>,
@@ -27928,6 +27867,7 @@ const renderNhm2SourceClosureMarkdown = (
 | accountingStatus | ${accounting.status} |
 | accountingMismatches | ${accounting.mismatchNote} |
 | t00MismatchMechanism | ${t00Mechanism} |
+| t00MismatchMechanismEvidenceStatus | ${region.mismatchDiagnostics?.t00MechanismEvidenceStatus ?? "unknown"} |
 | note | ${region.note ?? "null"} |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -49096,4 +49036,3 @@ if (isEntryPoint) {
       process.exitCode = 1;
     });
 }
-

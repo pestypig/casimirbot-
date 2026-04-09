@@ -345,6 +345,63 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.regionComparisons.regions[0]?.status).toBe("review");
   });
 
+  it("classifies t00 mismatch from truthful inferred evidence and blocks near-zero pressure dominance", () => {
+    const makeInferredT00Diagnostics = (sampleCount: number, meanT00: number) => ({
+      sampleCount,
+      includedCount: sampleCount,
+      skippedCount: null,
+      nonFiniteCount: null,
+      meanT00,
+      sumT00: sampleCount * meanT00,
+      normalizationBasis: "sample_count",
+      aggregationMode: "mean" as const,
+      evidenceStatus: "inferred" as const,
+    });
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      requiredRegionIds: ["wall", "hull"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 10, T22: 10, T33: 10 },
+          tileEffectiveTensor: { T00: -300, T11: 10, T22: 10, T33: 10 },
+          sampleCount: 8,
+          metricAccounting: makeAccounting(8, "metric"),
+          tileAccounting: makeAccounting(8, "tile"),
+          metricT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+          tileT00Diagnostics: makeInferredT00Diagnostics(8, -300),
+        },
+        {
+          regionId: "hull",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-hull",
+          tileTensorRef: "artifact://tile-hull",
+          metricRequiredTensor: { T00: -100, T11: 1e-15, T22: -1e-15, T33: 1e-15 },
+          tileEffectiveTensor: { T00: -100, T11: 2e-15, T22: -2e-15, T33: 2e-15 },
+          sampleCount: 8,
+          metricAccounting: makeAccounting(8, "metric"),
+          tileAccounting: makeAccounting(8, "tile"),
+          metricT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+          tileT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+    const wall = artifact.regionComparisons.regions.find((region) => region.regionId === "wall");
+    const hull = artifact.regionComparisons.regions.find((region) => region.regionId === "hull");
+    expect(wall?.mismatchDiagnostics?.t00MechanismCategory).toBe("t00_mismatch_present");
+    expect(wall?.mismatchDiagnostics?.t00MechanismEvidenceStatus).toBe("inferred");
+    expect(hull?.mismatchDiagnostics?.t00MechanismCategory).toBe("unknown");
+    expect(hull?.mismatchDiagnostics?.t00MechanismEvidenceStatus).toBe("inferred");
+  });
+
   it("marks missing required regional tensors as unavailable instead of synthetic success", () => {
     const artifact = buildNhm2SourceClosureArtifactV2({
       metricTensorRef: "warp.metricStressEnergy",
