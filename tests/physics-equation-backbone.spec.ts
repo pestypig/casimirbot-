@@ -183,7 +183,12 @@ describe("validatePhysicsEquationBackbone", () => {
     const backbone = JSON.parse(
       fs.readFileSync(path.join(repoRoot, "configs", "physics-equation-backbone.v1.json"), "utf8"),
     ) as {
-      equations: Array<{ id: string; claim_tier?: string; symbols?: Array<{ symbol?: string; units?: string }> }>;
+      equations: Array<{
+        id: string;
+        expression?: string;
+        claim_tier?: string;
+        symbols?: Array<{ symbol?: string; units?: string }>;
+      }>;
     };
 
     const requiredIds = [
@@ -199,6 +204,11 @@ describe("validatePhysicsEquationBackbone", () => {
       expect(equation).toBeDefined();
       expect(equation?.claim_tier).toBe("diagnostic");
     }
+
+    const radiativeTransferEquation = backbone.equations.find(
+      (entry) => entry.id === "stellar_radiative_transfer_equation",
+    );
+    expect(radiativeTransferEquation?.expression).toBe("mu * dI_nu/dtau_nu = S_nu - I_nu");
   });
 
   it("fails when manifest/equation claim tier is invalid", () => {

@@ -1845,7 +1845,7 @@
       "id": "stellar_radiative_transfer_equation",
       "name": "Stellar radiative transfer equation",
       "category": "stellar_radiation",
-      "expression": "mu * dI_nu/dtau_nu = I_nu - S_nu",
+      "expression": "mu * dI_nu/dtau_nu = S_nu - I_nu",
       "claim_tier": "diagnostic",
       "symbols": [
         {
