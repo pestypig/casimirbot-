@@ -5,6 +5,8 @@ import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { __buildFallbackSummaryForTest } from "../server/modules/starsim/sources/registry";
+import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/contract";
+import { STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION as RUNTIME_SOURCE_SELECTION_SCHEMA_VERSION } from "../server/modules/starsim/sources/types";
 
 type StarSimRouteModule = typeof import("../server/routes/star-sim");
 
@@ -45,6 +47,11 @@ afterEach(() => {
 });
 
 describe("star-sim source selection policy", () => {
+  it("keeps contract and runtime source-selection schema versions aligned", () => {
+    expect(STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION).toBe("star-sim-source-selection/3");
+    expect(RUNTIME_SOURCE_SELECTION_SCHEMA_VERSION).toBe(STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION);
+  });
+
   it("lets user overrides win by default while preserving source-derived fallback fields", async () => {
     const app = await buildApp();
     const res = await request(app)
@@ -185,7 +192,7 @@ describe("star-sim source selection policy", () => {
 
     const fallbackSummary = __buildFallbackSummaryForTest({
       selectionManifest: {
-        schema_version: "star-sim-source-selection/3",
+        schema_version: STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
         target_query: { object_id: null, name: null, identifiers: {} },
         fields: {
           "spectroscopy.teff_K": {
@@ -252,7 +259,7 @@ describe("star-sim source selection policy", () => {
   it("reports absent preferred catalog fallback when Astra is missing and LAMOST is selected", () => {
     const fallbackSummary = __buildFallbackSummaryForTest({
       selectionManifest: {
-        schema_version: "star-sim-source-selection/3",
+        schema_version: STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
         target_query: { object_id: null, name: null, identifiers: {} },
         fields: {
           "spectroscopy.teff_K": {
@@ -308,7 +315,7 @@ describe("star-sim source selection policy", () => {
   it("reports absent preferred catalog fallback when TASOC is missing and TESS is selected", () => {
     const fallbackSummary = __buildFallbackSummaryForTest({
       selectionManifest: {
-        schema_version: "star-sim-source-selection/3",
+        schema_version: STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
         target_query: { object_id: null, name: null, identifiers: {} },
         fields: {
           "asteroseismology.numax_uHz": {
@@ -364,7 +371,7 @@ describe("star-sim source selection policy", () => {
   it("does not count user overrides as fallback usage", () => {
     const fallbackSummary = __buildFallbackSummaryForTest({
       selectionManifest: {
-        schema_version: "star-sim-source-selection/3",
+        schema_version: STAR_SIM_SOURCE_SELECTION_SCHEMA_VERSION,
         target_query: { object_id: null, name: null, identifiers: {} },
         fields: {
           "spectroscopy.teff_K": {
