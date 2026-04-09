@@ -27758,6 +27758,40 @@ const renderNhm2SourceClosureMarkdown = (
       dominantSide: mismatch?.dominantSide ?? null,
     };
   };
+  const summarizeT00Mechanism = (region: Nhm2SourceClosureV2RegionComparison) => {
+    const metric = region.metricT00Diagnostics ?? null;
+    const tile = region.tileT00Diagnostics ?? null;
+    const metricMean = metric?.meanT00 ?? null;
+    const tileMean = tile?.meanT00 ?? null;
+    if (metricMean == null && tileMean != null) {
+      return "metric_required_t00_unavailable";
+    }
+    if (tileMean == null && metricMean != null) {
+      return "tile_effective_t00_unavailable";
+    }
+    const metricSkipped = (metric?.skippedCount ?? 0) + (metric?.nonFiniteCount ?? 0);
+    const tileSkipped = (tile?.skippedCount ?? 0) + (tile?.nonFiniteCount ?? 0);
+    if (metricSkipped > tileSkipped) {
+      return "metric_required_integration_masking";
+    }
+    if (tileSkipped > metricSkipped) {
+      return "tile_effective_aggregation_masking";
+    }
+    if (
+      metric?.sampleCount != null &&
+      tile?.sampleCount != null &&
+      metric.sampleCount !== tile.sampleCount
+    ) {
+      return "mask_inclusion_count_mismatch";
+    }
+    if (metric?.evidenceStatus === "unknown" && tile?.evidenceStatus !== "unknown") {
+      return "metric_required_evidence_unknown";
+    }
+    if (tile?.evidenceStatus === "unknown" && metric?.evidenceStatus !== "unknown") {
+      return "tile_effective_evidence_unknown";
+    }
+    return "unknown";
+  };
   const renderAccountingRows = (
     accounting: ReturnType<typeof summarizeAccounting>,
   ) => {
@@ -27826,6 +27860,7 @@ const renderNhm2SourceClosureMarkdown = (
           const dominant = resolveDominantResidual(region);
           const accounting = summarizeAccounting(region);
           const mismatch = summarizeMismatch(region);
+          const t00Mechanism = summarizeT00Mechanism(region);
           const tileProxy = region.tileProxyDiagnostics ?? null;
           const detailRows = renderComponentRows(region.residualComponents);
           const mismatchRows = renderMismatchRows(mismatch);
@@ -27862,6 +27897,7 @@ const renderNhm2SourceClosureMarkdown = (
 | tileTensorRef | ${region.tileTensorRef ?? "null"} |
 | accountingStatus | ${accounting.status} |
 | accountingMismatches | ${accounting.mismatchNote} |
+| t00MismatchMechanism | ${t00Mechanism} |
 | note | ${region.note ?? "null"} |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -27878,7 +27914,19 @@ ${proxyAttributionRows}
 
 | accounting field | metric | tile |
 |---|---|---|
-${renderAccountingRows(accounting)}`;
+${renderAccountingRows(accounting)}
+
+| t00 diagnostic field | metric | tile |
+|---|---|---|
+| sampleCount | ${region.metricT00Diagnostics?.sampleCount ?? "null"} | ${region.tileT00Diagnostics?.sampleCount ?? "null"} |
+| includedCount | ${region.metricT00Diagnostics?.includedCount ?? "null"} | ${region.tileT00Diagnostics?.includedCount ?? "null"} |
+| skippedCount | ${region.metricT00Diagnostics?.skippedCount ?? "null"} | ${region.tileT00Diagnostics?.skippedCount ?? "null"} |
+| nonFiniteCount | ${region.metricT00Diagnostics?.nonFiniteCount ?? "null"} | ${region.tileT00Diagnostics?.nonFiniteCount ?? "null"} |
+| meanT00 | ${region.metricT00Diagnostics?.meanT00 ?? "null"} | ${region.tileT00Diagnostics?.meanT00 ?? "null"} |
+| sumT00 | ${region.metricT00Diagnostics?.sumT00 ?? "null"} | ${region.tileT00Diagnostics?.sumT00 ?? "null"} |
+| aggregationMode | ${region.metricT00Diagnostics?.aggregationMode ?? "null"} | ${region.tileT00Diagnostics?.aggregationMode ?? "null"} |
+| normalizationBasis | ${region.metricT00Diagnostics?.normalizationBasis ?? "null"} | ${region.tileT00Diagnostics?.normalizationBasis ?? "null"} |
+| evidenceStatus | ${region.metricT00Diagnostics?.evidenceStatus ?? "null"} | ${region.tileT00Diagnostics?.evidenceStatus ?? "null"} |`;
         })
         .join("\n\n")
     : "";
@@ -28136,6 +28184,63 @@ const assertNhm2SourceClosureAuthorityParity = (args: {
       }
     }
   };
+  const assertT00DiagnosticsParity = (
+    fieldPrefix: string,
+    published: {
+      sampleCount: number | null;
+      includedCount: number | null;
+      skippedCount: number | null;
+      nonFiniteCount: number | null;
+      meanT00: number | null;
+      sumT00: number | null;
+      normalizationBasis: string | null;
+      aggregationMode: string;
+      evidenceStatus: string;
+    } | null,
+    runtime: {
+      sampleCount: number | null;
+      includedCount: number | null;
+      skippedCount: number | null;
+      nonFiniteCount: number | null;
+      meanT00: number | null;
+      sumT00: number | null;
+      normalizationBasis: string | null;
+      aggregationMode: string;
+      evidenceStatus: string;
+    } | null,
+  ) => {
+    if ((published == null) !== (runtime == null)) {
+      mismatch(`${fieldPrefix}:presence`);
+    }
+    if (!published || !runtime) return;
+    if (!approxEqual(published.sampleCount, runtime.sampleCount)) {
+      mismatch(`${fieldPrefix}:sampleCount`);
+    }
+    if (!approxEqual(published.includedCount, runtime.includedCount)) {
+      mismatch(`${fieldPrefix}:includedCount`);
+    }
+    if (!approxEqual(published.skippedCount, runtime.skippedCount)) {
+      mismatch(`${fieldPrefix}:skippedCount`);
+    }
+    if (!approxEqual(published.nonFiniteCount, runtime.nonFiniteCount)) {
+      mismatch(`${fieldPrefix}:nonFiniteCount`);
+    }
+    if (!approxEqual(published.meanT00, runtime.meanT00)) {
+      mismatch(`${fieldPrefix}:meanT00`);
+    }
+    if (!approxEqual(published.sumT00, runtime.sumT00)) {
+      mismatch(`${fieldPrefix}:sumT00`);
+    }
+    if (published.normalizationBasis !== runtime.normalizationBasis) {
+      mismatch(`${fieldPrefix}:normalizationBasis`);
+    }
+    if (published.aggregationMode !== runtime.aggregationMode) {
+      mismatch(`${fieldPrefix}:aggregationMode`);
+    }
+    if (published.evidenceStatus !== runtime.evidenceStatus) {
+      mismatch(`${fieldPrefix}:evidenceStatus`);
+    }
+  };
   const assertMismatchParity = (
     fieldPrefix: string,
     published: {
@@ -28387,6 +28492,16 @@ const assertNhm2SourceClosureAuthorityParity = (args: {
       `region:${publishedRegion.regionId}:tileAccounting`,
       publishedRegion.tileAccounting ?? null,
       runtimeRegion.tileAccounting ?? null,
+    );
+    assertT00DiagnosticsParity(
+      `region:${publishedRegion.regionId}:metricT00Diagnostics`,
+      publishedRegion.metricT00Diagnostics ?? null,
+      runtimeRegion.metricT00Diagnostics ?? null,
+    );
+    assertT00DiagnosticsParity(
+      `region:${publishedRegion.regionId}:tileT00Diagnostics`,
+      publishedRegion.tileT00Diagnostics ?? null,
+      runtimeRegion.tileT00Diagnostics ?? null,
     );
     assertProxyParity(
       `region:${publishedRegion.regionId}:tileProxyDiagnostics`,
@@ -28715,6 +28830,8 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
     const sampleCount = toFiniteNumber(runtimeRegion?.sampleCount) ?? null;
     const metricAccounting = runtimeRegion?.metricAccounting ?? null;
     const tileAccounting = runtimeRegion?.tileAccounting ?? null;
+    const metricT00Diagnostics = runtimeRegion?.metricT00Diagnostics ?? null;
+    const tileT00Diagnostics = runtimeRegion?.tileT00Diagnostics ?? null;
     const tileProxyDiagnostics = runtimeRegion?.tileProxyDiagnostics ?? null;
     const noteParts: string[] = [];
     if (tileExistingNote) {
@@ -28730,6 +28847,8 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
       sampleCount,
       metricAccounting,
       tileAccounting,
+      metricT00Diagnostics,
+      tileT00Diagnostics,
       tileProxyDiagnostics,
       note: noteParts.join(" "),
     });
@@ -48947,9 +49066,6 @@ if (isEntryPoint) {
       process.exitCode = 1;
     });
 }
-
-
-
 
 
 

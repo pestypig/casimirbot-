@@ -70,6 +70,18 @@ export type Nhm2SourceClosureV2RegionAccounting = {
   evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
 };
 
+export type Nhm2SourceClosureV2RegionT00Diagnostics = {
+  sampleCount: number | null;
+  includedCount: number | null;
+  skippedCount: number | null;
+  nonFiniteCount: number | null;
+  meanT00: number | null;
+  sumT00: number | null;
+  normalizationBasis: string | null;
+  aggregationMode: Nhm2SourceClosureRegionAggregationMode;
+  evidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
+};
+
 export type Nhm2SourceClosureV2RegionProxyMode = "proxy" | "metric" | "unknown";
 export type Nhm2SourceClosureV2RegionProxyConstructionMode =
   | "direct_region_mean_t00"
@@ -140,6 +152,8 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
   sampleCount?: number | null;
   metricAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
   tileAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
+  metricT00Diagnostics?: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics?: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileProxyDiagnostics?: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
   note?: string | null;
 };
@@ -156,6 +170,8 @@ export type Nhm2SourceClosureV2RegionComparison = {
   sampleCount: number | null;
   metricAccounting: Nhm2SourceClosureV2RegionAccounting | null;
   tileAccounting: Nhm2SourceClosureV2RegionAccounting | null;
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileProxyDiagnostics: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
   mismatchDiagnostics: Nhm2SourceClosureV2RegionMismatchDiagnostics | null;
   residualComponents: Record<
@@ -525,6 +541,33 @@ const normalizeRegionAccounting = (
   return normalized;
 };
 
+const normalizeRegionT00Diagnostics = (
+  value: Nhm2SourceClosureV2RegionT00Diagnostics | null | undefined,
+): Nhm2SourceClosureV2RegionT00Diagnostics | null => {
+  if (!value) return null;
+  const normalized: Nhm2SourceClosureV2RegionT00Diagnostics = {
+    sampleCount: toFiniteOrNull(value.sampleCount),
+    includedCount: toFiniteOrNull(value.includedCount),
+    skippedCount: toFiniteOrNull(value.skippedCount),
+    nonFiniteCount: toFiniteOrNull(value.nonFiniteCount),
+    meanT00: toFiniteOrNull(value.meanT00),
+    sumT00: toFiniteOrNull(value.sumT00),
+    normalizationBasis: toText(value.normalizationBasis),
+    aggregationMode: normalizeRegionAggregationMode(value.aggregationMode),
+    evidenceStatus: normalizeAccountingEvidenceStatus(value.evidenceStatus),
+  };
+  if (normalized.evidenceStatus === "measured") {
+    const hasRequiredMeasuredFields =
+      normalized.sampleCount != null &&
+      normalized.meanT00 != null &&
+      normalized.aggregationMode !== "unknown";
+    if (!hasRequiredMeasuredFields) {
+      normalized.evidenceStatus = "unknown";
+    }
+  }
+  return normalized;
+};
+
 const normalizeProxyMode = (
   value: unknown,
 ): Nhm2SourceClosureV2RegionProxyMode =>
@@ -813,6 +856,10 @@ const buildRegionComparison = (args: {
   const dominantResidual = resolveDominantResidualComponent(residualComponents);
   const metricAccounting = normalizeRegionAccounting(args.input.metricAccounting);
   const tileAccounting = normalizeRegionAccounting(args.input.tileAccounting);
+  const metricT00Diagnostics = normalizeRegionT00Diagnostics(
+    args.input.metricT00Diagnostics,
+  );
+  const tileT00Diagnostics = normalizeRegionT00Diagnostics(args.input.tileT00Diagnostics);
   const tileProxyDiagnostics = normalizeProxyDiagnostics(args.input.tileProxyDiagnostics);
   const mismatchDiagnostics = buildMismatchDiagnostics(metricTensor, tileTensor);
   const sampleCount = toFiniteOrNull(args.input.sampleCount);
@@ -857,6 +904,8 @@ const buildRegionComparison = (args: {
       sampleCount: resolvedSampleCount,
       metricAccounting,
       tileAccounting,
+      metricT00Diagnostics,
+      tileT00Diagnostics,
       tileProxyDiagnostics,
       mismatchDiagnostics,
       residualComponents,

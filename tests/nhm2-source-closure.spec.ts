@@ -158,6 +158,17 @@ describe("nhm2 source closure artifact v2", () => {
     supportInclusionNote: note,
     evidenceStatus: "measured" as const,
   });
+  const makeT00Diagnostics = (sampleCount: number, meanT00: number) => ({
+    sampleCount,
+    includedCount: sampleCount,
+    skippedCount: 0,
+    nonFiniteCount: 0,
+    meanT00,
+    sumT00: sampleCount * meanT00,
+    normalizationBasis: "sample_count",
+    aggregationMode: "mean" as const,
+    evidenceStatus: "measured" as const,
+  });
 
   it("passes when global and required regional comparisons are same-basis and within tolerance", () => {
     const artifact = buildNhm2SourceClosureArtifactV2({
@@ -187,6 +198,8 @@ describe("nhm2 source closure artifact v2", () => {
           sampleCount: 16,
           metricAccounting: makeAccounting(16, "metric"),
           tileAccounting: makeAccounting(16, "tile"),
+          metricT00Diagnostics: makeT00Diagnostics(16, -50),
+          tileT00Diagnostics: makeT00Diagnostics(16, -50),
         },
         {
           regionId: "wall",
@@ -198,6 +211,8 @@ describe("nhm2 source closure artifact v2", () => {
           sampleCount: 8,
           metricAccounting: makeAccounting(8, "metric"),
           tileAccounting: makeAccounting(8, "tile"),
+          metricT00Diagnostics: makeT00Diagnostics(8, -40),
+          tileT00Diagnostics: makeT00Diagnostics(8, -40.5),
         },
       ],
       toleranceRelLInf: 0.1,
@@ -223,6 +238,10 @@ describe("nhm2 source closure artifact v2", () => {
       expect(region.tileAccounting?.aggregationMode).toBe("mean");
       expect(region.metricAccounting?.evidenceStatus).toBe("measured");
       expect(region.tileAccounting?.evidenceStatus).toBe("measured");
+      expect(region.metricT00Diagnostics?.aggregationMode).toBe("mean");
+      expect(region.tileT00Diagnostics?.aggregationMode).toBe("mean");
+      expect(region.metricT00Diagnostics?.evidenceStatus).toBe("measured");
+      expect(region.tileT00Diagnostics?.evidenceStatus).toBe("measured");
       expect(region.tileProxyDiagnostics).toBeNull();
       expect(region.mismatchDiagnostics).toBeTruthy();
       expect(region.mismatchDiagnostics?.components.T00.ratioTileToMetric).not.toBeNull();
@@ -260,6 +279,8 @@ describe("nhm2 source closure artifact v2", () => {
           sampleCount: 8,
           metricAccounting: makeAccounting(8, "metric"),
           tileAccounting: makeAccounting(8, "tile"),
+          metricT00Diagnostics: makeT00Diagnostics(8, -100),
+          tileT00Diagnostics: makeT00Diagnostics(8, -10),
         },
       ],
       toleranceRelLInf: 0.1,
@@ -412,6 +433,28 @@ describe("nhm2 source closure artifact v2", () => {
             supportInclusionNote: null,
             evidenceStatus: "unknown",
           },
+          metricT00Diagnostics: {
+            sampleCount: null,
+            includedCount: null,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: null,
+            sumT00: null,
+            aggregationMode: "unknown",
+            normalizationBasis: null,
+            evidenceStatus: "unknown",
+          },
+          tileT00Diagnostics: {
+            sampleCount: null,
+            includedCount: null,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: null,
+            sumT00: null,
+            aggregationMode: "unknown",
+            normalizationBasis: null,
+            evidenceStatus: "unknown",
+          },
           tileProxyDiagnostics: {
             pressureModel: null,
             pressureFactor: null,
@@ -428,6 +471,8 @@ describe("nhm2 source closure artifact v2", () => {
     const region = artifact.regionComparisons.regions[0];
     expect(region.sampleCount).toBeNull();
     expect(region.tileProxyDiagnostics?.pressureFactor).toBeNull();
+    expect(region.metricT00Diagnostics?.meanT00).toBeNull();
+    expect(region.tileT00Diagnostics?.sumT00).toBeNull();
   });
 
   it("preserves proxy component attribution fields without coercion", () => {

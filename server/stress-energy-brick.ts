@@ -70,6 +70,17 @@ export interface StressEnergyTensorRegionSummary {
   normalizationBasis?: "sample_count";
   weightSum?: number | null;
   accountingEvidenceStatus?: "measured";
+  t00Diagnostics?: {
+    sampleCount: number;
+    includedCount: number;
+    skippedCount: number;
+    nonFiniteCount: number;
+    meanT00: number;
+    sumT00: number;
+    normalizationBasis: "sample_count";
+    aggregationMode: "mean";
+    evidenceStatus: "measured";
+  };
   note?: string;
 }
 
@@ -239,11 +250,17 @@ const STRESS_ENERGY_CHANNEL_ORDER = ["t00", "Sx", "Sy", "Sz", "divS"] as const;
 
 type TensorRegionAccumulator = {
   count: number;
+  includedCount: number;
+  skippedCount: number;
+  nonFiniteCount: number;
   sumT00: number;
 };
 
 const createTensorRegionAccumulator = (): TensorRegionAccumulator => ({
   count: 0,
+  includedCount: 0,
+  skippedCount: 0,
+  nonFiniteCount: 0,
   sumT00: 0,
 });
 
@@ -275,6 +292,17 @@ const buildTensorRegionSummary = (
     normalizationBasis: "sample_count",
     weightSum: accumulator.count,
     accountingEvidenceStatus: "measured",
+    t00Diagnostics: {
+      sampleCount: accumulator.count,
+      includedCount: accumulator.includedCount,
+      skippedCount: accumulator.skippedCount,
+      nonFiniteCount: accumulator.nonFiniteCount,
+      meanT00: accumulator.sumT00 / accumulator.count,
+      sumT00: accumulator.sumT00,
+      normalizationBasis: "sample_count",
+      aggregationMode: "mean",
+      evidenceStatus: "measured",
+    },
     ...(note ? { note } : {}),
   };
 };
@@ -1642,15 +1670,19 @@ export function buildStressEnergyBrick(input: Partial<StressEnergyBrickParams>):
         const radius = resolveHullRadius(dir, axes, radialMap);
         const centerDist = pLen - radius;
         tensorRegions.global.count += 1;
+        tensorRegions.global.includedCount += 1;
         tensorRegions.global.sumT00 += density;
         if (centerDist < -wallSigma) {
           tensorRegions.hull.count += 1;
+          tensorRegions.hull.includedCount += 1;
           tensorRegions.hull.sumT00 += density;
         } else if (Math.abs(centerDist) <= wallSigma) {
           tensorRegions.wall.count += 1;
+          tensorRegions.wall.includedCount += 1;
           tensorRegions.wall.sumT00 += density;
         } else if (centerDist > wallSigma && centerDist <= exteriorShellLimit) {
           tensorRegions.exterior_shell.count += 1;
+          tensorRegions.exterior_shell.includedCount += 1;
           tensorRegions.exterior_shell.sumT00 += density;
         }
         const normal = radialMap ? dir : ellipsoidNormal(pos, axesSq);

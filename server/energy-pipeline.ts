@@ -99,6 +99,7 @@ import {
   type Nhm2SourceClosureV2Artifact,
   type Nhm2SourceClosureV2RegionAccounting,
   type Nhm2SourceClosureV2RegionComparisonInput,
+  type Nhm2SourceClosureV2RegionT00Diagnostics,
   type Nhm2SourceClosureV2RegionProxyComponentAttribution,
   type Nhm2SourceClosureV2RegionProxyDiagnostics,
 } from "../shared/contracts/nhm2-source-closure.v2.ts";
@@ -4280,6 +4281,27 @@ const collectNhm2SourceClosureRegionComparisons = (
     supportInclusionNote: args.supportInclusionNote,
     evidenceStatus: args.evidenceStatus,
   });
+  const buildT00Diagnostics = (args: {
+    sampleCount: number | null;
+    includedCount?: number | null;
+    skippedCount?: number | null;
+    nonFiniteCount?: number | null;
+    meanT00: number | null;
+    sumT00: number | null;
+    normalizationBasis: string | null;
+    aggregationMode: Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"];
+    evidenceStatus: Nhm2SourceClosureV2RegionT00Diagnostics["evidenceStatus"];
+  }): Nhm2SourceClosureV2RegionT00Diagnostics => ({
+    sampleCount: args.sampleCount,
+    includedCount: args.includedCount ?? args.sampleCount,
+    skippedCount: args.skippedCount ?? null,
+    nonFiniteCount: args.nonFiniteCount ?? null,
+    meanT00: args.meanT00,
+    sumT00: args.sumT00,
+    normalizationBasis: args.normalizationBasis,
+    aggregationMode: args.aggregationMode,
+    evidenceStatus: args.evidenceStatus,
+  });
 
   return REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
     const metricRegionEntry = metricRegionMap.get(regionId);
@@ -4341,6 +4363,53 @@ const collectNhm2SourceClosureRegionComparisons = (
       supportInclusionNote:
         "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
     });
+    const tileRegionDiagnostics =
+      (tileRegionEntry as { t00Diagnostics?: Record<string, unknown> | null } | undefined)
+        ?.t00Diagnostics ?? null;
+    const tileSampleCountResolved = toFiniteNumberOrNull(
+      tileRegionDiagnostics?.sampleCount ?? tileSampleCount,
+    );
+    const tileMeanT00Resolved = toFiniteNumberOrNull(
+      tileRegionDiagnostics?.meanT00 ?? tileRegionTensor.T00,
+    );
+    const tileSumT00Resolved =
+      toFiniteNumberOrNull(tileRegionDiagnostics?.sumT00) ??
+      (tileSampleCountResolved != null && tileMeanT00Resolved != null
+        ? tileSampleCountResolved * tileMeanT00Resolved
+        : null);
+    const metricT00Diagnostics = buildT00Diagnostics({
+      sampleCount: metricSampleCount,
+      meanT00: metricRegionTensor.T00 ?? null,
+      sumT00: null,
+      normalizationBasis: "sample_count",
+      aggregationMode: "mean",
+      evidenceStatus:
+        metricSampleCount != null && metricRegionTensor.T00 != null ? "inferred" : "unknown",
+    });
+    const tileT00Diagnostics = buildT00Diagnostics({
+      sampleCount: tileSampleCountResolved,
+      includedCount: toFiniteNumberOrNull(
+        tileRegionDiagnostics?.includedCount ?? tileRegionDiagnostics?.sampleCount ?? tileSampleCount,
+      ),
+      skippedCount: toFiniteNumberOrNull(tileRegionDiagnostics?.skippedCount),
+      nonFiniteCount: toFiniteNumberOrNull(tileRegionDiagnostics?.nonFiniteCount),
+      meanT00: tileMeanT00Resolved,
+      sumT00: tileSumT00Resolved,
+      normalizationBasis:
+        asText(tileRegionDiagnostics?.normalizationBasis) ??
+        asText(tileRegionEntry?.normalizationBasis),
+      aggregationMode:
+        (tileRegionDiagnostics?.aggregationMode as Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"] | undefined) ??
+        ((tileRegionEntry?.aggregationMode as Nhm2SourceClosureV2RegionT00Diagnostics["aggregationMode"] | undefined) ?? "unknown"),
+      evidenceStatus:
+        tileRegionDiagnostics?.evidenceStatus === "measured"
+          ? "measured"
+          : tileRegionDiagnostics?.evidenceStatus === "inferred"
+            ? "inferred"
+            : tileRegionEntry?.accountingEvidenceStatus === "measured"
+              ? "measured"
+              : "unknown",
+    });
 
     const tileProxyDiagnostics = buildTileProxyDiagnostics(tileRegionTensor);
 
@@ -4355,6 +4424,8 @@ const collectNhm2SourceClosureRegionComparisons = (
       sampleCount,
       metricAccounting,
       tileAccounting,
+      metricT00Diagnostics,
+      tileT00Diagnostics,
       tileProxyDiagnostics,
       note: noteParts.join(" "),
     };
