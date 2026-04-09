@@ -41,7 +41,12 @@
         "physics-stellar-structure-nucleosynthesis-multiscale-plasma-variability-definition",
         "physics-stellar-structure-nucleosynthesis-sunquake-timing-replay-diagnostic",
         "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
-        "physics-stellar-structure-nucleosynthesis-equation-residual"
+        "physics-stellar-structure-nucleosynthesis-equation-residual",
+        "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+        "physics-stellar-structure-nucleosynthesis-lte-source-function-definition",
+        "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
+        "physics-stellar-structure-nucleosynthesis-continuum-opacity-sum-definition",
+        "physics-stellar-structure-nucleosynthesis-population-ionization-balance-diagnostic"
       ],
       "links": [
         {
@@ -1555,6 +1560,271 @@
           "claim:stellar.structure:stellar_nucleosynthesis"
         ]
       }
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+      "title": "Stellar Radiative Transfer Definition",
+      "excerpt": "Definition-level anchor for the 1D stellar radiative transfer equation used by the hardened null model.",
+      "bodyMD": "This node anchors the transfer equation used to propagate specific intensity through stellar optical depth in the null-model lane.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "radiative-transfer"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-lte-source-function-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for the stellar radiative transfer equation in the hardened null-model lane.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_radiative_transfer_equation",
+        "claim_ids": [
+          "claim:stellar.radiation:radiative_transfer"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-lte-source-function-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-lte-source-function-definition",
+      "title": "Stellar LTE Source Function Definition",
+      "excerpt": "Definition-level anchor for LTE source-function closure in stellar atmospheres.",
+      "bodyMD": "This node anchors the LTE closure S_nu = B_nu(T) used as a baseline source function in the stellar lane.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "lte",
+        "source-function"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-thermal-equilibrium-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for LTE source-function closure in stellar atmospheres.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_lte_source_function",
+        "claim_ids": [
+          "claim:stellar.radiation:lte_source_function"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
+      "title": "Stellar NLTE Source Function Definition",
+      "excerpt": "Definition-level anchor for NLTE source-function closure in stellar atmospheres.",
+      "bodyMD": "This node anchors the NLTE source-function closure using emissivity and extinction to support non-equilibrium diagnostics in the null-model hardening path.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "nlte",
+        "source-function"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-population-ionization-balance-diagnostic",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for NLTE source-function closure in stellar atmospheres.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_nlte_source_function",
+        "claim_ids": [
+          "claim:stellar.radiation:nlte_source_function"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-continuum-opacity-sum-definition",
+      "slug": "physics-stellar-structure-nucleosynthesis-continuum-opacity-sum-definition",
+      "title": "Stellar Continuum Opacity Sum Definition",
+      "excerpt": "Definition-level anchor for additive continuum opacity components in stellar atmospheres.",
+      "bodyMD": "This node anchors total continuum opacity as the sum of bound-free, free-free, and scattering terms for stellar radiation closure.",
+      "tags": [
+        "physics",
+        "stellar",
+        "definition",
+        "opacity",
+        "continuum"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-opacity-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Definition-level anchor for additive continuum opacity components in stellar atmospheres.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_continuum_opacity_sum",
+        "claim_ids": [
+          "claim:stellar.radiation:continuum_opacity_sum"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-opacity.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-population-ionization-balance-diagnostic",
+      "slug": "physics-stellar-structure-nucleosynthesis-population-ionization-balance-diagnostic",
+      "title": "Stellar Population Ionization Balance Diagnostic",
+      "excerpt": "Diagnostic anchor for population and ionization-balance closure checks in stellar atmospheres.",
+      "bodyMD": "This node anchors diagnostic population and ionization-balance checks to keep stellar null-model hardening constrained at diagnostic claim tier.",
+      "tags": [
+        "physics",
+        "stellar",
+        "diagnostic",
+        "population",
+        "ionization"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-observables-diagnostic",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "Diagnostic anchor for population and ionization-balance closure checks in stellar atmospheres.",
+      "nodeType": "diagnostic",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree"
+      ],
+      "validity": {
+        "equation_ref": "stellar_population_ionization_balance_diagnostic",
+        "claim_ids": [
+          "claim:stellar.radiation:population_ionization_balance"
+        ]
+      },
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-observables-diagnostic.md"
+        }
+      ]
     }
   ],
   "schema": {

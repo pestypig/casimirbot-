@@ -120,7 +120,7 @@ describe("stellar viability contract", () => {
     expect(report.winner).toBe(report.promotable_winner);
   });
 
-  it("falls back to M0 promotable winner when all models fail the contract", () => {
+  it("sets promotable winner to null and falls back to M0 when all models fail the contract", () => {
     const wavelengths = makeWavelengthGrid();
     const report = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
@@ -131,8 +131,9 @@ describe("stellar viability contract", () => {
       },
     });
     expect(report.models.every((entry) => entry.passes_contract === false)).toBe(true);
-    expect(report.promotable_winner).toBe("M0_planck_atmosphere");
-    expect(report.winner).toBe("M0_planck_atmosphere");
+    expect(report.promotable_winner).toBeNull();
+    expect(report.fallback_winner).toBe("M0_planck_atmosphere");
+    expect(report.winner).toBe(report.fallback_winner);
   });
 
   it("keeps M1 and M3 bolometric flux matched to M0 by default", () => {
@@ -154,6 +155,50 @@ describe("stellar viability contract", () => {
     const flux0 = m0?.bolometric_flux_W_m2 ?? 0;
     expect(Math.abs((m1?.bolometric_flux_W_m2 ?? 0) - flux0) / flux0).toBeLessThan(1e-10);
     expect(Math.abs((m3?.bolometric_flux_W_m2 ?? 0) - flux0) / flux0).toBeLessThan(1e-10);
+  });
+
+  it("keeps M1 and M3 flux-conserving even when M2 source power is enabled", () => {
+    const baseInput = {
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      structure: {
+        xi: 0.95,
+        alpha_xi: 0.75,
+        Q_coh: 10,
+        d_eff: 2e-12,
+        A_ml: 0.9,
+        pressure_proxy_Pa: 5e8,
+        stress_rate_proxy_Pa_s: 4e8,
+        trap_density_m3: 6e20,
+        material_gate: true,
+      },
+    };
+    const report = evaluateStellarSpectralViability({
+      ...baseInput,
+      structure: { ...baseInput.structure, m2_source_power_enabled: true },
+    });
+    const reportWithoutM2Source = evaluateStellarSpectralViability({
+      ...baseInput,
+      structure: { ...baseInput.structure, m2_source_power_enabled: false },
+    });
+
+    const m0 = report.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const m1 = report.models.find((entry) => entry.id === "M1_lattice_emissivity");
+    const m2 = report.models.find((entry) => entry.id === "M2_mechanoluminescent_pressure");
+    const m3 = report.models.find((entry) => entry.id === "M3_coherence_angular");
+    const m2WithoutSource = reportWithoutM2Source.models.find((entry) => entry.id === "M2_mechanoluminescent_pressure");
+    expect(m0).toBeDefined();
+    expect(m1).toBeDefined();
+    expect(m2).toBeDefined();
+    expect(m3).toBeDefined();
+    expect(m2WithoutSource).toBeDefined();
+
+    const flux0 = m0?.bolometric_flux_W_m2 ?? 0;
+    const m1Closure = Math.abs((m1?.bolometric_flux_W_m2 ?? 0) - flux0) / flux0;
+    const m3Closure = Math.abs((m3?.bolometric_flux_W_m2 ?? 0) - flux0) / flux0;
+    expect(m1Closure).toBeLessThan(1e-10);
+    expect(m3Closure).toBeLessThan(1e-10);
+    expect(m2?.bolometric_flux_W_m2).not.toBeCloseTo(m2WithoutSource?.bolometric_flux_W_m2 ?? 0, 12);
   });
 
   it("separates continuum and line residual metrics when no line mask is supplied", () => {

@@ -674,7 +674,7 @@ describe("validatePhysicsRootLeafManifest", () => {
   it("declares the stellar radiation null-model lane in the repo manifest", () => {
     const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
-      roots?: Array<{ id: string; tree_lane?: string; tree_path?: string }>;
+      roots?: Array<{ id: string; tree_lane?: string; tree_path?: string; equation_refs?: string[] }>;
       leaves?: Array<{ id: string; prompt_family?: string }>;
       paths?: Array<{ id: string; root_id?: string; leaf_id?: string; bundle_id?: string }>;
       bridge_bundles?: Array<{ id: string; path_ids?: string[] }>;
@@ -688,6 +688,16 @@ describe("validatePhysicsRootLeafManifest", () => {
         tree_lane: "physics_stellar_structure_nucleosynthesis",
         tree_path: "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
       }),
+    );
+    const stellarRoot = manifest.roots?.find((entry) => entry.id === "physics_stellar_structure_nucleosynthesis");
+    expect(stellarRoot?.equation_refs).toEqual(
+      expect.arrayContaining([
+        "stellar_radiative_transfer_equation",
+        "stellar_lte_source_function",
+        "stellar_nlte_source_function",
+        "stellar_continuum_opacity_sum",
+        "stellar_population_ionization_balance_diagnostic",
+      ]),
     );
     expect(
       manifest.leaves?.find((entry) => entry.id === "leaf_stellar_spectral_viability"),

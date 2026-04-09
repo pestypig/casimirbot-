@@ -134,7 +134,12 @@
         "planck_radiance_lambda",
         "stefan_boltzmann_flux",
         "solar_teff_from_LR",
-        "stellar_spectral_viability"
+        "stellar_spectral_viability",
+        "stellar_radiative_transfer_equation",
+        "stellar_lte_source_function",
+        "stellar_nlte_source_function",
+        "stellar_continuum_opacity_sum",
+        "stellar_population_ionization_balance_diagnostic"
       ],
       "tree_lane": "physics_stellar_structure_nucleosynthesis",
       "tree_path": "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json"
