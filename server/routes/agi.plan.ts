@@ -389,7 +389,7 @@ import {
   scoreHelixAskObjectiveRecoveryVariantResult,
   shouldBypassHelixAskObjectiveScopedRetrievalAgentGate,
 } from "../services/helix-ask/retrieval/objective-scoped-recovery";
-import { buildEvidenceKey, mergeEvidence } from "../services/helix-ask/retrieval/evidence-merging";
+import { mergeEvidence } from "../services/helix-ask/retrieval/evidence-merging";
 import {
   buildGeneralAmbiguityAnswerFloor,
   hasHelixAskConcreteDefinitionTarget,
@@ -410,6 +410,16 @@ import {
   resolveExecutionHandledSummary,
   resolveSafetyHandledSummary,
 } from "../services/helix-ask/policy/summary-handling";
+import {
+  collectSourcesLineCitationRefs,
+  scoreDeterministicClaimCitationLinkage,
+} from "../services/helix-ask/surface/citation-linking";
+import {
+  applyCitationContractSourcesPolicy,
+  applyCitationPersistenceGuard,
+  applyOpenWorldSourcesPolicy,
+  applyQualityFloorSourcesPolicy,
+} from "../services/helix-ask/surface/citation-persistence";
 import {
   isHelixAskClarifyForcedShortCircuitRule,
   isHelixAskConceptForcedShortCircuitRule,
@@ -453,6 +463,16 @@ import {
   evaluateNeedleNatarioRelationProof,
 } from "../services/helix-ask/relation-proof";
 import { buildHelixAskStrictFailReasonLedger } from "../services/helix-ask/strict-fail-reason-ledger";
+import {
+  completeHelixAskCitations,
+  type CitationCompletionMetrics,
+} from "../services/helix-ask/surface/citation-completion";
+import {
+  extractCitationTokensFromText,
+  sanitizeSourcesLine,
+  scrubUnsupportedPaths,
+  shouldAppendOpenWorldSourcesMarker,
+} from "../services/helix-ask/surface/sources-policy";
 import { collectStepCitations } from "../services/helix-ask/surface/step-citations";
 import { runNoiseFieldLoop } from "../../modules/analysis/noise-field-loop";
 import { runImageDiffusionLoop } from "../../modules/analysis/diffusion-loop";
@@ -1852,104 +1872,6 @@ const buildHintQueryEvidence = async (
   return { candidates, selected, queries };
 };
 
-const CITATION_COMPLETION_CLAIM_PATTERN =
-  /\b(is|are|does|returns|means|implements|uses|adds|removes|updates|exposes|requires|includes|defined|located|calls|builds|runs|function|class|module|endpoint|route|api|handler|schema|component|service|config)\b/i;
-const CITATION_COMPLETION_FILE_PATTERN =
-  /\b[a-z0-9_.-]+\.(ts|tsx|js|jsx|json|md|yml|yaml|py|go|rs|java|cpp|c|h)\b/i;
-const CITATION_COMPLETION_MAX = (() => {
-  const parsed = Number(process.env.AGI_REFINERY_CITATION_COMPLETION_MAX);
-  if (!Number.isFinite(parsed)) return 12;
-  return Math.min(Math.max(1, Math.floor(parsed)), 64);
-})();
-const CITATION_COMPLETION_MIN = (() => {
-  const parsed = Number(process.env.AGI_REFINERY_CITATION_COMPLETION_MIN);
-  if (!Number.isFinite(parsed)) return 2;
-  return Math.min(Math.max(0, Math.floor(parsed)), CITATION_COMPLETION_MAX);
-})();
-const CITATION_COMPLETION_RATIO = (() => {
-  const parsed = Number(process.env.AGI_REFINERY_CITATION_COMPLETION_RATIO);
-  if (!Number.isFinite(parsed)) return 0.5;
-  return Math.min(Math.max(0, parsed), 1);
-})();
-
-const hasCitationClaim = (value: string): boolean => {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (!normalized) return false;
-  return (
-    CITATION_COMPLETION_CLAIM_PATTERN.test(normalized) ||
-    CITATION_COMPLETION_FILE_PATTERN.test(normalized)
-  );
-};
-
-const collectEvidenceTokens = (item: AgiEvidence): string[] => {
-  const tokens = new Set<string>();
-  const path = normalizeEvidenceRef(item.path);
-  if (path) {
-    tokens.add(path);
-    const base = path.split("/").pop();
-    if (base) tokens.add(base);
-  }
-  if (item.id) tokens.add(item.id.toLowerCase());
-  if (Array.isArray(item.keys)) {
-    item.keys.forEach((key) => tokens.add(String(key).toLowerCase()));
-  }
-  if (item.extra && typeof item.extra === "object") {
-    const extra = item.extra as { snippetId?: unknown; symbolName?: unknown };
-    if (typeof extra.snippetId === "string") {
-      tokens.add(extra.snippetId.toLowerCase());
-    }
-    if (typeof extra.symbolName === "string") {
-      tokens.add(extra.symbolName.toLowerCase());
-    }
-  }
-  return Array.from(tokens).filter((token) => token.length >= 3);
-};
-
-const scoreEvidence = (textLower: string, item: AgiEvidence): number => {
-  let score = 0;
-  for (const token of collectEvidenceTokens(item)) {
-    if (textLower.includes(token)) score += 1;
-  }
-  return score;
-};
-
-const normalizeCitationRef = (value: string): string =>
-  normalizeEvidenceRef(value) ?? "";
-
-const buildEvidenceTokenSet = (items: AgiEvidence[]): string[] => {
-  const tokens = new Set<string>();
-  for (const item of items) {
-    collectEvidenceTokens(item).forEach((token) => tokens.add(token));
-    if (item.path) {
-      const normalized = normalizeCitationRef(item.path);
-      if (normalized) tokens.add(normalized);
-    }
-  }
-  return Array.from(tokens);
-};
-
-const citationMatchesEvidence = (
-  citation: string,
-  evidenceTokens: string[],
-): boolean => {
-  const normalized = normalizeCitationRef(citation);
-  if (!normalized) return false;
-  for (const token of evidenceTokens) {
-    if (!token) continue;
-    if (normalized === token) return true;
-    if (normalized.endsWith(token)) return true;
-    if (token.endsWith(normalized)) return true;
-  }
-  return false;
-};
-
-type CitationLinkStats = {
-  hasClaim: boolean;
-  citationCount: number;
-  linkedCount: number;
-  recall: number;
-};
-
 const normalizeVisibleCitationPath = (value: string): string | null => {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) return null;
@@ -1999,272 +1921,6 @@ const prioritizeHelixAskAllowedCitations = (citations: string[], limit = 16): st
     .sort((left, right) => left.rank - right.rank || left.index - right.index)
     .map((entry) => entry.value)
     .slice(0, Math.max(1, limit));
-
-const computeCitationLinkStats = ({
-  citations,
-  evidence,
-  hasClaim,
-}: {
-  citations: string[];
-  evidence: AgiEvidence[];
-  hasClaim: boolean;
-}): CitationLinkStats => {
-  const normalized = normalizeCitations(citations);
-  const evidenceTokens = buildEvidenceTokenSet(evidence);
-  let linkedCount = 0;
-  for (const citation of normalized) {
-    if (citationMatchesEvidence(citation, evidenceTokens)) linkedCount += 1;
-  }
-  if (!hasClaim) {
-    return {
-      hasClaim,
-      citationCount: normalized.length,
-      linkedCount,
-      recall: 1,
-    };
-  }
-  if (normalized.length === 0 || evidenceTokens.length === 0) {
-    return {
-      hasClaim,
-      citationCount: normalized.length,
-      linkedCount,
-      recall: 0,
-    };
-  }
-  return {
-    hasClaim,
-    citationCount: normalized.length,
-    linkedCount,
-    recall: linkedCount / normalized.length,
-  };
-};
-
-const resolveCitationValue = (item: AgiEvidence): string | undefined => {
-  if (item.path && !isRestrictedEvidencePath(item.path)) return item.path;
-  if (item.id) return item.id;
-  if (item.hash) return item.hash;
-  return undefined;
-};
-
-type CitationCompletionMetrics = {
-  candidateRecallPreCompletion: number;
-  candidateRecallPostCompletion: number;
-  selectedRecallPreCompletion: number;
-  selectedRecallPostCompletion: number;
-  citationsPreCompletion: number;
-  citationsPostCompletion: number;
-  completionQueriesCount: number;
-  completionLatencyMs: number;
-};
-
-const completeCitations = async (args: {
-  outputText: string;
-  citations: string[];
-  retrievalCandidates: AgiEvidence[];
-  retrievalSelected: AgiEvidence[];
-  searchQuery?: string;
-}): Promise<{
-  citations: string[];
-  retrievalCandidates: AgiEvidence[];
-  retrievalSelected: AgiEvidence[];
-  added: boolean;
-  metrics: CitationCompletionMetrics;
-}> => {
-  const completionStart = Date.now();
-  let completionQueriesCount = 0;
-  const baseCitations = normalizeCitations(args.citations);
-  const outputText = args.outputText.trim();
-  const forceCompletion =
-    process.env.AGI_REFINERY_CITATION_COMPLETION_FORCE === "1";
-  const hasClaim = forceCompletion
-    ? outputText.length > 0 || baseCitations.length > 0
-    : hasCitationClaim(outputText);
-  const preCandidateStats = computeCitationLinkStats({
-    citations: baseCitations,
-    evidence: args.retrievalCandidates,
-    hasClaim,
-  });
-  const preSelectedStats = computeCitationLinkStats({
-    citations: baseCitations,
-    evidence: args.retrievalSelected,
-    hasClaim,
-  });
-  const finalize = (result: {
-    citations: string[];
-    retrievalCandidates: AgiEvidence[];
-    retrievalSelected: AgiEvidence[];
-    added: boolean;
-  }): {
-    citations: string[];
-    retrievalCandidates: AgiEvidence[];
-    retrievalSelected: AgiEvidence[];
-    added: boolean;
-    metrics: CitationCompletionMetrics;
-  } => {
-    const finalCitations = normalizeCitations(result.citations);
-    const nextSelected =
-      finalCitations.length > 0 && result.retrievalSelected.length === 0
-        ? mergeEvidence(result.retrievalSelected, result.retrievalCandidates)
-        : result.retrievalSelected;
-    const postCandidateStats = computeCitationLinkStats({
-      citations: finalCitations,
-      evidence: result.retrievalCandidates,
-      hasClaim,
-    });
-    const postSelectedStats = computeCitationLinkStats({
-      citations: finalCitations,
-      evidence: nextSelected,
-      hasClaim,
-    });
-    return {
-      citations: finalCitations,
-      retrievalCandidates: result.retrievalCandidates,
-      retrievalSelected: nextSelected,
-      added: result.added,
-      metrics: {
-        candidateRecallPreCompletion: preCandidateStats.recall,
-        candidateRecallPostCompletion: postCandidateStats.recall,
-        selectedRecallPreCompletion: preSelectedStats.recall,
-        selectedRecallPostCompletion: postSelectedStats.recall,
-        citationsPreCompletion: baseCitations.length,
-        citationsPostCompletion: finalCitations.length,
-        completionQueriesCount,
-        completionLatencyMs: Math.max(0, Date.now() - completionStart),
-      },
-    };
-  };
-  if (!hasClaim && baseCitations.length === 0) {
-    return finalize({
-      citations: baseCitations,
-      retrievalCandidates: args.retrievalCandidates,
-      retrievalSelected: args.retrievalSelected,
-      added: false,
-    });
-  }
-  let retrievalCandidates = args.retrievalCandidates;
-  let retrievalSelected = args.retrievalSelected;
-  if (retrievalCandidates.length === 0 && retrievalSelected.length === 0) {     
-    if (args.searchQuery) completionQueriesCount += 1;
-    const fallback = await buildSafeRetrievalFallback(args.searchQuery);        
-    if (fallback.candidates.length > 0) {
-      retrievalCandidates = mergeEvidence(
-        retrievalCandidates,
-        fallback.candidates,
-      );
-    }
-    if (fallback.selected.length > 0) {
-      retrievalSelected = mergeEvidence(retrievalSelected, fallback.selected);
-    }
-  }
-  if (baseCitations.length > 0 && retrievalSelected.length === 0) {
-    retrievalSelected = mergeEvidence(retrievalSelected, retrievalCandidates);  
-  }
-  const targetEvidence = mergeEvidence(retrievalSelected, retrievalCandidates);
-  const targetCount = Math.min(
-    CITATION_COMPLETION_MAX,
-    Math.max(
-      CITATION_COMPLETION_MIN,
-      Math.ceil(
-        (targetEvidence.length > 0 ? targetEvidence : retrievalSelected.length > 0
-          ? retrievalSelected
-          : retrievalCandidates
-        ).length * CITATION_COMPLETION_RATIO,
-      ),
-    ),
-  );
-  const allowedEvidence =
-    retrievalSelected.length > 0 ? retrievalSelected : retrievalCandidates;
-  const allowedTokens = buildEvidenceTokenSet(allowedEvidence);
-  const linkedCitations = baseCitations.filter((citation) =>
-    citationMatchesEvidence(citation, allowedTokens),
-  );
-  const hasLinkedCitation = linkedCitations.length > 0;
-  const removedUnlinked = linkedCitations.length !== baseCitations.length;
-  if (
-    baseCitations.length > 0 &&
-    hasLinkedCitation &&
-    !removedUnlinked &&
-    baseCitations.length >= targetCount
-  ) {
-    return finalize({
-      citations: baseCitations,
-      retrievalCandidates,
-      retrievalSelected,
-      added: false,
-    });
-  }
-  if (baseCitations.length > 0 && hasLinkedCitation && removedUnlinked) {
-    return finalize({
-      citations: linkedCitations,
-      retrievalCandidates,
-      retrievalSelected,
-      added: true,
-    });
-  }
-  if (retrievalCandidates.length === 0 && retrievalSelected.length === 0) {
-    const nextCitations = baseCitations;
-    return finalize({
-      citations: nextCitations,
-      retrievalCandidates,
-      retrievalSelected,
-      added: nextCitations.length !== baseCitations.length,
-    });
-  }
-  const pool: Array<{ item: AgiEvidence; index: number }> = [];
-  const seen = new Set<string>();
-  let index = 0;
-  const addToPool = (item: AgiEvidence): void => {
-    const key = buildEvidenceKey(item);
-    if (seen.has(key)) return;
-    seen.add(key);
-    pool.push({ item, index });
-    index += 1;
-  };
-  retrievalSelected.forEach(addToPool);
-  retrievalCandidates.forEach(addToPool);
-
-  const textLower = outputText.toLowerCase();
-  const scored = pool.map(({ item, index }) => ({
-    item,
-    index,
-    score: scoreEvidence(textLower, item),
-  }));
-  const ordered = scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.index - b.index;
-  });
-  const nextCitations: string[] = [...linkedCitations];
-  const usedEvidence: AgiEvidence[] = [];
-  for (const entry of ordered) {
-    if (nextCitations.length >= CITATION_COMPLETION_MAX) break;
-    if (nextCitations.length >= targetCount) break;
-    const citation = resolveCitationValue(entry.item);
-    if (!citation) continue;
-    if (nextCitations.includes(citation)) continue;
-    nextCitations.push(citation);
-    usedEvidence.push(entry.item);
-  }
-  if (nextCitations.length === 0) {
-    return finalize({
-      citations: baseCitations,
-      retrievalCandidates,
-      retrievalSelected,
-      added: false,
-    });
-  }
-  const finalCitations = Array.from(new Set(nextCitations)).slice(
-    0,
-    CITATION_COMPLETION_MAX,
-  );
-  const nextCandidates = mergeEvidence(retrievalCandidates, usedEvidence);
-  const nextSelected = mergeEvidence(retrievalSelected, usedEvidence);
-  return finalize({
-    citations: finalCitations,
-    retrievalCandidates: nextCandidates,
-    retrievalSelected: nextSelected,
-    added: finalCitations.length !== baseCitations.length,
-  });
-};
 
 const buildGateMetrics = (
   gates: { name: string; pass: boolean }[],
@@ -6167,15 +5823,6 @@ function stripRepoCitationsForOpenWorldBypass(value: string): string {
     .join("\n")
     .trim();
 }
-
-const shouldAppendOpenWorldSourcesMarker = (args: {
-  answerText: string;
-  treeWalkBlock?: string | null;
-}): boolean => {
-  if (hasSourcesLine(args.answerText)) return false;
-  const treeWalkCitations = extractFilePathsFromText(args.treeWalkBlock ?? "").filter(Boolean);
-  return treeWalkCitations.length === 0;
-};
 
 function ensureOpenWorldBypassUncertainty(value: string): string {
   const body = value.trim();
@@ -23119,29 +22766,6 @@ const isEquationAnchorOnlyAnswer = (value: string): boolean => {
   return sentenceCount <= 2 && !mechanismSignal;
 };
 
-type ClaimCitationSemanticLinkageScore = {
-  claimCount: number;
-  linkedClaimCount: number;
-  linkRate: number;
-  failReasons: Array<"CLAIM_CITATION_LINK_MISSING" | "CLAIM_CITATION_LINK_WEAK">;
-};
-
-const collectSourcesLineCitationRefs = (value: string): string[] => {
-  if (!value) return [];
-  const refs: string[] = [];
-  const lines = value.split(/\r?\n/);
-  for (const line of lines) {
-    const match = line.match(/^\s*sources?\s*:\s*(.+)$/i);
-    if (!match) continue;
-    const parts = match[1]
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-    refs.push(...parts);
-  }
-  return normalizeCitations(refs);
-};
-
 type EquationQuoteContractResult = {
   required: boolean;
   ok: boolean;
@@ -35295,59 +34919,12 @@ const evaluateEquationQuoteContract = (args: {
   };
 };
 
-const scoreDeterministicClaimCitationLinkage = (value: string): ClaimCitationSemanticLinkageScore => {
-  const claimSentences = splitGroundedSentences(value)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length >= 20)
-    .filter((sentence) => !/^sources?\s*:/i.test(sentence));
-  if (claimSentences.length === 0) {
-    return {
-      claimCount: 0,
-      linkedClaimCount: 0,
-      linkRate: 1,
-      failReasons: [],
-    };
-  }
-
-  const citationRefs = normalizeCitations([
-    ...extractFilePathsFromText(value),
-    ...extractCitationTokensFromText(value),
-    ...collectSourcesLineCitationRefs(value),
-  ]);
-  if (citationRefs.length === 0) {
-    return {
-      claimCount: claimSentences.length,
-      linkedClaimCount: 0,
-      linkRate: 0,
-      failReasons: ["CLAIM_CITATION_LINK_MISSING"],
-    };
-  }
-
-  const normalizedRefs = citationRefs.map((ref) => ref.toLowerCase());
-  let linkedClaimCount = 0;
-  for (const sentence of claimSentences) {
-    const normalizedSentence = sentence.toLowerCase();
-    const linked = normalizedRefs.some((ref) => normalizedSentence.includes(ref));
-    if (linked) linkedClaimCount += 1;
-  }
-  const linkRate = linkedClaimCount / claimSentences.length;
-  if (linkedClaimCount === claimSentences.length) {
-    return {
-      claimCount: claimSentences.length,
-      linkedClaimCount,
-      linkRate,
-      failReasons: [],
-    };
-  }
-  return {
-    claimCount: claimSentences.length,
-    linkedClaimCount,
-    linkRate,
-    failReasons: ["CLAIM_CITATION_LINK_WEAK"],
-  };
-};
-
-export const __testScoreDeterministicClaimCitationLinkage = scoreDeterministicClaimCitationLinkage;
+export const __testScoreDeterministicClaimCitationLinkage = (value: string) =>
+  scoreDeterministicClaimCitationLinkage({
+    value,
+    splitGroundedSentences,
+    extractCitationTokensFromText,
+  });
 
 const computeGroundedSentenceRate = (answer: string): number => {
   const sentences = splitGroundedSentences(answer);
@@ -35544,139 +35121,6 @@ const dedupeReportParagraphs = (
     output.push(collapsed.trim());
   }
   return { text: output.join("\n\n"), applied };
-};
-
-const scrubUnsupportedPaths = (
-  value: string,
-  allowedPaths: string[],
-): { text: string; removed: string[] } => {
-  if (!value.trim()) return { text: value, removed: [] };
-  if (allowedPaths.length === 0) return { text: value, removed: [] };
-  const normalizeCitationComparablePath = (input: string): string => {
-    const normalized = (normalizeEvidenceRef(input) ?? input).replace(/\\/g, "/").trim();
-    if (!normalized) return "";
-    return normalized
-      .replace(/#L\d+(?:C\d+)?$/i, "")
-      .replace(/:L?\d+(?::\d+)?$/i, "")
-      .trim();
-  };
-  const dropComparableExtension = (input: string): string =>
-    input.replace(/\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yaml|yml|toml|sql|py|go|rs|java|c|cc|cpp|h|hpp|cs|swift|kt)$/i, "");
-  const escapeRegExp = (input: string): string =>
-    input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const allowed = new Set<string>();
-  for (const path of allowedPaths) {
-    const normalized = normalizeEvidenceRef(path) ?? path;
-    if (normalized) allowed.add(normalized);
-    const comparable = normalizeCitationComparablePath(path);
-    if (comparable) allowed.add(comparable);
-    const comparableNoExt = comparable ? dropComparableExtension(comparable) : "";
-    if (comparableNoExt) allowed.add(comparableNoExt);
-    if (path) allowed.add(path);
-  }
-  const presentPaths = extractFilePathsFromText(value);
-  if (presentPaths.length === 0) return { text: value, removed: [] };
-  let cleaned = value;
-  const removed: string[] = [];
-  for (const candidate of presentPaths) {
-    if (/^(gate|certificate):/i.test(candidate)) continue;
-    const normalized = normalizeEvidenceRef(candidate) ?? candidate;
-    const comparable = normalizeCitationComparablePath(candidate);
-    const comparableNoExt = comparable ? dropComparableExtension(comparable) : "";
-    if (
-      allowed.has(normalized) ||
-      allowed.has(candidate) ||
-      (comparable ? allowed.has(comparable) : false) ||
-      (comparableNoExt ? allowed.has(comparableNoExt) : false)
-    ) {
-      continue;
-    }
-    removed.push(candidate);
-    const escaped = escapeRegExp(candidate);
-    cleaned = cleaned.replace(new RegExp(`\\[[^\\]]*${escaped}[^\\]]*\\]`, "g"), "");
-    cleaned = cleaned.replace(new RegExp(`\\s*\\|\\s*(?:symbol|file)=${escaped}\\b`, "gi"), "");
-    cleaned = cleaned.replace(new RegExp(`\\b(?:symbol|file)=${escaped}\\b`, "gi"), "");
-    cleaned = cleaned.split(candidate).join("");
-  }
-  if (removed.length) {
-    cleaned = cleaned.replace(/\[(?:r|g|s|c):\s*\]/gi, "");
-    cleaned = cleaned.replace(/\s*\|\s*(?:symbol|file)=\s*(?=\s|$)/gi, "");
-    cleaned = cleaned.replace(/\b(?:symbol|file)=\s*(?=\s|$)/gi, "");
-    cleaned = cleaned.replace(/\s*\|\s*(?=\s*(?:\n|$))/g, "");
-    cleaned = cleanDanglingFileExtensionFragments(cleaned);
-    cleaned = cleaned.replace(/[ \t]{2,}/g, " ");
-    cleaned = cleaned.replace(/ +([,.;:])/g, "$1");
-    cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
-  }
-  return { text: cleaned, removed };
-};
-
-const CITATION_TOKEN_RE = /\b(?:gate|certificate):[a-z0-9._-]+/gi;
-
-const extractCitationTokensFromText = (value: string): string[] => {
-  if (!value) return [];
-  const tokens = value.match(CITATION_TOKEN_RE) ?? [];
-  return Array.from(new Set(tokens.map((token) => token.trim()).filter(Boolean)));
-};
-
-const sanitizeSourcesLine = (
-  value: string,
-  allowedPaths: string[],
-  allowedTokens: string[],
-): string => {
-  if (!value) return value;
-  const OPEN_WORLD_SOURCES_MARKER_TEXT =
-    "Sources: open-world best-effort (no repo citations required).";
-  const OPEN_WORLD_SOURCES_MARKER_RE =
-    /^\s*sources?\s*:\s*open-world\s+best-effort(?:\s*\(no\s+repo\s+citations\s+required\))?\.?\s*$/i;
-  const allowedPathSet = new Set(allowedPaths.map((path) => path.toLowerCase()));
-  const allowedTokenSet = new Set(allowedTokens.map((token) => token.toLowerCase()));
-  const lines = value.split(/\r?\n/);
-  const output: string[] = [];
-  const sourcePool: string[] = [];
-  let openWorldMarkerRequested = false;
-  for (const line of lines) {
-    const match = line.match(/^\s*sources?\s*:\s*(.+)$/i);
-    if (!match) {
-      output.push(line);
-      continue;
-    }
-    if (OPEN_WORLD_SOURCES_MARKER_RE.test(line)) {
-      openWorldMarkerRequested = true;
-      continue;
-    }
-    const rawPaths = normalizeCitations(extractFilePathsFromText(line));
-    const rawTokens = extractCitationTokensFromText(line);
-    const filteredPaths = rawPaths.filter((entry) => {
-      const normalized = (normalizeEvidenceRef(entry) ?? entry).toLowerCase();
-      return allowedPathSet.has(normalized) || allowedPathSet.has(entry.toLowerCase());
-    });
-    const filteredTokens = rawTokens.filter((token) => allowedTokenSet.has(token.toLowerCase()));
-    const combined = normalizeCitations([...filteredPaths, ...filteredTokens]);
-    if (combined.length === 0) {
-      continue;
-    }
-    sourcePool.push(...combined);
-  }
-  const mergedSources = normalizeCitations(sourcePool);
-  if (mergedSources.length > 0) {
-    while (output.length > 0 && !output[output.length - 1]?.trim()) {
-      output.pop();
-    }
-    if (output.length > 0) {
-      output.push("");
-    }
-    output.push(`Sources: ${mergedSources.join(", ")}`);
-  } else if (openWorldMarkerRequested) {
-    while (output.length > 0 && !output[output.length - 1]?.trim()) {
-      output.pop();
-    }
-    if (output.length > 0) {
-      output.push("");
-    }
-    output.push(OPEN_WORLD_SOURCES_MARKER_TEXT);
-  }
-  return output.join("\n").trim();
 };
 
 type HelixAskAnswerSurfaceMode = "conversational" | "structured_report" | "fail_closed";
@@ -57652,31 +57096,15 @@ const executeHelixAsk = async ({
         if (citationGuardTokens.length === 0) {
           citationGuardTokens = normalizeCitations([...HELIX_ASK_QUALITY_FLOOR_FALLBACK_SOURCES]);
         }
-        const beforeCitationGuard = cleaned;
-        cleaned = sanitizeSourcesLine(cleaned, citationGuardAllowedPaths, citationGuardTokens);
-        const hasFinalCitations =
-          extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
-        if (!hasFinalCitations && citationGuardTokens.length > 0) {
-          cleaned = `${cleaned}\n\nSources: ${citationGuardTokens.slice(0, 8).join(", ")}`.trim();
-          answerPath.push("citationPersistence:append_sources");
-        } else if (hasFinalCitations) {
-          answerPath.push("citationPersistence:preserved");
-        }
-        const citationPersistenceOk =
-          extractFilePathsFromText(cleaned).length > 0 || hasSourcesLine(cleaned);
-        if (!citationPersistenceOk) {
-          answerPath.push("citationPersistence:citation_missing");
-          if (debugPayload) {
-            debugPayload.helix_ask_fail_reason = "citation_missing";
-          }
-        }
-        if (debugPayload) {
-          debugPayload.citation_persistence_guard_applied = true;
-          debugPayload.citation_persistence_sources = citationGuardTokens.slice(0, 8);
-          debugPayload.citation_persistence_appended =
-            beforeCitationGuard.trim() !== cleaned.trim();
-          debugPayload.citation_persistence_ok = citationPersistenceOk;
-        }
+        const citationPersistenceResult = applyCitationPersistenceGuard({
+          cleaned,
+          citationLinkingRequired: citationPersistenceGuardEligible,
+          allowedPaths: citationGuardAllowedPaths,
+          citationTokens: citationGuardTokens,
+          answerPath,
+          debugPayload: debugPayload as Record<string, unknown> | null | undefined,
+        });
+        cleaned = citationPersistenceResult.cleaned;
       }
       let selectedMove: "direct_answer" | "retrieve_more" | "relation_build" | "clarify" | "fail_closed" =
         "fail_closed";
@@ -58612,30 +58040,13 @@ const executeHelixAsk = async ({
           ...finalCanonicalEvidence.citationTokens,
         ]);
         const finalCitationTokens = finalTokens.length > 0 ? finalTokens : finalFallbackTokens;
-        if (
-          repoStyleSourceAppendAllowed &&
-          (extractFilePathsFromText(cleaned).length === 0 && !hasSourcesLine(cleaned)) &&
-          finalCitationTokens.length > 0
-        ) {
-          cleaned = `${cleaned}\n\nSources: ${finalCitationTokens.slice(0, 8).join(", ")}`.trim();
-          answerPath.push("qualityFloor:append_sources");
-          if (debugPayload) {
-            const existingReasons = Array.isArray(debugPayload.answer_quality_floor_reasons)
-              ? debugPayload.answer_quality_floor_reasons
-              : [];
-            debugPayload.answer_quality_floor_reasons = Array.from(
-              new Set([...existingReasons, "citation_missing_appended"]),
-            );
-            debugPayload.answer_quality_floor_applied = true;
-          }
-        } else if (!repoStyleSourceAppendAllowed) {
-          answerPath.push("qualityFloor:append_sources_skipped_non_repo");
-          if (debugPayload) {
-            (debugPayload as Record<string, unknown>).citation_append_suppressed = true;
-            (debugPayload as Record<string, unknown>).citation_append_suppressed_reason =
-              "open_world_or_security_non_repo";
-          }
-        }
+        cleaned = applyQualityFloorSourcesPolicy({
+          cleaned,
+          repoStyleSourceAppendAllowed,
+          finalCitationTokens,
+          answerPath,
+          debugPayload: debugPayload as Record<string, unknown> | null | undefined,
+        });
       }
       let contractCitationTokens = normalizeCitations([
         ...applyQueryConstraintsToPathList(
@@ -58648,14 +58059,13 @@ const executeHelixAsk = async ({
         ),
         ...applyQueryConstraintsToPathList(finalCanonicalEvidence.citationTokens, queryConstraints),
       ]);
-      if (citationLinkingRequired && contractCitationTokens.length > 0 && !hasSourcesLine(cleaned)) {
-        cleaned = `${cleaned}\n\nSources: ${contractCitationTokens.slice(0, 8).join(", ")}`.trim();
-        answerPath.push("citationContract:append_sources");
-        if (debugPayload) {
-          debugPayload.citation_contract_applied = true;
-          debugPayload.citation_contract_sources = contractCitationTokens.slice(0, 8);
-        }
-      }
+      cleaned = applyCitationContractSourcesPolicy({
+        cleaned,
+        citationLinkingRequired,
+        contractCitationTokens,
+        answerPath,
+        debugPayload: debugPayload as Record<string, unknown> | null | undefined,
+      });
       if (
         equationQuotePrompt &&
         !Boolean((debugPayload as Record<string, unknown> | null | undefined)?.stage05_used) &&
@@ -60286,7 +59696,11 @@ const executeHelixAsk = async ({
         ).length,
         contradictionCount: platonicResult.beliefSummary?.contradictionCount ?? 0,
       });
-      const deterministicClaimCitationLinkage = scoreDeterministicClaimCitationLinkage(cleaned);
+      const deterministicClaimCitationLinkage = scoreDeterministicClaimCitationLinkage({
+        value: cleaned,
+        splitGroundedSentences,
+        extractCitationTokensFromText,
+      });
       const semanticGateFailReasons: string[] = [];
       if (equationBackingTentative && equationQuoteContract.required) {
         semanticGateFailReasons.push(
@@ -60628,37 +60042,34 @@ const executeHelixAsk = async ({
         }
       }
       if (suppressGeneralCitations && !preserveForcedAnswerAcrossFinalizer) {
-        cleaned = stripRepoCitationsForOpenWorldBypass(cleaned);
-        answerPath.push("citationScrub:general_sources_suppressed");
         const securityOpenWorldPrompt =
           isSecurityRiskPrompt(baseQuestion) &&
           intentDomain === "general" &&
           !explicitRepoExpectation &&
           !hasFilePathHints;
-        if (securityOpenWorldPrompt) {
-          cleaned = rewriteOpenWorldBestEffortAnswer(cleaned, baseQuestion);
-          answerPath.push("citationScrub:open_world_uncertainty_marker_security");
-        } else {
-          const shouldAppendMarker = shouldAppendOpenWorldSourcesMarker({
-            answerText: cleaned,
-            treeWalkBlock,
-          });
-          if (shouldAppendMarker || !hasSourcesLine(cleaned)) {
-            cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
-            answerPath.push("citationScrub:open_world_sources_marker");
-            if (!shouldAppendMarker) {
-              answerPath.push("citationScrub:open_world_sources_marker_forced");
-            }
-          } else {
-            answerPath.push("citationScrub:open_world_sources_marker_skipped_tree_walk_citations");
-          }
-        }
+        cleaned = applyOpenWorldSourcesPolicy({
+          cleaned,
+          suppressGeneralCitations,
+          preserveForcedAnswerAcrossFinalizer,
+          securityOpenWorldPrompt,
+          baseQuestion,
+          treeWalkBlock,
+          answerPath,
+          stripRepoCitationsForOpenWorldBypass,
+          rewriteOpenWorldBestEffortAnswer,
+        });
       } else if (suppressGeneralCitations) {
-        if (!hasSourcesLine(cleaned)) {
-          cleaned = `${cleaned}\n\nSources: open-world best-effort (no repo citations required).`.trim();
-          answerPath.push("citationScrub:open_world_sources_marker_forced_clarify");
-        }
-        answerPath.push("citationScrub:skipped_forced_clarify");
+        cleaned = applyOpenWorldSourcesPolicy({
+          cleaned,
+          suppressGeneralCitations,
+          preserveForcedAnswerAcrossFinalizer,
+          securityOpenWorldPrompt: false,
+          baseQuestion,
+          treeWalkBlock,
+          answerPath,
+          stripRepoCitationsForOpenWorldBypass,
+          rewriteOpenWorldBestEffortAnswer,
+        });
       }
       const frontierContractIntent =
         intentProfile.id === "falsifiable.frontier_consciousness_theory_lens";
@@ -68513,12 +67924,13 @@ planRouter.post("/execute", async (req, res) => {
               ? pickReadableText(finalStep.output)
               : undefined;
           const completionText = (finalText ?? summary).trim();
-          const completion = await completeCitations({
+          const completion = await completeHelixAskCitations({
             outputText: completionText.length > 0 ? completionText : summary,
             citations,
             retrievalCandidates,
             retrievalSelected,
             searchQuery: record.searchQuery ?? record.goal,
+            buildSafeRetrievalFallback,
           });
           citations = completion.citations;
           retrievalCandidates = completion.retrievalCandidates;
