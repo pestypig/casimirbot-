@@ -5,6 +5,8 @@ import type {
   StarSimSourceCatalog,
 } from "../contract";
 import { canonicalizeStarSimRequest } from "../canonicalize";
+import { resolveBenchmarkTarget } from "../benchmark-targets";
+import { buildLaneDiagnosticSummary } from "../diagnostics";
 import { evaluateStarSimSupportedDomain } from "../domain";
 import { getGaiaDr3AdapterVersion, resolveGaiaDr3Source } from "./gaia-dr3";
 import { getLamostDr10AdapterVersion, resolveLamostDr10Source } from "./lamost-dr10";
@@ -21,6 +23,7 @@ import {
   normalizeSourcePolicy,
 } from "./cache";
 import { buildStarSimSourceAdapterRuntime } from "./runtime";
+import { evaluateCrossmatch, type CrossmatchOutcome } from "./crossmatch";
 import {
   buildResolvedRequestDraft,
   buildSourceSelectionManifest,
@@ -69,6 +72,50 @@ const buildAttemptOrder = (
 const hasSelection = (fieldIds: string[], selectionManifest: ReturnType<typeof buildSourceSelectionManifest>): boolean =>
   fieldIds.some((fieldId) => Boolean(selectionManifest.fields[fieldId]));
 
+
+
+const applyCrossmatchPolicy = (args: {
+  request: StarSimRequest;
+  records: StarSimSourceRecord[];
+  identifiers: ReturnType<typeof mergeResolvedIdentifiers>;
+}): {
+  acceptedRecords: StarSimSourceRecord[];
+  outcomes: CrossmatchOutcome[];
+  qualityRejections: import("../contract").StarSimQualityRejection[];
+} => {
+  const gaia = args.records.find((record) => record.catalog === "gaia_dr3") ?? null;
+  const accepted = [...args.records];
+  const outcomes: CrossmatchOutcome[] = [];
+  const qualityRejections: import("../contract").StarSimQualityRejection[] = [];
+  const secondaryCatalogs: Array<StarSimSourceCatalog> = ["sdss_astra", "lamost_dr10", "tasoc", "tess_mast"];
+  const fallbackAvailable = (catalog: StarSimSourceCatalog): boolean =>
+    catalog === "sdss_astra" ? accepted.some((entry) => entry.catalog === "lamost_dr10") : false;
+
+  for (const catalog of secondaryCatalogs) {
+    const record = accepted.find((candidate) => candidate.catalog === catalog) ?? null;
+    const outcome = evaluateCrossmatch({
+      primary: gaia,
+      candidate: record,
+      expectedIdentifiers: args.identifiers,
+      fallbackAvailable: fallbackAvailable(catalog),
+    });
+    if (!outcome) continue;
+    outcomes.push(outcome);
+    if (outcome.status.startsWith("rejected") && record) {
+      const idx = accepted.findIndex((entry) => entry.catalog === catalog);
+      if (idx >= 0) accepted.splice(idx, 1);
+      qualityRejections.push({
+        catalog,
+        reason: outcome.status,
+        field_path: catalog.includes("tasoc") || catalog.includes("tess") ? "asteroseismology" : "spectroscopy",
+        quality_flags: outcome.quality_flags,
+        fallback_consequence: fallbackAvailable(catalog) ? "fallback_used" : "candidate_dropped",
+      });
+    }
+  }
+
+  return { acceptedRecords: accepted, outcomes, qualityRejections };
+};
 const summarizeResolutionState = (args: {
   request: StarSimRequest;
   records: StarSimSourceRecord[];
@@ -202,17 +249,21 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     }
   }
 
+  const benchmarkTarget = resolveBenchmarkTarget({ request, identifiersResolved: identifiers });
+  const crossmatchPolicy = applyCrossmatchPolicy({ request, records, identifiers });
+  const recordsForSelection = crossmatchPolicy.acceptedRecords;
   const selectionManifest = buildSourceSelectionManifest({
     request,
-    records,
-    preferredCatalogs: sourceHints.preferred_catalogs,
+    records: recordsForSelection,
+    preferredCatalogs: benchmarkTarget?.preferred_source_stack ?? sourceHints.preferred_catalogs,
     allowFallbacks: sourceHints.allow_fallbacks,
     policy: sourcePolicy,
     identifiersResolved: identifiers,
+    qualityRejections: crossmatchPolicy.qualityRejections,
   });
   const canonicalRequestDraft = buildResolvedRequestDraft({
     request,
-    records,
+    records: recordsForSelection,
     identifiersResolved: identifiers,
     selectionManifest,
   });
@@ -227,6 +278,9 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
   }
   for (const reason of resolutionState.reasons) {
     reasons.push(reason);
+  }
+  for (const rejection of crossmatchPolicy.qualityRejections) {
+    reasons.push(rejection.reason);
   }
 
   const supportedDomainPreview = canonicalRequestDraft
@@ -276,11 +330,29 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       ),
       reasons: unique(reasons).sort((left, right) => left.localeCompare(right)),
       notes: unique(notes).sort((left, right) => left.localeCompare(right)),
+      benchmark_target_id: benchmarkTarget?.id,
+      crossmatch_summary: {
+        accepted: crossmatchPolicy.outcomes.filter((entry) => entry.status === "accepted").length,
+        rejected: crossmatchPolicy.outcomes.filter((entry) => entry.status.startsWith("rejected")).length,
+        fallback_used: crossmatchPolicy.outcomes.some((entry) => entry.status === "fallback_used"),
+      },
+      quality_rejections: crossmatchPolicy.qualityRejections,
+      diagnostic_summary: {
+        top_residual_fields: [],
+      },
     },
     structure_mesa_ready: structureReady,
     supported_domain_preview: supportedDomainPreview,
     oscillation_gyre_ready: oscillationReady,
     oscillation_supported_domain_preview: oscillationSupportedDomainPreview,
+    benchmark_target_id: benchmarkTarget?.id,
+    crossmatch_summary: {
+      accepted: crossmatchPolicy.outcomes.filter((entry) => entry.status === "accepted").length,
+      rejected: crossmatchPolicy.outcomes.filter((entry) => entry.status.startsWith("rejected")).length,
+      fallback_used: crossmatchPolicy.outcomes.some((entry) => entry.status === "fallback_used"),
+    },
+    quality_rejections: crossmatchPolicy.qualityRejections,
+    diagnostic_summary: buildLaneDiagnosticSummary({ residuals: {}, observablesUsed: selectionManifest ? Object.keys(selectionManifest.fields) : [] }),
   };
 
   const requestHash = hashStableJson(request);

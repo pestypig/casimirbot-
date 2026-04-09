@@ -88,6 +88,7 @@ describe("star-sim resolve-first orchestration", () => {
     expect(submit.body.source_resolution_ref).toMatch(/resolve-response\.json$/);
     expect(submit.body.resolved_draft_ref).toMatch(/canonical-request\.json$/);
     expect(submit.body.lane_plan.runnable_lanes).toEqual(["structure_mesa"]);
+    expect(["demo_solar_a", "demo_solar_b"]).toContain(submit.body.benchmark_target_id);
 
     await waitForJob(app, submit.body.job_id, "completed");
     const result = await request(app).get(`/api/star-sim/v1/jobs/${submit.body.job_id}/result`).expect(200);
@@ -177,6 +178,7 @@ describe("star-sim resolve-first orchestration", () => {
     expect(submit.body.policy_used).toBe("run_available_prefix");
     expect(submit.body.requested_lanes).toEqual(["structure_mesa", "oscillation_gyre"]);
     expect(submit.body.lane_plan.runnable_lanes).toEqual(["structure_mesa"]);
+    expect(["demo_solar_a", "demo_solar_b"]).toContain(submit.body.benchmark_target_id);
     expect(submit.body.lane_plan.blocked_lanes).toEqual(["oscillation_gyre"]);
 
     await waitForJob(app, submit.body.job_id, "completed");

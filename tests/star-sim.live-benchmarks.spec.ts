@@ -110,6 +110,7 @@ describe("star-sim live fitting lanes", () => {
     expect(lane.result.runtime.live_solver).toBe(true);
     expect(lane.result.runtime.execution_mode).toBe("live_fit");
     expect(lane.result.fit_status).toBe("fit_completed");
+    expect(lane.result.diagnostic_summary.fit_quality).toBeTruthy();
     expect(lane.result.fit_profile_id).toBe("solar_like_observable_fit_v1");
     expect(lane.result.supported_domain.passed).toBe(true);
     expect(lane.result.supported_domain.id).toBe("solar_like_main_sequence_live");
@@ -167,6 +168,7 @@ describe("star-sim live fitting lanes", () => {
     expect(oscillationLane.result.runtime.live_solver).toBe(true);
     expect(oscillationLane.result.runtime.execution_mode).toBe("live_comparison");
     expect(oscillationLane.result.fit_status).toBe("comparison_completed");
+    expect(oscillationLane.result.diagnostic_summary.comparison_quality).toBeTruthy();
     expect(oscillationLane.result.benchmark_pack.id).toBe("solar_like_seismic_compare_pack_v1");
     expect(oscillationLane.benchmark_validation.passed).toBe(true);
     expect(oscillationLane.tree_dag.parent_claim_ids).toContain(structureLane.tree_dag.claim_id);
