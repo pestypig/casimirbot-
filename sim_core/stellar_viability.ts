@@ -46,7 +46,7 @@ export interface StellarStructureState {
   trap_density_m3?: number;
   chi_piezo?: number;
   material_gate?: boolean;
-  source_power_enabled?: boolean;
+  m2_source_power_enabled?: boolean;
 }
 
 export interface StellarViabilityWeights {
@@ -96,7 +96,8 @@ export interface StellarViabilityReport {
   wavelength_m: Float64Array;
   winner: StellarRadiationModelId;
   best_fit_winner: StellarRadiationModelId;
-  promotable_winner: StellarRadiationModelId;
+  promotable_winner: StellarRadiationModelId | null;
+  fallback_winner: StellarRadiationModelId;
   models: StellarModelResult[];
   null_model: StellarRadiationModelId;
   contract: {
@@ -325,7 +326,7 @@ function buildModelPredictions(input: StellarRadiationInput, wavelength_m: Float
   const trapProxy = computeProxyScale(Number(structure.trap_density_m3 ?? 0), 1e20);
   const piezoProxy = computeProxyScale(dEff, 1e-12);
   const materialGateEnabled = Boolean(structure.material_gate) || Number(structure.chi_piezo ?? 0) > 0;
-  const allowSourcePower = Boolean(structure.source_power_enabled);
+  const allowM2SourcePower = Boolean(structure.m2_source_power_enabled);
   const mechEnvelope = 0.35 * pressureProxy + 0.25 * stressRateProxy + 0.25 * trapProxy + 0.15 * Math.abs(xi);
   const mechAmplitude = aml * piezoProxy * mechEnvelope;
   const coherenceStrength = clamp01(Math.abs(xi) * (qCoh / (qCoh + 1)));
@@ -334,11 +335,12 @@ function buildModelPredictions(input: StellarRadiationInput, wavelength_m: Float
     const modifier = 1 + alphaXi * xi * latticeKernel[index];
     return value * Math.max(0, modifier);
   });
-  const lattice = renormalizeToTargetFlux(wavelength_m, latticeRaw, baseIntegral, allowSourcePower);
+  const lattice = renormalizeToTargetFlux(wavelength_m, latticeRaw, baseIntegral, false);
 
-  const mech = materialGateEnabled
+  const mechRaw = materialGateEnabled
     ? Float64Array.from(lattice, (value, index) => Math.max(0, value + baseIntegral * mechAmplitude * mechKernel[index]))
     : Float64Array.from(lattice);
+  const mech = renormalizeToTargetFlux(wavelength_m, mechRaw, baseIntegral, allowM2SourcePower);
 
   const coherenceRedistribution = Float64Array.from(lattice, (value, index) => {
     return coherenceStrength * Math.abs(value) * coherenceKernel[index];
@@ -347,7 +349,7 @@ function buildModelPredictions(input: StellarRadiationInput, wavelength_m: Float
   const coherenceRaw = Float64Array.from(lattice, (value, index) => {
     return Math.max(0, value + coherenceRedistribution[index] - redistributionMean);
   });
-  const coherence = renormalizeToTargetFlux(wavelength_m, coherenceRaw, baseIntegral, allowSourcePower);
+  const coherence = renormalizeToTargetFlux(wavelength_m, coherenceRaw, baseIntegral, false);
 
   return [
     { id: "M0_planck_atmosphere", predicted: base, anisotropy: 0, polarization: 0 },
@@ -427,14 +429,17 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
   const byScore = [...models].sort((left, right) => left.metrics.total - right.metrics.total);
   const bestFitWinner = byScore[0]?.id ?? "M0_planck_atmosphere";
   const promotable = byScore.find((entry) => entry.passes_contract);
-  const promotableWinner = promotable?.id ?? "M0_planck_atmosphere";
+  const promotableWinner = promotable?.id ?? null;
+  const fallbackWinner: StellarRadiationModelId = "M0_planck_atmosphere";
+  const winner = promotableWinner ?? fallbackWinner;
 
   return {
     teff_K,
     wavelength_m,
-    winner: promotableWinner,
+    winner,
     best_fit_winner: bestFitWinner,
     promotable_winner: promotableWinner,
+    fallback_winner: fallbackWinner,
     models: byScore,
     null_model: "M0_planck_atmosphere",
     contract: DEFAULT_CONTRACT,

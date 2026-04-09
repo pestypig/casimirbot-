@@ -28,6 +28,9 @@ type ResolverTree = { id: string; path: string };
 type Resolvers = { trees: ResolverTree[] };
 type TreeNode = {
   id: string;
+  validity?: {
+    equation_ref?: string;
+  };
   derived_residual?: {
     schema?: string;
     equation_ref?: string;
@@ -126,6 +129,33 @@ describe("physics root-lane tree parity", () => {
         expect(residual?.uncertainty?.model).toBeTruthy();
         expect(canonicalEquationIds.has(String(residual?.equation_ref ?? ""))).toBe(true);
       }
+    }
+  });
+
+  it("threads hardened stellar M0 radiative-transfer equations into the stellar lane tree", () => {
+    const repoRoot = process.cwd();
+    const treePath = path.join(
+      repoRoot,
+      "docs",
+      "knowledge",
+      "physics",
+      "physics-stellar-structure-nucleosynthesis-tree.json",
+    );
+    const tree = JSON.parse(fs.readFileSync(treePath, "utf8")) as LaneTree;
+
+    const requiredRefs = [
+      "stellar_radiative_transfer_equation",
+      "stellar_lte_source_function",
+      "stellar_nlte_source_function",
+      "stellar_continuum_opacity_sum",
+      "stellar_population_ionization_balance_diagnostic",
+    ];
+    const refsInTree = new Set(
+      tree.nodes.map((entry) => String(entry.validity?.equation_ref ?? "").trim()).filter(Boolean),
+    );
+
+    for (const equationRef of requiredRefs) {
+      expect(refsInTree.has(equationRef)).toBe(true);
     }
   });
 
