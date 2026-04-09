@@ -475,6 +475,104 @@ describe("nhm2 source closure artifact v2", () => {
     expect(region.tileT00Diagnostics?.sumT00).toBeNull();
   });
 
+  it("preserves null includedCount when reducer-native evidence is absent", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          sampleCount: 10,
+          metricAccounting: makeAccounting(10, "metric"),
+          tileAccounting: makeAccounting(10, "tile"),
+          tileT00Diagnostics: {
+            sampleCount: 10,
+            includedCount: null,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: -100,
+            sumT00: -1000,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "unknown",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    expect(artifact.regionComparisons.regions[0]?.tileT00Diagnostics?.includedCount).toBeNull();
+  });
+
+  it("keeps synthesized sumT00 evidence away from measured", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      tileEffectiveTensor: {
+        T00: -100,
+        T11: 100,
+        T22: 100,
+        T33: 100,
+      },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          sampleCount: 10,
+          metricAccounting: makeAccounting(10, "metric"),
+          tileAccounting: makeAccounting(10, "tile"),
+          tileT00Diagnostics: {
+            sampleCount: 10,
+            includedCount: null,
+            skippedCount: null,
+            nonFiniteCount: null,
+            meanT00: -100,
+            sumT00: null,
+            normalizationBasis: "sample_count",
+            aggregationMode: "mean",
+            evidenceStatus: "inferred",
+          },
+        },
+      ],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: null,
+    });
+
+    expect(artifact.regionComparisons.regions[0]?.tileT00Diagnostics?.evidenceStatus).not.toBe(
+      "measured",
+    );
+  });
+
   it("preserves proxy component attribution fields without coercion", () => {
     const artifact = buildNhm2SourceClosureArtifactV2({
       metricTensorRef: "warp.metricStressEnergy",
