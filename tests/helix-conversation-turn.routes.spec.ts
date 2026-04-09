@@ -30,6 +30,7 @@ const buildApp = async () => {
 const historyTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-conversation-history-route-"));
 const historyLogPath = path.join(historyTempDir, "helix-conversation-history.jsonl");
 const threadLedgerPath = path.join(historyTempDir, "helix-thread-ledger.jsonl");
+const threadIndexPath = path.join(historyTempDir, "helix-thread-index.json");
 
 describe("conversation-turn route", () => {
   beforeEach(() => {
@@ -37,6 +38,7 @@ describe("conversation-turn route", () => {
     process.env.HELIX_ASK_CONVERSATION_HISTORY_AUDIT_PATH = historyLogPath;
     process.env.HELIX_ASK_CONVERSATION_HISTORY_PERSIST = "1";
     process.env.HELIX_THREAD_LEDGER_PATH = threadLedgerPath;
+    process.env.HELIX_THREAD_INDEX_PATH = threadIndexPath;
     process.env.HELIX_THREAD_PERSIST = "1";
     llmLocalHandlerMock.mockReset();
   });
@@ -44,7 +46,7 @@ describe("conversation-turn route", () => {
   afterEach(async () => {
     vi.clearAllMocks();
     for (const name of fs.readdirSync(historyTempDir)) {
-      if (name.endsWith(".jsonl")) {
+      if (name.endsWith(".jsonl") || name.endsWith(".json")) {
         fs.rmSync(path.join(historyTempDir, name), { force: true });
       }
     }
@@ -54,11 +56,16 @@ describe("conversation-turn route", () => {
     const { __resetHelixThreadLedgerStore } = await import(
       "../server/services/helix-thread/ledger"
     );
+    const { __resetHelixThreadRegistryStore } = await import(
+      "../server/services/helix-thread/registry"
+    );
     __resetConversationHistoryStore();
     __resetHelixThreadLedgerStore();
+    __resetHelixThreadRegistryStore();
     delete process.env.HELIX_ASK_CONVERSATION_HISTORY_AUDIT_PATH;
     delete process.env.HELIX_ASK_CONVERSATION_HISTORY_PERSIST;
     delete process.env.HELIX_THREAD_LEDGER_PATH;
+    delete process.env.HELIX_THREAD_INDEX_PATH;
     delete process.env.HELIX_THREAD_PERSIST;
   });
 
@@ -187,9 +194,30 @@ describe("conversation-turn route", () => {
     const { getHelixThreadLedgerEvents } = await import(
       "../server/services/helix-thread/ledger"
     );
+    const seededEventTypes = getHelixThreadLedgerEvents({
+      sessionId: "session-history-seed",
+    }).map((entry) => entry.event_type);
+    expect(seededEventTypes).toEqual(
+      expect.arrayContaining([
+        "thread_started",
+        "turn_started",
+        "item_started",
+        "item_completed",
+        "conversation_turn_started",
+        "conversation_turn_classified",
+        "conversation_turn_brief_ready",
+        "turn_completed",
+        "conversation_turn_completed",
+      ]),
+    );
     expect(
-      getHelixThreadLedgerEvents({ sessionId: "session-history-seed" }).map(
-        (entry) => entry.event_type,
+      seededEventTypes.filter((eventType) =>
+        [
+          "conversation_turn_started",
+          "conversation_turn_classified",
+          "conversation_turn_brief_ready",
+          "conversation_turn_completed",
+        ].includes(eventType),
       ),
     ).toEqual([
       "conversation_turn_started",
@@ -277,9 +305,31 @@ describe("conversation-turn route", () => {
       "dottie: I am explaining the current evidence trail in a conversational follow-up.",
     );
     const { getHelixThreadLedgerEvents } = await import("../server/services/helix-thread/ledger");
+    const restartedEventTypes = getHelixThreadLedgerEvents({
+      sessionId: "session-history-restart",
+    }).map((entry) => entry.event_type);
+    expect(restartedEventTypes).toEqual(
+      expect.arrayContaining([
+        "thread_started",
+        "thread_resumed",
+        "turn_started",
+        "item_started",
+        "item_completed",
+        "conversation_turn_started",
+        "conversation_turn_classified",
+        "conversation_turn_brief_ready",
+        "turn_completed",
+        "conversation_turn_completed",
+      ]),
+    );
     expect(
-      getHelixThreadLedgerEvents({ sessionId: "session-history-restart" }).map(
-        (entry) => entry.event_type,
+      restartedEventTypes.filter((eventType) =>
+        [
+          "conversation_turn_started",
+          "conversation_turn_classified",
+          "conversation_turn_brief_ready",
+          "conversation_turn_completed",
+        ].includes(eventType),
       ),
     ).toEqual([
       "conversation_turn_started",
@@ -470,5 +520,173 @@ describe("conversation-turn route", () => {
     expect(
       /^(?:dispatch:|suppressed:low_salience)/.test(String(res.body.route_reason_code ?? "")),
     ).toBe(true);
+  }, 20000);
+
+  it("reuses an explicit thread id across restart instead of falling back to the session id", async () => {
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.81,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Initial turn detected.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          brief: "I am keeping the thread continuity explicit and replayable.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.79,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Follow-up turn detected.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          brief: "I am still on the same thread after restart.",
+        }),
+      });
+
+    const firstApp = await buildApp();
+    const first = await request(firstApp).post("/api/agi/ask/conversation-turn").send({
+      sessionId: "session-explicit-thread",
+      traceId: "explicit-thread-1",
+      transcript: "Keep this continuity on one thread.",
+    });
+    expect(first.status).toBe(200);
+    expect(String(first.body.thread_id ?? "")).toMatch(/^thread:/);
+    expect(first.body.thread_id).not.toBe("session-explicit-thread");
+
+    vi.resetModules();
+    const restartedApp = await buildApp();
+    const second = await request(restartedApp).post("/api/agi/ask/conversation-turn").send({
+      sessionId: "session-explicit-thread",
+      traceId: "explicit-thread-2",
+      transcript: "Resume that same thread after restart.",
+    });
+    expect(second.status).toBe(200);
+    expect(second.body.thread_id).toBe(first.body.thread_id);
+  }, 20000);
+
+  it("supports same-turn steering for steerable turns and rejects non-steerable ones", async () => {
+    const {
+      appendHelixTurnEvent,
+      appendHelixThreadItemEvent,
+      getHelixThreadLedgerEvents,
+    } = await import("../server/services/helix-thread/ledger");
+    const {
+      startHelixThread,
+      updateHelixThreadRecord,
+    } = await import("../server/services/helix-thread/registry");
+
+    const steerThread = startHelixThread({
+      sessionId: "session-steerable-turn",
+      titlePreview: "steerable thread",
+    });
+    updateHelixThreadRecord({
+      threadId: steerThread.thread_id,
+      patch: {
+        status: "active",
+        latest_turn_id: "active-conversation-turn",
+        active_turn_id: "active-conversation-turn",
+      },
+    });
+    appendHelixTurnEvent({
+      thread_id: steerThread.thread_id,
+      route: "/ask/conversation-turn",
+      event_type: "turn_started",
+      turn_id: "active-conversation-turn",
+      session_id: "session-steerable-turn",
+      trace_id: "seed-steerable-turn",
+      turn_kind: "conversation_turn",
+      thread_status: "active",
+    });
+    appendHelixThreadItemEvent({
+      thread_id: steerThread.thread_id,
+      route: "/ask/conversation-turn",
+      event_type: "item_started",
+      turn_id: "active-conversation-turn",
+      session_id: "session-steerable-turn",
+      trace_id: "seed-steerable-turn",
+      turn_kind: "conversation_turn",
+      item_id: "seed-user-item",
+      item_type: "userMessage",
+      item_status: "in_progress",
+      user_text: "Seed turn text",
+    });
+
+    const reviewThread = startHelixThread({
+      sessionId: "session-review-turn",
+      titlePreview: "review thread",
+    });
+    updateHelixThreadRecord({
+      threadId: reviewThread.thread_id,
+      patch: {
+        status: "active",
+        latest_turn_id: "active-review-turn",
+        active_turn_id: "active-review-turn",
+      },
+    });
+    appendHelixTurnEvent({
+      thread_id: reviewThread.thread_id,
+      route: "/ask/conversation-turn",
+      event_type: "turn_started",
+      turn_id: "active-review-turn",
+      session_id: "session-review-turn",
+      trace_id: "seed-review-turn",
+      turn_kind: "review",
+      thread_status: "active",
+    });
+
+    llmLocalHandlerMock
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          mode: "observe",
+          confidence: 0.73,
+          dispatch_hint: true,
+          clarify_needed: false,
+          reason: "Steering follow-up detected.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          brief: "I am continuing the same active turn.",
+        }),
+      });
+
+    const app = await buildApp();
+    const steered = await request(app).post("/api/agi/ask/conversation-turn").send({
+      sessionId: "session-steerable-turn",
+      threadId: steerThread.thread_id,
+      steerActiveTurn: true,
+      expectedTurnId: "active-conversation-turn",
+      transcript: "Keep going in the same turn.",
+    });
+    expect(steered.status).toBe(200);
+    expect(steered.body.turn_id).toBe("active-conversation-turn");
+    expect(steered.body.thread_id).toBe(steerThread.thread_id);
+    expect(
+      getHelixThreadLedgerEvents({
+        threadId: steerThread.thread_id,
+        turnId: "active-conversation-turn",
+      }).some((entry) => entry.item_type === "userMessage"),
+    ).toBe(true);
+
+    const rejected = await request(app).post("/api/agi/ask/conversation-turn").send({
+      sessionId: "session-review-turn",
+      threadId: reviewThread.thread_id,
+      steerActiveTurn: true,
+      expectedTurnId: "active-review-turn",
+      transcript: "Try to steer the review turn.",
+    });
+    expect(rejected.status).toBe(409);
+    expect(rejected.body.code).toBe("active_turn_not_steerable");
+    expect(rejected.body.turn_kind).toBe("review");
   }, 20000);
 });

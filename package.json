@@ -170,6 +170,8 @@
     "warp:full-solve:nhm2-shift-lapse:publish-boundary-sweep": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-boundary-sweep",
     "warp:full-solve:nhm2-shift-lapse:publish-envelope-suite": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-envelope-suite",
     "warp:full-solve:nhm2-shift-lapse:publish-strict-signal-readiness": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-strict-signal-readiness --reuse-existing-selected-shift-lapse-artifacts true",
+    "warp:full-solve:nhm2-shift-lapse:publish-source-closure": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-source-closure --reuse-existing-selected-shift-lapse-artifacts true",
+    "warp:full-solve:nhm2-shift-lapse:publish-observer-audit": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-observer-audit --reuse-existing-selected-shift-lapse-artifacts true",
     "warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit": "tsx scripts/warp-york-control-family-proof-pack.ts --publish-selected-shift-lapse-full-loop-audit --reuse-existing-selected-shift-lapse-artifacts true",
     "warp:promotion:readiness:check": "tsx scripts/warp-promotion-readiness-check.ts",
     "warp:deliverable:build": "tsx scripts/warp-deliverable-build.ts",

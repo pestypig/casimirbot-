@@ -7,6 +7,7 @@ import type {
   StarSimWorkerResponse,
   StructureMesaWorkerResult,
 } from "./starsim-worker-types";
+import { __resetStarSimRuntimeProbeCacheForTest } from "./starsim-runtime";
 
 type PendingTask = {
   resolve: (value: StructureMesaWorkerResult | OscillationGyreWorkerResult) => void;
@@ -56,12 +57,14 @@ const createWorker = () => {
   });
   worker.on("message", handleWorkerMessage);
   worker.on("error", (error) => {
-    rejectAllPending(error instanceof Error ? error : new Error(String(error)));
+    rejectAllPending(
+      error instanceof Error ? new Error(`star_sim_worker_error:${error.message}`) : new Error(String(error)),
+    );
     starSimWorker = null;
   });
   worker.on("exit", (code) => {
-    if (code !== 0) {
-      rejectAllPending(new Error(`Star-sim worker exited with code ${code}`));
+    if (pending.size > 0) {
+      rejectAllPending(new Error(`star_sim_worker_exit:${code}`));
     }
     starSimWorker = null;
   });
@@ -87,10 +90,19 @@ const submitTask = <T extends StructureMesaWorkerResult | OscillationGyreWorkerR
     if (STAR_SIM_WORKER_TIMEOUT_MS > 0) {
       task.timeout = setTimeout(() => {
         pending.delete(request.id);
-        reject(new Error("Star-sim worker timed out"));
+        const workerToTerminate = starSimWorker;
+        starSimWorker = null;
+        if (workerToTerminate) {
+          void workerToTerminate.terminate();
+        }
+        reject(new Error("star_sim_worker_timeout"));
       }, STAR_SIM_WORKER_TIMEOUT_MS);
     }
     pending.set(request.id, task);
+    if (process.env.STAR_SIM_WORKER_CRASH_ON_KIND === request.kind) {
+      void worker.terminate();
+      return;
+    }
     worker.postMessage(request);
   });
 };
@@ -121,6 +133,7 @@ export const runOscillationGyreInWorker = (args: {
   });
 
 export const __resetStarSimWorkerForTest = async (): Promise<void> => {
+  __resetStarSimRuntimeProbeCacheForTest();
   for (const [id, task] of pending.entries()) {
     pending.delete(id);
     if (task.timeout) clearTimeout(task.timeout);
@@ -131,4 +144,13 @@ export const __resetStarSimWorkerForTest = async (): Promise<void> => {
     starSimWorker = null;
     await worker.terminate();
   }
+};
+
+export const __terminateStarSimWorkerForTest = async (): Promise<void> => {
+  if (!starSimWorker) {
+    return;
+  }
+  const worker = starSimWorker;
+  starSimWorker = null;
+  await worker.terminate();
 };

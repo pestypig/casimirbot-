@@ -1,3 +1,4 @@
+import { inferBenchmarkCaseIdForCanonicalStar } from "./benchmarks";
 import type { CanonicalField, CanonicalStar, FieldStatus, RequestedLane, StarSimRequest } from "./contract";
 
 type SectionMeta = {
@@ -85,7 +86,7 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
   const orbital = request.orbital_context;
   const environment = request.environment;
 
-  return {
+  const canonical: CanonicalStar = {
     schema_version: "star-sim-v1",
     target: {
       object_id: objectId,
@@ -318,5 +319,11 @@ export function canonicalizeStarSimRequest(request: StarSimRequest): CanonicalSt
     evidence_refs: Array.from(new Set(request.evidence_refs ?? [])),
     requested_lanes: request.requested_lanes ?? defaultRequestedLanes(request, solar),
     strict_lanes: request.strict_lanes === true,
+    benchmark_case_id: request.benchmark_case_id?.trim() || null,
+    physics_flags: Object.fromEntries(
+      Object.entries(request.physics_flags ?? {}).sort(([left], [right]) => left.localeCompare(right)),
+    ),
   };
+  canonical.benchmark_case_id = canonical.benchmark_case_id ?? inferBenchmarkCaseIdForCanonicalStar(canonical);
+  return canonical;
 }

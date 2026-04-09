@@ -35,15 +35,15 @@ starSimRouter.post("/v1/jobs", async (req, res) => {
     });
   }
 
-  const job = submitStarSimJob(parsed.data);
+  const job = await submitStarSimJob(parsed.data);
   return res.status(202).json({
     ...job,
     result_url: `/api/star-sim/v1/jobs/${job.job_id}/result`,
   });
 });
 
-starSimRouter.get("/v1/jobs/:jobId", (req, res) => {
-  const job = getStarSimJob(req.params.jobId);
+starSimRouter.get("/v1/jobs/:jobId", async (req, res) => {
+  const job = await getStarSimJob(req.params.jobId);
   if (!job) {
     return res.status(404).json({
       error: "star_sim_job_not_found",
@@ -56,7 +56,7 @@ starSimRouter.get("/v1/jobs/:jobId", (req, res) => {
 });
 
 starSimRouter.get("/v1/jobs/:jobId/result", async (req, res) => {
-  const job = getStarSimJob(req.params.jobId);
+  const job = await getStarSimJob(req.params.jobId);
   if (!job) {
     return res.status(404).json({
       error: "star_sim_job_not_found",

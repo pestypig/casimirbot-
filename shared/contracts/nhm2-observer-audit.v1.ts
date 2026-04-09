@@ -122,6 +122,7 @@ export type Nhm2ObserverAuditArtifact = {
   artifactId: typeof NHM2_OBSERVER_AUDIT_ARTIFACT_ID;
   schemaVersion: typeof NHM2_OBSERVER_AUDIT_SCHEMA_VERSION;
   familyId: string;
+  shiftLapseProfileId?: string | null;
   status: Nhm2ObserverAuditStatus;
   completeness: Nhm2ObserverAuditCompleteness;
   reasonCodes: Nhm2ObserverAuditReasonCode[];
@@ -193,6 +194,7 @@ export type BuildNhm2ObserverAuditTensorInput = {
 
 export type BuildNhm2ObserverAuditArtifactInput = {
   familyId?: string | null;
+  shiftLapseProfileId?: string | null;
   metricRequired?: BuildNhm2ObserverAuditTensorInput;
   tileEffective?: BuildNhm2ObserverAuditTensorInput;
 };
@@ -396,6 +398,7 @@ export const buildNhm2ObserverAuditArtifact = (
     artifactId: NHM2_OBSERVER_AUDIT_ARTIFACT_ID,
     schemaVersion: NHM2_OBSERVER_AUDIT_SCHEMA_VERSION,
     familyId: asText(input.familyId) ?? "nhm2_shift_lapse",
+    shiftLapseProfileId: asText(input.shiftLapseProfileId),
     status,
     completeness,
     reasonCodes,
@@ -471,6 +474,9 @@ export const isNhm2ObserverAuditArtifact = (
     record.artifactId === NHM2_OBSERVER_AUDIT_ARTIFACT_ID &&
     record.schemaVersion === NHM2_OBSERVER_AUDIT_SCHEMA_VERSION &&
     typeof record.familyId === "string" &&
+    (record.shiftLapseProfileId === undefined ||
+      record.shiftLapseProfileId === null ||
+      typeof record.shiftLapseProfileId === "string") &&
     NHM2_OBSERVER_AUDIT_STATUS_VALUES.includes(
       record.status as Nhm2ObserverAuditStatus,
     ) &&

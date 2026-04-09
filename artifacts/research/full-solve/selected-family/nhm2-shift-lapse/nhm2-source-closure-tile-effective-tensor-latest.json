@@ -1,0 +1,18 @@
+{
+  "artifactId": "nhm2_source_closure_diagonal_tensor",
+  "schemaVersion": "nhm2_source_closure_diagonal_tensor/v1",
+  "tensorRole": "tile_effective",
+  "familyId": "nhm2_shift_lapse",
+  "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
+  "shiftLapseProfileStage": "controlled_tuning_stage_1",
+  "tensorSemanticRef": "warp.tileEffectiveStressEnergy.nhm2_shift_lapse.diagonal",
+  "sourceArtifactPath": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-shift-lapse-transport-result-latest.json",
+  "producer": "scripts/warp-york-control-family-proof-pack.ts",
+  "diagonalTensor": {
+    "T00": -0.11480523685564506,
+    "T11": 0.11480523685564506,
+    "T22": 0.05740261842782253,
+    "T33": 0.11480523685564506
+  },
+  "note": "Selected-profile global tile-effective diagonal tensor used by NHM2 source-closure publication."
+}

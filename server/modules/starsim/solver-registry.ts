@@ -156,6 +156,8 @@ export async function runStarSim(
   const solverManifest = {
     requested_lanes: canonical.requested_lanes,
     strict_lanes: canonical.strict_lanes,
+    benchmark_case_id: canonical.benchmark_case_id,
+    physics_flags: canonical.physics_flags,
     lanes: scored.lanes.map((lane) => ({
       lane_id: lane.lane_id,
       requested_lane: lane.requested_lane,
@@ -171,8 +173,8 @@ export async function runStarSim(
     schema_version: "star-sim-v1",
     meta: {
       contract_version: "star-sim-v1",
-      normalization_version: "star-sim.canonicalize/2",
-      solver_manifest_version: "star-sim.registry/3",
+      normalization_version: "star-sim.canonicalize/3",
+      solver_manifest_version: "star-sim.registry/5",
       congruence_version: "star-sim.harmonic/2",
       claim_identity_version: "star-sim.claims/3",
       deterministic_request_hash: hashStableJson(request),

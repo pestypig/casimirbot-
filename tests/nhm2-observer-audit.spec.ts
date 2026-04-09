@@ -31,6 +31,7 @@ describe("nhm2 observer audit artifact", () => {
   it("captures both tensor paths and labels surrogate limits explicitly", () => {
     const artifact = buildNhm2ObserverAuditArtifact({
       familyId: "nhm2_shift_lapse",
+      shiftLapseProfileId: "stage1_centerline_alpha_0p995_v1",
       metricRequired: {
         tensorRef: "warp.metricStressEnergy",
         sampleCount: 1,
@@ -98,6 +99,7 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.schemaVersion).toBe(NHM2_OBSERVER_AUDIT_SCHEMA_VERSION);
     expect(artifact.status).toBe("review");
     expect(artifact.completeness).toBe("incomplete");
+    expect(artifact.shiftLapseProfileId).toBe("stage1_centerline_alpha_0p995_v1");
     expect(artifact.reasonCodes).toEqual(
       expect.arrayContaining([
         "metric_audit_incomplete",

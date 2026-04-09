@@ -19,11 +19,14 @@ export const requestedLaneSchema = z.enum([
 ]);
 export const laneStatusSchema = z.enum(["available", "unavailable", "not_applicable", "failed"]);
 export const executionKindSchema = z.enum(["simulation", "diagnostic", "replay", "analytic", "fit"]);
-export const starSimJobStatusSchema = z.enum(["queued", "running", "completed", "failed"]);
+export const starSimExternalRuntimeKindSchema = z.enum(["mock", "docker", "wsl", "disabled"]);
+export const starSimArtifactIntegritySchema = z.enum(["verified", "missing", "corrupt", "stale", "unknown"]);
+export const starSimJobStatusSchema = z.enum(["queued", "running", "completed", "failed", "abandoned"]);
 export const starSimArtifactRefSchema = z.object({
   kind: z.string().min(1),
   path: z.string().min(1),
   hash: z.string().min(1).optional(),
+  integrity_status: starSimArtifactIntegritySchema.optional(),
 });
 
 const sectionMetaShape = {
@@ -137,6 +140,8 @@ const environmentSchema = z
   })
   .optional();
 
+const physicsFlagsSchema = z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional();
+
 export const starSimRequestSchema = z
   .object({
     target: targetSchema,
@@ -152,6 +157,8 @@ export const starSimRequestSchema = z
     evidence_refs: z.array(z.string()).optional(),
     requested_lanes: z.array(requestedLaneSchema).optional(),
     strict_lanes: z.boolean().optional(),
+    benchmark_case_id: z.string().min(1).optional(),
+    physics_flags: physicsFlagsSchema,
   })
   .strict();
 
@@ -161,10 +168,29 @@ export type Maturity = z.infer<typeof maturitySchema>;
 export type RequestedLane = z.infer<typeof requestedLaneSchema>;
 export type LaneStatus = z.infer<typeof laneStatusSchema>;
 export type ExecutionKind = z.infer<typeof executionKindSchema>;
+export type StarSimExternalRuntimeKind = z.infer<typeof starSimExternalRuntimeKindSchema>;
+export type StarSimArtifactIntegrityStatus = z.infer<typeof starSimArtifactIntegritySchema>;
 export type StarSimJobStatus = z.infer<typeof starSimJobStatusSchema>;
 export type StarSimArtifactRef = z.infer<typeof starSimArtifactRefSchema>;
+export type PhysicsFlagValue = string | number | boolean | null;
 export type ObsClass = "O0" | "O1" | "O2" | "O3" | "O4" | "O5";
 export type PhysClass = "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
+
+export interface StarSimBenchmarkMetricCheck {
+  metric_id: string;
+  actual: number;
+  expected: number;
+  tolerance: number;
+  comparator: "abs";
+  passed: boolean;
+}
+
+export interface StarSimBenchmarkValidation {
+  passed: boolean;
+  tolerance_profile: string;
+  checked_metrics: StarSimBenchmarkMetricCheck[];
+  notes: string[];
+}
 
 export interface CanonicalField<T = unknown> {
   value: T | null;
@@ -248,6 +274,8 @@ export interface CanonicalStar {
   evidence_refs: string[];
   requested_lanes: RequestedLane[];
   strict_lanes: boolean;
+  benchmark_case_id: string | null;
+  physics_flags: Record<string, PhysicsFlagValue>;
 }
 
 export interface TreeDagClaim {
@@ -278,6 +306,12 @@ export interface StarSimLaneResult {
   result: Record<string, unknown>;
   artifact_refs?: StarSimArtifactRef[];
   cache_key?: string;
+  runtime_mode?: StarSimExternalRuntimeKind;
+  runtime_fingerprint?: string;
+  artifact_integrity_status?: StarSimArtifactIntegrityStatus;
+  cache_status?: "hit" | "missing" | "stale" | "corrupt" | "incompatible";
+  cache_status_reason?: string;
+  benchmark_validation?: StarSimBenchmarkValidation;
   evidence_fit: number;
   domain_penalty: number;
   lane_score?: number;
@@ -316,8 +350,8 @@ export interface StarSimResponse {
   schema_version: "star-sim-v1";
   meta: {
     contract_version: "star-sim-v1";
-    normalization_version: "star-sim.canonicalize/2";
-    solver_manifest_version: "star-sim.registry/3";
+    normalization_version: "star-sim.canonicalize/3";
+    solver_manifest_version: "star-sim.registry/5";
     congruence_version: "star-sim.harmonic/2";
     claim_identity_version: "star-sim.claims/3";
     deterministic_request_hash: string;
@@ -345,13 +379,19 @@ export interface StarSimResponse {
 export interface StarSimJobRecord {
   job_id: string;
   status: StarSimJobStatus;
+  status_reason: string | null;
   created_at_iso: string;
   started_at_iso: string | null;
   completed_at_iso: string | null;
   requested_lanes: RequestedLane[];
   heavy_lanes: RequestedLane[];
   request_hash: string;
+  job_fingerprint: string;
+  attempt_count: number;
+  max_attempts: number;
   queue_position: number;
   result_path: string | null;
   error: string | null;
+  deduped: boolean;
+  deduped_from_job_id: string | null;
 }

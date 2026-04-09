@@ -89,8 +89,21 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
 import {
+  buildNhm2SourceClosureArtifact,
+  type Nhm2SourceClosureArtifact,
+  type Nhm2SourceClosureSampledSummaryInput,
+  type Nhm2SourceClosureTensor,
+} from "../shared/contracts/nhm2-source-closure.v1";
+import {
+  buildNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+  isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+  type Nhm2SourceClosureDiagonalTensorSnapshotArtifact,
+} from "../shared/contracts/nhm2-source-closure-diagonal-tensor.v1";
+import {
+  buildNhm2ObserverAuditArtifact,
   isNhm2ObserverAuditArtifact,
   type Nhm2ObserverAuditArtifact,
+  type BuildNhm2ObserverAuditTensorInput,
 } from "../shared/contracts/nhm2-observer-audit.v1";
 import {
   isCertifiedWarpWorldlineContract,
@@ -611,6 +624,22 @@ const DEFAULT_STRICT_SIGNAL_READINESS_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-strict-signal-readiness-latest.md",
 );
+const DEFAULT_OBSERVER_AUDIT_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-observer-audit-${DATE_STAMP}.json`,
+);
+const DEFAULT_OBSERVER_AUDIT_LATEST_JSON = path.join(
+  FULL_SOLVE_DIR,
+  "nhm2-observer-audit-latest.json",
+);
+const DEFAULT_OBSERVER_AUDIT_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-observer-audit-${DATE_STAMP}.md`,
+);
+const DEFAULT_OBSERVER_AUDIT_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-observer-audit-latest.md",
+);
 const DEFAULT_FULL_LOOP_AUDIT_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
   `nhm2-full-loop-audit-${DATE_STAMP}.json`,
@@ -626,6 +655,18 @@ const DEFAULT_FULL_LOOP_AUDIT_OUT_MD = path.join(
 const DEFAULT_FULL_LOOP_AUDIT_LATEST_MD = path.join(
   DOC_AUDIT_DIR,
   "warp-nhm2-full-loop-audit-latest.md",
+);
+const DEFAULT_SOURCE_CLOSURE_OUT_JSON = path.join(
+  FULL_SOLVE_DIR,
+  `nhm2-source-closure-${DATE_STAMP}.json`,
+);
+const DEFAULT_SOURCE_CLOSURE_OUT_MD = path.join(
+  DOC_AUDIT_DIR,
+  `warp-nhm2-source-closure-${DATE_STAMP}.md`,
+);
+const DEFAULT_SOURCE_CLOSURE_LATEST_MD = path.join(
+  DOC_AUDIT_DIR,
+  "warp-nhm2-source-closure-latest.md",
 );
 const DEFAULT_ENVELOPE_PERTURBATION_SUITE_OUT_JSON = path.join(
   FULL_SOLVE_DIR,
@@ -721,6 +762,22 @@ const SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_MD = path.join(
   SELECTED_FAMILY_DOC_AUDIT_DIR,
   "warp-nhm2-shift-lapse-transport-result-latest.md",
 );
+const SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_METRIC_TENSOR_OUT_JSON = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  `nhm2-source-closure-metric-required-tensor-${DATE_STAMP}.json`,
+);
+const SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_METRIC_TENSOR_LATEST_JSON = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  "nhm2-source-closure-metric-required-tensor-latest.json",
+);
+const SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_TILE_TENSOR_OUT_JSON = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  `nhm2-source-closure-tile-effective-tensor-${DATE_STAMP}.json`,
+);
+const SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_TILE_TENSOR_LATEST_JSON = path.join(
+  SELECTED_FAMILY_FULL_SOLVE_DIR,
+  "nhm2-source-closure-tile-effective-tensor-latest.json",
+);
 const SELECTED_SHIFT_LAPSE_SWEEP_ARTIFACT_DIR = path.join(
   SELECTED_FAMILY_FULL_SOLVE_DIR,
   "sweep",
@@ -807,6 +864,10 @@ const SELECTED_SHIFT_LAPSE_ENVELOPE_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-envelope-suite";
 const SELECTED_SHIFT_LAPSE_STRICT_SIGNAL_READINESS_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-strict-signal-readiness";
+const SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-source-closure";
+const SELECTED_SHIFT_LAPSE_OBSERVER_AUDIT_COMMAND =
+  "npm run warp:full-solve:nhm2-shift-lapse:publish-observer-audit";
 const SELECTED_SHIFT_LAPSE_FULL_LOOP_AUDIT_COMMAND =
   "npm run warp:full-solve:nhm2-shift-lapse:publish-full-loop-audit";
 const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
@@ -820,10 +881,6 @@ const SELECTED_SHIFT_LAPSE_PUBLICATION_SELECTORS: ControlRequestSelectors = {
 const DEFAULT_SOURCE_CLOSURE_LATEST_JSON = path.join(
   FULL_SOLVE_DIR,
   "nhm2-source-closure-latest.json",
-);
-const DEFAULT_OBSERVER_AUDIT_LATEST_JSON = path.join(
-  FULL_SOLVE_DIR,
-  "nhm2-observer-audit-latest.json",
 );
 const DEFAULT_RENDER_TAXONOMY_CANONICAL_ROOT = path.join(FULL_SOLVE_DIR, "rendered");
 const DEFAULT_YORK_CANONICAL_CALIBRATION_OUT_JSON = path.join(
@@ -26940,88 +26997,37 @@ const resolveStrictSignalPublishedFamilyId = (args: {
   return familyId;
 };
 
-const buildMissingStrictSignalReason = (
-  signalId: "theta" | "ts" | "qi",
-): string => {
-  switch (signalId) {
-    case "theta":
-      return "No emitted selected-profile artifact currently publishes theta metric-derivation provenance.";
-    case "ts":
-      return "No emitted selected-profile artifact currently publishes TS metric-derivation provenance.";
-    case "qi":
-      return "No emitted selected-profile artifact currently publishes QI metric-derivation provenance or applicability status.";
-  }
-};
-
-const buildNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile = (args: {
+const resolveNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile = (args: {
   transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
   worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
   missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+  strictSignalArtifact: Nhm2StrictSignalReadinessArtifact;
 }): Nhm2StrictSignalReadinessArtifact => {
   const familyId = resolveStrictSignalPublishedFamilyId(args);
   const selectedProfileId = resolveStrictSignalPublishedProfileId(args);
-  const shiftGate =
-    resolvePublishedShiftLapseGate(args.worldlineArtifact) ??
-    resolvePublishedShiftLapseGate(args.missionTimeComparisonArtifact);
-  const shiftLapseProfileStage =
-    args.transportResultArtifact.selectedFamily.shiftLapseProfileStage ??
-    asText(shiftGate?.shiftLapseProfileStage);
-  const shiftLapseProfileLabel = asText(shiftGate?.shiftLapseProfileLabel);
-  const shiftLapseProfileNote =
-    args.transportResultArtifact.selectedFamily.shiftLapseProfileNote ??
-    asText(shiftGate?.shiftLapseProfileNote);
-  const familyAuthorityStatus =
-    args.worldlineArtifact.sourceSurface.familyAuthorityStatus ??
-    args.missionTimeComparisonArtifact.sourceSurface.familyAuthorityStatus ??
-    null;
-  const transportCertificationStatus =
-    args.transportResultArtifact.transportCertificationStatus ??
-    args.worldlineArtifact.sourceSurface.transportCertificationStatus ??
-    args.missionTimeComparisonArtifact.sourceSurface.transportCertificationStatus ??
-    null;
+  const actualFamilyId = asText(args.strictSignalArtifact.family?.familyId);
+  if (actualFamilyId == null) {
+    throw new Error("nhm2_strict_signal_family_missing");
+  }
+  if (actualFamilyId !== familyId) {
+    throw new Error(
+      `nhm2_strict_signal_family_mismatch:${actualFamilyId}:${familyId}`,
+    );
+  }
 
-  return buildNhm2StrictSignalReadinessArtifact({
-    familyId,
-    familyAuthorityStatus,
-    transportCertificationStatus,
-    strictModeEnabled: true,
-    lapseSummary: {
-      alphaCenterline: args.transportResultArtifact.centerlineAlpha ?? null,
-      alphaMin: null,
-      alphaMax: null,
-      alphaProfileKind: null,
-      alphaGradientAxis: null,
-      shiftLapseProfileId: selectedProfileId,
-      shiftLapseProfileStage,
-      shiftLapseProfileLabel,
-      shiftLapseProfileNote,
-      signConvention: null,
-    },
-    theta: {
-      metricDerived: null,
-      provenance: "missing",
-      sourcePath: null,
-      reasonCode: "strict_signal_missing",
-      reason: buildMissingStrictSignalReason("theta"),
-    },
-    ts: {
-      metricDerived: null,
-      provenance: "missing",
-      sourcePath: null,
-      reasonCode: "strict_signal_missing",
-      reason: buildMissingStrictSignalReason("ts"),
-    },
-    qi: {
-      metricDerived: null,
-      provenance: "missing",
-      sourcePath: null,
-      rhoSource: null,
-      reasonCode: "strict_signal_missing",
-      reason: buildMissingStrictSignalReason("qi"),
-      applicabilityStatus: null,
-      applicabilityReasonCode: "strict_signal_missing",
-    },
-  });
+  const actualProfileId = asText(
+    args.strictSignalArtifact.family?.lapseSummary?.shiftLapseProfileId,
+  );
+  if (actualProfileId == null) {
+    throw new Error("nhm2_strict_signal_profile_missing");
+  }
+  if (actualProfileId !== selectedProfileId) {
+    throw new Error(
+      `nhm2_strict_signal_profile_mismatch:${actualProfileId}:${selectedProfileId}`,
+    );
+  }
+
+  return args.strictSignalArtifact;
 };
 
 const renderNhm2StrictSignalReadinessMarkdown = (
@@ -27169,10 +27175,40 @@ const publishNhm2ShiftLapseStrictSignalReadinessImpl = async (options?: {
       missionTimeComparisonLatestJsonPath,
       "nhm2_mission_time_comparison/v1",
     );
-  const artifact = buildNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile({
+  const selectedProfileId = resolveStrictSignalPublishedProfileId({
     transportResultArtifact,
     worldlineArtifact,
     missionTimeComparisonArtifact,
+  });
+  const pipelineModule = await import("../server/energy-pipeline.ts");
+  const baseState =
+    pipelineModule.getGlobalPipelineState?.() ??
+    pipelineModule.initializePipelineState();
+  const nextState = {
+    ...baseState,
+    warpFieldType: "nhm2_shift_lapse",
+    dynamicConfig: {
+      ...((baseState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: selectedProfileId,
+    },
+    warp: {
+      ...((baseState.warp as Record<string, unknown> | undefined) ?? {}),
+      metricT00Ref: transportResultArtifact.selectedFamily.metricT00Ref ?? undefined,
+      metricT00Source:
+        transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
+    },
+  } as Record<string, unknown>;
+  const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
+  pipelineModule.setGlobalPipelineState?.(refreshedState as any);
+  if (!isNhm2StrictSignalReadinessArtifact(refreshedState.nhm2StrictSignalReadiness)) {
+    throw new Error("nhm2_strict_signal_readiness_missing");
+  }
+  const artifact = resolveNhm2StrictSignalReadinessArtifactFromPublishedSelectedProfile({
+    transportResultArtifact,
+    worldlineArtifact,
+    missionTimeComparisonArtifact,
+    strictSignalArtifact: refreshedState.nhm2StrictSignalReadiness,
   });
   return {
     selectedTransport,
@@ -27204,6 +27240,873 @@ export const publishNhm2ShiftLapseStrictSignalReadiness = async (options?: {
   withProofSurfacePublicationLock({
     operation: "publish-selected-shift-lapse-strict-signal-readiness",
     fn: async () => publishNhm2ShiftLapseStrictSignalReadinessImpl(options),
+  });
+
+const REQUIRED_SOURCE_CLOSURE_REGION_IDS = [
+  "hull",
+  "wall",
+  "exterior_shell",
+] as const;
+
+type RequiredSourceClosureRegionId =
+  (typeof REQUIRED_SOURCE_CLOSURE_REGION_IDS)[number];
+
+const normalizeSourceClosureTensor = (
+  value: unknown,
+): Nhm2SourceClosureTensor => {
+  const record = asRecord(value);
+  return {
+    T00: toFiniteNumber(record?.T00),
+    T11: toFiniteNumber(record?.T11),
+    T22: toFiniteNumber(record?.T22),
+    T33: toFiniteNumber(record?.T33),
+  };
+};
+
+const buildSelectedShiftLapseSourceClosureTensorSnapshotPaths = (
+  artifactRootDir: string,
+) => ({
+  metricRequiredOutJsonPath: path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_METRIC_TENSOR_OUT_JSON),
+  ),
+  metricRequiredLatestJsonPath: path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_METRIC_TENSOR_LATEST_JSON),
+  ),
+  tileEffectiveOutJsonPath: path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_TILE_TENSOR_OUT_JSON),
+  ),
+  tileEffectiveLatestJsonPath: path.join(
+    artifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_TILE_TENSOR_LATEST_JSON),
+  ),
+});
+
+const buildNhm2SourceClosureDiagonalTensorSnapshotMarkdown = (
+  payload: Nhm2SourceClosureDiagonalTensorSnapshotArtifact,
+): string => {
+  const tensor = payload.diagonalTensor;
+  return `# NHM2 Source-Closure Diagonal Tensor Snapshot (${DATE_STAMP})
+
+"This selected-profile tensor snapshot exists only to make NHM2 source-closure inputs reviewable. It does not widen route ETA, transport, gravity, or viability claims."
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| tensorRole | ${payload.tensorRole} |
+| familyId | ${payload.familyId} |
+| shiftLapseProfileId | ${payload.shiftLapseProfileId ?? "null"} |
+| shiftLapseProfileStage | ${payload.shiftLapseProfileStage ?? "null"} |
+| tensorSemanticRef | ${payload.tensorSemanticRef ?? "null"} |
+| sourceArtifactPath | ${payload.sourceArtifactPath ?? "null"} |
+| producer | ${payload.producer} |
+| note | ${payload.note ?? "null"} |
+
+## Diagonal Tensor
+| component | value |
+|---|---|
+| T00 | ${tensor.T00 ?? "null"} |
+| T11 | ${tensor.T11 ?? "null"} |
+| T22 | ${tensor.T22 ?? "null"} |
+| T33 | ${tensor.T33 ?? "null"} |
+`;
+};
+
+const writeNhm2SourceClosureDiagonalTensorSnapshot = (args: {
+  artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+  outJsonPath: string;
+  latestJsonPath: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+} => {
+  ensureDirForFile(args.outJsonPath);
+  ensureDirForFile(args.latestJsonPath);
+  fs.writeFileSync(args.outJsonPath, `${JSON.stringify(args.artifact, null, 2)}\n`);
+  fs.writeFileSync(args.latestJsonPath, `${JSON.stringify(args.artifact, null, 2)}\n`);
+  return {
+    outJsonPath: args.outJsonPath,
+    latestJsonPath: args.latestJsonPath,
+    artifact: args.artifact,
+  };
+};
+
+const renderNhm2SourceClosureMarkdown = (
+  payload: Nhm2SourceClosureArtifact,
+): string => {
+  const reasonCodes =
+    payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
+  const componentRows = payload.comparedComponents
+    .map((component) => {
+      const residual = payload.residualComponents[component];
+      return `| ${component} | ${residual.metricRequired ?? "null"} | ${residual.tileEffective ?? "null"} | ${residual.absResidual ?? "null"} | ${residual.relResidual ?? "null"} |`;
+    })
+    .join("\n");
+  const regionRows = payload.sampledSummaries.regions
+    .map((region) => {
+      const tensor = region.tileTensor;
+      return `| ${region.regionId} | ${region.sampleCount ?? "null"} | ${region.residualNorms.relLInf ?? "null"} | ${tensor.T00 ?? "null"} | ${tensor.T11 ?? "null"} | ${tensor.T22 ?? "null"} | ${tensor.T33 ?? "null"} | ${region.note ?? "null"} |`;
+    })
+    .join("\n");
+  return `# NHM2 Source Closure (${DATE_STAMP})
+
+"This checklist records tensor-first NHM2 source-closure evidence for the currently selected nhm2_shift_lapse profile only. It does not widen route ETA, transport, gravity, or viability claims."
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| status | ${payload.status} |
+| completeness | ${payload.completeness} |
+| publicationCommand | ${SELECTED_SHIFT_LAPSE_SOURCE_CLOSURE_COMMAND} |
+| reasonCodes | ${reasonCodes} |
+| tensorRefs.metricRequired | ${payload.tensorRefs.metricRequired ?? "null"} |
+| tensorRefs.tileEffective | ${payload.tensorRefs.tileEffective ?? "null"} |
+| residualNorms.relL2 | ${payload.residualNorms.relL2 ?? "null"} |
+| residualNorms.relLInf | ${payload.residualNorms.relLInf ?? "null"} |
+| residualNorms.toleranceRelLInf | ${payload.residualNorms.toleranceRelLInf ?? "null"} |
+| sampledSummaries.status | ${payload.sampledSummaries.status} |
+| sampledSummaries.regionIds | ${payload.sampledSummaries.regions.map((entry) => entry.regionId).join(", ")} |
+| assumptionsDrifted | ${payload.assumptionsDrifted == null ? "null" : String(payload.assumptionsDrifted)} |
+| scalarCl3RhoDeltaRel | ${payload.scalarProjections.cl3RhoDeltaRel ?? "null"} |
+| scalarCongruenceSecondary | ${String(payload.distinction.scalarCongruenceSecondary)} |
+| scalarSurfaceId | ${payload.distinction.scalarSurfaceId} |
+
+## Global Tensor Comparison
+| component | metricRequired | tileEffective | absResidual | relResidual |
+|---|---|---|---|---|
+${componentRows}
+
+## Regional Sampled Summaries
+| regionId | sampleCount | relLInf | tileT00 | tileT11 | tileT22 | tileT33 | note |
+|---|---|---|---|---|---|---|---|
+${regionRows}
+`;
+};
+
+export const publishNhm2SourceClosureResearchSurface = (args: {
+  artifact: Nhm2SourceClosureArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2SourceClosureArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown: renderNhm2SourceClosureMarkdown(args.artifact),
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_SOURCE_CLOSURE_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_SOURCE_CLOSURE_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_SOURCE_CLOSURE_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_SOURCE_CLOSURE_LATEST_MD),
+    ),
+  });
+};
+
+const buildSelectedShiftLapseSourceClosureSampledSummaries = (args: {
+  regions: Array<{
+    regionId: string;
+    sampleCount?: unknown;
+    tensor?: unknown;
+    note?: unknown;
+  }> | null | undefined;
+  globalTileTensor: Nhm2SourceClosureTensor;
+}): {
+  sampledSummaries: Nhm2SourceClosureSampledSummaryInput[];
+  assumptionsDrifted: boolean;
+} => {
+  const regionMap = new Map<string, { sampleCount?: unknown; tensor?: unknown; note?: unknown }>();
+  for (const region of args.regions ?? []) {
+    if (typeof region.regionId === "string") {
+      regionMap.set(region.regionId, region);
+    }
+  }
+
+  const driftEpsilon = 1e-12;
+  let assumptionsDrifted = false;
+  const sampledSummaries = REQUIRED_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
+    const entry = regionMap.get(regionId);
+    const tileTensor = normalizeSourceClosureTensor(entry?.tensor);
+    const noteParts: string[] = [];
+    const existingNote = asText(entry?.note);
+    if (existingNote) {
+      noteParts.push(existingNote);
+    } else if (entry == null) {
+      noteParts.push("selected-profile regional tile-effective tensor summary not presently published for this region");
+    }
+    noteParts.push(
+      "Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published.",
+    );
+    if (
+      ["T00", "T11", "T22", "T33"].some((component) => {
+        const key = component as keyof Nhm2SourceClosureTensor;
+        const regionValue = tileTensor[key];
+        const globalValue = args.globalTileTensor[key];
+        return (
+          regionValue != null &&
+          globalValue != null &&
+          Math.abs(regionValue - globalValue) > driftEpsilon
+        );
+      })
+    ) {
+      assumptionsDrifted = true;
+    }
+    return {
+      regionId,
+      sampleCount: toFiniteNumber(entry?.sampleCount),
+      tileTensor,
+      note: noteParts.join(" "),
+    };
+  });
+
+  return { sampledSummaries, assumptionsDrifted };
+};
+
+const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  metricTensorSnapshot: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+  };
+  tileTensorSnapshot: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+  };
+  sourceClosureArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2SourceClosureArtifact;
+  };
+}> => {
+  const selectedFamilyArtifactRootDir =
+    options?.selectedFamilyArtifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const selectedFamilyAuditRootDir =
+    options?.selectedFamilyAuditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+  const selectedTransportLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  );
+  const selectedTransport =
+    options?.reuseExistingSelectedArtifacts === true &&
+    fs.existsSync(selectedTransportLatestJsonPath)
+      ? readExistingSelectedShiftLapseTransportBundleForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseSelectedTransportBundle({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: selectedFamilyArtifactRootDir,
+          auditRootDir: selectedFamilyAuditRootDir,
+        });
+
+  const transportResultArtifact = selectedTransport.transportResult.artifact;
+  const worldlineLatestJsonPath =
+    transportResultArtifact.selectedBundleArtifacts.worldlineLatestJsonPath;
+  const missionTimeComparisonLatestJsonPath =
+    transportResultArtifact.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath;
+  const worldlineArtifact = readJsonArtifact<Nhm2WarpWorldlineProofArtifact>(
+    worldlineLatestJsonPath,
+    "nhm2_warp_worldline_proof/v1",
+  );
+  const missionTimeComparisonArtifact =
+    readJsonArtifact<Nhm2MissionTimeComparisonArtifact>(
+      missionTimeComparisonLatestJsonPath,
+      "nhm2_mission_time_comparison/v1",
+    );
+  const selectedProfileId = resolveStrictSignalPublishedProfileId({
+    transportResultArtifact,
+    worldlineArtifact,
+    missionTimeComparisonArtifact,
+  });
+  const familyId = resolveStrictSignalPublishedFamilyId({
+    transportResultArtifact,
+    worldlineArtifact,
+    missionTimeComparisonArtifact,
+  });
+
+  const pipelineModule = await import("../server/energy-pipeline.ts");
+  const baseState =
+    pipelineModule.getGlobalPipelineState?.() ??
+    pipelineModule.initializePipelineState();
+  const nextState = {
+    ...baseState,
+    warpFieldType: "nhm2_shift_lapse",
+    dynamicConfig: {
+      ...((baseState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: selectedProfileId,
+    },
+    warp: {
+      ...((baseState.warp as Record<string, unknown> | undefined) ?? {}),
+      metricT00Ref: transportResultArtifact.selectedFamily.metricT00Ref ?? undefined,
+      metricT00Source:
+        transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
+    },
+  } as Record<string, unknown>;
+  const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
+  pipelineModule.setGlobalPipelineState?.(refreshedState as any);
+  const nhm2SourceClosure = asRecord(refreshedState.nhm2SourceClosure);
+  const sourceClosureTensors = asRecord(nhm2SourceClosure?.tensors);
+  const metricTensor = normalizeSourceClosureTensor(
+    sourceClosureTensors?.metricRequired ??
+      asRecord(refreshedState.warp)?.metricStressEnergy ??
+      null,
+  );
+  const globalTileTensor = normalizeSourceClosureTensor(
+    sourceClosureTensors?.tileEffective ??
+      asRecord(refreshedState.warp)?.tileEffectiveStressEnergy ??
+      null,
+  );
+  const toleranceRelLInf = toFiniteNumber(
+    asRecord(nhm2SourceClosure?.residualNorms)?.toleranceRelLInf,
+  );
+  const scalarCl3RhoDeltaRel = toFiniteNumber(
+    asRecord(nhm2SourceClosure?.scalarProjections)?.cl3RhoDeltaRel,
+  );
+  const shiftGate =
+    resolvePublishedShiftLapseGate(worldlineArtifact) ??
+    resolvePublishedShiftLapseGate(missionTimeComparisonArtifact);
+  const selectedProfileStage =
+    transportResultArtifact.selectedFamily.shiftLapseProfileStage ??
+    asText(shiftGate?.shiftLapseProfileStage);
+
+  const stressEnergyBrickModule = await import("../server/stress-energy-brick.ts");
+  const stressBrick = stressEnergyBrickModule.buildStressEnergyBrick({
+    metricT00Ref: transportResultArtifact.selectedFamily.metricT00Ref ?? undefined,
+    metricT00Source:
+      transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
+    warpFieldType: "nhm2_shift_lapse",
+  });
+  const stressRegions =
+    stressBrick.stats.tensorSampledSummaries?.regions?.map((region) => ({
+      regionId: region.regionId,
+      sampleCount: region.sampleCount,
+      tensor: region.tensor,
+      note: region.note,
+    })) ?? null;
+
+  const tensorSnapshotPaths =
+    buildSelectedShiftLapseSourceClosureTensorSnapshotPaths(
+      selectedFamilyArtifactRootDir,
+    );
+  const metricTensorSnapshotArtifact =
+    buildNhm2SourceClosureDiagonalTensorSnapshotArtifact({
+      tensorRole: "metric_required",
+      familyId,
+      shiftLapseProfileId: selectedProfileId,
+      shiftLapseProfileStage: selectedProfileStage,
+      tensorSemanticRef: transportResultArtifact.selectedFamily.metricT00Ref ?? null,
+      sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
+      diagonalTensor: metricTensor,
+      note:
+        "Selected-profile global metric-required diagonal tensor used by NHM2 source-closure publication.",
+    });
+  const tileTensorSnapshotArtifact =
+    buildNhm2SourceClosureDiagonalTensorSnapshotArtifact({
+      tensorRole: "tile_effective",
+      familyId,
+      shiftLapseProfileId: selectedProfileId,
+      shiftLapseProfileStage: selectedProfileStage,
+      tensorSemanticRef: "warp.tileEffectiveStressEnergy.nhm2_shift_lapse.diagonal",
+      sourceArtifactPath: selectedTransport.transportResult.latestJsonPath,
+      diagonalTensor: globalTileTensor,
+      note:
+        "Selected-profile global tile-effective diagonal tensor used by NHM2 source-closure publication.",
+    });
+
+  const metricTensorSnapshot = writeNhm2SourceClosureDiagonalTensorSnapshot({
+    artifact: metricTensorSnapshotArtifact,
+    outJsonPath: tensorSnapshotPaths.metricRequiredOutJsonPath,
+    latestJsonPath: tensorSnapshotPaths.metricRequiredLatestJsonPath,
+  });
+  const tileTensorSnapshot = writeNhm2SourceClosureDiagonalTensorSnapshot({
+    artifact: tileTensorSnapshotArtifact,
+    outJsonPath: tensorSnapshotPaths.tileEffectiveOutJsonPath,
+    latestJsonPath: tensorSnapshotPaths.tileEffectiveLatestJsonPath,
+  });
+
+  const sampledSummariesResult =
+    buildSelectedShiftLapseSourceClosureSampledSummaries({
+      regions: stressRegions,
+      globalTileTensor,
+    });
+
+  const artifact = buildNhm2SourceClosureArtifact({
+    metricTensorRef: normalizePath(metricTensorSnapshot.latestJsonPath),
+    tileEffectiveTensorRef: normalizePath(tileTensorSnapshot.latestJsonPath),
+    metricRequiredTensor: metricTensor,
+    tileEffectiveTensor: globalTileTensor,
+    sampledSummaries: sampledSummariesResult.sampledSummaries,
+    toleranceRelLInf,
+    scalarCl3RhoDeltaRel,
+    assumptionsDrifted: sampledSummariesResult.assumptionsDrifted,
+  });
+
+  return {
+    selectedTransport,
+    metricTensorSnapshot,
+    tileTensorSnapshot,
+    sourceClosureArtifact: publishNhm2SourceClosureResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    }),
+  };
+};
+
+export const publishNhm2ShiftLapseSourceClosure = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  metricTensorSnapshot: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+  };
+  tileTensorSnapshot: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    artifact: Nhm2SourceClosureDiagonalTensorSnapshotArtifact;
+  };
+  sourceClosureArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2SourceClosureArtifact;
+  };
+}> =>
+  withProofSurfacePublicationLock({
+    operation: "publish-selected-shift-lapse-source-closure",
+    fn: async () => publishNhm2ShiftLapseSourceClosureImpl(options),
+  });
+
+const toObserverAuditTensorInput = (
+  tensor:
+    | Nhm2ObserverAuditArtifact["tensors"]["metricRequired"]
+    | Nhm2ObserverAuditArtifact["tensors"]["tileEffective"],
+  tensorRef: string,
+): BuildNhm2ObserverAuditTensorInput => ({
+  tensorRef,
+  sampleCount: tensor.sampleCount,
+  rapidityCap: tensor.rapidityCap,
+  rapidityCapBeta: tensor.rapidityCapBeta,
+  typeI: {
+    count: tensor.typeI.count,
+    fraction: tensor.typeI.fraction,
+    tolerance: tensor.typeI.tolerance,
+  },
+  conditions: {
+    nec: {
+      eulerianMin: tensor.conditions.nec.eulerianMin,
+      eulerianMean: tensor.conditions.nec.eulerianMean,
+      robustMin: tensor.conditions.nec.robustMin,
+      robustMean: tensor.conditions.nec.robustMean,
+      eulerianViolationFraction: tensor.conditions.nec.eulerianViolationFraction,
+      robustViolationFraction: tensor.conditions.nec.robustViolationFraction,
+      missedViolationFraction: tensor.conditions.nec.missedViolationFraction,
+      severityGainMin: tensor.conditions.nec.severityGainMin,
+      severityGainMean: tensor.conditions.nec.severityGainMean,
+      maxRobustMinusEulerian: tensor.conditions.nec.maxRobustMinusEulerian,
+      worstCase: tensor.conditions.nec.worstCase,
+    },
+    wec: {
+      eulerianMin: tensor.conditions.wec.eulerianMin,
+      eulerianMean: tensor.conditions.wec.eulerianMean,
+      robustMin: tensor.conditions.wec.robustMin,
+      robustMean: tensor.conditions.wec.robustMean,
+      eulerianViolationFraction: tensor.conditions.wec.eulerianViolationFraction,
+      robustViolationFraction: tensor.conditions.wec.robustViolationFraction,
+      missedViolationFraction: tensor.conditions.wec.missedViolationFraction,
+      severityGainMin: tensor.conditions.wec.severityGainMin,
+      severityGainMean: tensor.conditions.wec.severityGainMean,
+      maxRobustMinusEulerian: tensor.conditions.wec.maxRobustMinusEulerian,
+      worstCase: tensor.conditions.wec.worstCase,
+    },
+    sec: {
+      eulerianMin: tensor.conditions.sec.eulerianMin,
+      eulerianMean: tensor.conditions.sec.eulerianMean,
+      robustMin: tensor.conditions.sec.robustMin,
+      robustMean: tensor.conditions.sec.robustMean,
+      eulerianViolationFraction: tensor.conditions.sec.eulerianViolationFraction,
+      robustViolationFraction: tensor.conditions.sec.robustViolationFraction,
+      missedViolationFraction: tensor.conditions.sec.missedViolationFraction,
+      severityGainMin: tensor.conditions.sec.severityGainMin,
+      severityGainMean: tensor.conditions.sec.severityGainMean,
+      maxRobustMinusEulerian: tensor.conditions.sec.maxRobustMinusEulerian,
+      worstCase: tensor.conditions.sec.worstCase,
+    },
+    dec: {
+      eulerianMin: tensor.conditions.dec.eulerianMin,
+      eulerianMean: tensor.conditions.dec.eulerianMean,
+      robustMin: tensor.conditions.dec.robustMin,
+      robustMean: tensor.conditions.dec.robustMean,
+      eulerianViolationFraction: tensor.conditions.dec.eulerianViolationFraction,
+      robustViolationFraction: tensor.conditions.dec.robustViolationFraction,
+      missedViolationFraction: tensor.conditions.dec.missedViolationFraction,
+      severityGainMin: tensor.conditions.dec.severityGainMin,
+      severityGainMean: tensor.conditions.dec.severityGainMean,
+      maxRobustMinusEulerian: tensor.conditions.dec.maxRobustMinusEulerian,
+      worstCase: tensor.conditions.dec.worstCase,
+    },
+  },
+  fluxDiagnostics: {
+    status: tensor.fluxDiagnostics.status,
+    meanMagnitude: tensor.fluxDiagnostics.meanMagnitude,
+    maxMagnitude: tensor.fluxDiagnostics.maxMagnitude,
+    netMagnitude: tensor.fluxDiagnostics.netMagnitude,
+    netDirection: tensor.fluxDiagnostics.netDirection,
+    note: tensor.fluxDiagnostics.note,
+  },
+  consistency: {
+    robustNotGreaterThanEulerian:
+      tensor.consistency.robustNotGreaterThanEulerian,
+    maxRobustMinusEulerian: tensor.consistency.maxRobustMinusEulerian,
+  },
+  model: {
+    pressureModel: tensor.model.pressureModel,
+    fluxHandling: tensor.model.fluxHandling,
+    shearHandling: tensor.model.shearHandling,
+    limitationNotes: tensor.model.limitationNotes,
+    note: tensor.model.note,
+  },
+  missingInputs: tensor.missingInputs,
+});
+
+const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
+  transportResultArtifact: Nhm2ShiftLapseTransportResultArtifact;
+  worldlineArtifact: Nhm2WarpWorldlineProofArtifact;
+  missionTimeComparisonArtifact: Nhm2MissionTimeComparisonArtifact;
+  observerAuditArtifact: Nhm2ObserverAuditArtifact;
+  selectedFamilyArtifactRootDir: string;
+}): Nhm2ObserverAuditArtifact => {
+  const familyId = resolveStrictSignalPublishedFamilyId(args);
+  const selectedProfileId = resolveStrictSignalPublishedProfileId(args);
+  const tensorSnapshotPaths =
+    buildSelectedShiftLapseSourceClosureTensorSnapshotPaths(
+      args.selectedFamilyArtifactRootDir,
+    );
+  const metricTensorSnapshot =
+    readJsonArtifact<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>(
+      tensorSnapshotPaths.metricRequiredLatestJsonPath,
+    );
+  const tileTensorSnapshot =
+    readJsonArtifact<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>(
+      tensorSnapshotPaths.tileEffectiveLatestJsonPath,
+    );
+  if (
+    !isNhm2SourceClosureDiagonalTensorSnapshotArtifact(metricTensorSnapshot) ||
+    !isNhm2SourceClosureDiagonalTensorSnapshotArtifact(tileTensorSnapshot)
+  ) {
+    throw new Error("nhm2_observer_audit_tensor_snapshot_invalid");
+  }
+  if (
+    metricTensorSnapshot.familyId !== familyId ||
+    tileTensorSnapshot.familyId !== familyId
+  ) {
+    throw new Error("nhm2_observer_audit_tensor_family_mismatch");
+  }
+  if (
+    metricTensorSnapshot.shiftLapseProfileId !== selectedProfileId ||
+    tileTensorSnapshot.shiftLapseProfileId !== selectedProfileId
+  ) {
+    throw new Error("nhm2_observer_audit_tensor_profile_mismatch");
+  }
+
+  return buildNhm2ObserverAuditArtifact({
+    familyId,
+    shiftLapseProfileId: selectedProfileId,
+    metricRequired: toObserverAuditTensorInput(
+      args.observerAuditArtifact.tensors.metricRequired,
+      normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
+    ),
+    tileEffective: toObserverAuditTensorInput(
+      args.observerAuditArtifact.tensors.tileEffective,
+      normalizePath(tensorSnapshotPaths.tileEffectiveLatestJsonPath),
+    ),
+  });
+};
+
+const renderNhm2ObserverAuditMarkdown = (
+  payload: Nhm2ObserverAuditArtifact,
+): string => {
+  const reasonCodes =
+    payload.reasonCodes.length > 0 ? payload.reasonCodes.join(", ") : "none";
+  const renderTensorSection = (
+    label: string,
+    tensor:
+      | Nhm2ObserverAuditArtifact["tensors"]["metricRequired"]
+      | Nhm2ObserverAuditArtifact["tensors"]["tileEffective"],
+  ) => {
+    const tensorReasonCodes =
+      tensor.reasonCodes.length > 0 ? tensor.reasonCodes.join(", ") : "none";
+    const limitationNotes =
+      tensor.model.limitationNotes.length > 0
+        ? tensor.model.limitationNotes.join("; ")
+        : "none";
+    const missingInputs =
+      tensor.missingInputs.length > 0 ? tensor.missingInputs.join(", ") : "none";
+    const direction =
+      tensor.fluxDiagnostics.netDirection == null
+        ? "null"
+        : `[${tensor.fluxDiagnostics.netDirection.join(", ")}]`;
+    return `## ${label}
+| field | value |
+|---|---|
+| tensorId | ${tensor.tensorId} |
+| status | ${tensor.status} |
+| completeness | ${tensor.completeness} |
+| tensorRef | ${tensor.tensorRef ?? "null"} |
+| sampleCount | ${tensor.sampleCount ?? "null"} |
+| reasonCodes | ${tensorReasonCodes} |
+| rapidityCap | ${tensor.rapidityCap ?? "null"} |
+| rapidityCapBeta | ${tensor.rapidityCapBeta ?? "null"} |
+| typeI.count | ${tensor.typeI.count ?? "null"} |
+| typeI.fraction | ${tensor.typeI.fraction ?? "null"} |
+| typeI.tolerance | ${tensor.typeI.tolerance ?? "null"} |
+| conditions.nec.status | ${tensor.conditions.nec.status} |
+| conditions.nec.robustMin | ${tensor.conditions.nec.robustMin ?? "null"} |
+| conditions.wec.status | ${tensor.conditions.wec.status} |
+| conditions.wec.robustMin | ${tensor.conditions.wec.robustMin ?? "null"} |
+| conditions.sec.status | ${tensor.conditions.sec.status} |
+| conditions.sec.robustMin | ${tensor.conditions.sec.robustMin ?? "null"} |
+| conditions.dec.status | ${tensor.conditions.dec.status} |
+| conditions.dec.robustMin | ${tensor.conditions.dec.robustMin ?? "null"} |
+| fluxDiagnostics.status | ${tensor.fluxDiagnostics.status} |
+| fluxDiagnostics.meanMagnitude | ${tensor.fluxDiagnostics.meanMagnitude ?? "null"} |
+| fluxDiagnostics.maxMagnitude | ${tensor.fluxDiagnostics.maxMagnitude ?? "null"} |
+| fluxDiagnostics.netMagnitude | ${tensor.fluxDiagnostics.netMagnitude ?? "null"} |
+| fluxDiagnostics.netDirection | ${direction} |
+| fluxDiagnostics.note | ${tensor.fluxDiagnostics.note ?? "null"} |
+| consistency.robustNotGreaterThanEulerian | ${tensor.consistency.robustNotGreaterThanEulerian == null ? "null" : String(tensor.consistency.robustNotGreaterThanEulerian)} |
+| consistency.maxRobustMinusEulerian | ${tensor.consistency.maxRobustMinusEulerian ?? "null"} |
+| model.pressureModel | ${tensor.model.pressureModel ?? "null"} |
+| model.fluxHandling | ${tensor.model.fluxHandling ?? "null"} |
+| model.shearHandling | ${tensor.model.shearHandling ?? "null"} |
+| model.limitationNotes | ${limitationNotes} |
+| model.note | ${tensor.model.note ?? "null"} |
+| missingInputs | ${missingInputs} |
+`;
+  };
+
+  return `# NHM2 Observer Audit (${DATE_STAMP})
+
+"This checklist records the currently selected nhm2_shift_lapse profile's published observer-audit evidence only. It does not widen route ETA, transport, gravity, or viability claims."
+
+## Summary
+| field | value |
+|---|---|
+| artifactId | ${payload.artifactId} |
+| schemaVersion | ${payload.schemaVersion} |
+| status | ${payload.status} |
+| completeness | ${payload.completeness} |
+| publicationCommand | ${SELECTED_SHIFT_LAPSE_OBSERVER_AUDIT_COMMAND} |
+| familyId | ${payload.familyId} |
+| shiftLapseProfileId | ${payload.shiftLapseProfileId ?? "null"} |
+| reasonCodes | ${reasonCodes} |
+
+${renderTensorSection("Metric Required Tensor", payload.tensors.metricRequired)}
+${renderTensorSection("Tile Effective Tensor", payload.tensors.tileEffective)}
+`;
+};
+
+export const publishNhm2ObserverAuditResearchSurface = (args: {
+  artifact: Nhm2ObserverAuditArtifact;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+}): {
+  outJsonPath: string;
+  latestJsonPath: string;
+  outMdPath: string;
+  latestMdPath: string;
+  artifact: Nhm2ObserverAuditArtifact;
+} => {
+  const artifactRootDir = args.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = args.auditRootDir ?? DOC_AUDIT_DIR;
+  return writePublishedArtifactSurface({
+    artifact: args.artifact,
+    markdown: renderNhm2ObserverAuditMarkdown(args.artifact),
+    outJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_OBSERVER_AUDIT_OUT_JSON),
+    ),
+    latestJsonPath: path.join(
+      artifactRootDir,
+      path.basename(DEFAULT_OBSERVER_AUDIT_LATEST_JSON),
+    ),
+    outMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_OBSERVER_AUDIT_OUT_MD),
+    ),
+    latestMdPath: path.join(
+      auditRootDir,
+      path.basename(DEFAULT_OBSERVER_AUDIT_LATEST_MD),
+    ),
+  });
+};
+
+const publishNhm2ShiftLapseObserverAuditImpl = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  observerAuditArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2ObserverAuditArtifact;
+  };
+}> => {
+  const selectedFamilyArtifactRootDir =
+    options?.selectedFamilyArtifactRootDir ?? SELECTED_FAMILY_FULL_SOLVE_DIR;
+  const selectedFamilyAuditRootDir =
+    options?.selectedFamilyAuditRootDir ?? SELECTED_FAMILY_DOC_AUDIT_DIR;
+  const artifactRootDir = options?.artifactRootDir ?? FULL_SOLVE_DIR;
+  const auditRootDir = options?.auditRootDir ?? DOC_AUDIT_DIR;
+  const selectedTransportLatestJsonPath = path.join(
+    selectedFamilyArtifactRootDir,
+    path.basename(SELECTED_SHIFT_LAPSE_TRANSPORT_RESULT_LATEST_JSON),
+  );
+  const selectedTransport =
+    options?.reuseExistingSelectedArtifacts === true &&
+    fs.existsSync(selectedTransportLatestJsonPath)
+      ? readExistingSelectedShiftLapseTransportBundleForEnvelope({
+          selectedFamilyArtifactRootDir,
+          selectedFamilyAuditRootDir,
+        })
+      : await publishNhm2ShiftLapseSelectedTransportBundle({
+          baseUrl: options?.baseUrl,
+          artifactRootDir: selectedFamilyArtifactRootDir,
+          auditRootDir: selectedFamilyAuditRootDir,
+        });
+  const transportResultArtifact = selectedTransport.transportResult.artifact;
+  const worldlineLatestJsonPath =
+    transportResultArtifact.selectedBundleArtifacts.worldlineLatestJsonPath;
+  const missionTimeComparisonLatestJsonPath =
+    transportResultArtifact.selectedBundleArtifacts.missionTimeComparisonLatestJsonPath;
+  const worldlineArtifact = readJsonArtifact<Nhm2WarpWorldlineProofArtifact>(
+    worldlineLatestJsonPath,
+    "nhm2_warp_worldline_proof/v1",
+  );
+  const missionTimeComparisonArtifact =
+    readJsonArtifact<Nhm2MissionTimeComparisonArtifact>(
+      missionTimeComparisonLatestJsonPath,
+      "nhm2_mission_time_comparison/v1",
+    );
+
+  const pipelineModule = await import("../server/energy-pipeline.ts");
+  const baseState =
+    pipelineModule.getGlobalPipelineState?.() ??
+    pipelineModule.initializePipelineState();
+  const selectedProfileId = resolveStrictSignalPublishedProfileId({
+    transportResultArtifact,
+    worldlineArtifact,
+    missionTimeComparisonArtifact,
+  });
+  const nextState = {
+    ...baseState,
+    warpFieldType: "nhm2_shift_lapse",
+    dynamicConfig: {
+      ...((baseState.dynamicConfig as Record<string, unknown> | undefined) ?? {}),
+      warpFieldType: "nhm2_shift_lapse",
+      shiftLapseProfileId: selectedProfileId,
+    },
+    warp: {
+      ...((baseState.warp as Record<string, unknown> | undefined) ?? {}),
+      metricT00Ref: transportResultArtifact.selectedFamily.metricT00Ref ?? undefined,
+      metricT00Source:
+        transportResultArtifact.selectedFamily.metricT00Source ?? undefined,
+    },
+  } as Record<string, unknown>;
+  const refreshedState = await pipelineModule.calculateEnergyPipeline(nextState as any);
+  pipelineModule.setGlobalPipelineState?.(refreshedState as any);
+  if (!isNhm2ObserverAuditArtifact(refreshedState.nhm2ObserverAudit)) {
+    throw new Error("nhm2_observer_audit_missing");
+  }
+
+  const artifact = buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile({
+    transportResultArtifact,
+    worldlineArtifact,
+    missionTimeComparisonArtifact,
+    observerAuditArtifact: refreshedState.nhm2ObserverAudit,
+    selectedFamilyArtifactRootDir,
+  });
+
+  return {
+    selectedTransport,
+    observerAuditArtifact: publishNhm2ObserverAuditResearchSurface({
+      artifact,
+      artifactRootDir,
+      auditRootDir,
+    }),
+  };
+};
+
+export const publishNhm2ShiftLapseObserverAudit = async (options?: {
+  baseUrl?: string;
+  selectedFamilyArtifactRootDir?: string;
+  selectedFamilyAuditRootDir?: string;
+  artifactRootDir?: string;
+  auditRootDir?: string;
+  reuseExistingSelectedArtifacts?: boolean;
+}): Promise<{
+  selectedTransport: Awaited<ReturnType<typeof publishNhm2ShiftLapseSelectedTransportBundle>>;
+  observerAuditArtifact: {
+    outJsonPath: string;
+    latestJsonPath: string;
+    outMdPath: string;
+    latestMdPath: string;
+    artifact: Nhm2ObserverAuditArtifact;
+  };
+}> =>
+  withProofSurfacePublicationLock({
+    operation: "publish-selected-shift-lapse-observer-audit",
+    fn: async () => publishNhm2ShiftLapseObserverAuditImpl(options),
   });
 
 const publishNhm2ShiftVsLapseDecompositionLatest = (args: {
@@ -32361,6 +33264,14 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     artifactRootDir,
     path.basename(DEFAULT_STRICT_SIGNAL_READINESS_LATEST_JSON),
   );
+  const rootObserverAuditLatestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_OBSERVER_AUDIT_LATEST_JSON),
+  );
+  const rootSourceClosureLatestJsonPath = path.join(
+    artifactRootDir,
+    path.basename(DEFAULT_SOURCE_CLOSURE_LATEST_JSON),
+  );
   const selectedEnvelopeLatestJsonPath = path.join(
     selectedFamilyArtifactRootDir,
     "envelope",
@@ -32490,6 +33401,10 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       expectedProfileId: selectedProfileId,
       expectedFamilyId: selectedFamilyId,
     });
+  const sourceClosureTensorSnapshotPaths =
+    buildSelectedShiftLapseSourceClosureTensorSnapshotPaths(
+      selectedFamilyArtifactRootDir,
+    );
   const sourceClosureInspection = inspectPublishedAuditArtifact<{
     status: string;
     reasonCodes: string[];
@@ -32499,15 +33414,29 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
     };
   }>({
-    expectedPath: DEFAULT_SOURCE_CLOSURE_LATEST_JSON,
+    expectedPath: rootSourceClosureLatestJsonPath,
     artifactId: "nhm2_source_closure",
     validator: isNhm2SourceClosureArtifactLike,
-    expectedProfileId: selectedProfileId,
-    expectedFamilyId: selectedFamilyId,
   });
+  const sourceClosureMetricTensorInspection =
+    inspectPublishedAuditArtifact<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>({
+      expectedPath: sourceClosureTensorSnapshotPaths.metricRequiredLatestJsonPath,
+      artifactId: "nhm2_source_closure_metric_required_tensor",
+      validator: isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
+  const sourceClosureTileTensorInspection =
+    inspectPublishedAuditArtifact<Nhm2SourceClosureDiagonalTensorSnapshotArtifact>({
+      expectedPath: sourceClosureTensorSnapshotPaths.tileEffectiveLatestJsonPath,
+      artifactId: "nhm2_source_closure_tile_effective_tensor",
+      validator: isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+      expectedProfileId: selectedProfileId,
+      expectedFamilyId: selectedFamilyId,
+    });
   const observerAuditInspection =
     inspectPublishedAuditArtifact<Nhm2ObserverAuditArtifact>({
-      expectedPath: DEFAULT_OBSERVER_AUDIT_LATEST_JSON,
+      expectedPath: rootObserverAuditLatestJsonPath,
       artifactId: "nhm2_observer_audit",
       validator: isNhm2ObserverAuditArtifact,
       expectedProfileId: selectedProfileId,
@@ -32783,6 +33712,34 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
           };
         })
       : null;
+  appendArtifactPathCheck({
+    inspection: sourceClosureInspection,
+    value: sourceClosureInspection.parsed,
+    keyPath: ["tensorRefs", "metricRequired"],
+    expectedPath: sourceClosureTensorSnapshotPaths.metricRequiredLatestJsonPath,
+    mismatchCode: "source_closure_metric_tensor_ref_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: sourceClosureInspection,
+    value: sourceClosureInspection.parsed,
+    keyPath: ["tensorRefs", "tileEffective"],
+    expectedPath: sourceClosureTensorSnapshotPaths.tileEffectiveLatestJsonPath,
+    mismatchCode: "source_closure_tile_tensor_ref_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: observerAuditInspection,
+    value: observerAuditInspection.parsed,
+    keyPath: ["tensors", "metricRequired", "tensorRef"],
+    expectedPath: sourceClosureTensorSnapshotPaths.metricRequiredLatestJsonPath,
+    mismatchCode: "observer_metric_tensor_ref_mismatch",
+  });
+  appendArtifactPathCheck({
+    inspection: observerAuditInspection,
+    value: observerAuditInspection.parsed,
+    keyPath: ["tensors", "tileEffective", "tensorRef"],
+    expectedPath: sourceClosureTensorSnapshotPaths.tileEffectiveLatestJsonPath,
+    mismatchCode: "observer_tile_tensor_ref_mismatch",
+  });
   const observerAuditArtifact =
     observerAuditInspection.parseStatus === "pass"
       ? (observerAuditInspection.parsed as Nhm2ObserverAuditArtifact)
@@ -32830,7 +33787,11 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     missionTimeComparisonInspection,
   ];
   const strictSignalInspections = [strictSignalInspection];
-  const sourceClosureInspections = [sourceClosureInspection];
+  const sourceClosureInspections = [
+    sourceClosureInspection,
+    sourceClosureMetricTensorInspection,
+    sourceClosureTileTensorInspection,
+  ];
   const observerAuditInspections = [observerAuditInspection];
   const grStabilityInspections = [
     transportInspection,
@@ -32964,6 +33925,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
           "tile_tensor_missing",
           "metric_tensor_incomplete",
           "tile_tensor_incomplete",
+          "tolerance_missing",
         ].includes(entry),
       )
     ) {
@@ -46336,6 +47298,14 @@ if (isEntryPoint) {
     "--publish-selected-shift-lapse-strict-signal-readiness",
     argv,
   );
+  const publishSelectedShiftLapseSourceClosure = hasArg(
+    "--publish-selected-shift-lapse-source-closure",
+    argv,
+  );
+  const publishSelectedShiftLapseObserverAudit = hasArg(
+    "--publish-selected-shift-lapse-observer-audit",
+    argv,
+  );
   const publishSelectedShiftLapseFullLoopAudit = hasArg(
     "--publish-selected-shift-lapse-full-loop-audit",
     argv,
@@ -46698,6 +47668,18 @@ if (isEntryPoint) {
       })
     : publishSelectedShiftLapseStrictSignalReadiness
     ? publishNhm2ShiftLapseStrictSignalReadiness({
+        baseUrl: parsedOptions.baseUrl,
+        reuseExistingSelectedArtifacts:
+          parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
+      })
+    : publishSelectedShiftLapseSourceClosure
+    ? publishNhm2ShiftLapseSourceClosure({
+        baseUrl: parsedOptions.baseUrl,
+        reuseExistingSelectedArtifacts:
+          parsedOptions.reuseExistingSelectedShiftLapseArtifacts,
+      })
+    : publishSelectedShiftLapseObserverAudit
+    ? publishNhm2ShiftLapseObserverAudit({
         baseUrl: parsedOptions.baseUrl,
         reuseExistingSelectedArtifacts:
           parsedOptions.reuseExistingSelectedShiftLapseArtifacts,

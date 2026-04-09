@@ -319,11 +319,35 @@ import {
   type HelixConversationHistoryEventInput,
   type HelixAskMemoryCitation,
 } from "../services/helix-ask/conversation-history";
-import { appendHelixThreadEvent } from "../services/helix-thread/ledger";
-import { buildRecentTurnsFromHelixThread } from "../services/helix-thread/reducer";
+import {
+  appendHelixThreadEvent,
+  appendHelixThreadItemEvent,
+  appendHelixThreadLifecycleEvent,
+  appendHelixThreadServerRequestEvent,
+  appendHelixTurnEvent,
+  getHelixThreadRequests,
+} from "../services/helix-thread/ledger";
+import {
+  forkHelixThread,
+  getActiveHelixThreadForSession,
+  readHelixThread,
+  resumeHelixThread,
+  setActiveHelixThreadForSession,
+  updateHelixThreadRecord,
+} from "../services/helix-thread/registry";
+import {
+  buildHelixThreadState,
+  buildHelixThreadCitationView,
+  buildHelixTurnState,
+  buildRecentTurnsFromHelixThread,
+} from "../services/helix-thread/reducer";
 import {
   type HelixThreadAnswerSurfaceMode,
+  type HelixThreadClaimLink,
   type HelixThreadMemoryCitation,
+  type HelixThreadItemType,
+  type HelixThreadRequestKind,
+  type HelixTurnKind,
 } from "../services/helix-thread/types";
 import {
   type CapsuleConstraintBundle,
@@ -20220,8 +20244,13 @@ const normalizeGraphLockSessionId = (value: unknown): string => {
     seed: z.coerce.number().int().nonnegative().optional(),
     stop: z.union([z.string().min(1), z.array(z.string().min(1))]).optional(),
     sessionId: z.string().min(1).max(128).optional(),
+    threadId: z.string().min(1).max(128).optional(),
+    threadForkFromId: z.string().min(1).max(128).optional(),
     traceId: z.string().min(1).max(128).optional(),
     turnId: z.string().min(1).max(128).optional(),
+    expectedTurnId: z.string().min(1).max(128).optional(),
+    steerActiveTurn: z.boolean().optional(),
+    resumeRequestId: z.string().min(1).max(160).optional(),
     capsuleIds: z.array(z.string().min(1).max(24)).max(12).optional(),
     personaId: z.string().min(1).optional(),
     tuning: HelixAskTuningOverrides.optional(),
@@ -20310,8 +20339,13 @@ const HelixConversationBriefSchema = z.object({
 const HelixConversationTurnRequest = z.object({
   transcript: z.string().min(1).max(4000),
   sessionId: z.string().min(1).max(128).optional(),
+  threadId: z.string().min(1).max(128).optional(),
+  threadForkFromId: z.string().min(1).max(128).optional(),
   traceId: z.string().min(1).max(128).optional(),
   turnId: z.string().min(1).max(128).optional(),
+  expectedTurnId: z.string().min(1).max(128).optional(),
+  steerActiveTurn: z.boolean().optional(),
+  resumeRequestId: z.string().min(1).max(160).optional(),
   missionId: z.string().min(1).max(200).optional(),
   personaId: z.string().min(1).optional(),
   sourceLanguage: z.string().min(1).max(32).optional(),
@@ -38559,6 +38593,7 @@ type HelixAskRequestMetadata = {
     index: number | null;
     isReplay: boolean;
   };
+  thread_id: string | null;
   turn_id: string | null;
   trace_id: string | null;
   session_id: string | null;
@@ -38608,6 +38643,10 @@ const buildHelixAskRequestMetadata = (request: z.infer<typeof LocalAskRequest>):
       index: replayIndex,
       isReplay: Boolean(replayIndex && replayIndex > 1),
     },
+    thread_id:
+      typeof request.threadId === "string" && request.threadId.trim()
+        ? request.threadId.trim()
+        : null,
     turn_id: turnId,
     trace_id: traceId,
     session_id: typeof request.sessionId === "string" && request.sessionId.trim() ? request.sessionId.trim() : null,
@@ -39505,6 +39544,9 @@ const resolveHelixAskConversationHistoryFinalGateOutcomeForAsk = (args: {
       typeof args.payload?.fail_reason === "string" ? args.payload.fail_reason.trim() : "";
     return failReason ? `failed:${failReason}` : `failed:http_${args.status}`;
   }
+  if (args.payload?.needs_input === true) {
+    return "needs_input";
+  }
   if (args.payload?.needs_confirmation === true) {
     return "confirmation_required";
   }
@@ -39575,6 +39617,397 @@ const appendHelixAskDualHistoryEvent = (
     event_id: input.event_id,
     ts: input.ts,
   });
+};
+
+type HelixThreadRouteContext = {
+  threadId: string;
+  turnId: string;
+  createdNewThread: boolean;
+  createdNewTurn: boolean;
+  forkedFromThreadId?: string | null;
+  resumedRequestId?: string | null;
+  steeringApplied: boolean;
+  lifecycleEventType: "thread_started" | "thread_resumed" | "thread_forked";
+  turnKind: HelixTurnKind;
+};
+
+type HelixThreadRouteResolutionError = {
+  code:
+    | "active_turn_not_steerable"
+    | "active_turn_mismatch"
+    | "no_active_turn";
+  turn_kind?: HelixTurnKind;
+  expected_turn_id?: string;
+  active_turn_id?: string;
+};
+
+const clipHelixThreadPreview = (value: unknown, limit = 140): string | null => {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+};
+
+const createHelixThreadItemId = (prefix = "item"): string =>
+  `${prefix}:${crypto.randomUUID()}`.slice(0, 160);
+
+const createHelixThreadRequestId = (prefix = "req"): string =>
+  `${prefix}:${crypto.randomUUID()}`.slice(0, 160);
+
+const isHelixTurnKindSteerable = (
+  turnKind: HelixTurnKind | null | undefined,
+): boolean => turnKind !== "review" && turnKind !== "compact";
+
+const appendHelixThreadCompletedItemLifecycle = (args: {
+  threadId: string;
+  turnId: string;
+  route: "/ask" | "/ask/conversation-turn";
+  sessionId?: string | null;
+  traceId?: string | null;
+  turnKind?: HelixTurnKind | null;
+  itemId?: string | null;
+  itemType: HelixThreadItemType;
+  itemStream?: "plan" | "answer" | "tool" | "observation" | null;
+  text?: string | null;
+  userText?: string | null;
+  assistantText?: string | null;
+  observationRef?: Record<string, unknown> | null;
+  sourceItemIds?: string[] | null;
+  claimLinks?: HelixThreadClaimLink[] | null;
+  meta?: Record<string, unknown> | null;
+}): string => {
+  const itemId = args.itemId?.trim() || createHelixThreadItemId(args.itemType);
+  appendHelixThreadItemEvent({
+    thread_id: args.threadId,
+    route: args.route,
+    event_type: "item_started",
+    turn_id: args.turnId,
+    session_id: args.sessionId ?? null,
+    trace_id: args.traceId ?? null,
+    turn_kind: args.turnKind ?? null,
+    item_id: itemId,
+    item_type: args.itemType,
+    item_status: "in_progress",
+    item_stream: args.itemStream ?? null,
+    user_text: args.itemType === "userMessage" ? args.userText ?? args.text ?? null : null,
+    assistant_text: args.itemType === "answer" ? args.assistantText ?? args.text ?? null : null,
+    observation_ref: args.observationRef ?? null,
+    meta: args.meta ?? null,
+  });
+  if (args.text) {
+    appendHelixThreadItemEvent({
+      thread_id: args.threadId,
+      route: args.route,
+      event_type: "item_delta",
+      turn_id: args.turnId,
+      session_id: args.sessionId ?? null,
+      trace_id: args.traceId ?? null,
+      turn_kind: args.turnKind ?? null,
+      item_id: itemId,
+      item_type: args.itemType,
+      item_status: "in_progress",
+      item_stream: args.itemStream ?? null,
+      delta_text: args.text,
+      observation_ref: args.observationRef ?? null,
+      meta: args.meta ?? null,
+    });
+  }
+  appendHelixThreadItemEvent({
+    thread_id: args.threadId,
+    route: args.route,
+    event_type: "item_completed",
+    turn_id: args.turnId,
+    session_id: args.sessionId ?? null,
+    trace_id: args.traceId ?? null,
+    turn_kind: args.turnKind ?? null,
+    item_id: itemId,
+    item_type: args.itemType,
+    item_status: "completed",
+    item_stream: args.itemStream ?? null,
+    user_text: args.itemType === "userMessage" ? args.userText ?? args.text ?? null : null,
+    assistant_text: args.itemType === "answer" ? args.assistantText ?? args.text ?? null : null,
+    observation_ref: args.observationRef ?? null,
+    source_item_ids: args.sourceItemIds ?? null,
+    claim_links: args.claimLinks ?? null,
+    meta: args.meta ?? null,
+  });
+  return itemId;
+};
+
+const buildHelixThreadRequestQuestionsFromText = (
+  value: unknown,
+): Array<{ id: string; text: string }> => {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return [];
+  const question = text.endsWith("?") ? text : `${text.replace(/[.]+$/g, "")}?`;
+  return [{ id: "clarify", text: question.slice(0, 320) }];
+};
+
+const resolveHelixThreadNeedsInputFromPayload = (payload: Record<string, unknown> | null): {
+  needsInput: boolean;
+  requestKind: HelixThreadRequestKind;
+  requestQuestions: Array<{ id: string; text: string }>;
+} => {
+  const debug =
+    payload?.debug && typeof payload.debug === "object"
+      ? (payload.debug as Record<string, unknown>)
+      : null;
+  const existingNeedsInput = payload?.needs_input === true;
+  const topLevelAgentStopReason =
+    typeof payload?.agent_stop_reason === "string" ? payload.agent_stop_reason.trim() : "";
+  const agentStopReason =
+    typeof debug?.agent_stop_reason === "string" ? debug.agent_stop_reason.trim() : "";
+  const controllerStopReason =
+    typeof debug?.controller_stop_reason === "string"
+      ? debug.controller_stop_reason.trim()
+      : "";
+  const clarifyTriggered = debug?.clarify_triggered === true;
+  const failReason = typeof payload?.fail_reason === "string" ? payload.fail_reason.trim() : "";
+  const needsInput =
+    existingNeedsInput ||
+    topLevelAgentStopReason === "user_clarify_required" ||
+    agentStopReason === "user_clarify_required" ||
+    controllerStopReason === "user_clarify_required" ||
+    clarifyTriggered ||
+    failReason === "PROMPT_CONTRACT_REQUIRED_INPUT_MISSING";
+  return {
+    needsInput,
+    requestKind: "request_user_input",
+    requestQuestions: buildHelixThreadRequestQuestionsFromText(payload?.text ?? payload?.answer),
+  };
+};
+
+const cloneHelixThreadVisibleHistoryIntoFork = (args: {
+  sourceThreadId: string;
+  targetThreadId: string;
+  route: "/ask" | "/ask/conversation-turn";
+  sessionId?: string | null;
+  traceId?: string | null;
+}): void => {
+  const sourceState = buildHelixThreadState({ threadId: args.sourceThreadId });
+  for (const turn of sourceState.turns) {
+    const projectedTurnId = `fork:${turn.turn_id}`.slice(0, 128);
+    appendHelixTurnEvent({
+      thread_id: args.targetThreadId,
+      route: args.route,
+      event_type: "turn_started",
+      turn_id: projectedTurnId,
+      session_id: args.sessionId ?? sourceState.session_id ?? null,
+      trace_id: args.traceId ?? null,
+      turn_kind: turn.turn_kind ?? (turn.route === "/ask" ? "ask" : "conversation_turn"),
+      thread_status: "active",
+      meta: {
+        source_thread_id: args.sourceThreadId,
+        source_turn_id: turn.turn_id,
+        fork_projection: true,
+      },
+    });
+    if (turn.user_text) {
+      appendHelixThreadCompletedItemLifecycle({
+        threadId: args.targetThreadId,
+        turnId: projectedTurnId,
+        route: args.route,
+        sessionId: args.sessionId ?? sourceState.session_id ?? null,
+        traceId: args.traceId ?? null,
+        turnKind: turn.turn_kind ?? (turn.route === "/ask" ? "ask" : "conversation_turn"),
+        itemType: "userMessage",
+        text: turn.user_text,
+        userText: turn.user_text,
+        meta: {
+          source_thread_id: args.sourceThreadId,
+          source_turn_id: turn.turn_id,
+          fork_projection: true,
+        },
+      });
+    }
+    if (turn.assistant_text && turn.status === "completed") {
+      appendHelixThreadCompletedItemLifecycle({
+        threadId: args.targetThreadId,
+        turnId: projectedTurnId,
+        route: args.route,
+        sessionId: args.sessionId ?? sourceState.session_id ?? null,
+        traceId: args.traceId ?? null,
+        turnKind: turn.turn_kind ?? (turn.route === "/ask" ? "ask" : "conversation_turn"),
+        itemType: "answer",
+        itemStream: "answer",
+        text: turn.assistant_text,
+        assistantText: turn.assistant_text,
+        meta: {
+          source_thread_id: args.sourceThreadId,
+          source_turn_id: turn.turn_id,
+          fork_projection: true,
+        },
+      });
+    }
+    appendHelixTurnEvent({
+      thread_id: args.targetThreadId,
+      route: args.route,
+      event_type:
+        turn.status === "failed"
+          ? "turn_failed"
+          : turn.status === "interrupted" || turn.status === "in_progress"
+            ? "turn_interrupted"
+            : "turn_completed",
+      turn_id: projectedTurnId,
+      session_id: args.sessionId ?? sourceState.session_id ?? null,
+      trace_id: args.traceId ?? null,
+      turn_kind: turn.turn_kind ?? (turn.route === "/ask" ? "ask" : "conversation_turn"),
+      thread_status:
+        turn.status === "failed"
+          ? "failed"
+          : turn.status === "interrupted" || turn.status === "in_progress"
+            ? "interrupted"
+            : "idle",
+      user_text: turn.user_text ?? null,
+      assistant_text: turn.status === "completed" ? turn.assistant_text ?? null : null,
+      meta: {
+        source_thread_id: args.sourceThreadId,
+        source_turn_id: turn.turn_id,
+        fork_projection: true,
+      },
+    });
+  }
+};
+
+const resolveHelixThreadRouteContext = (args: {
+  route: "/ask" | "/ask/conversation-turn";
+  sessionId?: string | null;
+  explicitThreadId?: string | null;
+  threadForkFromId?: string | null;
+  explicitTurnId?: string | null;
+  expectedTurnId?: string | null;
+  steerActiveTurn?: boolean;
+  resumeRequestId?: string | null;
+  traceId?: string | null;
+  titlePreview?: string | null;
+  turnKind: HelixTurnKind;
+}): HelixThreadRouteContext | HelixThreadRouteResolutionError => {
+  const sessionId = String(args.sessionId ?? "").trim() || null;
+  const explicitThreadId = String(args.explicitThreadId ?? "").trim() || null;
+  const forkFromThreadId = String(args.threadForkFromId ?? "").trim() || null;
+  const expectedTurnId = String(args.expectedTurnId ?? "").trim() || null;
+  const explicitTurnId = String(args.explicitTurnId ?? "").trim() || null;
+  const resumeRequestId = String(args.resumeRequestId ?? "").trim() || null;
+  const steerActiveTurn = args.steerActiveTurn === true;
+  let threadId = explicitThreadId;
+  let createdNewThread = false;
+  let lifecycleEventType: HelixThreadRouteContext["lifecycleEventType"] = "thread_resumed";
+  let forkedFromThreadId: string | null = null;
+
+  if (forkFromThreadId) {
+    const forked = forkHelixThread({
+      sourceThreadId: forkFromThreadId,
+      sessionId,
+      titlePreview: args.titlePreview ?? null,
+    });
+    threadId = forked.thread_id;
+    createdNewThread = true;
+    lifecycleEventType = "thread_forked";
+    forkedFromThreadId = forkFromThreadId;
+    cloneHelixThreadVisibleHistoryIntoFork({
+      sourceThreadId: forkFromThreadId,
+      targetThreadId: threadId,
+      route: args.route,
+      sessionId,
+      traceId: args.traceId ?? null,
+    });
+  } else {
+    const existingThread =
+      (explicitThreadId && readHelixThread({ threadId: explicitThreadId })) ||
+      (sessionId
+        ? (() => {
+            const activeThreadId = getActiveHelixThreadForSession(sessionId);
+            return activeThreadId ? readHelixThread({ threadId: activeThreadId }) : null;
+          })()
+        : null);
+    const resumed = resumeHelixThread({
+      threadId: explicitThreadId,
+      sessionId,
+      titlePreview: args.titlePreview ?? null,
+    });
+    threadId = resumed.thread_id;
+    createdNewThread = !existingThread;
+    lifecycleEventType = createdNewThread ? "thread_started" : "thread_resumed";
+  }
+
+  let turnId =
+    explicitTurnId ||
+    resolveHelixAskConversationTurnId({
+      explicitTurnId: explicitTurnId ?? undefined,
+      traceId: args.traceId ?? undefined,
+      prefix: args.turnKind === "ask" ? "ask" : "conversation",
+    });
+  let createdNewTurn = true;
+  let steeringApplied = false;
+
+  const activeThreadRecord = readHelixThread({ threadId });
+  const activeTurnId = activeThreadRecord?.active_turn_id ?? null;
+  const activeTurnState =
+    activeTurnId ? buildHelixTurnState({ threadId, turnId: activeTurnId }) : null;
+  const unresolvedRequest =
+    resumeRequestId && threadId
+      ? getHelixThreadRequests({ threadId, unresolvedOnly: true }).find(
+          (entry) => entry.request_id === resumeRequestId,
+        ) ?? null
+      : null;
+
+  if (steerActiveTurn) {
+    if (!activeTurnId || !activeTurnState) {
+      return {
+        code: "no_active_turn",
+        expected_turn_id: expectedTurnId ?? undefined,
+      };
+    }
+    if (expectedTurnId && expectedTurnId !== activeTurnId) {
+      return {
+        code: "active_turn_mismatch",
+        expected_turn_id: expectedTurnId,
+        active_turn_id: activeTurnId,
+      };
+    }
+    if (!isHelixTurnKindSteerable(activeTurnState.turn_kind ?? null)) {
+      return {
+        code: "active_turn_not_steerable",
+        turn_kind: activeTurnState.turn_kind ?? undefined,
+        expected_turn_id: expectedTurnId ?? undefined,
+        active_turn_id: activeTurnId,
+      };
+    }
+    turnId = activeTurnId;
+    createdNewTurn = false;
+    steeringApplied = true;
+  } else if (resumeRequestId && unresolvedRequest) {
+    const resumeTurnState = buildHelixTurnState({
+      threadId,
+      turnId: unresolvedRequest.turn_id,
+    });
+    if (
+      resumeTurnState &&
+      (!expectedTurnId || expectedTurnId === unresolvedRequest.turn_id) &&
+      resumeTurnState.status !== "completed" &&
+      resumeTurnState.status !== "failed"
+    ) {
+      turnId = unresolvedRequest.turn_id;
+      createdNewTurn = false;
+      steeringApplied = true;
+    }
+  }
+
+  if (sessionId) {
+    setActiveHelixThreadForSession(sessionId, threadId);
+  }
+
+  return {
+    threadId,
+    turnId,
+    createdNewThread,
+    createdNewTurn,
+    forkedFromThreadId,
+    resumedRequestId: resumeRequestId,
+    steeringApplied,
+    lifecycleEventType,
+    turnKind: args.turnKind,
+  };
 };
 
 type HelixAskObjectiveLoopState = {
@@ -67404,6 +67837,7 @@ const executeHelixAsk = async ({
       }
     }
     finalizeObjectiveLoopBeforeResponse();
+    (result as Record<string, unknown>).agent_stop_reason = agentStopReason ?? null;
     if (debugPayload) {
       const debugPayloadRecord = debugPayload as Record<string, unknown>;
       const finalModeBlocked = debugPayloadRecord.final_mode_gate_consistency_blocked === true;
@@ -67667,11 +68101,30 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     null;
   const sessionId = parsed.data.sessionId?.trim() || undefined;
   const traceId = (parsed.data.traceId?.trim() || `conversation:${crypto.randomUUID()}`).slice(0, 128);
-  const turnId = resolveHelixAskConversationTurnId({
-    explicitTurnId: parsed.data.turnId,
+  const threadContext = resolveHelixThreadRouteContext({
+    route: "/ask/conversation-turn",
+    sessionId,
+    explicitThreadId: parsed.data.threadId ?? null,
+    threadForkFromId: parsed.data.threadForkFromId ?? null,
+    explicitTurnId: parsed.data.turnId ?? null,
+    expectedTurnId: parsed.data.expectedTurnId ?? null,
+    steerActiveTurn: parsed.data.steerActiveTurn === true,
+    resumeRequestId: parsed.data.resumeRequestId ?? null,
     traceId,
-    prefix: "conversation",
+    titlePreview: parsed.data.transcript,
+    turnKind: "conversation_turn",
   });
+  if ("code" in threadContext) {
+    return res.status(409).json({
+      ok: false,
+      code: threadContext.code,
+      turn_kind: threadContext.turn_kind,
+      expected_turn_id: threadContext.expected_turn_id,
+      active_turn_id: threadContext.active_turn_id,
+    });
+  }
+  const threadId = threadContext.threadId;
+  const turnId = threadContext.turnId;
   const transcript = parsed.data.transcript.trim();
   const providedRecentTurns = Array.isArray(parsed.data.recentTurns)
     ? parsed.data.recentTurns.map((entry) => entry.trim()).filter(Boolean).slice(-HELIX_ASK_CONVERSATION_RECENT_TURNS)
@@ -67680,6 +68133,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     providedRecentTurns ??
     (() => {
       const threadRecentTurns = buildRecentTurnsFromHelixThread({
+        threadId,
         sessionId,
         limit: HELIX_ASK_CONVERSATION_RECENT_TURNS,
         excludeTurnId: turnId,
@@ -67785,7 +68239,81 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       ? interpreterArtifact.selected_pivot.text.trim()
       : transcript;
 
+  appendHelixThreadLifecycleEvent({
+    thread_id: threadId,
+    route: "/ask/conversation-turn",
+    event_type: threadContext.lifecycleEventType,
+    turn_id: turnId,
+    session_id: sessionId ?? null,
+    trace_id: traceId,
+    thread_status: "active",
+    turn_kind: "conversation_turn",
+    meta: {
+      forked_from_thread_id: threadContext.forkedFromThreadId ?? null,
+      steering_applied: threadContext.steeringApplied,
+    },
+  });
+  updateHelixThreadRecord({
+    threadId,
+    patch: {
+      session_id: sessionId ?? null,
+      status: "active",
+      latest_turn_id: turnId,
+      active_turn_id: turnId,
+      title_preview: clipHelixThreadPreview(transcript),
+      metadata: {
+        last_route: "/ask/conversation-turn",
+      },
+    },
+  });
+  if (threadContext.createdNewTurn) {
+    appendHelixTurnEvent({
+      thread_id: threadId,
+      route: "/ask/conversation-turn",
+      event_type: "turn_started",
+      turn_id: turnId,
+      session_id: sessionId ?? null,
+      trace_id: traceId,
+      turn_kind: "conversation_turn",
+      thread_status: "active",
+      user_text: transcript,
+    });
+  }
+  if (threadContext.resumedRequestId) {
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask/conversation-turn",
+      event_type: "server_request_resolved",
+      turn_id: turnId,
+      session_id: sessionId ?? null,
+      trace_id: traceId,
+      turn_kind: "conversation_turn",
+      request_id: threadContext.resumedRequestId,
+      request_kind: "request_user_input",
+      item_status: "completed",
+      request_payload: {
+        transcript,
+      },
+    });
+  }
+  appendHelixThreadCompletedItemLifecycle({
+    threadId,
+    turnId,
+    route: "/ask/conversation-turn",
+    sessionId: sessionId ?? null,
+    traceId,
+    turnKind: "conversation_turn",
+    itemType: "userMessage",
+    text: transcript,
+    userText: transcript,
+    meta: {
+      steering_applied: threadContext.steeringApplied,
+      resume_request_id: threadContext.resumedRequestId ?? null,
+    },
+  });
+
   appendHelixAskDualHistoryEvent({
+    thread_id: threadId,
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_started",
     turn_id: turnId,
@@ -67912,6 +68440,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     },
   });
   appendHelixAskDualHistoryEvent({
+    thread_id: threadId,
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_classified",
     turn_id: turnId,
@@ -67925,6 +68454,24 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     meta: {
       exploration_turn: routeDecision.explorationTurn,
       clarifier_policy: routeDecision.clarifierPolicy,
+    },
+  });
+  appendHelixThreadCompletedItemLifecycle({
+    threadId,
+    turnId,
+    route: "/ask/conversation-turn",
+    sessionId: sessionId ?? null,
+    traceId,
+    turnKind: "conversation_turn",
+    itemType: "classification",
+    text: classification.reason,
+    meta: {
+      mode: classification.mode,
+      confidence: classification.confidence,
+      dispatch_hint: classification.dispatch_hint,
+      clarify_needed: classification.clarify_needed,
+      route_reason_code: routeDecision.routeReasonCode,
+      source: classifierSource,
     },
   });
 
@@ -68038,6 +68585,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     },
   });
   appendHelixAskDualHistoryEvent({
+    thread_id: threadId,
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_brief_ready",
     turn_id: turnId,
@@ -68052,6 +68600,23 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
     brief_status: briefSource === "llm" ? "ready" : "none",
     fail_reason: briefFailReason ?? undefined,
     meta: {
+      repair_attempted: briefRepairAttempted,
+      repair_succeeded: briefRepairSucceeded,
+    },
+  });
+  appendHelixThreadCompletedItemLifecycle({
+    threadId,
+    turnId,
+    route: "/ask/conversation-turn",
+    sessionId: sessionId ?? null,
+    traceId,
+    turnKind: "conversation_turn",
+    itemType: "brief",
+    text: briefText || null,
+    assistantText: briefText || null,
+    meta: {
+      source: briefSource,
+      fail_reason: briefFailReason,
       repair_attempted: briefRepairAttempted,
       repair_succeeded: briefRepairSucceeded,
     },
@@ -68119,6 +68684,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
         ? "confirmation_required"
         : routeDecision.routeReasonCode;
   appendHelixAskDualHistoryEvent({
+    thread_id: threadId,
     route: "/ask/conversation-turn",
     event_type: "conversation_turn_completed",
     turn_id: turnId,
@@ -68140,8 +68706,37 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       exploration_turn: routeDecision.explorationTurn,
     },
   });
+  appendHelixTurnEvent({
+    thread_id: threadId,
+    route: "/ask/conversation-turn",
+    event_type: "turn_completed",
+    turn_id: turnId,
+    session_id: sessionId ?? null,
+    trace_id: traceId,
+    turn_kind: "conversation_turn",
+    thread_status: "idle",
+    user_text: transcript,
+    assistant_text: briefText || null,
+    final_gate_outcome: conversationFinalGateOutcome,
+    fail_reason: failReason ?? null,
+  });
+  updateHelixThreadRecord({
+    threadId,
+    patch: {
+      session_id: sessionId ?? null,
+      status: "idle",
+      latest_turn_id: turnId,
+      active_turn_id: null,
+      title_preview: clipHelixThreadPreview(transcript),
+      metadata: {
+        last_route: "/ask/conversation-turn",
+        recent_turn_seed_source: providedRecentTurns !== null ? "request" : "history",
+      },
+    },
+  });
   return res.json({
     ok: true,
+    thread_id: threadId,
     turn_id: turnId,
     traceId,
     sessionId: sessionId ?? null,
@@ -68394,13 +68989,41 @@ planRouter.post("/ask", async (req, res) => {
     });
   }
   const requestMetadata = buildHelixAskRequestMetadata(requestData);
-  const askTurnId =
+  const askTurnIdSeed =
     requestMetadata.turn_id ??
     resolveHelixAskConversationTurnId({
       explicitTurnId: requestData.turnId,
       traceId: requestMetadata.trace_id,
       prefix: "ask",
     });
+  const askThreadContext = resolveHelixThreadRouteContext({
+    route: "/ask",
+    sessionId: requestMetadata.session_id,
+    explicitThreadId: requestData.threadId ?? requestMetadata.thread_id ?? null,
+    threadForkFromId: requestData.threadForkFromId ?? null,
+    explicitTurnId: askTurnIdSeed,
+    expectedTurnId: requestData.expectedTurnId ?? null,
+    steerActiveTurn: requestData.steerActiveTurn === true,
+    resumeRequestId: requestData.resumeRequestId ?? null,
+    traceId: requestMetadata.trace_id,
+    titlePreview: requestData.question ?? requestData.prompt ?? null,
+    turnKind: "ask",
+  });
+  if ("code" in askThreadContext) {
+    return res.status(409).json({
+      ok: false,
+      code: askThreadContext.code,
+      turn_kind: askThreadContext.turn_kind,
+      expected_turn_id: askThreadContext.expected_turn_id,
+      active_turn_id: askThreadContext.active_turn_id,
+    });
+  }
+  const askTurnId = askThreadContext.turnId;
+  const threadId = askThreadContext.threadId;
+  requestMetadata.thread_id = threadId;
+  requestMetadata.turn_id = askTurnId;
+  requestData.threadId = threadId;
+  requestData.turnId = askTurnId;
   const multilangRollout = resolveHelixAskMultilangRollout({
     sessionId: requestMetadata.session_id,
     traceId: requestMetadata.trace_id,
@@ -68439,7 +69062,80 @@ planRouter.post("/ask", async (req, res) => {
     enabled: HELIX_ASK_HTTP_KEEPALIVE && requestData.dryRun !== true,
     intervalMs: HELIX_ASK_HTTP_KEEPALIVE_MS,
   });
+  appendHelixThreadLifecycleEvent({
+    thread_id: threadId,
+    route: "/ask",
+    event_type: askThreadContext.lifecycleEventType,
+    turn_id: askTurnId,
+    session_id: requestMetadata.session_id,
+    trace_id: requestMetadata.trace_id,
+    thread_status: "active",
+    turn_kind: "ask",
+    meta: {
+      forked_from_thread_id: askThreadContext.forkedFromThreadId ?? null,
+      steering_applied: askThreadContext.steeringApplied,
+    },
+  });
+  updateHelixThreadRecord({
+    threadId,
+    patch: {
+      session_id: requestMetadata.session_id,
+      status: "active",
+      latest_turn_id: askTurnId,
+      active_turn_id: askTurnId,
+      title_preview: clipHelixThreadPreview(requestData.question ?? requestData.prompt ?? ""),
+      metadata: {
+        last_route: "/ask",
+      },
+    },
+  });
+  if (askThreadContext.createdNewTurn) {
+    appendHelixTurnEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "turn_started",
+      turn_id: askTurnId,
+      session_id: requestMetadata.session_id,
+      trace_id: requestMetadata.trace_id,
+      turn_kind: "ask",
+      thread_status: "active",
+      user_text: requestQuestionSeed || requestData.context || null,
+    });
+  }
+  if (askThreadContext.resumedRequestId) {
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_resolved",
+      turn_id: askTurnId,
+      session_id: requestMetadata.session_id,
+      trace_id: requestMetadata.trace_id,
+      turn_kind: "ask",
+      request_id: askThreadContext.resumedRequestId,
+      request_kind: "request_user_input",
+      item_status: "completed",
+      request_payload: {
+        question: requestData.question ?? requestData.prompt ?? null,
+      },
+    });
+  }
+  appendHelixThreadCompletedItemLifecycle({
+    threadId,
+    turnId: askTurnId,
+    route: "/ask",
+    sessionId: requestMetadata.session_id,
+    traceId: requestMetadata.trace_id,
+    turnKind: "ask",
+    itemType: "userMessage",
+    text: requestQuestionSeed || requestData.context || null,
+    userText: requestQuestionSeed || requestData.context || null,
+    meta: {
+      steering_applied: askThreadContext.steeringApplied,
+      resume_request_id: askThreadContext.resumedRequestId ?? null,
+    },
+  });
   appendHelixAskDualHistoryEvent({
+    thread_id: threadId,
     route: "/ask",
     event_type: "ask_started",
     turn_id: askTurnId,
@@ -68468,6 +69164,9 @@ planRouter.post("/ask", async (req, res) => {
       const typedPayload = payload as Record<string, unknown>;
       if (typedPayload.turn_id === undefined) {
         typedPayload.turn_id = askTurnId;
+      }
+      if (typedPayload.thread_id === undefined) {
+        typedPayload.thread_id = threadId;
       }
     }
     if (strictFailLedger && payload && typeof payload === "object") {
@@ -68567,13 +69266,20 @@ planRouter.post("/ask", async (req, res) => {
         if (typedPayload.lang_schema_version === undefined && requestMetadata.lang_schema_version) {
           typedPayload.lang_schema_version = requestMetadata.lang_schema_version;
         }
-        if (
+      if (
           (requestMetadata.lang_schema_version ||
             requestMetadata.source_language ||
             requestMetadata.language_detected) &&
           typedPayload.request_metadata === undefined
         ) {
           typedPayload.request_metadata = requestMetadata;
+        }
+        if (
+          typedPayload.request_metadata &&
+          typeof typedPayload.request_metadata === "object" &&
+          (typedPayload.request_metadata as Record<string, unknown>).thread_id === undefined
+        ) {
+          (typedPayload.request_metadata as Record<string, unknown>).thread_id = threadId;
         }
         if (
           (requestMetadata.lang_schema_version ||
@@ -68669,16 +69375,184 @@ planRouter.post("/ask", async (req, res) => {
         normalizedPayload && typeof normalizedPayload === "object"
           ? (normalizedPayload as Record<string, unknown>)
           : null;
+      const needsInputState =
+        status < 400
+          ? resolveHelixThreadNeedsInputFromPayload(payloadRecord)
+          : {
+              needsInput: false,
+              requestKind: "request_user_input" as HelixThreadRequestKind,
+              requestQuestions: [] as Array<{ id: string; text: string }>,
+            };
+      let requestId: string | null =
+        typeof payloadRecord?.request_id === "string" && payloadRecord.request_id.trim()
+          ? payloadRecord.request_id.trim()
+          : null;
+      if (payloadRecord && needsInputState.needsInput) {
+        if (!requestId) {
+          requestId = createHelixThreadRequestId("request_input");
+          payloadRecord.request_id = requestId;
+        }
+        if (payloadRecord.needs_input === undefined) {
+          payloadRecord.needs_input = true;
+        }
+        if (payloadRecord.request_questions === undefined) {
+          payloadRecord.request_questions = needsInputState.requestQuestions;
+        }
+      }
       const eventType =
         status < 400
-          ? "ask_completed"
+          ? payloadRecord?.needs_input === true
+            ? "ask_interrupted"
+            : "ask_completed"
           : payloadRecord?.error === "helix_ask_interrupted" ||
               payloadRecord?.fail_reason === "helix_ask_interrupted"
             ? "ask_interrupted"
             : "ask_failed";
       const assistantText =
         status < 400 ? extractHelixAskResponseTextForHistory(payloadRecord) : null;
+      const observationItemIds: string[] = [];
+      if (status < 400 && payloadRecord?.memory_citation && typeof payloadRecord.memory_citation === "object") {
+        const citation = payloadRecord.memory_citation as HelixThreadMemoryCitation;
+        for (const entry of citation.entries ?? []) {
+          const itemId = appendHelixThreadCompletedItemLifecycle({
+            threadId,
+            turnId: askTurnId,
+            route: "/ask",
+            sessionId: requestMetadata.session_id,
+            traceId: requestMetadata.trace_id,
+            turnKind: "ask",
+            itemType: "toolObservation",
+            itemStream: "observation",
+            text: entry.note ?? entry.path,
+            observationRef: {
+              path: entry.path,
+              line_start: entry.line_start,
+              line_end: entry.line_end,
+              note: entry.note,
+            },
+          });
+          observationItemIds.push(itemId);
+        }
+      }
+      const payloadDebug =
+        payloadRecord?.debug && typeof payloadRecord.debug === "object"
+          ? (payloadRecord.debug as Record<string, unknown>)
+          : null;
+      const planSummary =
+        coerceHelixAskDebugString(payloadDebug?.policy_prompt_family) ??
+        coerceHelixAskDebugString(payloadDebug?.intent_strategy) ??
+        coerceHelixAskDebugString(payloadDebug?.synthesis_reason);
+      if (planSummary) {
+        appendHelixThreadCompletedItemLifecycle({
+          threadId,
+          turnId: askTurnId,
+          route: "/ask",
+          sessionId: requestMetadata.session_id,
+          traceId: requestMetadata.trace_id,
+          turnKind: "ask",
+          itemType: "plan",
+          itemStream: "plan",
+          text: planSummary,
+        });
+        appendHelixTurnEvent({
+          thread_id: threadId,
+          route: "/ask",
+          event_type: "turn_plan_updated",
+          turn_id: askTurnId,
+          session_id: requestMetadata.session_id,
+          trace_id: requestMetadata.trace_id,
+          turn_kind: "ask",
+          brief_status: planSummary,
+          meta: {
+            plan_summary: planSummary,
+          },
+        });
+      }
+      appendHelixThreadCompletedItemLifecycle({
+        threadId,
+        turnId: askTurnId,
+        route: "/ask",
+        sessionId: requestMetadata.session_id,
+        traceId: requestMetadata.trace_id,
+        turnKind: "ask",
+        itemType: "validation",
+        text:
+          resolveHelixAskConversationHistoryFinalGateOutcomeForAsk({
+            status,
+            payload: payloadRecord,
+          }) ?? null,
+        meta: {
+          http_status: status,
+          objective_finalize_gate_mode: payloadDebug?.objective_finalize_gate_mode ?? null,
+          final_mode_gate_consistency_blocked:
+            payloadDebug?.final_mode_gate_consistency_blocked === true,
+        },
+      });
+      if (assistantText) {
+        const claimLinks: HelixThreadClaimLink[] =
+          observationItemIds.length > 0
+            ? [
+                {
+                  claim_id: `answer:${askTurnId}`,
+                  source_item_ids: observationItemIds.slice(),
+                },
+              ]
+            : [];
+        appendHelixThreadCompletedItemLifecycle({
+          threadId,
+          turnId: askTurnId,
+          route: "/ask",
+          sessionId: requestMetadata.session_id,
+          traceId: requestMetadata.trace_id,
+          turnKind: "ask",
+          itemType: "answer",
+          itemStream: "answer",
+          text: assistantText,
+          assistantText,
+          sourceItemIds: observationItemIds,
+          claimLinks,
+        });
+      }
+      if (needsInputState.needsInput && requestId) {
+        appendHelixThreadCompletedItemLifecycle({
+          threadId,
+          turnId: askTurnId,
+          route: "/ask",
+          sessionId: requestMetadata.session_id,
+          traceId: requestMetadata.trace_id,
+          turnKind: "ask",
+          itemType: "requestUserInput",
+          text: needsInputState.requestQuestions.map((entry) => entry.text).join(" "),
+          meta: {
+            request_id: requestId,
+          },
+        });
+        appendHelixThreadServerRequestEvent({
+          thread_id: threadId,
+          route: "/ask",
+          event_type: "server_request_created",
+          turn_id: askTurnId,
+          session_id: requestMetadata.session_id,
+          trace_id: requestMetadata.trace_id,
+          turn_kind: "ask",
+          request_id: requestId,
+          request_kind: needsInputState.requestKind,
+          request_payload: {
+            questions: needsInputState.requestQuestions,
+          },
+        });
+      }
+      if (status < 400 && payloadRecord) {
+        const derivedCitation = buildHelixThreadCitationView({
+          threadId,
+          turnId: askTurnId,
+        })?.memory_citation;
+        if (derivedCitation) {
+          payloadRecord.memory_citation = derivedCitation;
+        }
+      }
       appendHelixAskDualHistoryEvent({
+        thread_id: threadId,
         route: "/ask",
         event_type: eventType,
         turn_id: askTurnId,
@@ -68708,12 +69582,65 @@ planRouter.post("/ask", async (req, res) => {
         meta: {
           http_status: status,
           has_memory_citation: Boolean(payloadRecord?.memory_citation),
+          request_id: requestId,
+          needs_input: payloadRecord?.needs_input === true,
         },
         answer_surface_mode: normalizeHelixThreadAnswerSurfaceMode(
           payloadRecord?.answer_surface_mode,
         ),
         memory_citation:
           (payloadRecord?.memory_citation as HelixThreadMemoryCitation | null | undefined) ?? null,
+      });
+      appendHelixTurnEvent({
+        thread_id: threadId,
+        route: "/ask",
+        event_type:
+          eventType === "ask_completed"
+            ? "turn_completed"
+            : eventType === "ask_interrupted"
+              ? "turn_interrupted"
+              : "turn_failed",
+        turn_id: askTurnId,
+        session_id: requestMetadata.session_id,
+        trace_id: requestMetadata.trace_id,
+        turn_kind: "ask",
+        thread_status:
+          eventType === "ask_completed"
+            ? "idle"
+            : eventType === "ask_interrupted"
+              ? "interrupted"
+              : "failed",
+        user_text: requestQuestionSeed || requestData.context || null,
+        assistant_text: assistantText,
+        final_gate_outcome: resolveHelixAskConversationHistoryFinalGateOutcomeForAsk({
+          status,
+          payload: payloadRecord,
+        }),
+        fail_reason:
+          typeof payloadRecord?.fail_reason === "string"
+            ? payloadRecord.fail_reason
+            : typeof payloadRecord?.error === "string"
+              ? payloadRecord.error
+              : null,
+      });
+      updateHelixThreadRecord({
+        threadId,
+        patch: {
+          session_id: requestMetadata.session_id,
+          status:
+            eventType === "ask_completed"
+              ? "idle"
+              : eventType === "ask_interrupted"
+                ? "interrupted"
+                : "failed",
+          latest_turn_id: askTurnId,
+          active_turn_id: eventType === "ask_interrupted" ? askTurnId : null,
+          title_preview: clipHelixThreadPreview(requestQuestionSeed || requestData.context || ""),
+          metadata: {
+            last_route: "/ask",
+            last_request_id: requestId,
+          },
+        },
       });
     }
     if (status >= 500) {

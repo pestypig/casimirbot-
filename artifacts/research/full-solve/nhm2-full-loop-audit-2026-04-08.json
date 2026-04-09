@@ -2,7 +2,7 @@
   "contractVersion": "nhm2_full_loop_audit/v1",
   "auditId": "nhm2_full_loop",
   "laneId": "nhm2_shift_lapse",
-  "generatedAt": "2026-04-08T21:56:39.953Z",
+  "generatedAt": "2026-04-08T23:30:55.859Z",
   "sectionOrder": [
     "family_semantics",
     "claim_tier",
@@ -183,22 +183,42 @@
     },
     "source_closure": {
       "sectionId": "source_closure",
-      "state": "unavailable",
+      "state": "fail",
       "reasons": [
-        "source_closure_missing"
+        "source_closure_residual_exceeded",
+        "policy_review_required"
       ],
-      "artifactRefs": [],
-      "metricTensorRef": null,
-      "tileEffectiveTensorRef": null,
-      "residualRms": null,
-      "residualMax": null,
+      "artifactRefs": [
+        {
+          "artifactId": "nhm2_source_closure",
+          "path": "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+          "contractVersion": "nhm2_source_closure/v1",
+          "status": "fail"
+        },
+        {
+          "artifactId": "nhm2_source_closure_metric_required_tensor",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
+          "contractVersion": "nhm2_source_closure_diagonal_tensor/v1",
+          "status": null
+        },
+        {
+          "artifactId": "nhm2_source_closure_tile_effective_tensor",
+          "path": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json",
+          "contractVersion": "nhm2_source_closure_diagonal_tensor/v1",
+          "status": null
+        }
+      ],
+      "metricTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
+      "tileEffectiveTensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json",
+      "residualRms": 1.9999999965519486,
+      "residualMax": 0.9999999990148425,
       "residualByRegion": {
-        "hull": null,
-        "wall": null,
-        "exteriorShell": null
+        "hull": 0.7128284035463214,
+        "wall": 464.24782162897617,
+        "exteriorShell": 87.1076894305983
       },
       "toleranceRef": "tensor_residual_relLInf",
-      "assumptionsDrifted": null,
+      "assumptionsDrifted": true,
       "supportedClaimTiers": [
         "reduced-order",
         "certified"
@@ -498,7 +518,7 @@
       ],
       "blockingReasons": [
         "strict_signal_missing",
-        "source_closure_missing",
+        "source_closure_residual_exceeded",
         "observer_audit_incomplete",
         "policy_review_required"
       ]
@@ -528,7 +548,7 @@
       ],
       "blockingReasons": [
         "strict_signal_missing",
-        "source_closure_missing",
+        "source_closure_residual_exceeded",
         "observer_audit_incomplete",
         "certificate_missing",
         "policy_review_required"
@@ -541,7 +561,7 @@
   "overallState": "fail",
   "blockingReasons": [
     "strict_signal_missing",
-    "source_closure_missing",
+    "source_closure_residual_exceeded",
     "observer_audit_incomplete",
     "certificate_missing",
     "policy_review_required"

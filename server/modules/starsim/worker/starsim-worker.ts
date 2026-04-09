@@ -9,8 +9,14 @@ if (!port) {
 
 port.on("message", async (message: StarSimWorkerRequest) => {
   try {
+    if (process.env.STAR_SIM_WORKER_CRASH_ON_KIND === message.kind) {
+      process.exit(86);
+    }
     if (message.kind === "structure_mesa") {
-      const payload = await executeStructureMesaRuntime(message.star);
+      const payload = await executeStructureMesaRuntime({
+        star: message.star,
+        cache_key: message.cache_key,
+      });
       const response: StarSimWorkerResponse = {
         id: message.id,
         kind: "structure_mesa",
@@ -21,7 +27,12 @@ port.on("message", async (message: StarSimWorkerRequest) => {
       return;
     }
 
-    const payload = await executeOscillationGyreRuntime(message.star);
+    const payload = await executeOscillationGyreRuntime({
+      star: message.star,
+      structure_cache_key: message.structure_cache_key,
+      structure_claim_id: message.structure_claim_id,
+      structure_summary: message.structure_summary,
+    });
     const response: StarSimWorkerResponse = {
       id: message.id,
       kind: "oscillation_gyre",

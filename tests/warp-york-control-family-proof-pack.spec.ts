@@ -10,8 +10,18 @@ import {
   buildNhm2ShiftVsLapseDecompositionArtifact,
 } from "../shared/contracts/nhm2-shift-vs-lapse-decomposition.v1";
 import {
+  buildNhm2SourceClosureArtifact,
+} from "../shared/contracts/nhm2-source-closure.v1";
+import {
+  buildNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+  isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
+} from "../shared/contracts/nhm2-source-closure-diagonal-tensor.v1";
+import {
   isNhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import {
+  isNhm2ObserverAuditArtifact,
+} from "../shared/contracts/nhm2-observer-audit.v1";
 import {
   isNhm2FullLoopAuditContract,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
@@ -119,6 +129,8 @@ import {
   buildNhm2ShiftLapseTransportResultArtifact,
   computeNhm2EnvelopePerturbationChecksum,
   publishNhm2EnvelopePerturbationResearchSurface,
+  publishNhm2ShiftLapseObserverAudit,
+  publishNhm2ShiftLapseSourceClosure,
   publishNhm2ShiftLapseStrictSignalReadiness,
   publishNhm2ShiftLapseFullLoopAudit,
   publishNhm2ShiftVsLapseDecompositionResearchSurface,
@@ -994,7 +1006,7 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("do not widen route ETA, transport, gravity, or viability claims");
   });
 
-  it("publishes a selected-profile NHM2 strict-signal readiness artifact that stays fail-closed on missing emitted signal provenance", async () => {
+  it("publishes a selected-profile NHM2 strict-signal readiness artifact from refreshed pipeline evidence", async () => {
     const fixture = makeNhm2FullLoopAuditPublisherFixture();
     const published = await publishNhm2ShiftLapseStrictSignalReadiness({
       artifactRootDir: fixture.artifactRootDir,
@@ -1023,24 +1035,39 @@ describe("nhm2 publication completion surfaces", () => {
       fs.readFileSync(published.strictSignalArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect(isNhm2StrictSignalReadinessArtifact(json)).toBe(true);
-    expect((json as any).status).toBe("fail");
-    expect((json as any).completeness).toBe("incomplete");
+    expect((json as any).status).toBe("pass");
+    expect((json as any).completeness).toBe("complete");
     expect((json as any).family.familyId).toBe("nhm2_shift_lapse");
     expect((json as any).family.lapseSummary.shiftLapseProfileId).toBe(
       fixture.selectedProfileId,
     );
-    expect((json as any).reasonCodes).toEqual(["strict_signal_missing"]);
-    expect((json as any).missingSignals).toEqual(["theta", "ts", "qi"]);
+    expect((json as any).reasonCodes).toEqual([]);
+    expect((json as any).missingSignals).toEqual([]);
     expect((json as any).proxySignals).toEqual([]);
-    expect((json as any).signals.theta.status).toBe("unavailable");
-    expect((json as any).signals.ts.status).toBe("unavailable");
-    expect((json as any).signals.qi.status).toBe("unavailable");
-    expect((json as any).promotionInputs.thetaMetricDerived).toBe(false);
-    expect((json as any).promotionInputs.tsMetricDerived).toBe(false);
-    expect((json as any).promotionInputs.qiMetricDerived).toBe(false);
-    expect((json as any).promotionInputs.qiApplicabilityStatus).toBeNull();
-    expect((json as any).readiness.promotionSignalReady).toBe(false);
-    expect((json as any).readiness.certifiedPromotionReady).toBe(false);
+    expect((json as any).signals.theta.status).toBe("pass");
+    expect((json as any).signals.theta.provenance).toBe("metric");
+    expect((json as any).signals.theta.sourcePath).toBe(
+      "warp.metricAdapter.betaDiagnostics.thetaMax",
+    );
+    expect((json as any).signals.ts.status).toBe("pass");
+    expect((json as any).signals.ts.provenance).toBe("metric");
+    expect((json as any).signals.ts.sourcePath).toBe("warp.metricAdapter+clocking");
+    expect((json as any).signals.qi.status).toBe("pass");
+    expect((json as any).signals.qi.provenance).toBe("metric");
+    expect((json as any).signals.qi.sourcePath).toBe(
+      "warp.metric.T00.nhm2.shift_lapse+warp.metricAdapter+clocking",
+    );
+    expect((json as any).signals.qi.rhoSource).toBe(
+      "warp.metric.T00.nhm2.shift_lapse",
+    );
+    expect((json as any).signals.qi.applicabilityStatus).toBe("PASS");
+    expect((json as any).signals.qi.applicabilityReasonCode).toBeNull();
+    expect((json as any).promotionInputs.thetaMetricDerived).toBe(true);
+    expect((json as any).promotionInputs.tsMetricDerived).toBe(true);
+    expect((json as any).promotionInputs.qiMetricDerived).toBe(true);
+    expect((json as any).promotionInputs.qiApplicabilityStatus).toBe("PASS");
+    expect((json as any).readiness.promotionSignalReady).toBe(true);
+    expect((json as any).readiness.certifiedPromotionReady).toBe(true);
 
     const markdown = fs.readFileSync(
       published.strictSignalArtifact.latestMdPath,
@@ -1049,16 +1076,18 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("NHM2 Strict-Signal Readiness");
     expect(markdown).toContain("publish-strict-signal-readiness");
     expect(markdown).toContain(fixture.selectedProfileId);
-    expect(markdown).toContain("| theta | unavailable |");
-    expect(markdown).toContain("| ts | unavailable |");
-    expect(markdown).toContain("| qi | unavailable |");
-    expect(markdown).toContain("strict_signal_missing");
+    expect(markdown).toContain("| theta | pass | true | metric |");
+    expect(markdown).toContain("| ts | pass | true | metric |");
+    expect(markdown).toContain("| qi | pass | true | metric |");
+    expect(markdown).toContain("warp.metricAdapter.betaDiagnostics.thetaMax");
+    expect(markdown).toContain("warp.metricAdapter+clocking");
+    expect(markdown).toContain("warp.metric.T00.nhm2.shift_lapse+warp.metricAdapter+clocking");
     expect(markdown).toContain(
       "does not widen route ETA, transport, gravity, or viability claims",
     );
   });
 
-  it("lets the full-loop audit consume emitted strict-signal evidence without upgrading missing signals", async () => {
+  it("lets the full-loop audit consume emitted strict-signal evidence instead of the placeholder all-missing artifact", async () => {
     const fixture = makeNhm2FullLoopAuditPublisherFixture();
     await publishNhm2ShiftLapseStrictSignalReadiness({
       artifactRootDir: fixture.artifactRootDir,
@@ -1092,10 +1121,8 @@ describe("nhm2 publication completion surfaces", () => {
       fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect(isNhm2FullLoopAuditContract(json)).toBe(true);
-    expect((json as any).sections.strict_signal_readiness.state).toBe("fail");
-    expect((json as any).sections.strict_signal_readiness.reasons).toContain(
-      "strict_signal_missing",
-    );
+    expect((json as any).sections.strict_signal_readiness.state).toBe("pass");
+    expect((json as any).sections.strict_signal_readiness.reasons).toEqual([]);
     expect((json as any).sections.strict_signal_readiness.artifactRefs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1106,11 +1133,21 @@ describe("nhm2 publication completion surfaces", () => {
         }),
       ]),
     );
-    expect((json as any).sections.strict_signal_readiness.missingSignals).toEqual([
-      "theta",
-      "ts",
-      "qi",
-    ]);
+    expect((json as any).sections.strict_signal_readiness.thetaMetricDerived).toBe(
+      true,
+    );
+    expect((json as any).sections.strict_signal_readiness.tsMetricDerived).toBe(
+      true,
+    );
+    expect((json as any).sections.strict_signal_readiness.qiMetricDerived).toBe(
+      true,
+    );
+    expect(
+      (json as any).sections.strict_signal_readiness.qiApplicabilityStatus,
+    ).toBe("PASS");
+    expect((json as any).sections.strict_signal_readiness.missingSignals).toEqual(
+      [],
+    );
     expect((json as any).highestPassingClaimTier).toBe("diagnostic");
 
     const markdown = fs.readFileSync(published.auditArtifact.latestMdPath, "utf8");
@@ -1118,6 +1155,415 @@ describe("nhm2 publication completion surfaces", () => {
       "artifacts/research/full-solve/nhm2-strict-signal-readiness-latest.json",
     );
     expect(markdown).toContain("| strict_signal_readiness |");
+    expect(markdown).toContain("| strict_signal_readiness | published nhm2 strict-signal readiness contract |");
+  });
+
+  it("publishes selected-profile NHM2 source-closure evidence with tensor snapshot refs and explicit regions", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedArtifactDir = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const selectedAuditDir = path.join(
+      fixture.auditRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const published = await publishNhm2ShiftLapseSourceClosure({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    expect(path.basename(published.sourceClosureArtifact.latestJsonPath)).toBe(
+      "nhm2-source-closure-latest.json",
+    );
+    expect(path.basename(published.sourceClosureArtifact.latestMdPath)).toBe(
+      "warp-nhm2-source-closure-latest.md",
+    );
+    expect(fs.existsSync(published.metricTensorSnapshot.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.tileTensorSnapshot.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.sourceClosureArtifact.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.sourceClosureArtifact.latestMdPath)).toBe(true);
+
+    const metricTensorJson = JSON.parse(
+      fs.readFileSync(published.metricTensorSnapshot.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    const tileTensorJson = JSON.parse(
+      fs.readFileSync(published.tileTensorSnapshot.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2SourceClosureDiagonalTensorSnapshotArtifact(metricTensorJson)).toBe(
+      true,
+    );
+    expect(isNhm2SourceClosureDiagonalTensorSnapshotArtifact(tileTensorJson)).toBe(
+      true,
+    );
+    expect((metricTensorJson as any).tensorRole).toBe("metric_required");
+    expect((tileTensorJson as any).tensorRole).toBe("tile_effective");
+    expect((metricTensorJson as any).shiftLapseProfileId).toBe(
+      fixture.selectedProfileId,
+    );
+    expect((tileTensorJson as any).familyId).toBe("nhm2_shift_lapse");
+
+    const json = JSON.parse(
+      fs.readFileSync(published.sourceClosureArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect((json as any).artifactId).toBe("nhm2_source_closure");
+    expect((json as any).schemaVersion).toBe("nhm2_source_closure/v1");
+    expect((json as any).status).toBe("fail");
+    expect((json as any).completeness).toBe("complete");
+    expect((json as any).reasonCodes).toContain("tensor_residual_exceeded");
+    expect((json as any).tensorRefs.metricRequired).toContain(
+      "nhm2-source-closure-metric-required-tensor-latest.json",
+    );
+    expect((json as any).tensorRefs.tileEffective).toContain(
+      "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    expect((json as any).residualNorms.toleranceRelLInf).not.toBeNull();
+    expect((json as any).sampledSummaries.regions.map((entry: any) => entry.regionId)).toEqual([
+      "hull",
+      "wall",
+      "exterior_shell",
+    ]);
+    expect((json as any).assumptionsDrifted).toBe(true);
+
+    const markdown = fs.readFileSync(
+      published.sourceClosureArtifact.latestMdPath,
+      "utf8",
+    );
+    expect(markdown).toContain("NHM2 Source Closure");
+    expect(markdown).toContain("publish-source-closure");
+    expect(markdown).toContain("| hull |");
+    expect(markdown).toContain("| wall |");
+    expect(markdown).toContain("| exterior_shell |");
+    expect(markdown).toContain(
+      "does not widen route ETA, transport, gravity, or viability claims",
+    );
+  });
+
+  it("lets the full-loop audit consume emitted source-closure evidence instead of missing-publication placeholders", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedArtifactDir = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const selectedAuditDir = path.join(
+      fixture.auditRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+
+    await publishNhm2ShiftLapseSourceClosure({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const published = await publishNhm2ShiftLapseFullLoopAudit({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const json = JSON.parse(
+      fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2FullLoopAuditContract(json)).toBe(true);
+    expect((json as any).sections.source_closure.state).toBe("fail");
+    expect((json as any).sections.source_closure.reasons).toContain(
+      "source_closure_residual_exceeded",
+    );
+    expect((json as any).sections.source_closure.reasons).toContain(
+      "policy_review_required",
+    );
+    expect((json as any).sections.source_closure.reasons).not.toContain(
+      "source_closure_missing",
+    );
+    expect((json as any).sections.source_closure.metricTensorRef).toContain(
+      "nhm2-source-closure-metric-required-tensor-latest.json",
+    );
+    expect((json as any).sections.source_closure.tileEffectiveTensorRef).toContain(
+      "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    expect((json as any).sections.source_closure.residualRms).not.toBeNull();
+    expect((json as any).sections.source_closure.residualMax).not.toBeNull();
+    expect((json as any).sections.source_closure.residualByRegion.hull).not.toBeNull();
+    expect((json as any).sections.source_closure.residualByRegion.wall).not.toBeNull();
+    expect((json as any).sections.source_closure.residualByRegion.exteriorShell).not.toBeNull();
+    expect((json as any).sections.source_closure.artifactRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactId: "nhm2_source_closure",
+          path: expect.stringContaining("nhm2-source-closure-latest.json"),
+        }),
+        expect.objectContaining({
+          artifactId: "nhm2_source_closure_metric_required_tensor",
+          path: expect.stringContaining(
+            "nhm2-source-closure-metric-required-tensor-latest.json",
+          ),
+        }),
+        expect.objectContaining({
+          artifactId: "nhm2_source_closure_tile_effective_tensor",
+          path: expect.stringContaining(
+            "nhm2-source-closure-tile-effective-tensor-latest.json",
+          ),
+        }),
+      ]),
+    );
+
+    const markdown = fs.readFileSync(published.auditArtifact.latestMdPath, "utf8");
+    expect(markdown).toContain(
+      "artifacts/research/full-solve/nhm2-source-closure-latest.json",
+    );
+    expect(markdown).toContain(
+      "nhm2-source-closure-metric-required-tensor-latest.json",
+    );
+    expect(markdown).toContain(
+      "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+  });
+
+  it("publishes selected-profile NHM2 observer-audit evidence with selected-profile tensor refs", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedArtifactDir = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const selectedAuditDir = path.join(
+      fixture.auditRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+
+    await publishNhm2ShiftLapseSourceClosure({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const published = await publishNhm2ShiftLapseObserverAudit({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    expect(path.basename(published.observerAuditArtifact.latestJsonPath)).toBe(
+      "nhm2-observer-audit-latest.json",
+    );
+    expect(path.basename(published.observerAuditArtifact.latestMdPath)).toBe(
+      "warp-nhm2-observer-audit-latest.md",
+    );
+    expect(fs.existsSync(published.observerAuditArtifact.latestJsonPath)).toBe(true);
+    expect(fs.existsSync(published.observerAuditArtifact.latestMdPath)).toBe(true);
+
+    const json = JSON.parse(
+      fs.readFileSync(published.observerAuditArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2ObserverAuditArtifact(json)).toBe(true);
+    expect((json as any).familyId).toBe("nhm2_shift_lapse");
+    expect((json as any).shiftLapseProfileId).toBe(fixture.selectedProfileId);
+    expect((json as any).tensors.metricRequired.tensorRef).toContain(
+      "nhm2-source-closure-metric-required-tensor-latest.json",
+    );
+    expect((json as any).tensors.tileEffective.tensorRef).toContain(
+      "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    expect((json as any).tensors.metricRequired.model.pressureModel).not.toBeNull();
+    expect((json as any).tensors.tileEffective.model.pressureModel).not.toBeNull();
+
+    const markdown = fs.readFileSync(
+      published.observerAuditArtifact.latestMdPath,
+      "utf8",
+    );
+    expect(markdown).toContain("NHM2 Observer Audit");
+    expect(markdown).toContain("publish-observer-audit");
+    expect(markdown).toContain(fixture.selectedProfileId);
+    expect(markdown).toContain(
+      "nhm2-source-closure-metric-required-tensor-latest.json",
+    );
+    expect(markdown).toContain(
+      "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    expect(markdown).toContain(
+      "does not widen route ETA, transport, gravity, or viability claims",
+    );
+  });
+
+  it("lets the full-loop audit consume emitted observer-audit evidence instead of missing-publication placeholders", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedArtifactDir = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const selectedAuditDir = path.join(
+      fixture.auditRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+
+    await publishNhm2ShiftLapseSourceClosure({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const observerPublished = await publishNhm2ShiftLapseObserverAudit({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+    const observerJson = JSON.parse(
+      fs.readFileSync(observerPublished.observerAuditArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+
+    const published = await publishNhm2ShiftLapseFullLoopAudit({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: selectedAuditDir,
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const json = JSON.parse(
+      fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2FullLoopAuditContract(json)).toBe(true);
+    expect((json as any).sections.observer_audit.artifactRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactId: "nhm2_observer_audit",
+          path: expect.stringContaining("nhm2-observer-audit-latest.json"),
+        }),
+      ]),
+    );
+    expect((json as any).sections.observer_audit.state).toBe(
+      (observerJson as any).status,
+    );
+    if ((observerJson as any).reasonCodes.includes("metric_audit_incomplete")) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "observer_audit_incomplete",
+      );
+    }
+    if ((observerJson as any).reasonCodes.includes("tile_audit_incomplete")) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "observer_audit_incomplete",
+      );
+    }
+    if ((observerJson as any).reasonCodes.includes("observer_condition_failed")) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "observer_blocking_violation",
+      );
+    }
+    if ((observerJson as any).reasonCodes.includes("surrogate_model_limited")) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "policy_review_required",
+      );
+    }
+    expect((json as any).sections.observer_audit.metric.typeIFraction).toBe(
+      (observerJson as any).tensors.metricRequired.typeI.fraction,
+    );
+    expect((json as any).sections.observer_audit.tile.typeIFraction).toBe(
+      (observerJson as any).tensors.tileEffective.typeI.fraction,
+    );
+
+    const markdown = fs.readFileSync(published.auditArtifact.latestMdPath, "utf8");
+    expect(markdown).toContain(
+      "artifacts/research/full-solve/nhm2-observer-audit-latest.json",
+    );
+  });
+
+  it("maps tolerance-missing source-closure evidence to a conservative full-loop blocker", async () => {
+    const fixture = makeNhm2FullLoopAuditPublisherFixture();
+    const selectedArtifactDir = path.join(
+      fixture.artifactRootDir,
+      "selected-family/nhm2-shift-lapse",
+    );
+    const metricTensorPath = path.join(
+      selectedArtifactDir,
+      "nhm2-source-closure-metric-required-tensor-latest.json",
+    );
+    const tileTensorPath = path.join(
+      selectedArtifactDir,
+      "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    writeJsonFixture(
+      metricTensorPath,
+      buildNhm2SourceClosureDiagonalTensorSnapshotArtifact({
+        tensorRole: "metric_required",
+        familyId: "nhm2_shift_lapse",
+        shiftLapseProfileId: fixture.selectedProfileId,
+        shiftLapseProfileStage: "controlled_tuning_stage_1",
+        tensorSemanticRef: "warp.metric.T00.nhm2.shift_lapse",
+        sourceArtifactPath: path.join(
+          selectedArtifactDir,
+          "nhm2-shift-lapse-transport-result-latest.json",
+        ),
+        diagonalTensor: { T00: 2, T11: 1, T22: 1, T33: 1 },
+      }),
+    );
+    writeJsonFixture(
+      tileTensorPath,
+      buildNhm2SourceClosureDiagonalTensorSnapshotArtifact({
+        tensorRole: "tile_effective",
+        familyId: "nhm2_shift_lapse",
+        shiftLapseProfileId: fixture.selectedProfileId,
+        shiftLapseProfileStage: "controlled_tuning_stage_1",
+        tensorSemanticRef: "warp.tileEffectiveStressEnergy.nhm2_shift_lapse.diagonal",
+        sourceArtifactPath: path.join(
+          selectedArtifactDir,
+          "nhm2-shift-lapse-transport-result-latest.json",
+        ),
+        diagonalTensor: { T00: 2, T11: 1, T22: 1, T33: 1 },
+      }),
+    );
+    writeJsonFixture(
+      path.join(fixture.artifactRootDir, "nhm2-source-closure-latest.json"),
+      buildNhm2SourceClosureArtifact({
+        metricTensorRef: metricTensorPath,
+        tileEffectiveTensorRef: tileTensorPath,
+        metricRequiredTensor: { T00: 2, T11: 1, T22: 1, T33: 1 },
+        tileEffectiveTensor: { T00: 2, T11: 1, T22: 1, T33: 1 },
+        sampledSummaries: [
+          { regionId: "hull", sampleCount: 1, tileTensor: { T00: 2, T11: 1, T22: 1, T33: 1 } },
+          { regionId: "wall", sampleCount: 1, tileTensor: { T00: 2, T11: 1, T22: 1, T33: 1 } },
+          {
+            regionId: "exterior_shell",
+            sampleCount: 1,
+            tileTensor: { T00: 2, T11: 1, T22: 1, T33: 1 },
+          },
+        ],
+      }),
+    );
+
+    const published = await publishNhm2ShiftLapseFullLoopAudit({
+      artifactRootDir: fixture.artifactRootDir,
+      auditRootDir: fixture.auditRootDir,
+      selectedFamilyArtifactRootDir: selectedArtifactDir,
+      selectedFamilyAuditRootDir: path.join(
+        fixture.auditRootDir,
+        "selected-family/nhm2-shift-lapse",
+      ),
+      reuseExistingSelectedArtifacts: true,
+    });
+
+    const json = JSON.parse(
+      fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(isNhm2FullLoopAuditContract(json)).toBe(true);
+    expect((json as any).sections.source_closure.state).toBe("unavailable");
+    expect((json as any).sections.source_closure.reasons).toContain(
+      "source_closure_missing",
+    );
   });
 
   it("blocks the full-loop audit when selected-profile refs are mismatched or contradictory", async () => {

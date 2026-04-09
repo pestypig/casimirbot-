@@ -3,10 +3,20 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   type HelixThreadAnswerSurfaceMode,
+  type HelixThreadClaimLink,
   type HelixThreadClassifierResult,
   type HelixThreadEvent,
   type HelixThreadEventInput,
+  type HelixThreadItem,
+  type HelixThreadItemStatus,
+  type HelixThreadItemStream,
+  type HelixThreadItemType,
   type HelixThreadMemoryCitation,
+  type HelixThreadRequestKind,
+  type HelixThreadServerRequest,
+  type HelixThreadServerRequestStatus,
+  type HelixThreadStatus,
+  type HelixTurnKind,
 } from "./types";
 
 const readNumber = (value: string | undefined, fallback: number): number => {
@@ -51,6 +61,26 @@ const clipThreadText = (value: unknown, limit = 1200): string | null => {
   if (!normalized) return null;
   if (normalized.length <= limit) return normalized;
   return `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+};
+
+const normalizeObjectRecord = (
+  value: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null =>
+  value && typeof value === "object" ? value : null;
+
+const normalizeStringArray = (
+  value: unknown,
+  limit: number,
+): string[] | null => {
+  if (!Array.isArray(value)) return null;
+  const next = Array.from(
+    new Set(
+      value
+        .map((entry) => normalizeOptionalString(entry))
+        .filter((entry): entry is string => Boolean(entry)),
+    ),
+  ).slice(0, limit);
+  return next.length > 0 ? next : null;
 };
 
 const normalizeClassifierResult = (
@@ -99,19 +129,11 @@ const normalizeMemoryCitation = (
         .filter((entry) => entry.path)
         .slice(0, 16)
     : [];
-  const rollout_ids = Array.isArray(value.rollout_ids)
-    ? Array.from(
-        new Set(
-          value.rollout_ids
-            .map((entry) => String(entry ?? "").trim())
-            .filter(Boolean),
-        ),
-      ).slice(0, 12)
-    : [];
-  if (entries.length === 0 && rollout_ids.length === 0) return null;
+  const rolloutIds = normalizeStringArray(value.rollout_ids, 12) ?? [];
+  if (entries.length === 0 && rolloutIds.length === 0) return null;
   return {
     entries,
-    rollout_ids,
+    rollout_ids: rolloutIds,
   };
 };
 
@@ -123,6 +145,80 @@ const normalizeAnswerSurfaceMode = (
   value === "fail_closed"
     ? value
     : null;
+
+const normalizeThreadStatus = (value: unknown): HelixThreadStatus | null =>
+  value === "idle" ||
+  value === "active" ||
+  value === "interrupted" ||
+  value === "failed" ||
+  value === "archived"
+    ? value
+    : null;
+
+const normalizeTurnKind = (value: unknown): HelixTurnKind | null =>
+  value === "ask" ||
+  value === "conversation_turn" ||
+  value === "review" ||
+  value === "compact" ||
+  value === "auxiliary"
+    ? value
+    : null;
+
+const normalizeItemType = (value: unknown): HelixThreadItemType | null =>
+  value === "userMessage" ||
+  value === "classification" ||
+  value === "brief" ||
+  value === "plan" ||
+  value === "retrieval" ||
+  value === "toolObservation" ||
+  value === "validation" ||
+  value === "answer" ||
+  value === "requestUserInput" ||
+  value === "approval" ||
+  value === "commandExecution" ||
+  value === "dynamicToolCall" ||
+  value === "review" ||
+  value === "contextCompaction"
+    ? value
+    : null;
+
+const normalizeItemStatus = (value: unknown): HelixThreadItemStatus | null =>
+  value === "in_progress" ||
+  value === "completed" ||
+  value === "failed" ||
+  value === "declined" ||
+  value === "cancelled"
+    ? value
+    : null;
+
+const normalizeItemStream = (value: unknown): HelixThreadItemStream | null =>
+  value === "plan" || value === "answer" || value === "tool" || value === "observation"
+    ? value
+    : null;
+
+const normalizeRequestKind = (value: unknown): HelixThreadRequestKind | null =>
+  value === "request_user_input" || value === "approval" || value === "elicitation"
+    ? value
+    : null;
+
+const normalizeClaimLinks = (
+  value: HelixThreadClaimLink[] | null | undefined,
+): HelixThreadClaimLink[] | null => {
+  if (!Array.isArray(value)) return null;
+  const links = value
+    .filter((entry) => entry && typeof entry === "object")
+    .map((entry) => ({
+      claim_id: normalizeOptionalString((entry as { claim_id?: unknown }).claim_id) ?? "",
+      source_item_ids:
+        normalizeStringArray(
+          (entry as { source_item_ids?: unknown }).source_item_ids,
+          24,
+        ) ?? [],
+    }))
+    .filter((entry) => entry.claim_id && entry.source_item_ids.length > 0)
+    .slice(0, 24);
+  return links.length > 0 ? links : null;
+};
 
 const resolveThreadId = (input: HelixThreadEventInput): string => {
   const explicit = normalizeOptionalString(input.thread_id);
@@ -143,6 +239,117 @@ const sortBySequence = (events: HelixThreadEvent[]): HelixThreadEvent[] =>
         a.ts.localeCompare(b.ts) ||
         a.event_id.localeCompare(b.event_id),
     );
+
+const buildItemStateFromEvents = (events: HelixThreadEvent[]): HelixThreadItem[] => {
+  const byItemId = new Map<string, HelixThreadItem>();
+  for (const event of sortBySequence(events)) {
+    if (!event.item_id || !event.item_type) continue;
+    const existing = byItemId.get(event.item_id);
+    const next: HelixThreadItem =
+      existing ?? {
+        thread_id: event.thread_id,
+        turn_id: event.turn_id,
+        item_id: event.item_id,
+        item_type: event.item_type,
+        item_status: event.item_status ?? "in_progress",
+        item_stream: event.item_stream ?? null,
+        started_at: event.ts,
+        updated_at: event.ts,
+        completed_at: null,
+        text: null,
+        delta_count: 0,
+        last_seq: event.seq,
+        source_item_ids: event.source_item_ids ?? null,
+        claim_links: event.claim_links ?? null,
+        observation_ref: event.observation_ref ?? null,
+        meta: event.meta ?? null,
+      };
+    next.thread_id = event.thread_id;
+    next.turn_id = event.turn_id;
+    next.item_type = event.item_type ?? next.item_type;
+    next.item_stream = event.item_stream ?? next.item_stream ?? null;
+    next.item_status = event.item_status ?? next.item_status;
+    next.updated_at = event.ts;
+    next.last_seq = event.seq;
+    next.source_item_ids = event.source_item_ids ?? next.source_item_ids ?? null;
+    next.claim_links = event.claim_links ?? next.claim_links ?? null;
+    next.observation_ref = event.observation_ref ?? next.observation_ref ?? null;
+    next.meta = event.meta ?? next.meta ?? null;
+    if (event.event_type === "item_started") {
+      next.started_at = existing?.started_at ?? event.ts;
+      next.item_status = event.item_status ?? "in_progress";
+    }
+    if (event.delta_text) {
+      next.text = [next.text ?? "", event.delta_text].filter(Boolean).join("");
+      next.delta_count += 1;
+    }
+    if (event.user_text && next.item_type === "userMessage") {
+      next.text = event.user_text;
+    }
+    if (event.assistant_text && next.item_type === "answer") {
+      next.text = event.assistant_text;
+    }
+    if (
+      event.event_type === "item_completed" ||
+      event.item_status === "completed" ||
+      event.item_status === "failed" ||
+      event.item_status === "declined" ||
+      event.item_status === "cancelled"
+    ) {
+      next.completed_at = event.ts;
+      next.item_status = event.item_status ?? "completed";
+    }
+    byItemId.set(event.item_id, next);
+  }
+  return Array.from(byItemId.values()).sort(
+    (a, b) => a.last_seq - b.last_seq || a.started_at.localeCompare(b.started_at),
+  );
+};
+
+const buildRequestStateFromEvents = (
+  events: HelixThreadEvent[],
+): HelixThreadServerRequest[] => {
+  const byRequestId = new Map<string, HelixThreadServerRequest>();
+  for (const event of sortBySequence(events)) {
+    if (!event.request_id || !event.request_kind) continue;
+    const existing = byRequestId.get(event.request_id);
+    const next: HelixThreadServerRequest =
+      existing ?? {
+        thread_id: event.thread_id,
+        turn_id: event.turn_id,
+        request_id: event.request_id,
+        request_kind: event.request_kind,
+        status: "pending",
+        created_at: event.ts,
+        updated_at: event.ts,
+        resolved_at: null,
+        payload: event.request_payload ?? null,
+        last_seq: event.seq,
+      };
+    next.thread_id = event.thread_id;
+    next.turn_id = event.turn_id;
+    next.request_kind = event.request_kind ?? next.request_kind;
+    next.updated_at = event.ts;
+    next.last_seq = event.seq;
+    next.payload = event.request_payload ?? next.payload ?? null;
+    if (event.event_type === "server_request_created") {
+      next.status = "pending";
+      next.created_at = existing?.created_at ?? event.ts;
+    } else if (event.event_type === "server_request_resolved") {
+      next.status =
+        event.item_status === "declined"
+          ? "declined"
+          : event.item_status === "cancelled"
+            ? "cancelled"
+            : "resolved";
+      next.resolved_at = event.ts;
+    }
+    byRequestId.set(event.request_id, next);
+  }
+  return Array.from(byRequestId.values()).sort(
+    (a, b) => a.last_seq - b.last_seq || a.created_at.localeCompare(b.created_at),
+  );
+};
 
 export const appendHelixThreadEvent = (
   input: HelixThreadEventInput,
@@ -166,9 +373,22 @@ export const appendHelixThreadEvent = (
     brief_status: normalizeOptionalString(input.brief_status),
     final_gate_outcome: clipThreadText(input.final_gate_outcome, 220),
     fail_reason: clipThreadText(input.fail_reason, 220),
+    thread_status: normalizeThreadStatus(input.thread_status),
+    turn_kind: normalizeTurnKind(input.turn_kind),
+    item_id: normalizeOptionalString(input.item_id),
+    item_type: normalizeItemType(input.item_type),
+    item_status: normalizeItemStatus(input.item_status),
+    item_stream: normalizeItemStream(input.item_stream),
+    delta_text: clipThreadText(input.delta_text, 2_400),
+    request_id: normalizeOptionalString(input.request_id),
+    request_kind: normalizeRequestKind(input.request_kind),
+    request_payload: normalizeObjectRecord(input.request_payload),
+    observation_ref: normalizeObjectRecord(input.observation_ref),
+    source_item_ids: normalizeStringArray(input.source_item_ids, 24),
+    claim_links: normalizeClaimLinks(input.claim_links),
     answer_surface_mode: normalizeAnswerSurfaceMode(input.answer_surface_mode),
     memory_citation: normalizeMemoryCitation(input.memory_citation),
-    meta: input.meta && typeof input.meta === "object" ? input.meta : null,
+    meta: normalizeObjectRecord(input.meta),
   };
   eventBuffer.push(record);
   if (eventBuffer.length > MAX_BUFFER_SIZE) {
@@ -178,9 +398,28 @@ export const appendHelixThreadEvent = (
   return record;
 };
 
+export const appendHelixThreadLifecycleEvent = (
+  input: HelixThreadEventInput,
+): HelixThreadEvent => appendHelixThreadEvent(input);
+
+export const appendHelixTurnEvent = (
+  input: HelixThreadEventInput,
+): HelixThreadEvent => appendHelixThreadEvent(input);
+
+export const appendHelixThreadItemEvent = (
+  input: HelixThreadEventInput,
+): HelixThreadEvent => appendHelixThreadEvent(input);
+
+export const appendHelixThreadServerRequestEvent = (
+  input: HelixThreadEventInput,
+): HelixThreadEvent => appendHelixThreadEvent(input);
+
 export const getHelixThreadLedgerEvents = (options?: {
   sessionId?: string | null;
   threadId?: string | null;
+  turnId?: string | null;
+  itemId?: string | null;
+  requestId?: string | null;
   limit?: number | null;
 }): HelixThreadEvent[] => {
   const limit =
@@ -189,15 +428,46 @@ export const getHelixThreadLedgerEvents = (options?: {
       : Math.max(1, Math.floor(options.limit));
   const sessionId = normalizeOptionalString(options?.sessionId);
   const threadId = normalizeOptionalString(options?.threadId);
-  const persisted = LEDGER_PERSIST_ENABLED ? readPersistedEvents(limit, sessionId, threadId) : [];
+  const turnId = normalizeOptionalString(options?.turnId);
+  const itemId = normalizeOptionalString(options?.itemId);
+  const requestId = normalizeOptionalString(options?.requestId);
+  const persisted = LEDGER_PERSIST_ENABLED
+    ? readPersistedEvents({ limit, sessionId, threadId, turnId, itemId, requestId })
+    : [];
   const merged = new Map<string, HelixThreadEvent>();
   for (const event of [...persisted, ...eventBuffer]) {
     if (sessionId && event.session_id !== sessionId) continue;
     if (threadId && event.thread_id !== threadId) continue;
+    if (turnId && event.turn_id !== turnId) continue;
+    if (itemId && event.item_id !== itemId) continue;
+    if (requestId && event.request_id !== requestId) continue;
     merged.set(event.event_id, event);
   }
   const ordered = sortBySequence(Array.from(merged.values()));
   return limit === null ? ordered : ordered.slice(-limit);
+};
+
+export const getHelixThreadItems = (args: {
+  threadId: string;
+  turnId?: string | null;
+}): HelixThreadItem[] =>
+  buildItemStateFromEvents(
+    getHelixThreadLedgerEvents({
+      threadId: args.threadId,
+      turnId: args.turnId ?? null,
+    }),
+  );
+
+export const getHelixThreadRequests = (args: {
+  threadId: string;
+  unresolvedOnly?: boolean;
+}): HelixThreadServerRequest[] => {
+  const requests = buildRequestStateFromEvents(
+    getHelixThreadLedgerEvents({
+      threadId: args.threadId,
+    }),
+  );
+  return args.unresolvedOnly ? requests.filter((entry) => entry.status === "pending") : requests;
 };
 
 export const getHelixThreadLedgerPath = (): string => LEDGER_PATH;
@@ -283,23 +553,36 @@ function parseLedgerRecord(line: string): HelixThreadEvent | null {
       brief_status: normalizeOptionalString(parsed.brief_status),
       final_gate_outcome: clipThreadText(parsed.final_gate_outcome, 220),
       fail_reason: clipThreadText(parsed.fail_reason, 220),
+      thread_status: normalizeThreadStatus(parsed.thread_status),
+      turn_kind: normalizeTurnKind(parsed.turn_kind),
+      item_id: normalizeOptionalString(parsed.item_id),
+      item_type: normalizeItemType(parsed.item_type),
+      item_status: normalizeItemStatus(parsed.item_status),
+      item_stream: normalizeItemStream(parsed.item_stream),
+      delta_text: clipThreadText(parsed.delta_text, 2_400),
+      request_id: normalizeOptionalString(parsed.request_id),
+      request_kind: normalizeRequestKind(parsed.request_kind),
+      request_payload: normalizeObjectRecord(parsed.request_payload),
+      observation_ref: normalizeObjectRecord(parsed.observation_ref),
+      source_item_ids: normalizeStringArray(parsed.source_item_ids, 24),
+      claim_links: normalizeClaimLinks(parsed.claim_links),
       answer_surface_mode: normalizeAnswerSurfaceMode(parsed.answer_surface_mode),
       memory_citation: normalizeMemoryCitation(parsed.memory_citation),
-      meta:
-        parsed.meta && typeof parsed.meta === "object"
-          ? (parsed.meta as Record<string, unknown>)
-          : null,
+      meta: normalizeObjectRecord(parsed.meta),
     };
   } catch {
     return null;
   }
 }
 
-function readPersistedEvents(
-  limit?: number | null,
-  sessionId?: string | null,
-  threadId?: string | null,
-): HelixThreadEvent[] {
+function readPersistedEvents(options?: {
+  limit?: number | null;
+  sessionId?: string | null;
+  threadId?: string | null;
+  turnId?: string | null;
+  itemId?: string | null;
+  requestId?: string | null;
+}): HelixThreadEvent[] {
   if (!LEDGER_PERSIST_ENABLED) return [];
   const parsed: HelixThreadEvent[] = [];
   for (const filePath of collectLedgerPaths()) {
@@ -308,8 +591,11 @@ function readPersistedEvents(
       for (const line of raw.split(/\r?\n/)) {
         const record = parseLedgerRecord(line);
         if (!record) continue;
-        if (sessionId && record.session_id !== sessionId) continue;
-        if (threadId && record.thread_id !== threadId) continue;
+        if (options?.sessionId && record.session_id !== options.sessionId) continue;
+        if (options?.threadId && record.thread_id !== options.threadId) continue;
+        if (options?.turnId && record.turn_id !== options.turnId) continue;
+        if (options?.itemId && record.item_id !== options.itemId) continue;
+        if (options?.requestId && record.request_id !== options.requestId) continue;
         parsed.push(record);
       }
     } catch {
@@ -317,8 +603,8 @@ function readPersistedEvents(
     }
   }
   const ordered = sortBySequence(parsed);
-  if (limit === null || limit === undefined) return ordered;
-  return ordered.slice(-Math.max(1, Math.floor(limit)));
+  if (options?.limit === null || options?.limit === undefined) return ordered;
+  return ordered.slice(-Math.max(1, Math.floor(options.limit)));
 }
 
 function loadPersistedBytes(): number {
@@ -387,10 +673,11 @@ function pruneLedgerRotations(dir: string, base: string, ext: string): void {
 }
 
 function hydrateFromPersisted(): void {
-  const persisted = readPersistedEvents(MAX_BUFFER_SIZE);
+  const persisted = readPersistedEvents({ limit: MAX_BUFFER_SIZE });
   if (persisted.length === 0) return;
   eventBuffer.push(...persisted);
   eventSequence = persisted.reduce((max, entry) => Math.max(max, entry.seq), 0);
 }
 
 hydrateFromPersisted();
+

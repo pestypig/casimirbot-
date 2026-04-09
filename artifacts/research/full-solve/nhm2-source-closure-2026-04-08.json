@@ -1,0 +1,228 @@
+{
+  "artifactId": "nhm2_source_closure",
+  "schemaVersion": "nhm2_source_closure/v1",
+  "status": "fail",
+  "completeness": "complete",
+  "reasonCodes": [
+    "tensor_residual_exceeded",
+    "assumption_drift"
+  ],
+  "comparedComponents": [
+    "T00",
+    "T11",
+    "T22",
+    "T33"
+  ],
+  "tensorRefs": {
+    "metricRequired": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
+    "tileEffective": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json"
+  },
+  "tensors": {
+    "metricRequired": {
+      "T00": -58267450.98955891,
+      "T11": 58267450.98955891,
+      "T22": 58267450.98955891,
+      "T33": 58267450.98955891
+    },
+    "tileEffective": {
+      "T00": -0.11480523685564506,
+      "T11": 0.11480523685564506,
+      "T22": 0.05740261842782253,
+      "T33": 0.11480523685564506
+    }
+  },
+  "residualComponents": {
+    "T00": {
+      "metricRequired": -58267450.98955891,
+      "tileEffective": -0.11480523685564506,
+      "absResidual": 58267450.87475368,
+      "relResidual": 0.999999998029685
+    },
+    "T11": {
+      "metricRequired": 58267450.98955891,
+      "tileEffective": 0.11480523685564506,
+      "absResidual": 58267450.87475368,
+      "relResidual": 0.999999998029685
+    },
+    "T22": {
+      "metricRequired": 58267450.98955891,
+      "tileEffective": 0.05740261842782253,
+      "absResidual": 58267450.932156295,
+      "relResidual": 0.9999999990148425
+    },
+    "T33": {
+      "metricRequired": 58267450.98955891,
+      "tileEffective": 0.11480523685564506,
+      "absResidual": 58267450.87475368,
+      "relResidual": 0.999999998029685
+    }
+  },
+  "residualNorms": {
+    "absL1": 233069803.55641732,
+    "absL2": 116534901.77820866,
+    "absLInf": 58267450.932156295,
+    "relL1": 3.999999993103897,
+    "relL2": 1.9999999965519486,
+    "relLInf": 0.9999999990148425,
+    "toleranceRelLInf": 0.1,
+    "pass": false
+  },
+  "sampledSummaries": {
+    "status": "available",
+    "regions": [
+      {
+        "regionId": "hull",
+        "sampleCount": 1096760,
+        "tileTensor": {
+          "T00": -16732756.921958108,
+          "T11": 16732756.921958108,
+          "T22": 16732756.921958108,
+          "T33": 16732756.921958108
+        },
+        "residualComponents": {
+          "T00": {
+            "metricRequired": -58267450.98955891,
+            "tileEffective": -16732756.921958108,
+            "absResidual": 41534694.0676008,
+            "relResidual": 0.7128284035463214
+          },
+          "T11": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 16732756.921958108,
+            "absResidual": 41534694.0676008,
+            "relResidual": 0.7128284035463214
+          },
+          "T22": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 16732756.921958108,
+            "absResidual": 41534694.0676008,
+            "relResidual": 0.7128284035463214
+          },
+          "T33": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 16732756.921958108,
+            "absResidual": 41534694.0676008,
+            "relResidual": 0.7128284035463214
+          }
+        },
+        "residualNorms": {
+          "absL1": 166138776.2704032,
+          "absL2": 83069388.1352016,
+          "absLInf": 41534694.0676008,
+          "relL1": 2.8513136141852855,
+          "relL2": 1.4256568070926428,
+          "relLInf": 0.7128284035463214,
+          "toleranceRelLInf": 0.1,
+          "pass": false
+        },
+        "note": "inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published."
+      },
+      {
+        "regionId": "wall",
+        "sampleCount": 3352,
+        "tileTensor": {
+          "T00": -27108804644.765415,
+          "T11": 27108804644.765415,
+          "T22": 27108804644.765415,
+          "T33": 27108804644.765415
+        },
+        "residualComponents": {
+          "T00": {
+            "metricRequired": -58267450.98955891,
+            "tileEffective": -27108804644.765415,
+            "absResidual": 27050537193.775856,
+            "relResidual": 464.24782162897617
+          },
+          "T11": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 27108804644.765415,
+            "absResidual": 27050537193.775856,
+            "relResidual": 464.24782162897617
+          },
+          "T22": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 27108804644.765415,
+            "absResidual": 27050537193.775856,
+            "relResidual": 464.24782162897617
+          },
+          "T33": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 27108804644.765415,
+            "absResidual": 27050537193.775856,
+            "relResidual": 464.24782162897617
+          }
+        },
+        "residualNorms": {
+          "absL1": 108202148775.10342,
+          "absL2": 54101074387.55171,
+          "absLInf": 27050537193.775856,
+          "relL1": 1856.9912865159047,
+          "relL2": 928.4956432579523,
+          "relLInf": 464.24782162897617,
+          "toleranceRelLInf": 0.1,
+          "pass": false
+        },
+        "note": "wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published."
+      },
+      {
+        "regionId": "exterior_shell",
+        "sampleCount": 2504,
+        "tileTensor": {
+          "T00": -5133810475.7006645,
+          "T11": 5133810475.7006645,
+          "T22": 5133810475.7006645,
+          "T33": 5133810475.7006645
+        },
+        "residualComponents": {
+          "T00": {
+            "metricRequired": -58267450.98955891,
+            "tileEffective": -5133810475.7006645,
+            "absResidual": 5075543024.711105,
+            "relResidual": 87.1076894305983
+          },
+          "T11": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 5133810475.7006645,
+            "absResidual": 5075543024.711105,
+            "relResidual": 87.1076894305983
+          },
+          "T22": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 5133810475.7006645,
+            "absResidual": 5075543024.711105,
+            "relResidual": 87.1076894305983
+          },
+          "T33": {
+            "metricRequired": 58267450.98955891,
+            "tileEffective": 5133810475.7006645,
+            "absResidual": 5075543024.711105,
+            "relResidual": 87.1076894305983
+          }
+        },
+        "residualNorms": {
+          "absL1": 20302172098.84442,
+          "absL2": 10151086049.42221,
+          "absLInf": 5075543024.711105,
+          "relL1": 348.4307577223932,
+          "relL2": 174.2153788611966,
+          "relLInf": 87.1076894305983,
+          "toleranceRelLInf": 0.1,
+          "pass": false
+        },
+        "note": "exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Compared against the selected profile's global metric-required diagonal tensor because region-specific metric-required tensors are not presently published."
+      }
+    ]
+  },
+  "scalarProjections": {
+    "cl3RhoDeltaRel": 0,
+    "metricVsTileT00Rel": 0.999999998029685,
+    "traceRel": 0.9999999985222636,
+    "isotropicPressureRel": 0.9999999983580709
+  },
+  "distinction": {
+    "scalarCongruenceSecondary": true,
+    "scalarSurfaceId": "CL3_RhoDelta",
+    "tensorSurfaceId": "nhm2_source_closure"
+  },
+  "assumptionsDrifted": true
+}

@@ -18,7 +18,7 @@ const buildApp = async () => {
   const workerClientModule: StarSimWorkerClientModule = await import(
     "../server/modules/starsim/worker/starsim-worker-client"
   );
-  jobsModule.__resetStarSimJobsForTest();
+  await jobsModule.__resetStarSimJobsForTest();
   await workerClientModule.__resetStarSimWorkerForTest();
   const app = express();
   app.use(express.json());
@@ -56,6 +56,8 @@ afterEach(async () => {
   delete process.env.STAR_SIM_MESA_RUNTIME;
   delete process.env.STAR_SIM_GYRE_RUNTIME;
   delete process.env.STAR_SIM_WORKER_TIMEOUT_MS;
+  delete process.env.STAR_SIM_JOB_MAX_ATTEMPTS;
+  delete process.env.STAR_SIM_WORKER_CRASH_ON_KIND;
   fs.rmSync(artifactRoot, { recursive: true, force: true });
   vi.resetModules();
 });
@@ -101,5 +103,66 @@ describe("star-sim async worker routes", () => {
     for (const ref of lane.artifact_refs) {
       expect(fs.existsSync(path.resolve(ref.path))).toBe(true);
     }
+  });
+
+  it("marks a crashed worker job failed instead of leaving it running forever", async () => {
+    process.env.STAR_SIM_WORKER_CRASH_ON_KIND = "structure_mesa";
+    process.env.STAR_SIM_JOB_MAX_ATTEMPTS = "1";
+    const app = await buildApp();
+
+    const submit = await request(app)
+      .post("/api/star-sim/v1/jobs")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+          epoch_iso: "2026-01-01T00:00:00.000Z",
+        },
+        spectroscopy: {
+          teff_K: 5772,
+          logg_cgs: 4.438,
+          metallicity_feh: 0,
+        },
+        structure: {
+          mass_Msun: 1,
+          radius_Rsun: 1,
+        },
+        requested_lanes: ["structure_mesa"],
+      })
+      .expect(202);
+
+    const job = await waitForJob(app, submit.body.job_id, "failed");
+    expect(job.status_reason).toBe("worker_crash");
+    expect(job.attempt_count).toBe(1);
+    expect(job.error).toContain("star_sim_worker_exit");
+  });
+
+  it("fails honestly when docker runtime is selected but not configured", async () => {
+    process.env.STAR_SIM_MESA_RUNTIME = "docker";
+    const app = await buildApp();
+    const res = await request(app)
+      .post("/api/star-sim/v1/run")
+      .send({
+        target: {
+          object_id: "sun",
+          name: "Sun",
+          epoch_iso: "2026-01-01T00:00:00.000Z",
+        },
+        spectroscopy: {
+          teff_K: 5772,
+          logg_cgs: 4.438,
+          metallicity_feh: 0,
+        },
+        structure: {
+          mass_Msun: 1,
+          radius_Rsun: 1,
+        },
+        requested_lanes: ["structure_mesa"],
+      })
+      .expect(200);
+
+    expect(res.body.lanes[0].status).toBe("unavailable");
+    expect(res.body.lanes[0].status_reason).toBe("solver_unconfigured");
+    expect(res.body.lanes[0].runtime_mode).toBe("docker");
   });
 });

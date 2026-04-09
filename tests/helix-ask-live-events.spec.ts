@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const threadTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-ask-live-thread-"));
 const threadLedgerPath = path.join(threadTempDir, "helix-thread-ledger.jsonl");
+const threadIndexPath = path.join(threadTempDir, "helix-thread-index.json");
 
 describe("Helix Ask live events", () => {
   let server: Server;
@@ -18,6 +19,7 @@ describe("Helix Ask live events", () => {
     process.env.HELIX_ASK_MICRO_PASS_AUTO = "0";
     process.env.HELIX_ASK_TWO_PASS = "0";
     process.env.HELIX_THREAD_LEDGER_PATH = threadLedgerPath;
+    process.env.HELIX_THREAD_INDEX_PATH = threadIndexPath;
     process.env.HELIX_THREAD_PERSIST = "1";
     vi.resetModules();
     const { planRouter } = await import("../server/routes/agi.plan");
@@ -46,9 +48,14 @@ describe("Helix Ask live events", () => {
     const { __resetHelixThreadLedgerStore } = await import(
       "../server/services/helix-thread/ledger"
     );
+    const { __resetHelixThreadRegistryStore } = await import(
+      "../server/services/helix-thread/registry"
+    );
     __resetHelixThreadLedgerStore();
+    __resetHelixThreadRegistryStore();
     fs.rmSync(threadTempDir, { recursive: true, force: true });
     delete process.env.HELIX_THREAD_LEDGER_PATH;
+    delete process.env.HELIX_THREAD_INDEX_PATH;
     delete process.env.HELIX_THREAD_PERSIST;
   });
 
@@ -65,6 +72,7 @@ describe("Helix Ask live events", () => {
     });
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
+      thread_id?: string;
       debug?: { answer_surface_mode?: string };
       memory_citation?: { entries?: Array<{ path?: string }>; rollout_ids?: string[] } | null;
     };
@@ -77,6 +85,7 @@ describe("Helix Ask live events", () => {
 
     expect(eventTypes).toContain("ask_started");
     expect(eventTypes).toContain("ask_completed");
+    expect(String(payload.thread_id ?? "")).toMatch(/^thread:/);
     expect(completedEvent?.route).toBe("/ask");
     expect(completedEvent?.answer_surface_mode ?? null).toBe(
       payload.debug?.answer_surface_mode ?? null,

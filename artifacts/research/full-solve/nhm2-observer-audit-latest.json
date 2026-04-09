@@ -1,0 +1,306 @@
+{
+  "artifactId": "nhm2_observer_audit",
+  "schemaVersion": "nhm2_observer_audit/v1",
+  "familyId": "nhm2_shift_lapse",
+  "shiftLapseProfileId": "stage1_centerline_alpha_0p995_v1",
+  "status": "fail",
+  "completeness": "incomplete",
+  "reasonCodes": [
+    "metric_audit_incomplete",
+    "tile_audit_incomplete",
+    "observer_condition_failed",
+    "surrogate_model_limited"
+  ],
+  "tensors": {
+    "metricRequired": {
+      "tensorId": "metric_required",
+      "status": "fail",
+      "completeness": "incomplete",
+      "tensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json",
+      "sampleCount": 1,
+      "reasonCodes": [
+        "metric_audit_incomplete",
+        "observer_condition_failed",
+        "surrogate_model_limited"
+      ],
+      "rapidityCap": 2.5,
+      "rapidityCapBeta": 0.9866142981514303,
+      "typeI": {
+        "count": 1,
+        "fraction": 1,
+        "tolerance": 0
+      },
+      "conditions": {
+        "nec": {
+          "status": "pass",
+          "eulerianMin": 0,
+          "eulerianMean": 0,
+          "robustMin": 0,
+          "robustMean": 0,
+          "eulerianViolationFraction": 0,
+          "robustViolationFraction": 0,
+          "missedViolationFraction": 0,
+          "severityGainMin": 0,
+          "severityGainMean": 0,
+          "maxRobustMinusEulerian": 0,
+          "worstCase": {
+            "index": 0,
+            "value": 0,
+            "direction": [
+              1,
+              0,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        },
+        "wec": {
+          "status": "fail",
+          "eulerianMin": -58267450.98955891,
+          "eulerianMean": -58267450.98955891,
+          "robustMin": -58267450.98955891,
+          "robustMean": -58267450.98955891,
+          "eulerianViolationFraction": 1,
+          "robustViolationFraction": 1,
+          "missedViolationFraction": 0,
+          "severityGainMin": 0,
+          "severityGainMean": 0,
+          "maxRobustMinusEulerian": 0,
+          "worstCase": {
+            "index": 0,
+            "value": -58267450.98955891,
+            "direction": [
+              1,
+              0,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        },
+        "sec": {
+          "status": "pass",
+          "eulerianMin": 58267450.98955892,
+          "eulerianMean": 58267450.98955892,
+          "robustMin": 0,
+          "robustMean": 0,
+          "eulerianViolationFraction": 0,
+          "robustViolationFraction": 0,
+          "missedViolationFraction": 0,
+          "severityGainMin": -58267450.98955892,
+          "severityGainMean": -58267450.98955892,
+          "maxRobustMinusEulerian": -58267450.98955892,
+          "worstCase": {
+            "index": 0,
+            "value": 0,
+            "direction": [
+              1,
+              0,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        },
+        "dec": {
+          "status": "fail",
+          "eulerianMin": -58267450.98955891,
+          "eulerianMean": -58267450.98955891,
+          "robustMin": -116534901.97911783,
+          "robustMean": -116534901.97911783,
+          "eulerianViolationFraction": 1,
+          "robustViolationFraction": 1,
+          "missedViolationFraction": 0,
+          "severityGainMin": -58267450.98955891,
+          "severityGainMean": -58267450.98955891,
+          "maxRobustMinusEulerian": -58267450.98955891,
+          "worstCase": {
+            "index": 0,
+            "value": -116534901.97911783,
+            "direction": [
+              1,
+              0,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        }
+      },
+      "fluxDiagnostics": {
+        "status": "assumed_zero",
+        "meanMagnitude": 0,
+        "maxMagnitude": 0,
+        "netMagnitude": 0,
+        "netDirection": null,
+        "note": "Flux magnitude was assumed zero because T0i terms were not supplied on the metric-required tensor path."
+      },
+      "consistency": {
+        "robustNotGreaterThanEulerian": true,
+        "maxRobustMinusEulerian": 0
+      },
+      "model": {
+        "pressureModel": "diagonal_tensor_components",
+        "fluxHandling": "assumed_zero_from_missing_t0i",
+        "shearHandling": "assumed_zero_from_missing_tij",
+        "limitationNotes": [
+          "Metric-required observer audit uses diagonal T_ab components only; T0i flux terms were not supplied and were treated as zero.",
+          "Off-diagonal spatial shear terms were unavailable, so this path is not a full anisotropic observer search."
+        ],
+        "note": "Diagonal metric tensor components were audited algebraically. This is explicit diagonal-only coverage, not a full anisotropic flux/shear observer sweep."
+      },
+      "missingInputs": [
+        "metric_t0i_missing",
+        "metric_tij_off_diagonal_missing"
+      ]
+    },
+    "tileEffective": {
+      "tensorId": "tile_effective",
+      "status": "fail",
+      "completeness": "incomplete",
+      "tensorRef": "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json",
+      "sampleCount": 0,
+      "reasonCodes": [
+        "tile_audit_incomplete",
+        "observer_condition_failed",
+        "surrogate_model_limited"
+      ],
+      "rapidityCap": 2.5,
+      "rapidityCapBeta": 0.9866142981514303,
+      "typeI": {
+        "count": 1,
+        "fraction": 1,
+        "tolerance": 0
+      },
+      "conditions": {
+        "nec": {
+          "status": "fail",
+          "eulerianMin": 0,
+          "eulerianMean": 0,
+          "robustMin": -0.05740261842782253,
+          "robustMean": -0.05740261842782253,
+          "eulerianViolationFraction": 0,
+          "robustViolationFraction": 1,
+          "missedViolationFraction": 1,
+          "severityGainMin": -0.05740261842782253,
+          "severityGainMean": -0.05740261842782253,
+          "maxRobustMinusEulerian": -0.05740261842782253,
+          "worstCase": {
+            "index": 0,
+            "value": -0.05740261842782253,
+            "direction": [
+              0,
+              1,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        },
+        "wec": {
+          "status": "fail",
+          "eulerianMin": -0.11480523685564506,
+          "eulerianMean": -0.11480523685564506,
+          "robustMin": -0.11480523685564506,
+          "robustMean": -0.11480523685564506,
+          "eulerianViolationFraction": 1,
+          "robustViolationFraction": 1,
+          "missedViolationFraction": 0,
+          "severityGainMin": 0,
+          "severityGainMean": 0,
+          "maxRobustMinusEulerian": 0,
+          "worstCase": {
+            "index": 0,
+            "value": -0.11480523685564506,
+            "direction": [
+              1,
+              0,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        },
+        "sec": {
+          "status": "fail",
+          "eulerianMin": 0.08610392764173379,
+          "eulerianMean": 0.08610392764173379,
+          "robustMin": -0.05740261842782253,
+          "robustMean": -0.05740261842782253,
+          "eulerianViolationFraction": 0,
+          "robustViolationFraction": 1,
+          "missedViolationFraction": 1,
+          "severityGainMin": -0.14350654606955632,
+          "severityGainMean": -0.14350654606955632,
+          "maxRobustMinusEulerian": -0.14350654606955632,
+          "worstCase": {
+            "index": 0,
+            "value": -0.05740261842782253,
+            "direction": [
+              0,
+              1,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        },
+        "dec": {
+          "status": "fail",
+          "eulerianMin": -0.11480523685564506,
+          "eulerianMean": -0.11480523685564506,
+          "robustMin": -0.22961047371129012,
+          "robustMean": -0.22961047371129012,
+          "eulerianViolationFraction": 1,
+          "robustViolationFraction": 1,
+          "missedViolationFraction": 0,
+          "severityGainMin": -0.11480523685564506,
+          "severityGainMean": -0.11480523685564506,
+          "maxRobustMinusEulerian": -0.11480523685564506,
+          "worstCase": {
+            "index": 0,
+            "value": -0.22961047371129012,
+            "direction": [
+              1,
+              0,
+              0
+            ],
+            "rapidity": 0,
+            "source": "algebraic_type_i"
+          }
+        }
+      },
+      "fluxDiagnostics": {
+        "status": "unavailable",
+        "meanMagnitude": 0,
+        "maxMagnitude": 0,
+        "netMagnitude": 0,
+        "netDirection": null,
+        "note": "Tile-effective tensor fell back to diagonal-only observer audit; flux direction diagnostics were unavailable because S_i channels were not emitted."
+      },
+      "consistency": {
+        "robustNotGreaterThanEulerian": true,
+        "maxRobustMinusEulerian": 0
+      },
+      "model": {
+        "pressureModel": "diagonal_tensor_components",
+        "fluxHandling": "missing_t0i_flux_channels",
+        "shearHandling": "assumed_zero_from_missing_tij",
+        "limitationNotes": [
+          "Tile-effective tensor fell back to a diagonal-only observer audit because GR brick flux diagnostics were unavailable.",
+          "This fallback does not supply flux magnitude search over T0i terms."
+        ],
+        "note": "Tile-effective tensor source: pipeline"
+      },
+      "missingInputs": [
+        "tile_t0i_flux_channels_missing"
+      ]
+    }
+  },
+  "distinction": {
+    "preserveNegativeAndMixedResults": true,
+    "metricTensorId": "metric_required",
+    "tileTensorId": "tile_effective"
+  }
+}

@@ -7,6 +7,7 @@ const importLedger = () => import("../server/services/helix-thread/ledger");
 const importReducer = () => import("../server/services/helix-thread/reducer");
 const importProjection = () => import("../server/services/helix-thread/projection");
 const importCarryForward = () => import("../server/services/helix-thread/carry-forward");
+const importRegistry = () => import("../server/services/helix-thread/registry");
 
 describe("helix thread ledger", () => {
   let tempDir = "";
@@ -14,6 +15,7 @@ describe("helix thread ledger", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "helix-thread-ledger-"));
     process.env.HELIX_THREAD_LEDGER_PATH = path.join(tempDir, "helix-thread-ledger.jsonl");
+    process.env.HELIX_THREAD_INDEX_PATH = path.join(tempDir, "helix-thread-index.json");
     process.env.HELIX_THREAD_PERSIST = "1";
     process.env.HELIX_THREAD_ROTATE_MAX_BYTES = "160";
     process.env.HELIX_THREAD_ROTATE_MAX_FILES = "4";
@@ -24,6 +26,7 @@ describe("helix thread ledger", () => {
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
     delete process.env.HELIX_THREAD_LEDGER_PATH;
+    delete process.env.HELIX_THREAD_INDEX_PATH;
     delete process.env.HELIX_THREAD_PERSIST;
     delete process.env.HELIX_THREAD_ROTATE_MAX_BYTES;
     delete process.env.HELIX_THREAD_ROTATE_MAX_FILES;
@@ -145,7 +148,6 @@ describe("helix thread ledger", () => {
     ).toEqual([
       `user: ${longUser}`,
       `dottie: ${longAssistant}`,
-      "user: Where did the prior answer get the repo evidence and how does replay keep it attached?",
     ]);
 
     vi.resetModules();
@@ -258,5 +260,27 @@ describe("helix thread ledger", () => {
 
     clearHelixThreadSessionGraphLock("carry-forward-session");
     expect(getHelixThreadSessionGraphLock("carry-forward-session")).toEqual([]);
+  });
+
+  it("persists explicit thread identity separately from the session mapping", async () => {
+    const { startHelixThread, resumeHelixThread, getActiveHelixThreadForSession } =
+      await importRegistry();
+
+    const started = startHelixThread({
+      sessionId: "explicit-thread-session",
+      titlePreview: "Thread identity should outlive the fallback alias.",
+    });
+    expect(started.thread_id).toMatch(/^thread:/);
+    expect(started.session_id).toBe("explicit-thread-session");
+    expect(getActiveHelixThreadForSession("explicit-thread-session")).toBe(started.thread_id);
+
+    vi.resetModules();
+
+    const reloadedRegistry = await importRegistry();
+    const resumed = reloadedRegistry.resumeHelixThread({
+      sessionId: "explicit-thread-session",
+    });
+    expect(resumed.thread_id).toBe(started.thread_id);
+    expect(resumed.session_id).toBe("explicit-thread-session");
   });
 });

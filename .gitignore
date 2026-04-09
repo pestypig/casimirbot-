@@ -91,6 +91,12 @@ client/public/originals/*
 !/artifacts/research/full-solve/nhm2-envelope-perturbation-suite-latest.json
 !/artifacts/research/full-solve/warp-york-control-family-proof-pack-latest.json
 !/artifacts/research/full-solve/nhm2-proof-surface-manifest-latest.json
+!/artifacts/research/full-solve/selected-family/
+/artifacts/research/full-solve/selected-family/*
+!/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/
+/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/*
+!/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-metric-required-tensor-latest.json
+!/artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-source-closure-tile-effective-tensor-latest.json
 /models/
 /.cache/
 /tmp/

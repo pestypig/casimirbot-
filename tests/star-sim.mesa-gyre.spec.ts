@@ -18,7 +18,7 @@ const buildApp = async () => {
   const workerClientModule: StarSimWorkerClientModule = await import(
     "../server/modules/starsim/worker/starsim-worker-client"
   );
-  jobsModule.__resetStarSimJobsForTest();
+  await jobsModule.__resetStarSimJobsForTest();
   await workerClientModule.__resetStarSimWorkerForTest();
   const app = express();
   app.use(express.json());
@@ -54,6 +54,7 @@ afterEach(async () => {
   delete process.env.STAR_SIM_ARTIFACT_ROOT;
   delete process.env.STAR_SIM_MESA_RUNTIME;
   delete process.env.STAR_SIM_GYRE_RUNTIME;
+  delete process.env.STAR_SIM_CACHE_TTL_MS;
   fs.rmSync(artifactRoot, { recursive: true, force: true });
   vi.resetModules();
 });

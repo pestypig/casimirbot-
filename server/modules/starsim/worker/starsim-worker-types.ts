@@ -1,9 +1,18 @@
-import type { CanonicalStar } from "../contract";
+import type { CanonicalStar, StarSimExternalRuntimeKind } from "../contract";
 
-export type StarSimExternalRuntimeKind = "mock" | "docker" | "wsl" | "disabled";
+export interface StarSimRuntimeArtifactPayload {
+  kind: string;
+  file_name: string;
+  content_encoding: "utf8" | "base64";
+  content: string;
+  media_type?: string;
+}
 
 export interface StructureMesaWorkerResult {
   runtime_kind: Exclude<StarSimExternalRuntimeKind, "disabled">;
+  runtime_fingerprint: string;
+  execution_mode: "mock_fixture" | "live_benchmark";
+  live_solver: boolean;
   solver_version: string;
   benchmark_case_id: string | null;
   fixture_id: string | null;
@@ -15,10 +24,15 @@ export interface StructureMesaWorkerResult {
   residuals_sigma: Record<string, number>;
   domain_validity: Record<string, unknown>;
   model_placeholder: Record<string, unknown> | null;
+  artifact_payloads: StarSimRuntimeArtifactPayload[];
+  live_solver_metadata: Record<string, unknown>;
 }
 
 export interface OscillationGyreWorkerResult {
   runtime_kind: Exclude<StarSimExternalRuntimeKind, "disabled">;
+  runtime_fingerprint: string;
+  execution_mode: "mock_fixture" | "live_benchmark";
+  live_solver: boolean;
   solver_version: string;
   benchmark_case_id: string | null;
   fixture_id: string | null;
@@ -27,6 +41,8 @@ export interface OscillationGyreWorkerResult {
   inferred_params: Record<string, unknown>;
   residuals_sigma: Record<string, number>;
   domain_validity: Record<string, unknown>;
+  artifact_payloads: StarSimRuntimeArtifactPayload[];
+  live_solver_metadata: Record<string, unknown>;
 }
 
 export type StarSimWorkerRequest =
