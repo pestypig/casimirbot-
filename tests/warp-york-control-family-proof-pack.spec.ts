@@ -1423,6 +1423,14 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.tileAccounting.evidenceStatus).toBe("measured");
       expect(region.metricAccounting.regionMaskNote).toContain("brick_mask");
       expect(region.tileAccounting.regionMaskNote).toContain("brick_mask");
+      expect(region.metricT00Diagnostics).toBeTruthy();
+      expect(region.tileT00Diagnostics).toBeTruthy();
+      expect(region.metricT00Diagnostics.aggregationMode).toBe("mean");
+      expect(region.tileT00Diagnostics.aggregationMode).toBe("mean");
+      expect(region.metricT00Diagnostics.meanT00).not.toBeNull();
+      expect(region.tileT00Diagnostics.meanT00).not.toBeNull();
+      expect(region.metricT00Diagnostics.sumT00).toBeNull();
+      expect(region.tileT00Diagnostics.sumT00).not.toBeNull();
       expect(region.tileProxyDiagnostics).toBeTruthy();
       expect(region.tileProxyDiagnostics.pressureModel).toBeTruthy();
       expect(region.tileProxyDiagnostics.proxyMode).toBeTruthy();
@@ -1471,6 +1479,8 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| scaleSide |");
     expect(markdown).toContain("| scaleRatio |");
     expect(markdown).toContain("| signStatus |");
+    expect(markdown).toContain("| t00MismatchMechanism |");
+    expect(markdown).toContain("| t00 diagnostic field | metric | tile |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
@@ -1573,6 +1583,10 @@ describe("nhm2 publication completion surfaces", () => {
       );
       expect(publishedRegion?.metricAccounting).toEqual(runtimeRegion.metricAccounting);
       expect(publishedRegion?.tileAccounting).toEqual(runtimeRegion.tileAccounting);
+      expect(publishedRegion?.metricT00Diagnostics).toEqual(
+        runtimeRegion.metricT00Diagnostics,
+      );
+      expect(publishedRegion?.tileT00Diagnostics).toEqual(runtimeRegion.tileT00Diagnostics);
     }
   });
 
@@ -13904,4 +13918,3 @@ describe("warp york control-family proof pack", () => {
     );
   });
 });
-
