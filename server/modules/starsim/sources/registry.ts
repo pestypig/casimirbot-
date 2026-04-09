@@ -29,6 +29,7 @@ import {
   buildSourceSelectionManifest,
   getPreferredCatalogForField,
   mergeResolvedIdentifiers,
+  mergeTrustedIdentifiers,
   summarizeSourceCandidates,
 } from "./selection";
 import { getSdssAstraAdapterVersion, resolveSdssAstraSource } from "./sdss-astra";
@@ -78,31 +79,40 @@ const secondaryCatalogs: Array<StarSimSourceCatalog> = ["sdss_astra", "lamost_dr
 const applyCrossmatchPolicy = (args: {
   request: StarSimRequest;
   records: StarSimSourceRecord[];
-  identifiers: ReturnType<typeof mergeResolvedIdentifiers>;
 }): {
   acceptedRecords: StarSimSourceRecord[];
+  trustedIdentifiers: ReturnType<typeof mergeResolvedIdentifiers>;
   outcomes: CrossmatchOutcome[];
+  crossmatchIdentityBasis: Partial<Record<StarSimSourceCatalog, string[]>>;
   qualityRejections: import("../contract").StarSimQualityRejection[];
   qualityWarnings: import("../contract").StarSimQualityWarning[];
 } => {
   const gaia = args.records.find((record) => record.catalog === "gaia_dr3") ?? null;
-  const accepted = [...args.records];
+  const accepted = gaia ? [gaia] : [...args.records];
   const outcomes: CrossmatchOutcome[] = [];
+  const crossmatchIdentityBasis: Partial<Record<StarSimSourceCatalog, string[]>> = {};
   const qualityRejections: import("../contract").StarSimQualityRejection[] = [];
   const qualityWarnings: import("../contract").StarSimQualityWarning[] = [];
+  const explicitIdentifiers = args.request.identifiers ?? {};
+  let trustedIdentifiers = mergeTrustedIdentifiers({
+    explicitIdentifiers,
+    acceptedRecords: accepted,
+  });
 
   for (const catalog of secondaryCatalogs) {
-    const record = accepted.find((candidate) => candidate.catalog === catalog) ?? null;
+    const record = args.records.find((candidate) => candidate.catalog === catalog) ?? null;
     const outcome = evaluateCrossmatch({
       primary: gaia,
       candidate: record,
-      expectedIdentifiers: args.identifiers,
+      explicitIdentifiers,
+      trustedIdentifiers,
     });
     if (!outcome) continue;
     outcomes.push(outcome);
+    if (outcome.identity_basis) {
+      crossmatchIdentityBasis[catalog] = [...outcome.identity_basis];
+    }
     if (outcome.status.startsWith("rejected") && record) {
-      const idx = accepted.findIndex((entry) => entry.catalog === catalog);
-      if (idx >= 0) accepted.splice(idx, 1);
       qualityRejections.push({
         catalog,
         reason: outcome.status,
@@ -111,6 +121,13 @@ const applyCrossmatchPolicy = (args: {
         fallback_consequence: "candidate_dropped",
       });
       continue;
+    }
+    if (record && !accepted.some((entry) => entry.catalog === catalog)) {
+      accepted.push(record);
+      trustedIdentifiers = mergeTrustedIdentifiers({
+        explicitIdentifiers,
+        acceptedRecords: accepted,
+      });
     }
     if (outcome.status === "accepted_with_warning") {
       qualityWarnings.push({
@@ -122,7 +139,14 @@ const applyCrossmatchPolicy = (args: {
     }
   }
 
-  return { acceptedRecords: accepted, outcomes, qualityRejections, qualityWarnings };
+  return {
+    acceptedRecords: accepted,
+    trustedIdentifiers,
+    outcomes,
+    crossmatchIdentityBasis,
+    qualityRejections,
+    qualityWarnings,
+  };
 };
 
 const buildFallbackSummary = (args: {
@@ -296,9 +320,11 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     }
   }
 
-  const benchmarkMatch = resolveBenchmarkTarget({ request, identifiersResolved: identifiers });
+  const identifiersObserved = identifiers;
+  const crossmatchPolicy = applyCrossmatchPolicy({ request, records });
+  const identifiersTrusted = crossmatchPolicy.trustedIdentifiers;
+  const benchmarkMatch = resolveBenchmarkTarget({ request, identifiersResolved: identifiersTrusted });
   const benchmarkTarget = benchmarkMatch.benchmark_target;
-  const crossmatchPolicy = applyCrossmatchPolicy({ request, records, identifiers });
   const recordsForSelection = crossmatchPolicy.acceptedRecords;
   const preferredCatalogs = benchmarkTarget?.preferred_source_stack ?? sourceHints.preferred_catalogs;
   const selectionManifest = buildSourceSelectionManifest({
@@ -307,7 +333,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     preferredCatalogs,
     allowFallbacks: sourceHints.allow_fallbacks,
     policy: sourcePolicy,
-    identifiersResolved: identifiers,
+    identifiersResolved: identifiersTrusted,
     qualityRejections: crossmatchPolicy.qualityRejections,
     qualityWarnings: crossmatchPolicy.qualityWarnings,
   });
@@ -319,7 +345,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
   const canonicalRequestDraft = buildResolvedRequestDraft({
     request,
     records: recordsForSelection,
-    identifiersResolved: identifiers,
+    identifiersResolved: identifiersTrusted,
     selectionManifest,
   });
   const resolutionState = summarizeResolutionState({
@@ -365,7 +391,9 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       requested_name: request.target?.name ?? null,
       resolved_name: canonicalRequestDraft?.target?.name ?? request.target?.name ?? null,
     },
-    identifiers_resolved: identifiers,
+    identifiers_resolved: identifiersTrusted,
+    identifiers_observed: identifiersObserved,
+    identifiers_trusted: identifiersTrusted,
     canonical_request_draft: canonicalRequestDraft,
     source_resolution: {
       status: resolutionStatus,
@@ -374,7 +402,9 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       fetch_mode: fetchMode,
       fetch_modes_by_catalog: fetchModesByCatalog,
       artifact_integrity_status: cacheRead.artifact_integrity_status,
-      identifiers_resolved: identifiers,
+      identifiers_resolved: identifiersTrusted,
+      identifiers_observed: identifiersObserved,
+      identifiers_trusted: identifiersTrusted,
       artifact_refs: [],
       selection_manifest: selectionManifest,
       candidate_counts: summarizeSourceCandidates(selectionManifest),
@@ -388,6 +418,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       benchmark_target_id: benchmarkTarget?.id,
       benchmark_target_match_mode: benchmarkMatch.benchmark_target_match_mode,
       benchmark_target_conflict_reason: benchmarkMatch.benchmark_target_conflict_reason,
+      benchmark_target_identity_basis: benchmarkMatch.benchmark_target_identity_basis,
       benchmark_target_quality_ok: benchmarkMatch.benchmark_target_quality_ok,
       crossmatch_summary: {
         accepted: crossmatchPolicy.outcomes.filter((entry) => entry.status === "accepted" || entry.status === "accepted_with_warning").length,
@@ -398,6 +429,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
       },
       quality_rejections: crossmatchPolicy.qualityRejections,
       quality_warnings: crossmatchPolicy.qualityWarnings,
+      crossmatch_identity_basis: crossmatchPolicy.crossmatchIdentityBasis,
       diagnostic_summary: {
         top_residual_fields: [],
       },
@@ -409,6 +441,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     benchmark_target_id: benchmarkTarget?.id,
     benchmark_target_match_mode: benchmarkMatch.benchmark_target_match_mode,
     benchmark_target_conflict_reason: benchmarkMatch.benchmark_target_conflict_reason,
+    benchmark_target_identity_basis: benchmarkMatch.benchmark_target_identity_basis,
     benchmark_target_quality_ok: benchmarkMatch.benchmark_target_quality_ok,
     crossmatch_summary: {
       accepted: crossmatchPolicy.outcomes.filter((entry) => entry.status === "accepted" || entry.status === "accepted_with_warning").length,
@@ -419,6 +452,7 @@ export const resolveStarSimSources = async (request: StarSimRequest): Promise<St
     },
     quality_rejections: crossmatchPolicy.qualityRejections,
     quality_warnings: crossmatchPolicy.qualityWarnings,
+    crossmatch_identity_basis: crossmatchPolicy.crossmatchIdentityBasis,
     diagnostic_summary: buildLaneDiagnosticSummary({ residuals: {}, observablesUsed: selectionManifest ? Object.keys(selectionManifest.fields) : [] }),
   };
 

@@ -11,6 +11,7 @@ describe("star-sim benchmark target matching", () => {
     });
     expect(match.benchmark_target?.id).toBe("demo_solar_a");
     expect(match.benchmark_target_match_mode).toBe("matched_by_identifier");
+    expect(match.benchmark_target_identity_basis).toBe("trusted_identifier");
   });
 
   it("does not infer unsupported target membership", () => {
@@ -22,6 +23,7 @@ describe("star-sim benchmark target matching", () => {
     });
     expect(match.benchmark_target).toBeNull();
     expect(match.benchmark_target_match_mode).toBe("no_match");
+    expect(match.benchmark_target_identity_basis).toBe("none");
   });
 
   it("does not silently assign a wrong benchmark target when name conflicts with identifiers", () => {
@@ -34,5 +36,6 @@ describe("star-sim benchmark target matching", () => {
     expect(match.benchmark_target).toBeNull();
     expect(match.benchmark_target_match_mode).toBe("conflicted_name_vs_identifier");
     expect(match.benchmark_target_conflict_reason).toBe("name_identifier_disagreement_conflict_unresolved");
+    expect(match.benchmark_target_identity_basis).toBe("conflicted_trusted_identifier_vs_name");
   });
 });

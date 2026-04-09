@@ -326,6 +326,17 @@ export const mergeResolvedIdentifiers = (
   return merged;
 };
 
+export const mergeTrustedIdentifiers = (args: {
+  explicitIdentifiers: StarSimSourceIdentifiers | undefined;
+  acceptedRecords: StarSimSourceRecord[];
+}): StarSimSourceIdentifiers =>
+  mergeResolvedIdentifiers(
+    {
+      identifiers: args.explicitIdentifiers ?? {},
+    } as StarSimRequest,
+    args.acceptedRecords,
+  );
+
 export const buildSourceSelectionManifest = (args: {
   request: StarSimRequest;
   records: StarSimSourceRecord[];

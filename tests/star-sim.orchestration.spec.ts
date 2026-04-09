@@ -90,6 +90,8 @@ describe("star-sim resolve-first orchestration", () => {
     expect(submit.body.lane_plan.runnable_lanes).toEqual(["structure_mesa"]);
     expect(["demo_solar_a", "demo_solar_b"]).toContain(submit.body.benchmark_target_id);
     expect(submit.body.benchmark_target_match_mode).toBe("matched_by_identifier");
+    expect(submit.body.benchmark_target_identity_basis).toBe("trusted_identifier");
+    expect(submit.body.identifiers_trusted.gaia_dr3_source_id).toBe("123456789012345678");
 
     await waitForJob(app, submit.body.job_id, "completed");
     const result = await request(app).get(`/api/star-sim/v1/jobs/${submit.body.job_id}/result`).expect(200);
@@ -104,6 +106,7 @@ describe("star-sim resolve-first orchestration", () => {
     );
     expect(cachedCanonicalRequest.source_context.source_cache_key).toBe(submit.body.source_cache_key);
     expect(cachedCanonicalRequest.source_context.source_resolution_ref).toBe(submit.body.source_resolution_ref);
+    expect(cachedCanonicalRequest.source_context.identifiers_resolved.gaia_dr3_source_id).toBe("123456789012345678");
     expect(cachedCanonicalRequest.source_context.selected_field_origins["spectroscopy.teff_K"]).toBe("sdss_astra");
   });
 
