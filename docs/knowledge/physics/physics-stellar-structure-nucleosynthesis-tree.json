@@ -270,7 +270,7 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stellar-opacity.md"
+          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
         }
       ]
     },
@@ -1770,7 +1770,7 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stellar-opacity.md"
+          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
         }
       ]
     },
@@ -1822,7 +1822,7 @@
       "evidence": [
         {
           "type": "doc",
-          "path": "docs/knowledge/physics/stellar-observables-diagnostic.md"
+          "path": "docs/knowledge/physics/stellar-radiative-transfer.md"
         }
       ]
     }

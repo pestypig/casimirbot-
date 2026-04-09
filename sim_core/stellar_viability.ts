@@ -33,6 +33,9 @@ export interface StellarAtmosphereState {
   emissivity_base?: ArrayLike<number> | number;
   transfer_operator?: ArrayLike<number> | number;
   pressure_profile_Pa?: ArrayLike<number>;
+  continuum_opacity?: ArrayLike<number> | number;
+  source_function_mode?: "lte" | "nlte_proxy";
+  nlte_departure?: ArrayLike<number> | number;
 }
 
 export interface StellarStructureState {
@@ -289,9 +292,16 @@ function buildBaseSpectrum(
 ): Float64Array {
   const emissivity = scalarOrSeries(kernels?.emissivity_base ?? atmosphere?.emissivity_base, wavelength_m.length, 1);
   const transfer = scalarOrSeries(kernels?.transfer_operator ?? atmosphere?.transfer_operator, wavelength_m.length, 1);
+  const continuumOpacity = scalarOrSeries(atmosphere?.continuum_opacity, wavelength_m.length, 0);
+  const nlteDeparture = scalarOrSeries(atmosphere?.nlte_departure, wavelength_m.length, 0);
+  const sourceMode = atmosphere?.source_function_mode ?? "lte";
   return Float64Array.from(wavelength_m, (lambda, index) => {
-    const base = planckRadianceLambda(lambda, teff_K);
-    return base * Math.max(0, emissivity[index]) * Math.max(0, transfer[index]);
+    const planckBase = planckRadianceLambda(lambda, teff_K);
+    const boundedDeparture = Math.max(-0.5, Math.min(0.5, nlteDeparture[index]));
+    const sourceFunction = sourceMode === "nlte_proxy" ? planckBase * (1 + boundedDeparture) : planckBase;
+    const opacity = Math.max(0, continuumOpacity[index]);
+    const attenuation = 1 / (1 + opacity);
+    return sourceFunction * attenuation * Math.max(0, emissivity[index]) * Math.max(0, transfer[index]);
   });
 }
 

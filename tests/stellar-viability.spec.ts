@@ -53,6 +53,82 @@ describe("stellar viability contract", () => {
     ).toBeLessThan(1e-12);
   });
 
+  it("keeps default M0 behavior unchanged when no atmosphere hardening inputs are supplied", () => {
+    const baseline = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const explicitDefault = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        source_function_mode: "lte",
+      },
+    });
+
+    const baselineM0 = baseline.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const explicitDefaultM0 = explicitDefault.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(baselineM0).toBeDefined();
+    expect(explicitDefaultM0).toBeDefined();
+
+    expect(Array.from(explicitDefaultM0?.predicted_intensity ?? [])).toEqual(
+      Array.from(baselineM0?.predicted_intensity ?? []),
+    );
+  });
+
+  it("applies continuum opacity directly in the null model and reshapes the M0 spectrum", () => {
+    const baseline = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const hardened = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        continuum_opacity: Float64Array.from(baseline.wavelength_m, (_, index) =>
+          index < baseline.wavelength_m.length / 2 ? 0.1 : 2.0,
+        ),
+      },
+    });
+
+    const baselineM0 = baseline.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const hardenedM0 = hardened.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(baselineM0).toBeDefined();
+    expect(hardenedM0).toBeDefined();
+    const lowIndex = 16;
+    const highIndex = baseline.wavelength_m.length - 16;
+    const lowRatio =
+      (hardenedM0?.predicted_intensity[lowIndex] ?? 0) / Math.max(baselineM0?.predicted_intensity[lowIndex] ?? 0, 1e-30);
+    const highRatio =
+      (hardenedM0?.predicted_intensity[highIndex] ?? 0) /
+      Math.max(baselineM0?.predicted_intensity[highIndex] ?? 0, 1e-30);
+    expect(lowRatio).toBeCloseTo(1 / 1.1, 12);
+    expect(highRatio).toBeCloseTo(1 / 3, 12);
+    expect(highRatio).toBeLessThan(lowRatio);
+  });
+
+  it("changes M0 deterministically when nlte_proxy source mode is enabled", () => {
+    const baseline = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const nlteProxy = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        source_function_mode: "nlte_proxy",
+        nlte_departure: 0.2,
+      },
+    });
+
+    const baselineM0 = baseline.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const nlteM0 = nlteProxy.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(baselineM0).toBeDefined();
+    expect(nlteM0).toBeDefined();
+    expect(nlteM0?.predicted_intensity[0]).toBeCloseTo((baselineM0?.predicted_intensity[0] ?? 0) * 1.2, 12);
+    expect(nlteM0?.predicted_intensity[128]).toBeCloseTo((baselineM0?.predicted_intensity[128] ?? 0) * 1.2, 12);
+  });
+
   it("promotes the lattice lane only when it improves the observed structured spectrum", () => {
     const seed = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
@@ -102,6 +178,48 @@ describe("stellar viability contract", () => {
         polarization: Float64Array.from({ length: seed.wavelength_m.length }, () => 0.05),
       },
       structure: { xi: 1, alpha_xi: 0, d_eff: 1e-12, A_ml: 0, material_gate: true },
+      weights: {
+        continuum: 1,
+        uv: 0,
+        line: 0,
+        bolometric: 0,
+        anisotropy: 0,
+        polarization: 0,
+      },
+    });
+
+    const bestFit = report.models.find((entry) => entry.id === report.best_fit_winner);
+    const promotable = report.models.find((entry) => entry.id === report.promotable_winner);
+    expect(bestFit?.passes_contract).toBe(false);
+    expect(promotable?.passes_contract).toBe(true);
+    expect(report.promotable_winner).not.toBe(report.best_fit_winner);
+    expect(report.winner).toBe(report.promotable_winner);
+  });
+
+  it("keeps alternative-lane promotion semantics unchanged under M0 atmosphere hardening inputs", () => {
+    const seed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      structure: { xi: 1, alpha_xi: 0, d_eff: 1e-12, A_ml: 0, material_gate: true },
+      atmosphere: {
+        source_function_mode: "lte",
+      },
+    });
+    const m0 = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    expect(m0).toBeDefined();
+
+    const report = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: {
+        wavelength_m: seed.wavelength_m,
+        intensity: m0?.predicted_intensity ?? new Float64Array(),
+        polarization: Float64Array.from({ length: seed.wavelength_m.length }, () => 0.05),
+      },
+      structure: { xi: 1, alpha_xi: 0, d_eff: 1e-12, A_ml: 0, material_gate: true },
+      atmosphere: {
+        source_function_mode: "lte",
+      },
       weights: {
         continuum: 1,
         uv: 0,

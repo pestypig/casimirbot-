@@ -159,4 +159,39 @@ describe("physics root-lane tree parity", () => {
     }
   });
 
+  it("requires stellar M0 hardening nodes to point to existing evidence docs", () => {
+    const repoRoot = process.cwd();
+    const treePath = path.join(
+      repoRoot,
+      "docs",
+      "knowledge",
+      "physics",
+      "physics-stellar-structure-nucleosynthesis-tree.json",
+    );
+    const tree = JSON.parse(fs.readFileSync(treePath, "utf8")) as LaneTree & {
+      nodes: Array<{ id: string; evidence?: Array<{ type?: string; path?: string }> }>;
+    };
+
+    const requiredNodeIds = [
+      "physics-stellar-structure-nucleosynthesis-radiative-transfer-definition",
+      "physics-stellar-structure-nucleosynthesis-lte-source-function-definition",
+      "physics-stellar-structure-nucleosynthesis-nlte-source-function-definition",
+      "physics-stellar-structure-nucleosynthesis-continuum-opacity-sum-definition",
+      "physics-stellar-structure-nucleosynthesis-population-ionization-balance-diagnostic",
+    ];
+
+    for (const nodeId of requiredNodeIds) {
+      const node = tree.nodes.find((entry) => entry.id === nodeId);
+      expect(node).toBeTruthy();
+      const docPaths = (node?.evidence ?? [])
+        .filter((entry) => entry.type === "doc" && typeof entry.path === "string")
+        .map((entry) => String(entry.path));
+      expect(docPaths.length).toBeGreaterThan(0);
+
+      for (const docPath of docPaths) {
+        expect(fs.existsSync(path.join(repoRoot, docPath))).toBe(true);
+      }
+    }
+  });
+
 });
