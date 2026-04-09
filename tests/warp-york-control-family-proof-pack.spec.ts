@@ -1439,10 +1439,22 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.metricT00Diagnostics.derivationMode).toBe(
         "runtime_integrated_metric_region_mean",
       );
+      expect(region.metricT00Diagnostics.trace?.traceStage).toBe(
+        "region_mean_from_shift_field",
+      );
+      expect(region.metricT00Diagnostics.trace?.regionMaskRef).toBe(
+        `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.brick_mask`,
+      );
       expect(region.tileT00Diagnostics.sourceRef).toBe(
         `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.t00Diagnostics.meanT00`,
       );
       expect(region.tileT00Diagnostics.derivationMode).toBe("gr_matter_brick_region_mean");
+      expect(region.tileT00Diagnostics.trace?.traceStage).toBe(
+        "region_mean_from_gr_matter_brick",
+      );
+      expect(region.tileT00Diagnostics.trace?.tensorRef).toBe(
+        `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.nhm2_shift_lapse.diagonal_proxy`,
+      );
       expect(region.tileProxyDiagnostics).toBeTruthy();
       expect(region.tileProxyDiagnostics.pressureModel).toBeTruthy();
       expect(region.tileProxyDiagnostics.proxyMode).toBeTruthy();
@@ -1475,6 +1487,7 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.mismatchDiagnostics.diagonalMeanRatio).not.toBeNull();
       expect(region.mismatchDiagnostics.diagonalSignStatus).toBeTruthy();
       expect(region.mismatchDiagnostics.components?.T00.signedRatioTileToMetric).not.toBeNull();
+      expect(region.mismatchDiagnostics.t00TraceDivergenceStage).toBe("source_path_mismatch");
       expect(region.residualNorms.relLInf).toBeGreaterThan(0.1);
       expect(region.note).toContain("Same-basis regional closure compares");
     }
@@ -1492,10 +1505,15 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| scaleRatio |");
     expect(markdown).toContain("| signStatus |");
     expect(markdown).toContain("| t00MismatchMechanism |");
+    expect(markdown).toContain("| t00TraceDivergenceStage |");
     expect(markdown).toContain("| directT00LocalizationNote |");
     expect(markdown).toContain("| t00 diagnostic field | metric | tile |");
     expect(markdown).toContain("| sourceRef |");
     expect(markdown).toContain("| derivationMode |");
+    expect(markdown).toContain("| traceStage |");
+    expect(markdown).toContain("| trace.regionMaskRef |");
+    expect(markdown).toContain("| trace.valueRef |");
+    expect(markdown).toContain("| trace.tensorRef |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
@@ -1604,6 +1622,9 @@ describe("nhm2 publication completion surfaces", () => {
         runtimeRegion.metricT00Diagnostics,
       );
       expect(publishedRegion?.tileT00Diagnostics).toEqual(runtimeRegion.tileT00Diagnostics);
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceDivergenceStage).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceDivergenceStage,
+      );
     }
   });
 

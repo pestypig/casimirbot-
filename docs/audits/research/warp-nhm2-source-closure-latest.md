@@ -74,7 +74,8 @@
 | t00MismatchMechanism | t00_mismatch_present |
 | t00MismatchMechanismEvidenceStatus | inferred |
 | t00MismatchMechanismNextStep | direct_t00_source_model_mapping |
-| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean at warp.metric.T00.nhm2.shift_lapse.region.hull.T00 against gr_matter_brick_region_mean at gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 |
+| t00TraceDivergenceStage | source_path_mismatch |
+| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field) at warp.metric.T00.nhm2.shift_lapse.region.hull.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick) at gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 |
 | note | inside-hull sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -119,6 +120,15 @@
 | sumT00 | null | -18351818481726.773 |
 | sourceRef | warp.metric.T00.nhm2.shift_lapse.region.hull.T00 | gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 |
 | derivationMode | runtime_integrated_metric_region_mean | gr_matter_brick_region_mean |
+| traceStage | region_mean_from_shift_field | region_mean_from_gr_matter_brick |
+| trace.regionMaskRef | gr.matter.stressEnergy.tensorSampledSummaries.hull.brick_mask | gr.matter.stressEnergy.tensorSampledSummaries.hull.brick_mask |
+| trace.sampleCount | 1096760 | 1096760 |
+| trace.valueRef | warp.metric.T00.nhm2.shift_lapse.region.hull.T00 | gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00 |
+| trace.tensorRef | warp.metric.T00.nhm2.shift_lapse.region.hull | gr.matter.stressEnergy.tensorSampledSummaries.hull.nhm2_shift_lapse.diagonal_proxy |
+| trace.maskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
+| trace.supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
+| trace.normalizationBasis | sample_count | sample_count |
+| trace.aggregationMode | mean | mean |
 | aggregationMode | mean | mean |
 | normalizationBasis | sample_count | sample_count |
 | evidenceStatus | inferred | inferred |
@@ -158,7 +168,8 @@
 | t00MismatchMechanism | t00_mismatch_present |
 | t00MismatchMechanismEvidenceStatus | inferred |
 | t00MismatchMechanismNextStep | direct_t00_source_model_mapping |
-| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean at warp.metric.T00.nhm2.shift_lapse.region.wall.T00 against gr_matter_brick_region_mean at gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 |
+| t00TraceDivergenceStage | source_path_mismatch |
+| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field) at warp.metric.T00.nhm2.shift_lapse.region.wall.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick) at gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 |
 | note | wall-band sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -203,6 +214,15 @@
 | sumT00 | null | -90868713169253.67 |
 | sourceRef | warp.metric.T00.nhm2.shift_lapse.region.wall.T00 | gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 |
 | derivationMode | runtime_integrated_metric_region_mean | gr_matter_brick_region_mean |
+| traceStage | region_mean_from_shift_field | region_mean_from_gr_matter_brick |
+| trace.regionMaskRef | gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask | gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask |
+| trace.sampleCount | 3352 | 3352 |
+| trace.valueRef | warp.metric.T00.nhm2.shift_lapse.region.wall.T00 | gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00 |
+| trace.tensorRef | warp.metric.T00.nhm2.shift_lapse.region.wall | gr.matter.stressEnergy.tensorSampledSummaries.wall.nhm2_shift_lapse.diagonal_proxy |
+| trace.maskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
+| trace.supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
+| trace.normalizationBasis | sample_count | sample_count |
+| trace.aggregationMode | mean | mean |
 | aggregationMode | mean | mean |
 | normalizationBasis | sample_count | sample_count |
 | evidenceStatus | inferred | inferred |
@@ -242,7 +262,8 @@
 | t00MismatchMechanism | t00_mismatch_present |
 | t00MismatchMechanismEvidenceStatus | inferred |
 | t00MismatchMechanismNextStep | direct_t00_source_model_mapping |
-| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean at warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00 against gr_matter_brick_region_mean at gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 |
+| t00TraceDivergenceStage | source_path_mismatch |
+| directT00LocalizationNote | direct T00 compares runtime_integrated_metric_region_mean (region_mean_from_shift_field) at warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00 against gr_matter_brick_region_mean (region_mean_from_gr_matter_brick) at gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 |
 | note | exterior-shell sampled mean; T11/T22/T33 follow the brick pressure proxy Same-basis regional closure compares runtime-integrated metric-required and tile-effective diagonal tensors over the shared GR matter brick region mask. |
 
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -287,6 +308,15 @@
 | sumT00 | null | -12855061431154.463 |
 | sourceRef | warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00 | gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 |
 | derivationMode | runtime_integrated_metric_region_mean | gr_matter_brick_region_mean |
+| traceStage | region_mean_from_shift_field | region_mean_from_gr_matter_brick |
+| trace.regionMaskRef | gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.brick_mask | gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.brick_mask |
+| trace.sampleCount | 2504 | 2504 |
+| trace.valueRef | warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00 | gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00 |
+| trace.tensorRef | warp.metric.T00.nhm2.shift_lapse.region.exterior_shell | gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.nhm2_shift_lapse.diagonal_proxy |
+| trace.maskNote | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 | brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1 |
+| trace.supportInclusionNote | metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped. | tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy. |
+| trace.normalizationBasis | sample_count | sample_count |
+| trace.aggregationMode | mean | mean |
 | aggregationMode | mean | mean |
 | normalizationBasis | sample_count | sample_count |
 | evidenceStatus | inferred | inferred |

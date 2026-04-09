@@ -170,6 +170,25 @@ describe("nhm2 source closure artifact v2", () => {
     aggregationMode: "mean" as const,
     evidenceStatus: "measured" as const,
   });
+  const makeT00Trace = (args: {
+    sampleCount: number;
+    valueRef: string;
+    tensorRef: string;
+    traceStage:
+      | "region_mean_from_shift_field"
+      | "region_mean_from_gr_matter_brick"
+      | "tensor_snapshot_fallback";
+  }) => ({
+    regionMaskRef: "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
+    sampleCount: args.sampleCount,
+    normalizationBasis: "sample_count",
+    aggregationMode: "mean" as const,
+    valueRef: args.valueRef,
+    tensorRef: args.tensorRef,
+    maskNote: "shared wall brick mask",
+    supportInclusionNote: "shared wall support set",
+    traceStage: args.traceStage,
+  });
 
   it("passes when global and required regional comparisons are same-basis and within tolerance", () => {
     const artifact = buildNhm2SourceClosureArtifactV2({
@@ -667,6 +686,12 @@ describe("nhm2 source closure artifact v2", () => {
             sumT00: -1600,
             sourceRef: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
             derivationMode: "runtime_integrated_metric_region_mean",
+            trace: makeT00Trace({
+              sampleCount: 16,
+              valueRef: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
+              tensorRef: "artifact://metric-wall",
+              traceStage: "region_mean_from_shift_field",
+            }),
             normalizationBasis: "sample_count",
             aggregationMode: "mean",
             evidenceStatus: "inferred",
@@ -681,6 +706,13 @@ describe("nhm2 source closure artifact v2", () => {
             sourceRef:
               "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
             derivationMode: "gr_matter_brick_region_mean",
+            trace: makeT00Trace({
+              sampleCount: 16,
+              valueRef:
+                "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+              tensorRef: "artifact://tile-wall",
+              traceStage: "region_mean_from_gr_matter_brick",
+            }),
             normalizationBasis: "sample_count",
             aggregationMode: "mean",
             evidenceStatus: "inferred",
@@ -702,10 +734,19 @@ describe("nhm2 source closure artifact v2", () => {
       "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
     );
     expect(region.tileT00Diagnostics?.derivationMode).toBe("gr_matter_brick_region_mean");
+    expect(region.metricT00Diagnostics?.trace?.traceStage).toBe("region_mean_from_shift_field");
+    expect(region.metricT00Diagnostics?.trace?.regionMaskRef).toBe(
+      "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
+    );
+    expect(region.tileT00Diagnostics?.trace?.traceStage).toBe(
+      "region_mean_from_gr_matter_brick",
+    );
+    expect(region.tileT00Diagnostics?.trace?.tensorRef).toBe("artifact://tile-wall");
     expect(region.mismatchDiagnostics?.t00MechanismCategory).toBe("t00_mismatch_present");
     expect(region.mismatchDiagnostics?.t00MechanismNextStep).toBe(
       "direct_t00_source_model_mapping",
     );
+    expect(region.mismatchDiagnostics?.t00TraceDivergenceStage).toBe("source_path_mismatch");
   });
 
   it("preserves null includedCount when reducer-native evidence is absent", () => {
@@ -754,6 +795,10 @@ describe("nhm2 source closure artifact v2", () => {
     });
 
     expect(artifact.regionComparisons.regions[0]?.tileT00Diagnostics?.includedCount).toBeNull();
+    expect(artifact.regionComparisons.regions[0]?.tileT00Diagnostics?.trace).toBeNull();
+    expect(artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceDivergenceStage).toBe(
+      "unknown",
+    );
   });
 
   it("keeps synthesized sumT00 evidence away from measured", () => {

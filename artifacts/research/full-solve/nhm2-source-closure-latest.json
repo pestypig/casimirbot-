@@ -123,6 +123,17 @@
           "sumT00": null,
           "sourceRef": "warp.metric.T00.nhm2.shift_lapse.region.hull.T00",
           "derivationMode": "runtime_integrated_metric_region_mean",
+          "trace": {
+            "regionMaskRef": "gr.matter.stressEnergy.tensorSampledSummaries.hull.brick_mask",
+            "sampleCount": 1096760,
+            "normalizationBasis": "sample_count",
+            "aggregationMode": "mean",
+            "valueRef": "warp.metric.T00.nhm2.shift_lapse.region.hull.T00",
+            "tensorRef": "warp.metric.T00.nhm2.shift_lapse.region.hull",
+            "maskNote": "brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1",
+            "supportInclusionNote": "metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped.",
+            "traceStage": "region_mean_from_shift_field"
+          },
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -136,6 +147,17 @@
           "sumT00": -18351818481726.773,
           "sourceRef": "gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00",
           "derivationMode": "gr_matter_brick_region_mean",
+          "trace": {
+            "regionMaskRef": "gr.matter.stressEnergy.tensorSampledSummaries.hull.brick_mask",
+            "sampleCount": 1096760,
+            "normalizationBasis": "sample_count",
+            "aggregationMode": "mean",
+            "valueRef": "gr.matter.stressEnergy.tensorSampledSummaries.hull.t00Diagnostics.meanT00",
+            "tensorRef": "gr.matter.stressEnergy.tensorSampledSummaries.hull.nhm2_shift_lapse.diagonal_proxy",
+            "maskNote": "brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1",
+            "supportInclusionNote": "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
+            "traceStage": "region_mean_from_gr_matter_brick"
+          },
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -204,6 +226,7 @@
           "t00MechanismCategory": "t00_mismatch_present",
           "t00MechanismEvidenceStatus": "inferred",
           "t00MechanismNextStep": "direct_t00_source_model_mapping",
+          "t00TraceDivergenceStage": "source_path_mismatch",
           "components": {
             "T00": {
               "metricValue": -733553902.6786809,
@@ -345,6 +368,17 @@
           "sumT00": null,
           "sourceRef": "warp.metric.T00.nhm2.shift_lapse.region.wall.T00",
           "derivationMode": "runtime_integrated_metric_region_mean",
+          "trace": {
+            "regionMaskRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
+            "sampleCount": 3352,
+            "normalizationBasis": "sample_count",
+            "aggregationMode": "mean",
+            "valueRef": "warp.metric.T00.nhm2.shift_lapse.region.wall.T00",
+            "tensorRef": "warp.metric.T00.nhm2.shift_lapse.region.wall",
+            "maskNote": "brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1",
+            "supportInclusionNote": "metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped.",
+            "traceStage": "region_mean_from_shift_field"
+          },
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -358,6 +392,17 @@
           "sumT00": -90868713169253.67,
           "sourceRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
           "derivationMode": "gr_matter_brick_region_mean",
+          "trace": {
+            "regionMaskRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
+            "sampleCount": 3352,
+            "normalizationBasis": "sample_count",
+            "aggregationMode": "mean",
+            "valueRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+            "tensorRef": "gr.matter.stressEnergy.tensorSampledSummaries.wall.nhm2_shift_lapse.diagonal_proxy",
+            "maskNote": "brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1",
+            "supportInclusionNote": "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
+            "traceStage": "region_mean_from_gr_matter_brick"
+          },
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -426,6 +471,7 @@
           "t00MechanismCategory": "t00_mismatch_present",
           "t00MechanismEvidenceStatus": "inferred",
           "t00MechanismNextStep": "direct_t00_source_model_mapping",
+          "t00TraceDivergenceStage": "source_path_mismatch",
           "components": {
             "T00": {
               "metricValue": -1699539201.2526472,
@@ -567,6 +613,17 @@
           "sumT00": null,
           "sourceRef": "warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00",
           "derivationMode": "runtime_integrated_metric_region_mean",
+          "trace": {
+            "regionMaskRef": "gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.brick_mask",
+            "sampleCount": 2504,
+            "normalizationBasis": "sample_count",
+            "aggregationMode": "mean",
+            "valueRef": "warp.metric.T00.nhm2.shift_lapse.region.exterior_shell.T00",
+            "tensorRef": "warp.metric.T00.nhm2.shift_lapse.region.exterior_shell",
+            "maskNote": "brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1",
+            "supportInclusionNote": "metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped.",
+            "traceStage": "region_mean_from_shift_field"
+          },
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -580,6 +637,17 @@
           "sumT00": -12855061431154.463,
           "sourceRef": "gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00",
           "derivationMode": "gr_matter_brick_region_mean",
+          "trace": {
+            "regionMaskRef": "gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.brick_mask",
+            "sampleCount": 2504,
+            "normalizationBasis": "sample_count",
+            "aggregationMode": "mean",
+            "valueRef": "gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.t00Diagnostics.meanT00",
+            "tensorRef": "gr.matter.stressEnergy.tensorSampledSummaries.exterior_shell.nhm2_shift_lapse.diagonal_proxy",
+            "maskNote": "brick_mask=ellipsoid_axes_m(503.500000,132.000000,86.500000); wall_sigma_m=0.100000; exterior_shell_limit_m=0.300000; dims=128x128x128; cell_volume_m3=2.193055e+1",
+            "supportInclusionNote": "tile_effective uses GR matter brick region means; unweighted voxel mean; T11/T22/T33 follow the brick pressure proxy.",
+            "traceStage": "region_mean_from_gr_matter_brick"
+          },
           "normalizationBasis": "sample_count",
           "aggregationMode": "mean",
           "evidenceStatus": "inferred"
@@ -648,6 +716,7 @@
           "t00MechanismCategory": "t00_mismatch_present",
           "t00MechanismEvidenceStatus": "inferred",
           "t00MechanismNextStep": "direct_t00_source_model_mapping",
+          "t00TraceDivergenceStage": "source_path_mismatch",
           "components": {
             "T00": {
               "metricValue": -1699157799.1011546,
