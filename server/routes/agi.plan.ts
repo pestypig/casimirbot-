@@ -204,7 +204,9 @@ import {
 } from "../services/helix-ask/novelty-phrasing";
 import {
   buildNhm2BlockGroundingContext,
+  renderNhm2BlockGroundedAnswer,
   selectNhm2BlockIdsForQuestion,
+  shouldDirectlyAnswerFromNhm2Blocks,
 } from "../services/helix-ask/nhm2-block-grounding";
 import {
   readDocSectionIndex,
@@ -44807,6 +44809,7 @@ const executeHelixAsk = async ({
     };
     let relationSecondPassAttempted = false;
     const nhm2GroundingBlockIds = selectNhm2BlockIdsForQuestion(baseQuestion);
+    const directNhm2BlockAnswerRequested = shouldDirectlyAnswerFromNhm2Blocks(baseQuestion);
     let nhm2GroundingContext = "";
     let nhm2GroundingRefs: string[] = [];
     let nhm2GroundingError: string | null = null;
@@ -44828,6 +44831,11 @@ const executeHelixAsk = async ({
           contextFiles = Array.from(new Set([...contextFiles, ...nhm2GroundingRefs]));
         }
         answerPath.push(`grounding:nhm2_blocks(${nhm2GroundingBlockIds.join(",")})`);
+        if (directNhm2BlockAnswerRequested) {
+          forcedAnswer = renderNhm2BlockGroundedAnswer(nhm2GroundingBlocks);
+          forcedAnswerIsHard = true;
+          answerPath.push("forcedAnswer:nhm2_block_grounding");
+        }
       } catch (error) {
         nhm2GroundingError = error instanceof Error ? error.message : String(error);
         contextText = appendContextBlock(
@@ -44842,6 +44850,7 @@ const executeHelixAsk = async ({
         debugRecord.nhm2_block_grounding_refs = nhm2GroundingRefs.slice();
         debugRecord.nhm2_block_grounding_attached = Boolean(nhm2GroundingContext);
         debugRecord.nhm2_block_grounding_error = nhm2GroundingError;
+        debugRecord.nhm2_block_grounding_direct_answer = directNhm2BlockAnswerRequested;
         debugRecord.repo_expectation_score = repoExpectationScore;
         debugRecord.repo_expectation_level = repoExpectationLevel;
         debugRecord.repo_expectation_signals = Array.from(new Set(repoExpectationSignals));

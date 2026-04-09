@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { Nhm2ClaimBlock } from "../../shared/nhm2-blocks";
 import {
   buildNhm2BlockGroundingContext,
+  renderNhm2BlockGroundedAnswer,
   selectNhm2BlockIdsForQuestion,
+  shouldDirectlyAnswerFromNhm2Blocks,
 } from "../services/helix-ask/nhm2-block-grounding";
 
 const authorityBlock: Nhm2ClaimBlock = {
@@ -98,6 +100,17 @@ describe("helix ask NHM2 block grounding", () => {
     ]);
   });
 
+  it("marks exact block-id questions for deterministic direct answers", () => {
+    expect(
+      shouldDirectlyAnswerFromNhm2Blocks(
+        "Using nhm2.proof-guardrails, explain the current NHM2 proof state and cite provenance.",
+      ),
+    ).toBe(true);
+    expect(
+      shouldDirectlyAnswerFromNhm2Blocks("What is the current NHM2 proof state?"),
+    ).toBe(false);
+  });
+
   it("formats status, integrity, and provenance into deterministic grounding text", () => {
     const grounding = buildNhm2BlockGroundingContext([authorityBlock, proofBlock]);
     expect(grounding.context).toContain("NHM2 live claim blocks:");
@@ -110,5 +123,12 @@ describe("helix ask NHM2 block grounding", () => {
       "shared/needle-hull-mark2-cavity-contract.ts",
       "shared/warp-promoted-profile.ts",
     ]);
+  });
+
+  it("renders deterministic direct answers from explicit NHM2 block requests", () => {
+    const answer = renderNhm2BlockGroundedAnswer([authorityBlock, proofBlock]);
+    expect(answer).toContain("Authority Status (nhm2.authority-status) reports status good");
+    expect(answer).toContain("Proof and Guardrails (nhm2.proof-guardrails) reports status bad");
+    expect(answer).toContain("Sources: shared/needle-hull-mark2-cavity-contract.ts, shared/warp-promoted-profile.ts");
   });
 });

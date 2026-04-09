@@ -92,6 +92,12 @@ export function selectNhm2BlockIdsForQuestion(question: string): Nhm2BlockId[] {
   return Array.from(selected);
 }
 
+export function shouldDirectlyAnswerFromNhm2Blocks(question: string): boolean {
+  const normalized = String(question ?? "").trim();
+  if (!normalized) return false;
+  return collectExactBlockMatches(normalized).length > 0;
+}
+
 const summarizeAuthorityBlock = (block: Nhm2ClaimBlock) => {
   const data = asRecord(block.data);
   const authority = asRecord(data?.authority);
@@ -252,4 +258,30 @@ export function buildNhm2BlockGroundingContext(blocks: ReadonlyArray<Nhm2ClaimBl
     context: lines.join("\n"),
     sourceRefs: collectNhm2GroundingRefs(blocks),
   };
+}
+
+const renderDirectAnswerLine = (block: Nhm2ClaimBlock) => {
+  const keyData = summarizeBlockData(block);
+  const provenance = block.provenance
+    .map((entry) => entry.ref?.trim() || entry.label.trim())
+    .filter((entry) => entry.length > 0)
+    .slice(0, 3)
+    .join(", ");
+  const parts = [
+    `${block.title} (${block.blockId}) reports status ${block.status}, authority ${block.authorityTier}, and integrity ${formatIntegrity(block.integrity.integrityOk)}.`,
+    toSentence(block.summary),
+    keyData ? `Key values: ${keyData}.` : "",
+    provenance ? `Provenance: ${provenance}.` : "",
+  ].filter(Boolean);
+  return parts.join(" ");
+};
+
+export function renderNhm2BlockGroundedAnswer(blocks: ReadonlyArray<Nhm2ClaimBlock>): string {
+  if (!blocks.length) return "";
+  const body = blocks.map((block) => renderDirectAnswerLine(block)).join("\n\n");
+  const sourceRefs = collectNhm2GroundingRefs(blocks);
+  if (!sourceRefs.length) {
+    return body;
+  }
+  return `${body}\n\nSources: ${sourceRefs.join(", ")}`;
 }
