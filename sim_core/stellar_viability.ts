@@ -44,6 +44,9 @@ export interface StellarStructureState {
   pressure_proxy_Pa?: number;
   stress_rate_proxy_Pa_s?: number;
   trap_density_m3?: number;
+  chi_piezo?: number;
+  material_gate?: boolean;
+  source_power_enabled?: boolean;
 }
 
 export interface StellarViabilityWeights {
@@ -68,7 +71,7 @@ export interface StellarRadiationInput {
 export interface StellarModelMetrics {
   continuum_rms: number;
   uv_residual: number;
-  line_residual: number;
+  line_residual: number | null;
   bolometric_closure: number;
   anisotropy_penalty: number;
   polarization_penalty: number;
@@ -90,7 +93,10 @@ export interface StellarModelResult {
 
 export interface StellarViabilityReport {
   teff_K: number;
+  wavelength_m: Float64Array;
   winner: StellarRadiationModelId;
+  best_fit_winner: StellarRadiationModelId;
+  promotable_winner: StellarRadiationModelId;
   models: StellarModelResult[];
   null_model: StellarRadiationModelId;
   contract: {
@@ -234,9 +240,28 @@ function defaultWavelengthGrid(): Float64Array {
   const minLambda = 100e-9;
   const maxLambda = 10e-6;
   const count = 256;
+  const logMin = Math.log(minLambda);
+  const logMax = Math.log(maxLambda);
   return Float64Array.from(
-    Array.from({ length: count }, (_, index) => minLambda + ((maxLambda - minLambda) * index) / (count - 1)),
+    Array.from({ length: count }, (_, index) => Math.exp(logMin + ((logMax - logMin) * index) / (count - 1))),
   );
+}
+
+function renormalizeToTargetFlux(
+  wavelength_m: Float64Array,
+  spectrum: Float64Array,
+  targetIntegral: number,
+  allowSourcePower: boolean,
+): Float64Array {
+  if (allowSourcePower) {
+    return spectrum;
+  }
+  const integral = integrateTrapezoid(wavelength_m, spectrum);
+  if (!(integral > 0) || !(targetIntegral > 0)) {
+    return spectrum;
+  }
+  const scale = targetIntegral / integral;
+  return Float64Array.from(spectrum, (value) => Math.max(0, value * scale));
 }
 
 export function computeEffectiveTemperature(luminosity_W: number, radius_m: number): number {
@@ -299,23 +324,30 @@ function buildModelPredictions(input: StellarRadiationInput, wavelength_m: Float
   const stressRateProxy = computeProxyScale(Number(structure.stress_rate_proxy_Pa_s ?? 0), 1e8);
   const trapProxy = computeProxyScale(Number(structure.trap_density_m3 ?? 0), 1e20);
   const piezoProxy = computeProxyScale(dEff, 1e-12);
+  const materialGateEnabled = Boolean(structure.material_gate) || Number(structure.chi_piezo ?? 0) > 0;
+  const allowSourcePower = Boolean(structure.source_power_enabled);
   const mechEnvelope = 0.35 * pressureProxy + 0.25 * stressRateProxy + 0.25 * trapProxy + 0.15 * Math.abs(xi);
   const mechAmplitude = aml * piezoProxy * mechEnvelope;
   const coherenceStrength = clamp01(Math.abs(xi) * (qCoh / (qCoh + 1)));
 
-  const lattice = Float64Array.from(base, (value, index) => {
+  const latticeRaw = Float64Array.from(base, (value, index) => {
     const modifier = 1 + alphaXi * xi * latticeKernel[index];
     return value * Math.max(0, modifier);
   });
+  const lattice = renormalizeToTargetFlux(wavelength_m, latticeRaw, baseIntegral, allowSourcePower);
 
-  const mech = Float64Array.from(lattice, (value, index) => {
-    return Math.max(0, value + baseIntegral * mechAmplitude * mechKernel[index]);
-  });
+  const mech = materialGateEnabled
+    ? Float64Array.from(lattice, (value, index) => Math.max(0, value + baseIntegral * mechAmplitude * mechKernel[index]))
+    : Float64Array.from(lattice);
 
-  const coherence = Float64Array.from(lattice, (value, index) => {
-    const modifier = 1 + coherenceStrength * coherenceKernel[index];
-    return Math.max(0, value * modifier);
+  const coherenceRedistribution = Float64Array.from(lattice, (value, index) => {
+    return coherenceStrength * Math.abs(value) * coherenceKernel[index];
   });
+  const redistributionMean = mean(coherenceRedistribution);
+  const coherenceRaw = Float64Array.from(lattice, (value, index) => {
+    return Math.max(0, value + coherenceRedistribution[index] - redistributionMean);
+  });
+  const coherence = renormalizeToTargetFlux(wavelength_m, coherenceRaw, baseIntegral, allowSourcePower);
 
   return [
     { id: "M0_planck_atmosphere", predicted: base, anisotropy: 0, polarization: 0 },
@@ -323,8 +355,8 @@ function buildModelPredictions(input: StellarRadiationInput, wavelength_m: Float
     {
       id: "M2_mechanoluminescent_pressure",
       predicted: mech,
-      anisotropy: 0.02 * clamp01(mechEnvelope),
-      polarization: clamp01(0.05 * piezoProxy * Math.max(Math.abs(xi), 0.2)),
+      anisotropy: materialGateEnabled ? 0.02 * clamp01(mechEnvelope) : 0,
+      polarization: materialGateEnabled ? clamp01(0.05 * piezoProxy * Math.max(Math.abs(xi), 0.2)) : 0,
     },
     { id: "M3_coherence_angular", predicted: coherence, anisotropy: coherenceStrength, polarization: 0 },
   ];
@@ -343,19 +375,20 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
   const observedIntensity = toFloat64(observation.intensity);
   const continuumMask = toMask(observation.continuum_mask, wavelength_m.length, (index) => wavelength_m[index] >= 400e-9 && wavelength_m[index] <= 2.5e-6);
   const uvMask = toMask(observation.uv_mask, wavelength_m.length, (index) => wavelength_m[index] < 400e-9);
-  const lineMask = toMask(observation.line_mask, wavelength_m.length, () => true);
+  const lineMask = observation.line_mask ? toMask(observation.line_mask, wavelength_m.length, () => false) : null;
   const observedAnisotropy = averageSeries(observation.anisotropy);
   const observedPolarization = averageSeries(observation.polarization);
   const expectedBolometricFlux = STEFAN_BOLTZMANN * Math.pow(teff_K, 4);
   const observedBolometricFlux = PI * integrateTrapezoid(wavelength_m, observedIntensity);
   const weights: StellarViabilityWeights = { ...DEFAULT_WEIGHTS, ...(input.weights ?? {}) };
 
+  const hasLineMask = lineMask ? lineMask.some(Boolean) : false;
   const models = buildModelPredictions(input, wavelength_m, base).map((entry) => {
     const predictedFlux = PI * integrateTrapezoid(wavelength_m, entry.predicted);
     const metrics: StellarModelMetrics = {
       continuum_rms: relativeRms(observedIntensity, entry.predicted, continuumMask),
       uv_residual: relativeRms(observedIntensity, entry.predicted, uvMask),
-      line_residual: relativeRms(observedIntensity, entry.predicted, lineMask),
+      line_residual: hasLineMask && lineMask ? relativeRms(observedIntensity, entry.predicted, lineMask) : null,
       bolometric_closure: Math.abs(predictedFlux - expectedBolometricFlux) / Math.max(expectedBolometricFlux, TINY),
       anisotropy_penalty: Math.abs(entry.anisotropy - observedAnisotropy),
       polarization_penalty: Math.abs(entry.polarization - observedPolarization),
@@ -366,7 +399,7 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
     metrics.total =
       weights.continuum * metrics.continuum_rms +
       weights.uv * metrics.uv_residual +
-      weights.line * metrics.line_residual +
+      (metrics.line_residual == null ? 0 : weights.line * metrics.line_residual) +
       weights.bolometric * metrics.bolometric_closure +
       weights.anisotropy * metrics.anisotropy_penalty +
       weights.polarization * metrics.polarization_penalty +
@@ -384,19 +417,25 @@ export function evaluateStellarSpectralViability(input: StellarRadiationInput): 
       passes_contract:
         metrics.continuum_rms <= DEFAULT_CONTRACT.continuum_rms_max &&
         metrics.uv_residual <= DEFAULT_CONTRACT.uv_residual_max &&
-        metrics.line_residual <= DEFAULT_CONTRACT.line_residual_max &&
+        (metrics.line_residual == null || metrics.line_residual <= DEFAULT_CONTRACT.line_residual_max) &&
         metrics.bolometric_closure <= DEFAULT_CONTRACT.bolometric_closure_max &&
         metrics.anisotropy_penalty <= DEFAULT_CONTRACT.anisotropy_penalty_max &&
         metrics.polarization_penalty <= DEFAULT_CONTRACT.polarization_penalty_max,
     } satisfies StellarModelResult;
   });
 
-  models.sort((left, right) => left.metrics.total - right.metrics.total);
+  const byScore = [...models].sort((left, right) => left.metrics.total - right.metrics.total);
+  const bestFitWinner = byScore[0]?.id ?? "M0_planck_atmosphere";
+  const promotable = byScore.find((entry) => entry.passes_contract);
+  const promotableWinner = promotable?.id ?? "M0_planck_atmosphere";
 
   return {
     teff_K,
-    winner: models[0]?.id ?? "M0_planck_atmosphere",
-    models,
+    wavelength_m,
+    winner: promotableWinner,
+    best_fit_winner: bestFitWinner,
+    promotable_winner: promotableWinner,
+    models: byScore,
     null_model: "M0_planck_atmosphere",
     contract: DEFAULT_CONTRACT,
   };
