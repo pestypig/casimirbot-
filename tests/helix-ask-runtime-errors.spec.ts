@@ -620,6 +620,93 @@ describe("non-report guard ordering for runtime fallback", () => {
     expect(finalized.text).toMatch(/lens-specific signatures should appear/i);
   });
 
+  it("falls back to a conversational roadmap sentence when only roadmap scaffolding survives", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Repo-Grounded Findings:",
+        "",
+        "Implementation Roadmap:",
+        "",
+        "Evidence Gaps:",
+        "",
+        "Next Anchors Needed:",
+      ].join("\n"),
+      question:
+        "Ok please organize my ideas to how they could be implemented in my code base in the future. I want profiles, a paywall, a voice lane, translation, and better retrieval planning.",
+      reportModeEnabled: false,
+      intentStrategy: "repo_plan",
+      allowedPaths: [],
+      citationTokens: [],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/^Repo-Grounded Findings:/im);
+    expect(finalized.text).not.toMatch(/^Implementation Roadmap:/im);
+    expect(finalized.text).toMatch(/Start with profiles and (?:the )?paywall/i);
+  });
+
+  it("falls back to a conversational frontier follow-up sentence when dry-run headings survive", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Definitions:",
+        "",
+        "Baseline:",
+        "",
+        "Hypothesis:",
+        "",
+        "Anti-hypothesis:",
+        "",
+        "Claim tier:",
+      ].join("\n"),
+      question: "What in the reasoning ladder should we focus on since this is the case?",
+      reportModeEnabled: false,
+      intentStrategy: "hybrid_explain",
+      allowedPaths: [],
+      citationTokens: [],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/^Baseline:/im);
+    expect(finalized.text).toMatch(/Focus on the falsifier step first/i);
+  });
+
+  it("restores open-world uncertainty markers for security prompts at the final surface", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText:
+        "Treat urgent payment requests as untrusted until you verify them through a separate channel you already control.",
+      question: "How can I protect myself from AI-driven financial fraud?",
+      reportModeEnabled: false,
+      intentStrategy: "general_explain",
+      allowedPaths: [],
+      citationTokens: [],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).toMatch(/open-world best-effort/i);
+    expect(finalized.text).toMatch(/explicit uncertainty/i);
+    expect(finalized.text).not.toMatch(/^Sources:/im);
+  });
+
+  it("restores ideology narrative anchors at the final surface for narrative-only prompts", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText:
+        "Feedback Loop Hygiene helps people slow down before rumor-driven escalation and check whether the public signal is actually verified.",
+      question:
+        "In plain language, how does Feedback Loop Hygiene affect society in the Ideology tree? Do this in a conversational tone for a non-technical reader, but keep it grounded in repo context. Include one short opening paragraph, a root-to-leaf narrative chain, a concrete real-world example, and one concise takeaway with societal impact. Do not return technical notes mode unless explicitly requested.",
+      reportModeEnabled: false,
+      intentStrategy: "repo_ideology",
+      allowedPaths: ["docs/ethos/ideology.json"],
+      citationTokens: ["docs/ethos/ideology.json"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).toMatch(/\bMission Ethos\b/i);
+    expect(finalized.text).toMatch(/\bFeedback Loop Hygiene\b/i);
+    expect(finalized.text).toMatch(/\bexample\b/i);
+    expect(finalized.text).toMatch(/\btakeaway\b/i);
+    expect(finalized.text).not.toMatch(/^Technical notes:/im);
+  });
+
   it("preserves visible fail-closed text when a hard stop already occurred", () => {
     const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
       answerText: [
@@ -670,6 +757,31 @@ describe("non-report guard ordering for runtime fallback", () => {
     );
     expect(envelope.extension?.title).toBe("Additional Repo Context");
     expect(envelope.proof?.gate?.status).toBe("PASS");
+  });
+
+  it("hides tree walk and key-file artifact blocks when the prompt did not ask for them", () => {
+    const finalized = __testOnlyNonReportGuard.finalizeHelixAskAnswerSurface({
+      answerText: [
+        "Tree Walk",
+        "Tree Walk: Mission Ethos Tree (tree-derived; source: docs/ethos/ideology.json)",
+        "1. Walk: Mission Ethos - The warp vessel is a vow to return radiance to the Sun.",
+        "",
+        "Key files",
+        "- docs/ethos/ideology.json",
+      ].join("\n"),
+      question:
+        "In plain language, how does Feedback Loop Hygiene affect society in the Ideology tree?",
+      reportModeEnabled: false,
+      intentStrategy: "repo_ideology",
+      allowedPaths: ["docs/ethos/ideology.json"],
+      citationTokens: ["docs/ethos/ideology.json"],
+    });
+
+    expect(finalized.mode).toBe("conversational");
+    expect(finalized.text).not.toMatch(/^Tree Walk/im);
+    expect(finalized.text).not.toMatch(/^Key files/im);
+    expect(finalized.text).toMatch(/\bMission Ethos\b/i);
+    expect(finalized.text).toMatch(/\bFeedback Loop Hygiene\b/i);
   });
 });
 
@@ -7559,7 +7671,7 @@ describe("helix ask reliability guards", () => {
       explicitPathOnlyExtraction: false,
     });
     expect(result).toBeTruthy();
-    expect(result?.primarySelected).toMatch(/shared\/collapse-benchmark\.ts:L(570|571)/);
+    expect(result?.primarySelected).toMatch(/shared\/collapse-benchmark\.ts:L(627|628)/);
     expect(result?.text).toMatch(/rho_eff_kg_m3|kappa_collapse_m2/i);
   });
 
@@ -9223,6 +9335,10 @@ describe("helix ask dialogue formatting", () => {
       path.join(process.cwd(), "server/routes/agi.plan.ts"),
       "utf8",
     );
+    const terminalFinalizeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/services/helix-ask/surface/terminal-finalize.ts"),
+      "utf8",
+    );
     expect(routeSource).toContain("answerExtension:suppressed_general_open_world");
     expect(routeSource).toContain("answer_extension_suppressed");
     expect(routeSource).toContain("answer_envelope_repo_context_suppressed");
@@ -9288,26 +9404,38 @@ describe("helix ask dialogue formatting", () => {
       path.join(process.cwd(), "server/routes/agi.plan.ts"),
       "utf8",
     );
+    const terminalFinalizeSource = fs.readFileSync(
+      path.join(process.cwd(), "server/services/helix-ask/surface/terminal-finalize.ts"),
+      "utf8",
+    );
+    const finalContractLockSource = fs.readFileSync(
+      path.join(process.cwd(), "server/services/helix-ask/surface/final-contract-locks.ts"),
+      "utf8",
+    );
+    const terminalConsistencySource = fs.readFileSync(
+      path.join(process.cwd(), "server/services/helix-ask/surface/terminal-consistency.ts"),
+      "utf8",
+    );
     expect(routeSource).toContain("parallel_variant_applied");
     expect(routeSource).toContain("objective_scoped_retrieval_recovery_parallel_variant_count");
     expect(routeSource).toContain("objective_scoped_retrieval_recovery_parallel_applied_count");
     expect(routeSource).toContain("Objective gate consistency");
     expect(routeSource).toContain("objective_gate_consistency_blocked");
-    expect(routeSource).toContain("global_terminal_validator_applied");
-    expect(routeSource).toContain("globalTerminalValidator:rewrite");
+    expect(terminalFinalizeSource).toContain("global_terminal_validator_applied");
+    expect(terminalFinalizeSource).toContain("globalTerminalValidator:rewrite");
     expect(routeSource).toContain("global_terminal_validator_required_sections");
     expect(routeSource).toContain("final_mode_gate_consistency_blocked");
     expect(routeSource).toContain("objective_obligations_missing");
     expect(routeSource).toContain("answer_obligations_missing");
-    expect(routeSource).toContain("frontier_required_headings_missing");
+    expect(terminalConsistencySource).toContain("frontier_required_headings_missing");
     expect(routeSource).toContain("buildDeterministicFrontierDryRunContract()");
-    expect(routeSource).toContain("frontier:terminal_heading_repair");
-    expect(routeSource).toContain("frontier_terminal_heading_repair_applied");
+    expect(finalContractLockSource).toContain("frontier:terminal_heading_repair");
+    expect(finalContractLockSource).toContain("frontier_terminal_heading_repair_applied");
     expect(routeSource).toContain("roadmap_repo_grounded_findings_missing");
     expect(routeSource).toContain("roadmap_implementation_roadmap_missing");
-    expect(routeSource).toContain("const objectivePrimaryPromise = buildAskContextFromQueries");
-    expect(routeSource).toContain("const objectiveVariantPromise =");
-    expect(routeSource).toContain("Promise.allSettled([");
+    expect(routeSource).toContain("objectivePrimaryQueries");
+    expect(routeSource).toContain("const objectiveVariantOutcomes = await Promise.allSettled(");
+    expect(routeSource).toContain("objectiveVariantQueries.map((variantQueries) =>");
   });
 
   it("contains reasoning sidebar debug markers and event-clock formatter", () => {

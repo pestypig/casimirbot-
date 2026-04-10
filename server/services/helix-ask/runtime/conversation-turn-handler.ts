@@ -113,6 +113,11 @@ export type HelixConversationTurnHandlerDeps = {
   parseConversationClassifierResult: (raw: string) => ConversationClassifierResult | null;
   inferConversationModeHeuristic: (transcript: string) => string;
   inferConversationDispatchHintHeuristic: (transcript: string, mode: string) => boolean;
+  buildConversationFallbackBrief: (args: {
+    transcript: string;
+    mode: string;
+    dispatchHint: boolean;
+  }) => string;
   normalizeConversationRouteDecision: (args: {
     transcript: string;
     classification: ConversationClassifierResult;
@@ -522,7 +527,7 @@ export const executeHelixConversationTurn = async (args: {
     },
   });
 
-  let briefSource: "llm" | "none" = "none";
+  let briefSource: "llm" | "fallback" | "none" = "none";
   let briefFailReason: string | null = null;
   let briefText = "";
   let briefRepairAttempted = false;
@@ -611,6 +616,23 @@ export const executeHelixConversationTurn = async (args: {
     }
   }
   briefText = deps.sanitizeConversationBriefText(briefText);
+  if (!briefText && classifierSource === "fallback") {
+    const fallbackBrief = deps.sanitizeConversationBriefText(
+      deps.buildConversationFallbackBrief({
+        transcript: routingTranscript,
+        mode: classification.mode,
+        dispatchHint: classification.dispatch_hint,
+      }),
+    );
+    if (
+      fallbackBrief &&
+      (classification.mode === "clarify" ||
+        deps.isConversationBriefPolicyCompliant(fallbackBrief, classification.mode))
+    ) {
+      briefText = fallbackBrief;
+      briefSource = "fallback";
+    }
+  }
   if (!briefText) {
     briefSource = "none";
   }
@@ -641,7 +663,7 @@ export const executeHelixConversationTurn = async (args: {
       source: classifierSource,
     },
     route_reason: routeDecision.routeReasonCode,
-    brief_status: briefSource === "llm" ? "ready" : "none",
+    brief_status: briefSource === "llm" ? "ready" : briefSource === "fallback" ? "fallback" : "none",
     fail_reason: briefFailReason ?? undefined,
     meta: {
       repair_attempted: briefRepairAttempted,
@@ -744,7 +766,7 @@ export const executeHelixConversationTurn = async (args: {
       source: classifierSource,
     },
     route_reason: routeDecision.routeReasonCode,
-    brief_status: briefSource === "llm" ? "ready" : "none",
+    brief_status: briefSource === "llm" ? "ready" : briefSource === "fallback" ? "fallback" : "none",
     final_gate_outcome: conversationFinalGateOutcome,
     fail_reason: failReason ?? undefined,
     meta: {

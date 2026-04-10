@@ -4,46 +4,20 @@ import {
   computeEffectiveTemperature,
   evaluateStellarSpectralViability,
 } from "../sim_core/stellar_viability";
-
-const SOLAR_LUMINOSITY_W = 3.828e26;
-const SOLAR_RADIUS_M = 6.957e8;
-
-function makeWavelengthGrid(): Float64Array {
-  const minLambda = 100e-9;
-  const maxLambda = 10e-6;
-  const count = 256;
-  return Float64Array.from(
-    Array.from({ length: count }, (_, index) => minLambda + ((maxLambda - minLambda) * index) / (count - 1)),
-  );
-}
-
-function makeContinuumMask(wavelengths: ArrayLike<number>): Float64Array {
-  return Float64Array.from(wavelengths, (lambda) =>
-    lambda >= 400e-9 &&
-    lambda <= 2.5e-6 &&
-    !((lambda >= 482e-9 && lambda <= 490e-9) || (lambda >= 650e-9 && lambda <= 660e-9))
-      ? 1
-      : 0,
-  );
-}
-
-function makeUvMask(wavelengths: ArrayLike<number>): Float64Array {
-  return Float64Array.from(wavelengths, (lambda) => (lambda < 400e-9 ? 1 : 0));
-}
-
-function makeLineMask(wavelengths: ArrayLike<number>): Float64Array {
-  return Float64Array.from(wavelengths, (lambda) =>
-    (lambda >= 482e-9 && lambda <= 490e-9) || (lambda >= 650e-9 && lambda <= 660e-9) ? 1 : 0,
-  );
-}
-
-function makeMuGrid(): Float64Array {
-  return Float64Array.from([0.2, 0.35, 0.5, 0.7, 0.85, 1]);
-}
-
-function makeVisibleBandGrid(): Float64Array {
-  return Float64Array.from({ length: 64 }, (_, index) => 420e-9 + index * 5e-9);
-}
+import {
+  SOLAR_LUMINOSITY_W,
+  SOLAR_RADIUS_M,
+  type StellarBenchmarkFixture,
+  buildBenchmarkObservation,
+  makeCanonicalStellarBenchmarkFixtures,
+  makeContinuumMask,
+  makeFullSpectrumSolarLikeFixture,
+  makeLineMask,
+  makeMuGrid,
+  makeUvMask,
+  makeVisibleBandSolarLikeFixture,
+  makeWavelengthGrid,
+} from "./helpers/stellar-benchmark-fixtures";
 
 function nearestIndex(wavelengths: ArrayLike<number>, target: number): number {
   let bestIndex = 0;
@@ -56,6 +30,35 @@ function nearestIndex(wavelengths: ArrayLike<number>, target: number): number {
     }
   }
   return bestIndex;
+}
+
+function fixtureObservablesActive(fixture: StellarBenchmarkFixture) {
+  return {
+    continuum: Boolean(fixture.continuum_mask?.some(Boolean)),
+    uv: Boolean(fixture.uv_mask?.some(Boolean)),
+    line: Boolean(fixture.line_mask?.some(Boolean)),
+    angular: false,
+    polarization: false,
+  };
+}
+
+function expectBenchmarkSummary(
+  benchmark: {
+    id: string | null;
+    coverage_mode: "full_spectrum" | "band_limited";
+    wavelength_min_m: number;
+    wavelength_max_m: number;
+    coverage_fraction: number | null;
+  },
+  fixture: StellarBenchmarkFixture,
+) {
+  expect(benchmark).toEqual({
+    id: fixture.benchmark_id,
+    coverage_mode: fixture.coverage_mode,
+    wavelength_min_m: fixture.wavelength_m[0],
+    wavelength_max_m: fixture.wavelength_m[fixture.wavelength_m.length - 1],
+    coverage_fraction: fixture.coverage_fraction,
+  });
 }
 
 describe("stellar viability contract", () => {
@@ -71,16 +74,12 @@ describe("stellar viability contract", () => {
     });
     const nullModel = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
     expect(nullModel).toBeDefined();
+    const fixture = makeFullSpectrumSolarLikeFixture(seed.wavelength_m);
 
     const report = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
-        wavelength_m: seed.wavelength_m,
-        intensity: nullModel?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(seed.wavelength_m),
-        uv_mask: makeUvMask(seed.wavelength_m),
-      },
+      observation: buildBenchmarkObservation(fixture, nullModel?.predicted_intensity ?? new Float64Array()),
       structure: {
         xi: 0.4,
         alpha_xi: 0.25,
@@ -99,12 +98,12 @@ describe("stellar viability contract", () => {
     expect(report.observables_active).toEqual({
       continuum: true,
       uv: true,
-      line: false,
+      line: true,
       angular: false,
       polarization: false,
     });
     expect(report.benchmark.coverage_mode).toBe("full_spectrum");
-    expect(report.benchmark.id).toBeNull();
+    expect(report.benchmark.id).toBe("solar-like-full-spectrum");
     expect(report.benchmark.coverage_fraction).toBe(1);
   });
 
@@ -230,28 +229,17 @@ describe("stellar viability contract", () => {
     });
     const hardenedM0 = hardenedSeed.models.find((entry) => entry.id === "M0_planck_atmosphere");
     expect(hardenedM0).toBeDefined();
+    const fixture = makeFullSpectrumSolarLikeFixture(hardenedSeed.wavelength_m);
 
     const baselineFit = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
-        wavelength_m: hardenedSeed.wavelength_m,
-        intensity: hardenedM0?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(hardenedSeed.wavelength_m),
-        uv_mask: makeUvMask(hardenedSeed.wavelength_m),
-        line_mask: makeLineMask(hardenedSeed.wavelength_m),
-      },
+      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array()),
     });
     const hardenedFit = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
-        wavelength_m: hardenedSeed.wavelength_m,
-        intensity: hardenedM0?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(hardenedSeed.wavelength_m),
-        uv_mask: makeUvMask(hardenedSeed.wavelength_m),
-        line_mask: makeLineMask(hardenedSeed.wavelength_m),
-      },
+      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array()),
       atmosphere: {
         line_opacity: 1.2,
         line_source_contrast: -0.15,
@@ -265,8 +253,64 @@ describe("stellar viability contract", () => {
     expect((baselineM0?.metrics.line_residual ?? 0)).toBeGreaterThan(matchedM0?.metrics.line_residual ?? 0);
   });
 
+  it("keeps M0 as the promoted winner across the canonical local benchmark suite", () => {
+    for (const fixture of makeCanonicalStellarBenchmarkFixtures()) {
+      const seed = evaluateStellarSpectralViability({
+        luminosity_W: SOLAR_LUMINOSITY_W,
+        radius_m: SOLAR_RADIUS_M,
+        observation: buildBenchmarkObservation(
+          fixture,
+          Float64Array.from({ length: fixture.wavelength_m.length }, () => 1),
+        ),
+      });
+      const m0Seed = seed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+      expect(m0Seed, fixture.benchmark_id).toBeDefined();
+
+      const report = evaluateStellarSpectralViability({
+        luminosity_W: SOLAR_LUMINOSITY_W,
+        radius_m: SOLAR_RADIUS_M,
+        observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array()),
+      });
+
+      expect(report.winner, fixture.benchmark_id).toBe("M0_planck_atmosphere");
+      expect(report.promotable_winner, fixture.benchmark_id).toBe("M0_planck_atmosphere");
+      expect(report.observables_active, fixture.benchmark_id).toEqual(fixtureObservablesActive(fixture));
+      expectBenchmarkSummary(report.benchmark, fixture);
+    }
+  });
+
+  it("allows challenger observations to win across reusable benchmark fixtures", () => {
+    const fixtures = makeCanonicalStellarBenchmarkFixtures().filter((fixture) => fixture.benchmark_id !== "solar-like-uv-band");
+    for (const fixture of fixtures) {
+      const structure = { xi: 0.9, alpha_xi: 0.45 };
+      const seed = evaluateStellarSpectralViability({
+        luminosity_W: SOLAR_LUMINOSITY_W,
+        radius_m: SOLAR_RADIUS_M,
+        structure,
+        observation: buildBenchmarkObservation(
+          fixture,
+          Float64Array.from({ length: fixture.wavelength_m.length }, () => 1),
+        ),
+      });
+      const m1Seed = seed.models.find((entry) => entry.id === "M1_lattice_emissivity");
+      expect(m1Seed, fixture.benchmark_id).toBeDefined();
+
+      const report = evaluateStellarSpectralViability({
+        luminosity_W: SOLAR_LUMINOSITY_W,
+        radius_m: SOLAR_RADIUS_M,
+        structure,
+        observation: buildBenchmarkObservation(fixture, m1Seed?.predicted_intensity ?? new Float64Array()),
+      });
+
+      expect(report.winner, fixture.benchmark_id).toBe("M1_lattice_emissivity");
+      expect(report.promotable_winner, fixture.benchmark_id).toBe("M1_lattice_emissivity");
+      expectBenchmarkSummary(report.benchmark, fixture);
+    }
+  });
+
   it("treats band-limited benchmarks differently from full-spectrum closure checks", () => {
-    const wavelengths = makeVisibleBandGrid();
+    const fixture = makeVisibleBandSolarLikeFixture();
+    const wavelengths = fixture.wavelength_m;
     const seed = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
@@ -282,28 +326,17 @@ describe("stellar viability contract", () => {
     const bandLimited = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
+      observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array(), {
         benchmark_id: "solar-visible",
-        coverage_mode: "band_limited",
-        coverage_fraction: 0.38,
-        wavelength_m: wavelengths,
-        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(wavelengths),
-        line_mask: makeLineMask(wavelengths),
-      },
+      }),
     });
     const fullSpectrum = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
+      observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array(), {
         benchmark_id: "solar-visible",
         coverage_mode: "full_spectrum",
-        coverage_fraction: 0.38,
-        wavelength_m: wavelengths,
-        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(wavelengths),
-        line_mask: makeLineMask(wavelengths),
-      },
+      }),
     });
 
     const bandM0 = bandLimited.models.find((entry) => entry.id === "M0_planck_atmosphere");
@@ -334,7 +367,8 @@ describe("stellar viability contract", () => {
   });
 
   it("applies reference_flux_W_m2 to the active closure path deterministically", () => {
-    const wavelengths = makeVisibleBandGrid();
+    const fixture = makeVisibleBandSolarLikeFixture();
+    const wavelengths = fixture.wavelength_m;
     const seed = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
@@ -350,28 +384,18 @@ describe("stellar viability contract", () => {
     const matched = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
+      observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array(), {
         benchmark_id: "solar-visible",
-        coverage_mode: "band_limited",
-        wavelength_m: wavelengths,
-        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(wavelengths),
-        line_mask: makeLineMask(wavelengths),
-      },
+      }),
     });
     const matchedReferenceFlux = matched.models[0]?.observed_bolometric_flux_W_m2 ?? 0;
     const shifted = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
+      observation: buildBenchmarkObservation(fixture, m0Seed?.predicted_intensity ?? new Float64Array(), {
         benchmark_id: "solar-visible",
-        coverage_mode: "band_limited",
         reference_flux_W_m2: matchedReferenceFlux * 0.5,
-        wavelength_m: wavelengths,
-        intensity: m0Seed?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(wavelengths),
-        line_mask: makeLineMask(wavelengths),
-      },
+      }),
     });
 
     const matchedM0 = matched.models.find((entry) => entry.id === "M0_planck_atmosphere");
@@ -392,17 +416,12 @@ describe("stellar viability contract", () => {
     });
     const lattice = seed.models.find((entry) => entry.id === "M1_lattice_emissivity");
     expect(lattice).toBeDefined();
+    const fixture = makeFullSpectrumSolarLikeFixture(seed.wavelength_m);
 
     const report = evaluateStellarSpectralViability({
       luminosity_W: SOLAR_LUMINOSITY_W,
       radius_m: SOLAR_RADIUS_M,
-      observation: {
-        wavelength_m: seed.wavelength_m,
-        intensity: lattice?.predicted_intensity ?? new Float64Array(),
-        continuum_mask: makeContinuumMask(seed.wavelength_m),
-        uv_mask: makeUvMask(seed.wavelength_m),
-        line_mask: makeLineMask(seed.wavelength_m),
-      },
+      observation: buildBenchmarkObservation(fixture, lattice?.predicted_intensity ?? new Float64Array()),
       structure: {
         xi: 0.8,
         alpha_xi: 0.35,
@@ -413,6 +432,68 @@ describe("stellar viability contract", () => {
     expect(
       report.models.find((entry) => entry.id === "M1_lattice_emissivity")?.metrics.continuum_rms,
     ).toBeLessThan(1e-12);
+  });
+
+  it("reuses one full-spectrum benchmark fixture across default M0, hardened M0, and challenger outputs", () => {
+    const baselineSeed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+    });
+    const hardenedSeed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        continuum_opacity: 0.25,
+        line_opacity: 0.8,
+      },
+    });
+    const challengerSeed = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      structure: {
+        xi: 0.8,
+        alpha_xi: 0.35,
+      },
+    });
+
+    const fixture = makeFullSpectrumSolarLikeFixture(baselineSeed.wavelength_m);
+    const baselineM0 = baselineSeed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const hardenedM0 = hardenedSeed.models.find((entry) => entry.id === "M0_planck_atmosphere");
+    const challengerM1 = challengerSeed.models.find((entry) => entry.id === "M1_lattice_emissivity");
+    expect(baselineM0).toBeDefined();
+    expect(hardenedM0).toBeDefined();
+    expect(challengerM1).toBeDefined();
+
+    const baselineReport = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      observation: buildBenchmarkObservation(fixture, baselineM0?.predicted_intensity ?? new Float64Array()),
+    });
+    const hardenedReport = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      atmosphere: {
+        continuum_opacity: 0.25,
+        line_opacity: 0.8,
+      },
+      observation: buildBenchmarkObservation(fixture, hardenedM0?.predicted_intensity ?? new Float64Array()),
+    });
+    const challengerReport = evaluateStellarSpectralViability({
+      luminosity_W: SOLAR_LUMINOSITY_W,
+      radius_m: SOLAR_RADIUS_M,
+      structure: {
+        xi: 0.8,
+        alpha_xi: 0.35,
+      },
+      observation: buildBenchmarkObservation(fixture, challengerM1?.predicted_intensity ?? new Float64Array()),
+    });
+
+    expect(baselineReport.benchmark.id).toBe("solar-like-full-spectrum");
+    expect(hardenedReport.benchmark.id).toBe("solar-like-full-spectrum");
+    expect(challengerReport.benchmark.id).toBe("solar-like-full-spectrum");
+    expect(baselineReport.winner).toBe("M0_planck_atmosphere");
+    expect(hardenedReport.winner).toBe("M0_planck_atmosphere");
+    expect(challengerReport.winner).toBe("M1_lattice_emissivity");
   });
 
   it("tracks best-fit winner separately from promotable winner when the lowest-score model fails contract", () => {

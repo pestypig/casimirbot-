@@ -4425,6 +4425,110 @@ const collectNhm2SourceClosureRegionComparisons = (
           ? `${tileRegionTensorRef}.T00`
           : null;
     const regionMaskRef = `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.brick_mask`;
+    const metricT00PathFacts: NonNullable<Nhm2SourceClosureV2RegionT00Trace["pathFacts"]> | null =
+      metricRegionTensor.T00 != null
+        ? {
+            producerModule: "modules/warp/natario-warp.ts",
+            producerFunction: "calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+            inputFieldRef: "warp.shiftVectorField.evaluateShiftVector",
+            semanticQuantityRef: "warp.metric.required_t00.shift_field_eulerian",
+            semanticQuantityKind: "metric_required_t00",
+            physicalMeaningRef: "warp.metric.required_t00.eulerian_energy_density",
+            comparisonRole: "metric_required_reference",
+            expectedCounterpartRole: "tile_effective_counterpart",
+            semanticEquivalenceExpected: true,
+            reconstructionLayer: "shift_field_metric_tensor_reconstruction",
+            assumptionBoundaryRef:
+              "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+            semanticAlignmentNote:
+              "Metric direct T00 is the reference-side metric-required quantity for same-basis source-closure comparison.",
+            upstreamValueType: "derived_metric_tensor_component",
+            constructionDomain: "brick_grid_metric_derivative_domain",
+            constructionStage: "pre_aggregation_shift_field_tensorization",
+            unitsRef: "J/m^3",
+            preAggregationValueRef: "warp.metric.required_t00.samples",
+            upstreamAssumptionNote:
+              "Metric direct T00 is reconstructed from brick-grid shift-field derivatives before regional averaging.",
+            maskClassifierRef: regionMaskRef,
+            voxelAveragingMode: "unweighted_voxel_mean",
+            derivativeSource: "shift_field_eulerian_t00",
+            pressureProxyApplied: false,
+            finiteDifferenceSource: "brick_grid_central_difference",
+            samplingDomain: `brick_grid.region.${regionId}`,
+            supportExclusionMode: "skip_nonfinite_derivative_cells",
+            normalizationRef: "sample_count",
+          }
+        : null;
+    const tileT00PathFacts: NonNullable<Nhm2SourceClosureV2RegionT00Trace["pathFacts"]> | null =
+      tileMeanT00Resolved != null
+        ? tileRegionDiagnostics?.meanT00 != null
+          ? {
+              producerModule: "server/stress-energy-brick.ts",
+              producerFunction: "buildTensorRegionSummary",
+              inputFieldRef: "gr.matter.stressEnergy.channels.t00",
+              semanticQuantityRef: "gr.matter.brick.channel_t00.region_mean",
+              semanticQuantityKind: "gr_matter_channel_t00",
+              physicalMeaningRef: "gr.matter.channel_t00.sampled_region_mean",
+              comparisonRole: "gr_matter_channel_observation",
+              expectedCounterpartRole: "metric_required_reference",
+              semanticEquivalenceExpected: false,
+              reconstructionLayer: "gr_matter_channel_sampling",
+              assumptionBoundaryRef:
+                "server/stress-energy-brick.ts::buildTensorRegionSummary",
+              semanticAlignmentNote:
+                "Tile direct T00 is a sampled GR matter brick channel mean, not a tile-effective counterpart to the metric-required reference quantity.",
+              upstreamValueType: "sampled_brick_channel_component",
+              constructionDomain: "brick_grid_matter_channel_domain",
+              constructionStage: "pre_aggregation_channel_sampling",
+              unitsRef: "J/m^3",
+              preAggregationValueRef: "gr.matter.stressEnergy.channels.t00",
+              upstreamAssumptionNote:
+                "Tile direct T00 is the region mean of sampled GR matter brick t00 channel values before pressure proxy reconstruction.",
+              maskClassifierRef: regionMaskRef,
+              voxelAveragingMode: "unweighted_voxel_mean",
+              derivativeSource: "direct_region_voxel_t00_mean",
+              pressureProxyApplied: false,
+              finiteDifferenceSource: null,
+              samplingDomain: `brick_grid.region.${regionId}`,
+              supportExclusionMode: "region_mask_voxel_mean",
+              normalizationRef: "sample_count",
+            }
+          : tileRegionTensor.T00 != null
+            ? {
+                producerModule: "server/energy-pipeline.ts",
+                producerFunction: "resolveNhm2SourceClosureRegionComparisons",
+                inputFieldRef: `${tileRegionTensorRef}.T00`,
+                semanticQuantityRef: "gr.matter.brick.tensor_snapshot_t00",
+                semanticQuantityKind: "tensor_snapshot_t00",
+                physicalMeaningRef: "gr.matter.tensor_snapshot_t00",
+                comparisonRole: "published_tensor_snapshot_observation",
+                expectedCounterpartRole: "metric_required_reference",
+                semanticEquivalenceExpected: false,
+                reconstructionLayer: "tensor_snapshot_fallback",
+                assumptionBoundaryRef:
+                  "server/energy-pipeline.ts::resolveNhm2SourceClosureRegionComparisons",
+                semanticAlignmentNote:
+                  "Tile direct T00 falls back to a published tensor snapshot rather than a semantically aligned tile-effective comparison counterpart.",
+                upstreamValueType: "published_tensor_snapshot_value",
+                constructionDomain: "source_closure_artifact_snapshot_domain",
+                constructionStage: "post_aggregation_snapshot_fallback",
+                unitsRef: "J/m^3",
+                preAggregationValueRef: `${tileRegionTensorRef}.T00`,
+                upstreamAssumptionNote:
+                  "Tile direct T00 falls back to the published tensor snapshot value when reducer-native region diagnostics are unavailable.",
+                maskClassifierRef: regionMaskRef,
+                voxelAveragingMode: "tensor_snapshot_direct_value",
+                derivativeSource: "none",
+                pressureProxyApplied: false,
+                finiteDifferenceSource: null,
+                samplingDomain: `brick_grid.region.${regionId}`,
+                supportExclusionMode: "snapshot_only",
+                normalizationRef:
+                  asText(tileRegionDiagnostics?.normalizationBasis) ??
+                  asText(tileRegionEntry?.normalizationBasis),
+              }
+            : null
+        : null;
     const metricT00Trace: Nhm2SourceClosureV2RegionT00Trace | null =
       metricRegionTensor.T00 != null
         ? {
@@ -4434,9 +4538,12 @@ const collectNhm2SourceClosureRegionComparisons = (
             aggregationMode: "mean",
             valueRef: metricT00SourceRef,
             tensorRef: metricRegionTensorRef,
+            boundaryRef:
+              "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
             maskNote: regionMaskNote,
             supportInclusionNote: metricAccounting.supportInclusionNote,
             traceStage: "region_mean_from_shift_field",
+            pathFacts: metricT00PathFacts,
           }
         : null;
     const tileT00Trace: Nhm2SourceClosureV2RegionT00Trace | null =
@@ -4453,6 +4560,12 @@ const collectNhm2SourceClosureRegionComparisons = (
                 "unknown"),
             valueRef: tileT00SourceRef,
             tensorRef: tileRegionTensorRef,
+            boundaryRef:
+              tileRegionDiagnostics?.meanT00 != null
+                ? "server/stress-energy-brick.ts::buildTensorRegionSummary"
+                : tileRegionTensor.T00 != null
+                  ? "server/energy-pipeline.ts::resolveNhm2SourceClosureRegionComparisons"
+                  : null,
             maskNote: regionMaskNote,
             supportInclusionNote: tileAccounting.supportInclusionNote,
             traceStage:
@@ -4461,6 +4574,7 @@ const collectNhm2SourceClosureRegionComparisons = (
                 : tileRegionTensor.T00 != null
                   ? "tensor_snapshot_fallback"
                   : "unknown",
+            pathFacts: tileT00PathFacts,
           }
         : null;
     const metricT00Diagnostics = buildT00Diagnostics({

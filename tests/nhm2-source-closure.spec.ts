@@ -174,10 +174,12 @@ describe("nhm2 source closure artifact v2", () => {
     sampleCount: number;
     valueRef: string;
     tensorRef: string;
+    boundaryRef?: string | null;
     traceStage:
       | "region_mean_from_shift_field"
       | "region_mean_from_gr_matter_brick"
       | "tensor_snapshot_fallback";
+    pathFacts?: Record<string, unknown> | null;
   }) => ({
     regionMaskRef: "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
     sampleCount: args.sampleCount,
@@ -185,9 +187,11 @@ describe("nhm2 source closure artifact v2", () => {
     aggregationMode: "mean" as const,
     valueRef: args.valueRef,
     tensorRef: args.tensorRef,
+    boundaryRef: args.boundaryRef ?? null,
     maskNote: "shared wall brick mask",
     supportInclusionNote: "shared wall support set",
     traceStage: args.traceStage,
+    pathFacts: args.pathFacts ?? null,
   });
 
   it("passes when global and required regional comparisons are same-basis and within tolerance", () => {
@@ -690,7 +694,41 @@ describe("nhm2 source closure artifact v2", () => {
               sampleCount: 16,
               valueRef: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
               tensorRef: "artifact://metric-wall",
+              boundaryRef:
+                "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
               traceStage: "region_mean_from_shift_field",
+              pathFacts: {
+                producerModule: "modules/warp/natario-warp.ts",
+                producerFunction: "calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+                inputFieldRef: "warp.shiftVectorField.evaluateShiftVector",
+                semanticQuantityRef: "warp.metric.required_t00.shift_field_eulerian",
+                semanticQuantityKind: "metric_required_t00",
+                physicalMeaningRef: "warp.metric.required_t00.eulerian_energy_density",
+                comparisonRole: "metric_required_reference",
+                expectedCounterpartRole: "tile_effective_counterpart",
+                semanticEquivalenceExpected: true,
+                reconstructionLayer: "shift_field_metric_tensor_reconstruction",
+                assumptionBoundaryRef:
+                  "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+                semanticAlignmentNote:
+                  "Metric direct T00 is the reference-side metric-required quantity for same-basis source-closure comparison.",
+                upstreamValueType: "derived_metric_tensor_component",
+                constructionDomain: "brick_grid_metric_derivative_domain",
+                constructionStage: "pre_aggregation_shift_field_tensorization",
+                unitsRef: "J/m^3",
+                preAggregationValueRef: "warp.metric.required_t00.samples",
+                upstreamAssumptionNote:
+                  "Metric direct T00 is reconstructed from brick-grid shift-field derivatives before regional averaging.",
+                maskClassifierRef:
+                  "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
+                voxelAveragingMode: "unweighted_voxel_mean",
+                derivativeSource: "shift_field_eulerian_t00",
+                pressureProxyApplied: false,
+                finiteDifferenceSource: "brick_grid_central_difference",
+                samplingDomain: "brick_grid.region.wall",
+                supportExclusionMode: "skip_nonfinite_derivative_cells",
+                normalizationRef: "sample_count",
+              },
             }),
             normalizationBasis: "sample_count",
             aggregationMode: "mean",
@@ -711,7 +749,40 @@ describe("nhm2 source closure artifact v2", () => {
               valueRef:
                 "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
               tensorRef: "artifact://tile-wall",
+              boundaryRef: "server/stress-energy-brick.ts::buildTensorRegionSummary",
               traceStage: "region_mean_from_gr_matter_brick",
+              pathFacts: {
+                producerModule: "server/stress-energy-brick.ts",
+                producerFunction: "buildTensorRegionSummary",
+                inputFieldRef: "gr.matter.stressEnergy.channels.t00",
+                semanticQuantityRef: "gr.matter.brick.channel_t00.region_mean",
+                semanticQuantityKind: "gr_matter_channel_t00",
+                physicalMeaningRef: "gr.matter.channel_t00.sampled_region_mean",
+                comparisonRole: "gr_matter_channel_observation",
+                expectedCounterpartRole: "metric_required_reference",
+                semanticEquivalenceExpected: false,
+                reconstructionLayer: "gr_matter_channel_sampling",
+                assumptionBoundaryRef:
+                  "server/stress-energy-brick.ts::buildTensorRegionSummary",
+                semanticAlignmentNote:
+                  "Tile direct T00 is a sampled GR matter brick channel mean, not a tile-effective counterpart to the metric-required reference quantity.",
+                upstreamValueType: "sampled_brick_channel_component",
+                constructionDomain: "brick_grid_matter_channel_domain",
+                constructionStage: "pre_aggregation_channel_sampling",
+                unitsRef: "J/m^3",
+                preAggregationValueRef: "gr.matter.stressEnergy.channels.t00",
+                upstreamAssumptionNote:
+                  "Tile direct T00 is the region mean of sampled GR matter brick t00 channel values before pressure proxy reconstruction.",
+                maskClassifierRef:
+                  "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
+                voxelAveragingMode: "unweighted_voxel_mean",
+                derivativeSource: "direct_region_voxel_t00_mean",
+                pressureProxyApplied: false,
+                finiteDifferenceSource: null,
+                samplingDomain: "brick_grid.region.wall",
+                supportExclusionMode: "region_mask_voxel_mean",
+                normalizationRef: "sample_count",
+              },
             }),
             normalizationBasis: "sample_count",
             aggregationMode: "mean",
@@ -738,15 +809,99 @@ describe("nhm2 source closure artifact v2", () => {
     expect(region.metricT00Diagnostics?.trace?.regionMaskRef).toBe(
       "gr.matter.stressEnergy.tensorSampledSummaries.wall.brick_mask",
     );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.producerFunction).toBe(
+      "calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.inputFieldRef).toBe(
+      "warp.shiftVectorField.evaluateShiftVector",
+    );
+    expect(region.metricT00Diagnostics?.trace?.boundaryRef).toBe(
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.semanticQuantityKind).toBe(
+      "metric_required_t00",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.physicalMeaningRef).toBe(
+      "warp.metric.required_t00.eulerian_energy_density",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.comparisonRole).toBe(
+      "metric_required_reference",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.expectedCounterpartRole).toBe(
+      "tile_effective_counterpart",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.semanticEquivalenceExpected).toBe(
+      true,
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.reconstructionLayer).toBe(
+      "shift_field_metric_tensor_reconstruction",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.assumptionBoundaryRef).toBe(
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+    );
+    expect(region.metricT00Diagnostics?.trace?.pathFacts?.constructionStage).toBe(
+      "pre_aggregation_shift_field_tensorization",
+    );
     expect(region.tileT00Diagnostics?.trace?.traceStage).toBe(
       "region_mean_from_gr_matter_brick",
     );
     expect(region.tileT00Diagnostics?.trace?.tensorRef).toBe("artifact://tile-wall");
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.producerFunction).toBe(
+      "buildTensorRegionSummary",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.inputFieldRef).toBe(
+      "gr.matter.stressEnergy.channels.t00",
+    );
+    expect(region.tileT00Diagnostics?.trace?.boundaryRef).toBe(
+      "server/stress-energy-brick.ts::buildTensorRegionSummary",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.semanticQuantityKind).toBe(
+      "gr_matter_channel_t00",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.physicalMeaningRef).toBe(
+      "gr.matter.channel_t00.sampled_region_mean",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.comparisonRole).toBe(
+      "gr_matter_channel_observation",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.expectedCounterpartRole).toBe(
+      "metric_required_reference",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.semanticEquivalenceExpected).toBe(
+      false,
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.reconstructionLayer).toBe(
+      "gr_matter_channel_sampling",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.assumptionBoundaryRef).toBe(
+      "server/stress-energy-brick.ts::buildTensorRegionSummary",
+    );
+    expect(region.tileT00Diagnostics?.trace?.pathFacts?.constructionStage).toBe(
+      "pre_aggregation_channel_sampling",
+    );
     expect(region.mismatchDiagnostics?.t00MechanismCategory).toBe("t00_mismatch_present");
     expect(region.mismatchDiagnostics?.t00MechanismNextStep).toBe(
       "direct_t00_source_model_mapping",
     );
     expect(region.mismatchDiagnostics?.t00TraceDivergenceStage).toBe("source_path_mismatch");
+    expect(region.mismatchDiagnostics?.t00TraceUpstreamMismatchClass).toBe(
+      "input_field_mismatch",
+    );
+    expect(region.mismatchDiagnostics?.t00TraceSemanticMismatchClass).toBe(
+      "semantic_quantity_mismatch",
+    );
+    expect(region.mismatchDiagnostics?.t00TraceComparisonContractStatus).toBe(
+      "semantically_misaligned",
+    );
+    expect(region.mismatchDiagnostics?.t00TraceContractMismatchClass).toBe(
+      "comparison_contract_mismatch",
+    );
+    expect(region.mismatchDiagnostics?.t00TraceFirstSemanticBoundary).toBe(
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
+    );
+    expect(region.mismatchDiagnostics?.t00TraceNextInspectionTarget).toBe(
+      "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
+    );
   });
 
   it("preserves null includedCount when reducer-native evidence is absent", () => {
@@ -799,6 +954,24 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceDivergenceStage).toBe(
       "unknown",
     );
+    expect(
+      artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceUpstreamMismatchClass,
+    ).toBe("unknown");
+    expect(
+      artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceSemanticMismatchClass,
+    ).toBe("unknown");
+    expect(
+      artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceComparisonContractStatus,
+    ).toBe("unknown");
+    expect(
+      artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceContractMismatchClass,
+    ).toBe("unknown");
+    expect(
+      artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceFirstSemanticBoundary,
+    ).toBeNull();
+    expect(
+      artifact.regionComparisons.regions[0]?.mismatchDiagnostics?.t00TraceNextInspectionTarget,
+    ).toBeNull();
   });
 
   it("keeps synthesized sumT00 evidence away from measured", () => {

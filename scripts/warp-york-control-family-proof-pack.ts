@@ -27769,6 +27769,36 @@ const renderNhm2SourceClosureMarkdown = (
   ) => {
     return region.mismatchDiagnostics?.t00TraceDivergenceStage ?? "unknown";
   };
+  const summarizeT00TraceUpstreamMismatchClass = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceUpstreamMismatchClass ?? "unknown";
+  };
+  const summarizeT00TraceSemanticMismatchClass = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceSemanticMismatchClass ?? "unknown";
+  };
+  const summarizeT00TraceComparisonContractStatus = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceComparisonContractStatus ?? "unknown";
+  };
+  const summarizeT00TraceContractMismatchClass = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceContractMismatchClass ?? "unknown";
+  };
+  const summarizeT00TraceFirstSemanticBoundary = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceFirstSemanticBoundary ?? "null";
+  };
+  const summarizeT00TraceNextInspectionTarget = (
+    region: Nhm2SourceClosureV2RegionComparison,
+  ) => {
+    return region.mismatchDiagnostics?.t00TraceNextInspectionTarget ?? "null";
+  };
   const summarizeDirectT00LocalizationNote = (
     region: Nhm2SourceClosureV2RegionComparison,
   ) => {
@@ -27789,7 +27819,15 @@ const renderNhm2SourceClosureMarkdown = (
     ) {
       return null;
     }
-    return `direct T00 compares ${metricMode} (${metricTraceStage}) at ${metricSourceRef} against ${tileMode} (${tileTraceStage}) at ${tileSourceRef}`;
+    const metricSemantic =
+      region.metricT00Diagnostics?.trace?.pathFacts?.semanticQuantityKind ?? "unknown";
+    const tileSemantic =
+      region.tileT00Diagnostics?.trace?.pathFacts?.semanticQuantityKind ?? "unknown";
+    const contractStatus = summarizeT00TraceComparisonContractStatus(region);
+    const contractMismatch = summarizeT00TraceContractMismatchClass(region);
+    const semanticBoundary = summarizeT00TraceFirstSemanticBoundary(region);
+    const inspectionTarget = summarizeT00TraceNextInspectionTarget(region);
+    return `direct T00 compares ${metricMode} (${metricTraceStage}; ${metricSemantic}) at ${metricSourceRef} against ${tileMode} (${tileTraceStage}; ${tileSemantic}) at ${tileSourceRef}; contract=${contractStatus}/${contractMismatch}; first semantic boundary=${semanticBoundary}; inspect ${inspectionTarget}`;
   };
   const renderAccountingRows = (
     accounting: ReturnType<typeof summarizeAccounting>,
@@ -27862,6 +27900,18 @@ const renderNhm2SourceClosureMarkdown = (
           const t00Mechanism = summarizeT00Mechanism(region);
           const t00MechanismNextStep = summarizeT00MechanismNextStep(region);
           const t00TraceDivergenceStage = summarizeT00TraceDivergenceStage(region);
+          const t00TraceUpstreamMismatchClass =
+            summarizeT00TraceUpstreamMismatchClass(region);
+          const t00TraceSemanticMismatchClass =
+            summarizeT00TraceSemanticMismatchClass(region);
+          const t00TraceComparisonContractStatus =
+            summarizeT00TraceComparisonContractStatus(region);
+          const t00TraceContractMismatchClass =
+            summarizeT00TraceContractMismatchClass(region);
+          const t00TraceFirstSemanticBoundary =
+            summarizeT00TraceFirstSemanticBoundary(region);
+          const t00TraceNextInspectionTarget =
+            summarizeT00TraceNextInspectionTarget(region);
           const directT00LocalizationNote = summarizeDirectT00LocalizationNote(region);
           const tileProxy = region.tileProxyDiagnostics ?? null;
           const detailRows = renderComponentRows(region.residualComponents);
@@ -27903,6 +27953,12 @@ const renderNhm2SourceClosureMarkdown = (
 | t00MismatchMechanismEvidenceStatus | ${region.mismatchDiagnostics?.t00MechanismEvidenceStatus ?? "unknown"} |
 | t00MismatchMechanismNextStep | ${t00MechanismNextStep} |
 | t00TraceDivergenceStage | ${t00TraceDivergenceStage} |
+| t00TraceUpstreamMismatchClass | ${t00TraceUpstreamMismatchClass} |
+| t00TraceSemanticMismatchClass | ${t00TraceSemanticMismatchClass} |
+| t00TraceComparisonContractStatus | ${t00TraceComparisonContractStatus} |
+| t00TraceContractMismatchClass | ${t00TraceContractMismatchClass} |
+| t00TraceFirstSemanticBoundary | ${t00TraceFirstSemanticBoundary} |
+| t00TraceNextInspectionTarget | ${t00TraceNextInspectionTarget} |
 | directT00LocalizationNote | ${directT00LocalizationNote ?? "null"} |
 | note | ${region.note ?? "null"} |
 
@@ -27937,10 +27993,37 @@ ${renderAccountingRows(accounting)}
 | trace.sampleCount | ${region.metricT00Diagnostics?.trace?.sampleCount ?? "null"} | ${region.tileT00Diagnostics?.trace?.sampleCount ?? "null"} |
 | trace.valueRef | ${region.metricT00Diagnostics?.trace?.valueRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.valueRef ?? "null"} |
 | trace.tensorRef | ${region.metricT00Diagnostics?.trace?.tensorRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.tensorRef ?? "null"} |
+| trace.boundaryRef | ${region.metricT00Diagnostics?.trace?.boundaryRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.boundaryRef ?? "null"} |
 | trace.maskNote | ${region.metricT00Diagnostics?.trace?.maskNote ?? "null"} | ${region.tileT00Diagnostics?.trace?.maskNote ?? "null"} |
 | trace.supportInclusionNote | ${region.metricT00Diagnostics?.trace?.supportInclusionNote ?? "null"} | ${region.tileT00Diagnostics?.trace?.supportInclusionNote ?? "null"} |
 | trace.normalizationBasis | ${region.metricT00Diagnostics?.trace?.normalizationBasis ?? "null"} | ${region.tileT00Diagnostics?.trace?.normalizationBasis ?? "null"} |
 | trace.aggregationMode | ${region.metricT00Diagnostics?.trace?.aggregationMode ?? "null"} | ${region.tileT00Diagnostics?.trace?.aggregationMode ?? "null"} |
+| trace.pathFacts.producerModule | ${region.metricT00Diagnostics?.trace?.pathFacts?.producerModule ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.producerModule ?? "null"} |
+| trace.pathFacts.producerFunction | ${region.metricT00Diagnostics?.trace?.pathFacts?.producerFunction ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.producerFunction ?? "null"} |
+| trace.pathFacts.inputFieldRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.inputFieldRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.inputFieldRef ?? "null"} |
+| trace.pathFacts.semanticQuantityRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.semanticQuantityRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.semanticQuantityRef ?? "null"} |
+| trace.pathFacts.semanticQuantityKind | ${region.metricT00Diagnostics?.trace?.pathFacts?.semanticQuantityKind ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.semanticQuantityKind ?? "null"} |
+| trace.pathFacts.physicalMeaningRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.physicalMeaningRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.physicalMeaningRef ?? "null"} |
+| trace.pathFacts.comparisonRole | ${region.metricT00Diagnostics?.trace?.pathFacts?.comparisonRole ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.comparisonRole ?? "null"} |
+| trace.pathFacts.expectedCounterpartRole | ${region.metricT00Diagnostics?.trace?.pathFacts?.expectedCounterpartRole ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.expectedCounterpartRole ?? "null"} |
+| trace.pathFacts.semanticEquivalenceExpected | ${region.metricT00Diagnostics?.trace?.pathFacts?.semanticEquivalenceExpected ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.semanticEquivalenceExpected ?? "null"} |
+| trace.pathFacts.reconstructionLayer | ${region.metricT00Diagnostics?.trace?.pathFacts?.reconstructionLayer ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.reconstructionLayer ?? "null"} |
+| trace.pathFacts.assumptionBoundaryRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.assumptionBoundaryRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.assumptionBoundaryRef ?? "null"} |
+| trace.pathFacts.semanticAlignmentNote | ${region.metricT00Diagnostics?.trace?.pathFacts?.semanticAlignmentNote ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.semanticAlignmentNote ?? "null"} |
+| trace.pathFacts.upstreamValueType | ${region.metricT00Diagnostics?.trace?.pathFacts?.upstreamValueType ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.upstreamValueType ?? "null"} |
+| trace.pathFacts.constructionDomain | ${region.metricT00Diagnostics?.trace?.pathFacts?.constructionDomain ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.constructionDomain ?? "null"} |
+| trace.pathFacts.constructionStage | ${region.metricT00Diagnostics?.trace?.pathFacts?.constructionStage ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.constructionStage ?? "null"} |
+| trace.pathFacts.unitsRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.unitsRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.unitsRef ?? "null"} |
+| trace.pathFacts.preAggregationValueRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.preAggregationValueRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.preAggregationValueRef ?? "null"} |
+| trace.pathFacts.upstreamAssumptionNote | ${region.metricT00Diagnostics?.trace?.pathFacts?.upstreamAssumptionNote ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.upstreamAssumptionNote ?? "null"} |
+| trace.pathFacts.maskClassifierRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.maskClassifierRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.maskClassifierRef ?? "null"} |
+| trace.pathFacts.voxelAveragingMode | ${region.metricT00Diagnostics?.trace?.pathFacts?.voxelAveragingMode ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.voxelAveragingMode ?? "null"} |
+| trace.pathFacts.derivativeSource | ${region.metricT00Diagnostics?.trace?.pathFacts?.derivativeSource ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.derivativeSource ?? "null"} |
+| trace.pathFacts.pressureProxyApplied | ${region.metricT00Diagnostics?.trace?.pathFacts?.pressureProxyApplied ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.pressureProxyApplied ?? "null"} |
+| trace.pathFacts.finiteDifferenceSource | ${region.metricT00Diagnostics?.trace?.pathFacts?.finiteDifferenceSource ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.finiteDifferenceSource ?? "null"} |
+| trace.pathFacts.samplingDomain | ${region.metricT00Diagnostics?.trace?.pathFacts?.samplingDomain ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.samplingDomain ?? "null"} |
+| trace.pathFacts.supportExclusionMode | ${region.metricT00Diagnostics?.trace?.pathFacts?.supportExclusionMode ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.supportExclusionMode ?? "null"} |
+| trace.pathFacts.normalizationRef | ${region.metricT00Diagnostics?.trace?.pathFacts?.normalizationRef ?? "null"} | ${region.tileT00Diagnostics?.trace?.pathFacts?.normalizationRef ?? "null"} |
 | aggregationMode | ${region.metricT00Diagnostics?.aggregationMode ?? "null"} | ${region.tileT00Diagnostics?.aggregationMode ?? "null"} |
 | normalizationBasis | ${region.metricT00Diagnostics?.normalizationBasis ?? "null"} | ${region.tileT00Diagnostics?.normalizationBasis ?? "null"} |
 | evidenceStatus | ${region.metricT00Diagnostics?.evidenceStatus ?? "null"} | ${region.tileT00Diagnostics?.evidenceStatus ?? "null"} |`;

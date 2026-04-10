@@ -15929,7 +15929,6 @@ const rewriteIdeologyScientificVoice = (text: string, question: string): string 
 
 const enforceIdeologyNarrativeContracts = (text: string, question: string): string => {
   const input = text.trim();
-  if (!input) return text;
   const lowerQ = question.toLowerCase();
   const ideologyNarrative =
     HELIX_ASK_IDEOLOGY_NARRATIVE_QUERY_RE.test(question) ||
@@ -15937,6 +15936,11 @@ const enforceIdeologyNarrativeContracts = (text: string, question: string): stri
   if (!ideologyNarrative) return input;
 
   let out = input;
+  if (!out) {
+    out = /feedback loop hygiene/.test(lowerQ)
+      ? "Feedback Loop Hygiene means public decisions stay tied to verified civic signals instead of rumor, momentum, or pressure alone."
+      : "Mission Ethos keeps public decisions tied to accountable stewardship and verified evidence before escalation.";
+  }
   const appendIfMissing = (pattern: RegExp, line: string) => {
     if (pattern.test(out)) return;
     out = `${out}\n\n${line}`.trim();
@@ -35206,6 +35210,31 @@ const stripHelixAskVisibleSourcesLines = (value: string): string => {
   return cleaned || value.trim();
 };
 
+const HELIX_ASK_SECONDARY_ARTIFACT_BLOCK_RE =
+  /^(?:Tree Walk(?::|$)|Key files(?::|$)|Proof(?::|$)|Context sources(?::|$)|Convergence snapshot(?::|$)|Capsule guards(?::|$)|Reasoning event log(?::|$)|Additional Repo Context(?::|$))/i;
+
+const stripHelixAskSecondaryArtifactBlocks = (value: string): string => {
+  if (!value) return value;
+  const lines = value.split(/\r?\n/);
+  const kept: string[] = [];
+  let skippingArtifactBlock = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (HELIX_ASK_SECONDARY_ARTIFACT_BLOCK_RE.test(trimmed)) {
+      skippingArtifactBlock = true;
+      continue;
+    }
+    if (skippingArtifactBlock) {
+      if (!trimmed) {
+        skippingArtifactBlock = false;
+      }
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+};
+
 const stripHelixAskBracketedPathCitations = (value: string): string =>
   String(value ?? "")
     .replace(HELIX_ASK_BRACKETED_PATH_CITATION_RE, "")
@@ -35556,6 +35585,7 @@ const finalizeHelixAskAnswerSurface = (args: {
   let text = answerText;
   if (mode === "conversational" && !artifactSurfaceRequested) {
     const naturalizationOptions = resolveHelixAskConversationalNaturalizationOptions(args.question);
+    text = stripHelixAskSecondaryArtifactBlocks(text);
     const needsConversationalFlatten =
       hasReportScaffolding(text) ||
       isScientificMicroReport(text) ||
@@ -35602,6 +35632,40 @@ const finalizeHelixAskAnswerSurface = (args: {
     text = stripHelixAskConversationalSurfaceScaffolding(text, naturalizationOptions);
     if (!text.trim()) {
       text = buildHelixAskQuestionResponsiveFallback(args.question) || text;
+    }
+    const responsiveFallback = buildHelixAskQuestionResponsiveFallback(args.question);
+    if (
+      responsiveFallback &&
+      /(?:^|\n)\s*(?:Repo-Grounded Findings|Implementation Roadmap|Evidence Gaps|Next Anchors Needed)\s*:/im.test(
+        text,
+      )
+    ) {
+      text = responsiveFallback;
+    }
+    if (
+      responsiveFallback &&
+      /(?:^|\n)\s*(?:Definitions|Baseline|Hypothesis|Anti-hypothesis|Falsifiers|Uncertainty band|Claim tier)\s*:/im.test(
+        text,
+      )
+    ) {
+      text = responsiveFallback;
+    }
+    if (
+      shouldForceIdeologyNarrativeDeterministic(args.question) &&
+      (!/\bMission Ethos\b/i.test(text) ||
+        !/\bFeedback Loop Hygiene\b/i.test(text) ||
+        !/\bexample\b/i.test(text) ||
+        !/\btakeaway\b/i.test(text))
+    ) {
+      text = stripIdeologyNarrativeLeakage(
+        enforceIdeologyNarrativeContracts(text, args.question),
+      ).trim();
+    }
+    if (
+      isSecurityRiskPrompt(args.question) &&
+      (!/\bopen-world best-effort\b/i.test(text) || !/\bexplicit uncertainty\b/i.test(text))
+    ) {
+      text = rewriteOpenWorldBestEffortAnswer(text, args.question);
     }
   }
   if (visibleSources) {
@@ -65517,7 +65581,9 @@ const executeHelixAsk = async ({
       });
       cleanedText = applyIdeologyFinalNarrativeLock({
         cleanedText,
-        ideologyIntent: intentProfile.id === "repo.ideology_reference",
+        ideologyIntent:
+          intentProfile.id === "repo.ideology_reference" ||
+          shouldForceIdeologyNarrativeDeterministic(baseQuestion),
         rewriteIdeologyScientificVoice,
         enforceIdeologyNarrativeContracts,
         stripIdeologyNarrativeLeakage,
@@ -66083,6 +66149,7 @@ planRouter.post("/ask/conversation-turn", async (req, res) => {
       parseConversationClassifierResult,
       inferConversationModeHeuristic,
       inferConversationDispatchHintHeuristic,
+      buildConversationFallbackBrief,
       normalizeConversationRouteDecision,
       llmLocalHandler,
       buildConversationBriefPrompt,

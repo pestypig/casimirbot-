@@ -378,7 +378,7 @@ describe("conversation-turn route", () => {
   it("falls back deterministically when model/parse paths fail", async () => {
     llmLocalHandlerMock
       .mockRejectedValueOnce(new Error("model unavailable"))
-      .mockResolvedValueOnce({ text: "" });
+      .mockRejectedValueOnce(new Error("brief unavailable"));
 
     const app = await buildApp();
     const res = await request(app).post("/api/agi/ask/conversation-turn").send({
@@ -390,14 +390,37 @@ describe("conversation-turn route", () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.classification?.source).toBe("fallback");
     expect(res.body.classification?.mode).toBe("act");
-    expect(["llm", "none"]).toContain(res.body.brief?.source);
+    expect(res.body.brief?.source).toBe("fallback");
     expect(typeof res.body.brief?.text).toBe("string");
     expect(["conversation_classifier_model_fallback", "conversation_classifier_parse_fallback"]).toContain(
       res.body.fail_reason,
     );
     expect(res.body.dispatch?.dispatch_hint).toBe(true);
-    expect(String(res.body.brief?.text ?? "")).toBe("");
+    expect(String(res.body.brief?.text ?? "")).not.toBe("");
+    expect(String(res.body.brief?.text ?? "").toLowerCase()).toContain("action");
     expect(llmLocalHandlerMock).toHaveBeenCalledTimes(2);
+  }, 20000);
+
+  it("produces a grounded verify brief when classifier fallback is unavoidable", async () => {
+    llmLocalHandlerMock
+      .mockRejectedValueOnce(new Error("classifier unavailable"))
+      .mockRejectedValueOnce(new Error("brief unavailable"));
+
+    const app = await buildApp();
+    const res = await request(app).post("/api/agi/ask/conversation-turn").send({
+      transcript: "Please verify the current route extraction status and summarize the result.",
+      traceId: "trace-conversation-verify-fallback-brief",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.classification?.source).toBe("fallback");
+    expect(res.body.classification?.mode).toBe("verify");
+    expect(res.body.route_reason_code).toBe("dispatch:verify");
+    expect(res.body.brief?.source).toBe("fallback");
+    expect(String(res.body.brief?.text ?? "")).not.toBe("");
+    expect(String(res.body.brief?.text ?? "").toLowerCase()).toContain("verification");
+    expect(res.body.fail_reason).toBe("conversation_classifier_model_fallback");
   }, 20000);
 
   it("routes exploratory broad prompts to observe with dispatch enabled", async () => {

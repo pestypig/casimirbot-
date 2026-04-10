@@ -1445,6 +1445,42 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.metricT00Diagnostics.trace?.regionMaskRef).toBe(
         `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.brick_mask`,
       );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.producerModule).toBe(
+        "modules/warp/natario-warp.ts",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.producerFunction).toBe(
+        "calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.inputFieldRef).toBe(
+        "warp.shiftVectorField.evaluateShiftVector",
+      );
+      expect(region.metricT00Diagnostics.trace?.boundaryRef).toBe(
+        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.semanticQuantityKind).toBe(
+        "metric_required_t00",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.physicalMeaningRef).toBe(
+        "warp.metric.required_t00.eulerian_energy_density",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.comparisonRole).toBe(
+        "metric_required_reference",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.expectedCounterpartRole).toBe(
+        "tile_effective_counterpart",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.semanticEquivalenceExpected).toBe(
+        true,
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.reconstructionLayer).toBe(
+        "shift_field_metric_tensor_reconstruction",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.assumptionBoundaryRef).toBe(
+        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField",
+      );
+      expect(region.metricT00Diagnostics.trace?.pathFacts?.constructionStage).toBe(
+        "pre_aggregation_shift_field_tensorization",
+      );
       expect(region.tileT00Diagnostics.sourceRef).toBe(
         `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.t00Diagnostics.meanT00`,
       );
@@ -1454,6 +1490,42 @@ describe("nhm2 publication completion surfaces", () => {
       );
       expect(region.tileT00Diagnostics.trace?.tensorRef).toBe(
         `gr.matter.stressEnergy.tensorSampledSummaries.${region.regionId}.nhm2_shift_lapse.diagonal_proxy`,
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.producerModule).toBe(
+        "server/stress-energy-brick.ts",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.producerFunction).toBe(
+        "buildTensorRegionSummary",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.inputFieldRef).toBe(
+        "gr.matter.stressEnergy.channels.t00",
+      );
+      expect(region.tileT00Diagnostics.trace?.boundaryRef).toBe(
+        "server/stress-energy-brick.ts::buildTensorRegionSummary",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.semanticQuantityKind).toBe(
+        "gr_matter_channel_t00",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.physicalMeaningRef).toBe(
+        "gr.matter.channel_t00.sampled_region_mean",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.comparisonRole).toBe(
+        "gr_matter_channel_observation",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.expectedCounterpartRole).toBe(
+        "metric_required_reference",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.semanticEquivalenceExpected).toBe(
+        false,
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.reconstructionLayer).toBe(
+        "gr_matter_channel_sampling",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.assumptionBoundaryRef).toBe(
+        "server/stress-energy-brick.ts::buildTensorRegionSummary",
+      );
+      expect(region.tileT00Diagnostics.trace?.pathFacts?.constructionStage).toBe(
+        "pre_aggregation_channel_sampling",
       );
       expect(region.tileProxyDiagnostics).toBeTruthy();
       expect(region.tileProxyDiagnostics.pressureModel).toBeTruthy();
@@ -1488,6 +1560,24 @@ describe("nhm2 publication completion surfaces", () => {
       expect(region.mismatchDiagnostics.diagonalSignStatus).toBeTruthy();
       expect(region.mismatchDiagnostics.components?.T00.signedRatioTileToMetric).not.toBeNull();
       expect(region.mismatchDiagnostics.t00TraceDivergenceStage).toBe("source_path_mismatch");
+      expect(region.mismatchDiagnostics.t00TraceUpstreamMismatchClass).toBe(
+        "input_field_mismatch",
+      );
+      expect(region.mismatchDiagnostics.t00TraceSemanticMismatchClass).toBe(
+        "semantic_quantity_mismatch",
+      );
+      expect(region.mismatchDiagnostics.t00TraceComparisonContractStatus).toBe(
+        "semantically_misaligned",
+      );
+      expect(region.mismatchDiagnostics.t00TraceContractMismatchClass).toBe(
+        "comparison_contract_mismatch",
+      );
+      expect(region.mismatchDiagnostics.t00TraceFirstSemanticBoundary).toBe(
+        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorAtPointFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
+      );
+      expect(region.mismatchDiagnostics.t00TraceNextInspectionTarget).toBe(
+        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
+      );
       expect(region.residualNorms.relLInf).toBeGreaterThan(0.1);
       expect(region.note).toContain("Same-basis regional closure compares");
     }
@@ -1506,6 +1596,12 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| signStatus |");
     expect(markdown).toContain("| t00MismatchMechanism |");
     expect(markdown).toContain("| t00TraceDivergenceStage |");
+    expect(markdown).toContain("| t00TraceUpstreamMismatchClass |");
+    expect(markdown).toContain("| t00TraceSemanticMismatchClass |");
+    expect(markdown).toContain("| t00TraceComparisonContractStatus |");
+    expect(markdown).toContain("| t00TraceContractMismatchClass |");
+    expect(markdown).toContain("| t00TraceFirstSemanticBoundary |");
+    expect(markdown).toContain("| t00TraceNextInspectionTarget |");
     expect(markdown).toContain("| directT00LocalizationNote |");
     expect(markdown).toContain("| t00 diagnostic field | metric | tile |");
     expect(markdown).toContain("| sourceRef |");
@@ -1514,6 +1610,27 @@ describe("nhm2 publication completion surfaces", () => {
     expect(markdown).toContain("| trace.regionMaskRef |");
     expect(markdown).toContain("| trace.valueRef |");
     expect(markdown).toContain("| trace.tensorRef |");
+    expect(markdown).toContain("| trace.boundaryRef |");
+    expect(markdown).toContain("| trace.pathFacts.producerModule |");
+    expect(markdown).toContain("| trace.pathFacts.producerFunction |");
+    expect(markdown).toContain("| trace.pathFacts.inputFieldRef |");
+    expect(markdown).toContain("| trace.pathFacts.semanticQuantityRef |");
+    expect(markdown).toContain("| trace.pathFacts.semanticQuantityKind |");
+    expect(markdown).toContain("| trace.pathFacts.physicalMeaningRef |");
+    expect(markdown).toContain("| trace.pathFacts.comparisonRole |");
+    expect(markdown).toContain("| trace.pathFacts.expectedCounterpartRole |");
+    expect(markdown).toContain("| trace.pathFacts.semanticEquivalenceExpected |");
+    expect(markdown).toContain("| trace.pathFacts.reconstructionLayer |");
+    expect(markdown).toContain("| trace.pathFacts.assumptionBoundaryRef |");
+    expect(markdown).toContain("| trace.pathFacts.semanticAlignmentNote |");
+    expect(markdown).toContain("| trace.pathFacts.upstreamValueType |");
+    expect(markdown).toContain("| trace.pathFacts.constructionDomain |");
+    expect(markdown).toContain("| trace.pathFacts.constructionStage |");
+    expect(markdown).toContain("| trace.pathFacts.unitsRef |");
+    expect(markdown).toContain("| trace.pathFacts.preAggregationValueRef |");
+    expect(markdown).toContain("| trace.pathFacts.upstreamAssumptionNote |");
+    expect(markdown).toContain("| trace.pathFacts.derivativeSource |");
+    expect(markdown).toContain("| trace.pathFacts.supportExclusionMode |");
     expect(markdown).toContain("| hull |");
     expect(markdown).toContain("| wall |");
     expect(markdown).toContain("| exterior_shell |");
@@ -1624,6 +1741,24 @@ describe("nhm2 publication completion surfaces", () => {
       expect(publishedRegion?.tileT00Diagnostics).toEqual(runtimeRegion.tileT00Diagnostics);
       expect(publishedRegion?.mismatchDiagnostics?.t00TraceDivergenceStage).toBe(
         runtimeRegion.mismatchDiagnostics?.t00TraceDivergenceStage,
+      );
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceUpstreamMismatchClass).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceUpstreamMismatchClass,
+      );
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceSemanticMismatchClass).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceSemanticMismatchClass,
+      );
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceComparisonContractStatus).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceComparisonContractStatus,
+      );
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceContractMismatchClass).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceContractMismatchClass,
+      );
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceFirstSemanticBoundary).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceFirstSemanticBoundary,
+      );
+      expect(publishedRegion?.mismatchDiagnostics?.t00TraceNextInspectionTarget).toBe(
+        runtimeRegion.mismatchDiagnostics?.t00TraceNextInspectionTarget,
       );
     }
   });

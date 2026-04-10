@@ -96,6 +96,32 @@ export type Nhm2SourceClosureV2RegionT00TraceDivergenceStage =
   | "source_path_mismatch"
   | "value_mismatch_after_same_trace"
   | "unknown";
+export type Nhm2SourceClosureV2RegionT00TraceUpstreamMismatchClass =
+  | "producer_function_mismatch"
+  | "input_field_mismatch"
+  | "derivative_source_mismatch"
+  | "support_exclusion_mismatch"
+  | "pressure_proxy_contamination"
+  | "same_upstream_path_value_mismatch"
+  | "unknown";
+export type Nhm2SourceClosureV2RegionT00TraceSemanticMismatchClass =
+  | "semantic_quantity_mismatch"
+  | "construction_stage_mismatch"
+  | "domain_mismatch"
+  | "units_or_normalization_mismatch"
+  | "same_semantic_target_value_mismatch"
+  | "unknown";
+export type Nhm2SourceClosureV2RegionT00TraceComparisonContractStatus =
+  | "semantically_aligned"
+  | "semantically_misaligned"
+  | "alignment_unproven"
+  | "unknown";
+export type Nhm2SourceClosureV2RegionT00TraceContractMismatchClass =
+  | "comparison_contract_mismatch"
+  | "reconstruction_boundary_mismatch"
+  | "domain_mapping_mismatch"
+  | "same_contract_value_mismatch"
+  | "unknown";
 
 export type Nhm2SourceClosureV2RegionAccounting = {
   sampleCount: number | null;
@@ -115,9 +141,38 @@ export type Nhm2SourceClosureV2RegionT00Trace = {
   aggregationMode: Nhm2SourceClosureRegionAggregationMode;
   valueRef: string | null;
   tensorRef: string | null;
+  boundaryRef?: string | null;
   maskNote: string | null;
   supportInclusionNote: string | null;
   traceStage: Nhm2SourceClosureV2RegionT00TraceStage;
+  pathFacts?: {
+    producerModule: string | null;
+    producerFunction: string | null;
+    inputFieldRef: string | null;
+    semanticQuantityRef: string | null;
+    semanticQuantityKind: string | null;
+    physicalMeaningRef: string | null;
+    comparisonRole: string | null;
+    expectedCounterpartRole: string | null;
+    semanticEquivalenceExpected: boolean | null;
+    reconstructionLayer: string | null;
+    assumptionBoundaryRef: string | null;
+    semanticAlignmentNote: string | null;
+    upstreamValueType: string | null;
+    constructionDomain: string | null;
+    constructionStage: string | null;
+    unitsRef: string | null;
+    preAggregationValueRef: string | null;
+    upstreamAssumptionNote: string | null;
+    maskClassifierRef: string | null;
+    voxelAveragingMode: string | null;
+    derivativeSource: string | null;
+    pressureProxyApplied: boolean | null;
+    finiteDifferenceSource: string | null;
+    samplingDomain: string | null;
+    supportExclusionMode: string | null;
+    normalizationRef: string | null;
+  } | null;
 };
 
 export type Nhm2SourceClosureV2RegionT00Diagnostics = {
@@ -196,6 +251,12 @@ export type Nhm2SourceClosureV2RegionMismatchDiagnostics = {
   t00MechanismEvidenceStatus: Nhm2SourceClosureV2RegionAccountingEvidenceStatus;
   t00MechanismNextStep: Nhm2SourceClosureV2RegionT00MechanismNextStep;
   t00TraceDivergenceStage: Nhm2SourceClosureV2RegionT00TraceDivergenceStage;
+  t00TraceUpstreamMismatchClass: Nhm2SourceClosureV2RegionT00TraceUpstreamMismatchClass;
+  t00TraceSemanticMismatchClass: Nhm2SourceClosureV2RegionT00TraceSemanticMismatchClass;
+  t00TraceComparisonContractStatus: Nhm2SourceClosureV2RegionT00TraceComparisonContractStatus;
+  t00TraceContractMismatchClass: Nhm2SourceClosureV2RegionT00TraceContractMismatchClass;
+  t00TraceFirstSemanticBoundary: string | null;
+  t00TraceNextInspectionTarget: string | null;
   components: Record<Nhm2SourceClosureComponent, Nhm2SourceClosureV2RegionScaleComponent>;
 };
 
@@ -659,9 +720,49 @@ const normalizeRegionT00Trace = (
     aggregationMode: normalizeRegionAggregationMode(value.aggregationMode),
     valueRef: toText(value.valueRef),
     tensorRef: toText(value.tensorRef),
+    boundaryRef: toText(value.boundaryRef),
     maskNote: toText(value.maskNote),
     supportInclusionNote: toText(value.supportInclusionNote),
     traceStage: normalizeT00TraceStage(value.traceStage),
+    pathFacts: normalizeRegionT00PathFacts(value.pathFacts),
+  };
+};
+
+const normalizeRegionT00PathFacts = (
+  value: Nhm2SourceClosureV2RegionT00Trace["pathFacts"],
+): NonNullable<Nhm2SourceClosureV2RegionT00Trace["pathFacts"]> | null => {
+  if (!value) return null;
+  return {
+    producerModule: toRepoPath(value.producerModule),
+    producerFunction: toText(value.producerFunction),
+    inputFieldRef: toText(value.inputFieldRef),
+    semanticQuantityRef: toText(value.semanticQuantityRef),
+    semanticQuantityKind: toText(value.semanticQuantityKind),
+    physicalMeaningRef: toText(value.physicalMeaningRef),
+    comparisonRole: toText(value.comparisonRole),
+    expectedCounterpartRole: toText(value.expectedCounterpartRole),
+    semanticEquivalenceExpected:
+      typeof value.semanticEquivalenceExpected === "boolean"
+        ? value.semanticEquivalenceExpected
+        : null,
+    reconstructionLayer: toText(value.reconstructionLayer),
+    assumptionBoundaryRef: toRepoPath(value.assumptionBoundaryRef),
+    semanticAlignmentNote: toText(value.semanticAlignmentNote),
+    upstreamValueType: toText(value.upstreamValueType),
+    constructionDomain: toText(value.constructionDomain),
+    constructionStage: toText(value.constructionStage),
+    unitsRef: toText(value.unitsRef),
+    preAggregationValueRef: toText(value.preAggregationValueRef),
+    upstreamAssumptionNote: toText(value.upstreamAssumptionNote),
+    maskClassifierRef: toText(value.maskClassifierRef),
+    voxelAveragingMode: toText(value.voxelAveragingMode),
+    derivativeSource: toText(value.derivativeSource),
+    pressureProxyApplied:
+      typeof value.pressureProxyApplied === "boolean" ? value.pressureProxyApplied : null,
+    finiteDifferenceSource: toText(value.finiteDifferenceSource),
+    samplingDomain: toText(value.samplingDomain),
+    supportExclusionMode: toText(value.supportExclusionMode),
+    normalizationRef: toText(value.normalizationRef),
   };
 };
 
@@ -919,6 +1020,12 @@ const buildMismatchDiagnostics = (
     t00MechanismEvidenceStatus: "unknown",
     t00MechanismNextStep: "insufficient_evidence",
     t00TraceDivergenceStage: "unknown",
+    t00TraceUpstreamMismatchClass: "unknown",
+    t00TraceSemanticMismatchClass: "unknown",
+    t00TraceComparisonContractStatus: "unknown",
+    t00TraceContractMismatchClass: "unknown",
+    t00TraceFirstSemanticBoundary: null,
+    t00TraceNextInspectionTarget: null,
     components,
   };
 };
@@ -1009,6 +1116,279 @@ const resolveT00TraceDivergenceStage = (args: {
   }
 
   return "unknown";
+};
+
+const resolveT00TraceUpstreamMismatchClass = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): Nhm2SourceClosureV2RegionT00TraceUpstreamMismatchClass => {
+  const metricT00Diagnostics = args.metricT00Diagnostics;
+  const tileT00Diagnostics = args.tileT00Diagnostics;
+  const metricTrace = metricT00Diagnostics?.trace ?? null;
+  const tileTrace = tileT00Diagnostics?.trace ?? null;
+  const metricFacts = metricTrace?.pathFacts ?? null;
+  const tileFacts = tileTrace?.pathFacts ?? null;
+  if (!metricTrace || !tileTrace || !metricFacts || !tileFacts) {
+    return "unknown";
+  }
+
+  const factsDiffer = (
+    metricValue: string | boolean | null | undefined,
+    tileValue: string | boolean | null | undefined,
+  ): boolean => metricValue != null && tileValue != null && metricValue !== tileValue;
+
+  if (
+    metricFacts.pressureProxyApplied === true ||
+    tileFacts.pressureProxyApplied === true
+  ) {
+    return "pressure_proxy_contamination";
+  }
+
+  if (factsDiffer(metricFacts.inputFieldRef, tileFacts.inputFieldRef)) {
+    return "input_field_mismatch";
+  }
+
+  if (
+    factsDiffer(metricFacts.derivativeSource, tileFacts.derivativeSource) ||
+    factsDiffer(metricFacts.finiteDifferenceSource, tileFacts.finiteDifferenceSource)
+  ) {
+    return "derivative_source_mismatch";
+  }
+
+  if (
+    factsDiffer(metricFacts.maskClassifierRef, tileFacts.maskClassifierRef) ||
+    factsDiffer(metricFacts.voxelAveragingMode, tileFacts.voxelAveragingMode) ||
+    factsDiffer(metricFacts.supportExclusionMode, tileFacts.supportExclusionMode) ||
+    factsDiffer(metricFacts.normalizationRef, tileFacts.normalizationRef)
+  ) {
+    return "support_exclusion_mismatch";
+  }
+
+  if (
+    factsDiffer(metricFacts.producerModule, tileFacts.producerModule) ||
+    factsDiffer(metricFacts.producerFunction, tileFacts.producerFunction)
+  ) {
+    return "producer_function_mismatch";
+  }
+
+  const metricMean = metricT00Diagnostics?.meanT00 ?? null;
+  const tileMean = tileT00Diagnostics?.meanT00 ?? null;
+  if (metricMean != null && tileMean != null && Math.abs(tileMean - metricMean) > 1e-12) {
+    return "same_upstream_path_value_mismatch";
+  }
+
+  return "unknown";
+};
+
+const resolveT00TraceSemanticMismatchClass = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): Nhm2SourceClosureV2RegionT00TraceSemanticMismatchClass => {
+  const metricT00Diagnostics = args.metricT00Diagnostics;
+  const tileT00Diagnostics = args.tileT00Diagnostics;
+  const metricTrace = metricT00Diagnostics?.trace ?? null;
+  const tileTrace = tileT00Diagnostics?.trace ?? null;
+  const metricFacts = metricTrace?.pathFacts ?? null;
+  const tileFacts = tileTrace?.pathFacts ?? null;
+  if (!metricTrace || !tileTrace || !metricFacts || !tileFacts) {
+    return "unknown";
+  }
+
+  const factsDiffer = (
+    metricValue: string | null | undefined,
+    tileValue: string | null | undefined,
+  ): boolean => metricValue != null && tileValue != null && metricValue !== tileValue;
+
+  if (
+    factsDiffer(metricFacts.semanticQuantityRef, tileFacts.semanticQuantityRef) ||
+    factsDiffer(metricFacts.semanticQuantityKind, tileFacts.semanticQuantityKind) ||
+    factsDiffer(metricFacts.upstreamValueType, tileFacts.upstreamValueType)
+  ) {
+    return "semantic_quantity_mismatch";
+  }
+
+  if (factsDiffer(metricFacts.constructionStage, tileFacts.constructionStage)) {
+    return "construction_stage_mismatch";
+  }
+
+  if (factsDiffer(metricFacts.constructionDomain, tileFacts.constructionDomain)) {
+    return "domain_mismatch";
+  }
+
+  if (
+    factsDiffer(metricFacts.unitsRef, tileFacts.unitsRef) ||
+    factsDiffer(metricFacts.normalizationRef, tileFacts.normalizationRef)
+  ) {
+    return "units_or_normalization_mismatch";
+  }
+
+  const metricMean = metricT00Diagnostics?.meanT00 ?? null;
+  const tileMean = tileT00Diagnostics?.meanT00 ?? null;
+  if (metricMean != null && tileMean != null && Math.abs(tileMean - metricMean) > 1e-12) {
+    return "same_semantic_target_value_mismatch";
+  }
+
+  return "unknown";
+};
+
+const resolveT00TraceComparisonContractStatus = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): Nhm2SourceClosureV2RegionT00TraceComparisonContractStatus => {
+  const metricFacts = args.metricT00Diagnostics?.trace?.pathFacts ?? null;
+  const tileFacts = args.tileT00Diagnostics?.trace?.pathFacts ?? null;
+  if (!metricFacts || !tileFacts) {
+    return "unknown";
+  }
+
+  const factsDiffer = (
+    metricValue: string | null | undefined,
+    tileValue: string | null | undefined,
+  ): boolean => metricValue != null && tileValue != null && metricValue !== tileValue;
+
+  const metricRoleMatches =
+    metricFacts.expectedCounterpartRole != null && tileFacts.comparisonRole != null
+      ? metricFacts.expectedCounterpartRole === tileFacts.comparisonRole
+      : null;
+  const tileRoleMatches =
+    tileFacts.expectedCounterpartRole != null && metricFacts.comparisonRole != null
+      ? tileFacts.expectedCounterpartRole === metricFacts.comparisonRole
+      : null;
+
+  if (
+    metricFacts.semanticEquivalenceExpected === false ||
+    tileFacts.semanticEquivalenceExpected === false ||
+    metricRoleMatches === false ||
+    tileRoleMatches === false
+  ) {
+    return "semantically_misaligned";
+  }
+
+  if (
+    metricFacts.semanticEquivalenceExpected === true &&
+    tileFacts.semanticEquivalenceExpected === true &&
+    metricRoleMatches === true &&
+    tileRoleMatches === true &&
+    !factsDiffer(metricFacts.physicalMeaningRef, tileFacts.physicalMeaningRef) &&
+    !factsDiffer(metricFacts.semanticQuantityRef, tileFacts.semanticQuantityRef) &&
+    !factsDiffer(metricFacts.semanticQuantityKind, tileFacts.semanticQuantityKind)
+  ) {
+    return "semantically_aligned";
+  }
+
+  if (
+    metricFacts.semanticEquivalenceExpected != null ||
+    tileFacts.semanticEquivalenceExpected != null ||
+    metricFacts.expectedCounterpartRole != null ||
+    tileFacts.expectedCounterpartRole != null ||
+    metricFacts.comparisonRole != null ||
+    tileFacts.comparisonRole != null ||
+    metricFacts.physicalMeaningRef != null ||
+    tileFacts.physicalMeaningRef != null
+  ) {
+    return "alignment_unproven";
+  }
+
+  return "unknown";
+};
+
+const resolveT00TraceContractMismatchClass = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): Nhm2SourceClosureV2RegionT00TraceContractMismatchClass => {
+  const metricT00Diagnostics = args.metricT00Diagnostics;
+  const tileT00Diagnostics = args.tileT00Diagnostics;
+  const metricFacts = metricT00Diagnostics?.trace?.pathFacts ?? null;
+  const tileFacts = tileT00Diagnostics?.trace?.pathFacts ?? null;
+  if (!metricFacts || !tileFacts) {
+    return "unknown";
+  }
+
+  const contractStatus = resolveT00TraceComparisonContractStatus(args);
+  const factsDiffer = (
+    metricValue: string | null | undefined,
+    tileValue: string | null | undefined,
+  ): boolean => metricValue != null && tileValue != null && metricValue !== tileValue;
+
+  const metricRoleMatches =
+    metricFacts.expectedCounterpartRole != null && tileFacts.comparisonRole != null
+      ? metricFacts.expectedCounterpartRole === tileFacts.comparisonRole
+      : null;
+  const tileRoleMatches =
+    tileFacts.expectedCounterpartRole != null && metricFacts.comparisonRole != null
+      ? tileFacts.expectedCounterpartRole === metricFacts.comparisonRole
+      : null;
+
+  if (
+    contractStatus === "semantically_misaligned" &&
+    (metricFacts.semanticEquivalenceExpected === false ||
+      tileFacts.semanticEquivalenceExpected === false ||
+      metricRoleMatches === false ||
+      tileRoleMatches === false)
+  ) {
+    return "comparison_contract_mismatch";
+  }
+
+  if (
+    factsDiffer(metricFacts.reconstructionLayer, tileFacts.reconstructionLayer) ||
+    factsDiffer(metricFacts.constructionStage, tileFacts.constructionStage)
+  ) {
+    return "reconstruction_boundary_mismatch";
+  }
+
+  if (
+    factsDiffer(metricFacts.constructionDomain, tileFacts.constructionDomain) ||
+    factsDiffer(metricFacts.samplingDomain, tileFacts.samplingDomain)
+  ) {
+    return "domain_mapping_mismatch";
+  }
+
+  const metricMean = metricT00Diagnostics?.meanT00 ?? null;
+  const tileMean = tileT00Diagnostics?.meanT00 ?? null;
+  if (
+    contractStatus === "semantically_aligned" &&
+    metricMean != null &&
+    tileMean != null &&
+    Math.abs(tileMean - metricMean) > 1e-12
+  ) {
+    return "same_contract_value_mismatch";
+  }
+
+  return "unknown";
+};
+
+const resolveT00TraceFirstSemanticBoundary = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): string | null => {
+  const metricBoundary = toRepoPath(
+    args.metricT00Diagnostics?.trace?.pathFacts?.assumptionBoundaryRef ??
+      args.metricT00Diagnostics?.trace?.boundaryRef,
+  );
+  const tileBoundary = toRepoPath(
+    args.tileT00Diagnostics?.trace?.pathFacts?.assumptionBoundaryRef ??
+      args.tileT00Diagnostics?.trace?.boundaryRef,
+  );
+  if (metricBoundary != null && tileBoundary != null) {
+    return metricBoundary === tileBoundary
+      ? metricBoundary
+      : `${metricBoundary} vs ${tileBoundary}`;
+  }
+  return metricBoundary ?? tileBoundary ?? null;
+};
+
+const resolveT00TraceNextInspectionTarget = (args: {
+  metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): string | null => {
+  const metricBoundary = toText(args.metricT00Diagnostics?.trace?.boundaryRef);
+  const tileBoundary = toText(args.tileT00Diagnostics?.trace?.boundaryRef);
+  if (metricBoundary != null && tileBoundary != null) {
+    return metricBoundary === tileBoundary
+      ? metricBoundary
+      : `${metricBoundary} vs ${tileBoundary}`;
+  }
+  return metricBoundary ?? tileBoundary ?? null;
 };
 
 const summarizeT00Mechanism = (args: {
@@ -1143,6 +1523,36 @@ const buildRegionComparison = (args: {
       metricT00Diagnostics,
       tileT00Diagnostics,
     });
+    mismatchDiagnostics.t00TraceUpstreamMismatchClass =
+      resolveT00TraceUpstreamMismatchClass({
+        metricT00Diagnostics,
+        tileT00Diagnostics,
+      });
+    mismatchDiagnostics.t00TraceSemanticMismatchClass =
+      resolveT00TraceSemanticMismatchClass({
+        metricT00Diagnostics,
+        tileT00Diagnostics,
+      });
+    mismatchDiagnostics.t00TraceComparisonContractStatus =
+      resolveT00TraceComparisonContractStatus({
+        metricT00Diagnostics,
+        tileT00Diagnostics,
+      });
+    mismatchDiagnostics.t00TraceContractMismatchClass =
+      resolveT00TraceContractMismatchClass({
+        metricT00Diagnostics,
+        tileT00Diagnostics,
+      });
+    mismatchDiagnostics.t00TraceFirstSemanticBoundary =
+      resolveT00TraceFirstSemanticBoundary({
+        metricT00Diagnostics,
+        tileT00Diagnostics,
+      });
+    mismatchDiagnostics.t00TraceNextInspectionTarget =
+      resolveT00TraceNextInspectionTarget({
+        metricT00Diagnostics,
+        tileT00Diagnostics,
+      });
   }
   const sampleCount = toFiniteOrNull(args.input.sampleCount);
   const resolvedSampleCount =
